@@ -36,7 +36,7 @@ artifactId:
 Reactor = **13 modules** (build order below; WS-D 2026-07-22 added `inspecto-engine`, then split
 `inspecto-etl`, `inspecto-event`, and `inspecto-acquire` out of it the same day, increments 2–4).
 Authoritative shape, version management, and the module-extraction playbook:
-[`okf/product/layer/platform/architecture-reactor.md`](okf/product/layer/platform/architecture-reactor.md).
+[`okf/product/layer/platform/architecture-modules.md`](okf/product/layer/platform/architecture-modules.md).
 
 | Dir | Role | artifactId / jar |
 |---|---|---|
@@ -111,7 +111,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   exposition) — joining `inspecto-oidc` and `inspecto-policy`. Personal answers their surfaces **503
   naming the module**, never 404. 🔴 The load-bearing one was `/metrics`: a `PUBLIC_PATH` on an edition
   that ships no authenticator and binds every interface. Recipe + traps:
-  [editions model](okf/product/layer/platform/architecture-editions-model.md). ✅ **EDG-01 COMPLETE 2026-09-08** — all six
+  [editions model](okf/product/layer/platform/architecture-editions.md). ✅ **EDG-01 COMPLETE 2026-09-08** — all six
   cells are now true of the build; the plan is archived. ⚠ The two hardest cells each had to change what
   the product PROMISES, not just where code lives: cell 6 kept a narrow core `/audit/*` read because
   gating `/events*` would have removed Personal's Audit-log screen (§Audit promises it), and cell 7

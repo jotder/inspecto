@@ -12,7 +12,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 `inspecto-util` is a foundation module: every other module may depend on it, it depends on none of them. That
 is why cross-cutting state such as `CurrentSpace` lives here rather than beside its first user. Reactor
-layering: [architecture-reactor](../../layer/platform/architecture-reactor.md).
+layering: [architecture-reactor](../../layer/platform/architecture-modules.md).
 
 ## Main seams
 
@@ -27,7 +27,7 @@ layering: [architecture-reactor](../../layer/platform/architecture-reactor.md).
   In `partitioned` mode a store that cannot open its backend fails the boot instead of degrading to memory.
 - **Module manifests.** Each module ships `META-INF/inspecto/module.toon`; `ModuleManifests` reads them all
   and `ModuleActivator` computes ACTIVE/INERT by fixpoint, so an Edition is assembled by which jars are
-  present ([architecture-module-taxonomy](../../layer/platform/architecture-module-taxonomy.md)).
+  present ([architecture-module-taxonomy](../../layer/platform/architecture-modules.md)).
 - **Crash-safe files.** `AtomicFiles` stages then renames, so readers never see a half-written config.
 
 Details: [spec](spec.md).

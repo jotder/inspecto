@@ -16,7 +16,7 @@ Providers are the pluggable implementations behind the SPI contracts — sign-in
 
 ## What this enables
 
-- Customers and integrators can swap an implementation by changing what is on the classpath, without changing the core — [architecture-layers](../platform/architecture-layers.md)
+- Customers and integrators can swap an implementation by changing what is on the classpath, without changing the core — [architecture-layers](../platform/architecture.md)
 
 ## Related hubs
 

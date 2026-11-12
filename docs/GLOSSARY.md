@@ -4,7 +4,7 @@
 > names, API paths, docs, and conversation must all use the **canonical term** below. The rename rolls out
 > **UI → model → backend** (the migration map is §13). The rules that make this file binding are §0; how the
 > concepts relate to one another is §10 (Component metamodel) and §11 (Graphs & Relationships), with the
-> platform-wide shape in [`okf/product/layer/platform/architecture-living-system.md`](okf/product/layer/platform/architecture-living-system.md) and the
+> platform-wide shape in [`okf/product/layer/platform/architecture.md`](okf/product/layer/platform/architecture.md) and the
 > per-area spine in §14.
 >
 > *Provenance, not authority (2026-09-10):* the two pre-lock analyses this vocabulary was derived from —
@@ -1399,7 +1399,7 @@ vocabulary, secret, doc-link, gate-tally, dependency-review and coverage guards 
 
 ---
 
-## 15. Module architecture *(added 2026-10-06 — module reorganisation P0; concepts `okf/product/layer/platform/architecture-module-taxonomy.md`, `okf/product/layer/platform/spec-module-reorg-decisions.md`)*
+## 15. Module architecture *(added 2026-10-06 — module reorganisation P0; concepts `okf/product/layer/platform/architecture-modules.md`, `okf/product/layer/platform/spec-module-reorg-decisions.md`)*
 
 **Platform module** — A horizontal Maven module that the rest of the system builds on (for example
 `inspecto-engine`): its **Build role** is *Platform module*. ⛔ Not **Platform Service** (§6-A — the grantable

@@ -1165,4 +1165,4 @@ planted anomalies at the top, bit-for-bit repeat, recompute, cap, preview refusa
 * Plan and decisions D-AN1 … D-AN9 and D-AN20 … D-AN29: [`analytics-core-plan.md`](../../../../archived-documents/plans-archive/analytics-core-plan.md).
 * The baselines' first consumer: [anomaly-scores](../anomaly/spec-anomaly-scores.md).
 * The score kinds on the contract: [anomaly-scores](../anomaly/spec-anomaly-scores.md), [risk-scores](../scoring/spec-risk-scores.md).
-* Module axes and manifests: [module-taxonomy](../../layer/platform/architecture-module-taxonomy.md).
+* Module axes and manifests: [module-taxonomy](../../layer/platform/architecture-modules.md).

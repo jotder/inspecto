@@ -45,7 +45,7 @@ add-on and Link Analysis modules implement `RouteModule` and never depend on the
   validation (opaque config accepted).
 - **Platform test kit.** The test-jar (`com.gamma.control.testkit`) carries `FakeApiContext`, the abstract
   `RouteModuleContract` TCK and `ModuleRoutesParity`; feature modules consume it with `type test-jar`, scope `test`
-  (`spi/inspecto-http-spi/pom.xml`). See [architecture-module-taxonomy](../../layer/platform/architecture-module-taxonomy.md).
+  (`spi/inspecto-http-spi/pom.xml`). See [architecture-module-taxonomy](../../layer/platform/architecture-modules.md).
 
 ## Who implements what
 

@@ -1,70 +1,95 @@
 ---
 type: Concept
-title: Editions Model
-description: Basic/Standard/Advanced are build flavors — Maven profiles + ServiceLoader modules + -D flags, never branches.
+title: Editions
+description: Basic, Standard and Advanced (plus Preview) are build flavors of one codebase - Maven profiles, optional modules discovered by ServiceLoader, edition features and -D flags, never branches.
 resource: docs/EDITIONS.md
 tags: [editions, build-flavors, maven, serviceloader]
-timestamp: 2026-07-07T00:00:00Z
+timestamp: 2026-11-12T00:00:00Z
 ---
 
-# Editions Model
+# Editions
+
+> **Status:** current as of 2026-11-12, checked against the code.
 
 **Editions are BUILD FLAVORS, never git branches.** One source tree (`master`) is the auth-free common core;
 an edition is *which Maven modules + flags* are assembled from a given commit. A fix lands once in core and
 every edition inherits it at build time — no cross-line cherry-picking. Authoritative doc: `docs/EDITIONS.md`.
+The module list, with the profile and the lowest edition of every module, is in
+[architecture-module-taxonomy.md](architecture-modules.md) §1.
 
 **Names and the Link Analysis split (`LA-EDITIONS-1`, 2026-10-17).** Basic / Standard / Advanced (formerly Personal /
 Professional / Enterprise) plus Preview; profiles `edition-standard`, `edition-advanced`, `edition-preview` (Basic = no
-profile). Basic now carries the Link Analysis **explorer** — `inspecto-entity-list`, `inspecto-la-core`,
+profile). Basic carries the Link Analysis **explorer** — `inspecto-entity-list`, `inspecto-la-core`,
 `inspecto-la-storage`, `inspecto-la-api`, `inspecto-geo-link` are default-reactor modules — while the Investigation
 surface is withheld by the `investigations` edition feature (`EditionFeatures.INVESTIGATIONS`), declared only by
 `inspecto-ops`: absent, the host answers every route module that names it in `featureIds()` 503
 `CAPABILITY_UNAVAILABLE` (`EditionFeatures.gatesRoutes`, checked in `ControlApi.requireModuleEnabled`) and `/bootstrap`
-reports `features.investigations: false`. Still module-shaped: Basic lacks the surface because it lacks the module. Detail:
-`docs/EDITIONS.md` (*Basic — the Link Analysis explorer*).
+reports `features.investigations: false`. Still module-shaped: Basic lacks the surface because it lacks the module.
+Two more route features work the same way and are also declared by `inspecto-ops`: `geoMap` (the Geo map and routes)
+and `entityPages` (the Entity profile pages). Detail: `docs/EDITIONS.md` (*Inspecto LA (Link Analysis) by edition*).
+
+**The Investigations add-on.** `investigations` is the one edition feature that an install can also lose at
+run time: it is present only while a module declares it **and** the install holds the Investigations add-on
+(`EditionFeatures.holdsInvestigationsAddon`). With a signed entitlement installed, the entitlement decides;
+without one, the setting `-Daddons.laInvestigations=false` removes the add-on (absent = held). Detail:
+`docs/EDITIONS.md` (*The Investigations add-on*).
 
 Assembly mechanisms:
 
-* **Maven profiles** — `-Pedition-standard` / `-Pedition-advanced` are **`<modules>` lists and nothing
-  else**: no `<build>`, no `<properties>`, no `<dependencies>`, and no child POM declares a profile at
-  all. 🔴 **They do NOT vary the fat-JAR's shaded content** (corrected 2026-09-09 — this said
-  “which modules + shade includes enter the fat-JAR”): `inspecto/pom.xml` has ONE unconditional shade
-  configuration (since 2026-10-08 it also EXCLUDES the 15 first-party core libraries, which ship as thin jars), and the optional modules ship as **separate sidecar jars**, never shaded in. 🔴 **There is no `edition-basic` profile** (corrected 2026-09-07; the
-  parent POM declares `edition-standard`, `edition-preview` and `edition-advanced` (plus `coverage`); line numbers drift, so none is cited. **Cite the id, not the line**): **Basic is the default build**, no profile at all.
-  ⚠ Maven only *warns* on a profile that does not exist and then builds the default, so the old
-  `-Pedition-basic` produced a correct Basic jar for an incorrect reason — the kind of instruction
+* **Maven profiles** — `-Pedition-standard` / `-Pedition-advanced` / `-Pedition-preview` are **`<modules>` lists
+  and nothing else**: no `<build>`, no `<properties>`, no `<dependencies>`. The edition profiles exist only in the
+  root pom; the only other profiles in the tree are `coverage` (root pom, `la/inspecto-geo-link/pom.xml` and the
+  nested `providers/asn-parser/asn-decoders/pom.xml`). `edition-standard` lists 17 modules; `edition-advanced`
+  and `edition-preview` list the same 19 (the 17 plus `inspecto-policy` and `inspecto-la-store-pg`). ⚠ The
+  profile lists are static XML: a module added to one profile must be added to the others that should have it.
+  🔴 **Profiles do NOT vary the shaded content of the processor jar**: `inspecto/pom.xml` has ONE unconditional
+  shade configuration (it EXCLUDES the 16 first-party base libraries, which ship as thin jars), and the optional
+  modules ship as **separate jars**, never shaded in. 🔴 **There is no `edition-basic` profile**: **Basic is the
+  default build**, no profile at all. ⚠ Maven only *warns* on a profile that does not exist and then builds the
+  default, so `-Pedition-basic` produces a correct Basic build for an incorrect reason — the kind of instruction
   that survives because it appears to work.
-* **An optional Maven module** — the primary mechanism, and as of 2026-09-08 there are **ten**:
-  `inspecto-oidc` (OIDC/Nimbus, role mapping, token relay — see [auth & security](../../module/access/admin-guide-auth-security.md)),
-  `inspecto-policy` (Advanced ABAC), `inspecto-entity-list` (SEP-08, 2026-10-01 — Entity Lists and the shared entity fact log; `inspecto-geo-link` depends on it; bundled wherever geo-link is), `inspecto-la-graph` (the ported graph algorithms, JDK only; D-4 step 4, 2026-10-01 — staged beside `inspecto-la-core` because `InMemoryGraphEngine` calls it; since D-AN2, 2026-10-17, it is the Base module `inspecto-graph` under `platform/`, a core thin jar in every edition, no longer an optional module), `inspecto-la-storage` (the Link Analysis index store, D-3 step 2, 2026-10-02 — skeleton only; staged and on the launcher classpaths now, `inspecto-la-api` depends on it from a later step), `inspecto-la-core` + `inspecto-la-api` (D-1 step 5b, 2026-10-01 — the host-free Link Analysis model/ports and the Link Analysis routes written against them; bundled wherever geo-link is; `inspecto-geo-link` is now the **bridge** that implements their `DatasetProvider` and `CasePort` ports from the engine and the host and holds the Alert Rule routes), and the **seven** EDG-01 modules (this said “five” before 2026-09-09 while listing seven) `inspecto-notify-channels`,
-  `inspecto-backup`, `inspecto-geo-link`, `inspecto-exchange`, `inspecto-observability`, `inspecto-observability`, `inspecto-ops`.
-  Each joins the reactor only under `edition-standard`/`edition-advanced`, so Basic never even
-  compiles it.
+* **An optional Maven module** — the primary mechanism: a feature an edition lacks is a module that edition
+  does not bundle. The 19 profile-scoped modules are `inspecto-oidc` (OIDC/Nimbus, role mapping, token relay — see
+  [auth & security](../../module/access/admin-guide-auth-security.md)), `inspecto-secrets`,
+  `inspecto-geo-country`, `inspecto-connectors-kafka`, `inspecto-notify-channels`, `inspecto-backup`,
+  `inspecto-exchange`, `inspecto-observability`, `inspecto-ops`, `inspecto-case-management`,
+  `inspecto-action-requests`, `inspecto-regulatory-reporting`, `inspecto-reconciliation`, `inspecto-scoring`,
+  `inspecto-screening`, `inspecto-anomaly`, `inspecto-predictive`, and for Advanced and Preview `inspecto-policy`
+  (ABAC) and `inspecto-la-store-pg` (the PostgreSQL Investigation store). Basic never compiles them.
+  ⚠ **Reactor membership is not bundle membership.** Some optional modules are in the default reactor, so their
+  tests run in every build, but ship only from a higher edition: `inspecto-agent` and `inspecto-telecom-asn1`
+  ship from Standard, `inspecto-intelligence` from Advanced; `inspecto-agent-hosted` and `inspecto-demo-auth` are
+  in no edition's Offering. What an edition ships is decided by its Offering (`offerings/<edition>.toon`), which
+  `tools/check-offerings.mjs` holds equal to the pom profile and the manifests.
 * **`ServiceLoader`** — an absent module means the no-op impl is the only one discovered (same pattern as the
   optional [assist agent](../../module/agent/spec-assist-agent.md) and [connectors](../../module/connectors/architecture.md)).
-* **`-D` flags** — e.g. `-Dauth.mode=none` (Basic) vs `-Dauth.mode=oidc` (Standard).
-* **`package.ps1 -Edition …`** — emits per-edition bundles from one build (`Basic` | `Standard` |
-  `Advanced`, the last a superset of Standard bundling the ABAC `policy` jar as well; see
-  [build & run](spec-build-test.md)).
+* **Edition features** — for a feature whose code cannot leave a base module, a module declares the feature and
+  every door asks `EditionFeatures.present(id)` (item 28 below).
+* **`-D` flags** — `-Dauth.mode` is `none` by default (Basic); the `serve` launchers of every other edition add
+  `-Dauth.mode=oidc`, and a demo build runs with `-Dauth.mode=demo`.
+* **`package.ps1 -Edition …`** — builds one edition's bundle (`Basic` | `Standard` | `Advanced` | `Preview`;
+  Advanced is a superset of Standard that also bundles the ABAC `policy` jar, the PostgreSQL Investigation store
+  and `inspecto-intelligence`; Preview ships the Advanced module set; see [build & run](spec-build-test.md)).
 
-One version spans all editions; artifacts differ by classifier. The matching branch policy is in
+One version spans all editions. The bundle's file name does not carry the edition; the edition is recorded
+inside the bundle, in `lib/edition.properties`, which the launchers read. The matching branch policy is in
 [branching & release](spec-branching-release.md).
 
 ## Extracting a feature into an edition module — the as-built recipe (EDG-01, 2026-09-07/08)
 
-**EDG-01 is COMPLETE as of 2026-09-08**: all six "not for Basic" cells of the feature × edition matrix
-are now true of the build, after having been a stated product decision the code did not apply.
-
-Seven cells were gated out of Basic this way (`9fdb99f8` · `c323f35c` · `91b6c9de`+`1de693a3` ·
-`f39b531f` · `d409921a` · cell 6). The shape that worked, and the traps that cost a rebuild each:
+EDG-01 made the "not for Basic" cells of the feature × edition matrix true of the build, after they had been a
+stated product decision the code did not apply. Seven cells were gated out of Basic this way (`9fdb99f8` ·
+`c323f35c` · `91b6c9de`+`1de693a3` · `f39b531f` · `d409921a` · cell 6). One of them, the Link Analysis module
+`inspecto-geo-link`, has since moved into Basic (`LA-EDITIONS-1`). The shape that worked, and the traps that
+cost a rebuild each:
 
 1. **Contribute through an SPI, never an `if (edition == …)`.** Routes go through the public
    `com.gamma.spi.http.RouteModule` (made public + `@PublicApi` in `91b6c9de`); maintenance tasks through
    `MaintenanceTaskProvider`; delivery through `NotificationChannel`. `ControlApi` registers its hard-coded
-   list first, then appends everything `ServiceLoader` finds.
-2. **Absent ⇒ 503 with an explanation, never 404** (`EDITIONS.md` §Assembly model — ⚠ this cited
-   “§4” until 2026-09-09; `EDITIONS.md` has **no numbered sections**). The core keeps an `Absent…Routes`
-   class that stubs the module's exact surface.
+   list first, then appends every `RouteModule` that `OptionalSpi.all` finds.
+2. **Absent ⇒ 503 with an explanation, never 404.** The stubs are no longer hand-written: `AbsentModuleRoutes`
+   synthesises them from the absent module's manifest (`provides.routes` and `absentMessage`), which the
+   processor build copies for every known module (see [architecture-module-taxonomy.md](architecture-modules.md) §3).
 3. 🔴 **Register stubs through `ApiContext.stub`, not `api.get`/`api.post`.** A stub registered as a real
    route counts in `hasRoute`, so a derived feature flag reports the module present. `features.geoLink` shipped
    `true` on Basic for exactly this reason and was caught only by the falsification test.
@@ -81,12 +106,12 @@ Seven cells were gated out of Basic this way (`9fdb99f8` · `c323f35c` · `91b6c
    deleting it loses a real assertion.
 7. **Pair a falsification test with each cell**, running in the DEFAULT build, asserting the feature is
    genuinely absent (503, empty SPI, refused task) — not merely unregistered.
-8. ⚠ **Five sites make a capability-gated route work**, `CapabilityManifest` being the one most easily
-   missed; route matching is FIRST-MATCH across modules, so a duplicate silently never runs (hence the
-   duplicate-registration guard added in `91b6c9de`).
+8. ⚠ **A capability-gated route needs more than its registration**, `CapabilityManifest` being the site most
+   easily missed; route matching is FIRST-MATCH across modules, so a duplicate would silently never run (hence
+   the duplicate-registration guard added in `91b6c9de`, which fails boot).
 9. ⚠ **`package.ps1` emits four launchers** (`run.sh`/`run.bat`/`serve.sh`/`serve.bat`, plus `serve-demo.*` for `-Distribution demo`)
    and `.gitignore` is per-module for `target/`. ✅ Since P3d (2026-10-08) none of them keeps a jar list: each reads the
-   bundle's `modules.list` (one jar per line, classpath order) and `serve.*` read `edition.properties`, both written at
+   bundle's `lib/modules.list` (one jar per line, classpath order) and `serve.*` read `lib/edition.properties`, both written at
    package time by `tools/offering-classpath.mjs` from the Offering (`offerings/<edition>.toon`; since `PRODUCT-ASSEMBLY-1`
    PA-1 `tools/bundle-modules.mjs` derives its table from the Offerings, so there is one module table). A new module is
    placed once in `CLASSPATH_ORDER` (`tools/bundle-modules.mjs`), not in four launchers.
@@ -100,8 +125,9 @@ Seven cells were gated out of Basic this way (`9fdb99f8` · `c323f35c` · `91b6c
     `EventsService`. One `grep -rln` on the service in the UI would have found them; the plan had only ever
     looked at the backend. Scope a cell from the consumer census, or you promise a product change you have
     not measured.
-12. 🔴 **A gated surface can carry a capability another matrix row PROMISES.** `EDITIONS` §Audit gives
-    Basic "local append-only logs", and the Audit-log screen read them through the very
+12. 🔴 **A gated surface can carry a capability another matrix row PROMISES.** `docs/EDITIONS.md` promises
+    every edition an audit trail that is kept on disk and readable (*Security and deployment by edition*), and
+    the Audit-log screen read it through the very
     `/events/search` cell 6 was gating — so the packaging change would have silently withdrawn a documented
     compliance capability. The fix is a **narrow core route** (`AuditLogRoutes`: `/audit/search`,
     `/audit/export`) that serves only the audit projection, **fail-closed to a closed type set** so it
@@ -119,7 +145,8 @@ Seven cells were gated out of Basic this way (`9fdb99f8` · `c323f35c` · `91b6c
     invisible until it is wrong in production.
 15. ⚠ **Absent-module stubs are an ORDERED surface, not a set.** `/events/([^/]+)` is a catch-all that
     swallows `/events/search`, `/events/export` and `/events/views` if stubbed first, because matching is
-    first-match. The stub array's order has to mirror the module's registration order, and the
+    first-match. The stub order has to mirror the module's registration order (today that is the order of the
+    manifest's `provides.routes`, which `ModuleRoutesParity` holds equal to the registration order), and the
     falsification test must probe the specific literal paths — every one of them 503s either way, so a
     status-code-only test cannot tell a correct stub from a catch-all that ate its siblings.
 16. 🔴 **A default-false feature flag silently re-points existing specs at the gated path.** Adding
@@ -142,8 +169,9 @@ Seven cells were gated out of Basic this way (`9fdb99f8` · `c323f35c` · `91b6c
 
 ## Extracting a feature that mandatory core CONSTRUCTS (EDG-01 cell 7, CP-11)
 
-The first six cells were leaves — routes, tasks or an exposition. `CP-11` was not: 31 domain files with 27
-code dependants, several of which **built** the feature. What that changes:
+The first six cells were leaves — routes, tasks or an exposition. `CP-11` (operational objects, now
+`inspecto-ops`) was not: a whole domain with many code dependants, several of which **built** the feature. What
+that changes:
 
 18. 🔴 **A provider SPI goes where its ARGUMENTS live, not where the seam lives.** `ObjectAccess` belongs
     in `inspecto-engine`, expressed in engine types. Its provider could not: opening the stores needs
@@ -151,7 +179,7 @@ code dependants, several of which **built** the feature. What that changes:
     be inverted. So `ObjectEngineProvider` is declared in `com.gamma.service` — the `RouteModule`
     precedent, not the `MaintenanceTaskProvider` one. Decide this before writing the interface; discovering
     it afterwards means moving the file and every implementor.
-19. ⚠ **A seam is rarely enough on its own — expect to return a HANDLE.** `ObjectAccess`'s nine methods
+19. ⚠ **A seam is rarely enough on its own — expect to return a HANDLE.** `ObjectAccess`'s domain methods
     covered none of: the boot-time backfill count core logs, the SLA sweep core *schedules*, the browsable
     stores the DB browser lists, or `close()` for four DuckDB connections. Those are lifecycle, not domain
     calls, so they sit on an `ObjectEngine` handle rather than widening the seam for every consumer.
@@ -164,7 +192,7 @@ code dependants, several of which **built** the feature. What that changes:
 21. 🔴 **Check what the OTHER matrix rows promise, and expect to amend some.** `OPS-01` promised Basic
     an `objects` store and `SP-CTL-02` a gap watchdog that raises ALERT objects; both had to change with
     the cell (operator-approved) rather than be left contradicting the build. Cell 6 hit the same wall with
-    §Audit and resolved it the other way, by keeping a narrow core read. **Read the neighbours before
+    the audit-trail promise and resolved it the other way, by keeping a narrow core read. **Read the neighbours before
     scoping the cell** — this is recipe item 12, and it has now decided the shape of two cells running.
 22. ⚠ **A ServiceLoader-contributed Job Type is constructed with NO arguments** and `create` receives only
     a `JobConfig` — neither the engine nor the data root. Defer resolution to run time:
@@ -185,7 +213,8 @@ code dependants, several of which **built** the feature. What that changes:
     field is assigned 40 lines later. When adding to a list of registrations, ask whether the line
     evaluates now or later — not whether it looks like its neighbours.
 26. ⚠ **Tests that needed a real engine were only ever testing the Standard shape.** Re-seating
-    `AlertServiceTest`/`ReconRunJobTest`/`DryRunServicesTest` onto a core `FakeObjectAccess` is a gain, not
+    `AlertServiceTest`/`ReconRunJobTest`/`DryRunServicesTest` onto a `FakeObjectAccess` (a test double in the
+    engine's test tree, `com.gamma.objects`) is a gain, not
     a compromise: they now assert what core is responsible for (dedupe-then-open, right kind/scope/attrs),
     which is identical on every edition. Move the ones that genuinely assert PERSISTENCE or the object
     GRAPH into the module — a fake asserting its own bookkeeping is a test of the fake.
@@ -199,10 +228,22 @@ code dependants, several of which **built** the feature. What that changes:
 28. **When the executing code cannot leave core, a module DECLARES the feature instead.** Alert Rules
     (`AlertService`), the Collector's `post_action: MOVE` archive and DuckLake registration (`DuckLakeRegistrar`)
     are core code with many dependants, so extraction was disproportionate. `com.gamma.etl.EditionFeatureProvider`
-    is a ServiceLoader SPI a Standard-only module registers (`inspecto-ops` → `alert.dispatch`,
-    `inspecto-backup` → `sink.archive` + `sink.ducklake`), and `EditionFeatures.present(id)` is the one question
-    every door asks. Still the house mechanism — the classpath entry is the switch, never a `-D` flag or an
-    `if (edition == …)` — and a provider that fails to load reads as absent, so the gate refuses (safe direction).
+    is a ServiceLoader SPI that a module above Basic registers, and `EditionFeatures.present(id)` is the one
+    question every door asks. The declarations today:
+
+    | Module | Feature ids it declares |
+    |---|---|
+    | `inspecto-ops` (Standard and above) | `alert.dispatch` · `investigations` · `geoMap` · `entityPages` · `laWidgets` · `pipeline.automation` |
+    | `inspecto-backup` (Standard and above) | `sink.archive` · `sink.ducklake` |
+    | `inspecto-policy` (Advanced and Preview) | `quality.pii.mask` (the `mask` Step) |
+
+    `investigations`, `geoMap` and `entityPages` are **route features**: the host answers their routes 503
+    `CAPABILITY_UNAVAILABLE` when the feature is absent. `laWidgets` is a UI flag only (`/bootstrap`
+    `features.laWidgets`), and `pipeline.automation` is checked by the Dataset feed and storage routes themselves.
+    Still the house mechanism — the classpath entry is the switch, never an `if (edition == …)` — and a provider
+    that fails to load reads as absent, so the gate refuses (safe direction). Two things can withhold a declared
+    feature: a signed entitlement that leaves it out (`Entitlements.featureEntitled`), and, for `investigations`
+    only, the Investigations add-on (above).
     Refusals carry `ERR_EDITION_FEATURE` (a finding code; the v1 `errorCode` stays `CONFIG_VALIDATION_FAILED`,
     because the `ErrorCode` enum is a contract catalog). Gate every door, not one: the save gate, the feature's own
     routes, and the run-time arrivals (registry load, boot load, the lanes the registry does not guard). Full

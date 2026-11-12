@@ -17,7 +17,7 @@ dependencies**: remote protocols live in [connectors](../connectors/architecture
 > **Not the engine anymore.** Before the WS-D reactor split (2026-07-22) `inspecto/` held the whole
 > engine; the engine was then extracted into the sibling modules below, and `inspecto/` now depends
 > *down* on them. Authoritative build order, version management, and the extraction playbook live in
-> [../../layer/platform/architecture-reactor.md](../../layer/platform/architecture-reactor.md).
+> [../../layer/platform/architecture-reactor.md](../../layer/platform/architecture-modules.md).
 
 ## What lives here now
 

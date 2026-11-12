@@ -1,8 +1,10 @@
 # Studio BI
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.
-> Offering: all tiers (the BI half is ungated); the two investigation studios are Standard and
-> above and have their own page, [link-analysis](../../module/la-core/architecture-overview.md). Checked against the code on 2026-10-17.
+> Offering: all editions (the BI screens carry no feature gate). The investigation studios mounted under
+> `/studio` have their own page, [link-analysis](../../module/la-core/architecture-overview.md): the Link
+> Analysis graph studio ships in every edition, the Geo map and the Entity profile pages in Standard and
+> above (`docs/EDITIONS.md`). Checked against the code on 2026-11-12.
 
 ## 1. What it is
 
@@ -37,7 +39,10 @@ ETags and history from the component registry. Code homes:
   `inspecto/src/main/java/com/gamma/control/ShareRoutes.java`.
 - SPA: `inspecto-ui/src/app/modules/admin/studio/` (shell `studio.routes.ts`) and the Visualization
   Type registry in `inspecto-ui/src/app/inspecto/viz/` (`viz-types.ts`, `viz-registry.ts`,
-  `plugins/index.ts`, `query-spec.ts`).
+  `plugins/index.ts`, `query-spec.ts`, `dataset-result.service.ts`). The HTTP client is
+  `inspecto-ui/src/app/inspecto/api/bi-query.service.ts`.
+
+For the SPA as a whole (stack, boot, layering) see [architecture](architecture.md).
 
 ## 4. How it works
 
@@ -45,25 +50,45 @@ ETags and history from the component registry. Code homes:
 
 **Visualization Types.** A `VizPlugin` declares `meta`, `controls`, `buildQuery()`,
 `transformProps()` and a `render` descriptor. `BUILTIN_VIZ_PLUGINS` registers, in order: `kpi`,
-`table`, `bar`, `line`, `area`, `pie`, `bubble`, `gauge`, `scatter`, `funnel`, the P3 breadth additions
-(`kpi-trend`, `progress-list`, `treemap`, `waterfall`, `combo`, `heatmap`), and the view-bound
-`geo-map`, `link-analysis`, `reconciliation` and `working-set`. `viz-render.component.ts` dispatches on
-`render.kind` (`chartjs`, `aggrid`, `component`).
+`table`, the Chart.js standards `bar`, `line`, `area`, `pie`, the breadth additions (`bubble`, `gauge`,
+`scatter`, `funnel`, `kpi-trend`, `progress-list`, `treemap`, `waterfall`, `combo`, `heatmap`), and the
+view-bound `geo-map`, `link-analysis`, `reconciliation` and `working-set`. `viz-render.component.ts`
+dispatches on `render.kind` (`chartjs`, `aggrid`, `component`).
 
 **Controls become structured Measures, never SQL text.** A control value
-(`{field, agg, grain, expression}`) is turned into a `QueryMeasure` `{agg, field}` by
-`query-spec.ts`. The Widget produces a `QuerySpec`
-(`{datasetId, sourceName, groupBy, grains?, measures, filters?, orderBy?, limit?}`); a spec that
-cannot cross faithfully fails rather than degrading.
+(`{field, agg, grain, expression}`) is turned into a `QueryMeasure`
+(`{id, expression, label, agg?, field?, ratio?}`) by `query-spec.ts`. The Widget produces a `QuerySpec`
+(`{datasetId, sourceName, groupBy, grains?, measures, window?, filters?, orderBy?, limit?, queryId?}`).
+`biQueryBody` in `dataset-result.service.ts` maps it to the request body: each Measure travels as its
+`{agg, field}` pair, a ratio as `{num, den}` in `ratios`, the filter tree as a flat AND list. A spec that
+cannot cross faithfully (a named Measure's SQL expression, a real OR branch, no Measure and no group-by)
+fails with a message rather than degrading.
 
-**The result path.** `POST /bi/query` hands the spec to `MeasureCompiler`, which builds one SELECT
-from validated identifiers and typed literals: fifteen aggregations (`count`, `countDistinct`, `sum`,
-`avg`, `min`, `max`, `median`, `stddev`, `variance` and percentiles `p05`…`p99`) and three grains
-(`day`, `week`, `month`). The text then passes `SqlGuard.check` (422 on failure), the Dataset resolves
-through `DatasetRelation.relationSql`, and it runs in the same ephemeral DuckDB sandbox as
-`POST /queries/{id}/run`. The answer is the shared Result Set:
-`{resultSet: {columns, rowCount}, rows, statistics{rowCount, elapsedMs, truncated}, sql}`. The public
-embed, the `report` Job and the Measure-alert probe reuse this path.
+**The result path.** `POST /bi/query` hands the body to `MeasureCompiler`, which builds one SELECT
+from validated identifiers and bound, typed parameters; no caller SQL text and no filter value enters
+the statement. It accepts:
+
+- fifteen aggregations: `count`, `countDistinct`, `sum`, `avg`, `min`, `max`, `median`, `stddev`,
+  `variance` and the percentiles `p05`, `p25`, `p75`, `p90`, `p95`, `p99`;
+- three grains: `day`, `week`, `month`;
+- an optional trailing `window` (`{field, asOf, days?}`), which also enables the as-of aggregate
+  `recency`;
+- `ratios` of two aggregations.
+
+The text then passes `SqlGuard.check` (422 on failure), the Dataset resolves through
+`DatasetRelation.relationSql`, and it runs in the same ephemeral DuckDB sandbox as
+`POST /queries/{id}/run`. Two more steps apply before the rows are returned:
+
+- **Bound Query.** When the body names a saved Query (`query`), the Measures are aggregated over that
+  Query's result instead of the whole Dataset. The Query must be `type: sql` and read the same Dataset;
+  the combined statement is guarded again.
+- **Masking.** Classified entity keys are masked in the rows unless the caller may reveal them
+  (`BiResultMasking`); the response then carries a `masking` block.
+
+The answer is the shared Result Set:
+`{resultSet: {columns, rowCount}, rows, statistics{rowCount, elapsedMs, truncated}, sql}`. The route
+fails closed: 503 without a write root, 404 for an unknown or not-visible Dataset, 422 for a bad spec.
+The public embed, the `report` Job and the Measure-alert probe compile through `MeasureCompiler` too.
 
 **Dashboards.** A Dashboard config holds `tiles: [{widgetId, span}]`, an optional `filter`,
 `exposedFields` for the quick-filter chips, a viewer header (`description`, `asOf`, `illustrative`)
@@ -76,20 +101,25 @@ Signal against the `maximumAge` of a freshness Alert Rule; nothing is persisted 
 
 | Component kind | Key fields |
 |---|---|
-| `dataset` | `sourceName` (never defaulted), columns, calculated columns, `measures` (named Measures) |
+| `dataset` | `sourceName` (never defaulted), `columns`, `calculated` (calculated columns), `measures` (named Measures) |
 | `widget` | `vizType` (required), the Dataset binding and control values |
 | `dashboard` | `tiles`, `filter`, `exposedFields`, `description`, `asOf`, `illustrative`, `dateField`, `defaultRange` |
 | `*_job.toon` with `type: report` | scheduled export and delivery |
 
-Specs are declared in `platform/inspecto-config/src/main/java/com/gamma/config/spec/ConfigSpecs.java`.
+The `widget`, `dashboard` and Job specs are declared in
+`platform/inspecto-config/src/main/java/com/gamma/config/spec/ConfigSpecs.java`. `dataset` has no entry
+there; its relation is validated when it is read, by
+`platform/inspecto-engine/src/main/java/com/gamma/query/DatasetRelation.java`.
 
 ## 6. Screens
 
 - **Datasets** (`/catalog/datasets`; editor `studio/datasets/dataset-editor.component.ts`, Measures
-  tab `dataset-measures.component.ts`). `/studio/datasets` redirects there.
-- **Query Library** (`/studio/queries`), **Widgets** (`/studio/widgets`, `widget-host.component.ts`),
-  **Dashboards** (`/studio/dashboards`), **Template Gallery** (`/studio/templates`).
-- **KPI and Reports** (`/kpi-reports`), a top-level pane, not a Studio child.
+  tab `dataset-measures.component.ts`). `/studio` and `/studio/datasets` redirect there.
+- **Query Library** (`/studio/queries`), **Widgets** (`/studio/widgets`, sidebar label "Viz Library",
+  `widget-host.component.ts`), **Dashboards** (`/studio/dashboards`, sidebar label "Dashboard Builder"),
+  **Template Gallery** (`/studio/templates`).
+- **KPI & Reports** (`/kpi-reports`), a top-level pane, not a Studio child.
+- **Shared Dashboard viewer** (`/share/:token`), outside the app shell, with no sign-in.
 
 ## 7. API
 
@@ -114,7 +144,13 @@ Specs are declared in `platform/inspecto-config/src/main/java/com/gamma/config/s
 ## 9. Limits and gotchas
 
 - `GET /bi/datasets` was retired; Datasets are listed through the component registry only.
-- A `QuerySpec` with a free-text `expression` cannot cross to `/bi/query`.
+- A `QuerySpec` with a named Measure's free-text `expression`, or with a real OR branch in its filter,
+  cannot cross to `/bi/query`; the Widget shows the refusal.
+- A `429` from `/bi/query` is retried three times (after 1, 2 and 4 seconds), then shown as rate limited,
+  not as "no data".
+- `recency` is accepted only together with a `window`, which gives it its as-of date.
+- `VizRender` also declares a `g6` kind; no built-in plugin uses it and `viz-render.component.ts` has no
+  branch for it.
 - Every row read is a page with `truncated`; a consumer that counts must say so.
 - A blank Dashboard header value is not written, so clearing a field removes the key.
 - Only three time grains (`day`, `week`, `month`) cross the wire.

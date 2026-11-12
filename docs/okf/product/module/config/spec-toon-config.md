@@ -17,7 +17,7 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   `ToonHelper.decode` (`platform/inspecto-util/src/main/java/com/gamma/util/ToonHelper.java`); `ConfigCodec.toMap`
   delegates to it and `ToonHelper.load(path)` wraps it, prefixing the path to any decode refusal
   (`<path>: line N: …`). It lives in `inspecto-util`, not `inspecto-config`, because util is the
-  documented `com.gamma` leaf ([reactor](../../layer/platform/architecture-reactor.md)) and `ToonHelper` reads
+  documented `com.gamma` leaf ([reactor](../../layer/platform/architecture-modules.md)) and `ToonHelper` reads
   TOON too; so the edge runs `inspecto-config → inspecto-util` (every consumer of config already had util).
   Every former direct `JToon.decode` reader — `ToonHelper.load`, `SchemaExtractor` and `MainApp.loadToon` (both deleted with the `ura`
   CLI, 2026-11-06), `inspecto-exchange`'s `Ledger`/`ExchangeSnapshots` — now goes through it. `toMapStrict` and

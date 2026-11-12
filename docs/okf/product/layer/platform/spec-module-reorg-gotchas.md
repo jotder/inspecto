@@ -2,14 +2,14 @@
 type: Guide
 title: Module reorganisation - traps and gotchas
 description: The traps the module reorganisation (MODULE-REORG-1) hit, each with its cause and the rule, so the next module move, split or packaging change does not repeat them.
-resource: docs/okf/product/layer/platform/architecture-module-taxonomy.md
+resource: docs/okf/product/layer/platform/architecture-modules.md
 tags: [architecture, modules, gotchas, packaging, testing, guards]
 timestamp: 2026-10-09T00:00:00Z
 ---
 
 # Module reorganisation - traps and gotchas
 
-Context: [architecture-module-taxonomy.md](architecture-module-taxonomy.md), [decisions](spec-module-reorg-decisions.md). Each line is cause, then rule.
+Context: [architecture-module-taxonomy.md](architecture-modules.md), [decisions](spec-module-reorg-decisions.md). Each line is cause, then rule.
 
 ## Moving code
 - **Regroup recipe: two commits.** Pure moves first (`git mv` only, so history follows), then the path rewrites in a second commit; mixing them hides the renames from git.

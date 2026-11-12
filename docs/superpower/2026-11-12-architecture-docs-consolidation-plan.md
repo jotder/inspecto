@@ -1,0 +1,111 @@
+# Architecture docs consolidation plan (`ARCH-DOCS-CONSOLIDATE-1`)
+
+> **Status: APPROVED 2026-11-12 (operator) — not started.** Board row: `ARCH-DOCS-CONSOLIDATE-1` in
+> `docs/BACKLOG.md` §5. Depth approved: restructure every hub, re-check only the system set against the
+> code; module pages keep their content and are re-verified under `DOCS-AGENT-WRITTEN-REVIEW-1`.
+
+## 1. Goal
+
+One small, citable set of architecture docs with uniform names, in place of 105 files with three
+competing whole-system pages. The hub model stays (`PRODUCT-DOCS-HUB-1`: one hub per Product Map Item);
+this plan changes what sits in each hub's `architecture` slot, not where hubs live.
+
+## 2. Findings (inventory of 2026-11-12)
+
+- 105 current `architecture*.md` files under `docs/okf/product/`; 6 more in `docs/archived-documents/`
+  (history, untouched) and `.claude/ARCHITECTURE_MAP.md` (agent quick reference, 37 lines).
+- `layer/platform` holds 10. `architecture.md`, `architecture-overview.md` and
+  `architecture-technical.md` each describe the whole system. `architecture-layers.md` and
+  `architecture-reactor.md` open with banners saying their main tables are history.
+- About 20 hubs name their only page `architecture-overview.md`; the others use `architecture.md`.
+- Seven hubs split one subject over small files: `module/agent` (4 files, about 120 lines),
+  `module/acquire` (3), `module/processor` (3), `module/etl` (2), `module/scoring` (2),
+  `module/workflow` (2), `addon/incidents` (2).
+- Two `architecture-change-log.md` files are dated journals, not architecture.
+- `module/la-core/architecture.md` is 2,340 lines beside a 100-line `architecture-overview.md`.
+
+## 3. Naming rule (binding once this ships)
+
+1. Every hub has exactly one `architecture.md`: the page a reader opens first.
+2. `architecture-<subject>.md` is allowed only for a separate subject too large to fold in (guide:
+   the merged page would pass about 400 lines). `<subject>` names the thing, never `overview`,
+   `module`, `technical` or `change-log`.
+3. Dated journals do not live in the `architecture` slot; they go to `docs/archived-documents/`.
+
+## 4. Target structure
+
+### 4.1 System set — `layer/platform` (10 → 4)
+
+| Target | Built from | Notes |
+|---|---|---|
+| `architecture.md` | `architecture.md`, `-overview`, `-technical`, `-living-system`, `-layers` §5 (two event buses) and §7 (DuckDB open-per-use, `SqlSandbox`) | Entry point. Ends with the architecture map (§4.4). Every claim re-checked against the code. |
+| `architecture-modules.md` | `-module-taxonomy`, the reasoning and shared-helper homes from `-reactor` | Module list rebuilt from root `pom.xml` and every `module.toon`. |
+| `architecture-editions.md` | `-editions-model` | Rename plus re-check. |
+| `architecture-platform-services.md` | unchanged | Re-check only. |
+
+Archived to `docs/archived-documents/`: the remainder of `-layers` and `-reactor`, and
+`architecture-change-log.md`. `docs/superpower/assets/` scripts cited by `-reactor` get their citation
+moved to `architecture-modules.md`.
+
+### 4.2 UI set — `layer/product` (4 → 2)
+
+`architecture.md` (absorbs `-overview`) and `architecture-studio-bi.md`. `architecture-change-log.md` is archived.
+
+### 4.3 Module, add-on and solution-pack hubs
+
+- **Rename** each lone `architecture-overview.md` to `architecture.md` (`access`, `action-requests`,
+  `analytics`, `anomaly`, `case-management`, `event`, `exchange`, `graph`, `notify-channels`,
+  `reconciliation`, `regulatory-reporting`, `screening`; list re-derived by glob at execution time).
+- **Merge to one `architecture.md`:** `agent`, `acquire`, `processor`, `etl`, `scoring`, `workflow`,
+  `addon/incidents`, `observability`, `entity-store`, `solution-pack/business-assurance`,
+  `solution-pack/la-showcase` (if the merged page stays under the size guide; otherwise keep the topic file).
+- **Keep as topic files, add or keep a short `architecture.md` beside them:**
+  `engine/architecture-pipeline-graph`, `engine/architecture-stage1`,
+  `engine/architecture-consignment-status` (fold into `architecture.md` if small enough),
+  `intelligence/architecture-embedded-intelligence` (`-overview` becomes `architecture.md`),
+  `config/architecture-space-anatomy` (`-spaces` becomes `architecture.md`).
+- **`la-core`:** the 100-line page becomes `architecture.md`; the 2,340-line page becomes
+  `architecture-backend.md`. Splitting it further is out of scope.
+- Generated pages (`solution-pack/la-ownership`, `solution-pack/la-trade`) are not edited by hand.
+
+### 4.4 One map
+
+`layer/platform/architecture.md` ends with a table: one row per hub, linking its `architecture.md` and
+any topic files. `docs/INDEX.md` and `.claude/ARCHITECTURE_MAP.md` point to it.
+
+Expected result: about 80 files, of which 6 are the system set (4 platform + 2 UI).
+
+## 5. Steps
+
+Each step is one lane: a sibling worktree from `origin/master`, pushed on its own.
+
+1. **System set** — write the four `layer/platform` pages and two `layer/product` pages; archive the
+   retired ones. → verify: every structural claim (module count, SPI count, layer names, tech stack)
+   matches `pom.xml`, the `module.toon` manifests and the code; `verification` agent PASS.
+2. **Renames** — `git mv` every lone `-overview` page; fix inbound links with the docs-relocate tool.
+   → verify: no `architecture-overview.md` left; doc link guards green.
+3. **Merges** — one hub at a time, content moved without rewording beyond joins and de-duplication.
+   → verify: each merged hub has one `architecture.md`; no fact dropped (diff of headings before and after).
+4. **Map and pointers** — add the map table, update `docs/INDEX.md`, `.claude/ARCHITECTURE_MAP.md`
+   and the `docs-lookup` skill if it names a retired file; run `node tools/render-product-docs.mjs`.
+   → verify: every `architecture*.md` under `docs/okf/product/` appears in the map exactly once.
+5. **Guard** — extend an existing doc guard to refuse `architecture-overview.md`,
+   `architecture-change-log.md` and a hub with topic files but no `architecture.md`.
+   → verify: the guard fails on a planted file and passes on the tree.
+6. **Close** — distill this plan's decisions into `layer/platform/spec-work-tracking.md` (naming
+   rule), close the board row, `git mv` this plan to `docs/archived-documents/plans-archive/`.
+
+## 6. Out of scope
+
+- Re-verifying module and solution-pack page content against the code (`DOCS-AGENT-WRITTEN-REVIEW-1`).
+- Changing the hub model, the slot list or any other slot (`spec`, `plan`, guides).
+- Splitting `la-core/architecture-backend.md`.
+- `docs/archived-documents/` — history, never maintained.
+
+## 7. Risks
+
+- **Broken links.** About 105 files are link targets from hubs, skills and `.claude/`. Steps 2–4 fix
+  links in the same change; the doc link guards are the check.
+- **Peer edits.** Hub docs change daily in this shared checkout; each lane fetches first and merges
+  `origin/master` again before its push.
+- **Silent fact loss in merges.** Step 3 moves text, it does not rewrite; rewriting is step 1 only.

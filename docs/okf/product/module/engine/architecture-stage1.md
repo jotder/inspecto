@@ -25,7 +25,7 @@ timestamp: 2026-07-16T00:00:00Z
 > (Personal/Standard/Enterprise; `inspecto-oidc` for Standard); and the optional **assist agent**
 > (vendored kernel + eoiagent model transport). The whole-platform map lives in the
 > [OKF knowledge bundle](../../index.md); the package-level **layer map** (dependency layering, SPI
-> surface, event/config/storage/threading models) in [`architecture-layers.md`](../../layer/platform/architecture-layers.md);
+> surface, event/config/storage/threading models) in [`architecture-layers.md`](../../layer/platform/architecture.md);
 > the authored-Pipeline design in [`pipeline-graph-design.md`](architecture-pipeline-graph.md). The non-goals below are **still correct for
 > Stage-1** — they are what keep each batch embarrassingly parallel and crash-isolated.
 

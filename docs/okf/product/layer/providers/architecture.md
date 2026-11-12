@@ -61,6 +61,6 @@ without sign-in (`offerings/basic.toon` `authMode: none`). `CollectorConnectorFa
 
 ## References
 
-- [platform architecture-module-taxonomy](../platform/architecture-module-taxonomy.md) — the module taxonomy and manifest fields
-- [platform architecture-editions-model](../platform/architecture-editions-model.md) — the Edition model
+- [platform architecture-module-taxonomy](../platform/architecture-modules.md) — the module taxonomy and manifest fields
+- [platform architecture-editions-model](../platform/architecture-editions.md) — the Edition model
 - [features layer architecture](../features/architecture.md) — the optional feature modules

@@ -12,7 +12,7 @@
 before any code. The key deliverable is section 9 (open decisions). Row: `PREDICTIVE-ANALYTICS-1` (P3) in
 [BACKLOG](../../../../BACKLOG.md); the later Sales & Marketing BI pack is `PACK-SALES-MARKETING-1`. How an add-on, an optional
 module and an Offering are modelled: [`okf/product/layer/platform/spec-module-reorg-decisions.md`](../../layer/platform/spec-module-reorg-decisions.md)
-and [`okf/product/layer/platform/architecture-module-taxonomy.md`](../../layer/platform/architecture-module-taxonomy.md). When this ships: distil into an OKF concept, move
+and [`okf/product/layer/platform/architecture-modules.md`](../../layer/platform/architecture-modules.md). When this ships: distil into an OKF concept, move
 leftovers to BACKLOG, `git mv` to `archived-documents/plans-archive/` (CLAUDE.md lifecycle).
 
 > **Honesty box - what was and was not verified.** Verified by reading this checkout at `299becc07`: the Anomaly and Risk

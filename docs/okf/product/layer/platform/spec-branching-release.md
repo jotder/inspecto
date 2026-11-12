@@ -13,7 +13,7 @@ Authoritative doc: `docs/BRANCHING.md`. Two axes, never confused:
 
 * **Versions = git branches.** Active: `master` (newest mainline) + the current `N.x` (today `4.x`). Retired/
   EOL and frozen: `1.x`, `2.x`, `3.x` (no commits/pushes/tags; never a propagation target).
-* **Editions = build flavors** (see [editions model](architecture-editions-model.md)) — never branches.
+* **Editions = build flavors** (see [editions model](architecture-editions.md)) — never branches.
 
 **Versioning**: SemVer `vMAJOR.MINOR.PATCH` + Conventional Commits — `fix:`→PATCH, `feat:`→MINOR,
 `feat!`/`BREAKING CHANGE:`→MAJOR; `chore/docs/refactor/test/build/ci/perf/style/revert`→none. One version

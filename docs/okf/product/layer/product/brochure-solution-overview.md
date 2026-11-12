@@ -59,7 +59,7 @@ Three journeys follow one piece of work across modules: [from a file to a dashbo
 
 One Java application with an embedded DuckDB engine and one Angular console, shipped as thin per-module jars.
 Content packs sit on feature modules, which sit on platform modules, which sit on contracts and providers.
-[`../platform/architecture-technical.md`](../platform/architecture-technical.md) is the architect's view.
+[`../platform/architecture.md`](../platform/architecture.md) is the architect's view.
 
 ## 5. How each part works (level 3)
 
@@ -74,6 +74,6 @@ flow, or [Alerts](../../addon/incidents/architecture-alerts.md) for detection.
 |---|---|
 | Executive or sponsor | [Executive Brief](brochure-executive-brief.md) |
 | Evaluating a solution | its page in §3, then [Product Capabilities](features-product-capabilities.md) |
-| Architect or integrator | [Technical Architecture](../platform/architecture-technical.md), the [OpenAPI contract](../../../../api/openapi-v1.json) |
+| Architect or integrator | [Technical Architecture](../platform/architecture.md), the [OpenAPI contract](../../../../api/openapi-v1.json) |
 | Operator or admin | [Operations Guide](../platform/admin-guide-operations.md), the module pages |
 | End user | [User Guide](../../../../USER_GUIDE.md) |

@@ -3,7 +3,7 @@
 > **Tier: dated journal.** Each entry records what shipped **on its heading's date** and is not revised
 > afterwards, so an entry's present tense means "true that day", not "true now". ⚠ Entries before
 > 2026-08-31 describe the **offline mock backend**, which was deleted that day; read them as history. For
-> current state follow the concept pages under [`okf/frontend/`](../../index.md).
+> current state follow the concept pages under [`okf/frontend/`](../okf/product/index.md).
 
 ## 2026-07-23
 * **Menu Builder favorites SHIPPED** (menu-builder-plan M5, BACKLOG §3 Menu builder — "favorites … still
@@ -26,7 +26,7 @@
   console errors.
 * *(SUPERSEDED 2026-08-16: the onboarding stage rail this entry describes was deleted — P6-e; the
   editor's guided checklist chips are the successor, see
-  [pipeline-editor](../../module/etl/user-guide-pipeline-editor.md).)* **Onboarding per-stage "blocked" chip SHIPPED** (BACKLOG §3 Onboarding — "Per-stage findings → blocked
+  [pipeline-editor](../okf/product/module/etl/user-guide-pipeline-editor.md).)* **Onboarding per-stage "blocked" chip SHIPPED** (BACKLOG §3 Onboarding — "Per-stage findings → blocked
   chip state", the small version): the Stream/Reference onboarding rail now surfaces validation findings as
   a persistent per-stage chip instead of only a transient toast. `StageStatus` gains `'blocked'`;
   `OnboardingStateService` retains each stage's last-save `POST /config/write` findings in a `stageFindings`
@@ -57,7 +57,7 @@
   up in its own freshly-loaded data (no new backend call) — found → focus/select (link-analysis:
   `emphasis` signal; geo-map: `selectedId` + `mapView.setCamera`, not `flyTo`, so it isn't reading the
   map's not-yet-updated `@Input`); not found → `toastr.info` and stays put. See
-  [investigation-pivot](../../module/la-core/user-guide-investigation-pivot.md) for the as-built. DoD green: lint:tokens PASS ·
+  [investigation-pivot](../okf/product/module/la-core/user-guide-investigation-pivot.md) for the as-built. DoD green: lint:tokens PASS ·
   build PASS · test:ci 1518/0/5 (exit 0, +9 new specs across `pivot.service.spec`,
   `element-detail.dialog.spec`, `link-analysis.component.spec`, `geo-map.component.spec`).
 
@@ -261,9 +261,9 @@
   assignee suggestions + dirty-guard, the **command registry**
   (`inspecto/commands/` — New incident / New case / New job via the `?create=1` handshake), and the
   data-table **keyboard layer** (`/` quick-filter focus; opt-in `[keyNav]` j/k/Enter/x, piloted on
-  the mail list). Updated: [forms-and-state](spec-forms-state.md),
-  [routing-and-navigation](spec-routing-navigation.md),
-  [data-table](spec-ds-data-table.md). Still deliberately deferred: R6 true offset paging,
+  the mail list). Updated: [forms-and-state](../okf/product/layer/product/spec-forms-state.md),
+  [routing-and-navigation](../okf/product/layer/product/spec-routing-navigation.md),
+  [data-table](../okf/product/layer/product/spec-ds-data-table.md). Still deliberately deferred: R6 true offset paging,
   R8 pivot-bar (see BACKLOG §4).
 
 ## 2026-07-16
@@ -271,32 +271,32 @@
   `docs/archived-documents/plans-archive/` (incidents-mail + case-management, lens-access, menu-builder,
   branding, db-browser, tree-table, reconciliation-board, ui-design-review, w7 `/api/v1` migration,
   studio/report-builder/widget-library plans, link-analysis + geo-map plans, frontend-review plan).
-  New concept files: [tree-table](spec-ds-tree-table.md),
-  [reconciliation](../../module/reconciliation/user-guide-reconciliation.md) (⚠ not yet in the section indexes). Updated:
-  [objects](../../module/ops/user-guide-objects.md) (mail UI rewrite — retires the banned "Issues"),
-  [spaces](user-guide-spaces.md) (branding), [catalog](user-guide-catalog.md) (Data Browser),
-  [routing-and-navigation](spec-routing-navigation.md) (Lens Access matrix, custom Menus,
-  command palette, detail-over-list + split), [forms-and-state](spec-forms-state.md)
-  (dialog conventions, optimistic bulk), [data-table](spec-ds-data-table.md) (`stateKey`,
-  Load more), [studio](user-guide-studio.md) (widget library + shared result layer).
+  New concept files: [tree-table](../okf/product/layer/product/spec-ds-tree-table.md),
+  [reconciliation](../okf/product/module/reconciliation/user-guide-reconciliation.md) (⚠ not yet in the section indexes). Updated:
+  [objects](../okf/product/module/ops/user-guide-objects.md) (mail UI rewrite — retires the banned "Issues"),
+  [spaces](../okf/product/layer/product/user-guide-spaces.md) (branding), [catalog](../okf/product/layer/product/user-guide-catalog.md) (Data Browser),
+  [routing-and-navigation](../okf/product/layer/product/spec-routing-navigation.md) (Lens Access matrix, custom Menus,
+  command palette, detail-over-list + split), [forms-and-state](../okf/product/layer/product/spec-forms-state.md)
+  (dialog conventions, optimistic bulk), [data-table](../okf/product/layer/product/spec-ds-data-table.md) (`stateKey`,
+  Load more), [studio](../okf/product/layer/product/user-guide-studio.md) (widget library + shared result layer).
 
 ## 2026-07-07
 * **Consolidated**: bundle moved `inspecto-ui/docs/okf/` → `docs/okf/frontend/` under the new
-  [consolidated bundle](../../index.md); features renamed to the canonical vocabulary
-  (`pipelines.md`→[`runs.md`](../../module/engine/user-guide-runs.md), `pipeline-detail.md`→[`run-detail.md`](../../module/engine/user-guide-run-detail.md),
-  `flows.md`→[`pipelines.md`](../../module/etl/user-guide-pipelines.md)).
-* **Refreshed** to the shipped state: new [studio](user-guide-studio.md),
-  [geo-map](../../module/geo-link/user-guide-geo-map.md), [link-analysis](../../module/la-core/user-guide-link-analysis.md),
-  [kpi-reports](../../module/analytics/user-guide-kpi-reports.md) features; [features index](../../index.md) regrouped to
+  [consolidated bundle](../okf/product/index.md); features renamed to the canonical vocabulary
+  (`pipelines.md`→[`runs.md`](../okf/product/module/engine/user-guide-runs.md), `pipeline-detail.md`→[`run-detail.md`](../okf/product/module/engine/user-guide-run-detail.md),
+  `flows.md`→[`pipelines.md`](../okf/product/module/etl/user-guide-pipelines.md)).
+* **Refreshed** to the shipped state: new [studio](../okf/product/layer/product/user-guide-studio.md),
+  [geo-map](../okf/product/module/geo-link/user-guide-geo-map.md), [link-analysis](../okf/product/module/la-core/user-guide-link-analysis.md),
+  [kpi-reports](../okf/product/module/analytics/user-guide-kpi-reports.md) features; [features index](../okf/product/index.md) regrouped to
   the Operations/Workbench/Studio/Catalog/Settings navigation (~35 screens);
-  [overview](architecture-overview.md) + [api-and-data](spec-api-and-data.md) +
-  [multi-space](spec-multi-space.md) updated
+  [overview](../okf/product/layer/product/architecture-overview.md) + [api-and-data](../okf/product/layer/product/spec-api-and-data.md) +
+  [multi-space](../okf/product/layer/product/spec-multi-space.md) updated
   for the `/api/v1` flip, the interceptor chain, and the OIDC no-op-on-Personal story;
-  [architecture](architecture.md) gains the shared `inspecto/` libraries (geo, investigation, graph,
+  [architecture](../okf/product/layer/product/architecture.md) gains the shared `inspecto/` libraries (geo, investigation, graph,
   component-model, viz). Superseded loose docs (`ui-components.md`, `devextreme-migration-plan.md`)
   archived to `docs/archived-documents/`.
 
 ## 2026-06-28
-* **Created**: Initial OKF v0.1 bundle for inspecto-ui — [Overview](architecture-overview.md), [Architecture](architecture.md),
-  the [Conventions](../../index.md), [Design system](../../index.md), [Features](../../index.md), and [Services](../../index.md) sets.
+* **Created**: Initial OKF v0.1 bundle for inspecto-ui — [Overview](../okf/product/layer/product/architecture-overview.md), [Architecture](../okf/product/layer/product/architecture.md),
+  the [Conventions](../okf/product/index.md), [Design system](../okf/product/index.md), [Features](../okf/product/index.md), and [Services](../okf/product/index.md) sets.
   Consolidated from the in-repo `angular-ui` rules, `docs/PROJECT_NOTES.md` §6, the in-app `/design` gallery, and the source tree.
