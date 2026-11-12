@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 designed and sliced 2026-11-12 (§11, D-PA26…D-PA31 decided, operator away). PA-10 designed and sliced 2026-11-12 (§11, D-PA32…D-PA37 decided, operator away). Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 designed and sliced 2026-11-12 (§11, D-PA26…D-PA31 decided, operator away); ✅ PA-8 done 2026-11-12 (8a the chart per Product, 8b the image per Product, 8c the air-gapped bundle; a cluster install and a complete air-gapped bundle are owed, `CONTAINER-AIRGAP-PROOFS-1`). PA-10 designed and sliced 2026-11-12 (§11, D-PA32…D-PA37 decided, operator away). PA-9 designed 2026-11-12 (§11; D-PA38…D-PA47 **PROPOSED, awaiting operator**, nothing built). Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -311,7 +311,7 @@ Each phase leaves the build green. Nothing changes for a customer until PA-4.
 | **PA-5** **Inspecto Telco** as proof (lanes 5a ✅ … 5d, §11) | the `telecom` Industry owns the xDR Datasets; RA, FM, LA and CM as Apps over **one** ingest; the App switcher and *My work* across Apps; demo Distribution with golden data; **no new Java** | the Product matrix green for Telco × Standard/Advanced; the demo boots seeded |
 | **PA-6** Platform product | the Add-on picker; builder-kit docs; `inspecto app new/validate/test/package`; the conformance kit | a sample partner App built only with the kit passes conformance |
 | **PA-7** Entitlements and live App install | signed entitlements; `POST /apps` install / upgrade / remove; the trial Distribution | install, upgrade and remove an App on a running server with no lost config |
-| **PA-8** Container and air-gap | OCI image plus Helm chart per Product (builds on `SCALEOUT-HELM-NPOD-1`); air-gapped bundle | Telco installs on a cluster and on an offline host |
+| **PA-8** Container and air-gap ✅ 2026-11-12 | OCI image plus Helm chart per Product (builds on `SCALEOUT-HELM-NPOD-1`); air-gapped bundle | Telco installs on a cluster and on an offline host |
 | **PA-9** CEP App | the **Streaming** Add-on (Kafka in, windowed conditions on the Decision Kernel, Alerts out); the CEP App | a pattern on a live stream raises an Alert within a stated latency |
 | **PA-10** Go-to-market | Product Map kinds; generated Product documents; `customer-build` through the assembler | a customer build of the pilot customer matches today's, plus an entitlement |
 
@@ -1199,6 +1199,255 @@ What exists to build on (measured 2026-11-12):
 | **PA-8a** Per-Product chart | `assemble.mjs` accepts `container` and `airgap` (plan fields `image`, `chart`; demo refused); `tools/ship.mjs chart`; the base chart's labels and `product` values | node tests; `helm lint` and `helm template` for inspecto, la and telco |
 | **PA-8b** Per-Product image | OCI labels in the bundle's Dockerfile; `tools/ship.mjs image` (build, tag, `docker save`); `package.ps1 -Target container` | a Telco Standard image built and booted read-only |
 | **PA-8c** Air-gapped bundle | `tools/ship.mjs airgap`, `install-offline.sh`, `package.ps1 -Target airgap`; the guide `admin-guide-container-airgap.md` | the offline-host boot from the tar, with `--network none` |
+
+**PA-8 as built (2026-11-12).** Guide: [`okf/product/layer/platform/admin-guide-container-airgap.md`](../okf/product/layer/platform/admin-guide-container-airgap.md).
+Lanes: 8a `46f5a646f` (the chart per Product), 8b `7a3d74d62` (the image per Product), 8c (the air-gapped bundle).
+- **The plan field is `ship`.** For `container` and `airgap`, `assemble.mjs` writes `ship: {image: {repository, tag},
+  chart: {name, version, appVersion}}` (`shipOf`), and `null` for the zip targets. The design said `image` and `chart`
+  side by side; one field keeps "this build ships beyond a zip" a single test.
+- **`tools/ship.mjs`** has three commands: `chart`, `image` and `airgap`.
+  - `chart` copies `deploy/helm/inspecto` and generates `Chart.yaml`. It replaces five exact lines of `values.yaml`
+    and refuses when one is not found exactly once.
+  - `image` checks the unpacked bundle against the plan (`lib/product.json`, an ELF `runtime/bin/java`, the Dockerfile's
+    product label), builds, checks the image's label, `docker save`s and stamps the chart.
+  - `airgap` adds the layout, `install-offline.sh` (template `deploy/airgap/install-offline.sh`), `airgap.json`,
+    `SHA256SUMS` and the tar.
+- **The chart source changed.** The selector labels are split from the descriptive ones, so the StatefulSet's
+  immutable selector is name plus instance only. A `product` values block now labels every object.
+  - Moving a release from one Product's chart to another's changes the name label, and Kubernetes refuses it; the guide
+    says to install a new release instead.
+- **`package.ps1 -Target`** takes `windows`, `linux`, `container` or `airgap`.
+  - Docker is checked up front. The Linux zip is required after the zips are made, and it is unpacked with
+    `Expand-Archive`: the shell's `tar` may be GNU tar, which reads no zip, and the staging folder holds the host runtime
+    after a cross-build.
+  - `airgap` sets `-RequireExtensions`, which applies to every zip the run makes.
+  - Every bundle's Dockerfile now carries OCI labels from the plan. `$` is escaped twice over: for Docker, and for
+    the .NET replacement string. The review found that hole.
+- **The air-gapped bundle carries the unpacked Linux bundle, not the zip.** A slim Linux host has no `unzip`, and
+  every Linux host has `tar`.
+  - The installer resolves its own path first, so a relative install folder is relative to where it was run.
+  - It sets the exec bits that a Windows-made archive drops, `jspawnhelper` included.
+  - The guide says to unpack as a normal user: a Windows tar records every file as writable by all.
+- **Decided here.** The image keeps the bundle's digest-pinned base and uid 10001, and no registry is assumed. The
+  chart stays single-replica, so PA-8 does not lift the `SCALEOUT-HELM-NPOD-1` hold.
+
+**Proof (as built), targeted tests only (the full gate runs in another session).**
+- `tools/ship.test.mjs` 9/9 (docker injected) and `tools/assemble.test.mjs`. The Java tests that read
+  `assemble.mjs` or `package.ps1`: `TelcoComposedSpaceGoldenTest`, `TelcoComposedBypassTest`, and
+  `ObjectsBackendEditionBootTest` 6/6.
+- Helm v3.19 from a local container, `--network none`: `helm lint --strict` passes on the source and on the stamped
+  inspecto, la and telco charts (and the chart inside the air-gap tar). `helm template` of Telco renders the Product's
+  labels and the image `inspecto-telco:4.0.0-SNAPSHOT-advanced`.
+- `package.ps1 -Product telco -Edition Standard -Target container -NoUi -GraalvmCache C:\.jdks` built
+  `inspecto-telco:4.0.0-SNAPSHOT-standard` (204 MB). Booted `--read-only --cap-drop ALL` as uid 10001: `/health` UP,
+  `/ready` READY.
+- **The offline host.** `ship.mjs airgap` on that build's Linux zip gave a 409 MB tar. Then:
+  - In a `debian:stable-slim` container with `--network none` (interfaces: `lo` only), the installer ran `verify`,
+    `host` (also from outside its folder, to a relative folder) and started `serve.sh` on the bundle's Java 27.
+    `/health` answered UP and `/ready` READY. Inspecto Telco Standard and its templates are present.
+  - With the local image removed, `install-offline.sh load` from a fresh extraction loaded it, and it booted
+    `--network none`: UP and READY.
+  - The review also showed that a changed or deleted file stops every command, and that the `ctr` path works.
+- **Not proven here (`CONTAINER-AIRGAP-PROOFS-1`):**
+  - **A Kubernetes install.** The desk has no cluster.
+  - **A complete air-gapped bundle.** The desk has no DuckDB 2.0 Linux extensions, so the proof used
+    `--allow-missing-extensions` and recorded `complete: false`.
+  - **A packaged `-Target airgap` run, and a build with the UI.**
+**PA-9 designed (2026-11-12) — ⚠ PROPOSED, awaiting operator. Nothing here is signed and nothing is built.** It picks a
+streaming runtime, so every decision (D-PA38…D-PA47 in §12) waits for the operator's signature. Proof (§11 table): a
+pattern on a live stream raises an Alert within a stated latency. Board row: `REALTIME-DECISIONING-1`.
+
+What exists to build on (measured 2026-11-12, code read; claims checked against the files named):
+- **The Kafka Collector turns a stream into files.** `KafkaConnector` (`providers/inspecto-connectors-kafka`,
+  `kafka-clients` 3.9.2, shaded) drains each partition's backlog into one slice file `<topic>-p<n>-<from>-<to>.ndjson`.
+  The slice goes through the ordinary batch ingest (`ConsignmentIngestor`). There is no consumer group: offsets live in
+  the acquisition ledger, and they advance only after the batch is durable. One uncommitted slice per partition (the
+  in-flight fence) is allowed. Delivery is at-least-once per slice. The `envelope` payload carries
+  `topic/partition/offset`.
+- **A continuous lane already exists.** `trigger: {type: stream, records: N, max_wait: T}` gives a Pipeline one
+  `StreamLane` (`inspecto-acquire`), a virtual thread that keeps the consumer open. It probes `pendingRecords()` every
+  200 ms (`PipelineScheduler.STREAM_PROBE_MS`). It drains when the backlog reaches N (default 1000) or has waited T
+  (default 5 s). It was built for D-P7, "p95 ≤ 30 s event → Incident". **Measured** (`plan-acquisition.md` §3.9):
+  event → committed frontier p50 563 ms, p95 1030 ms (MockConsumer, T = 1 s); file → committed batch 1.6 s through real
+  ingest. **Not measured: the hop from commit to Alert.** D-P7 is therefore not proven end to end. Push ingest
+  (`POST /streams/{id}/records`) is a second live input on the same path.
+- **"Kafka is not the data path"** (`BACKLOG.md`, settled decisions; consignment-ELT design). Urgency is a parameter
+  on one node, not a second execution model. Q4 of `STREAM-CONSUMER-1` (2026-09-24) kept the ledger and refused
+  broker consumer groups.
+- **The Decision Kernel has two evaluators for one condition tree.** `ConditionSql.predicateBound` compiles a `when`
+  tree to a bound DuckDB predicate (`DecisionRuleApplier` uses it). `ConditionTree.matched/filter` is a pure-Java
+  in-memory evaluator; only the `simulate` route uses it. Neither has a time window: `when` is a per-row predicate.
+- **Alert Rules have windows, but over batches, not over events.** A metric rule has `window: 1h | Nb` over the batch
+  ledger. A Measure rule (BI-5) has `dataset, measure, comparator, threshold`, plus `by` and `stormCap`
+  (ALERT-PER-RULE-1: one open Alert per rule, one Incident per key), and has no window. **Evaluation is a sweep:**
+  the `alert.evaluate` Job on a cron, or `POST /alerts/evaluate`. A Job can also fire on an upstream batch-commit
+  event (`JobService`). A Measure rule never runs on a commit by itself. `AlertService.raiseFromEvent(…, dedupeKey,
+  …, escalate)` is the API for an outside producer. An `error`/`critical` rule Alert is promoted to an Incident
+  (`promoteToIncident`).
+- **The glossary already uses the word Stream.** *Stream* is a Catalog data origin (§2). *Streaming Ingest Mode* is a
+  decode strategy (§5). *Watermark* is event-time completeness per output Dataset; it answers "has this window
+  closed" (§6-B, `StreamWatermark`).
+
+**The design (proposed).**
+
+*1. The runtime: micro-batches on the continuous lane, detection on commit (D-PA38).* PA-9 adds no second execution
+model. A stream Pipeline keeps today's path: lane → slice → ingest → commit. **One new hop** runs after each commit:
+the windowed Alert Rules over that Pipeline's output Datasets are evaluated, but only for the keys and windows the new
+Consignment touched. Rejected:
+- **(B) An in-process per-record operator.** This is a Java event-time window engine on its own consumer, with heap
+  state and checkpoints. It would give sub-second latency. But it is the second execution model that "Kafka is not the
+  data path" refused. It needs a state store, checkpointing and recovery of its own. It would read the topic twice, or
+  fork the lane, and the Datasets would no longer be the one record of what was seen. Keep it as the fallback that gate
+  G-RT (below) opens, and as the home of inline allow/block (D-PA47).
+- **(C) An embedded stream library.** Kafka Streams needs a consumer group (refused, Q4), RocksDB native code and
+  internal topics. Flink is a cluster, not a library. Esper's licence and footprint, and Siddhi's dependency tree,
+  break the framework-free rule. Each brings a second condition language beside the Condition Language (D-MR12 refused
+  that: "no general rule engine").
+- **(D) A detection Job on the commit event (`alert.evaluate` or `sql.template` with an `on: commit` trigger).** This
+  works today with no code, so PA-9a measures it as the baseline. It is not the design: a Job takes one of the four
+  global Run slots, its Runs do not overlap, and a run every second floods Run history. It also evaluates every rule
+  in the Space, not only the touched keys.
+
+*2. The window and state model (D-PA40).* A windowed Alert Rule is a **Measure rule plus a `window:` block**. It
+stays one Alert Rule kind; no new Decision Engine is added.
+```
+name: wangiri_burst          dataset: voice_cdr           severity: CRITICAL
+when: {kind: group, op: AND, items: [{kind: condition, field: duration_s, operator: lt, value: 3}]}
+measure: count_distinct(b_number)   by: [a_number]   comparator: gte   threshold: 30
+window: {type: sliding, size: 10m, slide: 1m, time: event_ts, lateness: 2m}
+```
+- **Window types:** `tumbling` (size) and `sliding` (size, slide), both over an **event-time** column. A
+  processing-time window is not offered: arrival time is the ingest time, not the business time, and the replays
+  that at-least-once delivery causes would move it.
+- **Two patterns** cover what an aggregate cannot express:
+  - `sequence` (event A, then event B for the same key within T). Each step has its own `when` tree. It compiles to a
+    keyed self-join with `b.ts BETWEEN a.ts AND a.ts + T`.
+  - `absence` (no event for the key, or for the whole Stream, in T). A window `[lo, hi)` counts only once the
+    Watermark is at least `hi + lateness`. Absence also needs a clock, because a silent feed sends no commit: the lane's
+    ordinary tick floor evaluates it.
+- **State is the committed Dataset.** There is no separate state store. Each evaluation reads `[lo − size, hi)` for the
+  touched keys (a semi-join on the Consignment's key set) and runs the window SQL in DuckDB. A restart therefore
+  rebuilds nothing, and a replayed slice re-reads the same rows. One small table holds what has fired: one row per
+  (rule, key, window start), so a replay or a later re-read cannot fire twice. This table is the Alert dedup key below.
+- **Bounds:** a window may be at most 1 h (`size` + `lateness`), and a sliding window at most 60 slides. Anything longer
+  is a batch Alert Rule on a schedule. `ConfigSafetyValidator` refuses a window above the bound, a `time` column that
+  is not a TIMESTAMP in the Dataset's Schema, and a `window` on a Dataset whose Pipeline has no `stream` trigger
+  (422 each).
+- **Gate G-RT (PA-9a decides it).** Reading the Dataset's Parquet partitions every second may cost too much, or leave
+  too many small files. If so, the fallback is a **window buffer**: a DuckDB table per (Dataset, rule set) in the
+  Space's processing database, appended on commit and trimmed past `size + lateness`. It is rebuilt from the Dataset at
+  boot. It stays derived state, never a second record. If even that misses the target, option B is re-opened for
+  signature.
+
+*3. The latency target and its proof (D-PA39).* **Stated latency: p95 ≤ 5 s from an event's arrival at the broker to
+its Alert, and p95 ≤ 10 s to its Incident.** This holds with `max_wait: 1s`, windows ≤ 1 h, on one 4-core node, up to
+the sustained rate PA-9a measures. The proposed floor is 5,000 events/s, to be confirmed by the spike. Budget:
+lane T (≤ 1 s) + drain and ingest (1.6 s measured) + windowed evaluation (≤ 1 s, to be measured) + raising the Alert.
+How it is proven:
+- **The latency harness** (PA-9d) is an engine test that drives the real `CollectorService`, ingest and evaluator
+  from a `MockConsumer`. A synthetic producer stamps each event's broker time and plants patterns in random bursts.
+  The harness records event → Alert and event → Incident for every planted pattern and reports p50, p95 and p99. In CI
+  it asserts p95 at a CI-sized load. The full-rate run is recorded in the hub.
+- **The product carries its own metric.** `inspecto_detection_latency_seconds{rule}` is a histogram: the Alert's raise
+  time minus the broker time of the newest event in its window. A customer sees the stated latency in production, not
+  only in our test.
+- **One real-broker run.** `KafkaRealBrokerTest` style, skipped unless a broker answers. It is recorded with its
+  environment. No broker ships with the build.
+
+*4. Delivery, ordering and backpressure (D-PA41).*
+- **Delivery stays at-least-once per slice.** For a stream Dataset that carries windowed rules, the Pipeline must keep
+  the envelope's `(topic, partition, offset)`. The window SQL counts distinct offsets, so a replayed slice does not
+  inflate a count. **Alerts are effectively once:** the fired table plus `raiseFromEvent`'s `dedupeKey`
+  (`<rule>:<key>:<window start>`) refuse a second raise.
+- **Ordering is event time, not arrival.** Kafka orders only within a partition, and windows ignore arrival order.
+  An event later than `lateness` is still stored (data is never dropped). It is not alerted on, and it is counted in
+  `inspecto_detection_late_events_total{rule}`. `sequence` uses event time only.
+- **Backpressure is the existing fence.** One uncommitted slice per partition, and `max_records` per slice, bound the
+  memory. When evaluation falls behind, slices grow, latency rises, and lag shows in `inspecto_stream_lag_records`.
+  The CEP App ships an Alert Rule on that lag. Nothing sheds load, nothing is buffered unbounded, and a slow evaluation
+  never blocks the commit.
+- **Scale-out:** one node. The lane is per process, and N-pod is on hold (`SCALEOUT-HELM-NPOD-1`). The stated rate is a
+  single-node rate.
+
+*5. Reusing the Decision Kernel (D-PA42).* A windowed rule's `when` and each pattern step's `when` are **Condition
+Language trees**. They compile through `ConditionSql.predicateBound`, so values are bound (`DECISION-RULE-SQL-GUARD-1`)
+and the UI condition builder and its `simulate` preview work unchanged. The threshold stays the Alert Rule's Measure,
+comparator and threshold. PA-9 adds no Java per-record path. `ConditionTree.matched` stays the preview evaluator, and
+is the evaluator option B or inline decisioning would use later.
+
+*6. The Alert path (D-PA43).* The evaluator raises through `AlertService`. The Alert carries the rule's Alert record
+(one open Alert per rule, one Incident per key, `stormCap`, the heal edge) and the window's evidence: key, window,
+measure value, and the first and last offset. An `error` or `critical` severity is promoted to an Incident by the
+existing path. Case Rules, Notification Rules and Escalation Rules then apply unchanged. The new piece is the trigger:
+**on commit of a `stream`-triggered Pipeline, for that Pipeline's windowed rules only**, from the commit hook. The
+cron sweep still runs as the floor. **Alerts out** means the existing Notification channels. A Kafka *producer* channel
+(publishing Alerts back to a topic) is not in PA-9; see question Q4.
+
+*7. Edition, Add-on and dependency budget (D-PA44).*
+- **One new optional module, `features/inspecto-realtime`.** It has `offeringRole: optional`, `bindingTime: boot`,
+  `provides.features: realtime` and a commit-hook contract. It requires `ops` (Alerts and Incidents) and no Kafka: push
+  ingest is a live input too. Its Edition floor is **Standard**, because Kafka is Standard.
+- **One new Add-on, offered in `standard.toon`.** It lists that module; its Product Map item is `addon/<id>.toon`,
+  billable, `enforcement: build`. It is gated at run time by `EditionFeatures.present(realtime)` and the entitlement.
+  Without it, a `window:` block loads inert, with a diagnostic that names the module (removal semantics).
+- **The name (question Q1).** The plan says *Streaming*. That would be the third concept called "stream" (beside the
+  Catalog *Stream* and the *Streaming Ingest Mode*), which §0 of the glossary forbids. The recommendation is
+  **Real-time Detection** (`realtimeDetection`). New glossary words, added in PA-9b: **Window**, **Pattern**
+  (sequence, absence), and **Detection latency**.
+- **Dependency budget: zero new third-party jars.** `kafka-clients` is already shipped. There is no Kafka Streams,
+  Flink, Esper, Siddhi or RocksDB, and no JNI beyond DuckDB. Anything heavier needs the operator's sign-off.
+
+*8. The CEP App (D-PA45).* `apps/telco-cep/app.toon`: Industry `telecom`. It requires the Incidents and Real-time
+Detection Add-ons, and is an **optional** App of Inspecto Telco (Standard and Advanced). Its Space Template
+`telco-cep` reads the Industry's canonical voice and SMS usage feed, as a `stream`-triggered Pipeline over Kafka. It
+ships five windowed rules, each with planted positives and look-alikes in a synthetic generator:
+- Wangiri ring-burst: one A-number, ≥ N distinct B-numbers with duration < 3 s in 10 min;
+- a SIM-box burst: one IMSI, many short outgoing calls across few cells in 5 min;
+- high-value roaming usage: summed charge per IMSI above a threshold in 15 min;
+- `sequence`: a SIM swap followed by a high-value transfer or call within 30 min;
+- `absence`: a switch feed silent for 5 min.
+
+Its landing shows live Alerts, detection latency and lag. Its conformance (`conformance.toon`, D-PA19) checks each
+planted pattern's Alert key exactly. The daily batch packs (`telco-fraud`, `telco-bypass`, `PACK-IRSF-WANGIRI-1`) stay
+batch; the CEP App is their live front line, not their replacement.
+
+*9. How it is tested.*
+- Window and pattern SQL: an independent oracle per window type and pattern, over a synthetic corpus with boundary
+  events (at `lo`, at `hi`, at `hi + lateness`, one past it).
+- Replay: re-deliver a slice and assert the same Alerts. Duplicate offsets: counts unchanged.
+- Validator: each 422 paired with the accepted shape one key away.
+- Mutation passes, each of which must turn a test red: the window bound off by one, lateness ignored, dedup removed,
+  the touched-keys scope widened or emptied.
+- Inert config: the module absent, and the rule loads inert.
+- The latency harness (above) in CI. The real-broker run recorded.
+- The CEP App's conformance in the Telco Product matrix.
+
+**Slices (proposed; one lane each, in this order — D-PA46).**
+
+| Lane | Builds | Proof |
+|---|---|---|
+| **PA-9a** Spike: the hop and gate G-RT | no product code: a scratch harness through today's lane, with option D (`alert.evaluate` on commit) and a hand-written window query over the committed Parquet | measured event → Alert p50/p95 at 1k, 5k and 20k events/s, a 10-min window, 100k keys; file count per hour; the G-RT verdict recorded in the hub; D-PA39's rate confirmed or restated |
+| **PA-9b** Windowed Alert Rule | the `window:` block on Measure rules; the SQL compiler; the fired table; the 422 gates; glossary words | oracle tests, validator pairs, mutants red, `openapi-v1.json` regenerated if a route changes |
+| **PA-9c** Patterns | `sequence` and `absence` (the Watermark close and the clock floor) | oracle and boundary tests, mutants red |
+| **PA-9d** The Add-on and the commit hook | `features/inspecto-realtime`, the module manifest, the Offering and Product Map entries, entitlement gating, evaluation on commit, the latency and late-event metrics, the latency harness | real-HTTP gate tests; the harness meets p95 in CI; the full-rate run and one real-broker run recorded |
+| **PA-9e** The CEP App | `apps/telco-cep`, the `telco-cep` template with its generator and conformance, optional in `products/telco.toon`, its landing | App conformance; the Telco Product matrix green; the demo raises the five Alerts |
+| **PA-9f** Docs | the Add-on hub (spec, admin guide with the latency statement and its conditions), the App hub, `BACKLOG.md` rows | the docs guards green |
+
+**Open questions for the operator (answer before PA-9b; PA-9a can start once Q2 is answered).**
+- **Q1 — the name.** Is the Add-on *Real-time Detection* (recommended), *Streaming* as the plan says, or *Real-time
+  Decisioning* as the board row says?
+- **Q2 — the stated latency.** Is p95 ≤ 5 s to Alert and ≤ 10 s to Incident, at a rate the spike sets, the promise?
+  Or does a buyer need sub-second? Sub-second means option B, a second execution model, and reversing "Kafka is not
+  the data path".
+- **Q3 — inline allow/block.** `REALTIME-DECISIONING-1` asks for an inline decision on each record (allow or block,
+  before the record is accepted). That is a synchronous call, not detection. Split it out as its own row (recommended,
+  D-PA47), or fold it into PA-9?
+- **Q4 — Alerts back to Kafka.** Must Alerts also be published to a topic (a Kafka producer Notification channel), or
+  are the existing channels enough for PA-9?
+- **Q5 — the Edition floor.** Standard (recommended, because Kafka is Standard), or Advanced only?
+- **Q6 — a desk broker.** May PA-9d pull a Kafka container image for the one real-broker run? Today the test skips,
+  and the run would be recorded as not done.
+
 **PA-10 designed and sliced (2026-11-12; D-PA32…D-PA37 decided while the operator was away, per the standing
 preference).** Proof (§11 table): a customer build of the pilot customer matches today's, plus an entitlement.
 D-PA26…D-PA31 are PA-8's.
@@ -1323,6 +1572,44 @@ kinds; they are now roots of their own, with their link in the CSV.
   - booted from its root (OIDC jars pointed at a dead JWKS, as the boot smoke does): `/health` 200, `/bootstrap` answers;
   - the same bundle with one byte of the entitlement changed refuses to boot ("the signature does not match").
 - The pilot's record and outputs stay out of git (the record is in `product-map/private/`, the outputs in a scratch folder).
+- Review fixes: a bundle built with an App its Product does not define (a partner App, `--app-root`) is refused rather
+  than silently dropped, and the bundle's `edition.properties` `apps=` line follows the plan. The pilot diff above was
+  re-run after them: still identical apart from the entitlement.
+
+**PA-10c as built (2026-11-12).**
+- `pilot` is in `DISTRIBUTIONS` and in every Product's `distributions`; `PLANNED_DISTRIBUTIONS` is empty.
+  `CUSTOMER_DISTRIBUTIONS = ['pilot']`: `assemble.mjs` refuses it unless called for a customer, naming
+  `customer-build.mjs --distribution pilot`, so `package.ps1 -Distribution pilot` is refused the same way.
+- The record's `pilot:` block (`template`, and `poll:` one folder per Pipeline) is checked in `customer.mjs pilotOf`:
+  the template must be bought and have at least one Pipeline; every Pipeline of it must be wired, no unknown one named,
+  and no two given the same folder; each folder absolute, `/` separated, with no space, quote, `;`, `#` or `$` (the
+  launchers split `INSPECTO_JAVA_OPTS` on whitespace and `assist.safety.roots` on `;`; found by the review).
+- `customer-build.mjs --distribution pilot` adds `spaces/_templates/<customer>-pilot` (the template with each `dirs.poll`
+  set, `data/samples` left out, the zero-row seeds kept, name, tagline and description saying pilot), writes `lib/product.json` with
+  `distribution: pilot`, and writes `PILOT.txt` at the bundle root.
+- **Decided here: the build never widens the server's path jail.** The live run found that `ConfigSafetyValidator`
+  refuses a `dirs.poll` outside the Space. An install allows more folders with `-Dassist.safety.roots`, so `PILOT.txt`
+  names the folders and the exact `INSPECTO_JAVA_OPTS` line for `serve.bat` and `serve.sh`. Widening it from a file in
+  the bundle would let a bundle edit open the server's disk.
+- **Found: the pilot customer cannot create a Space from the template it bought, today or now.** `telco-fraud` ships
+  Alert Rules, which need `ops` (the Incidents Add-on), and the resolution trims `ops` because no manifest declares
+  that need. Creating the Space answers 422 ("Alert Rules ... this build (Basic) does not include it") on the pilot's
+  bundle built by today's tool and by this one alike. So `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` is worse than "a Case Rule
+  loads inert", and the row now says so. D-PA37 keeps it out of PA-10, because closing it changes the pilot's jars.
+
+**Proof (as built).**
+- `customer-build.test.mjs` 14/14 (3 new tests; the refusals widened after the review): a pilot plan wires all three `telco-fraud` Pipelines, lists the roots and
+  says `pilot`; each refusal (no block, a template not bought, a Pipeline unwired, an unknown one, a relative or quoted
+  folder); `pilotTemplate` on a fixture tree. `assemble.test.mjs` refuses a pilot outside a customer build.
+- **A pilot build, live** (the same Standard bundle; the pilot record plus `INS-AO-INCIDENTS`, in a scratch copy, so
+  that `ops` ships):
+  - booted with `-Dassist.safety.roots` from `PILOT.txt`, against a throwaway local OIDC issuer and an administrator
+    token;
+  - `/bootstrap.entitlement`: installed, customer `demo-telco`, state `ok`, Add-ons `incidents` and `linkAnalysis`;
+  - the gallery lists `demo-telco-pilot`; `POST /spaces {template: demo-telco-pilot}` 200;
+  - the new Space's three Pipelines poll the customer's folders, and it holds no `data/samples` and no CSV.
+- The same build without `INS-AO-INCIDENTS` and without the roots: 422 for the Alert Rules (above), and, with `ops`
+  shipped but no roots, 422 naming the path jail.
 
 **PA-10d as built (2026-11-12).** `tools/product-documents.mjs`, called by `render-product-docs.mjs` before it draws the
 hub tables, writes `brochure.md`, `features.md` (the datasheet), `user-guide.md` and `admin-guide.md` into each
@@ -1386,6 +1673,16 @@ vocabulary and doc-count guards pass.
 | D-PA35 | What the pilot Distribution is | a customer build whose record names one bought template and the customer's poll folders; the bundle adds `<customer>-pilot` (those folders wired, no golden corpus); no Space is made at build time (decided 2026-11-12, operator away) |
 | D-PA36 | Generated Product documents | Product, App and Industry hubs; per Product a generated brochure, datasheet (`features`), user guide and admin guide; demo and video scripts not generated (decided 2026-11-12, operator away) |
 | D-PA37 | Does PA-10 close `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`? | no: declared ops needs change the pilot's jars; the row stays open with §9's declared needs (decided 2026-11-12, operator away) |
+| D-PA38 | The streaming runtime for PA-9 | **PROPOSED, awaiting operator:** micro-batches on the existing `trigger: stream` lane, with windowed Alert Rules evaluated on each commit, scoped to the touched keys; no second execution model. Rejected: an in-process per-record operator (kept as the gate G-RT fallback), Kafka Streams, Flink, Esper or Siddhi, and a detection Job on the commit event (the PA-9a baseline only) |
+| D-PA39 | The stated latency | **PROPOSED, awaiting operator:** p95 ≤ 5 s from broker to Alert and ≤ 10 s to Incident, with `max_wait: 1s`, windows ≤ 1 h, one 4-core node, up to the rate PA-9a measures (proposed floor 5,000 events/s); proven by an engine harness in CI, one recorded real-broker run, and the `inspecto_detection_latency_seconds` metric in production |
+| D-PA40 | The window and state model | **PROPOSED, awaiting operator:** a `window:` block (tumbling or sliding, event time, `lateness`) on a Measure Alert Rule, plus `sequence` and `absence` patterns; the state is the committed Dataset plus a table of what has fired; windows ≤ 1 h; a window buffer table only if gate G-RT trips |
+| D-PA41 | Delivery, ordering, backpressure | **PROPOSED, awaiting operator:** at-least-once per slice, with distinct offsets in the window counts; effectively-once Alerts (dedup on rule, key and window start); event-time order, late events kept but not alerted on, and counted; the in-flight fence and `max_records` are the backpressure; nothing is shed; one node |
+| D-PA42 | Reusing the Decision Kernel | **PROPOSED, awaiting operator:** every `when` is a Condition Language tree compiled by `ConditionSql.predicateBound`; the threshold stays the Alert Rule's Measure, comparator and threshold; no Java per-record evaluator in PA-9 |
+| D-PA43 | The Alert path | **PROPOSED, awaiting operator:** raise through `AlertService` (one Alert per rule, one Incident per key, `stormCap`), with window evidence; Incident promotion and Case, Notification and Escalation Rules unchanged; evaluation on commit of a stream Pipeline, with the cron sweep as the floor; out through the existing Notification channels |
+| D-PA44 | Placement and dependencies | **PROPOSED, awaiting operator:** one optional module `features/inspecto-realtime` (feature `realtime`, requires `ops`), offered from Standard as a new billable Add-on, gated by `EditionFeatures` and the entitlement, inert when absent; recommended name **Real-time Detection**, because *Streaming* would be a third "stream" concept; zero new third-party jars |
+| D-PA45 | The CEP App | **PROPOSED, awaiting operator:** `apps/telco-cep`, optional in Inspecto Telco, with five windowed rules (Wangiri burst, SIM-box burst, roaming high usage, SIM swap then high value, a silent switch feed) over the Industry's usage feed, golden data with look-alikes, and conformance; the batch fraud packs stay batch |
+| D-PA46 | The order of the PA-9 lanes | **PROPOSED, awaiting operator:** spike and gate G-RT (9a), windowed Alert Rule (9b), patterns (9c), Add-on, commit hook and latency harness (9d), CEP App (9e), docs (9f) |
+| D-PA47 | Inline allow/block decisioning | **PROPOSED, awaiting operator:** not in PA-9; `REALTIME-DECISIONING-1` is narrowed to a synchronous per-record decision (the `ConditionTree` in-memory evaluator), filed when a buyer names it |
 
 ## 13. The open board, re-checked 2026-11-10
 

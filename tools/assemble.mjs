@@ -23,7 +23,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { addonModules, builtAddons, carryPartnerApps, checkModel, loadProductFile, DEMO_EDITIONS, demoTextOf, DISTRIBUTIONS, gatherModel, PLANNED_DISTRIBUTIONS, productApps, productNavByApp, productTemplates, seedToolOf, spaceParts } from './products.mjs';
+import { addonModules, builtAddons, carryPartnerApps, checkModel, CUSTOMER_DISTRIBUTIONS, loadProductFile, DEMO_EDITIONS, demoTextOf, DISTRIBUTIONS, gatherModel, PLANNED_DISTRIBUTIONS, productApps, productNavByApp, productTemplates, seedToolOf, spaceParts } from './products.mjs';
 import { classpath, mvnModules, normalizeEdition } from './offering-classpath.mjs';
 import { gather } from './check-offerings.mjs';
 
@@ -53,7 +53,7 @@ const fail = (msg) => { throw new Error(msg); };
  * The Assembly Plan for one Product build. `model` is tools/products.mjs gatherModel(); `g` is check-offerings gather()
  * (the Offering classpath's inputs). `apps` (optional) narrows the Product's OPTIONAL Apps; required Apps always ship.
  */
-export function assemble(model, g, { product, edition, distribution = 'production', apps: chosen = null, target = 'windows' }) {
+export function assemble(model, g, { product, edition, distribution = 'production', apps: chosen = null, target = 'windows', customer = false }) {
     const findings = checkModel(model);
     if (findings.length) fail(`the definitions do not pass tools/check-products.mjs - fix them first:\n  ${findings.join('\n  ')}`);
     const p = model.products[product] ?? fail(`unknown Product '${product}' (products/: ${Object.keys(model.products).join(', ')})`);
@@ -61,6 +61,8 @@ export function assemble(model, g, { product, edition, distribution = 'productio
     if (!(p.editions ?? []).includes(ed)) fail(`Product '${product}' does not come in edition '${edition}' (it lists ${(p.editions ?? []).join(', ')})`);
     if (PLANNED_DISTRIBUTIONS[distribution]) fail(`distribution '${distribution}' is not built yet: ${PLANNED_DISTRIBUTIONS[distribution]}`);
     if (!DISTRIBUTIONS.includes(distribution)) fail(`distribution '${distribution}' is not one of ${DISTRIBUTIONS.join(', ')}`);
+    // PA-10c (D-PA35): a pilot names the customer's Collector folders, so it is built from the customer record only.
+    if (CUSTOMER_DISTRIBUTIONS.includes(distribution) && !customer) fail(`the '${distribution}' distribution is a customer build: package a production bundle, then node tools/customer-build.mjs <customer> --distribution ${distribution} --bundle <that bundle>`);
     if (!(p.distributions ?? []).includes(distribution)) fail(`Product '${product}' does not offer the '${distribution}' distribution (it lists ${(p.distributions ?? []).join(', ')})`);
     if (!TARGETS.includes(target)) fail(`target '${target}' is not one of ${TARGETS.join(', ')}`);
     const demo = distribution === 'demo';

@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { generateKeyPairSync } from 'node:crypto';
-import { bomCsv, resolve, signedEntitlement, templateNeeds, trimBundle } from './customer-build.mjs';
+import { bomCsv, pilotTemplate, pilotText, resolve, signedEntitlement, templateNeeds, trimBundle } from './customer-build.mjs';
 import { customerAssembly } from './customer.mjs';
 import { gather as gatherOfferings } from './check-offerings.mjs';
 import { gather } from './check-product-map.mjs';
@@ -180,5 +180,59 @@ test('PA-10b trimBundle executes the plan: jars, SBOMs, templates, descriptor, s
         assert.throws(() => trimBundle(src, dest, { ...plan, customer: { ...plan.customer, productApps: [] } }, {}),
             /built with App\(s\) link-analysis, which Product 'inspecto' does not define/);
         assert.throws(() => trimBundle(src, dest, { ...plan, space: { id: 'telco' }, descriptor: { apps: [{ id: 'x' }] } }, {}), /not a composed Space/);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// PA-10c (D-PA35): the pilot Distribution - the customer's Collectors pre-wired, no data. SYNTHETIC folders only.
+const pilotRecord = (poll) => record({ orderCodes: ['INS-AO-LINK-ANALYSIS', 'INS-SP-TELCO-FRAUD'],
+    pilot: { template: 'telco-fraud', poll: poll ?? { cdr: 'D:/feeds/cdr', payments: 'D:/feeds/payments', subscriber_events: '/srv/feeds/events' } } });
+test('PA-10c a pilot plan wires every Pipeline of the bought template and says pilot', () => {
+    const { plan } = customerAssembly({ ...repo(), customer: pilotRecord(), distribution: 'pilot', now });
+    assert.equal(plan.descriptor.distribution, 'pilot');
+    assert.equal(plan.pilot.template, 'acme-pilot');
+    assert.deepEqual(plan.pilot.pipelines.map((p) => `${p.name}=${p.poll}`), ['cdr=D:/feeds/cdr', 'payments=D:/feeds/payments', 'subscriber_events=/srv/feeds/events']);
+    assert.deepEqual(plan.pilot.roots, ['/srv/feeds/events', 'D:/feeds/cdr', 'D:/feeds/payments']);
+    assert.match(pilotText(plan), /INSPECTO_JAVA_OPTS=-Dassist\.safety\.roots=\/srv\/feeds\/events;D:\/feeds\/cdr;D:\/feeds\/payments/);
+    assert.match(pilotText(plan), /create a Space from the template 'acme-pilot'/);
+    assert.equal(customerAssembly({ ...repo(), customer: pilotRecord(), now }).plan.pilot, null, 'a production build has no pilot');
+});
+test('PA-10c a pilot is refused without its block, for a template not bought, or with a Pipeline unwired, unknown or relative', () => {
+    const R = repo();
+    const run = (c) => () => customerAssembly({ ...R, customer: c, distribution: 'pilot', now });
+    assert.throws(run(record({ orderCodes: ['INS-SP-TELCO-FRAUD'] })), /needs a pilot: block/);
+    assert.throws(run({ ...pilotRecord(), pilot: { template: 'telco-ra', poll: {} } }), /pilot.template 'telco-ra' is not one of this customer's templates/);
+    assert.throws(run(pilotRecord({ cdr: 'D:/feeds/cdr', payments: 'D:/p' })), /does not wire every Pipeline of 'telco-fraud': subscriber_events/);
+    assert.throws(run(pilotRecord({ cdr: 'D:/a', payments: 'D:/b', subscriber_events: 'D:/c', ghost: 'D:/d' })), /names no Pipeline of 'telco-fraud': ghost/);
+    assert.throws(run(pilotRecord({ cdr: 'feeds/cdr', payments: 'D:/b', subscriber_events: 'D:/c' })), /pilot.poll.cdr 'feeds\/cdr' must be an absolute folder/);
+    assert.throws(run(pilotRecord({ cdr: 'D:/a"b', payments: 'D:/b', subscriber_events: 'D:/c' })), /must be an absolute folder/);
+    // the launchers split INSPECTO_JAVA_OPTS on whitespace, and assist.safety.roots splits on ';'
+    assert.throws(run(pilotRecord({ cdr: 'D:/my feeds/cdr', payments: 'D:/b', subscriber_events: 'D:/c' })), /pilot.poll.cdr .* no space, quote, ;/);
+    assert.throws(run(pilotRecord({ cdr: 'D:/a;D:/x', payments: 'D:/b', subscriber_events: 'D:/c' })), /pilot.poll.cdr .* no space, quote, ;/);
+    assert.throws(run(pilotRecord({ cdr: 'D:/feeds', payments: 'D:/feeds', subscriber_events: 'D:/c' })), /gives Pipelines cdr, payments the same folder/);
+    assert.throws(run(pilotRecord({ cdr: 'D:/feeds', payments: 'd:/Feeds/', subscriber_events: 'D:/c' })), /gives Pipelines cdr, payments the same folder/);
+    assert.throws(run({ ...pilotRecord(), orderCodes: ['INS-SP-BUSINESS-ASSURANCE'], pilot: { template: 'business-assurance', poll: {} } }),
+        /'business-assurance' has no Pipeline with a dirs.poll folder/);
+});
+test('PA-10c pilotTemplate copies the bought template, wires dirs.poll, drops the samples, renames it', () => {
+    const root = mkdtempSync(join(tmpdir(), 'pm-pilot-'));
+    try {
+        const t = join(root, 'fraud');
+        mkdirSync(join(t, 'config', 'cdr'), { recursive: true });
+        mkdirSync(join(t, 'data', 'samples'), { recursive: true });
+        mkdirSync(join(t, 'data', 'cdr', 'database'), { recursive: true });
+        writeFileSync(join(t, 'template.toon'), 'name: Telecom fraud\ntagline: "Samples in data/samples"\ndescription: "copy data/samples into data/inbox"\n');
+        writeFileSync(join(t, 'config', 'cdr', 'cdr_pipeline.toon'), 'name: cdr\nactive: true\n\ndirs:\n  poll:       data/inbox/cdr\n  database:   data/cdr/database\n\nsink:\n  poll: untouched\n');
+        writeFileSync(join(t, 'data', 'samples', 'cdr.csv'), 'a,b\n');
+        writeFileSync(join(t, 'data', 'cdr', 'database', 'schema-seed.parquet'), 'x');
+        pilotTemplate(root, { template: 'acme-pilot', from: 'fraud', title: 'Acme "pilot"', pipelines: [{ name: 'cdr', file: 'config/cdr/cdr_pipeline.toon', poll: 'D:/feeds/cdr' }] });
+        const p = join(root, 'acme-pilot');
+        assert.equal(readFileSync(join(p, 'config', 'cdr', 'cdr_pipeline.toon'), 'utf8'),
+            'name: cdr\nactive: true\n\ndirs:\n  poll:       "D:/feeds/cdr"\n  database:   data/cdr/database\n\nsink:\n  poll: untouched\n');
+        assert.ok(!existsSync(join(p, 'data', 'samples')), 'no golden corpus');
+        assert.ok(existsSync(join(p, 'data', 'cdr', 'database', 'schema-seed.parquet')), 'the seeds a Space needs stay');
+        assert.match(readFileSync(join(p, 'template.toon'), 'utf8'), /^name: "Acme pilot"\ntagline: "Pilot of fraud: [^\n]*\ndescription: "The fraud Space Template with each Pipeline reading the customer's own folder/);
+        assert.ok(existsSync(join(t, 'data', 'samples', 'cdr.csv')), 'the bought template is untouched');
+        assert.throws(() => pilotTemplate(root, { template: 'acme-pilot', from: 'fraud', pipelines: [] }), /already has a Space Template 'acme-pilot'/);
+        assert.throws(() => pilotTemplate(root, { template: 'x-pilot', from: 'ghost', pipelines: [] }), /no Space Template 'ghost'/);
     } finally { rmSync(root, { recursive: true, force: true }); }
 });

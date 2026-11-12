@@ -15,18 +15,31 @@
 // deploy/Dockerfile, checks the image's io.inspecto.product label, saves it as <out>/<image>-<tag>.image.tar and stamps
 // and packs the chart beside it.
 //
+//   node tools/ship.mjs airgap --plan <assembly-plan.json> --bundle-dir <unpacked linux_amd64 bundle> --out <dir>
+//                              [--allow-missing-extensions]
+//
+// `airgap` (D-PA28; package.ps1 -Target airgap runs it) makes <out>/<image>-<tag>-airgap/ and its .tar (+ .sha256):
+// bundle/inspecto-deploy/ (the unpacked Linux bundle, for a host install), image/<image>-<tag>.image.tar, chart/<chart>.tgz,
+// install-offline.sh (from deploy/airgap/), airgap.json (the manifest) and SHA256SUMS over every other file. The DuckDB
+// extensions package.ps1 stages ($duckdbExtNames) must all be in bundle/.../lib/duckdb/linux_amd64/;
+// --allow-missing-extensions is for a desk proof only: it records complete: false and the missing names, and the
+// installer warns.
+//
 // REFUSES (exit 1, the reason named): a plan without `ship`; a chart source whose stamped lines are not each found
 // exactly once (the source changed under this tool - fix the tool, never the copy); a bundle that is not the plan's
 // linux_amd64 build (lib/product.json, an ELF runtime/bin/java, the Dockerfile's product label); an image whose label
-// disagrees with the plan.
+// disagrees with the plan; an air-gapped bundle missing a DuckDB extension (unless --allow-missing-extensions).
 
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { cpSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const CHART_SOURCE = 'deploy/helm/inspecto';
+export const AIRGAP_INSTALLER = 'deploy/airgap/install-offline.sh';
+export const AIRGAP_SCHEMA = 'inspecto.airgap/1';
 const fail = (msg) => { throw new Error(msg); };
 
 /** The plan's `ship` field, or a refusal that says how to get one. */
@@ -122,7 +135,7 @@ const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { stdio: ['ignore'
  * io.inspecto.product label, save it as <out>/<image>-<tag>.image.tar and stamp the chart beside it.
  * `docker` is injectable for tests. Returns { ref, imageTar, chart }.
  */
-export function buildImage(plan, bundleDir, out, { docker = run } = {}) {
+export function buildImage(plan, bundleDir, out, { docker = run, chartOut = out } = {}) {
     const { image } = shipOfPlan(plan);
     const findings = checkBundleForImage(plan, bundleDir);
     if (findings.length) fail(`the bundle at ${bundleDir} is not this plan's linux_amd64 build:\n  ${findings.join('\n  ')}`);
@@ -133,22 +146,109 @@ export function buildImage(plan, bundleDir, out, { docker = run } = {}) {
     if (label !== plan.product.id) fail(`image ${ref} is labelled io.inspecto.product='${label}', the plan '${plan.product.id}'`);
     const imageTar = join(out, `${image.repository}-${image.tag}.image.tar`);
     docker('docker', ['save', '-o', imageTar, ref]);
-    const stamped = stampChart(plan, out);
-    return { ref, imageTar, chart: packChart(stamped) };
+    const stamped = stampChart(plan, chartOut);
+    return { ref, imageTar, chart: packChart(stamped), chartDir: stamped.dir };
+}
+
+/** The DuckDB extension names package.ps1 stages, read from it so the list lives once (as fetch-duckdb-extensions does). */
+export function duckdbExtensionNames(repo = REPO) {
+    const m = readFileSync(join(repo, 'inspecto', 'package.ps1'), 'utf8').match(/\$duckdbExtNames\s*=\s*@\(([^)]*)\)/);
+    if (!m) fail('inspecto/package.ps1 has no $duckdbExtNames list');
+    const names = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+    if (!names.length) fail('inspecto/package.ps1 $duckdbExtNames is empty');
+    return names;
+}
+
+/** Every file under `root` as a sorted POSIX path relative to it. */
+function filesUnder(root, dir = root) {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+        const p = join(dir, e.name);
+        return e.isDirectory() ? filesUnder(root, p) : [relative(root, p).split(sep).join('/')];
+    }).sort();
+}
+
+const sha256 = (file) => createHash('sha256').update(readFileSync(file)).digest('hex');
+
+/** The installer with its @NAME@ values filled in; a value that cannot sit in single quotes is refused. */
+export function renderInstaller(template, values) {
+    let text = template;
+    for (const [k, v] of Object.entries(values)) {
+        const s = String(v);
+        if (/['\n\r]/.test(s)) fail(`install-offline.sh: the value of ${k} cannot hold a quote or a line break: ${s}`);
+        text = text.split(`@${k}@`).join(s);
+    }
+    const left = text.match(/@[A-Z_]+@/);
+    if (left) fail(`install-offline.sh: ${left[0]} has no value`);
+    return text;
+}
+
+/**
+ * The air-gapped bundle (D-PA28): build the image and chart, lay out bundle/ image/ chart/ with the installer, the manifest
+ * and SHA256SUMS, then tar the folder. Returns { root, tar, complete, missing }.
+ */
+export function buildAirgap(plan, bundleDir, out, { docker = run, allowMissingExtensions = false, repo = REPO } = {}) {
+    const { image, chart } = shipOfPlan(plan);
+    const required = duckdbExtensionNames(repo);
+    const missing = required.filter((n) => !existsSync(join(bundleDir, 'lib', 'duckdb', 'linux_amd64', `${n}.duckdb_extension`)));
+    if (missing.length && !allowMissingExtensions)
+        fail(`the bundle lacks the linux_amd64 DuckDB extension(s) ${missing.join(', ')}, which an offline host cannot INSTALL; populate the cache (node tools/fetch-duckdb-extensions.mjs) and package again`);
+    const name = `${image.repository}-${image.tag}-airgap`;
+    const root = join(out, name);
+    rmSync(root, { recursive: true, force: true });
+    mkdirSync(join(root, 'bundle'), { recursive: true });
+
+    const built = buildImage(plan, bundleDir, join(root, 'image'), { docker, chartOut: join(root, 'chart') });
+    rmSync(built.chartDir, { recursive: true, force: true }); // only the packed chart travels
+    cpSync(bundleDir, join(root, 'bundle', 'inspecto-deploy'), { recursive: true });
+
+    const imageTar = `${image.repository}-${image.tag}.image.tar`;
+    const chartTgz = `${chart.name}-${chart.version}.tgz`;
+    writeFileSync(join(root, 'install-offline.sh'), renderInstaller(readFileSync(join(repo, AIRGAP_INSTALLER), 'utf8'), {
+        TITLE: plan.product.title, EDITION: plan.edition, DISTRIBUTION: plan.distribution,
+        IMAGE_REF: built.ref, IMAGE_REPO: image.repository, IMAGE_TAR: imageTar, CHART_TGZ: chartTgz,
+        COMPLETE: missing.length ? 'false' : 'true', MISSING: missing.join(' '),
+    }));
+    const complete = missing.length === 0;
+    writeFileSync(join(root, 'airgap.json'), JSON.stringify({
+        schema: AIRGAP_SCHEMA,
+        product: plan.product.id, title: plan.product.title, edition: plan.edition, distribution: plan.distribution,
+        platformVersion: plan.platformVersion,
+        image: { ref: built.ref, tar: `image/${imageTar}` },
+        chart: `chart/${chartTgz}`,
+        bundle: 'bundle/inspecto-deploy',
+        extensions: { platform: 'linux_amd64', required, missing },
+        complete,
+    }, null, 2) + '\n');
+    writeFileSync(join(root, 'SHA256SUMS'), filesUnder(root).filter((f) => f !== 'SHA256SUMS').map((f) => `${sha256(join(root, f))}  ${f}\n`).join(''));
+
+    // tar runs inside <out> with relative names (GNU tar reads `C:\...` as a remote host).
+    const tar = join(out, `${name}.tar`);
+    rmSync(tar, { force: true });
+    execFileSync('tar', ['-cf', `${name}.tar`, name], { cwd: out, stdio: ['ignore', 'ignore', 'inherit'] });
+    writeFileSync(`${tar}.sha256`, `${sha256(tar)}  ${name}.tar\n`);
+    return { root, tar, complete, missing };
 }
 
 const USAGE = [
     'usage: node tools/ship.mjs chart --plan <assembly-plan.json> --out <dir> [--no-package]',
     '       node tools/ship.mjs image --plan <assembly-plan.json> --bundle-dir <unpacked linux_amd64 bundle> --out <dir>',
+    '       node tools/ship.mjs airgap --plan <assembly-plan.json> --bundle-dir <unpacked linux_amd64 bundle> --out <dir> [--allow-missing-extensions]',
 ].join('\n');
 
 function main() {
     const [cmd, ...a] = process.argv.slice(2);
     const val = (k) => { const i = a.indexOf(k); return i >= 0 ? a[i + 1] : undefined; };
     try {
-        if (!['chart', 'image'].includes(cmd)) fail(USAGE);
+        if (!['chart', 'image', 'airgap'].includes(cmd)) fail(USAGE);
         const plan = JSON.parse(readFileSync(val('--plan') ?? fail('--plan <assembly-plan.json> is required'), 'utf8'));
         const out = resolve(val('--out') ?? fail('--out <dir> is required'));
+        if (cmd === 'airgap') {
+            const r = buildAirgap(plan, resolve(val('--bundle-dir') ?? fail('--bundle-dir <unpacked linux_amd64 bundle> is required')), out,
+                { allowMissingExtensions: a.includes('--allow-missing-extensions') });
+            if (!r.complete) console.error(`ship: WARNING - --allow-missing-extensions: the bundle lacks ${r.missing.join(', ')} (airgap.json says complete: false)`);
+            console.log(`ship: air-gapped bundle ${r.tar}`);
+            return;
+        }
         if (cmd === 'image') {
             const r = buildImage(plan, resolve(val('--bundle-dir') ?? fail('--bundle-dir <unpacked linux_amd64 bundle> is required')), out);
             console.log(`ship: image ${r.ref} -> ${r.imageTar}`);

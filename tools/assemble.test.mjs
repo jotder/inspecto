@@ -117,7 +117,8 @@ const REFUSED = {
     'an unknown Product': [{ product: 'nope', edition: 'basic' }, /unknown Product 'nope'/],
     'an edition the Product does not list': [{ product: 'la', edition: 'enterprise' }, /does not come in edition 'enterprise'/],
     'a demo on Basic': [{ product: 'la', edition: 'basic', distribution: 'demo' }, /demo distribution exists for advanced and preview only/],
-    'a planned distribution': [{ product: 'la', edition: 'advanced', distribution: 'pilot' }, /'pilot' is not built yet: PA-10/],
+    // PA-10c (D-PA35): a pilot is a customer build only.
+    'a pilot outside a customer build': [{ product: 'la', edition: 'advanced', distribution: 'pilot' }, /'pilot' distribution is a customer build: .*customer-build.mjs/],
     'an unknown target': [{ product: 'la', edition: 'advanced', target: 'saas' }, /target 'saas' is not one of windows, linux, container, airgap/],
     'a demo container': [{ product: 'telco', edition: 'advanced', distribution: 'demo', target: 'container' }, /demo distribution is not built for the 'container' target/],
     'a demo air-gapped bundle': [{ product: 'la', edition: 'advanced', distribution: 'demo', target: 'airgap' }, /demo distribution is not built for the 'airgap' target/],

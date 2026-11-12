@@ -74,7 +74,14 @@ map adds the commercial layer (billability, Order Code, billing model, support, 
   the same Product), rewrites `lib/product.json` from the plan, and always stages a **signed entitlement**
   (`conf/entitlement.toon` + `.sig`) whose `modules` are exactly the kept optional modules, so a jar copied back in stays
   inert. It is refused without the issuer key. A Domain product whose composed Space joins Apps the customer did not buy is
-  refused (`package.ps1` builds every optional App; trimming cannot recompose a Space).
+  refused (`package.ps1` builds every optional App; trimming cannot recompose a Space), and so is a bundle built with an
+  App the Product does not define (a partner App). The bundle's `edition.properties` `apps=` line follows the plan.
+- **The pilot Distribution (PA-10c, D-PA35)** is `customer-build.mjs <customer> --distribution pilot --bundle <production
+  bundle>`. The record's `pilot:` block names one bought template and, under `poll:`, an absolute folder for every
+  Pipeline of it. The bundle gains the Space Template `<customer>-pilot` (those `dirs.poll` set, `data/samples` left out)
+  and a `PILOT.txt` naming the folders and the `INSPECTO_JAVA_OPTS=-Dassist.safety.roots=…` line the install starts with:
+  the server's path jail refuses a poll folder outside the Space, and the build never widens it. `lib/product.json`
+  says `pilot`. No Space is created at build time.
 
 ## Known residuals
 
@@ -82,7 +89,9 @@ The first two are row `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1`; S6 is row `PRODUCT-MA
 
 - **A pack's ops config is not detected.** Configs under a Template's `config/ops/` (for example `telco-fraud`'s Case
   Rule) name no owner in any manifest, so `customer-build` cannot derive that they need `ops` / `case-management`; in
-  the pilot that Case Rule loads inert. Fix: a manifest declaration for ops configs.
+  the pilot that Case Rule loads inert. Fix: a manifest declaration for ops configs. **The same gap refuses the pilot's
+  Space outright (found 2026-11-12):** `telco-fraud`'s Alert Rules need `ops` as well, so without Incidents bought,
+  creating a Space from it answers 422.
 - **The combined edition SBOM over-declares a trimmed bundle** (`sbom/inspecto-<edition>.{cdx,spdx}.json` still lists
   removed jars; per-jar SBOMs are removed). Safe direction, not exact.
 - **An App has one Order Code**, so a price per App × Edition (D-PA6) has no key yet: row

@@ -30,6 +30,8 @@ Rules:
   `expires` and `nodes`), assembles it (`tools/assemble.mjs --customer`, PA-10b) and writes the Assembly Plan, the customer
   Offering, a priced bill of materials and a signed entitlement to `target/customers/<customer>/`; with `--bundle`, a copy of the
   Product bundle trimmed to the plan, with `conf/entitlement.toon` + `.sig`. The key defaults to `private/keys/inspecto-issuer-1.pem`.
+  `--distribution pilot` (PA-10c) also needs the record's `pilot:` block (`template`, and under `poll:` one absolute
+  folder per Pipeline of it) and adds the Space Template `<customer>-pilot` plus a `PILOT.txt` to the bundle.
 - `node tools/pick-addons.mjs` lists the Platform product's Add-ons with their closure, Edition floor and price;
   `--pick a,b --id <id> --write` writes a picked Platform product to `private/products/<id>.toon`, which
   `inspecto/package.ps1 -ProductFile` builds in place of the Platform product it narrows.
