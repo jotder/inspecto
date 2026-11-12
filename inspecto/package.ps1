@@ -283,6 +283,8 @@ if ($plan.ship) {
 }
 # PA-8c (D-PA28): an offline host cannot INSTALL a DuckDB extension, so an air-gapped build stages every one or fails.
 if ($Target -eq 'airgap') { $RequireExtensions = $true }
+# CONTAINER-DEMO-IMAGE-1: a demo image carries its Product's baked demo Space (tools/ship.mjs image refuses one without it), so say so before the build.
+if ($Target -eq 'container' -and $plan.seedSpace -and $NoBakeDemo) { throw "-Target container -NoBakeDemo: a demo image carries the baked demo Space $($plan.seedSpace); drop -NoBakeDemo" }
 
 $bundleDir    = Join-Path $sandboxRoot  'inspecto-deploy'
 if ($DemoAuth) {

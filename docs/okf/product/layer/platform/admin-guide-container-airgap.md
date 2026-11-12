@@ -95,8 +95,9 @@ Product without a folder or a folder without a Product, a name, image or Product
 
 ## The demo image
 
-A Product with a demo Distribution also ships as a seeded **demo image** (CONTAINER-DEMO-IMAGE-1, D-PA26 as changed by
-the operator on 2026-11-12):
+A Product with a demo Distribution also ships as a **demo image** (CONTAINER-DEMO-IMAGE-1, D-PA26 as changed by the
+operator on 2026-11-12). It is seeded when the Product names a `demoSpace` (Inspecto Telco and Inspecto LA do); the
+Platform product names none, so its demo image carries no Space:
 
 ```powershell
 .\inspecto\package.ps1 -Product telco -Edition Advanced -Distribution demo -Target container -GraalvmCache C:\.jdks
