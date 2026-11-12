@@ -81,6 +81,8 @@ Every shipped lane went through independent adversarial verification (1–3 roun
 | Health | idle: 0 requests in 35 s (no polling); 🔴 **`TypeError: Cannot read properties of undefined (reading 'getData')` in `renderMinimap`, four times, after route changes** (a real defect); 5 × "Unable to preventDefault inside passive event listener" |
 
 ### The re-ranked open list (by what an analyst feels)
+Open items N3, N4, N7–N11, P5, P6 and P10a-5 are tracked on the board as `LA-PERF-*` rows (`docs/BACKLOG.md` §3.12, 2026-11-12).
+
 **Tier 1 — freezes the page**
 - **N1 Radial layout hangs the tab (> 3 min at 767 nodes / 4,000 links).** Cap or refuse Radial above a node count (a `layered_max_nodes` = 30 cap already exists as the pattern), and say so on screen; then decide on a worker (PERF-D5). Severity: high; a one-line cap removes the hang. ✅ **SHIPPED 2026-10-25** (3 builder / verifier rounds; targeted tests only): the Radial, Information density, Clustering and every other layout are capped at the one place they reach G6 (`layoutConfig`, caps through the `display` limits: Java `LaLimit`, `la-limits.ts`, docs, parity test), Concentric is the fallback, the cap notice no longer covers the legend. `d4fd1aa11`, `65593934a`, `92903f91b`.
 - **N2 Community hulls toggle costs ~3.1 s on and off.** Turning hulls OFF must not recompute Louvain; memoise the community assignment per graph signature (P8, now measured). ✅ **SHIPPED 2026-10-25** (3 rounds; targeted tests only): the hulls toggle no longer rebuilds the graph, Louvain is memoised per graph signature and cap, hull shapes come off before a data change and return after it. `0ceee890f`, `f0ecaeed5`, `aec36325a`.
@@ -89,7 +91,7 @@ Every shipped lane went through independent adversarial verification (1–3 roun
 
 **Tier 2 — load and startup**
 - **N5 Landing makes ~27 calls with every Space's `/bootstrap` fetched twice (~1 MB decoded).** Dedupe (a request-level cache for GETs, the same mechanism as P10a-2) and fetch only the current Space's bootstrap; `/spaces`, `/spaces/_meta`, the components lists and `/entity-lists` each ×2 too. Cheap, client-only, high yield. ✅ **SHIPPED 2026-10-25** (verified PASS; targeted tests only): the landing page fetches each Space call once through short-lived reads (`short-reads.ts`), and every Entity List / Dataset / component / access write clears them. `10b5776b7`, `0a6420e2b`, `ddfa3d81a`.
-- **N6 Hashed JS/CSS/font chunks are revalidated on every load (19 × `304`).** Serve content-hashed files with `Cache-Control: public, max-age=31536000, immutable`; negligible on localhost, 19 round trips on a real network.
+- **N6 Hashed JS/CSS/font chunks are revalidated on every load (19 × `304`).** Serve content-hashed files with `Cache-Control: public, max-age=31536000, immutable`; negligible on localhost, 19 round trips on a real network. ✅ **SHIPPED 2026-11-12** (targeted tests only): `<stem>-<hash>.js|css|woff2` is `public, max-age=31536000, immutable`; index.html and plain names keep `no-cache` + ETag (`ControlApiStaticAndCorsTest`). `732528b7c`.
 
 **Tier 3 — server fixed overhead (MEASURE FIRST: profile before building; code-read was wrong 6 of 8 times)**
 - **N7 A fixed ~80 ms per LA request** (Working Set and the Investigation list at 94–95 ms with one Investigation, against 15 ms for `/health`), and **N8 a 304 that costs as much as a 200** (projection 270–290 vs 303 ms; `/bootstrap` 21.8 vs 25.3 ms): the 304 still pays the key computation and gates. Profile with a sampling run (jcmd `Thread.print` ×N or JFR if the runtime has it) under a request loop to find what the fixed cost is (suspects: settings/limits read per request, audit append, capability/ABAC, fingerprint listing in the cache key).
@@ -99,8 +101,8 @@ Every shipped lane went through independent adversarial verification (1–3 roun
 
 **Tier 4 — defects and small fixes**
 - **N12 `renderMinimap` TypeError after route changes (×4).** Guard the destroyed-graph case. ✅ **SHIPPED 2026-10-25** (builder + verifier follow-up; targeted tests only): the graph tears down without a late minimap render and survives a throwing minimap silencer. `c47966312`, `3b5efb0c2`.
-- **N13 `429` without `Retry-After`,** and no client-side handling: add the header and let the client back off.
-- **N14 The "node cap" banner appears at 465–767 nodes** because the 4,000-ROW cap binds first: say which cap bit.
+- **N13 `429` without `Retry-After`,** and no client-side handling: add the header and let the client back off. ✅ **SHIPPED 2026-11-12** (targeted tests only): every 429 carries `Retry-After` (seconds to the bucket's next token); the LA projection and neighbour reads wait it out once (at most 10 s), then the refusal stands. `732528b7c`.
+- **N14 The "node cap" banner appears at 465–767 nodes** because the 4,000-ROW cap binds first: say which cap bit. ✅ **SHIPPED 2026-11-12** (targeted tests only): the *Result cut short* notice names the node cap when the graph holds that many nodes, else the server's row limit (`truncationNotice`). `732528b7c`.
 
 **Standing results.** Refuted at demo scale: H1 idle polling, H5 page leak (canvas/DOM), H7 worst-algorithm, P5's premise that betweenness is the top cost. Unmeasured (need bigger data or a map drive): H1/H2 geo, P2-1/P2-2 scaling, P2-3/P2-4 geo limit (consistent with the limit applied after the scan: 182 vs 177 ms for limit 100 vs 5,000 on 449 points), heap after a forced GC, shortest path, Grow.
 
