@@ -107,7 +107,9 @@ param(
     # 'container' also builds the Product's OCI image (inspecto-<product>:<version>-<edition>[-trial]) from the linux_amd64 zip and
     # stamps its Helm chart, both into inspecto-ship/<image>-<tag>/ (tools/ship.mjs). It needs Docker and the linux_amd64 zip
     # (the Linux jmods: -GraalvmCache). Refused for -Distribution demo.
-    [ValidateSet('windows', 'linux', 'container')]
+    # 'airgap' (D-PA28) does the same, then lays out inspecto-ship/<image>-<tag>-airgap/ and its .tar: the unpacked Linux bundle,
+    # the saved image, the chart, install-offline.sh, airgap.json and SHA256SUMS. It implies -RequireExtensions.
+    [ValidateSet('windows', 'linux', 'container', 'airgap')]
     [string]$Target = 'windows',
     # PRODUCT-ASSEMBLY-1 PA-6a (D-PA18): folders holding a partner App (app.toon + templates/<id>/) built with tools/inspecto-app.mjs,
     # outside apps/. Passed to the assembler as --app-root; the App's templates are staged from those folders, not from git.
@@ -277,6 +279,8 @@ if ($plan.ship) {
     if ($LASTEXITCODE -ne 0) { throw "-Target ${Target}: Docker is not reachable (docker version failed); the image is built with docker build" }
     Write-Host "  ships: image $($plan.ship.image.repository):$($plan.ship.image.tag), chart $($plan.ship.chart.name) $($plan.ship.chart.version)" -ForegroundColor Cyan
 }
+# PA-8c (D-PA28): an offline host cannot INSTALL a DuckDB extension, so an air-gapped build stages every one or fails.
+if ($Target -eq 'airgap') { $RequireExtensions = $true }
 
 $bundleDir    = Join-Path $sandboxRoot  'inspecto-deploy'
 if ($DemoAuth) {
@@ -2904,8 +2908,14 @@ if ($plan.ship) {
     if (Test-Path $unzipDir) { Remove-Item $unzipDir -Recurse -Force }
     try {
         Expand-Archive -LiteralPath $outZips['linux_amd64'] -DestinationPath $unzipDir
-        & node (Join-Path $sandboxRoot 'tools\ship.mjs') image --plan $planFile --bundle-dir (Join-Path $unzipDir $zipStem) --out $shipDir
-        if ($LASTEXITCODE -ne 0) { throw "tools/ship.mjs image failed for $($plan.ship.image.repository):$($plan.ship.image.tag) (the reason is above)" }
+        if ($Target -eq 'airgap') {
+            # The air-gapped folder and tar land in inspecto-ship/ itself, named <image>-<tag>-airgap.
+            $shipDir = Join-Path $sandboxRoot "inspecto-ship\$($plan.ship.image.repository)-$($plan.ship.image.tag)-airgap"
+            & node (Join-Path $sandboxRoot 'tools\ship.mjs') airgap --plan $planFile --bundle-dir (Join-Path $unzipDir $zipStem) --out (Split-Path -Parent $shipDir)
+        } else {
+            & node (Join-Path $sandboxRoot 'tools\ship.mjs') image --plan $planFile --bundle-dir (Join-Path $unzipDir $zipStem) --out $shipDir
+        }
+        if ($LASTEXITCODE -ne 0) { throw "tools/ship.mjs $Target failed for $($plan.ship.image.repository):$($plan.ship.image.tag) (the reason is above)" }
     } finally {
         if (Test-Path $unzipDir) { Remove-Item $unzipDir -Recurse -Force }
     }
@@ -2914,7 +2924,7 @@ if ($plan.ship) {
 Write-Host ""
 Write-Host "Deployment bundle(s) ready:" -ForegroundColor Green
 foreach ($plat in $outZips.Keys) { Write-Host "  $($outZips[$plat])  (+ .sha256$sigNote)  [$plat]" }
-if ($shipDir) { Write-Host "  $shipDir  (image $($plan.ship.image.repository):$($plan.ship.image.tag) saved as a tar + Helm chart)  [$Target]" }
+if ($shipDir) { Write-Host "  $shipDir$(if ($Target -eq 'airgap') { '(.tar)' })  (image $($plan.ship.image.repository):$($plan.ship.image.tag) + Helm chart$(if ($Target -eq 'airgap') { ' + Linux bundle + install-offline.sh' }))  [$Target]" }
 # A bundle with no ui/ still starts and still serves /api/v1 — but every browser hit returns
 # ControlApi's `{"error":"not found — API routes are served under /api/v1"}` 404, which looks like a
 # broken deployment rather than a packaging choice. It shipped that way once (2026-07-31) precisely
