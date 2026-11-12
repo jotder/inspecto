@@ -197,6 +197,8 @@ export function customerAssembly({ model, g, files, world, customer, prices = {}
         editionProperties: { ...plan.editionProperties, customer: customer.id, offering: `customer-${customer.id}` },
         customer: {
             id: customer.id, title: customer.title ?? customer.id, offering: r.offering, keep: r.keep, removed: r.removed,
+            // the Product's own Apps: a bundle built with any other (a partner App, --app-root) is refused by the trim
+            productApps: [...productApps(p).required, ...productApps(p).optional],
             removedJars: [...removedJars].sort(), bom: r.bom.map(({ listPrice, currency, ...b }) => b), entitlement: fields,
         },
     } };

@@ -153,12 +153,13 @@ test('PA-10b trimBundle executes the plan: jars, SBOMs, templates, descriptor, s
         const jars = ['inspecto.jar', 'inspecto-oidc.jar', 'inspecto-la.jar', 'inspecto-ops.jar'];
         for (const j of jars) { writeFileSync(join(src, 'lib', j), 'x'); writeFileSync(join(src, 'sbom', j.replace('.jar', '.sbom.cdx.json')), '{}'); }
         writeFileSync(join(src, 'lib', 'modules.list'), jars.map((j) => `lib/${j}`).join('\n') + '\n');
-        writeFileSync(join(src, 'lib', 'edition.properties'), 'edition=Standard\n');
+        writeFileSync(join(src, 'lib', 'edition.properties'), 'edition=Standard\nproduct=inspecto\napps=link-analysis\n');
         writeFileSync(join(src, 'lib', 'product.json'), JSON.stringify({ id: 'inspecto', apps: [{ id: 'link-analysis' }] }));
         const plan = {
             product: { id: 'inspecto' }, edition: 'Standard', templates: ['fraud'], space: null,
             descriptor: { schema: 'inspecto.product/1', id: 'inspecto', apps: [] },
-            customer: { id: 'acme', offering: 'id: customer-acme\n', removedJars: ['inspecto-ops.jar'], bom: [{ line: 'bought', orderCode: 'AO-LA' }] },
+            editionProperties: { apps: '' },
+            customer: { id: 'acme', offering: 'id: customer-acme\n', productApps: ['link-analysis'], removedJars: ['inspecto-ops.jar'], bom: [{ line: 'bought', orderCode: 'AO-LA' }] },
         };
         const dest = join(root, 'out');
         const t = trimBundle(src, dest, plan, { toon: 'schema: x\n', sig: 'c2ln\n' });
@@ -166,7 +167,7 @@ test('PA-10b trimBundle executes the plan: jars, SBOMs, templates, descriptor, s
         assert.equal(readFileSync(join(dest, 'lib', 'modules.list'), 'utf8'), 'lib/inspecto.jar\nlib/inspecto-oidc.jar\nlib/inspecto-la.jar\n');
         assert.ok(!existsSync(join(dest, 'sbom', 'inspecto-ops.sbom.cdx.json')) && existsSync(join(dest, 'sbom', 'inspecto-la.sbom.cdx.json')));
         assert.ok(existsSync(join(dest, 'spaces', '_templates', 'fraud')) && !existsSync(join(dest, 'spaces', '_templates', 'starter')));
-        assert.match(readFileSync(join(dest, 'lib', 'edition.properties'), 'utf8'), /^edition=Standard\ncustomer=acme\noffering=customer-acme\n$/);
+        assert.match(readFileSync(join(dest, 'lib', 'edition.properties'), 'utf8'), /^edition=Standard\nproduct=inspecto\ncustomer=acme\noffering=customer-acme\n$/, 'the Product build\'s apps= line follows the plan');
         assert.deepEqual(JSON.parse(readFileSync(join(dest, 'lib', 'product.json'), 'utf8')), plan.descriptor);
         assert.equal(readFileSync(join(dest, 'conf', 'entitlement.toon'), 'utf8'), 'schema: x\n');
         assert.equal(readFileSync(join(dest, 'conf', 'entitlement.sig'), 'utf8'), 'c2ln\n');
@@ -174,6 +175,10 @@ test('PA-10b trimBundle executes the plan: jars, SBOMs, templates, descriptor, s
         assert.throws(() => trimBundle(src, dest, { ...plan, edition: 'Advanced' }, {}), /edition 'Standard', the customer's Edition is 'Advanced'/);
         assert.throws(() => trimBundle(src, dest, { ...plan, product: { id: 'la' } }, {}), /is Product 'inspecto', the customer's Product is 'la'/);
         assert.throws(() => trimBundle(src, dest, { ...plan, customer: { ...plan.customer, removedJars: ['inspecto-ghost.jar'] } }, {}), /no lib\/inspecto-ghost.jar/);
+        trimBundle(src, dest, { ...plan, editionProperties: { apps: 'link-analysis' } }, { toon: '', sig: '' });
+        assert.match(readFileSync(join(dest, 'lib', 'edition.properties'), 'utf8'), /^edition=Standard\nproduct=inspecto\napps=link-analysis\ncustomer=acme\n/);
+        assert.throws(() => trimBundle(src, dest, { ...plan, customer: { ...plan.customer, productApps: [] } }, {}),
+            /built with App\(s\) link-analysis, which Product 'inspecto' does not define/);
         assert.throws(() => trimBundle(src, dest, { ...plan, space: { id: 'telco' }, descriptor: { apps: [{ id: 'x' }] } }, {}), /not a composed Space/);
     } finally { rmSync(root, { recursive: true, force: true }); }
 });

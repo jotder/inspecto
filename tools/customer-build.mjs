@@ -45,6 +45,8 @@ export function trimBundle(src, dest, plan, entitlement) {
     const descFile = join(src, 'lib', 'product.json');
     const built = existsSync(descFile) ? JSON.parse(readFileSync(descFile, 'utf8')) : fail(`bundle ${src} has no lib/product.json - build it with package.ps1 -Product ${plan.product.id}`);
     if (built.id !== plan.product.id) fail(`bundle ${src} is Product '${built.id}', the customer's Product is '${plan.product.id}'`);
+    const foreign = (built.apps ?? []).map((a) => a.id).filter((a) => c.productApps && !c.productApps.includes(a));
+    if (foreign.length) fail(`bundle ${src} was built with App(s) ${foreign.join(', ')}, which Product '${plan.product.id}' does not define (a partner App, --app-root): a customer build of it is not supported yet`);
     if (plan.space) {
         const want = plan.descriptor.apps.map((a) => a.id).join(','), has = (built.apps ?? []).map((a) => a.id).join(',');
         if (want !== has) fail(`bundle ${src} composed Space '${plan.space.id}' from Apps ${has}; this customer holds ${want}. A customer build trims jars and templates, not a composed Space`);
@@ -63,7 +65,10 @@ export function trimBundle(src, dest, plan, entitlement) {
     const templates = [];
     if (existsSync(tdir)) for (const t of listDirs(tdir)) { if (keepT.has(t)) continue; rmSync(join(tdir, t), { recursive: true }); templates.push(t); }
     writeFileSync(join(dest, 'lib', 'product.json'), JSON.stringify(plan.descriptor, null, 2) + '\n');
-    writeFileSync(join(dest, 'lib', 'edition.properties'), props.trimEnd() + `\ncustomer=${c.id}\noffering=customer-${c.id}\n`);
+    // The bundle's `apps=` line is the Product build's selection; the customer's is the plan's.
+    const apps = plan.editionProperties?.apps ?? '';
+    const stamped = /^apps=.*$/m.test(props) ? props.replace(/^apps=.*$/m, apps ? `apps=${apps}` : '').replace(/\n{2,}/g, '\n') : props;
+    writeFileSync(join(dest, 'lib', 'edition.properties'), stamped.trimEnd() + `\ncustomer=${c.id}\noffering=customer-${c.id}\n`);
     writeFileSync(join(dest, `customer-${c.id}.toon`), c.offering);
     writeFileSync(join(dest, 'customer-bom.csv'), bomCsv(c.bom, { prices: false }));
     mkdirSync(join(dest, 'conf'), { recursive: true });
