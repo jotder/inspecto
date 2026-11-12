@@ -4,7 +4,7 @@ metadata:
   name: {{ include "inspecto.fullname" . }}
   labels: {{- include "inspecto.labels" . | nindent 4 }}
 spec:
-  selector: {{- include "inspecto.labels" . | nindent 4 }}
+  selector: {{- include "inspecto.selectorLabels" . | nindent 4 }}
   ports:
     - name: {{ if .Values.tls.enabled }}https{{ else }}http{{ end }}
       port: {{ .Values.port }}

@@ -14,8 +14,8 @@
 // edition lacks; and any finding of tools/check-products.mjs (a plan is never assembled from broken definitions).
 //
 // WHAT A PLAN DOES NOT DO YET (PA-2 scope): the module set is the whole Edition's Offering classpath, exactly as before -
-// trimming to the Product's Apps is customer-build's job until PA-10. Entitlements (PA-7), container / air-gap targets
-// (PA-8) and the per-Product nav (PA-3) are not in it.
+// trimming to the Product's Apps is customer-build's job until PA-10. The container and air-gap targets (PA-8) add the
+// plan's `ship` field, which tools/ship.mjs reads (`chart` stamps the Product's Helm chart).
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -28,8 +28,21 @@ import { gather } from './check-offerings.mjs';
 export const PLAN_SCHEMA = 'inspecto.assembly-plan/1';
 export const LOCK_SCHEMA = 'inspecto.product-lock/1';
 /** One package.ps1 run makes the windows_amd64 zip and, with a Linux runtime cache, the linux_amd64 zip (see package.ps1's header). */
-export const TARGETS = ['windows', 'linux'];
-export const PLANNED_TARGETS = { container: 'PA-8 (OCI image + Helm chart per Product)', airgap: 'PA-8 (air-gapped bundle)' };
+/** PA-8 (D-PA26, D-PA28): `container` and `airgap` post-process the linux_amd64 bundle with tools/ship.mjs. */
+export const TARGETS = ['windows', 'linux', 'container', 'airgap'];
+export const SHIPPED_TARGETS = ['container', 'airgap'];
+
+/**
+ * PA-8 (D-PA26, D-PA27): the image and Helm chart a container or air-gap build ships. The image is `inspecto-<product>`
+ * (the Platform product stays `inspecto`), tagged `<platform version>-<edition>[-trial]`; the chart takes the image's name.
+ */
+export function shipOf(productId, edition, distribution, platformVersion) {
+    const repository = productId === 'inspecto' ? 'inspecto' : `inspecto-${productId}`;
+    if (!/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/.test(repository)) fail(`Product id '${productId}' does not make an image name (lowercase letters, digits, '.', '_' and '-' only)`);
+    const tag = `${platformVersion}-${edition}${distribution === 'trial' ? '-trial' : ''}`;
+    if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/.test(tag)) fail(`'${tag}' is not an image tag`);
+    return { image: { repository, tag }, chart: { name: repository, version: platformVersion, appVersion: tag } };
+}
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const fail = (msg) => { throw new Error(msg); };
@@ -47,9 +60,10 @@ export function assemble(model, g, { product, edition, distribution = 'productio
     if (PLANNED_DISTRIBUTIONS[distribution]) fail(`distribution '${distribution}' is not built yet: ${PLANNED_DISTRIBUTIONS[distribution]}`);
     if (!DISTRIBUTIONS.includes(distribution)) fail(`distribution '${distribution}' is not one of ${DISTRIBUTIONS.join(', ')}`);
     if (!(p.distributions ?? []).includes(distribution)) fail(`Product '${product}' does not offer the '${distribution}' distribution (it lists ${(p.distributions ?? []).join(', ')})`);
-    if (PLANNED_TARGETS[target]) fail(`target '${target}' is not built yet: ${PLANNED_TARGETS[target]}`);
     if (!TARGETS.includes(target)) fail(`target '${target}' is not one of ${TARGETS.join(', ')}`);
     const demo = distribution === 'demo';
+    // D-PA26: a demo build binds 127.0.0.1 and signs in Demo Users - a desk build, never a container or an offline install.
+    if (demo && SHIPPED_TARGETS.includes(target)) fail(`the demo distribution is not built for the '${target}' target (it binds 127.0.0.1 and signs in Demo Users); use production or trial`);
     if (demo && !DEMO_EDITIONS.includes(ed)) fail(`the demo distribution exists for ${DEMO_EDITIONS.join(' and ')} only (the demo sign-in replaces the OIDC jars), not '${ed}'`);
 
     const offered = builtAddons(ed, model.offerings);
@@ -102,6 +116,8 @@ export function assemble(model, g, { product, edition, distribution = 'productio
         posture: model.offerings[ed].posture ?? null,
         editionProperties: { edition: Edition, ...(demo ? { variant: 'demo' } : {}), product: p.id, apps: selected.join(',') },
         descriptor: productDescriptor(model, p, ed, distribution, selected),
+        // PA-8: the image and chart tools/ship.mjs makes from the linux_amd64 bundle (null for a zip-only target).
+        ship: SHIPPED_TARGETS.includes(target) ? shipOf(p.id, ed, distribution, model.pomVersion) : null,
         notes,
     };
 }
