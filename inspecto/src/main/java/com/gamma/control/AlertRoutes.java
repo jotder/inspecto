@@ -280,8 +280,87 @@ final class AlertRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an Alert Rule over an Investigation (investigation:) is authored through "
                     + "POST /inv/investigations/{id}/alert-rules, which checks that you own the Investigation");
         requireGroupingColumns(writeRoot, dataRoot, rule);
+        requireWindow(writeRoot, dataRoot, rule);
         requireRunbook(writeRoot, rule);
         return rule;
+    }
+
+    /** The {@code processing.batch.max_files} a windowed rule's Pipeline needs: one drain commits as one Consignment. */
+    static final int WINDOWED_MIN_BATCH_FILES = 2;
+
+    /**
+     * PA-9b (D-PA40): a windowed rule ({@code window: {type, size, time, …}}) is evaluated on each commit of a Stream,
+     * so it is refused (422, fail closed) unless
+     * <ul>
+     *   <li>its {@code window.time} is a TIMESTAMP column of the Dataset's Schema, and every {@code window.distinctOn}
+     *       column exists;</li>
+     *   <li>its Dataset is written by a Pipeline ({@code physicalRef} head) and every such Pipeline has a
+     *       {@code trigger: {type: stream}} — with no Stream, nothing commits for it to evaluate on;</li>
+     *   <li>every such Pipeline sets {@code processing.batch.max_files} to at least {@value #WINDOWED_MIN_BATCH_FILES}:
+     *       at the default 1, a drain over N partitions commits N Consignments queued behind each other, and PA-9a
+     *       measured that missing the stated latency (p95 7.1 s at 5k events/s over 4 partitions). Decided in the
+     *       PA-9a lane; reverse by dropping the check.</li>
+     * </ul>
+     * The window's own bounds (size + lateness ≤ 1h, ≤ 60 slides) are {@link AlertRule}'s. Runs inside {@link #parse}.
+     */
+    static void requireWindow(java.nio.file.Path writeRoot, java.util.function.Supplier<java.nio.file.Path> dataRoot,
+                              AlertRule rule) {
+        if (!rule.isWindowed()) return;
+        if (writeRoot == null)
+            throw new ApiException(503, ErrorCodes.CONTROL_PLANE_READ_ONLY,
+                    "alert rule write disabled: set -Dassist.write.root to enable");
+        com.gamma.alert.AlertWindow w = rule.eventWindow();
+        String ds = rule.dataset();
+        var probe = new com.gamma.query.DatasetMeasureProbe(() -> writeRoot, dataRoot);
+        List<String> columns;
+        String timeType;
+        try {
+            columns = probe.columns(ds);
+            if (!columns.contains(w.time()))
+                throw refused("alert.window.time '" + w.time() + "' is not in the Schema of dataset '" + ds + "' (have: " + columns + ")");
+            timeType = probe.columnType(ds, w.time());
+        } catch (IllegalArgumentException e) {
+            throw refused("alert.window cannot be checked against the Schema of dataset '" + ds + "': " + e.getMessage());
+        }
+        if (!timeType.startsWith("TIMESTAMP"))
+            throw refused("alert.window.time '" + w.time() + "' is " + timeType + " in dataset '" + ds
+                    + "'; a Window needs an event-time TIMESTAMP column");
+        List<String> missing = w.distinctOn().stream().filter(c -> !columns.contains(c)).toList();
+        if (!missing.isEmpty())
+            throw refused("alert.window.distinctOn column(s) " + missing + " are not in the Schema of dataset '" + ds + "'");
+
+        Map<String, Object> dataset = new ComponentStore(writeRoot.resolve("registry")).get("dataset", ds)
+                .map(com.gamma.pipeline.ComponentRegistry.Component::content).orElse(Map.of());
+        Object ref = dataset.get("physicalRef");
+        String store = ref == null ? "" : String.valueOf(ref).trim();
+        if (store.contains("/")) store = store.substring(0, store.indexOf('/'));
+        if (store.isEmpty())
+            throw refused("a windowed alert reads a Stream: dataset '" + ds + "' declares no physicalRef naming the "
+                    + "Pipeline that writes it");
+        var producers = com.gamma.catalog.PipelineSchemas.producers(writeRoot, store);
+        if (producers.unreadable())
+            throw refused("a windowed alert needs a stream-triggered Pipeline: a Pipeline that may write '" + store
+                    + "' (dataset '" + ds + "') could not be loaded");
+        if (producers.configs().isEmpty())
+            throw refused("a windowed alert needs a stream-triggered Pipeline: no Pipeline writes '" + store
+                    + "' (dataset '" + ds + "')");
+        for (com.gamma.etl.PipelineConfig p : producers.configs()) {
+            String name = p.identity().pipelineName();
+            com.gamma.pipeline.PipelineTrigger t = p.triggerConfig() == null ? null
+                    : com.gamma.pipeline.PipelineTrigger.of(p.triggerConfig());
+            if (t == null || t.kind() != com.gamma.pipeline.PipelineTrigger.Kind.STREAM)
+                throw refused("a windowed alert is evaluated on each commit of a Stream: Pipeline '" + name
+                        + "' (writing dataset '" + ds + "') has no trigger {type: stream}");
+            int maxFiles = p.processing().batchMaxFiles();
+            if (maxFiles < WINDOWED_MIN_BATCH_FILES)
+                throw refused("a windowed alert needs one drain to commit as one Consignment: Pipeline '" + name
+                        + "' has processing.batch.max_files " + maxFiles + "; set it to at least "
+                        + WINDOWED_MIN_BATCH_FILES + " (the Telco CEP template uses 64)");
+        }
+    }
+
+    private static ApiException refused(String message) {
+        return new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, message);
     }
 
     /**

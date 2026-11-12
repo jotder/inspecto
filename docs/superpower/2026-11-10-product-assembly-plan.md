@@ -4,7 +4,7 @@
 as recommended. ✅ PA-0 done 2026-11-10 (the words are in `GLOSSARY.md` §15 *Product assembly*); ✅ PA-1 done 2026-11-10 (§11
 as-built note); ✅ PA-2 done 2026-11-10 (§11 as-built note, with the package runs that prove it); ✅ PA-3 done 2026-11-10 (§11
 design and proof); ✅ PA-4 done 2026-11-10 (§11 design and proof); PA-5 designed and sliced (§11, D-PA13…D-PA16 signed), ✅ PA-5a and
-PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 designed and sliced 2026-11-12 (§11, D-PA26…D-PA31 decided, operator away); PA-8 built 2026-11-12 (8a the chart per Product, 8b the image per Product, 8c the air-gapped bundle) but **reopened by the operator 2026-11-12 (D-PA30): not done until a real cluster install passes** (`CONTAINER-AIRGAP-PROOFS-1`); D-PA26/27 add a demo image and per-Product chart values. PA-10 designed and sliced 2026-11-12 (§11, D-PA32…D-PA37 decided, operator away; reviewed 2026-11-12: D-PA35 pre-created pilot Space, D-PA36 generated scripts, D-PA37 gaps fixed next); ✅ PA-10 done 2026-11-12 (10a Product Map kinds, 10b customer builds through the assembler with a signed entitlement, 10c the pilot Distribution, 10d generated Product documents; the pilot customer's build matches today's byte for byte plus its entitlement). PA-9 designed 2026-11-12 (§11; D-PA38…D-PA47 signed 2026-11-12 by the operator, as recommended); ✅ PA-9a done 2026-11-12 (the spike: gate G-RT trips on reading the Dataset, so the window buffer is the state; one drain commits as one Consignment). Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
+PA-5b and PA-5c done 2026-11-10 (PA-5c: one usage feed in the Composed Space Template, D-PA17); ✅ PA-5d done 2026-11-11 (the Telco demo Distribution and Product matrix), so PA-5 is done; PA-6 designed and sliced 2026-11-11 (§11, D-PA18…D-PA20 signed); ✅ PA-6a done 2026-11-11 (the App kit); ✅ PA-6b done 2026-11-11 (the sample partner App); ✅ PA-6c done 2026-11-11 (the Add-on picker CLI); ✅ PA-6d done 2026-11-11 (the builder-kit guide), so PA-6 is done; PA-7 designed and sliced 2026-11-11 (§11, D-PA22…D-PA25 signed); ✅ PA-7a done 2026-11-11 (signed entitlements); ✅ PA-7b done 2026-11-11 (expiry, read-only, the trial Distribution); ✅ PA-7c done 2026-11-11 (signed App packages); ✅ PA-7d done 2026-11-11 (live App install), so PA-7 is done; PA-8 designed and sliced 2026-11-12 (§11, D-PA26…D-PA31 decided, operator away); PA-8 built 2026-11-12 (8a the chart per Product, 8b the image per Product, 8c the air-gapped bundle) but **reopened by the operator 2026-11-12 (D-PA30): not done until a real cluster install passes** (`CONTAINER-AIRGAP-PROOFS-1`); D-PA26/27 add a demo image and per-Product chart values. PA-10 designed and sliced 2026-11-12 (§11, D-PA32…D-PA37 decided, operator away; reviewed 2026-11-12: D-PA35 pre-created pilot Space, D-PA36 generated scripts, D-PA37 gaps fixed next); ✅ PA-10 done 2026-11-12 (10a Product Map kinds, 10b customer builds through the assembler with a signed entitlement, 10c the pilot Distribution, 10d generated Product documents; the pilot customer's build matches today's byte for byte plus its entitlement). PA-9 designed 2026-11-12 (§11; D-PA38…D-PA47 signed 2026-11-12 by the operator, as recommended); ✅ PA-9a done 2026-11-12 (the spike: gate G-RT trips on reading the Dataset, so the window buffer is the state; one drain commits as one Consignment); ✅ PA-9b done 2026-11-12 (the windowed Alert Rule: the `window:` block, its SQL compiler over the window buffer, the fired table, the 422 gates; not yet called on commit, PA-9d). Product Map Items: `layer.platform`, `layer.product`, `edition.basic`,
 `module.config`, `module.entity-store`. Board row: `PRODUCT-ASSEMBLY-1`.*
 
 ## 1. Goal
@@ -1514,6 +1514,69 @@ Not measured in PA-9a:
 - **A quiet desk.** Peer lanes were building at the time. One earlier attempt died on a full Windows paging file.
 - **The fake connector's fetch count.** It shows about two fetches per landed file (`fetched=468 of 239 csv`). This
   was not investigated: commits and latencies are counted from the committed output, not from fetches.
+
+**PA-9b as built (2026-11-12): the windowed Alert Rule — the `window:` block, its SQL compiler over the window
+buffer, the fired table and the 422 gates.** Engine code in `com.gamma.alert` (`inspecto-engine`); the gates in
+`AlertRoutes`; no route added or changed, so `openapi-v1.json` and the generated inventories are untouched. Nothing
+calls the evaluator on commit yet: the commit hook, the Add-on gating and the metrics are PA-9d.
+- **The rule** (`AlertWindow`, `AlertRule.eventWindow`). A Dataset measure rule takes `window: {type: tumbling|sliding,
+  size, slide, time, lateness, distinctOn}` (durations `Ns|Nm|Nh`). A block is a Window; a string stays the ledger
+  window of a ledger-metric rule, so stored rules parse as before. Refused in the record (422 at every save door):
+  `size + lateness` > 1 h, more than 60 slides, a `slide` above or not dividing `size`, a tumbling `slide` other than its
+  size, a non-plain `time` or `distinctOn` column, an unknown block key, a block on any other rule kind, and
+  `healAfterSweeps`. A windowed rule may carry `when` (a Condition Language tree, D-PA42); a non-windowed measure rule
+  still may not.
+- **Decided in this lane (standing preference, operator away): a windowed rule takes comparator `gt` or `gte` only.**
+  An open window can only grow towards such a threshold, so it fires the first time it breaches, inside the latency
+  budget. "Too few events in a window" can only be judged once the window closes; that is the `absence` Pattern
+  (PA-9c). Reverse by allowing `lt`/`lte` with a close-time evaluation.
+- **The compiler** (`WindowSql.breaches`). One DuckDB statement per rule over two tables: `fresh` (the committed
+  Consignment's rows) and the window buffer. It evaluates only the **touched** (key, window start) pairs — every window a
+  fresh row matching `when` falls in — and only windows still open before the commit (`start + size + lateness >
+  Watermark`). Window starts are aligned to the epoch in µs. The `when` tree is bound (`ConditionSql.predicateBound`),
+  the Measure comes from `MeasureCompiler.aggregateSql`, the Watermark and threshold are parameters, columns are
+  quoted; nothing authored reaches the text.
+- **The window buffer** (`WindowedRuleEvaluator`, gate G-RT). An in-memory DuckDB per (Dataset, rule set), sealed to the
+  Dataset's read roots, holding only the columns the rules read. `commit(files)` takes the Consignment's own committed
+  files (never a folder glob, never an arrival mark — PA-9a), appends them, advances the Watermark (max event time
+  buffered), evaluates, and trims rows with `time + size + lateness ≤ Watermark`. `load(committedFiles(folder))` is the
+  boot rebuild; `committedFiles` skips any dot-folder, so `.staging/` is never read. One evaluator serves the rules of
+  one Dataset that share the `time` column and `distinctOn`; PA-9d groups the rules.
+- **Effectively-once Alerts** (D-PA41). `distinctOn` (a Kafka Stream's `topic, partition, offset`) keeps one buffered
+  row per event, so a re-delivered slice neither inflates a count nor touches a window. `FiredWindows` is a durable
+  DuckDB table, one row per (rule, key, window start) fired; it is checked before raising and written after, and rows
+  of closed windows are purged. Alerts go through `AlertService.raiseFromEvent` with the dedupe key
+  `<rule>:<keyId>:<window start ms>`; a CRITICAL rule escalates to an Incident there. The Alert's evidence carries the
+  key, window, Measure value and first and last event time.
+- **Decided in this lane: one Alert per key per commit.** A burst in a sliding window breaches every window it falls in
+  at once (10 for a 10m/1m window); the evaluator raises one Alert for the key's earliest newly breaching window, says
+  how many overlapped, and records every one as fired. Above the rule's `stormCap` breaching keys in one commit, one
+  storm Alert stands for them. The fold into the rule's single Alert of ALERT-PER-RULE-1 (one Alert per rule, one
+  Incident per key) is PA-9d's, with the commit hook.
+- **The sweep skips a windowed rule** (`AlertService.evaluateRules`): over the whole Dataset its threshold would be
+  compared against all history. The cron floor of D-PA43 comes with the commit hook (PA-9d).
+- **The 422 gates** (`AlertRoutes.requireWindow`, inside `parseContent`, so every door runs them): `window.time` must be a
+  TIMESTAMP column of the Dataset's Schema, every `distinctOn` column must exist, the Dataset's `physicalRef` head must
+  name a Pipeline (`PipelineSchemas.producers`), every such Pipeline must have `trigger: {type: stream}` and
+  `processing.batch.max_files` ≥ 2 (the PA-9a decision). A Schema or Pipeline that cannot be read refuses (fail closed).
+- **Glossary** (`GLOSSARY.md` §6-B): **Window** (and the *ledger window* it is not), **Window buffer** with the fired
+  table, **Pattern**, **Detection latency**.
+- **Proof.** `WindowSqlOracleTest`: 300 random corpora (tumbling and sliding, four Measures, with and without `by` and
+  `when`, boundary events at a window's start, one µs before its end, at its end and around `end + lateness`) agree
+  exactly with a plain-Java oracle; plus half-open, close-at-lateness, touched-scope, sliding and injection cases.
+  `WindowedRuleEvaluatorTest` (real Parquet): one Alert per (rule, key, window) and never twice, a replay with
+  `distinctOn`, a late event kept and counted, the trim, a restart with a durable fired table, the `.staging` listing,
+  the storm cap. `AlertWindowTest` and `AlertRoutesWindowGateTest`: each 422 paired with the accepted shape one key
+  away, and the POST door. **Mutation pass: 12 of 12 killed** — the window end off by one, lateness ignored, the
+  fired-table dedup removed, the touched scope widened to the buffer and emptied, the `distinctOn` replay dedup removed,
+  the 1 h bound off by one, the sweep skip removed, late rows not counted, and each of the `max_files`, `stream` trigger
+  and TIMESTAMP gates removed.
+- **Not in PA-9b:** the commit hook, the Add-on and its gating, the latency and late-event metrics and the harness
+  (PA-9d); `sequence` and `absence` (PA-9c); a windowed rule loading inert without the Add-on (PA-9d); the authoring UI.
+- **Owed to PA-9d (found by the lane's verification):** the save does not yet check that the `when` fields and the
+  Measure field exist in the Schema, so a typo fails at every commit instead of at save; and `load()` at boot buffers
+  Consignments that committed but were never evaluated, so with `distinctOn` their replay evaluates nothing. The
+  commit hook must evaluate (or replay) every Consignment committed after the last evaluated one.
 
 **PA-10 designed and sliced (2026-11-12; D-PA32…D-PA37 decided while the operator was away, per the standing
 preference).** Proof (§11 table): a customer build of the pilot customer matches today's, plus an entitlement.

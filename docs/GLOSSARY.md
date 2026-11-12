@@ -687,6 +687,32 @@ overlap pruning cannot give them. Derived on read, never stored. **Absent means 
 - **Wall clock** (`$job.last_success_time`) — when a Job last succeeded, not where its data reaches. Say
   **last-success time**.
 
+**Window** *(added 2026-11-12 — PA-9b, `AlertWindow.java`)* — An **event-time interval `[lo, hi)` of one Stream
+Dataset** over which a **windowed Alert Rule** evaluates its Measure per key, on each commit. Declared as the rule's
+`window:` block: `tumbling` (back-to-back, `size`) or `sliding` (`size`, a new window every `slide`), over an
+event-time `time` column, with `lateness` — a window counts events until the **Watermark** reaches `hi + lateness`, then
+it is **closed**; an event that falls only in closed windows is a **late event** (kept in the Dataset, alerted on by
+nothing, counted). Bounded: `size + lateness` ≤ 1 h, ≤ 60 slides. A windowed Alert Rule fires at most once per
+(rule, key, window start). ⛔ Not the **ledger window** of a ledger-metric Alert Rule (`window: 1h | 20b`, the last span
+or N batches of the batches ledger): that one is a string, this one a block; say *ledger window* for the old one.
+⛔ No processing-time window: arrival time is ingest time.
+
+**Window buffer** *(added 2026-11-12 — PA-9b, `WindowedRuleEvaluator`)* — The **derived state of windowed Alert Rules**:
+a DuckDB table per (Dataset, rule set) holding only the columns the rules read and only rows whose windows may still be
+open; appended from each committed Consignment's own files, trimmed past `size + lateness`, rebuilt from the committed
+files at boot. Never a second record — the Dataset is the record. Beside it, the **fired table** keeps one row per
+(rule, key, window start) that has fired, so an Alert is raised effectively once. ⛔ Not a *state store* or *cache*.
+
+**Pattern** *(added 2026-11-12 — PA-9 design; built in PA-9c)* — A **windowed Alert Rule shape an aggregate cannot
+express**: `sequence` (event A, then event B for the same key within T, each step its own Condition Language `when`) or
+`absence` (no event for a key, or for the whole Stream, in T — judged only once the Window has closed). ⛔ Not a
+*rule* (the rule is the Alert Rule; the Pattern is its shape), not a *regex* pattern.
+
+**Detection latency** *(added 2026-11-12 — PA-9 design, D-PA39)* — **The time from an event's arrival at the broker to
+the Alert that names it** (the newest event in its window; `inspecto_detection_latency_seconds{rule}`, PA-9d). The
+stated promise: p95 ≤ 5 s to Alert and ≤ 10 s to Incident, under the conditions D-PA39 lists. ⛔ Not *lag* (the
+backlog a Stream has not drained, `inspecto_stream_lag_records`).
+
 **Query** *(added 2026-07-06, R3)* — A first-class, reusable **executable knowledge** Component:
 `{ type (sql \| structured), source Dataset, text \| model, Parameters }`. Lifted out of the artifacts that
 embed it (a Dataset's view SQL, a Widget's channel mapping) so **one Query serves many renderings**. Authored in
