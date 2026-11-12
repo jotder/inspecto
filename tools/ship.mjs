@@ -9,8 +9,16 @@
 // tag), values.yaml's image.repository and `product` block set, and, unless --no-package, <out>/<name>-<version>.tgz
 // (the layout `helm package` writes). The plan must come from `assemble.mjs --target container|airgap` (its `ship` field).
 //
-// REFUSES (exit 1, the reason named): a plan without `ship`, and a chart source whose stamped lines are not each found
-// exactly once (the source changed under this tool - fix the tool, never the copy).
+//   node tools/ship.mjs image --plan <assembly-plan.json> --bundle-dir <unpacked linux_amd64 bundle> --out <dir>
+//
+// `image` (D-PA26; package.ps1 -Target container runs it) builds `inspecto-<product>:<tag>` with the bundle's own
+// deploy/Dockerfile, checks the image's io.inspecto.product label, saves it as <out>/<image>-<tag>.image.tar and stamps
+// and packs the chart beside it.
+//
+// REFUSES (exit 1, the reason named): a plan without `ship`; a chart source whose stamped lines are not each found
+// exactly once (the source changed under this tool - fix the tool, never the copy); a bundle that is not the plan's
+// linux_amd64 build (lib/product.json, an ELF runtime/bin/java, the Dockerfile's product label); an image whose label
+// disagrees with the plan.
 
 import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -85,13 +93,68 @@ export function packChart({ dir, name, version }) {
     return join(out, file);
 }
 
+/**
+ * Check that an unpacked bundle is the plan's Product build before an image is made of it: its lib/product.json names the
+ * plan's Product, Edition and Distribution, it carries a Linux JVM (runtime/bin/java, an ELF file), and its Dockerfile has
+ * the plan's OCI product label. Returns the findings (empty = good).
+ */
+export function checkBundleForImage(plan, bundleDir) {
+    const findings = [];
+    const read = (rel) => { try { return readFileSync(join(bundleDir, rel)); } catch { findings.push(`the bundle has no ${rel}`); return null; } };
+    const desc = read('lib/product.json');
+    if (desc) {
+        const d = JSON.parse(desc.toString('utf8'));
+        if (d.id !== plan.product.id) findings.push(`lib/product.json is Product '${d.id}', the plan '${plan.product.id}'`);
+        if (String(d.edition).toLowerCase() !== String(plan.edition).toLowerCase()) findings.push(`lib/product.json is the ${d.edition} Edition, the plan ${plan.edition}`);
+        if (d.distribution !== plan.distribution) findings.push(`lib/product.json is the ${d.distribution} distribution, the plan ${plan.distribution}`);
+    }
+    const java = read('runtime/bin/java');
+    if (java && !(java[0] === 0x7f && java.subarray(1, 4).toString('latin1') === 'ELF')) findings.push('runtime/bin/java is not a Linux (ELF) executable: the image needs the linux_amd64 bundle');
+    const df = read('deploy/Dockerfile');
+    if (df && !df.toString('utf8').includes(`io.inspecto.product=${JSON.stringify(plan.product.id)}`)) findings.push(`deploy/Dockerfile carries no io.inspecto.product label for '${plan.product.id}'`);
+    return findings;
+}
+
+const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { stdio: ['ignore', 'inherit', 'inherit'], ...opts });
+
+/**
+ * Build the plan's image from an unpacked linux_amd64 bundle with the bundle's own Dockerfile (D-PA26), check its
+ * io.inspecto.product label, save it as <out>/<image>-<tag>.image.tar and stamp the chart beside it.
+ * `docker` is injectable for tests. Returns { ref, imageTar, chart }.
+ */
+export function buildImage(plan, bundleDir, out, { docker = run } = {}) {
+    const { image } = shipOfPlan(plan);
+    const findings = checkBundleForImage(plan, bundleDir);
+    if (findings.length) fail(`the bundle at ${bundleDir} is not this plan's linux_amd64 build:\n  ${findings.join('\n  ')}`);
+    const ref = `${image.repository}:${image.tag}`;
+    mkdirSync(out, { recursive: true });
+    docker('docker', ['build', '-f', 'deploy/Dockerfile', '-t', ref, '.'], { cwd: bundleDir });
+    const label = String(docker('docker', ['image', 'inspect', '--format', '{{ index .Config.Labels "io.inspecto.product" }}', ref], { stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8' }) ?? '').trim();
+    if (label !== plan.product.id) fail(`image ${ref} is labelled io.inspecto.product='${label}', the plan '${plan.product.id}'`);
+    const imageTar = join(out, `${image.repository}-${image.tag}.image.tar`);
+    docker('docker', ['save', '-o', imageTar, ref]);
+    const stamped = stampChart(plan, out);
+    return { ref, imageTar, chart: packChart(stamped) };
+}
+
+const USAGE = [
+    'usage: node tools/ship.mjs chart --plan <assembly-plan.json> --out <dir> [--no-package]',
+    '       node tools/ship.mjs image --plan <assembly-plan.json> --bundle-dir <unpacked linux_amd64 bundle> --out <dir>',
+].join('\n');
+
 function main() {
     const [cmd, ...a] = process.argv.slice(2);
     const val = (k) => { const i = a.indexOf(k); return i >= 0 ? a[i + 1] : undefined; };
     try {
-        if (cmd !== 'chart') fail('usage: node tools/ship.mjs chart --plan <assembly-plan.json> --out <dir> [--no-package]');
+        if (!['chart', 'image'].includes(cmd)) fail(USAGE);
         const plan = JSON.parse(readFileSync(val('--plan') ?? fail('--plan <assembly-plan.json> is required'), 'utf8'));
         const out = resolve(val('--out') ?? fail('--out <dir> is required'));
+        if (cmd === 'image') {
+            const r = buildImage(plan, resolve(val('--bundle-dir') ?? fail('--bundle-dir <unpacked linux_amd64 bundle> is required')), out);
+            console.log(`ship: image ${r.ref} -> ${r.imageTar}`);
+            console.log(`ship: chart ${r.chart}`);
+            return;
+        }
         const stamped = stampChart(plan, out);
         console.log(`ship: chart ${stamped.name} ${stamped.version} -> ${stamped.dir}`);
         if (!a.includes('--no-package')) console.log(`ship: packaged ${packChart(stamped)}`);

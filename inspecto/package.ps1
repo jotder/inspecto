@@ -103,6 +103,12 @@ param(
     # ($DemoAuth is set from the plan below), or if the demo branch stops removing inspecto-oidc.jar. The demo bundle's modules.list
     # comes from tools/offering-classpath.mjs --demo (the OIDC trio replaced by the demo jar), which serve-demo.* read like any launcher.
     [string]$Distribution = 'production',
+    # PRODUCT-ASSEMBLY-1 PA-8 (D-PA26, D-PA29): what the build ships beyond the zips. 'windows' and 'linux' are the zips alone.
+    # 'container' also builds the Product's OCI image (inspecto-<product>:<version>-<edition>[-trial]) from the linux_amd64 zip and
+    # stamps its Helm chart, both into inspecto-ship/<image>-<tag>/ (tools/ship.mjs). It needs Docker and the linux_amd64 zip
+    # (the Linux jmods: -GraalvmCache). Refused for -Distribution demo.
+    [ValidateSet('windows', 'linux', 'container')]
+    [string]$Target = 'windows',
     # PRODUCT-ASSEMBLY-1 PA-6a (D-PA18): folders holding a partner App (app.toon + templates/<id>/) built with tools/inspecto-app.mjs,
     # outside apps/. Passed to the assembler as --app-root; the App's templates are staged from those folders, not from git.
     [string[]]$AppRoot = @(),
@@ -257,7 +263,7 @@ $planFile = Join-Path ([System.IO.Path]::GetTempPath()) "inspecto-assembly-$Prod
 # PA-3: the Product build's descriptor too (written into lib/product.json beside edition.properties at step 3a-ter).
 $descriptorFile = Join-Path ([System.IO.Path]::GetTempPath()) "inspecto-product-$Product-$Edition-$Distribution.json"
 $appRootArgs = @($AppRoot | Where-Object { $_ } | ForEach-Object { '--app-root'; (Resolve-Path $_).Path })
-& node (Join-Path $sandboxRoot 'tools\assemble.mjs') @productArgs --edition $Edition --distribution $Distribution --out $planFile --descriptor $descriptorFile @appRootArgs
+& node (Join-Path $sandboxRoot 'tools\assemble.mjs') @productArgs --edition $Edition --distribution $Distribution --target $Target --out $planFile --descriptor $descriptorFile @appRootArgs
 if ($LASTEXITCODE -ne 0) { throw "tools/assemble.mjs refused Product '$Product' x $Edition x $Distribution (the reason is above)" }
 $plan = Get-Content -Raw $planFile | ConvertFrom-Json
 $Ui = [string]$plan.host
@@ -265,6 +271,12 @@ $DemoAuth = [bool]$plan.demo
 $planApps = (@($plan.apps | ForEach-Object { $_.id }) -join ',')
 Write-Host "Assembly Plan: $($plan.product.title) x $($plan.edition) x $Distribution - ui $Ui, $(@($plan.templates).Count) template(s), App(s) [$planApps]$(if ($plan.seedSpace) { ", demo Space $($plan.seedSpace)" })" -ForegroundColor Cyan
 foreach ($n in @($plan.notes)) { if ($n) { Write-Host "  note: $n" -ForegroundColor Yellow } }
+# PA-8: a container build needs Docker; refused before the build runs rather than after it.
+if ($plan.ship) {
+    & docker version --format '{{.Server.Version}}' *> $null
+    if ($LASTEXITCODE -ne 0) { throw "-Target ${Target}: Docker is not reachable (docker version failed); the image is built with docker build" }
+    Write-Host "  ships: image $($plan.ship.image.repository):$($plan.ship.image.tag), chart $($plan.ship.chart.name) $($plan.ship.chart.version)" -ForegroundColor Cyan
+}
 
 $bundleDir    = Join-Path $sandboxRoot  'inspecto-deploy'
 if ($DemoAuth) {
@@ -1913,6 +1925,22 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=15s CMD ["bash", "-c", \
   "exec 3<>/dev/tcp/localhost/${PORT} && printf 'GET /health HTTP/1.0\r\n\r\n' >&3 && grep -q '200' <&3"]
 ENTRYPOINT ["./bin/serve.sh"]
 '@
+# PA-8 (D-PA26): the image says which Product build it is - OCI labels from the plan, so `docker image inspect` and a
+# registry show the Product, Edition and Distribution. tools/ship.mjs image checks io.inspecto.product against its plan.
+# Escaped for a Dockerfile double-quoted value: \ and " and $ (Docker expands $VAR inside LABEL values).
+$q = { param($s) '"' + ([string]$s -replace '\\', '\\' -replace '"', '\"' -replace '\$', '\$') + '"' }
+$ociLabels = @(
+    "LABEL org.opencontainers.image.title=$(& $q $plan.product.title) \",
+    "      org.opencontainers.image.description=$(& $q "$($plan.product.title) $($plan.edition) ($Distribution)") \",
+    "      org.opencontainers.image.version=$(& $q $plan.platformVersion) \",
+    "      io.inspecto.product=$(& $q $plan.product.id) \",
+    "      io.inspecto.edition=$(& $q ([string]$plan.edition).ToLowerInvariant()) \",
+    "      io.inspecto.distribution=$(& $q $Distribution) \",
+    "      io.inspecto.apps=$(& $q $planApps)"
+) -join "`n"
+# .Replace('$','$$'): a -replace replacement string reads $0, $1 ... as substitutions.
+$dockerfileContent = $dockerfileContent -replace '(?m)^WORKDIR /app\r?$', ($ociLabels.Replace('$', '$$') + "`nWORKDIR /app")
+if ($dockerfileContent -notmatch 'io\.inspecto\.product=') { throw "step 6b-2: the OCI labels did not land in the Dockerfile (its WORKDIR line moved)" }
 Write-LfScript -Path "$deployDir\Dockerfile" -Content $dockerfileContent
 $dockerignoreContent = @'
 # BuildKit's per-Dockerfile ignore file: `docker build -f deploy/Dockerfile .` reads deploy/Dockerfile.dockerignore
@@ -2864,9 +2892,29 @@ $sigNote = if ($Sign) { ' + GPG signature' } else { '' }
 Write-Host "Generating release integrity artifacts (SHA-256$sigNote)..." -ForegroundColor Cyan
 foreach ($zipPath in $outZips.Values) { New-ReleaseIntegrity -ArtifactPath $zipPath }
 
+# ── step 8c: the container target (PRODUCT-ASSEMBLY-1 PA-8, D-PA26/D-PA29) ─────────────────────────────────────────
+# The image is built from the linux_amd64 ZIP, never from $bundleDir: after a cross-build $bundleDir holds the host runtime
+# and both platforms' extensions. Expand-Archive unpacks it (the shell's tar may be GNU tar, which reads no zip); tools/ship.mjs
+# builds, checks and saves the image and stamps the Helm chart into inspecto-ship/<image>-<tag>/.
+$shipDir = $null
+if ($plan.ship) {
+    if (-not $outZips.Contains('linux_amd64')) { throw "-Target ${Target}: no linux_amd64 zip was built, and the image needs it (its JVM is the bundle's Linux runtime). Point -GraalvmCache at a folder holding a *linux* JDK with jmods/ and drop -NoRuntime." }
+    $shipDir = Join-Path $sandboxRoot "inspecto-ship\$($plan.ship.image.repository)-$($plan.ship.image.tag)"
+    $unzipDir = Join-Path ([System.IO.Path]::GetTempPath()) "inspecto-ship-context-$PID"
+    if (Test-Path $unzipDir) { Remove-Item $unzipDir -Recurse -Force }
+    try {
+        Expand-Archive -LiteralPath $outZips['linux_amd64'] -DestinationPath $unzipDir
+        & node (Join-Path $sandboxRoot 'tools\ship.mjs') image --plan $planFile --bundle-dir (Join-Path $unzipDir $zipStem) --out $shipDir
+        if ($LASTEXITCODE -ne 0) { throw "tools/ship.mjs image failed for $($plan.ship.image.repository):$($plan.ship.image.tag) (the reason is above)" }
+    } finally {
+        if (Test-Path $unzipDir) { Remove-Item $unzipDir -Recurse -Force }
+    }
+}
+
 Write-Host ""
 Write-Host "Deployment bundle(s) ready:" -ForegroundColor Green
 foreach ($plat in $outZips.Keys) { Write-Host "  $($outZips[$plat])  (+ .sha256$sigNote)  [$plat]" }
+if ($shipDir) { Write-Host "  $shipDir  (image $($plan.ship.image.repository):$($plan.ship.image.tag) saved as a tar + Helm chart)  [$Target]" }
 # A bundle with no ui/ still starts and still serves /api/v1 — but every browser hit returns
 # ControlApi's `{"error":"not found — API routes are served under /api/v1"}` 404, which looks like a
 # broken deployment rather than a packaging choice. It shipped that way once (2026-07-31) precisely
@@ -2902,7 +2950,8 @@ Write-Host "  4c. Run it as an OS service so a crashed process comes back (SCR-3
 Write-Host "       .\bin\install-service.ps1    (Windows, ELEVATED PowerShell; output -> logs\service.log)"
 Write-Host "       sudo bin/install-service.sh  (Linux, systemd; output -> journalctl -u inspecto)"
 Write-Host "       verify recovery: kill the process, then curl /health -- do not assume it"
-Write-Host "  4d. Container: docker build -f deploy/Dockerfile -t inspecto .   (from the bundle root, linux_amd64 bundle)"
+Write-Host "  4d. Container: package.ps1 -Target container builds inspecto-<product>:<version>-<edition> and its Helm chart (inspecto-ship/);"
+Write-Host "       by hand: docker build -f deploy/Dockerfile -t <image> .   (from the bundle root, linux_amd64 bundle)"
 Write-Host ""
 if (-not $NoRuntime) {
     Write-Host "Embedded Java runtime included (bundle\runtime\) — no JVM needed on the target."

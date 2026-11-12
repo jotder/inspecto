@@ -3,14 +3,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, cpSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assemble } from './assemble.mjs';
 import { gatherModel } from './products.mjs';
 import { gather } from './check-offerings.mjs';
-import { CHART_SOURCE, packChart, stampChart } from './ship.mjs';
+import { buildImage, CHART_SOURCE, packChart, stampChart } from './ship.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..');
 const model = gatherModel(repo);
@@ -49,6 +49,53 @@ test('chart: the Platform product keeps the name inspecto; a trial build is stam
         assert.match(readFileSync(join(s.dir, 'values.yaml'), 'utf8'), /^ {2}distribution: "trial"$/m);
         assert.match(readFileSync(join(s.dir, 'Chart.yaml'), 'utf8'), /^appVersion: ".*-basic-trial"$/m);
     } finally { rmSync(out, { recursive: true, force: true }); }
+});
+
+/** A fake unpacked bundle: lib/product.json from the plan, a runtime/bin/java with the given magic, a labelled Dockerfile. */
+function fakeBundle(plan, { magic = '\x7fELF', productId = plan.product.id, label = plan.product.id } = {}) {
+    const dir = tmp();
+    mkdirSync(join(dir, 'lib'), { recursive: true });
+    mkdirSync(join(dir, 'runtime', 'bin'), { recursive: true });
+    mkdirSync(join(dir, 'deploy'), { recursive: true });
+    writeFileSync(join(dir, 'lib', 'product.json'), JSON.stringify({ ...plan.descriptor, id: productId }));
+    writeFileSync(join(dir, 'runtime', 'bin', 'java'), Buffer.from(magic + 'rest', 'latin1'));
+    writeFileSync(join(dir, 'deploy', 'Dockerfile'), `FROM x\nLABEL io.inspecto.product=${JSON.stringify(label)}\n`);
+    return dir;
+}
+
+test('image: builds with the bundle Dockerfile, checks the label, saves the image and the chart beside it', () => {
+    const plan = assemble(model, g, { product: 'telco', edition: 'standard', target: 'container' });
+    const bundle = fakeBundle(plan);
+    const out = tmp();
+    const calls = [];
+    const docker = (cmd, args, opts) => { calls.push({ args, cwd: opts?.cwd }); return args[1] === 'inspect' ? 'telco\n' : null; };
+    try {
+        const r = buildImage(plan, bundle, out, { docker });
+        const ref = `inspecto-telco:${plan.platformVersion}-standard`;
+        assert.equal(r.ref, ref);
+        assert.deepEqual(calls[0], { args: ['build', '-f', 'deploy/Dockerfile', '-t', ref, '.'], cwd: bundle });
+        assert.equal(calls[1].args[1], 'inspect');
+        assert.deepEqual(calls[2].args, ['save', '-o', join(out, `inspecto-telco-${plan.platformVersion}-standard.image.tar`), ref]);
+        assert.ok(r.chart.endsWith(`inspecto-telco-${plan.platformVersion}.tgz`));
+    } finally { rmSync(bundle, { recursive: true, force: true }); rmSync(out, { recursive: true, force: true }); }
+});
+
+test('REFUSED image: a Windows bundle, another Product\'s bundle, an unlabelled Dockerfile, an image labelled otherwise', () => {
+    const plan = assemble(model, g, { product: 'telco', edition: 'standard', target: 'container' });
+    const never = () => assert.fail('docker must not run for a refused bundle');
+    const cases = [
+        [{ magic: 'MZ\x90\x00' }, /runtime\/bin\/java is not a Linux \(ELF\) executable/],
+        [{ productId: 'la' }, /lib\/product\.json is Product 'la', the plan 'telco'/],
+        [{ label: 'la' }, /deploy\/Dockerfile carries no io\.inspecto\.product label for 'telco'/],
+    ];
+    for (const [opts, re] of cases) {
+        const b = fakeBundle(plan, opts);
+        try { assert.throws(() => buildImage(plan, b, tmp(), { docker: never }), re); } finally { rmSync(b, { recursive: true, force: true }); }
+    }
+    const b = fakeBundle(plan);
+    try {
+        assert.throws(() => buildImage(plan, b, tmp(), { docker: (c, args) => (args[1] === 'inspect' ? 'la' : null) }), /labelled io\.inspecto\.product='la', the plan 'telco'/);
+    } finally { rmSync(b, { recursive: true, force: true }); }
 });
 
 test('REFUSED: a plan from a zip target has no ship field', () => {
