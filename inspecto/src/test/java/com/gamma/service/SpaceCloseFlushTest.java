@@ -57,8 +57,8 @@ class SpaceCloseFlushTest {
     @Test
     void aQuietSpaceClosesItsStoresOnceAfterItsDrain(@TempDir Path root) throws Exception {
         Map<String, String> saved = new HashMap<>();
-        PRODUCTION_BACKENDS.forEach((k, v) -> saved.put(k, System.setProperty(k, v)));
         try {
+            PRODUCTION_BACKENDS.forEach((k, v) -> saved.put(k, System.setProperty(k, v)));
             Files.createDirectories(root.resolve("quiet").resolve("config"));
             SpaceManager mgr = SpaceManager.discover(root);
             CollectorService svc = mgr.space(SpaceId.of("quiet")).orElseThrow().service();
@@ -81,10 +81,10 @@ class SpaceCloseFlushTest {
     @Test
     void aSpaceBusyPastItsCloseBudgetStillFlushesItsStores(@TempDir Path root) throws Exception {
         Map<String, String> saved = new HashMap<>();
-        PRODUCTION_BACKENDS.forEach((k, v) -> saved.put(k, System.setProperty(k, v)));
-        Files.createDirectories(root.resolve("busy").resolve("config"));
         BusyAgent agent = new BusyAgent();
         try {
+            PRODUCTION_BACKENDS.forEach((k, v) -> saved.put(k, System.setProperty(k, v)));
+            Files.createDirectories(root.resolve("busy").resolve("config"));
             SpaceManager mgr = SpaceManager.discover(root);
             SpaceContext busy = mgr.space(SpaceId.of("busy")).orElseThrow();
             busy.service().registerAgent(agent);
