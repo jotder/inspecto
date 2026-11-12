@@ -215,13 +215,9 @@ public final class LinkGraph {
     /** Collect {@code [concreteKey, value]} for {@code segs[i..]} under {@code node}. */
     private static void walk(Object node, String[] segs, int i, String at, List<String[]> found) {
         if (i == segs.length) {
-            if (node instanceof List<?> list) {
-                for (int k = 0; k < list.size(); k++)
-                    if (list.get(k) != null)
-                        found.add(new String[]{at + "[" + k + "]", String.valueOf(list.get(k))});
-            } else if (node != null && !(node instanceof Map<?, ?>) && !blank(node)) {
-                found.add(new String[]{at, String.valueOf(node)});
-            }
+            // A scalar path takes the value's TEXT whatever its shape — a list or map included, as every check
+            // always read it (String.valueOf / toString); only a `[]` segment splits a list.
+            if (!blank(node)) found.add(new String[]{at, String.valueOf(node)});
             return;
         }
         String seg = segs[i];
@@ -242,7 +238,10 @@ public final class LinkGraph {
             walk(v, segs, i + 1, join(at, key), found);
         } else if (v instanceof List<?> list) {
             if (i + 1 == segs.length) {
-                walk(list, segs, i + 1, join(at, key), found);
+                // each non-null element is a link, a blank one included (a blank Reconciliation side dangles)
+                for (int k = 0; k < list.size(); k++)
+                    if (list.get(k) != null)
+                        found.add(new String[]{join(at, key) + "[" + k + "]", String.valueOf(list.get(k))});
             } else {
                 for (int k = 0; k < list.size(); k++)
                     walk(list.get(k), segs, i + 1, join(at, key) + "[" + k + "]", found);

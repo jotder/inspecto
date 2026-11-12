@@ -50,6 +50,16 @@ class LinkGraphTest {
     }
 
     @Test
+    void aScalarPathReadsAListOrMapValueAsItsTextOnlyBracketsSplit() {
+        Map<String, List<ComponentRegistry.Component>> byType = Map.of(
+                "widget", List.of(c("widget", "w", Map.of("datasetId", Map.of("k", "v"), "queryId", List.of("q")))),
+                "reconciliation", List.of(c("reconciliation", "r", Map.of("leftDataset", List.of("a", "q")))));
+        List<String> values = LinkGraph.ofComponents(byType, null).dangling().stream()
+                .map(e -> e.key() + "=" + e.value()).toList();
+        assertEquals(List.of("datasetId={k=v}", "queryId=[q]", "leftDataset=[a, q]"), values);
+    }
+
+    @Test
     void reconciliationReadsItsDatasetsListElseLeftAndRight() {
         Map<String, List<ComponentRegistry.Component>> byType = Map.of(
                 "reconciliation", List.of(
