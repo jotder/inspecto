@@ -47,7 +47,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `TEST-ENV-PG-ASN-UNRUN-1` | P3 | chore | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
 | `REALTIME-DECISIONING-1` | P3 | feature | Real-time Detection Add-on and the CEP App (PRODUCT-ASSEMBLY-1 phase PA-9) | — |
 | `REALTIME-INLINE-DECISION-1` | P3 | feature | inline allow / block decision on each record of a stream | demand |
-| `PREDICTIVE-ANALYTICS-1` | P3 | feature | Predictive Analytics add-on | — |
 | `SCALEOUT-HELM-NPOD-1` | P2 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
 | `SCALEOUT-D14-D16-DECISIONS-1` | P2 | chore | D14 and D16 SIGNED yes 2026-10-20 (operator, accepted the recommended answer); D15 stays open (operator-signed 2026-10-18 per the index,… | operator |
 | `SCALEOUT-LIVE-HALVES-1` | P3 | chore | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |

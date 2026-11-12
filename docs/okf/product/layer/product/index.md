@@ -34,7 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `AUTHORING-REDESIGN-1` | P2 | feature | the authoring redesign's still-open letters. | — |
+| `AUTHORING-REDESIGN-1` | P3 | feature | the authoring redesign's still-open letters. | demand |
 | `AGT-SEGMENT-1` | P3 | chore | the assistant's commercial framing is an unvalidated product read. | — |
 | `PRODUCT-ASSEMBLY-1` | P2 | feature | assemble finished domain Products and the Platform with chosen Add-ons from definition files, with one tool — PA-0…PA-7 SHIPPED 2026-11-1… | — |
 | `ADDON-PICKER-PAGE-1` | P3 | feature | the Add-on picker has no page yet: tools/pick-addons.mjs (PA-6c, 2026-11-11) is a CLI. | demand |

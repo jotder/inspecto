@@ -2034,8 +2034,8 @@ Live, on the same Standard bundle:
 **Method.** All 89 open rows (17 P2, 72 P3; changelog lines excluded) were checked against `master` at `8b1da0587`.
 Each row's named symbols were looked up in the code (CodeGraph, grep, `git log -S`); no build was run. Verdicts are
 grounded hypotheses: four claims were checked by hand and all held (rows 613 and 714, the module-table lockstep, and
-`contentPacks` staging nothing). The rest still need the usual check before a row is closed. **The board itself is not
-edited yet** (§14).
+`contentPacks` staging nothing). The rest still need the usual check before a row is closed. **§13.1 and §13.2 were
+applied to the board on 2026-11-12** (§14 item 2).
 
 | Verdict | Rows | Meaning |
 |---|---|---|
@@ -2062,6 +2062,20 @@ left (`SCREENING-1`, `ANALYTICS-CORE-1`, `TELCO-BYPASS-SIMBOX-1`, `SCALEOUT-OBJS
 | `AUTHORING-REDESIGN-1` (P2) | **P3, `hold: demand`** | only (d), v3 macros, is left, and it is parked |
 | Platform Services Stage 2/3 residuals (P3) | add **`hold: demand`** | says "on demand" with no tag |
 
+**Applied 2026-11-12** (each claim re-checked against `origin/master` first; board −3 rows: 118 → 115, landed as 115 → 112 after peer rows merged):
+- Test mapping row: ✅ **done**, deleted (no `Test mapping` in `inspecto-ui/` confirmed; removed in `42fa41fe5`);
+  `user-guide-pipeline-editor.md` line 645 rewritten to say it is gone and where a mapping is previewed now.
+- Queries / BI row: ✅ **done**, deleted; `spec-queries.md` records the retirement, including "more `$`-resolvers".
+- `SCREENING-1`: ⏸ **left at P2**: the hub (`module/screening/plan.md`, `spec.md`) still marks D6 and D8 "pending
+  confirmation"; it closes when the operator confirms them.
+- `PREDICTIVE-ANALYTICS-1`: ✅ **done**, merged into `PREDICTIVE-STUDIO-PREVIEW-1` (five slices shipped, not four:
+  windowed Measures, RFM, churn, forecast, surface). OD-10/12/13/16 moved with it, OD-11 settled, OD-15 → `PACK-SALES-MARKETING-1`;
+  marked in `module/anomaly/plan-predictive-analytics.md`.
+- `ANALYTICS-CORE-1` C7: ✅ **done**, removed from its Open list and owned by `DUCKDB-2-LOOP-QUERIES-1`.
+- `AUTHORING-REDESIGN-1`: ✅ **done**, P2 → P3 `hold: demand` (it was still a P2 row on 2026-11-12; still no
+  `CREATE MACRO` in main source).
+- Platform Services Stage 2/3: ✅ **done**, tagged `hold: demand`.
+
 ### 13.2 Rewrite (the row says something the code contradicts)
 
 | Row | Correct statement |
@@ -2075,6 +2089,20 @@ left (`SCREENING-1`, `ANALYTICS-CORE-1`, `TELCO-BYPASS-SIMBOX-1`, `SCALEOUT-OBJS
 | `SCALEOUT-LIVE-HALVES-1` | bundles already stage `httpfs` and `aws`, and MinIO is running; only `pg_duckdb` is owed |
 
 Also: `enterprise-scale-out-plan.md:82` still says D14–D16 are unsigned; D14 and D16 were signed 2026-10-20.
+
+**Applied 2026-11-12**, each row rewritten on the board after one check:
+- `JOB-SIGNAL-OVERLAP-SKIP-1`: ✅ **done**. Confirmed: the coalescing path calls `submitRun` without a `SignalLane`
+  (the non-coalescing path has one); the guard is now at `JobService.java:1554`, not 1541.
+- `LA-INDEX-SCALE-MEASURE-1`: ✅ **done**, `hold: demand` (`index.enabled` default ON since 2026-10-10, confirmed in `IndexRoutes`).
+- `LA-DAILY-INGEST-1`: ✅ **done**, narrowed in a "What is left" lead; `DATA-TIERS-1` is still an open row.
+- `LA-INVESTIGATION-STORE-DESIGN-1`: ✅ **done**; `nightly-postgres.yml` runs both Pg suites, green 2026-11-09 … 2026-11-12.
+- `TEST-ENV-PG-ASN-UNRUN-1`: ✅ **done**; `surefire-junit-platform-3.5.3.jar` is in `C:/.m2/repository` (the
+  `localRepository` of `~/.m2/settings.xml`), not under `~/.m2`. The offline run itself was not made.
+- `PACK-SALES-MARKETING-1`: ✅ **done** (churn and forecast closed 2026-11-01; D-SM1…D-SM12 still "open" in its plan).
+- `SCALEOUT-LIVE-HALVES-1`: ✅ **done** (`$duckdbExtNames` in `inspecto/package.ps1` stages `httpfs`, `aws`; a MinIO
+  container is running; no `pg_duckdb` in any `.java` / `.toon`).
+- Scale-out plan: ✅ **done**: lines 3, 80, 82 and 85 now say D14 and D16 were signed 2026-10-20 (evidence: board
+  `SCALEOUT-D14-D16-DECISIONS-1`); D15 is left to that row, because the board contradicts itself on it.
 
 ### 13.3 Startable now, no decision owed, each S-sized
 
@@ -2104,8 +2132,9 @@ These are the parallel lanes. Each is code-only, needs no host, and touches file
 ## 14. Next steps
 
 1. ✅ The operator signed §12 (D-PA1 … D-PA12), 2026-11-10.
-2. ✅ Board row `PRODUCT-ASSEMBLY-1` filed (P2 feature, §3.10). Still to do: apply §13.1 and §13.2 to the board. Each
-   closure is marked in its owning hub first, and the counts are re-derived (`tools/check-doc-counts.mjs`).
+2. ✅ Board row `PRODUCT-ASSEMBLY-1` filed (P2 feature, §3.10). ✅ §13.1 and §13.2 applied to the board 2026-11-12
+   (outcomes row by row under each table; `SCREENING-1` is left for the operator's D6/D8 confirmation); closures marked
+   in their hubs, counts re-derived.
 3. Run §13.3 as parallel lanes (at most three at a time), one push per lane.
 4. ✅ PA-0 … PA-7 and PA-10 shipped 2026-11-10 … 2026-11-12; PA-8 built 2026-11-12. The full Advanced reactor gate
    (12,085 tests, 0 failures) and the UI checks (7,542 passed) were run on `fc8b5d1f0` on 2026-11-12. The full
