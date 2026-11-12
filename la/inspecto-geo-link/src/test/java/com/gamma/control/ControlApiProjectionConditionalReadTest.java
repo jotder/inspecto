@@ -121,7 +121,7 @@ class ControlApiProjectionConditionalReadTest {
 
     private static JsonNode rows(HttpResponse<String> r) throws Exception {
         assertEquals(200, r.statusCode(), r.body());
-        return JSON.readTree(r.body()).get("data").get("rows");
+        return EdgeWireTestRows.decoded(JSON.readTree(r.body()).get("data")).get("rows");
     }
 
     @Test

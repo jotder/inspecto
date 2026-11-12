@@ -6483,30 +6483,132 @@
     "/inv/projection" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/projection (generated skeleton)",
+        "summary" : "Fold a Dataset into distinct links (compact edge rows)",
         "operationId" : "postInvProjection",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "PERF-P10-1 (2026-11-12): answered as application/vnd.inspecto.la-edges.v2+json - column names once and each folded link as an array; this REPLACED the per-row object shape (no compatibility shape is served). ETag / If-None-Match revalidation answers 304 with no body. An error is plain application/json. A Dataset the caller may not view is 404 (R3).",
         "responses" : {
+          "200" : {
+            "description" : "Compact edge rows (Envelope-wrapped under /api/v1).",
+            "content" : {
+              "application/vnd.inspecto.la-edges.v2+json" : {
+                "schema" : {
+                  "type" : "object",
+                  "required" : [ "columns", "attrCols", "rows", "truncated" ],
+                  "properties" : {
+                    "masking" : {
+                      "type" : "object",
+                      "description" : "DR-D2: the Space's masking mode, whether this read masked its ids, and why."
+                    },
+                    "columns" : {
+                      "type" : "array",
+                      "items" : {
+                        "type" : "string"
+                      },
+                      "description" : "Named once: source, target, kind, count, then total when the request named measureCol, then the attrCols."
+                    },
+                    "attrCols" : {
+                      "type" : "array",
+                      "items" : {
+                        "type" : "string"
+                      },
+                      "description" : "The trailing attribute columns of each row, in order."
+                    },
+                    "rows" : {
+                      "type" : "array",
+                      "items" : {
+                        "type" : "array"
+                      },
+                      "description" : "One array per folded link, in columns order, heaviest first. Masked ids are masked:<hex> aliases."
+                    },
+                    "truncated" : {
+                      "type" : "boolean"
+                    },
+                    "columnTypes" : {
+                      "type" : "object",
+                      "description" : "LA-17 D-M6: column -> {id, normaliser} of the Entity Type typing it."
+                    },
+                    "source" : {
+                      "type" : "object",
+                      "description" : "neighbors only: where the read was answered from (index or dataset)."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not modified: the If-None-Match tag still matches (PERF-P4-2)."
+          },
           "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+            "description" : "Envelope-wrapped error (application/json)."
           }
         },
-        "x-generated" : true,
         "x-optional-module" : true
       }
     },
     "/inv/projection/neighbors" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/projection/neighbors (generated skeleton)",
+        "summary" : "One entity's one-hop links (compact edge rows)",
         "operationId" : "postInvProjectionNeighbors",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "PERF-P10-1 (2026-11-12): answered as application/vnd.inspecto.la-edges.v2+json - column names once and each folded link as an array; this REPLACED the per-row object shape (no compatibility shape is served). ETag / If-None-Match revalidation answers 304 with no body. An error is plain application/json. A Dataset the caller may not view is 404 (R3). With list:true the answer is a page of neighbours as application/json, not this shape.",
         "responses" : {
+          "200" : {
+            "description" : "Compact edge rows (Envelope-wrapped under /api/v1).",
+            "content" : {
+              "application/vnd.inspecto.la-edges.v2+json" : {
+                "schema" : {
+                  "type" : "object",
+                  "required" : [ "columns", "attrCols", "rows", "truncated" ],
+                  "properties" : {
+                    "masking" : {
+                      "type" : "object",
+                      "description" : "DR-D2: the Space's masking mode, whether this read masked its ids, and why."
+                    },
+                    "columns" : {
+                      "type" : "array",
+                      "items" : {
+                        "type" : "string"
+                      },
+                      "description" : "Named once: source, target, kind, count, then total when the request named measureCol, then the attrCols."
+                    },
+                    "attrCols" : {
+                      "type" : "array",
+                      "items" : {
+                        "type" : "string"
+                      },
+                      "description" : "The trailing attribute columns of each row, in order."
+                    },
+                    "rows" : {
+                      "type" : "array",
+                      "items" : {
+                        "type" : "array"
+                      },
+                      "description" : "One array per folded link, in columns order, heaviest first. Masked ids are masked:<hex> aliases."
+                    },
+                    "truncated" : {
+                      "type" : "boolean"
+                    },
+                    "columnTypes" : {
+                      "type" : "object",
+                      "description" : "LA-17 D-M6: column -> {id, normaliser} of the Entity Type typing it."
+                    },
+                    "source" : {
+                      "type" : "object",
+                      "description" : "neighbors only: where the read was answered from (index or dataset)."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "304" : {
+            "description" : "Not modified: the If-None-Match tag still matches (PERF-P4-2)."
+          },
           "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+            "description" : "Envelope-wrapped error (application/json)."
           }
         },
-        "x-generated" : true,
         "x-optional-module" : true
       }
     },

@@ -118,7 +118,7 @@ class ControlApiExplorationMaskingTest {
         if (!rawShown)
             for (String raw : RAW)
                 assertFalse(r.body().contains(raw), path + " leaked the raw id " + raw + ": " + r.body());
-        return JSON.readTree(r.body()).get("data");
+        return EdgeWireTestRows.decoded(JSON.readTree(r.body()).get("data"));
     }
 
     private static String aliasOf(JsonNode projection, int row, String end) {
@@ -296,7 +296,7 @@ class ControlApiExplorationMaskingTest {
                 default -> Optional.empty();
             });
             String own = "Bearer owner";
-            JsonNode proj = JSON.readTree(send(c, "POST", PROJECTION, "{" + BASE + "}", own).body()).get("data");
+            JsonNode proj = EdgeWireTestRows.decoded(JSON.readTree(send(c, "POST", PROJECTION, "{" + BASE + "}", own).body()).get("data"));
             String aliasA = aliasOf(proj, 0, "source");
             assertEquals(200, send(c, "POST", "/inv/investigations", "{\"id\":\"canvas\",\"purpose\":\"pattern on canvas\","
                     + "\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"}", own).statusCode());

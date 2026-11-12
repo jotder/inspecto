@@ -101,7 +101,7 @@ class ControlApiInvIndexedFilterBindTest {
 
     private JsonNode data(HttpResponse<String> r, int expected) throws Exception {
         assertEquals(expected, r.statusCode(), r.body());
-        return JSON.readTree(r.body()).get("data");
+        return EdgeWireTestRows.decoded(JSON.readTree(r.body()).get("data"));
     }
 
     private void build(Ctx c) throws Exception {

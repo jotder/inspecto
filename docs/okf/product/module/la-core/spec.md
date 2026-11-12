@@ -69,6 +69,9 @@ published as `live.investigations` on `/health/details`; `probeAtBoot` tries onc
   for a Space with a data root ([architecture-backend](architecture-backend.md) §3.2). Serialised by a JVM monitor plus an OS `FileChannel.lock` on `.store.lock`.
 - Graph Run checks size before work and the deadline at checkpoints; overrun ends `BUDGET_EXCEEDED` with no result.
 - Library code takes every limit as a parameter from its la-api caller ([architecture-backend](architecture-backend.md) §9).
+- The exploration edge reads (`/inv/projection`, `/inv/projection/neighbors`) send compact rows (PERF-P10-1, 2026-11-12);
+  the SPA library (`projects/link-analysis/src/api/edge-wire.ts`) decodes them to the `ProjectionTriple` objects every
+  fold reads, so no fold changed. Wire contract: [la-api spec](../la-api/spec.md) § Invariants.
 
 ## Tests
 

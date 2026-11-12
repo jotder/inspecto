@@ -109,7 +109,7 @@ class ControlApiIndexMaxAgeTest {
 
     private JsonNode data(HttpResponse<String> r) throws Exception {
         assertTrue(r.statusCode() == 200 || r.statusCode() == 202, r.body());
-        return JSON.readTree(r.body()).get("data");
+        return EdgeWireTestRows.decoded(JSON.readTree(r.body()).get("data"));
     }
 
     private void build(Ctx c, String cols) throws Exception {

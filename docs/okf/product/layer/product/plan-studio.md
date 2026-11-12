@@ -687,7 +687,8 @@ artifact or lineage graphs (`GLOSSARY.md` §11 keeps the four graph planes disti
 source Entity, another the target, optional columns carry the Link type and attributes. It is
 **backend-first only** — `POST /inv/projection` folds server-side in DuckDB
 (`GROUP BY` with `COUNT(*)`, **heaviest-first**, default cap 2,000 and maximum 20,000, returning
-`{rows[{source,target,kind,count,attrs?}], truncated}`), `POST /inv/projection/neighbors` does one-hop
+`{columns, attrCols, rows[[source,target,kind,count,total?,…attrs]], truncated}` as
+`application/vnd.inspecto.la-edges.v2+json` since PERF-P10-1, 2026-11-12; the SPA decodes it to `{source,target,kind,count,attrs?}`), `POST /inv/projection/neighbors` does one-hop
 expansion with bound parameters, and `GET /inv/schema/relationships` infers naming-convention foreign
 keys across Datasets (`<base>_id` → a Dataset named `<base>`) so a multi-mapping projection can be
 pre-filled instead of hand-picked. `attrCols` are extra validated identifiers that join the group-by
