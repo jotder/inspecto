@@ -32,6 +32,10 @@ expect:
 A case name and every input are plain names (`ImportPaths.segmentRefusal`) and must resolve inside the case
 folder (`PathJail.contains`). A case that names a file outside its folder is malformed, never run.
 
+`case.toon` is an **allowed** fixed name, not a reserved one (`ImportLoaderInventoryTest.ALLOWED`, 2026-11-12):
+an import writes only under `config/` (`ImportPaths.realPathRefusal` jails it there), and `tests/` is that
+folder's sibling, so an import cannot plant a case; and a case only ever runs into a deleted scratch root.
+
 ## 2. How a case runs
 
 `SpaceTestRunner` (in `com.gamma.service`, beside `ImportPaths` whose jail it reuses) runs each case through
@@ -71,6 +75,11 @@ Runs the cases of its Space (`cases` parameter: comma-separated names; all when 
 the Space's own `*_pipeline.toon` files with `PipelineConfig.loadForValidation` (no write). On any failed case it
 emits `space.test.failed` (WARN) with the failed case names; it always emits `space.test.completed`. A dry run
 runs the cases too: running them is itself side-effect free.
+
+The type is contributed by the host module through `META-INF/services/com.gamma.job.JobTypeProvider`, like
+`expectation.evaluate`, so `GET /jobs/types` reports its `source` as `classpath`, not `builtin` (by design:
+the engine module cannot see `SpaceTestRunner`). It resolves its Space with `SpaceConfigRoot.requireCurrent`,
+where a Space's registered config root wins over `-Dassist.write.root`.
 
 ## 5. Deliberately not covered
 
