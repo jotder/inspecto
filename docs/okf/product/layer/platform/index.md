@@ -59,4 +59,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `CUSTOMER-BUILD-DOMAIN-APPS-1` | P3 | feature | a customer of a Domain product must hold every optional App the Product's composed Space Template joins, or the customer build is refused. | demand |
 | `PRODUCT-MAP-APP-EDITION-PRICES-1` | P3 | feature | an App has one Order Code (INS-APP-<ID>), so a price per App × Edition (D-PA6) has no key yet. | demand |
 | `DOCS-AGENT-WRITTEN-REVIEW-1` | P3 | chore | ~200 hub docs were written by agents on 2026-10-19 (PRODUCT-DOCS-HUB-1) | — |
-| `ARCH-DOCS-CONSOLIDATE-1` | P3 | chore | consolidate the 105 architecture*.md hub docs into a uniform, citable set: one architecture.md per hub (no -overview, no change logs in t… | — |
+| `ARCH-DOCS-RESIDUALS-1` | P3 | chore | what ARCH-DOCS-CONSOLIDATE-1 left when it shipped (2026-11-12 | demand |

@@ -102,7 +102,7 @@ Term keys are `concept.`, `entity_type.`, `record_type.`, `link_kind.`, `measure
   profile's hints: case-insensitive, anywhere unless anchored with `^` / `$`; a bad pattern refuses the pack); wire
   `recordTypes[].roleHints {time, measure, category, from, to}`. A hint gives a role only where the column's type can
   hold it (Time: a date or timestamp; Measure: a number; Category: neither a decimal number nor a date), first Time,
-  then Measure, then Category. Readers: Add data and the Data page (column roles, la-core `architecture.md` §6.15) and
+  then Measure, then Category. Readers: Add data and the Data page (column roles, la-core `architecture-backend.md` §6.15) and
   the preset questions' From / To (§6.16). Telecom's and mobile money's record types carry generic hints; a broad word
   is anchored (`^to_`, `_to$`: a *total* is no payee).
 

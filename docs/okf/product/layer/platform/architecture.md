@@ -86,13 +86,14 @@ The group directories hold plain modules; there is no aggregator pom per directo
 | Contracts | `spi/` | `inspecto-audit-spi`, `-auth-spi`, `-http-spi` | Interfaces and value types only, no state |
 | Providers | `providers/` | Swap-in implementations: `inspecto-connectors`, `-connectors-kafka`, `-oidc`, `-demo-auth`, `-secrets`, `-policy`, `-geo-country`, `-notify-channels`, `-agent-hosted`, `-telecom-asn1`, and the nested `asn-parser` reactor | Chosen by deployment |
 
-**Module count, and how to re-derive it.** The root `pom.xml` lists 48 `<module>` entries: 47 Inspecto
+**Module count, and how to re-derive it.** The root `pom.xml` names 48 distinct module directories: 47 Inspecto
 modules plus `providers/asn-parser/asn-decoders`, a separately parented reactor that is aggregated only
 so its `asn-facade` artifact builds first. Of the 47, 28 are in the default `<modules>` list (the Basic
 build) and 19 are profile-scoped: 17 enter with `-Pedition-standard`, and `inspecto-policy` and
 `inspecto-la-store-pg` enter with `-Pedition-advanced`. `-Pedition-preview` carries the same 19. By
 directory: `spi` 3, `platform` 13, `features` 15, `la` 5, `providers` 10 (plus `asn-parser`), root 1.
-Count the `<module>` lines of the root `pom.xml` to check; `tools/reactor-modules.mjs` does the same
+Count the distinct `<module>` values of the root `pom.xml` to check (a module listed by several profiles
+appears on several lines); `tools/reactor-modules.mjs` does the same
 walk for the guard tools. The directory name equals the artifactId for every module except `inspecto/`.
 
 **Every module declares itself.** Each module carries a manifest, `META-INF/inspecto/module.toon`, with
@@ -228,8 +229,8 @@ providers declare the services they require; `JobContext.services()` returns a v
 unknown id is refused at registration, never at fire time.
 
 The host binds ten services per Space in `CollectorService`: `notifications`, `mail`, `incidents`,
-`schema`, `consignment-status`, `datasets`, `analytics`, `alerts`, `link-index` and `objects` (the
-last only when `inspecto-ops` is installed). To re-derive the list, read the
+`schema`, `consignment-status`, `datasets`, `analytics`, `alerts`, `link-index` and `objects` (always
+registered; without `inspecto-ops` its implementation is absent and a grant reports it so). To re-derive the list, read the
 `platformServices.register` calls in that class. A Job Pack can contribute further services through
 `ServiceProvider`. Under a dry run every mutating service is replaced by a stand-in that records the
 would-be effect; `DryRunCoverageTest` fails the build if a service has neither a stand-in nor a

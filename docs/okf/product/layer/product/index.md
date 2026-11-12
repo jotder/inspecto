@@ -42,5 +42,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `UI-SCHEMA-FORM-EDITOR-1` | P3 | feature | <inspecto-schema-form>'s in-row editor is still a dense boxed Material field, the last file on the lint:forms allow-list. | — |
 | `PACK-SALES-MARKETING-1` | P3 | feature | Sales & Marketing BI pack: sales, commissions, marketing and churn analytics | operator |
 | `DOCS-AGENT-WRITTEN-REVIEW-1` | P3 | chore | ~200 hub docs were written by agents on 2026-10-19 (PRODUCT-DOCS-HUB-1) | — |
-| `ARCH-DOCS-CONSOLIDATE-1` | P3 | chore | consolidate the 105 architecture*.md hub docs into a uniform, citable set: one architecture.md per hub (no -overview, no change logs in t… | — |
+| `ARCH-DOCS-RESIDUALS-1` | P3 | chore | what ARCH-DOCS-CONSOLIDATE-1 left when it shipped (2026-11-12 | demand |
 | `DOCS-FUNCTIONALITY-HUBS-1` | P3 | chore | decide whether functionality/ Product Map Items get their own hubs or stay sections of their module's features slot (none exist yet, so n… | operator |

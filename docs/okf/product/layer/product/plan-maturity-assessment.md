@@ -683,7 +683,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
     `ExchangeSnapshotMultiPodTest` and the end-to-end `CrossSpaceFraudIncidentAcceptanceTest`. UI: about 6 sharing specs.
   - Gating (grep of the module source): `canRequestShares`, `canOfferDatasets`, `canOfferSignals`, `canRender*`.
   - Open: only P3 `IMPORT-WHOLE-SPACE-SPLIT-1` (demand hold) and the "load as draft" browser pass.
-  - Known limits (`architecture-overview.md` §9): Signals cross only within one Pod and are never queued. Duplicate `EXCHANGE_REFRESHED`
+  - Known limits (`architecture.md` §9): Signals cross only within one Pod and are never queued. Duplicate `EXCHANGE_REFRESHED`
     events are possible from two pods.
 - **Strengths vs market:**
   - The matrix says no RAFM peer shows a multi-entity / group-regulator model on its public pages. Here sharing fails closed and masks under
@@ -872,7 +872,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - The add-on holds one module, `notify-channels` (`offerings/standard.toon`). The code is 5 classes in `providers/inspecto-notify-channels/src/main/java/com/gamma/notify/channel/`: `SmtpEmailChannel`, `WebhookChannel`, `HttpWebhookSinkTransport`, `PinnedHttp` and `WebhookEgress`.
   - `plan.md`: email and webhook are built only under Standard and above, with digest batching, receipts, bounce suppression and per-Space destinations. `WEBHOOK-EGRESS-POLICY-1` gives a pinned connect, and channel and notification-rule writes go through maker-checker (`ASSURE-MAKER-CHECKER-RESIDUALS-1`). No open rows.
   - Module tests: 9 unit classes, including two channel TCKs, `SmtpEmailChannelStarttlsRequiredTest`, `SmtpEmailChannelTlsIdentityTest` and `PinnedHttpTlsTest`. The core holds 5 real-HTTP notification tests (`inspecto/src/test/java/com/gamma/control/ControlApiNotification*Test`, `NotificationContentMaskingTest`).
-  - Known limits (`architecture-overview.md` §9): no retry inside a channel except the soft-bounce retry, and suppression applies only to persisted destinations.
+  - Known limits (`architecture.md` §9): no retry inside a channel except the soft-bounce retry, and suppression applies only to persisted destinations.
   - There is no feature-db row (`addon/integrationDelivery/index.md`: "no feature rows derive to this item").
   - No HMAC or signature code exists in `providers/inspecto-notify-channels` (grep `signature|hmac`). Signing of notification webhooks is unverified. Link Analysis has its own signed webhooks (`IntegrationWebhooksTest`).
 - **Strengths vs market:**

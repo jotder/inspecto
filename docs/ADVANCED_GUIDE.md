@@ -201,7 +201,7 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
 - **Deep dives (design of record):** the [`module.engine` hub](okf/product/module/engine/index.md)
   — `architecture-pipeline-graph.md`, `spec-editable-round-trip.md`, `spec-live-execution.md` (views,
   provenance, incremental watermarks, failure modes), `spec-step-park-drain.md`; plus
-  `architecture-multi-location-ingest.md` in the [`module.acquire` hub](okf/product/module/acquire/index.md).
+  `architecture.md` (part *Multi-location ingest*) in the [`module.acquire` hub](okf/product/module/acquire/index.md).
   Reusable `use:` components (`ComponentStore`/`ComponentRegistry`) →
   [`component-registry.md`](okf/product/module/processor/spec-component-registry.md).
 
