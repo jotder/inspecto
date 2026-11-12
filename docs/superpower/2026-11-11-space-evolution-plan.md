@@ -1,10 +1,24 @@
 # Space evolution — a Space the server understands as a whole, reached without breaking one
 
-**State:** DECIDED 2026-11-11 — D-SE1…D-SE8 answered (§6); nothing built; starts after the link census
-plan's LC-1 is built (its decisions D-LC1…D-LC5 were answered the same day). Board row `SPACE-EVOLUTION-1`.
+**State:** IN PROGRESS — D-SE1…D-SE8 answered 2026-11-11 (§6); SE-0, SE-6a and SE-1a built (table below).
+Board row `SPACE-EVOLUTION-1`.
 **Depends on:** [`2026-11-11-space-link-census-plan.md`](2026-11-11-space-link-census-plan.md) phase LC-1
 (the declared link census and its graph). This plan does not repeat that design; it builds on it.
 **As-built today:** [Space anatomy](../okf/product/module/config/architecture-space-anatomy.md).
+
+## Progress
+
+| Step | State | Commits | Notes |
+|---|---|---|---|
+| SE-0 corpus equivalence gate, old-reader check | built 2026-11-12 | `7243bcd07` | 3 Spaces + 30 templates; capability flags registered: `space.integrity`, `links.delete`, `links.save` |
+| SE-6a tests that travel with a Space | built 2026-11-12 | `cbbc0523a`, `199affd8d`; fixes `2aad8fc9b`, `ac09275b4` | pushed without the whole module's tests, which left three tests red on master until the fixes; spec `spec-space-tests.md`; five operator questions open |
+| SE-1a Space lock, report-only | built 2026-11-13 | `ad946532e`, `1f61ef26f` | `GET /spaces/{id}/integrity`; kill switch `-Dspace.integrity=off`; residuals `SPACE-LOCK-CLOSE-RESIDUALS-1`; spec `spec-space-lock.md` |
+| SE-3a column contract, report-only | next | — | the census side (LC-5) is built; this adds the lock's change classes and the Schema-save warning |
+| SE-2a hand-rename detection, report | next | — | |
+| SE-5a template version + origin | next | — | |
+| SE-1b / 2b / 3b, SE-4, SE-5b, SE-6b | gated | — | §5 |
+
+Only targeted test classes ran on each lane; the full gate was not run.
 
 ## 1. Why
 

@@ -40,6 +40,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P2 | feature | SPACE-LINK-CENSUS-1 one declared census of the links between a Space's config files | — |
 | — | P3 | feature | SPACE-EVOLUTION-1 a Space the server understands as a whole, reached without breaking one | — |
 | — | P3 | defect | PIPELINE-LINK-GAPS-1 links the Pipeline rename and impact scans still miss | — |
+| `CENSUS-EXPECTATION-TARGET-PATH-1` | P3 | defect | the link census reports a false broken link: it reads an Expectation target (with targetType: pipeline) as a Pipeline id, but Expectation… | — |
 | `ALERT-EVALUATE-NO-BREACH-WORDING-1` | P3 | defect | an alert.evaluate Job logs "no rule breached" on every run while an Alert it raised stays OPEN. | — |
 | `REPORT-PDF-CHARTS-1` | P3 | feature | a report Job's PDF is a table snapshot, never a chart. | — |
 | `JOB-SIGNAL-OVERLAP-SKIP-1` | P2 | defect | every coalescing on_signal Job can lose its last landing when a signal arrives while it runs (wider than first filed; S-sized). | — |
