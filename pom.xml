@@ -686,12 +686,13 @@
                         </archive>
                     </configuration>
                 </plugin>
-                <!-- maven-shade-plugin: the fat-jar/sidecar builder. FIVE modules run it — inspecto
-                     (the core fat jar) plus the inspecto-agent, inspecto-connectors,
-                     inspecto-notify-channels, inspecto-oidc and inspecto-geo-country sidecars — and each pinned 3.5.2
-                     with its own copy of the "Pinned: the offline reactor resolves no plugin version
-                     from a repository" comment, so a bump half-landed. The version now lives once; the
-                     five children declare the plugin version-free and keep their own <configuration>.
+                <!-- maven-shade-plugin: the fat-jar/sidecar builder. NINE modules run it — inspecto
+                     (the core jar) plus the inspecto-agent, inspecto-intelligence, inspecto-connectors,
+                     inspecto-connectors-kafka, inspecto-notify-channels, inspecto-oidc, inspecto-geo-country and
+                     inspecto-telecom-asn1 sidecars (list them: grep maven-shade-plugin in the child poms). Five
+                     of them once each pinned 3.5.2 with its own copy of the "Pinned: the offline reactor resolves
+                     no plugin version from a repository" comment, so a bump half-landed. The version now lives
+                     once; every child declares the plugin version-free and keeps its own <configuration>.
                      ⚠ Still an explicit pin, for that same offline reason — pluginManagement supplies
                      it from the local repo exactly as it already does for compiler and surefire. -->
                 <plugin>

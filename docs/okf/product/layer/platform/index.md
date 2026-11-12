@@ -15,7 +15,7 @@ tags: [product-item, layer]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Compliance (CMP) — capability spec](plan-compliance.md) · [Data plane (DAT)](plan-data-plane.md) · [Editions & packaging (PKG) — capability spec](plan-editions.md) · [Inspecto — Forward Roadmap](plan-roadmap.md) · [Guards & repository tooling (TOOL) — capability spec](plan-tooling.md) |
+| plan | current | [Architecture work — MoSCoW analysis (2026-11-12)](plan-architecture-moscow.md) · [Compliance (CMP) — capability spec](plan-compliance.md) · [Data plane (DAT)](plan-data-plane.md) · [Editions & packaging (PKG) — capability spec](plan-editions.md) · [Inspecto — Forward Roadmap](plan-roadmap.md) · [Guards & repository tooling (TOOL) — capability spec](plan-tooling.md) |
 | spec | current | [Branching & Release Policy](spec-branching-release.md) · [Build & Test](spec-build-test.md) · [Editions — engineering specification (Basic / Standard / Advanced / Preview)](spec-editions.md) · [Module reorganisation - decision record (D-MR1..D-MR12)](spec-module-reorg-decisions.md) · [Module reorganisation - traps and gotchas](spec-module-reorg-gotchas.md) · [Product Map — the commercial tree, its guard, its views and customer builds (as built)](spec-product-map.md) · [Work tracking — one board, tagged rows, generated hub views](spec-work-tracking.md) |
 | architecture | current | [Editions](architecture-editions.md) · [Modules](architecture-modules.md) · [Platform Services](architecture-platform-services.md) · [Inspecto platform architecture](architecture.md) |
 | features | current | [Platform — features](features.md) |
@@ -59,4 +59,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `CUSTOMER-BUILD-DOMAIN-APPS-1` | P3 | feature | a customer of a Domain product must hold every optional App the Product's composed Space Template joins, or the customer build is refused. | demand |
 | `PRODUCT-MAP-APP-EDITION-PRICES-1` | P3 | feature | an App has one Order Code (INS-APP-<ID>), so a price per App × Edition (D-PA6) has no key yet. | demand |
 | `DOCS-AGENT-WRITTEN-REVIEW-1` | P3 | chore | ~200 hub docs were written by agents on 2026-10-19 (PRODUCT-DOCS-HUB-1) | — |
-| `ARCH-DOCS-RESIDUALS-1` | P3 | chore | what ARCH-DOCS-CONSOLIDATE-1 left when it shipped (2026-11-12 | demand |
+| `ARCH-MOSCOW-UNTRACKED-1` | P2 | chore | check eleven architecture gaps that the MoSCoW analysis found in documents but that have no board row, then file or refuse each (filed 20… | — |
+| `ARCH-DOC-CONTRADICTIONS-1` | P3 | chore | fourteen places where current docs contradict each other, found by the MoSCoW research pass (filed 2026-11-12); settle each against the c… | — |

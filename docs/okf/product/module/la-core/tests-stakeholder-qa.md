@@ -26,7 +26,7 @@ everyone else the answer is "not found", the same answer as for one that does no
 it is there. A member who lacks a role gets a refusal only after the Dataset-visibility and policy checks have
 passed. Visibility of the underlying Dataset is checked on every request, so losing access to a Dataset also closes
 the Investigation built on it.
-Evidence: backend §6.1 (gate order, step 6); `ControlApiInvestigationMembersTest`; user manual §12.
+Evidence: [architecture-http-surface](architecture-http-surface.md) §6.1 (gate order, step 6); `ControlApiInvestigationMembersTest`; user manual §12.
 Confidence: PROVEN (the gate order and members behaviour have tests); the Postgres-store variant is DOCUMENTED.
 
 **Q2. How does masking work, and can it be bypassed by a clever query?**
@@ -36,7 +36,7 @@ default mode is `typed`: only columns whose classification an Entity Type claims
 are masked; `all` masks every id; `none` shows raw. The same rule applies on the canvas, node lists, paths,
 patterns, Value Measures and the Working Set, and a raw id typed into an alias field is refused, so the route is not
 an oracle for guessing.
-Evidence: backend §3.4; `ControlApiExplorationMaskingTest` (the `everyInvReadOnAMaskedSpaceIsScannedForRawIds`
+Evidence: [architecture-masking](architecture-masking.md) §3.4; `ControlApiExplorationMaskingTest` (the `everyInvReadOnAMaskedSpaceIsScannedForRawIds`
 case scans every Investigation read for raw ids); `ControlApiInvestigationOversightTest` (typed by default).
 Confidence: PROVEN for the routes the tests cover. A new route must be added to that scan; say so if asked about
 future routes.
@@ -44,7 +44,7 @@ future routes.
 **Q3. Can anyone ever see the real value? Who, and is it recorded?**
 Yes, per entity, through *Reveal*. It needs its own capability (`canRevealLinkEntities`), is a separate action from
 approving, and every reveal writes an audit event. In the shipped demo the `admin` persona holds it.
-Evidence: backend §3.4 and §6 (Four-eyes / reveal row); `ControlApiInvestigationOversightTest
+Evidence: [architecture-masking](architecture-masking.md) §3.4 and backend §6 (Four-eyes / reveal row); `ControlApiInvestigationOversightTest
 .revealIsPerEntityGatedOnItsOwnCapabilityAndAudited`.
 Confidence: PROVEN.
 
@@ -53,7 +53,7 @@ Link Analysis writes `LINK_*` audit events (reveal, embed minted, viewed or deni
 reads, and so on), and the host records every 401, 403 and 5xx. The platform audit ledger is append-only, but it is
 NOT hash-chained: the security spec states that `AuditTrail` contains no hash, chain or signature. Our tamper-evidence
 claim is about the Investigation record (Q13), not about the general audit ledger.
-Evidence: backend §6.1 step 7, §6.2 (audit events); [`security.md`](../access/plan-security.md) row
+Evidence: [architecture-http-surface](architecture-http-surface.md) §6.1 step 7, §6.2 (audit events); [`security.md`](../access/plan-security.md) row
 "Tamper-evidence of the audit log" (checked against `platform/inspecto-access` `AuditTrail.java`).
 Confidence: DOCUMENTED for the events; the absence of a chain on the ledger is a stated gap (see Section 8).
 
@@ -83,7 +83,7 @@ or SQL, expires (default 72 hours, a Space may allow up to 30 days by default an
 automatically if the minter loses the lead role, the Case closes or masking is loosened. Every bad, expired or
 revoked token gets the same "not found". The feature is OFF by default (`-Dla.embed.enabled`) and the answer is
 GET-only with no cookie and no framing.
-Evidence: backend §6.2; `ControlApiInvestigationEmbedTest` (expiry, kill switch, same-404, auto-revoke, token in no
+Evidence: [architecture-http-surface](architecture-http-surface.md) §6.2; `ControlApiInvestigationEmbedTest` (expiry, kill switch, same-404, auto-revoke, token in no
 log or audit row).
 Confidence: PROVEN for the API. There is no viewer page yet (Section 8).
 
@@ -112,7 +112,7 @@ that no personal data exists anywhere.
 Columns carry a classification from the Dataset registry and lineage. In `typed` mode a column is masked when an
 Entity Type claims its classification; untraceable lineage fails closed (masked). A Space can also refuse to mint an
 embed link when the strictest classification of the Investigation's columns is on its refusal list.
-Evidence: backend §3.4 and §6.2; `ControlApiInvestigationOversightTest
+Evidence: [architecture-masking](architecture-masking.md) §3.4 and [architecture-http-surface](architecture-http-surface.md) §6.2; `ControlApiInvestigationOversightTest
 .aColumnClassificationIsTypedByTheEntityTypeClaimingIt`; `ControlApiInvestigationEmbedTest
 .aSpaceCanRefuseToShareInvestigationsOfAClassificationAndAPolicyCanForbidTheActionEmbed`.
 Confidence: PROVEN.
@@ -225,7 +225,7 @@ It is refused or limited out loud, never silently trimmed. A Graph Run has a siz
 `BUDGET_EXCEEDED` with no result when exceeded. The Run pool is 2 running plus 16 waiting; the next request beyond
 that is refused with 503. Expensive exploration calls share a per-person bucket of 30, refilling one per 2
 seconds (429). Large expansions go to four-eyes.
-Evidence: backend §5 (Budgets, Pool), §6.1 step 2, §9; `ControlApiGraphRunTest
+Evidence: backend §5 (Budgets, Pool), [architecture-http-surface](architecture-http-surface.md) §6.1 step 2, backend §9; `ControlApiGraphRunTest
 .aBudgetExceededRunIs200WithTheNumbersAndNeverAResultKey`; `LinkAnalysisRateClassCoverageTest`.
 Confidence: PROVEN for the budget refusal; DOCUMENTED for the exact pool and queue figures.
 
@@ -253,7 +253,7 @@ Link Analysis is optional jars discovered at startup, not a separate server. It 
 (Standard is a Professional alias in the bundler), absent in Personal (the routes answer 503), and the PostgreSQL
 Investigation store and the Enterprise policy engine are Preview and Enterprise only. Per Space it needs the
 `geoLink` module enabled in `modules.toon`.
-Evidence: backend §8 and §6.1 step 4; `ControlApiGeoLinkModuleGateTest`.
+Evidence: backend §8 and [architecture-http-surface](architecture-http-surface.md) §6.1 step 4; `ControlApiGeoLinkModuleGateTest`.
 Confidence: PROVEN for the module gate; DOCUMENTED for packaging.
 
 **Q26. Can it run on several servers for scale or high availability? Be honest.**
@@ -265,7 +265,7 @@ Analysis specifically, the Postgres Investigation store is built, but embed link
 store answers 503 for them).
 Evidence: [`../../layer/platform/admin-guide-ha-dr-drill.md`](../../layer/platform/admin-guide-ha-dr-drill.md) "What has actually been proven" and the laptop-scale
 drill; [`enterprise-scale-out-plan.md`](../../../../superpower/enterprise-scale-out-plan.md) status header;
-`docs/BACKLOG.md` `SCALEOUT-PLAN-AUDIT-1`; backend §6.2.
+`docs/BACKLOG.md` `SCALEOUT-PLAN-AUDIT-1`; [architecture-http-surface](architecture-http-surface.md) §6.2.
 Confidence: NOT YET for multi-pod; PROVEN only for the single-database lease at laptop scale.
 
 **Q27. How do we back up, restore and upgrade? Can it run air-gapped?**
@@ -300,7 +300,7 @@ Confidence: DOCUMENTED (driven live in the 2026-10-12 telecom demo runs per the 
 Yes: 82 Link Analysis routes (76 in `la-api`, 6 in `geo-link`), all in the OpenAPI contract, each behind the same
 gate order (authenticate, rate limit, authorize, module enabled, capability, Investigation access). A guard test
 keeps the route modules behind the module gate.
-Evidence: backend §6 and §6.1; `LaApiRoutesManifestParityTest`; `ControlApiGeoLinkModuleGateTest`.
+Evidence: backend §6 and [architecture-http-surface](architecture-http-surface.md) §6.1; `LaApiRoutesManifestParityTest`; `ControlApiGeoLinkModuleGateTest`.
 Confidence: PROVEN. (The readiness plan still says 75 routes and 28 algorithms; those figures are stale.)
 
 ## 8. What we do NOT claim, and what is not yet

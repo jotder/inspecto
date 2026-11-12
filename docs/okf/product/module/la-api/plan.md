@@ -18,7 +18,7 @@ design: [architecture](architecture.md); layer: [layer/la architecture](../../la
 - Contribute every Link Analysis route to the one host `ControlApi` as ServiceLoader `RouteModule`s, with no LA server
   and no engine class named ([la-separation-execution-plan](../../../../archived-documents/plans-archive/la-separation-execution-plan.md)).
 - Enforce the request gate order (authenticate, rate, ABAC, module enabled, capability, Investigation membership, Dataset
-  visibility, PDP) and mask entities on every output ([la-core architecture-backend](../la-core/architecture-backend.md) §6.1, §3.4).
+  visibility, PDP) and mask entities on every output ([la-core architecture-http-surface](../la-core/architecture-http-surface.md) §6.1, [la-core architecture-masking](../la-core/architecture-masking.md) §3.4).
 - Orchestrate Drafts (admission, rebase, promote, four-eyes) over la-core storage
   ([la-separation-d7-design](../../../../archived-documents/plans-archive/la-separation-d7-design.md)).
 - Serve reads from the link index when a fresh index exists, else from the flat Dataset relation, never mixing the two
@@ -38,7 +38,7 @@ design: [architecture](architecture.md); layer: [layer/la architecture](../../la
 | Entity profile pages (`EntityProfileRoutes`, `EntityProfiles`) | [la-entity-profile-plan](../../../../archived-documents/plans-archive/la-entity-profile-plan.md) |
 | Data trust: Dataset files, coverage (`DatasetFilesRoutes`) | [la-data-trust-plan](../../../../archived-documents/plans-archive/la-data-trust-plan.md); `LA-DATA-TRUST-1` closed |
 | Every limit read through `SpaceLimits` | [la-configurable-limits-plan](../../../../archived-documents/plans-archive/la-configurable-limits-plan.md); `LA-CONFIG-LIMITS-1` |
-| Inbound / outbound integration (`InvestigationInboundRoutes`, `IntegrationRoutes`, `LaIntegration`), analyst CSV upload (`UploadRoutes`) | `LA-EDITIONS-1`; [la-core architecture-backend](../la-core/architecture-backend.md) §6.4-§6.6 |
+| Inbound / outbound integration (`InvestigationInboundRoutes`, `IntegrationRoutes`, `LaIntegration`), analyst CSV upload (`UploadRoutes`) | `LA-EDITIONS-1`; [la-core architecture-http-surface](../la-core/architecture-http-surface.md) §6.4-§6.6 |
 
 ## Left
 
