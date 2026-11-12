@@ -30,7 +30,7 @@ contract`, `offeringRole: base`, `bindingTime: build` in its `module.toon`). It 
 
 - **Auth-free core.** The core ships no `Authenticator`, `TokenRelay`, `AccessDecider`, `GeoCountryResolver` or
   `SecretsProvider`. Which ones a bundle carries is an Edition choice made at build time — see
-  [architecture-editions-model](../../layer/platform/architecture-editions.md).
+  [architecture-editions](../../layer/platform/architecture-editions.md).
 - **Fail-closed where absence opens the door.** The usual product rule is "absent module ⇒ no-op wins". It is
   reversed for two slots: an `Authenticator` that is registered but cannot load would leave every route open, and
   an `AccessDecider` that cannot load would drop the Space-isolation policies at route and row level. Both refuse

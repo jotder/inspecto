@@ -28,4 +28,4 @@ Fraud, AML and claims investigators.
 
 [la-core](../../module/la-core/index.md) · [la-api](../../module/la-api/index.md) · [geo-link](../../module/geo-link/index.md) · [la](../../layer/la/index.md)
 
-More in this hub: [feature-db](feature-db.md).
+More in this hub: [feature-db](feature-db.md)

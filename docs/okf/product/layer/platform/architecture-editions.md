@@ -15,7 +15,7 @@ timestamp: 2026-11-12T00:00:00Z
 an edition is *which Maven modules + flags* are assembled from a given commit. A fix lands once in core and
 every edition inherits it at build time — no cross-line cherry-picking. Authoritative doc: `docs/EDITIONS.md`.
 The module list, with the profile and the lowest edition of every module, is in
-[architecture-module-taxonomy.md](architecture-modules.md) §1.
+[architecture-modules.md](architecture-modules.md) §1.
 
 **Names and the Link Analysis split (`LA-EDITIONS-1`, 2026-10-17).** Basic / Standard / Advanced (formerly Personal /
 Professional / Enterprise) plus Preview; profiles `edition-standard`, `edition-advanced`, `edition-preview` (Basic = no
@@ -89,7 +89,7 @@ cost a rebuild each:
    list first, then appends every `RouteModule` that `OptionalSpi.all` finds.
 2. **Absent ⇒ 503 with an explanation, never 404.** The stubs are no longer hand-written: `AbsentModuleRoutes`
    synthesises them from the absent module's manifest (`provides.routes` and `absentMessage`), which the
-   processor build copies for every known module (see [architecture-module-taxonomy.md](architecture-modules.md) §3).
+   processor build copies for every known module (see [architecture-modules.md](architecture-modules.md) §3).
 3. 🔴 **Register stubs through `ApiContext.stub`, not `api.get`/`api.post`.** A stub registered as a real
    route counts in `hasRoute`, so a derived feature flag reports the module present. `features.geoLink` shipped
    `true` on Basic for exactly this reason and was caught only by the falsification test.

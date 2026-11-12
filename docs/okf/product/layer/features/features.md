@@ -16,7 +16,7 @@ Feature modules are the optional business capabilities — scoring, screening, c
 
 ## What this enables
 
-- Customers buy only the capabilities they need; how modules are classified and gated is in [architecture-module-taxonomy](../platform/architecture-modules.md)
+- Customers buy only the capabilities they need; how modules are classified and gated is in [architecture-modules](../platform/architecture-modules.md)
 
 ## Related hubs
 

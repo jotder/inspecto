@@ -21,7 +21,7 @@ Edition. They hold interfaces, value types and discovery helpers — no policy, 
 | Route module contract | `spi/inspecto-http-spi/` | `com.gamma.spi.http` | [http-spi](../../module/http-spi/index.md) |
 
 Dependency direction: `http-spi` → `auth-spi`; `audit-spi` stands alone. Implementations sit above, in
-`platform/`, `providers/`, `features/` and `la/` (layer map: [architecture-layers](../platform/architecture.md)).
+`platform/`, `providers/`, `features/` and `la/` (layer map: [platform architecture](../platform/architecture.md)).
 
 ## How a provider plugs in
 
@@ -29,7 +29,7 @@ Dependency direction: `http-spi` → `auth-spi`; `audit-spi` stands alone. Imple
 2. It lists the implementing class in `src/main/resources/META-INF/services/<interface FQN>`.
 3. The host discovers it with `java.util.ServiceLoader` at boot or first use — never by name. Which providers a
    bundle carries is decided at build time by the Edition profile
-   ([architecture-editions-model](../platform/architecture-editions.md)); there are no runtime switches.
+   ([architecture-editions](../platform/architecture-editions.md)); there are no runtime switches.
 
 Two discovery disciplines, both in `inspecto-auth-spi`:
 
@@ -87,4 +87,4 @@ Each contract ships a TCK in its test-jar (`com.gamma.control.testkit`): `Authen
 - `spi/inspecto-auth-spi/src/main/java/com/gamma/spi/auth/SpiSlot.java`
 - `spi/inspecto-audit-spi/src/main/java/com/gamma/audit/EventSink.java`
 - `spi/inspecto-http-spi/src/main/java/com/gamma/spi/http/RouteModule.java`
-- [architecture-module-taxonomy](../platform/architecture-modules.md) · [Features](features.md)
+- [architecture-modules](../platform/architecture-modules.md) · [Features](features.md)

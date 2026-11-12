@@ -27,4 +27,4 @@ Investigation teams who work a problem as one Case rather than many alerts.
 
 [case-management](../../module/case-management/index.md) · [incidents](../../addon/incidents/index.md) · [linkAnalysis](../../addon/linkAnalysis/index.md)
 
-More in this hub: [feature-db](feature-db.md).
+More in this hub: [feature-db](feature-db.md)

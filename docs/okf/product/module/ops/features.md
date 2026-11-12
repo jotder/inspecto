@@ -28,4 +28,4 @@ Operations and assurance teams triaging what the platform raises.
 
 [incidents](../../addon/incidents/index.md) · [workflowSla](../../addon/workflowSla/index.md) · [case-management](../../module/case-management/index.md) · [workflow](../../module/workflow/index.md)
 
-More in this hub: [feature-db](feature-db.md) · [user-guide-objects](user-guide-objects.md).
+More in this hub: [feature-db](feature-db.md) · [user-guide-objects](user-guide-objects.md)

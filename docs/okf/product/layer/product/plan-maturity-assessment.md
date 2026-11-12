@@ -1550,7 +1550,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Its own content is mis-tiered. `business-assurance` and `la-daily-feed` ship Alert Rules whose dispatcher is Standard+ (`OFFERING-DECLARATION-DRIFT-1` D1).
 - **Strengths vs market:**
   - The install is zero-dependency (one process, no database, no IdP), which suits a presales or analyst desk. That is comparable to i2 ANB desktop or Neo4j Desktop/Bloom free use (general market).
-  - It is upgraded by swapping the build, not migrating: Spaces and configuration carry over (`edition/basic/brochure.md`). This is held by the build-flavor model (`architecture-editions-model.md`).
+  - It is upgraded by swapping the build, not migrating: Spaces and configuration carry over (`edition/basic/brochure.md`). This is held by the build-flavor model (`architecture-editions.md`).
 - **Gaps vs market / RFP risk:**
   - No authentication at all. Competitors' entry tiers (Linkurious, Neo4j Enterprise starter, general market) still have users and roles. Basic cannot answer any SSO/RBAC RFP line (by design; no row needed, but it limits Basic to non-regulated use).
   - Per-node billing with no metering or licence key. The node count is honour-system: no row (D-MR3 decided "none").

@@ -26,4 +26,4 @@ Investigators using the studio, and integrators driving it over the API.
 
 [linkAnalysis](../../addon/linkAnalysis/index.md) · [la-core](../../module/la-core/index.md) · [la-storage](../../module/la-storage/index.md) · [geo-link](../../module/geo-link/index.md)
 
-More in this hub: [feature-db](feature-db.md).
+More in this hub: [feature-db](feature-db.md)

@@ -27,4 +27,4 @@ Operations teams who want detections to trigger work in other systems with a tra
 
 [action-requests](../../module/action-requests/index.md) · [workflowSla](../../addon/workflowSla/index.md)
 
-More in this hub: [feature-db](feature-db.md).
+More in this hub: [feature-db](feature-db.md)

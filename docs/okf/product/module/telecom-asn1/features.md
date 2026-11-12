@@ -26,4 +26,4 @@ Telecom operators ingesting switch and network CDRs directly.
 
 [telecomIndustryPack](../../addon/telecomIndustryPack/index.md) · [asn-decoders](../../module/asn-decoders/index.md) · [etl](../../module/etl/index.md)
 
-More in this hub: [feature-db](feature-db.md).
+More in this hub: [feature-db](feature-db.md)

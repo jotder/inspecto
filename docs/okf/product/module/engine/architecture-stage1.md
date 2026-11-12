@@ -1,7 +1,7 @@
 ---
 type: Architecture
 title: Stage-1 architecture & design
-description: The M..N multiplexer ingest path — design philosophy and scope, the architecture, the directory layout, and the two-step process. Scoped deliberately against architecture-layers.md, which owns the platform-wide layer model.
+description: The M..N multiplexer ingest path — design philosophy and scope, the architecture, the directory layout, and the two-step process. Scoped deliberately against the platform architecture page (layer/platform architecture.md), which owns the platform-wide layer model.
 resource: platform/inspecto-etl/src/main/java/com/gamma/etl
 tags: [architecture, stage1, multiplexer, ingest, layout]
 timestamp: 2026-07-16T00:00:00Z
@@ -25,7 +25,7 @@ timestamp: 2026-07-16T00:00:00Z
 > (Personal/Standard/Enterprise; `inspecto-oidc` for Standard); and the optional **assist agent**
 > (vendored kernel + eoiagent model transport). The whole-platform map lives in the
 > [OKF knowledge bundle](../../index.md); the package-level **layer map** (dependency layering, SPI
-> surface, event/config/storage/threading models) in [`architecture-layers.md`](../../layer/platform/architecture.md);
+> surface, event/config/storage/threading models) in [`architecture.md`](../../layer/platform/architecture.md);
 > the authored-Pipeline design in [`pipeline-graph-design.md`](architecture-pipeline-graph.md). The non-goals below are **still correct for
 > Stage-1** — they are what keep each batch embarrassingly parallel and crash-isolated.
 

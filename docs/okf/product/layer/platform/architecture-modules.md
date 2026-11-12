@@ -248,7 +248,7 @@ A feature is reached through three gates, none of them inside feature code:
   `ConsequenceProvider` (Decision Kernel Consequences), `HostBootHook` (a module's boot-time host installs) and
   `LinkedSubjectProvider`. Closed central registries become contribution points; `EventType` is the model to copy.
 - **Edition features.** Where the executing code cannot leave a base module, a Standard-only module declares the
-  feature instead (`EditionFeatureProvider`). See [architecture-editions-model.md](architecture-editions.md).
+  feature instead (`EditionFeatureProvider`). See [architecture-editions.md](architecture-editions.md).
 
 ## 6. Offerings (`offerings/<id>.toon`)
 
@@ -464,7 +464,7 @@ blanks) and `RowShaper.str` (a `PipelineNode` accessor, not a map lookup).
     in the host module, because opening the stores needs `SpaceRoot` and `OperationalDb`, which live there.
 
 The edition-specific half of this playbook (stubs, feature flags, falsification tests) is in
-[architecture-editions-model.md](architecture-editions.md).
+[architecture-editions.md](architecture-editions.md).
 
 ## 14. Package cycles inside modules
 

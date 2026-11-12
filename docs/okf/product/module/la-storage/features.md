@@ -22,4 +22,4 @@ Link analysis storage keeps the link index that investigations read. It sits und
 
 [la-core](../../module/la-core/index.md) · [la-store-pg](../../module/la-store-pg/index.md) · [linkAnalysis](../../addon/linkAnalysis/index.md)
 
-More in this hub: [tests-index-scale-run](tests-index-scale-run.md).
+More in this hub: [tests-index-scale-run](tests-index-scale-run.md)

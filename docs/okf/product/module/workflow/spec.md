@@ -37,6 +37,6 @@ Javadoc of `SlaPolicy` and `EscalationRule`.
 
 Maker-checker is core control plane, not this module: `inspecto/src/main/java/com/gamma/control/PendingChanges.java`,
 `inspecto/src/main/java/com/gamma/control/ApprovalPolicy.java` — see
-[architecture-maker-checker](architecture.md).
+[architecture](architecture.md).
 
 Tests: [tests-inventory](tests-inventory.md).

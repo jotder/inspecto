@@ -16,7 +16,7 @@ The route module contract lets an optional module contribute its own Control API
 
 ## What this enables
 
-- Add-ons arrive with their own HTTP surface and leave none behind when absent, so each bundle exposes only what the customer bought — [architecture-module-taxonomy](../../layer/platform/architecture-modules.md)
+- Add-ons arrive with their own HTTP surface and leave none behind when absent, so each bundle exposes only what the customer bought — [architecture-modules](../../layer/platform/architecture-modules.md)
 
 ## Related hubs
 

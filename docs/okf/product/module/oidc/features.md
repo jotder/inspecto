@@ -29,4 +29,4 @@ Enterprises that need single sign-on through their own identity provider.
 
 [access](../../module/access/index.md) · [auth-spi](../../module/auth-spi/index.md) · [demo-auth](../../module/demo-auth/index.md)
 
-More in this hub: [architecture](architecture.md).
+More in this hub: [architecture](architecture.md)
