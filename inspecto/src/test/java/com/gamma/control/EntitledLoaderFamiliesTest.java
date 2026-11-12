@@ -260,6 +260,19 @@ class EntitledLoaderFamiliesTest {
                 .anyMatch(h -> h.getClass().getName().equals(ProbeBootHook.class.getName())));
     }
 
+    /**
+     * The seams that only govern, refuse or clean up (approval kinds, component validators and delete hooks, store families)
+     * and RouteModule discovery use allInstalled: a left-out module's provider is still there, so a renewal that opens the
+     * module never opens writes that skip maker-checker (verification finding, 2026-11-13).
+     */
+    @Test
+    void allInstalledKeepsALeftOutModulesProviderWhereAllDropsIt() throws Exception {
+        entitled(List.of("other-module"));
+        java.util.function.Predicate<HostBootHook> probe = h -> h.getClass().getName().equals(ProbeBootHook.class.getName());
+        assertFalse(OptionalSpi.all(HostBootHook.class).stream().anyMatch(probe), "all: narrowed");
+        assertTrue(OptionalSpi.allInstalled(HostBootHook.class).stream().anyMatch(probe), "allInstalled: every installed provider");
+    }
+
     @Test
     void aLeftOutProviderIsNeverInstantiated() throws Exception {
         System.clearProperty(ProbeStep.CONSTRUCTED);

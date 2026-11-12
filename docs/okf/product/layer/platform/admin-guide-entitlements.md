@@ -35,9 +35,16 @@ home (D-PA22, product assembly plan §12).
 
   **What an entitlement never closes.** Some loaders stay open on purpose, because closing them would make the install
   less safe, never smaller: the Authenticator, the access decider and the durable Investigation store (the fail-closed
-  slots), the audit trail, row masking for exported reports and the Link Analysis masking default. The ASN.1 library's
-  own transform functions also stay open; the library reaches Inspecto only through the Telecom parser, which is
-  narrowed. `tools/check-entitled-loaders.mjs` lists each with its reason, and fails CI when a new `ServiceLoader.load`
+  slots), the audit trail, row masking for exported reports and the Link Analysis masking default. Also staying open:
+  - approval governance: a left-out module's kinds stay governable, so a renewal that opens the module never opens writes
+    that skip maker-checker;
+  - component validators and delete hooks: a left-out module's kinds stay checked, its store names stay reserved, and
+    its state is still deleted with a component;
+  - the operational store's family roster;
+  - route modules, whose routes are closed per request instead.
+
+  The ASN.1 library's own transform functions also stay open: the library reaches Inspecto only through the Telecom
+  parser, which is narrowed. `tools/check-entitled-loaders.mjs` lists each with its reason, and fails CI when a new `ServiceLoader.load`
   bypasses `com.gamma.module.EntitledServices`.
 - **The Investigations Add-on** follows the file's `addons` (`laInvestigations`). The install setting is ignored
   while a file is installed.

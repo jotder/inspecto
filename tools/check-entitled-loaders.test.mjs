@@ -66,6 +66,16 @@ test('an open entry whose file is gone is refused', () => {
     assert.match(p.join('\n'), /ReportRowMasking\.java: listed in OPEN or UNFILTERED_CALLERS but not a tracked/);
 });
 
+test('a method reference or a static import of load is a site too', () => {
+    const p = run(fixture({
+        'x/src/main/java/a/Ref.java': 'class Ref { java.util.function.Function<Class<Runnable>, ?> f = java.util.ServiceLoader::load; }',
+        'x/src/main/java/a/Imp.java': 'import static java.util.ServiceLoader.load;\nclass Imp { }',
+    }));
+    assert.equal(p.length, 2, p.join('\n'));
+    assert.match(p.join('\n'), /Ref\.java: 1 raw/);
+    assert.match(p.join('\n'), /Imp\.java: 1 raw/);
+});
+
 test('unfiltered OptionalSpi discovery outside the listed callers is refused', () => {
     const p = run(fixture({ 'x/src/main/java/a/Hooks.java': 'class Hooks { Object o = com.gamma.spi.OptionalSpi.allInstalled(Runnable.class); }' }));
     assert.equal(p.length, 1, p.join('\n'));

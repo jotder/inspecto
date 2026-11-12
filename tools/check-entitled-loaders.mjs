@@ -66,9 +66,25 @@ export const UNFILTERED_CALLERS = {
         why: 'RouteModule discovery: a left-out module still registers and its routes answer 503 per request '
             + '(requireModuleEnabled), so a renewed entitlement opens them without a restart',
     },
+    'inspecto/src/main/java/com/gamma/control/ApprovalPolicy.java': {
+        sites: 1,
+        why: 'governable kinds (maker-checker): a left-out module\'s kind stays governable, so a renewal that opens its routes '
+            + 'never opens writes without approval',
+    },
+    'inspecto/src/main/java/com/gamma/control/ComponentRoutes.java': {
+        sites: 3,
+        why: 'component validators and delete hooks only refuse or clean up: a left-out module\'s kinds stay checked, its '
+            + 'store names reserved, and its state is deleted with the component',
+    },
+    'inspecto/src/main/java/com/gamma/service/OperationalDb.java': {
+        sites: 1,
+        why: 'the operational store\'s family roster is storage layout, not capability: a left-out module\'s tables stay as '
+            + 'they are, read correctly when it returns',
+    },
 };
 
-const SITE = /\bServiceLoader\s*\.\s*load(?:Installed)?\s*\(/g;
+// a call, a method reference, or a static import of load (then a bare `load(` would be a site the guard cannot see)
+const SITE = /\bServiceLoader\s*(?:\.\s*load(?:Installed)?\s*\(|::\s*load(?:Installed)?\b|\.\s*(?:load(?:Installed)?|\*)\s*;)/g;
 const UNFILTERED = /\bOptionalSpi\s*\.\s*allInstalled\s*\(/g;
 
 /** Code lines only: block and line comments stripped, string literals blanked. */

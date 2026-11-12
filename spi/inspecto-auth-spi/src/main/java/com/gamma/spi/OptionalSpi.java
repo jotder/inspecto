@@ -78,9 +78,10 @@ public final class OptionalSpi {
 
     /**
      * As {@link #all}, WITHOUT the entitlement filter: every loadable provider on the classpath. Only for a loader whose
-     * providers are gated per use instead - the control plane's {@code RouteModule}s, whose routes answer 503 per request
-     * while the entitlement leaves their module out, so a renewed entitlement opens them without a restart.
-     * {@code tools/check-entitled-loaders.mjs} lists the files allowed to call it.
+     * providers are gated per use instead (the control plane's {@code RouteModule}s, whose routes answer 503 per request
+     * while the entitlement leaves their module out), or whose providers only refuse, govern or clean up (approval kinds,
+     * component validators and delete hooks, store families) - narrowing those would make an install less safe, never
+     * smaller. {@code tools/check-entitled-loaders.mjs} lists the files allowed to call it, each with its reason.
      */
     public static <T> List<T> allInstalled(Class<T> spi) {
         return discover(spi, false);

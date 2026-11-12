@@ -78,8 +78,10 @@ record ApprovalPolicy(Map<String, Rule> rules, int expiresAfterHours, boolean fa
                 AccessRoutes.ROLES_KIND, AccessRoutes.POLICIES_KIND));
         // Optional modules contribute their own kinds (GovernableKindProvider, MODULE-REORG-1 P1) — e.g.
         // inspecto-entity-list contributes "entity-list" (ASSURE-ENTITY-LISTS-1, D-P5). Fail-soft discovery;
-        // an absent module's kind is simply not governable.
-        for (GovernableKindProvider p : com.gamma.spi.OptionalSpi.all(GovernableKindProvider.class))
+        // an absent module's kind is simply not governable. ENTITLEMENT-SPI-NARROWING-1: allInstalled - a kind stays
+        // governable while the entitlement leaves its module out, so a renewal that opens the module's routes never opens
+        // writes that skip maker-checker.
+        for (GovernableKindProvider p : com.gamma.spi.OptionalSpi.allInstalled(GovernableKindProvider.class))
             s.addAll(p.kinds());
         return java.util.Collections.unmodifiableSet(s);
     }
