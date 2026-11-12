@@ -12,8 +12,10 @@ import com.gamma.audit.Event;
 import com.gamma.audit.EventType;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
+import com.gamma.pipeline.LinkCensus;
+import com.gamma.pipeline.LinkGraph;
 import com.gamma.service.DbStatusStore;
-import com.gamma.service.PipelineDependents;
+import com.gamma.service.ReservedConfigPaths;
 import com.gamma.util.AtomicFiles;
 import com.sun.net.httpserver.HttpExchange;
 import org.slf4j.Logger;
@@ -27,12 +29,17 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 import com.gamma.access.WriteGates;
-import static com.gamma.util.Values.mapAt;
 
 /**
  * Pipeline identity-migration routes ({@code POST /pipelines/{name}/rename},
@@ -507,40 +514,29 @@ final class PipelineRenameRoutes implements RouteModule {
     }
 
     /**
-     * Rewrite every dependent config's reference to {@code oldId} into {@code newId} (plan §1's dependent
-     * table): {@code *_enrich.toon} triggers, {@code *_job.toon} triggers, {@code expectation}/
-     * {@code decision-rule} pipeline targets, {@code dataset} store references, and {@code alert-rule}
-     * {@code onPipeline}. Best-effort per file —
-     * one malformed sibling must never abort a rename whose state-moving steps already committed. Returns
-     * the total count of files rewritten.
+     * Rewrite every dependent config's reference to {@code oldId} into {@code newId}: each link
+     * {@link LinkCensus#renamedWithPipeline()} names — {@code onRename = REWRITE}, naming the Pipeline or its store —
+     * found by one {@link LinkGraph} of the write root (`SPACE-LINK-CENSUS-1` LC-2): Enrichment triggers and by-name
+     * references, Job {@code on_pipeline} (one member of a comma list), Expectation / Decision Rule pipeline targets,
+     * Dataset store references (and a virtual Dataset's SQL) and Alert Rule {@code onPipeline}. Best-effort per
+     * file — one malformed sibling must never abort a rename whose state-moving steps already committed. Returns
+     * the count of files rewritten (a file with several links is one).
      */
     private int rewriteDependents(Path writeRoot, String oldId, String newId) {
-        int count = rewriteEnrichTriggers(writeRoot, oldId, newId, null);
-        count += rewriteJobTriggers(writeRoot, oldId, newId, null);
-        count += rewriteComponentTargets(writeRoot, "expectation", oldId, newId, null);
-        count += rewriteComponentTargets(writeRoot, "decision-rule", oldId, newId, null);
-        count += rewriteDatasetRefs(writeRoot, oldId, newId, null);
-        count += rewriteAlertRules(writeRoot, oldId, newId, null);
-        return count;
+        return rewrite(writeRoot, oldId, newId, kind -> true, null);
     }
 
     /**
      * The dependents a rename would rewrite whose KIND this Space's approval policy holds
      * (`ASSURE-MAKER-CHECKER-1` verification finding 2): the rename's own hold is on {@code pipeline}, so
-     * without this an Expectation, Decision Rule, Dataset, Alert Rule or Enrichment under a policy would be
-     * rewritten with no Pending Change of its own. The same matchers as the rewrite, run without writing.
-     * A Job's {@code on_pipeline} trigger too, since {@code job} became governable (operator, 2026-09-28).
+     * without this an Expectation, Decision Rule, Dataset, Alert Rule, Enrichment or Job under a policy would be
+     * rewritten with no Pending Change of its own. The same selection as the rewrite, run without writing.
      */
     private List<String> governedDependents(Path writeRoot, String oldId, String newId) {
         ApprovalPolicy policy = ApprovalPolicy.forRoot(writeRoot);
         if (!policy.holdsAnything()) return List.of();
         List<String> planned = new ArrayList<>();
-        if (policy.ruleFor("enrichment") != null) rewriteEnrichTriggers(writeRoot, oldId, newId, planned);
-        if (policy.ruleFor("job") != null) rewriteJobTriggers(writeRoot, oldId, newId, planned);
-        for (String type : List.of("expectation", "decision-rule"))
-            if (policy.ruleFor(type) != null) rewriteComponentTargets(writeRoot, type, oldId, newId, planned);
-        if (policy.ruleFor("dataset") != null) rewriteDatasetRefs(writeRoot, oldId, newId, planned);
-        if (policy.ruleFor("alert-rule") != null) rewriteAlertRules(writeRoot, oldId, newId, planned);
+        rewrite(writeRoot, oldId, newId, kind -> policy.ruleFor(kind) != null, planned);
         return planned;
     }
 
@@ -554,172 +550,162 @@ final class PipelineRenameRoutes implements RouteModule {
                     + "first (so it can be approved), or rename with rewriteDependents:false");
     }
 
-    /** {@code triggers.on_pipeline} in every live {@code *_enrich.toon} under the write root, at any depth
-     *  ({@code PipelineDependents.configFiles} — the same file set the impact scan reads). */
-    private int rewriteEnrichTriggers(Path writeRoot, String oldId, String newId, List<String> planned) {
-        int count = 0;
-        for (Path p : PipelineDependents.configFiles(writeRoot, "_enrich.toon")) {
-            try {
-                Map<String, Object> raw = ConfigLoader.filesystem().decode(p.toString());
-                if (!(raw.get("triggers") instanceof Map<?, ?> t)
-                        || !oldId.equalsIgnoreCase(String.valueOf(t.get("on_pipeline")))) continue;
-                Map<String, Object> triggers = new LinkedHashMap<>(mapAt(raw, "triggers"));
-                triggers.put("on_pipeline", newId);
-                Map<String, Object> out = new LinkedHashMap<>(raw);
-                out.put("triggers", triggers);
-                if (planned != null) {
-                    planned.add("enrichment '" + p.getFileName() + "'");
-                    continue;
-                }
-                AtomicFiles.write(p, ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8), ".enr-");
-                count++;
-            } catch (Exception ex) {
-                log.warn("[PIPELINE-RENAME] skipping unreadable enrichment {}: {}", p, ex.getMessage());
-            }
-        }
-        return count;
-    }
-
-    /** {@code on_pipeline} in every live {@code *_job.toon} under the write root, at any depth — inside the
-     *  {@code job:} section {@code JobConfig} loads, or at the top level of a document without one. */
-    private int rewriteJobTriggers(Path writeRoot, String oldId, String newId, List<String> planned) {
-        int count = 0;
-        for (Path p : PipelineDependents.configFiles(writeRoot, "_job.toon")) {
-            try {
-                Map<String, Object> raw = ConfigLoader.filesystem().decode(p.toString());
-                boolean nested = raw.get("job") instanceof Map<?, ?>;
-                Map<String, Object> section = new LinkedHashMap<>(nested ? mapAt(raw, "job") : raw);
-                if (!oldId.equalsIgnoreCase(String.valueOf(section.get("on_pipeline")).trim())) continue;
-                section.put("on_pipeline", newId);
-                Map<String, Object> out = section;
-                if (nested) {
-                    out = new LinkedHashMap<>(raw);
-                    out.put("job", section);
-                }
-                if (planned != null) {
-                    planned.add("job '" + p.getFileName() + "'");
-                    continue;
-                }
-                AtomicFiles.write(p, ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8), ".job-");
-                count++;
-            } catch (Exception ex) {
-                log.warn("[PIPELINE-RENAME] skipping unreadable job {}: {}", p, ex.getMessage());
-            }
-        }
-        return count;
-    }
+    /** One file or registry component holding renamed links, with the links that name the old id. */
+    private record Holder(String kind, Path file, String name, Set<LinkCensus.Link> links) {}
 
     /**
-     * {@code target} on every {@code type} component (expectation / decision-rule) whose {@code targetType}
-     * is {@code pipeline} (the default when absent) and whose {@code target} names {@code oldId} —
-     * mirrors {@code DataSourceBundleResolver.ruleTargets}'s matching rule.
+     * Rewrite (or, with {@code planned}, only list) every holder of a kind {@code kinds} accepts. Holders come
+     * in graph order — Enrichments, Jobs, then Expectations, Decision Rules, Datasets, Alert Rules — and a
+     * registry component is written through its store, a config file atomically in place.
      */
-    private int rewriteComponentTargets(Path writeRoot, String type, String oldId, String newId,
-                                        List<String> planned) {
+    private int rewrite(Path writeRoot, String oldId, String newId, Predicate<String> kinds, List<String> planned) {
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        Map<String, Map<String, ComponentRegistry.Component>> listed = new HashMap<>();
         int count = 0;
-        for (ComponentRegistry.Component c : store.list(type)) {
-            Map<String, Object> content = c.content();
-            String targetType = String.valueOf(content.getOrDefault("targetType", "pipeline"));
-            if (!"pipeline".equalsIgnoreCase(targetType)) continue;
-            String target = content.get("target") == null ? "" : String.valueOf(content.get("target")).trim();
-            if (!oldId.equalsIgnoreCase(target)) continue;
-            Map<String, Object> updated = new LinkedHashMap<>(content);
-            updated.put("target", newId);
+        for (Holder h : holders(writeRoot, oldId, kinds)) {
+            if (!ComponentStore.WRITABLE_TYPES.contains(h.kind())) {
+                try {
+                    Map<String, Object> raw = ConfigLoader.filesystem().decode(h.file().toString());
+                    Map<String, Object> out = rewritten(h, raw, oldId, newId);
+                    if (out == raw) continue;   // changed on disk since the graph read it
+                    if (planned != null) {
+                        planned.add(h.kind() + " '" + h.file().getFileName() + "'");
+                        continue;
+                    }
+                    // temp-file prefix as before: .enr- / .job-
+                    AtomicFiles.write(h.file(), ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8),
+                            "." + h.kind().substring(0, 3) + "-");
+                    count++;
+                } catch (Exception ex) {
+                    log.warn("[PIPELINE-RENAME] skipping unreadable {} {}: {}", h.kind(), h.file(), ex.getMessage());
+                }
+                continue;
+            }
+            ComponentRegistry.Component c = listed.computeIfAbsent(h.kind(), k -> {
+                Map<String, ComponentRegistry.Component> byName = new HashMap<>();
+                for (ComponentRegistry.Component x : store.list(k)) byName.putIfAbsent(x.name(), x);
+                return byName;
+            }).get(h.name());
+            if (c == null) continue;
+            Map<String, Object> updated = rewritten(h, c.content(), oldId, newId);
+            if (updated == c.content()) continue;
             // A rename moves target only; a decision-rule's invoke-api consequences (and its stamped makers) stay.
-            if (DecisionRuleGuard.TYPE.equals(type)) DecisionRuleGuard.checkTargetRewrite(content, updated);
+            if (DecisionRuleGuard.TYPE.equals(h.kind())) DecisionRuleGuard.checkTargetRewrite(c.content(), updated);
             if (planned != null) {
-                planned.add(type + " '" + c.name() + "'");
+                planned.add(h.kind() + " '" + c.name() + "'");
                 continue;
             }
             try {
-                store.write(type, c.name(), updated);
+                store.write(h.kind(), c.name(), updated);
                 count++;
             } catch (IOException ex) {
-                log.warn("[PIPELINE-RENAME] could not rewrite {} '{}': {}", type, c.name(), ex.getMessage());
+                log.warn("[PIPELINE-RENAME] could not rewrite {} '{}': {}", h.kind(), c.name(), ex.getMessage());
             }
         }
         return count;
     }
 
     /**
-     * {@code sourceName} and/or the first path segment of {@code physicalRef} on every {@code dataset}
-     * component that reads {@code oldId}'s store — mirrors
-     * {@code DataSourceBundleResolver.datasetReadsStore}'s {@code physicalRef} rule, widened to
-     * {@code sourceName} (a {@code kind: virtual} dataset's direct store reference, which that resolver
-     * does not need to check but a rename does — an unrewritten one would silently start reading nothing).
+     * The holders of a renamed link naming {@code oldId}, in graph order. An Expectation / Decision Rule
+     * {@code target} counts only when it names a Pipeline ({@code targetType} {@code pipeline}, the default).
      */
-    private int rewriteDatasetRefs(Path writeRoot, String oldId, String newId, List<String> planned) {
-        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        int count = 0;
-        for (ComponentRegistry.Component c : store.list("dataset")) {
-            Map<String, Object> content = c.content();
-            Map<String, Object> updated = new LinkedHashMap<>(content);
-            boolean changed = false;
-
-            Object sn = content.get("sourceName");
-            if (sn != null && oldId.equalsIgnoreCase(String.valueOf(sn).trim())) {
-                updated.put("sourceName", newId);
-                changed = true;
-                // VIRTUAL-DATASET-SQL-RENAME-1: the SQL's FROM names the store too; rewrite it via the
-                // DuckDB parse tree (unparseable SQL is left as is and keeps failing closed at read).
-                Object sql = content.get("sql");
-                if (sql != null)
-                    updated.put("sql", com.gamma.sql.SqlGuard.renameBaseTable(
-                            String.valueOf(sql), String.valueOf(sn).trim(), newId));
-            }
-
-            Object ref = content.get("physicalRef");
-            String refStr = ref == null ? "" : String.valueOf(ref).trim();
-            if (!refStr.isEmpty() && !"null".equals(refStr)) {
-                int slash = refStr.indexOf('/');
-                String head = slash < 0 ? refStr : refStr.substring(0, slash);
-                if (head.equalsIgnoreCase(oldId)) {
-                    updated.put("physicalRef", newId + (slash < 0 ? "" : refStr.substring(slash)));
-                    changed = true;
-                }
-            }
-
-            if (!changed) continue;
-            if (planned != null) {
-                planned.add("dataset '" + c.name() + "'");
-                continue;
-            }
-            try {
-                store.write("dataset", c.name(), updated);
-                count++;
-            } catch (IOException ex) {
-                log.warn("[PIPELINE-RENAME] could not rewrite dataset '{}': {}", c.name(), ex.getMessage());
-            }
+    private static List<Holder> holders(Path writeRoot, String oldId, Predicate<String> kinds) {
+        Set<LinkCensus.Link> renamed = Set.copyOf(LinkCensus.renamedWithPipeline());
+        Map<List<Object>, Holder> out = new LinkedHashMap<>();
+        for (LinkGraph.Edge e : LinkGraph.of(writeRoot, ReservedConfigPaths::reserved).edges()) {
+            if (!renamed.contains(e.link()) || !e.toKind().equals(e.link().toKind()) || !kinds.test(e.fromKind())
+                    || !names(e.link(), e.value(), oldId)) continue;
+            out.computeIfAbsent(List.of(e.fromKind(), String.valueOf(e.file()), e.fromName()),
+                    k -> new Holder(e.fromKind(), e.file(), e.fromName(), new HashSet<>())).links().add(e.link());
         }
-        return count;
+        return List.copyOf(out.values());
     }
 
     /**
-     * {@code onPipeline} on every {@code alert-rule} naming {@code oldId} (case-insensitively, a space read as
-     * {@code _}) - mirrors {@code PipelineDependents.alertRules}. An alert's {@code dataset} names a Dataset,
-     * not the pipeline, so a rename leaves it alone.
+     * Whether one link value names {@code oldId}, case-insensitively after trimming: a store reference by its
+     * first path segment ({@code physicalRef}, as {@code DataSourceBundleResolver.datasetReadsStore} reads it),
+     * an Alert Rule's {@code onPipeline} also with a space read as {@code _} ({@code AlertService}). A SQL text
+     * never selects its holder — it follows the holder's {@code sourceName} ({@link #rewritten}).
      */
-    private int rewriteAlertRules(Path writeRoot, String oldId, String newId, List<String> planned) {
-        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        int count = 0;
-        for (ComponentRegistry.Component c : store.list("alert-rule")) {
-            Map<String, Object> content = c.content();
-            String on = content.get("onPipeline") == null ? "" : String.valueOf(content.get("onPipeline")).trim();
-            if (on.isEmpty() || !(on.equalsIgnoreCase(oldId) || on.replace(' ', '_').equalsIgnoreCase(oldId))) continue;
-            Map<String, Object> updated = new LinkedHashMap<>(content);
-            updated.put("onPipeline", newId);
-            if (planned != null) {
-                planned.add("alert-rule '" + c.name() + "'");
-                continue;
-            }
-            try {
-                store.write("alert-rule", c.name(), updated);
-                count++;
-            } catch (IOException ex) {
-                log.warn("[PIPELINE-RENAME] could not rewrite alert-rule '{}': {}", c.name(), ex.getMessage());
-            }
+    private static boolean names(LinkCensus.Link l, String value, String oldId) {
+        // An Enrichment trigger is compared as written, as the rename always did (a padded value is left alone,
+        // though the runtime and impact trim it — a separate defect, not LC-2's to change).
+        String v = l.keyPath().equals("triggers.on_pipeline") ? value : value.trim();
+        if (l.type() == LinkCensus.Type.SQL_RELATION) return false;
+        if (l.keyPath().equals("physicalRef")) {
+            int slash = v.indexOf('/');
+            return !"null".equals(v) && (slash < 0 ? v : v.substring(0, slash)).equalsIgnoreCase(oldId);
         }
-        return count;
+        return v.equalsIgnoreCase(oldId)
+                || l.fromKind().equals("alert-rule") && v.replace(' ', '_').equalsIgnoreCase(oldId);
+    }
+
+    /** One link value with {@code oldId} replaced, or {@code null} when it does not name it. A comma list
+     *  ({@link LinkCensus.Type#ID_LIST}) keeps every other member and its spacing as written. */
+    private static String renamedValue(LinkCensus.Link l, String value, String oldId, String newId) {
+        if (l.type() == LinkCensus.Type.ID_LIST && value.contains(",")) {
+            String[] parts = value.split(",", -1);
+            boolean hit = false;
+            for (int i = 0; i < parts.length; i++) {
+                if (!names(l, parts[i], oldId)) continue;
+                String p = parts[i];
+                int lead = p.length() - p.stripLeading().length(), trail = p.length() - p.stripTrailing().length();
+                parts[i] = p.substring(0, lead) + newId + p.substring(p.length() - trail);
+                hit = true;
+            }
+            return hit ? String.join(",", parts) : null;
+        }
+        if (!names(l, value, oldId)) return null;
+        String v = value.trim();
+        int slash = v.indexOf('/');
+        return l.keyPath().equals("physicalRef") && slash >= 0 ? newId + v.substring(slash) : newId;
+    }
+
+    /**
+     * {@code doc} with the holder's links rewritten (a copy; {@code doc} itself when nothing changed). A Job's
+     * keys are read inside its {@code job:} section when it has one ({@link LinkGraph#jobSection}).
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> rewritten(Holder h, Map<String, Object> doc, String oldId, String newId) {
+        Map<String, Object> out = doc;
+        boolean nested = h.kind().equals("job") && doc.get("job") instanceof Map<?, ?>;
+        for (LinkCensus.Link l : h.links()) {
+            String path = (nested ? "job." : "") + l.keyPath();
+            out = (Map<String, Object>) rewriteAt(out, path.split("\\."), 0, v -> renamedValue(l, v, oldId, newId));
+        }
+        // VIRTUAL-DATASET-SQL-RENAME-1: a virtual Dataset's SQL FROM names the store its sourceName names; rewrite
+        // it via the DuckDB parse tree (unparseable SQL is left as is and keeps failing closed at read).
+        Object sn = doc.get("sourceName");
+        if (h.kind().equals("dataset") && doc.get("sql") != null && !Objects.equals(sn, out.get("sourceName")))
+            out.put("sql", com.gamma.sql.SqlGuard.renameBaseTable(
+                    String.valueOf(doc.get("sql")), String.valueOf(sn).trim(), newId));
+        return out;
+    }
+
+    /**
+     * {@code node} with {@code fn} applied to the scalar at {@code segs[i..]} (census key-path syntax: a map key, or
+     * {@code *} for each value of a map). Copies only the maps on a changed path; returns {@code node} itself when
+     * {@code fn} changed nothing ({@code fn} answers {@code null} for "not this value").
+     */
+    private static Object rewriteAt(Object node, String[] segs, int i, UnaryOperator<String> fn) {
+        if (i == segs.length) {
+            if (node == null || node instanceof Map<?, ?> || node instanceof List<?>) return node;
+            String v = fn.apply(String.valueOf(node));
+            return v == null ? node : v;
+        }
+        if (!(node instanceof Map<?, ?> map)) return node;
+        Map<String, Object> copy = null;
+        for (Map.Entry<?, ?> en : map.entrySet()) {
+            String key = String.valueOf(en.getKey());
+            if (!segs[i].equals("*") && !segs[i].equals(key)) continue;
+            Object v = rewriteAt(en.getValue(), segs, i + 1, fn);
+            if (v == en.getValue()) continue;
+            if (copy == null) {
+                copy = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> c : map.entrySet()) copy.put(String.valueOf(c.getKey()), c.getValue());
+            }
+            copy.put(key, v);
+        }
+        return copy == null ? node : copy;
     }
 }

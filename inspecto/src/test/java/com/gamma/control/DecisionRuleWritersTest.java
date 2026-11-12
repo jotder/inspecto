@@ -60,12 +60,10 @@ class DecisionRuleWritersTest {
             Map.entry("RequirementRoutes#createKpi", FIXED_KIND + " (kpi — the constant KPI_TYPE = KpiRoutes.TYPE; the "
                     + "request body supplies only the KPI's content and id, never the kind)"),
             Map.entry("PipelineListRoutes#deletePipeline", FIXED_KIND + " (authored-pipeline)"),
-            Map.entry("PipelineRenameRoutes#rewriteDatasetRefs", FIXED_KIND + " (dataset)"),
             Map.entry("OnboardImport#setColumn", FIXED_KIND + " (dataset: one column's classification, LA-ONBOARD-1)"),
             Map.entry("OnboardImport#setRecordType", FIXED_KIND + " (dataset: what one row is, ENTITY-TYPE-CATALOG-1)"),
             Map.entry("ImportFilterEdit#edit", FIXED_KIND + " (dataset: its importFilter, ADD-DATA-FILTER-EDIT-1)"),
             Map.entry("DatasetCompaction#setRetention", FIXED_KIND + " (dataset: its retention policy, LA-DATASET-COMPACT-1)"),
-            Map.entry("PipelineRenameRoutes#rewriteAlertRules", FIXED_KIND + " (alert-rule)"),
             Map.entry("WidgetTags#reproject", FIXED_KIND + " (widget)"),
             Map.entry("ObjectService#discard", NOT_CONFIG), Map.entry("ObjectService#purge", NOT_CONFIG),
             Map.entry("ConsignmentIngestor#parkSource", NOT_CONFIG),
@@ -114,7 +112,7 @@ class DecisionRuleWritersTest {
                 }
         }
         for (String pinned : new String[] {"ComponentRoutes#writeComponent", "DataSourceRoutes#importBundle",
-                "PipelineRenameRoutes#rewriteComponentTargets", "BundleRoutes#write", "SpaceManager#createFromBundle"})
+                "PipelineRenameRoutes#rewrite", "BundleRoutes#write", "SpaceManager#createFromBundle"})
             assertTrue(sites.containsKey(pinned), "the writer scan went blind to " + pinned + ": " + sites.keySet());
 
         Set<String> open = new LinkedHashSet<>();

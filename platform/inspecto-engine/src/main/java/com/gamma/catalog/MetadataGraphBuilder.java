@@ -224,7 +224,7 @@ final class MetadataGraphBuilder {
      * with {@code ""}/{@code "null"} read as absent. It is the same rule applied by
      * {@code PipelineDependents.datasets} (the delete-impact and dependents routes),
      * {@code DataSourceBundleResolver.datasetReadsStore} ({@code physicalRef} half only — an export
-     * never needs the virtual case) and {@code PipelineRenameRoutes.rewriteDatasetRefs}; all three live
+     * never needs the virtual case) and {@code PipelineRenameRoutes.names}; all three live
      * in another module and cannot share code. ⚠ <b>If the rule changes in one, change it in all
      * four.</b> ⛔ Do not make {@code sourceName} shadow {@code physicalRef}: the mirrors check both,
      * so a Dataset naming two origins binds to two.
