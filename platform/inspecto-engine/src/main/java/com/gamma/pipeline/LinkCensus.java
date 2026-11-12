@@ -24,7 +24,7 @@ public final class LinkCensus {
     private LinkCensus() {}
 
     /** What the value of a link is. */
-    public enum Type { ID, ID_LIST, PATH, STORE, COLUMN, SQL_RELATION, TEXT }
+    public enum Type { ID, ID_LIST, PATH, STORE, COLUMN, SQL_RELATION, SQL_COLUMN, TEXT }
 
     /** Intended behaviour when the target is deleted. */
     public enum OnDelete { REFUSE, WARN }
@@ -77,7 +77,7 @@ public final class LinkCensus {
             link("enrichment", "references.*.ref", "pipeline", Type.ID, REFUSE, REWRITE, RENAME, IMPACT, VALIDATE),
             link("enrichment", "input.database", "store", Type.PATH, WARN, REPORT),
             link("enrichment", "references.*.path", "file", Type.PATH, WARN, REPORT),
-            link("enrichment", "transform", "column", Type.SQL_RELATION, WARN, REPORT),
+            link("enrichment", "transform", "column", Type.SQL_COLUMN, WARN, REPORT, VALIDATE, IMPACT),
             // ── Job (keys read inside the job: section) ──────────────────────────────────────────
             link("job", "on_pipeline", "pipeline", Type.ID_LIST, REFUSE, REWRITE, RENAME, IMPACT),
             link("job", "template", "job-template", Type.ID, REFUSE, REPORT, LOAD),
@@ -89,18 +89,24 @@ public final class LinkCensus {
             link("job", "when", "signal", Type.TEXT, WARN, REPORT),
             // ── Registry components ──────────────────────────────────────────────────────────────
             link("expectation", "target", "pipeline", Type.ID, REFUSE, REWRITE, RENAME, IMPACT, VALIDATE),
-            link("expectation", "column", "column", Type.COLUMN, WARN, REPORT),
+            link("expectation", "column", "column", Type.COLUMN, WARN, REPORT, VALIDATE, IMPACT),
+            link("expectation", "refDataset", "store", Type.STORE, WARN, REPORT),
+            link("expectation", "refColumn", "column", Type.COLUMN, WARN, REPORT, VALIDATE, IMPACT),
+            link("expectation", "when.**.field", "column", Type.COLUMN, WARN, REPORT, VALIDATE, IMPACT),
             link("decision-rule", "target", "pipeline", Type.ID, REFUSE, REWRITE, RENAME, IMPACT, VALIDATE),
-            link("decision-rule", "field", "column", Type.COLUMN, WARN, REPORT),
+            link("decision-rule", "when.**.field", "column", Type.COLUMN, WARN, REPORT, VALIDATE, IMPACT),
             link("dataset", "sourceName", "store", Type.STORE, REFUSE, REWRITE, RENAME, IMPACT),
             link("dataset", "physicalRef", "store", Type.STORE, REFUSE, REWRITE, RENAME, IMPACT, VALIDATE),
             link("dataset", "sql", "store", Type.SQL_RELATION, REFUSE, REWRITE, RENAME),
-            link("dataset", "dateField", "column", Type.COLUMN, WARN, REPORT),
+            link("dataset", "sql", "column", Type.SQL_COLUMN, WARN, REPORT, VALIDATE, IMPACT),
+            link("dataset", "dateField", "column", Type.COLUMN, WARN, REPORT, VALIDATE, IMPACT),
+            link("dataset", "calculated[].expr", "column", Type.SQL_COLUMN, WARN, REPORT, VALIDATE, IMPACT),
             link("alert-rule", "onPipeline", "pipeline", Type.ID, REFUSE, REWRITE, RENAME, IMPACT),
             link("alert-rule", "dataset", "dataset", Type.ID, REFUSE, REWRITE, IMPACT),
             link("widget", "datasetId", "dataset", Type.ID, REFUSE, REWRITE, IMPACT, VALIDATE, IMPORT),
             link("widget", "queryId", "query", Type.ID, REFUSE, REWRITE, VALIDATE, IMPORT),
-            link("widget", "controls", "column", Type.COLUMN, WARN, REPORT),
+            link("widget", "controls.*.field", "column", Type.COLUMN, WARN, REPORT, VALIDATE, IMPACT),
+            link("widget", "controls.*[].field", "column", Type.COLUMN, WARN, REPORT, VALIDATE, IMPACT),
             link("dashboard", "tiles[].widgetId", "widget", Type.ID, REFUSE, REWRITE, IMPACT, VALIDATE, IMPORT),
             link("link-analysis-view", "query.projection.datasetId", "dataset", Type.ID, REFUSE, REWRITE, VALIDATE, IMPORT),
             link("geo-map-view", "query.projection.datasetId", "dataset", Type.ID, REFUSE, REWRITE, VALIDATE, IMPORT),
@@ -108,15 +114,32 @@ public final class LinkCensus {
             link("reconciliation", "leftDataset", "dataset", Type.ID, REFUSE, REWRITE, VALIDATE, IMPORT),
             link("reconciliation", "rightDataset", "dataset", Type.ID, REFUSE, REWRITE, VALIDATE, IMPORT),
             link("reconciliation", "thirdDataset", "dataset", Type.ID, REFUSE, REWRITE, VALIDATE, IMPORT),
-            link("reconciliation", "keyColumns", "column", Type.COLUMN, WARN, REPORT),
-            link("reconciliation", "compareColumns", "column", Type.COLUMN, WARN, REPORT),
+            link("reconciliation", "keyColumns[]", "column", Type.COLUMN, WARN, REPORT, VALIDATE, IMPACT),
+            link("reconciliation", "compareColumns[].column", "column", Type.COLUMN, WARN, REPORT, VALIDATE, IMPACT),
+            link("reconciliation", "impact.column", "column", Type.COLUMN, WARN, REPORT, VALIDATE, IMPACT),
+            link("query", "text", "column", Type.SQL_COLUMN, WARN, REPORT, VALIDATE, IMPACT),
             // ── Space settings ───────────────────────────────────────────────────────────────────
             link("nav-menu", "**.binding.componentId", "component", Type.ID, WARN, REWRITE));
 
-    /** The one link declared for {@code fromKind} at {@code keyPath}; fails loudly on a typo. */
+    /** The first link declared for {@code fromKind} at {@code keyPath}; fails loudly on a typo. A key holding two
+     *  links (a virtual Dataset's {@code sql}: its store, then its columns) answers the first; name the other by
+     *  {@link #of(String, String, String)}. */
     public static Link of(String fromKind, String keyPath) {
         for (Link l : LINKS) if (l.fromKind().equals(fromKind) && l.keyPath().equals(keyPath)) return l;
         throw new IllegalArgumentException("no census link " + fromKind + ":" + keyPath);
+    }
+
+    /** The link declared for {@code fromKind} at {@code keyPath} naming {@code toKind}; fails loudly on a typo. */
+    public static Link of(String fromKind, String keyPath, String toKind) {
+        for (Link l : LINKS)
+            if (l.fromKind().equals(fromKind) && l.keyPath().equals(keyPath) && l.toKind().equals(toKind)) return l;
+        throw new IllegalArgumentException("no census link " + fromKind + ":" + keyPath + " -> " + toKind);
+    }
+
+    /** The column links (LC-5): a {@link Type#COLUMN} key or a {@link Type#SQL_COLUMN} text, resolved by
+     *  {@link LinkGraph#of} against the column sets a Schema and a Dataset publish ({@link ColumnSets}). */
+    public static List<Link> columnLinks() {
+        return LINKS.stream().filter(l -> l.type() == Type.COLUMN || l.type() == Type.SQL_COLUMN).toList();
     }
 
     /**

@@ -8,7 +8,6 @@ import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceLoader;
 
 /**
  * Orchestrates a graded connection probe (design §3: REACHABILITY → AUTHENTICATE → READ → WRITE → LIST) over
@@ -28,7 +27,7 @@ public final class ConnectionProber {
      */
     public static ConnectionWorkbench workbenchFor(ConnectionProfile profile) {
         if (!profile.isRemote()) return new LocalConnectionWorkbench(profile);
-        for (CollectorConnectorFactory f : ServiceLoader.load(CollectorConnectorFactory.class))
+        for (CollectorConnectorFactory f : com.gamma.module.EntitledServices.load(CollectorConnectorFactory.class))
             if (f.scheme().equalsIgnoreCase(profile.connector())) return f.workbench(profile);
         return null;
     }

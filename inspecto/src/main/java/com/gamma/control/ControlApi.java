@@ -332,7 +332,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // normalization → space binding then feed the terminal route dispatch.
         this.pipeline = compose(this::routeDispatch,
                 this::correlation, this::cors, this::frameHeaders, this::errorBoundary,
-                this::normalizePath, this::bindSpace);
+                this::normalizePath, this::bindSpace, this::spaceWrites);
         this.http.createContext("/", this::dispatch);
         // Fail-closed at the edge (W6): resolve the edition's Authenticator now, not on the first
         // request, so a misconfigured Standard deployment (e.g. missing -Dauth.oidc.jwksUri, which the
@@ -649,7 +649,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 new BootstrapRoutes(), new AuthRoutes(),
                 new SpaceRoutes(), new DataSourceRoutes(),   // ExchangeRoutes moved to inspecto-exchange (EDG-01 cell 4)
                 new RunRoutes(),
-                new ConnectionRoutes(), new ViewRoutes(), new PipelineListRoutes(), new PipelineGraphRoutes(), new PipelineInboxRoutes(), new PipelineSettingsRoutes(), new PipelineRenameRoutes(), new PipelineHistoryRoutes(), new PipelineRelatedRoutes(), new SpaceTestRoutes(), new PipelineBundleRoutes(), new ComponentRoutes(), new BundleRoutes(),
+                new ConnectionRoutes(), new ViewRoutes(), new PipelineListRoutes(), new PipelineGraphRoutes(), new PipelineInboxRoutes(), new PipelineSettingsRoutes(), new PipelineRenameRoutes(), new PipelineHistoryRoutes(), new PipelineRelatedRoutes(), new SpaceTestRoutes(), new SpaceIntegrityRoutes(), new PipelineBundleRoutes(), new ComponentRoutes(), new BundleRoutes(),
                 new CatalogRoutes(), new ConfigPreviewRoutes(), new ConfigWriteRoutes(), new ConfigReadRoutes(), new ParserRoutes(),   // EventRoutes -> inspecto-observability (cell 6); Object/Note/TagRoutes -> inspecto-ops (cell 7; QueueRoutes retired by RETIRE-HALVES-1)
                 new QueryRoutes(), new DatasetRoutes(), new OnboardRoutes(), new SpaceComparisonRoutes(), new BiRoutes(), new KpiRoutes(), new DbBrowserRoutes(), new ShareRoutes(),   // InvRoutes + GeoRoutes moved to inspecto-geo-link (EDG-01 cell 3b); ReconRoutes to inspecto-reconciliation (P7)
                 new ExpectationRoutes(), new RequirementRoutes(),
@@ -672,7 +672,9 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // and its paths fall through to the absent-module stubs below, exactly as if it were not
         // installed. ⛔ Do not go back to a raw ServiceLoader loop: one unloadable module would take
         // every other route module and the boot down with it.
-        for (RouteModule module : com.gamma.spi.OptionalSpi.all(RouteModule.class)) {
+        // ENTITLEMENT-SPI-NARROWING-1: allInstalled, not all - a module the entitlement leaves out still registers, and
+        // requireModuleEnabled answers its routes 503 per request, so a renewed entitlement opens them without a restart.
+        for (RouteModule module : com.gamma.spi.OptionalSpi.allInstalled(RouteModule.class)) {
             int firstNew = routes.size();
             module.register(this);
             registeredFeatures.addAll(module.featureIds());
@@ -1039,6 +1041,34 @@ public final class ControlApi implements AutoCloseable, HostContext {
             next.proceed(ex);
         } finally {
             if (spaceBound) MDC.remove(EventLog.SPACE_MDC_KEY);
+        }
+    }
+
+    /** SE-1a: the one write hook of the Space lock (spec-space-lock.md §6). A mutating request bound to a hosted
+     *  Space is a write window; a 2xx answer schedules a debounced lock computation. Reports only — it never
+     *  changes the request or its answer. */
+    private void spaceWrites(HttpExchange ex, Chain next) throws Exception {
+        String m = ex.getRequestMethod();
+        if (!("POST".equals(m) || "PUT".equals(m) || "PATCH".equals(m) || "DELETE".equals(m))) {
+            next.proceed(ex);
+            return;
+        }
+        SpaceContext ctx;
+        try {
+            ctx = currentContext();
+        } catch (RuntimeException noSpace) {
+            ctx = null;
+        }
+        Path config = ctx == null ? null : ctx.root().config();
+        com.gamma.service.SpaceLock.Window w = config == null ? null
+                : com.gamma.service.SpaceLock.writeStarted(ctx.id().value(), config);
+        boolean ok = false;
+        try {
+            next.proceed(ex);
+            int code = ex.getResponseCode();
+            ok = code >= 200 && code < 300;
+        } finally {
+            com.gamma.service.SpaceLock.writeEnded(config, w, ok);
         }
     }
 

@@ -303,39 +303,39 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
             loader = new URLClassLoader(new URL[]{staged.toUri().toURL()}, JobPackManager.class.getClassLoader());
 
             List<JobTypeProvider> providers = new ArrayList<>();
-            for (JobTypeProvider p : ServiceLoader.load(JobTypeProvider.class, loader))
+            for (JobTypeProvider p : com.gamma.module.EntitledServices.load(JobTypeProvider.class, loader))
                 if (p.getClass().getClassLoader() == loader) providers.add(p);   // only this pack's own types
             // A pack may also contribute Expression tokens (job-parameter-contract §4.2, step 5) — and may
             // contribute *only* tokens, so the "empty" check below spans both kinds rather than demanding a
             // Job Type from a pack whose whole purpose is vocabulary.
             List<ExpressionProvider> exprProviders = new ArrayList<>();
-            for (ExpressionProvider p : ServiceLoader.load(ExpressionProvider.class, loader))
+            for (ExpressionProvider p : com.gamma.module.EntitledServices.load(ExpressionProvider.class, loader))
                 if (p.getClass().getClassLoader() == loader) exprProviders.add(p);
             // A pack may also contribute PIPELINE node types and/or their executors (pipeline spec gap 7,
             // whose remainder was exactly that these were classpath-only). Same rules as the two above:
             // only this pack's own providers, and the "empty" check spans all four kinds so a pack whose
             // whole purpose is a node type is not made to ship a Job Type it does not have.
             List<PipelineNodeType> nodeTypes = new ArrayList<>();
-            for (PipelineNodeType t : ServiceLoader.load(PipelineNodeType.class, loader))
+            for (PipelineNodeType t : com.gamma.module.EntitledServices.load(PipelineNodeType.class, loader))
                 if (t.getClass().getClassLoader() == loader) nodeTypes.add(t);
             // ⛔ D-2 (S2-3): a pack may not carry the raw-Connection executor — it would write third-party SQL
             // on the batch connection (R2). The pack is rejected whole; its Steps implement StepExecutor.
-            for (PipelineNodeExecutor e : ServiceLoader.load(PipelineNodeExecutor.class, loader))
+            for (PipelineNodeExecutor e : com.gamma.module.EntitledServices.load(PipelineNodeExecutor.class, loader))
                 if (e.getClass().getClassLoader() == loader)
                     throw new IllegalStateException("pack carries a raw-Connection PipelineNodeExecutor ("
                             + e.getClass().getName() + " for '" + e.type() + "') — that seam is classpath-only; "
                             + "implement com.gamma.pipeline.exec.StepExecutor instead");
             List<StepExecutor> steps = new ArrayList<>();
-            for (StepExecutor e : ServiceLoader.load(StepExecutor.class, loader))
+            for (StepExecutor e : com.gamma.module.EntitledServices.load(StepExecutor.class, loader))
                 if (e.getClass().getClassLoader() == loader) steps.add(e);
             // The fifth kind (parser-plugins-trust-design.md slice P2, operator D1 2026-09-25): a pack may
             // contribute ParserPlugins — the drop-in parser jar, through this one loader and trust gate.
             List<ParserPlugin> parsers = new ArrayList<>();
-            for (ParserPlugin p : ServiceLoader.load(ParserPlugin.class, loader))
+            for (ParserPlugin p : com.gamma.module.EntitledServices.load(ParserPlugin.class, loader))
                 if (p.getClass().getClassLoader() == loader) parsers.add(p);
             // The sixth kind (platform-services S3-1): a pack may contribute Platform Services.
             List<ServiceProvider> services = new ArrayList<>();
-            for (ServiceProvider p : ServiceLoader.load(ServiceProvider.class, loader))
+            for (ServiceProvider p : com.gamma.module.EntitledServices.load(ServiceProvider.class, loader))
                 if (p.getClass().getClassLoader() == loader) services.add(p);
             if (providers.isEmpty() && exprProviders.isEmpty() && nodeTypes.isEmpty() && steps.isEmpty()
                     && parsers.isEmpty() && services.isEmpty())

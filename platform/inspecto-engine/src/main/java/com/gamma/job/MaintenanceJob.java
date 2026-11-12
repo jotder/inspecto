@@ -262,7 +262,7 @@ final class MaintenanceJob implements Job {
     private static java.util.Map<String, MaintenanceTaskProvider> discoverContributed() {
         java.util.Map<String, MaintenanceTaskProvider> byTask = new java.util.HashMap<>();
         java.util.Map<String, java.util.List<String>> claimants = new java.util.HashMap<>();
-        for (MaintenanceTaskProvider p : java.util.ServiceLoader.load(MaintenanceTaskProvider.class)) {
+        for (MaintenanceTaskProvider p : com.gamma.module.EntitledServices.load(MaintenanceTaskProvider.class)) {
             for (String raw : p.tasks()) {
                 String name = raw == null ? "" : raw.trim().toLowerCase();
                 if (name.isEmpty()) continue;

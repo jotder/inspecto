@@ -938,7 +938,11 @@ What exists to build on:
   `product-map/private/keys/`, and its public half is committed.
 - **Deliberately not done.**
   - The other extension points (Consequences, step kinds, Collector connectors, maintenance tasks, boot hooks):
-    `ENTITLEMENT-SPI-NARROWING-1`, held for demand.
+    `ENTITLEMENT-SPI-NARROWING-1`, held for demand. **Built 2026-11-12 (operator's ask):** every `ServiceLoader` site
+    goes through `com.gamma.module.EntitledServices`, which skips a provider, before instantiating it, when the module
+    manifest in its jar is left out. The fail-closed safety slots, the audit trail and masking stay open by design.
+    `RouteModule` discovery stays unfiltered, because its routes are gated per request. `tools/check-entitled-loaders.mjs`
+    holds this. As-built facts are in `okf/product/layer/platform/admin-guide-entitlements.md`.
   - Expiry behaviour, renewal without a restart and the Home notice: PA-7b.
 
 **Proof (as built).**

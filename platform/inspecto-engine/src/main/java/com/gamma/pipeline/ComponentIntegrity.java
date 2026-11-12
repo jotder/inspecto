@@ -57,6 +57,22 @@ public final class ComponentIntegrity {
         return findings;
     }
 
+    /**
+     * Dangling column links (`SPACE-LINK-CENSUS-1` LC-5, report-only): a column key or a SQL column reference
+     * naming a column the Schema or Dataset it reads does not publish. Needs a {@link LinkGraph#of config-root}
+     * graph — an in-memory component universe reads no Schema, so its column links are never judged. A link the
+     * census could not read ({@link LinkGraph.Status#NOT_ANALYSED}) is not a finding.
+     */
+    public static List<String> brokenColumns(LinkGraph graph) {
+        List<String> findings = new ArrayList<>();
+        for (LinkGraph.Edge e : graph.dangling()) {
+            if (!e.toKind().equals("column") || !e.link().checks().contains(LinkCensus.Check.VALIDATE)) continue;
+            findings.add("broken column reference: " + e.fromKind() + " '" + e.fromName() + "' " + e.key()
+                    + " → missing column '" + e.value() + "'");
+        }
+        return findings;
+    }
+
     /** Components of one type whose content is identical apart from {@code name}. */
     public static List<String> duplicates(Map<String, List<ComponentRegistry.Component>> byType) {
         List<String> findings = new ArrayList<>();

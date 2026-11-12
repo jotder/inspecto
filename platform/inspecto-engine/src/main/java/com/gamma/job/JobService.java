@@ -753,7 +753,7 @@ public final class JobService implements AutoCloseable {
         // Classpath providers (optional Maven modules — the "classpath way", §12.4). ServiceLoader finds
         // none in the base build; a provider whose id collides with a built-in (registered first) is
         // rejected, fail-closed. Hot-deployable Job Packs (isolated classloaders) arrive in P2c.
-        for (JobTypeProvider provider : ServiceLoader.load(JobTypeProvider.class)) {
+        for (JobTypeProvider provider : com.gamma.module.EntitledServices.load(JobTypeProvider.class)) {
             // PRODUCT-ASSEMBLY-1 PA-7a: a Job type only modules the install's entitlement leaves out provide is not registered,
             // so a Job of that type is refused as an unknown type, exactly as when its module is absent.
             if (!com.gamma.module.Entitlements.jobTypeEntitled(provider.id())) {
@@ -771,7 +771,7 @@ public final class JobService implements AutoCloseable {
         // $-vocabulary is ambiguous, and an authored $-value would resolve differently depending on which
         // provider won. Startup fails loudly instead — a mis-packaged plugin is a deployment error, not a
         // condition to run through. ServiceLoader finds none in the base build.
-        for (ExpressionProvider provider : ServiceLoader.load(ExpressionProvider.class)) {
+        for (ExpressionProvider provider : com.gamma.module.EntitledServices.load(ExpressionProvider.class)) {
             try {
                 expressions.register(provider);
             } catch (RuntimeException e) {
@@ -2358,7 +2358,7 @@ public final class JobService implements AutoCloseable {
         // failure a partial catalog hides worst. ServiceLoader consumes the offending entry before it throws,
         // so continuing advances; the budget guarantees termination anyway if some loader cannot advance.
         int errorBudget = cap + 25;
-        Iterator<ConsignmentProcessor> it = ServiceLoader.load(ConsignmentProcessor.class).iterator();
+        Iterator<ConsignmentProcessor> it = com.gamma.module.EntitledServices.load(ConsignmentProcessor.class).iterator();
         while (true) {
             ConsignmentProcessor p;
             try {

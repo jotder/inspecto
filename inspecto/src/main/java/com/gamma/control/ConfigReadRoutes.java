@@ -7,7 +7,9 @@ import com.gamma.spi.http.RouteModule;
 import com.gamma.config.io.ConfigLoader;
 import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.service.PipelineDataDirs;
+import com.gamma.pipeline.LinkGraph;
 import com.gamma.service.PipelineDependents;
+import com.gamma.service.ReservedConfigPaths;
 import com.gamma.util.MappingCsv;
 import com.gamma.util.StructureCsv;
 import com.sun.net.httpserver.HttpExchange;
@@ -24,7 +26,8 @@ import com.gamma.access.WriteGates;
 
 /**
  * Declarative-config read/delete routes ({@code DELETE /config/&#123;type&#125;/&#123;name&#125;},
- * {@code GET /config/pipeline/&#123;name&#125;/impact}, {@code GET
+ * {@code GET /config/pipeline/&#123;name&#125;/impact},
+ * {@code GET /config/schema/&#123;name&#125;/columns/&#123;column&#125;/impact} (LC-5), {@code GET
  * /config/&#123;type&#125;/&#123;name&#125;}; v5.1.0): discard a draft (never an active pipeline),
  * report a pipeline's dependents, and read a config file back. Extracted verbatim from
  * {@code ConfigRoutes}: identical routes, statuses, gating order and on-disk behaviour. File
@@ -45,6 +48,10 @@ final class ConfigReadRoutes implements RouteModule {
         // read-back below (route patterns are anchored).
         api.get("/config/pipeline/([^/]+)/impact",
                 (e, m) -> pipelineImpact(api, e, ApiContext.name(m)));
+        // Column impact read (SPACE-LINK-CENSUS-1 LC-5): what reads one mapped column of a Schema, before a
+        // rename. Read-only and ungated like the pipeline impact read; five segments, no collision.
+        api.get("/config/schema/([^/]+)/columns/([^/]+)/impact",
+                (e, m) -> columnImpact(api, e, ApiContext.name(m), ApiContext.param(m, 2)));
         // Draft read-back (stream onboarding resume): return a config file's decoded content.
         // Registered after /config/spec/…, which therefore keeps serving type="spec" lookups.
         api.get("/config/([^/]+)/([^/]+)",
@@ -106,6 +113,11 @@ final class ConfigReadRoutes implements RouteModule {
                         impact.pipeline(), impact.total(), impact.summary());
             }
         }
+
+        // SPACE-LINK-CENSUS-1 LC-3 (D-LC3), mode links.delete: a census link still naming this config. A Pipeline
+        // keeps its own dependents refusal above, unchanged in every mode.
+        LinkRefusals.Delete links = "pipeline".equals(type) ? null : LinkRefusals.delete(writeRoot, ex, type, fileName);
+        if (links != null && links.refused()) return links.respond(ex);
 
         // Maker-checker (ASSURE-MAKER-CHECKER-1): a delete is a change — held before any data or file goes.
         PendingChanges.hold(api, ex, type, fileName, null, ConfigFileSupport.storedContent(target, type));
@@ -170,7 +182,7 @@ final class ConfigReadRoutes implements RouteModule {
             r.put("dataRemoved", dataRemoval.removed());
             r.put("dataRetained", dataRemoval.retained());
         }
-        return r;
+        return links == null ? r : links.report(ex, r);
     }
 
     /**
@@ -210,6 +222,75 @@ final class ConfigReadRoutes implements RouteModule {
         }
         return PipelineDependents.toJson(
                 PipelineDependents.scan(writeRoot, pipelineIdOf(raw, fileName), limit));
+    }
+
+    /**
+     * {@code GET /config/schema/{name}/columns/{column}/impact} - every config that reads {@code column} as this
+     * Schema publishes it (its {@code mapping.fields}), from the link census ({@link LinkGraph}): Dataset
+     * {@code dateField} and {@code calculated} expressions, Widget {@code controls}, Expectation columns, Decision
+     * Rule conditions, Reconciliation key / compare columns, and column references in Enrichment {@code transform},
+     * Query {@code text} and virtual Dataset {@code sql}. Report-only: a rename is not refused. SQL the census could
+     * not read is listed under {@code notAnalysed} - those texts may read the column too. Matched
+     * case-insensitively, as DuckDB binds every consumer. Gate order is the read side's: write-root 503 -> unsafe
+     * name 422 -> path jail 403 -> reserved 403 -> missing file 404. Optional {@code ?subdir=}.
+     */
+    private Object columnImpact(ApiContext api, HttpExchange ex, String name, String column) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "config impact");
+        String fileName = WriteGates.safeName(name, "config name");
+        String col = column == null ? "" : column.trim();
+        if (col.isEmpty() || col.length() > 256)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "column must be 1-256 characters");
+
+        Path dir = writeRoot;
+        String subdir = ApiContext.query(ex, "subdir");
+        if (subdir != null && !subdir.isBlank()) {
+            Path sub = Path.of(subdir.trim());
+            if (sub.isAbsolute()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "subdir must be relative");
+            dir = WriteGates.jail(writeRoot, writeRoot.resolve(sub), "subdir");
+        }
+        Path target = ConfigFileSupport.resolveRegisteredConfigFile(api, writeRoot, dir, "schema", fileName, subdir);
+        ConfigTargetGuard.refuseReservedConfigTarget(writeRoot, target);
+        target = ConfigFileSupport.resolveSatelliteForRead(writeRoot, target, "schema", fileName, subdir);
+        String rel = writeRoot.relativize(target).toString().replace('\\', '/');
+        if (!Files.isRegularFile(target)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such config: " + rel);
+
+        boolean mapped = false;
+        if (ConfigFileSupport.storedContent(target, "schema").get("mapping") instanceof Map<?, ?> mapping
+                && mapping.get("fields") instanceof List<?> fields)
+            for (Object f : fields)
+                if (f instanceof Map<?, ?> fm && fm.get("name") != null && String.valueOf(fm.get("name")).trim().equalsIgnoreCase(col))
+                    mapped = true;
+
+        LinkGraph graph = LinkGraph.of(writeRoot, ReservedConfigPaths::reserved);
+        List<Map<String, Object>> consumers = new java.util.ArrayList<>();
+        for (LinkGraph.Edge e : graph.columnConsumers(target, col)) {
+            Map<String, Object> c = new LinkedHashMap<>();
+            c.put("kind", e.fromKind());
+            c.put("name", e.fromName());
+            c.put("key", e.key());
+            c.put("value", e.value());
+            consumers.add(c);
+        }
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        List<Map<String, Object>> notAnalysed = new java.util.ArrayList<>();
+        for (LinkGraph.Edge e : graph.columnEdges()) {
+            if (e.status() != LinkGraph.Status.NOT_ANALYSED || !seen.add(e.fromKind() + "|" + e.fromName() + "|" + e.key()))
+                continue;
+            Map<String, Object> n = new LinkedHashMap<>();
+            n.put("kind", e.fromKind());
+            n.put("name", e.fromName());
+            n.put("key", e.key());
+            notAnalysed.add(n);
+        }
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("schema", fileName);
+        r.put("path", rel);
+        r.put("column", col);
+        r.put("mapped", mapped);
+        r.put("total", consumers.size());
+        r.put("consumers", consumers);
+        r.put("notAnalysed", notAnalysed);
+        return r;
     }
 
     /**

@@ -48,9 +48,11 @@ public final class LinkGraph {
 
     /** Registry component kinds that hold links, in emission order. */
     private static final List<String> COMPONENT_KINDS = List.of("expectation", "decision-rule", "dataset",
-            "alert-rule", "widget", "dashboard", "link-analysis-view", "geo-map-view", "reconciliation");
+            "alert-rule", "widget", "dashboard", "link-analysis-view", "geo-map-view", "reconciliation", "query");
 
-    public enum Status { RESOLVED, DANGLING, UNCHECKED }
+    /** {@link #NOT_ANALYSED}: a column reference in SQL text the census could not read or attribute (LC-5) - a
+     *  gap in the analysis, never a finding. */
+    public enum Status { RESOLVED, DANGLING, UNCHECKED, NOT_ANALYSED }
 
     /**
      * One link found.
@@ -60,18 +62,35 @@ public final class LinkGraph {
      * @param key      the concrete key, e.g. {@code references.region_dim.ref} or {@code tiles[2].widgetId}
      * @param toKind   what the value names; for an Expectation / Decision Rule {@code target}, its
      *                 {@code targetType} ({@code pipeline} when absent)
+     * @param origins  for a RESOLVED column link, where the column is published ({@code schema:<path>},
+     *                 {@code pipeline:<id>}, {@code dataset:<name>} - {@link ColumnSets}); empty otherwise
      */
     public record Edge(LinkCensus.Link link, Path file, String fromName, String key, String value,
-                       String toKind, Status status) {
+                       String toKind, Status status, Set<String> origins) {
         public String fromKind() {
             return link.fromKind();
         }
     }
 
     private final List<Edge> edges;
+    private final Universe universe;
 
-    private LinkGraph(List<Edge> edges) {
+    private LinkGraph(List<Edge> edges, Universe universe) {
         this.edges = List.copyOf(edges);
+        this.universe = universe;
+    }
+
+    /**
+     * The edges one document would hold as a {@code kind} named {@code name}, judged against this graph's
+     * universe (`SPACE-LINK-CENSUS-1` LC-3: the save check compares a draft's {@link Status#DANGLING} edges with
+     * the stored version's). A Job is read inside its {@code job:} section. {@code file} on each edge is null.
+     */
+    public List<Edge> edgesOf(String kind, String name, Map<?, ?> doc) {
+        List<Edge> out = new ArrayList<>();
+        if (doc == null) return out;
+        Map<?, ?> d = kind.equals("job") && doc.get("job") instanceof Map<?, ?> inner ? inner : doc;
+        emit(kind, null, name, d, universe, out);
+        return out;
     }
 
     public List<Edge> edges() {
@@ -84,6 +103,11 @@ public final class LinkGraph {
         return edges.stream().filter(e -> e.link() == l).toList();
     }
 
+    /** The edges of one census link, in graph order (for a key holding two links: {@link LinkCensus#of(String, String, String)}). */
+    public List<Edge> edges(LinkCensus.Link l) {
+        return edges.stream().filter(e -> e.link() == l).toList();
+    }
+
     /** The edges held by one kind, in graph order. */
     public List<Edge> from(String fromKind) {
         return edges.stream().filter(e -> e.fromKind().equals(fromKind)).toList();
@@ -91,6 +115,22 @@ public final class LinkGraph {
 
     public List<Edge> dangling() {
         return edges.stream().filter(e -> e.status() == Status.DANGLING).toList();
+    }
+
+    /** The column-link edges (LC-5), in graph order. */
+    public List<Edge> columnEdges() {
+        return edges.stream().filter(e -> e.toKind().equals("column")).toList();
+    }
+
+    /**
+     * Every resolved column link to {@code column} as the Schema file {@code schemaFile} publishes it - what a
+     * rename of that mapped column would break. Matched case-insensitively, as DuckDB binds every consumer.
+     */
+    public List<Edge> columnConsumers(Path schemaFile, String column) {
+        String origin = ColumnSets.schemaOrigin(schemaFile);
+        String want = column.trim();
+        return edges.stream().filter(e -> e.toKind().equals("column") && e.status() == Status.RESOLVED
+                && e.origins().contains(origin) && e.value().trim().equalsIgnoreCase(want)).toList();
     }
 
     // ── building ────────────────────────────────────────────────────────────────────────────
@@ -102,7 +142,8 @@ public final class LinkGraph {
      * logged and skipped. An absent root is an empty graph.
      */
     public static LinkGraph of(Path configRoot, Predicate<String> reserved) {
-        if (configRoot == null || !Files.isDirectory(configRoot)) return new LinkGraph(List.of());
+        if (configRoot == null || !Files.isDirectory(configRoot))
+            return new LinkGraph(List.of(), Universe.of(Map.of(), null, null));
         Map<String, List<ComponentRegistry.Component>> byType = new LinkedHashMap<>();
         ComponentRegistry registry = ComponentRegistry.scan(configRoot.resolve("registry"));
         for (String t : List.of("dataset", "query", "widget")) byType.put(t, registry.ofType(t));
@@ -121,7 +162,8 @@ public final class LinkGraph {
             if (id != null) pipelineIds.add(id.toLowerCase());
         }
 
-        Universe u = Universe.of(byType, pipelineIds);
+        Universe u = Universe.of(byType, pipelineIds,
+                new ColumnSets(pipelineFiles, pipelineDocs, byType.getOrDefault("dataset", List.of())));
         List<Edge> out = new ArrayList<>();
         for (int i = 0; i < pipelineFiles.size(); i++)
             if (pipelineDocs.get(i) != null) fileEdges("pipeline", pipelineFiles.get(i), pipelineDocs.get(i), u, out);
@@ -139,13 +181,14 @@ public final class LinkGraph {
             Map<String, Object> raw = decode(nav);
             if (raw != null) fileEdges("nav-menu", nav, raw, u, out);
         }
-        return new LinkGraph(out);
+        return new LinkGraph(out, u);
     }
 
     /**
      * Resolve an in-memory component universe (the live registry, or registry ∪ an incoming bundle); missing
      * type keys are empty. {@code pipelineIds} is the registered-id universe, or {@code null} when unknown
-     * (pipeline links are then {@link Status#UNCHECKED}).
+     * (pipeline links are then {@link Status#UNCHECKED}). No Schema is read here, so every column link is
+     * {@link Status#UNCHECKED} (its raw value, as before LC-5) - the bundle import pre-check is unchanged.
      */
     public static LinkGraph ofComponents(Map<String, List<ComponentRegistry.Component>> byType, Set<String> pipelineIds) {
         Set<String> ids = null;
@@ -154,17 +197,20 @@ public final class LinkGraph {
             for (String p : pipelineIds) ids.add(p.toLowerCase());
         }
         List<Edge> out = new ArrayList<>();
-        componentEdges(byType, Universe.of(byType, ids), out);
-        return new LinkGraph(out);
+        Universe u = Universe.of(byType, ids, null);
+        componentEdges(byType, u, out);
+        return new LinkGraph(out, u);
     }
 
-    private record Universe(Map<String, Set<String>> names, Set<String> pipelineIds) {
-        static Universe of(Map<String, List<ComponentRegistry.Component>> byType, Set<String> pipelineIds) {
+    /** {@code columns} is {@code null} when column links are not judged ({@link #ofComponents}). */
+    private record Universe(Map<String, Set<String>> names, Set<String> pipelineIds, ColumnSets columns) {
+        static Universe of(Map<String, List<ComponentRegistry.Component>> byType, Set<String> pipelineIds,
+                           ColumnSets columns) {
             Map<String, Set<String>> n = new HashMap<>();
             for (Map.Entry<String, List<ComponentRegistry.Component>> e : byType.entrySet())
                 for (ComponentRegistry.Component c : e.getValue())
                     n.computeIfAbsent(e.getKey(), k -> new HashSet<>()).add(c.name());
-            return new Universe(n, pipelineIds);
+            return new Universe(n, pipelineIds, columns);
         }
 
         boolean hasComponent(String type, String name) {
@@ -190,6 +236,10 @@ public final class LinkGraph {
             List<String[]> found = new ArrayList<>();
             walk(doc, l.keyPath().split("\\."), 0, "", found);
             if (l.type() == LinkCensus.Type.ID_LIST) found = members(found);
+            if (u.columns() != null && l.toKind().equals("column")) {
+                columnEdges(kind, file, name, doc, l, found, u.columns(), out);
+                continue;
+            }
             for (String[] kv : found) {
                 String toKind = l.toKind();
                 if (l.keyPath().equals("target") && (kind.equals("expectation") || kind.equals("decision-rule"))) {
@@ -197,8 +247,29 @@ public final class LinkGraph {
                     String tt = String.valueOf(doc.containsKey("targetType") ? doc.get("targetType") : "pipeline");
                     toKind = "pipeline".equalsIgnoreCase(tt) ? "pipeline" : tt;
                 }
-                out.add(new Edge(l, file, name, kv[0], kv[1], toKind, status(l, toKind, kv[1], u)));
+                out.add(new Edge(l, file, name, kv[0], kv[1], toKind, status(l, toKind, kv[1], u), Set.of()));
             }
+        }
+    }
+
+    /** LC-5: a COLUMN value judged against the holder's set(s); a SQL text expanded into one edge per column it
+     *  references ({@link ColumnSets#sql}). */
+    private static void columnEdges(String kind, Path file, String name, Map<?, ?> doc, LinkCensus.Link l,
+                                    List<String[]> found, ColumnSets cols, List<Edge> out) {
+        if (l.type() == LinkCensus.Type.SQL_COLUMN) {
+            boolean expr = l.keyPath().equals("calculated[].expr");
+            for (String[] kv : found)
+                for (ColumnSets.Judged j : ColumnSets.sql(kv[0], kv[1],
+                        expr ? rel -> cols.dataset(name) : cols.relationsFor(kind, name, doc),
+                        expr ? "__dataset" : null))
+                    out.add(new Edge(l, file, name, j.key(), j.value(), l.toKind(), j.status(), j.origins()));
+            return;
+        }
+        List<ColumnSets.Cols> sets = cols.setsFor(kind, l.keyPath(), name, doc);
+        for (String[] kv : found) {
+            Set<String> origins = new java.util.LinkedHashSet<>();
+            Status st = ColumnSets.judge(l, kv[1], sets, origins);
+            out.add(new Edge(l, file, name, kv[0], kv[1], l.toKind(), st, Set.copyOf(origins)));
         }
     }
 
@@ -231,6 +302,14 @@ public final class LinkGraph {
         if (seg.equals("*")) {
             for (Map.Entry<?, ?> e : map.entrySet())
                 walk(e.getValue(), segs, i + 1, join(at, String.valueOf(e.getKey())), found);
+            return;
+        }
+        if (seg.equals("*[]")) {
+            // each element of each list value (a Widget's controls.<slot>[].field)
+            for (Map.Entry<?, ?> e : map.entrySet())
+                if (e.getValue() instanceof List<?> list)
+                    for (int k = 0; k < list.size(); k++)
+                        walk(list.get(k), segs, i + 1, join(at, String.valueOf(e.getKey())) + "[" + k + "]", found);
             return;
         }
         boolean each = seg.endsWith("[]");
@@ -279,6 +358,10 @@ public final class LinkGraph {
 
     private static boolean blank(Object v) {
         return v == null || v.toString().isBlank();
+    }
+
+    static Map<String, Object> decodeQuietly(Path p) {
+        return decode(p);
     }
 
     private static Map<String, Object> decode(Path p) {

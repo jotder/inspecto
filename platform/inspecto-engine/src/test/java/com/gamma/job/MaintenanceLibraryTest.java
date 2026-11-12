@@ -977,6 +977,30 @@ class MaintenanceLibraryTest {
     }
 
     @Test
+    void metadataValidateReportsDanglingColumnLinks(@TempDir Path writeRoot) throws Exception {
+        // LC-5: a column the Schema does not map is a finding; a mapped one, and a .history copy, are not.
+        System.setProperty("assist.write.root", writeRoot.toString());
+        try {
+            Files.writeString(writeRoot.resolve("orders_pipeline.toon"),
+                    "name: orders\ndirs:\n  database: data/orders/database\nprocessing:\n  schema_file: orders_schema.toon\n");
+            Files.writeString(writeRoot.resolve("orders_schema.toon"),
+                    "mapping:\n  fields[2]{name,from,fn}:\n    ORDER_ID,ORDER_ID,keep\n    GROSS,GROSS,keep\n");
+            Files.createDirectories(writeRoot.resolve(".history"));
+            Files.writeString(writeRoot.resolve(".history/old_enrich.toon"),
+                    "input:\n  database: data/orders/database\ntransform: \"SELECT NOPE FROM input\"\n");
+            var store = new com.gamma.pipeline.ComponentStore(writeRoot.resolve("registry"));
+            store.write("expectation", "gross_ok", Map.of("target", "orders", "column", "gross", "kind", "non_null"));
+            store.write("expectation", "net_gone", Map.of("target", "orders", "column", "NET", "kind", "non_null"));
+
+            JobResult r = new MaintenanceJob(job(Map.of("task", "metadata_validate"))).run();
+            assertEquals("SUCCESS", r.status(), r.message());
+            assertTrue(r.message().contains("1 finding(s)"), r.message());
+        } finally {
+            System.clearProperty("assist.write.root");
+        }
+    }
+
+    @Test
     void metadataValidateSkipsPipelineTargetsWhenNoPipelineFileExists(@TempDir Path writeRoot) throws Exception {
         System.setProperty("assist.write.root", writeRoot.toString());
         try {

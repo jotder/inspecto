@@ -72,7 +72,7 @@ public interface MailAccess {
             MailAttachments.check(files);
             // Every To AND Cc must sit in the Space's attachment domain allowlist (EMPTY by default ⇒ refused).
             if (!files.isEmpty()) MailAttachDomains.requireAllowed(to, cc);
-            for (NotificationChannel channel : ServiceLoader.load(NotificationChannel.class)) {
+            for (NotificationChannel channel : com.gamma.module.EntitledServices.load(NotificationChannel.class)) {
                 if (!"email".equals(channel.id()) || !channel.configured()) continue;
                 channel.deliver(Notification.create("job", "JOB_RUN", null,
                         subject == null ? "" : subject, body == null ? "" : body, null), target, files);

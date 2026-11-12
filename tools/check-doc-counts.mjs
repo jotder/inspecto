@@ -189,9 +189,11 @@ const MANIFEST = {
     'spi-extension-points': {
         floor: 1,
         what: 'distinct SPI interfaces a plugin jar can implement — every class the core discovers through '
-            + 'ServiceLoader.load(X.class), OptionalSpi.all(X.class) or a SpiSlot(X.class) in inspecto*/src/main',
+            + 'ServiceLoader.load(X.class), EntitledServices.load/stream/first(X.class), OptionalSpi.all/allInstalled(X.class) '
+            + 'or a SpiSlot(X.class) in inspecto*/src/main',
         derive: () => {
-            const re = /(?:ServiceLoader\s*\.\s*load|OptionalSpi\s*\.\s*all|SpiSlot\s*(?:\.\s*\w+)?\s*(?:<[^>]*>)?)\s*\(\s*([A-Za-z_][\w.]*)\s*\.class/g;
+            // ENTITLEMENT-SPI-NARROWING-1: most sites now go through EntitledServices, the entitlement-aware loader.
+            const re = /(?:ServiceLoader\s*\.\s*load|EntitledServices\s*\.\s*(?:load|stream|first)|OptionalSpi\s*\.\s*(?:all|allInstalled)|SpiSlot\s*(?:\.\s*\w+)?\s*(?:<[^>]*>)?)\s*\(\s*([A-Za-z_][\w.]*)\s*\.class/g;
             const names = new Set();
             for (const f of javaMainFiles()) {
                 const src = read(f);
@@ -203,7 +205,7 @@ const MANIFEST = {
             if (names.size === 0) throw new Error('spi-extension-points: no loader call sites found — re-anchor this parse');
             return names.size;
         },
-        source: 'inspecto*/src/main (ServiceLoader / OptionalSpi / SpiSlot call sites)',
+        source: 'inspecto*/src/main (ServiceLoader / EntitledServices / OptionalSpi / SpiSlot call sites)',
     },
     'ui-specced-frontends': {
         floor: 1,

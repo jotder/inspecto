@@ -2821,6 +2821,19 @@
         }
       }
     },
+    "/integrity" : {
+      "get" : {
+        "tags" : [ "spaces" ],
+        "summary" : "GET /integrity - the Space lock's report: broken links, duplicates, files changed outside the server",
+        "operationId" : "getIntegrity",
+        "description" : "SE-1a. Reached as /spaces/{id}/integrity. Report-only: always 200 with status computing (the lock is computed in the background after boot and after server writes; ask again), ready {checkedAt, lockWrittenAt, baseline, baselineNote?, files, links, broken, duplicates, changedOutside - each list {total, items} with at most 200 items}, disabled (-Dspace.integrity=off) or unavailable (single-tenant default Space). Requires canAuthorWorkbench. Spec: docs/okf/product/module/config/spec-space-lock.md.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); data = {status, ...}."
+          }
+        }
+      }
+    },
     "/pipelines/{pipelineId}/bundle" : {
       "get" : {
         "tags" : [ "pipelines" ],
@@ -12607,6 +12620,34 @@
           },
           "404" : {
             "description" : "No visible score for that model and entity."
+          }
+        }
+      }
+    },
+    "/config/schema/{schemaId}/columns/{columnId}/impact" : {
+      "get" : {
+        "tags" : [ "config" ],
+        "summary" : "What reads one mapped column of a Schema (column impact, report-only)",
+        "operationId" : "getConfigSchemaBySchemaIdColumnsByColumnIdImpact",
+        "description" : "SPACE-LINK-CENSUS-1 LC-5. Every config that reads {columnId} as the Schema {schemaId} publishes it (its mapping.fields), from the link census: Dataset dateField and calculated expressions, Widget controls fields, Expectation column / refColumn / condition fields, Decision Rule condition fields, Reconciliation keyColumns / compareColumns / impact.column, and the column references of Enrichment transform, Query text and virtual Dataset sql read through the DuckDB parse tree. Matched case-insensitively, as DuckDB binds every consumer. Read-only: nothing is refused or rewritten. Answers {schema, path, column, mapped, total, consumers:[{kind, name, key, value}], notAnalysed:[{kind, name, key}]} - notAnalysed names the SQL texts the census could not read or attribute, which may read the column too. Optional ?subdir=. Gates in order: 503 no write root; 422 unsafe name; 403 escaping subdir or a reserved file; 404 no such Schema; 422 blank or over-long column.",
+        "parameters" : [ {
+          "name" : "schemaId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "columnId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
           }
         }
       }

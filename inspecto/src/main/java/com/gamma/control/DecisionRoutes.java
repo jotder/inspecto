@@ -271,7 +271,9 @@ final class DecisionRoutes implements RouteModule {
             com.gamma.module.ModuleManifest declared = declaringModule(action);
             res = declared != null
                     ? ConsequenceProvider.Result.unavailable("'" + action + "' is not available: "
-                            + com.gamma.module.KnownModules.absentMessage(declared))
+                            + (com.gamma.module.Entitlements.moduleEntitled(declared)
+                                    ? com.gamma.module.KnownModules.absentMessage(declared)
+                                    : "module '" + declared.id() + "' is " + com.gamma.module.Entitlements.NOT_ENTITLED))
                     : ConsequenceProvider.Result.skipped("unknown action '" + action
                             + "' — no installed module provides it; the rule is kept unchanged");
         }
@@ -513,6 +515,9 @@ final class DecisionRoutes implements RouteModule {
     }
 
     private static Object write(ComponentStore store, String name, Map<String, Object> content) throws IOException {
+        // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: this kind-specific writer's one funnel.
+        LinkRefusals.requireLinks(store.root().getParent(), TYPE, name, content,
+                store.get(TYPE, name).map(ComponentRegistry.Component::content).orElse(null));
         try {
             ComponentRegistry.Component c = store.write(TYPE, name, content);
             return c.content();

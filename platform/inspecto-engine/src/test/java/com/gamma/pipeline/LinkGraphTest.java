@@ -26,7 +26,9 @@ class LinkGraphTest {
     void censusDeclaresEachLinkOnce() {
         Set<String> seen = new HashSet<>();
         for (LinkCensus.Link l : LinkCensus.LINKS)
-            assertTrue(seen.add(l.fromKind() + ":" + l.keyPath()), "declared twice: " + l);
+            // one key may hold two links to different targets (a virtual Dataset's sql: its store, its columns - LC-5)
+            assertTrue(seen.add(l.fromKind() + ":" + l.keyPath() + "->" + l.toKind()), "declared twice: " + l);
+        assertEquals("store", LinkCensus.of("dataset", "sql").toKind(), "the two-arg lookup keeps the first link");
         assertThrows(IllegalArgumentException.class, () -> LinkCensus.of("widget", "nope"));
         assertFalse(LinkCensus.of("job", "pipeline_config").enforced(), "an anatomy 'none' row stays unenforced");
     }

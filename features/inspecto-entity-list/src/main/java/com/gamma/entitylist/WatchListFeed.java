@@ -59,6 +59,6 @@ public interface WatchListFeed {
 
     /** The installed provider, if any. */
     static Optional<WatchListFeed> installed() {
-        return ServiceLoader.load(WatchListFeed.class, WatchListFeed.class.getClassLoader()).findFirst();
+        return com.gamma.module.EntitledServices.stream(WatchListFeed.class, WatchListFeed.class.getClassLoader()).findFirst();
     }
 }

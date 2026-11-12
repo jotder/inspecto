@@ -224,7 +224,7 @@ public final class OperationalDb {
         java.util.Set<String> names = new java.util.HashSet<>();
         for (Family f : Family.values()) names.add(f.name());
         List<StoreFamily> out = new java.util.ArrayList<>();
-        for (StoreFamilyProvider p : com.gamma.spi.OptionalSpi.all(StoreFamilyProvider.class))
+        for (StoreFamilyProvider p : com.gamma.spi.OptionalSpi.allInstalled(StoreFamilyProvider.class))
             for (StoreFamily f : p.families()) {
                 if (!names.add(f.name()))
                     throw new IllegalStateException("store family '" + f.name() + "' (contributed by "
