@@ -40,4 +40,4 @@ sample, past them (D-AN24 in the [plan](../../../../archived-documents/plans-arc
 |---|---|
 | Score run fails with an entity-cap refusal | Population larger than the cap; raise the flag or the model's `maxEntities`, or narrow the input. |
 | Isolation-forest model refused by preview (422) | By design: scored by the `anomaly.score` Job only (D-AN28). |
-| A kernel missing from the catalogue | Not yet registered as a provider (open item in the [plan](plan.md)). |
+| A kernel missing from the catalogue | Not registered as a provider: it needs an `AnalyticsFunctionProvider` and a line in the service file ([spec § Function catalogue](spec.md#function-catalogue)). |

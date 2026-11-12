@@ -26,9 +26,20 @@ class AnalyticsCatalogueTest {
         AnalyticsCatalogue c = AnalyticsCatalogue.load();
         Set<Kernel> kernels = EnumSet.noneOf(Kernel.class);
         for (AnalyticsFunction f : c.functions()) kernels.add(f.kernel());
-        assertEquals(EnumSet.allOf(Kernel.class), kernels, "every S-tier kernel is catalogued");
+        assertEquals(EnumSet.allOf(Kernel.class), kernels, "every kernel is catalogued");
         assertTrue(c.find("stats.mean").isPresent());
         assertTrue(c.find("nope.nothing").isEmpty());
+    }
+
+    @Test
+    void theCouldBatchKernelsAreCataloguedThroughTheirOwnProvider() {
+        AnalyticsCatalogue c = AnalyticsCatalogue.load();
+        for (String id : List.of("timeseries.calendar_slot", "timeseries.seasonal_profile", "timeseries.changepoint",
+                "cohort.retention", "cohort.funnel", "model.kmeans", "model.logistic_regression", "model.isolation_forest"))
+            assertTrue(c.find(id).isPresent(), id + " is catalogued");
+        AnalyticsFunction corr = c.find("stats.correlation").orElseThrow();
+        assertTrue(corr.params().stream().anyMatch(p -> p.name().equals("method") && p.choices().contains("spearman")),
+                "the correlation entry names Spearman");
     }
 
     @Test
@@ -54,7 +65,7 @@ class AnalyticsCatalogueTest {
 
     @Test
     void everyBuiltInEntryIsWellFormed() {
-        for (AnalyticsFunction f : new KernelFunctions().functions()) {
+        for (AnalyticsFunction f : AnalyticsCatalogue.load().functions()) {
             assertTrue(f.id().startsWith(prefix(f.kernel())), f.id() + " sits under its kernel's prefix");
             assertTrue(!f.summary().isBlank(), f.id() + " has a summary");
             for (Param p : f.params()) {
@@ -80,6 +91,8 @@ class AnalyticsCatalogueTest {
             case SIMILARITY -> "similarity.";
             case GROUPING -> "grouping.";
             case GRAPH -> "graph.";
+            case COHORT -> "cohort.";
+            case MODEL -> "model.";
         };
     }
 }
