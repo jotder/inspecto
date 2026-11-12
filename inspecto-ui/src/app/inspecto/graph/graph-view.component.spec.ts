@@ -6,6 +6,8 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { G6GraphData } from './catalog-graph';
 import {
     DENSE_EDGE_LABEL_CAP,
+    EXPAND_RELAYOUT_MAX_NEW,
+    placeBesideNeighbours,
     GRAPH_DEFAULT_LAYOUT_SPACING,
     GRAPH_DEFAULT_NODE_SIZE,
     GRAPH_LAYOUT_SPACINGS,
@@ -483,6 +485,72 @@ describe('GraphViewComponent change classifier (LA-05)', () => {
         expect(graph.setData).toHaveBeenCalledTimes(1);
         expect(graph.render).toHaveBeenCalledTimes(1);
         expect(graph.draw).not.toHaveBeenCalled();
+    });
+
+    describe('an expand places its new nodes beside their neighbours (PERF-P6)', () => {
+        const linked = (ids: string[], edges: [string, string][]): G6GraphData => ({
+            ...graphOf(ids),
+            edges: edges.map(([source, target]) => ({
+                id: `${source}-${target}`,
+                source,
+                target,
+                data: { kind: 'LINK' },
+            })) as unknown as G6GraphData['edges'],
+        });
+        const styleOf = (g: G6GraphData, id: string) =>
+            (g.nodes.find((n) => n.id === id) as unknown as { style?: { x: number; y: number } }).style;
+
+        it('a small expand keeps every existing position, places the new ones near their anchor, and runs no layout', () => {
+            const { comp, graph } = harness(linked(['a', 'b'], [['a', 'b']]), { a: [10, 20], b: [300, 400] });
+            const incoming = linked(
+                ['a', 'b', 'c', 'd'],
+                [
+                    ['a', 'b'],
+                    ['a', 'c'],
+                    ['c', 'd'], // d hangs off another new node: placed in a second pass
+                ],
+            );
+            comp.data = incoming;
+            comp.ngOnChanges({ data: {} });
+            expect(graph.render).not.toHaveBeenCalled();
+            expect(graph.draw).toHaveBeenCalledTimes(1);
+            const seeded = graph.setData.mock.calls[0][0] as G6GraphData;
+            expect(styleOf(seeded, 'a')).toMatchObject({ x: 10, y: 20 });
+            expect(styleOf(seeded, 'b')).toMatchObject({ x: 300, y: 400 });
+            const c = styleOf(seeded, 'c')!;
+            const d = styleOf(seeded, 'd')!;
+            expect(Math.hypot(c.x - 10, c.y - 20)).toBeLessThan(150);
+            expect(Math.hypot(d.x - c.x, d.y - c.y)).toBeLessThan(150);
+            // The caller's data is not written to.
+            expect(styleOf(incoming, 'c')).toBeUndefined();
+        });
+
+        it(`more than ${EXPAND_RELAYOUT_MAX_NEW} new nodes re-run the layout`, () => {
+            const { comp, graph } = harness(linked(['a'], []), { a: [10, 20] });
+            const fresh = Array.from({ length: EXPAND_RELAYOUT_MAX_NEW + 1 }, (_, i) => `n${i}`);
+            comp.data = linked(
+                ['a', ...fresh],
+                fresh.map((id) => ['a', id] as [string, string]),
+            );
+            comp.ngOnChanges({ data: {} });
+            expect(graph.render).toHaveBeenCalledTimes(1);
+            expect(graph.draw).not.toHaveBeenCalled();
+        });
+
+        it('siblings of one hub do not stack on one point', () => {
+            const nodes: Record<string, unknown>[] = [{ id: 'hub', style: { x: 0, y: 0 } }, { id: 'x' }, { id: 'y' }];
+            const ok = placeBesideNeighbours(
+                nodes,
+                [
+                    { source: 'hub', target: 'x' },
+                    { source: 'y', target: 'hub' },
+                ],
+                new Set(['x', 'y']),
+            );
+            expect(ok).toBe(true);
+            const [x, y] = [nodes[1]['style'], nodes[2]['style']] as { x: number; y: number }[];
+            expect(Math.hypot(x.x - y.x, x.y - y.y)).toBeGreaterThan(20);
+        });
     });
 });
 

@@ -2518,8 +2518,20 @@ public final class JobService implements AutoCloseable {
         if (eventLog != null && signalSubscriber != null) eventLog.removeSubscriber(signalSubscriber);
         packs.close();     // P2c: stop the watch thread, close pack classloaders
         workers.close();   // virtual-thread executor: awaits in-flight job runs
+        closeStores();
+        log.info("JobService stopped");
+    }
+
+    private boolean storesClosed;
+
+    /** DEMO-BAKE-WAL-RACE-1: close the run ledger and the provenance store (each closing DuckDB store checkpoints, so
+     *  no {@code .wal} is left), without waiting for in-flight Runs. {@link #close()} calls it after its drain; a host
+     *  whose drain overran its stop budget calls it directly, and a Run still writing then fails on a closed store.
+     *  Idempotent; a second caller waits for the first to finish. */
+    public synchronized void closeStores() {
+        if (storesClosed) return;
+        storesClosed = true;
         ledger.close();
         if (provenanceStore != null) provenanceStore.close();
-        log.info("JobService stopped");
     }
 }

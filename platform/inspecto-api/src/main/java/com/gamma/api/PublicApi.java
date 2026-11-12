@@ -22,6 +22,10 @@ import java.lang.annotation.Target;
  * framework. See {@code docs/okf/product/module/api/plan-api-stability.md} for the
  * full policy and the current marked surface.
  *
+ * <p>Marking a type covers its visible nested types. Every marked signature is recorded in
+ * {@code platform/inspecto-api/public-api.txt}; {@code tools/check-public-api.mjs} fails when one changes
+ * without that file being updated ({@code --update}) in the same change.
+ *
  * <p><b>The promise binds only within a <em>released</em> major.</b> The newest
  * release on this line is {@code v3.11.0}; the trunk is {@code 4.0.0-SNAPSHOT}
  * and 4.0.0 has not shipped. An element marked {@code since = "4.0.0"} has

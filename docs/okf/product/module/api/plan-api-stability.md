@@ -52,6 +52,20 @@ Two consequences, and they govern every relocation and rename question on this c
    `ConsignmentProcessor` SPI widening ([BACKLOG](../../../../BACKLOG.md) §4), and the architecture
    plan's Phase C cycle cuts. It is *inherited*, not measured. Measure it.
 
+## The baseline guard (`PUBLIC-API-SURFACE-1`, 2026-11-12)
+
+[`platform/inspecto-api/public-api.txt`](../../../../../platform/inspecto-api/public-api.txt) records the
+marked surface: one line per `@PublicApi` type header and per member a caller outside the package can see
+(`<type> | <signature>`, parameter names left out). Marking a type covers its visible nested types, so
+`CollectorConnector.Readiness` and `ConsequenceProvider.Result` need no mark of their own. One exposed type
+is left unmarked on purpose: the deprecated enum `com.gamma.job.JobType`, which two `JobConfig` constructors
+still take. Marking it would promise a type that is on its way out.
+[`tools/check-public-api.mjs`](../../../../../tools/check-public-api.mjs) reads every tracked `.java` file
+(no module list) and fails on any difference from that file. It runs in CI's `guards` job and so in
+pre-commit. An intended change is recorded by `node tools/check-public-api.mjs --update` in the same commit,
+where the reviewer sees the changed lines. The guard does not judge whether a change is allowed: under the
+rule above, a line whose type was not in `v3.11.0` may still change before 4.0.0 ships.
+
 ## Release notes — the pending MAJOR (draft, kept current until the tag is cut)
 
 Everything below is already on `master` and is either a `feat!:` or an operator-visible behaviour change

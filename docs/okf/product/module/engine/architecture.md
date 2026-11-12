@@ -64,6 +64,24 @@ include-list, so the sibling modules' classes and resources bundle automatically
 
 Build/run: see [build & test](../../layer/platform/spec-build-test.md).
 
+### Stopping a Space (graceful stop)
+
+`SpaceManager.close()` closes each Space under a 10 s budget (`CLOSE_DEADLINE_MS`). `CollectorService.close()`
+first asks in-flight runs to stop, then drains them (Jobs, timers, trigger workers, enrichment, the notification
+queue), and closes the stores last. A busy Space can overrun the budget; its drain is then abandoned on a daemon
+thread. **Since `DEMO-BAKE-WAL-RACE-1` (2026-11-12) an abandoned close still closes the Space's stores**
+(`CollectorService.closeStoresNow()`, which also closes the Job run ledger and provenance store through
+`JobService.closeStores()`), under a second 10 s budget. A closing DuckDB store checkpoints, so no `.wal` is left;
+work still running then fails on a closed store, which is the stop it was already asked to make. Each store
+serialises its one connection (`SingleConnectionSource`), so a store close waits for the statement in flight and
+never cuts it; only a store still busy after the second budget keeps its `.wal`, which DuckDB replays at the next
+start. The store close runs once, whichever path reaches it first.
+
+Decision: close the stores at the deadline rather than extend the budget while Jobs finish. A container runtime
+stops a process after its own grace period (10 s for `docker stop`, 30 s for a Kubernetes pod) and Spaces close one
+after another, so a longer budget would not hold; a checkpoint alone would not either, because work that is still
+writing would add to the WAL again before the JVM exits. Test: `SpaceCloseFlushTest`.
+
 ## Consignment status flow (the flowfile question)
 
 "Where is this Consignment, and what happened to it?" — NiFi's flowfile question, answered by four
