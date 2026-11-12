@@ -86,7 +86,7 @@ class ControlApiOnboardLinkAnalysisTest {
 
     private static JsonNode data(HttpResponse<String> r, int expected) throws Exception {
         assertEquals(expected, r.statusCode(), r.body());
-        return JSON.readTree(r.body()).get("data");
+        return EdgeWireTestRows.decoded(JSON.readTree(r.body()).get("data"));
     }
 
     /** Transfers between 40 accounts, with one hub (ACC-0001) that receives every tenth transfer. */

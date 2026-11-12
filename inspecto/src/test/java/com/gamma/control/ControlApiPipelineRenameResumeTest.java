@@ -151,6 +151,43 @@ class ControlApiPipelineRenameResumeTest {
         }
     }
 
+    /** A resume rewrites the dependents through the same link census as a fresh rename (`PIPELINE-LINK-GAPS-1`
+     *  a, b): an Enrichment's by-name reference and the renamed member of a Job's comma-list trigger. */
+    @Test
+    void resumeRewritesByNameReferencesAndCommaListMembers() throws Exception {
+        Path root = Files.createTempDirectory("resume-census");
+        try (Ctx c = open(root, false)) {
+            Files.writeString(root.resolve("lookup_enrich.toon"), """
+                    name: lookup
+                    transform: SELECT 1
+                    references:
+                      mini:
+                        ref: mini_etl
+                    """);
+            Files.createDirectories(root.resolve("jobs"));
+            Files.writeString(root.resolve("jobs").resolve("both_job.toon"), """
+                    job:
+                      name: both
+                      type: pipeline
+                      on_pipeline: "fx, mini_etl"
+                    """);
+            journal(root, "2026-08-13T00:00:00Z mini_etl -> mini_v2 : begin src=mini_pipeline.toon"
+                    + " rewriteDependents=true");
+            journal(root, "2026-08-13T00:00:00Z mini_etl -> mini_v2 : unregistered source");
+
+            HttpResponse<String> r = post(c.port, "/pipelines/rename/resume", "{}");
+            assertEquals(200, r.statusCode(), r.body());
+            assertEquals(2, V1Body.of(r.body()).get("dependentsRewritten").asInt());
+            Map<?, ?> refs = (Map<?, ?>) ConfigLoader.filesystem().decode(
+                    root.resolve("lookup_enrich.toon").toString()).get("references");
+            assertEquals("mini_v2", String.valueOf(((Map<?, ?>) refs.get("mini")).get("ref")));
+            assertEquals(List.of("fx", "mini_v2"), com.gamma.job.JobConfig.load(
+                    root.resolve("jobs").resolve("both_job.toon").toString()).onPipelines());
+        } finally {
+            deleteRecursive(root);
+        }
+    }
+
     /** AUDIT-LOG-UNBOUNDED-READ-1: the journal read is streamed, not loaded whole. A long history of closed
      *  brackets plus a torn trailing line (a hard kill mid-append) still yields exactly the one open rename. */
     @Test

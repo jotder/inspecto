@@ -559,7 +559,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | Unpack (11): **xz / zstd codecs**; `.Z` has no round-trip test; multi-part archives; the UI cannot author `data_extensions[0]:`; a stale `META-INF/services` header | `BACKLOG.md` §3 *Onboarding, Catalog, Parsing* | a dependency sign-off, not a build |
 | Unpack (5)(8)(10) — partial never fails; nested refused; crash mid-archive re-ingests committed Entries by design | `BACKLOG.md` §6 | LEAVE |
 | A drop-in `plugins/` jar directory (the ASN.1 grammar as a stored `.asn` file SHIPPED 2026-09-23 — `okf/product/module/engine/spec-parser-plugins.md`) | `BACKLOG.md` §3 *Parsing (Stage-1)* | a trust decision |
-| **P4 test mapping on a generic `parser` node** | `BACKLOG.md` §3 *Authoring* | re-scope before building |
+| ~~P4 test mapping on a generic `parser` node~~ | row deleted 2026-11-12 | obsolete: Test mapping went with the Load drawer (`42fa41fe5`) |
 | **D13 parser field tiers** — the onboarding-observation session; `tier: 'required'` ships `required: false`. The pre-agreed analysis rule and the deliverable that closes it are in `okf/product/module/config/user-guide-grammar-config.md`; the kit itself is archived but still runnable | `BACKLOG.md` §2 | externally gated |
 | **Row 15** — delete the legacy flat read path (`-Dingest.lane` is the precondition) | `BACKLOG.md` §2 | release-gated |
 | D-8 **XLSX export** (zero groundwork, no spreadsheet library) | `BACKLOG.md` §3 | |

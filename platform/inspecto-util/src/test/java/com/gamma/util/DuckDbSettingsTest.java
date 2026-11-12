@@ -243,6 +243,34 @@ class DuckDbSettingsTest {
         }
     }
 
+    @Test
+    void everyOpenPathCapsTheAsyncThreadPool(@TempDir Path dir) throws Exception {
+        // LA-PERF-N10-1: DuckDB 2.0 defaults async_threads to 4 × cores per instance; both open paths cap it.
+        DuckDbUtil.loadDriver();
+        String prior = System.getProperty(DuckDbUtil.PROP_ASYNC_THREADS);
+        File db = DuckDbUtil.tempDbFile("duckdb_test_", dir);
+        try {
+            System.clearProperty(DuckDbUtil.PROP_ASYNC_THREADS);
+            try (Connection c = DuckDbUtil.openConnection(db)) {
+                assertEquals(String.valueOf(DuckDbUtil.DEFAULT_ASYNC_THREADS), currentSetting(c, "async_threads"));
+            }
+            try (Connection c = JdbcDrivers.connect(DuckDbUtil.jdbcUrl(db))) {
+                assertEquals(String.valueOf(DuckDbUtil.DEFAULT_ASYNC_THREADS), currentSetting(c, "async_threads"));
+            }
+            System.setProperty(DuckDbUtil.PROP_ASYNC_THREADS, "3");
+            try (Connection c = DuckDbUtil.openInMemory(dir.resolve("spill"))) {
+                assertEquals("3", currentSetting(c, "async_threads"), "the -D override wins");
+            }
+            System.setProperty(DuckDbUtil.PROP_ASYNC_THREADS, "-1");
+            try (Connection c = DuckDbUtil.openInMemory(dir.resolve("spill"))) {
+                assertNotEquals("1", currentSetting(c, "async_threads"), "a negative value leaves DuckDB's default");
+            }
+        } finally {
+            restore(DuckDbUtil.PROP_ASYNC_THREADS, prior);
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
     /** Restore a system property to its prior value (or clear it when it had none). */
     private static void restore(String key, String prior) {
         if (prior != null) System.setProperty(key, prior);

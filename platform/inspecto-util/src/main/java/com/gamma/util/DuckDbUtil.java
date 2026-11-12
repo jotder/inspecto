@@ -133,6 +133,29 @@ public final class DuckDbUtil {
         try (Statement st = conn.createStatement()) {
             st.execute("SET disabled_optimizers = 'window_self_join'");
         }
+        applyInstanceCaps(conn);
+    }
+
+    /** JVM property: DuckDB {@code async_threads} per database instance; negative leaves DuckDB's default. */
+    public static final String PROP_ASYNC_THREADS = "processing.duckdb.async_threads";
+    /** Code default for {@link #PROP_ASYNC_THREADS}. */
+    public static final int DEFAULT_ASYNC_THREADS = 1;
+
+    /**
+     * Cap DuckDB's idle per-instance thread pools ({@code LA-PERF-N10-1}, 2026-11-12). DuckDB 2.0 starts an
+     * async I/O pool of {@code async_threads} (default 48 on a 12-core box) beside its {@code threads} workers in
+     * EVERY database instance; a server holding 89 open connections carried 5,251 DuckDB threads at idle (59 per
+     * instance, 48 of them async). Capping {@code async_threads} to {@value #DEFAULT_ASYNC_THREADS} leaves 12 per
+     * instance; a local parquet group-by showed no measurable difference. The setting is instance-wide, so applying
+     * it on each connection to the same file is idempotent. {@code -Dprocessing.duckdb.async_threads=N} overrides;
+     * a negative value leaves DuckDB's default.
+     */
+    public static void applyInstanceCaps(Connection conn) throws SQLException {
+        int asyncThreads = Integer.getInteger(PROP_ASYNC_THREADS, DEFAULT_ASYNC_THREADS);
+        if (asyncThreads < 0) return;
+        try (Statement st = conn.createStatement()) {
+            st.execute("SET async_threads=" + asyncThreads);
+        }
     }
 
     private static boolean notBlank(String s) { return s != null && !s.isBlank(); }

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.geo-link`](../../../../../product-map/module/geo-link.toon).
 
-130 test class(es): 19 unit, 111 real-HTTP control-plane, 0 IT.
+131 test class(es): 19 unit, 112 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -38,6 +38,7 @@ mvn -o test -pl la/inspecto-geo-link -Dtest=ControlApiAnalystUploadTest,ControlA
 | `ControlApiDraftLabelTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiDraftLabelTest.java` | An optional human {@code label} on a Draft (operator 2026-10-12), over real HTTP with an ARMED Authenticator: it is stored in |
 | `ControlApiDraftRebasePromoteTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiDraftRebasePromoteTest.java` | D7-5 - rebase (conflict report, confirmation, pinned reads, expiry) and promote (atomic append, four-eyes), over real HTTP with an |
 | `ControlApiDraftsTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiDraftsTest.java` | D7-3 - Drafts, over real HTTP with an ARMED Authenticator and SIX Subjects (a Subject-less test makes |
+| `ControlApiEdgeWireFormatTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiEdgeWireFormatTest.java` | PERF-P10-1 - the compact edge wire format of {@code POST /inv/projection} and {@code /inv/projection/neighbors} over the |
 | `ControlApiEmbedMultiSpaceTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiEmbedMultiSpaceTest.java` | The public embed view of a deployment with MORE THAN ONE Space: the token names no Space, so the route finds the grant's Space itself. |
 | `ControlApiEntityIdentityImportTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiEntityIdentityImportTest.java` | LA-17 mapping-Dataset import cut — {@code POST /inv/entity-identities/import} over real HTTP with a REAL Subject on |
 | `ControlApiEntityIdentityTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiEntityIdentityTest.java` | LA-17 slice 2 (design §8.1) — analyst identity resolution over real HTTP, every gate in house order, with a REAL |

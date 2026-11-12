@@ -12,9 +12,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -31,7 +33,7 @@ class LinkCensusParityTest {
 
     /** The checks that read link keys, with the marker their link code starts at (null = the whole file). */
     private static final Map<String, String> SOURCES = Map.of(
-            "inspecto/src/main/java/com/gamma/control/PipelineRenameRoutes.java", "private int rewriteEnrichTriggers(",
+            "inspecto/src/main/java/com/gamma/control/PipelineRenameRoutes.java", "private int rewriteDependents(",
             "inspecto/src/main/java/com/gamma/service/PipelineDependents.java", "",
             "platform/inspecto-engine/src/main/java/com/gamma/pipeline/ComponentIntegrity.java", "",
             "platform/inspecto-engine/src/main/java/com/gamma/job/MetadataValidateTask.java", "");
@@ -78,12 +80,24 @@ class LinkCensusParityTest {
     }
 
     @Test
-    void theRenameKeysAreDeclaredAsRenamed() {
-        // The rename path (LC-2 moves it onto the graph) rewrites exactly these; each must say so in the census.
-        for (String[] l : List.of(new String[]{"enrichment", "triggers.on_pipeline"}, new String[]{"job", "on_pipeline"},
-                new String[]{"expectation", "target"}, new String[]{"decision-rule", "target"},
-                new String[]{"dataset", "sourceName"}, new String[]{"dataset", "physicalRef"},
-                new String[]{"dataset", "sql"}, new String[]{"alert-rule", "onPipeline"}))
-            assertTrue(LinkCensus.of(l[0], l[1]).checks().contains(LinkCensus.Check.RENAME), l[0] + ":" + l[1]);
+    void theRenameRewritesEveryCensusLinkToAPipelineOrItsStore() {
+        // LC-2: PipelineRenameRoutes rewrites LinkCensus.renamedWithPipeline() and nothing else. Pin that set, and
+        // that the RENAME check says exactly which links the rename reads.
+        Set<String> renamed = new TreeSet<>();
+        for (LinkCensus.Link l : LinkCensus.renamedWithPipeline()) {
+            renamed.add(l.fromKind() + ":" + l.keyPath());
+            assertTrue(l.checks().contains(LinkCensus.Check.RENAME), l.fromKind() + ":" + l.keyPath() + " lacks RENAME");
+            // the rewriter walks plain keys and `*` only
+            for (String seg : l.keyPath().split("[.]"))
+                assertTrue(seg.equals("*") || seg.matches("[A-Za-z_][A-Za-z0-9_]*"),
+                        l.fromKind() + ":" + l.keyPath() + " has a segment the rename cannot walk: " + seg);
+        }
+        assertEquals(new TreeSet<>(List.of("enrichment:triggers.on_pipeline", "enrichment:references.*.ref",
+                "job:on_pipeline", "expectation:target", "decision-rule:target", "dataset:sourceName",
+                "dataset:physicalRef", "dataset:sql", "alert-rule:onPipeline")), renamed);
+        Set<String> declared = new TreeSet<>();
+        for (LinkCensus.Link l : LinkCensus.LINKS)
+            if (l.checks().contains(LinkCensus.Check.RENAME)) declared.add(l.fromKind() + ":" + l.keyPath());
+        assertEquals(renamed, declared, "a link marked RENAME that the rename does not rewrite, or the reverse");
     }
 }

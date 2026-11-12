@@ -386,6 +386,67 @@ export function cappedLayout(
     return id && cap !== undefined && nodeCount > cap ? CAPPED_LAYOUT_FALLBACK : id;
 }
 
+/**
+ * PERF-P6: an expand that adds more new nodes than this re-runs the whole layout; up to this many are placed beside their
+ * neighbours and every other node keeps its position. A typical expand adds one hop of a handful to a few dozen nodes.
+ */
+export const EXPAND_RELAYOUT_MAX_NEW = 50;
+
+/**
+ * Give each new node (`added`) a position beside its already-positioned neighbours: their centre, pushed out on a
+ * golden-angle spiral so siblings of one hub fan out instead of stacking. New nodes linked only to other new nodes are
+ * placed in later passes. Replaces the new nodes' entries in `nodes` with positioned copies; returns false when some new node has no positioned
+ * neighbour at all, in which case the caller re-runs the layout.
+ */
+export function placeBesideNeighbours(
+    nodes: Record<string, unknown>[],
+    edges: readonly { source: unknown; target: unknown }[],
+    added: ReadonlySet<string>,
+): boolean {
+    const at = new Map<string, [number, number]>();
+    for (const n of nodes) {
+        const s = n['style'] as { x?: unknown; y?: unknown } | undefined;
+        if (!added.has(String(n['id'])) && typeof s?.x === 'number' && typeof s.y === 'number') {
+            at.set(String(n['id']), [s.x, s.y]);
+        }
+    }
+    const adj = new Map<string, string[]>();
+    for (const e of edges) {
+        const a = String(e.source);
+        const b = String(e.target);
+        if (added.has(a)) adj.set(a, [...(adj.get(a) ?? []), b]);
+        if (added.has(b)) adj.set(b, [...(adj.get(b) ?? []), a]);
+    }
+    const indexOf = new Map(nodes.map((n, i) => [String(n['id']), i]));
+    let pending = [...added];
+    let k = 0;
+    while (pending.length) {
+        const placedNow: [string, [number, number]][] = [];
+        const rest: string[] = [];
+        for (const id of pending) {
+            const anchors = (adj.get(id) ?? []).map((nb) => at.get(nb)).filter((p) => p !== undefined);
+            if (!anchors.length) {
+                rest.push(id);
+                continue;
+            }
+            const cx = anchors.reduce((s, p) => s + p[0], 0) / anchors.length;
+            const cy = anchors.reduce((s, p) => s + p[1], 0) / anchors.length;
+            const r = 60 + 12 * Math.sqrt(k);
+            const angle = k++ * 2.399963; // the golden angle in radians
+            placedNow.push([id, [cx + r * Math.cos(angle), cy + r * Math.sin(angle)]]);
+        }
+        if (!placedNow.length) return false;
+        for (const [id, p] of placedNow) {
+            at.set(id, p);
+            const i = indexOf.get(id)!;
+            const n = nodes[i];
+            nodes[i] = { ...n, style: { ...((n['style'] as Record<string, unknown>) ?? {}), x: p[0], y: p[1] } };
+        }
+        pending = rest;
+    }
+    return true;
+}
+
 /** The node size every graph drew before {@link GraphDisplayOptions.nodeSize} existed. */
 export const HOST_NODE_SIZE = 32;
 /** The node size Link Analysis starts at: small, so a busy graph stays readable. */
@@ -1198,9 +1259,9 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     /**
      * Apply a data change onto the LIVE graph. Surviving nodes carry their current canvas position onto
-     * the incoming data, and layout re-runs only when a node was ADDED - a node that does not exist yet
-     * is the only one that needs a position computed for it. A removal (the analyst excluding a branch)
-     * or an attribute-only change therefore redraws exactly in place.
+     * the incoming data. New nodes (an expand) are placed beside their drawn neighbours, so a removal, an
+     * attribute-only change or a small expand redraws in place; layout re-runs only for more than
+     * {@link EXPAND_RELAYOUT_MAX_NEW} new nodes or a new node with no drawn neighbour (PERF-P6).
      */
     private applyData(dataKey: string): void {
         this.hoverLabelled = [];
@@ -1216,20 +1277,25 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             return;
         }
         const next = this.data.nodes.map((n) => String(n.id));
-        const added = next.some((id) => !this.renderedNodeIds.has(id));
+        const addedIds = new Set(next.filter((id) => !this.renderedNodeIds.has(id)));
         // The shapes name nodes the new data may no longer hold, and G6's render() makes each plugin look them up (it
         // throws on a missing id): take them off first, syncHulls puts them back once the new data is drawn.
         if ((graph.getPlugins() as unknown[]).some(isCommunityShape)) {
             swapCommunityShapes(graph, []);
             this.prevHullKey = '';
         }
-        const seeded = { nodes: this.data.nodes.map((n) => this.seedPosition(n)), edges: this.data.edges };
-        graph.setData(seeded as unknown as GraphData);
+        const nodes = this.data.nodes.map((n) => this.seedPosition(n));
+        // PERF-P6: a small expand places its new nodes beside their drawn neighbours and keeps every other node where it
+        // is; only a large one, or a new node with no drawn neighbour to stand beside, re-runs the whole layout.
+        const relayout =
+            addedIds.size > 0 &&
+            (addedIds.size > EXPAND_RELAYOUT_MAX_NEW || !placeBesideNeighbours(nodes, this.data.edges, addedIds));
+        graph.setData({ nodes, edges: this.data.edges } as unknown as GraphData);
         this.refreshStyleState();
         this.prevDataKey = dataKey;
         this.prevStyleKey = this.styleKey();
         this.renderedNodeIds = new Set(next);
-        const painted = added ? graph.render() : graph.draw();
+        const painted = relayout ? graph.render() : graph.draw();
         // The pointer model asked for a graph that stays fully in view: re-fit once the new data is on the canvas.
         // Only HERE (a data change), never in `redraw`, so a hover, a selection or a restyle never yanks the view.
         void painted

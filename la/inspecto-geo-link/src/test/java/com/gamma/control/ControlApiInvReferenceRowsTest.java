@@ -106,7 +106,7 @@ class ControlApiInvReferenceRowsTest {
         assertEquals(200, r.statusCode(), path + " -> " + r.body());
         if (!rawShown)
             for (String raw : RAW) assertFalse(r.body().contains(raw), path + " leaked " + raw + ": " + r.body());
-        return JSON.readTree(r.body()).get("data");
+        return EdgeWireTestRows.decoded(JSON.readTree(r.body()).get("data"));
     }
 
     private static String ask(String keys) {

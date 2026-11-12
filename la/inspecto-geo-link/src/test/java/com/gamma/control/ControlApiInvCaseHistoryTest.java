@@ -124,7 +124,7 @@ class ControlApiInvCaseHistoryTest {
         HttpResponse<String> r = send(c, ROUTE, body);
         assertEquals(200, r.statusCode(), body + " -> " + r.body());
         if (!rawShown) for (String raw : RAW) assertFalse(r.body().contains(raw), body + " leaked " + raw + ": " + r.body());
-        return JSON.readTree(r.body()).get("data");
+        return EdgeWireTestRows.decoded(JSON.readTree(r.body()).get("data"));
     }
 
     private String aliasOfA(Ctx c) throws Exception {
@@ -135,7 +135,7 @@ class ControlApiInvCaseHistoryTest {
         HttpResponse<String> r = send(c, "/inv/projection", "{\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"}", auth);
         assertEquals(200, r.statusCode(), r.body());
         // A appears only as a source, B as both: A's alias is the source never seen as a target
-        JsonNode rows = JSON.readTree(r.body()).at("/data/rows");
+        JsonNode rows = EdgeWireTestRows.decoded(JSON.readTree(r.body()).get("data")).get("rows");
         Set<String> targets = new java.util.HashSet<>();
         rows.forEach(n -> targets.add(n.get("target").asText()));
         for (JsonNode n : rows) if (!targets.contains(n.get("source").asText())) return n.get("source").asText();
@@ -319,7 +319,7 @@ class ControlApiInvCaseHistoryTest {
             HttpResponse<String> r = send(c, ROUTE, body, own);
             assertEquals(200, r.statusCode(), r.body());
             for (String raw : RAW) assertFalse(r.body().contains(raw), r.body());
-            JsonNode d = JSON.readTree(r.body()).get("data");
+            JsonNode d = EdgeWireTestRows.decoded(JSON.readTree(r.body()).get("data"));
             assertTrue(d.get("resolved").asBoolean(), d.toString());
             assertTrue(d.at("/objects/0/title").asText().endsWith(pseudonym), "re-masked with the pseudonym as asked");
             assertEquals(List.of("msisdn|" + A + "|all|50"), CaseTeamObjectEngine.ASKED);
@@ -369,7 +369,7 @@ class ControlApiInvCaseHistoryTest {
             HttpResponse<String> r = send(c, ROUTE, body, own);
             assertEquals(200, r.statusCode(), r.body());
             for (String raw : RAW) assertFalse(r.body().contains(raw), "leaked " + raw + ": " + r.body());
-            JsonNode d = JSON.readTree(r.body()).get("data");
+            JsonNode d = EdgeWireTestRows.decoded(JSON.readTree(r.body()).get("data"));
             assertEquals(2, d.get("objects").size(), d.toString());
             assertEquals(2, d.get("total").asInt());
             Map<String, JsonNode> byId = new java.util.HashMap<>();
@@ -429,7 +429,7 @@ class ControlApiInvCaseHistoryTest {
     private JsonNode history(Ctx c, String alias, String auth) throws Exception {
         HttpResponse<String> r = send(c, ROUTE, "{\"key\":\"" + alias + "\",\"status\":\"all\"}", auth);
         assertEquals(200, r.statusCode(), r.body());
-        return JSON.readTree(r.body()).get("data");
+        return EdgeWireTestRows.decoded(JSON.readTree(r.body()).get("data"));
     }
 
     /** Item (6): the caps count only records the caller may read, so hidden Investigations neither crowd out nor flag. */

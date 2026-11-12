@@ -640,6 +640,22 @@ class ControlApiPendingChangesTest {
         }
     }
 
+    /** The governed check selects through the link census like the rewrite (LC-2): an Enrichment that names the
+     *  Pipeline only by a by-name reference is a governed dependent too. */
+    @Test
+    void aRenameThatWouldRewriteAGovernedByNameReferenceIsRefused(@TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        try (Ctx c = openInactive(root)) {
+            String enrich = "name: lookup\ntransform: SELECT 1\nreferences:\n  mini:\n    ref: mini_etl\n";
+            Files.writeString(root.resolve("lookup_enrich.toon"), enrich);
+            policy(c, "{\"approval\":{\"enrichment\":{\"required\":true}}}");
+            HttpResponse<String> r = send(c, "POST", "/pipelines/mini_etl/rename", "{\"newId\":\"mini_two\"}", AUTHOR);
+            assertEquals(409, r.statusCode(), r.body());
+            assertTrue(r.body().contains("enrichment 'lookup_enrich.toon'"), r.body());
+            assertEquals(enrich, Files.readString(root.resolve("lookup_enrich.toon")), "the governed dependent is untouched");
+        }
+    }
+
     /** Verification finding 5: changing the policy is audited as its own row — who, and before / after. */
     @Test
     void changingThePolicyIsAuditedWithBeforeAndAfter(@TempDir Path cfg, @TempDir Path tmp) throws Exception {

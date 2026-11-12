@@ -719,6 +719,6 @@ class ControlApiInvProjectionTest {
      *  lives in inspecto's TEST tree and is not visible from another module — the inspecto-policy precedent). */
     private static com.fasterxml.jackson.databind.JsonNode json(String raw) throws Exception {
         com.fasterxml.jackson.databind.JsonNode n = new com.fasterxml.jackson.databind.ObjectMapper().readTree(raw);
-        return n.has("data") ? n.get("data") : n;
+        return EdgeWireTestRows.decoded(n.has("data") ? n.get("data") : n);
     }
 }

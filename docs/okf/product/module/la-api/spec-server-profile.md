@@ -45,3 +45,41 @@ projection cache.
 Tests: `StampedCacheTest` (5), `EvidenceMaskerTest` (21, incl. `aReclassifiedSchemaIsSeenAtOnceEvenWhenTheTreeWasServedFromMemory`),
 `ComponentStoreTest` (13), and the real-HTTP masking suites `ControlApiExplorationMaskingTest`, `ControlApiEntityListMaskedMatchTest`,
 `ControlApiEntityProfileScaleTest`, `EngineDatasetProviderFingerprintTest`. The full gate was NOT run.
+
+## N10 / N11 / N9 tail (LA-PERF-N10-1, LA-PERF-N11-1, LA-PERF-N9-1, 2026-11-12)
+
+**Method.** The Preview demo install (`inspecto-preview/inspecto-la`, 9 Spaces including the three shared ones) booted
+with JFR from launch (`INSPECTO_JAVA_OPTS=-XX:StartFlightRecording=...,settings=profile`). The "after" boots use a copy
+of the same install with only `lib/inspecto-util.jar` replaced, over the same `spaces` folder. Probe: demo sign-in as
+`admin`, then `POST /spaces/la-showcase/inv/projection` (`mule_transfers_dataset`, PAYER/PAYEE, limit 500-506 so the
+projection cache cannot answer 304), one call every 1.1 s. Native threads were attributed by their Win32 start
+address (`NtQueryInformationThread` class 9) mapped to loaded modules. The box was running parallel Maven builds, so
+absolute timings are noisy. Compare runs only within this section.
+
+### N10: who owns the native threads
+| | Before | After `async_threads=1` |
+|---|---|---|
+| OS threads in the JVM (at the probe) | 5,332 (the native dump a minute earlier: 5,338, of which 5,251 start in `libduckdb_java` and 79 are Java threads) | **1,158** |
+| Working set after 60 projections | 1,844 MB | **1,483 MB** (1,436-1,655 over later runs) |
+| Projection p50 / p90 / max (60 calls) | 579 / 1,393 / 1,982 ms | **450 / 1,249 / 10,299** ms; then 392 / 833 / 1,300 and 455 / 1,318 / 1,659 |
+
+Cause, measured in isolation with the bundled `duckdb_jdbc` 2.0.0.0 on 12 cores: each database instance starts
+**59 threads**: 11 workers (`threads=12`) and **48 async I/O threads (`async_threads`, 4 × cores)**. The server held 89
+open DuckDB connections (`GC.class_histogram`), and 89 × 59 = 5,251. `SET threads` saves only 8-11 per instance (8 at `threads=4`, 11 at `threads=1`). `SET
+async_threads=1` leaves 12, and it works after open. A 20 M-row parquet group-by: best of 5 is 592-667 ms by default and
+623-706 ms with `async_threads` 0 or 1, within noise. The fix is `DuckDbUtil.applyInstanceCaps`, called from
+`applyCorrectnessSettings` and from `JdbcDrivers.connect` for `jdbc:duckdb:` URLs (the per-Space stores). Its default is
+1 and `-Dprocessing.duckdb.async_threads` overrides it. `threads` and `memory_limit` were left unchanged; see the plan
+§0b N10. Test: `DuckDbSettingsTest.everyOpenPathCapsTheAsyncThreadPool`.
+
+### N11: boot
+Three warm restarts: first application log line at 9-11 s after launch, `/health` at **37, 55 and 83 s**. The 3 min 35 s
+(185 s before the first log line) of 2026-10-25 followed a fresh `/MIR` swap of every jar, so it is recorded as a
+cold-only cost. It was not reproduced and is not fixed.
+
+### N9 tail
+220 projections in four runs. **One 10.3 s call**, in the run that began at 19:10:02, the first `*/10` job burst
+after boot. In that burst `system.freshness-sweep` took **11,435 ms**; at later bursts it took 13-16 ms. A 40-call
+run straddling a later burst (20:40, the same ~20 jobs including two `la_index_build`) peaked at 2.2 s. JFR shows no
+Java wait over 2 s on a request (virtual) thread, and no GC or file event above 1 s, so the time was native or CPU.
+Verdict: **the tail goes with the first job burst after boot.** N10 did not remove it, and its exact stage was not caught.

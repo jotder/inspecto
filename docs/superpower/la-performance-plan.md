@@ -33,9 +33,11 @@ Every shipped lane went through independent adversarial verification (1–3 roun
 | P3a Grow preview rescans | ⛔ MEASURED NO-GO (DuckDB already materialises the CTE; only a semantic rewrite would help) | — |
 | P0 measure (browser timings, per-option algorithm timings) | 🟡 DONE in-page, 2026-10-25 (§0b); no Chrome performance-panel trace; largest graph available is only 767 nodes | — |
 | P5 betweenness worker | ⬜ OPEN — operator decision PERF-D1; §0b shows betweenness is NOT the top cost (385 ms at 465 nodes), layouts and hulls are | — |
-| P6 layout on expand, P8 hulls, P11 polish | ⬜ OPEN — P8 hulls is now MEASURED at about 3.1 s per toggle (§0b N2) and moves to the top | — |
+| P6 layout on expand | ✅ SHIPPED 2026-11-12 on its vitest proof; the after-timing was NOT measured (§P6) | see §P6 |
+| P8 hulls | ✅ SHIPPED as N2 (§0b) | — |
+| P11 polish | ⬜ OPEN — not measured, so not built (§P11); board row `LA-PERF-P11-1` | — |
 | P10a-5 delta fetch on expand | ⬜ OPEN — needs a server delta response | — |
-| P10 wire format | ⬜ DEFERRED — PERF-D3 | — |
+| P10 wire format | ✅ SHIPPED 2026-11-12 (PERF-D3 answered: build it) — compact edge rows; raw bytes −41 %, gzip bytes only −1 to −7 %, no measurable server or parse time change (§P10 "Measured") | see §P10 |
 
 **Known low items left open:** no test pins the production ETag-cache budget (a mutation to 3.2 billion passes); `deepEqual` overflows the stack at about 5,000 levels of nesting (real fold output never gets there); a fresh 200 at the full budget blocks the main thread about 70 ms; `menu-landing.spec` fails four tests when it runs after `session.service.spec` (that spec leaves `inspecto.currentSpace=gone` in localStorage, pre-existing on master); `FsInvestigationStore.promoteBeforeMarkHook` is a pre-existing public mutable static; the Postgres store, an ABA token change inside one mtime tick, and a real serialisation failure through the full HTTP stack were never exercised. The LA user guide still states the old caps (500 / 2,000; the defaults are now 1,000 / 2,500).
 
@@ -81,13 +83,13 @@ Every shipped lane went through independent adversarial verification (1–3 roun
 | Health | idle: 0 requests in 35 s (no polling); 🔴 **`TypeError: Cannot read properties of undefined (reading 'getData')` in `renderMinimap`, four times, after route changes** (a real defect); 5 × "Unable to preventDefault inside passive event listener" |
 
 ### The re-ranked open list (by what an analyst feels)
-Open items N3, N4, N7–N11, P5, P6 and P10a-5 are tracked on the board as `LA-PERF-*` rows (`docs/BACKLOG.md` §3.12, 2026-11-12).
+Open items N4, N7–N11, P5, P10a-5 and P11 are tracked on the board as `LA-PERF-*` rows (`docs/BACKLOG.md` §3.12, 2026-11-12).
 
 **Tier 1 — freezes the page**
 - **N1 Radial layout hangs the tab (> 3 min at 767 nodes / 4,000 links).** Cap or refuse Radial above a node count (a `layered_max_nodes` = 30 cap already exists as the pattern), and say so on screen; then decide on a worker (PERF-D5). Severity: high; a one-line cap removes the hang. ✅ **SHIPPED 2026-10-25** (3 builder / verifier rounds; targeted tests only): the Radial, Information density, Clustering and every other layout are capped at the one place they reach G6 (`layoutConfig`, caps through the `display` limits: Java `LaLimit`, `la-limits.ts`, docs, parity test), Concentric is the fallback, the cap notice no longer covers the legend. `d4fd1aa11`, `65593934a`, `92903f91b`.
 - **N2 Community hulls toggle costs ~3.1 s on and off.** Turning hulls OFF must not recompute Louvain; memoise the community assignment per graph signature (P8, now measured). ✅ **SHIPPED 2026-10-25** (3 rounds; targeted tests only): the hulls toggle no longer rebuilds the graph, Louvain is memoised per graph signature and cap, hull shapes come off before a data change and return after it. `0ceee890f`, `f0ecaeed5`, `aec36325a`.
 - **N3 Cold first-open freezes 2.7–4.1 s.** Cause not isolated: the lazy graph chunk (~1.2 MB of library, now loaded on first open since P7) plus the layout. Prefetch the chunk when the landing page is idle; measure parse vs layout separately before building anything. ⛔ **PREFETCH MEASURED NO-GO 2026-11-12** (table below): the chunk costs about 0.28 s; the freeze is G6 creating 4,767 elements (2.7 s) and the Force layout (4.1 s). What is left is the worker case, PERF-D5.
-- **N4 Other layouts 2.3–3.6 s (Fruchterman, Force, Layered) and box-select 579 ms.** Main-thread layouts: P6 plus the worker decision. ✅ **Layout switch SHIPPED 2026-11-12** (targeted spec only): a layout pick no longer destroys and rebuilds the graph; it runs the new layout on the live graph and re-runs the element styles only when `display` changed too. Circular 2.7 → 1.2 s, Force 5.2 → 2.3 s (table below); a node size change still rebuilds, because the entity icon size is fixed at construction (found by the verifier). `c0b60fdb1`, `b8aababb1`. The layout itself and the selection repaint stay on the main thread (PERF-D5).
+- **N4 Other layouts 2.3–3.6 s (Fruchterman, Force, Layered) and box-select 579 ms.** Main-thread layouts: P6 plus the worker decision. ✅ **Layout switch SHIPPED 2026-11-12** (targeted spec only): a layout pick no longer destroys and rebuilds the graph; it runs the new layout on the live graph and re-runs the element styles only when `display` changed too. Circular 2.7 → 1.2 s, Force 5.2 → 2.3 s (table below); a node size change still rebuilds, because the entity icon size is fixed at construction (found by the verifier). `c0b60fdb1`, `b8aababb1`. The layout itself and the selection repaint stay on the main thread (PERF-D5, answered 2026-11-12: no worker). ✅ **Layout on expand (P6) SHIPPED 2026-11-12**: a small expand no longer re-lays out the graph; before 378–435 ms per few-node expand on ~405 nodes, after NOT measured (§P6).
 
 #### N3 / N4 measured, 2026-11-12
 Production `la-app` build of `origin/master` 948fcf54b, demo-auth Preview bundle on :8081 with a copy of `la-showcase`, saved view `telecom_fraud_network` (767 nodes / 4,000 links, default layout Force), the built-in browser. In-page `PerformanceObserver` long tasks and long-animation-frame script attribution, plus TEMPORARY `performance.mark`s on G6's `beforerender / beforeelementcreate / beforelayout / afterlayout / beforedraw / afterrender` events (not shipped). No Chrome performance-panel trace: the agent's browser tools give no DevTools protocol. Before and after are separate builds of the same tree measured in the same session.
@@ -113,9 +115,9 @@ Production `la-app` build of `origin/master` 948fcf54b, demo-auth Preview bundle
 
 **Tier 3 — server fixed overhead (MEASURE FIRST: profile before building; code-read was wrong 6 of 8 times)**
 - **N7 A fixed ~80 ms per LA request** (Working Set and the Investigation list at 94–95 ms with one Investigation, against 15 ms for `/health`), and **N8 a 304 that costs as much as a 200** (projection 270–290 vs 303 ms; `/bootstrap` 21.8 vs 25.3 ms): the 304 still pays the key computation and gates. Profile with a sampling run (jcmd `Thread.print` ×N or JFR if the runtime has it) under a request loop to find what the fixed cost is (suspects: settings/limits read per request, audit append, capability/ABAC, fingerprint listing in the cache key). ✅ **SHIPPED 2026-11-12 (LA-PERF-SERVER-1), N7 and N8 together:** profiled, not code-read — the Investigation list spent 80 % of its time re-parsing every pipeline file for the masking lineage, the projection 304 spent ~50 % re-scanning the registry; a stamped (no time-to-live) cache cut the list 174 → 32 ms p50 and the projection 209 → 52 ms. Settings / ABAC / fingerprint listing showed no cost. Evidence: `docs/okf/product/module/la-api/spec-server-profile.md`. Hash: `git log --grep LA-PERF-SERVER-1`.
-- **N9 Projection latency 146 ms → 20.6 s, unexplained.** Repeat with a server-side timer and the scheduled jobs' minutes ruled out (jobs are ≤ 1.5 s so they are not the cause); suspects: lazy first-open of a DuckDB file, native-thread oversubscription (N10), the rate limiter's queueing. 🟡 **PARTLY EXPLAINED 2026-11-12:** rate-limiter queueing REFUTED (it answers 429, never waits); the median was the N7 cost; one 15.99 s call in 60 is still unexplained; audit append (journal write 36 %, parquet flush 24 % of native samples, on the request thread under the event store lock) is a proven cost left unfixed because the per-event sync is the audit durability rule. Evidence file above.
-- **N10 About 3,550 native threads and 1.4 GB at idle.** Cap DuckDB `threads` and `memory_limit` per instance (the first review: `DuckDbUtil.applyDuckDbSettings` leaves them at defaults when unset); prove with a before/after thread count and a projection timing.
-- **N11 Boot 3 min 35 s (185 s before the first log line).** Re-measure on a warm restart; then trace what runs before logging.
+- **N9 Projection latency 146 ms → 20.6 s, unexplained.** Repeat with a server-side timer and the scheduled jobs' minutes ruled out (jobs are ≤ 1.5 s so they are not the cause); suspects: lazy first-open of a DuckDB file, native-thread oversubscription (N10), the rate limiter's queueing. 🟡 **PARTLY EXPLAINED 2026-11-12:** rate-limiter queueing REFUTED (it answers 429, never waits); the median was the N7 cost; one 15.99 s call in 60 is still unexplained; audit append (journal write 36 %, parquet flush 24 % of native samples, on the request thread under the event store lock) is a proven cost left unfixed because the per-event sync is the audit durability rule. Evidence file above. 🟡 **TAIL RE-MEASURED 2026-11-12 after N10** (`LA-PERF-N9-1`): 220 projections in four runs; one call took **10.3 s**, in the first run, which started at the first 10-minute cron burst after boot (about 20 jobs, two `la_index_build`, and `system.freshness-sweep` taking **11.4 s**). Every other call was ≤ 2.2 s, including a 40-call run straddling a later burst (the same jobs; that sweep took 16 ms; max 2.2 s). So the tail follows the FIRST job burst after a boot, not a steady cost; N10 did not remove it. Not caught in a JFR sample: request threads are virtual and showed no Java wait over 2 s, so the time was native (DuckDB) or CPU contention. No per-stage timer was added. **Next step if it matters:** time the first post-boot `system.freshness-sweep` (11.4 s cold against 16 ms warm). **Audit append on the request thread: decision for the operator, nothing changed.** Measured: journal write 36 % and parquet flush 24 % of the projection's native samples, under the event store lock. Options: (a) keep it (durability per event, the current rule); (b) group commit: a writer thread forces once every N ms and the request waits for its batch's force (same durability, less lock time under concurrency, same latency for one caller); (c) journal-only on the request thread with the parquet flush moved off it (the journal keeps it durable; the flush is a compaction); (d) fully async append (fastest; an event can be lost on a crash, so this breaks the rule). (c) looks like the smallest change that keeps the rule. It needs a design review of the replay path.
+- **N10 About 3,550 native threads and 1.4 GB at idle.** Cap DuckDB `threads` and `memory_limit` per instance (the first review: `DuckDbUtil.applyDuckDbSettings` leaves them at defaults when unset); prove with a before/after thread count and a projection timing. ✅ **SHIPPED 2026-11-12** (`LA-PERF-N10-1`, targeted tests only): the cause was NOT `threads` or `memory_limit` but DuckDB 2.0's async I/O pool, `async_threads` = 4 × cores (48 here) per database instance, idle. A start-address dump of the native threads put 5,251 of 5,338 in `libduckdb_java` (5,332 at the probe a minute later); 89 open DuckDB instances × 59 threads. `DuckDbUtil.applyInstanceCaps` sets `async_threads=1` on every open path (`applyCorrectnessSettings` and `JdbcDrivers.connect` for the per-Space stores), override `-Dprocessing.duckdb.async_threads`. Same bundle, only `inspecto-util.jar` swapped: threads **5,332 → 1,158**, working set **1,844 → 1,483 MB**, projection p50 **579 → 450 ms** (three runs of 60: 450 / 392 / 455). `threads` alone saves 8-11 per instance and costs query parallelism, so it stays at DuckDB's default; `memory_limit` is a cap, not idle use, and the idle working set did not point at it — left unchanged. Evidence: `okf/product/module/la-api/spec-server-profile.md` § N10.
+- **N11 Boot 3 min 35 s (185 s before the first log line).** Re-measure on a warm restart; then trace what runs before logging. ✅ **MEASURED, COLD-ONLY 2026-11-12** (`LA-PERF-N11-1`): three warm restarts of the same install (9 Spaces) reached the first application log line 9–11 s after launch and `/health` in 37, 55 and 83 s (the spread follows load from parallel Maven builds on the box). The 185 s before the first log line happened once, right after a fresh `/MIR` swap of every jar: a cold-file cost (first read of new jars and the jlinked runtime, likely including an on-access scan), not code. Nothing to fix.
 
 **Tier 4 — defects and small fixes**
 - **N12 `renderMinimap` TypeError after route changes (×4).** Guard the destroyed-graph case. ✅ **SHIPPED 2026-10-25** (builder + verifier follow-up; targeted tests only): the graph tears down without a late minimap render and survives a throwing minimap silencer. `c47966312`, `3b5efb0c2`.
@@ -254,6 +256,22 @@ if an analyst reports the ~425 ms as a felt freeze".
 |---|---|---|
 | PERF-P6-1 | Position only the new nodes from their neighbours; re-layout only when the new set is large (threshold stated in code) | P0-1: expand scripting drops on S-expand; positions of existing nodes unchanged (test) |
 
+✅ **SHIPPED 2026-11-12 (`perf(link-analysis)`, hash in the board's closing note; targeted spec only).** `applyData` in
+`graph-view.component.ts` now gives each new node a position beside its drawn neighbours (`placeBesideNeighbours`: their
+centre plus a golden-angle spiral offset, new-to-new chains in later passes, the caller's data never written) and calls
+`graph.draw()`, so no existing node moves. The whole layout re-runs (`graph.render()`) only for more than
+`EXPAND_RELAYOUT_MAX_NEW` = 50 new nodes or a new node with no drawn neighbour. Proof: three vitest specs in
+`graph-view.component.spec.ts` (existing positions unchanged and no layout on a small expand; 51 new nodes re-lay out;
+siblings of one hub do not stack).
+
+*Measured BEFORE* (production `la-app` build of `fbac92982`, demo-auth Preview bundle on :8083 over a copy of `la-showcase`,
+built-in browser pane, in-page `PerformanceObserver` long tasks — the §0b method): an Investigation from `99979100001`
+grown to about 405 nodes; expands adding 2, 5 and 3 nodes cost **378, 379 and 435 ms** of long tasks (longest 236–283 ms),
+and the whole graph visibly moved after each. *AFTER:* **NOT measured** — the browser pane was hidden for the rest of the
+session (a hidden pane runs as a background page, so its timings are not comparable), no Claude-in-Chrome or Playwright
+was available, and the operator chose to ship on the vitest proof. The before/after box-select + hover screenshot was
+NOT taken either. Re-measure on the next visible-pane session with the same method.
+
 ### P7 — browser: bundle (unknown gain until P0-2; low risk if confirmed)
 
 **Why:** a static import chain may put the graph library into the eager `main` chunk on every page load
@@ -286,6 +304,60 @@ checkpoints, the main log does not. Cost grows with the number of steps.
 | Id | Work | Proof |
 |---|---|---|
 | PERF-P10-1 | Send column names once and rows as arrays, or stream via a generator; cache `columnTypes` per Dataset fingerprint; skip the mask copy when masking is off | Versioned API change (new media type or `v2` path, per the no-compat rule); P0-3 bytes and GC drop |
+
+**✅ SHIPPED 2026-11-12 (PERF-D3 answered "let's take on D3").** As built:
+- **Routes (re-grounded).** `POST /inv/projection` and `POST /inv/projection/neighbors` (`InvRoutes.project`, both the index
+  and the flat branch). "Investigation expand" is NOT an edge-row response: `POST /inv/investigations/{id}/ops` answers the
+  appended log entry, and the graph comes from the Working Set / replay, so it is unchanged. Also unchanged: the neighbours
+  `list: true` page, `/inv/projection/multi` and the Grow preview.
+- **Shape.** `{masking, columns, attrCols, rows, truncated, columnTypes, source?}`: `columns` = `source, target, kind, count`,
+  then `total` when a Measure is read, then the `attrCols`; each row is an array in that order. It REPLACED the object rows
+  (no-shim rule); nothing serves the old shape.
+- **Versioning: a media type, `application/vnd.inspecto.la-edges.v2+json`, not a `v2` path** (session decision). Every
+  path-keyed table stays as it is: the rate classes, the capability manifest, OpenAPI, the absent-module stubs, the
+  projection cache's route key and the SPA's conditional-read key. With no dual serving, a new path would only rename. To carry
+  it, `ApiContext.respondJson` now keeps a `…+json` type the handler set on a success; any error is plain
+  `application/json` and carries no ETag, as before.
+  The type is set on the three success returns only. Known low gap: a request replayed by `Idempotency-Key` (`Idempotency.replay`)
+  is sent as `application/json`; the SPA never sends that key on these reads. The decoder counts columns (`5 + attrCols` means a
+  `total` is present), so an attribute column named `total` stays an attribute (verification finding, fixed).
+- **Mask copy.** Each row is built once as an array straight from the statement row (`InvRoutes.edgeArrays`); the two ends are
+  masked in place only when the read masks. The old path built a `LinkedHashMap` (and an `attrs` map) per row.
+- **`columnTypes` cache: NOT built** (session decision). On a ProjectionCache hit it is not computed at all (the cached body
+  holds it); on a miss it is one registry lookup beside a DuckDB `GROUP BY`. With no measured cost, caching it would add a
+  key and an invalidation rule for nothing.
+- **Masking, row scope, cache, 304.** Unchanged order: every gate and the masking run before the ProjectionCache lookup; the
+  cached body is the compact body; ETag/304 (P4-2) and the client's revalidation (P10a-2) work as before. The SPA decodes once
+  in `edge-wire.ts` (`decodeEdges`) BEFORE the conditional-read cache holds the body, so a 304 returns the same decoded object
+  and the cache key stays viewer-scoped. The cache budget therefore still counts decoded JSON.
+- **Tests.** `ControlApiEdgeWireFormatTest` (real HTTP, armed: shape and media type on both routes, masking off and on, the
+  304 path, the R3 404 as plain JSON with no ETag, 401); `EdgeWireParityTest` (decoded compact rows equal the old rows,
+  masking off and on, with and without a Measure and attribute columns); `edge-wire.spec.ts` and
+  `inv-conditional-read.spec.ts` (vitest). The 28 geo-link tests that read projection rows decode through
+  `EdgeWireTestRows`. Targeted runs only; the full gate was NOT run.
+
+**Measured (2026-11-12, la-showcase `telecom_links_dataset`, the 767-node view: `a_msisdn` → `b_msisdn`, kind `link_kind`,
+attribute `via`, limit 4,000 minus a varied 1–9 so every timed call misses the cache; medians of 9).** Before = the
+installed Preview build; after = the same install with this lane's `inspecto-la-api` and `inspecto-http-spi` jars swapped
+in (the install's other jars are older; probe script `la-perf-wire-probe.mjs` in the session notes, not in the repo).
+
+| Scenario | Rows | Bytes decoded before → after | Bytes gzip before → after | Server ms, cache miss | Server ms, cache hit | V8 parse (+ decode) ms |
+|---|---|---|---|---|---|---|
+| Projection | 3,991 | 477,874 → 282,387 (**−41 %**) | 27,841 → 26,009 (**−6.6 %**) | 678 → 620 | 390 → 423 | 5.2 → 5.5 |
+| Neighbours of the hub 99970000100 | 730 | 87,190 → 51,489 (−41 %) | 8,951 → 8,785 (−1.9 %) | 601 → 760 | 460 → 590 | 1.0 → 0.8 |
+| Neighbours of the suspect 99979100001 | 403 | 48,666 → 28,989 (−40 %) | 5,452 → 5,398 (−1.0 %) | 599 → 661 | 472 → 761 | 0.6 → 0.5 |
+
+Server serialisation alone (Jackson, in-process, 4,000 rows with one attribute column, warm, median of 25;
+`EdgeWireParityTest.serialisationCostOfBothShapes`): **13.7 ms → 4.9 ms**, 356 KB → 160 KB (the fixture ids are shorter than the showcase's). Real, but 9 ms against a ~400 ms per-request floor.
+
+**Verdict, plainly: the gain on the wire is negligible.** gzip already removed the repetition the compact shape removes, so
+the bytes a browser downloads fall by 1–7 % (1.8 KB on the largest graph). Server time is unchanged within noise: even a
+cache HIT costs about 400 ms on this install, a per-request floor that has nothing to do with the body shape (see N9 and
+`spec-server-profile`). Parse plus decode in V8 is the same (about 5.5 ms for 3,991 rows), because the client still builds
+one object per row for the folds. The real gains are the uncompressed size (−41 %, which matters only where gzip is not
+negotiated) and one fewer map per row on the server. Not measured: browser heap and GC (the Node heap probe was not
+reliable, so no figure is claimed), a browser performance trace, and the fold time, which this change does not touch
+(the folds read the same decoded objects).
 
 ### P10a — browser: smart data fetch (high gain for repeated work; depends on P4)
 
@@ -321,6 +393,11 @@ be visibly marked as "as of" a time, never silently shown as current.
 |---|---|---|
 | PERF-P11-1 | Fuse the 8–12 derived passes in the browser pipeline; memoise `autoStyleOf`; add value comparators on `canvasData` and its intermediate computeds (as `canvasPlugins` already does) | P0-1 scripting per action drops; no identity churn in the change log |
 
+⬜ **NOT BUILT, 2026-11-12:** the brief makes P11 conditional on a measurement showing scripting per action drops, and
+no measurement surface was available (browser pane hidden, see §P6). Nothing was changed; it stays open as board row
+`LA-PERF-P11-1`. Context: the P6 before numbers put a whole small expand at about 0.4 s of long tasks on 405 nodes, so
+the page-side derived passes are a fraction of an action, not the freeze.
+
 ---
 
 ## 3. Sequencing
@@ -345,7 +422,8 @@ be visibly marked as "as of" a time, never silently shown as current.
 freeze is reported with a trace?
 *Recommendation:* keep refused until P0-1 shows it as the top scripting cost on S-large; the existing reopen trigger
 is about analyst reports, so record one if it happens.
-**Answer:**
+**Answer:** (2026-11-12, aligned with the operator's PERF-D5 answer at the operator's instruction "align D1") keep refused: no worker, no approximation. Reopen only on an
+analyst-reported felt freeze with a trace.
 
 **PERF-D4 — Working Set staleness bound (ANSWERED 2026-10-25, operator: "go with your 30s TTL decision").**
 The Working Set GET trusts a cheap change token (size + nanosecond mtime + file key + a hash of the last log line)
@@ -363,12 +441,15 @@ with different row scope.
 
 **PERF-D3 — API change for P10.** A new media type / `v2` path for the edge wire format, or defer P10 entirely?
 *Recommendation:* defer until P0-3 shows bytes are still a problem after P4 (gzip removes most of the cost).
-**Answer:**
+**Answer:** 2026-11-12, operator: "let's take on D3" — build it now rather than defer. Built as PERF-P10-1 with a versioned
+media type (§P10); the measurement bore out the recommendation's caution (gzip bytes −1 to −7 %).
 
 **PERF-D5 — Heavy graph work off the main thread (NEW 2026-10-25, from §0b).** The live measurement found the freezes are LAYOUTS and HULLS, not betweenness: Radial blocks the tab for more than 3 minutes at 767 nodes / 4,000 links, Fruchterman / Force / Layered take 2.3–3.6 s, the hulls toggle 3.1 s, a cold first-open 2.7–4.1 s, while betweenness is 385 ms at 465 nodes and is already refused above 500. The standing refusals LA-06 / LA-07 (viewport culling, Web Worker for the algorithms) were reasoned at a 500-node canvas cap and one slow algorithm. Choose: (a) keep the refusals and fix by CAPS and MEMOISATION only (N1 cap on Radial, N2 memoised hulls, prefetch the graph chunk), or (b) reopen LA-07 to cover layouts and Louvain in a Web Worker (G6 supports worker layouts for some algorithms).
 *Recommendation:* (a) first — N1 and N2 are small and remove the worst freezes (both SHIPPED 2026-10-25) — then re-measure; reopen (b) only if layouts above the caps are still a felt freeze. This also supersedes PERF-D1's framing: betweenness alone does not justify a worker.
 *Evidence, 2026-11-12 (§0b "N3 / N4 measured"; the worker was NOT built, this decision stays the operator's):* with N1, N2 and the N4 live relayout shipped and every layout cap in place, the main thread still blocks on the default graph of 767 nodes / 4,000 links for **7.4 s at first open** (G6 element creation 2.7 s + Force layout 4.1 s), **2.3 s for a switch to Force** and **3.8 s to Force (spread)**, and **1.3 s to paint a 767-node selection**. Prefetching the chunk would save 0.28 s of that. A worker can take only the layout part: about 4.1 s at first open and 1.3–2.8 s of a Force switch (the switch minus the ~1 s position update). It cannot take element creation or the selection repaint, which are G6 canvas work. Cheaper alternatives that are NOT caps: fewer d3-force ticks (a faster `alphaDecay`, visibly looser layout; not tried) and positions remembered per graph signature so a re-open skips the layout. Both change behaviour or add state, so they are listed for the decision rather than built.
-**Answer:**
+**Answer:** (operator, 2026-11-12: "go with your recommendation on PERF-D5") option (a): keep LA-06 / LA-07 refused,
+no Web Worker for layouts or algorithms; fix by caps and memoisation only. Reopen (b) only on an analyst-reported felt
+freeze with a trace.
 
 ## 6. Documentation that must be corrected
 

@@ -30,7 +30,8 @@ import java.util.function.Predicate;
  *
  * <p><b>Values.</b> An edge's value is the raw text ({@code String.valueOf}, untrimmed); a blank scalar is not a
  * link and yields no edge. A list element yields an edge whenever it is non-null (a blank Reconciliation side is
- * a broken reference, as it always was).
+ * a broken reference, as it always was). An {@link LinkCensus.Type#ID_LIST} value (a Job's comma-list
+ * {@code on_pipeline}) yields one edge per member, trimmed, under the same key.
  *
  * <p><b>Status.</b> Only an enforced link to a Dataset, Query, Widget or Pipeline is judged: a component id must
  * name a component of that type exactly; a Pipeline id matches case-insensitively after trimming, and only when
@@ -183,11 +184,12 @@ public final class LinkGraph {
 
     private static void emit(String kind, Path file, String name, Map<?, ?> doc, Universe u, List<Edge> out) {
         for (LinkCensus.Link l : LinkCensus.from(kind)) {
-            // A v2 Reconciliation lists its sides in `datasets`; left/right are then not read (as before).
-            if (kind.equals("reconciliation") && (l.keyPath().equals("leftDataset") || l.keyPath().equals("rightDataset"))
-                    && doc.get("datasets") instanceof List<?>) continue;
+            // A v2 Reconciliation lists its sides in `datasets`; left/right/third are then not read (as before).
+            if (kind.equals("reconciliation") && (l.keyPath().equals("leftDataset") || l.keyPath().equals("rightDataset")
+                    || l.keyPath().equals("thirdDataset")) && doc.get("datasets") instanceof List<?>) continue;
             List<String[]> found = new ArrayList<>();
             walk(doc, l.keyPath().split("\\."), 0, "", found);
+            if (l.type() == LinkCensus.Type.ID_LIST) found = members(found);
             for (String[] kv : found) {
                 String toKind = l.toKind();
                 if (l.keyPath().equals("target") && (kind.equals("expectation") || kind.equals("decision-rule"))) {
@@ -247,6 +249,16 @@ public final class LinkGraph {
                     walk(list.get(k), segs, i + 1, join(at, key) + "[" + k + "]", found);
             }
         }
+    }
+
+    /** An {@link LinkCensus.Type#ID_LIST} value is one edge per member: split on commas, trimmed, blanks dropped
+     *  ({@code JobConfig.onPipelines}). */
+    private static List<String[]> members(List<String[]> found) {
+        List<String[]> out = new ArrayList<>();
+        for (String[] kv : found)
+            for (String m : kv[1].split(","))
+                if (!m.isBlank()) out.add(new String[]{kv[0], m.trim()});
+        return out;
     }
 
     /** {@code **}: apply the rest of the path at this node and at every map / list node below it. */

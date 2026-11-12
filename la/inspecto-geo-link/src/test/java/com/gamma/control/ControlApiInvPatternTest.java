@@ -108,7 +108,7 @@ class ControlApiInvPatternTest {
     private JsonNode ok(Ctx c, String body) throws Exception {
         HttpResponse<String> r = post(c.port, "/inv/pattern/branching", body);
         assertEquals(200, r.statusCode(), r.body());
-        return JSON.readTree(r.body()).get("data");
+        return EdgeWireTestRows.decoded(JSON.readTree(r.body()).get("data"));
     }
 
     /** {@code normalizeEntityKey} — the browser's node key, so both sides are compared in one key space. */
@@ -234,7 +234,7 @@ class ControlApiInvPatternTest {
             HttpResponse<String> proj = post(c.port, "/inv/projection",
                     "{\"dataset\":\"tx_ds\",\"sourceCol\":\"src\",\"targetCol\":\"dst\",\"attrCols\":[\"TS\",\"AMOUNT\"]}");
             assertEquals(200, proj.statusCode(), proj.body());
-            JsonNode projected = JSON.readTree(proj.body()).get("data");
+            JsonNode projected = EdgeWireTestRows.decoded(JSON.readTree(proj.body()).get("data"));
             assertTrue(projected.get("truncated").asBoolean(), "the projection is capped");
             for (JsonNode row : projected.get("rows"))
                 assertFalse(row.get("target").asText().equals("MULE-HUB-01"),
