@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpParameterCodec, HttpParams } from '@angular/common/http';
 import { Observable, catchError, map, of, switchMap, tap, throwError, timer } from 'rxjs';
-import { retryAfterMs } from '../link-analysis/limit-refusal';
+import { retryAfterMs } from '@inspecto/link-analysis/link-analysis/limit-refusal';
 // eslint-disable-next-line no-restricted-imports -- only `actor`, to keep a stored answer from crossing viewers (as la-limits.service does)
 import { SessionService, SpacesService } from '@inspecto/core/api';
 import { ConditionalReadCache } from './conditional-read-cache';

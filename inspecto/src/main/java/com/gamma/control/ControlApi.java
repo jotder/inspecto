@@ -1406,7 +1406,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // 🔴 ETag belongs here too, and its absence was silent: the SPA runs on :4204 against the API on
         // :8080, so every header it needs is cross-origin. ETags have been served since W3, but nothing
         // sent If-Match, so no one noticed the browser could not read them back (`CLIENT-HALVES-1` (a)).
-        h.set("Access-Control-Expose-Headers", "Correlation-ID, X-Config-Fingerprint, ETag");
+        h.set("Access-Control-Expose-Headers", "Correlation-ID, X-Config-Fingerprint, ETag, Retry-After");
         h.set("Access-Control-Max-Age", "600");
         if (!"*".equals(corsOrigin)) h.set("Vary", "Origin");
     }
@@ -1472,6 +1472,13 @@ public final class ControlApi implements AutoCloseable, HostContext {
         logStatic(ex, index, 200, bytes.length);
     }
 
+    /** Angular build output named {@code <stem>-<8-9 char hash>.js|css|woff|woff2} (the stem may hold hyphens: {@code Inter-roman.var-EDENVCUS.woff2}); the hash must hold an upper-case letter or digit so
+     *  a plain hyphenated name ({@code runtime-config.js}) is not mistaken for one. Everything else (index.html, assets/) revalidates. */
+    private static final java.util.regex.Pattern CONTENT_HASHED =
+            java.util.regex.Pattern.compile("^[\\w.-]+-(?=[A-Za-z0-9_-]*[A-Z0-9])[A-Za-z0-9_-]{8,9}\\.(?:js|css|woff2?)$");
+
+    static boolean isContentHashed(String fileName) { return CONTENT_HASHED.matcher(fileName).matches(); }
+
     /**
      * Write a UI file, with a cache directive and a validator.
      *
@@ -1493,12 +1500,6 @@ public final class ControlApi implements AutoCloseable, HostContext {
      * Size+mtime is a sufficient validator here — these files are build output, replaced wholesale by
      * a deploy, never edited in place within a millisecond of the same length.
      */
-    /** Angular build output named {@code <stem>-<8-9 char hash>.js|css|woff|woff2}; the hash must hold an upper-case letter or digit so
-     *  a plain hyphenated name ({@code runtime-config.js}) is not mistaken for one. Everything else (index.html, assets/) revalidates. */
-    private static final java.util.regex.Pattern CONTENT_HASHED =
-            java.util.regex.Pattern.compile("^[\\w.]+-(?=[A-Za-z0-9_-]*[A-Z0-9])[A-Za-z0-9_-]{8,9}\\.(?:js|css|woff2?)$");
-
-    static boolean isContentHashed(String fileName) { return CONTENT_HASHED.matcher(fileName).matches(); }
 
     private void writeFile(HttpExchange ex, Path file) throws IOException {
         BasicFileAttributes attrs = Files.readAttributes(file, BasicFileAttributes.class);

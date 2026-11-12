@@ -1,13 +1,5 @@
 import { apiErrorMessage } from '@inspecto/core/api';
 
-/**
- * DR-D6 — the two resource-bound refusals every Link Analysis route can answer, in an analyst's words. Returns null
- * for any other status, so each surface's own message function asks this FIRST and carries on with its own table.
- *
- * - 413 (`PAYLOAD_TOO_LARGE`): a Working Set over the Space's `max_set_bytes`, or an Investigation over its
- *   `max_investigation_bytes`. The server's body names the limit and the setting; nothing was stored.
- * - 429 (`RATE_LIMITED`): the per-user Link Analysis rate limit — a burst of 20 requests, then one every 3 seconds.
- */
 /** The longest `Retry-After` the client waits out on its own; a longer one is left to the analyst. */
 const MAX_AUTO_RETRY_MS = 10_000;
 
@@ -20,6 +12,14 @@ export function retryAfterMs(err: unknown): number | null {
     return Number.isFinite(ms) && ms > 0 && ms <= MAX_AUTO_RETRY_MS ? ms : null;
 }
 
+/**
+ * DR-D6 — the two resource-bound refusals every Link Analysis route can answer, in an analyst's words. Returns null
+ * for any other status, so each surface's own message function asks this FIRST and carries on with its own table.
+ *
+ * - 413 (`PAYLOAD_TOO_LARGE`): a Working Set over the Space's `max_set_bytes`, or an Investigation over its
+ *   `max_investigation_bytes`. The server's body names the limit and the setting; nothing was stored.
+ * - 429 (`RATE_LIMITED`): the per-user Link Analysis rate limit — a burst of 20 requests, then one every 3 seconds.
+ */
 export function limitRefusalMessage(err: unknown): string | null {
     const status = (err as { status?: number } | null)?.status;
     if (status !== 413 && status !== 429) return null;

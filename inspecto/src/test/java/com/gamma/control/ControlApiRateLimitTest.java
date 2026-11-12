@@ -76,7 +76,8 @@ class ControlApiRateLimitTest {
             // N13: the 429 says how long until the bucket holds its next token (whole seconds, at least 1)
             String retryAfter = exhausted.headers().firstValue("Retry-After").orElse(null);
             assertNotNull(retryAfter, "a 429 must carry Retry-After");
-            assertTrue(Long.parseLong(retryAfter) >= 1, "Retry-After: " + retryAfter);
+            // the standard bucket refills one token every 3 s and the clock is frozen at an empty bucket: exactly 3
+            assertEquals("3", retryAfter, "Retry-After = seconds to the next token");
 
             // (c) an unrelated route (not in the throttled prefix set) is unaffected by the exhausted bucket.
             HttpResponse<String> h = health(c.port);
