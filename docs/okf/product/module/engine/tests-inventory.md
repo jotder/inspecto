@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-388 test class(es): 388 unit, 0 real-HTTP control-plane, 0 IT.
+391 test class(es): 391 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -35,6 +35,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `AlertRuleTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/AlertRuleTest.java` | Rule parsing/validation + window/comparator semantics (v4.1, B5). |
 | `AlertServiceTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/AlertServiceTest.java` | The alert engine's evaluation semantics (v4.1, B5): metric math over ledger rows, duration and <!-- vocab-allow: quoted Javadoc --> |
 | `AlertTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/AlertTest.java` | R2-05: the words an operator reads on a fired Alert and the Incident it raises. The machine ids stay |
+| `AlertWindowTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/AlertWindowTest.java` | PA-9b: the {@code window:} block of a windowed Measure Alert Rule. Every refusal is paired with the accepted shape |
 | `BusinessAssurancePackGoldenTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/BusinessAssurancePackGoldenTest.java` | `ASSURE-PACK-BUSINESS-ASSURANCE-1` golden test: the shipped {@code spaces/_templates/business-assurance} pack, |
 | `BusinessAssuranceSinkDatasetTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/BusinessAssuranceSinkDatasetTest.java` | `ASSURE-PACK-BUSINESS-ASSURANCE-1` (d): each business-assurance Job's {@code sink_dataset} is a Dataset the |
 | `EventAlertBridgeTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/EventAlertBridgeTest.java` | MODULE-REORG-P7 ALERT residue retirement: SEQUENCE_GAP and PIPELINE_CONSERVATION_IMBALANCE domain events are each |
@@ -44,6 +45,8 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `PerEntityAlertTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/PerEntityAlertTest.java` | ASSURE-PER-ENTITY-ALERTS-1 — a Dataset measure Alert Rule with {@code by} evaluates the Measure per key over |
 | `PollRelativeFreshnessTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/PollRelativeFreshnessTest.java` | LA-DATA-TRUST-1 S3: a freshness Alert Rule whose {@code maximumAge} is a MULTIPLE of the feeding Collector's poll interval |
 | `RunbookTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/RunbookTest.java` | The {@code runbook} kind's structural validator, and the Alert Rule's {@code runbook:} link. |
+| `WindowedRuleEvaluatorTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/WindowedRuleEvaluatorTest.java` | PA-9b: {@link WindowedRuleEvaluator} over committed Parquet files — the window buffer, effectively-once Alerts |
+| `WindowSqlOracleTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/WindowSqlOracleTest.java` | PA-9b: the window SQL compiler ({@link WindowSql}) against an independent oracle — a plain-Java evaluation of the |
 | `CatalogModelTest` | `com.gamma.catalog` | unit | `platform/inspecto-engine/src/test/java/com/gamma/catalog/CatalogModelTest.java` | Unit tests for the pure metadata-graph model (P0): id formatting/parsing, description |
 | `CatalogOverlayTest` | `com.gamma.catalog` | unit | `platform/inspecto-engine/src/test/java/com/gamma/catalog/CatalogOverlayTest.java` | Tests for {@link CatalogOverlay} (P4): per-kind overlay projection from the audit reads. |
 | `DescriptionProviderTest` | `com.gamma.catalog` | unit | `platform/inspecto-engine/src/test/java/com/gamma/catalog/DescriptionProviderTest.java` | Tests for the {@link DescriptionProvider} SPI applied by {@link MetadataGraphService} (P5): |

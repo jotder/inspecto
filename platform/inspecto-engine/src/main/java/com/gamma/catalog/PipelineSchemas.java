@@ -125,9 +125,31 @@ public final class PipelineSchemas {
     public static Found forStore(Path configRoot, String origin) {
         List<Entry> entries = new ArrayList<>();
         List<SchemaProjection.Column> stepColumns = new ArrayList<>();
-        boolean reshaped = false, unreadable = false;
+        boolean reshaped = false;
+        Producers producers = producers(configRoot, origin);
+        for (PipelineConfig cfg : producers.configs()) {
+            entries.addAll(entries(cfg));
+            for (PipelineConfig.Step st : cfg.steps())
+                if (RESHAPING.contains(st.kind())) reshaped = true;
+            for (StepOutput so : stepOutputs(cfg)) stepColumns.addAll(so.columns());
+        }
+        return new Found(entries, reshaped, producers.unreadable(), List.copyOf(stepColumns));
+    }
+
+    /**
+     * The Pipelines that write {@code origin}, by the same rule as {@link #forStore}.
+     *
+     * @param configs    every loaded Pipeline whose Stream or own name is {@code origin}
+     * @param unreadable a Pipeline that may be {@code origin}'s could not be loaded
+     */
+    public record Producers(List<PipelineConfig> configs, boolean unreadable) {}
+
+    /** The Pipelines under {@code configRoot} that write {@code origin} (PA-9b: a windowed Alert Rule's save gates). */
+    public static Producers producers(Path configRoot, String origin) {
+        List<PipelineConfig> configs = new ArrayList<>();
+        boolean unreadable = false;
         if (origin == null || origin.isBlank() || configRoot == null || !Files.isDirectory(configRoot))
-            return new Found(entries, false, false);
+            return new Producers(configs, false);
         String o = origin.trim().toLowerCase(Locale.ROOT);
         List<Path> files;
         try (Stream<Path> w = Files.walk(configRoot, 4)) {
@@ -146,13 +168,9 @@ public final class PipelineSchemas {
                 if (!claimsAnotherStore(f, o)) unreadable = true;
                 continue;
             }
-            if (!o.equalsIgnoreCase(cfg.identity().pipelineName()) && !o.equalsIgnoreCase(cfg.stream())) continue;
-            entries.addAll(entries(cfg));
-            for (PipelineConfig.Step st : cfg.steps())
-                if (RESHAPING.contains(st.kind())) reshaped = true;
-            for (StepOutput so : stepOutputs(cfg)) stepColumns.addAll(so.columns());
+            if (o.equalsIgnoreCase(cfg.identity().pipelineName()) || o.equalsIgnoreCase(cfg.stream())) configs.add(cfg);
         }
-        return new Found(entries, reshaped, unreadable, List.copyOf(stepColumns));
+        return new Producers(List.copyOf(configs), unreadable);
     }
 
     /**
