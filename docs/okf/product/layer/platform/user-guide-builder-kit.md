@@ -99,13 +99,21 @@ Read [`docs/api/README.md`](../../../../api/README.md).
 
 `com.gamma.api.PublicApi` (`platform/inspecto-api`) marks the types, methods and constructors that are promised to
 code outside the repo. Its `since` attribute names the Platform version that introduced each one.
-- **Marked today** among the §2 extension points: `StepExecutor`, `PipelineNodeType` and `CollectorConnectorFactory`
-  (all `since = "4.0.0"`).
-- **Not marked yet:** `JobTypeProvider`, `ConsequenceProvider` and `CollectorConnector`. A Job pack or a Consequence
-  necessarily implements an unmarked interface, so pin your pack to the Platform version it was scaffolded from and
-  re-run its tests on each upgrade.
-- **Everything else unmarked** is internal and may change in any release.
-- **No guard yet** holds the marked surface stable between releases.
+- **All six §2 extension points are marked** (`since = "4.0.0"`): `StepExecutor`, `PipelineNodeType`,
+  `CollectorConnectorFactory`, `JobTypeProvider`, `ConsequenceProvider` and `CollectorConnector`. So is every type
+  their methods expose. 18 were marked on 2026-11-12: `Job`, `JobContext`, `JobResult`, `JobTypeDescriptor`,
+  `ParameterDecl`, `ParamType`, `ArtifactDecl`, `ArtifactRecorder`, `ResultSetMeta`, `TriggerInfo`, `RunLog`,
+  `SignalEmitter`, `ConsignmentSource`, `ConsequenceContext`, `RemoteFile`, `DiscoveryContext`, `PostAction` and
+  `AcquisitionException`. `JobConfig`, `PlatformServices`, `ObjectAccess`, `Severity` and `CronExpression` were
+  already marked. A mark on a type covers its visible nested types. One exception: the deprecated `JobType` enum,
+  which two `JobConfig` constructors still take, stays unmarked. Use the constructors that take the type id as a
+  `String`.
+- **Everything else unmarked** is internal and may change in any release. Build a pack against marked types only.
+- **A guard holds the marked surface.** `platform/inspecto-api/public-api.txt` lists every marked signature, and
+  `tools/check-public-api.mjs` (CI and pre-commit) fails when one changes without that file changing in the same
+  commit. Within a released major, marked types only gain members. 4.0.0 is not released yet, so until it ships
+  re-run your pack's tests on each Platform upgrade
+  ([API stability](../../module/api/plan-api-stability.md)).
 
 Read [the layers architecture](architecture.md).
 

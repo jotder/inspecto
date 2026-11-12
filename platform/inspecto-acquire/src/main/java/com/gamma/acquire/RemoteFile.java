@@ -1,5 +1,7 @@
 package com.gamma.acquire;
 
+import com.gamma.api.PublicApi;
+
 import java.nio.file.Path;
 import java.time.Instant;
 
@@ -19,6 +21,7 @@ import java.time.Instant;
  * needs none of it (batch planning stats on demand). Later phases (stability/watermark/checksum) fill these
  * when they actually need them, keeping discovery I/O at the legacy minimum.
  */
+@PublicApi(since = "4.0.0")
 public record RemoteFile(String name,
                          String relativePath,
                          long size,

@@ -1,5 +1,7 @@
 package com.gamma.job;
 
+import com.gamma.api.PublicApi;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +14,7 @@ import java.util.Map;
  * fail-closed at registration, granted to every Run's {@link JobContext#services()}). Served by
  * {@code GET /jobs/types/{id}} to drive authoring forms, wiring, and the grants panel.
  */
+@PublicApi(since = "4.0.0")
 public record JobTypeDescriptor(String id, String title, String description,
                                 List<ParameterDecl> parameters, List<String> emits,
                                 List<ArtifactDecl> artifacts, List<String> requires) {

@@ -1,5 +1,7 @@
 package com.gamma.job;
 
+import com.gamma.api.PublicApi;
+
 import java.util.List;
 
 /**
@@ -36,6 +38,7 @@ import java.util.List;
  *                    dialog must not offer it. Default {@code false} — set it ONLY on a declaration the Job
  *                    does not read via {@code ctx.params()}
  */
+@PublicApi(since = "4.0.0")
 public record ParameterDecl(String name, ParamType type, boolean required,
                             String deduce, String defaultValue, String description,
                             String label, Tier tier, List<String> options, String pattern,

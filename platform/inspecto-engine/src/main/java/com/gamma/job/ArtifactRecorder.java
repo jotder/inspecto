@@ -1,5 +1,7 @@
 package com.gamma.job;
 
+import com.gamma.api.PublicApi;
+
 import java.nio.file.Path;
 import java.util.Map;
 import java.time.Instant;
@@ -15,6 +17,7 @@ import java.time.Instant;
  * <p>Recording metadata is the P1d scope; auto-registering a queryable {@code ViewDefinition} for a
  * dataset artifact (§10, the {@code ViewStore} bridge) is a deferred follow-on.
  */
+@PublicApi(since = "4.0.0")
 public interface ArtifactRecorder {
 
     /** A produced/updated Dataset (Table | Derived Table | View). */
