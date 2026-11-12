@@ -172,6 +172,40 @@ class DeliveryCheckTest {
                 Instant.parse(now).toEpochMilli());
     }
 
+    /**
+     * GAP-DETECTION-ENABLED-IGNORED-1 (found 2026-11-11, PRODUCT-ASSEMBLY-1 PA-5d): {@code enabled: false} switches the
+     * file-template checks off. The same feed with the block enabled reports day 4, so the probe would fire.
+     */
+    @Test
+    void aDisabledFileTemplateRecordsAndReportsNothing(@TempDir Path dir) throws Exception {
+        for (boolean enabled : new boolean[]{true, false}) {
+            Path d = dir.resolve(enabled ? "on" : "off");
+            Files.createDirectories(d);
+            Path p = PipelineConfigBatchTest.writePipeline(d, "");
+            Files.writeString(p, Files.readString(p) + "collector:\n  gap_detection:\n    enabled: " + enabled
+                    + "\n    file_template: \"XDR_{yyyyMMdd}.csv\"\n", java.nio.file.StandardOpenOption.TRUNCATE_EXISTING);
+            EventLog.current().addSubscriber(sub);
+            PipelineConfig cfg = PipelineConfig.load(p.toString());
+            List<Consignment.Member> landed = new ArrayList<>();
+            for (int day = 1; day <= 7; day++) if (day != 4) landed.add(member(d, "XDR_2026090" + day + ".csv", day));
+            DeliveryCheck.afterCommit(cfg, "b", landed, List.of(), NOW);
+            List<String> gaps = DeliveryCheck.detectFileGaps(cfg, List.of(), NOW);
+            long events = seen.stream().filter(e -> EventType.SEQUENCE_GAP.equals(e.type())).count();
+            if (enabled) {
+                assertEquals(List.of("20260904"), gaps, "the control: enabled, day 4 is a gap");
+                assertEquals(1, events);
+            } else {
+                assertTrue(gaps.isEmpty(), "disabled: no file gap reported, got " + gaps);
+                assertEquals(1, events, "disabled: no further SEQUENCE_GAP event");
+                assertTrue(Files.notExists(DeliveryCheck.manifestFile(cfg)), "disabled: no delivery manifest written");
+                assertEquals("XDR_{yyyyMMdd}.csv", cfg.collector().gapDetection().fileTemplate(),
+                        "the template is still read: it names the feed's days in Signals and is kpi.completeness's default");
+            }
+            EventLog.current().removeSubscriber(sub);
+            GapTracker.shared().reset();
+        }
+    }
+
     @Test
     void withoutAFileTemplateNothingIsRecordedOrReported(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = config(dir, false);

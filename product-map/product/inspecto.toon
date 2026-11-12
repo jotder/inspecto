@@ -1,0 +1,7 @@
+id: product.inspecto
+kind: product
+title: Inspecto
+product: inspecto
+billable: false
+status: ga
+docs: docs/okf/product/product/inspecto/index.md

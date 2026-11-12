@@ -100,8 +100,8 @@ test('scaffold lays down the composed Space with its samples in the inboxes and 
         assert.equal(fs.readFileSync(path.join(base, 'config/demo-users.toon'), 'utf8'), ROSTER);
         for (const f of ['payments', 'subscriber_events']) {
             const p = fs.readFileSync(path.join(base, 'config', f, `${f}_pipeline.toon`), 'utf8');
-            assert.doesNotMatch(p, /gap_detection|file_template/, `${f}: no daily-file watch over a fixed-date corpus`);
-            assert.doesNotMatch(p, /^collector:\s*$(?![\s\S]*^  \S)/m, `${f}: no empty collector key is left`);
+            assert.match(p, /^  gap_detection:\r?\n(    .*\r?\n)*    enabled: false\r?$/m, `${f}: the daily-file watch is off over a fixed-date corpus`);
+            assert.match(p, /^    file_template:/m, `${f}: the template stays, to switch back on`);
             assert.match(p, /^processing:\r?$/m, `${f}: the rest of the Pipeline stays`);
         }
         const tpl = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'spaces/_templates/telco-fraud/config/payments/payments_pipeline.toon'), 'utf8');

@@ -8,7 +8,7 @@ apps:
   required[0]:
   optional[1]: link-analysis
 templates[30]: aml,business-assurance,la-audit,la-benefits,la-card,la-claims,la-crypto,la-daily-feed,la-health,la-insider,la-logistics,la-mfs,la-mobile-money,la-ownership,la-police,la-procurement,la-sample,la-showcase,la-showcase-off,la-telco-ra,la-trade,la-utility,mobile-money,orders-starter,partner-settlement,payment-fraud,telco-bypass,telco-fraud,telco-ra,telco-rerating
-distributions[3]: production,trial,demo
+distributions[4]: production,trial,demo,pilot
 brand:
   name: Inspecto
-docs: docs/okf/product/layer/product/index.md
+docs: docs/okf/product/product/inspecto/index.md

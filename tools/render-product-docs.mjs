@@ -12,11 +12,13 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join } from 'node:path';
 import { SLOTS } from './check-product-docs.mjs';
 import { parseBoard } from './check-backlog-items.mjs';
+import { productDocuments } from './product-documents.mjs';
 
 const HUBS = 'docs/okf/product', MAP = 'product-map';
 const check = process.argv.includes('--check');
-const KIND_ORDER = ['edition', 'solution-pack', 'layer', 'addon', 'module', 'functionality'];
-const KIND_TITLE = { edition: 'Editions', 'solution-pack': 'Solution packs', layer: 'Layers', addon: 'Add-ons', module: 'Modules', functionality: 'Functionalities' };
+const KIND_ORDER = ['product', 'app', 'industry', 'edition', 'solution-pack', 'layer', 'addon', 'module', 'functionality'];
+const KIND_TITLE = { product: 'Products', app: 'Apps', industry: 'Industries', edition: 'Editions', 'solution-pack': 'Solution packs', layer: 'Layers',
+    addon: 'Add-ons', module: 'Modules', functionality: 'Functionalities' };
 let stale = 0;
 const board = parseBoard(readFileSync('docs/BACKLOG.md', 'utf8'));
 const cell = (s) => s.replace(/\|/g, '\\|');
@@ -33,6 +35,12 @@ const KIND_NA = {
     edition: Object.fromEntries(['plan', 'spec', 'architecture', 'user-guide', 'admin-guide', 'api', 'tests'].map((s) => [s, `an Edition is a build flavor — ${MODULES}`])),
     addon: Object.fromEntries(['plan', 'spec', 'architecture', 'user-guide', 'admin-guide', 'api', 'tests'].map((s) => [s, `an Add-on licenses modules — ${MODULES}`])),
     'solution-pack': Object.fromEntries(['plan', 'spec', 'api', 'tests'].map((s) => [s, `a Solution pack configures modules — ${MODULES}`])),
+    // PA-10a (D-PA32): the assembly kinds. A Product's brochure, datasheet and guides are composed from its Apps (D-PA36).
+    product: Object.fromEntries(['plan', 'spec', 'architecture', 'api', 'tests'].map((s) => [s, 'a Product assembles Apps — see the hubs of its Apps and Add-ons'])),
+    app: Object.fromEntries(['plan', 'spec', 'architecture', 'features', 'user-guide', 'admin-guide', 'api', 'tests']
+        .map((s) => [s, 'an App installs Space Templates and needs Add-ons — see their hubs (solution-pack, addon)'])),
+    industry: Object.fromEntries(['plan', 'spec', 'architecture', 'features', 'user-guide', 'admin-guide', 'api', 'tests']
+        .map((s) => [s, "an Industry names its Industry pack — see that pack's hub (solution-pack industry-<pack>)"])),
 };
 const LAYER_NA = Object.fromEntries(['plan', 'spec', 'user-guide', 'admin-guide', 'api', 'tests'].map((s) => [s, `a layer groups modules — ${MODULES}`]));
 
@@ -46,6 +54,9 @@ function put(path, text) {
     mkdirSync(join(path, '..'), { recursive: true });
     writeFileSync(path, text);
 }
+
+// PA-10d (D-PA36): each Product hub's brochure, datasheet and guides are generated first, so the hub tables list them.
+for (const [path, text] of Object.entries(productDocuments('.'))) put(path, text);
 
 const items = [];
 for (const kind of KIND_ORDER) {
@@ -64,7 +75,7 @@ for (const kind of KIND_ORDER) {
             const mine = files.filter((f) => f === `${slot}.md` || f.startsWith(`${slot}-`));
             if (mine.length) return `| ${slot} | current | ${mine.map((f) => `[${titleOf(readFileSync(join(dir, f), 'utf8'), f)}](${f})`).join(' · ')} |`;
             if (naOverride[slot]) return `| ${slot} | n/a | ${naOverride[slot]} |`;
-            if (slot === 'brochure' && kind !== 'edition' && kind !== 'solution-pack') return `| ${slot} | n/a | per edition / solution pack |`;
+            if (slot === 'brochure' && kind !== 'edition' && kind !== 'solution-pack' && kind !== 'product') return `| ${slot} | n/a | per edition / solution pack |`;
             if (slot === 'feature-db') return `| ${slot} | n/a | no feature rows derive to this item (\`tools/render-feature-db.mjs\`) |`;
             const na = KIND_NA[kind]?.[slot] ?? (kind === 'layer' && !['platform', 'product'].includes(name) ? LAYER_NA[slot] : undefined);
             if (na) return `| ${slot} | n/a | ${na} |`;

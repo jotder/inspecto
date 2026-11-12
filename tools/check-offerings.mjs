@@ -20,15 +20,19 @@
 // CHECKS  1 every module id named has a manifest   2 resolved module set == bundleModules(edition) == the edition pom profile
 //         (profile modules = bundle set minus the default-reactor modules)   3 requires.modules closure of the resolved set
 //         4 a `built` add-on names existing modules that are in the resolved set; a `planned` one's hostedBy modules exist
-//         5 contentPacks exist under spaces/_templates, and a template's `minEdition:` (template.toon) is not above the tier   6 includes resolve, no cycle, id equals file name.
+//         5 contentPacks exist under spaces/_templates, a template's `minEdition:` (template.toon) is not above the tier, and every
+//         module its `requiresModules[N]:` declares is in the Offering   6 includes resolve, no cycle, id equals file name.
 //         7 (P6b) an OPTIONAL `posture:` section holds only POSTURE keys/values from the closed vocabulary below, complete when
 //         present, and - when the caller supplies the launcher facts (main() does) - equal to what the launcher scenarios of
 //         tools/check-launchers.mjs prove each edition gets (auth.mode, events.backend, objects.backend) and to whether the
 //         classpath carries postgresql.jar. Posture is NOT inherited through `includes`: each Offering states its own.
+//         8 (PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1) a Space Template DECLARES the modules its config needs that no manifest derives
+//         (`requiresModules[N]: a,b` in template.toon), and the declaration is honest: each declared module has a manifest, and
+//         what the server judges by content is declared (templateConfigNeeds below). A customer build keeps those modules.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bundleModules } from './bundle-modules.mjs';
 import { parseToon } from './toon-subset.mjs';
@@ -77,7 +81,7 @@ const setDiff = (a, b) => [[...a].filter((x) => !b.has(x)), [...b].filter((x) =>
  * Pure check. in: { offerings: {id: parsed}, manifests: {id: {offeringRole, requires?}}, bundle: (edition) => [artifactId],
  * pom: {defaults, profiles}, templates: [ids] }. Returns a list of findings (empty = green).
  */
-export function check({ offerings, manifests, bundle, pom, templates, templateMinEdition, launcher }) {
+export function check({ offerings, manifests, bundle, pom, templates, templateMinEdition, templateRequires = {}, templateConfigNeeds: configNeeds = {}, launcher }) {
     const out = [];
     const exempt = (id) => ['base', 'internal'].includes(manifests[id]?.offeringRole);
     const resolve = (id, seen = []) => {
@@ -146,9 +150,55 @@ export function check({ offerings, manifests, bundle, pom, templates, templateMi
             const need = templateMinEdition?.[t];
             if (need && !(need in EDITION_OF)) say(`content pack '${t}' has unknown minEdition '${need}'`);
             else if (need && TIERS.indexOf(o.tier) < TIERS.indexOf(need)) say(`content pack '${t}' needs minEdition ${need} but the Offering is tier ${o.tier}`);
+            for (const m of templateRequires[t] ?? []) if (manifests[m] && !exempt(m) && !r.modules.has(m)) say(`content pack '${t}' requires module '${m}', which the Offering does not include`);
         }
     }
+    for (const [t, ms] of Object.entries(templateRequires)) for (const m of ms) if (!manifests[m]) out.push(`spaces/_templates/${t}: requiresModules names '${m}', which has no manifest`);
+    for (const [t, needs] of Object.entries(configNeeds))
+        for (const [m, why] of needs) if (!(templateRequires[t] ?? []).includes(m)) out.push(`spaces/_templates/${t}: ${why} needs module '${m}' - declare it in template.toon (requiresModules)`);
     return out;
+}
+
+/** A template.toon's declared module needs (`requiresModules[N]: a,b`; PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1); [] when it declares none. */
+export function templateRequires(text) {
+    const m = /^requiresModules\[\d+\]:[ \t]*(.*?)[ \t]*$/m.exec(text);
+    return m ? m[1].split(',').map((x) => x.trim()).filter(Boolean) : [];
+}
+
+/**
+ * What a Space Template's config needs that no module manifest derives, judged the way the server judges it: [[module, why]].
+ * - an Alert Rule (`alert-rules/`, registry or pending) or a Decision Rule with a `create-alert` consequence needs `ops`
+ *   (EditionFeatures.ALERT_DISPATCH, declared by inspecto-ops): without it POST /spaces answers 422 (SpaceManager.missingFeatures).
+ *   A Basic-tier template (`minEdition: basic`) ships its Alert Rules unarmed instead (operator 2026-11-08), so they need nothing;
+ * - a Case Rule (`*_caserule.toon`, read by the suffix scan) needs `case-management`; without it the rule loads inert.
+ */
+export function templateConfigNeeds(dir, minEdition) {
+    const needs = new Map();
+    const walk = (d) => {
+        for (const e of readdirSync(d, { withFileTypes: true })) {
+            const p = join(d, e.name);
+            if (e.isDirectory()) { walk(p); continue; }
+            if (!e.name.endsWith('.toon')) continue;
+            const parent = basename(d);
+            if (parent === 'alert-rules' && minEdition !== 'basic') { if (!needs.has('ops')) needs.set('ops', 'an Alert Rule'); }
+            else if (parent === 'decision-rules' && readFileSync(p, 'utf8').includes('create-alert')) { if (!needs.has('ops')) needs.set('ops', 'a Decision Rule create-alert'); }
+            if (e.name.endsWith('_caserule.toon')) needs.set('case-management', 'a Case Rule');
+        }
+    };
+    const cfg = join(dir, 'config');
+    if (existsSync(cfg)) walk(cfg);
+    return [...needs].sort();
+}
+
+/** { templateRequires, templateConfigNeeds } of every template under spaces/_templates (a folder with a template.toon). */
+function templateDeclarations(tdir) {
+    const ts = (existsSync(tdir) ? readdirSync(tdir) : []).filter((t) => existsSync(join(tdir, t, 'template.toon')));
+    const text = Object.fromEntries(ts.map((t) => [t, readFileSync(join(tdir, t, 'template.toon'), 'utf8')]));
+    const minEdition = (t) => /^minEdition:\s*(\S+)\s*$/m.exec(text[t])?.[1];
+    return {
+        templateRequires: Object.fromEntries(ts.map((t) => [t, templateRequires(text[t])]).filter(([, ms]) => ms.length)),
+        templateConfigNeeds: Object.fromEntries(ts.map((t) => [t, templateConfigNeeds(join(tdir, t), minEdition(t))]).filter(([, n]) => n.length)),
+    };
 }
 
 /** Everything check() needs, read from a repo root. */
@@ -170,6 +220,7 @@ export function gather(root) {
             const m = existsSync(f) && /^minEdition:\s*(\S+)\s*$/m.exec(readFileSync(f, 'utf8'));
             return m ? [[t, m[1]]] : [];
         })),
+        ...templateDeclarations(tdir),
     };
 }
 

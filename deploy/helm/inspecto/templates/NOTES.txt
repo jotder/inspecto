@@ -1,4 +1,4 @@
-Inspecto is running as ONE replica ({{ include "inspecto.fullname" . }}-0).
+{{ .Values.product.title }} ({{ .Values.product.edition }}, image {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}) is running as ONE replica ({{ include "inspecto.fullname" . }}-0).
 
 NOT MULTI-REPLICA SAFE: do not scale this StatefulSet. Each pod owns a private Spaces volume and, with the
 default in-process run lease, nothing stops two pods from running the same Pipeline.

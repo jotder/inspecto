@@ -8,28 +8,45 @@
 //   node tools/assemble.mjs --diff-lock <old.lock> <new.lock>                 the upgrade diff between two locks
 //   node tools/assemble.mjs --product-file <picked.toon> --edition standard   a picked Platform product (tools/pick-addons.mjs, PA-6c),
 //                                                                             built in place of the Platform product it narrows
+//   node tools/assemble.mjs --customer <id|record.toon> [--distribution ...]   one customer's build (PA-10b, tools/customer.mjs): the
+//                                                                             plan narrowed to the record, with a `customer` block
 //
 // REFUSES (exit 1, the reason named): an unknown Product / App; an edition, distribution or target the Product does not
 // list or that is not built yet; a demo build on an edition without the demo sign-in swap; a chosen App whose Add-ons the
 // edition lacks; and any finding of tools/check-products.mjs (a plan is never assembled from broken definitions).
 //
-// WHAT A PLAN DOES NOT DO YET (PA-2 scope): the module set is the whole Edition's Offering classpath, exactly as before -
-// trimming to the Product's Apps is customer-build's job until PA-10. Entitlements (PA-7), container / air-gap targets
-// (PA-8) and the per-Product nav (PA-3) are not in it.
+// MODULES: a Product plan holds the whole Edition's Offering classpath; a customer plan (--customer, PA-10b) narrows it to the
+// modules that customer keeps, and tools/customer-build.mjs trims a Product bundle to it (D-PM8). The container and air-gap
+// targets (PA-8) add the plan's `ship` field, which tools/ship.mjs reads (`chart` stamps the Product's Helm chart).
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { addonModules, builtAddons, carryPartnerApps, checkModel, loadProductFile, DEMO_EDITIONS, demoTextOf, DISTRIBUTIONS, gatherModel, PLANNED_DISTRIBUTIONS, productApps, productNavByApp, productTemplates, seedToolOf, spaceParts } from './products.mjs';
+import { addonModules, builtAddons, carryPartnerApps, checkModel, CUSTOMER_DISTRIBUTIONS, loadProductFile, DEMO_EDITIONS, demoTextOf, DISTRIBUTIONS, gatherModel, PLANNED_DISTRIBUTIONS, productApps, productNavByApp, productTemplates, seedToolOf, spaceParts } from './products.mjs';
 import { classpath, mvnModules, normalizeEdition } from './offering-classpath.mjs';
 import { gather } from './check-offerings.mjs';
 
 export const PLAN_SCHEMA = 'inspecto.assembly-plan/1';
 export const LOCK_SCHEMA = 'inspecto.product-lock/1';
 /** One package.ps1 run makes the windows_amd64 zip and, with a Linux runtime cache, the linux_amd64 zip (see package.ps1's header). */
-export const TARGETS = ['windows', 'linux'];
-export const PLANNED_TARGETS = { container: 'PA-8 (OCI image + Helm chart per Product)', airgap: 'PA-8 (air-gapped bundle)' };
+/** PA-8 (D-PA26, D-PA28): `container` and `airgap` post-process the linux_amd64 bundle with tools/ship.mjs. */
+export const TARGETS = ['windows', 'linux', 'container', 'airgap'];
+export const SHIPPED_TARGETS = ['container', 'airgap'];
+
+/**
+ * PA-8 (D-PA26, D-PA27): the image and Helm chart a container or air-gap build ships. The image is `inspecto-<product>`
+ * (the Platform product stays `inspecto`), tagged `<platform version>-<edition>[-trial|-demo]`; the chart takes the image's name.
+ * CONTAINER-DEMO-IMAGE-1 (D-PA26 as changed 2026-11-12): a demo build's image ships no chart (chart: null) - it listens on its
+ * own loopback and signs in Demo Users, so it is run on a desk, never installed on a cluster.
+ */
+export function shipOf(productId, edition, distribution, platformVersion) {
+    const repository = productId === 'inspecto' ? 'inspecto' : `inspecto-${productId}`;
+    if (!/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/.test(repository)) fail(`Product id '${productId}' does not make an image name (lowercase letters, digits, '.', '_' and '-' only)`);
+    const tag = `${platformVersion}-${edition}${distribution === 'trial' ? '-trial' : distribution === 'demo' ? '-demo' : ''}`;
+    if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/.test(tag)) fail(`'${tag}' is not an image tag`);
+    return { image: { repository, tag }, chart: distribution === 'demo' ? null : { name: repository, version: platformVersion, appVersion: tag } };
+}
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const fail = (msg) => { throw new Error(msg); };
@@ -38,7 +55,7 @@ const fail = (msg) => { throw new Error(msg); };
  * The Assembly Plan for one Product build. `model` is tools/products.mjs gatherModel(); `g` is check-offerings gather()
  * (the Offering classpath's inputs). `apps` (optional) narrows the Product's OPTIONAL Apps; required Apps always ship.
  */
-export function assemble(model, g, { product, edition, distribution = 'production', apps: chosen = null, target = 'windows' }) {
+export function assemble(model, g, { product, edition, distribution = 'production', apps: chosen = null, target = 'windows', customer = false }) {
     const findings = checkModel(model);
     if (findings.length) fail(`the definitions do not pass tools/check-products.mjs - fix them first:\n  ${findings.join('\n  ')}`);
     const p = model.products[product] ?? fail(`unknown Product '${product}' (products/: ${Object.keys(model.products).join(', ')})`);
@@ -46,10 +63,14 @@ export function assemble(model, g, { product, edition, distribution = 'productio
     if (!(p.editions ?? []).includes(ed)) fail(`Product '${product}' does not come in edition '${edition}' (it lists ${(p.editions ?? []).join(', ')})`);
     if (PLANNED_DISTRIBUTIONS[distribution]) fail(`distribution '${distribution}' is not built yet: ${PLANNED_DISTRIBUTIONS[distribution]}`);
     if (!DISTRIBUTIONS.includes(distribution)) fail(`distribution '${distribution}' is not one of ${DISTRIBUTIONS.join(', ')}`);
+    // PA-10c (D-PA35): a pilot names the customer's Collector folders, so it is built from the customer record only.
+    if (CUSTOMER_DISTRIBUTIONS.includes(distribution) && !customer) fail(`the '${distribution}' distribution is a customer build: package a production bundle, then node tools/customer-build.mjs <customer> --distribution ${distribution} --bundle <that bundle>`);
     if (!(p.distributions ?? []).includes(distribution)) fail(`Product '${product}' does not offer the '${distribution}' distribution (it lists ${(p.distributions ?? []).join(', ')})`);
-    if (PLANNED_TARGETS[target]) fail(`target '${target}' is not built yet: ${PLANNED_TARGETS[target]}`);
     if (!TARGETS.includes(target)) fail(`target '${target}' is not one of ${TARGETS.join(', ')}`);
     const demo = distribution === 'demo';
+    // D-PA26 (changed 2026-11-12, CONTAINER-DEMO-IMAGE-1): a demo build binds 127.0.0.1 and signs in Demo Users. It may be an
+    // image (run on a desk, its server still on loopback), never an offline install.
+    if (demo && target === 'airgap') fail(`the demo distribution is not built for the 'airgap' target (it binds 127.0.0.1 and signs in Demo Users: a desk build, never an install); a demo image is -Target container`);
     if (demo && !DEMO_EDITIONS.includes(ed)) fail(`the demo distribution exists for ${DEMO_EDITIONS.join(' and ')} only (the demo sign-in replaces the OIDC jars), not '${ed}'`);
 
     const offered = builtAddons(ed, model.offerings);
@@ -102,6 +123,8 @@ export function assemble(model, g, { product, edition, distribution = 'productio
         posture: model.offerings[ed].posture ?? null,
         editionProperties: { edition: Edition, ...(demo ? { variant: 'demo' } : {}), product: p.id, apps: selected.join(',') },
         descriptor: productDescriptor(model, p, ed, distribution, selected),
+        // PA-8: the image and chart tools/ship.mjs makes from the linux_amd64 bundle (null for a zip-only target).
+        ship: SHIPPED_TARGETS.includes(target) ? shipOf(p.id, ed, distribution, model.pomVersion) : null,
         notes,
     };
 }
@@ -178,7 +201,7 @@ export function diffLocks(a, b) {
     return out;
 }
 
-function main() {
+async function main() {
     const a = process.argv.slice(2);
     const val = (k) => { const i = a.indexOf(k); return i >= 0 ? a[i + 1] : undefined; };
     const write = (obj) => {
@@ -204,6 +227,14 @@ function main() {
         if (val('--product-file')) {
             if (product) fail('pass --product or --product-file, not both');
             ({ model, product } = loadProductFile(model, val('--product-file')));
+        }
+        // PA-10b (D-PA33): `--customer <id|record.toon>` - the plan of one customer's build, narrowed to what the record buys, with
+        // the entitlement to sign (tools/customer-build.mjs signs it and trims a bundle to it). The record names its Product.
+        if (val('--customer')) {
+            if (product || val('--edition')) fail('--customer takes its Product and Edition from the record; pass neither --product nor --edition');
+            const { customerPlan } = await import('./customer.mjs');
+            write(customerPlan(REPO, val('--customer'), { distribution: val('--distribution') ?? 'production', target: val('--target') ?? 'windows' }).plan);
+            return;
         }
         if (!product) fail('--product <id> (or --product-file <picked.toon>) is required');
         carryPartnerApps(model, product);

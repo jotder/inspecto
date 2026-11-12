@@ -21,7 +21,7 @@ tags: [product-item, layer]
 | features | current | [Platform — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Platform — the builder kit](user-guide-builder-kit.md) · [Platform — user guide](user-guide.md) |
-| admin-guide | current | [Platform — installing Apps on a running server](admin-guide-apps.md) · [Platform — entitlements](admin-guide-entitlements.md) · [Cross-Cutting Gotchas](admin-guide-gotchas.md) · [HA/DR drill runbook: two-node active/passive on plain Linux (T4)](admin-guide-ha-dr-drill.md) · [Operations & Launch Flags](admin-guide-launch-flags.md) · [Local feature testing without a real IAM or Postgres](admin-guide-local-testing.md) · [Operations reference — utilities, batching, output, deployment](admin-guide-operations-reference.md) · [Inspecto — Operations & Support Guide (pointer map)](admin-guide-operations.md) · [Troubleshooting](admin-guide-troubleshooting.md) · [UAT Sample-Data Seeding Runbook](admin-guide-uat-seeding.md) |
+| admin-guide | current | [Platform — installing Apps on a running server](admin-guide-apps.md) · [Platform — container image, Helm chart and air-gapped install](admin-guide-container-airgap.md) · [Platform — entitlements](admin-guide-entitlements.md) · [Cross-Cutting Gotchas](admin-guide-gotchas.md) · [HA/DR drill runbook: two-node active/passive on plain Linux (T4)](admin-guide-ha-dr-drill.md) · [Operations & Launch Flags](admin-guide-launch-flags.md) · [Local feature testing without a real IAM or Postgres](admin-guide-local-testing.md) · [Operations reference — utilities, batching, output, deployment](admin-guide-operations-reference.md) · [Inspecto — Operations & Support Guide (pointer map)](admin-guide-operations.md) · [Troubleshooting](admin-guide-troubleshooting.md) · [UAT Sample-Data Seeding Runbook](admin-guide-uat-seeding.md) |
 | api | current | [DuckLake & the warehouse query layer](api-integrations-ducklake.md) |
 | tests | current | [Doc claim audit — 2026-10-19 (PRODUCT-DOCS-HUB-1)](tests-doc-claim-audit-2026-10-19.md) · [Guards that cannot fail](tests-guard-coverage.md) · [Operator mutation checklist](tests-operator-mutation-checklist.md) · [Performance assessment & bottleneck analysis](tests-performance.md) · [Provenance conservation — live-data verification protocol (OPS-5)](tests-provenance-conservation.md) · [Java Review Coverage](tests-review-coverage.md) · [Inspecto — Testing Guide](tests-testing-guide.md) · [Platform tooling — tests inventory](tests-tools-inventory.md) |
 | brochure | n/a | per edition / solution pack |
@@ -37,6 +37,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
 | `NATIVE-LICENCE-LINUX-MACOS-1` | P3 | chore | two licence calls on the tokenizers natives wait on the operator ((a) accepted 2026-11-01). | operator |
 | `PRODUCT-ASSEMBLY-1` | P2 | feature | assemble finished domain Products and the Platform with chosen Add-ons from definition files, with one tool — PA-0…PA-7 SHIPPED 2026-11-1… | — |
+| `CONTAINER-AIRGAP-PROOFS-1` | P3 | chore | now the gate that closes PA-8 (operator 2026-11-12, D-PA30) | external |
 | `DEMO-BAKE-WAL-RACE-1` | P3 | defect | ⬇ narrowed 2026-11-11 (PRODUCT-ASSEMBLY-1 PA-5d) to the engine: the Space close abandons a busy Space after 10 s and leaves .wal files. T… | — |
 | `ENTITLEMENT-SPI-NARROWING-1` | P3 | feature | a signed entitlement closes a left-out module's routes (503), features, Job types and /modules state, but not its other extension points:… | demand |
 | `PUBLIC-API-SURFACE-1` | P3 | feature | the extension surface a partner builds against is only partly marked: JobTypeProvider, ConsequenceProvider and CollectorConnector carry n… | demand |
@@ -45,7 +46,8 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `DEPLOY-SERVICE-WRAPPER-1` | P2 | chore | the live acceptance is UNRUN. | — |
 | — | P2 | feature | Postgres multi-user | operator |
 | `TEST-ENV-PG-ASN-UNRUN-1` | P3 | chore | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
-| `REALTIME-DECISIONING-1` | P3 | feature | Real-time Decisioning add-on | — |
+| `REALTIME-DECISIONING-1` | P3 | feature | Real-time Detection Add-on and the CEP App (PRODUCT-ASSEMBLY-1 phase PA-9) | — |
+| `REALTIME-INLINE-DECISION-1` | P3 | feature | inline allow / block decision on each record of a stream | demand |
 | `PREDICTIVE-ANALYTICS-1` | P3 | feature | Predictive Analytics add-on | — |
 | `SCALEOUT-HELM-NPOD-1` | P2 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
 | `SCALEOUT-D14-D16-DECISIONS-1` | P2 | chore | D14 and D16 SIGNED yes 2026-10-20 (operator, accepted the recommended answer); D15 stays open (operator-signed 2026-10-18 per the index,… | operator |
@@ -54,5 +56,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `MODULE-REORG-P3-THIN-JARS` | P3 | feature | thin per-module jars + Offering-driven launcher classpath. | — |
 | `CODEGRAPH-AFFECTED-UNUSABLE-1` | P3 | chore | codegraph affected over-reports to uselessness; only the upstream defect is open. | external |
 | `PRODUCT-MAP-S6-1` | P3 | feature | Product Map slice S6, on demand: | demand |
-| `PRODUCT-MAP-CUSTOMER-BUILD-GAPS-1` | P3 | defect | a trimmed customer bundle is not exact: | operator |
+| `CUSTOMER-BUILD-DOMAIN-APPS-1` | P3 | feature | a customer of a Domain product must hold every optional App the Product's composed Space Template joins, or the customer build is refused. | demand |
+| `PRODUCT-MAP-APP-EDITION-PRICES-1` | P3 | feature | an App has one Order Code (INS-APP-<ID>), so a price per App × Edition (D-PA6) has no key yet. | demand |
 | `DOCS-AGENT-WRITTEN-REVIEW-1` | P3 | chore | ~200 hub docs were written by agents on 2026-10-19 (PRODUCT-DOCS-HUB-1) | — |

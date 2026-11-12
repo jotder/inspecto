@@ -1,0 +1,13 @@
+id: app.case-management
+kind: app
+title: Case Management
+app: case-management
+billable: true
+orderCode: INS-APP-CASE-MANAGEMENT
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga
+docs: docs/okf/product/app/case-management/index.md

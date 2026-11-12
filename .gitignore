@@ -59,6 +59,7 @@
 /inspecto-deploy*.zip.sha256
 /inspecto-deploy*.zip.asc
 /inspecto-deploy/
+/inspecto-ship/
 # DEMO-AUTH-1: package.ps1 -DemoAuth assembles an offline demo build here (never an edition).
 /inspecto-demo/
 /inspecto-demo-*.zip

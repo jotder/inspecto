@@ -1,0 +1,7 @@
+id: industry.mobile-money
+kind: industry
+title: Mobile money
+industry: mobile-money
+billable: false
+status: ga
+docs: docs/okf/product/industry/mobile-money/index.md
