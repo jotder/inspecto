@@ -231,6 +231,33 @@ class LinkGraphColumnsTest {
     }
 
     @Test
+    void verifierFindingsSchemaPartitionsAliasListsAndRegistrySchemaRefs() throws IOException {
+        // a Schema's partitions[] column is a store column
+        w("part/part_pipeline.toon", "name: part\nprocessing:\n  schema_file: part_schema.toon\n");
+        w("part/part_schema.toon", """
+                partitions[1]{column,source,type}:
+                  item_category,CATEGORY,VARCHAR
+                mapping:
+                  fields[1]{name,from,fn}:
+                    ITEM,ITEM,keep
+                """);
+        w("registry/expectations/e_part.toon", "target: part\ncolumn: item_category\nkind: non_null\n");
+        // schema/<id> names registry/schemas/<id>.toon (PipelineConfigParser.SCHEMA_REF_PREFIX)
+        w("reg/reg_pipeline.toon", "name: reg\nprocessing:\n  schema_file: schema/regs\n");
+        w("reg/registry/schemas/regs.toon", "mapping:\n  fields[1]{name,from,fn}:\n    A,A,keep\n");
+        w("registry/expectations/e_reg.toon", "target: reg\ncolumn: NOPE\nkind: non_null\n");
+        // a table column-alias list renames the columns: not analysed, never dangling
+        w("registry/datasets/ds_alias.toon", "kind: virtual\nsourceName: orders\nsql: \"SELECT a FROM orders t(a, b)\"\n");
+        LinkGraph g = graph();
+        assertEquals(List.of("e_part column=item_category RESOLVED", "e_reg column=NOPE DANGLING"),
+                view(g.edges("expectation", "column").stream()
+                        .filter(e -> e.fromName().equals("e_part") || e.fromName().equals("e_reg")).toList())
+                        .stream().sorted().toList());
+        assertEquals(List.of(LinkGraph.Status.NOT_ANALYSED), g.edges(LinkCensus.of("dataset", "sql", "column")).stream()
+                .filter(e -> e.fromName().equals("ds_alias")).map(LinkGraph.Edge::status).toList());
+    }
+
+    @Test
     void anUnreadMappingKeepsItsLinksUnchecked() throws IOException {
         w("registry/expectations/e_csv.toon", "target: csvmap\ncolumn: ZZZ\nkind: non_null\n");
         assertEquals(List.of("e_csv column=ZZZ UNCHECKED"), view(graph().edges("expectation", "column").stream()

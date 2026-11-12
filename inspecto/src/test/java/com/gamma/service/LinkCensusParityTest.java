@@ -55,7 +55,8 @@ class LinkCensusParityTest {
             Map.entry("map", "processing.map, a container of the projection that outranks mapping.fields"),
             Map.entry("schemas", "processing.schemas (plural): only read to mark the column set unknown"),
             Map.entry("mapping_file", "processing.mapping_file: only read to mark the column set unknown"),
-            Map.entry("columns", "a Dataset's own declared columns, the universe"),
+            Map.entry("partitions", "a Schema's own partition columns, part of the store's column universe"),
+            Map.entry("columns","a Dataset's own declared columns, the universe"),
             Map.entry("columnMap", "a Reconciliation side's column renames: only read to mark that side unknown")));
 
     private static Set<String> censusSegments() {

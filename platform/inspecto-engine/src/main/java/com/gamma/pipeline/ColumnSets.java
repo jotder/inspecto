@@ -94,6 +94,7 @@ final class ColumnSets {
         if (proc.get("schemas") != null || proc.get("mapping_file") != null) return null;
         List<?> fields = proc.get("map") instanceof Map<?, ?> map && map.get("fields") instanceof List<?> l ? l : null;
         String origin = "pipeline:" + id;
+        List<String> named = new ArrayList<>();
         if (fields == null) {
             if (blank(proc.get("schema_file"))) return null;
             Path schema = schemaPath(file, String.valueOf(proc.get("schema_file")).trim());
@@ -103,6 +104,11 @@ final class ColumnSets {
                     || !(mapping.get("fields") instanceof List<?> l)) return null;
             fields = l;
             origin = schemaOrigin(schema);
+            // a Schema's own partition columns are store columns too (excel_example: item_category)
+            if (s.get("partitions") instanceof List<?> parts)
+                for (Object pt : parts)
+                    if (pt instanceof Map<?, ?> pm && !blank(pm.get("column")))
+                        named.add(String.valueOf(pm.get("column")));
         }
         Map<String, String> out = new LinkedHashMap<>();
         for (Object f : fields) {
@@ -111,19 +117,19 @@ final class ColumnSets {
         }
         if (out.isEmpty()) return null;
         for (String p : PARTITION_COLUMNS) out.putIfAbsent(p, "pipeline:" + id);
-        List<String> named = new ArrayList<>();
         collect(doc, "filename_column", named);
         for (String n : named) out.putIfAbsent(n.trim().toLowerCase(Locale.ROOT), "pipeline:" + id);
         return new Cols(out);
     }
 
-    /** {@code schema:<id>} names {@code registry/schemas/<id>.toon}; anything else resolves beside the Pipeline
+    /** {@code schema/<id>} names {@code registry/schemas/<id>.toon}; anything else resolves beside the Pipeline
      *  (PipelineConfigParser.resolveSchemaRef). */
     private static Path schemaPath(Path pipelineFile, String ref) {
         Path dir = pipelineFile.toAbsolutePath().getParent();
         if (dir == null) return null;
         try {
-            String rel = ref.startsWith("schema:") ? "registry/schemas/" + ref.substring("schema:".length()) + ".toon" : ref;
+            // PipelineConfigParser.SCHEMA_REF_PREFIX
+            String rel = ref.startsWith("schema/") ? "registry/schemas/" + ref.substring("schema/".length()) + ".toon" : ref;
             return dir.resolve(rel).normalize();
         } catch (RuntimeException ex) {
             return null;
@@ -345,6 +351,8 @@ final class ColumnSets {
                     return false;
                 String table = from.path("table_name").asText("");
                 if (table.isEmpty()) return false;
+                // t(a, b) renames the table's columns: not read here
+                if (from.path("column_name_alias").size() > 0) return false;
                 String alias = from.path("alias").asText("");
                 String k = (alias.isEmpty() ? table : alias).toLowerCase(Locale.ROOT);
                 if (byAlias.containsKey(k)) return false;
