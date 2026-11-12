@@ -335,6 +335,11 @@ checkpoints, the main log does not. Cost grows with the number of steps.
   masking off and on, with and without a Measure and attribute columns); `edge-wire.spec.ts` and
   `inv-conditional-read.spec.ts` (vitest). The 28 geo-link tests that read projection rows decode through
   `EdgeWireTestRows`. Targeted runs only; the full gate was NOT run.
+- **Error path pinned (2026-11-13).** `aReadThatFailsAfterTheCacheLookupIsPlainJsonWithNoETag` fails the read itself (a
+  Measure column the Dataset lacks → 422) AFTER the cache lookup on both routes and asserts plain JSON with no ETag. The two
+  guards (v2 type set only on success returns; `respondJson` forces `application/json` at status >= 400) are redundant
+  layers: removing both turns it red on each route; removing either alone keeps it green, by design. Commit
+  `test(la-api): LA-PERF-P10-1 pin the plain-JSON error path after the cache lookup`.
 
 **Measured (2026-11-12, la-showcase `telecom_links_dataset`, the 767-node view: `a_msisdn` → `b_msisdn`, kind `link_kind`,
 attribute `via`, limit 4,000 minus a varied 1–9 so every timed call misses the cache; medians of 9).** Before = the

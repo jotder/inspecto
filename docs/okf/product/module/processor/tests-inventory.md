@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-406 test class(es): 161 unit, 245 real-HTTP control-plane, 0 IT.
+408 test class(es): 162 unit, 246 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -245,6 +245,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiSnapshotExportTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSnapshotExportTest.java` | A Postgres snapshot's Run now, redesigned 2026-11-05 (operator): EXPORT the table into a temporary folder under the data |
 | `ControlApiSpaceBootReadinessTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceBootReadinessTest.java` | HA-RUNLEASE-DB-CREDENTIALS-1 (operator 2026-10-10): a node whose Spaces are CONFIGURED but none could boot must |
 | `ControlApiSpaceComparisonTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceComparisonTest.java` | Real-HTTP tests for {@code POST /space-comparisons} (space-comparison design, decided 2026-09-24) over a |
+| `ControlApiSpaceIntegrityTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceIntegrityTest.java` | SE-1a — {@code GET /spaces/{id}/integrity} over real HTTP under an ARMED authenticator: 401, 403 without |
 | `ControlApiSpaceSamplesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceSamplesTest.java` | {@code LA-ONBOARD-1} OB-12 over real HTTP: {@code POST /spaces {template, loadSamples: true}} copies the template's |
 | `ControlApiSpacesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpacesTest.java` | The Stage-5 {@code SpaceRoutes} CRUD over real HTTP: create + boot a space without restart, list it, confirm the |
 | `ControlApiSpaceTemplateKpiTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceTemplateKpiTest.java` | `ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1) over real HTTP, with an armed Authenticator: a Space Template's KPI pack |
@@ -421,6 +422,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `SpaceIdTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceIdTest.java` | The filesystem-safe space-id guard: lower-case alnum + hyphen only, so an id can never escape {@code spaces/}. |
 | `SpaceInboxAuditTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceInboxAuditTest.java` | Two Spaces polling one inbox — scale-out plan §5.3. |
 | `SpaceLayoutContractTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceLayoutContractTest.java` | The boot-time storage-layout contract: WARN-only findings, never a boot failure. |
+| `SpaceLockTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceLockTest.java` | SE-1a — the Space lock ({@code docs/okf/product/module/config/spec-space-lock.md}): what it lists, how a file keeps |
 | `SpaceManagerTemplateGateTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceManagerTemplateGateTest.java` | {@link SpaceManager#createFromTemplate(SpaceId, String, String, String, java.util.function.Consumer)}: a template |
 | `SpaceManagerTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceManagerTest.java` | The multi-space container: single-service wrapping, boot discovery, concurrent isolation, orderly shutdown. |
 | `SpaceMigratorTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceMigratorTest.java` | The migrate command: a flat working-directory layout relocates into spaces/&lt;id&gt;/ that discovers cleanly. |
