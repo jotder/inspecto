@@ -260,7 +260,9 @@ export function pilotOf(customer, templates, model) {
     if (missing.length) fail(`pilot.poll does not wire every Pipeline of '${t}': ${missing.join(', ')}`);
     for (const [n, f] of Object.entries(poll)) if (!POLL.test(String(f))) fail(`pilot.poll.${n} '${f}' must be an absolute folder with / separators and no space, quote, ;, # or $`);
     // Two Collectors on one folder would take each other's files.
-    const shared = Object.entries(poll).filter(([n, f]) => Object.entries(poll).some(([m, g]) => m !== n && String(g) === String(f))).map(([n]) => n);
+    // Compared without a trailing `/` and case-blind, since Windows folders are.
+    const key = (f) => String(f).replace(/\/+$/, '').toLowerCase();
+    const shared = Object.entries(poll).filter(([n, f]) => Object.entries(poll).some(([m, g]) => m !== n && key(g) === key(f))).map(([n]) => n);
     if (shared.length) fail(`pilot.poll gives Pipelines ${shared.join(', ')} the same folder; each Pipeline needs its own`);
     // The server reads a Pipeline's folders only under its allowed roots (ConfigSafetyValidator's path jail), so the install
     // starts with these folders allowed (-Dassist.safety.roots); the build names them and never widens the jail itself.

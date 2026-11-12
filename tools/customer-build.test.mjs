@@ -209,6 +209,7 @@ test('PA-10c a pilot is refused without its block, for a template not bought, or
     assert.throws(run(pilotRecord({ cdr: 'D:/my feeds/cdr', payments: 'D:/b', subscriber_events: 'D:/c' })), /pilot.poll.cdr .* no space, quote, ;/);
     assert.throws(run(pilotRecord({ cdr: 'D:/a;D:/x', payments: 'D:/b', subscriber_events: 'D:/c' })), /pilot.poll.cdr .* no space, quote, ;/);
     assert.throws(run(pilotRecord({ cdr: 'D:/feeds', payments: 'D:/feeds', subscriber_events: 'D:/c' })), /gives Pipelines cdr, payments the same folder/);
+    assert.throws(run(pilotRecord({ cdr: 'D:/feeds', payments: 'd:/Feeds/', subscriber_events: 'D:/c' })), /gives Pipelines cdr, payments the same folder/);
     assert.throws(run({ ...pilotRecord(), orderCodes: ['INS-SP-BUSINESS-ASSURANCE'], pilot: { template: 'business-assurance', poll: {} } }),
         /'business-assurance' has no Pipeline with a dirs.poll folder/);
 });
