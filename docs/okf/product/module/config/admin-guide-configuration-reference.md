@@ -29,8 +29,10 @@ container root, resolved in this order: `-Dspaces.root=<dir>` → `SPACES_ROOT` 
 app root → `<app root>/spaces`. The **app root** is `-Dapp.root` / `APP_ROOT`, else the working directory, and the
 launchers change to the bundle root first, so by default it is the install. `spaces.ref` holds one line, the spaces
 root, written rooted or relative to the app root; present but empty, or naming something that is not a directory, is
-a loud boot error rather than a silent fall back to `./spaces`. `serve.sh` / `serve.bat` pass `-Dspaces.root` only
-when `SPACES_ROOT` is set, so the pointer is reachable from a shipped bundle (`SPACE-RELOCATABLE-ROOTS-1`):
+a loud boot error rather than a silent fall back to `./spaces`. Every launcher — `serve.sh`, `serve.bat` and both
+`serve-demo.*` — passes `-Dspaces.root` only when `SPACES_ROOT` is set, so the pointer is reachable from a shipped
+bundle (`SPACE-RELOCATABLE-ROOTS-1`); the flag wins over it, so one that always passed the flag would ignore the
+pointer silently. `tools/check-launchers.mjs` proves this by EXECUTING all four:
 
 ```
 spaces/

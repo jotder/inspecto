@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SCENARIOS, runOneShot, runScenarios, staticFindings } from './check-launchers.mjs';
+import { SCENARIOS, runDemoScenarios, runOneShot, runScenarios, staticFindings } from './check-launchers.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const REAL = readFileSync(join(ROOT, 'inspecto', 'package.ps1'), 'utf8').replace(/\r\n/g, '\n');
@@ -39,7 +39,11 @@ test('RED (static): serve.* guess the edition again (no edition.properties read)
 test('RED (static): the serve.bat self-referential-set-in-a-block rule, and delayed expansion, still fire', () => {
     const block = mutate('if "%EDITION%"=="Advanced" set "OPTS=%OPTS% -Dobjects.backend=postgres"', 'if defined X (\nset "OPTS=%OPTS% -Da=b"\nset "OPTS=%OPTS% -Dc=d"\n)');
     assert.match(statics(block), /re-expands a variable inside a parenthesised block/);
-    assert.match(statics(mutate('setlocal\ncd /d "%~dp0.."\nrem bin\\ -> the bundle ROOT: spaces\\, ui\\, docs\\, lib\\ and logs\\ are root-relative.\nif "%PORT%"=="" set "PORT=8080"\nif "%SPACES_ROOT%"=="" set "SPACES_ROOT=spaces"\nset "ANY_SPACE="', 'setlocal EnableDelayedExpansion\ncd /d "%~dp0.."\nif "%PORT%"=="" set "PORT=8080"\nif "%SPACES_ROOT%"=="" set "SPACES_ROOT=spaces"\nset "ANY_SPACE="')), /enables delayed expansion/);
+    // ⚠ Anchor on `setlocal` + the cd ONLY. It used to carry the lines that follow it in serve.bat, which made the
+    // fixture break the moment those lines changed (SPACE-RELOCATABLE-ROOTS-1 inserted the spaces.ref gate between
+    // them, 2026-11-14) — and a fixture whose anchor no longer matches mutates NOTHING, so it fails without the rule
+    // ever being wrong. A fixture must pin the rule it tests, not the text around it.
+    assert.match(statics(mutate('setlocal\ncd /d "%~dp0.."\nrem bin', 'setlocal EnableDelayedExpansion\ncd /d "%~dp0.."\nrem bin')), /enables delayed expansion/);
 });
 
 test('RED (static): the demo launchers keep a jar list of their own', () => {
@@ -55,6 +59,40 @@ test('RED (static): the demo launchers ignore INSPECTO_JAVA_OPTS / never append 
     const late = REAL.replace(/^rem Extra JVM flags from the operator, same contract as serve\.bat \(LAUNCHER[\s\S]*?extra JVM opts: %EXTRA_OPTS%\n/m, '').replace('com.gamma.control.ControlApi\n"@\n    Write-CrlfScript -Path "$binDir\\serve-demo.bat"', 'com.gamma.control.ControlApi %INSPECTO_JAVA_OPTS% %EXTRA_JAVA_OPTS% %OPTS% %EXTRA_OPTS%\n"@\n    Write-CrlfScript -Path "$binDir\\serve-demo.bat"');
     assert.notEqual(late, REAL);
     assert.match(statics(late), /serveDemoBat reads INSPECTO_JAVA_OPTS only after -cp/);
+});
+
+test('the real serve-demo.sh/.bat, EXECUTED over the spaces-root cases, GREEN', () => {
+    assert.deepEqual(runDemoScenarios(REAL).findings, []);
+});
+
+// SPACE-RELOCATABLE-ROOTS-1: a launcher that passes -Dspaces.root unconditionally makes spaces.ref unreachable,
+// because the flag wins. The demo here-strings are scoped by name — the bat line is identical in serve.bat, and
+// mutating that one instead would prove nothing about serve-demo.
+const demoBlock = (name, from, to) => {
+    const open = REAL.indexOf('$' + name + ' = @"\n');
+    const end = REAL.indexOf('\n"@\n', open);
+    assert.ok(open >= 0 && end > open, `the ${name} here-string is not in package.ps1`);
+    const body = REAL.slice(open, end);
+    assert.equal(body.split(from).length - 1, 1, `fixture anchor must occur exactly once in ${name}: ${from.slice(0, 70)}`);
+    return REAL.slice(0, open) + body.split(from).join(to) + REAL.slice(end);
+};
+
+test('RED (executed): serve-demo.bat passes -Dspaces.root unconditionally, so spaces.ref is never read', () => {
+    const t = demoBlock('serveDemoBat', 'if not defined SPACES_REF set "OPTS=%OPTS% -Dspaces.root=%SPACES_ROOT%"', 'set "OPTS=%OPTS% -Dspaces.root=%SPACES_ROOT%"');
+    assert.notEqual(t, REAL);
+    const found = runDemoScenarios(t).findings.join('\n');
+    assert.match(found, /serve-demo\.(bat|sh)[\s\S]*WINS over spaces\.ref/);
+});
+
+test('RED (executed): serve-demo.sh passes -Dspaces.root unconditionally, so spaces.ref is never read', () => {
+    const t = demoBlock('serveDemoSh', 'if [ -n "`$SPACES_REF" ]; then\n    echo "[serve-demo] spaces root from ./spaces.ref"\nelse\n    JAVA_OPTS+=("-Dspaces.root=`${SPACES_ROOT}")\nfi', 'JAVA_OPTS+=("-Dspaces.root=`${SPACES_ROOT}")');
+    assert.notEqual(t, REAL);
+    assert.match(runDemoScenarios(t).findings.join('\n'), /serve-demo\.sh[\s\S]*WINS over spaces\.ref/);
+});
+
+test('RED (executed): serve-demo loses -Dauth.mode=demo', () => {
+    const t = demoBlock('serveDemoSh', 'JAVA_OPTS=($demoFlags "-Dcontrol.port=`${PORT}")', 'JAVA_OPTS=("-Dcontrol.port=`${PORT}")');
+    assert.match(runDemoScenarios(t).findings.join('\n'), /dropped `-Dauth\.mode=demo`/);
 });
 
 test('RED (executed): a serve.sh that ignores modules.list (falls to the *.jar glob) puts the jars in the WRONG ORDER', () => {

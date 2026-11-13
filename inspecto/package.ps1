@@ -2404,13 +2404,19 @@ if ($DemoAuth) {
 @echo off
 rem DEMO BUILD - internal evaluation only (DEMO-AUTH-1). Demo User sign-in, NO real authentication.
 rem Listens on 127.0.0.1 only. The bundle ships NO Spaces: drop your Space folder(s) into .\spaces
-rem (or set SPACES_ROOT), then open http://127.0.0.1:%PORT%
+rem (or set SPACES_ROOT, or name the root in a spaces.ref file at the bundle root), then open http://127.0.0.1:%PORT%
 setlocal
 cd /d "%~dp0.."
 rem bin\ -> the bundle ROOT: spaces\, ui\, docs\, lib\ and logs\ are root-relative.
 if "%PORT%"=="" set "PORT=8080"
+rem spaces.ref: same contract as serve.bat (SPACE-RELOCATABLE-ROOTS-1). SPACES_ROOT wins; unset, the pointer at the
+rem bundle root is left to the server to read, so -Dspaces.root must NOT be passed and must not assume .\spaces.
+set "SPACES_REF="
+if "%SPACES_ROOT%"=="" if exist "spaces.ref" set "SPACES_REF=1"
 if "%SPACES_ROOT%"=="" set "SPACES_ROOT=spaces"
-set "OPTS=$demoFlags -Dcontrol.port=%PORT% -Dspaces.root=%SPACES_ROOT%"
+set "OPTS=$demoFlags -Dcontrol.port=%PORT%"
+if defined SPACES_REF echo [serve-demo] spaces root from .\spaces.ref
+if not defined SPACES_REF set "OPTS=%OPTS% -Dspaces.root=%SPACES_ROOT%"
 rem SPACES_DATA_ROOT: same contract as serve.bat.
 if not "%SPACES_DATA_ROOT%"=="" set "OPTS=%OPTS% -Dspaces.data.root=%SPACES_DATA_ROOT%"
 if exist ui set "OPTS=%OPTS% -Dui.dir=./ui"
@@ -2433,7 +2439,8 @@ rem leading ; stripped - see serve.bat for why there is no delayed expansion.
 set "CP="
 for /f "usebackq delims=" %%J in ("lib\modules.list") do call set "CP=%%CP%%;%%J"
 set "CP=%CP:~1%"
-echo [serve-demo] DEMO BUILD on http://127.0.0.1:%PORT%  (spaces: .\%SPACES_ROOT%)
+if defined SPACES_REF echo [serve-demo] DEMO BUILD on http://127.0.0.1:%PORT%  (spaces: per .\spaces.ref)
+if not defined SPACES_REF echo [serve-demo] DEMO BUILD on http://127.0.0.1:%PORT%  (spaces: .\%SPACES_ROOT%)
 "%JAVA%" %OPTS% -cp "%CP%" com.gamma.control.ControlApi
 "@
     Write-CrlfScript -Path "$binDir\serve-demo.bat" -Content $serveDemoBat
@@ -2441,13 +2448,22 @@ echo [serve-demo] DEMO BUILD on http://127.0.0.1:%PORT%  (spaces: .\%SPACES_ROOT
 #!/usr/bin/env bash
 # DEMO BUILD - internal evaluation only (DEMO-AUTH-1). Demo User sign-in, NO real authentication.
 # Listens on 127.0.0.1 only. The bundle ships NO Spaces: drop your Space folder(s) into ./spaces
-# (or set SPACES_ROOT), then open http://127.0.0.1:`${PORT}
+# (or set SPACES_ROOT, or name the root in a spaces.ref file at the bundle root), then open http://127.0.0.1:`${PORT}
 set -euo pipefail
 cd "`$(dirname "`$0")/.."   # bin/ -> the bundle ROOT
 PORT="`${PORT:-8080}"
+# spaces.ref: same contract as serve.sh (SPACE-RELOCATABLE-ROOTS-1). SPACES_ROOT wins; unset, the pointer at the
+# bundle root is left to the server to read, so -Dspaces.root must NOT be passed and must not assume ./spaces.
+SPACES_REF=""
+if [ -z "`${SPACES_ROOT:-}" ] && [ -f spaces.ref ]; then SPACES_REF="yes"; fi
 SPACES_ROOT="`${SPACES_ROOT:-spaces}"
 # An ARRAY, like serve.sh: a SPACES_ROOT (or cwd) containing a space must stay one argument.
-JAVA_OPTS=($demoFlags "-Dcontrol.port=`${PORT}" "-Dspaces.root=`${SPACES_ROOT}")
+JAVA_OPTS=($demoFlags "-Dcontrol.port=`${PORT}")
+if [ -n "`$SPACES_REF" ]; then
+    echo "[serve-demo] spaces root from ./spaces.ref"
+else
+    JAVA_OPTS+=("-Dspaces.root=`${SPACES_ROOT}")
+fi
 # SPACES_DATA_ROOT: same contract as serve.sh.
 [ -n "`${SPACES_DATA_ROOT:-}" ] && JAVA_OPTS+=("-Dspaces.data.root=`${SPACES_DATA_ROOT}")
 [ -d ui ] && JAVA_OPTS+=("-Dui.dir=./ui")
@@ -2475,7 +2491,7 @@ else
     echo "[serve-demo] lib/modules.list not found - falling back to every *.jar in lib/" >&2
     CP="lib/inspecto.jar"; for _jar in lib/*.jar; do [ "`$_jar" = "lib/inspecto.jar" ] || CP="`${CP}:`${_jar}"; done
 fi
-echo "[serve-demo] DEMO BUILD on http://127.0.0.1:`${PORT}  (spaces: ./`${SPACES_ROOT})"
+echo "[serve-demo] DEMO BUILD on http://127.0.0.1:`${PORT}  (spaces: `$([ -n "`$SPACES_REF" ] && echo "per ./spaces.ref" || echo "./`${SPACES_ROOT}"))"
 exec "`$JAVA" "`${JAVA_OPTS[@]}" -cp "`$CP" com.gamma.control.ControlApi
 "@
     Write-LfScript -Path "$binDir\serve-demo.sh" -Content $serveDemoSh

@@ -40,8 +40,10 @@ are NOT the problem: `start-basic.cmd` resolves everything from `%~dp0`, so the 
 - **A showcase install is relocatable from 2026-11-14 on** — the packer writes `data_root: ../inspecto-la-data/<id>`
   into each `space.toon`, and the spaces root goes in `<bundle>/spaces.ref`. ⚠ `SPACES_ROOT`/`SPACES_DATA_ROOT` are
   what make it NON-relocatable: `SPACES_DATA_ROOT` leaves `data_root` blank, and a blank one is stamped ABSOLUTE.
-  `serve.sh`/`serve.bat` now pass `-Dspaces.root` only when `SPACES_ROOT` is set, so the pointer is reachable at
-  all; `serve-demo.*` still always passes it, so the Preview demo still needs the two variables.
+  All four launchers — `serve.sh`, `serve.bat` and both `serve-demo.*` — now pass `-Dspaces.root` only when
+  `SPACES_ROOT` is set, which is what makes the pointer reachable at all: the flag WINS over it, so a launcher
+  that always passes the flag silently ignores `spaces.ref`. `tools/check-launchers.mjs` EXECUTES all four over
+  three spaces-root cases; reading the script cannot catch this.
 - A zip can be stripped without unpacking it: copy every entry except the ones named `.inspecto-space`
   (`System.IO.Compression.ZipFile`), which is also the safe way past the auto-mode classifier's refusal to update a
   large archive in place.

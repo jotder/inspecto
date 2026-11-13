@@ -61,8 +61,8 @@ Prove every Space on both products before handing the release over:
    product (this also proves the Demo User rosters coexist: a differing user id would refuse with `ROSTER_CONFLICT`).
 2. Put `../inspecto-la-spaces` in `spaces.ref` at each bundle's root (the packed `space.toon` already names the data
    root) and start each product from a `.cmd` file, not from Git Bash: `set PORT=…`, then `bin\serve.bat` (Basic).
-   ⚠ `serve-demo.bat` (Preview) does NOT read `spaces.ref` — it still needs `set SPACES_ROOT=..\inspecto-la-spaces`
-   and `set SPACES_DATA_ROOT=..\inspecto-la-data`, and Git Bash mangles the `..\` in those.
+   `bin\serve-demo.bat` (Preview) reads the same pointer, so both products start the same way. Setting
+   `SPACES_ROOT` still overrides it on either, and Git Bash mangles the `..\` in that value.
 3. Wait for every inbox file to land and for at least one `*/5` cron run after the last landing; trigger no Job by hand.
 4. **Preview:** per Space, read `GET /api/v1/spaces/<id>/alerts` (one OPEN Alert at the value its install guide
    names), run `node tools/seed-la-<id>.mjs --base http://127.0.0.1:<PORT> --space <id> --apply` (every step created,

@@ -183,9 +183,10 @@ product can be upgraded by replacing its folder without touching any Space or da
 Both roots are named in FILES, not environment variables (`SPACE-RELOCATABLE-ROOTS-1`, 2026-11-14), and both are
 relative to the bundle root the launchers change to. That is what makes `<parent>` movable: see "Relocation" below.
 
-- **Spaces:** `<bundle>/spaces.ref`, one line holding `../inspecto-la-spaces`. `serve.bat` / `serve.sh` pass
-  `-Dspaces.root` only when `SPACES_ROOT` is set, so the pointer is reachable; setting `SPACES_ROOT` still overrides
-  it. A malformed pointer is a loud boot error, never a silent fall back to `./spaces`.
+- **Spaces:** `<bundle>/spaces.ref`, one line holding `../inspecto-la-spaces`. `serve.bat` / `serve.sh` and both
+  `serve-demo.*` pass `-Dspaces.root` only when `SPACES_ROOT` is set, so the pointer is reachable; setting
+  `SPACES_ROOT` still overrides it. A malformed pointer is a loud boot error, never a silent fall back to
+  `./spaces`. The Preview demo therefore starts exactly like Basic — no environment variables.
 - **Data:** `data_root: ../inspecto-la-data/<id>` in each Space's own `space.toon`, written by the packer. Each
   Space's `data/`, `audit/` and `duckdb/` then live there (`SpaceDataRoot`; the
   [configuration reference](../../module/config/admin-guide-configuration-reference.md) has the rules).

@@ -32,8 +32,10 @@
 //
 // SCOPE, stated so it can be audited apart from the rules (a guard's scope is where its silent
 // exemptions live):
-//   • Subject: `serve.sh` and `serve.bat` EXECUTED per edition; `run.sh`/`run.bat` EXECUTED for their classpath only (runOneShot); `serve-demo.*` STATICALLY only
-//     (they must read modules.list and name no jar — `staticFindings`). They have no edition branch and no auth flags.
+//   • Subject: `serve.sh` and `serve.bat` EXECUTED per edition; `run.sh`/`run.bat` EXECUTED for their classpath only (runOneShot);
+//     `serve-demo.*` EXECUTED over the spaces-root cases only (`runDemoScenarios`, 2026-11-14) PLUS the static rules
+//     (they must read modules.list and name no jar — `staticFindings`). Their classpath and edition are still static-only.
+//     They have no edition branch and no auth flags beyond `-Dauth.mode=demo`, which the executed cases assert is present.
 //   • `serve.sh` is EXECUTED on every platform — bash is required, and its absence is a hard error
 //     (exit 2), never a skip. A skipping check is how this repository has hidden breakage before.
 //   • `serve.bat` is EXECUTED only on Windows. On every other platform it is checked STATICALLY
@@ -347,6 +349,24 @@ function batBlockFindings(bat, label) {
 // read by their delimiters too.
 const LAUNCHERS = ['runShContent', 'runBatContent', 'serveShContent', 'serveBatContent'];
 
+/**
+ * The demo launchers are `@"` EXPANDABLE here-strings, so their text carries PowerShell escapes: `$demoFlags` is
+ * interpolated at package time and every shell `$` is written `` `$ ``. Undo both, and what is left is byte-for-byte
+ * what the demo bundle ships — which is what makes EXECUTING them (`runDemoScenarios`) meaningful rather than a
+ * check of the generator's source.
+ */
+export function demoHereString(ps1, varName) {
+  const open = ps1.indexOf(`$${varName} = @"\n`);
+  if (open < 0) abort(`\`$${varName}\` is not an expandable here-string in inspecto/package.ps1.\n` +
+    `  It was renamed, re-quoted, or moved. Point this guard at the new name — do NOT delete the check.`);
+  const bodyStart = open + `$${varName} = @"\n`.length;
+  const end = ps1.indexOf(`\n"@\n`, bodyStart);
+  if (end < 0) abort(`\`$${varName}\` has no closing \`"@\` line in inspecto/package.ps1.`);
+  const flags = ps1.match(/^\s*\$demoFlags = '([^']*)'/m);
+  if (!flags) abort('`$demoFlags` is not a single-quoted assignment in inspecto/package.ps1 — the demo launchers cannot be reconstructed.');
+  return ps1.slice(bodyStart, end + 1).split('$demoFlags').join(flags[1]).split('`$').join('$');
+}
+
 /** Static findings over a package.ps1 text: no hand-kept jar list, every launcher READS modules.list, serve.* read the edition marker. */
 export function staticFindings(ps1src) {
   const ps1 = toLf(ps1src);
@@ -410,6 +430,65 @@ export function runScenarios(ps1src, scenarios = SCENARIOS) {
 }
 
 /**
+ * The spaces-root contract, asserted on whichever launcher is under test. `-Dspaces.root` must be ABSENT when a
+ * `spaces.ref` pointer is to be read, because the flag wins over the pointer — that is the whole defect
+ * `SPACE-RELOCATABLE-ROOTS-1` closed, and reading the script cannot catch it.
+ */
+const POINTER_CASES = [
+  { name: 'spaces.ref present, SPACES_ROOT unset', env: {}, files: { 'spaces.ref': '../elsewhere\n' }, absent: '-Dspaces.root' },
+  { name: 'SPACES_ROOT overrides a present spaces.ref', env: { SPACES_ROOT: '../chosen' }, files: { 'spaces.ref': '../elsewhere\n' }, present: '-Dspaces.root=../chosen' },
+  { name: 'no pointer and no SPACES_ROOT', env: {}, files: {}, present: '-Dspaces.root=spaces' },
+];
+
+/**
+ * EXECUTE serve-demo.sh (and serve-demo.bat on Windows) over the pointer cases. The demo launchers used to be checked
+ * STATICALLY only; they are executed from 2026-11-14 so their spaces-root handling is proved the same way serve.*'s is.
+ * The stub java echoes argv, so the demo bundle's real jars are not needed — only `modules.list`, which `makeBundle` writes.
+ */
+export function runDemoScenarios(ps1src) {
+  const ps1 = toLf(ps1src);
+  const demoSh = demoHereString(ps1, 'serveDemoSh');
+  const demoBat = demoHereString(ps1, 'serveDemoBat');
+  const work = join(tmpdir(), `inspecto-launcher-guard-demo-${process.pid}`);
+  const kinds = IS_WINDOWS ? ['sh', 'bat'] : ['sh'];
+  const findings = [];
+  try {
+    for (const kind of kinds) {
+      POINTER_CASES.forEach((c, i) => {
+        const sc = ed('Basic', { name: c.name, env: c.env, files: c.files });
+        const dir = makeBundle(join(work, `${kind}-${i}`), sc);
+        installStubJava(dir);
+        if (kind === 'sh') writeFileSync(join(dir, 'bin', 'serve-demo.sh'), toLf(demoSh));
+        else writeFileSync(join(dir, 'bin', 'serve-demo.bat'), asBatBytes(demoBat));
+        const [cmd, args] = launch(kind, dir, 'serve-demo');
+        const pathSep = IS_WINDOWS ? ';' : ':';
+        const childEnv = { ...process.env, ...c.env, PATH: join(dir, '.stub') + pathSep + process.env.PATH };
+        if (!('SPACES_ROOT' in c.env)) delete childEnv.SPACES_ROOT;
+        delete childEnv.SPACES_DATA_ROOT; delete childEnv.PORT; delete childEnv.INSPECTO_JAVA_OPTS; delete childEnv.EXTRA_JAVA_OPTS;
+        let out;
+        try {
+          out = execFileSync(cmd, args, { cwd: dirname(dir), env: childEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+        } catch (e) {
+          if (e.code === 'ENOENT') abort(`\`${cmd}\` is not on PATH. serve-demo.sh must be EXECUTED, not skipped.`);
+          abort(`serve-demo.${kind} exited ${e.status}:\n${e.stdout || ''}${e.stderr || ''}`);
+        }
+        const got = observe(out);
+        const where = `serve-demo.${kind} · ${c.name}`;
+        if (c.absent && got.argv.some((a) => a.startsWith(c.absent)))
+          findings.push(`${where}: passed \`${got.argv.find((a) => a.startsWith(c.absent))}\`, which WINS over spaces.ref — the pointer would never be read.`);
+        if (c.present && !got.argv.includes(c.present))
+          findings.push(`${where}: \`${c.present}\` is missing from\n      [${got.argv.join(' ')}]`);
+        if (!got.argv.includes('-Dauth.mode=demo'))
+          findings.push(`${where}: the demo launcher dropped \`-Dauth.mode=demo\` — it would boot with no sign-in at all.`);
+      });
+    }
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+  return { findings, kinds, ran: kinds.length * POINTER_CASES.length };
+}
+
+/**
  * EXECUTE run.sh (and run.bat on Windows): the one-shot ETL launchers have no edition branch, but they carry the same classpath
  * contract - they must put exactly modules.list on `-cp`, in order, and launch CollectorProcessor. (Before P3d run.* kept an order
  * of their own and no inspecto-policy; this is what proves they now read the list.) A throwaway Space holds a dummy pipeline file
@@ -465,10 +544,13 @@ function main() {
     const { findings, kinds, ran: ranServe } = runScenarios(ps1src);
     const oneShot = runOneShot(ps1src);
     findings.push(...oneShot.findings);
-    const ran = ranServe + oneShot.ran;
+    const demo = runDemoScenarios(ps1src);
+    findings.push(...demo.findings);
+    const ran = ranServe + oneShot.ran + demo.ran;
     if (findings.length) fail(findings[0] + (findings.length > 1 ? `\n\n  (${findings.length - 1} more scenario(s) also failed)` : ''));
     console.log(
-      `✓ Launcher guard: ${ran} launcher run(s) (${oneShot.ran} of them run.sh/run.bat one-shot launches, classpath == modules.list in order) — ${SCENARIOS.length} serve scenario(s) × ` +
+      `✓ Launcher guard: ${ran} launcher run(s) (${oneShot.ran} of them run.sh/run.bat one-shot launches, classpath == modules.list in order; ` +
+      `${demo.ran} of them serve-demo.* over the ${POINTER_CASES.length} spaces-root cases) — ${SCENARIOS.length} serve scenario(s) × ` +
       `${kinds.map((k) => (k === 'sh' ? 'serve.sh' : 'serve.bat')).join(' + ')}, each EXECUTED over stub jars + the generator's modules.list/edition.properties ` +
       `with a stub java first on PATH; every classpath equalled its edition's modules.list IN ORDER and every flag set matched its edition.\n` +
       `  static rules: run.sh/run.bat/serve.*/serve-demo.* all read modules.list, none names a jar, serve.* read edition.properties, no self-referential \`set\` in a block.\n` +
@@ -476,7 +558,8 @@ function main() {
         ? `  scope: serve.sh + serve.bat both executed (Windows runner).`
         : `  scope: serve.sh executed; serve.bat NOT executed on ${process.platform} — it is covered here by ` +
           `the static rules only, and is proved by execution on a Windows runner.`) +
-      ` serve-demo.* (static rules only) are not executed.`
+      ` serve-demo.* are EXECUTED from 2026-11-14, but only over the spaces-root cases — their classpath and edition ` +
+      `are still covered by the static rules alone.`
     );
   } catch (e) {
     if (e instanceof Abort) { console.error(`✗ Launcher guard could not run: ${e.message}`); process.exit(2); }
