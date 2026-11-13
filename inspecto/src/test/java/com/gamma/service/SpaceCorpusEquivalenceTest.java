@@ -20,7 +20,7 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * SE-0 corpus equivalence gate ({@code docs/superpower/2026-11-11-space-evolution-plan.md} §3): every tracked
+ * SE-0 corpus equivalence gate ({@code docs/okf/product/module/config/plan-space-evolution.md} §3): every tracked
  * Space under {@code spaces/} and every Space Template under {@code spaces/_templates/} is loaded through the
  * real boot path ({@link SpaceLoadSnapshot}) — twice to prove the load is deterministic, then once with each
  * registered capability off and once on. A capability that changes what loads fails here, naming the Space and

@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Component metamodel & Catalog (MET)](plan-metamodel.md) · [Spaces & tenancy (SPC)](plan-spaces.md) |
+| plan | current | [Component metamodel & Catalog (MET)](plan-metamodel.md) · [Space evolution — a Space the server understands as a whole, reached without breaking one](plan-space-evolution.md) · [Spaces & tenancy (SPC)](plan-spaces.md) |
 | spec | current | [Column contract — Schema column changes and what they break (SE-3a, SE-3b)](spec-column-contract.md) · [Config Safety Validator](spec-config-safety.md) · [Pipeline config keys — the single block census](spec-pipeline-config-keys.md) · [Space lock — the server's signed record of a Space (SE-1a)](spec-space-lock.md) · [Space origin — which template made a Space (SE-5a)](spec-space-origin.md) · [Space promotion — a whole Space applied to an existing Space as a previewed change set (SE-6b)](spec-space-promotion.md) · [Space tests — cases that travel with a Space (SE-6a)](spec-space-tests.md) · [TOON Configuration](spec-toon-config.md) |
 | architecture | current | [Space anatomy — every folder and file in a Space](architecture-space-anatomy.md) · [Spaces](architecture.md) |
 | features | current | [Spaces — features](features-spaces.md) |
@@ -35,7 +35,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | — | P2 | feature | SPACE-LINK-CENSUS-1 one declared census of the links between a Space's config files | — |
-| — | P3 | feature | SPACE-EVOLUTION-1 a Space the server understands as a whole, reached without breaking one | — |
+| — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
 | `SPACE-UPGRADE-STUCK-VERSION-1` | P3 | defect | a Space Template upgrade whose last remaining files are conflicts never records the new version | — |
 | `SPACE-PROMOTION-PARAM-TYPES-1` | P3 | defect | a promotion parameter value can change the type of the value it fills | — |
 | — | P3 | feature | D-11 hand-authored relations component | demand |

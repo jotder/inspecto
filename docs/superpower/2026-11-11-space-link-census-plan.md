@@ -122,7 +122,7 @@ All five answered by the operator on 2026-11-11.
 | # | Question | Decision |
 |---|---|---|
 | **D-LC1** | When is a save with a broken link refused? | **Only when the config is active.** A draft (`active: false`) saves with broken links; activating it is refused (422) until they resolve. |
-| **D-LC2** | Boot mode default? | **`report`.** `refuse-activation` becomes the default for **new** Spaces after two releases of clean shadow — answered as D-SE2 of the [Space evolution plan](2026-11-11-space-evolution-plan.md). Existing Spaces never change on their own. |
+| **D-LC2** | Boot mode default? | **`report`.** `refuse-activation` becomes the default for **new** Spaces after two releases of clean shadow — answered as D-SE2 of the [Space evolution plan](../okf/product/module/config/plan-space-evolution.md). Existing Spaces never change on their own. |
 | **D-LC3** | Delete refusal for every kind — accept the behaviour change for API clients? | **Yes.** Every kind refuses a delete while something uses it, listing the dependents; `?force=true` gives the old outcome. |
 | **D-LC4** | A file changed outside the server? | **Reported, with what it broke; the edit takes effect.** In a Space whose approval policy (`approval.toon`) governs that kind, the edited file stays inactive until accepted. |
 | **D-LC5** | Editions? | **The integrity report on every edition; the refuse modes and the config ledger on Standard and Advanced.** |
