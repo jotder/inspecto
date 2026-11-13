@@ -9,8 +9,9 @@
 //   node tools/render-space-links.mjs --check    # exit 1 when the page is stale (CI guards job)
 //
 // The census is parsed from the source (the way tools/check-space-anatomy.mjs parses its constants), not run:
-// every `link("from", "key", "to", Type.X, ONDELETE, ONRENAME, CHECKS...)` line inside `LINKS = List.of(`.
-// The parse fails loudly when it reads no link, or when a line starting `link(` does not match the shape.
+// every `link("from", "key", "to", Type.X, ONDELETE, ONRENAME, CHECKS...)` call inside `LINKS = List.of(`, comments
+// removed first, any layout. The parse fails loudly when it reads no link, when it read fewer links than there are
+// `link(` calls, or when a check has no label here.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';

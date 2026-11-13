@@ -1,6 +1,6 @@
 # Space link census — one declaration of every link between config files
 
-**State:** IN PROGRESS — D-LC1…D-LC5 answered 2026-11-11 (§4); LC-1, LC-2, LC-3, LC-5 and LC-7 built (table below).
+**State:** IN PROGRESS — D-LC1…D-LC5 answered 2026-11-11 (§4); LC-1…LC-7 built (table below); the LC-3 shadow → refuse flip and two holds (below) remain.
 Board row `SPACE-LINK-CENSUS-1`.
 **Home when shipped:** `docs/okf/product/module/config/architecture-space-anatomy.md` §12.
 
@@ -11,9 +11,9 @@ Board row `SPACE-LINK-CENSUS-1`.
 | LC-1 census + graph; impact, validate, import read it | built 2026-11-12 | `037b0a22b`, `312dd995b` | |
 | LC-2 rename reads the census | built 2026-11-13 | `ac4b6c639`, `cffbdec55` | closed `PIPELINE-LINK-GAPS-1` (a), (b), (c), (e); (d) fixed by `ce1daa28d`, row closed 2026-11-13 |
 | LC-3 delete refusal (every kind) and save refusal (active configs) | built 2026-11-13, **shadow** | `e1f48dabd`, `569d0c890` | `-Dlinks.delete` / `-Dlinks.save` default `shadow`; the flip to `refuse` waits for a clean shadow period (D-LC3); save refusal is Standard and Advanced only (D-LC5) |
-| LC-4 boot integrity report, duplicates | **re-scope** | — | the SE-1a Space lock already serves `GET /spaces/{id}/integrity` (broken links, duplicates, outside edits); what remains is the `safety-policy.toon` `links:` mode, events per dangling link and the count on the Spaces screen |
+| LC-4 boot integrity report, duplicates | built 2026-11-13 (on the SE-1a lock) | `ff074caa0`, `fc2bb8721` | the report itself is SE-1a's `GET /spaces/{id}/integrity`; added: per-Space `safety-policy.toon` `links: report \| refuse-activation` (refuse mode Standard and Advanced; `-Dlinks.*=off` still wins), a `CONFIG_LINK_BROKEN` event per new broken link, and the findings count on the Spaces screen (`GET /spaces` rows carry `integrity` for authors). **Not built:** `refuse-activation` refuses saves and deletes only; a Pipeline or Job with a dangling link is not held inactive at load (no clean seam: `PipelineScheduler` reads the cached `active`; spec-space-lock §10) |
 | LC-5 column links, column impact | built 2026-11-13, report-only | `78f5e04d0`, `552a7c05d`, `a7f0e2ad4` | |
-| LC-6 config ledger, hand-edit detection | **re-scope** | — | the SE-1a lock detects files changed outside the server; what remains is `config.changed.outside` events and `POST /spaces/{id}/integrity/accept` |
+| LC-6 config ledger, hand-edit detection | built 2026-11-13 (on the SE-1a lock) | `ff074caa0` | the lock replaced the ledger; added a `CONFIG_CHANGED_OUTSIDE` event per new outside edit and `POST /spaces/{id}/integrity/accept` (`canAdminister`, every edition, audited). **Not built:** D-LC4's "an edited file stays inactive until accepted where `approval.toon` governs its kind" |
 | LC-7 generated link table | built 2026-11-13 | `27b7c3848` | `tools/render-space-links.mjs --check` in the CI guards job; the hand table and the anatomy guard's check C retired |
 
 Only targeted test classes ran on each lane; the full gate was not run. The first report's false finding,
