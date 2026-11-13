@@ -82,4 +82,25 @@ performance fix — caps are product decisions. Masking and row scope run before
 
 No test pins the production ETag-cache budget; `deepEqual` overflows at ~5,000 nesting levels (real folds never get
 there); a fresh 200 at the full budget blocks the main thread ~70 ms. The two unrun live checks (hover reveal at size,
-P6 after-timing) are board row `LA-PERF-LIVE-CHECKS-1`.
+P6 after-timing) were run on 2026-11-13; see "Live checks" below.
+
+## Live checks, 2026-11-13 (`LA-PERF-LIVE-CHECKS-1`)
+
+Demo-auth Preview bundle of `ef0466730` on :8087 over a private copy of `la-showcase`, built-in browser with the pane
+shown, `PerformanceObserver` long tasks. One run per row; the box was not otherwise idle.
+
+- **Large-graph hover reveal: PASS.** On `telecom_fraud_network` (767 nodes / 4,000 links) the note "arrows and node
+  labels on hover above 1,000 links" shows; zoomed in, links carry no arrowheads and nodes no labels. Hovering a node
+  shows the arrowheads of its links. With *Node labels* turned on, nodes stay unlabelled at rest, and a hover shows the
+  node's label, its links' arrowheads and the labels of the nodes at their other ends.
+- **Layout on expand (P6): no measured gain.** An Investigation from `99979100001`, 1 degree (403 nodes / 403 links):
+
+| Expand | Nodes | Long tasks (ms) | Total |
+|---|---|---|---|
+| double-click one subscriber | 403 → 412 | 553 · 74 · 65 · 83 · 463 · 87 · 125 | 1,450 ms |
+| double-click one subscriber | 412 → 418 | 334 · 71 · 67 | 472 ms |
+| toolbox Expand (first 25 unexpanded) | 418 → 444 | 775 · 112 · 117 · 52 | 1,056 ms |
+
+  Before (2026-11-12, another build and day, ~405 nodes): 378–435 ms per 2–5-node expand. So the expand still costs a
+  re-fit and repaint of the whole canvas; skipping the layout did not make it cheaper here. Also seen: the new
+  entities land in a separate group far from the graph, board row `LA-EXPAND-PLACEMENT-1` (not root-caused).
