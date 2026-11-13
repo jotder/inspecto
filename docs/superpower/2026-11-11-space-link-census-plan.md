@@ -134,6 +134,10 @@ something uses the target, and `?force=true` gives the old outcome. This is the 
 evolution plan's rule 3 (an existing Space changes only by an explicit operator step): it is announced as a
 behaviour change in the release that turns it on, and it keeps its own kill switch.
 
+**What "clean" means (operator, 2026-11-13):** two releases in shadow with zero false findings on the shipped
+Spaces — the same rule as the evolution plan's D-SE2 — then `-Dlinks.delete` and `-Dlinks.save` default to
+`refuse`.
+
 ## 5. Not in scope
 
 Cross-Space links (the Exchange has its own grants), links from runtime rows (Incidents, Cases) to config, and
