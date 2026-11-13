@@ -19,7 +19,8 @@ Board row `SPACE-EVOLUTION-1`.
 | SE-5b template upgrade proposal | built 2026-11-13 | `5f43a9475`, `af71a6fad` | `GET` / `POST /spaces/{id}/origin/upgrade`: three-way per file (recorded hash, template now, Space now), applies only `update` / `add`, one Pending Change under a policy; a partial apply keeps the old version until the last group; spec `spec-space-origin.md` §5; known limit `SPACE-UPGRADE-STUCK-VERSION-1` |
 | SE-6b promotion into an existing Space | built 2026-11-13 | `45667eed3`, `fc7ff8993` | `POST /spaces/{id}/promotion/preview` and `/apply`: a `GET /export` bundle plus `${NAME}` parameters in the request, a previewed change set, one Pending Change under a policy (D-SE7), removals only with `removals: true`, kill switch `-Dspace.promotion=off`; spec `spec-space-promotion.md`; known limits `SPACE-PROMOTION-PARAM-TYPES-1` |
 | SE-2b rename auto-rewrite, opt-in | built 2026-11-13 with SE-2a | `288d5f55a` | per-Space `rename_rewrite: true` in `space.toon` (not `safety-policy.toon`: a lenient reader, so older releases ignore it); Pipelines only; held under an approval policy; kill switch `-Dspace.rename.rewrite=off`. The default flip waits (D-SE2) |
-| SE-1b / 3b, SE-4 | gated; the finding baseline, the SE-3b opt-in, the activation seam and SE-4 step 1 started 2026-11-13 | — | §5; D-SE10…D-SE13 |
+| Finding baseline (§3, D-SE10) | run 2026-11-13 | commit `(D-SE10)` | 3 Spaces + 30 templates: 0 findings in every check (integrity, column contract, LC-3 shadow, `metadata_validate`), so no defect or false positive to fix and zero unknowns; **the clean-shadow clock of D-SE2 / D-LC3 starts 2026-11-13**. Gate `SpaceFindingBaselineTest`; record `spec-space-lock.md` §14 |
+| SE-1b / 3b, SE-4 | gated; the SE-3b opt-in, the activation seam and SE-4 step 1 started 2026-11-13 | — | §5; D-SE10…D-SE13 |
 
 Only targeted test classes ran on each lane; the full gate was not run.
 

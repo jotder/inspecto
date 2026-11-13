@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-424 test class(es): 170 unit, 254 real-HTTP control-plane, 0 IT.
+425 test class(es): 171 unit, 254 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -432,6 +432,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `SpaceCorpusEquivalenceTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceCorpusEquivalenceTest.java` | SE-0 corpus equivalence gate ({@code docs/superpower/2026-11-11-space-evolution-plan.md} §3): every tracked |
 | `SpaceDataRootTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceDataRootTest.java` | SPACE-DATA-ROOT-1: where a Space's data, audit and DuckDB stores live, and the load-time checks. |
 | `SpaceDiscoveryRuleTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceDiscoveryRuleTest.java` | Which folders under the Spaces root {@link SpaceManager#discover} admits — real folder trees, no mocks. |
+| `SpaceFindingBaselineTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceFindingBaselineTest.java` | D-SE10 finding baseline ({@code docs/superpower/2026-11-11-space-evolution-plan.md} §3): every shadow finding the |
 | `SpaceIdTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceIdTest.java` | The filesystem-safe space-id guard: lower-case alnum + hyphen only, so an id can never escape {@code spaces/}. |
 | `SpaceInboxAuditTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceInboxAuditTest.java` | Two Spaces polling one inbox — scale-out plan §5.3. |
 | `SpaceLayoutContractTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceLayoutContractTest.java` | The boot-time storage-layout contract: WARN-only findings, never a boot failure. |

@@ -138,7 +138,7 @@ final class SpaceLoadSnapshot {
         return out.replace('\\', '/');
     }
 
-    private static void copyConfig(Path src, Path dst, String id, boolean template) throws IOException {
+    static void copyConfig(Path src, Path dst, String id, boolean template) throws IOException {
         Files.createDirectories(dst);
         Path manifest = src.resolve("space.toon");
         if (Files.isRegularFile(manifest)) Files.copy(manifest, dst.resolve("space.toon"));
