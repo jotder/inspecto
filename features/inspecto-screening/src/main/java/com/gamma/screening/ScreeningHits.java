@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventType;
 import com.gamma.config.safety.PathJail;
+import com.gamma.config.safety.SpaceStateDirs;
 import com.gamma.control.PendingChanges;
 import com.gamma.event.EventLog;
 import com.gamma.spi.auth.ApiException;
@@ -30,7 +31,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 /**
  * The Space's <b>Screening Hits</b> (SCR-D10 … SCR-D12, {@code docs/superpower/screening-addon-plan.md}): one
@@ -168,8 +168,9 @@ public final class ScreeningHits {
         return INVALID.equals(rec.get("integrity"));
     }
 
+    /** The store's WRITE directory, {@code config/screening-hits} (SE-4 step 1: reads also look in {@code state/}). */
     private static Path dir(Path root) {
-        return root.resolve(DIR);
+        return SpaceStateDirs.writeDir(root, DIR);
     }
 
     private static Path file(Path root, String id) {
@@ -185,6 +186,10 @@ public final class ScreeningHits {
     static void save(Path root, Map<String, Object> rec) throws IOException {
         if (invalid(rec)) throw new IllegalStateException("refusing to re-sign a screening hit that failed its integrity check");
         Path f = file(root, String.valueOf(rec.get("id")));
+        // SE-4 step 1: a hit also in state/ is a newer release's; a write here would land where no read sees it.
+        if (SpaceStateDirs.shadowed(f))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "screening hit '" + rec.get("id") + "' lives in this Space's "
+                    + "state/ folder, written by a newer release — this release can show it but not change it");
         Files.createDirectories(f.getParent());
         Map<String, Object> clean = new LinkedHashMap<>(rec);
         clean.remove(MAC);
@@ -199,7 +204,7 @@ public final class ScreeningHits {
      * verify, or that names another id or record type than its file, comes back {@code integrity: invalid}.
      */
     static Map<String, Object> read(Path root, String id) throws IOException {
-        Path f = file(root, id);
+        Path f = SpaceStateDirs.readable(file(root, id));   // state/ first, then config/ (SE-4 step 1)
         if (!Files.isRegularFile(f)) return null;
         Map<String, Object> rec = ApiContext.JSON.readValue(Files.readAllBytes(f), MAP);
         Object claimed = rec.remove(MAC);
@@ -217,16 +222,13 @@ public final class ScreeningHits {
 
     /** Every hit of the Space, newest first. */
     static List<Map<String, Object>> list(Path root) throws IOException {
-        Path d = dir(root);
-        if (!Files.isDirectory(d)) return List.of();
         List<Map<String, Object>> out = new ArrayList<>();
-        try (Stream<Path> s = Files.list(d)) {
-            for (Path p : s.filter(p -> p.getFileName().toString().endsWith(".json")).toList()) {
-                String id = p.getFileName().toString().replaceFirst("\\.json$", "");
-                if (!SAFE_ID.matcher(id).matches()) continue;
-                Map<String, Object> rec = read(root, id);
-                if (rec != null) out.add(rec);
-            }
+        for (Path p : SpaceStateDirs.list(dir(root))) {   // config/ and state/, one entry per id (SE-4 step 1)
+            if (!p.getFileName().toString().endsWith(".json")) continue;
+            String id = p.getFileName().toString().replaceFirst("\\.json$", "");
+            if (!SAFE_ID.matcher(id).matches()) continue;
+            Map<String, Object> rec = read(root, id);
+            if (rec != null) out.add(rec);
         }
         out.sort(Comparator.comparing((Map<String, Object> r) -> String.valueOf(r.get("id"))).reversed());
         return out;
@@ -252,25 +254,32 @@ public final class ScreeningHits {
     /** {@link #index(Path)}, counting in {@code reread[0]} the documents it had to read. */
     private static Map<String, Object> index(Path root, int[] reread) throws IOException {
         Path d = dir(root);
-        if (!Files.isDirectory(d)) return new LinkedHashMap<>();
+        Path state = SpaceStateDirs.readable(d);   // SE-4 step 1: state/screening-hits first, when there is one
+        List<Path> dirs = state.equals(d) ? List.of(d) : List.of(state, d);
+        if (!Files.isDirectory(d) && !Files.isDirectory(state)) return new LinkedHashMap<>();
         Map<String, Long> stamps = new java.util.HashMap<>();
-        // One directory pass that also yields each file's time (cached by the directory read on Windows).
-        Files.walkFileTree(d, Set.of(), 1, new java.nio.file.SimpleFileVisitor<>() {
-            @Override
-            public java.nio.file.FileVisitResult visitFile(Path p, java.nio.file.attribute.BasicFileAttributes a) {
-                String name = p.getFileName().toString();
-                String id = name.endsWith(".json") ? name.substring(0, name.length() - 5) : "";
-                if (SAFE_ID.matcher(id).matches()) stamps.put(id, a.lastModifiedTime().to(java.util.concurrent.TimeUnit.MICROSECONDS));
-                return java.nio.file.FileVisitResult.CONTINUE;
-            }
+        for (Path one : dirs) {
+            if (!Files.isDirectory(one)) continue;
+            // One directory pass that also yields each file's time (cached by the directory read on Windows).
+            Files.walkFileTree(one, Set.of(), 1, new java.nio.file.SimpleFileVisitor<>() {
+                @Override
+                public java.nio.file.FileVisitResult visitFile(Path p, java.nio.file.attribute.BasicFileAttributes a) {
+                    String name = p.getFileName().toString();
+                    String id = name.endsWith(".json") ? name.substring(0, name.length() - 5) : "";
+                    // putIfAbsent: a hit in both places is read from state/ (read() does the same), so its time is state's
+                    if (SAFE_ID.matcher(id).matches())
+                        stamps.putIfAbsent(id, a.lastModifiedTime().to(java.util.concurrent.TimeUnit.MICROSECONDS));
+                    return java.nio.file.FileVisitResult.CONTINUE;
+                }
 
-            @Override
-            public java.nio.file.FileVisitResult visitFileFailed(Path p, IOException e) throws IOException {
-                // A save's temp file renamed away mid-walk (POSIX reads attributes per entry): not a hit, skip it.
-                if (e instanceof java.nio.file.NoSuchFileException) return java.nio.file.FileVisitResult.CONTINUE;
-                throw e;
-            }
-        });
+                @Override
+                public java.nio.file.FileVisitResult visitFileFailed(Path p, IOException e) throws IOException {
+                    // A save's temp file renamed away mid-walk (POSIX reads attributes per entry): not a hit, skip it.
+                    if (e instanceof java.nio.file.NoSuchFileException) return java.nio.file.FileVisitResult.CONTINUE;
+                    throw e;
+                }
+            });
+        }
         Map<String, Object> entries = readIndex(root);
         entries.keySet().retainAll(stamps.keySet());
         for (Map.Entry<String, Long> s : stamps.entrySet()) {
@@ -355,6 +364,9 @@ public final class ScreeningHits {
     @SuppressWarnings("unchecked")
     private static Map<String, Object> readIndex(Path root) throws IOException {
         Path f = dir(root).resolve(INDEX);
+        // SE-4 step 1: the index is a cache this release rewrites in config/ over BOTH places, so the config/ one is the
+        // newer; state/'s is read only until this release has written one (a stale entry is re-read by its file time).
+        if (!Files.isRegularFile(f)) f = SpaceStateDirs.readable(f);
         if (!Files.isRegularFile(f)) return new LinkedHashMap<>();
         Map<String, Object> doc;
         try {

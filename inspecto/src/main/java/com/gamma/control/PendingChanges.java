@@ -7,6 +7,7 @@ import com.gamma.spi.auth.Subject;
 import com.gamma.spi.http.ApiContext;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.gamma.config.safety.PathJail;
+import com.gamma.config.safety.SpaceStateDirs;
 import com.gamma.audit.Event;
 import com.gamma.event.EventLog;
 import com.gamma.audit.EventType;
@@ -33,7 +34,6 @@ import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 import com.gamma.access.Roles;
 import com.gamma.access.AccessGrants;
 import com.gamma.access.ComponentAccess;
@@ -448,8 +448,20 @@ public final class PendingChanges {
         return s;
     }
 
+    /** The store's WRITE directory, {@code config/pending-changes} (SE-4 step 1: reads also look in {@code state/}). */
     private static Path dir(Path root) {
-        return root.toAbsolutePath().normalize().resolve(DIR);
+        return SpaceStateDirs.writeDir(root, DIR);
+    }
+
+    /**
+     * 409 when Pending Change {@code id} also lives in the Space's {@code state/} zone (SE-4 step 1): a newer release
+     * owns it, and a write here would land in {@code config/}, where no read sees it. Checked before anything is
+     * applied, so a held change is never replayed by a release that cannot record the outcome.
+     */
+    static void requireWritable(Path root, String id) {
+        if (SpaceStateDirs.shadowed(file(root, id)))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "pending change '" + id + "' lives in this Space's state/ "
+                    + "folder, written by a newer release — this release can show it but not change it");
     }
 
     private static Path file(Path root, String id) {
@@ -466,6 +478,7 @@ public final class PendingChanges {
      * JSON, keyed by {@link #key} — so a record no server wrote (a forged or edited file) is detected on read.
      */
     static void save(Path root, Map<String, Object> rec) throws IOException {
+        requireWritable(root, String.valueOf(rec.get("id")));
         Path f = file(root, String.valueOf(rec.get("id")));
         Files.createDirectories(f.getParent());
         Map<String, Object> clean = new LinkedHashMap<>(rec);
@@ -483,7 +496,7 @@ public final class PendingChanges {
      * {@code integrity: invalid} — shown, never decidable, never re-saved (that would sign a forgery).
      */
     static Map<String, Object> read(Path root, String id) throws IOException {
-        Path f = file(root, id);
+        Path f = SpaceStateDirs.readable(file(root, id));   // state/ first, then config/ (SE-4 step 1)
         if (!Files.isRegularFile(f)) return null;
         Map<String, Object> rec = ApiContext.JSON.readValue(Files.readAllBytes(f), MAP);
         Object claimed = rec.remove(MAC);
@@ -622,16 +635,13 @@ public final class PendingChanges {
 
     /** Every Pending Change of the Space, newest first. */
     static List<Map<String, Object>> list(Path root) throws IOException {
-        Path d = dir(root);
-        if (!Files.isDirectory(d)) return List.of();
         List<Map<String, Object>> out = new ArrayList<>();
-        try (Stream<Path> s = Files.list(d)) {
-            for (Path p : s.filter(p -> p.getFileName().toString().endsWith(".json")).toList()) {
-                String id = p.getFileName().toString().replaceFirst("\\.json$", "");
-                if (!SAFE_ID.matcher(id).matches()) continue;
-                Map<String, Object> rec = read(root, id);
-                if (rec != null) out.add(rec);
-            }
+        for (Path p : SpaceStateDirs.list(dir(root))) {   // config/ and state/, one entry per id (SE-4 step 1)
+            if (!p.getFileName().toString().endsWith(".json")) continue;
+            String id = p.getFileName().toString().replaceFirst("\\.json$", "");
+            if (!SAFE_ID.matcher(id).matches()) continue;
+            Map<String, Object> rec = read(root, id);
+            if (rec != null) out.add(rec);
         }
         out.sort(Comparator.comparing((Map<String, Object> r) -> String.valueOf(r.get("id"))).reversed());
         return out;
@@ -640,6 +650,7 @@ public final class PendingChanges {
     /** Record expiry: a still-pending change past its {@code expiresAt} becomes {@code expired}. */
     static boolean expireIfDue(HttpExchange ex, Path root, Map<String, Object> rec) throws IOException {
         if (invalid(rec) || !"pending".equals(rec.get("status"))) return false;
+        if (SpaceStateDirs.shadowed(file(root, String.valueOf(rec.get("id"))))) return false;   // a newer release's record: read only
         Object at = rec.get("expiresAt");
         if (at == null || Instant.parse(String.valueOf(at)).isAfter(Instant.now())) return false;
         rec.put("status", "expired");

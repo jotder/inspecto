@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.backup`](../../../../../product-map/module/backup.toon).
 
-10 test class(es): 9 unit, 1 real-HTTP control-plane, 0 IT.
+11 test class(es): 10 unit, 1 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -33,5 +33,6 @@ mvn -o test -pl features/inspecto-backup -Dtest=BackupSignalsTest,BackupTaskProv
 | `BackupCatalogSpaceRootTest` | `com.gamma.job` | unit | `features/inspecto-backup/src/test/java/com/gamma/job/BackupCatalogSpaceRootTest.java` | {@code BACKUP-CATALOG-SPACE-ROOT-1} — <b>a backup in a named Space registers its {@code maintenance_backups} |
 | `BackupJobPathResolutionTest` | `com.gamma.job` | unit | `features/inspecto-backup/src/test/java/com/gamma/job/BackupJobPathResolutionTest.java` | The three backup tasks resolve a RELATIVE path value against the <b>Space config root</b>, not the |
 | `BackupPathContainmentTest` | `com.gamma.job` | unit | `features/inspecto-backup/src/test/java/com/gamma/job/BackupPathContainmentTest.java` | Path containment for the three backup tasks — every operator-supplied directory is jailed against the |
+| `BackupTaskStateZoneTest` | `com.gamma.job` | unit | `features/inspecto-backup/src/test/java/com/gamma/job/BackupTaskStateZoneTest.java` | SE-4 step 1: a backup of a Space's {@code config/} carries the Space's {@code state/} zone beside it (as |
 | `BackupTaskTest` | `com.gamma.job` | unit | `features/inspecto-backup/src/test/java/com/gamma/job/BackupTaskTest.java` | The backup / backup_verify / restore tasks (MNT-5 / MNT-6), driven the way production drives them — |
 | `ModuleRemovalBackupTest` | `com.gamma.job` | unit | `features/inspecto-backup/src/test/java/com/gamma/job/ModuleRemovalBackupTest.java` | {@code MODULE-REORG-1 P4a} (plan §2.5): backup and restore carry the config and store families of a module |

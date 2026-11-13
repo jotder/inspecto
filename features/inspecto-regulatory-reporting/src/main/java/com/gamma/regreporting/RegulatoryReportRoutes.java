@@ -684,6 +684,7 @@ public final class RegulatoryReportRoutes implements RouteModule {
     static void submit(Path root, Map<String, Object> rec, String by, String byType) throws IOException {
         Map<String, Object> delivery = (Map<String, Object>) rec.get("delivery");
         String id = String.valueOf(rec.get("id"));
+        RegulatoryReports.requireWritable(root, id);   // SE-4 step 1: never deliver what this release cannot record
         try {
             String content = String.valueOf(rec.get("content"));
             if (!com.gamma.job.ApprovalFingerprint.sha256(content.getBytes(java.nio.charset.StandardCharsets.UTF_8))

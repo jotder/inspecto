@@ -2,6 +2,7 @@ package com.gamma.service;
 
 import com.gamma.acquire.ConnectionProfile;
 import com.gamma.config.io.ConfigCodec;
+import com.gamma.config.safety.SpaceStateDirs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -105,20 +106,22 @@ public final class BundleExporter {
             try (Stream<Path> s = Files.walk(configDir)) {
                 for (Path f : s.filter(Files::isRegularFile).sorted().toList()) {
                     String entry = configDir.relativize(f).toString().replace('\\', '/');
-                    // Pending Changes are proposals, not config, and their MAC key must never leave the server
-                    // (ASSURE-MAKER-CHECKER-1): a whole-Space export skips the store.
-                    if (entry.startsWith("pending-changes/")) continue;
-                    // Action Requests carry rendered payloads and target response excerpts, and are signed with
-                    // that same key (ASSURE-ACTION-REQUESTS-1): operational records, never exported config.
-                    if (entry.startsWith("action-requests/")) continue;
-                    // Regulatory Reports carry a filing's confidential content, signed with that same key
-                    // (REGULATORY-REPORTING-1): operational records, never exported config.
-                    if (entry.startsWith("regulatory-reports/")) continue;
-                    // Screening Hits hold screened names and review decisions, signed with that same key (SCREENING-1):
-                    // operational records, never exported config.
-                    if (entry.startsWith("screening-hits/")) continue;
+                    if (neverExported(entry)) continue;
                     entries.put(entry, exportableBytes(f));
                     artifacts.add(artifact(entry, kindOf(f)));
+                }
+            }
+        }
+        // SE-4 step 1: the Space's state/ zone beside config/ rides under the SAME config-relative names its files had
+        // in config/ (state/recon-state/x.json → recon-state/x.json), so the bundle layout does not change and an
+        // importer cannot tell where a record lived. A file in both places is taken from state/, as every reader does.
+        Path state = SpaceStateDirs.stateRoot(configDir);
+        if (state != null && Files.isDirectory(state)) {
+            try (Stream<Path> s = Files.walk(state)) {
+                for (Path f : s.filter(Files::isRegularFile).sorted().toList()) {
+                    String entry = state.relativize(f).toString().replace('\\', '/');
+                    if (neverExported(entry)) continue;
+                    if (entries.put(entry, exportableBytes(f)) == null) artifacts.add(artifact(entry, kindOf(f)));
                 }
             }
         }
@@ -130,6 +133,22 @@ public final class BundleExporter {
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────────────────────────────
+
+    /** Whether a whole-Space export skips the config-relative {@code entry}: a store of signed operational records. */
+    private static boolean neverExported(String entry) {
+        // Pending Changes are proposals, not config, and their MAC key must never leave the server
+        // (ASSURE-MAKER-CHECKER-1): a whole-Space export skips the store.
+        if (entry.startsWith("pending-changes/")) return true;
+        // Action Requests carry rendered payloads and target response excerpts, and are signed with
+        // that same key (ASSURE-ACTION-REQUESTS-1): operational records, never exported config.
+        if (entry.startsWith("action-requests/")) return true;
+        // Regulatory Reports carry a filing's confidential content, signed with that same key
+        // (REGULATORY-REPORTING-1): operational records, never exported config.
+        if (entry.startsWith("regulatory-reports/")) return true;
+        // Screening Hits hold screened names and review decisions, signed with that same key (SCREENING-1):
+        // operational records, never exported config.
+        return entry.startsWith("screening-hits/");
+    }
 
     private static Map<String, Object> manifest(String kind, String spaceId, List<Map<String, Object>> artifacts) {
         Map<String, Object> m = new LinkedHashMap<>();

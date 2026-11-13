@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventType;
 import com.gamma.config.safety.PathJail;
+import com.gamma.config.safety.SpaceStateDirs;
 import com.gamma.control.PendingChanges;
 import com.gamma.event.EventLog;
 import com.gamma.spi.auth.ApiException;
@@ -26,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 /**
  * <b>Regulatory Reports</b> ({@code REGULATORY-REPORTING-1}): the model and the durable per-Space store. A report is
@@ -136,8 +136,9 @@ public final class RegulatoryReports {
 
     // ── the store ────────────────────────────────────────────────────────────────────────────────
 
+    /** The store's WRITE directory, {@code config/regulatory-reports} (SE-4 step 1: reads also look in {@code state/}). */
     private static Path dir(Path root) {
-        return root.toAbsolutePath().normalize().resolve(DIR);
+        return SpaceStateDirs.writeDir(root, DIR);
     }
 
     private static Path file(Path root, String id) {
@@ -149,9 +150,20 @@ public final class RegulatoryReports {
         return f;
     }
 
+    /**
+     * 409 when report {@code id} also lives in the Space's {@code state/} zone (SE-4 step 1): a newer release owns it,
+     * and a write here would land in {@code config/}, where no read sees it. A retry checks it before delivering.
+     */
+    static void requireWritable(Path root, String id) {
+        if (SpaceStateDirs.shadowed(file(root, id)))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "regulatory report '" + id + "' lives in this Space's "
+                    + "state/ folder, written by a newer release — this release can show it but not change it");
+    }
+
     /** Persist {@code rec}, signed. ⛔ Never on a record that read back invalid — that would sign a forgery. */
     static void save(Path root, Map<String, Object> rec) throws IOException {
         if (invalid(rec)) throw new IllegalStateException("refusing to re-sign a regulatory report that failed its integrity check");
+        requireWritable(root, String.valueOf(rec.get("id")));
         Path f = file(root, String.valueOf(rec.get("id")));
         Files.createDirectories(f.getParent());
         Map<String, Object> clean = new LinkedHashMap<>(rec);
@@ -167,7 +179,7 @@ public final class RegulatoryReports {
      * verify, or that names another id or record type than its file, comes back {@code status: invalid}.
      */
     static Map<String, Object> read(Path root, String id) throws IOException {
-        Path f = file(root, id);
+        Path f = SpaceStateDirs.readable(file(root, id));   // state/ first, then config/ (SE-4 step 1)
         if (!Files.isRegularFile(f)) return null;
         Map<String, Object> rec = ApiContext.JSON.readValue(Files.readAllBytes(f), MAP);
         Object claimed = rec.remove(MAC);
@@ -186,16 +198,13 @@ public final class RegulatoryReports {
 
     /** Every report of the Space, newest first. */
     static List<Map<String, Object>> list(Path root) throws IOException {
-        Path d = dir(root);
-        if (!Files.isDirectory(d)) return List.of();
         List<Map<String, Object>> out = new ArrayList<>();
-        try (Stream<Path> s = Files.list(d)) {
-            for (Path p : s.filter(p -> p.getFileName().toString().endsWith(".json")).toList()) {
-                String id = p.getFileName().toString().replaceFirst("\\.json$", "");
-                if (!SAFE_ID.matcher(id).matches()) continue;
-                Map<String, Object> rec = read(root, id);
-                if (rec != null) out.add(rec);
-            }
+        for (Path p : SpaceStateDirs.list(dir(root))) {   // config/ and state/, one entry per id (SE-4 step 1)
+            if (!p.getFileName().toString().endsWith(".json")) continue;
+            String id = p.getFileName().toString().replaceFirst("\\.json$", "");
+            if (!SAFE_ID.matcher(id).matches()) continue;
+            Map<String, Object> rec = read(root, id);
+            if (rec != null) out.add(rec);
         }
         out.sort(Comparator.comparing((Map<String, Object> r) -> String.valueOf(r.get("id"))).reversed());
         return out;
@@ -216,6 +225,7 @@ public final class RegulatoryReports {
     /** A draft or pending report past its {@code expiresAt} becomes {@code expired}. Call under {@link #lock}. */
     static boolean expireIfDue(Path root, Map<String, Object> rec) throws IOException {
         if (invalid(rec) || !(PENDING.equals(rec.get("status")) || DRAFT.equals(rec.get("status")))) return false;
+        if (SpaceStateDirs.shadowed(file(root, String.valueOf(rec.get("id"))))) return false;   // a newer release's record: read only
         Object at = rec.get("expiresAt");
         if (at == null || Instant.parse(String.valueOf(at)).isAfter(Instant.now())) return false;
         transition(rec, EXPIRED, "system");

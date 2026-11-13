@@ -7,6 +7,7 @@ import com.gamma.job.JobResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.acquire.Checksums;
 import com.gamma.config.safety.PathJail;
+import com.gamma.config.safety.SpaceStateDirs;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.signal.Severity;
@@ -107,6 +108,15 @@ final class BackupTask {
                         .startsWith(backupDir.toAbsolutePath()))   // never archive the archive dir
                 .filter(p -> !secret(dir, p))                       // never archive a secret
                 .toList());
+        // SE-4 step 1: a backup of a Space's config/ also carries the Space's state/ zone beside it, as
+        // "../state/<path>" entries — the server-written records that zone takes over from config/ (restore maps them
+        // back). The same secret rule applies. Nothing is added for a Space with no state/ folder.
+        Path state = SpaceStateDirs.stateRoot(dir);
+        if (state != null && Files.isDirectory(state))
+            files.addAll(com.gamma.util.DuckDbUtil.regularFilesSkippingSpill(state).stream()
+                    .filter(p -> !p.toAbsolutePath().normalize().startsWith(backupDir.toAbsolutePath()))
+                    .filter(p -> !secret(dir, p))
+                    .toList());
         files.sort(Comparator.comparing(Path::toString));   // deterministic archive order
         long totalBytes = 0;
         for (Path p : files) totalBytes += Files.size(p);
@@ -292,8 +302,8 @@ final class BackupTask {
         List<String> conflicts = new ArrayList<>();
         for (Object o : fileEntries) {
             String rel = String.valueOf(((Map<?, ?>) o).get("path"));
-            Path dest = target.resolve(rel).normalize();
-            if (!dest.startsWith(target)) {   // zip-slip jail
+            Path dest = restoreTarget(target, rel);
+            if (dest == null) {   // zip-slip jail
                 return JobResult.failed("restore blocked: entry escapes target_dir: " + rel,
                         (System.nanoTime() - t0) / 1_000_000L);
             }
@@ -317,7 +327,7 @@ final class BackupTask {
             for (Object o : fileEntries) {
                 Map<?, ?> entry = (Map<?, ?>) o;
                 String rel = String.valueOf(entry.get("path"));
-                Path dest = target.resolve(rel).normalize();
+                Path dest = restoreTarget(target, rel);   // jailed in the pass above
                 Files.createDirectories(dest.getParent());
                 try (InputStream in = zf.getInputStream(zf.getEntry(rel))) {
                     Files.copy(in, dest, StandardCopyOption.REPLACE_EXISTING);
@@ -412,6 +422,23 @@ final class BackupTask {
         } catch (NoSuchAlgorithmException e) {
             throw new IOException(e);
         }
+    }
+
+    /** The prefix of a backup entry taken from the Space's {@code state/} zone beside the backed-up {@code config/}. */
+    static final String STATE_ENTRY = "../" + SpaceStateDirs.STATE + "/";
+
+    /**
+     * Where entry {@code rel} restores to, or {@code null} when it would escape (zip-slip): under {@code target}, or —
+     * for a {@link #STATE_ENTRY} entry when {@code target} is a Space's {@code config/} — under that Space's
+     * {@code state/} (SE-4 step 1), and nowhere else.
+     */
+    static Path restoreTarget(Path target, String rel) {
+        Path dest = target.resolve(rel).normalize();
+        if (dest.startsWith(target)) return dest;
+        Path state = SpaceStateDirs.stateRoot(target);
+        if (state == null || !rel.replace('\\', '/').startsWith(STATE_ENTRY)) return null;
+        Path abs = dest.toAbsolutePath().normalize();
+        return abs.startsWith(state) && !abs.equals(state) ? abs : null;
     }
 
     /**

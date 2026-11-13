@@ -3,6 +3,7 @@ package com.gamma.recon;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.config.safety.PathJail;
+import com.gamma.config.safety.SpaceStateDirs;
 import com.gamma.util.AtomicFiles;
 
 import java.io.IOException;
@@ -67,7 +68,7 @@ public final class ReconStateStore {
 
     public ReconStateStore(Path writeRoot) {
         this.writeRoot = writeRoot.toAbsolutePath().normalize();
-        this.dir = this.writeRoot.resolve("recon-state");
+        this.dir = SpaceStateDirs.writeDir(this.writeRoot, "recon-state");   // SE-4 step 1: reads also look in state/
     }
 
     /** One Reconciliation's recorded state; {@code lastRunAt} null and no Breaks when it was never run. */
@@ -185,6 +186,7 @@ public final class ReconStateStore {
     public void delete(String reconciliationId) throws IOException {
         synchronized (LOCK) {
             Files.deleteIfExists(file(reconciliationId));
+            refuseShadowed(file(reconciliationId));   // never silent: a state/ copy would be inherited by a re-created one
         }
     }
 
@@ -219,7 +221,7 @@ public final class ReconStateStore {
 
     @SuppressWarnings("unchecked")
     private State load(String reconciliationId) throws IOException {
-        Path f = file(reconciliationId);
+        Path f = SpaceStateDirs.readable(file(reconciliationId));   // state/ first, then config/ (SE-4 step 1)
         if (!Files.exists(f)) return new State(reconciliationId, null, 0, List.of());
         try {
             Map<String, Object> doc = JSON.readValue(f.toFile(), new TypeReference<LinkedHashMap<String, Object>>() {});
@@ -236,7 +238,18 @@ public final class ReconStateStore {
     }
 
     private void save(State state) throws IOException {
+        refuseShadowed(file(state.reconciliation()));
         AtomicFiles.write(file(state.reconciliation()), JSON.writeValueAsBytes(state.toMap()), ".recon-state-");
+    }
+
+    /**
+     * SE-4 step 1: a state file that also lives in the Space's {@code state/} zone is a newer release's — a write here
+     * would land in {@code config/}, where no read sees it, so it is refused instead.
+     */
+    private static void refuseShadowed(Path f) throws IOException {
+        if (SpaceStateDirs.shadowed(f))
+            throw new IOException(SpaceStateDirs.twin(f) + " was written by a newer release (the Space's state/ folder);"
+                    + " this release reads it but cannot change it");
     }
 
     /** The state file of {@code reconciliationId}: a bare name, jailed under the write root. */
