@@ -143,6 +143,58 @@ class LinkGraphTest {
         assertEquals(LinkGraph.Status.UNCHECKED, g.edges("dataset", "physicalRef").get(0).status(), "stores are not judged");
     }
 
+    /** SE-1b: a Pipeline's own links are judged as their loaders resolve them, and only where the loader reads them. */
+    @Test
+    void aPipelinesOwnLinksAreJudgedWhereTheLoaderReadsThem(@TempDir Path root) throws Exception {
+        Files.createDirectories(root.resolve("conns"));
+        Files.writeString(root.resolve("conns/edge_connection.toon"),
+                "connection:\n  id: \" EDGE \"\n  connector: sftp\n  host: h\n");
+        Files.createDirectories(root.resolve("registry/connections"));
+        Files.writeString(root.resolve("registry/connections/reg_only.toon"),
+                "connection:\n  id: REG_ONLY\n  connector: sftp\n  host: h\n");
+        Files.writeString(root.resolve("broken_connection.toon"), "nope: 1\n");   // does not load: no profile
+        Files.createDirectories(root.resolve("registry/datasets"));
+        Files.writeString(root.resolve("registry/datasets/sales.toon"), "name: sales\nphysicalRef: sales/database\n");
+        Files.writeString(root.resolve("orders_schema.toon"), "fields: []\n");
+        Files.createDirectories(root.resolve("registry/schemas"));
+        Files.writeString(root.resolve("registry/schemas/reg.toon"), "fields: []\n");
+
+        Files.writeString(root.resolve("a_pipeline.toon"), "id: a\ncollector:\n  connector: SFTP\n  connection: EDGE\n"
+                + "processing:\n  schema_file: orders_schema.toon\n");
+        Files.writeString(root.resolve("b_pipeline.toon"), "id: b\ncollector:\n  connector: s3\n  connection: REG_ONLY\n"
+                + "processing:\n  schema_file: missing_schema.toon\n");
+        Files.writeString(root.resolve("c_pipeline.toon"), "id: c\ncollector:\n  connector: local\n  connection: GONE\n"
+                + "processing:\n  schema_file: schema/reg\n");
+        Files.writeString(root.resolve("d_pipeline.toon"), "id: d\ncollector:\n  connector: dataset\n  connection: GONE\n"
+                + "  dataset: datasets/sales\nprocessing:\n  schema_file: missing.toon\n  ingester: x.Y\n");
+        Files.writeString(root.resolve("e_pipeline.toon"), "id: e\ncollector:\n  connector: dataset\n  dataset: nope\n"
+                + "processing:\n  schema_file: missing.toon\n  grammar: grammar/g\n");
+        Files.writeString(root.resolve("f_pipeline.toon"), "id: f\ncollector:\n  connection: GONE\n  dataset: sales\n"
+                + "extra:\n  use: grammar/none\n");
+        LinkGraph g = LinkGraph.of(root, rel -> false);
+
+        assertEquals(List.of("a=RESOLVED", "b=DANGLING", "c=UNCHECKED", "d=UNCHECKED", "f=UNCHECKED"),
+                g.edges("pipeline", "collector.connection").stream().map(e -> e.fromName().replace("_pipeline", "")
+                        + "=" + e.status()).toList(),
+                "remote: trimmed id from *_connection.toon at any depth, registry/connections not loaded; local, "
+                        + "dataset and absent connectors never look it up");
+        assertEquals(List.of("d=RESOLVED", "e=DANGLING", "f=UNCHECKED"),
+                g.edges("pipeline", "collector.dataset").stream().map(e -> e.fromName().replace("_pipeline", "")
+                        + "=" + e.status()).toList(), "datasets/ prefix dropped; only with connector: dataset");
+        assertEquals(List.of("a=RESOLVED", "b=DANGLING", "c=RESOLVED", "d=UNCHECKED", "e=UNCHECKED"),
+                g.edges("pipeline", "processing.schema_file").stream().map(e -> e.fromName().replace("_pipeline", "")
+                        + "=" + e.status()).toList(), "beside the file, schema/<id> in the registry; not with a "
+                        + "plugin ingester or a Grammar");
+        assertEquals(List.of(LinkGraph.Status.UNCHECKED), g.edges("pipeline", "**.use").stream()
+                .map(LinkGraph.Edge::status).toList(), "no loader reads use: in a *_pipeline.toon");
+
+        // a draft (LC-3 save) is judged against the same universe; with no file its schema_file is not judged
+        List<LinkGraph.Edge> draft = g.edgesOf("pipeline", "x", Map.of("collector", Map.of("connector", "sftp",
+                "connection", "GONE"), "processing", Map.of("schema_file", "missing.toon")));
+        assertEquals(List.of("collector.connection=DANGLING", "processing.schema_file=UNCHECKED"),
+                draft.stream().map(e -> e.key() + "=" + e.status()).sorted().toList());
+    }
+
     @Test
     void anAbsentRootIsAnEmptyGraph(@TempDir Path root) {
         assertTrue(LinkGraph.of(root.resolve("nope"), rel -> false).edges().isEmpty());
