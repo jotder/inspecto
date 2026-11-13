@@ -1,6 +1,6 @@
 # Space evolution — a Space the server understands as a whole, reached without breaking one
 
-**State:** IN PROGRESS — D-SE1…D-SE9 answered (§6); SE-0, SE-6a, SE-1a, SE-3a, SE-5a, SE-5b and SE-6b built (table below); SE-2a is a peer lane; what is left is gated (§5).
+**State:** IN PROGRESS — D-SE1…D-SE13 answered (§6); SE-0, SE-6a, SE-1a, SE-3a, SE-5a, SE-5b, SE-6b and SE-2a built (table below); what is left is gated (§5), with D-SE10…D-SE13 started.
 Board row `SPACE-EVOLUTION-1`.
 **Depends on:** [`2026-11-11-space-link-census-plan.md`](2026-11-11-space-link-census-plan.md) phase LC-1
 (the declared link census and its graph). This plan does not repeat that design; it builds on it.
@@ -11,14 +11,15 @@ Board row `SPACE-EVOLUTION-1`.
 | Step | State | Commits | Notes |
 |---|---|---|---|
 | SE-0 corpus equivalence gate, old-reader check | built 2026-11-12 | `7243bcd07` | 3 Spaces + 30 templates; capability flags registered: `space.integrity`, `links.delete`, `links.save` |
-| SE-6a tests that travel with a Space | built 2026-11-12 | `cbbc0523a`, `199affd8d`; fixes `2aad8fc9b`, `ac09275b4` | pushed without the whole module's tests, which left three tests red on master until the fixes; spec `spec-space-tests.md`; five operator questions open |
+| SE-6a tests that travel with a Space | built 2026-11-12 | `cbbc0523a`, `199affd8d`; fixes `2aad8fc9b`, `ac09275b4` | pushed without the whole module's tests, which left three tests red on master until the fixes; spec `spec-space-tests.md`; its five operator questions answered as built (D-SE9, 2026-11-13) |
 | SE-1a Space lock, report-only | built 2026-11-13 | `ad946532e`, `1f61ef26f` | `GET /spaces/{id}/integrity`; kill switch `-Dspace.integrity=off`; residuals `SPACE-LOCK-CLOSE-RESIDUALS-1`; spec `spec-space-lock.md` |
 | SE-3a column contract, report-only | built 2026-11-13 | `d94dec6be`, `1f62b8235` | spec `spec-column-contract.md` |
-| SE-2a hand-rename detection, report | in flight (peer lane) | — | |
+| SE-2a hand-rename detection, report | built 2026-11-13 | `288d5f55a`, `a37dd8f69`, merge `bf7650e2c` | renames and deletes reported with their referrers; also closed `SPACE-LOCK-CLOSE-RESIDUALS-1`; spec `spec-space-lock.md` §3 |
 | SE-5a template version + origin | built 2026-11-13 | `54d10255d`, `0385d15c4` | the origin lives in `.inspecto/created-from.toon`, not the lock (spec `spec-space-origin.md` §1) |
 | SE-5b template upgrade proposal | built 2026-11-13 | `5f43a9475`, `af71a6fad` | `GET` / `POST /spaces/{id}/origin/upgrade`: three-way per file (recorded hash, template now, Space now), applies only `update` / `add`, one Pending Change under a policy; a partial apply keeps the old version until the last group; spec `spec-space-origin.md` §5; known limit `SPACE-UPGRADE-STUCK-VERSION-1` |
 | SE-6b promotion into an existing Space | built 2026-11-13 | `45667eed3`, `fc7ff8993` | `POST /spaces/{id}/promotion/preview` and `/apply`: a `GET /export` bundle plus `${NAME}` parameters in the request, a previewed change set, one Pending Change under a policy (D-SE7), removals only with `removals: true`, kill switch `-Dspace.promotion=off`; spec `spec-space-promotion.md`; known limits `SPACE-PROMOTION-PARAM-TYPES-1` |
-| SE-1b / 2b / 3b, SE-4 | gated | — | §5 |
+| SE-2b rename auto-rewrite, opt-in | built 2026-11-13 with SE-2a | `288d5f55a` | per-Space `rename_rewrite: true` in `space.toon` (not `safety-policy.toon`: a lenient reader, so older releases ignore it); Pipelines only; held under an approval policy; kill switch `-Dspace.rename.rewrite=off`. The default flip waits (D-SE2) |
+| SE-1b / 3b, SE-4 | gated; the finding baseline, the SE-3b opt-in, the activation seam and SE-4 step 1 started 2026-11-13 | — | §5; D-SE10…D-SE13 |
 
 Only targeted test classes ran on each lane; the full gate was not run.
 
@@ -221,6 +222,10 @@ All eight answered by the operator on 2026-11-11.
 | **D-SE7** | Promotion into an existing Space? | **Yes, as a previewed change set through Pending Changes** — nothing lands in the target Space without review. **Detail (operator, 2026-11-13):** a target Space with no approval policy lets an administrator apply the previewed change set directly; with a policy it goes through Pending Changes. |
 | **D-SE9** | The SE-1a integrity report's gate, and SE-6a's five open questions | **Answered 2026-11-13, all as built:** `GET /spaces/{id}/integrity` stays `canAuthorWorkbench`; a dry run of `space.test` runs the cases (they write only to temp folders); a Pipeline with several outputs is checked across all of them together; the test routes also answer unprefixed for the default Space; the runner stays in the control plane. |
 | **D-SE8** | When may the old paths be retired (a Space without a lock; state inside `config/`)? | **At a named major release.** Both paths live until then; that release ships the migrator, runs it as a documented upgrade step, and removes the old path. This is the agreed exception to "breaking changes are free, no shims" for this plan. The release is named when SE-4 ships. |
+| **D-SE10** | The finding baseline (§3) has not been run; the clean-shadow clock of D-SE2 / D-LC3 has not really started | **Run it now (operator, 2026-11-13):** compute every shipped Space's and Space Template's reports (integrity, rename, column contract, LC-3 delete/save shadow), class each finding as a real defect in that Space (fixed there) or a false positive (the check is fixed), and record the baseline here. The clock starts at zero unknowns. |
+| **D-SE11** | D-SE2 gates only the *default*; may the opt-in steps be built before the clean-shadow period? | **Yes (operator, 2026-11-13):** build SE-2b (rename auto-rewrite) and SE-3b (Schema save stopped with the consumers it breaks, `?force=true` goes ahead, D-SE4) now, each behind its own default-off per-Space key in `safety-policy.toon`, as LC-4's `links: refuse-activation`. Existing Spaces are unchanged; the default flip still waits for two clean releases. |
+| **D-SE12** | The two holds left out of LC-4 / LC-6 for want of a seam: a Pipeline or Job with a dangling link inactive at load under `refuse-activation`, and D-LC4's outside-edited file inactive until accepted where `approval.toon` governs its kind | **Build the seam (operator, 2026-11-13):** one activation check that both the Pipeline and the Job scheduler consult (link and acceptance status from the Space lock), then both holds on top. Only a Space that opted in is affected; a Space always boots and the held object says why. |
+| **D-SE13** | SE-4 waits on readers shipped one release before any writer, and on the major release D-SE8 names | **Build step 1 now (operator, 2026-11-13):** each store reads `state/<dir>` first and falls back to `config/<dir>`; `BackupTask`, bundle export and `.gitignore` learn `state/`; each store is checked for a signature that covers its path. Nothing moves and nothing new is written there. The major release is still named when SE-4 ships. |
 
 ## 7. Risks
 

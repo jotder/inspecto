@@ -67,6 +67,9 @@ class SpaceCorpusEquivalenceTest {
             mode("links.save"),
             // SE-3a column contract: report-only, kill switch -Dcolumn.contract=off; touches the lock and save warnings only
             Capability.killSwitch(ColumnContract.PROPERTY, null),
+            // SE-2a opt-in hand-rename rewrite: kill switch -Dspace.rename.rewrite=off; acts only in a Space whose
+            // space.toon opts in (none shipped), after a lock computation — never at load
+            Capability.killSwitch(SpaceLock.RENAME_REWRITE_PROPERTY, null),
             // SE-6b promotion: two routes, kill switch -Dspace.promotion=off; nothing at load reads it
             Capability.killSwitch(com.gamma.control.SpacePromotion.PROPERTY, null));
 

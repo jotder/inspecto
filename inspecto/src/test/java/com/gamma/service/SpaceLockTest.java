@@ -276,6 +276,84 @@ class SpaceLockTest {
         assertEquals(0, ((Map<?, ?>) next.body().get("changedOutside")).get("total"), next.body().toString());
     }
 
+    /** SPACE-LOCK-CLOSE-RESIDUALS-1 (2): a write window opened after a Space was closed and deleted (a request
+     *  already bound to it) makes no fresh state, and nothing recreates its folders. */
+    @Test
+    void aDeletedSpaceIsNeverRecreated(@TempDir Path tmp) throws Exception {
+        Path config = space(tmp);
+        SpaceLock.compute("alpha", config, List.of());
+        SpaceLock.forget(config);
+        deleteTree(tmp.resolve("alpha"));
+
+        SpaceLock.Window w = SpaceLock.writeStarted("alpha", config);
+        SpaceLock.writeEnded(config, w, true);
+        assertEquals("closed", SpaceLock.report("alpha", config).status());
+        Thread.sleep(SpaceLock.DEBOUNCE_MS + 1000);   // past the debounce a scheduled computation would have run
+        assertFalse(Files.exists(tmp.resolve("alpha")), "a forgotten Space's folder was recreated");
+
+        // a computation that reaches a deleted config root (already running when the Space went) writes nothing
+        SpaceLock.compute("alpha", config, List.of());
+        assertFalse(Files.exists(tmp.resolve("alpha")), "compute recreated a deleted Space's folders");
+    }
+
+    /** (2) A computation still running when the Space closes writes no lock and creates no folder. */
+    @Test
+    void aComputationThatSeesTheSpaceClosedWritesNothing(@TempDir Path tmp) throws Exception {
+        Path config = space(tmp);
+        SpaceLock.Report r = SpaceLock.compute("alpha", config, List.of(), () -> true);
+        assertEquals("closed", r.status());
+        assertFalse(Files.exists(tmp.resolve("alpha/" + SpaceLock.DIR)), "a closed Space got a lock folder");
+        assertFalse(Files.exists(tmp.resolve("alpha/config.secrets")), "a closed Space got a key folder");
+    }
+
+    /** (1) and (3): a running computation holds closing for at most the flush budget — not the Space's whole close
+     *  deadline — and the skipped flush is logged. */
+    @Test
+    void closingWaitsAtMostTheFlushBudgetAndLogsTheSkippedFlush(@TempDir Path tmp) throws Exception {
+        Path config = space(tmp);
+        SpaceLock.Window w = SpaceLock.writeStarted("alpha", config);
+        SpaceLock.writeEnded(config, w, true);   // an unrecorded server write: closing would flush it
+        java.util.concurrent.locks.ReentrantLock computing = SpaceLock.computingForTest(config);
+        java.util.concurrent.CountDownLatch held = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+        Thread holder = new Thread(() -> {
+            computing.lock();
+            held.countDown();
+            try {
+                done.await();
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            } finally {
+                computing.unlock();
+            }
+        });
+        holder.start();
+        held.await();
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> logs =
+                new ch.qos.logback.core.read.ListAppender<>();
+        logs.start();
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(SpaceLock.class);
+        logger.addAppender(logs);
+        try {
+            long t0 = System.currentTimeMillis();
+            SpaceLock.forget(config);
+            long took = System.currentTimeMillis() - t0;
+            assertTrue(took < SpaceLock.FLUSH_BUDGET_MS + 1500, "closing waited " + took + " ms");
+            assertTrue(logs.list.stream().anyMatch(e -> e.getFormattedMessage().contains("close-time flush was skipped")),
+                    "the skipped flush was not logged");
+        } finally {
+            logger.detachAppender(logs);
+            done.countDown();
+            holder.join();
+        }
+    }
+
+    private static void deleteTree(Path dir) throws IOException {
+        try (Stream<Path> s = Files.walk(dir)) {
+            for (Path p : s.sorted(java.util.Comparator.reverseOrder()).toList()) Files.delete(p);
+        }
+    }
+
     /** Writes closer together than the debounce still get a computation within the maximum wait (finding 3). */
     @Test
     void steadyWritesStillGetAComputation(@TempDir Path tmp) throws Exception {
@@ -346,12 +424,18 @@ class SpaceLockTest {
             Path root = tmp.resolve("boot" + i);
             copy(demo.resolve("config"), root.resolve("demo/config"));
             Files.copy(demo.resolve("space.toon"), root.resolve("demo/space.toon"));
+            // the lock's thread is held through startAll, so "no lock yet" proves boot only scheduled, at any boot speed
+            Runnable release = SpaceLock.holdThreadForTest();
             long t0 = System.nanoTime();
             SpaceManager spaces = SpaceManager.discover(root);
             try {
-                spaces.startAll();
-                ms[i] = (System.nanoTime() - t0) / 1_000_000;
-                assertFalse(Files.exists(root.resolve("demo/.inspecto/space.lock")), "boot must not compute the lock");
+                try {
+                    spaces.startAll();
+                    ms[i] = (System.nanoTime() - t0) / 1_000_000;
+                    assertFalse(Files.exists(root.resolve("demo/.inspecto/space.lock")), "boot must not compute the lock");
+                } finally {
+                    release.run();
+                }
                 if (on) {
                     long deadline = System.currentTimeMillis() + 20_000;
                     while (!Files.exists(root.resolve("demo/.inspecto/space.lock")) && System.currentTimeMillis() < deadline)

@@ -55,8 +55,13 @@ public final class SpaceContext implements AutoCloseable {
 
     @Override
     public void close() {
-        SpaceLock.forget(root.config());
-        service.close();
+        // the service first: its store drain keeps the whole close budget (SpaceManager.CLOSE_DEADLINE_MS); the lock's
+        // close-time flush has a short budget of its own (SpaceLock.FLUSH_BUDGET_MS)
+        try {
+            service.close();
+        } finally {
+            SpaceLock.forget(root.config());
+        }
     }
 
     /**
@@ -66,15 +71,26 @@ public final class SpaceContext implements AutoCloseable {
     public record SpaceManifest(String displayName, String description, String createdAt, String dataRoot) {
 
         private static final Logger log = LoggerFactory.getLogger(SpaceContext.class);
+        private static final java.util.Set<String> OWNED = java.util.Set.of("display_name", "description", "created_at", "data_root");
 
         /** A manifest with no {@code data_root} (the Space's state stays under its base, or the convention mount). */
         public SpaceManifest(String displayName, String description, String createdAt) {
             this(displayName, description, createdAt, "");
         }
 
-        /** Write this manifest to {@code space.toon} at {@code path} (canonical TOON, crash-safe). */
+        /** Write this manifest to {@code space.toon} at {@code path} (canonical TOON, crash-safe). Keys this record does
+         *  not own ({@code min_product_version}, {@code rename_rewrite}, …) are kept from the file as it was. */
         void write(Path path) throws IOException {
             Map<String, Object> m = new LinkedHashMap<>();
+            if (Files.isRegularFile(path)) {
+                try {
+                    for (Map.Entry<String, Object> e : ToonHelper.load(path.toString()).entrySet())
+                        if (!OWNED.contains(e.getKey())) m.put(e.getKey(), e.getValue());
+                } catch (Exception e) {
+                    log.warn("Could not read space manifest {} before rewriting it — its other keys are lost: {}", path,
+                            e.getMessage());
+                }
+            }
             m.put("display_name", displayName);
             m.put("description", description);
             m.put("created_at", createdAt);
