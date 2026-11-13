@@ -321,7 +321,7 @@ check found in the code.
 | Enrichment `triggers.on_pipeline` | Pipeline | id | rename, impact, validate |
 | Enrichment `references.<n>.ref` | Pipeline | id | rename, impact, validate |
 | Enrichment `input.database`, `references.<n>.path` | a store directory / a file | path | none |
-| Job `on_pipeline` | Pipeline | id, or several comma-separated (each member is a link) | rename, impact |
+| Job `on_pipeline` | Pipeline | id, or several comma-separated (each member is a link) | rename, impact, validate |
 | Job `pipeline_config` | a `*_pipeline.toon` file | path | none |
 | Job `dataset`, `target`, `dir`, params | Dataset / directory | id / path | none |
 | Job `on_signal` + `when` | a signal and its payload | text | none |
@@ -384,8 +384,8 @@ Job (all of them nest the key under `job:`) pointing at the old id, and a delete
 *Census, 2026-11-12 (`SPACE-LINK-CENSUS-1` LC-2).* The rename now rewrites an Enrichment's by-name
 `references.<n>.ref` and one member of a comma-list `on_pipeline`, which impact also lists; a bundle export finds
 companions at any depth; and `metadata_validate` / the bundle import judge a Reconciliation's `thirdDataset`.
-`metadata_validate` itself still walks four folder levels and checks no Job — board row `PIPELINE-LINK-GAPS-1`
-in [`BACKLOG.md`](../../../../BACKLOG.md).
+`metadata_validate` reads every file-held pipeline link (Enrichment and Job, any folder depth) from the link
+census, never a walk of its own; `registry/` and hidden folders are not read as config.
 
 ### 12.4 Duplicates — one definition per thing
 
