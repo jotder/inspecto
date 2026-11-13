@@ -323,13 +323,54 @@ class ControlApiSpaceOriginUpgradeTest {
             Path config = c.shop().resolve("config");
             Files.writeString(config.resolve("approval.toon"), "approval:\n  widget:\n    required: true\n");
             bump(c);
+            String revenue = Files.readString(config.resolve(REVENUE));
             String id = V1Body.of(apply(c, "admin", "{\"toVersion\":\"2\"}").body()).at("/pendingChange/id").asText();
-            Files.writeString(config.resolve(REVENUE), Files.readString(config.resolve(REVENUE)) + "title: edited meanwhile\n");
-            String edited = Files.readString(config.resolve(REVENUE));
+            // the Space moves while the change waits, in a file the proposal listed (the KPI conflict) - the chosen set
+            // (the revenue update) stays exactly what was approved, so only the pinned base can refuse it
+            Files.writeString(config.resolve(KPI), Files.readString(config.resolve(KPI)) + "subtitle: edited meanwhile\n");
             HttpResponse<String> r = send(c, "POST", "/spaces/shop/pending-changes/" + id + "/approve", "checker", "{}");
             assertEquals(409, r.statusCode(), r.body());
-            assertEquals(edited, Files.readString(config.resolve(REVENUE)), "the Space's newer edit stands");
+            assertTrue(r.body().contains("changed after this change was proposed"), "refused by the approval pin: " + r.body());
+            JsonNode pc = V1Body.of(send(c, "GET", "/spaces/shop/pending-changes/" + id, "checker", null).body());
+            assertEquals("stale", pc.get("status").asText(), pc.toString());
+            assertEquals(revenue, Files.readString(config.resolve(REVENUE)), "nothing applied");
             assertEquals("unversioned", SpaceOrigin.read(c.shop()).orElseThrow().templateVersion());
+        }
+    }
+
+    @Test
+    void filesAppliedInGroupsStayProposedUntilTheLastGroupRecordsTheVersion(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            Path config = c.shop().resolve("config");
+            Files.copy(c.template().resolve("config").resolve(KPI), config.resolve(KPI),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);   // undo the Space's edit: both widgets are updates
+            bump(c);
+            JsonNode p = V1Body.of(read(c, "shop").body());
+            assertEquals(2, p.get("applicable").size(), p.toString());
+
+            HttpResponse<String> first = apply(c, "ops", "{\"toVersion\":\"2\",\"files\":[\"" + REVENUE + "\"]}");
+            assertEquals(200, first.statusCode(), first.body());
+            JsonNode one = V1Body.of(first.body());
+            assertEquals("unversioned", one.get("recordedVersion").asText(), one.toString());
+            assertEquals(KPI, one.get("remaining").get(0).asText());
+            SpaceOrigin.Origin mid = SpaceOrigin.read(c.shop()).orElseThrow();
+            assertEquals("unversioned", mid.templateVersion(), "a partial apply keeps the recorded version");
+            assertEquals(sha(config.resolve(REVENUE)), mid.hashes().get(REVENUE));
+            JsonNode rest = V1Body.of(read(c, "shop").body());
+            assertEquals("proposal", rest.get("status").asText(), "the rest stays proposed: " + rest);
+            assertNull(entry(rest, REVENUE), "the applied file now equals the template");
+            assertEquals(KPI, rest.get("applicable").get(0).asText());
+            assertEquals(1, rest.get("applicable").size());
+
+            HttpResponse<String> second = apply(c, "ops", "{\"toVersion\":\"2\",\"files\":[\"" + KPI + "\"]}");
+            assertEquals(200, second.statusCode(), second.body());
+            JsonNode two = V1Body.of(second.body());
+            assertEquals("2", two.get("recordedVersion").asText(), two.toString());
+            assertEquals(0, two.get("remaining").size());
+            assertEquals("2", SpaceOrigin.read(c.shop()).orElseThrow().templateVersion());
+            assertEquals("same-version", V1Body.of(read(c, "shop").body()).get("status").asText());
+            for (String f : new String[] {KPI, REVENUE})
+                assertArrayEquals(Files.readAllBytes(c.template().resolve("config").resolve(f)), Files.readAllBytes(config.resolve(f)), f);
         }
     }
 

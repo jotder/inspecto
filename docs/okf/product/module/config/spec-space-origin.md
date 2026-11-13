@@ -129,16 +129,29 @@ apply takes without `files`. `proposalId` is a SHA-256 over every entry and both
 8. the maker-checker hold (`PendingChanges.holdSet`): when the Space's approval policy holds the kind of ANY chosen file
    (a file whose kind cannot be told counts as held), the whole set becomes ONE Pending Change, kind
    `space-template-upgrade`, name = the template id, answered 202. Its rules must name one approver capability, else 409
-   (apply the files in groups). It pins the template's hashes over the Space's; approving replays this request as its
-   author, and a Space file changed meanwhile makes it stale (409). With no policy the administrator's request applies
-   directly (D-SE7's detail);
+   (apply the files in groups, §5.4). It pins the template's hashes over the chosen files' Space hashes and the
+   `proposalId`; approving replays this request as its author, and anything the proposal listed that moved meanwhile
+   (a chosen file, a conflict the Space edited further, the template's files) makes it stale (409, Pending Change
+   status `stale`). With no policy the administrator's request applies directly (D-SE7's detail);
 9. write: every file through the import's writer (`BundleImporter.writeConfig` + `ImportJournal`, atomic per file, all
    rolled back if one fails), a Pipeline also into its history (`PipelineHistory`) and refusal audit; then the record is
-   rewritten (temp file + move): `templateVersion` = the new version, each applied file's hash = the bytes written (a
+   rewritten (temp file + move): `templateVersion` = the new version once no `update` / `add` is left unapplied (else
+   it stays, §5.4), each applied file's hash = the bytes written (a
    stamped Job's, not the template's), every other hash kept, so a conflict still reads against the old baseline;
    `recordedAt` now; `template`, `origin` and the PA-7d App fields kept. A failed record rewrite rolls the files back.
 
-Answer: `{template, fromVersion, toVersion, applied, notApplied: [{path, change}]}`.
+Answer: `{template, fromVersion, toVersion, applied, recordedVersion, remaining, notApplied: [{path, change}]}` —
+`remaining` the applicable files still unapplied.
+
+### 5.4 Applying in groups
+
+`files` may name a subset (a policy whose kinds name different approvers needs it). A partial apply records the hashes of
+the files it wrote but keeps the recorded `templateVersion`, so the next `GET` still proposes the remaining updates and
+adds against the same newer version (the applied files now equal the template and drop out). The apply that leaves no
+applicable `update` / `add` records the new version; conflicts, `kept`, `template-removed` and refused files never hold
+it back. Until then `/origin` reports `templateSince: newer-version`, which is true: part of the newer version is not in
+the Space. Decision (SE-5b verification, 2026-11-13): first built as "every apply records the new version", which made a
+second group read `same-version` and be refused.
 
 Deliberately not done: a registry component written by the upgrade gets no MET-5 version-history copy (the import writer
 writes raw files, as a Space bundle import does); nothing is deleted; a Pipeline the upgrade writes takes effect as after

@@ -187,7 +187,8 @@ public final class SpaceOrigin {
     // ── upgrade (SE-5b) ──
 
     /**
-     * After an upgrade applied some of a newer template's files: the record now names {@code newVersion} and holds
+     * After an upgrade applied some of a newer template's files: the record now names {@code newVersion} (the caller passes
+     * the old version while updates or adds of the newer one remain unapplied) and holds
      * {@code applied} (path to the SHA-256 of the bytes written) in place of those files' old hashes. Every other hash - a
      * conflict, a file the operator left out - stays as recorded, so it still reads against the old baseline. The record's
      * {@code template}, {@code origin} and the PA-7d App fields are kept; {@code recordedAt} is now. Temp file + move.

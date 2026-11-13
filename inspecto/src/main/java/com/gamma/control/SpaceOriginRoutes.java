@@ -210,7 +210,8 @@ final class SpaceOriginRoutes implements RouteModule {
             bundle = JobAuthority.stampBundle(ex, bundle);
 
             // Maker-checker: ONE Pending Change for the set when the policy holds any of its files. Pinned on the
-            // template's hashes (proposed) over the Space's (current), so a replay passes only over the same base.
+            // template's hashes (proposed) over the Space's and the whole proposal's (current), so a replay passes only
+            // when neither the chosen files nor anything else the proposal listed moved since it was proposed.
             Map<String, Object> proposed = new LinkedHashMap<>(), current = new LinkedHashMap<>();
             Map<String, Object> to = new TreeMap<>(), from = new TreeMap<>();
             for (String f : chosen) {
@@ -223,6 +224,7 @@ final class SpaceOriginRoutes implements RouteModule {
             proposed.put("files", to);
             current.put("fromVersion", o.templateVersion());
             current.put("files", from);
+            current.put("proposalId", p.id());
             PendingChanges.holdSet(api, ex, chosen, UPGRADE_KIND, o.template(), proposed, current);
 
             // The shared raw-config writer (the import's): every file judged first, each written atomically through the
@@ -241,8 +243,12 @@ final class SpaceOriginRoutes implements RouteModule {
             }
             Map<String, String> written = new TreeMap<>();
             bundle.configEntries().forEach((f, b) -> written.put(f, SpaceOrigin.sha256(b)));
+            // A partial apply (files in groups) keeps the recorded version, so the updates and adds it left stay proposed
+            // against the same template version; the apply that leaves none records the new version.
+            List<String> remaining = p.applicable().stream().filter(f -> !written.containsKey(f)).toList();
+            String recordedVersion = remaining.isEmpty() ? now : o.templateVersion();
             try {
-                SpaceOrigin.recordUpgrade(base, now, written);
+                SpaceOrigin.recordUpgrade(base, recordedVersion, written);
             } catch (IOException | RuntimeException failed) {
                 try {
                     journal.rollback();
@@ -262,6 +268,8 @@ final class SpaceOriginRoutes implements RouteModule {
             out.put("fromVersion", o.templateVersion());
             out.put("toVersion", now);
             out.put("applied", new ArrayList<>(written.keySet()));
+            out.put("recordedVersion", recordedVersion);
+            out.put("remaining", remaining);
             List<Map<String, Object>> left = new ArrayList<>();
             for (SpaceTemplateUpgrade.Entry e : p.files())
                 if (!written.containsKey(e.path())) left.add(Map.of("path", e.path(), "change", e.change()));
