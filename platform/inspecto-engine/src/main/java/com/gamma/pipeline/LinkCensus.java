@@ -97,7 +97,7 @@ public final class LinkCensus {
             link("enrichment", "references.*.path", "file", Type.PATH, WARN, REPORT),
             link("enrichment", "transform", "column", Type.SQL_COLUMN, WARN, REPORT, VALIDATE, IMPACT),
             // ── Job (keys read inside the job: section) ──────────────────────────────────────────
-            link("job", "on_pipeline", "pipeline", Type.ID_LIST, REFUSE, REWRITE, RENAME, IMPACT),
+            link("job", "on_pipeline", "pipeline", Type.ID_LIST, REFUSE, REWRITE, RENAME, IMPACT, VALIDATE),
             link("job", "template", "job-template", Type.ID, REFUSE, REPORT, LOAD),
             link("job", "pipeline_config", "pipeline-file", Type.PATH, REFUSE, REWRITE),
             link("job", "dataset", "dataset", Type.ID, REFUSE, REWRITE),

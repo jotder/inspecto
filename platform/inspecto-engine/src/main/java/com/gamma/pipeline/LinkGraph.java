@@ -113,6 +113,11 @@ public final class LinkGraph {
         return edges.stream().filter(e -> e.fromKind().equals(fromKind)).toList();
     }
 
+    /** The lower-cased pipeline ids the config root's pipeline files declare; empty when none (or not known). */
+    public Set<String> pipelineIds() {
+        return universe.pipelineIds() == null ? Set.of() : Set.copyOf(universe.pipelineIds());
+    }
+
     public List<Edge> dangling() {
         return edges.stream().filter(e -> e.status() == Status.DANGLING).toList();
     }

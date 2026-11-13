@@ -977,6 +977,37 @@ class MaintenanceLibraryTest {
     }
 
     @Test
+    void metadataValidateReportsDeepJobAndEnrichmentPipelineLinksOnce(@TempDir Path writeRoot) throws Exception {
+        // PIPELINE-LINK-GAPS-1 (d): the audit used to walk four levels and never read a Job. A Job in a deep
+        // sub-folder (comma list inside job:) and an Enrichment five levels down each yield exactly one finding;
+        // their resolved links, a .history copy and a registry file named *_job.toon yield none.
+        System.setProperty("assist.write.root", writeRoot.toString());
+        try {
+            Files.writeString(writeRoot.resolve("orders_pipeline.toon"), "name: orders\n");
+            Path deepJob = Files.createDirectories(writeRoot.resolve("a/b/c/d"));
+            Files.writeString(deepJob.resolve("nightly_job.toon"), "job:\n  on_pipeline: \"orders, ghost_pipe\"\n");
+            Path deepEnrich = Files.createDirectories(writeRoot.resolve("l1/l2/l3/l4/l5"));
+            Files.writeString(deepEnrich.resolve("deep_enrich.toon"),
+                    "transform: SELECT 1\ntriggers:\n  on_pipeline: gone_pipe\nreferences:\n  dim:\n    ref: orders\n");
+            Files.createDirectories(writeRoot.resolve(".history"));
+            Files.writeString(writeRoot.resolve(".history/old_job.toon"), "job:\n  on_pipeline: ghost_pipe\n");
+            Files.createDirectories(writeRoot.resolve("registry/views"));
+            Files.writeString(writeRoot.resolve("registry/views/saved_job.toon"), "job:\n  on_pipeline: ghost_pipe\n");
+
+            var ctx = new CapturingJobContext();
+            JobResult r = new MaintenanceJob(job(Map.of("task", "metadata_validate"))).run(ctx);
+            assertEquals("SUCCESS", r.status(), r.message());
+            assertEquals(List.of(
+                    "broken reference: enrichment 'deep_enrich' → missing pipeline 'gone_pipe' (triggers.on_pipeline)",
+                    "broken reference: job 'nightly_job' → missing pipeline 'ghost_pipe' (on_pipeline)"),
+                    ctx.warnings.stream().sorted().toList(), ctx.warnings.toString());
+            assertTrue(r.message().contains("2 finding(s)"), r.message());
+        } finally {
+            System.clearProperty("assist.write.root");
+        }
+    }
+
+    @Test
     void metadataValidateReportsDanglingColumnLinks(@TempDir Path writeRoot) throws Exception {
         // LC-5: a column the Schema does not map is a finding; a mapped one, and a .history copy, are not.
         System.setProperty("assist.write.root", writeRoot.toString());
