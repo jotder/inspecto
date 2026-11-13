@@ -32,8 +32,9 @@ public final class LinkCensus {
     /** Intended behaviour when the target is renamed. */
     public enum OnRename { REWRITE, REPORT }
 
-    /** The existing checks that read a link (as of LC-1). */
-    public enum Check { LOAD, IMPACT, VALIDATE, IMPORT, RENAME, DELETE }
+    /** The existing checks that read a link (as of LC-1). {@code RUN}: the Pipeline's run resolves it and fails
+     *  without it (its Collector cannot be built, every cycle) - SE-1b. */
+    public enum Check { LOAD, IMPACT, VALIDATE, IMPORT, RENAME, DELETE, RUN }
 
     /**
      * One link.
@@ -61,9 +62,12 @@ public final class LinkCensus {
                     || fromKind.equals("expectation") && keyPath.equals("target");
         }
 
-        /** What {@code value} names: trimmed, and for a {@link #storePath} only its first path segment. */
+        /** What {@code value} names: trimmed, for a {@link #storePath} only its first path segment, and for a
+         *  Pipeline's {@code collector.dataset} without the {@code datasets/} prefix the parser drops. */
         public String named(String value) {
             String v = value.trim();
+            if (fromKind.equals("pipeline") && keyPath.equals("collector.dataset") && v.startsWith("datasets/"))
+                return v.substring("datasets/".length()).trim();
             int slash = v.indexOf('/');
             return storePath() && slash >= 0 ? v.substring(0, slash) : v;
         }
@@ -76,7 +80,7 @@ public final class LinkCensus {
     private static final OnDelete REFUSE = OnDelete.REFUSE, WARN = OnDelete.WARN;
     private static final OnRename REWRITE = OnRename.REWRITE, REPORT = OnRename.REPORT;
     private static final Check LOAD = Check.LOAD, IMPACT = Check.IMPACT, VALIDATE = Check.VALIDATE,
-            IMPORT = Check.IMPORT, RENAME = Check.RENAME, DELETE = Check.DELETE;
+            IMPORT = Check.IMPORT, RENAME = Check.RENAME, DELETE = Check.DELETE, RUN = Check.RUN;
 
     /**
      * The census. Within one {@code fromKind}, {@link LinkGraph} emits a component's edges in this order — the
@@ -88,8 +92,8 @@ public final class LinkCensus {
             // ── Pipeline → elsewhere ─────────────────────────────────────────────────────────────
             link("pipeline", "processing.schema_file", "schema-file", Type.PATH, REFUSE, REWRITE, LOAD),
             link("pipeline", "**.use", "component", Type.ID, REFUSE, REWRITE, DELETE),
-            link("pipeline", "collector.connection", "connection", Type.ID, REFUSE, REWRITE, DELETE),
-            link("pipeline", "collector.dataset", "dataset", Type.ID, REFUSE, REWRITE),
+            link("pipeline", "collector.connection", "connection", Type.ID, REFUSE, REWRITE, DELETE, RUN),
+            link("pipeline", "collector.dataset", "dataset", Type.ID, REFUSE, REWRITE, RUN),
             // ── Enrichment ───────────────────────────────────────────────────────────────────────
             link("enrichment", "triggers.on_pipeline", "pipeline", Type.ID, REFUSE, REWRITE, RENAME, IMPACT, VALIDATE),
             link("enrichment", "references.*.ref", "pipeline", Type.ID, REFUSE, REWRITE, RENAME, IMPACT, VALIDATE),

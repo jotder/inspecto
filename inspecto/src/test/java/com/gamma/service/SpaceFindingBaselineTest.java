@@ -50,7 +50,8 @@ class SpaceFindingBaselineTest {
                 + "\nno longer found (drop from EXPECTED):\n  " + String.join("\n  ", gone));
     }
 
-    /** The baseline bites: a planted dangling Widget link and a planted duplicate Connection are found. */
+    /** The baseline bites: a planted dangling Widget link, a planted Pipeline whose remote Collector names no
+     *  Connection (SE-1b) and a planted duplicate Connection are found. */
     @Test
     void aPlantedBreakAndDuplicateAreFindings(@TempDir Path tmp) throws IOException {
         SpaceCorpusEquivalenceTest.Entry demo = SpaceCorpusEquivalenceTest.corpus().stream()
@@ -62,10 +63,14 @@ class SpaceFindingBaselineTest {
                 "vizType: line\ndatasetId: no_such_dataset\n");
         java.nio.file.Files.copy(config.resolve("connections/demo_local_connection.toon"),
                 config.resolve("demo_local_copy_connection.toon"));
+        java.nio.file.Files.writeString(config.resolve("planted_remote_pipeline.toon"),
+                "id: planted_remote\nactive: false\ncollector:\n  connector: sftp\n  connection: no_such_connection\n");
         List<String> found = findings(new SpaceCorpusEquivalenceTest.Entry("planted", src, "planted", false),
                 tmp.resolve("work"));
         assertTrue(found.contains("planted | integrity.broken | registry/widgets/planted_widget.toon widget "
                 + "'planted_widget' datasetId=no_such_dataset -> dataset"), "broken link: " + found);
+        assertTrue(found.contains("planted | integrity.broken | planted_remote_pipeline.toon pipeline "
+                + "'planted_remote_pipeline' collector.connection=no_such_connection -> connection"), "pipeline link: " + found);
         assertTrue(found.stream().anyMatch(f -> f.startsWith("planted | metadata_validate | ")
                 && f.contains("no_such_dataset")), "metadata_validate: " + found);
         assertTrue(found.stream().anyMatch(f -> f.startsWith("planted | integrity.duplicates | connection:")),
@@ -132,11 +137,15 @@ class SpaceFindingBaselineTest {
 
         // what was looked at, one line per entry (the record's coverage columns)
         Map<LinkGraph.Status, Integer> byStatus = new java.util.EnumMap<>(LinkGraph.Status.class);
-        for (LinkGraph.Edge x : graph.edges()) byStatus.merge(x.status(), 1, Integer::sum);
+        Map<String, Integer> pipelineLinks = new java.util.TreeMap<>();   // SE-1b: a Pipeline's own links, by key
+        for (LinkGraph.Edge x : graph.edges()) {
+            byStatus.merge(x.status(), 1, Integer::sum);
+            if (x.fromKind().equals("pipeline")) pipelineLinks.merge(x.link().keyPath() + ":" + x.status(), 1, Integer::sum);
+        }
         @SuppressWarnings("unchecked") Map<String, Object> cc = (Map<String, Object>) first.body().get("columnChanges");
         System.out.println("[D-SE10-COVERAGE] " + e.label() + " files=" + first.body().get("files") + " links="
                 + graph.edges().size() + " " + byStatus + " schemas=" + cc.get("schemas") + " unknownSchemas="
-                + cc.get("unknownSchemas") + " findings=" + out.size());
+                + cc.get("unknownSchemas") + " findings=" + out.size() + " pipelineLinks=" + pipelineLinks);
         return out;
     }
 

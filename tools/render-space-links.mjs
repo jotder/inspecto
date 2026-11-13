@@ -62,8 +62,8 @@ const TYPE = {
     ID: 'id', ID_LIST: 'id, or a comma list of ids', PATH: 'path', STORE: 'store name', COLUMN: 'column name',
     SQL_RELATION: 'SQL relation', SQL_COLUMN: 'SQL column', TEXT: 'text',
 };
-const CHECK = { LOAD: 'load', DELETE: 'delete 409', RENAME: 'rename', IMPACT: 'impact', VALIDATE: 'validate', IMPORT: 'import' };
-const CHECK_ORDER = ['LOAD', 'DELETE', 'RENAME', 'IMPACT', 'VALIDATE', 'IMPORT'];
+const CHECK = { LOAD: 'load', RUN: 'run', DELETE: 'delete 409', RENAME: 'rename', IMPACT: 'impact', VALIDATE: 'validate', IMPORT: 'import' };
+const CHECK_ORDER = ['LOAD', 'RUN', 'DELETE', 'RENAME', 'IMPACT', 'VALIDATE', 'IMPORT'];
 const kind = (k) => KIND[k] ?? `\`${k}\``;
 
 export function renderTable(links) {

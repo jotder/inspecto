@@ -135,6 +135,30 @@ class ControlApiLinkRefusalTest {
         }
     }
 
+    /** SE-1b: a Pipeline's own {@code collector.dataset} (with {@code connector: dataset}) is a judged link, so the
+     *  Dataset it consumes is not deleted out from under it in refuse mode; the same key with another connector is
+     *  not read by the loader and names nothing. */
+    @Test
+    void refuseModeRefusesDeletingTheDatasetAConsumerPipelineCollects(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        space(root);
+        component(root, "datasets", "ds2", "name: ds2\nphysicalRef: orders_feed/database\n");
+        component(root, "datasets", "ds3", "name: ds3\nphysicalRef: orders_feed/database\n");
+        Files.writeString(root.resolve("consumer_pipeline.toon"),
+                "id: consumer\nactive: false\ncollector:\n  connector: dataset\n  dataset: datasets/ds2\n");
+        Files.writeString(root.resolve("other_pipeline.toon"),
+                "id: other\nactive: false\ncollector:\n  connector: local\n  dataset: ds3\n");
+        System.setProperty(LinkRefusals.DELETE_PROPERTY, "refuse");
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = send(c.port, "DELETE", "/components/dataset/ds2", null);
+            assertEquals(409, r.statusCode(), r.body());
+            assertDependent(body(r).get("dependents"), "pipeline", "consumer_pipeline", "collector.dataset");
+            assertTrue(Files.exists(root.resolve("registry/datasets/ds2.toon")), "refused: the Dataset stays");
+
+            HttpResponse<String> ok = send(c.port, "DELETE", "/components/dataset/ds3", null);
+            assertEquals(200, ok.statusCode(), "a local connector never reads collector.dataset: " + ok.body());
+        }
+    }
+
     @Test
     void refuseModeRefusesAWidgetDeleteADashboardShows(@TempDir Path cfg, @TempDir Path root) throws Exception {
         space(root);
