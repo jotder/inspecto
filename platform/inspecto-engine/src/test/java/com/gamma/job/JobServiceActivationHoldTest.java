@@ -55,10 +55,24 @@ class JobServiceActivationHoldTest {
             assertTrue(js.trigger("hb"), "a manual run is not held, as for a disabled Job");
             assertEquals("manual", await(() -> js.lastRunOf("hb").orElse(null), "SUCCESS").trigger());
 
-            why.set(null);   // released: no restart, the next fire runs
-            js.submit("hb", "schedule");
-            JobRun ran = await(() -> js.lastRunOf("hb").filter(r -> "schedule".equals(r.trigger())).orElse(null), "SUCCESS");
-            assertEquals("schedule", ran.trigger());
+            // Released: no restart, the next fire runs. The manual run records SUCCESS before it frees its exclusive
+            // slot, so a fire submitted at once may be SKIPPED "previous run still in flight" — fire until one runs.
+            why.set(null);
+            JobRun ran = null;
+            for (int i = 0; i < 40 && ran == null; i++) {
+                js.submit("hb", "schedule");
+                for (int j = 0; j < 20 && ran == null; j++) {
+                    JobRun r = js.lastRunOf("hb").orElse(null);
+                    if (r != null && "schedule".equals(r.trigger()) && "SUCCESS".equals(r.status())) ran = r;
+                    else if (r != null && "schedule".equals(r.trigger()) && "SKIPPED".equals(r.status())) {
+                        assertFalse(r.message().startsWith("held: "), "released Job still held: " + r.message());
+                        Thread.sleep(100);   // let the slot free before the next fire
+                        break;
+                    }
+                    else Thread.sleep(25);
+                }
+            }
+            assertNotNull(ran, "no scheduled run succeeded after the release: last " + js.lastRunOf("hb").orElse(null));
         }
     }
 
