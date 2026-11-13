@@ -218,7 +218,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:78` |
 | POST | `/import/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:79` |
 | POST | `/incidents/([^/]+)/briefs` | gated | `canWorkIncidents` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/IncidentBriefRoutes.java:54` |
-| POST | `/integrity/accept` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceIntegrityRoutes.java:44` |
+| POST | `/integrity/accept` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceIntegrityRoutes.java:45` |
 | POST | `/inv/case-history` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/CaseHistoryRoutes.java:28` |
 | POST | `/inv/datasets/([^/]+)/query` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/QueryRoutes.java:47` |
 | POST | `/inv/deep-links/resolve` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationInboundRoutes.java:79` |

@@ -74,6 +74,12 @@ final class PipelineListRoutes implements RouteModule {
                     s.put("displayName", c.identity().name());
                 // Same conditional style: absent ⇒ the payload is byte-identical to before.
                 if (!c.description().isEmpty()) s.put("description", c.description());
+                // SE-1b (D-SE12): why an active Pipeline's automatic runs are held; emitted only when held.
+                if (c.active()) {
+                    String held = com.gamma.pipeline.ActivationGate.reason(
+                            HostContext.of(api).service().spaceId(), "pipeline", c.identity().pipelineName());
+                    if (held != null) s.put("held", held);
+                }
                 out.add(s);
             });
         }

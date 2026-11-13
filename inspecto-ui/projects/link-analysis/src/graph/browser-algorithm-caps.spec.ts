@@ -37,7 +37,6 @@ function ring(n: number): G6GraphData {
 
 /** Every guarded algorithm: its item, the name its refusal uses, and a run over `g`. */
 const GUARDED: [LaLimitKey, string, (g: G6GraphData) => unknown][] = [
-    ['browser_algorithms.betweennessCentrality', 'Betweenness', betweennessCentrality],
     ['browser_algorithms.closenessCentrality', 'Closeness', closenessCentrality],
     ['browser_algorithms.eigenvectorCentrality', 'Eigenvector centrality', eigenvectorCentrality],
     ['browser_algorithms.katzCentrality', 'Katz centrality', katzCentrality],
@@ -50,6 +49,18 @@ const GUARDED: [LaLimitKey, string, (g: G6GraphData) => unknown][] = [
 
 describe('per-algorithm browser caps (CL-3)', () => {
     afterEach(() => resetLaLimits());
+
+    // LA-PERF-P5-1: betweenness's own item is where EXACT ends; above it the answer is sampled, and it refuses only
+    // above the larger of that item and the analysis cap.
+    it('betweenness refuses only above the larger of its own item and the analysis cap', () => {
+        const g = ring(12);
+        configureLaLimits({ 'browser_algorithms.betweennessCentrality': 11, analysis_node_cap: 12 });
+        expect(() => betweennessCentrality(g)).not.toThrow();
+        configureLaLimits({ 'browser_algorithms.betweennessCentrality': 11, analysis_node_cap: 11 });
+        expect(() => betweennessCentrality(g)).toThrowError('Betweenness is capped at 11 nodes (graph has 12).');
+        configureLaLimits({ 'browser_algorithms.betweennessCentrality': 12, analysis_node_cap: 5 });
+        expect(() => betweennessCentrality(g)).not.toThrow();
+    });
 
     it('ships the decided defaults: 2 500, or the lower measured ceiling', () => {
         expect(LA_LIMIT_FALLBACKS.projection_node_cap).toBe(1000);

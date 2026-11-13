@@ -58,6 +58,8 @@ import {
     BrowserCappedAlgorithm,
     allPaths,
     browserAlgorithmCapValue,
+    betweennessNodeCapValue,
+    betweennessPivots,
     selectionNodeCapValue,
     articulationPoints,
     betweennessCentrality,
@@ -656,7 +658,11 @@ export class LinkAnalysisToolboxComponent {
         const t = CATALOGUE_TOOLS[id];
         if (!t || t.listed !== 'browser') return '';
         const caps = t.server
-            .map((a) => browserAlgorithmCapValue(a as BrowserCappedAlgorithm))
+            .map((a) =>
+                a === 'betweennessCentrality'
+                    ? betweennessNodeCapValue()
+                    : browserAlgorithmCapValue(a as BrowserCappedAlgorithm),
+            )
             .filter((c) => Number.isFinite(c) && c > 0);
         const cap = id === 'scoring' ? suspicionNodeCapValue() : caps.length ? Math.min(...caps) : 0;
         return cap ? `Up to ${fmt(cap)} nodes` : '';
@@ -718,6 +724,8 @@ export class LinkAnalysisToolboxComponent {
     readonly allPathsResult = signal<GraphSelection[]>([]);
     readonly explainText = signal('');
     readonly ranking = signal<NodeScore[]>([]);
+    /** Set when the ranking on screen is a sampled estimate (betweenness above its exact cap, LA-PERF-P5-1). */
+    readonly rankingNote = signal('');
     readonly communityMethod = signal<'label-prop' | 'louvain'>('label-prop');
     readonly communities = signal<{ id: string; members: string[] }[]>([]);
     readonly components = signal<string[][]>([]);
@@ -959,7 +967,7 @@ export class LinkAnalysisToolboxComponent {
         const metric = this.centralityMetric();
         const centrality =
             metric === 'betweenness'
-                ? own('betweennessCentrality')
+                ? spec('betweennessCentrality', betweennessNodeCapValue())
                 : metric === 'closeness'
                   ? own('closenessCentrality')
                   : metric === 'eigenvector'
@@ -1111,6 +1119,7 @@ export class LinkAnalysisToolboxComponent {
         this.allPathsResult.set([]);
         this.explainText.set('');
         this.ranking.set([]);
+        this.rankingNote.set('');
         this.communities.set([]);
         this.components.set([]);
         this.patternMatches.set([]);
@@ -1244,6 +1253,11 @@ export class LinkAnalysisToolboxComponent {
         this.clearServerNotices();
         try {
             this.applyRanking(this.centralityScores(g));
+            const pivots = this.centralityMetric() === 'betweenness' ? betweennessPivots(g.nodes.length) : null;
+            if (pivots !== null)
+                this.rankingNote.set(
+                    `Approximate: estimated from ${fmt(pivots)} of ${fmt(g.nodes.length)} nodes, so close scores may swap places.`,
+                );
         } catch (err) {
             this.ranking.set([]);
             this.analysisError.set(err instanceof Error ? err.message : 'The analysis failed.');
@@ -1252,6 +1266,7 @@ export class LinkAnalysisToolboxComponent {
 
     private applyRanking(scores: NodeScore[]): void {
         this.ranking.set(scores.slice(0, 20));
+        this.rankingNote.set('');
         this.emphasisChange.emit(null);
     }
 

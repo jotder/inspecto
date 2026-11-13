@@ -6,6 +6,7 @@ import {
     findCyclesShortestFirst,
     articulationPoints,
     betweennessCentrality,
+    betweennessPivots,
     bridges,
     cliques,
     closenessCentrality,
@@ -145,6 +146,42 @@ describe('centrality', () => {
             edges: [],
         };
         expect(() => betweennessCentrality(big)).toThrow(/capped/);
+    });
+
+    // LA-PERF-P5-1: above its exact cap betweenness is a Brandes-Pich estimate from cap² / n source nodes.
+    describe('sampled betweenness above the exact cap', () => {
+        afterEach(() => resetLaLimits());
+
+        /** Two 30-node stars joined through one bridge node: the bridge, then the two hubs, carry every path. */
+        function barbell(): G6GraphData {
+            const nodes = [node('bridge'), node('hubA'), node('hubB')];
+            const edges = [edge('hubA', 'bridge'), edge('bridge', 'hubB')];
+            for (let i = 0; i < 30; i++) {
+                nodes.push(node(`a${i}`), node(`b${i}`));
+                edges.push(edge('hubA', `a${i}`), edge('hubB', `b${i}`));
+            }
+            return { nodes, edges };
+        }
+
+        it('is exact up to the cap and samples cap² / n pivots above it', () => {
+            configureLaLimits({ 'browser_algorithms.betweennessCentrality': 500 });
+            expect(betweennessPivots(500)).toBeNull();
+            expect(betweennessPivots(767)).toBe(325);
+            expect(betweennessPivots(2500)).toBe(100);
+        });
+
+        it('keeps the exact top nodes, scaled to the same size, and answers the same on every run', () => {
+            const g = barbell();
+            const exact = betweennessCentrality(g);
+            configureLaLimits({ 'browser_algorithms.betweennessCentrality': 20 }); // 63 nodes: 6 pivots
+            expect(betweennessPivots(g.nodes.length)).toBe(6);
+            const approx = betweennessCentrality(g);
+            expect(approx.slice(0, 3).map((s) => s.id).sort()).toEqual(exact.slice(0, 3).map((s) => s.id).sort());
+            const top = (r: typeof exact, id: string) => r.find((s) => s.id === id)!.score;
+            expect(top(approx, 'bridge') / top(exact, 'bridge')).toBeGreaterThan(0.5);
+            expect(top(approx, 'bridge') / top(exact, 'bridge')).toBeLessThan(2);
+            expect(betweennessCentrality(g)).toEqual(approx);
+        });
     });
 });
 

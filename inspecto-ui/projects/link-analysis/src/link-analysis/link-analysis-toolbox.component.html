@@ -496,6 +496,9 @@
                                 />
                             }
                             @if (ranking().length) {
+                                @if (rankingNote()) {
+                                    <p class="text-secondary mt-1 text-xs" data-testid="ranking-note">{{ rankingNote() }}</p>
+                                }
                                 <table class="mt-1 w-full max-w-md text-sm">
                                     <caption class="sr-only">
                                         Node ranking by {{ centralityLabel() }}
