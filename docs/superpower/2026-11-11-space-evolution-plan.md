@@ -1,6 +1,6 @@
 # Space evolution — a Space the server understands as a whole, reached without breaking one
 
-**State:** IN PROGRESS — D-SE1…D-SE13 answered (§6); SE-0, SE-6a, SE-1a, SE-3a, SE-5a, SE-5b and SE-6b built (table below); SE-2a is a peer lane; what is left is gated (§5).
+**State:** IN PROGRESS — D-SE1…D-SE13 answered (§6); SE-0, SE-6a, SE-1a, SE-3a, SE-5a, SE-5b, SE-6b and SE-2a built (table below); what is left is gated (§5), with D-SE10…D-SE13 started.
 Board row `SPACE-EVOLUTION-1`.
 **Depends on:** [`2026-11-11-space-link-census-plan.md`](2026-11-11-space-link-census-plan.md) phase LC-1
 (the declared link census and its graph). This plan does not repeat that design; it builds on it.
@@ -14,11 +14,12 @@ Board row `SPACE-EVOLUTION-1`.
 | SE-6a tests that travel with a Space | built 2026-11-12 | `cbbc0523a`, `199affd8d`; fixes `2aad8fc9b`, `ac09275b4` | pushed without the whole module's tests, which left three tests red on master until the fixes; spec `spec-space-tests.md`; its five operator questions answered as built (D-SE9, 2026-11-13) |
 | SE-1a Space lock, report-only | built 2026-11-13 | `ad946532e`, `1f61ef26f` | `GET /spaces/{id}/integrity`; kill switch `-Dspace.integrity=off`; residuals `SPACE-LOCK-CLOSE-RESIDUALS-1`; spec `spec-space-lock.md` |
 | SE-3a column contract, report-only | built 2026-11-13 | `d94dec6be`, `1f62b8235` | spec `spec-column-contract.md` |
-| SE-2a hand-rename detection, report | in flight (peer lane) | — | |
+| SE-2a hand-rename detection, report | built 2026-11-13 | `288d5f55a`, `a37dd8f69`, merge `bf7650e2c` | renames and deletes reported with their referrers; also closed `SPACE-LOCK-CLOSE-RESIDUALS-1`; spec `spec-space-lock.md` §3 |
 | SE-5a template version + origin | built 2026-11-13 | `54d10255d`, `0385d15c4` | the origin lives in `.inspecto/created-from.toon`, not the lock (spec `spec-space-origin.md` §1) |
 | SE-5b template upgrade proposal | built 2026-11-13 | `5f43a9475`, `af71a6fad` | `GET` / `POST /spaces/{id}/origin/upgrade`: three-way per file (recorded hash, template now, Space now), applies only `update` / `add`, one Pending Change under a policy; a partial apply keeps the old version until the last group; spec `spec-space-origin.md` §5; known limit `SPACE-UPGRADE-STUCK-VERSION-1` |
 | SE-6b promotion into an existing Space | built 2026-11-13 | `45667eed3`, `fc7ff8993` | `POST /spaces/{id}/promotion/preview` and `/apply`: a `GET /export` bundle plus `${NAME}` parameters in the request, a previewed change set, one Pending Change under a policy (D-SE7), removals only with `removals: true`, kill switch `-Dspace.promotion=off`; spec `spec-space-promotion.md`; known limits `SPACE-PROMOTION-PARAM-TYPES-1` |
-| SE-1b / 2b / 3b, SE-4 | gated; opt-ins (SE-2b, SE-3b), the activation seam and SE-4 step 1 started 2026-11-13 | — | §5; D-SE10…D-SE13 |
+| SE-2b rename auto-rewrite, opt-in | built 2026-11-13 with SE-2a | `288d5f55a` | per-Space `rename_rewrite: true` in `space.toon` (not `safety-policy.toon`: a lenient reader, so older releases ignore it); Pipelines only; held under an approval policy; kill switch `-Dspace.rename.rewrite=off`. The default flip waits (D-SE2) |
+| SE-1b / 3b, SE-4 | gated; the finding baseline, the SE-3b opt-in, the activation seam and SE-4 step 1 started 2026-11-13 | — | §5; D-SE10…D-SE13 |
 
 Only targeted test classes ran on each lane; the full gate was not run.
 
