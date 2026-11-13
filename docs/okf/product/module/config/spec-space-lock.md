@@ -270,6 +270,42 @@ role table (checked per row as `/integrity` would check it; everyone on Basic). 
 `/integrity` request per row, each up to 600 listed items, and no config path leaves the server. Code:
 `SpaceRoutes.withIntegrity`, `SpaceIntegrityRoutes.summary`; UI `inspecto-ui/src/app/inspecto/spaces/space-integrity.ts`.
 
+## 14. The finding baseline (D-SE10)
+
+Plan §3 and D-SE10: the first shadow run on each shipped Space is reviewed, and each finding is a real defect in the
+Space (fixed there) or a false positive (the check is fixed). Run 2026-11-13 on `origin/master` `a065efc50`.
+
+**Covered:** the 3 shipped Spaces (`default`, `demo`, `ucc`) and the 30 Space Templates under `spaces/_templates/`
+(`spaces/_industries/` holds industry manifests, not Spaces): 1,260 config files, 1,132 census links, 188 Schemas.
+
+**Checks, over a temp copy of each, unchanged (templates with `${SPACE}` replaced, as the corpus gate does):**
+
+| Check | What was computed | Findings |
+|---|---|---|
+| Integrity: broken links | every DANGLING census link (`LinkGraph.dangling()`, uncapped), and the report's `broken.total` equals it | 0 |
+| Integrity: duplicates | the report's `duplicates` | 0 |
+| Integrity: changed outside, renamed, deleted | on the first computation (no baseline) and on a recomputation that reads the first lock | 0 |
+| Column contract (SE-3a) | `columnChanges` on both computations: a baseline, then no change on an unchanged Schema | 0 |
+| LC-3 save / delete shadow | acts on the DANGLING links above (a save warns on a dangling link it adds; a delete lists the links naming its target) | 0 |
+| `metadata_validate` | `ComponentIntegrity` broken refs, duplicates, broken pipeline refs (components and files), broken columns, as the task composes them; the physical-data check is skipped (no data root: no data is shipped) | 0 |
+
+**Fixed defects:** none. **Fixed false positives:** none. **UNKNOWN:** none.
+
+**What the zero covers.** Of the 1,132 links, 389 are judged and all RESOLVED; 740 are UNCHECKED by design (stores,
+paths, signals, `processing.schema_file`, links nothing enforces yet, and column links whose set config cannot tell:
+62 Widget `controls` fields, 10 Reconciliation `keyColumns`, among others) and 3 are NOT_ANALYSED (two `demo`
+Enrichment `transform` columns, one `demo` Query subquery). One Schema (in `default`) has an unknown column set. A
+link the census does not judge cannot be a false finding, so widening what it judges needs a new baseline.
+
+**The clean-shadow clock (D-SE2, D-LC3) starts 2026-11-13: zero unknowns.** Two releases of clean shadow from here
+gate the default flips (`links.delete` / `links.save` to `refuse`; enforcement for new Spaces).
+
+**The regression gate.** `SpaceFindingBaselineTest` computes all of the above and asserts the set equals its
+recorded `EXPECTED` (empty): a new defect in a shipped Space or a new false positive in a check fails it, naming
+Space, check and finding. Its second test plants a dangling Widget link and a duplicate Connection in a copy of
+`demo` and proves both are found. A finding that cannot be classed goes into `EXPECTED` marked UNKNOWN, and the
+clock stops until it is resolved.
+
 ## References
 
 - Plan: `docs/superpower/2026-11-11-space-evolution-plan.md` §4.1, §4.2, D-SE1.

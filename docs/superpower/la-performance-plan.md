@@ -145,6 +145,21 @@ Production `la-app` build of `origin/master` 948fcf54b, demo-auth Preview bundle
 
 **What would move it:** a cheaper renderer, not a slice: @antv/g's WebGL renderer (`@antv/g-webgl`, a new dependency) or fewer shapes per element (edge labels and arrows off at this size). Both are product decisions for the operator; neither was built or measured here.
 
+#### N4 WebGL renderer trial, measured 2026-11-13 (third lane, NO-GO, nothing shipped)
+**Operator choice:** "Try WebGL renderer". **Built (prototype, reverted):** `@antv/g-webgl@2.1.1` (the release built on the installed `@antv/g-lite` 2.7.0, beside `@antv/g-canvas` 2.2.0 and G6 5.1.1). It was wired through G6's per-layer `renderer` option: the `main` layer (every node, link and label) used WebGL, the other layers stayed on canvas, and a browser without WebGL fell back to canvas. One production `la-app` build had a temporary local switch that forced canvas, so the before and after runs used the same build. The production build passed; it warned that `earcut` (pulled in through `@antv/g-plugin-device-renderer`) is not ESM. The bundle delta was not recorded because nothing ships.
+
+**How measured:** a demo-auth Preview bundle built from `origin/master` `5086db965b` on :8087, with a private copy of `la-showcase`. The built-in browser with the pane shown, real GPU (`ANGLE (Intel UHD Graphics 630, Direct3D11)`), `PerformanceObserver` long tasks, saved view `telecom_fraud_network` (767 nodes / 4,000 links).
+
+| Action | Canvas (before) | WebGL (after) |
+|---|---|---|
+| Cold open of the view, longest task | 442 ms (one run; this build, this box) | **page frozen > 2.5 min, two runs**; never recovered, the tab had to be reloaded |
+| Move after a layout / Select all 767 | not re-measured | not reachable (the open never finished) |
+| Small view `mule_large_transfers` (8 nodes / 32 links) | draws | draws the same picture (longest task 136 ms) |
+
+- **Verdict: NO-GO.** On the target size the WebGL renderer does not reduce the freeze; it blocks the main thread far longer than canvas does. It renders correctly on a small graph, so the cost grows with shape count. That is plausibly @antv/g-webgl building a mesh per shape (text and paths) on the main thread, but this was not profiled. So the feature checks (labels, arrows, click, hover, lasso, export) were not run at size. The export path does not depend on the renderer, though: G6's `toDataURL` clones the scene into its own offscreen canvas renderer.
+- The canvas figure here (442 ms) is lower than the 1.5–2.9 s from the earlier lanes. That is a different day and box load, a single run and the same view, so it is NOT a new before figure for the plan.
+- **Left for the operator:** the other option, "fewer shapes": link labels and arrows off at large sizes. PERF-D5 (no worker) stands.
+
 **Tier 2 — load and startup**
 - **N5 Landing makes ~27 calls with every Space's `/bootstrap` fetched twice (~1 MB decoded).** Dedupe (a request-level cache for GETs, the same mechanism as P10a-2) and fetch only the current Space's bootstrap; `/spaces`, `/spaces/_meta`, the components lists and `/entity-lists` each ×2 too. Cheap, client-only, high yield. ✅ **SHIPPED 2026-10-25** (verified PASS; targeted tests only): the landing page fetches each Space call once through short-lived reads (`short-reads.ts`), and every Entity List / Dataset / component / access write clears them. `10b5776b7`, `0a6420e2b`, `ddfa3d81a`.
 - **N6 Hashed JS/CSS/font chunks are revalidated on every load (19 × `304`).** Serve content-hashed files with `Cache-Control: public, max-age=31536000, immutable`; negligible on localhost, 19 round trips on a real network. ✅ **SHIPPED 2026-11-12** (targeted tests only): `<stem>-<hash>.js|css|woff2` is `public, max-age=31536000, immutable`; index.html and plain names keep `no-cache` + ETag (`ControlApiStaticAndCorsTest`). `732528b7c`.
