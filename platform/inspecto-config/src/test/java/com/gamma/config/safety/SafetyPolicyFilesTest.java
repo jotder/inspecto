@@ -145,6 +145,35 @@ class SafetyPolicyFilesTest {
         assertThrows(SafetyPolicyUnreadableException.class, () -> eff(serverDir(), base, "s1"));
     }
 
+    /** LC-4: {@code links:} — absent and {@code report} read alike and narrow nothing; a bad value and the server file refuse. */
+    @Test
+    void linksIsASpaceSettingWithTwoValues() throws IOException {
+        Path base = spaceBase("s1");
+        Path cfg = base.resolve("config");
+        assertEquals(SafetyPolicyFiles.Links.REPORT, SafetyPolicyFiles.links(base), "no file");
+        assertEquals(SafetyPolicyFiles.Links.REPORT, SafetyPolicyFiles.links(null), "no Space folder");
+        write(cfg, "permit:\n  network: false\n");
+        SafetyPolicyTier without = eff(serverDir(), base, "s1");
+        assertEquals(SafetyPolicyFiles.Links.REPORT, SafetyPolicyFiles.links(base), "a file without the key");
+
+        write(cfg, "permit:\n  network: false\nlinks: refuse-activation\n");
+        assertEquals(SafetyPolicyFiles.Links.REFUSE_ACTIVATION, SafetyPolicyFiles.links(base));
+        assertEquals(without, eff(serverDir(), base, "s1"), "links narrows nothing in the folded tier");
+        write(cfg, "links: REPORT\n");
+        assertEquals(SafetyPolicyFiles.Links.REPORT, SafetyPolicyFiles.links(base));
+
+        write(cfg, "links: refuse\n");
+        var e = assertThrows(SafetyPolicyUnreadableException.class, () -> SafetyPolicyFiles.links(base));
+        assertTrue(e.getMessage().contains("links must be report or refuse-activation, not 'refuse'"), e.getMessage());
+        assertThrows(SafetyPolicyUnreadableException.class, () -> eff(serverDir(), base, "s1"),
+                "the same strict parse refuses the whole policy, like any bad value");
+
+        Path server = serverDir();
+        write(server, "links: report\n");
+        var s = assertThrows(SafetyPolicyUnreadableException.class, () -> eff(server, spaceBase("s2"), "s2"));
+        assertTrue(s.getMessage().contains("'links' is legal in a Space file only"), s.getMessage());
+    }
+
     @Test
     void aFixedFileIsReReadAfterItsStampChanges() throws IOException {
         Path base = spaceBase("s1");

@@ -7,8 +7,9 @@
 >
 > **This page is checked, not trusted.** `node tools/check-space-anatomy.mjs` (CI `guards` job, so every commit)
 > fails when the code declares a reserved file, registry directory, DuckDB store or config suffix this page does
-> not list, when a census table here names one the code does not declare, when a link key in §12.2 is read by no
-> Java source, or when a class member named here (as `SpaceRoot.dataRoot`) no longer exists. What each file *means* is prose and is not
+> not list, when a census table here names one the code does not declare, or when a class member named here (as
+> `SpaceRoot.dataRoot`) no longer exists. The link table of §12.2 is generated from the link census
+> (`node tools/render-space-links.mjs`, `--check` in CI). What each file *means* is prose and is not
 > machine-checked. **One home per fact:** boot, lifecycle, data-root rules and "what is not a Space" live on
 > [Spaces](architecture.md) and are linked from here, never restated.
 
@@ -306,37 +307,73 @@ input file ─► Pipeline ─────────┬─ processing.schema_f
 
 ### 12.2 Every link and what protects it
 
-**Protection** column: **load** = checked when the file loads · **delete 409** = deleting the target is refused ·
-**rename** = `POST /pipelines/{name}/rename` rewrites the link · **impact** = listed by
-`GET /config/pipeline/{name}/impact` and before a Pipeline delete · **validate** = reported by the
-`metadata_validate` maintenance task · **import** = a bundle import refuses to add the break · **none** = no
-check found in the code.
+The table is **generated from the link census** (`LinkCensus.LINKS`, the one list every check reads) by
+`node tools/render-space-links.mjs`; CI runs it with `--check`, so a link added to the census and not to this page
+fails the build. Never edit the rows by hand. Key paths read against the file's document root (a Job's inside its
+`job:` section): `a.b` nested maps, `a[]` each list element, `*` each value of a map, `**` the node and every node
+below it.
 
-| From (file · key) | To | Link is | Protection |
-|---|---|---|---|
-| Pipeline `processing.schema_file` | `*_schema.toon` | file path | load |
-| Pipeline `use: <type>/<id>` | registry grammar / schema / transform / sink | id | delete 409 (`ComponentRoutes`) |
-| Pipeline Collector `connection` | Connection | id | delete 409 (`ConnectionRoutes`) |
-| Job `template` | `*_job_template.toon` | name | load |
-| Enrichment `triggers.on_pipeline` | Pipeline | id | rename, impact, validate |
-| Enrichment `references.<n>.ref` | Pipeline | id | rename, impact, validate |
-| Enrichment `input.database`, `references.<n>.path` | a store directory / a file | path | none |
-| Job `on_pipeline` | Pipeline | id, or several comma-separated (each member is a link) | rename, impact, validate |
-| Job `pipeline_config` | a `*_pipeline.toon` file | path | none |
-| Job `dataset`, `target`, `dir`, params | Dataset / directory | id / path | none |
-| Job `on_signal` + `when` | a signal and its payload | text | none |
-| Expectation / Decision Rule `target` | Pipeline | id | rename, impact, validate |
-| Alert Rule `onPipeline` / `dataset` | Pipeline / Dataset | id | rename, impact |
-| Dataset `physicalRef`, `sourceName` | the store a Pipeline writes | store name | rename, impact; validate (the data exists) |
-| Dataset `sql` (a virtual Dataset) | the store its `sourceName` names | SQL relation | rename (with `sourceName`) |
-| Widget `datasetId`, `queryId` | Dataset / Query | id | impact (`datasetId`), validate, import |
-| Dashboard `tiles[].widgetId` | Widget | id | impact, validate, import |
-| Link Analysis / Geo Map view `query.projection.datasetId` | Dataset | id | validate, import |
-| Reconciliation `leftDataset`, `rightDataset`, `thirdDataset` (or `datasets[]`) | Dataset | id | validate, import |
-| Dataset-consumer Pipeline (`collector.connector: dataset`) | Dataset | id | fails at poll (`unknown dataset`) |
-| `nav-menus.toon` `binding.componentId` | Dashboard / component | id | none |
-| Column names: Dataset `dateField`, Widget `controls` fields, Expectation `column` / `refColumn` / `when` fields, Decision Rule `when` fields, Reconciliation `keyColumns` / `compareColumns` / `impact` column | the mapped columns of the Schema of the store read (a Dataset adds its `calculated` columns; a Dataset on a store no Pipeline writes offers its declared `columns`) | column name, matched case-insensitively | impact (`GET /config/schema/{name}/columns/{column}/impact`), validate |
-| Column references in SQL: Enrichment `transform`, Query `text`, virtual Dataset `sql`, Dataset `calculated` `expr` | the columns of the relation each reference is attributed to (DuckDB parse tree) | SQL column | impact, validate; SQL the parser cannot read or attribute is reported as not analysed |
+**On delete** / **On rename** are the census policy for when the target goes away or changes name (`refuse` /
+`warn`, `rewrite` / `report`). **Checked by today**: **load** = checked when the file loads · **delete 409** =
+deleting the target is refused (`ComponentRoutes`, `ConnectionRoutes`) · **rename** = `POST /pipelines/{name}/rename`
+rewrites the link · **impact** = listed by `GET /config/pipeline/{name}/impact` (or the column impact read) and before a
+Pipeline delete · **validate** = reported by the `metadata_validate` maintenance task · **import** = a bundle import
+refuses to add the break · **none** = no check reads it yet. Independently of this column, every link the census
+resolves is judged by the LC-3 delete and save checks below and reported by the Space lock
+(`GET /spaces/{id}/integrity`). A column link to SQL the parser cannot read or attribute is reported as not analysed.
+
+<!-- link-census:begin (generated by tools/render-space-links.mjs from LinkCensus.LINKS; do not edit) -->
+| From | Key | To | Value | On delete | On rename | Checked by today |
+|---|---|---|---|---|---|---|
+| Pipeline | `processing.schema_file` | `*_schema.toon` file | path | refuse | rewrite | load |
+| Pipeline | `**.use` | registry component | id | refuse | rewrite | delete 409 |
+| Pipeline | `collector.connection` | Connection | id | refuse | rewrite | delete 409 |
+| Pipeline | `collector.dataset` | Dataset | id | refuse | rewrite | **none** |
+| Enrichment | `triggers.on_pipeline` | Pipeline | id | refuse | rewrite | rename, impact, validate |
+| Enrichment | `references.*.ref` | Pipeline | id | refuse | rewrite | rename, impact, validate |
+| Enrichment | `input.database` | store | path | warn | report | **none** |
+| Enrichment | `references.*.path` | file | path | warn | report | **none** |
+| Enrichment | `transform` | column | SQL column | warn | report | impact, validate |
+| Job | `on_pipeline` | Pipeline | id, or a comma list of ids | refuse | rewrite | rename, impact, validate |
+| Job | `template` | `*_job_template.toon` | id | refuse | report | load |
+| Job | `pipeline_config` | `*_pipeline.toon` file | path | refuse | rewrite | **none** |
+| Job | `dataset` | Dataset | id | refuse | rewrite | **none** |
+| Job | `target` | Dataset | id | refuse | rewrite | **none** |
+| Job | `dir` | directory | path | warn | report | **none** |
+| Job | `on_signal` | signal | text | warn | report | **none** |
+| Job | `when` | signal | text | warn | report | **none** |
+| Expectation | `target` | Pipeline | data path; its first segment names the store | refuse | rewrite | rename, impact, validate |
+| Expectation | `column` | column | column name | warn | report | impact, validate |
+| Expectation | `refDataset` | store | store name | warn | report | **none** |
+| Expectation | `refColumn` | column | column name | warn | report | impact, validate |
+| Expectation | `when.**.field` | column | column name | warn | report | impact, validate |
+| Decision Rule | `target` | Pipeline | id | refuse | rewrite | rename, impact, validate |
+| Decision Rule | `when.**.field` | column | column name | warn | report | impact, validate |
+| Dataset | `sourceName` | store | store name | refuse | rewrite | rename, impact |
+| Dataset | `physicalRef` | store | data path; its first segment names the store | refuse | rewrite | rename, impact, validate |
+| Dataset | `sql` | store | SQL relation | refuse | rewrite | rename |
+| Dataset | `sql` | column | SQL column | warn | report | impact, validate |
+| Dataset | `dateField` | column | column name | warn | report | impact, validate |
+| Dataset | `calculated[].expr` | column | SQL column | warn | report | impact, validate |
+| Alert Rule | `onPipeline` | Pipeline | id | refuse | rewrite | rename, impact |
+| Alert Rule | `dataset` | Dataset | id | refuse | rewrite | impact |
+| Widget | `datasetId` | Dataset | id | refuse | rewrite | impact, validate, import |
+| Widget | `queryId` | Query | id | refuse | rewrite | validate, import |
+| Widget | `controls.*.field` | column | column name | warn | report | impact, validate |
+| Widget | `controls.*[].field` | column | column name | warn | report | impact, validate |
+| Dashboard | `tiles[].widgetId` | Widget | id | refuse | rewrite | impact, validate, import |
+| Link Analysis view | `query.projection.datasetId` | Dataset | id | refuse | rewrite | validate, import |
+| Geo Map view | `query.projection.datasetId` | Dataset | id | refuse | rewrite | validate, import |
+| Reconciliation | `datasets[]` | Dataset | id | refuse | rewrite | validate, import |
+| Reconciliation | `leftDataset` | Dataset | id | refuse | rewrite | validate, import |
+| Reconciliation | `rightDataset` | Dataset | id | refuse | rewrite | validate, import |
+| Reconciliation | `thirdDataset` | Dataset | id | refuse | rewrite | validate, import |
+| Reconciliation | `keyColumns[]` | column | column name | warn | report | impact, validate |
+| Reconciliation | `compareColumns[].column` | column | column name | warn | report | impact, validate |
+| Reconciliation | `impact.column` | column | column name | warn | report | impact, validate |
+| Query | `text` | column | SQL column | warn | report | impact, validate |
+| `nav-menus.toon` | `**.binding.componentId` | registry component | id | warn | rewrite | **none** |
+<!-- link-census:end -->
 
 Two things this table means in practice:
 
@@ -434,8 +471,9 @@ it here"). That copying is why §12.2 has rows marked **none** and why the scans
 planned fix is one declared **link census** that every check reads, refusal of a save or delete that would
 break a link, a column-level check, duplicate detection, and a report of files changed outside the server:
 [Space link census plan](../../../../superpower/2026-11-11-space-link-census-plan.md), board row
-`SPACE-LINK-CENSUS-1`. Built so far: the census and the checks that read it (LC-1, LC-2) and the delete and
-save refusals in shadow mode (LC-3, §12.2).
+`SPACE-LINK-CENSUS-1`. Built so far: the census and the checks that read it (LC-1, LC-2), the delete and
+save refusals in shadow mode (LC-3, §12.2), column links (LC-5) and this page's link table, generated from the
+census (LC-7).
 
 ## 13. Gotchas
 

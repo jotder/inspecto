@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-417 test class(es): 166 unit, 251 real-HTTP control-plane, 0 IT.
+422 test class(es): 168 unit, 254 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -248,8 +248,11 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiSnapshotExportTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSnapshotExportTest.java` | A Postgres snapshot's Run now, redesigned 2026-11-05 (operator): EXPORT the table into a temporary folder under the data |
 | `ControlApiSpaceBootReadinessTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceBootReadinessTest.java` | HA-RUNLEASE-DB-CREDENTIALS-1 (operator 2026-10-10): a node whose Spaces are CONFIGURED but none could boot must |
 | `ControlApiSpaceComparisonTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceComparisonTest.java` | Real-HTTP tests for {@code POST /space-comparisons} (space-comparison design, decided 2026-09-24) over a |
+| `ControlApiSpaceIntegrityAcceptTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceIntegrityAcceptTest.java` | LC-6 — {@code POST /spaces/{id}/integrity/accept} over real HTTP under an ARMED authenticator: 401, 403 for an |
 | `ControlApiSpaceIntegrityTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceIntegrityTest.java` | SE-1a — {@code GET /spaces/{id}/integrity} over real HTTP under an ARMED authenticator: 401, 403 without |
+| `ControlApiSpaceLinksModeTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceLinksModeTest.java` | `SPACE-LINK-CENSUS-1` LC-4 over real HTTP, two Spaces side by side: {@code alpha} sets |
 | `ControlApiSpaceOriginTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceOriginTest.java` | SE-5a — {@code GET /spaces/{id}/origin} and {@code POST /spaces/{id}/origin/adopt} over real HTTP under an ARMED |
+| `ControlApiSpaceOriginUpgradeTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceOriginUpgradeTest.java` | SE-5b — {@code GET\|POST /spaces/{id}/origin/upgrade} over real HTTP under an ARMED authenticator. The proof of the |
 | `ControlApiSpacePromotionTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpacePromotionTest.java` | SE-6b — {@code POST /spaces/{id}/promotion/preview} and {@code /promotion/apply} over real HTTP under an ARMED |
 | `ControlApiSpaceSamplesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceSamplesTest.java` | {@code LA-ONBOARD-1} OB-12 over real HTTP: {@code POST /spaces {template, loadSamples: true}} copies the template's |
 | `ControlApiSpacesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpacesTest.java` | The Stage-5 {@code SpaceRoutes} CRUD over real HTTP: create + boot a space without restart, list it, confirm the |
@@ -349,6 +352,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ServerFaultsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ServerFaultsTest.java` | ERR-5XX-ROUTE-BODIES (operator, 2026-09-28), over real HTTP: a route-built 500/502/503 names a curated |
 | `ShippedExamplesPassTheSaveGateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ShippedExamplesPassTheSaveGateTest.java` | Every shipped example Pipeline under {@code inspecto/examples/} passes the authoring gate and loads |
 | `SpacePromotionTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpacePromotionTest.java` | SE-6b — {@link SpacePromotion#compute} without HTTP: connections and secrets, placeholders against secret |
+| `SpaceTemplateUpgradeTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpaceTemplateUpgradeTest.java` | SE-5b — {@link SpaceTemplateUpgrade#propose}, the three-way classification the HTTP proof does not reach: a file the Space |
 | `SpaceVersionCheckTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpaceVersionCheckTest.java` | LA-SHOWCASE-DIST-1: a Space naming a newer {@code min_product_version} than the running product is flagged. |
 | `SpiSlotFailClosedTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpiSlotFailClosedTest.java` | {@link SpiSlot}'s two discovery postures, exercised through real {@code ServiceLoader} registrations |
 | `SpiSlotTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpiSlotTest.java` | Pins the edition-seam slot semantics the three facades (Authenticators / AccessDeciders / |
@@ -430,6 +434,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `SpaceIdTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceIdTest.java` | The filesystem-safe space-id guard: lower-case alnum + hyphen only, so an id can never escape {@code spaces/}. |
 | `SpaceInboxAuditTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceInboxAuditTest.java` | Two Spaces polling one inbox — scale-out plan §5.3. |
 | `SpaceLayoutContractTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceLayoutContractTest.java` | The boot-time storage-layout contract: WARN-only findings, never a boot failure. |
+| `SpaceLockEventsTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceLockEventsTest.java` | LC-4 / LC-6 of `SPACE-LINK-CENSUS-1` — the Space lock emits {@code CONFIG_LINK_BROKEN} once per newly broken link |
 | `SpaceLockTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceLockTest.java` | SE-1a — the Space lock ({@code docs/okf/product/module/config/spec-space-lock.md}): what it lists, how a file keeps |
 | `SpaceManagerTemplateGateTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceManagerTemplateGateTest.java` | {@link SpaceManager#createFromTemplate(SpaceId, String, String, String, java.util.function.Consumer)}: a template |
 | `SpaceManagerTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceManagerTest.java` | The multi-space container: single-service wrapping, boot discovery, concurrent isolation, orderly shutdown. |

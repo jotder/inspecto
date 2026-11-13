@@ -10,6 +10,8 @@ import { apiErrorMessage, LensService, Space, SpacesService } from 'app/inspecto
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
+import { ChipComponent } from 'app/inspecto/components/chip.component';
+import { SpaceIntegrityView, spaceIntegrityView } from 'app/inspecto/spaces/space-integrity';
 import { SpaceFormDialog } from 'app/inspecto/spaces/space-form.dialog';
 import { SampleSpaceDialog } from 'app/inspecto/spaces/sample-space.dialog';
 import { CONSOLE_SAMPLE_TEMPLATE } from 'app/inspecto/onboarding/space-guide';
@@ -36,6 +38,7 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
         MatTooltipModule,
         InspectoEmptyStateComponent,
         StatusBadgeComponent,
+        ChipComponent,
     ],
     templateUrl: './spaces.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -70,6 +73,11 @@ export class SpacesComponent implements OnInit {
                 this.toastr.warning(apiErrorMessage(e, 'Could not load spaces.'));
             },
         });
+    }
+
+    /** The row's integrity count (LC-4), or null while the Space lock has no ready report to show. */
+    integrityOf(s: Space): SpaceIntegrityView | null {
+        return spaceIntegrityView(s.integrity);
     }
 
     isCurrent(s: Space): boolean {

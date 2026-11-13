@@ -48,7 +48,8 @@ synchronous bus that writes each event to an `EventStore` and hands it to subscr
 
 **Event kinds.** `EventType` is an open set of string constants, not a closed enum: a caller may emit a new
 type without editing the class. Families present today: logging and audit (`LOG`, `AUDIT`, `ACCESS_DENIED`,
-`SECURITY_TRIGGERED`), Pipeline lifecycle (`PIPELINE_REGISTERED`, `PIPELINE_PAUSED`, `PIPELINE_RENAMED`
+`SECURITY_TRIGGERED`), Space config integrity (`CONFIG_LINK_BROKEN`, `CONFIG_CHANGED_OUTSIDE`, from the Space
+lock — [spec-space-lock.md](../config/spec-space-lock.md) §11), Pipeline lifecycle (`PIPELINE_REGISTERED`, `PIPELINE_PAUSED`, `PIPELINE_RENAMED`
 ...), consignment and file acquisition (`BATCH_COMMITTED`, `BATCH_FAILED`, `FILE_RECEIVED`,
 `FILE_DISCOVERED`, `FILE_FETCHED`, `FILE_STABLE`, `SEQUENCE_GAP`, `SOURCE_CIRCUIT_OPEN` ...), Jobs
 (`JOB_STARTED`, `JOB_FAILED`), `SIGNAL`, conservation (`PIPELINE_CONSERVATION_IMBALANCE`), Exchange

@@ -144,7 +144,48 @@ public final class PendingChanges {
             JobWriteGuard.revokeOnDelete(kind, proposed, current, root);
             return;
         }
+        propose(api, ex, kind, name, proposed, current, policy, rule, publication, mandatory, attachFingerprint);
+    }
 
+    /**
+     * The hold for ONE act that writes several config files (SE-5b, a Space Template upgrade): it becomes ONE Pending
+     * Change of {@code kind}/{@code name} when the Space's policy holds the kind of ANY of {@code relPaths} — a path that
+     * cannot be classified ({@link #kindOfConfigPath}) under a policy holding anything counts as held, with the default
+     * approver and four eyes, as {@link #holdRefusingPaths} refuses it. The rules of the held paths must name one approver
+     * capability (else 409: the act cannot be one Pending Change — apply the files in groups); four eyes when any asks.
+     * {@code proposed} / {@code current} pin the set exactly as {@link #hold} pins one write, and a replay of the approved
+     * change passes only when it is the same set over the same base.
+     */
+    public static void holdSet(ApiContext api, HttpExchange ex, java.util.Collection<String> relPaths, String kind,
+                               String name, Map<String, Object> proposed, Map<String, Object> current) throws IOException {
+        if (ApiContext.attr(ex, ApiContext.ATTR_APPROVED_CHANGE) instanceof Map<?, ?> approved) {
+            @SuppressWarnings("unchecked") Map<String, Object> pc = (Map<String, Object>) approved;
+            verifyApproved(pc, kind, name, proposed, current);
+            return;
+        }
+        ApprovalPolicy policy = ApprovalPolicy.forRoot(api.writeRoot());
+        if (!policy.holdsAnything()) return;
+        ApprovalPolicy.Rule rule = null;
+        for (String p : relPaths) {
+            String k = kindOfConfigPath(p);
+            ApprovalPolicy.Rule r = k == null ? new ApprovalPolicy.Rule(true, ApprovalPolicy.DEFAULT_APPROVER, true) : policy.ruleFor(k);
+            if (r == null) continue;
+            if (rule != null && !rule.approverCapability().equals(r.approverCapability()))
+                throw new ApiException(409, ErrorCodes.CONFLICT, "this Space's approval policy names different approvers ("
+                        + rule.approverCapability() + ", " + r.approverCapability() + ") for the files of this "
+                        + kind + ", so it cannot be one Pending Change — apply the files in groups that share an approver");
+            rule = rule == null ? r : new ApprovalPolicy.Rule(true, rule.approverCapability(), rule.fourEyes() || r.fourEyes());
+        }
+        if (rule == null) return;
+        propose(api, ex, kind, name, proposed, current, policy, rule, null, null, null);
+    }
+
+    /** Record the Pending Change for a held write and unwind the request with {@link Held} (202). */
+    private static void propose(ApiContext api, HttpExchange ex, String kind, String name, Map<String, Object> proposed,
+                                Map<String, Object> current, ApprovalPolicy policy, ApprovalPolicy.Rule rule,
+                                Map<String, String> publication, ApprovalPolicy.Rule mandatory, String attachFingerprint)
+            throws IOException {
+        Path root = api.writeRoot();
         String reason = ex.getRequestHeaders().getFirst(HEADER_REASON);
         if (reason != null && reason.length() > MAX_REASON)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, HEADER_REASON + " is at most " + MAX_REASON + " chars");
@@ -565,7 +606,8 @@ public final class PendingChanges {
             "POST /notifications/channels", "PUT /notifications/channels/([^/]+)",
             "DELETE /notifications/channels/([^/]+)",
             "POST /notifications/rules", "PUT /notifications/rules/([^/]+)", "DELETE /notifications/rules/([^/]+)",
-            "POST /promotion/apply");
+            "POST /promotion/apply",
+            "POST /origin/upgrade");
 
     /** Whether {@code method path} (route-table path, query allowed) is on {@link #REPLAYABLE}. */
     static boolean replayable(String method, String path) {

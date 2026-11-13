@@ -56,7 +56,7 @@ final class SpaceRoutes implements RouteModule {
             ApiContext.podScoped(e);
             return HostContext.of(api).spaces().all().stream()
                     .sorted(java.util.Comparator.comparing(c -> c.id().value()))
-                    .map(SpaceRoutes::manifest)
+                    .map(c -> withIntegrity(e, c, manifest(c)))
                     .toList();
         });
 
@@ -184,6 +184,22 @@ final class SpaceRoutes implements RouteModule {
 
         if (!HostContext.of(api).spaces().supportsCrud())
             throw new ApiException(409, ErrorCodes.CONFLICT, "this server hosts a single space; launch with -Dspaces.root to manage many");
+    }
+
+    /**
+     * LC-4 — the Spaces-screen count: {@code integrity} {status, broken, duplicates, changedOutside} from the Space lock's
+     * report in memory ({@link SpaceIntegrityRoutes#summary}), only for a caller who may read that Space's
+     * {@code /integrity} ({@code canAuthorWorkbench} in THAT Space's role table; everyone on Basic). One list request
+     * instead of one report request per row, and no config path leaves the server.
+     */
+    private static Map<String, Object> withIntegrity(HttpExchange e, SpaceContext ctx, Map<String, Object> m) {
+        try {
+            ApiContext.requireCapabilityIn(e, ctx.root().config(), "canAuthorWorkbench");
+        } catch (ApiException notAnAuthorThere) {
+            return m;
+        }
+        m.put("integrity", SpaceIntegrityRoutes.summary(ctx));
+        return m;
     }
 
     /** The id + display metadata returned for a space. */

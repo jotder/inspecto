@@ -401,6 +401,9 @@ public final class CapabilityManifest {
             new Entry("POST", "/tests/run", Roles.CAN_AUTHOR_WORKBENCH),
             // SpaceIntegrityRoutes — SE-1a: the Space lock's report lists every config path, so it is an author's read.
             new Entry("GET", "/integrity", Roles.CAN_AUTHOR_WORKBENCH),
+            // LC-6: accepting a hand edit clears the record of an out-of-band change to any config, settings such as
+            // roles.toon included — an administrator's act.
+            new Entry("POST", "/integrity/accept", Roles.CAN_ADMINISTER),
             // SpaceOriginRoutes — SE-5a: the origin report lists config paths (an author's read, like /integrity); adopting
             // a template records the Space's origin, an administrator's act.
             new Entry("GET", "/origin", Roles.CAN_AUTHOR_WORKBENCH),
@@ -409,6 +412,9 @@ public final class CapabilityManifest {
             // (D-SE7), an administrator's act; the preview reads the uploaded bundle against every config and is gated alike.
             new Entry("POST", "/promotion/preview", Roles.CAN_ADMINISTER),
             new Entry("POST", "/promotion/apply", Roles.CAN_ADMINISTER),
+            // SE-5b: the upgrade proposal is a report like /origin; applying it writes the Space's config, an administrator's act.
+            new Entry("GET", "/origin/upgrade", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("POST", "/origin/upgrade", Roles.CAN_ADMINISTER),
             // ReconRoutes — R2-03 (operator 2026-09-26, reversing C9): recording a run and resolving / re-opening
             // a Break write the Reconciliation's OPERATIONAL state, so they are operate acts like an Expectation's
             // evaluation — never the canAuthorWorkbench config PUT that used to carry them. (/recon/promote is
