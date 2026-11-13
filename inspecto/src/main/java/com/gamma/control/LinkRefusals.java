@@ -139,7 +139,7 @@ final class LinkRefusals {
             String want = pipeline ? id.trim().toLowerCase(Locale.ROOT) : id;
             for (LinkGraph.Edge e : LinkGraph.of(writeRoot, ReservedConfigPaths::reserved).edges()) {
                 if (e.status() != LinkGraph.Status.RESOLVED || !toKind.equals(e.toKind())) continue;
-                String v = pipeline ? e.value().trim().toLowerCase(Locale.ROOT) : e.value();
+                String v = pipeline ? e.link().named(e.value()).toLowerCase(Locale.ROOT) : e.value();
                 if (!v.equals(want)) continue;
                 Map<String, Object> d = new LinkedHashMap<>();
                 d.put("kind", e.fromKind());

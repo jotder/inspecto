@@ -104,7 +104,7 @@ public final class PipelineDependents {
     }
 
     private static boolean names(LinkGraph.Edge e, String id) {
-        return id.equalsIgnoreCase(e.value().trim());
+        return id.equalsIgnoreCase(e.link().named(e.value()));
     }
 
     /** {@code triggers.on_pipeline} and by-name {@code references.<n>.ref} in every {@code *_enrich.toon}. */

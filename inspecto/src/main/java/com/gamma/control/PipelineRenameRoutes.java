@@ -632,10 +632,7 @@ final class PipelineRenameRoutes implements RouteModule {
         // though the runtime and impact trim it — a separate defect, not LC-2's to change).
         String v = l.keyPath().equals("triggers.on_pipeline") ? value : value.trim();
         if (l.type() == LinkCensus.Type.SQL_RELATION) return false;
-        if (l.keyPath().equals("physicalRef")) {
-            int slash = v.indexOf('/');
-            return !"null".equals(v) && (slash < 0 ? v : v.substring(0, slash)).equalsIgnoreCase(oldId);
-        }
+        if (l.storePath()) return !"null".equals(v) && l.named(v).equalsIgnoreCase(oldId);
         return v.equalsIgnoreCase(oldId)
                 || l.fromKind().equals("alert-rule") && v.replace(' ', '_').equalsIgnoreCase(oldId);
     }
@@ -658,7 +655,7 @@ final class PipelineRenameRoutes implements RouteModule {
         if (!names(l, value, oldId)) return null;
         String v = value.trim();
         int slash = v.indexOf('/');
-        return l.keyPath().equals("physicalRef") && slash >= 0 ? newId + v.substring(slash) : newId;
+        return l.storePath() && slash >= 0 ? newId + v.substring(slash) : newId;
     }
 
     /**

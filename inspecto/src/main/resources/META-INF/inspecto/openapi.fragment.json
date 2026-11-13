@@ -89,6 +89,8 @@
     "/tests",
     "/tests/run",
     "/integrity",
+    "/origin",
+    "/origin/adopt",
     "/pipelines/{pipelineId}/bundle",
     "/pipelines/import",
     "/components/{componentId}",
@@ -3241,6 +3243,32 @@
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); data = {status, ...}."
+          }
+        }
+      }
+    },
+    "/origin" : {
+      "get" : {
+        "tags" : [ "spaces" ],
+        "summary" : "GET /origin - which Space Template (and version) the Space came from, and what changed since",
+        "operationId" : "getOrigin",
+        "description" : "SE-5a. Reached as /spaces/{id}/origin. Report-only, always 200: status none (no origin recorded), unavailable (single-tenant default Space) or recorded {template, templateVersion, origin: created|adopted, recordedAt, space: {unchanged, changed, removed, added}, templateSince: {status: same-version|newer-version|missing, currentVersion, added?, changed?}} - config-relative paths. Requires canAuthorWorkbench. Spec: docs/okf/product/module/config/spec-space-origin.md.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); data = {status, ...}."
+          }
+        }
+      }
+    },
+    "/origin/adopt" : {
+      "post" : {
+        "tags" : [ "spaces" ],
+        "summary" : "POST /origin/adopt - match an existing Space to a Space Template by file hash and record its origin",
+        "operationId" : "postOriginAdopt",
+        "description" : "SE-5a. Reached as /spaces/{id}/origin/adopt. Body {template, version?}. Writes only <space>/.inspecto/created-from.toon and created-from.sha256, never config; records only when at least one config file matches. Requires canAdminister. 503 no Space folder, 400 bad body, 422 malformed version, 403 a template id that is not a bare id, 404 unknown template, 409 origin already recorded or version is not the template's current one, 200 {template, templateVersion, match: full|partial|none, recorded, matching, differing, onlyInTemplate, onlyInSpace}.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
           }
         }
       }

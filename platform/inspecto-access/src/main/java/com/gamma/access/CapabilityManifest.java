@@ -401,6 +401,10 @@ public final class CapabilityManifest {
             new Entry("POST", "/tests/run", Roles.CAN_AUTHOR_WORKBENCH),
             // SpaceIntegrityRoutes — SE-1a: the Space lock's report lists every config path, so it is an author's read.
             new Entry("GET", "/integrity", Roles.CAN_AUTHOR_WORKBENCH),
+            // SpaceOriginRoutes — SE-5a: the origin report lists config paths (an author's read, like /integrity); adopting
+            // a template records the Space's origin, an administrator's act.
+            new Entry("GET", "/origin", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("POST", "/origin/adopt", Roles.CAN_ADMINISTER),
             // ReconRoutes — R2-03 (operator 2026-09-26, reversing C9): recording a run and resolving / re-opening
             // a Break write the Reconciliation's OPERATIONAL state, so they are operate acts like an Expectation's
             // evaluation — never the canAuthorWorkbench config PUT that used to carry them. (/recon/promote is

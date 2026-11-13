@@ -280,7 +280,7 @@ public final class LinkGraph {
             case "dataset", "query", "widget" ->
                     u.hasComponent(toKind, value) ? Status.RESOLVED : Status.DANGLING;
             case "pipeline" -> u.pipelineIds() == null ? Status.UNCHECKED
-                    : u.pipelineIds().contains(value.trim().toLowerCase()) ? Status.RESOLVED : Status.DANGLING;
+                    : u.pipelineIds().contains(l.named(value).toLowerCase()) ? Status.RESOLVED : Status.DANGLING;
             default -> Status.UNCHECKED;
         };
     }

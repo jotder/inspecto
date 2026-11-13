@@ -16,7 +16,7 @@ tags: [product-item, module]
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [Component metamodel & Catalog (MET)](plan-metamodel.md) · [Spaces & tenancy (SPC)](plan-spaces.md) |
-| spec | current | [Column contract — Schema column changes and what they break (SE-3a)](spec-column-contract.md) · [Config Safety Validator](spec-config-safety.md) · [Pipeline config keys — the single block census](spec-pipeline-config-keys.md) · [Space lock — the server's signed record of a Space (SE-1a)](spec-space-lock.md) · [Space tests — cases that travel with a Space (SE-6a)](spec-space-tests.md) · [TOON Configuration](spec-toon-config.md) |
+| spec | current | [Column contract — Schema column changes and what they break (SE-3a)](spec-column-contract.md) · [Config Safety Validator](spec-config-safety.md) · [Pipeline config keys — the single block census](spec-pipeline-config-keys.md) · [Space lock — the server's signed record of a Space (SE-1a)](spec-space-lock.md) · [Space origin — which template made a Space (SE-5a)](spec-space-origin.md) · [Space tests — cases that travel with a Space (SE-6a)](spec-space-tests.md) · [TOON Configuration](spec-toon-config.md) |
 | architecture | current | [Space anatomy — every folder and file in a Space](architecture-space-anatomy.md) · [Spaces](architecture.md) |
 | features | current | [Spaces — features](features-spaces.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
@@ -38,7 +38,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | feature | SPACE-EVOLUTION-1 a Space the server understands as a whole, reached without breaking one | — |
 | `SPACE-LOCK-CLOSE-RESIDUALS-1` | P3 | defect | the SE-1a Space lock (shadow, report-only) can overrun a Space's close budget and recreate the folders of a deleted Space | — |
 | — | P3 | defect | PIPELINE-LINK-GAPS-1 links the Pipeline rename and impact scans still miss | — |
-| `IMPORT-LOADER-REALTIME-1` | P2 | defect | ImportLoaderInventoryTest is red on master since 4cd593246 (PRODUCT-ASSEMBLY-1 PA-9d, the Real-time Detection Add-on). | — |
 | `CENSUS-EXPECTATION-TARGET-PATH-1` | P3 | defect | the link census reports a false broken link: it reads an Expectation target (with targetType: pipeline) as a Pipeline id, but Expectation… | — |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | NARROWED 2026-11-01 (twice): the ingest lane WRITES an allow-listed s3:// dirs.database and REGISTERS that output in DuckLake; what is le… | — |

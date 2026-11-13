@@ -137,6 +137,22 @@ class ControlApiSpaceIntegrityTest {
         }
     }
 
+    /** CENSUS-EXPECTATION-TARGET-PATH-1: a store-path target resolves; one naming no store is still broken. */
+    @Test
+    void anExpectationStorePathTargetIsNotBroken(@TempDir Path root) throws Exception {
+        Path config = Files.createDirectories(root.resolve("alpha/config/registry/expectations"));
+        Files.writeString(root.resolve("alpha/config/orders_pipeline.toon"), "name: orders\n");
+        Files.writeString(config.resolve("band.toon"), "name: band\ntarget: orders/database\n");
+        Files.writeString(config.resolve("stray.toon"), "name: stray\ntarget: nostore/database\n");
+        try (Ctx c = open(root)) {
+            integrity(c);
+            JsonNode r = awaitReady(c, n -> true);
+            List<String> broken = new ArrayList<>();
+            r.get("broken").get("items").forEach(b -> broken.add(b.get("fromKind").asText() + ":" + b.get("value").asText()));
+            assertEquals(List.of("expectation:nostore/database", "job:gone"), broken.stream().sorted().toList(), r.toString());
+        }
+    }
+
     @Test
     void aServerWriteIsNotAnOutsideEditAndAHandEditIs(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
