@@ -37,7 +37,7 @@ ratcheting duplication guard (Must items M1–M10).
   forest; `stats.correlation` names `method: pearson | spearman`. Windowed and ratio Measures are Measure grammar, not
   a kernel function, so they are not catalogued.
 - **Anomaly Model form authors `method` / `forest`** (D-AN29, closed 2026-10-20 with `ANOMALY-ML-SCORING-1`).
-- **Last residuals closed (2026-11-13, row `ANALYTICS-CORE-1` closed):** the 61 hand-wrapped `"" + name + ""`
+- **Last residuals closed (2026-11-13, row `ANALYTICS-CORE-1` closed):** the 61 hand-wrapped `"\"" + name + "\""`
   identifier quotes in the 15 classes the row named now go through `SqlIdent.q` (same SQL for every plain name; a name
   holding `"` is now escaped, not broken out of; `PatternRoutes` was already safe, its columns are checked against
   `[A-Za-z_][A-Za-z0-9_]*` and its Dataset must resolve). `PartitionCompactor` reads by name

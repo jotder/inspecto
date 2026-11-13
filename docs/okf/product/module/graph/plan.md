@@ -31,8 +31,8 @@ timestamp: 2026-10-19T00:00:00Z
 
 ## Left
 
-- Nothing open is owned by this module. Open `ANALYTICS-CORE-1` items (Could C7, scratch-name sites)
-  are outside the graph library.
+- Nothing open is owned by this module. `ANALYTICS-CORE-1` closed 2026-11-13; its Could C7 (graph traversal in SQL)
+  is open on `DUCKDB-2-LOOP-QUERIES-1`.
 
 ## Refused or deferred
 

@@ -118,8 +118,8 @@ than the doubling `replace` (a char loop, a regex, a `String.format` of a quote)
 `"` with no escape at all (nothing to match — `EnrichmentEngine.buildFilter`'s key and
 `ConsignmentIngestStrategy.stampReferenceVersions`' `src` / `dst` moved onto `SqlIdent.q` on 2026-10-17, after a name
 containing `"` was shown to give broken SQL; the reference view names and `eventTimeSource` in `EnrichmentEngine` and the `dropTable` / `dropView` / member-copy names in
-`ConsignmentIngestStrategy` followed on 2026-10-18, pinned by `ConsignmentDropQuotingTest`; many other `"\"" + name + "\""`
-wraps of engine-generated scratch names remain, listed under `ANALYTICS-CORE-1` in `BACKLOG.md`), statistics computed inline (`VolumeBaseline`'s lower median), and a robust z named
+`ConsignmentIngestStrategy` followed on 2026-10-18, pinned by `ConsignmentDropQuotingTest`; the remaining `"\"" + name + "\""`
+wraps of scratch names in 15 classes moved to `SqlIdent.q` on 2026-11-13, closing `ANALYTICS-CORE-1`), statistics computed inline (`VolumeBaseline`'s lower median), and a robust z named
 only `z` (`RobustStats.z`) are not counted, so a 0 means "no copy of the escape", not "no hand-built SQL". Plan:
 [`analytics-core-plan.md`](../../../../archived-documents/plans-archive/analytics-core-plan.md) §1a, §4a.
 
