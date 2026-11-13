@@ -5356,6 +5356,40 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(c.graph()).not.toBeNull();
         expect(c.openWorkLabel()).toBe('the unsaved Investigation');
     });
+    it('LA-EXPAND-PLACEMENT-1: a double click on an unsaved ring entity is a recorded Expand step, not the explorer read', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        const getEntityList = vi.fn(() => of({ id: 'suspects', title: 'Suspects', entityType: 'account', members: ['S-1'] }));
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), getEntityList, previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
+        });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'list', datasetId: 'transfers', listId: 'suspects' },
+            defaults: { name: 'n', purpose: 'p' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        const ringNode = c.graph()!.nodes.find((n) => n.data.label === 'S-1.n')!;
+        const ids = () => c.graph()!.nodes.map((n) => n.id);
+        const drawn = ids();
+        expand.mockClear();
+        await c.onNodeDblClick(ringNode.id);
+        await settle(fixture);
+        expect(expand).not.toHaveBeenCalled(); // the explorer read minted its own ids beside the Working Set's
+        const steps = c.investigation.unsaved()!.steps;
+        expect(steps).toHaveLength(3);
+        expect(steps[2]).toEqual(expect.objectContaining({ kind: 'expand', from: 'ids', ids: ['S-1.n'], walked: [['S-1.n']] }));
+        // one id per entity: every node drawn before is still there under the same id, and only S-1.n.n is new
+        expect(ids().filter((id) => !drawn.includes(id)).map((id) => c.graph()!.nodes.find((n) => n.id === id)!.data.label)).toEqual(['S-1.n.n']);
+        // a second double click on the entity it just read does not read it again
+        await c.onNodeDblClick(ringNode.id);
+        await settle(fixture);
+        expect(c.investigation.unsaved()!.steps).toHaveLength(3);
+    });
     it('LA-PANELS-REDESIGN-1: the start box only draws a list on the Investigations level - no pending form, no queue', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
         const getEntityList = vi.fn(() => of({ id: 'suspects', title: 'Suspects', entityType: 'account', members: ['S-1', 'S-2'] }));

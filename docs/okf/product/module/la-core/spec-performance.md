@@ -102,5 +102,10 @@ shown, `PerformanceObserver` long tasks. One run per row; the box was not otherw
 | toolbox Expand (first 25 unexpanded) | 418 → 444 | 775 · 112 · 117 · 52 | 1,056 ms |
 
   Before (2026-11-12, another build and day, ~405 nodes): 378–435 ms per 2–5-node expand. So the expand still costs a
-  full layout on every expand of a started graph; P6 needs re-measuring once `LA-EXPAND-PLACEMENT-1` is fixed. The
-  separate far group is the duplicated entities that the relayout pushed away from the drawn graph.
+  full layout on every expand of a started graph. The separate far group was the duplicated entities that the relayout
+  pushed away from the drawn graph.
+- **P6 after the `LA-EXPAND-PLACEMENT-1` fix** (same scenario, the double click now runs the unsaved Expand step): three
+  successive single-subscriber expands on 403 → 412 nodes each took `draw` only, moved 0 existing nodes and added 3
+  entities beside their neighbour; long tasks 429, 309 and 545 ms in total (longest 251–317 ms). ⚠ Measured on a
+  DEVELOPMENT `la-app` build (`ng serve`), not production, so it is not comparable with the production figures above;
+  a production re-measure is still owed (not filed: a measurement, not a defect).
