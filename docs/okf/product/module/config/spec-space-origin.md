@@ -1,7 +1,7 @@
 # Space origin — which template made a Space (SE-5a)
 
-**State:** built 2026-11-13 (SE-5a of the Space evolution plan, §4.5 steps 1 and 2). The upgrade proposal (step 3,
-SE-5b) is not part of this.
+**State:** SE-5a built 2026-11-13 (the Space evolution plan, §4.5 steps 1 and 2); SE-5b, the upgrade proposal (step 3),
+built 2026-11-13 (§5 below).
 
 ## 1. Decision: one record, the one that already existed
 
@@ -75,8 +75,92 @@ the **template's** rendered hashes, so a file the Space holds differently reads 
 Adopt writes only `.inspecto/created-from.*`, never config. Re-adopting is refused (409); to start over, delete the two
 files (rollback is "ignore the record").
 
-## 5. Tests
+## 5. Upgrade proposal (SE-5b)
+
+A Space never changes because its template did. An administrator reads what a newer template version would change and
+applies the part they choose. Code: `com.gamma.control.SpaceTemplateUpgrade` (the comparison) and
+`SpaceOriginRoutes` (the routes).
+
+### 5.1 The three-way comparison
+
+The server keeps no older template copies, only the hashes recorded at creation (or adoption). Per config file:
+**then** = the recorded hash, **now** = the installed template's file rendered with `${SPACE}` = the Space id (as creation
+renders it), **Space** = the file the Space holds. When the Space already holds what the template now says, the file is
+left out. Equality is decoded TOON for `.toon` files, setting aside the keys the server stamps on a seeded Job
+(`InstalledApps.sameConfig`, PA-7d's rule), and bytes otherwise.
+
+| `change` | When | Applied? |
+|---|---|---|
+| `update` | the Space's file still equals the recorded hash; the template's differs | yes, by default |
+| `add` | the template has a file the Space never had (not recorded, absent) | yes, by default |
+| `kept` | the Space changed (or deleted) the file; the template's still equals the recorded hash | no, the Space's edit stays |
+| `conflict` | both changed, or the Space has its own file where the template now adds one | never; listed with `recordedSha256`, `templateSha256`, `spaceSha256` to resolve by hand |
+| `template-removed` | recorded, gone from the template, still in the Space | never, report only (§3: the record also holds files the server writes into every Space, such as `egress.toon`, which therefore always shows here) |
+
+An `update` or `add` that no import may write (`ImportPaths`: not a config file, a reserved settings or access document, a
+suffix-scanned ops config) carries `refused` and is never applied by the upgrade; its own route writes it.
+
+⚠ A seeded Job is stamped at creation, so its recorded hash is of the stamped file. A Space that edited such a Job reads
+as `conflict` even when the template left the Job alone: the safe side, never applied.
+
+### 5.2 Reading it — `GET /spaces/{id}/origin/upgrade`
+
+Report-only, always 200, `canAuthorWorkbench`. `status`: `none`, `unavailable` (as `/origin`), `missing` (the template is
+no longer installed), `same-version` (the template's version equals the recorded one: nothing is proposed, whatever its
+files say), or `proposal` with `{template, fromVersion, toVersion, proposalId, files: [{path, kind?, change, …hashes,
+refused?}], applicable}`. `kind` is the approval-policy kind (`PendingChanges.kindOfConfigPath`); `applicable` is what an
+apply takes without `files`. `proposalId` is a SHA-256 over every entry and both versions.
+
+### 5.3 Applying it — `POST /spaces/{id}/origin/upgrade {toVersion, files?, proposalId?}`
+
+`canAdminister`. Never automatic: only this request applies anything, and only `update` / `add` files. Gates, in order:
+
+1. no Space folder 503;
+2. body 400 (`toVersion` missing, `files` not a non-empty list of strings, `proposalId` not a string) / 422 (`toVersion`
+   not a version);
+3. a named path that is not a plain relative path 403;
+4. no origin recorded 409 (adopt first); the template no longer installed 404;
+5. already at the template's version 409; `toVersion` not the installed version, or `proposalId` not the current
+   proposal's, 409 `CONFLICT_STALE_VERSION` (the template or the Space moved since the caller read it);
+6. a named file no import may write 403; a named file that is not an `update` or `add`, or nothing to apply, 409;
+7. the gates a Space bundle import runs over raw config files: a kind whose own route needs more
+   (`ImportCapabilityGuard`: a Connection needs `canOnboardConnections`, …) 403, every Decision Rule through
+   `DecisionRuleGuard`, every Job server-stamped (`JobAuthority`);
+8. the maker-checker hold (`PendingChanges.holdSet`): when the Space's approval policy holds the kind of ANY chosen file
+   (a file whose kind cannot be told counts as held), the whole set becomes ONE Pending Change, kind
+   `space-template-upgrade`, name = the template id, answered 202. Its rules must name one approver capability, else 409
+   (apply the files in groups, §5.4). It pins the template's hashes over the chosen files' Space hashes and the
+   `proposalId`; approving replays this request as its author, and anything the proposal listed that moved meanwhile
+   (a chosen file, a conflict the Space edited further, the template's files) makes it stale (409, Pending Change
+   status `stale`). With no policy the administrator's request applies directly (D-SE7's detail);
+9. write: every file through the import's writer (`BundleImporter.writeConfig` + `ImportJournal`, atomic per file, all
+   rolled back if one fails), a Pipeline also into its history (`PipelineHistory`) and refusal audit; then the record is
+   rewritten (temp file + move): `templateVersion` = the new version once no `update` / `add` is left unapplied (else
+   it stays, §5.4), each applied file's hash = the bytes written (a
+   stamped Job's, not the template's), every other hash kept, so a conflict still reads against the old baseline;
+   `recordedAt` now; `template`, `origin` and the PA-7d App fields kept. A failed record rewrite rolls the files back.
+
+Answer: `{template, fromVersion, toVersion, applied, recordedVersion, remaining, notApplied: [{path, change}]}` —
+`remaining` the applicable files still unapplied.
+
+### 5.4 Applying in groups
+
+`files` may name a subset (a policy whose kinds name different approvers needs it). A partial apply records the hashes of
+the files it wrote but keeps the recorded `templateVersion`, so the next `GET` still proposes the remaining updates and
+adds against the same newer version (the applied files now equal the template and drop out). The apply that leaves no
+applicable `update` / `add` records the new version; conflicts, `kept`, `template-removed` and refused files never hold
+it back. Until then `/origin` reports `templateSince: newer-version`, which is true: part of the newer version is not in
+the Space. Decision (SE-5b verification, 2026-11-13): first built as "every apply records the new version", which made a
+second group read `same-version` and be refused.
+
+Deliberately not done: a registry component written by the upgrade gets no MET-5 version-history copy (the import writer
+writes raw files, as a Space bundle import does); nothing is deleted; a Pipeline the upgrade writes takes effect as after
+any config write. Rollback: none needed for the record (ignore it); a written file is restored from its history or by hand.
+
+## 6. Tests
 
 `SpaceOriginTest` (create with/without version, unrecorded Space, adopt full/partial/none, the report's space and
 template sections) and `ControlApiSpaceOriginTest` (real HTTP, armed: 401, 403 for each route, every adopt gate, the
-read). `ImportLoaderInventoryTest.ALLOWED` names `created-from.toon` (outside `config/`, where an import writes).
+read). SE-5b: `SpaceTemplateUpgradeTest` (each classification, the stamped Job left out, the proposal id moving with the
+Space) and `ControlApiSpaceOriginUpgradeTest` (real HTTP, armed: the plan's proof on `orders-starter`, 401, 403 per route,
+every apply gate, the capability gate, 202 + approval applying the set, a stale approval). `ImportLoaderInventoryTest.ALLOWED` names `created-from.toon` (outside `config/`, where an import writes).

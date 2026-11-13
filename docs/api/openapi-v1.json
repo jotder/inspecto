@@ -2873,6 +2873,30 @@
         }
       }
     },
+    "/origin/upgrade" : {
+      "get" : {
+        "tags" : [ "spaces" ],
+        "summary" : "GET /origin/upgrade - what a newer version of the Space's template would change, file by file",
+        "operationId" : "getOriginUpgrade",
+        "description" : "SE-5b. Reached as /spaces/{id}/origin/upgrade. Report-only, always 200. status none (no origin recorded), unavailable (single-tenant default Space), missing (the template is no longer installed), same-version, or proposal {template, fromVersion, toVersion, proposalId, files: [{path, kind?, change: update|add|conflict|kept|template-removed, recordedSha256, templateSha256, spaceSha256, refused?}], applicable: [paths an apply takes by default]}. Three-way: the recorded hash at creation, the installed template rendered for the Space, the Space's file now; .toon files compare as decoded TOON less the server's Job stamps. Requires canAuthorWorkbench. Spec: docs/okf/product/module/config/spec-space-origin.md.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); data = {status, ...}."
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "spaces" ],
+        "summary" : "POST /origin/upgrade - apply the chosen update and add files of a template upgrade proposal",
+        "operationId" : "postOriginUpgrade",
+        "description" : "SE-5b. Reached as /spaces/{id}/origin/upgrade. Body {toVersion, files?: [config-relative paths, default every applicable update and add], proposalId?}. Never applies a conflict, kept or template-removed file and never deletes. Requires canAdminister. 503 no Space folder, 400 bad body, 422 malformed toVersion, 403 a named path that is not a plain relative path, 409 no origin recorded, 404 template no longer installed, 409 already at the template's version / toVersion not the installed version / proposalId not the current proposal (CONFLICT_STALE_VERSION), 403 a named file no import may write, 409 a named file that is not an update or add or nothing to apply, 403 a file kind whose own route needs a capability the caller lacks, 202 one Pending Change for the whole set when the Space's approval policy holds any of its files (kind space-template-upgrade, name = template id; approving replays this request), 200 {template, fromVersion, toVersion, applied, recordedVersion, remaining, notApplied: [{path, change}]}. Files are written through the import journal (all or nothing) and the origin record is then rewritten: applied files' hashes = the bytes written, every other hash kept; templateVersion = toVersion only once no applicable update or add remains (a partial apply keeps the old version, so the rest stays proposed).",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
+          }
+        }
+      }
+    },
     "/pipelines/{pipelineId}/bundle" : {
       "get" : {
         "tags" : [ "pipelines" ],
