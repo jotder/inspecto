@@ -118,6 +118,9 @@ Gated on `canAuthorWorkbench` (it lists every config path); available on every e
 | `unavailable` | the bound Space has no Space folder (single-tenant default). |
 | `failed` | the computation threw; `error` says why. |
 
+A `ready` report also carries `columnChanges` — Schema column changes and the consumers they break (SE-3a,
+[spec-column-contract.md](spec-column-contract.md)); the lock then holds an additive `columns` field.
+
 ## 8. Kill switch
 
 `-Dspace.integrity=off` (default on, because it only reports): no lock is written, no computation is scheduled,

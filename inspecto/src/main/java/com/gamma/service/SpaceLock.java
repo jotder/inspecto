@@ -405,6 +405,18 @@ public final class SpaceLock {
             links.add(l);
         }
 
+        // SE-3a: per Schema its published column set, the consumers of each column and the changes since the
+        // previous lock (ColumnContract). Absent under -Dcolumn.contract=off.
+        ColumnContract.Section columns = null;
+        if (ColumnContract.enabled()) {
+            Set<String> outsidePaths = new HashSet<>();
+            // marked in THIS computation (an older mark is carried by an unchanged file)
+            for (Map<String, Object> f : files)
+                if (f.get("outside") instanceof Map<?, ?> o && nowIso.equals(o.get("at"))) outsidePaths.add(str(f.get("path")));
+            columns = ColumnContract.lockSection(root, graph, prev == null ? null : prev.get("columns"), outsidePaths,
+                    nowIso, CAP);
+        }
+
         Map<String, Object> lock = new LinkedHashMap<>();
         lock.put("format", FORMAT);
         lock.put("space", spaceId);
@@ -412,6 +424,7 @@ public final class SpaceLock {
         lock.put("files", files);
         lock.put("removedOutside", removed);
         lock.put("links", links);
+        if (columns != null) lock.put("columns", columns.entries());
 
         String writtenAt;
         if (prev != null && sameContent(prev, lock)) {
@@ -422,7 +435,9 @@ public final class SpaceLock {
             AtomicFiles.write(lockFile, PRETTY.writeValueAsBytes(lock), ".lock-");
             writtenAt = nowIso;
         }
-        return ready(nowIso, writtenAt, prev != null, note[0], files, removed, links);
+        Report r = ready(nowIso, writtenAt, prev != null, note[0], files, removed, links);
+        r.body().put("columnChanges", columns == null ? Map.of("status", "disabled") : columns.report());
+        return r;
     }
 
     private static boolean byServer(String change, long mtime, List<Window> windows, boolean anyWindow, long now) {

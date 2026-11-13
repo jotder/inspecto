@@ -64,7 +64,9 @@ class SpaceCorpusEquivalenceTest {
             }),
             // SPACE-LINK-CENSUS-1 LC-3: the census delete / save refusal modes (shadow|refuse|off) touch routes only
             mode("links.delete"),
-            mode("links.save"));
+            mode("links.save"),
+            // SE-3a column contract: report-only, kill switch -Dcolumn.contract=off; touches the lock and save warnings only
+            Capability.killSwitch(ColumnContract.PROPERTY, null));
 
     /** A {@code shadow|refuse|off} mode property: on = refuse, off = the default (shadow), cleared so no test inherits it. */
     private static Capability mode(String property) {

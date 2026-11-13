@@ -70,7 +70,7 @@ class ImportLoaderInventoryTest {
         // read from inside a package, whose every file is held to its signed manifest.
         ALLOWED.put("app.toon", "an App definition under the install's apps/<id>/ or inside a signed package - outside every Space");
         ALLOWED.put("installed.toon", "the install record of a live-installed App under the install's apps/<id>/ - outside every Space");
-        ALLOWED.put("created-from.toon", "which App template made a Space, at <space>/.inspecto/ - outside config/, where an import writes, "
+        ALLOWED.put("created-from.toon", "which Space Template (SE-5a: any template, or adopted) made a Space, at <space>/.inspecto/ - outside config/, where an import writes, "
                 + "and it only shapes the upgrade's read-only offer");
         // SPACE-EVOLUTION-1 SE-6a: a Space test case, read by SpaceTestRunner from <space>/tests/<case>/ (SpaceTestRunner.testsDir).
         ALLOWED.put("case.toon", "a Space test case at <space>/tests/<case>/ - outside config/, where an import writes, and a run "

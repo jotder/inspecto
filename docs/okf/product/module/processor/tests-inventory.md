@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-411 test class(es): 163 unit, 248 real-HTTP control-plane, 0 IT.
+415 test class(es): 165 unit, 250 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -92,6 +92,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiClientIpTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiClientIpTest.java` | SEC review F3 over real HTTP: {@code ApiContext.ip} — the per-IP rate-limit key and the audit trail's |
 | `ControlApiCollectorNotifyTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCollectorNotifyTest.java` | Real-HTTP tests for {@code POST /collectors/{id}/notify} (ACQ-6 push discovery): v1 202+runId+Location with |
 | `ControlApiCollectorsAndConnectionsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCollectorsAndConnectionsTest.java` | Integration tests over real HTTP for the Acquisition/Sources UI backend: {@code GET /collectors} (flattened source <!-- vocab-allow: quoted Javadoc --> |
+| `ControlApiColumnContractSaveTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiColumnContractSaveTest.java` | SE-3a — the Schema save warning over real HTTP (D-SE4 step 1, report-only): a save through the config write |
 | `ControlApiColumnImpactTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiColumnImpactTest.java` | {@code GET /config/schema/{name}/columns/{column}/impact} (`SPACE-LINK-CENSUS-1` LC-5) over real HTTP: the read's |
 | `ControlApiCommitRetryTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCommitRetryTest.java` | The X1 retry affordance over real HTTP ({@code GET /runs/{name}/retries}, |
 | `ControlApiComponentSharesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiComponentSharesTest.java` | Component sharing RBAC (R3, {@code docs/superpower/rbac-abac-plan.md} §3) over real HTTP: the |
@@ -248,6 +249,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiSpaceBootReadinessTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceBootReadinessTest.java` | HA-RUNLEASE-DB-CREDENTIALS-1 (operator 2026-10-10): a node whose Spaces are CONFIGURED but none could boot must |
 | `ControlApiSpaceComparisonTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceComparisonTest.java` | Real-HTTP tests for {@code POST /space-comparisons} (space-comparison design, decided 2026-09-24) over a |
 | `ControlApiSpaceIntegrityTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceIntegrityTest.java` | SE-1a — {@code GET /spaces/{id}/integrity} over real HTTP under an ARMED authenticator: 401, 403 without |
+| `ControlApiSpaceOriginTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceOriginTest.java` | SE-5a — {@code GET /spaces/{id}/origin} and {@code POST /spaces/{id}/origin/adopt} over real HTTP under an ARMED |
 | `ControlApiSpaceSamplesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceSamplesTest.java` | {@code LA-ONBOARD-1} OB-12 over real HTTP: {@code POST /spaces {template, loadSamples: true}} copies the template's |
 | `ControlApiSpacesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpacesTest.java` | The Stage-5 {@code SpaceRoutes} CRUD over real HTTP: create + boot a space without restart, list it, confirm the |
 | `ControlApiSpaceTemplateKpiTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceTemplateKpiTest.java` | `ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1) over real HTTP, with an armed Authenticator: a Space Template's KPI pack |
@@ -381,6 +383,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `CollectorServiceTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CollectorServiceTest.java` | End-to-end tests for {@link CollectorService} (M1) — registry runs, batch-commit |
 | `CollectorServiceTriggerTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CollectorServiceTriggerTest.java` | T13 / §3.8 — entry-node triggers driving the live loop. A pipeline with no {@code trigger:} rides the |
 | `CollectorWatcherTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CollectorWatcherTest.java` | ACQ-6 push discovery: a file landing in a {@code source.discovery: watch} inbox triggers a run. <!-- vocab-allow: quoted Javadoc --> |
+| `ColumnContractTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ColumnContractTest.java` | SE-3a — the column contract: each change class, the rename heuristic and its limits, the published set read |
 | `ConfigKindOwnershipTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ConfigKindOwnershipTest.java` | {@code MODULE-REORG-1 P4e} (P4-3 b) - who owns each registry kind, and what an import does with it. |
 | `ConfigRegistryTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ConfigRegistryTest.java` | Unit tests for the O(1) config index (P3): lookups address pipelines by their <b>in-file |
 | `ContractVerdictsTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ContractVerdictsTest.java` | DUCKLE-C7 second half: the reader-dependent contract verdicts, over real config trees. Fixture: {@code prod} |
@@ -429,6 +432,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `SpaceManagerTemplateGateTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceManagerTemplateGateTest.java` | {@link SpaceManager#createFromTemplate(SpaceId, String, String, String, java.util.function.Consumer)}: a template |
 | `SpaceManagerTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceManagerTest.java` | The multi-space container: single-service wrapping, boot discovery, concurrent isolation, orderly shutdown. |
 | `SpaceMigratorTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceMigratorTest.java` | The migrate command: a flat working-directory layout relocates into spaces/&lt;id&gt;/ that discovers cleanly. |
+| `SpaceOriginTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceOriginTest.java` | SE-5a — {@link SpaceOrigin}: a Space made from a template records template, version and per-file hashes; a Space without |
 | `SpacePartitionTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpacePartitionTest.java` | Static work distribution — scale-out plan §5.3. Which Spaces a pod hosts, and what it does when the |
 | `SpaceRefTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceRefTest.java` | {@code <id>.ref} Space references, booted together with a convention data root (SPACE-DATA-ROOT-1). |
 | `SpaceRootTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceRootTest.java` | {@link SpaceRoot#under} per-space DB URLs: asking for any DuckDB URL mints {@code <base>/duckdb/} first. |

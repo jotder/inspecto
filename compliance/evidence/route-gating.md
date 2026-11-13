@@ -160,11 +160,11 @@ system: the evidence cannot say something the code does not.
 | POST | `/components/workflow/([^/]+)/versions/([^/]+)/restore` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:94` |
 | DELETE | `/config/([^/]+)/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ConfigReadRoutes.java:44` |
 | PUT | `/config/icon-map` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:98` |
-| POST | `/config/patch` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ConfigWriteRoutes.java:51` |
+| POST | `/config/patch` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ConfigWriteRoutes.java:52` |
 | POST | `/config/preview/parsing` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:48` |
 | POST | `/config/preview/schema` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:51` |
 | POST | `/config/suggest/schema` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:52` |
-| POST | `/config/write` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ConfigWriteRoutes.java:47` |
+| POST | `/config/write` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ConfigWriteRoutes.java:48` |
 | POST | `/connections` | gated | `canOnboardConnections` | `inspecto/src/main/java/com/gamma/control/ConnectionRoutes.java:46` |
 | DELETE | `/connections/([^/]+)` | gated | `canOnboardConnections` | `inspecto/src/main/java/com/gamma/control/ConnectionRoutes.java:67` |
 | PUT | `/connections/([^/]+)` | gated | `canOnboardConnections` | `inspecto/src/main/java/com/gamma/control/ConnectionRoutes.java:66` |
@@ -328,6 +328,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/onboard/postgres` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/PostgresSnapshot.java:90` |
 | POST | `/onboard/postgres/test` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/PostgresSnapshot.java:89` |
 | POST | `/onboarding/events` | exempt | self-limiting | `inspecto/src/main/java/com/gamma/control/OnboardingRoutes.java:40` |
+| POST | `/origin/adopt` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceOriginRoutes.java:41` |
 | POST | `/parsers/([^/]+)/preview` | exempt | provenance-gated | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java:43` |
 | POST | `/pending-changes/([^/]+)/approve` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:74` |
 | POST | `/pending-changes/([^/]+)/decline` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:76` |
