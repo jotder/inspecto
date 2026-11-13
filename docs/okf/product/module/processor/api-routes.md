@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-380 route(s) registered; 380 in the OpenAPI contract, 0 not.
+381 route(s) registered; 381 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -197,6 +197,7 @@ tags: [api, routes, generated]
 | POST | `/import` | POST /import (generated skeleton) | import | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java` |
 | POST | `/import/preview` | POST /import/preview (generated skeleton) | import | — | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java` |
 | GET | `/integrity` | GET /integrity - the Space lock's report: broken links, duplicates, files changed outside the server | spaces | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SpaceIntegrityRoutes.java` |
+| POST | `/integrity/accept` | POST /integrity/accept - accept files changed outside the server so they leave the integrity report | spaces | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceIntegrityRoutes.java` |
 | GET | `/jobs` | GET /jobs (generated skeleton) | jobs | — | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
 | POST | `/jobs` | POST /jobs (generated skeleton) | jobs | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
 | DELETE | `/jobs/{jobId}` | DELETE /jobs/{jobId} (generated skeleton) | jobs | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |

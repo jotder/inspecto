@@ -12,6 +12,7 @@ import com.gamma.service.ReservedConfigPaths;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
+import com.gamma.util.CurrentSpace;
 import com.sun.net.httpserver.HttpExchange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +44,9 @@ import java.util.Set;
  *       only; on Basic it acts as {@code shadow}.</li>
  * </ul>
  *
- * A value outside the three reads as {@code shadow}: a typo never starts refusing. The existing Pipeline and
+ * A Space whose {@code safety-policy.toon} sets {@code links: refuse-activation} gets {@code refuse} where the JVM mode
+ * is {@code shadow} ({@link SpaceLinksMode}, LC-4). A value outside the three reads as {@code shadow}: a typo never
+ * starts refusing. The existing Pipeline and
  * Connection delete refusals are not this class and stay as they are in every mode.
  */
 final class LinkRefusals {
@@ -75,7 +78,18 @@ final class LinkRefusals {
     /** The save mode in effect: {@code refuse} needs Standard or Advanced (D-LC5). */
     static Mode saveMode() {
         Mode m = mode(SAVE_PROPERTY);
-        return m == Mode.REFUSE && "basic".equals(BootstrapRoutes.edition()) ? Mode.SHADOW : m;
+        return forSpace(m == Mode.REFUSE && "basic".equals(BootstrapRoutes.edition()) ? Mode.SHADOW : m);
+    }
+
+    /** The delete mode in effect for the calling request's Space. */
+    static Mode deleteMode() {
+        return forSpace(mode(DELETE_PROPERTY));
+    }
+
+    /** LC-4: a Space whose {@code links:} is {@code refuse-activation} turns {@code shadow} into {@code refuse}
+     *  ({@link SpaceLinksMode}); {@code off} stays the kill switch. */
+    private static Mode forSpace(Mode m) {
+        return m == Mode.SHADOW && SpaceLinksMode.of(CurrentSpace.id()).refuses() ? Mode.REFUSE : m;
     }
 
     // ── delete (D-LC3) ──────────────────────────────────────────────────────────────────────
@@ -131,7 +145,7 @@ final class LinkRefusals {
      * naming it (a Pipeline id matched as the graph judges it, trimmed and case-insensitive).
      */
     static Delete delete(Path writeRoot, HttpExchange ex, String toKind, String id) {
-        Mode mode = mode(DELETE_PROPERTY);
+        Mode mode = deleteMode();
         boolean force = "true".equalsIgnoreCase(String.valueOf(ApiContext.query(ex, "force")));
         List<Map<String, Object>> deps = new ArrayList<>();
         if (mode != Mode.OFF) {
