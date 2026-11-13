@@ -12,7 +12,7 @@ The showcase ships as three downloads that unzip **side by side** into one folde
 product can be upgraded without touching the Space or its data. It runs on every edition, Basic included; the saved
 Geo View needs the Geo map (Standard and above) and does nothing on Basic. Layout and seams:
 [showcase distribution and install layout](../la-showcase/architecture.md#distribution-and-install-layout)
-and the [configuration reference](../../module/config/admin-guide-configuration-reference.md) (`SPACES_DATA_ROOT`).
+and the [configuration reference](../../module/config/admin-guide-configuration-reference.md) (`spaces.ref`, `data_root`).
 
 | Download | File | Unzip into |
 |---|---|---|
@@ -27,21 +27,23 @@ and the [configuration reference](../../module/config/admin-guide-configuration-
 2. Unzip the Space zip into `<parent>/inspecto-la-spaces/` — it creates `la-police/` with `space.toon` and `config/`.
 3. Unzip the data zip into `<parent>/inspecto-la-data/` — it creates `la-police/data/inbox/` and
    `la-police/data/staged/`.
-4. Start the product from its folder with both roots set, relative to the bundle:
+4. Create the pointer file `<parent>/inspecto-la/spaces.ref` holding one line — `../inspecto-la-spaces` (forward
+   slashes, so the same file works on Windows, Linux and macOS). It names the spaces root relative to the bundle.
+   Each Space's `space.toon` already names its own data root the same way (`data_root: ../inspecto-la-data/<id>`),
+   so no environment variable is needed and the three folders can be moved or copied together after the first start.
+5. Start the product from its folder:
 
    Windows:
 
    ```bat
    cd <parent>\inspecto-la
-   set SPACES_ROOT=..\inspecto-la-spaces
-   set SPACES_DATA_ROOT=..\inspecto-la-data
    bin\serve.bat
    ```
 
    Linux or macOS:
 
    ```bash
-   cd <parent>/inspecto-la && SPACES_ROOT=../inspecto-la-spaces SPACES_DATA_ROOT=../inspecto-la-data bin/serve.sh
+   cd <parent>/inspecto-la && bin/serve.sh
    ```
 
    The launcher changes to the bundle folder first, so both paths are relative to `inspecto-la/`. `PORT` picks

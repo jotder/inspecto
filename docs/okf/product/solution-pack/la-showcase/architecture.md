@@ -180,13 +180,23 @@ product can be upgraded by replacing its folder without touching any Space or da
 
 #### How the server finds them
 
-- **Spaces:** `SPACES_ROOT`, read by `serve.bat` / `serve.sh` / `serve-demo.*` and passed as `-Dspaces.root`.
-- **Data:** `SPACES_DATA_ROOT`, passed by the same launchers as `-Dspaces.data.root`; each Space's `data/`, `audit/`
-  and `duckdb/` then live under `<data root>/<id>` (`SpaceDataRoot`; the
-  [configuration reference](../../module/config/admin-guide-configuration-reference.md) has the rules). Both may be
-  relative: the JVM resolves them against its working directory and every launcher changes to the bundle root first,
-  so the documented `..\inspecto-la-spaces` and `..\inspecto-la-data` need no launcher logic. Guarded by a
-  `tools/check-launchers.mjs` scenario.
+Both roots are named in FILES, not environment variables (`SPACE-RELOCATABLE-ROOTS-1`, 2026-11-14), and both are
+relative to the bundle root the launchers change to. That is what makes `<parent>` movable: see "Relocation" below.
+
+- **Spaces:** `<bundle>/spaces.ref`, one line holding `../inspecto-la-spaces`. `serve.bat` / `serve.sh` pass
+  `-Dspaces.root` only when `SPACES_ROOT` is set, so the pointer is reachable; setting `SPACES_ROOT` still overrides
+  it. A malformed pointer is a loud boot error, never a silent fall back to `./spaces`.
+- **Data:** `data_root: ../inspecto-la-data/<id>` in each Space's own `space.toon`, written by the packer. Each
+  Space's `data/`, `audit/` and `duckdb/` then live there (`SpaceDataRoot`; the
+  [configuration reference](../../module/config/admin-guide-configuration-reference.md) has the rules).
+  `SPACES_DATA_ROOT` → `-Dspaces.data.root` still works and is still guarded, but it is NOT the showcase's route:
+  it leaves `data_root` blank, and a blank one is stamped with the Space's absolute path.
+- **Relocation.** Each data root carries a `.inspecto-space` stamp naming its owning Space, so a copied Space cannot
+  drain the original's inbox. With a RELATIVE `data_root` the stamp holds the Space's path *from* the data root, so
+  it still names a different folder per install yet survives a move: `<parent>` can be moved, copied or re-zipped
+  whole, started or not. With a rooted `data_root` (or none, i.e. `SPACES_DATA_ROOT`) the stamp is absolute and the
+  install boots 0 Spaces anywhere else until the stamps are deleted — the 2026-11-13 relocation failure.
+- Both root rules are guarded by `tools/check-launchers.mjs` scenarios, which EXECUTE the launchers.
 - **Why the split is exact.** With a data root set, a Space folder that still holds `data/`, `audit/` or `duckdb/` is
   not booted, so the Space zip carries no `data/`; an unstamped data root holding only those folders is adopted on the
   first boot. The data folder becomes the Space's runtime state as soon as the server starts. Deleting it and
@@ -194,8 +204,13 @@ product can be upgraded by replacing its folder without touching any Space or da
 - **Version check.** `space.toon` names `min_product_version`; `SpaceVersionCheck` logs a WARN at boot for a Space
   that asks for a newer product, and the Space still boots. A `dev` run checks nothing.
 - **Known limits (accepted 2026-11-07):** renaming a Space in Settings rewrites `space.toon` with its four known
-  fields and drops `min_product_version`; an absolute `SPACES_DATA_ROOT` with a space in it splits in `serve.bat` (as
-  `SPACES_ROOT` already does; the documented relative paths avoid it); `4.1.0-rc1` counts as meeting `4.1.0`.
+  fields; an absolute `SPACES_DATA_ROOT` with a space in it splits in `serve.bat` (as `SPACES_ROOT` already does;
+  the documented relative paths avoid it); `4.1.0-rc1` counts as meeting `4.1.0`. ⚠ Corrected 2026-11-14: the rename
+  does NOT drop `min_product_version` or `data_root`. `SpaceManifest.write` owns four keys
+  (`display_name`, `description`, `created_at`, `data_root`) and copies every other key through from the file as it
+  was, and `SpaceManager.update` carries the existing `data_root` into the record it writes. What DOES drop
+  `data_root` is importing a Space bundle: the exporting Space's data root belongs to it, so the new Space takes the
+  convention default (`SpaceManager` line 540).
 - **`la-sample` is the exception:** its files are in `data/samples` for the in-app *Try it with sample data*
   (`POST /spaces {template, loadSamples: true}`, which works from a data root), so its data download lands nothing
   until the files are copied into `data/inbox`. Every other showcase keeps its files in `data/<feed>/inbox`.

@@ -37,6 +37,14 @@ test('space.toon takes name and tagline as SpaceManager.createFromTemplate does,
   assert.match(out, /^created_at: "\d{4}-/m);
 });
 
+// SPACE-RELOCATABLE-ROOTS-1: the data root is declared RELATIVE in space.toon rather than left to SPACES_DATA_ROOT.
+// A blank data_root is stamped with the Space's ABSOLUTE path, which is what stopped a started bundle booting anywhere else.
+test('space.toon declares the data root relative to the bundle root, per Space', () => {
+  const out = spaceToon('name: x\n', 'la-claims', '4.0.0');
+  assert.match(out, /^data_root: "\.\.\/inspecto-la-data\/la-claims"$/m);
+  assert.ok(!/^data_root: "[A-Za-z]:|^data_root: "\//m.test(out), 'the data root must not be rooted');
+});
+
 test('toonValue reads bare and quoted values and misses absent keys', () => {
   assert.equal(toonValue('name: Bare value\n', 'name'), 'Bare value');
   assert.equal(toonValue('tagline: "q"\n', 'tagline'), 'q');

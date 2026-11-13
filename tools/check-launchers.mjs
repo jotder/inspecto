@@ -91,6 +91,8 @@ function makeBundle(dir, scenario) {
   // Exactly what package.ps1 step 3a-ter has the generator write: LF-only list of root-relative lib/<jar> entries, plus the edition marker.
   if (!scenario.noList) writeFileSync(join(dir, 'lib', 'modules.list'), renderList(listEntries(scenario.list)));
   if (!scenario.noMarker) writeFileSync(join(dir, 'lib', 'edition.properties'), scenario.markerText ?? renderEdition(scenario.edition));
+  // Extra bundle-root files a scenario needs, e.g. the `spaces.ref` pointer (SPACE-RELOCATABLE-ROOTS-1).
+  for (const [path, text] of Object.entries(scenario.files ?? {})) writeFileSync(join(dir, path), text);
   return dir;
 }
 
@@ -184,6 +186,21 @@ export const SCENARIOS = [
     name: 'Basic — SPACES_ROOT and SPACES_DATA_ROOT beside the bundle',
     env: { SPACES_ROOT: '../inspecto-la-spaces', SPACES_DATA_ROOT: '../inspecto-la-data' },
     expect: ['-Dspaces.root=../inspecto-la-spaces', '-Dspaces.data.root=../inspecto-la-data'],
+  }),
+  // SPACE-RELOCATABLE-ROOTS-1. A launcher that always passed `-Dspaces.root` made `spaces.ref` unreachable from a
+  // shipped bundle: the flag wins, so the pointer was never read. The flag must be ABSENT for the server to resolve it.
+  ed('Basic', {
+    name: 'Basic — spaces.ref at the bundle root, SPACES_ROOT unset: no -Dspaces.root at all',
+    env: {},
+    files: { 'spaces.ref': '../inspecto-la-spaces\n' },
+    expect: ['--enable-native-access=ALL-UNNAMED', '-Dcontrol.port=8080'],
+    rejectPrefix: ['-Dspaces.root', '-Dspaces.data.root'],
+  }),
+  ed('Basic', {
+    name: 'Basic — SPACES_ROOT still overrides a spaces.ref that is present',
+    env: { SPACES_ROOT: '../elsewhere' },
+    files: { 'spaces.ref': '../inspecto-la-spaces\n' },
+    expect: ['-Dspaces.root=../elsewhere'],
   }),
   ed('Standard', {
     name: 'Standard — OIDC + secrets + geo jars, no OIDC env',

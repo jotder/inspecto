@@ -37,6 +37,11 @@ are NOT the problem: `start-basic.cmd` resolves everything from `%~dp0`, so the 
 - **Official packaging already gets this right** — `tools/package-la-showcase.mjs` splits the Space zip (no `data/`)
   from the data zip (only `data/`, never a stamp), and says so in its header comment. Only a hand-made zip of a
   live install hits this.
+- **A showcase install is relocatable from 2026-11-14 on** — the packer writes `data_root: ../inspecto-la-data/<id>`
+  into each `space.toon`, and the spaces root goes in `<bundle>/spaces.ref`. ⚠ `SPACES_ROOT`/`SPACES_DATA_ROOT` are
+  what make it NON-relocatable: `SPACES_DATA_ROOT` leaves `data_root` blank, and a blank one is stamped ABSOLUTE.
+  `serve.sh`/`serve.bat` now pass `-Dspaces.root` only when `SPACES_ROOT` is set, so the pointer is reachable at
+  all; `serve-demo.*` still always passes it, so the Preview demo still needs the two variables.
 - A zip can be stripped without unpacking it: copy every entry except the ones named `.inspecto-space`
   (`System.IO.Compression.ZipFile`), which is also the safe way past the auto-mode classifier's refusal to update a
   large archive in place.

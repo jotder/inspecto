@@ -1,7 +1,9 @@
 # Relocatable Space roots — `spaces.ref`, relative `data_root`, relative `<id>.ref` (`SPACE-RELOCATABLE-ROOTS-1`)
 
-Status: **IN FLIGHT** — approved by the operator 2026-11-13; steps 0-3 and 6 built in that shift. Steps 4 (relative
-stamps) and 5 (repackage the showcase bundle) are still open. Opened 2026-11-13. Owner: this shift.
+Status: **DONE** — approved by the operator 2026-11-13. Steps 0-3 and 6 shipped as `5469e9ccf`; step 4 was built
+inside it after verification falsified the "no stamp for a relative root" rule (§3); step 5 shipped 2026-11-14.
+Only Q1 (a migration for installs with a rooted `data_root`) is left, and it is on the board, not here. Opened
+2026-11-13. Owner: this shift. **Archive this plan once Q1 is answered.**
 Items: `module.config`, `layer/platform`. Supersedes nothing; extends `SPACE-DATA-ROOT-1`.
 
 ## 1. Why
@@ -147,11 +149,33 @@ Each step names its verification. Nothing is merged until every one passes.
    relocatable. ⚠ It changes an on-disk format every existing install already wrote, so `ownedBy` must read
    both shapes. **Recommendation: defer.** Steps 1-3 give the operator what was asked for; step 4 is a
    migration with no requester.
-5. **Showcase bundle + launcher.** Switch `tools/package-la-showcase.mjs` and `start-basic.cmd` to the
-   relative form (`data_root: "inspecto-la-data/<id>"`, no `SPACES_DATA_ROOT`), so a packaged bundle is
-   relocatable with no stamps to delete.
-   → verify: package a bundle, unzip at two different paths, boot both, confirm 11 Spaces each and no
-   `.inspecto-space` anywhere.
+5. **Showcase bundle + launcher.** ✅ 2026-11-14. `tools/package-la-showcase.mjs` writes
+   `data_root: "../inspecto-la-data/<id>"` into each packaged `space.toon` (`../`, not the plan's
+   `inspecto-la-data/<id>`: the data folder is a SIBLING of the bundle, and a relative root resolves against the
+   app root, which is the bundle). `serve.sh` / `serve.bat` now pass `-Dspaces.root` **only when `SPACES_ROOT` is
+   set**, so `<bundle>/spaces.ref` is reachable from a shipped bundle — it was not before, because the flag wins.
+   `start-basic.cmd` is a hand-made file at the demo install, not a repo artifact; the repo change is the launchers
+   the bundle ships.
+   → verified: two `tools/check-launchers.mjs` scenarios that EXECUTE both launchers (pointer honoured; `SPACES_ROOT`
+   still overrides), each falsified against a mutated launcher; a unit test on the emitted `space.toon`; and a live
+   two-path boot of a packaged bundle.
+   ⚠ The plan's "no `.inspecto-space` anywhere" acceptance is **void** — step 4 made a relative root stamp
+   *relatively*. The right check is: stamps exist, each holds a relative path, and both copies boot.
+
+   **Live run, 2026-11-14** (Basic bundle, `package.ps1 -NoUi -NoRuntime`; `la-claims` packed with the new packer):
+   - `C:\sandbox\reloc-a` — bundle + the two unzipped siblings + `spaces.ref`. `bin\serve.bat` with NO environment
+     variables printed `spaces root from .\spaces.ref`, then `1 space(s) booted from …\inspecto-la-spaces (app root
+     …\inspecto-la)`; `/health` 200, `GET /api/v1/spaces` lists `la-claims` ready. Stamp written
+     `..\..\inspecto-la-spaces\la-claims` — relative.
+   - Server stopped, the WHOLE tree copied to `C:\sandbox\reloc-b` **with its stamps in place**: 1 space booted,
+     `/health` 200. This is the case that used to give `0 space(s) booted`.
+   - Falsified at `C:\sandbox\reloc-c` — the same tree with the stamp hand-written as the absolute path of
+     `reloc-a`'s Space folder: `0 space(s) booted`, with the original "belongs to the Space at … a copied Space
+     folder must get its own data_root". So the guard still bites and it is the RELATIVE stamp doing the work.
+   - ⚠ `bin/serve.sh` cannot be run from Git Bash on Windows (it builds a `:`-separated classpath, so the JVM
+     reports `ClassNotFoundException: com.gamma.control.ControlApi`). Pre-existing, unrelated to this change, and
+     already the reason the release guide says to start from a `.cmd`. Its pointer logic was proved by
+     `check-launchers.mjs`, which executes it under bash.
 6. **Docs.** `docs/okf/product/module/config/` — the resolution order as a table, the relative/absolute
    stamp rule and why. `docs/EDITIONS.md` / the bundle README if they name the data root. Update
    `.claude/memory/space-data-root-stamp.md` to say relative roots need no stamp-deleting.

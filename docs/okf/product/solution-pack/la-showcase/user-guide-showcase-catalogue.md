@@ -53,8 +53,9 @@ product can be upgraded without touching any Space or its data:
 | Space (configuration) | `inspecto-la-space-<id>-<version>.zip` | `<parent>/inspecto-la-spaces/` |
 | Data | `inspecto-la-data-<id>-<version>.zip` | `<parent>/inspecto-la-data/` |
 
-Start the product with `SPACES_ROOT` pointing at the Spaces folder and `SPACES_DATA_ROOT` at the data folder
-(relative to the bundle: `..\inspecto-la-spaces` and `..\inspecto-la-data`). The Pipelines land the data on start.
+Put one line — `../inspecto-la-spaces` — in a file `spaces.ref` at the bundle root, then start the product; each
+Space's own `space.toon` already names its data folder (`data_root: ../inspecto-la-data/<id>`), so nothing else is
+needed and the whole folder can be moved or copied later. The Pipelines land the data on start.
 To reset a showcase, stop the product, delete the Space's data folder and unzip its data download again. Install the product once and add as many showcases as you like.
 
 The full steps, the start command and the checks are in each Space's install guide; see the *Install* column below.

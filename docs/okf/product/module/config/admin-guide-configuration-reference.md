@@ -25,8 +25,12 @@ Config files live under a space's `config/<adapter>/` directory (e.g. `spaces/<i
 ## Spaces (multi-project layout)
 
 One server can host **many isolated spaces** (projects) at once. A space is a self-contained directory under a
-container root — `-Dspaces.root=<dir>`, default `<install_dir>/spaces` when no config args are given
-(`serve.sh`/`serve.bat` pass the same `SPACES_ROOT=spaces`):
+container root, resolved in this order: `-Dspaces.root=<dir>` → `SPACES_ROOT` → a `spaces.ref` pointer file at the
+app root → `<app root>/spaces`. The **app root** is `-Dapp.root` / `APP_ROOT`, else the working directory, and the
+launchers change to the bundle root first, so by default it is the install. `spaces.ref` holds one line, the spaces
+root, written rooted or relative to the app root; present but empty, or naming something that is not a directory, is
+a loud boot error rather than a silent fall back to `./spaces`. `serve.sh` / `serve.bat` pass `-Dspaces.root` only
+when `SPACES_ROOT` is set, so the pointer is reachable from a shipped bundle (`SPACE-RELOCATABLE-ROOTS-1`):
 
 ```
 spaces/
@@ -38,12 +42,13 @@ spaces/
     data/  ( data/events/ ) # partition output, inbox, backups  ( + rolling Parquet events )   ┐ under the
     audit/                  # run journal, watermarks, commit logs                               │ data root
     duckdb/                 # this space's *.duckdb / *.db stores                                ┘
-  <id>.ref                  # a Space reference: one line, the absolute path of a Space folder kept elsewhere
+  <id>.ref                  # a Space reference: one line, the path of a Space folder kept elsewhere
+                            #   (rooted, or relative to the app root)
 ```
 
 **Data root — config here, high-growth state on a bigger disk.** `data/`, `audit/` and `duckdb/` live under the
-Space's data root: `data_root: <absolute path>` in `space.toon`, else `-Dspaces.data.root=<mount>` → `<mount>/<id>`,
-else the Space folder. Configs are unchanged — `data/orders/inbox` or `../data/backups` resolve onto the data root.
+Space's data root: `data_root: <path>` in `space.toon` — rooted, or relative to the app root — else
+`-Dspaces.data.root=<mount>` → `<mount>/<id>`, else the Space folder. Configs are unchanged — `data/orders/inbox` or `../data/backups` resolve onto the data root.
 Example (all configs in `C:\sandbox\spaces`, all data in `C:\data`):
 
 ```
@@ -52,23 +57,29 @@ C:\sandbox\spaces\demo\{space.toon, config\}      C:\data\demo\{data\, audit\, d
 ```
 
 The launchers (`serve.bat`, `serve.sh`, `serve-demo.*`) pass `SPACES_DATA_ROOT` as `-Dspaces.data.root`; unset leaves
-the flag off. Both `SPACES_ROOT` and `SPACES_DATA_ROOT` may be relative to the bundle root, which is how a showcase
-attached from separate downloads runs (LA-SHOWCASE-DIST-1; `tools/package-la-showcase.mjs`):
+the flag off. Both `SPACES_ROOT` and `SPACES_DATA_ROOT` may be relative to the bundle root. ⚠ **They are not the
+portable way to attach a showcase**, because neither names a `data_root` — and a blank `data_root` is stamped with
+the Space's ABSOLUTE path, so the install boots nowhere else once it has been started. Name both roots in files
+instead (LA-SHOWCASE-DIST-1 + `SPACE-RELOCATABLE-ROOTS-1`; `tools/package-la-showcase.mjs` writes the `data_root`):
 
 ```
 <parent>\inspecto-la\                  the product download
-<parent>\inspecto-la-spaces\<id>\      the Space download: space.toon + config\
+<parent>\inspecto-la\spaces.ref        one line: ../inspecto-la-spaces
+<parent>\inspecto-la-spaces\<id>\      the Space download: space.toon (data_root: ../inspecto-la-data/<id>) + config\
 <parent>\inspecto-la-data\<id>\        the data download: data\ (then the Space's audit\ and duckdb\)
-set SPACES_ROOT=..\inspecto-la-spaces
-set SPACES_DATA_ROOT=..\inspecto-la-data
 inspecto-la\bin\serve.bat
 ```
+
+Both roots are then relative to the bundle, every stamp is written relative, and `<parent>` may be moved, copied or
+re-zipped whole at any time — started or not.
 
 `space.toon` may name `min_product_version: "<x.y.z>"`; at boot each Space asking for a newer product than the running
 one is named in a WARN (it still boots). A `dev` run checks nothing.
 
 Moving an existing Space: stop the server, move its `data/`, `audit/`, `duckdb/` into `<data root>/` (nothing else
-may be in that folder), set the flag or `data_root`, start. A Space whose folder still holds files in those dirs,
+may be in that folder), set the flag or `data_root`, start. Moving a whole INSTALL is free when every root is
+relative (the stamps are written relative too); an install whose `data_root` is rooted keeps absolute stamps and
+refuses every Space at the new path — stop it and delete the `.inspecto-space` files, which are then rewritten. A Space whose folder still holds files in those dirs,
 or whose data root is stamped (`.inspecto-space`) by another Space folder, or whose mount is missing, is not booted
 (`GET /spaces` lists it as skipped with the reason). ⚠ Keep `duckdb/` off object-storage mounts (s3fs,
 mountpoint-s3): DuckDB needs random writes.

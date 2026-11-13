@@ -1694,6 +1694,9 @@ $serveShContent = @'
 # Usage: [PORT=8080] [SPACES_ROOT=spaces] [SPACES_DATA_ROOT=<dir>] bin/serve.sh   (from any directory: it cd's to the bundle root)
 # SPACES_DATA_ROOT: each Space's data/, audit/ and duckdb/ go to <dir>/<space id> (-Dspaces.data.root); unset = inside the Space
 # folder. Both roots may be relative to the bundle root, e.g. SPACES_ROOT=../inspecto-la-spaces SPACES_DATA_ROOT=../inspecto-la-data.
+# With SPACES_ROOT unset, a `spaces.ref` file at the bundle root names the spaces root instead (SPACE-RELOCATABLE-ROOTS-1);
+# with neither, the root is ./spaces. Setting SPACES_ROOT overrides the pointer. Prefer the pointer plus a relative
+# `data_root` in each space.toon over SPACES_DATA_ROOT: that pair keeps the install movable after it has been started.
 # The core is AUTH-FREE by design. Real authentication is the `inspecto-oidc` module (Standard+, OIDC) — see docs/EDITIONS.md.
 # Extra JVM flags: INSPECTO_JAVA_OPTS="-Dui.static.log=DEBUG" bin/serve.sh   (see below)
 # Starts the control plane + operator UI over every space under the spaces/ root (discover mode).
@@ -1702,10 +1705,19 @@ $serveShContent = @'
 set -euo pipefail
 cd "$(dirname "$0")/.."   # bin/ -> the bundle ROOT: spaces/, ui/, docs/, lib/ and logs/ are root-relative
 PORT="${PORT:-8080}"
+# SPACES_ROOT wins; unset, a spaces.ref pointer at the bundle root is left to the server to read and report on, so
+# neither -Dspaces.root nor the probe below may assume ./spaces (SPACE-RELOCATABLE-ROOTS-1).
+SPACES_REF=""
+if [ -z "${SPACES_ROOT:-}" ] && [ -f spaces.ref ]; then SPACES_REF="yes"; fi
 SPACES_ROOT="${SPACES_ROOT:-spaces}"
-# A Space is a folder with config/ or a <id>.ref file pointing at one kept elsewhere (SpaceManager.REF_SUFFIX).
-{ ls -d "${SPACES_ROOT}"/*/config || ls "${SPACES_ROOT}"/*.ref; } >/dev/null 2>&1 || echo "[serve.sh] no Space attached under ./${SPACES_ROOT} -- drop your Space folder(s) there (or set SPACES_ROOT) and restart, or create one in Settings -> Spaces"
-JAVA_OPTS=(--enable-native-access=ALL-UNNAMED "-Dcontrol.port=${PORT}" "-Dspaces.root=${SPACES_ROOT}")
+JAVA_OPTS=(--enable-native-access=ALL-UNNAMED "-Dcontrol.port=${PORT}")
+if [ -n "$SPACES_REF" ]; then
+    echo "[serve.sh] spaces root from ./spaces.ref"
+else
+    # A Space is a folder with config/ or a <id>.ref file pointing at one kept elsewhere (SpaceManager.REF_SUFFIX).
+    { ls -d "${SPACES_ROOT}"/*/config || ls "${SPACES_ROOT}"/*.ref; } >/dev/null 2>&1 || echo "[serve.sh] no Space attached under ./${SPACES_ROOT} -- drop your Space folder(s) there (or set SPACES_ROOT) and restart, or create one in Settings -> Spaces"
+    JAVA_OPTS+=("-Dspaces.root=${SPACES_ROOT}")
+fi
 [ -n "${SPACES_DATA_ROOT:-}" ] && JAVA_OPTS+=("-Dspaces.data.root=${SPACES_DATA_ROOT}")
 [ -d ui ] && JAVA_OPTS+=("-Dui.dir=./ui")
 # DuckDB excel extension (multiformat X1, frontend: xlsx) — auto-detect the bundled per-platform
@@ -1800,7 +1812,7 @@ if [ -n "${EXTRA_OPTS}" ]; then
     JAVA_OPTS+=("${_extra_opts[@]}")
 fi
 JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
-echo "[serve.sh] ControlApi on :${PORT}  (spaces: ./${SPACES_ROOT}, UI: $([ -d ui ] && echo ./ui || echo none), edition: ${EDITION})${EXTRA_OPTS:+  extra JVM opts: ${EXTRA_OPTS}}"
+echo "[serve.sh] ControlApi on :${PORT}  (spaces: $([ -n "$SPACES_REF" ] && echo "per ./spaces.ref" || echo "./${SPACES_ROOT}"), UI: $([ -d ui ] && echo ./ui || echo none), edition: ${EDITION})${EXTRA_OPTS:+  extra JVM opts: ${EXTRA_OPTS}}"
 exec "$JAVA" "${JAVA_OPTS[@]}" -cp "$CP" com.gamma.control.ControlApi
 '@
 # OBJECTS-BACKEND-DEFAULT-MEMORY-1: a Preview bundle carries Advanced's exact jars, which the old jar-sniffing launcher
@@ -1814,6 +1826,10 @@ rem Usage: bin\serve.bat   (from any directory: it cd's to the bundle root)
 rem Optional env: PORT (default 8080), CORS_ORIGIN, SPACES_ROOT (default spaces), SPACES_DATA_ROOT (default unset).
 rem SPACES_DATA_ROOT: each Space's data\, audit\ and duckdb\ go to <dir>\<space id> (-Dspaces.data.root); unset = inside the
 rem Space folder. Both roots may be relative to the bundle root, e.g. ..\inspecto-la-spaces and ..\inspecto-la-data.
+rem With SPACES_ROOT unset, a spaces.ref file at the bundle root names the spaces root instead
+rem (SPACE-RELOCATABLE-ROOTS-1); with neither, the root is .\spaces. Setting SPACES_ROOT overrides the pointer.
+rem Prefer the pointer plus a relative data_root in each space.toon over SPACES_DATA_ROOT: that pair keeps the
+rem install movable after it has been started.
 rem The core is AUTH-FREE by design; real auth is the inspecto-oidc module (Standard+, OIDC).
 rem Extra JVM flags: set "INSPECTO_JAVA_OPTS=-Dui.static.log=DEBUG"   (see below)
 rem Starts the control plane + operator UI over every space under .\spaces (serves bundled .\ui).
@@ -1823,13 +1839,20 @@ setlocal
 cd /d "%~dp0.."
 rem bin\ -> the bundle ROOT: spaces\, ui\, docs\, lib\ and logs\ are root-relative.
 if "%PORT%"=="" set "PORT=8080"
+rem SPACES_ROOT wins; unset, a spaces.ref pointer is left to the server to read and report on, so neither
+rem -Dspaces.root nor the probe below may assume .\spaces (SPACE-RELOCATABLE-ROOTS-1).
+set "SPACES_REF="
+if "%SPACES_ROOT%"=="" if exist "spaces.ref" set "SPACES_REF=1"
 if "%SPACES_ROOT%"=="" set "SPACES_ROOT=spaces"
+set "OPTS=--enable-native-access=ALL-UNNAMED -Dcontrol.port=%PORT%"
+if defined SPACES_REF echo [serve.bat] spaces root from .\spaces.ref
+if not defined SPACES_REF set "OPTS=%OPTS% -Dspaces.root=%SPACES_ROOT%"
 set "ANY_SPACE="
+if defined SPACES_REF set "ANY_SPACE=1"
 for /d %%S in ("%SPACES_ROOT%\*") do if exist "%%~S\config\" set "ANY_SPACE=1"
 rem A Space may also be a <id>.ref file pointing at a folder kept elsewhere (SpaceManager.REF_SUFFIX).
 if exist "%SPACES_ROOT%\*.ref" set "ANY_SPACE=1"
 if not defined ANY_SPACE echo [serve.bat] no Space attached under .\%SPACES_ROOT% -- drop your Space folder(s) there (or set SPACES_ROOT) and restart, or create one in Settings -^> Spaces
-set "OPTS=--enable-native-access=ALL-UNNAMED -Dcontrol.port=%PORT% -Dspaces.root=%SPACES_ROOT%"
 if not "%SPACES_DATA_ROOT%"=="" set "OPTS=%OPTS% -Dspaces.data.root=%SPACES_DATA_ROOT%"
 if exist ui set "OPTS=%OPTS% -Dui.dir=./ui"
 rem DuckDB excel extension (multiformat X1, frontend: xlsx) - auto-detect the bundled
@@ -1914,7 +1937,8 @@ if not "%EXTRA_OPTS%"=="" set "OPTS=%OPTS% %EXTRA_OPTS%"
 if not "%EXTRA_OPTS%"=="" echo [serve.bat] extra JVM opts: %EXTRA_OPTS%
 set "JAVA=java"
 if exist "runtime\bin\java.exe" set "JAVA=runtime\bin\java.exe"
-echo [serve.bat] ControlApi on :%PORT%  (spaces: .\%SPACES_ROOT%, edition: %EDITION%)
+if defined SPACES_REF echo [serve.bat] ControlApi on :%PORT%  (spaces: per .\spaces.ref, edition: %EDITION%)
+if not defined SPACES_REF echo [serve.bat] ControlApi on :%PORT%  (spaces: .\%SPACES_ROOT%, edition: %EDITION%)
 "%JAVA%" %OPTS% -cp %CP% com.gamma.control.ControlApi
 '@
 Write-CrlfScript -Path "$binDir\serve.bat" -Content $serveBatContent

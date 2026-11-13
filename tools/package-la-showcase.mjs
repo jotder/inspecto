@@ -8,7 +8,13 @@
 //   inspecto-la-space-<id>-<version>.zip   <id>/space.toon + <id>/config/**      -> unzip into <parent>/inspecto-la-spaces/
 //   inspecto-la-data-<id>-<version>.zip    <id>/data/**                          -> unzip into <parent>/inspecto-la-data/
 //
-// and the product runs with SPACES_ROOT=../inspecto-la-spaces SPACES_DATA_ROOT=../inspecto-la-data.
+// and the product runs with `<bundle>/spaces.ref` holding `../inspecto-la-spaces` — no environment variables.
+//
+// RELOCATABLE (SPACE-RELOCATABLE-ROOTS-1, 2026-11-14). Both roots are named RELATIVE to the bundle root: the spaces
+// root in spaces.ref, each Space's data root in its own space.toon (`data_root: ../inspecto-la-data/<id>`). That
+// replaces SPACES_DATA_ROOT, which left data_root blank — and a blank data_root is stamped with the Space's ABSOLUTE
+// path, so a bundle zipped after it had been started booted 0 Spaces anywhere else. A relative data_root is stamped
+// relatively, so the three sibling folders may be moved, copied or re-zipped together at any time.
 //
 // WHY THE SPLIT IS EXACT. With a data root set, a Space folder that still holds data/, audit/ or duckdb/ is NOT booted
 // (SpaceDataRoot), so the Space zip must carry no data/. The data zip holds only data/: an unstamped data root holding
@@ -76,11 +82,18 @@ export function toonValue(text, key) {
   return v.startsWith('"') ? JSON.parse(v) : v;
 }
 
-/** The space.toon a Space created from this template gets, plus min_product_version. */
+/** Where a showcase Space keeps its data: the data zip's folder, named RELATIVE to the app root (the bundle root the
+ *  launchers cd to). SPACE-RELOCATABLE-ROOTS-1 — a relative data_root is stamped relatively, so the whole install
+ *  (bundle + the two sibling folders) can be moved, copied or re-zipped after it has been started. Declaring it here
+ *  is what replaces SPACES_DATA_ROOT: that flag leaves data_root blank, and a blank one is stamped ABSOLUTE. */
+export const DATA_ROOT_PARENT = '../inspecto-la-data';
+
+/** The space.toon a Space created from this template gets, plus min_product_version and the relative data_root. */
 export function spaceToon(templateToon, id, minProduct) {
   const name = toonValue(templateToon, 'name') || id;
   const desc = toonValue(templateToon, 'tagline');
-  return `display_name: ${q(name)}\ndescription: ${q(desc)}\ncreated_at: ${q(new Date().toISOString())}\nmin_product_version: ${q(minProduct)}\n`;
+  return `display_name: ${q(name)}\ndescription: ${q(desc)}\ncreated_at: ${q(new Date().toISOString())}\n`
+    + `min_product_version: ${q(minProduct)}\ndata_root: ${q(`${DATA_ROOT_PARENT}/${id}`)}\n`;
 }
 
 /** config/egress.toon as EgressAllowlist.recordEmpty writes it for a new Space: an empty allowlist. Without it the server
@@ -312,8 +325,9 @@ function main() {
     console.log(`✓ ${opts.id} ${version}: ${p.space.length + 2} Space file(s) -> ${spaceZip}`);
     console.log(`  ${p.data.length} data file(s) -> ${dataZip}`);
     console.log(`  min_product_version: ${minProduct}`);
-    console.log(`  install: unzip the Space into <parent>/inspecto-la-spaces/, the data into <parent>/inspecto-la-data/, then start`);
-    console.log(`  the product with SPACES_ROOT=../inspecto-la-spaces SPACES_DATA_ROOT=../inspecto-la-data`);
+    console.log(`  install: unzip the Space into <parent>/inspecto-la-spaces/, the data into <parent>/inspecto-la-data/,`);
+    console.log(`  write "../inspecto-la-spaces" into <bundle>/spaces.ref, then start the product with bin/serve - no env needed.`);
+    console.log(`  space.toon declares data_root: ${DATA_ROOT_PARENT}/${opts.id} (relative), so the install stays movable once started.`);
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

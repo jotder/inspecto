@@ -29,16 +29,18 @@ The showcase runs on every edition, Basic included. It needs no sign-in, databas
 
 ## 2. Start
 
-Windows:
+Create the pointer file `<parent>/inspecto-la/spaces.ref` holding one line — `../inspecto-la-spaces` (forward
+slashes, so the same file works on every platform). Each Space's `space.toon` already names its own data root the
+same way (`data_root: ../inspecto-la-data/<id>`), so no environment variable is needed and the three folders can be
+moved or copied together after the first start. Then, Windows:
 
 ```
 cd <parent>\inspecto-la
-set SPACES_ROOT=..\inspecto-la-spaces
-set SPACES_DATA_ROOT=..\inspecto-la-data
 bin\serve.bat
 ```
 
-Linux or macOS: `SPACES_ROOT=../inspecto-la-spaces SPACES_DATA_ROOT=../inspecto-la-data bin/serve.sh`.
+Linux or macOS: `cd <parent>/inspecto-la && bin/serve.sh`. Setting `SPACES_ROOT` still works and overrides
+`spaces.ref`, but a root named that way is not carried with the folder.
 
 Open the address the server prints and pick the Space **Link Analysis ownership showcase**.
 
