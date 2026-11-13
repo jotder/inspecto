@@ -26,8 +26,8 @@ import java.util.stream.Stream;
  *       {@link PathJail#spaceDirOf} and {@link SpaceAuditDir} use). The single-tenant default Space's write root
  *       ({@code -Dassist.write.root}, no Space folder) is not one, so it reads {@code config/} only.</li>
  * </ul>
- * Nothing moves at boot and nothing here creates a directory. A state twin that resolves outside the Space's
- * {@code state/} (a symlinked directory) is never read.
+ * Nothing moves at boot and nothing here creates a directory. No link below the Space folder is followed:
+ * a {@code state/}, {@code state/<dir>} or file that is a symlink or junction is never read ({@link #linkFree}).
  */
 public final class SpaceStateDirs {
 
@@ -111,11 +111,31 @@ public final class SpaceStateDirs {
         Path[] located = locate(p);
         if (located == null || !Files.exists(located[1])) return null;
         Path t = located[1];
-        if (!PathJail.contains(located[0], t)) {
-            log.log(System.Logger.Level.WARNING, t + " resolves outside its Space's state/ folder and is not read");
+        if (!linkFree(located[0].getParent(), t)) {
+            log.log(System.Logger.Level.WARNING, t + " passes through a link (state/ or a folder under it) and is not read");
             return null;
         }
         return t;
+    }
+
+    /**
+     * Whether no folder or file from {@code base} (exclusive) down to {@code p} is a link (symlink or junction): the
+     * real path of the deepest existing one of them equals {@code base}'s real path plus the same relative path. A
+     * {@code state/} that is itself a link to outside the Space fails, which a containment check that resolves both
+     * sides would let through. {@code base} itself may be a link (a Space kept elsewhere). Nothing existing below
+     * {@code base} is link-free; an unanswerable filesystem is not.
+     */
+    public static boolean linkFree(Path base, Path p) {
+        Path b = base.toAbsolutePath().normalize();
+        Path e = p.toAbsolutePath().normalize();
+        if (!e.startsWith(b)) return false;
+        while (!e.equals(b) && !Files.exists(e, java.nio.file.LinkOption.NOFOLLOW_LINKS)) e = e.getParent();
+        if (e.equals(b)) return true;
+        try {
+            return e.toRealPath().equals(b.toRealPath().resolve(b.relativize(e).toString()));
+        } catch (IOException | RuntimeException unanswerable) {
+            return false;
+        }
     }
 
     private static List<Path> listOne(Path d) throws IOException {

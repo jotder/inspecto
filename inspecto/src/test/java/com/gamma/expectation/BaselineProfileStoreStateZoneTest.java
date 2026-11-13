@@ -12,6 +12,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** SE-4 step 1: a baseline history under {@code state/expectation-baselines} is read before {@code config/}'s; writes stay in config. */
 class BaselineProfileStoreStateZoneTest {
@@ -59,6 +60,7 @@ class BaselineProfileStoreStateZoneTest {
         assertEquals(1, s.acceptedWindow("e", 5).size(), "state/ wins");
         assertThrows(IOException.class, () -> s.record("e", rows(11), "PASSED", 2), "a newer release's history");
         assertThrows(IOException.class, () -> s.delete("e"), "a delete that cannot reach state/ says so");
+        assertTrue(Files.isRegularFile(inConfig(root)), "and a refused delete changes nothing");
         assertEquals(new String(oneAccepted), Files.readString(inState(root)), "state/ untouched");
     }
 }

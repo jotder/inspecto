@@ -11,6 +11,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** SE-4 step 1: a Reconciliation's state under {@code state/recon-state} is read before {@code config/}'s; writes stay in config. */
 class ReconStateStoreStateZoneTest {
@@ -55,6 +56,7 @@ class ReconStateStoreStateZoneTest {
         assertEquals(1, store.read("orders").runs(), "state/ wins");
         assertThrows(IOException.class, () -> store.record("orders", List.of(), "2026-09-01T00:00:00Z"));
         assertThrows(IOException.class, () -> store.delete("orders"), "a delete that cannot reach state/ says so");
+        assertTrue(Files.isRegularFile(inConfig(root)), "and a refused delete changes nothing");
         assertEquals(new String(oneRun), Files.readString(inState(root)), "state/ untouched");
     }
 }

@@ -150,8 +150,8 @@ public final class BaselineProfileStore {
      *  same name must not inherit its baseline. */
     public void delete(String name) throws IOException {
         synchronized (LOCK) {
+            refuseShadowed(file(name));   // first: a refused delete changes nothing (a state/ copy would be inherited)
             Files.deleteIfExists(file(name));
-            refuseShadowed(file(name));   // never silent: a state/ copy would be inherited by a re-created one
         }
     }
 

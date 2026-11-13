@@ -185,8 +185,8 @@ public final class ReconStateStore {
     /** Drop the state — its Reconciliation was deleted, and a re-created one of the same id must not inherit it. */
     public void delete(String reconciliationId) throws IOException {
         synchronized (LOCK) {
+            refuseShadowed(file(reconciliationId));   // first: a refused delete changes nothing (a state/ copy would be inherited)
             Files.deleteIfExists(file(reconciliationId));
-            refuseShadowed(file(reconciliationId));   // never silent: a state/ copy would be inherited by a re-created one
         }
     }
 

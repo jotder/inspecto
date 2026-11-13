@@ -112,10 +112,11 @@ final class BackupTask {
         // "../state/<path>" entries — the server-written records that zone takes over from config/ (restore maps them
         // back). The same secret rule applies. Nothing is added for a Space with no state/ folder.
         Path state = SpaceStateDirs.stateRoot(dir);
-        if (state != null && Files.isDirectory(state))
+        if (state != null && Files.isDirectory(state) && SpaceStateDirs.linkFree(state.getParent(), state))   // never a linked state/
             files.addAll(com.gamma.util.DuckDbUtil.regularFilesSkippingSpill(state).stream()
                     .filter(p -> !p.toAbsolutePath().normalize().startsWith(backupDir.toAbsolutePath()))
                     .filter(p -> !secret(dir, p))
+                    .filter(p -> SpaceStateDirs.linkFree(state.getParent(), p))   // nor a linked folder under it
                     .toList());
         files.sort(Comparator.comparing(Path::toString));   // deterministic archive order
         long totalBytes = 0;
@@ -438,7 +439,8 @@ final class BackupTask {
         Path state = SpaceStateDirs.stateRoot(target);
         if (state == null || !rel.replace('\\', '/').startsWith(STATE_ENTRY)) return null;
         Path abs = dest.toAbsolutePath().normalize();
-        return abs.startsWith(state) && !abs.equals(state) ? abs : null;
+        // never through a link: a state/ (or a folder under it) linked to outside the Space is refused
+        return abs.startsWith(state) && !abs.equals(state) && SpaceStateDirs.linkFree(state.getParent(), abs) ? abs : null;
     }
 
     /**

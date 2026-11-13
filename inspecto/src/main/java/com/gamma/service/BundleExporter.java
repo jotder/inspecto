@@ -116,11 +116,13 @@ public final class BundleExporter {
         // in config/ (state/recon-state/x.json → recon-state/x.json), so the bundle layout does not change and an
         // importer cannot tell where a record lived. A file in both places is taken from state/, as every reader does.
         Path state = SpaceStateDirs.stateRoot(configDir);
-        if (state != null && Files.isDirectory(state)) {
+        if (state != null && Files.isDirectory(state) && SpaceStateDirs.linkFree(state.getParent(), state)) {
             try (Stream<Path> s = Files.walk(state)) {
                 for (Path f : s.filter(Files::isRegularFile).sorted().toList()) {
                     String entry = state.relativize(f).toString().replace('\\', '/');
-                    if (neverExported(entry)) continue;
+                    // only the switched directories: a later store in state/ is never exported by accident
+                    if (!SpaceStateDirs.DIRS.contains(entry.split("/", 2)[0]) || neverExported(entry)) continue;
+                    if (!SpaceStateDirs.linkFree(state.getParent(), f)) continue;   // never through a link
                     if (entries.put(entry, exportableBytes(f)) == null) artifacts.add(artifact(entry, kindOf(f)));
                 }
             }

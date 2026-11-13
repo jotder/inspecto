@@ -85,11 +85,12 @@ class BundleExporterTest {
         write(base.resolve("state/recon-state/both.json"), "state");
         write(base.resolve("state/expectation-baselines/e.json"), "baseline");
         write(base.resolve("state/pending-changes/pc-20261113000000-abcdef.json"), "held");
+        write(base.resolve("state/some-later-store/x.json"), "not switched");
 
         Map<String, byte[]> got = unzip(BundleExporter.exportSpace(config, null, "space-a"));
         assertEquals("state", new String(got.get("recon-state/both.json"), StandardCharsets.UTF_8), "state/ wins");
         assertEquals("baseline", new String(got.get("expectation-baselines/e.json"), StandardCharsets.UTF_8));
-        assertFalse(got.keySet().stream().anyMatch(k -> k.startsWith("pending-changes/") || k.startsWith("state/")),
+        assertFalse(got.keySet().stream().anyMatch(k -> k.startsWith("pending-changes/") || k.startsWith("state/") || k.startsWith("some-later-store/")),
                 got.keySet().toString());
         String manifest = new String(got.get("bundle.toon"), StandardCharsets.UTF_8);
         assertEquals(1, manifest.split("recon-state/both.json", -1).length - 1, "one artifact per entry: " + manifest);

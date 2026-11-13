@@ -97,7 +97,7 @@
 /spaces/*/config.secrets/
 # SE-4 state zone (spaces/<id>/state/, beside config/): server-written records — Pending Changes, signed add-on records,
 # Reconciliation and baseline state, the assist agent's files — runtime state per install, never committed.
-/spaces/*/state/
+/spaces/*/state
 # SE-1a Space lock: derived, recomputed from config/ (spec-space-lock.md)
 /spaces/*/.inspecto/
 # WEBHOOK-EGRESS-POLICY-1: each Space's egress allowlist is written by the boot-time migration (or recorded empty

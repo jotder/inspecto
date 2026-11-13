@@ -68,8 +68,10 @@ public final class AutonomyPolicyStore {
     private void persist() {
         if (file == null) return;
         if (SpaceStateDirs.shadowed(file)) {   // SE-4 step 1: a newer release's file — kept in memory, never written here
-            log.warn("Not persisting the autonomy policy to {}: {} was written by a newer release and this release "
-                    + "only reads it", file, SpaceStateDirs.twin(file));
+            // ERROR, not WARN: this change (a kill switch included) holds only until the next restart
+            log.error("NOT persisting the autonomy policy to {}: {} was written by a newer release and this release only "
+                    + "reads it — this change (killSwitch={}) is lost at restart", file, SpaceStateDirs.twin(file),
+                    policy.killSwitch());
             return;
         }
         try {

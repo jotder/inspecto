@@ -79,10 +79,65 @@ class SpaceStateDirsTest {
     }
 
     @Test
+    void aStateFolderThatIsALinkToOutsideTheSpaceIsNeverRead(@TempDir Path tmp) throws Exception {
+        Path config = Files.createDirectories(tmp.resolve("demo").resolve("config"));
+        Path outside = Files.createDirectories(tmp.resolve("outside").resolve("recon-state"));
+        Files.writeString(outside.resolve("r.json"), "evil");
+        link(tmp.resolve("demo").resolve("state"), outside.getParent());
+        Path f = config.resolve("recon-state").resolve("r.json");
+        assertEquals("evil", Files.readString(tmp.resolve("demo").resolve("state").resolve("recon-state").resolve("r.json")),
+                "the link works, so the refusal below is the jail");
+        assertEquals(f, SpaceStateDirs.readable(f), "a linked state/ is never read");
+        assertFalse(SpaceStateDirs.shadowed(f));
+        assertEquals(List.of(), SpaceStateDirs.list(config.resolve("recon-state")));
+        assertFalse(SpaceStateDirs.linkFree(tmp.resolve("demo"), tmp.resolve("demo").resolve("state")));
+    }
+
+    @Test
+    void aZoneFolderThatIsALinkToOutsideTheSpaceIsNeverRead(@TempDir Path tmp) throws Exception {
+        Path config = Files.createDirectories(tmp.resolve("demo").resolve("config"));
+        Path outside = Files.createDirectories(tmp.resolve("outside"));
+        Files.writeString(outside.resolve("r.json"), "evil");
+        Files.createDirectories(tmp.resolve("demo").resolve("state"));
+        link(tmp.resolve("demo").resolve("state").resolve("recon-state"), outside);
+        Path f = config.resolve("recon-state").resolve("r.json");
+        assertEquals(f, SpaceStateDirs.readable(f));
+        assertFalse(SpaceStateDirs.shadowed(f));
+    }
+
+    @Test
+    void aSpaceFolderThatIsItselfALinkStillReadsItsState(@TempDir Path tmp) throws Exception {
+        Path real = Files.createDirectories(tmp.resolve("elsewhere").resolve("demo"));
+        Files.writeString(Files.createDirectories(real.resolve("state").resolve("recon-state")).resolve("r.json"), "s");
+        link(tmp.resolve("spaces").resolve("demo"), real);
+        Path f = tmp.resolve("spaces").resolve("demo").resolve("config").resolve("recon-state").resolve("r.json");
+        assertEquals("s", Files.readString(SpaceStateDirs.readable(f)), "a Space kept elsewhere (a .ref) is not refused");
+    }
+
+    @Test
     void nothingIsCreatedByReading(@TempDir Path tmp) throws Exception {
         Path config = Files.createDirectories(tmp.resolve("demo").resolve("config"));
         SpaceStateDirs.readable(config.resolve("agent").resolve("policy.json"));
         SpaceStateDirs.list(config.resolve("agent"));
         assertFalse(Files.exists(tmp.resolve("demo").resolve("state")), "a reader never makes state/");
+    }
+
+    /** {@code link} → {@code target} as a symlink, else (Windows without the privilege) a junction; the test is skipped when neither can be made. */
+    static void link(Path link, Path target) throws Exception {
+        java.nio.file.Files.createDirectories(link.getParent());
+        try {
+            java.nio.file.Files.createSymbolicLink(link, target);
+            return;
+        } catch (Exception noSymlink) {
+            // fall through to a junction
+        }
+        boolean made = false;
+        if (System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win")) {
+            Process p = new ProcessBuilder("cmd", "/c", "mklink", "/J", link.toString(), target.toString())
+                    .redirectErrorStream(true).start();
+            p.getInputStream().readAllBytes();
+            made = p.waitFor() == 0 && java.nio.file.Files.isDirectory(link);
+        }
+        org.junit.jupiter.api.Assumptions.assumeTrue(made, "this OS cannot create a symlink or junction here");
     }
 }

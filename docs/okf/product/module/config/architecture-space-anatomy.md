@@ -195,15 +195,19 @@ move (D-SE6). `ReservedConfigPaths` keeps reserving the old `config/` locations.
   listing holds both places, the state one first, one entry per name (`SpaceStateDirs.list`). So a Space a newer
   release has moved, or half moved, still reads every record.
 - **Write:** always `config/<dir>` (`SpaceStateDirs.writeDir`) — the one place the writer step changes.
-- **A record in both places belongs to a newer release.** Writing it here would land in `config/`, where no read sees
-  it, so this release refuses: a 409 for the signed stores (`PendingChanges.requireWritable` is checked before a
+- **A record that has a copy in `state/` belongs to a newer release — whether or not `config/` holds one too.**
+  Writing it here would land in `config/`, where no read sees it, so this release refuses: a 409 for the signed stores (`PendingChanges.requireWritable` is checked before a
   held change is replayed, an Action Request saves before it dispatches, a Regulatory Report checks before it
   delivers), an IOException for Reconciliation and baseline state (a delete says so too), and for the agent's files
-  the change stays in memory with a WARN. Expiry skips such a record. This can only happen once a writer release has
+  the change stays in memory, logged at ERROR for the autonomy policy because even a kill switch set then holds only
+  until the next restart. A refused delete changes nothing. Expiry skips such a record. This can only happen once a writer release has
   run against the Space (a rollback, or two releases on one Space).
 - **Which roots:** only a Space's `config/` (a folder named `config` inside a Space folder — the rule
   `PathJail.spaceDirOf` and `SpaceAuditDir` use). The single-tenant default Space (`-Dassist.write.root`, no Space
-  folder) reads `config/` only. A `state/` file that resolves outside the Space's `state/` (a symlink) is never read.
+  folder) reads `config/` only. **No link is followed below the Space folder** (`SpaceStateDirs.linkFree`): a `state/`, a `state/<dir>` or a file
+  that is a symlink or junction is never read, backed up, exported or restored through — a link at `state/` itself
+  included, which a containment check resolving both sides would let through. The Space folder itself may be a link
+  (a Space kept elsewhere).
 
 **Per store** — "Signature covers the path?" was checked in the code: a store whose MAC covered its folder could not
 move. None does.
@@ -229,8 +233,10 @@ move. None does.
   A backup of the whole Space folder already carried `state/`.
 - `BundleExporter.exportSpace` (`GET /export`, and so promotion): `state/` files ride under the config-relative names
   they had in `config/` (`state/recon-state/x.json` → `recon-state/x.json`), a file in both places is taken from
-  `state/`, and the four signed stores stay out wherever they live. The bundle layout and the importer are unchanged.
-- The root `.gitignore` ignores `/spaces/*/state/` whole: all of it is server-written.
+  `state/`, only the switched directories travel (`SpaceStateDirs.DIRS`, so a later store in `state/` is never exported by
+  accident), and the four signed stores stay out wherever they live. The bundle layout and the importer are unchanged.
+- The root `.gitignore` ignores `/spaces/*/state` whole (no trailing slash, so a link named `state` is ignored too): all of it is
+  server-written.
 
 **Hard-coded paths** (searched 2026-11-13, repo and `tools/`): no script or tool names `config/pending-changes` or
 any other zone directory; only `.gitignore` (`/spaces/*/config/audit/`, `/spaces/*/config/pending-changes/`, kept
