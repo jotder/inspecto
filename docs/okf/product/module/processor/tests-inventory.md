@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-431 test class(es): 175 unit, 256 real-HTTP control-plane, 0 IT.
+432 test class(es): 176 unit, 256 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -384,6 +384,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ActivationFactsTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ActivationFactsTest.java` | SE-1b (D-SE12): the facts one Space lock computation gives the activation holds. |
 | `AffectedPipelinesTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/AffectedPipelinesTest.java` | DUCKLE-C7 first slice: which Pipelines a change reaches, over real config trees. Fixture: {@code prod} |
 | `AlertStoreWiringTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/AlertStoreWiringTest.java` | {@code ServiceStores.openAlertStore} — the {@code ALERTS} family's opener (MODULE-REORG-P7-INCIDENTS slice 2). |
+| `AppRootTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/AppRootTest.java` | SPACE-RELOCATABLE-ROOTS-1: the install root, and the {@code spaces.ref} pointer that hangs off it. |
 | `BundleExporterTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/BundleExporterTest.java` | Packages a data-source bundle / whole space into a zip + bundle.toon manifest. <!-- vocab-allow: quoted Javadoc --> |
 | `BundleImporterTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/BundleImporterTest.java` | Parses a bundle zip and unpacks it into a config dir (jailed against zip-slip). |
 | `CancelRunsLeaseTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CancelRunsLeaseTest.java` | HA-GRACEFUL-STOP-LEASE-RELEASE-1, lease side: a cancel never releases the lease - the run thread does, after |

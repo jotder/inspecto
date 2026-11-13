@@ -1,9 +1,20 @@
 ---
 name: space-data-root-stamp
-description: "Each data root carries a hidden .inspecto-space file holding the OWNING SPACE'S ABSOLUTE PATH - a bundle zipped after it was started boots 0 spaces anywhere else; delete the stamps before copying, moving or re-zipping"
+description: "Each data root carries a hidden .inspecto-space naming its Space: ABSOLUTE for a rooted data_root, so a bundle zipped after it was started boots 0 spaces anywhere else (delete the stamps before copying, moving or re-zipping); relative, and portable, for a relative data_root"
 metadata:
   type: project
 ---
+
+> **Fixed for new installs by `SPACE-RELOCATABLE-ROOTS-1` (2026-11-13).** With a **relative** `data_root`
+> (resolved against `-Dapp.root`, default the working directory) the stamp holds the Space's path FROM the data
+> root, so it travels with the install and there is nothing to delete before a move. Everything below still
+> applies to a **rooted** `data_root` and to every bundle packaged before the change.
+>
+> ⛔ The first draft skipped the stamp entirely for relative roots, reasoning that two installs could never
+> resolve one to the same directory. **That was false** and verification proved it: a second Space whose relative
+> root lands on a directory another Space owns then claims it — and purge deletes it. Relative-but-stamped keeps
+> both properties. Classify with `Path.getRoot() != null`, never `isAbsolute()`: on Windows `/mnt/x` is rooted
+> but NOT absolute, so an operator's POSIX path would be taken for a relative one.
 
 **A started install is not portable until its stamps are gone (2026-11-13).** `SpaceDataRoot.stake`
 (`inspecto/src/main/java/com/gamma/service/SpaceDataRoot.java`) writes `.inspecto-space` into each data root on

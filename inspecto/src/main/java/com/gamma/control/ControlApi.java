@@ -564,8 +564,9 @@ public final class ControlApi implements AutoCloseable, HostContext {
         String spacesRoot = System.getProperty("spaces.root");
         // No flag and no config args: the install's own spaces/ (the launchers run from the install dir and pass the
         // same default, SPACES_ROOT=spaces), so a bare server is multi-Space too. Config args keep the single mode.
+        // SPACE-RELOCATABLE-ROOTS-1: <app root>/spaces.ref may point the spaces root elsewhere; the flag still wins.
         if ((spacesRoot == null || spacesRoot.isBlank()) && args.length == 0)
-            spacesRoot = Path.of("spaces").toAbsolutePath().toString();
+            spacesRoot = com.gamma.service.SpacesPointer.resolve().toString();
         SpaceManager spaces;
         if (spacesRoot != null && !spacesRoot.isBlank()) {
             spaces = SpaceManager.discover(Path.of(spacesRoot.trim()));

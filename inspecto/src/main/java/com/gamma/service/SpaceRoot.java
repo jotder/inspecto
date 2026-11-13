@@ -145,8 +145,9 @@ public interface SpaceRoot {
     String DATA_ROOT_PROPERTY = "spaces.data.root";
 
     /**
-     * {@link #dataRoot()} for the space at {@code base}: {@code space.toon data_root} (resolved against {@code base}
-     * when relative — {@code SpaceBootstrap} refuses that at load), else {@code -Dspaces.data.root/<id>}, else {@code base}.
+     * {@link #dataRoot()} for the space at {@code base}: {@code space.toon data_root} (resolved against
+     * {@link AppRoot} when relative — {@code SPACE-RELOCATABLE-ROOTS-1}), else {@code -Dspaces.data.root/<id>},
+     * else {@code base}.
      */
     static Path dataRootFor(Path base) {
         return dataRootFor(base, Files.isDirectory(base.resolve("config")));
@@ -156,7 +157,10 @@ public interface SpaceRoot {
      *  plans into a folder whose {@code config/} is not moved yet. */
     static Path dataRootFor(Path base, boolean isSpace) {
         String declared = SpaceContext.SpaceManifest.read(base.resolve("space.toon"), "").dataRoot();
-        if (!declared.isBlank()) return base.resolve(declared.trim()).normalize();
+        // SPACE-RELOCATABLE-ROOTS-1: a relative data_root is the install's own layout, so it resolves against the
+        // install root, NOT the Space folder - one base for spaces.ref, data_root and <id>.ref alike. Nothing on
+        // disk is re-interpreted: a relative value was refused outright before this, so no Space declares one.
+        if (!declared.isBlank()) return AppRoot.resolve(declared);
         String mount = System.getProperty(DATA_ROOT_PROPERTY);
         // Only a Space (a dir with config/) takes the convention; the spaces root itself (the fleet inbox registry) stays put.
         if (mount != null && !mount.isBlank() && base.getFileName() != null && isSpace)

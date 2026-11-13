@@ -1,6 +1,7 @@
 # Relocatable Space roots — `spaces.ref`, relative `data_root`, relative `<id>.ref` (`SPACE-RELOCATABLE-ROOTS-1`)
 
-Status: **PLAN — awaiting operator approval.** Opened 2026-11-13. Owner: this shift.
+Status: **IN FLIGHT** — approved by the operator 2026-11-13; steps 0-3 and 6 built in that shift. Steps 4 (relative
+stamps) and 5 (repackage the showcase bundle) are still open. Opened 2026-11-13. Owner: this shift.
 Items: `module.config`, `layer/platform`. Supersedes nothing; extends `SPACE-DATA-ROOT-1`.
 
 ## 1. Why
@@ -67,17 +68,32 @@ What does not work, and is the whole of this plan:
 rehearsal: a **copied** Space folder still pointing at the **original's** data root would write into and
 drain the original's inbox. That hazard needs two Spaces resolving to **one** path.
 
-> **A relative data root cannot be shared by two installs — it moves with the Space.** Copy the tree and
-> each copy resolves its own. So for a relative `data_root` the hazard cannot arise, and the stamp that
-> guards against it is not merely unnecessary: it is the thing that breaks relocation.
+> ~~**A relative data root cannot be shared by two installs — it moves with the Space.** So for a relative
+> `data_root` the hazard cannot arise, and the stamp that guards it is not merely unnecessary: it is the
+> thing that breaks relocation.~~
+>
+> ⛔ **FALSIFIED during the build (2026-11-13), by the verification pass.** Two installs CAN resolve relative
+> roots onto one directory — a shared disk, a second server on the same box, or simply a second Space in the
+> same install whose relative root lands on a directory another Space already owns (demonstrated: Space `aaa`
+> with `data_root: la-data/zzz` claimed and could purge the data of Space `zzz`). Skipping the stamp was an
+> ownership hole, not a simplification.
+>
+> **The rule that actually holds:** the stamp's FORM follows the `data_root`'s. Rooted ⇒ the absolute base, as
+> before. Relative ⇒ the base's path *from the data root*, which travels with the install and still names a
+> different folder for every install. Relocation and ownership, with no exception to carve out — this is the
+> plan's step 4, which was listed as deferrable and is not.
 
 Hence the shape of the change:
 
-| `data_root` | Overlap / reachability / secrets checks | Stamp | Relocates |
-| --- | --- | --- | --- |
-| absent (data under the base) | n/a — `claim` returns early | none | ✅ today |
-| **relative** (new) | **yes, unchanged** | **none** | ✅ new |
-| absolute | yes | written and enforced, unchanged | ❌ by design |
+| `data_root` | Overlap / secrets | Mount (parent exists) | Stamp | Relocates |
+| --- | --- | --- | --- | --- |
+| absent (data under the base) | n/a — `claim` returns early | n/a | none | ✅ today |
+| **relative** (new) | **yes, unchanged** | **skipped — see the amendment** | **relative to the data root** | ✅ new |
+| rooted (absolute, or POSIX `/mnt/...`) | yes | yes | absolute, unchanged | ❌ by design |
+
+⚠ **"Rooted", not "absolute"** (also found by verification): on Windows `Path.of("/mnt/bigdisk").isAbsolute()`
+is `false`. Classifying by it took an operator's POSIX path for a relative one, skipped the mount check and
+planted the tree on the current drive. The test is `Path.getRoot() != null` (`AppRoot.rooted`), everywhere.
 
 ⛔ **"It resolves" is not the test.** The operator's framing — any path form is fine if it resolves — is
 accepted for the *form* of a path (D3) and rejected as the *only* check. Resolution says nothing about the
@@ -88,6 +104,12 @@ relative:
 | --- | --- | --- |
 | **overlap** (`stake` 116-121) | `data_root: "inspecto-la-spaces/la-banking"` | Resolves perfectly, and hands this Space another Space's `config/` as an allowed root — a `PathJail` fail-closed rule |
 | **reachability** (`stake` 127-129) | an absolute root on an unmounted volume | Resolves perfectly, then silently plants a data tree on the root disk |
+
+⚠ **Amended during the build (2026-11-13).** Reachability turned out to be the one check that must NOT apply to
+both forms. It is a *mount* check: a missing parent means the volume is absent. A relative root cannot name a
+mount — it is a path inside the install — so there a missing parent only means first boot, and refusing it made
+a fresh relocated install unbootable (caught by `aRelativeDataRootIsClaimedWithoutAStamp` before it shipped).
+Relative roots now create their parents. Overlap and secrets are unchanged for both forms.
 | **secrets** (`stake` 122-126) | a root inside a `*.secrets` dir | Resolves perfectly |
 
 In practice, then, a relative data root points at a **sibling of the spaces root** —

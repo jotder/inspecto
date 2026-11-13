@@ -15,9 +15,17 @@ class SpaceRefTest {
 
     @TempDir Path tmp;
 
+    @org.junit.jupiter.api.BeforeEach
+    void setAppRoot() {
+        // SPACE-RELOCATABLE-ROOTS-1: a relative <id>.ref resolves against the install root, so pin it rather than
+        // letting these cases depend on the surefire working directory.
+        System.setProperty(AppRoot.PROPERTY, tmp.resolve("install").toString());
+    }
+
     @AfterEach
     void tearDown() {
         System.clearProperty(SpaceRoot.DATA_ROOT_PROPERTY);
+        System.clearProperty(AppRoot.PROPERTY);
         DiscoveredRoots.clear();
     }
 
@@ -58,6 +66,30 @@ class SpaceRefTest {
             assertEquals(0, mgr.size());
             assertEquals(3, mgr.skipped().size());
             assertTrue(mgr.skipped().stream().allMatch(s -> "SPACE_REF_INVALID".equals(s.code())));
+        }
+    }
+
+    /** SPACE-RELOCATABLE-ROOTS-1: a reference may be written relative to the install root, so the install moves. */
+    @Test
+    void aRelativeReferenceBootsFromTheInstallRoot() throws Exception {
+        Path root = spacesRoot();
+        Path ext = elsewhere("acme");   // tmp/elsewhere/acme, a sibling of tmp/install
+        Files.writeString(root.resolve("acme.ref"), "../elsewhere/acme\n");
+        try (SpaceManager mgr = SpaceManager.discover(root)) {
+            assertEquals(ext.toAbsolutePath().normalize(),
+                    mgr.space(SpaceId.of("acme")).orElseThrow().root().base());
+        }
+    }
+
+    /** Resolving is not enough: a relative reference that climbs back into the spaces root is refused like an absolute one. */
+    @Test
+    void aRelativeReferenceIntoTheSpacesRootIsRefused() throws Exception {
+        Path root = spacesRoot();
+        Files.createDirectories(root.resolve("inside").resolve("acme").resolve("config"));
+        Files.writeString(root.resolve("acme.ref"), "spaces/inside/acme\n");
+        try (SpaceManager mgr = SpaceManager.discover(root)) {
+            assertTrue(mgr.space(SpaceId.of("acme")).isEmpty());
+            assertTrue(mgr.skipped().stream().anyMatch(s -> "SPACE_REF_INVALID".equals(s.code())));
         }
     }
 

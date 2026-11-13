@@ -180,12 +180,16 @@ public final class SpaceManager implements AutoCloseable {
             com.gamma.pipeline.exec.EgressAllowlist.migrate(d.resolve("config"));   // WEBHOOK-EGRESS-POLICY-1
             m.bootQuietly(d);
         }
-        log.info("SpaceManager: {} space(s) booted from {}", m.spaces.size(), spacesRoot.toAbsolutePath());
+        // The app root is logged beside the spaces root because every relative data_root and <id>.ref hangs off it:
+        // a server started from the wrong directory boots, so the one-line check must be visible (SPACE-RELOCATABLE-ROOTS-1).
+        log.info("SpaceManager: {} space(s) booted from {} (app root {})",
+                m.spaces.size(), spacesRoot.toAbsolutePath(), AppRoot.current());
         m.auditInboxOwnership();   // §5.3: two Spaces on one inbox = silent double-ingestion
         return m;
     }
 
-    /** A Space reference: {@code <spaces root>/<id>.ref} holds the absolute path of a Space folder kept elsewhere. */
+    /** A Space reference: {@code <spaces root>/<id>.ref} holds the path of a Space folder kept elsewhere —
+     *  absolute, or relative to {@link AppRoot} ({@code SPACE-RELOCATABLE-ROOTS-1}). */
     static final String REF_SUFFIX = ".ref";
 
     /**
@@ -221,8 +225,10 @@ public final class SpaceManager implements AutoCloseable {
         Path target = null;
         try {
             String text = Files.readString(ref).trim();
-            target = text.isEmpty() ? null : Path.of(text);
-            if (target == null || !target.isAbsolute()) why = "must hold an absolute path to a Space folder";
+            // SPACE-RELOCATABLE-ROOTS-1: absolute, or relative to the install root — the same base spaces.ref and
+            // space.toon data_root use. Every rule below is unchanged and applies to both forms alike.
+            target = text.isEmpty() ? null : AppRoot.resolve(text);
+            if (target == null) why = "must hold a path to a Space folder";
             else if (!target.getFileName().toString().equals(id))
                 why = "points at '" + target.getFileName() + "', but the folder name must be the Space id '" + id + "'";
             else if (com.gamma.config.safety.PathJail.canonical(target).startsWith(

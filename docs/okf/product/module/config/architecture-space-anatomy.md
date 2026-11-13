@@ -54,22 +54,52 @@ Two rules hold everywhere:
 `config/`, `config.secrets/` and `space.toon` always stay in `spaces/<id>/`. The high-growth state — `data/`,
 `audit/` and `duckdb/` — sits under the Space's **data root** (`SpaceRoot.dataRoot()`):
 
-1. `data_root: <absolute path>` in `space.toon`, else
+1. `data_root: <path>` in `space.toon` — **absolute, or relative to the app root** (`SPACE-RELOCATABLE-ROOTS-1`), else
 2. `-Dspaces.data.root=<mount>` → `<mount>/<id>`, else
 3. the Space folder itself (the layout above).
 
 Configs never change when the data root moves: a path such as `data/orders/inbox` or `../data/backups` that
-resolves under `<space>/data|audit|duckdb` is redirected onto the data root (`PathJail.onDataRoot`). A moved data
-root holds an ownership stamp `.inspecto-space` naming its Space folder (`SpaceDataRoot.STAMP`); a copied Space
-needs its own data root, or it is refused. The refusal rules and the move procedure are on
-[Spaces §4](architecture.md) and the [configuration reference](admin-guide-configuration-reference.md).
+resolves under `<space>/data|audit|duckdb` is redirected onto the data root (`PathJail.onDataRoot`).
+
+### 2.1 The app root, and how a relative data root is stamped
+
+Every path that names a **root** — `spaces.ref`, `space.toon data_root`, `<id>.ref` — may be written absolute or
+relative, and relative always means **relative to the app root**: `-Dapp.root` or `APP_ROOT`, else the process
+working directory (`AppRoot`). The launchers `cd` to the install directory, so by default the app root is the
+install. It is logged beside the spaces root on the `SpaceManager` boot line, because a server started from the
+wrong directory still boots — it just resolves every relative root somewhere else.
+
+A moved data root holds an ownership stamp `.inspecto-space` naming its Space folder (`SpaceDataRoot.STAMP`); a
+copied Space needs its own data root, or it is refused. **The stamp's form follows the `data_root`'s.** Declared
+rooted, it holds the Space's absolute path, as it always has. Declared relative, it holds the Space's path *from
+the data root* (`../../spaces/<id>`), so the pair travels together: move the install and the stamp still resolves
+to the same Space, where an absolute one would name the old path and refuse every Space — the 2026-11-13
+relocation failure.
+
+⛔ Do not "simplify" this to skipping the stamp for relative roots. Two installs *can* resolve relative roots onto
+one directory (a shared disk, a second server on the same box), and an unstamped root is then claimed — and
+purged — by whichever Space reaches it first. A relative stamp still names a different folder per install, so
+ownership is not weakened.
+
+⛔ **"It resolves" is not the test.** Written relative or rooted, a data root may not **overlap** the spaces root
+or any Space directory (that would hand this Space another Space's `config/` as an allowed root), may not be a
+`*.secrets` directory, and may not be a directory another Space has stamped. One check differs by form, and only
+because it means nothing in the other: a **rooted** root's parent must already exist, so an unmounted volume is
+refused rather than silently created on the root disk; a **relative** root names a path under the app root, which
+no mount can be, so its parents are created on first boot.
+
+⚠ "Rooted", not "absolute": on Windows `Path.of("/mnt/bigdisk").isAbsolute()` is `false`, so an operator's POSIX
+path would otherwise be taken for a relative one. The test is `Path.getRoot() != null` (`AppRoot.rooted`). The
+refusal rules and the move procedure are on [Spaces §4](architecture.md) and the
+[configuration reference](admin-guide-configuration-reference.md).
 
 ## 3. Space-level files
 
 | File | Written by | What it holds |
 |---|---|---|
-| `space.toon` | create / `PUT /spaces/{id}` | `display_name`, `description`, `created_at`; optional `data_root` (absolute) and `min_product_version` (a WARN at boot when the running product is older). Optional: a Space without it still boots. |
-| `<id>.ref` (in the Spaces root) | operator | the absolute path of a Space folder outside the Spaces root, which must itself be named `<id>`. A real `<id>/` beside it wins. Purge deletes only the `.ref`. |
+| `space.toon` | create / `PUT /spaces/{id}` | `display_name`, `description`, `created_at`; optional `data_root` (absolute, or relative to the app root) and `min_product_version` (a WARN at boot when the running product is older). Optional: a Space without it still boots. |
+| `<id>.ref` (in the Spaces root) | operator | the path of a Space folder outside the Spaces root, which must itself be named `<id>` — absolute, or relative to the app root. A real `<id>/` beside it wins. Purge deletes only the `.ref`. |
+| `spaces.ref` (in the app root) | operator | the spaces root, when it is not `<app root>/spaces` — absolute, or relative to the app root. `-Dspaces.root` / `SPACES_ROOT` still win. A present-but-unusable pointer fails the boot loudly rather than falling back. |
 | `.inspecto/value-fingerprint.salt` | the engine, on first use | the salt for the keyed fingerprints that rejected lines and failure texts carry instead of the values themselves (`FailureText.SALT_FILE`). Deleting it changes every future fingerprint. |
 | `.inspecto-space` (data root only) | `SpaceDataRoot.stake` | the ownership stamp described in §2. |
 

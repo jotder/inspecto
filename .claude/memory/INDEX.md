@@ -32,7 +32,7 @@ Add a lesson as a new file here + one line below, in the same change. Personal o
 
 ## Environment & deploy
 - [LA demo installs](preview-la-demo.md) — Preview :8080 + Basic :8098 share MFS/IMS/Mobile money via `spaces\<id>.ref`, one at a time; no zips; restore runtime cacerts
-- [Space data-root stamp](space-data-root-stamp.md) — `.inspecto-space` holds the owning Space's ABSOLUTE path; a bundle zipped after it was started boots 0 spaces elsewhere — delete the stamps before copying/moving/re-zipping
+- [Space data-root stamp](space-data-root-stamp.md) — `.inspecto-space` names the owning Space; absolute for a rooted `data_root` (a bundle zipped after it was started boots 0 spaces elsewhere — delete the stamps), relative, and so portable, for a relative one
 - [OIDC: WSO2 / Keycloak](oidc-wso2-keycloak.md) — provider gotchas, JWT tokens, groups claim, bundle cacerts import
 
 ## Operator preferences

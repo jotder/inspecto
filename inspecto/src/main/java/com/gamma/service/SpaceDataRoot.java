@@ -82,29 +82,45 @@ final class SpaceDataRoot {
         Path stamp = dataRoot.resolve(STAMP);
         if (!Files.isRegularFile(stamp)) return false;
         String claimed = Files.readString(stamp, StandardCharsets.UTF_8).trim();
-        return !claimed.isEmpty() && PathJail.canonical(Path.of(claimed)).equals(PathJail.canonical(base));
+        if (claimed.isEmpty()) return false;
+        // A RELATIVE stamp (SPACE-RELOCATABLE-ROOTS-1) names the Space from the data root, so it survives a move of
+        // the whole install; an absolute one is the pre-existing form and is compared as it always was.
+        Path owner = Path.of(claimed);
+        if (!AppRoot.rooted(owner)) owner = dataRoot.resolve(owner);
+        return PathJail.canonical(owner).equals(PathJail.canonical(base));
     }
 
     /**
      * The checks every use of a moved data root shares, then the ownership stamp:
      * <ul>
-     *   <li>{@code space.toon data_root} must be absolute — a relative one would move with the Space folder.</li>
+     *   <li>{@code space.toon data_root} may be written rooted or relative (relative resolves against
+     *       {@link AppRoot}); every check below applies to both, except where a bullet says otherwise.</li>
      *   <li>It may not overlap the spaces root or any Space directory (its own included): containing one, or sitting
      *       inside one, would hand this Space another Space's {@code config/} as an allowed root. Not a {@code *.secrets} dir.</li>
-     *   <li>Its parent (the mount) must already exist: an unmounted volume is refused, never created on the root disk.</li>
+     *   <li>For an ABSOLUTE root, its parent (the mount) must already exist: an unmounted volume is refused, never
+     *       created on the root disk. A relative root cannot name a mount, so its parents are created on first boot.</li>
      *   <li>It must be empty or already stamped by this Space. A stamp naming another Space is refused — a copied Space
      *       folder still pointing at the original's data root would otherwise write into and drain the original's inbox
      *       (the 2026-10-27 MFS rehearsal). An unstamped directory holding anything but {@code data/}, {@code audit/},
      *       {@code duckdb/} is refused — {@code data_root: /mnt/bigdisk} without the {@code /<id>} must never be claimed,
-     *       since purge deletes what a Space owns. One holding only those is a Space's state moved there by hand.</li>
+     *       since purge deletes what a Space owns. One holding only those is a Space's state moved there by hand.
+     *       ⚠ The stamp is written RELATIVE (the Space's path from the data root) when {@code data_root} is relative
+     *       ({@code SPACE-RELOCATABLE-ROOTS-1}). An absolute stamp is what refuses every Space after the install
+     *       folder moves — the 2026-11-13 relocation failure — while a relative one moves with the install and still
+     *       names a different folder for every install, so ownership is NOT weakened. ⛔ Do not "simplify" this by
+     *       skipping the stamp for relative roots: two installs CAN resolve relative roots onto one directory (a
+     *       shared disk, a second server), and an unstamped root is then silently claimed and purged by whichever
+     *       Space reaches it first.</li>
      * </ul>
      */
     static void stake(SpaceRoot root, SpaceContext.SpaceManifest manifest) throws IOException {
         Path base = root.base();
         Path dataRoot = root.dataRoot();
         String declared = manifest.dataRoot() == null ? "" : manifest.dataRoot().trim();
-        if (!declared.isBlank() && !Path.of(declared).isAbsolute())
-            throw new IllegalStateException("space.toon data_root '" + declared + "' must be an absolute path");
+        // Blank counts as rooted: no data_root but a data root off the base means the -Dspaces.data.root mount.
+        // ⚠ AppRoot.rooted, never Path.isAbsolute: on Windows "/mnt/bigdisk" is rooted but NOT absolute, and taking
+        // an operator's POSIX path for a relative one would skip the mount check and land it on the current drive.
+        boolean rooted = declared.isBlank() || AppRoot.rooted(Path.of(declared));
         Path d = PathJail.canonical(dataRoot);
         Set<Path> spaces = new java.util.LinkedHashSet<>(DiscoveredRoots.all());
         spaces.add(base);
@@ -124,7 +140,10 @@ final class SpaceDataRoot {
         } catch (PathJail.Escape e) {
             throw new IllegalStateException("data_root " + dataRoot + " is a secrets directory");
         }
-        if (dataRoot.getParent() == null || !Files.isDirectory(dataRoot.getParent()))
+        // Reachability is a MOUNT check: a missing parent under a rooted data_root means the volume is not mounted,
+        // and creating it would plant a data tree on the root disk instead. A relative one names a path under the app
+        // root, which no mount can be, so there a missing parent only means first boot and it is created below.
+        if (rooted && (dataRoot.getParent() == null || !Files.isDirectory(dataRoot.getParent())))
             throw new IllegalStateException("data_root " + dataRoot + " is not reachable: its parent "
                     + dataRoot.getParent() + " does not exist (is the volume mounted?)");
 
@@ -145,7 +164,22 @@ final class SpaceDataRoot {
             }
         }
         Files.createDirectories(dataRoot);
-        AtomicFiles.write(stamp, (base + "\n").getBytes(StandardCharsets.UTF_8), ".stamp-");
+        AtomicFiles.write(stamp, (stampText(base, dataRoot, rooted) + "\n").getBytes(StandardCharsets.UTF_8), ".stamp-");
+    }
+
+    /**
+     * What the stamp records as the owning Space: the base's path FROM the data root when {@code data_root} was
+     * written relative, so the pair moves together and the Space still owns its data at the new location; otherwise
+     * the absolute base, the long-standing form. Falls back to absolute when the two have no common root (different
+     * drives), which cannot happen for a relative {@code data_root} resolved against the app root.
+     */
+    private static String stampText(Path base, Path dataRoot, boolean rooted) {
+        if (rooted) return base.toString();
+        try {
+            return dataRoot.relativize(base).toString();
+        } catch (IllegalArgumentException e) {
+            return base.toString();
+        }
     }
 
     private static boolean holdsFiles(Path dir) throws IOException {

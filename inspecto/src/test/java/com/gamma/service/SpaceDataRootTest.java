@@ -20,6 +20,7 @@ class SpaceDataRootTest {
     @AfterEach
     void clearProperty() {
         System.clearProperty(SpaceRoot.DATA_ROOT_PROPERTY);
+        System.clearProperty(AppRoot.PROPERTY);
     }
 
     private Path space(String id, String dataRootLine) throws Exception {
@@ -94,11 +95,119 @@ class SpaceDataRootTest {
         assertTrue(e.getMessage().contains("belongs to the Space at"));
     }
 
+    /** SPACE-RELOCATABLE-ROOTS-1: a relative data_root resolves against the APP ROOT, not the Space folder. */
     @Test
-    void relativeDataRootIsRefused() throws Exception {
-        Path base = space("demo", "../elsewhere");
-        assertThrows(IllegalStateException.class, () -> SpaceDataRoot.claim(
+    void relativeDataRootResolvesAgainstTheAppRoot() throws Exception {
+        System.setProperty(AppRoot.PROPERTY, tmp.toString());
+        Path base = space("demo", "la-data/demo");
+        assertEquals(tmp.resolve("la-data").resolve("demo"), SpaceRoot.under(base).dataRoot());
+    }
+
+    /**
+     * SPACE-RELOCATABLE-ROOTS-1: a relative data root is claimed like any other and IS stamped — but with the
+     * Space's path FROM the data root, so the stamp travels with the install instead of pinning it to one path.
+     */
+    @Test
+    void aRelativeDataRootIsStampedRelatively() throws Exception {
+        System.setProperty(AppRoot.PROPERTY, tmp.toString());
+        Path base = space("demo", "la-data/demo");
+        SpaceRoot root = SpaceRoot.under(base);
+        SpaceDataRoot.claim(root, SpaceContext.SpaceManifest.read(base.resolve("space.toon"), "demo"));
+        Path d = tmp.resolve("la-data").resolve("demo");
+        for (String sub : new String[]{"data", "audit", "duckdb"}) assertTrue(Files.isDirectory(d.resolve(sub)));
+        Path owner = Path.of(Files.readString(d.resolve(SpaceDataRoot.STAMP)).trim());
+        assertFalse(owner.isAbsolute(), "the stamp must not pin the Space to this install's path");
+        assertEquals(base, d.resolve(owner).normalize());
+        assertTrue(SpaceDataRoot.ownedBy(d, base));
+        SpaceDataRoot.claim(root, SpaceContext.SpaceManifest.read(base.resolve("space.toon"), "demo"));   // re-boot is fine
+    }
+
+    /**
+     * The hole an earlier draft left: a relative data root that lands on a directory another Space already owns is
+     * refused like any other. Skipping the stamp for relative roots would have let this Space claim — and purge — it.
+     */
+    @Test
+    void aRelativeDataRootOnAnotherSpacesDataIsRefused() throws Exception {
+        System.setProperty(AppRoot.PROPERTY, tmp.toString());
+        Path mnt = Files.createDirectories(tmp.resolve("la-data"));
+        Path owner = space("owner", toon(mnt.resolve("shared")));
+        SpaceDataRoot.claim(SpaceRoot.under(owner), SpaceContext.SpaceManifest.read(owner.resolve("space.toon"), "owner"));
+        Path thief = space("thief", "la-data/shared");
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> SpaceDataRoot.claim(
+                SpaceRoot.under(thief), SpaceContext.SpaceManifest.read(thief.resolve("space.toon"), "thief")));
+        assertTrue(e.getMessage().contains("belongs to the Space at"), e.getMessage());
+    }
+
+    /**
+     * ⚠ Windows: {@code Path.of("/mnt/bigdisk").isAbsolute()} is false. Classifying by that would take an operator's
+     * POSIX path for a relative one, skip the mount check and plant the tree on the current drive.
+     */
+    @Test
+    void aPosixStylePathIsTreatedAsRootedNotRelative() throws Exception {
+        System.setProperty(AppRoot.PROPERTY, tmp.toString());
+        Path base = space("demo", "/mnt/definitely-not-mounted/demo");
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> SpaceDataRoot.claim(
                 SpaceRoot.under(base), SpaceContext.SpaceManifest.read(base.resolve("space.toon"), "demo")));
+        assertTrue(e.getMessage().contains("is the volume mounted?"), e.getMessage());
+        assertFalse(Files.exists(tmp.resolve("mnt")), "nothing is created under the app root either");
+    }
+
+    /**
+     * The point of the whole change: the SAME install copied to a second path boots there, each copy against its
+     * own data. Under an absolute data_root this is the failure the stamp produces
+     * ({@code aCopiedSpacePointingAtTheSameDataRootIsRefused}).
+     */
+    @Test
+    void theInstallBootsAfterItMoves() throws Exception {
+        Path first = Files.createDirectories(tmp.resolve("install-a"));
+        System.setProperty(AppRoot.PROPERTY, first.toString());
+        Path base = Files.createDirectories(first.resolve("spaces").resolve("demo").resolve("config")).getParent();
+        Files.writeString(base.resolve("space.toon"), "display_name: demo\ndata_root: la-data/demo\n");
+        SpaceDataRoot.claim(SpaceRoot.under(base), SpaceContext.SpaceManifest.read(base.resolve("space.toon"), "demo"));
+        assertTrue(Files.isDirectory(first.resolve("la-data").resolve("demo").resolve("data")));
+
+        // the whole install is COPIED to a second path - stamp included, which is what used to refuse the Space
+        Path second = tmp.resolve("install-b");
+        copyTree(first, second);
+        assertTrue(Files.isRegularFile(second.resolve("la-data").resolve("demo").resolve(SpaceDataRoot.STAMP)),
+                "the copy carries the stamp; the point is that it still resolves");
+        System.setProperty(AppRoot.PROPERTY, second.toString());
+        Path moved = second.resolve("spaces").resolve("demo");
+        SpaceDataRoot.claim(SpaceRoot.under(moved), SpaceContext.SpaceManifest.read(moved.resolve("space.toon"), "demo"));
+        assertEquals(second.resolve("la-data").resolve("demo"), SpaceRoot.under(moved).dataRoot());
+        assertTrue(SpaceDataRoot.ownedBy(second.resolve("la-data").resolve("demo"), moved));
+        // and the original still owns its own, at its own path
+        assertTrue(SpaceDataRoot.ownedBy(first.resolve("la-data").resolve("demo"), first.resolve("spaces").resolve("demo")));
+    }
+
+    private static void copyTree(Path from, Path to) throws Exception {
+        try (java.util.stream.Stream<Path> walk = Files.walk(from)) {
+            for (Path p : walk.toList()) {
+                Path target = to.resolve(from.relativize(p).toString());
+                if (Files.isDirectory(p)) Files.createDirectories(target);
+                else Files.copy(p, target);
+            }
+        }
+    }
+
+    /** "It resolves" is not the test: a relative root is held to the SAME overlap rule as an absolute one. */
+    @Test
+    void aRelativeDataRootInsideTheSpacesRootIsStillRefused() throws Exception {
+        System.setProperty(AppRoot.PROPERTY, tmp.toString());
+        Path base = space("demo", "spaces/demo/data");
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> SpaceDataRoot.claim(
+                SpaceRoot.under(base), SpaceContext.SpaceManifest.read(base.resolve("space.toon"), "demo")));
+        assertTrue(e.getMessage().contains("overlaps"), e.getMessage());
+    }
+
+    /** Purge deletes a moved data root only when it is owned — the relative stamp must satisfy that, or data leaks. */
+    @Test
+    void aRelativeDataRootIsOwnedSoPurgeReachesIt() throws Exception {
+        System.setProperty(AppRoot.PROPERTY, tmp.toString());
+        Path base = space("demo", "la-data/demo");
+        SpaceRoot root = SpaceRoot.under(base);
+        SpaceDataRoot.claim(root, SpaceContext.SpaceManifest.read(base.resolve("space.toon"), "demo"));
+        assertTrue(SpaceDataRoot.ownedBy(root.dataRoot(), base));
     }
 
     @Test
