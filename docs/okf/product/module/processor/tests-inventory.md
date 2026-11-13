@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-415 test class(es): 165 unit, 250 real-HTTP control-plane, 0 IT.
+417 test class(es): 167 unit, 250 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -347,6 +347,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `SchemaFileFindingsTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SchemaFileFindingsTest.java` | {@link ConfigRoutes#schemaFileFindings}: the pre-flight check that a pipeline draft's |
 | `ServerFaultsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ServerFaultsTest.java` | ERR-5XX-ROUTE-BODIES (operator, 2026-09-28), over real HTTP: a route-built 500/502/503 names a curated |
 | `ShippedExamplesPassTheSaveGateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ShippedExamplesPassTheSaveGateTest.java` | Every shipped example Pipeline under {@code inspecto/examples/} passes the authoring gate and loads |
+| `SpaceLockRenameRewriteTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpaceLockRenameRewriteTest.java` | SE-2a opt-in rewrite (D-SE3): a hand rename of a Pipeline in a Space whose {@code space.toon} says |
 | `SpaceVersionCheckTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpaceVersionCheckTest.java` | LA-SHOWCASE-DIST-1: a Space naming a newer {@code min_product_version} than the running product is flagged. |
 | `SpiSlotFailClosedTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpiSlotFailClosedTest.java` | {@link SpiSlot}'s two discovery postures, exercised through real {@code ServiceLoader} registrations |
 | `SpiSlotTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpiSlotTest.java` | Pins the edition-seam slot semantics the three facades (Authenticators / AccessDeciders / |
@@ -428,6 +429,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `SpaceIdTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceIdTest.java` | The filesystem-safe space-id guard: lower-case alnum + hyphen only, so an id can never escape {@code spaces/}. |
 | `SpaceInboxAuditTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceInboxAuditTest.java` | Two Spaces polling one inbox — scale-out plan §5.3. |
 | `SpaceLayoutContractTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceLayoutContractTest.java` | The boot-time storage-layout contract: WARN-only findings, never a boot failure. |
+| `SpaceLockRenameTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceLockRenameTest.java` | SE-2a — hand-rename detection in the Space lock ({@code spec-space-lock.md} §SE-2a): the same {@code uid} under a |
 | `SpaceLockTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceLockTest.java` | SE-1a — the Space lock ({@code docs/okf/product/module/config/spec-space-lock.md}): what it lists, how a file keeps |
 | `SpaceManagerTemplateGateTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceManagerTemplateGateTest.java` | {@link SpaceManager#createFromTemplate(SpaceId, String, String, String, java.util.function.Consumer)}: a template |
 | `SpaceManagerTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceManagerTest.java` | The multi-space container: single-service wrapping, boot discovery, concurrent isolation, orderly shutdown. |
