@@ -92,7 +92,7 @@ describe('suspicion score has its own cap, shared with the server (D-S3, CL-2)',
         configureLaLimits({ 'browser_algorithms.betweennessCentrality': 10, suspicion_node_cap: 100 });
         const g = ring(40);
 
-        expect(() => betweennessCentrality(g)).toThrow(/Betweenness is capped at 10 nodes/);
+        expect(betweennessCentrality(g).length).toBe(40); // above its own item: sampled, not refused (LA-PERF-P5-1)
         expect(suspicionScore(g).length).toBe(40);
         expect(suspicionScore(g)[0].factors).toHaveProperty('betweenness');
     });

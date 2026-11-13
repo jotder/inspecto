@@ -319,15 +319,57 @@ export function betweennessCentrality(g: G6GraphData): NodeScore[] {
     // component of suspicion score together costs under 130 ms at 2 000. Guarding it with the shared
     // cap meant an analyst choosing "Betweenness" from the centrality list froze the main thread
     // for about ten seconds. Its own item defaults to 500, the measured server ceiling (CL-3).
-    requireUnderCap(g, 'Betweenness', browserAlgorithmCapValue('betweennessCentrality'));
-    return brandes(g);
+    //
+    // LA-PERF-P5-1 (2026-11-13): above that cap it is no longer refused but APPROXIMATED (Brandes–Pich pivot
+    // sampling, see betweennessPivots) up to betweennessNodeCapValue(); exact at 767 nodes / 4,000 links was
+    // 781–849 ms in the browser. Still no Web Worker (PERF-D5).
+    requireUnderCap(g, 'Betweenness', betweennessNodeCapValue());
+    const pivots = betweennessPivots(g.nodes.length);
+    return pivots === null ? brandes(g) : brandes(g, samplePivots(g, pivots));
 }
 
-/** Brandes betweenness, unguarded: {@link betweennessCentrality} and {@link suspicionScore} each apply their own cap. */
-function brandes(g: G6GraphData): NodeScore[] {
+/** The largest graph betweenness answers in the browser at all: the analysis cap, never below its exact cap. */
+export function betweennessNodeCapValue(): number {
+    return Math.max(analysisNodeCapValue(), browserAlgorithmCapValue('betweennessCentrality'));
+}
+
+/**
+ * How many source nodes (pivots) betweenness samples on a graph of `n` nodes, or `null` when it is exact.
+ * Exact up to `browser_algorithms.betweennessCentrality`; above it cap² / n pivots, so the work (pivots × links)
+ * stays about that of an exact run at the cap. Measured 2026-11-13 on the la-showcase telecom graphs (767 and
+ * 1,458 nodes, 10 seeds): the top node always the exact one, Spearman 0.97–0.99 (la-performance-plan §P5).
+ */
+export function betweennessPivots(n: number): number | null {
+    const cap = browserAlgorithmCapValue('betweennessCentrality');
+    return n <= cap ? null : Math.max(1, Math.floor((cap * cap) / n));
+}
+
+/** `k` distinct nodes, the same ones on every run of the same graph (seeded partial Fisher–Yates). */
+function samplePivots(g: G6GraphData, k: number): G6GraphData['nodes'] {
+    const pool = [...g.nodes];
+    let seed = 0x9e3779b9;
+    const rnd = (): number => {
+        // mulberry32
+        seed = (seed + 0x6d2b79f5) | 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    for (let i = 0; i < k; i++) {
+        const j = i + Math.floor(rnd() * (pool.length - i));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    return pool.slice(0, k);
+}
+
+/**
+ * Brandes betweenness, unguarded: {@link betweennessCentrality} and {@link suspicionScore} each apply their own cap.
+ * With `sources` a subset, each source's share is scaled by n / |sources| (the Brandes–Pich estimate).
+ */
+function brandes(g: G6GraphData, sources: G6GraphData['nodes'] = g.nodes): NodeScore[] {
     const adj = adjacency(g);
     const bc = new Map<string, number>(g.nodes.map((n) => [n.id, 0]));
-    for (const s of g.nodes) {
+    for (const s of sources) {
         const stack: string[] = [];
         const preds = new Map<string, string[]>();
         const sigma = new Map<string, number>([[s.id, 1]]);
@@ -359,8 +401,9 @@ function brandes(g: G6GraphData): NodeScore[] {
             if (w !== s.id) bc.set(w, bc.get(w)! + (delta.get(w) ?? 0));
         }
     }
-    // undirected: every pair counted twice
-    for (const [k, v] of bc) bc.set(k, v / 2);
+    // undirected: every pair counted twice; a sample is scaled up to all n sources
+    const scale = g.nodes.length / sources.length / 2;
+    for (const [k, v] of bc) bc.set(k, v * scale);
     return scored(g, bc);
 }
 

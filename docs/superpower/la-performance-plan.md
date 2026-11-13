@@ -32,7 +32,7 @@ Every shipped lane went through independent adversarial verification (1–3 roun
 | P9 main-log checkpoint | ⛔ MEASURED NO-GO (13–35 ms at 1,000 ops) | — |
 | P3a Grow preview rescans | ⛔ MEASURED NO-GO (DuckDB already materialises the CTE; only a semantic rewrite would help) | — |
 | P0 measure (browser timings, per-option algorithm timings) | 🟡 DONE in-page, 2026-10-25 (§0b); no Chrome performance-panel trace; largest graph available is only 767 nodes | — |
-| P5 betweenness worker | ⬜ OPEN — operator decision PERF-D1; §0b shows betweenness is NOT the top cost (385 ms at 465 nodes), layouts and hulls are | — |
+| P5 betweenness | ✅ SHIPPED 2026-11-13 as an APPROXIMATION (no worker, PERF-D5): sampled above 500 nodes, exact below; 767 nodes 781–1,285 → 423–595 ms and no longer refused (§P5 "As built") | — |
 | P6 layout on expand | ✅ SHIPPED 2026-11-12 on its vitest proof; the after-timing was NOT measured (§P6) | see §P6 |
 | P8 hulls | ✅ SHIPPED as N2 (§0b) | — |
 | P11 polish | ❌ NO-GO 2026-11-13 — measured, the derived passes are ~0.1–0.3 % of scripting per action (§P11); nothing built | — |
@@ -315,6 +315,36 @@ if an analyst reports the ~425 ms as a felt freeze".
 | PERF-P5-1 | **Operator decision first:** reopen LA-07 (Web Worker for betweenness) or approximate it (pivot sampling, with the approximation stated on screen) | Decision recorded in the roadmap |
 | PERF-P5-2 | If reopened: run betweenness in a worker with progress and cancel; results byte-identical to the main-thread version on the parity fixture | Parity test; no main-thread block over 50 ms in the P0-1 trace |
 
+**As built (`LA-PERF-P5-1`, 2026-11-13, operator ask; P5-1 answered "approximate", P5-2 stays refused with PERF-D5).**
+`betweennessCentrality` (`graph-analysis.ts`) is exact up to `browser_algorithms.betweennessCentrality` (500). Above
+it, it runs the same Brandes pass from k = ⌊cap² / n⌋ source nodes only (Brandes–Pich pivot sampling), scaled by n / k,
+so the work stays about that of an exact run at the cap. The pivots come from a fixed seed: the same graph gives the
+same answer on every run. It refuses only above `max(analysis_node_cap, its own item)` (2,500), and the toolbox hands
+it to the server only above that. Under the ranking the toolbox says "Approximate: estimated from k of n nodes, so close
+scores may swap places." Suspicion score still runs exact betweenness under its own cap.
+
+Measured on la-showcase `telecom_fraud_network` (the projection's 4,000 rows, ordered by source then target: 767 nodes,
+4,000 links, rebuilt from the Preview install's `telecom_links` Parquet), in-page in the built-in browser with the
+shipped algorithm copied verbatim, 5 alternating runs each:
+
+| | before (exact, was refused in the app) | after (sampled, k = 325) |
+|---|---|---|
+| main-thread time | 875–1,285 ms (781–849 ms in a first run of 5) | 423–595 ms |
+
+Ranking against exact (Node, the shipped seed; the 1,458-node graph is the first 8,000 rows of the same Dataset — the
+other showcase graphs are under 500 nodes and stay exact):
+
+| graph | k | top node | top-10 overlap | top-20 overlap | sampled top 10 in exact top 20 | Spearman (all nodes) |
+|---|---|---|---|---|---|---|
+| 767 nodes / 4,000 links | 325 | same | 0.8 | 0.75 | 0.9 | 0.985 |
+| 1,458 nodes / 8,000 links | 171 | same | 0.5 | 0.4 | 0.6 | 0.962 |
+
+Over 10 other seeds the top node matched every time; at 767 nodes Spearman stayed 0.98–0.99 for k = 300.
+⚠ **Where it is weak:** after the supernode the exact scores sit close together (8,645 … 3,691 for ranks 2–25 at 767
+nodes), so places 2–20 swap; the larger the graph, the fewer pivots and the more they swap. Hence the on-screen note.
+For an exact answer above 500 nodes, raise `browser_algorithms.betweennessCentrality`, or run it on the
+Whole Dataset tab.
+
 ### P6 — browser: layout on expand (medium gain, medium risk)
 
 **Why:** `applyData` seeds every node's position one call at a time, and adding any node triggers a full
@@ -514,7 +544,7 @@ freeze is reported with a trace?
 *Recommendation:* keep refused until P0-1 shows it as the top scripting cost on S-large; the existing reopen trigger
 is about analyst reports, so record one if it happens.
 **Answer:** (2026-11-12, aligned with the operator's PERF-D5 answer at the operator's instruction "align D1") keep refused: no worker, no approximation. Reopen only on an
-analyst-reported felt freeze with a trace.
+analyst-reported felt freeze with a trace. **Superseded 2026-11-13 (operator asked for P5):** approximation built, worker still refused (§P5 "As built").
 
 **PERF-D4 — Working Set staleness bound (ANSWERED 2026-10-25, operator: "go with your 30s TTL decision").**
 The Working Set GET trusts a cheap change token (size + nanosecond mtime + file key + a hash of the last log line)
