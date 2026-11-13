@@ -70,11 +70,18 @@ class ImportLoaderInventoryTest {
         // read from inside a package, whose every file is held to its signed manifest.
         ALLOWED.put("app.toon", "an App definition under the install's apps/<id>/ or inside a signed package - outside every Space");
         ALLOWED.put("installed.toon", "the install record of a live-installed App under the install's apps/<id>/ - outside every Space");
-        ALLOWED.put("created-from.toon", "which App template made a Space, at <space>/.inspecto/ - outside config/, where an import writes, "
+        ALLOWED.put("created-from.toon", "which Space Template (SE-5a: any template, or adopted) made a Space, at <space>/.inspecto/ - outside config/, where an import writes, "
                 + "and it only shapes the upgrade's read-only offer");
         // SPACE-EVOLUTION-1 SE-6a: a Space test case, read by SpaceTestRunner from <space>/tests/<case>/ (SpaceTestRunner.testsDir).
         ALLOWED.put("case.toon", "a Space test case at <space>/tests/<case>/ - outside config/, where an import writes, and a run "
                 + "only reads it into a temp scratch dir, never a live store");
+        // PRODUCT-ASSEMBLY-1 PA-9d: Real-time Detection state, at <data root>/audit/realtime/ (CollectorService.realtimeStateDir).
+        ALLOWED.put("realtime", "the Real-time Detection state folder under the Space's audit dir on its data root - outside config/, "
+                + "where an import writes");
+        ALLOWED.put("fired.duckdb", "Real-time Detection's fired-window table in <data root>/audit/realtime/ - outside config/, "
+                + "where an import writes; the server creates and owns it");
+        ALLOWED.put("evaluated.duckdb", "Real-time Detection's evaluated-commit ledger in <data root>/audit/realtime/ - outside config/, "
+                + "where an import writes; the server creates and owns it");
         // PRODUCT-ASSEMBLY-1 PA-7a: the install's entitlement, resolved against the server's working directory (the bundle root),
         // never a Space root; and a planted copy would have to carry an issuer key's Ed25519 signature to be read at all.
         ALLOWED.put("conf/entitlement.toon", "the install's signed entitlement under the bundle's conf/ — outside every Space, "

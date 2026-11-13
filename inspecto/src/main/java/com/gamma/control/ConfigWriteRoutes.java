@@ -12,6 +12,7 @@ import com.gamma.config.spec.ConfigSpec;
 import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
 import com.gamma.etl.SchemaMappingDrift;
+import com.gamma.service.ColumnContract;
 import com.gamma.util.AtomicFiles;
 import com.gamma.util.MappingCsv;
 import com.gamma.util.StructureCsv;
@@ -227,6 +228,11 @@ final class ConfigWriteRoutes implements RouteModule {
                         "error", "schema edit is not BACKWARD-compatible; not written", "findings", findings));
             }
         }
+
+        // SE-3a column contract (D-SE4 step 1): a mapped column removed, renamed or narrowed warns with the
+        // consumers it breaks; the save goes ahead. Drafts too. Kill switch -Dcolumn.contract=off.
+        if ("schema".equals(type) && exists)
+            findings.addAll(ColumnContract.saveWarnings(writeRoot, target, ColumnContract.stored(target), draft));
 
         // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: an active config adding a dangling link.
         Object linkRefusal = LinkRefusals.save(ex, writeRoot, type, ConfigFileSupport.fileBase(type, fileName), draft,
@@ -451,6 +457,9 @@ final class ConfigWriteRoutes implements RouteModule {
                         "error", "schema edit is not BACKWARD-compatible; not written", "findings", findings));
             }
         }
+
+        // SE-3a column contract: as /config/write.
+        if ("schema".equals(type)) findings.addAll(ColumnContract.saveWarnings(writeRoot, target, existing, merged));
 
         // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: an active config adding a dangling link.
         Object linkRefusal = LinkRefusals.save(ex, writeRoot, type, ConfigFileSupport.fileBase(type, fileName), merged,

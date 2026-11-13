@@ -55,6 +55,7 @@ class ControlApiSpaceIntegrityTest {
     void disarm() {
         Authenticators.forTest(null);
         System.clearProperty(SpaceLock.PROPERTY);
+        System.clearProperty(com.gamma.service.ColumnContract.PROPERTY);
         DiscoveredRoots.clear();
         MetricRegistry.global().reset();
     }
@@ -136,6 +137,22 @@ class ControlApiSpaceIntegrityTest {
         }
     }
 
+    /** CENSUS-EXPECTATION-TARGET-PATH-1: a store-path target resolves; one naming no store is still broken. */
+    @Test
+    void anExpectationStorePathTargetIsNotBroken(@TempDir Path root) throws Exception {
+        Path config = Files.createDirectories(root.resolve("alpha/config/registry/expectations"));
+        Files.writeString(root.resolve("alpha/config/orders_pipeline.toon"), "name: orders\n");
+        Files.writeString(config.resolve("band.toon"), "name: band\ntarget: orders/database\n");
+        Files.writeString(config.resolve("stray.toon"), "name: stray\ntarget: nostore/database\n");
+        try (Ctx c = open(root)) {
+            integrity(c);
+            JsonNode r = awaitReady(c, n -> true);
+            List<String> broken = new ArrayList<>();
+            r.get("broken").get("items").forEach(b -> broken.add(b.get("fromKind").asText() + ":" + b.get("value").asText()));
+            assertEquals(List.of("expectation:nostore/database", "job:gone"), broken.stream().sorted().toList(), r.toString());
+        }
+    }
+
     @Test
     void aServerWriteIsNotAnOutsideEditAndAHandEditIs(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
@@ -156,6 +173,56 @@ class ControlApiSpaceIntegrityTest {
             List<String> outside = new ArrayList<>();
             for (JsonNode o : r.get("changedOutside").get("items")) outside.add(o.get("change").asText() + " " + o.get("path").asText());
             assertEquals(List.of("added hand_job.toon"), outside, r.toString());
+        }
+    }
+
+    /** SE-3a: a column renamed by hand in a copy of the demo Space shows in {@code columnChanges} on the next computation. */
+    @Test
+    void aHandColumnRenameIsReportedInColumnChanges(@TempDir Path root) throws Exception {
+        Path src = ReactorModules.root().resolve("spaces/demo/config");
+        Path config = Files.createDirectories(root.resolve("alpha/config"));
+        Files.createDirectories(root.resolve("alpha/data"));
+        try (java.util.stream.Stream<Path> s = Files.walk(src)) {
+            for (Path p : s.toList()) {
+                Path rel = src.relativize(p);
+                if (rel.toString().replace('\\', '/').contains(".history")) continue;
+                Path to = config.resolve(rel.toString());
+                if (Files.isDirectory(p)) Files.createDirectories(to);
+                else Files.copy(p, to);
+            }
+        }
+        Authenticators.forTest(FAKE);
+        SpaceManager spaces = SpaceManager.discover(root);
+        ControlApi api = new ControlApi(spaces, 0);
+        api.start();
+        try (Ctx c = new Ctx(spaces, api, api.port(), config)) {
+            integrity(c);
+            JsonNode first = awaitReady(c, n -> true);
+            assertEquals("ready", first.get("columnChanges").get("status").asText(), first.toString());
+            assertEquals(0, first.get("columnChanges").get("total").asInt(), "the first computation is a baseline");
+
+            Path schema = config.resolve("orders/orders_schema.toon");
+            String text = Files.readString(schema);
+            assertTrue(text.contains("    - name: GROSS\n"), "the demo schema changed shape — re-aim the plant");
+            Files.writeString(schema, text.replace("    - name: GROSS\n", "    - name: GROSS_AMOUNT\n"));
+            Files.setLastModifiedTime(schema, FileTime.fromMillis(System.currentTimeMillis() - 3_600_000));
+            // any server write schedules the next computation
+            String backups = root.resolve("alpha/data/backups").toAbsolutePath().normalize().toString().replace("\\", "\\\\");
+            assertEquals(200, send(c, "POST", "/spaces/alpha/jobs", "author",
+                    "{\"name\":\"served\",\"type\":\"maintenance\",\"task\":\"cleanup\",\"retention_days\":\"30\",\"backup_dir\":\""
+                            + backups + "\"}").statusCode());
+
+            JsonNode r = awaitReady(c, n -> n.get("columnChanges").get("total").asInt() > 0);
+            JsonNode cc = r.get("columnChanges");
+            assertEquals(1, cc.get("total").asInt(), cc.toString());
+            assertEquals(1, cc.get("breaking").asInt());
+            JsonNode item = cc.get("items").get(0);
+            assertEquals("orders/orders_schema.toon", item.get("schema").asText());
+            assertEquals("renamed", item.get("change").asText());
+            assertEquals("GROSS", item.get("column").asText());
+            assertEquals("GROSS_AMOUNT", item.get("to").asText());
+            assertTrue(item.get("outside").asBoolean(), "made by hand, outside the server");
+            assertEquals(7, item.get("consumers").size(), item.toString());
         }
     }
 

@@ -1,6 +1,6 @@
 # Space evolution — a Space the server understands as a whole, reached without breaking one
 
-**State:** IN PROGRESS — D-SE1…D-SE8 answered 2026-11-11 (§6); SE-0, SE-6a and SE-1a built (table below).
+**State:** IN PROGRESS — D-SE1…D-SE9 answered (§6); SE-0, SE-6a, SE-1a, SE-3a and SE-5a built (table below).
 Board row `SPACE-EVOLUTION-1`.
 **Depends on:** [`2026-11-11-space-link-census-plan.md`](2026-11-11-space-link-census-plan.md) phase LC-1
 (the declared link census and its graph). This plan does not repeat that design; it builds on it.
@@ -13,10 +13,12 @@ Board row `SPACE-EVOLUTION-1`.
 | SE-0 corpus equivalence gate, old-reader check | built 2026-11-12 | `7243bcd07` | 3 Spaces + 30 templates; capability flags registered: `space.integrity`, `links.delete`, `links.save` |
 | SE-6a tests that travel with a Space | built 2026-11-12 | `cbbc0523a`, `199affd8d`; fixes `2aad8fc9b`, `ac09275b4` | pushed without the whole module's tests, which left three tests red on master until the fixes; spec `spec-space-tests.md`; five operator questions open |
 | SE-1a Space lock, report-only | built 2026-11-13 | `ad946532e`, `1f61ef26f` | `GET /spaces/{id}/integrity`; kill switch `-Dspace.integrity=off`; residuals `SPACE-LOCK-CLOSE-RESIDUALS-1`; spec `spec-space-lock.md` |
-| SE-3a column contract, report-only | next | — | the census side (LC-5) is built; this adds the lock's change classes and the Schema-save warning |
-| SE-2a hand-rename detection, report | next | — | |
-| SE-5a template version + origin | next | — | |
-| SE-1b / 2b / 3b, SE-4, SE-5b, SE-6b | gated | — | §5 |
+| SE-3a column contract, report-only | built 2026-11-13 | `d94dec6be`, `1f62b8235` | spec `spec-column-contract.md` |
+| SE-2a hand-rename detection, report | in flight (peer lane) | — | |
+| SE-5a template version + origin | built 2026-11-13 | `54d10255d`, `0385d15c4` | the origin lives in `.inspecto/created-from.toon`, not the lock (spec `spec-space-origin.md` §1) |
+| SE-5b template upgrade proposal | next | — | |
+| SE-6b promotion into an existing Space | next | — | D-SE7 and its detail settled |
+| SE-1b / 2b / 3b, SE-4 | gated | — | §5 |
 
 Only targeted test classes ran on each lane; the full gate was not run.
 
@@ -216,7 +218,8 @@ All eight answered by the operator on 2026-11-11.
 | **D-SE4** | How strict is a Schema save that breaks a column consumers use? | **Stopped with the list of what breaks; `?force=true` goes ahead** — the pattern a Pipeline delete uses today. Never a hard refusal. |
 | **D-SE5** | Where does the state zone live? | **`spaces/<id>/state/`, beside `config/`** — small governance records, backed up and moved with the config. |
 | **D-SE6** | Does `.history/` move to `state/`? | **No. It stays beside each file.** |
-| **D-SE7** | Promotion into an existing Space? | **Yes, as a previewed change set through Pending Changes** — nothing lands in the target Space without review. ⚠ Open detail for SE-6b: what a Space with no approval policy does (Pending Changes need signed-in users). |
+| **D-SE7** | Promotion into an existing Space? | **Yes, as a previewed change set through Pending Changes** — nothing lands in the target Space without review. **Detail (operator, 2026-11-13):** a target Space with no approval policy lets an administrator apply the previewed change set directly; with a policy it goes through Pending Changes. |
+| **D-SE9** | The SE-1a integrity report's gate, and SE-6a's five open questions | **Answered 2026-11-13, all as built:** `GET /spaces/{id}/integrity` stays `canAuthorWorkbench`; a dry run of `space.test` runs the cases (they write only to temp folders); a Pipeline with several outputs is checked across all of them together; the test routes also answer unprefixed for the default Space; the runner stays in the control plane. |
 | **D-SE8** | When may the old paths be retired (a Space without a lock; state inside `config/`)? | **At a named major release.** Both paths live until then; that release ships the migrator, runs it as a documented upgrade step, and removes the old path. This is the agreed exception to "breaking changes are free, no shims" for this plan. The release is named when SE-4 ships. |
 
 ## 7. Risks

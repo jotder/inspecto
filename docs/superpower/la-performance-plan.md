@@ -35,7 +35,7 @@ Every shipped lane went through independent adversarial verification (1–3 roun
 | P5 betweenness worker | ⬜ OPEN — operator decision PERF-D1; §0b shows betweenness is NOT the top cost (385 ms at 465 nodes), layouts and hulls are | — |
 | P6 layout on expand | ✅ SHIPPED 2026-11-12 on its vitest proof; the after-timing was NOT measured (§P6) | see §P6 |
 | P8 hulls | ✅ SHIPPED as N2 (§0b) | — |
-| P11 polish | ⬜ OPEN — not measured, so not built (§P11); board row `LA-PERF-P11-1` | — |
+| P11 polish | ❌ NO-GO 2026-11-13 — measured, the derived passes are ~0.1–0.3 % of scripting per action (§P11); nothing built | — |
 | P10a-5 delta fetch on expand | ⬜ OPEN — needs a server delta response | — |
 | P10 wire format | ✅ SHIPPED 2026-11-12 (PERF-D3 answered: build it) — compact edge rows; raw bytes −41 %, gzip bytes only −1 to −7 %, no measurable server or parse time change (§P10 "Measured") | see §P10 |
 
@@ -83,7 +83,7 @@ Every shipped lane went through independent adversarial verification (1–3 roun
 | Health | idle: 0 requests in 35 s (no polling); 🔴 **`TypeError: Cannot read properties of undefined (reading 'getData')` in `renderMinimap`, four times, after route changes** (a real defect); 5 × "Unable to preventDefault inside passive event listener" |
 
 ### The re-ranked open list (by what an analyst feels)
-Open items N4, N7–N11, P5, P10a-5 and P11 are tracked on the board as `LA-PERF-*` rows (`docs/BACKLOG.md` §3.12, 2026-11-12).
+Open items N4, N7–N11, P5 and P10a-5 are tracked on the board as `LA-PERF-*` rows (`docs/BACKLOG.md` §3.12, 2026-11-12; P11 closed as a measured no-go 2026-11-13).
 
 **Tier 1 — freezes the page**
 - **N1 Radial layout hangs the tab (> 3 min at 767 nodes / 4,000 links).** Cap or refuse Radial above a node count (a `layered_max_nodes` = 30 cap already exists as the pattern), and say so on screen; then decide on a worker (PERF-D5). Severity: high; a one-line cap removes the hang. ✅ **SHIPPED 2026-10-25** (3 builder / verifier rounds; targeted tests only): the Radial, Information density, Clustering and every other layout are capped at the one place they reach G6 (`layoutConfig`, caps through the `display` limits: Java `LaLimit`, `la-limits.ts`, docs, parity test), Concentric is the fallback, the cap notice no longer covers the legend. `d4fd1aa11`, `65593934a`, `92903f91b`.
@@ -413,10 +413,28 @@ be visibly marked as "as of" a time, never silently shown as current.
 |---|---|---|
 | PERF-P11-1 | Fuse the 8–12 derived passes in the browser pipeline; memoise `autoStyleOf`; add value comparators on `canvasData` and its intermediate computeds (as `canvasPlugins` already does) | P0-1 scripting per action drops; no identity churn in the change log |
 
-⬜ **NOT BUILT, 2026-11-12:** the brief makes P11 conditional on a measurement showing scripting per action drops, and
-no measurement surface was available (browser pane hidden, see §P6). Nothing was changed; it stays open as board row
-`LA-PERF-P11-1`. Context: the P6 before numbers put a whole small expand at about 0.4 s of long tasks on 405 nodes, so
-the page-side derived passes are a fraction of an action, not the freeze.
+❌ **MEASURED, NO-GO, 2026-11-13 (nothing built; board row `LA-PERF-P11-1` closed).** Preview demo install
+(`inspecto-previewinspecto-la`, its own production UI) on :8080, `la-showcase` saved view `telecom_fraud_network`
+(767 nodes / 4,000 links), the built-in browser pane VISIBLE, in-page `PerformanceObserver` long tasks and
+long-animation-frame script time, plus a timing wrapper on `JSON.stringify` (the cost of every `stableKey` comparator).
+
+| Action | Script per action | Long tasks | `stableKey` (all calls) |
+|---|---|---|---|
+| Select (node click, first) | 4,518 ms (pointerup 3,426 ms) | 4,433 ms | — |
+| Link click (details dialog) | 253 ms | 83 ms | — |
+| Filter: hide one link kind (legend chip) | 2,349 ms | 2,335 ms | 0.4 ms, 4 calls, 27 KB |
+| Filter: show it again | 3,403 ms | 3,295 ms | 0.4 ms, 4 calls, 27 KB |
+| Expand | not re-measured: §P6 has 378–435 ms of long tasks per small expand on ~405 nodes | | |
+
+The derived passes themselves could not be isolated in the production bundle (no profiler protocol). Bound: a replica
+of the pipeline's passes at the same size (Working Set marking, link-kind hiding, held marking, link weighing, the
+`autoStyle` counts, legend kinds, degree / hubs, node options, drawn / unexpanded / missing counts — 12 full passes
+with object spreads) costs **2.8 ms median, 5.4 ms p90** over 30 runs in the same page. With `stableKey` at 0.4 ms,
+the work P11 would fuse or memoise is about 0.1–0.3 % of an action; even removing all of it would not be visible. The
+time is in G6 (rAF and timer callbacks: element update, render). A plain select does not recompute `canvasData`
+at all unless "Only unexpanded" is on. `autoStyleOf` and `displayOptions` already carry `stableKey` comparators.
+Before = after: nothing changed. (The current-tree dev UI on :4210 could not draw against this older backend, so the
+measurement used the install's own UI build; the derived-pass code is the same shape.)
 
 ---
 

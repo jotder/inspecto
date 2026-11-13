@@ -58,6 +58,23 @@ public final class ComponentIntegrity {
     }
 
     /**
+     * Dangling pipeline links held by config FILES — an Enrichment's {@code triggers.on_pipeline} /
+     * {@code references.*.ref}, a Job's {@code on_pipeline} (each comma-list member) — at any folder depth.
+     * Needs a {@link LinkGraph#of config-root} graph; the caller skips it when that graph knows no pipeline.
+     */
+    public static List<String> brokenFilePipelineRefs(LinkGraph graph) {
+        List<String> findings = new ArrayList<>();
+        for (LinkGraph.Edge e : graph.dangling()) {
+            if (e.file() == null || !e.toKind().equals("pipeline")
+                    || !e.link().checks().contains(LinkCensus.Check.VALIDATE)) continue;
+            if (!e.fromKind().equals("enrichment") && !e.fromKind().equals("job")) continue;
+            findings.add("broken reference: " + e.fromKind() + " '" + e.fromName() + "' → missing pipeline '"
+                    + e.value().trim() + "' (" + e.key() + ")");
+        }
+        return findings;
+    }
+
+    /**
      * Dangling column links (`SPACE-LINK-CENSUS-1` LC-5, report-only): a column key or a SQL column reference
      * naming a column the Schema or Dataset it reads does not publish. Needs a {@link LinkGraph#of config-root}
      * graph — an in-memory component universe reads no Schema, so its column links are never judged. A link the

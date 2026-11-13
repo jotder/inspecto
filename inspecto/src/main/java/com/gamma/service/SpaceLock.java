@@ -102,7 +102,7 @@ public final class SpaceLock {
 
     private static final ObjectMapper CANONICAL =
             new ObjectMapper().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
-    private static final ObjectMapper PRETTY = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+    static final ObjectMapper PRETTY = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
     private SpaceLock() {}
 
@@ -140,7 +140,7 @@ public final class SpaceLock {
         }
     }
 
-    private static final class State {
+    static final class State {
         final String spaceId;
         final Path configRoot;
         final ReentrantLock computing = new ReentrantLock();
@@ -159,7 +159,7 @@ public final class SpaceLock {
 
     private static final Map<Path, State> STATES = new ConcurrentHashMap<>();
 
-    private static State state(String spaceId, Path configRoot) {
+    static State state(String spaceId, Path configRoot) {
         Path key = configRoot.toAbsolutePath().normalize();
         return STATES.computeIfAbsent(key, k -> new State(spaceId, k));
     }
@@ -224,7 +224,7 @@ public final class SpaceLock {
     /** One computation over the windows recorded so far; only the windows already ENDED when it began are
      *  consumed — a write that ends while the scan runs is still covered by the next computation. Caller holds
      *  {@code s.computing}. */
-    private static void computeNow(State s) {
+    static void computeNow(State s) {
         List<Window> taken, ended = new ArrayList<>();
         synchronized (s) {
             s.firstAsk = 0;
@@ -405,6 +405,18 @@ public final class SpaceLock {
             links.add(l);
         }
 
+        // SE-3a: per Schema its published column set, the consumers of each column and the changes since the
+        // previous lock (ColumnContract). Absent under -Dcolumn.contract=off.
+        ColumnContract.Section columns = null;
+        if (ColumnContract.enabled()) {
+            Set<String> outsidePaths = new HashSet<>();
+            // marked in THIS computation (an older mark is carried by an unchanged file)
+            for (Map<String, Object> f : files)
+                if (f.get("outside") instanceof Map<?, ?> o && nowIso.equals(o.get("at"))) outsidePaths.add(str(f.get("path")));
+            columns = ColumnContract.lockSection(root, graph, prev == null ? null : prev.get("columns"), outsidePaths,
+                    nowIso, CAP);
+        }
+
         Map<String, Object> lock = new LinkedHashMap<>();
         lock.put("format", FORMAT);
         lock.put("space", spaceId);
@@ -412,6 +424,7 @@ public final class SpaceLock {
         lock.put("files", files);
         lock.put("removedOutside", removed);
         lock.put("links", links);
+        if (columns != null) lock.put("columns", columns.entries());
 
         String writtenAt;
         if (prev != null && sameContent(prev, lock)) {
@@ -422,7 +435,10 @@ public final class SpaceLock {
             AtomicFiles.write(lockFile, PRETTY.writeValueAsBytes(lock), ".lock-");
             writtenAt = nowIso;
         }
-        return ready(nowIso, writtenAt, prev != null, note[0], files, removed, links);
+        SpaceLockEvents.emit(spaceId, prev, files, removed, links, nowIso);   // LC-4/LC-6: new findings only
+        Report r = ready(nowIso, writtenAt, prev != null, note[0], files, removed, links);
+        r.body().put("columnChanges", columns == null ? Map.of("status", "disabled") : columns.report());
+        return r;
     }
 
     private static boolean byServer(String change, long mtime, List<Window> windows, boolean anyWindow, long now) {
@@ -431,7 +447,7 @@ public final class SpaceLock {
         return false;
     }
 
-    private static Report ready(String checkedAt, String writtenAt, boolean baseline, String note,
+    static Report ready(String checkedAt, String writtenAt, boolean baseline, String note,
                                 List<Map<String, Object>> files, List<Map<String, Object>> removed,
                                 List<Map<String, Object>> links) {
         List<Map<String, Object>> broken = new ArrayList<>();
@@ -616,7 +632,7 @@ public final class SpaceLock {
     }
 
     @SuppressWarnings("unchecked")
-    private static List<Map<String, Object>> maps(Object o) {
+    static List<Map<String, Object>> maps(Object o) {
         List<Map<String, Object>> out = new ArrayList<>();
         if (o instanceof List<?> l) for (Object e : l) if (e instanceof Map<?, ?> m) out.add((Map<String, Object>) m);
         return out;

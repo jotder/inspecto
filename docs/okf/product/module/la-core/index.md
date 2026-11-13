@@ -57,5 +57,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | narrowed 2026-10-24: the assistant walked T1-T13 alone and the run of show moved into the demo runbook section 9 with the rehearsal recor… | external |
 | `LA-PERF-N4-1` | P2 | feature | G6 canvas work still blocks the main thread on 767 nodes / 4,000 links (N4, narrowed 2026-11-13): element creation at first open (~2.4–3.… | demand |
 | `LA-PERF-P5-1` | P3 | feature | Betweenness in a Web Worker, or approximated (P5). | demand |
-| `LA-PERF-P11-1` | P3 | feature | Fuse the LA browser pipeline's derived passes, memoise autoStyleOf, value comparators on canvasData (P11). | — |
 | `LA-PERF-P10A5-1` | P3 | feature | Expand and Grow fetch only the delta (P10a-5). | — |
