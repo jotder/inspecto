@@ -940,6 +940,12 @@ Design: [`policy-narrowing-design.md`](../../../../archived-documents/plans-arch
   LC-3 save and delete link checks refuse where the JVM mode is `shadow` (Standard and Advanced only, D-LC5). Any
   other value, or the key in the server file, is unreadable like every bad key. `SafetyPolicyFiles.links`,
   `SafetyPolicy.linksForSpace`; behaviour in [spec-space-lock.md](spec-space-lock.md) §10.
+- **`columns: report | refuse-breaking` (Space file only, 2026-11-13, SE-3b).** Absent = `report`. Read by the
+  Control API's Schema save check, not folded into the tier: `refuse-breaking` stops a Schema save that removes,
+  renames or narrows a column a consumer uses with 409 and the consumers listed; `?force=true` saves (Standard and
+  Advanced only, D-LC5; Basic warns). Any other value, or the key in the server file, is unreadable like every bad
+  key. `SafetyPolicyFiles.columns`, `SafetyPolicy.columnsForSpace`; behaviour in
+  [spec-column-contract.md](spec-column-contract.md) §9.
 - Parsed files are cached by their exact text (an (mtime, size) stamp missed a same-size rewrite inside one mtime tick, `f2110d781`); a failure is cached too and re-evaluated when the text changes.
 - **S2b (2026-10-04) — the refusal surfaces, fail-closed everywhere.**
   - *Plan-time gates:* `ControlApi.errorBoundary` maps `SafetyPolicyUnreadableException` to **422** with `errorCode ERR_SAFETY_POLICY_UNREADABLE` (a new `ErrorCodes` entry + the contract's `ErrorCode` enum) and a `findings` array whose ERROR finding's `fieldPath` is the file. One boundary mapping covers every `ConfigSafetyValidator.check` caller that runs inside a route (SaveGate, RunRoutes, JobRoutes, DataSourceRoutes, EnrichmentRoutes, ComponentRoutes, BundleRoutes), because `defaultPolicy()` is what throws. The three agent-tool callers (`ComponentActions.apply`/`preview`, `InspectoTools` validate) catch it themselves and fail closed as a refusal/ERROR finding. Audit status is 422, not 500 (`failureStatus`).

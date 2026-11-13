@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-428 test class(es): 173 unit, 255 real-HTTP control-plane, 0 IT.
+431 test class(es): 175 unit, 256 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -96,6 +96,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiCollectorsAndConnectionsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCollectorsAndConnectionsTest.java` | Integration tests over real HTTP for the Acquisition/Sources UI backend: {@code GET /collectors} (flattened source <!-- vocab-allow: quoted Javadoc --> |
 | `ControlApiColumnContractSaveTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiColumnContractSaveTest.java` | SE-3a — the Schema save warning over real HTTP (D-SE4 step 1, report-only): a save through the config write |
 | `ControlApiColumnImpactTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiColumnImpactTest.java` | {@code GET /config/schema/{name}/columns/{column}/impact} (`SPACE-LINK-CENSUS-1` LC-5) over real HTTP: the read's |
+| `ControlApiColumnRefusalTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiColumnRefusalTest.java` | SE-3b over real HTTP, two Spaces side by side: {@code alpha} sets {@code columns: refuse-breaking} in its |
 | `ControlApiCommitRetryTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCommitRetryTest.java` | The X1 retry affordance over real HTTP ({@code GET /runs/{name}/retries}, |
 | `ControlApiComponentSharesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiComponentSharesTest.java` | Component sharing RBAC (R3, {@code docs/superpower/rbac-abac-plan.md} §3) over real HTTP: the |
 | `ControlApiComponentsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiComponentsTest.java` | Component registry CRUD (T19, §7.1) over real HTTP: create / list / get / update / delete |
@@ -335,6 +336,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `PendingChangesKeyTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/PendingChangesKeyTest.java` | The Pending Change MAC key (`ASSURE-MAKER-CHECKER-1` round-3 findings 2 and 4): it lives OUTSIDE the config |
 | `PendingChangesLockTimeoutTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/PendingChangesLockTimeoutTest.java` | The Pending Change store lock waits a BOUNDED time: a held lock yields 503 STORE_BUSY, never a hang. |
 | `PendingChangesMultiPodTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/PendingChangesMultiPodTest.java` | Deciding a Pending Change across Pods (`ASSURE-MAKER-CHECKER-MULTIPOD-1`): two control planes over the SAME |
+| `PendingChangesStateZoneTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/PendingChangesStateZoneTest.java` | SE-4 step 1 for the Pending Change store: a record under {@code state/pending-changes} is read, one under |
 | `PersonalAlertHistoryTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/PersonalAlertHistoryTest.java` | MODULE-REORG-P7-INCIDENTS slice 2 (operator decision 2026-10-07): <b>Basic keeps Alert history and |
 | `PipelineSinksFileRoundTripTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/PipelineSinksFileRoundTripTest.java` | The plural {@code sinks:} block through the <b>real file</b>: graph → {@code lower} → |
 | `PipelineStepsFileRoundTripTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/PipelineStepsFileRoundTripTest.java` | The multiplicity chain through the <b>real file</b>: graph → {@code lower} → {@code ConfigCodec.toToon} |
@@ -370,6 +372,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `WriteGateOrderTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/WriteGateOrderTest.java` | The four-stage write gate: <b>its ORDER, and {@link WriteGates} itself</b> — one of |
 | `BaselineEvaluatorGoldenTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/BaselineEvaluatorGoldenTest.java` | Golden figures of the {@code baseline} Expectation kind (ANALYTICS-CORE-1 M4 / M2): every profiled cell over parquet |
 | `BaselineEvaluatorTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/BaselineEvaluatorTest.java` | DUCKLE-C8 — the {@code baseline} kind's decision logic (median of the accepted window, limits in either |
+| `BaselineProfileStoreStateZoneTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/BaselineProfileStoreStateZoneTest.java` | SE-4 step 1: a baseline history under {@code state/expectation-baselines} is read before {@code config/}'s; writes stay in config. |
 | `BaselineProfileStoreTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/BaselineProfileStoreTest.java` | DUCKLE-C8 — the durable profile history + accepted-profile store behind the {@code baseline} kind. |
 | `ExpectationEvaluatorParityTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/ExpectationEvaluatorParityTest.java` | Golden corpus for the {@code non_null} / {@code range} / {@code regex} shorthand kinds: the failing-row |
 | `LaDailyFeedTemplateRulesTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/LaDailyFeedTemplateRulesTest.java` | LA-DATA-TRUST-1 S3, S4, S7 / S8: the rules the shipped {@code spaces/_templates/la-daily-feed} template carries load through |

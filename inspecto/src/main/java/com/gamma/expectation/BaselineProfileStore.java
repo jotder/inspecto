@@ -2,6 +2,7 @@ package com.gamma.expectation;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gamma.config.safety.SpaceStateDirs;
 import com.gamma.util.AtomicFiles;
 
 import java.io.IOException;
@@ -48,7 +49,7 @@ public final class BaselineProfileStore {
     private final Path dir;
 
     public BaselineProfileStore(Path writeRoot) {
-        this.dir = writeRoot.resolve("expectation-baselines").toAbsolutePath().normalize();
+        this.dir = SpaceStateDirs.writeDir(writeRoot, "expectation-baselines");   // SE-4 step 1: reads also look in state/
     }
 
     /** The last {@code n} accepted profiles, oldest first. */
@@ -149,6 +150,7 @@ public final class BaselineProfileStore {
      *  same name must not inherit its baseline. */
     public void delete(String name) throws IOException {
         synchronized (LOCK) {
+            refuseShadowed(file(name));   // first: a refused delete changes nothing (a state/ copy would be inherited)
             Files.deleteIfExists(file(name));
         }
     }
@@ -219,7 +221,7 @@ public final class BaselineProfileStore {
     }
 
     private Map<String, Object> read(String name) throws IOException {
-        Path f = file(name);
+        Path f = SpaceStateDirs.readable(file(name));   // state/ first, then config/ (SE-4 step 1)
         if (!Files.exists(f)) return new LinkedHashMap<>();
         try {
             return JSON.readValue(f.toFile(), new TypeReference<LinkedHashMap<String, Object>>() {});
@@ -231,8 +233,19 @@ public final class BaselineProfileStore {
 
     private void write(String name, Map<String, Object> doc) throws IOException {
         Path f = file(name);
+        refuseShadowed(f);
         Files.createDirectories(dir);
         AtomicFiles.write(f, JSON.writeValueAsBytes(doc), ".baseline-");
+    }
+
+    /**
+     * SE-4 step 1: a history that also lives in the Space's {@code state/} zone is a newer release's — a write here
+     * would land in {@code config/}, where no read sees it, so it is refused instead.
+     */
+    private static void refuseShadowed(Path f) throws IOException {
+        if (SpaceStateDirs.shadowed(f))
+            throw new IOException(SpaceStateDirs.twin(f) + " was written by a newer release (the Space's state/ folder);"
+                    + " this release reads it but cannot change it");
     }
 
     private Path file(String name) {

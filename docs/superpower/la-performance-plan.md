@@ -160,6 +160,23 @@ Production `la-app` build of `origin/master` 948fcf54b, demo-auth Preview bundle
 - The canvas figure here (442 ms) is lower than the 1.5–2.9 s from the earlier lanes. That is a different day and box load, a single run and the same view, so it is NOT a new before figure for the plan.
 - **Left for the operator:** the other option, "fewer shapes": link labels and arrows off at large sizes. PERF-D5 (no worker) stands.
 
+#### N4 fewer shapes, measured 2026-11-13 (fourth lane, measure only, nothing shipped)
+**Operator choice:** measure first, build only on a clear gain (at least 30–40 % off the longest task). **Found first:** link labels are ALREADY off on this view; `edgeLabelsHiddenByDensity` hides them above `DENSE_EDGE_LABEL_CAP`. So the shapes left to cut were the 4,000 arrowheads (`endArrow`) and the 767 node labels.
+
+**How measured:** one production `la-app` build of `origin/master` `cd5a5af6ac` with a temporary `localStorage` switch, removed afterwards: `arrows` set `endArrow: false`, and `both` also turned the node labels off. A demo-auth Preview bundle of the same tree ran on :8087 with a private copy of `la-showcase`. The built-in browser had the pane shown, and `PerformanceObserver` recorded long tasks. Saved view `telecom_fraud_network` (767 nodes / 4,000 links). Each run opened the view from the landing page, switched to Grid, switched to Circular, then pressed Select all and Clear. Modes were alternated (base, arrows, both, base, arrows, both, base, both, arrows, base). Figure = the longest task; every run is listed, and the median is in bold.
+
+| Action | Baseline (4 runs) | Arrows off (3) | Arrows + node labels off (3) | Change, both off |
+|---|---|---|---|---|
+| Open the view | 3,808 · 1,985 · 1,418 · 2,034 (**~2,010**) | 2,477 · 1,565 · 961 (**1,565**) | 1,050 · 907 · 1,015 (**1,015**) | **−50 %** |
+| Move after Grid switch | 1,264 · 864 · 823 · 1,028 (**946**) | 802 · 802 · 537 (**802**) | 556 · 479 · 482 (**482**) | **−49 %** |
+| Move after Circular switch | 1,533 · 892 · 700 · 708 (**800**) | 722 · 739 · 480 (**722**) | 570 · 475 · 492 (**492**) | **−39 %** |
+| Select all 767 | 2,365 · 1,413 · 1,080 · 1,301 (**1,357**) | 1,983 · 1,324 · 1,137 (**1,324**) | 1,181 · 863 · 869 (**869**) | **−36 %** |
+| Clear the selection | 2,866 · 1,455 · 1,044 · 1,829 (**1,642**) | 1,152 · 1,584 · 813 (**1,152**) | 884 · 978 · 830 (**884**) | **−46 %** |
+
+- **Baseline (step 1):** the freezes are still about 0.8–2 s (median), so the row is not "acceptable as is". The 442 ms single run of the WebGL lane was an outlier. The baseline ran first and last too (2,034 ms at open), so the gain is not drift on the box.
+- **Arrowheads alone:** a small, uneven gain (about −2 % to −30 %, inside the run-to-run spread on Select all). **Arrowheads plus node labels:** a clear gain on all three freezes, −36 % to −50 %, and the spread of its runs is tight. The node labels are the larger share: text is the most expensive shape @antv/g draws.
+- **Verdict: GO for a build.** Above a size threshold, turn off the arrowheads and the node labels, as the existing link-label density rule already does for link labels. Show them again on hover and selection (the same reveal as `revealEdgeLabels`), with a short note on screen and a Display-menu override, like `allEdgeLabels`. Still a decision for the operator: the threshold and whether arrows matter for this analysis. Nothing was built in this lane.
+
 **Tier 2 — load and startup**
 - **N5 Landing makes ~27 calls with every Space's `/bootstrap` fetched twice (~1 MB decoded).** Dedupe (a request-level cache for GETs, the same mechanism as P10a-2) and fetch only the current Space's bootstrap; `/spaces`, `/spaces/_meta`, the components lists and `/entity-lists` each ×2 too. Cheap, client-only, high yield. ✅ **SHIPPED 2026-10-25** (verified PASS; targeted tests only): the landing page fetches each Space call once through short-lived reads (`short-reads.ts`), and every Entity List / Dataset / component / access write clears them. `10b5776b7`, `0a6420e2b`, `ddfa3d81a`.
 - **N6 Hashed JS/CSS/font chunks are revalidated on every load (19 × `304`).** Serve content-hashed files with `Cache-Control: public, max-age=31536000, immutable`; negligible on localhost, 19 round trips on a real network. ✅ **SHIPPED 2026-11-12** (targeted tests only): `<stem>-<hash>.js|css|woff2` is `public, max-age=31536000, immutable`; index.html and plain names keep `no-cache` + ETag (`ControlApiStaticAndCorsTest`). `732528b7c`.

@@ -372,7 +372,20 @@ final class ComponentRoutes implements RouteModule {
         requireNoStrandedObjects(api, type, current.content(), merged);
         Object incompatible = schemaCompatibilityGate(ex, type, current.content(), merged);
         if (incompatible != null) return incompatible;
-        return writeComponent(api, store, ex, type, id, merged);
+        // SE-3a / SE-3b column contract, as POST /config/write: a breaking change warns (columnWarnings), or is stopped
+        // with 409 in a Space with columns: refuse-breaking unless ?force=true. Update only: create has no previous
+        // set, and a version restore is a rollback (exempt for the reason schemaCompatibilityGate gives).
+        List<Finding> columnWarnings = new ArrayList<>();
+        if ("schema".equals(type)) {
+            Object refused = ColumnRefusals.save(ex, api.writeRoot(), current.path(), current.content(), merged, columnWarnings);
+            if (refused != null) return refused;
+        }
+        Object written = writeComponent(api, store, ex, type, id, merged);
+        if (columnWarnings.isEmpty() || !(written instanceof Map<?, ?> doc)) return written;
+        @SuppressWarnings("unchecked")
+        Map<String, Object> out = new LinkedHashMap<>((Map<String, Object>) doc);
+        out.put("columnWarnings", columnWarnings);
+        return out;
     }
 
     /**

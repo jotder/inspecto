@@ -38,6 +38,12 @@ public final class ColumnContract {
     /** The save warning's finding code. */
     public static final String WARN_COLUMN_BREAKS = "WARN_COLUMN_BREAKS";
 
+    /**
+     * SE-3b kill switch for the opt-in refusal only: {@code off} ignores every Space's {@code columns: refuse-breaking},
+     * so a breaking Schema save warns as under SE-3a (the warning-only rollback); anything else (default) honours it.
+     */
+    public static final String REFUSAL_PROPERTY = "column.contract.refusal";
+
     private ColumnContract() {}
 
     public static boolean enabled() {
@@ -319,31 +325,42 @@ public final class ColumnContract {
     // ── the save warning ────────────────────────────────────────────────────────────────────
 
     /**
-     * The WARNING findings a Schema save gets (D-SE4 step 1: warn only, refuse nothing): one per breaking change
-     * between the stored and the saved document, naming the consumers it breaks. {@code graph} is the Space as
-     * stored, before the write. Empty when the switch is off, either set is unknown, or nothing breaks.
+     * One breaking change of a Schema save with what it breaks: the RESOLVED consumers of the column as the Schema
+     * published it, and the column links the parser could not attribute (never counted as broken).
      */
-    public static List<com.gamma.config.spec.Finding> saveWarnings(Path writeRoot, Path target,
-                                                                   Map<?, ?> stored, Map<?, ?> saved) {
+    public record Break(Change change, List<Map<String, Object>> consumers, List<Map<String, Object>> notAnalysed) {
+        /** The finding text: the change, the consumers it breaks, the count of SQL references not analysed. */
+        public String message() {
+            List<String> names = new ArrayList<>();
+            for (Map<String, Object> u : consumers) names.add(u.get("fromKind") + " '" + u.get("fromName") + "' (" + u.get("key") + ")");
+            return describe(change) + "; "
+                    + (names.isEmpty() ? "no consumer in this Space reads it" : "breaks " + consumers.size() + " consumer(s): " + String.join(", ", names))
+                    + (notAnalysed.isEmpty() ? "" : "; " + notAnalysed.size() + " SQL reference(s) to it were not analysed");
+        }
+
+        /** The SE-3a WARNING finding (the save went ahead). */
+        public com.gamma.config.spec.Finding warning() {
+            return new com.gamma.config.spec.Finding(com.gamma.config.spec.Severity.WARNING,
+                    "mapping.fields[" + change.column() + "]", message(), WARN_COLUMN_BREAKS,
+                    "update the consumers listed, or keep the column; the save went ahead (report-only)");
+        }
+    }
+
+    /**
+     * The breaking changes between the stored and the saved Schema document, each with its consumers; {@code graph}
+     * is the Space as stored, before the write. Empty when the switch is off, there is no stored version, the mapping
+     * is rule-built (inline or a sibling {@code _mapping.csv}), either set is unknown, or nothing breaks.
+     */
+    public static List<Break> breaks(Path writeRoot, Path target, Map<?, ?> stored, Map<?, ?> saved) {
         if (!enabled() || stored == null || Files.exists(MappingCsv.siblingFor(target))) return List.of();
         List<Col> before = columns(stored), after = columns(saved);
         if (before == null || after == null) return List.of();
         List<Change> breaking = classify(before, after).stream().filter(Change::breaking).toList();
         if (breaking.isEmpty()) return List.of();
         LinkGraph graph = LinkGraph.of(writeRoot, ReservedConfigPaths::reserved);
-        List<com.gamma.config.spec.Finding> out = new ArrayList<>();
-        for (Change c : breaking) {
-            List<Map<String, Object>> used = consumers(graph, writeRoot, target, c.column());
-            List<Map<String, Object>> unread = notAnalysed(graph, writeRoot, c.column());
-            List<String> names = new ArrayList<>();
-            for (Map<String, Object> u : used) names.add(u.get("fromKind") + " '" + u.get("fromName") + "' (" + u.get("key") + ")");
-            String what = describe(c) + "; "
-                    + (names.isEmpty() ? "no consumer in this Space reads it" : "breaks " + used.size() + " consumer(s): " + String.join(", ", names))
-                    + (unread.isEmpty() ? "" : "; " + unread.size() + " SQL reference(s) to it were not analysed");
-            out.add(new com.gamma.config.spec.Finding(com.gamma.config.spec.Severity.WARNING,
-                    "mapping.fields[" + c.column() + "]", what, WARN_COLUMN_BREAKS,
-                    "update the consumers listed, or keep the column; the save went ahead (report-only)"));
-        }
+        List<Break> out = new ArrayList<>();
+        for (Change c : breaking)
+            out.add(new Break(c, consumers(graph, writeRoot, target, c.column()), notAnalysed(graph, writeRoot, c.column())));
         return out;
     }
 

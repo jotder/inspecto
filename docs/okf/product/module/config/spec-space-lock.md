@@ -151,7 +151,7 @@ local administrator did not write it.
 ## 7. `GET /spaces/{id}/integrity`
 
 Gated on `canAuthorWorkbench` (it lists every config path); available on every edition (D-LC5). Every answer for a
-Space with a Space folder also carries `linksMode` (§10). Answers 200:
+Space with a Space folder also carries `linksMode` (§10) and `columnsMode` ([spec-column-contract.md](spec-column-contract.md) §9). Answers 200:
 
 | `status` | Body |
 |---|---|

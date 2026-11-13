@@ -2,6 +2,7 @@ package com.gamma.intelligence.policy;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gamma.config.safety.SpaceStateDirs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,22 +49,31 @@ public final class AutonomyPolicyStore {
     }
 
     private void load() {
-        if (file == null || !Files.exists(file)) return;
+        if (file == null) return;
+        Path from = SpaceStateDirs.readable(file);   // state/ first, then config/ (SE-4 step 1)
+        if (!Files.exists(from)) return;
         try {
-            String content = Files.readString(file, StandardCharsets.UTF_8);
+            String content = Files.readString(from, StandardCharsets.UTF_8);
             if (content.isBlank()) return;
             Map<String, Object> record = JSON.readValue(content, new TypeReference<Map<String, Object>>() {});
             this.policy = AutonomyPolicy.fromRecord(record);
             log.info("Loaded autonomy policy from {} (killSwitch={}, {} class(es))",
-                    file, policy.killSwitch(), policy.classes().size());
+                    from, policy.killSwitch(), policy.classes().size());
         } catch (IOException | RuntimeException e) {
-            log.warn("Could not load autonomy policy from {}: {} — using defaults", file, e.getMessage());
+            log.warn("Could not load autonomy policy from {}: {} — using defaults", from, e.getMessage());
             this.policy = AutonomyPolicy.defaults();
         }
     }
 
     private void persist() {
         if (file == null) return;
+        if (SpaceStateDirs.shadowed(file)) {   // SE-4 step 1: a newer release's file — kept in memory, never written here
+            // ERROR, not WARN: this change (a kill switch included) holds only until the next restart
+            log.error("NOT persisting the autonomy policy to {}: {} was written by a newer release and this release only "
+                    + "reads it — this change (killSwitch={}) is lost at restart", file, SpaceStateDirs.twin(file),
+                    policy.killSwitch());
+            return;
+        }
         try {
             if (file.getParent() != null) Files.createDirectories(file.getParent());
             Files.writeString(file, JSON.writerWithDefaultPrettyPrinter().writeValueAsString(policy.toRecord()),

@@ -26,6 +26,7 @@ spaces/                                   the Spaces root (-Dspaces.root, defaul
 │   │   ├── pipelines/                      Pipelines authored in the UI (§4.5)
 │   │   ├── roles.toon, modules.toon, …     fixed-name Space settings (§4.4)
 │   │   └── pending-changes/, recon-state/, … server-written state inside config (§4.6)
+│   ├── state/                            the state zone: read, never yet written — no shipped Space has one (§4.7)
 │   ├── config.secrets/                   keys and anchors, never imported or exported (§5)
 │   ├── .inspecto/value-fingerprint.salt  salt for value fingerprints (§3)
 │   │   ─ ─ ─ ─ ─ ─ ─ ─ below this line: the DATA ROOT (may sit on another volume, §2) ─ ─ ─ ─ ─ ─
@@ -180,6 +181,77 @@ These live in the config tree but are written by the server, never by hand or by
 | `registry/access-catalog/`, `registry/access-profiles/` | the access config; written only through its own `canConfigureAccess` routes |
 | `.history/` (anywhere) | saved versions of edited configs |
 
+### 4.7 The state zone — `state/` beside `config/` (SE-4 step 1: readers only)
+
+The directories of §4.6 are to leave `config/` for `spaces/<id>/state/<dir>`, so that `config/` holds only what
+people author ([Space evolution plan](../../../../superpower/2026-11-11-space-evolution-plan.md) §4.4, D-SE5).
+Readers ship one release before any writer (D-SE13). **Step 1, built 2026-11-13, is the readers only:** nothing moves,
+nothing is written under `state/`, and no shipped Space or Space Template has a `state/` folder. `.history/` does not
+move (D-SE6). `ReservedConfigPaths` keeps reserving the old `config/` locations.
+
+**The rule** (`SpaceStateDirs`, one resolver every switched store reads through):
+
+- **Read:** `state/<dir>/<file>` when that file exists, else `config/<dir>/<file>` (`SpaceStateDirs.readable`). A
+  listing holds both places, the state one first, one entry per name (`SpaceStateDirs.list`). So a Space a newer
+  release has moved, or half moved, still reads every record.
+- **Write:** always `config/<dir>` (`SpaceStateDirs.writeDir`) — the one place the writer step changes.
+- **A record that has a copy in `state/` belongs to a newer release — whether or not `config/` holds one too.**
+  Writing it here would land in `config/`, where no read sees it, so this release refuses: a 409 for the signed stores (`PendingChanges.requireWritable` is checked before a
+  held change is replayed, an Action Request saves before it dispatches, a Regulatory Report checks before it
+  delivers), an IOException for Reconciliation and baseline state (a delete says so too), and for the agent's files
+  the change stays in memory, logged at ERROR for the autonomy policy because even a kill switch set then holds only
+  until the next restart. A refused delete changes nothing. Expiry skips such a record. This can only happen once a writer release has
+  run against the Space (a rollback, or two releases on one Space).
+- **Which roots:** only a Space's `config/` (a folder named `config` inside a Space folder — the rule
+  `PathJail.spaceDirOf` and `SpaceAuditDir` use). The single-tenant default Space (`-Dassist.write.root`, no Space
+  folder) reads `config/` only. **No link is followed below the Space folder** (`SpaceStateDirs.linkFree`): a `state/`, a `state/<dir>` or a file
+  that is a symlink or junction is never read, backed up, exported or restored through — a link at `state/` itself
+  included, which a containment check resolving both sides would let through. The Space folder itself may be a link
+  (a Space kept elsewhere).
+
+**Per store** — "Signature covers the path?" was checked in the code: a store whose MAC covered its folder could not
+move. None does.
+
+| Directory | Store (class) | Reads through the resolver | Signature covers the path? | Step 1 |
+|---|---|---|---|---|
+| `pending-changes/` | `PendingChanges` | `read`, `list` | **No** — HMAC-SHA256 over the record's canonical JSON; the key is found from the config root (`config.secrets/`), not from the record's folder | switched |
+| `action-requests/` | `ActionRequests` | `read`, `list` | **No** — `PendingChanges.domainMac` over the content; the id inside must equal the file name (a name, not a folder) | switched |
+| `regulatory-reports/` | `RegulatoryReports` | `read`, `list` | **No** — as Action Requests | switched |
+| `screening-hits/` | `ScreeningHits` | `read`, `list`, the index's directory pass (both folders); the `dedupe-index.json` cache is read from `config/` once this release has written one, from `state/` until then | **No** — as Action Requests; the index is signed over its content | switched |
+| `recon-state/` | `ReconStateStore` | `load` | **No** — unsigned | switched |
+| `expectation-baselines/` | `BaselineProfileStore` | `read` | **No** — unsigned | switched |
+| `agent/` | `DurableJsonlRing` (approvals, triage runs, feedback, runbook runs), `AutonomyPolicyStore` | load at construction | **No** — unsigned | switched; only applies when `-Dassist.write.root` is a Space's `config/` (`AgentWriteRoot`) |
+| `publication-approvals/` | `PublicationApproval` | — | **No** — unsigned; bound to its approved Pending Change by a nonce | **not switched**: `PublicationApproval.forget` and `PublicationApproval.sweep` delete a record so a re-created Job needs a new approval; a fallback read those deletes cannot reach would honour a forgotten approval. It stays `config/` only — fail closed: a record only in `state/` means re-approve. The writer step must make the deletes reach both places first. |
+| `audit/` (no data root) | `SpaceAuditDir`: `SnapshotStore`, `FsInvestigationLayout`, LA uploads, `EntityFactLog` | — | **No** — `EntityFactLog` chains each fact file's bytes (`prevHash`) with the sequence in the file name; snapshots are sealed by create-new; audit anchors pin the event audit chain, not files | **not switched**: these stores write where they read (an Investigation's directory, the attachments log, the upload ledger), so a read fallback would either write into `state/` or split one record across two places. It needs a third location inside `SpaceAuditDir`, chosen per record, before any writer. |
+
+**Backup, export and git** learned `state/` in the same step:
+
+- `BackupTask`: a backup whose `dir` is a Space's `config/` (the demo's `config_backup` Job) also archives the
+  Space's `state/`, as `../state/<path>` entries; the secret rule applies there too (`action-requests`,
+  `regulatory-reports` and `*.secrets` are never archived). A restore into a Space's `config/` puts those entries
+  back under that Space's `state/` (`BackupTask.restoreTarget`); into any other folder they are refused as escaping.
+  A backup of the whole Space folder already carried `state/`.
+- `BundleExporter.exportSpace` (`GET /export`, and so promotion): `state/` files ride under the config-relative names
+  they had in `config/` (`state/recon-state/x.json` → `recon-state/x.json`), a file in both places is taken from
+  `state/`, only the switched directories travel (`SpaceStateDirs.DIRS`, so a later store in `state/` is never exported by
+  accident), and the four signed stores stay out wherever they live. The bundle layout and the importer are unchanged.
+- The root `.gitignore` ignores `/spaces/*/state` whole (no trailing slash, so a link named `state` is ignored too): all of it is
+  server-written.
+
+**Hard-coded paths** (searched 2026-11-13, repo and `tools/`): no script or tool names `config/pending-changes` or
+any other zone directory; only `.gitignore` (`/spaces/*/config/audit/`, `/spaces/*/config/pending-changes/`, kept
+while those locations exist) and a comment in `FsInvestigationLayout`. `tools/doc-diagrams/screening.py` labels
+`screening-hits/<id>.json` without a parent folder, which stays true.
+
+**For the writer step** (found while building step 1):
+
+- The Pending Change store lock is `config/pending-changes/.lock`. A writer release must take the same lock (or
+  both), or two Pods of different releases on one Space do not exclude each other.
+- The `la-audit` Space Template keeps authored Pipelines and Schemas in `config/audit/`; a migrator must move only
+  the sealed sub-folders (`snapshots/`, `la-uploads/`, `entity-facts/`), never the whole folder.
+- `incident-briefs/` (written by the Action Requests module) is server-written state in `config/` that neither
+  `ReservedConfigPaths.DIRS` nor plan §4.4 names.
+
 ## 5. `config.secrets/`
 
 A sibling of `config/`, outside the config tree on purpose: no import, export, Exchange or `BackupTask` reaches
@@ -260,7 +332,7 @@ Postgres instead, and some files exist only when their flag is set. Each file ha
 ## 9. What git keeps
 
 From the root `.gitignore`: `space.toon`, `config/` and `data/samples/` are tracked; ignored are `data/**`
-(except `samples/`), `audit/`, `duckdb/`, `config.secrets/`, `config/audit/`, `config/pending-changes/`,
+(except `samples/`), `audit/`, `duckdb/`, `config.secrets/`, `state/` (§4.7), `config/audit/`, `config/pending-changes/`,
 `config/egress.toon`, `config/approvers.toon`, the legacy `<id>/flows/` folder, `_shared/`, and the whole
 generated `spaces/uat/`. Never commit real or client data into `data/samples/` — synthetic fixtures only.
 <!-- vocab-allow: quotes the ignored legacy directory name -->
