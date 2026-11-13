@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-398 test class(es): 398 unit, 0 real-HTTP control-plane, 0 IT.
+399 test class(es): 399 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -198,6 +198,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `JobRunDiffTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobRunDiffTest.java` | DUCKLE-C2: facts only, every explanation traces to a listed difference, absent ≠ zero, "not compared" is stated. |
 | `JobRunLedgerAuditSignalTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobRunLedgerAuditSignalTest.java` | {@code JOBRUN-STORE-SWALLOWED-WRITES-1}: a failed append to {@code jobs_runs.csv} loses the durable record |
 | `JobRunLedgerStreamedReadTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobRunLedgerStreamedReadTest.java` | {@code AUDIT-LOG-UNBOUNDED-READ-1}: the three read-backs of {@code jobs_runs.csv} stream the file instead of |
+| `JobServiceActivationHoldTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobServiceActivationHoldTest.java` | SE-1b (D-SE12): a Job the installed activation check holds is not run by an automatic trigger — the fire is recorded |
 | `JobServiceOrphanAuditTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobServiceOrphanAuditTest.java` | The default-on orphan {@code output_store:} audit ({@link JobService#auditOrphanOutputStores()}) — |
 | `JobServiceReadOnlyTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobServiceReadOnlyTest.java` | PRODUCT-ASSEMBLY-1 PA-7b (D-PA24): a read-only install runs no Job - the fire is recorded SKIPPED with the reason - and runs |
 | `JobServiceRetryAlarmTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobServiceRetryAlarmTest.java` | D8: transient failures retry, permanent ones do not, and a final failure raises the alarm. |

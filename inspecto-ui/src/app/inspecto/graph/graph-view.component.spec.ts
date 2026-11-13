@@ -5,7 +5,9 @@ import { GammaConfigService } from '@gamma/services/config';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { G6GraphData } from './catalog-graph';
 import {
+    DENSE_DETAIL_CAP,
     DENSE_EDGE_LABEL_CAP,
+    detailHiddenByDensity,
     EXPAND_RELAYOUT_MAX_NEW,
     placeBesideNeighbours,
     GRAPH_DEFAULT_LAYOUT_SPACING,
@@ -584,6 +586,7 @@ describe('GraphViewComponent selection is a state change, not a repaint (PERF-P1
             for (const id of Object.keys(states)) applied.set(id, states[id]);
             return Promise.resolve();
         }),
+        getElementState: (id: string) => applied.get(id) ?? [],
         destroy: vi.fn(),
         getOptions: vi.fn(() => ({})),
         held: new Set<string>(),
@@ -636,6 +639,15 @@ describe('GraphViewComponent selection is a state change, not a repaint (PERF-P1
         expect(diff['c']).toEqual([SELECTED_STATE]);
         expect(graph.setData).not.toHaveBeenCalled();
         expect(graph.draw).not.toHaveBeenCalled();
+    });
+
+    it('LA-PERF-N4-1: a selection change keeps a node’s revealed label (`detailed`) on and off', () => {
+        const { comp, graph } = host();
+        applied.set('a', ['detailed']); // the hover/click reveal showed a's label
+        select(comp, ['a']);
+        expect(graph.setElementState.mock.calls[0][0]).toEqual({ a: ['detailed', SELECTED_STATE] });
+        select(comp, []);
+        expect(graph.setElementState.mock.calls[1][0]).toEqual({ a: ['detailed'] });
     });
 
     it('data and selection changing in ONE change still refresh the selection and its states', () => {
@@ -871,6 +883,45 @@ describe('dense-graph link labels (telco demo ring, 2026-09-27)', () => {
         comp.display = null;
         comp.data = { nodes: [], edges: edges.slice(0, 20) } as unknown as G6GraphData;
         expect(comp.edgesToReveal('hub', 'node')).toEqual([]); // sparse: nothing hidden to reveal
+    });
+
+    it('LA-PERF-N4-1: hides arrowheads and node labels only ABOVE the large-graph cap, unless asked for on every size', () => {
+        expect(DENSE_DETAIL_CAP).toBe(1000);
+        expect(detailHiddenByDensity(disp(), 1000)).toBe(false); // a 1,000-link graph keeps arrows and labels
+        expect(detailHiddenByDensity(disp(), 1001)).toBe(true);
+        expect(detailHiddenByDensity(null, 4000)).toBe(true); // a saved view with no display block
+        expect(detailHiddenByDensity(disp({ allDetail: true }), 4000)).toBe(false);
+    });
+
+    it('LA-PERF-N4-1: reveals the hovered node, its links and their ends; an edge, its arrowhead and both ends', () => {
+        const comp = create(null).componentInstance;
+        // 1,001 links: dense for both rules; e0..e2 touch the hub.
+        const edges = Array.from({ length: 1001 }, (_, i) => ({
+            id: `e${i}`,
+            source: i === 0 ? 'hub' : `n${i}`,
+            target: i < 3 ? 'hub' : 'x',
+        }));
+        comp.data = { nodes: [], edges } as unknown as G6GraphData;
+        comp.display = disp({ allEdgeLabels: true }); // link labels all showing: only the detail reveal is left
+        expect(comp.revealTargets('e7', 'edge').sort()).toEqual(['detailed|e7', 'detailed|n7', 'detailed|x']);
+        expect(comp.revealTargets('hub', 'node').sort()).toEqual(
+            ['detailed|e0', 'detailed|e1', 'detailed|e2', 'detailed|hub', 'detailed|n1', 'detailed|n2'].sort(),
+        );
+        // Node labels switched off stay off: only the arrowheads are revealed.
+        comp.display = disp({ allEdgeLabels: true, nodeLabels: false });
+        expect(comp.revealTargets('e7', 'edge')).toEqual(['detailed|e7']);
+        // Both rules hiding: the link label AND the detail are revealed.
+        comp.display = disp();
+        expect(comp.revealTargets('e7', 'edge').sort()).toEqual(
+            ['detailed|e7', 'detailed|n7', 'detailed|x', 'labelled|e7'].sort(),
+        );
+        // Below the cap only the link-label reveal is left; with all detail on, the same.
+        comp.data = { nodes: [], edges: edges.slice(0, 1000) } as unknown as G6GraphData;
+        expect(comp.revealTargets('e7', 'edge')).toEqual(['labelled|e7']);
+        comp.data = { nodes: [], edges } as unknown as G6GraphData;
+        comp.display = disp({ allDetail: true });
+        expect(comp.revealTargets('e7', 'edge')).toEqual(['labelled|e7']);
+        expect(comp.revealTargets(undefined, 'node')).toEqual([]);
     });
 
     it("names a ringed node's contact count in its hover text, and only when served", () => {

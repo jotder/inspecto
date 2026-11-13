@@ -447,7 +447,9 @@ Conditions are a tree of AND/OR groups; a single bare condition is refused — w
 * Each server read says where it was answered: *Answered from the link index v3* (with a stale note when rows were
   added after the build) or *Answered from the Dataset because …*, with the reason in words.
 * Very busy hubs are folded into a **super-node**. Above 20 links on the canvas, link labels show on hover or click
-  only; *All link labels* in Display options overrides it.
+  only; *All link labels* in Display options overrides it. Above 1,000 links, arrowheads and node labels also show on
+  hover or click only (the canvas says so at the bottom); *Arrows and node labels on large graphs* overrides it, at the
+  cost of slower drawing.
 
 ---
 
@@ -1510,6 +1512,15 @@ node labels are untouched; the legend still names every link type.
   off). It persists in the saved view as `display.allEdgeLabels: true` (omitted when off, so older views
   and views without it get the density rule); undo/redo snapshots it.
 - Not driven live in the browser this change — covered by vitest only.
+
+**Large-graph rule (LA-PERF-N4-1, 2026-11-13).** Above `DENSE_DETAIL_CAP = 1,000` links (`detailHiddenByDensity`),
+arrowheads and node labels are hidden too, because painting them is a large share of the canvas freeze (on
+767 nodes / 4,000 links, the arrowheads alone cost about half of the open and of the move after a layout). A second
+state, `detailed`, reveals them through the same hover and click events. `revealTargets` names the node, its links
+and their ends, or a link and its ends. A *Node labels* switch that is off stays off. The override is **Arrows and
+node labels on large graphs**, saved as `display.allDetail: true` (omitted when off). The render strip says "arrows and
+node labels on hover above 1,000 links" while the rule is active. Select all does not reveal labels. Measurements:
+`superpower/la-performance-plan.md` §0b "N4 fewer shapes" and "N4 large-graph rule".
 
 ## Grounded limits and consequences (code read 2026-09-20 / 2026-09-22)
 

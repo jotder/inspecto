@@ -3,7 +3,8 @@
 **State:** built 2026-11-12 (SE-1a of the Space evolution plan, §4.1 step 1: shadow, report-only). It refuses
 nothing and changes no load. Rename handling (SE-2a) is not part of it. Built on it 2026-11-13
 (`SPACE-LINK-CENSUS-1` LC-4, LC-6): the per-Space `links:` mode (§10), the events (§11), the accept route (§12) and
-the count on the Spaces screen (§13).
+the count on the Spaces screen (§13). Built on it 2026-11-13 (SE-1b, D-SE12): the activation holds (§10a, §12a),
+which act only in a Space that opted in.
 
 ## 1. What it is
 
@@ -164,7 +165,8 @@ Space with a Space folder also carries `linksMode` (§10) and `columnsMode` ([sp
 
 A `ready` report also carries `renamed` and `deleted` (§3a, `{total, items}`) and `renameRewrite`, and
 `columnChanges` — Schema column changes and the consumers they break (SE-3a,
-[spec-column-contract.md](spec-column-contract.md)); the lock then holds an additive `columns` field.
+[spec-column-contract.md](spec-column-contract.md)); the lock then holds an additive `columns` field. It also carries
+`activationHolds` and `held` (SE-1b, §10a).
 
 ## 8. Kill switch
 
@@ -174,8 +176,9 @@ on and proves the load identical.
 
 ## 9. Deliberately not covered
 
-- **Enforcement at load** (SE-1b): a broken link, a duplicate or an outside edit changes no load. The opt-in
-  refusals at save and delete are §10.
+- **Enforcement at load** (SE-1b): a broken link, a duplicate or an outside edit changes no load; every config
+  still loads. The opt-in refusals at save and delete are §10; the opt-in holds, which keep one loaded Pipeline or
+  Job from running automatically, are §10a and §12a. A duplicate holds nothing.
 - **Rewriting** a renamed kind other than a Pipeline, and any rewrite in a Space that did not opt in (§3a).
 - **Edits at runtime with no later server write** are reported at the next computation, not when they happen;
   there is no file watcher.
@@ -211,14 +214,60 @@ links: refuse-activation
   Advanced). The same file already refuses every run of the Space until it is fixed.
 - **Reported** as `linksMode` on `GET /spaces/{id}/integrity`: `{configured: report|refuse-activation|unreadable,
   effective: report|refuse-activation, note?}`; the note gives the Basic or unreadable reason.
-- **Not built: the load-time hold.** The plan's "a Pipeline or Job with a dangling link stays inactive" has no clean
-  seam: a Pipeline's `active` flag is read in six places of `PipelineScheduler` from the `ConfigRegistry` parse,
-  which is reused while the Pipeline's own files are unchanged and so cannot see a link target in another file
-  disappear, and Jobs load through a separate scheduler. `refuse-activation` therefore refuses saves and deletes
-  only; every config still loads and runs as before.
+- **The activation hold** (hold 1, §10a): under `refuse-activation` a Pipeline or Job whose own file holds a
+  dangling link does not run automatically.
 - Code: `SpaceLinksMode`, `LinkRefusals.deleteMode` / `saveMode`, `SafetyPolicyFiles.links`,
   `SafetyPolicy.linksForSpace`. Tests: `ControlApiSpaceLinksModeTest`,
   `SafetyPolicyFilesTest.linksIsASpaceSettingWithTwoValues`.
+
+## 10a. The activation holds (SE-1b, D-SE12)
+
+One activation check, `ActivationHolds`, answers for a Space and a Pipeline id or Job name: held or not, and why.
+The control plane installs it into the engine seam `ActivationGate`, which both schedulers consult. A held object
+acts as an **inactive** one (a Pipeline with `active: false`, a Job with `enabled: false`): it stays loaded and
+listed, no automatic path runs it, and a stream push to it is refused (409, as for a paused or inactive Pipeline,
+so a batch is never accepted into an inbox nothing drains). **A manual run of a held object still goes**, as for any
+inactive object ("Run now" on a Pipeline, `POST /jobs/{name}/trigger`, a replay or a dry run); whether hold 2 should
+also block manual runs is an open operator decision. Every other object runs (plan §2 rule 4: a Space always boots).
+
+| Hold | Applies when | Released by |
+|---|---|---|
+| **1, broken links** | the Space's `links:` mode is `refuse-activation` (effective, §10) and the object's own file holds a DANGLING census link | a fix the next lock computation sees (§6; a server write, or the refresh below) |
+| **2, changed outside** (D-LC4) | the Space's `approval.toon` governs the object's kind (`pipeline` or `job`) and its file is marked changed outside the server (§4) | `POST /spaces/{id}/integrity/accept` (§12a) |
+
+- **Inputs:** the Space lock's latest report only (`SpaceLock.latest`, in memory; the report carries uncapped facts
+  per Pipeline and Job, `ActivationFacts`, never written to the lock), the `links:` mode (`SpaceLinksMode`, its
+  edition rule included) and the approval policy (`PendingChanges.governs`). Before the first report is ready
+  nothing is held, never on `computing` (D-SE1); the single-tenant default Space has no lock and holds nothing.
+- **Editions (D-LC5):** both holds need Standard or Advanced; on Basic nothing is held and the report says so.
+- **The seam.** The Pipeline scheduler asks one predicate, `PipelineScheduler.runnable` (not paused, `active`, not
+  held), on every automatic path: the poll cycle, the acquisition cycle, both event triggers and the stream lanes.
+  The hold is asked last, so a paused or inactive Pipeline costs nothing extra. The Job scheduler asks in
+  `JobService.submitRun` for the automatic triggers (`schedule`, `catch-up`, `event:`, `signal:`); a held fire is
+  recorded `SKIPPED` with `held: <reason>`, so the Job's run history says why.
+- **Cost.** An object the lock has no fact about costs in-memory lookups only. Otherwise the Space's opt-ins are read
+  once and cached per Space, keyed on the edition and the modification time and size of `safety-policy.toon` and
+  `approval.toon`: a check is two file stats, and a policy file is read again only after it changed.
+- **Refresh.** There is no file watcher (§9), so in a Space that opted into either hold the check asks for a
+  computation when the report is older than 30 s (considered at most every 30 s per Space). A hand fix or a hand
+  edit is therefore seen within about 30 s plus the debounce. Until then a hand edit of a governed Pipeline runs
+  as edited: the hold starts at the computation that marks it.
+- **Visible:** the `[ACTIVATION]` log line when an object becomes held (WARN, with the reason) or released (INFO);
+  on `GET /spaces/{id}/integrity` (a `ready` report) `activationHolds: {status: on|disabled, links, changedOutside:
+  [kinds], note?}` and `held: [{kind, name, hold: links|changed-outside, reason, links | path + change}]` — every
+  object the check holds, active or not; on `GET /pipelines` a `held` reason on an active held row (absent
+  otherwise, so an ordinary row is unchanged); on `GET /jobs` the same on an enabled held row (added by `JobRoutes`; the `JobView` record, public API, is
+  unchanged).
+- **Today's reach.** The link census judges no link a Pipeline's own file holds (`collector.*`, `**.use` and
+  `processing.schema_file` are `UNCHECKED`), so hold 1 holds Jobs today (`on_pipeline` naming no Pipeline) and
+  reaches Pipelines once the census judges one of their links — which needs a new finding baseline (§14).
+- **Kill switch** `-Dspace.activation.holds=off` (default on: it acts only in a Space that opted in): nothing is
+  held anywhere and the report says `activationHolds: {status: disabled}`. A Space with neither opt-in behaves
+  exactly as before; the finding baseline (§14) is zero, so no shipped Space holds anything.
+- Code: `ActivationHolds`, `ActivationFacts`, `ActivationGate` (engine), `PipelineScheduler.runnable`,
+  `JobService.submitRun`. Tests: `ActivationHoldsTest`, `ActivationFactsTest`, `JobServiceActivationHoldTest`,
+  `ControlApiActivationHoldsTest` (hold 1 on a Job with the fix releasing it, hold 2 on a Pipeline with accept
+  releasing it, Basic, kill switch; each negative falsified by the same files held where the opt-in applies).
 
 ## 11. Events (LC-4, LC-6)
 
@@ -255,6 +304,19 @@ computation reads the accepted lock as its baseline; an accepted file reappears 
   `count`, `paths`. An accept that accepts nothing is not audited.
 - Code: `SpaceLockAccept`, `SpaceIntegrityRoutes`. Tests: `ControlApiSpaceIntegrityAcceptTest` (401, 403, 503, 400,
   404, 200), `SpaceLockEventsTest.anAcceptedHandEditLeavesTheReportAndTheLockStillVerifies`.
+
+## 12a. Hold 2 — a governed file changed outside stays inactive until accepted (SE-1b, D-LC4)
+
+D-LC4: a file changed outside the server is reported with what it broke, and the edit takes effect — except in a
+Space whose approval policy (`approval.toon`) governs that kind, where the edited Pipeline or Job stays inactive
+until accepted. The hold is §10a's second row: its file carries an `outside` mark in the latest report (modified,
+added or moved; a removed file has nothing left to run) and the policy governs `pipeline` or `job`. The accept
+replaces the in-memory report at once, so the object runs on the next scheduler tick with no restart. Accepting a
+path the hold does not concern is harmless. A Space with no approval policy, or one that governs other kinds, is
+unaffected. While held, an automatic run and a stream push are refused, but **a manual run still goes**, as for any
+inactive object (§10a); whether hold 2 should block manual runs too is left to the operator. Test:
+`ControlApiActivationHoldsTest.aGovernedPipelineEditedOnDiskIsHeldUntilAccepted` (a policy governing `job` only holds
+nothing on the same edit; a push answers 409 naming the hold, then 201 after the accept).
 
 ## 13. The count on the Spaces screen (LC-4)
 
@@ -315,5 +377,8 @@ clock stops until it is resolved.
   `inspecto/src/main/java/com/gamma/control/SpaceIntegrityRoutes.java`,
   `inspecto/src/main/java/com/gamma/service/SpaceLockEvents.java`,
   `inspecto/src/main/java/com/gamma/service/SpaceLockAccept.java`,
-  `inspecto/src/main/java/com/gamma/control/SpaceLinksMode.java`.
+  `inspecto/src/main/java/com/gamma/control/SpaceLinksMode.java`,
+  `inspecto/src/main/java/com/gamma/control/ActivationHolds.java`,
+  `inspecto/src/main/java/com/gamma/service/ActivationFacts.java`,
+  `platform/inspecto-engine/src/main/java/com/gamma/pipeline/ActivationGate.java`.
 - Link census plan: `docs/superpower/2026-11-11-space-link-census-plan.md` §2.2–§2.4, LC-4, LC-6.
