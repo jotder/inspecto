@@ -29,7 +29,7 @@ import java.util.Map;
  * <p>Report-only and always 200: {@code computing} until the first lock is ready, {@code disabled} under
  * {@code -Dspace.integrity=off}, {@code unavailable} for the single-tenant default Space (no Space folder).
  * Gated on {@code canAuthorWorkbench} because it lists every config path. Every edition (D-LC5). A Space report
- * carries {@code linksMode} (LC-4, {@link SpaceLinksMode}).
+ * carries {@code linksMode} (LC-4, {@link SpaceLinksMode}) and {@code columnsMode} (SE-3b, {@link ColumnRefusals}).
  *
  * <p>LC-6 — {@code POST /spaces/{id}/integrity/accept {paths?}} (§12): accept hand edits, so they leave
  * {@code changedOutside}. {@code canAdminister}: accepting clears the record of an out-of-band change to any config,
@@ -57,6 +57,7 @@ final class SpaceIntegrityRoutes implements RouteModule {
                 "reason", "this Space has no Space folder (single-tenant -Dassist.write.root), so it has no lock");
         Map<String, Object> body = new LinkedHashMap<>(SpaceLock.report(ctx.id().value(), config).body());
         body.put("linksMode", SpaceLinksMode.of(ctx.id().value()).body());
+        body.put("columnsMode", ColumnRefusals.of(ctx.id().value()).body());   // SE-3b
         return body;
     }
 

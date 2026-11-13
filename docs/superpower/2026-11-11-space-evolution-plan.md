@@ -1,6 +1,6 @@
 # Space evolution — a Space the server understands as a whole, reached without breaking one
 
-**State:** IN PROGRESS — D-SE1…D-SE13 answered (§6); SE-0, SE-6a, SE-1a, SE-3a, SE-5a, SE-5b, SE-6b and SE-2a built (table below); what is left is gated (§5), with D-SE10…D-SE13 started.
+**State:** IN PROGRESS — D-SE1…D-SE13 answered (§6); SE-0, SE-6a, SE-1a, SE-3a, SE-5a, SE-5b, SE-6b, SE-2a and SE-3b built (table below); what is left is gated (§5), with D-SE10…D-SE13 started.
 Board row `SPACE-EVOLUTION-1`.
 **Depends on:** [`2026-11-11-space-link-census-plan.md`](2026-11-11-space-link-census-plan.md) phase LC-1
 (the declared link census and its graph). This plan does not repeat that design; it builds on it.
@@ -19,7 +19,10 @@ Board row `SPACE-EVOLUTION-1`.
 | SE-5b template upgrade proposal | built 2026-11-13 | `5f43a9475`, `af71a6fad` | `GET` / `POST /spaces/{id}/origin/upgrade`: three-way per file (recorded hash, template now, Space now), applies only `update` / `add`, one Pending Change under a policy; a partial apply keeps the old version until the last group; spec `spec-space-origin.md` §5; known limit `SPACE-UPGRADE-STUCK-VERSION-1` |
 | SE-6b promotion into an existing Space | built 2026-11-13 | `45667eed3`, `fc7ff8993` | `POST /spaces/{id}/promotion/preview` and `/apply`: a `GET /export` bundle plus `${NAME}` parameters in the request, a previewed change set, one Pending Change under a policy (D-SE7), removals only with `removals: true`, kill switch `-Dspace.promotion=off`; spec `spec-space-promotion.md`; known limits `SPACE-PROMOTION-PARAM-TYPES-1` |
 | SE-2b rename auto-rewrite, opt-in | built 2026-11-13 with SE-2a | `288d5f55a` | per-Space `rename_rewrite: true` in `space.toon` (not `safety-policy.toon`: a lenient reader, so older releases ignore it); Pipelines only; held under an approval policy; kill switch `-Dspace.rename.rewrite=off`. The default flip waits (D-SE2) |
-| SE-1b / 3b, SE-4 | gated; the finding baseline, the SE-3b opt-in, the activation seam and SE-4 step 1 started 2026-11-13 | — | §5; D-SE10…D-SE13 |
+| Finding baseline (§3, D-SE10) | run 2026-11-13 | commit `(D-SE10)` | 3 Spaces + 30 templates: 0 findings in every check (integrity, column contract, LC-3 shadow, `metadata_validate`), so no defect or false positive to fix and zero unknowns; **the clean-shadow clock of D-SE2 / D-LC3 starts 2026-11-13**. Gate `SpaceFindingBaselineTest`; record `spec-space-lock.md` §14 |
+| SE-3b Schema save stop, opt-in | built 2026-11-13 | `b40da5b09`, `9865aa194` | per-Space `columns: refuse-breaking` in `safety-policy.toon` (D-SE11); 409 with the consumers, `?force=true` saves (D-SE4); Standard/Advanced only; kill switch `-Dcolumn.contract.refusal=off`; also brought the SE-3a warning to `PUT /components/schema/{id}`; spec `spec-column-contract.md` §9 |
+| SE-4 step 1 state-zone readers | built 2026-11-13 | `0e5060186`, `3877b79f9` | eight stores read `state/<dir>` first and fall back to `config/<dir>`; every write still goes to `config/`; publication-approvals and the sealed `audit/` stay `config/`-only; a link below the Space folder is never followed; a record with a `state/` copy is read-only; backup, export and `.gitignore` know `state/`; anatomy §4.7. Steps 2 and 3 wait one release (§2 rule 2) |
+| SE-1b, SE-4 steps 2-3 | gated; the activation seam started 2026-11-13 | — | §5; D-SE12 |
 
 Only targeted test classes ran on each lane; the full gate was not run.
 

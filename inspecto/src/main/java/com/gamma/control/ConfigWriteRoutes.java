@@ -229,10 +229,13 @@ final class ConfigWriteRoutes implements RouteModule {
             }
         }
 
-        // SE-3a column contract (D-SE4 step 1): a mapped column removed, renamed or narrowed warns with the
-        // consumers it breaks; the save goes ahead. Drafts too. Kill switch -Dcolumn.contract=off.
-        if ("schema".equals(type) && exists)
-            findings.addAll(ColumnContract.saveWarnings(writeRoot, target, ColumnContract.stored(target), draft));
+        // SE-3a column contract (D-SE4): a mapped column removed, renamed or narrowed warns with the consumers it
+        // breaks; in a Space with columns: refuse-breaking (SE-3b) it is stopped with 409 unless ?force=true. Drafts too.
+        // Kill switches -Dcolumn.contract=off, -Dcolumn.contract.refusal=off.
+        if ("schema".equals(type) && exists) {
+            Object columnRefusal = ColumnRefusals.save(ex, writeRoot, target, ColumnContract.stored(target), draft, findings);
+            if (columnRefusal != null) return columnRefusal;
+        }
 
         // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: an active config adding a dangling link.
         Object linkRefusal = LinkRefusals.save(ex, writeRoot, type, ConfigFileSupport.fileBase(type, fileName), draft,
@@ -458,8 +461,11 @@ final class ConfigWriteRoutes implements RouteModule {
             }
         }
 
-        // SE-3a column contract: as /config/write.
-        if ("schema".equals(type)) findings.addAll(ColumnContract.saveWarnings(writeRoot, target, existing, merged));
+        // SE-3a / SE-3b column contract: as /config/write.
+        if ("schema".equals(type)) {
+            Object columnRefusal = ColumnRefusals.save(ex, writeRoot, target, existing, merged, findings);
+            if (columnRefusal != null) return columnRefusal;
+        }
 
         // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: an active config adding a dangling link.
         Object linkRefusal = LinkRefusals.save(ex, writeRoot, type, ConfigFileSupport.fileBase(type, fileName), merged,
