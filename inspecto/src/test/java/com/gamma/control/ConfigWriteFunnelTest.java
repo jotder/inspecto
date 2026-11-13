@@ -246,8 +246,9 @@ class ConfigWriteFunnelTest {
             Map.entry("RequirementRoutes#write", "requirement: " + NOT_GOVERNED),
             Map.entry("PipelineListRoutes#deletePipeline", "a grandfathered PipelineStore graph (authored-pipeline) — "
                     + "not a governable kind; read-only apart from this delete"),
-            Map.entry("PipelineRenameRoutes#rewrite", "rename's dependent rewrite — refused up front "
-                    + "under a policy on the dependent's kind (refuseGovernedDependents)"),
+            Map.entry("PipelineLinkRewrite#rewrite", "the census rewrite both rename paths share (SE-2a moved it here): "
+                    + "the rename route refuses governed dependents up front, and the opt-in hand-rename rewrite "
+                    + "rewrites nothing and reports the governed holders when a policy holds any of their kinds"),
             Map.entry("WidgetTags#reproject", "the widget tags PROJECTION — every tag route refuses first "
                     + "(WidgetTags.refuseUnderPolicy) before the edge moves; component writes project inside the hold"),
             Map.entry("SpaceManager#createFromBundle", "seeds a brand-new Space (canAdminister) — no policy, role "

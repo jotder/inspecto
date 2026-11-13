@@ -237,13 +237,14 @@ jobs:
         run: node tools/check-doc-flags.mjs && node tools/check-doc-routes.mjs && node --test tools/check-doc-flags.test.mjs tools/check-doc-routes.test.mjs
 
       # Space-anatomy guard (2026-11-11). architecture-space-anatomy.md restates constants — the reserved
-      # config files and dirs, the registry directory map, SpaceRoot's DuckDB files, the config suffixes and
-      # the reference keys that link one config to another. The page fails when the code declares a name it
-      # does not list, when one of its census tables names one the code does not declare, when a link key is a
-      # literal in no main Java source, or when a Class.member it names is gone. Prose is not judged. First
+      # config files and dirs, the registry directory map, SpaceRoot's DuckDB files and the config suffixes.
+      # The page fails when the code declares a name it does not list, when one of its census tables names one
+      # the code does not declare, or when a Class.member it names is gone. Prose is not judged. First
       # run found 3 reserved names missing from the page (onboarding-counters.tsv, the two access dirs).
+      # LC-7 (2026-11-13): the page's §12.2 link table is generated from LinkCensus.LINKS; the render's --check
+      # replaces the guard's old check C (a hand-kept key with a Java literal somewhere).
       - name: Guard — the Space anatomy page lists what the code declares
-        run: node tools/check-space-anatomy.mjs
+        run: node tools/check-space-anatomy.mjs && node tools/render-space-links.mjs --check && node --test tools/render-space-links.test.mjs
 
       # NUL-byte guard (2026-09-10). Found while running scale-out spike S4: an agent reported one file
       # "drops out of a naive content grep"; measured, a recursive `rg -l --glob '*.java' 'SHARED'` over

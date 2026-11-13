@@ -31,6 +31,7 @@ import { G6GraphData, entityTypeIcon, nodeColor, nodeKindLabel, nodeShape } from
 import { toSvg } from './graph-export';
 import type { G6Node } from './graph-types';
 import { CAPPED_LAYOUT_FALLBACK, GRAPH_LAYOUTS, type GraphLayoutId } from './graph-layouts';
+import { LayoutSuperseded, registerSlicedLayouts } from './graph-sliced-layout';
 import { NodeRule, NodeRuleDetails, nodeRuleColor } from './node-rules';
 import { NodeKind } from 'app/inspecto/api';
 import { ICON_COLOR_SWATCHES, canvasTheme } from 'app/inspecto/theme/chart-tokens';
@@ -542,7 +543,7 @@ export function layoutConfig(
             return { type: 'grid' };
         case 'force': {
             // d3's own link distance (30) and charge (-30) are what `k` multiplies; collide keeps a gap round each node.
-            const base = { type: 'd3-force', collide: { radius: Math.round(node * 0.875) } };
+            const base = { type: 'sliced-d3-force', collide: { radius: Math.round(node * 0.875) } };
             return k === 1 ? base : { ...base, link: { distance: 30 * k }, manyBody: { strength: -30 * k } };
         }
         case 'force-cluster':
@@ -562,7 +563,7 @@ export function layoutConfig(
         case 'mds':
             return { type: 'mds' };
         case 'fruchterman':
-            return { type: 'fruchterman', gravity: 5 / k, speed: 5 };
+            return { type: 'sliced-fruchterman', gravity: 5 / k, speed: 5 };
         case 'mindmap':
             return {
                 type: 'mindmap',
@@ -1152,7 +1153,9 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 this.syncSelectionState();
                 return graph.fitView();
             })
-            .catch((e: unknown) => console.warn('[graph-view] the layout failed', e));
+            .catch((e: unknown) => {
+                if (!(e instanceof LayoutSuperseded)) console.warn('[graph-view] the layout failed', e);
+            });
         return true;
     }
 
@@ -1304,7 +1307,9 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 this.syncSelectionState();
                 if (this.interaction?.fitOnDataChange) void graph.fitView();
             })
-            .catch((e: unknown) => console.warn('[graph-view] drawing the new data failed', e));
+            .catch((e: unknown) => {
+                if (!(e instanceof LayoutSuperseded)) console.warn('[graph-view] drawing the new data failed', e);
+            });
     }
 
     /**
@@ -1328,6 +1333,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     /** Build a brand-new G6 instance. The last resort - see {@link ngOnChanges}. */
     private create(): void {
+        registerSlicedLayouts();
         this.hoverLabelled = [];
         this.pinnedLabelled = [];
         this.destroyGraph();
@@ -1554,14 +1560,22 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         graph.on(NodeEvent.POINTER_LEAVE, () => this.revealEdgeLabels(undefined, 'node', false));
         graph.on(EdgeEvent.POINTER_LEAVE, () => this.revealEdgeLabels(undefined, 'edge', false));
         const host = this.hostEl.nativeElement;
-        void graph.render().then(() => {
-            demotePositiveTabindex(host);
-            // Registered AFTER render(): G6 binds the behaviours there, so the brush's own release handler (which emits its
-            // final ids, brush-select has immediately:false) runs first and this flush then emits them without a frame's wait.
-            graph.on(CommonEvent.POINTER_UP, () => this.flushBrush());
-            this.selectedStateIds = new Set(); // a fresh instance carries no states
-            this.syncSelectionState();
-        });
+        // A sliced Force layout superseded by a newer layout (or a destroy) rejects this render: the elements are drawn
+        // already, so the set-up below still runs for the live graph.
+        void graph
+            .render()
+            .catch((e: unknown) => {
+                if (!(e instanceof LayoutSuperseded)) console.warn('[graph-view] the first draw failed', e);
+            })
+            .then(() => {
+                if (this.graph !== graph) return;
+                demotePositiveTabindex(host);
+                // Registered AFTER render(): G6 binds the behaviours there, so the brush's own release handler (which emits its
+                // final ids, brush-select has immediately:false) runs first and this flush then emits them without a frame's wait.
+                graph.on(CommonEvent.POINTER_UP, () => this.flushBrush());
+                this.selectedStateIds = new Set(); // a fresh instance carries no states
+                this.syncSelectionState();
+            });
         this.graph = graph;
         this.snapshotKeys();
     }

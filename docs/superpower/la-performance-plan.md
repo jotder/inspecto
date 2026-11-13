@@ -35,7 +35,7 @@ Every shipped lane went through independent adversarial verification (1–3 roun
 | P5 betweenness worker | ⬜ OPEN — operator decision PERF-D1; §0b shows betweenness is NOT the top cost (385 ms at 465 nodes), layouts and hulls are | — |
 | P6 layout on expand | ✅ SHIPPED 2026-11-12 on its vitest proof; the after-timing was NOT measured (§P6) | see §P6 |
 | P8 hulls | ✅ SHIPPED as N2 (§0b) | — |
-| P11 polish | ⬜ OPEN — not measured, so not built (§P11); board row `LA-PERF-P11-1` | — |
+| P11 polish | ❌ NO-GO 2026-11-13 — measured, the derived passes are ~0.1–0.3 % of scripting per action (§P11); nothing built | — |
 | P10a-5 delta fetch on expand | ⬜ OPEN — needs a server delta response | — |
 | P10 wire format | ✅ SHIPPED 2026-11-12 (PERF-D3 answered: build it) — compact edge rows; raw bytes −41 %, gzip bytes only −1 to −7 %, no measurable server or parse time change (§P10 "Measured") | see §P10 |
 
@@ -83,13 +83,13 @@ Every shipped lane went through independent adversarial verification (1–3 roun
 | Health | idle: 0 requests in 35 s (no polling); 🔴 **`TypeError: Cannot read properties of undefined (reading 'getData')` in `renderMinimap`, four times, after route changes** (a real defect); 5 × "Unable to preventDefault inside passive event listener" |
 
 ### The re-ranked open list (by what an analyst feels)
-Open items N4, N7–N11, P5, P10a-5 and P11 are tracked on the board as `LA-PERF-*` rows (`docs/BACKLOG.md` §3.12, 2026-11-12).
+Open items N4, N7–N11, P5 and P10a-5 are tracked on the board as `LA-PERF-*` rows (`docs/BACKLOG.md` §3.12, 2026-11-12; P11 closed as a measured no-go 2026-11-13).
 
 **Tier 1 — freezes the page**
 - **N1 Radial layout hangs the tab (> 3 min at 767 nodes / 4,000 links).** Cap or refuse Radial above a node count (a `layered_max_nodes` = 30 cap already exists as the pattern), and say so on screen; then decide on a worker (PERF-D5). Severity: high; a one-line cap removes the hang. ✅ **SHIPPED 2026-10-25** (3 builder / verifier rounds; targeted tests only): the Radial, Information density, Clustering and every other layout are capped at the one place they reach G6 (`layoutConfig`, caps through the `display` limits: Java `LaLimit`, `la-limits.ts`, docs, parity test), Concentric is the fallback, the cap notice no longer covers the legend. `d4fd1aa11`, `65593934a`, `92903f91b`.
 - **N2 Community hulls toggle costs ~3.1 s on and off.** Turning hulls OFF must not recompute Louvain; memoise the community assignment per graph signature (P8, now measured). ✅ **SHIPPED 2026-10-25** (3 rounds; targeted tests only): the hulls toggle no longer rebuilds the graph, Louvain is memoised per graph signature and cap, hull shapes come off before a data change and return after it. `0ceee890f`, `f0ecaeed5`, `aec36325a`.
 - **N3 Cold first-open freezes 2.7–4.1 s.** Cause not isolated: the lazy graph chunk (~1.2 MB of library, now loaded on first open since P7) plus the layout. Prefetch the chunk when the landing page is idle; measure parse vs layout separately before building anything. ⛔ **PREFETCH MEASURED NO-GO 2026-11-12** (table below): the chunk costs about 0.28 s; the freeze is G6 creating 4,767 elements (2.7 s) and the Force layout (4.1 s). What is left is the worker case, PERF-D5.
-- **N4 Other layouts 2.3–3.6 s (Fruchterman, Force, Layered) and box-select 579 ms.** Main-thread layouts: P6 plus the worker decision. ✅ **Layout switch SHIPPED 2026-11-12** (targeted spec only): a layout pick no longer destroys and rebuilds the graph; it runs the new layout on the live graph and re-runs the element styles only when `display` changed too. Circular 2.7 → 1.2 s, Force 5.2 → 2.3 s (table below); a node size change still rebuilds, because the entity icon size is fixed at construction (found by the verifier). `c0b60fdb1`, `b8aababb1`. The layout itself and the selection repaint stay on the main thread (PERF-D5, answered 2026-11-12: no worker). ✅ **Layout on expand (P6) SHIPPED 2026-11-12**: a small expand no longer re-lays out the graph; before 378–435 ms per few-node expand on ~405 nodes, after NOT measured (§P6).
+- **N4 Other layouts 2.3–3.6 s (Fruchterman, Force, Layered) and box-select 579 ms.** Main-thread layouts: P6 plus the worker decision. ✅ **Layout switch SHIPPED 2026-11-12** (targeted spec only): a layout pick no longer destroys and rebuilds the graph; it runs the new layout on the live graph and re-runs the element styles only when `display` changed too. Circular 2.7 → 1.2 s, Force 5.2 → 2.3 s (table below); a node size change still rebuilds, because the entity icon size is fixed at construction (found by the verifier). `c0b60fdb1`, `b8aababb1`. The layout itself and the selection repaint stay on the main thread (PERF-D5, answered 2026-11-12: no worker). ✅ **Layout on expand (P6) SHIPPED 2026-11-12**: a small expand no longer re-lays out the graph; before 378–435 ms per few-node expand on ~405 nodes, after NOT measured (§P6). ✅ **Force layouts sliced SHIPPED 2026-11-13** (`LA-PERF-N4-1`): Force and Force (spread) yield every ~40 ms instead of blocking; longest task at open 5.4–7.6 → 2.4–3.3 s, Force switch 2.5–4.5 → 0.7–1.7 s, Force (spread) 2.9–5.8 → 0.8–1.7 s (alternated runs, table under "N4 sliced Force layouts"). Selection batching measured worse in total and dropped.
 
 #### N3 / N4 measured, 2026-11-12
 Production `la-app` build of `origin/master` 948fcf54b, demo-auth Preview bundle on :8081 with a copy of `la-showcase`, saved view `telecom_fraud_network` (767 nodes / 4,000 links, default layout Force), the built-in browser. In-page `PerformanceObserver` long tasks and long-animation-frame script attribution, plus TEMPORARY `performance.mark`s on G6's `beforerender / beforeelementcreate / beforelayout / afterlayout / beforedraw / afterrender` events (not shipped). No Chrome performance-panel trace: the agent's browser tools give no DevTools protocol. Before and after are separate builds of the same tree measured in the same session.
@@ -108,6 +108,21 @@ Production `la-app` build of `origin/master` 948fcf54b, demo-auth Preview bundle
 - **After a switch, about 1 s stays at any layout** (Circular, Grid): moving 4,767 elements to their new positions. A first fix that also re-set the data cost 1.7 s for the same switch, so the style mappers are re-run only when `display` changed.
 - **Not avoidable by caps, memoisation or prefetch:** element creation at first open (2.7 s, edges dominate), the Force layout (2.3–4.1 s, about 300 d3 ticks with collide), and the 1.27 s state repaint of a large selection. The lasso emits once on release (`brush-select immediately:false`), so the old "579 ms in 8 tasks" is the state repaint, not work in the brush callback. Layered (`dagre`) is capped at 30 nodes and could not be measured on this graph. No double layout was found: one `beforelayout` per open and per switch.
 - Checked live after the change: the hulls follow the new layout (they come off before it and return after it), the view re-fits, Select all paints 767 and the hover tooltip shows. A screenshot pass only; no halo pixel comparison.
+
+#### N4 sliced Force layouts, measured 2026-11-13 (`LA-PERF-N4-1`)
+**Built:** Force (`d3-force`) and Force (spread) (`fruchterman`) run through `graph-sliced-layout.ts`, a G6 layout that drives the SAME @antv/layout class with the same options and G6's own 300 ticks, but yields to the event loop after every ~40 ms of ticks instead of running all of them in one task. The positions are G6's. Every other layout is unchanged. No Web Worker (PERF-D5 stands): G6 5.1.1's own `enableWorker` needs a served `worker.js` and cannot carry the `nodeSize` function, and the iterative path it uses never calls the worker anyway.
+
+**How measured:** two production `la-app` builds of the same tree (before = `origin/master` 875a84f1f3, after = this change) served side by side by two demo-auth servers (:8086 before, :8085 after) on two copies of `la-showcase`. The installed Preview jars predate the v2 edge wire (`4a6a7cf7ef`), so `inspecto-la-api` and `inspecto-http-spi` were rebuilt from the same tree and swapped in. Saved view `telecom_fraud_network` (767 nodes / 4,000 links), the built-in browser, page visible, `PerformanceObserver` long tasks; each layout switch starts from Circular. The box was busy (CPU ~73 % from other work), so the builds were ALTERNATED and every run is listed. Figure = the LONGEST task (the freeze an analyst feels).
+
+| Action | Before (runs) | After (runs) |
+|---|---|---|
+| Cold open of the view | 5,414 · 6,022 · 7,566 ms | 2,397 · 2,901 · 3,186 · 3,275 ms |
+| Switch to Force | 2,451 · 4,453 · 4,282 ms | 745 · 1,271 · 1,287 · 1,652 ms |
+| Switch to Force (spread) | 2,894 · 5,340 · 5,780 ms | 767 · 1,594 · 1,671 · 1,685 ms |
+
+- **What is left in the longest task is not the layout.** At open it is G6 element creation (2.7 s on 2026-11-12, edges dominate); after a switch it is moving the 4,767 elements to their new positions (~1 s, the same cost Circular and Grid pay). Neither can be sliced without changing G6's render, so both stay.
+- **Selection repaint batching was built, measured and dropped.** Repainting a 767-node Select all in batches of 120 cut its longest task 908 → 444 ms but DOUBLED the total main-thread time (1.7 → 3.4 s, Clear the same): each G6 `setElementState` call pays a fixed repaint cost. Not shipped; the 1.3 s state repaint stays (G6 canvas work, as PERF-D5 said).
+- Checked live after the change: the Force layout draws the same star-of-clusters shape and the hulls follow it (screenshot pass).
 
 **Tier 2 — load and startup**
 - **N5 Landing makes ~27 calls with every Space's `/bootstrap` fetched twice (~1 MB decoded).** Dedupe (a request-level cache for GETs, the same mechanism as P10a-2) and fetch only the current Space's bootstrap; `/spaces`, `/spaces/_meta`, the components lists and `/entity-lists` each ×2 too. Cheap, client-only, high yield. ✅ **SHIPPED 2026-10-25** (verified PASS; targeted tests only): the landing page fetches each Space call once through short-lived reads (`short-reads.ts`), and every Entity List / Dataset / component / access write clears them. `10b5776b7`, `0a6420e2b`, `ddfa3d81a`.
@@ -398,10 +413,28 @@ be visibly marked as "as of" a time, never silently shown as current.
 |---|---|---|
 | PERF-P11-1 | Fuse the 8–12 derived passes in the browser pipeline; memoise `autoStyleOf`; add value comparators on `canvasData` and its intermediate computeds (as `canvasPlugins` already does) | P0-1 scripting per action drops; no identity churn in the change log |
 
-⬜ **NOT BUILT, 2026-11-12:** the brief makes P11 conditional on a measurement showing scripting per action drops, and
-no measurement surface was available (browser pane hidden, see §P6). Nothing was changed; it stays open as board row
-`LA-PERF-P11-1`. Context: the P6 before numbers put a whole small expand at about 0.4 s of long tasks on 405 nodes, so
-the page-side derived passes are a fraction of an action, not the freeze.
+❌ **MEASURED, NO-GO, 2026-11-13 (nothing built; board row `LA-PERF-P11-1` closed).** Preview demo install
+(`inspecto-previewinspecto-la`, its own production UI) on :8080, `la-showcase` saved view `telecom_fraud_network`
+(767 nodes / 4,000 links), the built-in browser pane VISIBLE, in-page `PerformanceObserver` long tasks and
+long-animation-frame script time, plus a timing wrapper on `JSON.stringify` (the cost of every `stableKey` comparator).
+
+| Action | Script per action | Long tasks | `stableKey` (all calls) |
+|---|---|---|---|
+| Select (node click, first) | 4,518 ms (pointerup 3,426 ms) | 4,433 ms | — |
+| Link click (details dialog) | 253 ms | 83 ms | — |
+| Filter: hide one link kind (legend chip) | 2,349 ms | 2,335 ms | 0.4 ms, 4 calls, 27 KB |
+| Filter: show it again | 3,403 ms | 3,295 ms | 0.4 ms, 4 calls, 27 KB |
+| Expand | not re-measured: §P6 has 378–435 ms of long tasks per small expand on ~405 nodes | | |
+
+The derived passes themselves could not be isolated in the production bundle (no profiler protocol). Bound: a replica
+of the pipeline's passes at the same size (Working Set marking, link-kind hiding, held marking, link weighing, the
+`autoStyle` counts, legend kinds, degree / hubs, node options, drawn / unexpanded / missing counts — 12 full passes
+with object spreads) costs **2.8 ms median, 5.4 ms p90** over 30 runs in the same page. With `stableKey` at 0.4 ms,
+the work P11 would fuse or memoise is about 0.1–0.3 % of an action; even removing all of it would not be visible. The
+time is in G6 (rAF and timer callbacks: element update, render). A plain select does not recompute `canvasData`
+at all unless "Only unexpanded" is on. `autoStyleOf` and `displayOptions` already carry `stableKey` comparators.
+Before = after: nothing changed. (The current-tree dev UI on :4210 could not draw against this older backend, so the
+measurement used the install's own UI build; the derived-pass code is the same shape.)
 
 ---
 

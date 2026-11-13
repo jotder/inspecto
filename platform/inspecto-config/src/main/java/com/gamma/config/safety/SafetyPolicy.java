@@ -194,6 +194,15 @@ public record SafetyPolicy(
                 serverDir == null || serverDir.isBlank() ? null : Paths.get(serverDir.trim()), base, spaceId, roots);
     }
 
+    /**
+     * The {@code links:} mode of {@code spaceId}'s policy file (`SPACE-LINK-CENSUS-1` LC-4): {@code report} for a Space
+     * with no Space folder (the single-tenant default) or no file. Throws {@link SafetyPolicyUnreadableException}
+     * when the Space file is unreadable.
+     */
+    public static SafetyPolicyFiles.Links linksForSpace(String spaceId) {
+        return SafetyPolicyFiles.links(DiscoveredRoots.baseOf(spaceId).orElse(null));
+    }
+
     private static SafetyPolicy toPolicy(SafetyPolicyTier t) {
         Set<String> formats = new java.util.LinkedHashSet<>(DEFAULT_FORMATS);
         if (t.allowFormats() != null) formats.retainAll(t.allowFormats());

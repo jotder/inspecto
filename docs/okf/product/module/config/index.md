@@ -36,8 +36,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | — | P2 | feature | SPACE-LINK-CENSUS-1 one declared census of the links between a Space's config files | — |
 | — | P3 | feature | SPACE-EVOLUTION-1 a Space the server understands as a whole, reached without breaking one | — |
-| `SPACE-LOCK-CLOSE-RESIDUALS-1` | P3 | defect | the SE-1a Space lock (shadow, report-only) can overrun a Space's close budget and recreate the folders of a deleted Space | — |
-| — | P3 | defect | PIPELINE-LINK-GAPS-1 links the Pipeline rename and impact scans still miss | — |
-| `CENSUS-EXPECTATION-TARGET-PATH-1` | P3 | defect | the link census reports a false broken link: it reads an Expectation target (with targetType: pipeline) as a Pipeline id, but Expectation… | — |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | NARROWED 2026-11-01 (twice): the ingest lane WRITES an allow-listed s3:// dirs.database and REGISTERS that output in DuckLake; what is le… | — |

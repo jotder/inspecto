@@ -112,7 +112,7 @@ public final class SpaceLock {
 
     private static final ObjectMapper CANONICAL =
             new ObjectMapper().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
-    private static final ObjectMapper PRETTY = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+    static final ObjectMapper PRETTY = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
     private SpaceLock() {}
 
@@ -150,7 +150,7 @@ public final class SpaceLock {
         }
     }
 
-    private static final class State {
+    static final class State {
         final String spaceId;
         final Path configRoot;
         final ReentrantLock computing = new ReentrantLock();
@@ -173,7 +173,7 @@ public final class SpaceLock {
     private static final Set<Path> FORGOTTEN = ConcurrentHashMap.newKeySet();
 
     /** The state of {@code configRoot}; {@code null} once the Space was closed and not started again. */
-    private static State state(String spaceId, Path configRoot) {
+    static State state(String spaceId, Path configRoot) {
         Path key = configRoot.toAbsolutePath().normalize();
         if (FORGOTTEN.contains(key)) return null;
         return STATES.computeIfAbsent(key, k -> new State(spaceId, k));
@@ -242,7 +242,7 @@ public final class SpaceLock {
     /** One computation over the windows recorded so far; only the windows already ENDED when it began are
      *  consumed — a write that ends while the scan runs is still covered by the next computation. Caller holds
      *  {@code s.computing}. */
-    private static void computeNow(State s) {
+    static void computeNow(State s) {
         List<Window> taken, ended = new ArrayList<>();
         synchronized (s) {
             s.firstAsk = 0;
@@ -543,6 +543,7 @@ public final class SpaceLock {
             AtomicFiles.write(lockFile, PRETTY.writeValueAsBytes(lock), ".lock-");
             writtenAt = nowIso;
         }
+        SpaceLockEvents.emit(spaceId, prev, files, removed, links, nowIso);   // LC-4/LC-6: new findings only
         Report r = ready(nowIso, writtenAt, prev != null, note[0], files, removed, links);
         r.body().put("columnChanges", columns == null ? Map.of("status", "disabled") : columns.report());
         List<Map<String, Object>> renamedReport = new ArrayList<>(), deletedReport = new ArrayList<>();
@@ -708,7 +709,7 @@ public final class SpaceLock {
         return false;
     }
 
-    private static Report ready(String checkedAt, String writtenAt, boolean baseline, String note,
+    static Report ready(String checkedAt, String writtenAt, boolean baseline, String note,
                                 List<Map<String, Object>> files, List<Map<String, Object>> removed,
                                 List<Map<String, Object>> links) {
         List<Map<String, Object>> broken = new ArrayList<>();
@@ -893,7 +894,7 @@ public final class SpaceLock {
     }
 
     @SuppressWarnings("unchecked")
-    private static List<Map<String, Object>> maps(Object o) {
+    static List<Map<String, Object>> maps(Object o) {
         List<Map<String, Object>> out = new ArrayList<>();
         if (o instanceof List<?> l) for (Object e : l) if (e instanceof Map<?, ?> m) out.add((Map<String, Object>) m);
         return out;
