@@ -34,7 +34,13 @@ rediscovered. The per-item open work is `BACKLOG.md`; this file is the rule.
   ⚠ Two generalisations worth carrying: **a fixture must pin the rule it tests, not the text around it** —
   anchor on the smallest distinctive fragment, and assert the mutation changed something; and **wiring a test
   into `ci.yml`'s `guards:` job is not free**, because `tools/precommit.mjs` runs every step of that job on
-  every commit in this shared checkout. Slow fixtures belong in another job.
+  every commit in this shared checkout. Slow fixtures belong in another job — `slow-fixtures:` exists for them,
+  and a step there carries its measured time in its name so the next person can weigh it.
+  ✅ First payment the same day, 54 → 46: the guard-fixture group is wired (`check-family-count`,
+  `check-sbom-modules`, `check-package-strict`, `offering-classpath`, `package-la-showcase`, `sbom-modules` in
+  `guards:`; `check-jar-signatures` at ~45 s in `slow-fixtures:`). ⚠ **All seven passed unmodified** — the
+  point is not that they were broken, it is that nothing would have told us if they were. The rest
+  (`gen-la-*`, `seed-la-*`, the UI tool lints) is `TOOL-TESTS-UNWIRED-BASELINE-1`.
 
 **Shape 2 — the test whose subject is its own module.** Coverage that is structurally incapable of
 indicting the real risk, because the test supplies what production must supply.

@@ -46,21 +46,20 @@ const WORKFLOWS = join(ROOT, '.github', 'workflows');
 const MIN_TESTS = 100;
 
 /**
- * Known debt, 2026-11-14: tool tests no workflow names. ⛔ This list may only SHRINK — see rule 3. Wiring one in
- * means deleting its line here in the SAME change. Do not add to it: a NEW test file is wired when it is written.
+ * Known debt: tool tests no workflow names. ⛔ This list may only SHRINK — see rule 3. Wiring one in means
+ * deleting its line here in the SAME change. Do not add to it: a NEW test file is wired when it is written.
  *
- * Roughly three groups, none of them approved, all of them unrun:
- *   • guards whose own negative fixtures are unrun (`check-family-count`, `check-jar-signatures`,
- *     `check-package-strict`, `check-sbom-modules`, `offering-classpath`) — the same hazard as the row that
- *     prompted this guard;
- *   • showcase data generators, seeds and smokes (`gen-la-*`, `seed-la-*`, `la-*-smoke`) — many are slow or need
- *     a running server, so they likely belong in a nightly, not `guards:`;
- *   • UI tool lints (`inspecto-ui/tools/*`) — their GUARDS run in CI, their fixtures do not.
+ * 54 entries on 2026-11-14 when this guard was written; 46 after the first payment the same day, which wired
+ * the guard-fixture group — the one that shares the hazard that prompted this guard, a guard whose proof of
+ * redness runs nowhere. What is left, none of it approved, all of it unrun:
+ *   • showcase data generators, seeds and smokes (`gen-la-*`, `seed-la-*`, `la-*-smoke`, `seed-telco-fraud-demo`)
+ *     — many are slow or need a running server, so they likely belong in a nightly, not `guards:`;
+ *   • UI tool lints (`inspecto-ui/tools/*`) — their GUARDS run in CI, their fixtures do not;
+ *   • three odds and ends: `regroup-modules`, `release-notes`, `vuln-db-refresh`.
+ * Tracked as `TOOL-TESTS-UNWIRED-BASELINE-1` in docs/BACKLOG.md.
  */
 const BASELINE = new Set([
-    'check-family-count.test.mjs', 'check-jar-signatures.test.mjs', 'check-package-strict.test.mjs',
-    'check-sbom-modules.test.mjs', 'offering-classpath.test.mjs', 'package-la-showcase.test.mjs',
-    'regroup-modules.test.mjs', 'release-notes.test.mjs', 'sbom-modules.test.mjs', 'vuln-db-refresh.test.mjs',
+    'regroup-modules.test.mjs', 'release-notes.test.mjs', 'vuln-db-refresh.test.mjs',
     'gen-la-audit-data.test.mjs', 'gen-la-benefits-data.test.mjs', 'gen-la-card-data.test.mjs',
     'gen-la-claims-data.test.mjs', 'gen-la-crypto-data.test.mjs', 'gen-la-health-data.test.mjs',
     'gen-la-insider-data.test.mjs', 'gen-la-logistics-data.test.mjs', 'gen-la-mfs-data.test.mjs',
