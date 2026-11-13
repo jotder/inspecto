@@ -1,6 +1,6 @@
 # Space evolution — a Space the server understands as a whole, reached without breaking one
 
-**State:** IN PROGRESS — D-SE1…D-SE9 answered (§6); SE-0, SE-6a, SE-1a, SE-3a and SE-5a built (table below).
+**State:** IN PROGRESS — D-SE1…D-SE9 answered (§6); SE-0, SE-6a, SE-1a, SE-3a, SE-5a, SE-5b and SE-6b built (table below); SE-2a is a peer lane; what is left is gated (§5).
 Board row `SPACE-EVOLUTION-1`.
 **Depends on:** [`2026-11-11-space-link-census-plan.md`](2026-11-11-space-link-census-plan.md) phase LC-1
 (the declared link census and its graph). This plan does not repeat that design; it builds on it.
@@ -16,8 +16,8 @@ Board row `SPACE-EVOLUTION-1`.
 | SE-3a column contract, report-only | built 2026-11-13 | `d94dec6be`, `1f62b8235` | spec `spec-column-contract.md` |
 | SE-2a hand-rename detection, report | in flight (peer lane) | — | |
 | SE-5a template version + origin | built 2026-11-13 | `54d10255d`, `0385d15c4` | the origin lives in `.inspecto/created-from.toon`, not the lock (spec `spec-space-origin.md` §1) |
-| SE-5b template upgrade proposal | next | — | |
-| SE-6b promotion into an existing Space | next | — | D-SE7 and its detail settled |
+| SE-5b template upgrade proposal | built 2026-11-13 | `5f43a9475`, `af71a6fad` | `GET` / `POST /spaces/{id}/origin/upgrade`: three-way per file (recorded hash, template now, Space now), applies only `update` / `add`, one Pending Change under a policy; a partial apply keeps the old version until the last group; spec `spec-space-origin.md` §5; known limit `SPACE-UPGRADE-STUCK-VERSION-1` |
+| SE-6b promotion into an existing Space | built 2026-11-13 | `45667eed3`, `fc7ff8993` | `POST /spaces/{id}/promotion/preview` and `/apply`: a `GET /export` bundle plus `${NAME}` parameters in the request, a previewed change set, one Pending Change under a policy (D-SE7), removals only with `removals: true`, kill switch `-Dspace.promotion=off`; spec `spec-space-promotion.md`; known limits `SPACE-PROMOTION-PARAM-TYPES-1` |
 | SE-1b / 2b / 3b, SE-4 | gated | — | §5 |
 
 Only targeted test classes ran on each lane; the full gate was not run.
