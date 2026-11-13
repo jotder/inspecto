@@ -106,6 +106,16 @@ public final class PendingChanges {
      */
     public static void hold(ApiContext api, HttpExchange ex, String kind, String name,
                             Map<String, Object> proposed, Map<String, Object> current) throws IOException {
+        hold(api, ex, kind, name, proposed, current, false);
+    }
+
+    /**
+     * {@link #hold} for a write of MANY configs as ONE Pending Change (SE-6b, a promotion into an existing Space):
+     * with {@code wholeSet}, a policy that holds ANY kind holds this write too, under
+     * {@link ApprovalPolicy#forWholeSet()} — a promotion spans kinds, so no single kind's rule can stand for it.
+     */
+    static void hold(ApiContext api, HttpExchange ex, String kind, String name, Map<String, Object> proposed,
+                     Map<String, Object> current, boolean wholeSet) throws IOException {
         if (ApiContext.attr(ex, ApiContext.ATTR_APPROVED_CHANGE) instanceof Map<?, ?> approved) {
             @SuppressWarnings("unchecked") Map<String, Object> pc = (Map<String, Object>) approved;
             verifyApproved(pc, kind, name, proposed, current);
@@ -115,6 +125,7 @@ public final class PendingChanges {
         Path root = api.writeRoot();
         ApprovalPolicy policy = ApprovalPolicy.forRoot(root);
         ApprovalPolicy.Rule rule = policy.ruleFor(kind);
+        if (rule == null && wholeSet) rule = policy.forWholeSet();
         Map<String, String> publication = null;
         if (rule == null && isPublicationWrite(kind, proposed)) {
             publication = publicationFingerprints(api, proposed);
@@ -595,6 +606,7 @@ public final class PendingChanges {
             "POST /notifications/channels", "PUT /notifications/channels/([^/]+)",
             "DELETE /notifications/channels/([^/]+)",
             "POST /notifications/rules", "PUT /notifications/rules/([^/]+)", "DELETE /notifications/rules/([^/]+)",
+            "POST /promotion/apply",
             "POST /origin/upgrade");
 
     /** Whether {@code method path} (route-table path, query allowed) is on {@link #REPLAYABLE}. */

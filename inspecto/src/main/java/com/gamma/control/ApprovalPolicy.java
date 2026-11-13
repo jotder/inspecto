@@ -104,6 +104,19 @@ record ApprovalPolicy(Map<String, Rule> rules, int expiresAfterHours, boolean fa
         return r != null && r.required() ? r : null;
     }
 
+    /**
+     * The rule for a write of many configs as ONE Pending Change (SE-6b promotion, D-SE7), or {@code null} when this
+     * policy holds nothing: four eyes always; the approver the policy names when every required rule names the same
+     * one, else {@code canAdminister} — so a promotion is never approved by less than any kind it carries asks for.
+     */
+    Rule forWholeSet() {
+        if (!holdsAnything()) return null;
+        Set<String> approvers = new TreeSet<>();
+        rules.values().stream().filter(Rule::required).forEach(r -> approvers.add(r.approverCapability()));
+        if (failedClosed) approvers.add(DEFAULT_APPROVER);
+        return new Rule(true, approvers.size() == 1 ? approvers.iterator().next() : Roles.CAN_ADMINISTER, true);
+    }
+
     /** Whether this policy holds ANY kind — an import that cannot classify a file refuses under it. */
     boolean holdsAnything() {
         return failedClosed || rules.values().stream().anyMatch(Rule::required);

@@ -69,7 +69,9 @@ class SpaceCorpusEquivalenceTest {
             Capability.killSwitch(ColumnContract.PROPERTY, null),
             // SE-2a opt-in hand-rename rewrite: kill switch -Dspace.rename.rewrite=off; acts only in a Space whose
             // space.toon opts in (none shipped), after a lock computation — never at load
-            Capability.killSwitch(SpaceLock.RENAME_REWRITE_PROPERTY, null));
+            Capability.killSwitch(SpaceLock.RENAME_REWRITE_PROPERTY, null),
+            // SE-6b promotion: two routes, kill switch -Dspace.promotion=off; nothing at load reads it
+            Capability.killSwitch(com.gamma.control.SpacePromotion.PROPERTY, null));
 
     /** A {@code shadow|refuse|off} mode property: on = refuse, off = the default (shadow), cleared so no test inherits it. */
     private static Capability mode(String property) {
