@@ -11,7 +11,7 @@ Board row `SPACE-EVOLUTION-1`.
 | Step | State | Commits | Notes |
 |---|---|---|---|
 | SE-0 corpus equivalence gate, old-reader check | built 2026-11-12 | `7243bcd07` | 3 Spaces + 30 templates; capability flags registered: `space.integrity`, `links.delete`, `links.save` |
-| SE-6a tests that travel with a Space | built 2026-11-12 | `cbbc0523a`, `199affd8d`; fixes `2aad8fc9b`, `ac09275b4` | pushed without the whole module's tests, which left three tests red on master until the fixes; spec `spec-space-tests.md`; five operator questions open |
+| SE-6a tests that travel with a Space | built 2026-11-12 | `cbbc0523a`, `199affd8d`; fixes `2aad8fc9b`, `ac09275b4` | pushed without the whole module's tests, which left three tests red on master until the fixes; spec `spec-space-tests.md`; its five operator questions answered as built (D-SE9, 2026-11-13) |
 | SE-1a Space lock, report-only | built 2026-11-13 | `ad946532e`, `1f61ef26f` | `GET /spaces/{id}/integrity`; kill switch `-Dspace.integrity=off`; residuals `SPACE-LOCK-CLOSE-RESIDUALS-1`; spec `spec-space-lock.md` |
 | SE-3a column contract, report-only | built 2026-11-13 | `d94dec6be`, `1f62b8235` | spec `spec-column-contract.md` |
 | SE-2a hand-rename detection, report | in flight (peer lane) | — | |
