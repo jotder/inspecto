@@ -629,7 +629,7 @@ public final class SpaceLock {
             }
         } else {
             for (LinkGraph.Edge e : graph.edges()) {
-                if (!kind.equals(e.toKind()) || e.value() == null || !e.value().trim().equalsIgnoreCase(id)) continue;
+                if (!kind.equals(e.toKind()) || e.value() == null || !e.link().named(e.value()).equalsIgnoreCase(id)) continue;
                 Map<String, Object> m = out.computeIfAbsent(List.of(e.fromKind(), String.valueOf(e.file()), e.fromName()),
                         k -> referrer(root, e.fromKind(), e.file(), e.fromName(), new ArrayList<>()));
                 @SuppressWarnings("unchecked") List<String> keys = (List<String>) m.get("keys");

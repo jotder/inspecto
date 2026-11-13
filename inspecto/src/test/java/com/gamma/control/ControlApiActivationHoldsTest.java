@@ -35,20 +35,20 @@ import static org.junit.jupiter.api.Assertions.*;
  * ({@code POST /trigger} counts the Pipelines a cycle selected), every other object runs, and {@code GET /integrity},
  * {@code GET /pipelines} and {@code GET /jobs} say why.
  *
- * <p>Hold 1 is shown on a Job: no Pipeline-held link is judged DANGLING by the link census today (every one is
- * UNCHECKED), so a Pipeline cannot carry one; hold 2 is shown on a Pipeline. Each negative (no opt-in, Basic, the kill
- * switch) is falsified by the same files being held where the opt-in applies.
+ * <p>Hold 1 is shown on a Job ({@code on_pipeline}) and on a Pipeline (a remote Collector's {@code connection}, judged
+ * since SE-1b); hold 2 on a Pipeline. Each negative (no opt-in, Basic, the kill switch) is falsified by the same files
+ * being held where the opt-in applies.
  */
 class ControlApiActivationHoldsTest {
 
     private final HttpClient client = HttpClient.newHttpClient();
 
-    /** {@code Bearer admin} authors, operates runs and administers. */
+    /** {@code Bearer admin} authors, operates runs, administers and onboards Connections. */
     private static final Authenticator FAKE = ex -> {
         String a = ex.getRequestHeaders().getFirst("Authorization");
         if (a == null || !a.startsWith("Bearer ")) return Optional.empty();
         return Optional.of(new Subject(a.substring(7),
-                Set.of("canAuthorWorkbench", "canAdminister", "canOperateRuns", "canApproveChanges")));
+                Set.of("canAuthorWorkbench", "canAdminister", "canOperateRuns", "canApproveChanges", "canOnboardConnections")));
     };
 
     @BeforeEach
@@ -237,6 +237,54 @@ class ControlApiActivationHoldsTest {
             awaitReport(c, "alpha", n -> held(n).isEmpty());
             awaitRun(c, "alpha", "j_held", r -> scheduled(r, "SUCCESS"));
             assertFalse(row(c, "alpha", "jobs", "j_held").has("held"));
+        }
+    }
+
+    /**
+     * SE-1b: hold 1 reaches a Pipeline. A Pipeline whose remote Collector names a Connection the Space does not have
+     * (DANGLING {@code collector.connection}) is held: a cycle runs only the other one, the report and the row say
+     * why, a push is refused; the same files in a Space without the opt-in run both; creating the Connection (a
+     * server write) releases it with no restart.
+     */
+    @Test
+    void aPipelineWhoseCollectorNamesAMissingConnectionIsHeldUntilTheConnectionExists(@TempDir Path root) throws Exception {
+        String remote = "collector:\n  connector: sftp\n  connection: missing_conn\n";
+        for (String space : List.of("alpha", "beta")) {
+            Path config = Files.createDirectories(root.resolve(space + "/config"));
+            Path data = Files.createDirectories(root.resolve(space + "/data"));
+            Files.writeString(config.resolve("mini.toon"), PipelineConfigBatchTest.miniSchema());
+            pipeline(config, data, "p_ok", "");
+            pipeline(config, data, "p_remote", remote);
+        }
+        Files.writeString(root.resolve("alpha/config/safety-policy.toon"), "links: refuse-activation\n");
+        try (Ctx c = open(root, true, false)) {
+            JsonNode a = awaitReport(c, "alpha", n -> true);
+            assertEquals(List.of("pipeline:p_remote:links"), held(a), a.toString());
+            JsonNode hold = a.get("held").get(0);
+            assertEquals("collector.connection", hold.get("links").get(0).get("key").asText(), hold.toString());
+            assertTrue(hold.get("reason").asText().contains("collector.connection -> missing_conn"), hold.toString());
+            assertEquals(1, cycle(c, "alpha"), "the held Pipeline does not run, the other does");
+            assertTrue(row(c, "alpha", "pipelines", "p_remote").get("held").asText().contains("missing_conn"));
+            assertFalse(row(c, "alpha", "pipelines", "p_ok").has("held"));
+            HttpResponse<String> refused = push(c, "alpha", "p_remote");
+            assertEquals(409, refused.statusCode(), refused.body());
+            assertTrue(refused.body().contains("pipeline held: 'p_remote'"), refused.body());
+
+            // falsifies the hold: the same files without the opt-in hold nothing and run both
+            JsonNode b = awaitReport(c, "beta", n -> true);
+            assertEquals(List.of(), held(b), b.toString());
+            assertEquals(1, b.get("broken").get("total").asInt(), "still reported as a broken link: " + b);
+            assertEquals(2, cycle(c, "beta"));
+            assertFalse(row(c, "beta", "pipelines", "p_remote").has("held"));
+
+            // the fix is a server write: the Connection now exists, the lock is recomputed, the Pipeline runs
+            HttpResponse<String> fix = send(c, "POST", "/spaces/alpha/connections",
+                    "{\"id\":\"missing_conn\",\"connector\":\"sftp\",\"host\":\"localhost\",\"port\":22,\"basePath\":\"/in\"}");
+            assertEquals(200, fix.statusCode(), fix.body());
+            JsonNode released = awaitReport(c, "alpha", n -> held(n).isEmpty());
+            assertEquals(0, released.get("broken").get("total").asInt(), released.toString());
+            assertEquals(2, cycle(c, "alpha"), "released with no restart");
+            assertFalse(row(c, "alpha", "pipelines", "p_remote").has("held"));
         }
     }
 

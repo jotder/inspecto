@@ -1,10 +1,15 @@
 # Space evolution — a Space the server understands as a whole, reached without breaking one
 
-**State:** IN PROGRESS — D-SE1…D-SE13 answered (§6); SE-0, SE-6a, SE-1a, SE-3a, SE-5a, SE-5b, SE-6b, SE-2a and SE-3b built (table below); what is left is gated (§5), with D-SE10…D-SE13 started.
-Board row `SPACE-EVOLUTION-1`.
-**Depends on:** [`2026-11-11-space-link-census-plan.md`](2026-11-11-space-link-census-plan.md) phase LC-1
-(the declared link census and its graph). This plan does not repeat that design; it builds on it.
-**As-built today:** [Space anatomy](../okf/product/module/config/architecture-space-anatomy.md).
+> **Plan page** for Product Map Item `module.config`. **State:** every startable step built and pushed 2026-11-12/13
+> (table below); what is left is **gated on releases by the operator's own decisions** and open on the board as
+> `SPACE-EVOLUTION-1` (hold: operator): making enforcement the default for new Spaces after two releases of clean
+> shadow counted from the 2026-11-13 baseline (D-SE2, D-LC3), and SE-4 steps 2-3 one release after the step-1 readers
+> (§2 rule 2, D-SE8). The working plan is archived at
+> `archived-documents/plans-archive/2026-11-11-space-evolution-plan.md` (provenance only; this page is current).
+> **Builds on** the link census, `SPACE-LINK-CENSUS-1` ([plan](../../../../superpower/2026-11-11-space-link-census-plan.md)).
+> **As-built detail:** [Space anatomy](architecture-space-anatomy.md), [Space lock](spec-space-lock.md),
+> [column contract](spec-column-contract.md), [Space origin](spec-space-origin.md),
+> [promotion](spec-space-promotion.md), [tests in a Space](spec-space-tests.md).
 
 ## Progress
 
@@ -22,7 +27,7 @@ Board row `SPACE-EVOLUTION-1`.
 | Finding baseline (§3, D-SE10) | run 2026-11-13 | commit `(D-SE10)` | 3 Spaces + 30 templates: 0 findings in every check (integrity, column contract, LC-3 shadow, `metadata_validate`), so no defect or false positive to fix and zero unknowns; **the clean-shadow clock of D-SE2 / D-LC3 starts 2026-11-13**. Gate `SpaceFindingBaselineTest`; record `spec-space-lock.md` §14 |
 | SE-3b Schema save stop, opt-in | built 2026-11-13 | `b40da5b09`, `9865aa194` | per-Space `columns: refuse-breaking` in `safety-policy.toon` (D-SE11); 409 with the consumers, `?force=true` saves (D-SE4); Standard/Advanced only; kill switch `-Dcolumn.contract.refusal=off`; also brought the SE-3a warning to `PUT /components/schema/{id}`; spec `spec-column-contract.md` §9 |
 | SE-4 step 1 state-zone readers | built 2026-11-13 | `0e5060186`, `3877b79f9` | eight stores read `state/<dir>` first and fall back to `config/<dir>`; every write still goes to `config/`; publication-approvals and the sealed `audit/` stay `config/`-only; a link below the Space folder is never followed; a record with a `state/` copy is read-only; backup, export and `.gitignore` know `state/`; anatomy §4.7. Steps 2 and 3 wait one release (§2 rule 2) |
-| SE-1b activation holds, opt-in | built 2026-11-13 | `2e0a887dd`, `56eb8a760` | one check both schedulers ask (`ActivationGate`, `ActivationHolds`): hold 1 under `links: refuse-activation` (a dangling link in the object's own file; reaches Jobs now, Pipelines once the census judges one of their links), hold 2 where `approval.toon` governs the kind (an unaccepted outside edit, released by `POST /integrity/accept`); Standard/Advanced; a held object acts as an inactive one (a manual run still goes, operator to decide); a held Pipeline refuses a stream push 409; kill switch `-Dspace.activation.holds=off`; spec-space-lock §10, §10a, §12a |
+| SE-1b activation holds, opt-in | built 2026-11-13 | `2e0a887dd`, `56eb8a760` | one check both schedulers ask (`ActivationGate`, `ActivationHolds`): hold 1 under `links: refuse-activation` (a dangling link in the object's own file; reaches Jobs and, since `baccce715`, Pipelines (the census judges a Pipeline's `collector.connection`, `collector.dataset` and `processing.schema_file` as the loader resolves them)), hold 2 where `approval.toon` governs the kind (an unaccepted outside edit, released by `POST /integrity/accept`); Standard/Advanced; a held object acts as an inactive one (a manual run still goes, operator to decide); a held Pipeline refuses a stream push 409; kill switch `-Dspace.activation.holds=off`; spec-space-lock §10, §10a, §12a |
 | Default enforcement for new Spaces (SE-1b / 2b / 3b, LC-3), SE-4 steps 2-3 | gated | — | two clean releases from the 2026-11-13 baseline (D-SE2, D-LC3); SE-4 writers one release after the step-1 readers |
 
 Only targeted test classes ran on each lane; the full gate was not run.

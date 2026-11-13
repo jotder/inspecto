@@ -258,16 +258,35 @@ also block manual runs is an open operator decision. Every other object runs (pl
   object the check holds, active or not; on `GET /pipelines` a `held` reason on an active held row (absent
   otherwise, so an ordinary row is unchanged); on `GET /jobs` the same on an enabled held row (added by `JobRoutes`; the `JobView` record, public API, is
   unchanged).
-- **Today's reach.** The link census judges no link a Pipeline's own file holds (`collector.*`, `**.use` and
-  `processing.schema_file` are `UNCHECKED`), so hold 1 holds Jobs today (`on_pipeline` naming no Pipeline) and
-  reaches Pipelines once the census judges one of their links — which needs a new finding baseline (§14).
+- **Reach (SE-1b, 2026-11-13).** Hold 1 holds a Job (`on_pipeline` naming no Pipeline) and a Pipeline whose own
+  file holds a DANGLING link. The census judges a Pipeline's links exactly as their loaders resolve them, and only
+  where the loader reads them (`PipelineLinks`):
+  - `collector.connection`: for a remote connector other than `dataset` (a `local` or absent connector never
+    looks the id up; `dataset` ignores it), against the ids the server registers — every `*_connection.toon` under
+    the config root outside `registry/`, loaded by `ConnectionProfile.load` (one that does not load is skipped,
+    as at boot), trimmed, case-sensitive. A profile only under `registry/connections/` does not resolve a Collector,
+    so it does not resolve the link.
+  - `collector.dataset`: with `connector: dataset` only (the parser refuses the key otherwise), the `datasets/`
+    prefix dropped, against the Dataset components of the Space registry.
+  - `processing.schema_file`: when the file loads it (no non-empty `processing.schemas`, plugin ingester, Grammar
+    reference or `frontend: asn1`), `schema/<id>` as `registry/schemas/<id>.toon`, anything else beside the
+    Pipeline file (`PathJail.resolveConfigRef`). A missing schema fails the load, so such a Pipeline is never
+    loaded and the hold is moot; the link is still reported.
+
+  Still `UNCHECKED`, so no hold: `**.use` (no loader reads a `use` key in a `*_pipeline.toon`; `use` lives on graph
+  nodes, not scanned), the cases above where the loader does not read the key, and a draft's `schema_file` in the
+  LC-3 save check (an unsaved draft has no directory to resolve against). The allowed-roots jail a loaded schema
+  path then passes is not judged (it needs the Space's Safety Policy): a schema outside it reads RESOLVED, a missed
+  finding rather than a false one.
 - **Kill switch** `-Dspace.activation.holds=off` (default on: it acts only in a Space that opted in): nothing is
   held anywhere and the report says `activationHolds: {status: disabled}`. A Space with neither opt-in behaves
   exactly as before; the finding baseline (§14) is zero, so no shipped Space holds anything.
 - Code: `ActivationHolds`, `ActivationFacts`, `ActivationGate` (engine), `PipelineScheduler.runnable`,
   `JobService.submitRun`. Tests: `ActivationHoldsTest`, `ActivationFactsTest`, `JobServiceActivationHoldTest`,
-  `ControlApiActivationHoldsTest` (hold 1 on a Job with the fix releasing it, hold 2 on a Pipeline with accept
-  releasing it, Basic, kill switch; each negative falsified by the same files held where the opt-in applies).
+  `ControlApiActivationHoldsTest` (hold 1 on a Job with the fix releasing it, hold 1 on a Pipeline whose remote
+  Collector names a missing Connection with creating it releasing it, hold 2 on a Pipeline with accept releasing
+  it, Basic, kill switch; each negative falsified by the same files held where the opt-in applies),
+  `LinkGraphTest.aPipelinesOwnLinksAreJudgedWhereTheLoaderReadsThem`.
 
 ## 11. Events (LC-4, LC-6)
 
@@ -359,18 +378,27 @@ paths, signals, `processing.schema_file`, links nothing enforces yet, and column
 Enrichment `transform` columns, one `demo` Query subquery). One Schema (in `default`) has an unknown column set. A
 link the census does not judge cannot be a false finding, so widening what it judges needs a new baseline.
 
+**Re-run 2026-11-13 (SE-1b, the census judges a Pipeline's own links, §10a)** on `origin/master` `be436402c` plus
+the change, same corpus and checks: **still 0 findings in every check**; no defect, no false positive, no UNKNOWN,
+so the clean-shadow clock is not reset. Of the same 1,132 links, **570 are judged and all RESOLVED** (181 more:
+180 `processing.schema_file`, 1 `collector.dataset` in `demo`), 559 UNCHECKED, 3 NOT_ANALYSED. One
+`processing.schema_file` stays UNCHECKED by rule (`ucc` `sites`, which names a Grammar). No shipped Space has a
+remote Collector, so no `collector.connection` link is judged in the corpus (the rule is covered by
+`LinkGraphTest`, the baseline's planted Pipeline and `ControlApiActivationHoldsTest`). The baseline test's coverage
+line now prints the Pipeline links per key and status.
+
 **The clean-shadow clock (D-SE2, D-LC3) starts 2026-11-13: zero unknowns.** Two releases of clean shadow from here
 gate the default flips (`links.delete` / `links.save` to `refuse`; enforcement for new Spaces).
 
 **The regression gate.** `SpaceFindingBaselineTest` computes all of the above and asserts the set equals its
 recorded `EXPECTED` (empty): a new defect in a shipped Space or a new false positive in a check fails it, naming
 Space, check and finding. Its second test plants a dangling Widget link and a duplicate Connection in a copy of
-`demo` and proves both are found. A finding that cannot be classed goes into `EXPECTED` marked UNKNOWN, and the
+`demo`, plus a Pipeline whose remote Collector names no Connection, and proves all three are found. A finding that cannot be classed goes into `EXPECTED` marked UNKNOWN, and the
 clock stops until it is resolved.
 
 ## References
 
-- Plan: `docs/superpower/2026-11-11-space-evolution-plan.md` §4.1, §4.2, D-SE1.
+- Plan: `docs/okf/product/module/config/plan-space-evolution.md` §4.1, §4.2, D-SE1.
 - Link census: `platform/inspecto-engine/src/main/java/com/gamma/pipeline/LinkCensus.java`, `LinkGraph.java`.
 - Folder layout: [Space anatomy](architecture-space-anatomy.md).
 - Code: `inspecto/src/main/java/com/gamma/service/SpaceLock.java`,

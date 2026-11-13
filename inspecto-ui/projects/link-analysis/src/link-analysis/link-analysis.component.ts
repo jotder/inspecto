@@ -4553,7 +4553,18 @@ Its prior copies stay in its version history.`,
             blocked: null,
             sources: undefined,
         };
-        const req: GrowRequest = {
+        const req = this.nodeExpandRequest(change);
+        if (req.hold && !ctx.frontier.length) {
+            this.toastr.info(`${ids.length === 1 ? `This ${t.node} is` : `These ${t.nodes} are`} busy and held: use Expand anyway.`);
+            return false;
+        }
+        await this.onExpand({ ctx, req, from: 'selection' });
+        return true;
+    }
+
+    /** The Expand tab's filter (or one degree, either way, holding busy entities), changed for this step by `change`. */
+    private nodeExpandRequest(change: Partial<GrowRequest> = {}): GrowRequest {
+        return {
             ...(this.growExclude.filterRequest() ?? {
                 direction: 'either',
                 degrees: 1,
@@ -4563,12 +4574,31 @@ Its prior copies stay in its version history.`,
             }),
             ...change,
         };
-        if (req.hold && !ctx.frontier.length) {
-            this.toastr.info(`${ids.length === 1 ? `This ${t.node} is` : `These ${t.nodes} are`} busy and held: use Expand anyway.`);
-            return false;
+    }
+
+    /**
+     * LA-EXPAND-PLACEMENT-1: a double click while an Investigation is unsaved is that Investigation's Expand step, the same
+     * one the tab's Expand runs. The explorer's neighbours read would add nodes under the read's typed ids beside the
+     * Working Set's, and Save would not record it.
+     */
+    private async expandUnsavedNode(node: G6GraphData['nodes'][number]): Promise<void> {
+        const held = this.growExclude.basicHeld();
+        const isHeld = held.has(node.id) || rawIdsOf(node).some((r) => held.has(r));
+        const t = this.growTerms();
+        const ctx: GrowContext = {
+            ...this.growContext(),
+            frontier: isHeld ? [] : [node.id],
+            heldFrontier: isHeld ? [node.id] : [],
+            from: `1 ${t.node}`,
+            blocked: null,
+            sources: undefined,
+        };
+        const req = this.nodeExpandRequest();
+        if (req.hold && isHeld) {
+            this.toastr.info(`This ${t.node} is busy and held: use Expand anyway.`);
+            return;
         }
         await this.onExpand({ ctx, req, from: 'selection' });
-        return true;
     }
 
     /** "Keep selected" (Investigation only): a logged `keep` step — later clean-ups and exclusions spare them. */
@@ -4677,6 +4707,15 @@ Its prior copies stay in its version history.`,
         if (this.investigation.canvas() !== null) {
             if (node.data.unexpanded) {
                 if (this.writesToInvestigation()) await this.expandInInvestigation([node]);
+                return;
+            }
+        }
+        const unsaved = this.investigation.unsaved();
+        if (unsaved) {
+            // expanded = an Expand step already read it (expandedNodeIds also holds every inner-ring entity it never read)
+            const walked = new Set(unsaved.steps.flatMap((s) => (s.kind === 'expand' ? (s.walked ?? []).flat() : [])));
+            if (!rawIdsOf(node).some((raw) => walked.has(raw))) {
+                await this.expandUnsavedNode(node);
                 return;
             }
         }

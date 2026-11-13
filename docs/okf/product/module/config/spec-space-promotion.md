@@ -100,7 +100,7 @@ the approval that lands it).
 
 ## References
 
-- Plan: [Space evolution plan](../../../../superpower/2026-11-11-space-evolution-plan.md) §2, §4.6, §6 D-SE7
+- Plan: [Space evolution plan](plan-space-evolution.md) §2, §4.6, §6 D-SE7
 - [Space tests (SE-6a)](spec-space-tests.md) · [Space lock (SE-1a)](spec-space-lock.md) ·
   [Space anatomy](architecture-space-anatomy.md)
 - Code: `inspecto/src/main/java/com/gamma/control/SpacePromotion.java`,

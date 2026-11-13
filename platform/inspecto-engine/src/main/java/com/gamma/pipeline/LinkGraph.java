@@ -35,7 +35,9 @@ import java.util.function.Predicate;
  *
  * <p><b>Status.</b> Only an enforced link to a Dataset, Query, Widget or Pipeline is judged: a component id must
  * name a component of that type exactly; a Pipeline id matches case-insensitively after trimming, and only when
- * the pipeline universe is known. Everything else — stores, paths, columns, signals, and links nothing enforces
+ * the pipeline universe is known. A Pipeline's own links ({@code collector.connection}, {@code collector.dataset},
+ * {@code processing.schema_file}) are judged as their loaders resolve them, where the loader reads them
+ * ({@link PipelineLinks}; SE-1b). Everything else — stores, paths, columns, signals, and links nothing enforces
  * yet — is {@link Status#UNCHECKED}: stores legitimately exist that no Pipeline owns (job-created ones), so
  * judging them would be a false finding.
  *
@@ -148,7 +150,7 @@ public final class LinkGraph {
      */
     public static LinkGraph of(Path configRoot, Predicate<String> reserved) {
         if (configRoot == null || !Files.isDirectory(configRoot))
-            return new LinkGraph(List.of(), Universe.of(Map.of(), null, null));
+            return new LinkGraph(List.of(), Universe.of(Map.of(), null, null, null));
         Map<String, List<ComponentRegistry.Component>> byType = new LinkedHashMap<>();
         ComponentRegistry registry = ComponentRegistry.scan(configRoot.resolve("registry"));
         for (String t : List.of("dataset", "query", "widget")) byType.put(t, registry.ofType(t));
@@ -168,7 +170,8 @@ public final class LinkGraph {
         }
 
         Universe u = Universe.of(byType, pipelineIds,
-                new ColumnSets(pipelineFiles, pipelineDocs, byType.getOrDefault("dataset", List.of())));
+                new ColumnSets(pipelineFiles, pipelineDocs, byType.getOrDefault("dataset", List.of())),
+                PipelineLinks.connectionIds(configRoot));
         List<Edge> out = new ArrayList<>();
         for (int i = 0; i < pipelineFiles.size(); i++)
             if (pipelineDocs.get(i) != null) fileEdges("pipeline", pipelineFiles.get(i), pipelineDocs.get(i), u, out);
@@ -202,20 +205,22 @@ public final class LinkGraph {
             for (String p : pipelineIds) ids.add(p.toLowerCase());
         }
         List<Edge> out = new ArrayList<>();
-        Universe u = Universe.of(byType, ids, null);
+        Universe u = Universe.of(byType, ids, null, null);
         componentEdges(byType, u, out);
         return new LinkGraph(out, u);
     }
 
-    /** {@code columns} is {@code null} when column links are not judged ({@link #ofComponents}). */
-    private record Universe(Map<String, Set<String>> names, Set<String> pipelineIds, ColumnSets columns) {
+    /** {@code columns} is {@code null} when column links are not judged ({@link #ofComponents}); {@code connectionIds}
+     *  (the ids the server registers from {@code *_connection.toon}) is {@code null} when not known. */
+    private record Universe(Map<String, Set<String>> names, Set<String> pipelineIds, ColumnSets columns,
+                            Set<String> connectionIds) {
         static Universe of(Map<String, List<ComponentRegistry.Component>> byType, Set<String> pipelineIds,
-                           ColumnSets columns) {
+                           ColumnSets columns, Set<String> connectionIds) {
             Map<String, Set<String>> n = new HashMap<>();
             for (Map.Entry<String, List<ComponentRegistry.Component>> e : byType.entrySet())
                 for (ComponentRegistry.Component c : e.getValue())
                     n.computeIfAbsent(e.getKey(), k -> new HashSet<>()).add(c.name());
-            return new Universe(n, pipelineIds, columns);
+            return new Universe(n, pipelineIds, columns, connectionIds);
         }
 
         boolean hasComponent(String type, String name) {
@@ -252,7 +257,9 @@ public final class LinkGraph {
                     String tt = String.valueOf(doc.containsKey("targetType") ? doc.get("targetType") : "pipeline");
                     toKind = "pipeline".equalsIgnoreCase(tt) ? "pipeline" : tt;
                 }
-                out.add(new Edge(l, file, name, kv[0], kv[1], toKind, status(l, toKind, kv[1], u), Set.of()));
+                LinkGraph.Status st = kind.equals("pipeline") ? pipelineStatus(l, file, doc, kv[1], u)
+                        : status(l, toKind, kv[1], u);
+                out.add(new Edge(l, file, name, kv[0], kv[1], toKind, st, Set.of()));
             }
         }
     }
@@ -276,6 +283,14 @@ public final class LinkGraph {
             Status st = ColumnSets.judge(l, kv[1], sets, origins);
             out.add(new Edge(l, file, name, kv[0], kv[1], l.toKind(), st, Set.copyOf(origins)));
         }
+    }
+
+    /** A Pipeline's own links, judged as their loaders resolve them ({@link PipelineLinks}); UNCHECKED where they
+     *  cannot be judged without guessing. */
+    private static Status pipelineStatus(LinkCensus.Link l, Path file, Map<?, ?> doc, String value, Universe u) {
+        if (!l.enforced()) return Status.UNCHECKED;
+        Status s = PipelineLinks.status(l, file, doc, value, id -> u.hasComponent("dataset", id), u.connectionIds());
+        return s == null ? Status.UNCHECKED : s;
     }
 
     private static Status status(LinkCensus.Link l, String toKind, String value, Universe u) {

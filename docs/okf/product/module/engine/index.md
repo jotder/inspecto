@@ -38,7 +38,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | feature | Consignment addressing | demand |
 | `MAPPING-EPOCH-TIMESTAMP-1` | P3 | feature | a field mapping cannot type an epoch-seconds string as a TIMESTAMP. | — |
 | — | P2 | feature | SPACE-LINK-CENSUS-1 one declared census of the links between a Space's config files | — |
-| — | P3 | feature | SPACE-EVOLUTION-1 a Space the server understands as a whole, reached without breaking one | — |
+| — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
 | `ALERT-EVALUATE-NO-BREACH-WORDING-1` | P3 | defect | an alert.evaluate Job logs "no rule breached" on every run while an Alert it raised stays OPEN. | — |
 | `REPORT-PDF-CHARTS-1` | P3 | feature | a report Job's PDF is a table snapshot, never a chart. | — |
 | `JOB-SNAPSHOT-SWAP-READER-RACE-1` | P3 | defect | a Job reading a snapshot Dataset fails when the Job that writes that Dataset publishes a new snapshot during the read. | — |
