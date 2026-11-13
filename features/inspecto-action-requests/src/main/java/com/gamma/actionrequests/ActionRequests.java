@@ -5,6 +5,7 @@ import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.gamma.config.safety.PathJail;
+import com.gamma.config.safety.SpaceStateDirs;
 import com.gamma.control.PendingChanges;
 import com.gamma.audit.Event;
 import com.gamma.event.EventLog;
@@ -28,7 +29,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 /**
  * <b>Action Requests</b> ({@code ASSURE-ACTION-REQUESTS-1}, WS-24): an outbound API call proposed from an Incident
@@ -172,8 +172,9 @@ public final class ActionRequests {
 
     // ── the store ───────────────────────────────────────────────────────────────────────────────
 
+    /** The store's WRITE directory, {@code config/action-requests} (SE-4 step 1: reads also look in {@code state/}). */
     private static Path dir(Path root) {
-        return root.toAbsolutePath().normalize().resolve(DIR);
+        return SpaceStateDirs.writeDir(root, DIR);
     }
 
     private static Path file(Path root, String id) {
@@ -189,6 +190,11 @@ public final class ActionRequests {
     static void save(Path root, Map<String, Object> rec) throws IOException {
         if (invalid(rec)) throw new IllegalStateException("refusing to re-sign an action request that failed its integrity check");
         Path f = file(root, String.valueOf(rec.get("id")));
+        // SE-4 step 1: a record also in state/ is a newer release's; a write here would land where no read sees it.
+        // Every decision saves before it dispatches, so this refuses before anything is sent.
+        if (SpaceStateDirs.shadowed(f))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "action request '" + rec.get("id") + "' lives in this Space's "
+                    + "state/ folder, written by a newer release — this release can show it but not change it");
         Files.createDirectories(f.getParent());
         Map<String, Object> clean = new LinkedHashMap<>(rec);
         clean.remove(MAC);
@@ -204,7 +210,7 @@ public final class ActionRequests {
      * {@code status: invalid}, {@code integrity: invalid}: shown, never decidable, never dispatched, never re-saved.
      */
     static Map<String, Object> read(Path root, String id) throws IOException {
-        Path f = file(root, id);
+        Path f = SpaceStateDirs.readable(file(root, id));   // state/ first, then config/ (SE-4 step 1)
         if (!Files.isRegularFile(f)) return null;
         Map<String, Object> rec = ApiContext.JSON.readValue(Files.readAllBytes(f), MAP);
         Object claimed = rec.remove(MAC);
@@ -223,16 +229,13 @@ public final class ActionRequests {
 
     /** Every request of the Space, newest first. */
     static List<Map<String, Object>> list(Path root) throws IOException {
-        Path d = dir(root);
-        if (!Files.isDirectory(d)) return List.of();
         List<Map<String, Object>> out = new ArrayList<>();
-        try (Stream<Path> s = Files.list(d)) {
-            for (Path p : s.filter(p -> p.getFileName().toString().endsWith(".json")).toList()) {
-                String id = p.getFileName().toString().replaceFirst("\\.json$", "");
-                if (!SAFE_ID.matcher(id).matches()) continue;
-                Map<String, Object> rec = read(root, id);
-                if (rec != null) out.add(rec);
-            }
+        for (Path p : SpaceStateDirs.list(dir(root))) {   // config/ and state/, one entry per id (SE-4 step 1)
+            if (!p.getFileName().toString().endsWith(".json")) continue;
+            String id = p.getFileName().toString().replaceFirst("\\.json$", "");
+            if (!SAFE_ID.matcher(id).matches()) continue;
+            Map<String, Object> rec = read(root, id);
+            if (rec != null) out.add(rec);
         }
         out.sort(Comparator.comparing((Map<String, Object> r) -> String.valueOf(r.get("id"))).reversed());
         return out;
@@ -241,6 +244,7 @@ public final class ActionRequests {
     /** A still-pending request past its {@code expiresAt} becomes {@code expired}. Call under {@link #lock}. */
     static boolean expireIfDue(Path root, Map<String, Object> rec) throws IOException {
         if (invalid(rec) || !PENDING.equals(rec.get("status"))) return false;
+        if (SpaceStateDirs.shadowed(file(root, String.valueOf(rec.get("id"))))) return false;   // a newer release's record: read only
         Object at = rec.get("expiresAt");
         if (at == null || Instant.parse(String.valueOf(at)).isAfter(Instant.now())) return false;
         transition(rec, EXPIRED, "system");

@@ -273,6 +273,7 @@ final class PendingChangeRoutes implements RouteModule {
             if (PendingChanges.invalid(rec))
                 throw new ApiException(409, ErrorCodes.CONFLICT, "pending change '" + id + "' fails its integrity check "
                         + "(its MAC does not verify: it was not written by this server, or was edited since) — it cannot be decided");
+            PendingChanges.requireWritable(root, id);   // SE-4 step 1: never replay a change this release cannot record
             PendingChanges.expireIfDue(ex, root, rec);
             if (!"pending".equals(rec.get("status")))
                 throw new ApiException(409, ErrorCodes.CONFLICT, "pending change '" + id + "' is already " + rec.get("status")

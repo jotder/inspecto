@@ -72,6 +72,31 @@ class BundleExporterTest {
     }
 
     /**
+     * SE-4 step 1: the Space's {@code state/} zone rides under the config-relative names its files had in
+     * {@code config/}, so the bundle layout is unchanged; a file in both places is taken from {@code state/}; the
+     * signed stores stay out wherever they live.
+     */
+    @Test
+    void exportSpaceCarriesTheStateZoneUnderItsConfigNames(@TempDir Path tmp) throws Exception {
+        Path base   = tmp.resolve("space-a");
+        Path config = base.resolve("config");
+        write(config.resolve("a_pipeline.toon"), "name: A\n");
+        write(config.resolve("recon-state/both.json"), "config");
+        write(base.resolve("state/recon-state/both.json"), "state");
+        write(base.resolve("state/expectation-baselines/e.json"), "baseline");
+        write(base.resolve("state/pending-changes/pc-20261113000000-abcdef.json"), "held");
+        write(base.resolve("state/some-later-store/x.json"), "not switched");
+
+        Map<String, byte[]> got = unzip(BundleExporter.exportSpace(config, null, "space-a"));
+        assertEquals("state", new String(got.get("recon-state/both.json"), StandardCharsets.UTF_8), "state/ wins");
+        assertEquals("baseline", new String(got.get("expectation-baselines/e.json"), StandardCharsets.UTF_8));
+        assertFalse(got.keySet().stream().anyMatch(k -> k.startsWith("pending-changes/") || k.startsWith("state/") || k.startsWith("some-later-store/")),
+                got.keySet().toString());
+        String manifest = new String(got.get("bundle.toon"), StandardCharsets.UTF_8);
+        assertEquals(1, manifest.split("recon-state/both.json", -1).length - 1, "one artifact per entry: " + manifest);
+    }
+
+    /**
      * W3, 2026-07-31. Both export paths used to {@code Files.readAllBytes} a {@code *_connection.toon}, and
      * nothing upstream forces a credential to be a {@code ${…}} reference — {@code POST /connections} accepts
      * a literal and {@code connectionDoc} writes it unmasked — so a plaintext password was zipped and served

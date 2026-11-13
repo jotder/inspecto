@@ -421,6 +421,15 @@
                             ></mat-checkbox
                         >
                         <mat-checkbox
+                            [checked]="allDetail()"
+                            data-testid="la-all-detail"
+                            (change)="allDetail.set($event.checked)"
+                            >Arrows and node labels on large graphs
+                            <span class="text-secondary text-xs"
+                                >(else hover-only above {{ denseDetailCap }} links)</span
+                            ></mat-checkbox
+                        >
+                        <mat-checkbox
                             [checked]="!!viewOptions().snapline"
                             (change)="toggleViewFlag('snapline', $event.checked)"
                             data-testid="la-display-snapline"
@@ -1542,6 +1551,11 @@
                             }
                             @if (investigation.canvas()) {
                                 <span>Investigation Working Set</span>
+                            }
+                            @if (detailDense()) {
+                                <span data-testid="la-detail-dense"
+                                    >arrows and node labels on hover above {{ denseDetailCap }} links</span
+                                >
                             }
                             @if (lodLabelsOff()) {
                                 <span>labels off above {{ lodLabelCap() }} nodes (level of detail)</span>

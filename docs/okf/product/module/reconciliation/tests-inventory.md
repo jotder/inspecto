@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.reconciliation`](../../../../../product-map/module/reconciliation.toon).
 
-30 test class(es): 24 unit, 6 real-HTTP control-plane, 0 IT.
+31 test class(es): 25 unit, 6 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -54,4 +54,5 @@ mvn -o test -pl features/inspecto-reconciliation -Dtest=ControlApiReconDayTest,C
 | `ReconRunJobTypeTckTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconRunJobTypeTckTest.java` | {@link ReconRunJobType} against the platform's JobTypeProvider TCK (MODULE-REORG-1 P5b). |
 | `ReconServiceTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconServiceTest.java` | Unit tests for {@link ReconService} — spec validation (the route's 422 surface), the server-built |
 | `ReconSignalsTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconSignalsTest.java` | Pins every emitted Signal type byte-for-byte: they are persisted and matched, so a rename is a data break. |
+| `ReconStateStoreStateZoneTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconStateStoreStateZoneTest.java` | SE-4 step 1: a Reconciliation's state under {@code state/recon-state} is read before {@code config/}'s; writes stay in config. |
 | `ReconStateStoreTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconStateStoreTest.java` | {@link ReconStateStore} — a Reconciliation's recorded run + Break lifecycle (R2-03): one JSON document per |

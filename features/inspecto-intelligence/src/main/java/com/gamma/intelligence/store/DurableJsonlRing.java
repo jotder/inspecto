@@ -2,6 +2,7 @@ package com.gamma.intelligence.store;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gamma.config.safety.SpaceStateDirs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,6 +76,11 @@ public abstract class DurableJsonlRing<T> {
     /** Rewrite the whole file from the ring — call after any in-place mutation of a held item. */
     protected synchronized void persist() {
         if (file == null) return;
+        if (SpaceStateDirs.shadowed(file)) {   // SE-4 step 1: a newer release's file — kept in memory, never written here
+            log.warn("Not persisting {} to {}: {} was written by a newer release and this release only reads it",
+                    noun, file, SpaceStateDirs.twin(file));
+            return;
+        }
         try {
             StringBuilder sb = new StringBuilder();
             for (T item : ring) sb.append(JSON.writeValueAsString(codec.toRecord(item))).append('\n');
@@ -86,17 +92,19 @@ public abstract class DurableJsonlRing<T> {
     }
 
     private void load() {
-        if (file == null || !Files.exists(file)) return;
+        if (file == null) return;
+        Path from = SpaceStateDirs.readable(file);   // state/ first, then config/ (SE-4 step 1)
+        if (!Files.exists(from)) return;
         try {
-            for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
+            for (String line : Files.readAllLines(from, StandardCharsets.UTF_8)) {
                 if (line.isBlank()) continue;
                 Map<String, Object> record = JSON.readValue(line, new TypeReference<Map<String, Object>>() {});
                 if (ring.size() >= capacity) ring.removeFirst();
                 ring.addLast(codec.fromRecord(record));
             }
-            log.info("Loaded {} persisted {} from {}", ring.size(), noun, file);
+            log.info("Loaded {} persisted {} from {}", ring.size(), noun, from);
         } catch (IOException | RuntimeException e) {
-            log.warn("Could not load persisted {} from {}: {}", noun, file, e.getMessage());
+            log.warn("Could not load persisted {} from {}: {}", noun, from, e.getMessage());
             ring.clear();
         }
     }

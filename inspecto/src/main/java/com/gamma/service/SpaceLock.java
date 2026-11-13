@@ -349,10 +349,33 @@ public final class SpaceLock {
         return pending ? r.recomputing() : r;
     }
 
+    /**
+     * SE-1b: the last report of a Space this JVM tracks, without making state or scheduling anything — {@code null}
+     * when the kill switch is off, the root is untracked (the single-tenant default Space, a closed Space) or no
+     * report is ready yet. The activation holds read it on every scheduler tick.
+     */
+    public static Report latest(Path configRoot) {
+        if (configRoot == null || !enabled()) return null;
+        State s = STATES.get(configRoot.toAbsolutePath().normalize());
+        return s == null ? null : s.last;
+    }
+
+    /** SE-1b: schedule a (debounced) computation of a tracked Space, so a hand fix or a hand edit is seen with no
+     *  server write. No-op for an untracked or closed Space. */
+    public static void refresh(Path configRoot) {
+        if (configRoot == null || !enabled()) return;
+        State s = STATES.get(configRoot.toAbsolutePath().normalize());
+        if (s != null) schedule(s);
+    }
+
     // ── computation ─────────────────────────────────────────────────────────────────────────
 
-    /** The route's answer: a status and, when ready, the findings. */
-    public record Report(String status, Map<String, Object> body) {
+    /** The route's answer: a status and, when ready, the findings; {@code facts} feed the activation holds (SE-1b). */
+    public record Report(String status, Map<String, Object> body, ActivationFacts facts) {
+        Report(String status, Map<String, Object> body) {
+            this(status, body, ActivationFacts.NONE);
+        }
+
         static Report of(String status) {
             return new Report(status, Map.of("status", status));
         }
@@ -367,7 +390,7 @@ public final class SpaceLock {
         Report recomputing() {
             Map<String, Object> m = new LinkedHashMap<>(body);
             m.put("recomputing", true);
-            return new Report(status, m);
+            return new Report(status, m, facts);
         }
     }
 
@@ -755,7 +778,7 @@ public final class SpaceLock {
         b.put("broken", bounded(broken));
         b.put("duplicates", bounded(duplicates));
         b.put("changedOutside", bounded(outside));
-        return new Report("ready", b);
+        return new Report("ready", b, ActivationFacts.of(files, links));
     }
 
     private static Map<String, Object> bounded(List<Map<String, Object>> items) {

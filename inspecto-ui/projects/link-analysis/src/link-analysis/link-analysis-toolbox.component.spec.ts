@@ -8,6 +8,7 @@ import { GammaConfigService } from '@gamma/services/config';
 import { of } from 'rxjs';
 import { ComponentDef, ComponentsService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
+import { configureLaLimits, resetLaLimits } from './la-limits';
 import { G6GraphData } from '@inspecto/core/graph';
 import { GraphEmphasis } from '@inspecto/core/graph/graph-view.component';
 import { GENERIC_PROFILE, installDomainProfiles, profileFromPack } from '@inspecto/link-analysis/graph/domain-profile';
@@ -213,6 +214,30 @@ describe('LinkAnalysisToolboxComponent', () => {
         c.runPattern();
         expect(c.patternMatches()).toHaveLength(0);
         expect(c.analysisError()).toMatch(/No matches/);
+    });
+
+    it('labels a sampled betweenness ranking as approximate, and only that one (LA-PERF-P5-1)', async () => {
+        configureLaLimits({ 'browser_algorithms.betweennessCentrality': 2 });
+        try {
+            const { c, fixture } = make();
+            c.tab.set('centrality');
+            c.centralityMetric.set('betweenness');
+            c.runCentrality();
+            const n = GRAPH.nodes.length;
+            expect(c.analysisError()).toBe('');
+            expect(c.rankingNote()).toBe(
+                `Approximate: estimated from 1 of ${n} nodes, so close scores may swap places.`,
+            );
+            fixture.detectChanges();
+            expect(fixture.nativeElement.querySelector('[data-testid=ranking-note]')?.textContent).toContain('Approximate');
+            await expectNoA11yViolations(fixture.nativeElement);
+
+            c.centralityMetric.set('degree');
+            c.runCentrality();
+            expect(c.rankingNote()).toBe('');
+        } finally {
+            resetLaLimits();
+        }
     });
 
     it('reset() clears results but keeps presentation choices (open tab, metric, motif)', () => {
@@ -1255,7 +1280,7 @@ describe('LinkAnalysisToolboxComponent search around', () => {
             ]);
             expect(c.runsOn('centrality')).toBe('both');
             expect(c.runsOn('explain')).toBe('both'); // its edge-index reads run on the server
-            expect(c.toolCap('centrality')).toBe('Up to 500 nodes'); // betweenness is the lowest
+            expect(c.toolCap('centrality')).toBe('Up to 1,000 nodes'); // betweenness is sampled above 500 (LA-PERF-P5-1)
             // T-087: a row that also runs on the other tab names it; no raw "both / browser / server" chip
             const chips = Array.from(el.querySelectorAll('section > button inspecto-chip')).map((x) => x.textContent!.trim());
             expect(chips).toContain('Also on Whole Dataset');

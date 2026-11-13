@@ -747,6 +747,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                 this.registryLock, this.bus, this.triggerWorkers,
                 this.maxConcurrentRuns, maxConcurrentAcquisitions, acquireHighWater,
                 this.pollSeconds * 1000L, this::runPipeline, this::syncStatus);
+        this.pipelineScheduler.spaceId(this.spaceId);   // SE-1b: the activation holds are per Space
         if (realtime != null) this.pipelineScheduler.onStreamIdle(realtime::onStreamIdle);   // PA-9d: the clock floor
     }
 
