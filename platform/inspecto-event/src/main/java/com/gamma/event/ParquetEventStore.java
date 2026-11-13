@@ -212,7 +212,9 @@ public final class ParquetEventStore implements EventStore {
             for (Path f : sources) {
                 if (!Files.exists(f)) continue;
                 int torn = 0;
-                for (String line : Files.readAllLines(f, StandardCharsets.UTF_8)) {
+                // Decoded leniently (malformed bytes become U+FFFD): a kill inside a multi-byte character must tear
+                // only its own line, which then fails to parse and is skipped — not abort the whole replay.
+                for (String line : new String(Files.readAllBytes(f), StandardCharsets.UTF_8).split("\r?\n")) {
                     if (line.isBlank()) continue;
                     try {
                         Event e = fromJournal(line);
