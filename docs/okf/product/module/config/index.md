@@ -39,6 +39,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `SPACE-UPGRADE-STUCK-VERSION-1` | P3 | defect | a Space Template upgrade whose last remaining files are conflicts never records the new version | — |
 | `SPACE-PROMOTION-PARAM-TYPES-1` | P3 | defect | a promotion parameter value can change the type of the value it fills | — |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
+| `SPACE-CREATE-PARTIAL-1` | P3 | defect | creating a Space half-succeeds when the caller lacks canAuthorWorkbench. | — |
 | `SPACE-ROOTED-DATA-ROOT-MIGRATION-1` | P3 | feature | an install whose data_root is rooted (or absent, i.e. -Dspaces.data.root) is still not relocatable, and there is no route that migrates it. | demand |
 | `WRITER-SCAN-BLIND-RENAME-1` | P2 | defect | DecisionRuleWritersTest fails on origin/master, so every lane's gate is red. | — |
 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | NARROWED 2026-11-01 (twice): the ingest lane WRITES an allow-listed s3:// dirs.database and REGISTERS that output in DuckLake; what is le… | — |

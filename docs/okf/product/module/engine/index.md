@@ -34,6 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `TRANSFORMER-TWO-NODES-1` | P3 | defect | two different Steps are both called "Record Transformer". | — |
 | — | P3 | feature | Branch-aware executor residuals | demand |
 | — | P3 | feature | Consignment addressing | demand |
 | `MAPPING-EPOCH-TIMESTAMP-1` | P3 | feature | a field mapping cannot type an epoch-seconds string as a TIMESTAMP. | — |

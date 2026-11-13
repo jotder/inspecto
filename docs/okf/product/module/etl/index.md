@@ -34,6 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `TRANSFORMER-TWO-NODES-1` | P3 | defect | two different Steps are both called "Record Transformer". | — |
 | `AUTHORING-REDESIGN-1` | P3 | feature | the authoring redesign's still-open letters. | demand |
 | — | P3 | feature | Step Processor catalog | — |
 | `PARSING-DERIVE-EDITOR-1` | P3 | feature | slice 4 of Parsing D9: an optional profile editor for ASN.1 derive / children. | operator |

@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **106<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 19<!--count:backlog-p2--> × P2 · 87<!--count:backlog-p3--> × P3** —
+> **109<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 89<!--count:backlog-p3--> × P3** —
+> ⬆ **106 → 109 (P2 19 → 20, P3 87 → 89) on 2026-11-14**: filed P2 defect `DEMO-AUTH-NO-ROSTER-1` [items: module.demo-auth · kind: defect], P3 defects `TRANSFORMER-TWO-NODES-1` [items: module.etl, module.engine · kind: defect] and `SPACE-CREATE-PARTIAL-1` [items: module.config, module.access · kind: defect] — found rebuilding the football pilot on the 2026-10-27 bundle (2026-11-13).
 > ↔ **106 → 106 on 2026-11-14**: first payment on P3 chore `TOOL-TESTS-UNWIRED-BASELINE-1` [items: layer.platform · kind: chore] — the guard-fixture group is wired and the BASELINE shrank 54 → 46. Six fast files ride along with their guard's own `guards:` step; `check-jar-signatures.test.mjs` (~45 s) went into a new `slow-fixtures:` job, because `tools/precommit.mjs` runs every `guards:` step on every commit here. All seven passed unmodified. Row stays open for the `gen-la-*` / `seed-la-*` / UI-lint groups.
 > ↔ **106 → 106 (P2 20 → 19, P3 86 → 87) on 2026-11-14**: closed P2 defect `GUARD-FIXTURES-UNRUN-1` [items: layer.platform · kind: defect] — `tools/check-launchers.test.mjs` is wired into the `launchers-windows` job (NOT `guards:`: it takes ~100 s and the hook runs every `guards:` step on every commit), and the recommended meta-guard is built: `tools/check-tool-tests-wired.mjs` asserts every `tools/*.test.mjs` is named by some workflow or listed as shrinking debt, with its own seven negative fixtures, both wired into `guards:`. The audit it asked for found 54 of 111 unwired; they are now the BASELINE and the new P3 row `TOOL-TESTS-UNWIRED-BASELINE-1`. As built: `okf/product/layer/platform/tests-guard-coverage.md` (Shape 1).
 > ⬆ **105 → 106 (P2 19 → 20) on 2026-11-14**: filed P2 defect `GUARD-FIXTURES-UNRUN-1` [items: layer.platform · kind: defect · hold: operator] — `tools/check-launchers.test.mjs` is run by neither `ci.yml` nor the pre-commit hook, so its negative fixtures rot unnoticed. Found by breaking one in `01c999a67` and only seeing it by running the file by hand. §4.
@@ -538,11 +539,11 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 19<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 87<!--count:backlog-p3--> P3 rows are mostly a list of things
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 19<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 87<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 106<!--count:backlog-rows--> as pending work overstates it.
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 20<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 89<!--count:backlog-p3--> P3 rows are mostly a list of things
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 20<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 89<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 109<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -670,6 +671,14 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Authoring surfaces
 
+- **P3** · `TRANSFORMER-TWO-NODES-1` — **two different Steps are both called "Record Transformer".** [items: module.etl, module.engine · kind: defect]
+  The canvas node the guided onboarding wires between parse and sink is the Stage-1 projection slot (saves
+  `processing.map.fields[]`, executes at ingest); the palette entry of the same name adds a Stage-2 chain Step
+  (`steps: - sql:`) which, saved with no `output_store:` and no `type: pipeline` Job, is an orphan chain that
+  silently never runs. Found rebuilding the football pilot 2026-11-13: the palette Step was authored, saved and
+  activated, and the landed store kept only the raw columns. Name them apart in the palette, and/or refuse a chain
+  Step with no `output_store:` at save, as the lift already does.
+
 - **P3** · **AUTHORING-REDESIGN-1** — **the authoring redesign's still-open letters.** *Re-ranked P2 → P3, `hold: demand`, 2026-11-12 (product assembly plan §13.1): only (d) is left and the operator parked it until a named consumer exists; still no `CREATE MACRO` in any main source.* (c), the structured AST table over the row predicate, is COMPLETE (2026-09-23; step 5 `transform.join` out of scope by design), and (f)(g)(j)(l)(m)(n2)(o) shipped, and (i) — the Parse pane's per-row "sample resolves to" line, over an additive `resolved` `sniff_csv` map on the delimited previews — shipped 2026-09-24 (`okf/product/module/config/user-guide-grammar-config.md`). Open: **(d)** v3 macros as the UDF registry — per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `ConsignmentIngestStrategy` and preview — **PARKED ON DEMAND (operator 2026-10-04: stays parked until a named consumer exists)**; re-grounded: no `CREATE MACRO` in any source, the JDBC driver has no scalar-UDF API, and it needs a macro component kind + registry that do not exist; if ever built, recommended shape is a Space-level `macros/*.toon` registry loaded by one shared helper on every scratch connection (2A) governed by the existing Safety Policy tiers + SqlGuard/ExpressionGuard + seal (3A); **(e)** column metadata editing on the Transform pane (Parse D2) — ✅ **BUILT 2026-10-11** (reopened by the operator after the 2026-10-04 deferral): a chain `sql` Step's `fields[]` rows carry the schema's four metadata keys, the save refuses malformed ones (`ERR_STEP_COLUMN_METADATA_INVALID`), the Catalog reads them as a `STEP` node with COLUMN children, and a sensitive Step classification joins the masking lineage ADDITIVELY (operator Q1 = (B); never clears fail-closed) → `okf/product/module/etl/user-guide-schema-mapping.md` §0; possible future item, not built: option **(C)** — a Step's declared classifications REPLACING the fail-closed `UNKNOWN_LINEAGE` rule for that pipeline (fixes over-masking but lets an omission unmask a column; a security-posture change needing its own decision); and on (f), which COLUMNS a reference carries is the dry run's question (the save checks existence and `on` presence only). → `archived-documents/plans-archive/authoring-ast-table-design.md` · `okf/product/module/etl/user-guide-schema-mapping.md` §0 [items: module.etl, layer.product · kind: feature · hold: demand]
 
 #### Step catalog & node types
@@ -785,6 +794,21 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
   - **ASSISTANT-DECIDED under operator delegation 2026-10-18 — PENDING OPERATOR CONFIRMATION.** **D1:** move `business-assurance` to `offerings/standard.toon` `contentPacks` and set `minEdition: standard` in its `template.toon` (verified: all five of its pack Alert Rules need the dispatcher, and `docs/EDITIONS.md` SP-CTL-07 says Basic refuses every authoring door and arms no rule copied onto disk, so on Basic the pack's headline is inert). **`la-daily-feed` stays in Basic** — but note the row's recommendation understated it: its two Alert Rules (`daily_xdr_freshness`, `daily_xdr_index_lag`) are equally inert on Basic; they ship as examples a Standard upgrade arms, and the pack's value on Basic is the feed Datasets. **D2:** list `la-audit`, `la-claims`, `la-mobile-money`, `la-showcase` in `offerings/preview.toon` `contentPacks` (they need Demo Auth, which only the demo/Preview edition has); `la-showcase-off` stays unlisted. **Not yet applied** — this was a docs-only lane; the follow-up is two `.toon` edits plus `node tools/check-offerings.mjs`. **Reverse:** revert those edits (an Offering lists packs; no stored Space data changes). No sign-off needed.
 
+
+- **P2** · `DEMO-AUTH-NO-ROSTER-1` — **a demo build with no Space carrying a roster cannot be signed into, and does not say so.** [items: module.demo-auth · kind: defect]
+  `DemoAuthenticator` names its principals from a Space's `config/demo-users.toon`, so a `spaces/` holding only
+  `_templates` answers `/bootstrap` with `authMode: demo`, `mock: true` and `demoUsers: []`; the sign-in page then
+  renders the SSO panel and a bare "Sign-in failed", with no hint that the roster is the missing piece. Hit on
+  2026-11-13 after the 2026-10-27 bundle rebuild emptied `inspecto-demo/spaces/`; unblocked by hand-seeding
+  `spaces/demo/config/demo-users.toon`. Either ship a fallback roster with the demo build, or have the sign-in page
+  say that no attached Space carries a Demo User roster.
+
+- **P3** · `SPACE-CREATE-PARTIAL-1` — **creating a Space half-succeeds when the caller lacks `canAuthorWorkbench`.** [items: module.config, module.access · kind: defect]
+  `POST /spaces` succeeds, the branding `PUT` that follows is refused, and the UI shows only
+  `missing capability 'canAuthorWorkbench'` while the dialog stays open — so the Space exists, un-branded, and the
+  operator believes the create failed. Related: the seeded `admin` role does not hold `canAuthorWorkbench` (only
+  `super` does), so the role whose name means "administrator" cannot finish a create. Say which step was refused,
+  and keep the Space and its branding in one outcome.
 
 - **P2** · `DATA-TIERS-1` — **RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration; the edition line is what its screens offer); P1 and P10 done, P9 superseded; P8 docs done 2026-11-06 (as the code stands: `EDITIONS.md` *Data layer by edition*); left: P2 (shrunk), P4 (narrowed: ASN.1 to Advanced, remote kinds other than the Postgres snapshot Standard), P5 egress, P6 (palette locks only), P7 upgrade test, and DT-18 (`la-daily-feed` to Standard: not moved, still in `offerings/basic.toon`).** **the data layer by edition, under one product-wide edition switch: Basic gets a files-only "Add data" import (CSV / TSV, Parquet, JSON / NDJSON, Excel when the bundle carries the extension; no-code shaping), manual runs only, Expectations and quarantine; Standard keeps flowing Pipelines (automation, transformation, remote systems including databases, delivery Alerts, outbound delivery); Advanced adds ASN.1 and the telecom decoders, masking, scale and governance (plan 2026-10-21, merged 2026-10-22 with the unpublished draft `PIPELINE-EDITIONS-1`; every decision DT-1…DT-19 answered by the operator, the last on 2026-10-25, nothing built).** Gates name capabilities (`pipeline.automation`, `pipeline.transform`, `pipeline.egress`) plus two Offering moves (`connectors` out of Basic, `telecom-asn1` to Advanced), locked with a reason inside screens (DT-13); takes over D-LAE7…D-LAE11 from `archived-documents/plans-archive/la-edition-placement-changes-plan.md`. Phase 1 ("Add data", Basic and up) is built by `ONBOARDING-FIRST-RUN-1`; the gating phases are a breaking change for current Basic configurations and must refuse with a named feature (DT-9). → [`superpower/data-tier-editions-plan.md`](superpower/data-tier-editions-plan.md) [items: edition.basic, module.etl, module.acquire, module.engine, module.connectors, module.telecom-asn1, layer.platform · kind: feature]
 - **P3** · `ONBOARDING-REMOTE-SYSTEMS-1` — **Connect a system on Standard: Add data and the guided editor's Collect stage offer remote kinds (SFTP, object stores, other databases) with *Test connection* (DNS, port, auth, path, host key in plain words), browse a folder or table and pick a sample to drive the draft; grown from Basic's Postgres *Choose a table* flow (`BASIC-ONBOARD-1` P3) (first-run C6b / B6, split out 2026-11-05).** On Basic the kinds stay locked with their reason in the screens (DATA-TIERS-1 §5.3). → [`archived-documents/plans-archive/first-run-onboarding-plan.md`](archived-documents/plans-archive/first-run-onboarding-plan.md) §4 B6 [items: edition.standard, module.processor, module.connectors · kind: feature]
