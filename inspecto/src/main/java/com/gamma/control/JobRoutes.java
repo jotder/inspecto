@@ -62,7 +62,7 @@ final class JobRoutes implements RouteModule {
         api.get("/jobs", (e, m) -> {
             java.util.List<JobService.JobView> all =
                     HostContext.of(api).service().jobService().map(JobService::jobs).orElseGet(java.util.List::of);
-            return ApiContext.v1(e) ? jobsPage(all, e) : ApiContext.paged(all, e);
+            return withHeld(api, ApiContext.v1(e) ? jobsPage(all, e) : ApiContext.paged(all, e));
         });
         // Job CRUD (Scheduler write actions). Requires canAuthorWorkbench (W6; a no-op on Basic).
         // Persisted as <write-root>/jobs/<name>_job.toon; the write also hot-registers the job on the
@@ -615,7 +615,28 @@ final class JobRoutes implements RouteModule {
      * sorted list, mirroring the {@code /objects} adopter rather than the SQL-side {@code /jobs/runs} one.
      * The v1 envelope's {@code metadata.pagination} carries {@code cursor/nextCursor/limit/total}.
      */
-    private static Object jobsPage(java.util.List<JobService.JobView> all, HttpExchange e) {
+    /**
+     * SE-1b (D-SE12): an enabled Job the activation check holds gets {@code held: <reason>} on its row; every other row
+     * is the {@link JobService.JobView} unchanged (the record is public API, so the field is added here, not to it).
+     */
+    private static java.util.List<Object> withHeld(ApiContext api, java.util.List<JobService.JobView> rows) {
+        String space = HostContext.of(api).service().spaceId();
+        java.util.List<Object> out = new java.util.ArrayList<>(rows.size());
+        for (JobService.JobView v : rows) {
+            String held = v.enabled() ? com.gamma.pipeline.ActivationGate.reason(space, "job", v.name()) : null;
+            if (held == null) {
+                out.add(v);
+                continue;
+            }
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>(ApiContext.JSON.convertValue(v, java.util.Map.class));
+            m.put("held", held);
+            out.add(m);
+        }
+        return out;
+    }
+
+    private static java.util.List<JobService.JobView> jobsPage(java.util.List<JobService.JobView> all, HttpExchange e) {
         int limit = Math.max(1, Math.min(500, ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50)));
         String cursor = ApiContext.query(e, "cursor");
         java.util.List<String> key = Cursor.decode(cursor);

@@ -1469,6 +1469,15 @@ public final class JobService implements AutoCloseable {
             recordSkipped(name, trigger, "read-only: " + com.gamma.module.Entitlements.readOnlyReason());
             return;
         }
+        // SE-1b (D-SE12): a held Job acts as a disabled one - no AUTOMATIC run (cron, catch-up, on_pipeline,
+        // on_signal); a manual run, a replay and a dry run still go, as for a disabled Job. Recorded SKIPPED with why.
+        String held = automatic(trigger) ? com.gamma.pipeline.ActivationGate.reason(spaceId, "job", name) : null;
+        if (held != null) {
+            if (lane != null) lane.pending().decrementAndGet();
+            if (followUp != null) followUp.compareAndSet(runId, null);
+            recordSkipped(name, trigger, "held: " + held);
+            return;
+        }
         String start = LocalDateTime.now().format(TS);
         liveRuns.put(runId, new JobRun(runId, name, job.type(), trigger, start, null, "RUNNING", 0L, null));
         // The default space runs with no MDC (it is the fallback namespace everywhere); a named space sets it so
@@ -1494,6 +1503,12 @@ public final class JobService implements AutoCloseable {
                 if (scoped) MDC.remove(EventLog.SPACE_MDC_KEY);
             }
         });
+    }
+
+    /** The triggers an activation hold stops: the automatic ones a disabled Job does not fire either. */
+    static boolean automatic(String trigger) {
+        return trigger != null && (trigger.equals("schedule") || trigger.equals("catch-up")
+                || trigger.startsWith("event:") || trigger.startsWith("signal:"));
     }
 
     /** Blocks the worker thread (never the caller) until a slot is free under the installed bound
