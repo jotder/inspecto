@@ -609,13 +609,6 @@ final class JobRoutes implements RouteModule {
     }
 
     /**
-     * {@code GET /api/v1/jobs?limit=&cursor=} — one cursor-paginated page of the job registry, sorted by
-     * name (unique, so a single-part keyset resumes unambiguously). The registry is an in-memory
-     * materialized list (configured jobs — low-volume by design), so the keyset runs in-route over the
-     * sorted list, mirroring the {@code /objects} adopter rather than the SQL-side {@code /jobs/runs} one.
-     * The v1 envelope's {@code metadata.pagination} carries {@code cursor/nextCursor/limit/total}.
-     */
-    /**
      * SE-1b (D-SE12): an enabled Job the activation check holds gets {@code held: <reason>} on its row; every other row
      * is the {@link JobService.JobView} unchanged (the record is public API, so the field is added here, not to it).
      */
@@ -636,6 +629,13 @@ final class JobRoutes implements RouteModule {
         return out;
     }
 
+    /**
+     * {@code GET /api/v1/jobs?limit=&cursor=} — one cursor-paginated page of the job registry, sorted by
+     * name (unique, so a single-part keyset resumes unambiguously). The registry is an in-memory
+     * materialized list (configured jobs — low-volume by design), so the keyset runs in-route over the
+     * sorted list, mirroring the {@code /objects} adopter rather than the SQL-side {@code /jobs/runs} one.
+     * The v1 envelope's {@code metadata.pagination} carries {@code cursor/nextCursor/limit/total}.
+     */
     private static java.util.List<JobService.JobView> jobsPage(java.util.List<JobService.JobView> all, HttpExchange e) {
         int limit = Math.max(1, Math.min(500, ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50)));
         String cursor = ApiContext.query(e, "cursor");

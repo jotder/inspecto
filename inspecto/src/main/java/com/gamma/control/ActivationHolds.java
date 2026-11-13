@@ -6,7 +6,10 @@ import com.gamma.service.SpaceLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -30,8 +33,10 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * Inputs are the Space lock's latest report only ({@link SpaceLock#latest}): before the first report is ready nothing
  * is held, never on "computing" (D-SE1). Both holds need Standard or Advanced (D-LC5): on Basic nothing is held.
- * Kill switch {@code -Dspace.activation.holds=off}. A Space that opted into neither hold, or whose lock has no fact
- * about the object, reads no policy file: the check is in-memory map lookups.
+ * Kill switch {@code -Dspace.activation.holds=off}. An object the lock has no fact about costs in-memory map lookups
+ * only. Otherwise the Space's opt-ins ({@link #mode}) are read once and cached per Space, keyed on the edition and the
+ * modification time and size of {@code safety-policy.toon} and {@code approval.toon}: a check is then two file stats,
+ * and a file is read again only after it changed.
  */
 final class ActivationHolds {
 
@@ -82,9 +87,30 @@ final class ActivationHolds {
         }
     }
 
+    /** A Space's cached {@link Mode} and the stamp it was read under. */
+    private record CachedMode(String stamp, Mode mode) {}
+
+    private static final Map<String, CachedMode> MODES = new ConcurrentHashMap<>();
+
+    /** The Space's opt-ins: cached until the edition or either policy file (time, size) changes. */
     static Mode mode(String spaceId, Path configRoot) {
-        return new Mode("basic".equals(BootstrapRoutes.edition()), SpaceLinksMode.of(spaceId).refuses(),
+        String stamp = BootstrapRoutes.edition() + "|" + stamp(configRoot.resolve("safety-policy.toon")) + "|"
+                + stamp(configRoot.resolve(ApprovalPolicy.FILE));
+        CachedMode c = MODES.get(spaceId);
+        if (c != null && c.stamp().equals(stamp)) return c.mode();
+        Mode m = new Mode("basic".equals(BootstrapRoutes.edition()), SpaceLinksMode.of(spaceId).refuses(),
                 PendingChanges.governs(configRoot, "pipeline"), PendingChanges.governs(configRoot, "job"));
+        MODES.put(spaceId, new CachedMode(stamp, m));
+        return m;
+    }
+
+    private static String stamp(Path file) {
+        try {
+            BasicFileAttributes a = Files.readAttributes(file, BasicFileAttributes.class);
+            return a.lastModifiedTime().toMillis() + ":" + a.size();
+        } catch (IOException absent) {
+            return "-";
+        }
     }
 
     /** The holds {@code mode} puts on the object whose lock facts are {@code e}; empty when it may run. */
@@ -192,5 +218,6 @@ final class ActivationHolds {
     static void resetForTest() {
         HELD.clear();
         REFRESHED.clear();
+        MODES.clear();
     }
 }

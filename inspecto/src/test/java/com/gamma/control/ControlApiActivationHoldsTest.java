@@ -215,7 +215,9 @@ class ControlApiActivationHoldsTest {
             assertEquals("on_pipeline", hold.get("links").get(0).get("key").asText(), hold.toString());
             assertTrue(hold.get("reason").asText().contains("on_pipeline -> gone"), hold.toString());
 
-            JsonNode skipped = awaitRun(c, "alpha", "j_held", r -> scheduled(r, "SKIPPED"));
+            // a fire before the first report is not held (D-SE1) and may skip as "previous run still in flight"
+            JsonNode skipped = awaitRun(c, "alpha", "j_held",
+                    r -> scheduled(r, "SKIPPED") && r.get("message").asText().startsWith("held: "));
             assertTrue(skipped.get("message").asText().startsWith("held: this Space sets links: refuse-activation"),
                     skipped.toString());
             awaitRun(c, "alpha", "j_ok", r -> scheduled(r, "SUCCESS"));
@@ -270,13 +272,15 @@ class ControlApiActivationHoldsTest {
         String approval = "approval:\n  pipeline:\n    required: true\n";
         pipelineSpace(root, "gamma", approval);
         pipelineSpace(root, "delta", null);
+        pipelineSpace(root, "epsilon", "approval:\n  job:\n    required: true\n");   // governs another kind only
         try (Ctx c = open(root, true, false)) {
             JsonNode first = awaitReport(c, "gamma", n -> true);
             assertEquals(List.of(), held(first), "no baseline yet: nothing is changed outside " + first);
             assertEquals(List.of("pipeline"), mapper(first.get("activationHolds").get("changedOutside")));
             awaitReport(c, "delta", n -> true);
+            awaitReport(c, "epsilon", n -> true);
 
-            for (String space : List.of("gamma", "delta")) {
+            for (String space : List.of("gamma", "delta", "epsilon")) {
                 Path p = root.resolve(space + "/config/p_ok_pipeline.toon");
                 Files.writeString(p, Files.readString(p) + "description: edited by hand\n");
                 Files.setLastModifiedTime(p, FileTime.fromMillis(System.currentTimeMillis() - 3_600_000));
@@ -287,17 +291,58 @@ class ControlApiActivationHoldsTest {
             assertEquals("p_ok_pipeline.toon", g.get("held").get(0).get("path").asText());
             assertEquals(1, cycle(c, "gamma"), "the hand-edited Pipeline is held, the other runs");
             assertTrue(row(c, "gamma", "pipelines", "p_ok").get("held").asText().contains("integrity/accept"));
+            HttpResponse<String> refused = push(c, "gamma", "p_ok");
+            assertEquals(409, refused.statusCode(), "a held Pipeline takes no push (its inbox would strand): " + refused.body());
+            assertTrue(refused.body().contains("pipeline held: 'p_ok'") && refused.body().contains("integrity/accept"),
+                    refused.body());
 
             // falsifies the hold: the same hand edit in a Space with no approval policy is reported and runs
             JsonNode d = awaitReport(c, "delta", n -> n.get("changedOutside").get("total").asInt() == 1);
             assertEquals(List.of(), held(d), d.toString());
             assertEquals(2, cycle(c, "delta"), "D-LC4: without a policy the edit takes effect");
+            JsonNode e = awaitReport(c, "epsilon", n -> n.get("changedOutside").get("total").asInt() == 1);
+            assertEquals(List.of(), held(e), "a policy governing job only does not hold a Pipeline: " + e);
+            assertEquals(List.of("job"), mapper(e.get("activationHolds").get("changedOutside")));
+            assertEquals(2, cycle(c, "epsilon"), "a policy for another kind leaves the edited Pipeline running");
 
             HttpResponse<String> accept = send(c, "POST", "/spaces/gamma/integrity/accept",
                     "{\"paths\":[\"p_ok_pipeline.toon\"]}");
             assertEquals(200, accept.statusCode(), accept.body());
             assertEquals(2, cycle(c, "gamma"), "accepted: released at once, no restart");
             assertFalse(row(c, "gamma", "pipelines", "p_ok").has("held"));
+            HttpResponse<String> pushed = push(c, "gamma", "p_ok");
+            assertEquals(201, pushed.statusCode(), "accepted: the push lands again " + pushed.body());
+        }
+    }
+
+    /** A push of two CSV rows to the Stream of {@code pipeline} in {@code space}. */
+    private HttpResponse<String> push(Ctx c, String space, String pipeline) throws Exception {
+        String stream = null;
+        for (java.util.Map<String, Object> m : c.spaces().space(com.gamma.service.SpaceId.of(space)).orElseThrow()
+                .service().collectors())
+            if (pipeline.equals(m.get("pipeline"))) stream = String.valueOf(m.get("id"));
+        assertNotNull(stream, "no Stream for " + pipeline);
+        HttpRequest r = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1/spaces/" + space
+                        + "/streams/" + stream + "/records"))
+                .header("Content-Type", "text/csv").header("Authorization", "Bearer admin")
+                .POST(HttpRequest.BodyPublishers.ofString("ID,AMT,EVENT_DATE\nr1,1.5,2026-01-01\nr2,2.5,2026-01-02\n")).build();
+        return client.send(r, HttpResponse.BodyHandlers.ofString());
+    }
+
+    /** Fail open at the seam: a check that throws holds nothing, so every Pipeline still runs and no row says held. */
+    @Test
+    void aCheckThatThrowsHoldsNothingAndEveryPipelineRuns(@TempDir Path root) throws Exception {
+        pipelineSpace(root, "gamma", null);
+        try (Ctx c = open(root, true, false)) {
+            awaitReport(c, "gamma", n -> true);
+            com.gamma.pipeline.ActivationGate.install((space, kind, name) -> { throw new IllegalStateException("boom"); });
+            try {
+                assertEquals(2, cycle(c, "gamma"));
+                assertFalse(row(c, "gamma", "pipelines", "p_ok").has("held"));
+                assertEquals(201, push(c, "gamma", "p_ok").statusCode());
+            } finally {
+                com.gamma.pipeline.ActivationGate.install(null);
+            }
         }
     }
 

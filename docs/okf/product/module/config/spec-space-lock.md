@@ -225,8 +225,10 @@ links: refuse-activation
 One activation check, `ActivationHolds`, answers for a Space and a Pipeline id or Job name: held or not, and why.
 The control plane installs it into the engine seam `ActivationGate`, which both schedulers consult. A held object
 acts as an **inactive** one (a Pipeline with `active: false`, a Job with `enabled: false`): it stays loaded and
-listed, no automatic path runs it, and a manual run still goes, as for an inactive one. Every other object runs
-(plan §2 rule 4: a Space always boots).
+listed, no automatic path runs it, and a stream push to it is refused (409, as for a paused or inactive Pipeline,
+so a batch is never accepted into an inbox nothing drains). **A manual run of a held object still goes**, as for any
+inactive object ("Run now" on a Pipeline, `POST /jobs/{name}/trigger`, a replay or a dry run); whether hold 2 should
+also block manual runs is an open operator decision. Every other object runs (plan §2 rule 4: a Space always boots).
 
 | Hold | Applies when | Released by |
 |---|---|---|
@@ -243,8 +245,9 @@ listed, no automatic path runs it, and a manual run still goes, as for an inacti
   The hold is asked last, so a paused or inactive Pipeline costs nothing extra. The Job scheduler asks in
   `JobService.submitRun` for the automatic triggers (`schedule`, `catch-up`, `event:`, `signal:`); a held fire is
   recorded `SKIPPED` with `held: <reason>`, so the Job's run history says why.
-- **Cost.** A Space whose lock has no fact about the object reads no file: the check is in-memory lookups. Facts
-  present, the two policy files are read (as the save checks read them).
+- **Cost.** An object the lock has no fact about costs in-memory lookups only. Otherwise the Space's opt-ins are read
+  once and cached per Space, keyed on the edition and the modification time and size of `safety-policy.toon` and
+  `approval.toon`: a check is two file stats, and a policy file is read again only after it changed.
 - **Refresh.** There is no file watcher (§9), so in a Space that opted into either hold the check asks for a
   computation when the report is older than 30 s (considered at most every 30 s per Space). A hand fix or a hand
   edit is therefore seen within about 30 s plus the debounce. Until then a hand edit of a governed Pipeline runs
@@ -310,7 +313,10 @@ until accepted. The hold is §10a's second row: its file carries an `outside` ma
 added or moved; a removed file has nothing left to run) and the policy governs `pipeline` or `job`. The accept
 replaces the in-memory report at once, so the object runs on the next scheduler tick with no restart. Accepting a
 path the hold does not concern is harmless. A Space with no approval policy, or one that governs other kinds, is
-unaffected. Test: `ControlApiActivationHoldsTest.aGovernedPipelineEditedOnDiskIsHeldUntilAccepted`.
+unaffected. While held, an automatic run and a stream push are refused, but **a manual run still goes**, as for any
+inactive object (§10a); whether hold 2 should block manual runs too is left to the operator. Test:
+`ControlApiActivationHoldsTest.aGovernedPipelineEditedOnDiskIsHeldUntilAccepted` (a policy governing `job` only holds
+nothing on the same edit; a push answers 409 naming the hold, then 201 after the accept).
 
 ## 13. The count on the Spaces screen (LC-4)
 

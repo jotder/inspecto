@@ -3,6 +3,10 @@ package com.gamma.control;
 import com.gamma.service.ActivationFacts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import java.util.List;
 import java.util.Map;
@@ -74,10 +78,19 @@ class ActivationHoldsTest {
     }
 
     @Test
-    void anUntrackedSpaceOrTheKillSwitchHoldsNothing() {
+    void anUntrackedSpaceHoldsNothing() {
         assertNull(ActivationHolds.reason("no-such-space", "pipeline", "orders"), "no report: never held (D-SE1)");
-        System.setProperty(ActivationHolds.PROPERTY, "off");
-        assertFalse(ActivationHolds.enabled());
-        assertNull(ActivationHolds.reason("no-such-space", "pipeline", "orders"));
+    }
+
+    @Test
+    void theOptInsAreCachedUntilAPolicyFileChanges(@TempDir Path config) throws Exception {
+        ActivationHolds.resetForTest();
+        assertFalse(ActivationHolds.mode("cache-space", config).governsPipeline(), "no approval.toon: governs nothing");
+        Files.writeString(config.resolve("approval.toon"), "approval:\n  pipeline:\n    required: true\n");
+        assertTrue(ActivationHolds.mode("cache-space", config).governsPipeline(), "a new file is a new stamp: read again");
+        Files.writeString(config.resolve("approval.toon"), "approval:\n  job:\n    required: true\n  pipeline:\n    required: false\n");
+        ActivationHolds.Mode m = ActivationHolds.mode("cache-space", config);
+        assertFalse(m.governsPipeline(), m.toString());
+        assertTrue(m.governsJob(), m.toString());
     }
 }
