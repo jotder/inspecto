@@ -8,6 +8,7 @@ import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.LinkGraph;
 import com.gamma.util.AtomicFiles;
 import com.gamma.util.SpaceSecretKeys;
+import com.gamma.util.ToonHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,6 +34,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BooleanSupplier;
 
 /**
  * SE-1a — the Space lock ({@code docs/okf/product/module/config/spec-space-lock.md}): a derived, signed record
@@ -68,6 +70,14 @@ public final class SpaceLock {
     static final long SLACK_MS = 2000;
     /** Most items a report list or the {@code removedOutside} history holds. */
     static final int CAP = 200;
+    /** How long closing a Space waits for a running computation before skipping the close-time flush. */
+    static final long FLUSH_BUDGET_MS = 2000;
+
+    /** SE-2a kill switch for the opt-in hand-rename rewrite: {@code off} rewrites nothing anywhere (the report
+     *  stays); anything else (default) honours a Space's opt-in. */
+    public static final String RENAME_REWRITE_PROPERTY = "space.rename.rewrite";
+    /** The {@code space.toon} key by which one Space opts in to the hand-rename rewrite (D-SE3). Off by default. */
+    public static final String RENAME_REWRITE_KEY = "rename_rewrite";
 
     /** Suffix → kind, the loader's suffix-named configs (Space anatomy §4.2). */
     static final Map<String, String> SUFFIX_KINDS = suffixKinds();
@@ -158,22 +168,30 @@ public final class SpaceLock {
     }
 
     private static final Map<Path, State> STATES = new ConcurrentHashMap<>();
+    /** Config roots of Spaces closed by {@link #forget} and not started again: no new state is made for them, so a
+     *  request still bound to a deleted Space cannot recreate its folders. */
+    private static final Set<Path> FORGOTTEN = ConcurrentHashMap.newKeySet();
 
+    /** The state of {@code configRoot}; {@code null} once the Space was closed and not started again. */
     static State state(String spaceId, Path configRoot) {
         Path key = configRoot.toAbsolutePath().normalize();
+        if (FORGOTTEN.contains(key)) return null;
         return STATES.computeIfAbsent(key, k -> new State(spaceId, k));
     }
 
     /** A Space has started: compute its lock in the background. The boot path only schedules. */
     public static void afterBoot(String spaceId, Path configRoot) {
         if (configRoot == null || !enabled()) return;
-        schedule(state(spaceId, configRoot));
+        FORGOTTEN.remove(configRoot.toAbsolutePath().normalize());   // started (again): tracked from now on
+        State s = state(spaceId, configRoot);
+        if (s != null) schedule(s);
     }
 
     /** A mutating request bound to this Space begins; {@code null} when there is nothing to track. */
     public static Window writeStarted(String spaceId, Path configRoot) {
         if (configRoot == null || !enabled()) return null;
         State s = state(spaceId, configRoot);
+        if (s == null) return null;
         Window w = new Window();
         synchronized (s) {
             s.windows.add(w);
@@ -232,7 +250,8 @@ public final class SpaceLock {
             for (Window w : taken) if (w.end != 0) ended.add(w);
         }
         try {
-            s.last = compute(s.spaceId, s.configRoot, taken);
+            s.last = compute(s.spaceId, s.configRoot, taken, () -> s.closed);
+            rewriteRenames(s);
         } catch (RuntimeException | IOException ex) {
             log.warn("[SPACE-LOCK] could not compute the lock of Space '{}': {}", s.spaceId, ex.toString());
             s.last = Report.failed(ex.toString());
@@ -243,30 +262,45 @@ public final class SpaceLock {
     }
 
     /**
-     * The Space is closing: cancel its pending computation and wait (bounded) for a running one. A server write not
-     * yet in a lock is flushed now — dropped, its window would be lost and the next boot would report the file as
-     * changed outside the server. Never throws.
+     * The Space is closing (called after its service closed, so the store drain keeps its whole close budget): no new
+     * state is made for this root until it starts again, its pending computation is cancelled, and a server write not
+     * yet in a lock is flushed — dropped, its window would be lost and the next boot would report the file as changed
+     * outside the server. A running computation is waited for at most {@link #FLUSH_BUDGET_MS}; past that the flush is
+     * skipped and logged. A computation still running sees {@code closed} and writes nothing. Never throws.
      */
     public static void forget(Path configRoot) {
         if (configRoot == null) return;
-        State s = STATES.remove(configRoot.toAbsolutePath().normalize());
+        Path key = configRoot.toAbsolutePath().normalize();
+        FORGOTTEN.add(key);
+        State s = STATES.remove(key);
         if (s == null) return;
         synchronized (s) {
             s.closed = true;
             if (s.pending != null) s.pending.cancel(false);
         }
         try {
-            if (s.computing.tryLock(10, TimeUnit.SECONDS)) {
-                try {
-                    boolean unrecorded;
-                    synchronized (s) {
-                        unrecorded = s.windows.stream().anyMatch(w -> w.end != 0);
-                    }
-                    if (unrecorded && enabled()) computeNow(s);
-                } finally {
-                    s.computing.unlock();
-                }
+            boolean unrecorded;
+            synchronized (s) {
+                unrecorded = s.windows.stream().anyMatch(w -> w.end != 0);
             }
+            if (!unrecorded || !enabled()) return;
+            if (!s.computing.tryLock(FLUSH_BUDGET_MS, TimeUnit.MILLISECONDS)) {
+                log.warn("[SPACE-LOCK] Space '{}' closed while its lock was computing; the close-time flush was skipped "
+                        + "after {} ms, so the next start may report its last server writes as changed outside the "
+                        + "server", s.spaceId, FLUSH_BUDGET_MS);
+                return;
+            }
+            try {
+                List<Window> taken;
+                synchronized (s) {
+                    taken = List.copyOf(s.windows);
+                }
+                compute(s.spaceId, s.configRoot, taken, () -> false);   // gone folder: compute writes nothing
+            } finally {
+                s.computing.unlock();
+            }
+        } catch (IOException ex) {
+            log.warn("[SPACE-LOCK] could not flush the lock of Space '{}' at close: {}", s.spaceId, ex.toString());
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
         } catch (RuntimeException ex) {
@@ -274,10 +308,37 @@ public final class SpaceLock {
         }
     }
 
+    /** Tests: block the lock's thread until the returned action runs, so nothing computes meanwhile. */
+    static Runnable holdThreadForTest() {
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch held = new java.util.concurrent.CountDownLatch(1);
+        EXEC.execute(() -> {
+            held.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        try {
+            held.await();
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
+        return release::countDown;
+    }
+
+    /** Tests: the computing lock of a tracked Space ({@code null} when untracked). */
+    static ReentrantLock computingForTest(Path configRoot) {
+        State s = STATES.get(configRoot.toAbsolutePath().normalize());
+        return s == null ? null : s.computing;
+    }
+
     /** The last report; {@code computing} until the first is ready (and the first read schedules one). */
     public static Report report(String spaceId, Path configRoot) {
         if (!enabled()) return Report.of("disabled");
         State s = state(spaceId, configRoot);
+        if (s == null) return Report.of("closed");
         boolean pending;
         synchronized (s) {
             if (!s.scheduledOnce) schedule(s);
@@ -318,7 +379,17 @@ public final class SpaceLock {
      * {@code windows} are the server writes since the previous computation (empty at boot).
      */
     public static Report compute(String spaceId, Path configRoot, List<Window> windows) throws IOException {
+        return compute(spaceId, configRoot, windows, () -> false);
+    }
+
+    /**
+     * {@link #compute(String, Path, List)}, writing nothing once {@code stop} answers true (the Space closed while
+     * this ran) and nothing at all for a config root that no longer exists (a deleted Space): no lock, no
+     * {@code .inspecto/}, no key folder is ever recreated.
+     */
+    static Report compute(String spaceId, Path configRoot, List<Window> windows, BooleanSupplier stop) throws IOException {
         Path root = configRoot.toAbsolutePath().normalize();
+        if (!Files.isDirectory(root)) return Report.of("absent");
         Path lockFile = file(root);
         long now = System.currentTimeMillis();
         String nowIso = Instant.ofEpochMilli(now).toString();
@@ -339,6 +410,7 @@ public final class SpaceLock {
 
         Set<String> usedUids = new HashSet<>();
         List<Map<String, Object>> files = new ArrayList<>();
+        List<Map<String, Object>> renamesFound = new ArrayList<>();
         for (Scanned sc : scanned) {
             Map<String, Object> before = prevByPath.get(sc.path());
             String change = null;
@@ -372,7 +444,33 @@ public final class SpaceLock {
             }
             if (outside != null) f.put("outside", outside);
             files.add(f);
+            // SE-2a: the same uid under a new id is a rename, whoever made it (a hand edit, or a move unchanged)
+            if (before != null && uid.equals(str(before.get("uid"))) && sc.kind().equals(str(before.get("kind")))
+                    && before.get("id") != null
+                    && !sc.id().equals(str(before.get("id")))) {
+                Map<String, Object> rn = new LinkedHashMap<>();
+                rn.put("kind", sc.kind());
+                rn.put("uid", uid);
+                rn.put("from", before.get("id"));
+                rn.put("to", sc.id());
+                rn.put("path", sc.path());
+                rn.put("at", nowIso);
+                renamesFound.add(rn);
+            }
         }
+        List<Map<String, Object>> deletesFound = new ArrayList<>();
+        if (prev != null) for (Map<String, Object> f : maps(prev.get("files"))) {
+            if (usedUids.contains(str(f.get("uid")))) continue;
+            Map<String, Object> d = new LinkedHashMap<>();
+            d.put("kind", f.get("kind"));
+            d.put("uid", f.get("uid"));
+            d.put("id", f.get("id"));
+            d.put("path", f.get("path"));
+            d.put("at", nowIso);
+            deletesFound.add(d);
+        }
+        Set<String> liveClaims = new HashSet<>();
+        for (Scanned sc : scanned) liveClaims.add(claim(sc.kind(), sc.id()));
 
         List<Map<String, Object>> removed = new ArrayList<>();
         if (prev != null) {
@@ -405,6 +503,11 @@ public final class SpaceLock {
             links.add(l);
         }
 
+        List<Map<String, Object>> renamed = identity(prev == null ? null : prev.get("renamed"), renamesFound, "from",
+                graph, root, liveClaims);
+        List<Map<String, Object>> deleted = identity(prev == null ? null : prev.get("deleted"), deletesFound, "id",
+                graph, root, liveClaims);
+
         // SE-3a: per Schema its published column set, the consumers of each column and the changes since the
         // previous lock (ColumnContract). Absent under -Dcolumn.contract=off.
         ColumnContract.Section columns = null;
@@ -426,9 +529,14 @@ public final class SpaceLock {
         lock.put("links", links);
         if (columns != null) lock.put("columns", columns.entries());
 
+        lock.put("renamed", renamed);
+        lock.put("deleted", deleted);
+
         String writtenAt;
         if (prev != null && sameContent(prev, lock)) {
             writtenAt = str(prev.get("computedAt"));
+        } else if (stop.getAsBoolean() || !Files.isDirectory(root)) {
+            return Report.of("closed");   // closed or deleted while this ran: write nothing, create no folder
         } else {
             lock.put("mac", mac(root, lock));
             Files.createDirectories(lockFile.getParent());
@@ -438,7 +546,161 @@ public final class SpaceLock {
         SpaceLockEvents.emit(spaceId, prev, files, removed, links, nowIso);   // LC-4/LC-6: new findings only
         Report r = ready(nowIso, writtenAt, prev != null, note[0], files, removed, links);
         r.body().put("columnChanges", columns == null ? Map.of("status", "disabled") : columns.report());
+        List<Map<String, Object>> renamedReport = new ArrayList<>(), deletedReport = new ArrayList<>();
+        for (Map<String, Object> e : renamed) {
+            Map<String, Object> m = new LinkedHashMap<>(e);
+            m.put("referrers", referrers(graph, root, str(e.get("kind")), str(e.get("from"))));
+            renamedReport.add(m);
+        }
+        for (Map<String, Object> e : deleted) {
+            Map<String, Object> m = new LinkedHashMap<>(e);
+            m.put("dependents", referrers(graph, root, str(e.get("kind")), str(e.get("id"))));
+            deletedReport.add(m);
+        }
+        r.body().put("renamed", bounded(renamedReport));
+        r.body().put("deleted", bounded(deletedReport));
+        r.body().put("renameRewrite", renameRewriteMode(root));
         return r;
+    }
+
+    // ── SE-2a: hand renames and deletes ─────────────────────────────────────────────────────
+
+    /**
+     * The renames ({@code uid} kept, id changed) and deletes ({@code uid} gone) still worth reporting: the previous
+     * lock's entries plus this computation's, each kept while something still names the old id and no live config of
+     * that kind has taken the id again; at most {@link #CAP}, newest last.
+     */
+    private static List<Map<String, Object>> identity(Object prevEntries, List<Map<String, Object>> found, String idKey,
+                                                      LinkGraph graph, Path root, Set<String> liveClaims) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        List<Map<String, Object>> all = new ArrayList<>(maps(prevEntries));
+        all.addAll(found);
+        Set<String> seen = new HashSet<>();
+        for (Map<String, Object> e : all) {
+            String kind = str(e.get("kind")), old = str(e.get(idKey));
+            String claim = claim(kind, old);
+            if (old == null || liveClaims.contains(claim) || !seen.add(claim + "\n" + e.get("uid"))) continue;
+            if (referrers(graph, root, kind, old).isEmpty()) continue;
+            out.add(e);
+        }
+        return out.size() > CAP ? new ArrayList<>(out.subList(out.size() - CAP, out.size())) : out;
+    }
+
+    private static String claim(String kind, String id) {
+        return (kind + ":" + id).toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * The configs whose links still name {@code id} of {@code kind}: for a Pipeline the census links its rename
+     * rewrites ({@link PipelineLinkRewrite#holders}, its store included), for any other kind the links whose target
+     * kind is that kind and whose value is the id (trimmed, case-insensitive).
+     */
+    private static List<Map<String, Object>> referrers(LinkGraph graph, Path root, String kind, String id) {
+        Map<List<Object>, Map<String, Object>> out = new LinkedHashMap<>();
+        if ("pipeline".equals(kind)) {
+            for (PipelineLinkRewrite.Holder h : PipelineLinkRewrite.holders(graph, id, k -> true)) {
+                List<String> keys = new ArrayList<>();
+                for (com.gamma.pipeline.LinkCensus.Link l : h.links()) keys.add(l.keyPath());
+                keys.sort(null);
+                out.put(List.of(h.kind(), String.valueOf(h.file()), h.name()), referrer(root, h.kind(), h.file(), h.name(), keys));
+            }
+        } else {
+            for (LinkGraph.Edge e : graph.edges()) {
+                if (!kind.equals(e.toKind()) || e.value() == null || !e.value().trim().equalsIgnoreCase(id)) continue;
+                Map<String, Object> m = out.computeIfAbsent(List.of(e.fromKind(), String.valueOf(e.file()), e.fromName()),
+                        k -> referrer(root, e.fromKind(), e.file(), e.fromName(), new ArrayList<>()));
+                @SuppressWarnings("unchecked") List<String> keys = (List<String>) m.get("keys");
+                if (!keys.contains(e.key())) keys.add(e.key());
+            }
+        }
+        return List.copyOf(out.values());
+    }
+
+    private static Map<String, Object> referrer(Path root, String kind, Path file, String name, List<String> keys) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("kind", kind);
+        m.put("name", name);
+        m.put("path", file == null ? null : rel(root, file));
+        m.put("keys", keys);
+        return m;
+    }
+
+    /** {@code rewrite} when this Space opted in and the kill switch allows it, {@code disabled} under the kill switch,
+     *  else {@code report} (the default). */
+    static String renameRewriteMode(Path configRoot) {
+        if ("off".equalsIgnoreCase(System.getProperty(RENAME_REWRITE_PROPERTY, "on").trim())) return "disabled";
+        return optedIn(configRoot) ? "rewrite" : "report";
+    }
+
+    /** Whether the Space's {@code space.toon} (beside {@code config/}) says {@code rename_rewrite: true}. */
+    static boolean optedIn(Path configRoot) {
+        Path manifest = configRoot.toAbsolutePath().normalize().getParent().resolve("space.toon");
+        if (!Files.isRegularFile(manifest)) return false;
+        try {
+            return "true".equalsIgnoreCase(ToonHelper.opt(ToonHelper.load(manifest.toString()), RENAME_REWRITE_KEY, "").trim());
+        } catch (Exception unreadable) {
+            return false;   // an unreadable manifest never opts a Space in
+        }
+    }
+
+    /** What the opt-in rewrite did for one rename: holders rewritten, or the governed ones that stopped it. */
+    public record RewriteResult(int rewritten, List<String> held) {}
+
+    /** The census rewrite of a renamed Pipeline's dependents, installed by the control plane (the rename route's). */
+    @FunctionalInterface
+    public interface Rewriter {
+        RewriteResult rewrite(Path configRoot, String oldId, String newId);
+    }
+
+    private static volatile Rewriter rewriter;
+
+    /** Install the rename route's census rewrite; until then an opted-in Space is only reported. */
+    public static void installRewriter(Rewriter r) {
+        rewriter = r;
+    }
+
+    /**
+     * After a computation of an opted-in Space: rewrite the dependents of each Pipeline rename it reports, inside a
+     * server write window (so the rewritten files are not reported as outside edits), then recompute. The result is
+     * recorded on the report's rename entry and logged. Caller holds {@code s.computing}.
+     */
+    @SuppressWarnings("unchecked")
+    private static void rewriteRenames(State s) {
+        Report r = s.last;
+        Rewriter rw = rewriter;
+        if (rw == null || r == null || s.closed || !"rewrite".equals(r.body().get("renameRewrite"))) return;
+        List<Map<String, Object>> items = (List<Map<String, Object>>) ((Map<String, Object>) r.body().get("renamed")).get("items");
+        boolean wrote = false;
+        List<Window> opened = new ArrayList<>();
+        for (Map<String, Object> e : items) {
+            if (!"pipeline".equals(e.get("kind")) || ((List<?>) e.get("referrers")).isEmpty()) continue;
+            String from = str(e.get("from")), to = str(e.get("to"));
+            Window w = new Window();
+            opened.add(w);
+            synchronized (s) {
+                s.windows.add(w);
+            }
+            try {
+                RewriteResult res = rw.rewrite(s.configRoot, from, to);
+                e.put("rewrite", Map.of("rewritten", res.rewritten(), "held", res.held()));
+                if (!res.held().isEmpty())
+                    log.warn("[SPACE-LOCK] Space '{}': hand rename '{}' -> '{}' not rewritten: the approval policy holds {}",
+                            s.spaceId, from, to, res.held());
+                else log.info("[SPACE-LOCK] Space '{}': hand rename '{}' -> '{}' rewrote {} dependent(s)",
+                        s.spaceId, from, to, res.rewritten());
+                wrote |= res.rewritten() > 0;
+            } catch (RuntimeException ex) {
+                e.put("rewrite", Map.of("error", ex.toString()));
+                log.warn("[SPACE-LOCK] Space '{}': rewrite of hand rename '{}' -> '{}' failed: {}", s.spaceId, from, to,
+                        ex.toString());
+            } finally {
+                w.end = System.currentTimeMillis();
+            }
+        }
+        if (wrote) schedule(s);
+        else synchronized (s) {
+            s.windows.removeAll(opened);   // nothing written: nothing to attribute
+        }
     }
 
     private static boolean byServer(String change, long mtime, List<Window> windows, boolean anyWindow, long now) {

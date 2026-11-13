@@ -37,6 +37,7 @@ public final class SpaceLockAccept {
      */
     public static Result accept(String spaceId, Path configRoot, Collection<String> paths) throws IOException {
         SpaceLock.State s = SpaceLock.state(spaceId, configRoot);
+        if (s == null) throw new IOException("the Space is closed");   // closed and not started again (SpaceLock.forget)
         s.computing.lock();
         try {
             if (s.closed) throw new IOException("the Space is closing");
