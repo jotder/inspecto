@@ -23,19 +23,27 @@ const END = '<!-- link-census:end -->';
 
 /** The census links, in declaration order. */
 export function parseCensus(src) {
-    const start = src.indexOf('LINKS = List.of(');
+    // Comments go first (a `));` or a `link(` inside one must neither end the list nor count), keeping strings.
+    const code = src.replace(/"(?:[^"\\]|\\.)*"|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (t) => (t.startsWith('"') ? t : ' '));
+    const start = code.indexOf('LINKS = List.of(');
     if (start < 0) throw new Error(`${CENSUS}: no "LINKS = List.of(" — the render's anchor moved`);
-    const body = src.slice(start, src.indexOf('));', start) + 2);
+    const body = code.slice(start, code.indexOf('));', start) + 3);
+    const calls = [...body.matchAll(/\blink\(/g)].length;
     const links = [];
-    for (const raw of body.split('\n')) {
-        const line = raw.replace(/\/\/.*$/, '').trim();
-        if (!line.startsWith('link(')) continue;
-        const m = line.match(/^link\("([^"]+)",\s*"([^"]+)",\s*"([^"]+)",\s*Type\.([A-Z_]+),\s*([A-Z]+),\s*([A-Z]+)((?:,\s*[A-Z]+)*)\)/);
-        if (!m) throw new Error(`${CENSUS}: a link line the render cannot read: ${line}`);
+    const CALL = /\blink\(\s*"([^"]+)",\s*"([^"]+)",\s*"([^"]+)",\s*Type\.([A-Z_]+),\s*([A-Z]+),\s*([A-Z]+)((?:,\s*[A-Z]+)*)\s*\)/g;
+    for (const m of body.matchAll(CALL)) {
         const checks = m[7].split(',').map((s) => s.trim()).filter(Boolean);
+        for (const c of checks) if (!(c in CHECK)) throw new Error(`${CENSUS}: check ${c} has no label in the render — add it to CHECK`);
         links.push({ from: m[1], key: m[2], to: m[3], type: m[4], onDelete: m[5], onRename: m[6], checks });
     }
     if (links.length === 0) throw new Error(`${CENSUS}: read no link — the render's parse broke`);
+    if (links.length !== calls)
+        throw new Error(`${CENSUS}: ${calls} link( call(s) in LINKS but the render read ${links.length} — a call it cannot read`);
+    // Link.storePath(): the links whose value is a data path under the Space data root (first segment = the store).
+    const sp = code.slice(code.indexOf('boolean storePath()'));
+    const pairs = [...sp.slice(0, sp.indexOf('}')).matchAll(/fromKind\.equals\("([^"]+)"\)\s*&&\s*keyPath\.equals\("([^"]+)"\)/g)];
+    if (pairs.length === 0) throw new Error(`${CENSUS}: read no pair from Link.storePath() — the render's parse broke`);
+    for (const l of links) l.storePath = pairs.some((m) => m[1] === l.from && m[2] === l.key);
     return links;
 }
 
@@ -60,7 +68,7 @@ const kind = (k) => KIND[k] ?? `\`${k}\``;
 export function renderTable(links) {
     const rows = links.map((l) => {
         const checks = CHECK_ORDER.filter((c) => l.checks.includes(c)).map((c) => CHECK[c] ?? c.toLowerCase());
-        return `| ${kind(l.from)} | \`${l.key}\` | ${kind(l.to)} | ${TYPE[l.type] ?? l.type} | `
+        return `| ${kind(l.from)} | \`${l.key}\` | ${kind(l.to)} | ${l.storePath ? 'data path; its first segment names the store' : TYPE[l.type] ?? l.type} | `
             + `${l.onDelete.toLowerCase()} | ${l.onRename.toLowerCase()} | ${checks.length ? checks.join(', ') : '**none**'} |`;
     });
     return [BEGIN,

@@ -342,7 +342,7 @@ resolves is judged by the LC-3 delete and save checks below and reported by the 
 | Job | `dir` | directory | path | warn | report | **none** |
 | Job | `on_signal` | signal | text | warn | report | **none** |
 | Job | `when` | signal | text | warn | report | **none** |
-| Expectation | `target` | Pipeline | id | refuse | rewrite | rename, impact, validate |
+| Expectation | `target` | Pipeline | data path; its first segment names the store | refuse | rewrite | rename, impact, validate |
 | Expectation | `column` | column | column name | warn | report | impact, validate |
 | Expectation | `refDataset` | store | store name | warn | report | **none** |
 | Expectation | `refColumn` | column | column name | warn | report | impact, validate |
@@ -350,7 +350,7 @@ resolves is judged by the LC-3 delete and save checks below and reported by the 
 | Decision Rule | `target` | Pipeline | id | refuse | rewrite | rename, impact, validate |
 | Decision Rule | `when.**.field` | column | column name | warn | report | impact, validate |
 | Dataset | `sourceName` | store | store name | refuse | rewrite | rename, impact |
-| Dataset | `physicalRef` | store | store name | refuse | rewrite | rename, impact, validate |
+| Dataset | `physicalRef` | store | data path; its first segment names the store | refuse | rewrite | rename, impact, validate |
 | Dataset | `sql` | store | SQL relation | refuse | rewrite | rename |
 | Dataset | `sql` | column | SQL column | warn | report | impact, validate |
 | Dataset | `dateField` | column | column name | warn | report | impact, validate |

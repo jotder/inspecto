@@ -10,12 +10,27 @@ import { parseCensus, renderTable, splice } from './render-space-links.mjs';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const census = readFileSync(join(root, 'platform/inspecto-engine/src/main/java/com/gamma/pipeline/LinkCensus.java'), 'utf8');
 
-test('the parse reads one link per link( line of the census', () => {
-    const body = census.slice(census.indexOf('LINKS = List.of('), census.indexOf('));', census.indexOf('LINKS = List.of(')));
-    const lines = body.split('\n').filter((l) => l.trim().startsWith('link('));
+test('the parse reads the census', () => {
     const links = parseCensus(census);
-    assert.equal(links.length, lines.length);
+    assert.ok(links.length >= 40);
     assert.ok(links.some((l) => l.from === 'job' && l.key === 'on_pipeline' && l.type === 'ID_LIST'));
+});
+
+const SP = ' boolean storePath() { return fromKind.equals("z") && keyPath.equals("z"); }';
+const L = (from) => `link("${from}", "k", "t", Type.ID, REFUSE, REWRITE, LOAD)`;
+
+test('a comment holding )); or link( neither ends the list nor counts', () => {
+    const src = `LINKS = List.of(\n  ${L('a')},\n  // )); and link("x", "y", "z", Type.ID, WARN, REPORT)\n  /* ${L('b')}, */\n  ${L('c')});` + SP;
+    assert.deepEqual(parseCensus(src).map((l) => l.from), ['a', 'c']);
+});
+
+test('two links on one line and one link across lines are both read', () => {
+    const src = `LINKS = List.of(\n  ${L('a')}, ${L('b')},\n  link("c", "k",\n       "t", Type.ID, WARN, REPORT));` + SP;
+    assert.deepEqual(parseCensus(src).map((l) => l.from), ['a', 'b', 'c']);
+});
+
+test('a check the render has no label for fails loudly', () => {
+    assert.throws(() => parseCensus('LINKS = List.of(\n  link("a", "k", "t", Type.ID, WARN, REPORT, AUDIT));'), /no label/);
 });
 
 test('a link line the parse cannot read fails loudly', () => {
