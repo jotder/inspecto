@@ -1,10 +1,15 @@
 # Space evolution — a Space the server understands as a whole, reached without breaking one
 
-**State:** IN PROGRESS — D-SE1…D-SE13 answered (§6); SE-0, SE-6a, SE-1a, SE-3a, SE-5a, SE-5b, SE-6b, SE-2a and SE-3b built (table below); what is left is gated (§5), with D-SE10…D-SE13 started.
-Board row `SPACE-EVOLUTION-1`.
-**Depends on:** [`2026-11-11-space-link-census-plan.md`](2026-11-11-space-link-census-plan.md) phase LC-1
-(the declared link census and its graph). This plan does not repeat that design; it builds on it.
-**As-built today:** [Space anatomy](../okf/product/module/config/architecture-space-anatomy.md).
+> **Plan page** for Product Map Item `module.config`. **State:** every startable step built and pushed 2026-11-12/13
+> (table below); what is left is **gated on releases by the operator's own decisions** and open on the board as
+> `SPACE-EVOLUTION-1` (hold: operator): making enforcement the default for new Spaces after two releases of clean
+> shadow counted from the 2026-11-13 baseline (D-SE2, D-LC3), and SE-4 steps 2-3 one release after the step-1 readers
+> (§2 rule 2, D-SE8). The working plan is archived at
+> `archived-documents/plans-archive/2026-11-11-space-evolution-plan.md` (provenance only; this page is current).
+> **Builds on** the link census, `SPACE-LINK-CENSUS-1` ([plan](../../../../superpower/2026-11-11-space-link-census-plan.md)).
+> **As-built detail:** [Space anatomy](architecture-space-anatomy.md), [Space lock](spec-space-lock.md),
+> [column contract](spec-column-contract.md), [Space origin](spec-space-origin.md),
+> [promotion](spec-space-promotion.md), [tests in a Space](spec-space-tests.md).
 
 ## Progress
 

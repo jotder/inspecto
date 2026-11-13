@@ -19,7 +19,7 @@ import java.util.TreeSet;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * D-SE10 finding baseline ({@code docs/superpower/2026-11-11-space-evolution-plan.md} §3): every shadow finding the
+ * D-SE10 finding baseline ({@code docs/okf/product/module/config/plan-space-evolution.md} §3): every shadow finding the
  * built checks produce on every shipped Space and Space Template, unchanged, computed over a temp copy — the
  * integrity report (broken links, duplicates; changed-outside, renamed and deleted must be empty on a fresh copy and
  * on a recomputation), the column contract (no change on a recomputation), the link census dangling links (what the

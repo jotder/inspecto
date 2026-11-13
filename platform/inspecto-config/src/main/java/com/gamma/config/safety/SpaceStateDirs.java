@@ -11,7 +11,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 /**
- * The state zone of a Space, step 1: <b>readers only</b> (SE-4, D-SE13 — {@code docs/superpower/2026-11-11-space-evolution-plan.md}
+ * The state zone of a Space, step 1: <b>readers only</b> (SE-4, D-SE13 — {@code docs/okf/product/module/config/plan-space-evolution.md}
  * §4.4). What the server writes about config moves, in a later release, from {@code spaces/<id>/config/<dir>} to
  * {@code spaces/<id>/state/<dir>}. This release only <i>reads</i> there, so a Space a newer release has moved (or half
  * moved) still reads every record:

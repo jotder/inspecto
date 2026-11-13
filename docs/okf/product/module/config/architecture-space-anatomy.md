@@ -184,7 +184,7 @@ These live in the config tree but are written by the server, never by hand or by
 ### 4.7 The state zone — `state/` beside `config/` (SE-4 step 1: readers only)
 
 The directories of §4.6 are to leave `config/` for `spaces/<id>/state/<dir>`, so that `config/` holds only what
-people author ([Space evolution plan](../../../../superpower/2026-11-11-space-evolution-plan.md) §4.4, D-SE5).
+people author ([Space evolution plan](plan-space-evolution.md) §4.4, D-SE5).
 Readers ship one release before any writer (D-SE13). **Step 1, built 2026-11-13, is the readers only:** nothing moves,
 nothing is written under `state/`, and no shipped Space or Space Template has a `state/` folder. `.history/` does not
 move (D-SE6). `ReservedConfigPaths` keeps reserving the old `config/` locations.

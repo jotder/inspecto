@@ -195,7 +195,7 @@ columns: refuse-breaking
 
 ## References
 
-- Plan: `docs/superpower/2026-11-11-space-evolution-plan.md` §4.3, D-SE4.
+- Plan: `docs/okf/product/module/config/plan-space-evolution.md` §4.3, D-SE4.
 - Space lock: [spec-space-lock.md](spec-space-lock.md).
 - Census: `platform/inspecto-engine/src/main/java/com/gamma/pipeline/ColumnSets.java`, `LinkGraph.java`.
 - Code: `inspecto/src/main/java/com/gamma/service/ColumnContract.java`, `SpaceLock.java`,

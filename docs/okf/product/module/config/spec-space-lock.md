@@ -398,7 +398,7 @@ clock stops until it is resolved.
 
 ## References
 
-- Plan: `docs/superpower/2026-11-11-space-evolution-plan.md` §4.1, §4.2, D-SE1.
+- Plan: `docs/okf/product/module/config/plan-space-evolution.md` §4.1, §4.2, D-SE1.
 - Link census: `platform/inspecto-engine/src/main/java/com/gamma/pipeline/LinkCensus.java`, `LinkGraph.java`.
 - Folder layout: [Space anatomy](architecture-space-anatomy.md).
 - Code: `inspecto/src/main/java/com/gamma/service/SpaceLock.java`,
