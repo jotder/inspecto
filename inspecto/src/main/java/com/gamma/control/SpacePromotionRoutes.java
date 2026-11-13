@@ -126,6 +126,14 @@ final class SpacePromotionRoutes implements RouteModule {
         return ApiContext.respondJson(e, 422, refusal);
     }
 
+    private static Object broken(HttpExchange e, SpacePromotion.BrokenByBinding broken) throws IOException {
+        Map<String, Object> refusal = new LinkedHashMap<>();
+        refusal.put("error", "binding the parameters makes " + broken.paths + " unreadable (a value with a comma in an "
+                + "array row, say); nothing was written");
+        refusal.put("brokenByParameters", broken.paths);
+        return ApiContext.respondJson(e, 422, refusal);
+    }
+
     private Object preview(ApiContext api, HttpExchange e) throws IOException {
         Path root = configRoot(api);
         Request r = request(api, e, false);
@@ -135,6 +143,8 @@ final class SpacePromotionRoutes implements RouteModule {
             cs = SpacePromotion.compute(root, r.bundle(), r.parameters(), space);
         } catch (SpacePromotion.MissingParameters m) {
             return missing(e, m);
+        } catch (SpacePromotion.BrokenByBinding b) {
+            return broken(e, b);
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("space", space);
@@ -167,6 +177,8 @@ final class SpacePromotionRoutes implements RouteModule {
             cs = SpacePromotion.compute(root, r.bundle(), r.parameters(), space);
         } catch (SpacePromotion.MissingParameters m) {
             return missing(e, m);
+        } catch (SpacePromotion.BrokenByBinding b) {
+            return broken(e, b);
         }
         List<SpacePromotion.Change> applied = new ArrayList<>(cs.of("add"));
         applied.addAll(cs.of("change"));
@@ -270,6 +282,7 @@ final class SpacePromotionRoutes implements RouteModule {
         for (Map.Entry<Path, byte[]> gone : removed.entrySet()) {
             String p = root.relativize(gone.getKey()).toString().replace('\\', '/');
             if (p.endsWith("_pipeline.toon")) service.unregisterPipeline(gone.getKey());
+            if ("job".equals(SpacePromotion.kindOf(p))) removeJob(root, service, gone.getValue());
             if (SpacePromotion.isConnection(p)) {
                 try {
                     Map<String, Object> doc = ConfigCodec.toMap(new String(gone.getValue(), StandardCharsets.UTF_8));
@@ -282,6 +295,25 @@ final class SpacePromotionRoutes implements RouteModule {
         }
         service.refreshConfigs();
         return result(space, cs, written, removedPaths, removals);
+    }
+
+    /**
+     * A removed Job stops now, as after {@code DELETE /jobs/{name}}: dropped from the running JobService, its publication
+     * and attachment approvals forgotten (a re-created Job needs new ones). An added or changed Job is read at the next
+     * restart, as after {@code POST /import}.
+     */
+    private static void removeJob(Path root, com.gamma.service.CollectorService service, byte[] removed) throws IOException {
+        Map<String, Object> doc;
+        try {
+            doc = ConfigCodec.toMap(new String(removed, StandardCharsets.UTF_8));
+        } catch (RuntimeException unparseable) {
+            return;   // the loader never ran a Job it could not read
+        }
+        String name = JobWriteGuard.name(doc);
+        if (name == null || name.isBlank()) return;
+        service.jobService().ifPresent(js -> js.removeJob(name));
+        com.gamma.job.PublicationApproval.forget(root, name);
+        JobWriteGuard.revokeOnDelete(JobRoutes.KIND, null, doc, root);
     }
 
     private static Map<String, Object> result(String space, SpacePromotion.ChangeSet cs, List<String> written,

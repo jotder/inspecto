@@ -67,9 +67,12 @@ public final class SpacePromotion {
     static final Pattern PARAM_NAME = Pattern.compile("[A-Z][A-Z0-9_]{0,63}");
     static final int MAX_PARAM_VALUE = 1024;
     private static final Pattern TEXT = Pattern.compile("(?i)\\.(toon|csv|asn|asn1|sql)$");
-    private static final Pattern PLACEHOLDER =Pattern.compile("\\$\\{([A-Z][A-Z0-9_]{0,63})}");
+    private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([A-Z][A-Z0-9_]{0,63})}");
     /** Top-level keys a server stamps at write or evaluation time ({@code PendingChanges.WRITE_TIME_STAMPS}). */
     private static final Set<String> SERVER_STAMPS = Set.of("createdAt", "updatedAt", "lastResult", "lastSimulation");
+    /** What {@code DecisionRuleGuard.prepare} stamps on every Decision Rule a write lands. */
+    private static final Set<String> DECISION_RULE_STAMPS = Set.of("createdBy", "updatedBy",
+            DecisionRuleGuard.MAKERS, DecisionRuleGuard.RESTORED_MAKERS);
 
     private SpacePromotion() {}
 
@@ -101,6 +104,17 @@ public final class SpacePromotion {
         }
     }
 
+    /** {@code .toon} files that parsed before their parameters were bound and do not after (a value with a comma in
+     *  an array row, say). */
+    static final class BrokenByBinding extends RuntimeException {
+        final List<String> paths;
+
+        BrokenByBinding(List<String> paths) {
+            super("binding the parameters breaks " + paths, null, false, false);
+            this.paths = paths;
+        }
+    }
+
     /**
      * The change set of promoting {@code bundle} (a whole-Space bundle) into the Space whose config root is
      * {@code configRoot}, with {@code params} bound and {@code SPACE} = {@code spaceId}. Writes nothing.
@@ -129,7 +143,7 @@ public final class SpacePromotion {
 
         List<Change> changes = new ArrayList<>();
         List<Excluded> excluded = new ArrayList<>();
-        Set<String> missing = new TreeSet<>(), used = new TreeSet<>();
+        Set<String> missing = new TreeSet<>(), used = new TreeSet<>(), broken = new TreeSet<>();
         for (Map.Entry<String, byte[]> e : incoming.entrySet()) {
             String path = e.getKey();
             String why = refusal(root, path, referenced);
@@ -139,6 +153,13 @@ public final class SpacePromotion {
             }
             missing.addAll(missingBy.get(path));
             used.addAll(usedBy.get(path));
+            if (missingBy.get(path).isEmpty() && brokenByBinding(path, bundle.configEntries(), e.getValue()))
+                broken.add(path);
+            if (isConnection(path) && holdsLiteralSecret(e.getValue())) {
+                excluded.add(new Excluded(path, "the bundle's connection carries a literal secret (or does not parse), "
+                        + "which a promotion never writes — export it with secrets as references"));
+                continue;
+            }
             byte[] cur = target.get(path);
             if (cur != null && isConnection(path)) {
                 if (holdsLiteralSecret(cur)) {
@@ -171,6 +192,7 @@ public final class SpacePromotion {
             changes.add(new Change(path, kindOf(path), "remove", null, cur));
         }
         if (!missing.isEmpty()) throw new MissingParameters(List.copyOf(missing));
+        if (!broken.isEmpty()) throw new BrokenByBinding(List.copyOf(broken));
         changes.sort((a, b) -> a.path().compareTo(b.path()));
         return new ChangeSet(List.copyOf(changes), List.copyOf(excluded), List.copyOf(used), hash(changes));
     }
@@ -242,6 +264,23 @@ public final class SpacePromotion {
         return changed ? sb.toString().getBytes(StandardCharsets.UTF_8) : bytes;
     }
 
+    /** Whether binding turned a parseable {@code .toon} entry into one that no longer parses. */
+    private static boolean brokenByBinding(String path, Map<String, byte[]> raw, byte[] bound) {
+        if (!path.endsWith(".toon")) return false;
+        byte[] before = raw.get(path);
+        if (before == null || Arrays.equals(before, bound) || !parses(before)) return false;
+        return !parses(bound);
+    }
+
+    private static boolean parses(byte[] toon) {
+        try {
+            ConfigCodec.toMap(new String(toon, StandardCharsets.UTF_8));
+            return true;
+        } catch (RuntimeException unparseable) {
+            return false;
+        }
+    }
+
     /** {@code bytes} as strict UTF-8, or {@code null} when they are not text. */
     private static String utf8(byte[] bytes) {
         try {
@@ -307,19 +346,20 @@ public final class SpacePromotion {
         if (Arrays.equals(a, b)) return true;
         if (!path.endsWith(".toon")) return false;
         try {
-            boolean job = "job".equals(PendingChanges.kindOfConfigPath(path));
-            return unstamped(ConfigCodec.toMap(new String(a, StandardCharsets.UTF_8)), job)
-                    .equals(unstamped(ConfigCodec.toMap(new String(b, StandardCharsets.UTF_8)), job));
+            String kind = PendingChanges.kindOfConfigPath(path);
+            return unstamped(ConfigCodec.toMap(new String(a, StandardCharsets.UTF_8)), kind)
+                    .equals(unstamped(ConfigCodec.toMap(new String(b, StandardCharsets.UTF_8)), kind));
         } catch (RuntimeException unparseable) {
             return false;
         }
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> unstamped(Map<String, Object> doc, boolean job) {
+    private static Map<String, Object> unstamped(Map<String, Object> doc, String kind) {
         Map<String, Object> out = new LinkedHashMap<>(doc);
         SERVER_STAMPS.forEach(out::remove);
-        if (job) {
+        if (DecisionRuleGuard.TYPE.equals(kind)) DECISION_RULE_STAMPS.forEach(out::remove);
+        if ("job".equals(kind)) {
             JobConfig.AUTHOR_KEYS.forEach(out::remove);
             if (out.get("job") instanceof Map<?, ?> j) {
                 Map<String, Object> section = new LinkedHashMap<>((Map<String, Object>) j);

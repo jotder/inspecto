@@ -101,6 +101,33 @@ class SpacePromotionTest {
     }
 
     @Test
+    void aBundleConnectionWithALiteralSecretIsNeverWritten(@TempDir Path target) throws Exception {
+        String src = "connection:\n  id: db\n  connector: postgres\n  host: h\n  password: hunter2\n";
+        SpacePromotion.ChangeSet cs = SpacePromotion.compute(target, bundle(Map.of(CONN, src)), Map.of(), "p");
+        assertTrue(cs.changes().isEmpty(), cs.changes().toString());
+        assertEquals(List.of(CONN), cs.excluded().stream().map(SpacePromotion.Excluded::path).toList());
+    }
+
+    @Test
+    void aValueThatBreaksAnArrayRowRefusesTheChangeSet(@TempDir Path target) throws Exception {
+        String row = "physicalRef: d/database\ntags[2]: a,${TAG}\n";
+        assertEquals("add", action(SpacePromotion.compute(target, bundle(Map.of("registry/datasets/d.toon", row)),
+                Map.of("TAG", "b"), "p"), "registry/datasets/d.toon"));
+        SpacePromotion.BrokenByBinding broken = assertThrows(SpacePromotion.BrokenByBinding.class,
+                () -> SpacePromotion.compute(target, bundle(Map.of("registry/datasets/d.toon", row)),
+                        Map.of("TAG", "b,c"), "p"));
+        assertEquals(List.of("registry/datasets/d.toon"), broken.paths);
+    }
+
+    @Test
+    void decisionRuleStampsAreNotAChange(@TempDir Path target) throws Exception {
+        write(target, "registry/decision-rules/r.toon", "name: r\ncreatedBy: alice\nupdatedBy: bob\nmakers[1]: alice\n");
+        SpacePromotion.ChangeSet cs = SpacePromotion.compute(target, bundle(Map.of(
+                "registry/decision-rules/r.toon", "name: r\ncreatedBy: carol\n")), Map.of(), "p");
+        assertEquals("same", action(cs, "registry/decision-rules/r.toon"));
+    }
+
+    @Test
     void theHashMovesWithEitherSide(@TempDir Path target) throws Exception {
         write(target, "registry/datasets/d.toon", "physicalRef: d/database\n");
         BundleImporter.Bundle b = bundle(Map.of("registry/datasets/d.toon", "physicalRef: d/database\n"));

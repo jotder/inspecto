@@ -312,6 +312,48 @@ class ControlApiSpacePromotionTest {
         }
     }
 
+    @Test
+    void aCarriedPublicationJobRefusesTheApplyAndARemovedJobStopsAtOnce(@TempDir Path root, @TempDir Path tmp)
+            throws Exception {
+        Path src = Files.createDirectories(tmp.resolve("src-config"));
+        write(src, ORDERS, "physicalRef: orders/database\ndescription: v2\n");
+        write(src, SAME, "physicalRef: same/database\n");
+        write(src, PARAM, "physicalRef: eu/database\nowner: alpha\n");
+        write(src, "jobs/pub_job.toon", "job:\n  name: pub\n  type: publish.postgres\n  enabled: false\n");
+        byte[] withPublication = BundleExporter.exportSpace(src, null, "src");
+        Files.delete(src.resolve("jobs/pub_job.toon"));
+        byte[] plain = BundleExporter.exportSpace(src, null, "src");
+        Path config = Files.createDirectories(root.resolve("alpha/config"));
+        write(config, "jobs/hello_job.toon",
+                "job:\n  name: hello\n  type: sample.hello\n  cron: \"0 * * * *\"\n  enabled: true\n");
+        try (Ctx c = open(root)) {
+            HttpResponse<String> jobsBefore = send(c, "GET", "/spaces/alpha/jobs");
+            assertTrue(jobsBefore.body().contains("\"hello\""), jobsBefore.body());
+
+            String hash = preview(c, withPublication).get("changeSetHash").asText();
+            HttpResponse<String> pub = post(c.port, "/spaces/alpha/promotion/apply", "admin",
+                    body(withPublication, Map.of("previewHash", hash)));
+            assertEquals(409, pub.statusCode(), "a publish.postgres Job needs its own four-eyes approval: " + pub.body());
+            assertFalse(Files.exists(c.config.resolve("jobs/pub_job.toon")));
+            assertTrue(Files.readString(c.config.resolve(ORDERS)).contains("v1"), "nothing was written");
+
+            JsonNode p = preview(c, plain);
+            assertTrue(actions(p, "remove").contains("jobs/hello_job.toon"), p.toString());
+            HttpResponse<String> r = post(c.port, "/spaces/alpha/promotion/apply", "admin",
+                    body(plain, Map.of("previewHash", p.get("changeSetHash").asText(), "removals", true)));
+            assertEquals(200, r.statusCode(), r.body());
+            assertFalse(Files.exists(c.config.resolve("jobs/hello_job.toon")));
+            HttpResponse<String> jobsAfter = send(c, "GET", "/spaces/alpha/jobs");
+            assertFalse(jobsAfter.body().contains("\"hello\""), "a removed Job stops at once: " + jobsAfter.body());
+        }
+    }
+
+    private HttpResponse<String> send(Ctx c, String method, String path) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1" + path))
+                .header("Authorization", "Bearer admin").method(method, HttpRequest.BodyPublishers.noBody()).build(),
+                HttpResponse.BodyHandlers.ofString());
+    }
+
     // ── approval policy (D-SE7): one Pending Change, nothing lands until it is approved ──
 
     private static final String ADMIN = "Bearer admin", CHECKER = "Bearer checker";
