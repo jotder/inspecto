@@ -1,0 +1,128 @@
+# Relocatable Space roots — `spaces.ref`, relative `data_root`, relative `<id>.ref` (`SPACE-RELOCATABLE-ROOTS-1`)
+
+Status: **PLAN — awaiting operator approval.** Opened 2026-11-13. Owner: this shift.
+Items: `module.config`, `layer/platform`. Supersedes nothing; extends `SPACE-DATA-ROOT-1`.
+
+## 1. Why
+
+An install is a tree under one root (call it `%APP_ROOT%` — the folder holding `inspecto-la\`,
+`start-basic.cmd` and the Spaces). The operator wants that tree to run from **any** path: unzip it
+somewhere else, double-click the launcher, and every Space boots.
+
+Today most of that already works, and the gaps are narrow. What is already true:
+
+| Behaviour | Where | Already works? |
+| --- | --- | --- |
+| Launchers resolve everything from the install dir | `start-basic.cmd` uses `%~dp0` | ✅ |
+| Default spaces root is `<cwd>/spaces` when no flag and no config args | `ControlApi.main` 564-568 | ✅ |
+| A **relative** `-Dspaces.root` is honoured | `SpaceManager.discover`, test `aRelativeSpacesRootStillStampsAnAbsoluteBase` | ✅ |
+| Default Space data is `spaces/<id>/{data,audit,duckdb}` | `SpaceRoot.dataRootFor` falls through to `base` | ✅ |
+| That default relocates cleanly | `SpaceDataRoot.claim` returns at once when `dataRoot.equals(base)` — **no stamp written** | ✅ |
+| `space.toon data_root` is resolved against the base when relative | `SpaceRoot.dataRootFor` 157-165 | ✅ (then refused — see below) |
+
+What does not work, and is the whole of this plan:
+
+- **G1 — a relative `data_root` is computed and then rejected.** `SpaceDataRoot.stake` 106-107 throws
+  `space.toon data_root '<v>' must be an absolute path`. So an install whose data sits beside the Spaces
+  (`%APP_ROOT%\inspecto-la-data\<id>`, the showcase bundle's layout) can only name it absolutely.
+- **G2 — the absolute `data_root` is then stamped with an absolute path.** `stake` 148 writes
+  `.inspecto-space` holding `base.toString()`; `ownedBy` compares it canonically on every later boot. Move
+  the tree and every Space is refused with `data_root ... belongs to the Space at ...`, then
+  `SpaceManager: 0 space(s) booted`. This is the defect the operator hit on 2026-11-13; see
+  `.claude/memory/space-data-root-stamp.md`.
+- **G3 — `<id>.ref` must hold an absolute path.** `SpaceManager.resolveRef` 225: `must hold an absolute
+  path to a Space folder`. A bundle that references Spaces kept beside it cannot do so portably.
+- **G4 — there is no way to point the spaces root somewhere else from disk.** Only `-Dspaces.root` /
+  `SPACES_ROOT`, which means editing a launcher.
+
+## 2. Decisions (operator, 2026-11-13)
+
+- **D1. The pointer file is `%APP_ROOT%/spaces.ref`** — one line naming the spaces root, absolute or
+  relative to `%APP_ROOT%`. Absent ⇒ `%APP_ROOT%/spaces`. Same name and shape as the existing per-Space
+  `<spaces root>/<id>.ref`, so there is one convention, not two.
+- **D2. The launch flag wins.** `-Dspaces.root` (and `SPACES_ROOT`) keep precedence; `spaces.ref` is
+  consulted only when neither is set. No existing deployment or launcher changes behaviour.
+- **D3. Relative paths are supported everywhere a root is named**, each against the one obvious base:
+  `spaces.ref` → `%APP_ROOT%` (the server's working directory); `space.toon data_root` → the Space's own
+  base; `<id>.ref` → the spaces root.
+
+## 3. The rule that makes this safe
+
+`stake`'s stamp exists for one reason, recorded in its javadoc 95-98 and proven by the 2026-10-27 MFS
+rehearsal: a **copied** Space folder still pointing at the **original's** data root would write into and
+drain the original's inbox. That hazard needs two Spaces resolving to **one** path.
+
+> **A relative data root cannot be shared by two installs — it moves with the Space.** Copy the tree and
+> each copy resolves its own. So for a relative `data_root` the hazard cannot arise, and the stamp that
+> guards against it is not merely unnecessary: it is the thing that breaks relocation.
+
+Hence the shape of the change:
+
+| `data_root` | Overlap / reachability / secrets checks | Stamp | Relocates |
+| --- | --- | --- | --- |
+| absent (data under the base) | n/a — `claim` returns early | none | ✅ today |
+| **relative** (new) | **yes, unchanged** | **none** | ✅ new |
+| absolute | yes | written and enforced, unchanged | ❌ by design |
+
+⛔ The overlap check stays for relative roots. `data_root: ./data` or `../<another space>` must still be
+refused: the reason it exists — handing a Space another Space's `config/` as an allowed root — has nothing
+to do with copying. In practice a relative root therefore points at a **sibling of the spaces root**, e.g.
+`data_root: "../../inspecto-la-data/la-showcase"` from `%APP_ROOT%/spaces/la-showcase` — which is exactly
+the showcase bundle's layout.
+
+## 4. Work
+
+Each step names its verification. Nothing is merged until every one passes.
+
+1. **`SpaceDataRoot.stake` — allow a relative `data_root`.** Replace the 106-107 refusal with: resolve as
+   today (`dataRootFor` already does), run every other check unchanged, and **skip the stamp** when the
+   declared value is relative. `ownedBy` is not consulted for a relative root.
+   → verify: `SpaceDataRootTest.relativeDataRootIsRefused` is **inverted** into
+   `relativeDataRootIsClaimedWithoutAStamp`; new tests for (a) relative root overlapping the spaces root is
+   still refused, (b) the tree copied to a second path boots both copies against their own data,
+   (c) an absolute root still stamps and still refuses a foreign stamp (regression).
+2. **`SpaceManager.resolveRef` — allow a relative `<id>.ref`,** resolved against the spaces root. Keep every
+   other rule: folder name must equal the id, must not land inside the spaces root, must exist.
+   → verify: new cases in the ref tests, including a relative ref that climbs back into the spaces root
+   (refused) and one naming a sibling (accepted).
+3. **`ControlApi.main` — read `spaces.ref`.** Order: `-Dspaces.root` → `SPACES_ROOT` → `./spaces.ref`
+   (relative to the working directory) → `./spaces`. A malformed or dangling `spaces.ref` is a **loud boot
+   error**, never a silent fall-through to `./spaces` — a pointer the operator wrote and got wrong must not
+   look like "no Spaces configured". Register the resolved root with `SpaceDataRoot.registerSpacesRoot` as
+   today.
+   → verify: a real-HTTP boot test per branch, including the malformed-pointer refusal.
+4. **Stop stamping an absolute base where a relative one would do** *(decide during build; may be dropped)*.
+   For an absolute `data_root` the stamp could hold the base's path **relative to the data root** when the
+   two share a root, falling back to absolute otherwise. This would make even absolute-rooted installs
+   relocatable. ⚠ It changes an on-disk format every existing install already wrote, so `ownedBy` must read
+   both shapes. **Recommendation: defer.** Steps 1-3 give the operator what was asked for; step 4 is a
+   migration with no requester.
+5. **Showcase bundle + launcher.** Switch `tools/package-la-showcase.mjs` and `start-basic.cmd` to the
+   relative form (`data_root: "../../inspecto-la-data/<id>"`, no `SPACES_DATA_ROOT`), so a packaged bundle is
+   relocatable with no stamps to delete.
+   → verify: package a bundle, unzip at two different paths, boot both, confirm 11 Spaces each and no
+   `.inspecto-space` anywhere.
+6. **Docs.** `docs/okf/product/module/config/` — the resolution order as a table, the relative/absolute
+   stamp rule and why. `docs/EDITIONS.md` / the bundle README if they name the data root. Update
+   `.claude/memory/space-data-root-stamp.md` to say relative roots need no stamp-deleting.
+   → verify: `node tools/render-product-docs.mjs`, pre-commit guards.
+
+## 5. Open questions for the operator
+
+- **Q1. Do existing installs get a migration?** An install with an absolute `data_root` keeps its stamp and
+  stays non-relocatable. The manual fix (edit `space.toon` to the relative form, delete the stamp) is two
+  commands and is documented. A `POST /spaces/<id>/relocate` route would automate it — not proposed here.
+- **Q2. Step 4 (relative stamps) — defer as recommended, or build it now?**
+
+## 6. Out of scope
+
+Ingest ledgers (status / lineage CSVs) keep absolute paths after a move. They are provenance, not boot
+inputs. Nothing reads them to resolve a root.
+
+## References
+
+- `inspecto/src/main/java/com/gamma/service/SpaceDataRoot.java` — `stake` 102-149, `ownedBy` 81-86
+- `inspecto/src/main/java/com/gamma/service/SpaceRoot.java` — `dataRootFor` 151-165
+- `inspecto/src/main/java/com/gamma/service/SpaceManager.java` — `discover` 146-186, `resolveRef` 217-237
+- `inspecto/src/main/java/com/gamma/control/ControlApi.java` — `main` 561-580
+- `.claude/memory/space-data-root-stamp.md` — the 2026-11-13 relocation failure
