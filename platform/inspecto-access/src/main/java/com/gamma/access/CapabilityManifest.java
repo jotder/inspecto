@@ -405,6 +405,9 @@ public final class CapabilityManifest {
             // a template records the Space's origin, an administrator's act.
             new Entry("GET", "/origin", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/origin/adopt", Roles.CAN_ADMINISTER),
+            // SE-5b: the upgrade proposal is a report like /origin; applying it writes the Space's config, an administrator's act.
+            new Entry("GET", "/origin/upgrade", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("POST", "/origin/upgrade", Roles.CAN_ADMINISTER),
             // ReconRoutes — R2-03 (operator 2026-09-26, reversing C9): recording a run and resolving / re-opening
             // a Break write the Reconciliation's OPERATIONAL state, so they are operate acts like an Expectation's
             // evaluation — never the canAuthorWorkbench config PUT that used to carry them. (/recon/promote is
