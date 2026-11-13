@@ -792,7 +792,7 @@ public final class SpaceManager implements AutoCloseable {
     /**
      * PRODUCT-ASSEMBLY-1 PA-7d (D-PA25): a Space made from a template an installed App owns (its {@code .installed-by} marker)
      * records {@code .inspecto/created-from.toon} - the template, the App and its version - so an upgrade of that App can offer
-     * the Space the difference. A shipped template records nothing. Best effort: the Space is created either way.
+     * the Space the difference. SE-5a: every template records its origin (spec-space-origin.md); a shipped one writes no App fields. Best effort: the Space is created either way.
      */
     private static void recordProvenance(Path tpl, Path base, String templateId) {
         // SE-5a (spec-space-origin.md): every template now records its origin - template, templateVersion and each config
@@ -807,7 +807,7 @@ public final class SpaceManager implements AutoCloseable {
                 }
             SpaceOrigin.recordCreated(tpl, base, templateId, app, version);
         } catch (IOException e) {
-            log.warn("Could not record which App made Space {}: {}", base, e.toString());
+            log.warn("Could not record the origin of Space {}: {}", base, e.toString());
         }
     }
 
