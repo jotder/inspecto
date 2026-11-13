@@ -342,6 +342,11 @@ export interface GraphDisplayOptions {
      * hover/click of the edge or an endpoint.
      */
     allEdgeLabels?: boolean;
+    /**
+     * Draw arrowheads and node labels even on a large graph. Absent/false = the large-graph rule
+     * ({@link detailHiddenByDensity}): above {@link DENSE_DETAIL_CAP} edges they show only on hover/click.
+     */
+    allDetail?: boolean;
     /** node kind → stroke colour (a chart-token swatch). */
     nodeColors: Record<string, string>;
     /** edge (relationship) kind → stroke colour. */
@@ -484,6 +489,23 @@ export const DENSE_EDGE_LABEL_CAP = 20;
 export function edgeLabelsHiddenByDensity(display: GraphDisplayOptions | null | undefined, edgeCount: number): boolean {
     return display?.edgeLabels !== false && !display?.allEdgeLabels && edgeCount > DENSE_EDGE_LABEL_CAP;
 }
+
+/**
+ * Above this many edges, arrowheads and node labels are hidden until hovered/clicked (LA-PERF-N4-1). Every changed
+ * shape is repainted in one frame: on 767 nodes / 4,000 links (node labels already off) dropping the arrowheads cut
+ * the open, the move after a layout and a Clear by 34–49 % (la-performance-plan §0b "N4 fewer shapes"). Node labels
+ * follow the same rule because text is the costliest shape to paint (not measured). At this density the labels
+ * overlap and the arrowheads are a few pixels, so little is lost; a small investigation keeps both.
+ */
+export const DENSE_DETAIL_CAP = 1000;
+
+/** Whether the large-graph rule hides arrowheads and node labels by default (still revealed on hover/click). */
+export function detailHiddenByDensity(display: GraphDisplayOptions | null | undefined, edgeCount: number): boolean {
+    return !display?.allDetail && edgeCount > DENSE_DETAIL_CAP;
+}
+
+/** The states the hover/click reveal toggles: `labelled` (link label) and `detailed` (arrowhead, node label). */
+const REVEAL_STATES = ['labelled', 'detailed'];
 
 /** The node shapes the Display menu offers per kind (value = G6 node type; glyph = the picker face). */
 export const GRAPH_NODE_SHAPES: readonly {
@@ -991,21 +1013,46 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         return this.data.edges.filter((e) => e.source === id || e.target === id).map((e) => String(e.id));
     }
 
-    /** Apply the `labelled` state: hover replaces the transient set, click replaces the pinned set. */
+    /**
+     * What the hover/click reveal shows, as `state|elementId` keys: `labelled` on the edges whose label the density
+     * rule hides, and `detailed` on the edges (arrowhead) and nodes (label) the large-graph rule hides — the element
+     * itself, its links and their ends. Empty when neither rule is hiding anything.
+     */
+    revealTargets(id: string | undefined, kind: 'node' | 'edge'): string[] {
+        const out = this.edgesToReveal(id, kind).map((e) => `labelled|${e}`);
+        if (!id || !this.data || !detailHiddenByDensity(this.display, this.data.edges.length)) return out;
+        const edges = this.data.edges.filter((e) =>
+            kind === 'edge' ? String(e.id) === id : e.source === id || e.target === id,
+        );
+        const nodes = new Set(kind === 'node' ? [id] : []);
+        for (const e of edges) {
+            out.push(`detailed|${e.id}`);
+            nodes.add(String(e.source));
+            nodes.add(String(e.target));
+        }
+        if (this.display?.nodeLabels !== false) for (const n of nodes) out.push(`detailed|${n}`);
+        return out;
+    }
+
+    /** Apply the reveal states: hover replaces the transient set, click replaces the pinned set. */
     private revealEdgeLabels(id: string | undefined, kind: 'node' | 'edge', pin: boolean): void {
         const graph = this.graph;
         if (!graph) return;
-        const next = this.edgesToReveal(id, kind);
+        const next = this.revealTargets(id, kind);
         const before = new Set([...this.hoverLabelled, ...this.pinnedLabelled]);
         if (pin) this.pinnedLabelled = next;
         else this.hoverLabelled = next;
         const after = new Set([...this.hoverLabelled, ...this.pinnedLabelled]);
         const states: Record<string, string[]> = {};
         try {
-            // Keep any other state (hover-activate's `active`) — only `labelled` is toggled here.
-            const others = (e: string): string[] => graph.getElementState(e).filter((st) => st !== 'labelled');
-            for (const e of before) if (!after.has(e)) states[e] = others(e);
-            for (const e of after) if (!before.has(e)) states[e] = [...others(e), 'labelled'];
+            // Keep any other state (hover-activate's `active`, selection) — only the reveal states are toggled here.
+            const touched = new Set([...before, ...after].map((k) => k.slice(k.indexOf('|') + 1)));
+            for (const el of touched) {
+                const want = REVEAL_STATES.filter((s) => after.has(`${s}|${el}`));
+                const had = REVEAL_STATES.filter((s) => before.has(`${s}|${el}`));
+                if (want.join() === had.join()) continue;
+                states[el] = [...graph.getElementState(el).filter((st) => !REVEAL_STATES.includes(st)), ...want];
+            }
             if (Object.keys(states).length) void graph.setElementState(states);
         } catch {
             // An id no longer on the canvas (data swapped under the pointer) — nothing to reveal.
@@ -1255,7 +1302,12 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         this.selectedStateIds = new Set(want);
         if (!touched.length) return;
         const states: Record<string, string[]> = {};
-        for (const id of touched) states[id] = want.has(id) ? [SELECTED_STATE] : [];
+        // Keep a node's other states: since LA-PERF-N4-1 a node can carry the `detailed` reveal (its label), which a
+        // selection change must not wipe.
+        for (const id of touched) {
+            const others = graph.getElementState(id).filter((st) => st !== SELECTED_STATE);
+            states[id] = want.has(id) ? [...others, SELECTED_STATE] : others;
+        }
         // Every id is rendered, so the batch cannot be rejected for an unknown element; a failure here is a real one.
         void graph.setElementState(states, false).catch(() => undefined);
     }
@@ -1427,7 +1479,10 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     // `label` is G6's own on/off switch for the label shape. A `labelText` mapper that
                     // returns `undefined` does NOT clear a label: G6 reads that as "no change" and the
                     // previous text stays on the canvas, so turning labels off left them showing.
-                    label: () => this.display?.nodeLabels !== false,
+                    // The large-graph rule hides them too; a hover or click reveals them (`detailed` state below).
+                    label: () =>
+                        this.display?.nodeLabels !== false &&
+                        !detailHiddenByDensity(this.display, this.data?.edges.length ?? 0),
                     labelText: (d): string =>
                         (d.data as { label: string; canvasLabel?: string }).canvasLabel ??
                         (d.data as { label: string }).label,
@@ -1443,6 +1498,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 // Painted by G6's state style, so a selection change touches only the changed elements (PERF-P1).
                 state: {
                     [SELECTED_STATE]: { lineWidth: 4, halo: true, haloLineWidth: 16, haloStrokeOpacity: 0.6 },
+                    // The large-graph rule's reveal: set on hover/click by revealEdgeLabels(), over the base style.
+                    detailed: { label: true },
                 },
             },
             edge: {
@@ -1455,7 +1512,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                                 ? (this.emEdgeOpacity?.get(d.id as string) ?? 1)
                                 : 0.2
                             : 1,
-                    endArrow: true,
+                    endArrow: () => !detailHiddenByDensity(this.display, this.data?.edges.length ?? 0),
                     // A dry-run's provenance rows (PIPELINE-DRYRUN-1) paint their edge dashed regardless of
                     // the Display-menu pattern override, so a simulated run stays visually distinct.
                     lineDash: (d) =>
@@ -1479,7 +1536,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     labelBackground: false,
                 },
                 // The density rule's reveal: set on hover/click by revealEdgeLabels(), over the base style.
-                state: { labelled: { label: true } },
+                state: { labelled: { label: true }, detailed: { endArrow: true } },
             },
             layout: layoutConfig(this.effectiveLayout(), {
                 nodeSize: this.display?.nodeSize,

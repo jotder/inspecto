@@ -235,6 +235,7 @@ import {
 } from './link-analysis-overlays.component';
 import { ICON_COLOR_SWATCHES } from '@inspecto/core/theme/chart-tokens';
 import {
+    DENSE_DETAIL_CAP,
     DENSE_EDGE_LABEL_CAP,
     EdgePattern,
     GRAPH_EDGE_PATTERNS,
@@ -252,6 +253,7 @@ import {
     GraphViewInteraction,
     GraphViewPlugins,
     baseEdgeKind,
+    detailHiddenByDensity,
     edgeLabelsHiddenByDensity,
     graphSignature,
     stableKey,
@@ -411,6 +413,7 @@ interface PresentationSnapshot {
     nodeLabels: boolean;
     edgeLabels: boolean;
     allEdgeLabels: boolean;
+    allDetail: boolean;
     nodeColors: Record<string, string>;
     edgeColors: Record<string, string>;
     nodeShapes: Record<string, string>;
@@ -1587,6 +1590,13 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly edgeLabelsDense = computed(() =>
         edgeLabelsHiddenByDensity(this.displayOptions(), this.displayed()?.edges.length ?? 0),
     );
+    /** Override the large-graph rule: draw arrowheads and node labels on every size (persisted as `display.allDetail`). */
+    readonly allDetail = signal(false);
+    readonly denseDetailCap = DENSE_DETAIL_CAP.toLocaleString('en-GB'); // "1,000"
+    /** True while the large-graph rule is hiding arrowheads and node labels (drives the render-strip note). */
+    readonly detailDense = computed(() =>
+        detailHiddenByDensity(this.displayOptions(), this.displayed()?.edges.length ?? 0),
+    );
     readonly nodeColors = signal<Record<string, string>>({});
     readonly edgeColors = signal<Record<string, string>>({});
     readonly nodeShapes = signal<Record<string, string>>({});
@@ -1698,6 +1708,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             nodeLabels: this.nodeLabels() && !this.lodLabelsOff(),
             edgeLabels: this.edgeLabels() && !this.lodLabelsOff(),
             ...(this.allEdgeLabels() ? { allEdgeLabels: true } : {}),
+            ...(this.allDetail() ? { allDetail: true } : {}),
             nodeColors: this.nodeColors(),
             edgeColors: this.edgeColors(),
             nodeShapes: this.nodeShapes(),
@@ -1752,6 +1763,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             this.nodeLabels() ||
             this.edgeLabels() ||
             this.allEdgeLabels() ||
+            this.allDetail() ||
             this.nodeSize() !== GRAPH_DEFAULT_NODE_SIZE ||
             this.layoutSpacing() !== GRAPH_DEFAULT_LAYOUT_SPACING ||
             Object.keys(this.nodeColors()).length > 0 ||
@@ -4202,6 +4214,7 @@ Its prior copies stay in its version history.`,
             nodeLabels: this.nodeLabels(),
             edgeLabels: this.edgeLabels(),
             allEdgeLabels: this.allEdgeLabels(),
+            allDetail: this.allDetail(),
             nodeColors: this.nodeColors(),
             edgeColors: this.edgeColors(),
             nodeShapes: this.nodeShapes(),
@@ -4224,6 +4237,7 @@ Its prior copies stay in its version history.`,
         this.nodeLabels.set(s.nodeLabels);
         this.edgeLabels.set(s.edgeLabels);
         this.allEdgeLabels.set(s.allEdgeLabels);
+        this.allDetail.set(s.allDetail);
         this.nodeColors.set(s.nodeColors);
         this.edgeColors.set(s.edgeColors);
         this.nodeShapes.set(s.nodeShapes);
@@ -4295,6 +4309,7 @@ Its prior copies stay in its version history.`,
         this.nodeLabels.set(display?.nodeLabels ?? false);
         this.edgeLabels.set(display?.edgeLabels ?? false);
         this.allEdgeLabels.set(display?.allEdgeLabels ?? false);
+        this.allDetail.set(display?.allDetail ?? false);
         this.nodeColors.set(display?.nodeColors ?? {});
         this.edgeColors.set(display?.edgeColors ?? {});
         this.nodeShapes.set(display?.nodeShapes ?? {});
