@@ -22,6 +22,19 @@ rediscovered. The per-item open work is `BACKLOG.md`; this file is the rule.
   while `CLAUDE.md` says work lands directly on `master` with no PRs. Zero PRs ⇒ it has never run.
 - The two guards positioned **after** `mvn test` in `ci.yml` — lean-core and dependency-lock — do not run
   while the test step fails, and it has failed on every retrievable run.
+- 🔴 **The sharpest version: a guard's own NEGATIVE FIXTURES never reached** (`GUARD-FIXTURES-UNRUN-1`,
+  2026-11-14). `tools/check-launchers.test.mjs` — the file that exists to prove the launcher guard still goes
+  red — was named by no workflow and by no hook. A commit then changed the `serve.bat` lines one fixture
+  anchored on; its `mutate` helper replaces the first occurrence of a literal, so a **missing anchor mutates
+  nothing**, and the fixture went on asserting that an unmutated `package.ps1` is red, which it is not. The
+  test failed while the rule it tests was still perfectly correct, and nothing said so for two commits. A
+  sweep found **54 of 111** tool tests in the same position. Fixed by wiring it into `launchers-windows`
+  (NOT `guards:` — see the cost note below) and by `tools/check-tool-tests-wired.mjs`, which asserts every
+  `tools/*.test.mjs` is named by some workflow or listed as shrinking debt.
+  ⚠ Two generalisations worth carrying: **a fixture must pin the rule it tests, not the text around it** —
+  anchor on the smallest distinctive fragment, and assert the mutation changed something; and **wiring a test
+  into `ci.yml`'s `guards:` job is not free**, because `tools/precommit.mjs` runs every step of that job on
+  every commit in this shared checkout. Slow fixtures belong in another job.
 
 **Shape 2 — the test whose subject is its own module.** Coverage that is structurally incapable of
 indicting the real risk, because the test supplies what production must supply.
@@ -53,8 +66,10 @@ separate `URLClassLoader`, filtering to providers that actually came from it. Co
 2. **Ratchet both ways.** An allowlist entry that stops suppressing anything is debt already paid, and a
    stale exemption silently forgives the next regression. `check-vocabulary.mjs` does this for all three
    of its file allowlists (`DOC_ALLOW`/`CONFIG_ALLOW`/`SOURCE_ALLOW`) and `PipelineKeyCoverageContractTest`
-   for `UNDECLARED_BLOCKS`. Those are the only four in the repo; every other exemption surface is a
-   one-way carve-out, including the inline `vocab-allow` / `ds-allow` / `secret-allow` markers.
+   for `UNDECLARED_BLOCKS`, and `check-tool-tests-wired.mjs` for its `BASELINE` (a listed test that is wired
+   now, or that no longer exists, is a finding — so the list can only shrink). Those are the only five in the
+   repo; every other exemption surface is a one-way carve-out, including the inline `vocab-allow` /
+   `ds-allow` / `secret-allow` markers.
 3. **Anchor a source scan and assert the anchor.** `MapNodeKeyContractTest` asserts its scanned region
    was actually found before trusting the scan — *"the map-path region moved or was renamed — re-anchor
    this scan before trusting it"*. Without that, a moved region silently scans nothing.

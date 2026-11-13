@@ -377,6 +377,14 @@ jobs:
       - name: Guard — the emitted launchers hand the JVM their edition's flag set
         run: node tools/check-launchers.mjs
 
+      # Tool-test wiring guard (GUARD-FIXTURES-UNRUN-1, 2026-11-14). A `tools/*.test.mjs` that no workflow names
+      # is run by nothing and proves nothing — which is exactly what had happened to the launcher guard's own
+      # negative fixtures, for long enough that one of them rotted unnoticed. This asserts every tool test is
+      # named by some workflow, or is listed as known debt in the guard's BASELINE (a list that may only shrink).
+      # It is pure file reads, so it costs nothing on the pre-commit hook; its own fixtures run beside it.
+      - name: Guard — every tools/*.test.mjs is run by some workflow
+        run: node tools/check-tool-tests-wired.mjs && node --test tools/check-tool-tests-wired.test.mjs
+
       # Bundle-platform guard (RELEASE-BUNDLE-PLATFORM-MISMATCH-1, 2026-09-17). The one zip a tag published
       # was compressed as 'windows_amd64' by a LITERAL at the call site while the jlink image on ubuntu-latest
       # is Linux — a Linux JVM beside Windows-only DuckDB extensions. package.ps1 now reads the platform off the
@@ -749,6 +757,15 @@ jobs:
       - uses: actions/checkout@v4
       - name: Guard — serve.bat hands the JVM its edition's flag set (executed on Windows)
         run: node tools/check-launchers.mjs
+
+      # GUARD-FIXTURES-UNRUN-1 (2026-11-14): the launcher guard's own negative fixtures. They were run by NOTHING
+      # — not this workflow, not the pre-commit hook — so one of them could rot unnoticed, and did: a commit
+      # changed the serve.bat lines a fixture anchored on, and `mutate` on a missing anchor mutates nothing, so
+      # the test failed while the rule it tests was still correct. ⚠ They belong HERE and not in `guards:`: they
+      # take ~100 s (they execute launchers per scenario) and the pre-commit hook runs every `guards:` step on
+      # every commit in a shared checkout. `tools/check-tool-tests-wired.mjs` keeps this wiring honest.
+      - name: Guard — the launcher guard's negative fixtures still go red
+        run: node --test tools/check-launchers.test.mjs
 
 # Note: CI does not build or store the fat JAR. It is ~90 MB (almost entirely
 # DuckDB's per-platform native binaries) and would bloat Actions artifact
