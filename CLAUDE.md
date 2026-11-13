@@ -160,8 +160,9 @@ shift gets the identical environment.
   - If the session itself was started at low effort and the next task is design or review, ask the operator
     once to raise it (app effort picker) rather than proceeding at low.
 
-- **Delegate, don't read raw:** broad code searches → `Explore` (pass `model: "haiku"` for pure
-  locating) or `backend-explorer` / `frontend-explorer`; builds/tests → `verify-runner`. Never parse
+- **Delegate, don't read raw:** code questions → `codegraph_explore` first (see CodeGraph below); a sweep it
+  cannot answer → `Explore` (pass `model: "haiku"` for pure locating) or `backend-explorer` / `frontend-explorer`,
+  told to use CodeGraph first; builds/tests → `verify-runner`. Never parse
   full Maven/npm logs in the main thread.
 - **Parallel forks:** independent research questions = multiple forks/agents launched in a single
   message, one per question — not sequential searches (but see the agent budget below).
@@ -204,6 +205,9 @@ shift gets the identical environment.
 
 ## CodeGraph (code knowledge graph)
 
-Indexed by **CodeGraph** (`codegraph_explore` MCP tool + CLI, Java and Angular both). Reach for it first for
-orientation and treat its source as already Read. ⛔ Never pick tests with `codegraph affected` (broken), and
-`callers` is not exhaustive. Usage, CLI and traps: the **`codegraph`** skill.
+**Always use CodeGraph for code (operator, 2026-11-13 — binding for every session and subagent).** Every code
+question — where is X, how does X work, who calls X, what does changing X break — and every read of code before an
+edit goes through `codegraph_explore` (subagents: the `codegraph` CLI) FIRST, not Grep, Read or an exploration
+agent; treat its source as already Read. Grep/Read only for what it does not index (docs, TOON/config, logs), a
+literal string, or a gap its answer left. ⛔ Never pick tests with `codegraph affected` (broken); `callers` is not
+exhaustive. Usage, CLI and traps: the **`codegraph`** skill.
