@@ -241,8 +241,8 @@ class ParquetEventStoreTest {
     @Test
     void aLeftoverSegmentIsNeverOverwrittenByTheNextRotation(@TempDir Path dir) throws Exception {
         java.nio.file.Files.writeString(dir.resolve(ParquetEventStore.SEGMENT_PREFIX + "0.jsonl"), "kept-as-is\n");
-        // a journal torn inside a multi-byte character makes this open's replay fail (a separate, older defect)
-        java.nio.file.Files.write(dir.resolve(ParquetEventStore.JOURNAL), new byte[] {'{', (byte) 0xC3});
+        // a held file that cannot be read (a directory in its place) makes this open's replay fail
+        java.nio.file.Files.createDirectory(dir.resolve(ParquetEventStore.HELD));
         try (ParquetEventStore store = new ParquetEventStore(dir, 2, 0, 100)) {
             store.append(ev(1_000L, EventLevel.INFO, EventType.AUDIT, null, "y1"));
             store.append(ev(2_000L, EventLevel.INFO, EventType.AUDIT, null, "y2"));   // background flush + rotation
@@ -280,6 +280,36 @@ class ParquetEventStoreTest {
                 java.nio.file.StandardOpenOption.APPEND);
         try (ParquetEventStore reopened = new ParquetEventStore(dir, 1000, 0, 100)) {
             assertEquals(List.of("kept"), reopened.query(EventQuery.recent(100)).stream().map(Event::message).toList());
+        }
+    }
+
+    /** EVENT-JOURNAL-TORN-UTF8-1: a kill inside a multi-byte character tears only the last line; every whole
+     *  event still replays. */
+    @Test
+    void aJournalTornInsideAMultiByteCharacterReplaysEveryWholeEvent(@TempDir Path dir) throws Exception {
+        ParquetEventStore crashed = new ParquetEventStore(dir, 1000, 0, 100);
+        crashed.append(ev(1_000L, EventLevel.INFO, EventType.AUDIT, null, "kept-é"));
+        crashed.append(ev(2_000L, EventLevel.INFO, EventType.AUDIT, null, "kept-2"));
+        java.nio.file.Files.write(dir.resolve(ParquetEventStore.JOURNAL),
+                new byte[] {'{', '"', 'e', 'v', (byte) 0xC3}, java.nio.file.StandardOpenOption.APPEND);
+        try (ParquetEventStore reopened = new ParquetEventStore(dir, 1000, 0, 100)) {
+            assertEquals(java.util.Set.of("kept-é", "kept-2"), reopened.query(EventQuery.recent(100)).stream()
+                    .map(Event::message).collect(java.util.stream.Collectors.toSet()));
+        }
+    }
+
+    /** The replay rule for corruption anywhere in the journal: an unreadable line (here malformed UTF-8 in the
+     *  middle) is skipped and logged; the whole lines on both sides of it still replay. */
+    @Test
+    void aCorruptMidJournalLineIsSkippedAndTheRestReplays(@TempDir Path dir) throws Exception {
+        ParquetEventStore crashed = new ParquetEventStore(dir, 1000, 0, 100);
+        crashed.append(ev(1_000L, EventLevel.INFO, EventType.AUDIT, null, "before"));
+        java.nio.file.Files.write(dir.resolve(ParquetEventStore.JOURNAL),
+                new byte[] {'{', (byte) 0xFF, (byte) 0xC3, '}', '\n'}, java.nio.file.StandardOpenOption.APPEND);
+        crashed.append(ev(2_000L, EventLevel.INFO, EventType.AUDIT, null, "after"));
+        try (ParquetEventStore reopened = new ParquetEventStore(dir, 1000, 0, 100)) {
+            assertEquals(java.util.Set.of("before", "after"), reopened.query(EventQuery.recent(100)).stream()
+                    .map(Event::message).collect(java.util.stream.Collectors.toSet()));
         }
     }
     private static List<Path> parquetIn(Path day) throws Exception {
