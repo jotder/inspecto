@@ -186,7 +186,6 @@ final class SpaceRoutes implements RouteModule {
             throw new ApiException(409, ErrorCodes.CONFLICT, "this server hosts a single space; launch with -Dspaces.root to manage many");
     }
 
-    /** The id + display metadata returned for a space. */
     /**
      * LC-4 — the Spaces-screen count: {@code integrity} {status, broken, duplicates, changedOutside} from the Space lock's
      * report in memory ({@link SpaceIntegrityRoutes#summary}), only for a caller who may read that Space's
@@ -203,6 +202,7 @@ final class SpaceRoutes implements RouteModule {
         return m;
     }
 
+    /** The id + display metadata returned for a space. */
     private static Map<String, Object> manifest(SpaceContext ctx) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", ctx.id().value());
