@@ -405,6 +405,10 @@ public final class CapabilityManifest {
             // a template records the Space's origin, an administrator's act.
             new Entry("GET", "/origin", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/origin/adopt", Roles.CAN_ADMINISTER),
+            // SpacePromotionRoutes — SE-6b: promoting a whole-Space bundle into an existing Space rewrites its configs
+            // (D-SE7), an administrator's act; the preview reads the uploaded bundle against every config and is gated alike.
+            new Entry("POST", "/promotion/preview", Roles.CAN_ADMINISTER),
+            new Entry("POST", "/promotion/apply", Roles.CAN_ADMINISTER),
             // ReconRoutes — R2-03 (operator 2026-09-26, reversing C9): recording a run and resolving / re-opening
             // a Break write the Reconciliation's OPERATIONAL state, so they are operate acts like an Expectation's
             // evaluation — never the canAuthorWorkbench config PUT that used to carry them. (/recon/promote is

@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-380 route(s) registered; 380 in the OpenAPI contract, 0 not.
+382 route(s) registered; 382 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -300,6 +300,8 @@ tags: [api, routes, generated]
 | GET | `/pipelines/node-types` | GET /pipelines/node-types (generated skeleton) | pipelines | — | `inspecto/src/main/java/com/gamma/control/PipelineListRoutes.java` |
 | GET | `/pipelines/processor-catalog` | GET /pipelines/processor-catalog (generated skeleton) | pipelines | — | `inspecto/src/main/java/com/gamma/control/PipelineListRoutes.java` |
 | POST | `/pipelines/rename/resume` | POST /pipelines/rename/resume (generated skeleton) | pipelines | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineRenameRoutes.java` |
+| POST | `/promotion/apply` | POST /promotion/apply - apply a previewed change set to this existing Space | spaces | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpacePromotionRoutes.java` |
+| POST | `/promotion/preview` | POST /promotion/preview - the change set a whole-Space bundle would make in this existing Space | spaces | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpacePromotionRoutes.java` |
 | GET | `/provenance` | GET /provenance (generated skeleton) | provenance | — | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
 | GET | `/provenance/batches` | GET /provenance/batches (generated skeleton) | provenance | — | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
 | GET | `/public/dashboards/{dashboardId}` | GET /public/dashboards/{dashboardId} (generated skeleton) | public | — | `inspecto/src/main/java/com/gamma/control/ShareRoutes.java` |

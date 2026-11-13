@@ -66,7 +66,9 @@ class SpaceCorpusEquivalenceTest {
             mode("links.delete"),
             mode("links.save"),
             // SE-3a column contract: report-only, kill switch -Dcolumn.contract=off; touches the lock and save warnings only
-            Capability.killSwitch(ColumnContract.PROPERTY, null));
+            Capability.killSwitch(ColumnContract.PROPERTY, null),
+            // SE-6b promotion: two routes, kill switch -Dspace.promotion=off; nothing at load reads it
+            Capability.killSwitch(com.gamma.control.SpacePromotion.PROPERTY, null));
 
     /** A {@code shadow|refuse|off} mode property: on = refuse, off = the default (shadow), cleared so no test inherits it. */
     private static Capability mode(String property) {

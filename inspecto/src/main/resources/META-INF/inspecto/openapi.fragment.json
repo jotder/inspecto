@@ -91,6 +91,8 @@
     "/integrity",
     "/origin",
     "/origin/adopt",
+    "/promotion/preview",
+    "/promotion/apply",
     "/pipelines/{pipelineId}/bundle",
     "/pipelines/import",
     "/components/{componentId}",
@@ -3266,6 +3268,32 @@
         "summary" : "POST /origin/adopt - match an existing Space to a Space Template by file hash and record its origin",
         "operationId" : "postOriginAdopt",
         "description" : "SE-5a. Reached as /spaces/{id}/origin/adopt. Body {template, version?}. Writes only <space>/.inspecto/created-from.toon and created-from.sha256, never config; records only when at least one config file matches. Requires canAdminister. 503 no Space folder, 400 bad body, 422 malformed version, 403 a template id that is not a bare id, 404 unknown template, 409 origin already recorded or version is not the template's current one, 200 {template, templateVersion, match: full|partial|none, recorded, matching, differing, onlyInTemplate, onlyInSpace}.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
+          }
+        }
+      }
+    },
+    "/promotion/preview" : {
+      "post" : {
+        "tags" : [ "spaces" ],
+        "summary" : "POST /promotion/preview - the change set a whole-Space bundle would make in this existing Space",
+        "operationId" : "postPromotionPreview",
+        "description" : "SE-6b. Reached as /spaces/{id}/promotion/preview. Body {bundle: base64 of a GET /export zip, parameters?: {NAME: value}}. Writes nothing. Each promotable config file is add | change | remove | same (decoded TOON less server stamps for .toon, bytes otherwise); what no import may write is listed under excluded. ${NAME} placeholders take the parameters; ${SPACE} is always this Space. Requires canAdminister. Kill switch -Dspace.promotion=off. 503 switched off or no config root, 400 bad body, 413 body over 64 MB, 422 not a whole-Space bundle or a placeholder with no value (missingParameters), 200 {space, sourceSpace, changeSetHash, counts, changes, excluded, parametersUsed, approval: direct|pending-change}.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
+          }
+        }
+      }
+    },
+    "/promotion/apply" : {
+      "post" : {
+        "tags" : [ "spaces" ],
+        "summary" : "POST /promotion/apply - apply a previewed change set to this existing Space",
+        "operationId" : "postPromotionApply",
+        "description" : "SE-6b, D-SE7. Reached as /spaces/{id}/promotion/apply. Body as the preview plus previewHash (the preview changeSetHash) and removals? (default false: files the bundle lacks are listed, not removed). Re-computes the change set. Under an approval policy the whole set is ONE Pending Change (202, kind space-promotion) applied on approval; otherwise written at once through the import journal (atomic, all or nothing). Requires canAdminister. 503 switched off or no config root, 400 bad body, 422 not a whole-Space bundle, a placeholder with no value or a promoted Pipeline escaping the allowed roots, 403 a carried kind the caller may not write, 409 changed since the preview or a promotion already pending, 202 held, 200 {space, applied, changeSetHash, written, removed, removalsSkipped}.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."

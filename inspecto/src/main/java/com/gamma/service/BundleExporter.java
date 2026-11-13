@@ -160,14 +160,15 @@ public final class BundleExporter {
     /**
      * A config file's bytes as they may leave the instance. Everything but a {@code connection} travels
      * verbatim; a connection is re-serialised through {@link ConnectionProfile#toBundleMap()} so a literal
-     * credential is <b>omitted</b> (see the class javadoc for why omission beats masking here).
+     * credential is <b>omitted</b> (see the class javadoc for why omission beats masking here). Public for SE-6b:
+     * a promotion compares a target Space's connection in this same form, so a secret is never a difference.
      *
      * @throws IOException if a connection file cannot be parsed — deliberately fail-closed, because that is
      *                     exactly the file whose secrets we cannot prove absent. Aborting a promotion is
      *                     recoverable; leaking a credential into a zip that lands in git or a support
      *                     ticket is not.
      */
-    private static byte[] exportableBytes(Path file) throws IOException {
+    public static byte[] exportableBytes(Path file) throws IOException {
         byte[] raw = Files.readAllBytes(file);
         if (!"connection".equals(kindOf(file))) return raw;
         ConnectionProfile profile;
