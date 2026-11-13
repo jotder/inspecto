@@ -325,18 +325,6 @@ public final class ColumnContract {
     // ── the save warning ────────────────────────────────────────────────────────────────────
 
     /**
-     * The WARNING findings a Schema save gets (D-SE4 step 1: warn only, refuse nothing): one per breaking change
-     * between the stored and the saved document, naming the consumers it breaks. {@code graph} is the Space as
-     * stored, before the write. Empty when the switch is off, either set is unknown, or nothing breaks.
-     */
-    public static List<com.gamma.config.spec.Finding> saveWarnings(Path writeRoot, Path target,
-                                                                   Map<?, ?> stored, Map<?, ?> saved) {
-        List<com.gamma.config.spec.Finding> out = new ArrayList<>();
-        for (Break b : breaks(writeRoot, target, stored, saved)) out.add(b.warning());
-        return out;
-    }
-
-    /**
      * One breaking change of a Schema save with what it breaks: the RESOLVED consumers of the column as the Schema
      * published it, and the column links the parser could not attribute (never counted as broken).
      */

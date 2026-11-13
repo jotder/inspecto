@@ -162,7 +162,8 @@ columns: refuse-breaking
 | `refuse-breaking` | a Schema save with a breaking change (`removed`, `renamed`, `type-narrowed`) that **at least one RESOLVED consumer reads** answers **409**, writes nothing, and lists the consumers; `?force=true` saves as before, with the warnings. |
 
 - **Writers.** `POST /config/write` (overwriting a Schema), `POST /config/patch` (on a Schema) and
-  `PUT /components/schema/{id}`, at the place §6 puts the warning: after every existing gate, before the LC-3 link
+  `PUT /components/schema/{id}`, at the place §6 puts the warning: after the route's existing gates (on `PUT /components/schema/{id}` it runs before
+  `writeComponent`'s kind validation, so an invalid document that also breaks a column can answer 409 first), before the LC-3 link
   check and the maker-checker hold (a stopped save is never held; a forced one is held as before).
 - **The 409 body** (`error.details`): `written: false`, `code: CONFLICT`, `consumers` — one entry per consumer of
   every breaking change, `{kind, name, key, column, change, to?, from}` (`column` is the name before the change,
