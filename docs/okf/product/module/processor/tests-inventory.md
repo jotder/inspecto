@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-420 test class(es): 168 unit, 252 real-HTTP control-plane, 0 IT.
+422 test class(es): 169 unit, 253 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -252,6 +252,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiSpaceIntegrityTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceIntegrityTest.java` | SE-1a — {@code GET /spaces/{id}/integrity} over real HTTP under an ARMED authenticator: 401, 403 without |
 | `ControlApiSpaceLinksModeTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceLinksModeTest.java` | `SPACE-LINK-CENSUS-1` LC-4 over real HTTP, two Spaces side by side: {@code alpha} sets |
 | `ControlApiSpaceOriginTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceOriginTest.java` | SE-5a — {@code GET /spaces/{id}/origin} and {@code POST /spaces/{id}/origin/adopt} over real HTTP under an ARMED |
+| `ControlApiSpaceOriginUpgradeTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceOriginUpgradeTest.java` | SE-5b — {@code GET\|POST /spaces/{id}/origin/upgrade} over real HTTP under an ARMED authenticator. The proof of the |
 | `ControlApiSpaceSamplesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceSamplesTest.java` | {@code LA-ONBOARD-1} OB-12 over real HTTP: {@code POST /spaces {template, loadSamples: true}} copies the template's |
 | `ControlApiSpacesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpacesTest.java` | The Stage-5 {@code SpaceRoutes} CRUD over real HTTP: create + boot a space without restart, list it, confirm the |
 | `ControlApiSpaceTemplateKpiTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceTemplateKpiTest.java` | `ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1) over real HTTP, with an armed Authenticator: a Space Template's KPI pack |
@@ -350,6 +351,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ServerFaultsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ServerFaultsTest.java` | ERR-5XX-ROUTE-BODIES (operator, 2026-09-28), over real HTTP: a route-built 500/502/503 names a curated |
 | `ShippedExamplesPassTheSaveGateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ShippedExamplesPassTheSaveGateTest.java` | Every shipped example Pipeline under {@code inspecto/examples/} passes the authoring gate and loads |
 | `SpaceLockRenameRewriteTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpaceLockRenameRewriteTest.java` | SE-2a opt-in rewrite (D-SE3): a hand rename of a Pipeline in a Space whose {@code space.toon} says |
+| `SpaceTemplateUpgradeTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpaceTemplateUpgradeTest.java` | SE-5b — {@link SpaceTemplateUpgrade#propose}, the three-way classification the HTTP proof does not reach: a file the Space |
 | `SpaceVersionCheckTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpaceVersionCheckTest.java` | LA-SHOWCASE-DIST-1: a Space naming a newer {@code min_product_version} than the running product is flagged. |
 | `SpiSlotFailClosedTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpiSlotFailClosedTest.java` | {@link SpiSlot}'s two discovery postures, exercised through real {@code ServiceLoader} registrations |
 | `SpiSlotTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpiSlotTest.java` | Pins the edition-seam slot semantics the three facades (Authenticators / AccessDeciders / |

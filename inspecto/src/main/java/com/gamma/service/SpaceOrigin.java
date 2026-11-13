@@ -184,6 +184,23 @@ public final class SpaceOrigin {
         return out;
     }
 
+    // ── upgrade (SE-5b) ──
+
+    /**
+     * After an upgrade applied some of a newer template's files: the record now names {@code newVersion} (the caller passes
+     * the old version while updates or adds of the newer one remain unapplied) and holds
+     * {@code applied} (path to the SHA-256 of the bytes written) in place of those files' old hashes. Every other hash - a
+     * conflict, a file the operator left out - stays as recorded, so it still reads against the old baseline. The record's
+     * {@code template}, {@code origin} and the PA-7d App fields are kept; {@code recordedAt} is now. Temp file + move.
+     */
+    public static void recordUpgrade(Path spaceBase, String newVersion, Map<String, String> applied) throws IOException {
+        Map<String, Object> m = ToonHelper.decode(Files.readString(spaceBase.resolve(RECORD)));
+        Map<String, String> merged = hashes(spaceBase);
+        merged.putAll(applied);
+        write(spaceBase, ToonHelper.opt(m, "template", ""), newVersion, ToonHelper.opt(m, "origin", "created"),
+                ToonHelper.opt(m, "app", ""), ToonHelper.opt(m, "version", ""), merged);
+    }
+
     // ── files ──
 
     private static void write(Path spaceBase, String templateId, String version, String origin, String app, String appVersion,
@@ -233,21 +250,32 @@ public final class SpaceOrigin {
 
     /** The template's config files as creation would write them for {@code spaceId}: each {@code .toon} with {@code ${SPACE}} rewritten. */
     private static Map<String, String> renderedTemplateHashes(Path templateDir, String spaceId) throws IOException {
-        Path config = templateDir.resolve("config");
         Map<String, String> out = new TreeMap<>();
+        renderedTemplateFiles(templateDir, spaceId).forEach((f, b) -> out.put(f, sha256(b)));
+        return out;
+    }
+
+    /**
+     * SE-5b: the template's config files, {@code config-relative path -> bytes}, as creation would write them for
+     * {@code spaceId} (each {@code .toon} with {@code ${SPACE}} rewritten, any other file as is); empty if it has no config.
+     */
+    public static Map<String, byte[]> renderedTemplateFiles(Path templateDir, String spaceId) throws IOException {
+        Path config = templateDir.resolve("config");
+        Map<String, byte[]> out = new TreeMap<>();
         if (!Files.isDirectory(config)) return out;
         try (Stream<Path> files = Files.walk(config)) {
             for (Path f : files.filter(Files::isRegularFile).sorted().toList()) {
                 byte[] b = f.getFileName().toString().endsWith(".toon")
                         ? Files.readString(f).replace("${SPACE}", spaceId).getBytes(StandardCharsets.UTF_8)
                         : Files.readAllBytes(f);
-                out.put(config.relativize(f).toString().replace('\\', '/'), sha256(b));
+                out.put(config.relativize(f).toString().replace('\\', '/'), b);
             }
         }
         return out;
     }
 
-    private static String sha256(byte[] b) {
+    /** Hex SHA-256 of {@code b}, the hash the record keeps. */
+    public static String sha256(byte[] b) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(b));
         } catch (NoSuchAlgorithmException impossible) {

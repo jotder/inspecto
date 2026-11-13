@@ -135,8 +135,11 @@ class ConfigWriteFunnelTest {
     record Verdict(String route, boolean toon, boolean component, boolean saveGate, boolean hold, Path file,
                    boolean holdsItself, String closure) {}
 
-    /** A real hold — not {@code holdRefusing*}, which refuses instead of recording a replayable request. */
-    private static final Pattern REAL_HOLD = Pattern.compile("PendingChanges\\.hold\\(");
+    /**
+     * A real hold — {@code hold}, or {@code holdSet} (SE-5b: one Pending Change for a multi-file act) — not
+     * {@code holdRefusing*}, which refuses instead of recording a replayable request.
+     */
+    private static final Pattern REAL_HOLD = Pattern.compile("PendingChanges\\.hold(Set)?\\(");
 
     /**
      * Re-verification finding 2 (i): the production replay allowlist ({@link PendingChanges#REPLAYABLE}) is EXACTLY

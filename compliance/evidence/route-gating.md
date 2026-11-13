@@ -329,7 +329,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/onboard/postgres` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/PostgresSnapshot.java:90` |
 | POST | `/onboard/postgres/test` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/PostgresSnapshot.java:89` |
 | POST | `/onboarding/events` | exempt | self-limiting | `inspecto/src/main/java/com/gamma/control/OnboardingRoutes.java:40` |
-| POST | `/origin/adopt` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceOriginRoutes.java:41` |
+| POST | `/origin/adopt` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceOriginRoutes.java:60` |
+| POST | `/origin/upgrade` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceOriginRoutes.java:62` |
 | POST | `/parsers/([^/]+)/preview` | exempt | provenance-gated | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java:43` |
 | POST | `/pending-changes/([^/]+)/approve` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:74` |
 | POST | `/pending-changes/([^/]+)/decline` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:76` |
