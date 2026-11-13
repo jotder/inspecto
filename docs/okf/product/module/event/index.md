@@ -34,5 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `EVENT-JOURNAL-TORN-UTF8-1` | P3 | defect | A journal torn inside a multi-byte character aborts the whole event replay. | — |
 | `SES-SNS-LIVE-CHECKS-1` | P3 | chore | live checks of the SES/SNS adapter, when a customer names SES | external |

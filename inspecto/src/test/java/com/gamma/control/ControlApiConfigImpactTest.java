@@ -166,6 +166,19 @@ class ControlApiConfigImpactTest {
         }
     }
 
+    /** CENSUS-EXPECTATION-TARGET-PATH-1: an Expectation target is a data path; its first segment names the store. */
+    @Test
+    void anExpectationTargetingTheStoreByPathCounts(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        writeOrigin(root);
+        writeComponent(root, "expectations", "band", "name: band\ntarget: orders_feed/database\n");
+        writeComponent(root, "expectations", "other", "name: other\ntarget: orders_feedx/database\n");
+        try (Ctx c = open(cfg, root)) {
+            JsonNode out = V1Body.of(get(c.port, "/config/pipeline/orders_feed/impact").body());
+            assertEquals(1, out.get("total").asInt(), out.toString());
+            assertEquals("band", out.get("dependents").get("expectation").get(0).get("name").asText());
+        }
+    }
+
     /**
      * The loader reads the whole config tree, so the scan must too: an Enrichment and a Job in a sub-folder
      * are dependents (the demo keeps {@code orders/orders_daily_enrich.toon}). A copy under {@code .history/}
