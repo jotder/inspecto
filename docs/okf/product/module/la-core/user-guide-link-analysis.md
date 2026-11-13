@@ -1520,7 +1520,7 @@ state, `detailed`, reveals them through the same hover and click events. `reveal
 and their ends, or a link and its ends. A *Node labels* switch that is off stays off. The override is **Arrows and
 node labels on large graphs**, saved as `display.allDetail: true` (omitted when off). The render strip says "arrows and
 node labels on hover above 1,000 links" while the rule is active. Select all does not reveal labels. Measurements:
-`superpower/la-performance-plan.md` §0b "N4 fewer shapes" and "N4 large-graph rule".
+[`spec-performance.md`](spec-performance.md) (history: `archived-documents/plans-archive/la-performance-plan.md`).
 
 ## Grounded limits and consequences (code read 2026-09-20 / 2026-09-22)
 
