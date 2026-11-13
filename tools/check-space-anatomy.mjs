@@ -15,15 +15,14 @@
  *   B. NOT INVENTED — every name in the page's three census tables is declared by the code:
  *        "Fixed-name Space settings" (first column) ⊆ FILES · "Registry components" (second column) ⊆ the
  *        directory map · "`duckdb/`" (first column) ⊆ SpaceRoot's files.
- *   C. LINK KEYS — every reference key in the first column of the "Every link" table is a string literal in a
- *        tracked main Java source (`"on_pipeline"`, `"widgetId"`): a key nothing reads is not a link.
+ *   C. (retired 2026-11-13, LC-7) — the "Every link" table is generated from LinkCensus.LINKS by
+ *        tools/render-space-links.mjs, whose --check runs in CI; a key there is a census key by construction.
  *   D. MEMBERS — every `Class.member` the page names in backticks: `Class.java` is tracked and contains `member`.
  *
  * ── SCOPE ────────────────────────────────────────────────────────────────────────────────────
  *
  *   - One page. Its PROSE is not judged (what a file means), only the names above.
- *   - C and D are evidence, not proof: a literal or a member name existing does not prove the described behaviour.
- *   - A key written with a placeholder (`use: <type>/<id>`) is skipped in C and counted.
+ *   - D is evidence, not proof: a literal or a member name existing does not prove the described behaviour.
  *
  * Pure Node, no dependencies. Run by `.github/workflows/ci.yml` (guards job).
  */
@@ -98,20 +97,6 @@ for (const row of tableRows('Registry components'))
 for (const row of tableRows('`duckdb/`'))
     for (const t of ticks(row[0])) { censusNames++; if (!DB_FILES.includes(t)) fail('B', `DuckDB file \`${t}\` is not declared by SpaceRoot`); }
 
-// ── C. link keys are read by code ─────────────────────────────────────────────────────────────
-const mainSrc = mainJava.map((f) => read(f)).join('\n');
-let keys = 0, placeholders = 0;
-for (const row of tableRows('Every link')) {
-    for (const t of ticks(row[0])) {
-        if (/\.(toon|csv)$/.test(t)) continue;                       // a file name in the cell, not a key
-        if (t.includes('<') && !t.includes('.')) { placeholders++; continue; }
-        const key = t.split(':')[0].trim().split('.').pop().replace(/\[\]$/, '').replace(/\[.*$/, '');
-        if (!/^[A-Za-z_]+$/.test(key)) { placeholders++; continue; }
-        keys++;
-        if (!mainSrc.includes('"' + key + '"')) fail('C', `link key \`${t}\`: no main Java source holds the literal "${key}"`);
-    }
-}
-
 // ── D. Class.member mentions ──────────────────────────────────────────────────────────────────
 const byClass = new Map();
 for (const f of javaFiles) {
@@ -133,7 +118,7 @@ for (const cm of members) {
 // ── Verdict ───────────────────────────────────────────────────────────────────────────────────
 const scope = `scope: ${DOC} against ${FILES.length} reserved file(s), ${DIRS.length} reserved dir(s), `
     + `${REGISTRY_DIRS.length} registry dir(s), ${DB_FILES.length} DuckDB file(s), ${SUFFIXES.length} suffix(es); `
-    + `${censusNames} census-table name(s) checked back; ${keys} link key(s) (${placeholders} placeholder(s) skipped); `
+    + `${censusNames} census-table name(s) checked back; `
     + `${members.size} Class.member mention(s); prose not judged`;
 if (failures.length) {
     console.error(`\n✖ Space-anatomy guard: ${failures.length} mismatch(es) between the page and the code.\n`);
