@@ -576,6 +576,7 @@ public final class SpaceManager implements AutoCloseable {
                     info.put("description", com.gamma.util.ToonHelper.opt(m, "description", ""));
                     info.put("icon", com.gamma.util.ToonHelper.opt(m, "icon", "heroicons_outline:cube"));
                     info.put("contents", m.get("contents") instanceof List<?> l ? l : List.of());
+                    info.put("version", SpaceOrigin.templateVersion(dir));   // SE-5a: "unversioned" without version:
                     List<Map<String, String>> missing = missingFeatures(dir.resolve("config"));
                     info.put("creatable", missing.isEmpty());
                     info.put("missingFeatures", missing);
@@ -587,6 +588,18 @@ public final class SpaceManager implements AutoCloseable {
             }
         }
         return out;
+    }
+
+    /**
+     * SE-5a: the folder of template {@code templateId} ({@code <spaces-root>/_templates/<id>/}), or empty when no such
+     * template exists, the id would leave the catalog, or this server hosts a single space.
+     */
+    public Optional<Path> templateDir(String templateId) {
+        Path root = templatesRoot();
+        if (root == null || templateId == null || templateId.isBlank()) return Optional.empty();
+        Path tpl = root.resolve(templateId).normalize();
+        return tpl.startsWith(root) && !tpl.equals(root) && Files.isRegularFile(tpl.resolve("template.toon"))
+                ? Optional.of(tpl) : Optional.empty();
     }
 
     /**
@@ -782,29 +795,17 @@ public final class SpaceManager implements AutoCloseable {
      * the Space the difference. A shipped template records nothing. Best effort: the Space is created either way.
      */
     private static void recordProvenance(Path tpl, Path base, String templateId) {
+        // SE-5a (spec-space-origin.md): every template now records its origin - template, templateVersion and each config
+        // file's SHA-256 as the Space now holds it (seeded and stamped); an installed App's template also its app + version.
         Path marker = tpl.resolve(".installed-by");
-        if (!Files.isRegularFile(marker)) return;
         try {
             String app = "", version = "";
-            for (String line : Files.readAllLines(marker)) {
-                if (line.startsWith("app=")) app = line.substring(4).trim();
-                if (line.startsWith("version=")) version = line.substring(8).trim();
-            }
-            Path out = base.resolve(".inspecto").resolve("created-from.toon");
-            Files.createDirectories(out.getParent());
-            Files.writeString(out, "template: " + templateId + "\napp: " + app + "\nversion: \"" + version + "\"\n");
-            // each config file's SHA-256 as the Space now holds it (seeded and stamped): "not changed since created" for an upgrade
-            StringBuilder sums = new StringBuilder();
-            Path config = base.resolve("config");
-            if (Files.isDirectory(config))
-                try (java.util.stream.Stream<Path> files = Files.walk(config)) {
-                    for (Path f : files.filter(Files::isRegularFile).sorted().toList())
-                        sums.append(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(f))))
-                                .append("  ").append(config.relativize(f).toString().replace('\\', '/')).append('\n');
+            if (Files.isRegularFile(marker))
+                for (String line : Files.readAllLines(marker)) {
+                    if (line.startsWith("app=")) app = line.substring(4).trim();
+                    if (line.startsWith("version=")) version = line.substring(8).trim();
                 }
-            Files.writeString(out.resolveSibling("created-from.sha256"), sums.toString());
-        } catch (java.security.NoSuchAlgorithmException impossible) {
-            throw new IllegalStateException(impossible);
+            SpaceOrigin.recordCreated(tpl, base, templateId, app, version);
         } catch (IOException e) {
             log.warn("Could not record which App made Space {}: {}", base, e.toString());
         }

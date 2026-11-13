@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-378 route(s) registered; 378 in the OpenAPI contract, 0 not.
+380 route(s) registered; 380 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -259,6 +259,8 @@ tags: [api, routes, generated]
 | GET | `/onboard/runs/{runId}` | Follow an import run answered with 202 | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |
 | POST | `/onboarding/events` | Report a step only the browser sees (LA-ONBOARD-1 OB-13) | — | — | `inspecto/src/main/java/com/gamma/control/OnboardingRoutes.java` |
 | GET | `/onboarding/metrics` | What the onboarding counters say (LA-ONBOARD-1 OB-13) | — | `canAdminister` | `inspecto/src/main/java/com/gamma/control/OnboardingRoutes.java` |
+| GET | `/origin` | GET /origin - which Space Template (and version) the Space came from, and what changed since | spaces | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SpaceOriginRoutes.java` |
+| POST | `/origin/adopt` | POST /origin/adopt - match an existing Space to a Space Template by file hash and record its origin | spaces | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceOriginRoutes.java` |
 | GET | `/parsers` | GET /parsers (generated skeleton) | parsers | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
 | POST | `/parsers/{parserId}/preview` | POST /parsers/{parserId}/preview (generated skeleton) | parsers | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
 | GET | `/parsers/asn1/profile` | GET /parsers/asn1/profile (generated skeleton) | parsers | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
