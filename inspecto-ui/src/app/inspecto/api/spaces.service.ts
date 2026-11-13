@@ -14,6 +14,16 @@ export interface Space {
     displayName: string;
     description: string;
     createdAt: string;
+    /** The Space lock's counts (LC-4), only when the caller may read that Space's `/integrity`. */
+    integrity?: SpaceIntegritySummary;
+}
+
+/** `GET /spaces` row `integrity`: the totals are present only when `status` is `ready`. */
+export interface SpaceIntegritySummary {
+    status: 'computing' | 'ready' | 'disabled' | 'unavailable' | 'failed' | string;
+    broken?: number;
+    duplicates?: number;
+    changedOutside?: number;
 }
 
 /** POST /spaces request body — note the snake_case keys the ControlApi expects. */

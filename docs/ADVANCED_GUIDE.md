@@ -269,6 +269,8 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
 | Type | When | Key attributes | Emitter |
 |---|---|---|---|
 | `SERVICE_STARTED` | host fully started | pipelines, pollSeconds, maxConcurrentRuns | CollectorService |
+| `CONFIG_LINK_BROKEN` | Space lock finds a new dangling config link (WARN) | space, path, fromKind, fromName, key, toKind, target | SpaceLockEvents |
+| `CONFIG_CHANGED_OUTSIDE` | Space lock finds a config file newly changed outside the server (INFO) | space, path, kind, id, change, brokenLinks | SpaceLockEvents |
 | `PIPELINE_REGISTERED` | config loaded+activated | configPath, activePipelines | CollectorService |
 | `PIPELINE_PAUSED` / `PIPELINE_RESUMED` | via API | — | CollectorService |
 | `BATCH_COMMITTED` | batch success | batchId, outputRows, durationMs, rejectedCount, partitions | CollectorService/bus |

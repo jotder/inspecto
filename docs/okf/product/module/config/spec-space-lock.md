@@ -1,7 +1,9 @@
 # Space lock — the server's signed record of a Space (SE-1a)
 
 **State:** built 2026-11-12 (SE-1a of the Space evolution plan, §4.1 step 1: shadow, report-only). It refuses
-nothing and changes no load. Enforcement (SE-1b), rename handling (SE-2a) and any UI are not part of it.
+nothing and changes no load. Rename handling (SE-2a) is not part of it. Built on it 2026-11-13
+(`SPACE-LINK-CENSUS-1` LC-4, LC-6): the per-Space `links:` mode (§10), the events (§11), the accept route (§12) and
+the count on the Spaces screen (§13).
 
 ## 1. What it is
 
@@ -108,7 +110,8 @@ local administrator did not write it.
 
 ## 7. `GET /spaces/{id}/integrity`
 
-Gated on `canAuthorWorkbench` (it lists every config path); available on every edition (D-LC5). Answers 200:
+Gated on `canAuthorWorkbench` (it lists every config path); available on every edition (D-LC5). Every answer for a
+Space with a Space folder also carries `linksMode` (§10). Answers 200:
 
 | `status` | Body |
 |---|---|
@@ -129,18 +132,102 @@ on and proves the load identical.
 
 ## 9. Deliberately not covered
 
-- **Enforcement** of any kind (SE-1b): a broken link, a duplicate or an outside edit refuses nothing.
+- **Enforcement at load** (SE-1b): a broken link, a duplicate or an outside edit changes no load. The opt-in
+  refusals at save and delete are §10.
 - **Rename handling** (SE-2a): `uid`s are recorded, not acted on.
 - **Edits at runtime with no later server write** are reported at the next computation, not when they happen;
   there is no file watcher.
 - **Server writes outside a request** (a Job or background task writing a config file) carry no window and may be
   reported as outside edits.
 - **Files outside the live set** (`.asn`, `.sql`, unreferenced `.toon` files) and the single-tenant default Space.
-- **UI.**
+- **UI** beyond the count on the Spaces screen (§13): there is no details view yet.
 - **Known gaps, open on the board as `SPACE-LOCK-CLOSE-RESIDUALS-1`:** a crash loses the in-memory windows, so writes
   in flight are then reported as outside edits, as are a second JVM's writes and a server write to a Space other than
   the bound one; the longest delay is about 11.5 s (§6's 10 s plus the 1.5 s debounce); and the close path can overrun
   the Space's 10 s close budget or recreate a deleted Space's folders.
+
+## 10. The `links:` mode (LC-4)
+
+A Space opts into refusing broken links in its own `config/safety-policy.toon`:
+
+```
+links: refuse-activation
+```
+
+| Value | Effect |
+|---|---|
+| `report` (default; also the key absent) | the JVM-wide `-Dlinks.delete` / `-Dlinks.save` modes apply unchanged (LC-3, default `shadow`: the delete or save goes through and the response lists what it broke). |
+| `refuse-activation` | for THIS Space the LC-3 save and delete checks act as `refuse` wherever the JVM mode is `shadow`: a delete of something a link still names answers 409 with the dependents (`?force=true` still deletes), and a save of an ACTIVE config that adds a dangling link answers 422 (a draft, `active: false` / `enabled: false`, still saves — D-LC1). The JVM kill switch `off` still wins. |
+
+- **Parsing.** `SafetyPolicyFiles` knows the key, strictly: any other value (`links: refuse`) or the key in the
+  server file makes the policy unreadable (`ERR_SAFETY_POLICY_UNREADABLE`, the message names the two values), as for
+  every bad key. No server route writes `safety-policy.toon` (a reserved file the operator edits on disk), so the
+  strict parse at read is the refusal. A file without the key parses exactly as before; the key narrows nothing in
+  the folded Safety Policy tier. No shipped Space sets it.
+- **Editions (D-LC5).** Refusing needs Standard or Advanced. On Basic the key parses and acts as `report`, and the
+  integrity report says so.
+- **An unreadable policy file** fails closed: the link checks act as under `refuse-activation` (on Standard and
+  Advanced). The same file already refuses every run of the Space until it is fixed.
+- **Reported** as `linksMode` on `GET /spaces/{id}/integrity`: `{configured: report|refuse-activation|unreadable,
+  effective: report|refuse-activation, note?}`; the note gives the Basic or unreadable reason.
+- **Not built: the load-time hold.** The plan's "a Pipeline or Job with a dangling link stays inactive" has no clean
+  seam: a Pipeline's `active` flag is read in six places of `PipelineScheduler` from the `ConfigRegistry` parse,
+  which is reused while the Pipeline's own files are unchanged and so cannot see a link target in another file
+  disappear, and Jobs load through a separate scheduler. `refuse-activation` therefore refuses saves and deletes
+  only; every config still loads and runs as before.
+- Code: `SpaceLinksMode`, `LinkRefusals.deleteMode` / `saveMode`, `SafetyPolicyFiles.links`,
+  `SafetyPolicy.linksForSpace`. Tests: `ControlApiSpaceLinksModeTest`,
+  `SafetyPolicyFilesTest.linksIsASpaceSettingWithTwoValues`.
+
+## 11. Events (LC-4, LC-6)
+
+Each computation compares its findings with the previous lock and emits, into the Space's own event log
+(`source: space-lock`), only what is new:
+
+| Type | Level | Once per | Attributes |
+|---|---|---|---|
+| `CONFIG_LINK_BROKEN` | WARN | DANGLING link the previous lock did not hold (same file, key and value) | `space`, `path` (the linking file), `fromKind`, `fromName`, `key`, `toKind`, `target` |
+| `CONFIG_CHANGED_OUTSIDE` (the plan's `config.changed.outside`) | INFO | file this computation marked changed outside the server (§4), a removal included | `space`, `path`, `kind`, `id`, `change` (`added`, `modified`, `moved`, `removed`), `brokenLinks` (dangling links the file now holds) |
+
+A finding the previous lock already holds is never emitted again, so a steady Space emits nothing. With no previous
+lock (first boot, or a lock that does not verify) every broken link is new and nothing is marked outside. At most
+200 events of each type per computation; the rest are counted in the log. An event-sink failure leaves the lock as
+computed. The names follow the event catalog's upper-case convention (`EventType`). Code: `SpaceLockEvents`. Test:
+`SpaceLockEventsTest`.
+
+## 12. `POST /spaces/{id}/integrity/accept` (LC-6)
+
+Accepts hand edits so they leave `changedOutside`. Body `{paths?: [config-relative path, ...]}`; absent = every file
+currently changed outside (a git checkout, a template clone). Under the Space's computation lock it computes the
+lock afresh, so the accepted hashes are the files' current ones, drops the `outside` mark of each accepted file and
+the `removedOutside` entry of each accepted removal, re-signs the lock (§5) and replaces the report. The next
+computation reads the accepted lock as its baseline; an accepted file reappears only when it changes again.
+
+- **Gate:** `canAdminister`. Accepting clears the record of an out-of-band change to any config, fixed-name settings
+  such as `roles.toon` and `safety-policy.toon` included, so it is an administrator's act rather than an author's
+  (the report itself is an author's read). Every edition: it only acknowledges a report every edition has.
+- **Gates in order:** kill switch off, no Space folder, or no lock could be computed → 503; `paths` not a non-empty
+  list of non-blank strings → 400; a path that is not a config file in the Space's lock → 404 (nothing accepted);
+  then 200 `{accepted: [{path, change, hash?}], notChangedOutside: [path], changedOutside: <left>, acceptedBy}`. A
+  path that is a config file but not changed outside is listed, not refused, so a repeated accept is a 200.
+- **Audit:** one AUDIT event, `action: config.changed-outside.accepted`, actor = the operator, attributes `space`,
+  `count`, `paths`. An accept that accepts nothing is not audited.
+- Code: `SpaceLockAccept`, `SpaceIntegrityRoutes`. Tests: `ControlApiSpaceIntegrityAcceptTest` (401, 403, 503, 400,
+  404, 200), `SpaceLockEventsTest.anAcceptedHandEditLeavesTheReportAndTheLockStillVerifies`.
+
+## 13. The count on the Spaces screen (LC-4)
+
+Each Space row on the Spaces screen shows a chip "N integrity findings" (broken links + duplicates + files changed
+outside), in the warning tone when above zero; its tooltip and screen-reader text give the three numbers. There is no
+details view yet. While the report is `computing`, `disabled`, `unavailable` or `failed` the row shows nothing, never
+a zero nobody measured.
+
+**Data path.** `GET /spaces` adds `integrity: {status, broken?, duplicates?, changedOutside?}` to each row, read from
+the report already in memory (no computation or file read on the request thread; a Space with none yet is
+`computing` and the read schedules one). It is added only for a caller holding `canAuthorWorkbench` in THAT Space's
+role table (checked per row as `/integrity` would check it; everyone on Basic). One list request instead of one
+`/integrity` request per row, each up to 600 listed items, and no config path leaves the server. Code:
+`SpaceRoutes.withIntegrity`, `SpaceIntegrityRoutes.summary`; UI `inspecto-ui/src/app/inspecto/spaces/space-integrity.ts`.
 
 ## References
 
@@ -148,4 +235,8 @@ on and proves the load identical.
 - Link census: `platform/inspecto-engine/src/main/java/com/gamma/pipeline/LinkCensus.java`, `LinkGraph.java`.
 - Folder layout: [Space anatomy](architecture-space-anatomy.md).
 - Code: `inspecto/src/main/java/com/gamma/service/SpaceLock.java`,
-  `inspecto/src/main/java/com/gamma/control/SpaceIntegrityRoutes.java`.
+  `inspecto/src/main/java/com/gamma/control/SpaceIntegrityRoutes.java`,
+  `inspecto/src/main/java/com/gamma/service/SpaceLockEvents.java`,
+  `inspecto/src/main/java/com/gamma/service/SpaceLockAccept.java`,
+  `inspecto/src/main/java/com/gamma/control/SpaceLinksMode.java`.
+- Link census plan: `docs/superpower/2026-11-11-space-link-census-plan.md` §2.2–§2.4, LC-4, LC-6.

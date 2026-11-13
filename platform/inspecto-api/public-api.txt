@@ -242,6 +242,8 @@ com.gamma.audit.EventType | public static final String ALERT_FIRED
 com.gamma.audit.EventType | public static final String AUDIT
 com.gamma.audit.EventType | public static final String BATCH_COMMITTED
 com.gamma.audit.EventType | public static final String BATCH_FAILED
+com.gamma.audit.EventType | public static final String CONFIG_CHANGED_OUTSIDE
+com.gamma.audit.EventType | public static final String CONFIG_LINK_BROKEN
 com.gamma.audit.EventType | public static final String DEDUP_RECORDS_DROPPED
 com.gamma.audit.EventType | public static final String ENTITY_IDENTITY_CHANGED
 com.gamma.audit.EventType | public static final String ENTITY_LIST_CHANGED
@@ -434,6 +436,7 @@ com.gamma.config.safety.SafetyPolicy | public static List<String> unreadable()
 com.gamma.config.safety.SafetyPolicy | public static SafetyPolicy defaultPolicy()
 com.gamma.config.safety.SafetyPolicy | public static SafetyPolicy forSpace(String)
 com.gamma.config.safety.SafetyPolicy | public static SafetyPolicy withRoots(Path...)
+com.gamma.config.safety.SafetyPolicy | public static SafetyPolicyFiles.Links linksForSpace(String)
 com.gamma.config.safety.SafetyPolicy | public static SafetyPolicyFiles.Tiers tiersForSpace(String)
 com.gamma.config.safety.SafetyPolicy | public static SafetyPolicyTier effectiveTier()
 com.gamma.config.safety.SafetyPolicy | public static java.util.Optional<Pin> pinned()
