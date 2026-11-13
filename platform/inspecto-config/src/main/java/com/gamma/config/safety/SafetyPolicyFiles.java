@@ -32,7 +32,7 @@ public final class SafetyPolicyFiles {
 
     public static final String FILE = "safety-policy.toon";
 
-    private static final Set<String> TOP = Set.of("mode", "permit", "allow", "deny", "caps", "require_spaces", "links");
+    private static final Set<String> TOP = Set.of("mode", "permit", "allow", "deny", "caps", "require_spaces", "links", "columns");
     private static final Set<String> PERMIT = Set.of("network", "install_extensions", "advance_state", "rewind_state");
     private static final Set<String> ALLOW = Set.of("roots", "hosts", "connectors", "extensions", "formats");
     private static final Set<String> DENY = Set.of("hosts", "roots");
@@ -45,8 +45,16 @@ public final class SafetyPolicyFiles {
      */
     public enum Links { REPORT, REFUSE_ACTIVATION }
 
-    /** One parsed file: the tier, (server file only) the Spaces whose policy file is required, (Space file only) {@code links}. */
-    public record Loaded(SafetyPolicyTier tier, Set<String> requiredSpaces, Links links) {}
+    /**
+     * A Space's {@code columns:} mode (SE-3b, Space file only): {@code report} (the default, also when the key is absent)
+     * or {@code refuse-breaking}. It narrows nothing here; the Control API's Schema save check reads it
+     * ({@code spec-column-contract.md} §9).
+     */
+    public enum Columns { REPORT, REFUSE_BREAKING }
+
+    /** One parsed file: the tier, (server file only) the Spaces whose policy file is required, (Space file only)
+     *  {@code links} and {@code columns}. */
+    public record Loaded(SafetyPolicyTier tier, Set<String> requiredSpaces, Links links, Columns columns) {}
 
     private record Entry(String text, Loaded loaded, SafetyPolicyUnreadableException failure) {}
 
@@ -73,7 +81,7 @@ public final class SafetyPolicyFiles {
 
     /** {@link #effective} with its inputs: the same strict loading, the same refusals. */
     public static Tiers tiers(Path serverDir, Path spaceBase, String spaceId, List<Path> defaultRoots) {
-        Loaded server = new Loaded(SafetyPolicyTier.NONE, Set.of(), Links.REPORT);
+        Loaded server = new Loaded(SafetyPolicyTier.NONE, Set.of(), Links.REPORT, Columns.REPORT);
         Path serverFile = serverDir == null ? null : serverDir.resolve(FILE);
         boolean serverPresent = false;
         if (serverFile != null) {
@@ -106,6 +114,17 @@ public final class SafetyPolicyFiles {
         if (spaceBase == null) return Links.REPORT;
         Loaded l = load(spaceBase.resolve("config").resolve(FILE), true);
         return l == null ? Links.REPORT : l.links();
+    }
+
+    /**
+     * The {@code columns:} mode of the Space whose base is {@code spaceBase}: {@link Columns#REPORT} when the base is
+     * null, the Space has no policy file or the file does not set the key. Same strict, cached loading as
+     * {@link #links}: throws {@link SafetyPolicyUnreadableException} when the file exists and is not a valid policy.
+     */
+    public static Columns columns(Path spaceBase) {
+        if (spaceBase == null) return Columns.REPORT;
+        Loaded l = load(spaceBase.resolve("config").resolve(FILE), true);
+        return l == null ? Columns.REPORT : l.columns();
     }
 
     /** Loads one file; {@code null} when it does not exist, throws when it exists and is not a valid policy. */
@@ -166,6 +185,16 @@ public final class SafetyPolicyFiles {
                 default -> throw bad(f, "links must be report or refuse-activation, not '" + v + "'");
             };
         }
+        Columns columns = Columns.REPORT;
+        if (m.containsKey("columns")) {
+            if (!spaceTier) throw bad(f, "'columns' is legal in a Space file only");
+            String v = String.valueOf(m.get("columns")).trim().toLowerCase(Locale.ROOT);
+            columns = switch (v) {
+                case "report" -> Columns.REPORT;
+                case "refuse-breaking" -> Columns.REFUSE_BREAKING;
+                default -> throw bad(f, "columns must be report or refuse-breaking, not '" + v + "'");
+            };
+        }
         Map<String, Object> permit = section(f, m, "permit", PERMIT);
         Map<String, Object> allow = section(f, m, "allow", ALLOW);
         Map<String, Object> deny = section(f, m, "deny", DENY);
@@ -186,7 +215,7 @@ public final class SafetyPolicyFiles {
                 posInt(f, "caps.max_threads", caps.get("max_threads")),
                 posInt(f, "caps.max_batch_files", caps.get("max_batch_files")),
                 posLong(f, "caps.max_batch_bytes", caps.get("max_batch_bytes")));
-        return new Loaded(tier, Set.copyOf(required), links);
+        return new Loaded(tier, Set.copyOf(required), links, columns);
     }
 
     // ---- strict readers -------------------------------------------------------------------------------

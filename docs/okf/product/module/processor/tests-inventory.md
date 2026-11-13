@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-424 test class(es): 170 unit, 254 real-HTTP control-plane, 0 IT.
+425 test class(es): 170 unit, 255 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -94,6 +94,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiCollectorsAndConnectionsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCollectorsAndConnectionsTest.java` | Integration tests over real HTTP for the Acquisition/Sources UI backend: {@code GET /collectors} (flattened source <!-- vocab-allow: quoted Javadoc --> |
 | `ControlApiColumnContractSaveTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiColumnContractSaveTest.java` | SE-3a — the Schema save warning over real HTTP (D-SE4 step 1, report-only): a save through the config write |
 | `ControlApiColumnImpactTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiColumnImpactTest.java` | {@code GET /config/schema/{name}/columns/{column}/impact} (`SPACE-LINK-CENSUS-1` LC-5) over real HTTP: the read's |
+| `ControlApiColumnRefusalTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiColumnRefusalTest.java` | SE-3b over real HTTP, two Spaces side by side: {@code alpha} sets {@code columns: refuse-breaking} in its |
 | `ControlApiCommitRetryTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCommitRetryTest.java` | The X1 retry affordance over real HTTP ({@code GET /runs/{name}/retries}, |
 | `ControlApiComponentSharesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiComponentSharesTest.java` | Component sharing RBAC (R3, {@code docs/superpower/rbac-abac-plan.md} §3) over real HTTP: the |
 | `ControlApiComponentsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiComponentsTest.java` | Component registry CRUD (T19, §7.1) over real HTTP: create / list / get / update / delete |

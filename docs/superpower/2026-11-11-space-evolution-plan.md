@@ -1,6 +1,6 @@
 # Space evolution — a Space the server understands as a whole, reached without breaking one
 
-**State:** IN PROGRESS — D-SE1…D-SE13 answered (§6); SE-0, SE-6a, SE-1a, SE-3a, SE-5a, SE-5b, SE-6b and SE-2a built (table below); what is left is gated (§5), with D-SE10…D-SE13 started.
+**State:** IN PROGRESS — D-SE1…D-SE13 answered (§6); SE-0, SE-6a, SE-1a, SE-3a, SE-5a, SE-5b, SE-6b, SE-2a and SE-3b built (table below); what is left is gated (§5), with D-SE10…D-SE13 started.
 Board row `SPACE-EVOLUTION-1`.
 **Depends on:** [`2026-11-11-space-link-census-plan.md`](2026-11-11-space-link-census-plan.md) phase LC-1
 (the declared link census and its graph). This plan does not repeat that design; it builds on it.
@@ -19,7 +19,8 @@ Board row `SPACE-EVOLUTION-1`.
 | SE-5b template upgrade proposal | built 2026-11-13 | `5f43a9475`, `af71a6fad` | `GET` / `POST /spaces/{id}/origin/upgrade`: three-way per file (recorded hash, template now, Space now), applies only `update` / `add`, one Pending Change under a policy; a partial apply keeps the old version until the last group; spec `spec-space-origin.md` §5; known limit `SPACE-UPGRADE-STUCK-VERSION-1` |
 | SE-6b promotion into an existing Space | built 2026-11-13 | `45667eed3`, `fc7ff8993` | `POST /spaces/{id}/promotion/preview` and `/apply`: a `GET /export` bundle plus `${NAME}` parameters in the request, a previewed change set, one Pending Change under a policy (D-SE7), removals only with `removals: true`, kill switch `-Dspace.promotion=off`; spec `spec-space-promotion.md`; known limits `SPACE-PROMOTION-PARAM-TYPES-1` |
 | SE-2b rename auto-rewrite, opt-in | built 2026-11-13 with SE-2a | `288d5f55a` | per-Space `rename_rewrite: true` in `space.toon` (not `safety-policy.toon`: a lenient reader, so older releases ignore it); Pipelines only; held under an approval policy; kill switch `-Dspace.rename.rewrite=off`. The default flip waits (D-SE2) |
-| SE-1b / 3b, SE-4 | gated; the finding baseline, the SE-3b opt-in, the activation seam and SE-4 step 1 started 2026-11-13 | — | §5; D-SE10…D-SE13 |
+| SE-3b Schema save stop, opt-in | built 2026-11-13 | (SE-3b) | per-Space `columns: refuse-breaking` in `safety-policy.toon` (D-SE11); 409 with the consumers, `?force=true` saves (D-SE4); Standard/Advanced only; kill switch `-Dcolumn.contract.refusal=off`; also brought the SE-3a warning to `PUT /components/schema/{id}`; spec `spec-column-contract.md` §9 |
+| SE-1b, SE-4 | gated; the finding baseline, the activation seam and SE-4 step 1 started 2026-11-13 | — | §5; D-SE10, D-SE12, D-SE13 |
 
 Only targeted test classes ran on each lane; the full gate was not run.
 

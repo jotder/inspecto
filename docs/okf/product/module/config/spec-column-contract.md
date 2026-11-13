@@ -1,7 +1,9 @@
-# Column contract — Schema column changes and what they break (SE-3a)
+# Column contract — Schema column changes and what they break (SE-3a, SE-3b)
 
-**State:** built 2026-11-13 (SE-3a of the Space evolution plan, §4.3 steps 1 and 2: the shadow report, then a
-warning on Schema save). It refuses nothing. The opt-in refusal with `?force=true` (D-SE4) is SE-3b.
+**State:** built 2026-11-13. SE-3a (the Space evolution plan, §4.3 steps 1 and 2: the shadow report, then a warning
+on Schema save) refuses nothing. SE-3b (step 3, D-SE4, D-SE11) adds the opt-in stop: a Space whose
+`safety-policy.toon` sets `columns: refuse-breaking` has a breaking Schema save answered 409 with the consumers it
+breaks, and `?force=true` saves (§9). No shipped Space sets the key; the default flip waits for D-SE2.
 
 ## 1. What it adds, and what it reuses
 
@@ -115,21 +117,29 @@ cases) and before the maker-checker hold. Each breaking change adds a WARNING fi
 - message: the change, then `breaks N consumer(s): <kind> '<name>' (<key>), …` (or "no consumer in this Space
   reads it"), then the count of not-analysed SQL references.
 
-The save is written as before (D-SE4 step 1: warn only). There is no draft exemption: a Schema has no
+The save is written as before (D-SE4 step 1: warn only), unless the Space opted into the stop (§9). There is no draft exemption: a Schema has no
 `active` flag, and the warning never skips a save. The consumers come from the Space as stored before the write.
 A Schema saved with a rule-built mapping, or first written (no stored version), gets no warning.
+
+`PUT /components/schema/{id}` (a registry Schema component, `registry/schemas/<id>.toon`, read by a Pipeline's
+`schema_file: schema/<id>`) gets the same check since SE-3b, after its BACKWARD gate; its warnings ride the
+response as `columnWarnings` (the component body has no `findings` list, like `linkWarnings`). Create and
+`/versions/{v}/restore` are not checked: create has no stored set, and a restore is a rollback, exempt for the
+reason the BACKWARD gate gives.
 
 ## 7. Kill switch
 
 `-Dcolumn.contract=off` (default `report`; any other value is `report`, so a typo never silences more than
 asked). Off: the lock records no `columns`, the report answers `columnChanges: {status: disabled}`, and saves get
 no warning. Turning it back on starts from a baseline, never a flood of changes. `SpaceCorpusEquivalenceTest`
-loads every shipped Space with the switch off and on and proves the load identical. SE-3b will add a `refuse`
-value.
+loads every shipped Space with the switch off and on and proves the load identical. The SE-3b stop has its own
+kill switch (§9); `column.contract=off` silences it too.
 
 ## 8. Deliberately not covered
 
-- **Refusal** of any kind (SE-3b: stopped with the list, `?force=true` goes ahead).
+- **A stop in a Space that did not opt in** (§9), and a stop on Basic (D-LC5).
+- **The bulk writers**: a bundle import, a promotion apply (SE-6b), a template upgrade (SE-5b), Add data (it only
+  creates or grows a Schema) and a version restore write Schemas without the check.
 - **A deleted Schema**: its consumers lose their set and become UNCHECKED in the census; the change report covers
   only Schemas that still exist.
 - **History of changes**: a Schema changed twice before anyone reads the report shows only the latest diff.
@@ -138,11 +148,56 @@ value.
 - **Pipeline-side raw-field reads** (`custom` expressions, `steps[].filter.where`): not census links (LC-5 open).
 - **UI.**
 
+## 9. The opt-in stop (SE-3b)
+
+A Space opts in through its own `config/safety-policy.toon`, beside LC-4's `links:`:
+
+```
+columns: refuse-breaking
+```
+
+| Value | Effect |
+|---|---|
+| `report` (default; also the key absent) | §6 unchanged: the save goes ahead with a `WARN_COLUMN_BREAKS` finding per breaking change. |
+| `refuse-breaking` | a Schema save with a breaking change (`removed`, `renamed`, `type-narrowed`) that **at least one RESOLVED consumer reads** answers **409**, writes nothing, and lists the consumers; `?force=true` saves as before, with the warnings. |
+
+- **Writers.** `POST /config/write` (overwriting a Schema), `POST /config/patch` (on a Schema) and
+  `PUT /components/schema/{id}`, at the place §6 puts the warning: after every existing gate, before the LC-3 link
+  check and the maker-checker hold (a stopped save is never held; a forced one is held as before).
+- **The 409 body** (`error.details`): `written: false`, `code: CONFLICT`, `consumers` — one entry per consumer of
+  every breaking change, `{kind, name, key, column, change, to?, from}` (`column` is the name before the change,
+  `to` the new name of a rename, `from` the consumer's config path) — and `findings`: an `ERR_COLUMN_BREAKS` ERROR
+  per breaking change with consumers (the §6 message), a `WARN_COLUMN_BREAKS` WARNING for one without. The error
+  message names each consumer and says to re-send with `?force=true`. A forced save logs `[COLUMNS] forced …`.
+- **Never a stop.** A breaking change no consumer reads, and a column link the parser could not attribute
+  (NOT_ANALYSED, §4), stay warnings: SQL the parser cannot read is "not analysed", never a refusal. Everything §6
+  exempts (no stored version, a rule-built mapping, an unknown set) is exempt here too.
+- **Parsing.** `SafetyPolicyFiles` knows the key strictly, as `links:`: any other value (`columns: refuse`) or the
+  key in the server file makes the policy unreadable (`ERR_SAFETY_POLICY_UNREADABLE`, naming the two values). A file
+  without the key parses exactly as before; the key narrows nothing in the folded tier.
+- **Editions (D-LC5).** The stop needs Standard or Advanced. On Basic the key parses and acts as `report`.
+- **An unreadable policy file** fails closed, as `links:`: a breaking save is stopped as under `refuse-breaking`
+  (Standard and Advanced; `?force=true` still saves). The same file already refuses every run of the Space.
+- **Kill switches**, both winning over the key: `-Dcolumn.contract.refusal=off` ignores every Space's key, so a
+  breaking save only warns (the plan's warning-only rollback); `-Dcolumn.contract=off` (§7) turns the whole
+  contract off — no warning, no stop. Only `off` (any case) disables. `SpaceCorpusEquivalenceTest` registers
+  `column.contract.refusal`: nothing at load reads it.
+- **Reported** as `columnsMode` on `GET /spaces/{id}/integrity`: `{configured: report|refuse-breaking|unreadable,
+  effective: report|refuse-breaking, note?}`; the note gives the Basic, kill-switch or unreadable reason.
+- **Why `safety-policy.toon`, not `space.toon`** (SE-2b chose `space.toon` for its lenient reader): D-SE11 names
+  `safety-policy.toon`, as LC-4. The cost: a release older than SE-3b reads a file with the key as unreadable (its
+  strict parser does not know `columns`) and refuses that Space's runs — as it already does for `links:`. Set
+  `min_product_version` in `space.toon` when a Space sets the key.
+- Code: `ColumnRefusals` (control), `ColumnContract.breaks` / `Break` / `REFUSAL_PROPERTY`,
+  `SafetyPolicyFiles.columns`, `SafetyPolicy.columnsForSpace`. Tests: `ControlApiColumnRefusalTest`,
+  `SafetyPolicyFilesTest.columnsIsASpaceSettingWithTwoValues`.
+
 ## References
 
 - Plan: `docs/superpower/2026-11-11-space-evolution-plan.md` §4.3, D-SE4.
 - Space lock: [spec-space-lock.md](spec-space-lock.md).
 - Census: `platform/inspecto-engine/src/main/java/com/gamma/pipeline/ColumnSets.java`, `LinkGraph.java`.
 - Code: `inspecto/src/main/java/com/gamma/service/ColumnContract.java`, `SpaceLock.java`,
-  `inspecto/src/main/java/com/gamma/control/ConfigWriteRoutes.java`.
-- Tests: `ColumnContractTest`, `ControlApiColumnContractSaveTest`, `ControlApiSpaceIntegrityTest`.
+  `inspecto/src/main/java/com/gamma/control/ConfigWriteRoutes.java`, `ColumnRefusals.java`, `ComponentRoutes.java`.
+- Tests: `ColumnContractTest`, `ControlApiColumnContractSaveTest`, `ControlApiColumnRefusalTest`,
+  `ControlApiSpaceIntegrityTest`.

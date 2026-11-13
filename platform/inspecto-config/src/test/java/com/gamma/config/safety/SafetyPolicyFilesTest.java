@@ -174,6 +174,37 @@ class SafetyPolicyFilesTest {
         assertTrue(s.getMessage().contains("'links' is legal in a Space file only"), s.getMessage());
     }
 
+    /** SE-3b: {@code columns:} — as {@code links:}: absent and {@code report} alike, narrows nothing, strict, Space file only. */
+    @Test
+    void columnsIsASpaceSettingWithTwoValues() throws IOException {
+        Path base = spaceBase("s1");
+        Path cfg = base.resolve("config");
+        assertEquals(SafetyPolicyFiles.Columns.REPORT, SafetyPolicyFiles.columns(base), "no file");
+        assertEquals(SafetyPolicyFiles.Columns.REPORT, SafetyPolicyFiles.columns(null), "no Space folder");
+        write(cfg, "permit:\n  network: false\nlinks: refuse-activation\n");
+        SafetyPolicyTier without = eff(serverDir(), base, "s1");
+        assertEquals(SafetyPolicyFiles.Columns.REPORT, SafetyPolicyFiles.columns(base), "a file without the key");
+
+        write(cfg, "permit:\n  network: false\nlinks: refuse-activation\ncolumns: refuse-breaking\n");
+        assertEquals(SafetyPolicyFiles.Columns.REFUSE_BREAKING, SafetyPolicyFiles.columns(base));
+        assertEquals(SafetyPolicyFiles.Links.REFUSE_ACTIVATION, SafetyPolicyFiles.links(base), "the two keys are independent");
+        assertEquals(without, eff(serverDir(), base, "s1"), "columns narrows nothing in the folded tier");
+        write(cfg, "columns: REPORT\n");
+        assertEquals(SafetyPolicyFiles.Columns.REPORT, SafetyPolicyFiles.columns(base));
+        assertEquals(SafetyPolicyFiles.Links.REPORT, SafetyPolicyFiles.links(base));
+
+        write(cfg, "columns: refuse\n");
+        var e = assertThrows(SafetyPolicyUnreadableException.class, () -> SafetyPolicyFiles.columns(base));
+        assertTrue(e.getMessage().contains("columns must be report or refuse-breaking, not 'refuse'"), e.getMessage());
+        assertThrows(SafetyPolicyUnreadableException.class, () -> eff(serverDir(), base, "s1"),
+                "the same strict parse refuses the whole policy, like any bad value");
+
+        Path server = serverDir();
+        write(server, "columns: report\n");
+        var s = assertThrows(SafetyPolicyUnreadableException.class, () -> eff(server, spaceBase("s2"), "s2"));
+        assertTrue(s.getMessage().contains("'columns' is legal in a Space file only"), s.getMessage());
+    }
+
     @Test
     void aFixedFileIsReReadAfterItsStampChanges() throws IOException {
         Path base = spaceBase("s1");

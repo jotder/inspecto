@@ -203,6 +203,14 @@ public record SafetyPolicy(
         return SafetyPolicyFiles.links(DiscoveredRoots.baseOf(spaceId).orElse(null));
     }
 
+    /**
+     * The {@code columns:} mode of {@code spaceId}'s policy file (SE-3b): {@code report} for a Space with no Space folder
+     * or no file. Throws {@link SafetyPolicyUnreadableException} when the Space file is unreadable.
+     */
+    public static SafetyPolicyFiles.Columns columnsForSpace(String spaceId) {
+        return SafetyPolicyFiles.columns(DiscoveredRoots.baseOf(spaceId).orElse(null));
+    }
+
     private static SafetyPolicy toPolicy(SafetyPolicyTier t) {
         Set<String> formats = new java.util.LinkedHashSet<>(DEFAULT_FORMATS);
         if (t.allowFormats() != null) formats.retainAll(t.allowFormats());
