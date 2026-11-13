@@ -36,7 +36,7 @@ Every shipped lane went through independent adversarial verification (1–3 roun
 | P6 layout on expand | ✅ SHIPPED 2026-11-12 on its vitest proof; the after-timing was NOT measured (§P6) | see §P6 |
 | P8 hulls | ✅ SHIPPED as N2 (§0b) | — |
 | P11 polish | ❌ NO-GO 2026-11-13 — measured, the derived passes are ~0.1–0.3 % of scripting per action (§P11); nothing built | — |
-| P10a-5 delta fetch on expand | ⬜ OPEN — needs a server delta response | — |
+| P10a-5 delta fetch on expand | ❌ MEASURED, NO-GO, 2026-11-13 — built in a lane, measured a net wire LOSS on a hub, discarded (§P10a "P10a-5 measured") | — |
 | P10 wire format | ✅ SHIPPED 2026-11-12 (PERF-D3 answered: build it) — compact edge rows; raw bytes −41 %, gzip bytes only −1 to −7 %, no measurable server or parse time change (§P10 "Measured") | see §P10 |
 
 **Known low items left open:** no test pins the production ETag-cache budget (a mutation to 3.2 billion passes); `deepEqual` overflows the stack at about 5,000 levels of nesting (real fold output never gets there); a fresh 200 at the full budget blocks the main thread about 70 ms; `menu-landing.spec` fails four tests when it runs after `session.service.spec` (that spec leaves `inspecto.currentSpace=gone` in localStorage, pre-existing on master); `FsInvestigationStore.promoteBeforeMarkHook` is a pre-existing public mutable static; the Postgres store, an ABA token change inside one mtime tick, and a real serialisation failure through the full HTTP stack were never exercised. The LA user guide still states the old caps (500 / 2,000; the defaults are now 1,000 / 2,500).
@@ -83,7 +83,7 @@ Every shipped lane went through independent adversarial verification (1–3 roun
 | Health | idle: 0 requests in 35 s (no polling); 🔴 **`TypeError: Cannot read properties of undefined (reading 'getData')` in `renderMinimap`, four times, after route changes** (a real defect); 5 × "Unable to preventDefault inside passive event listener" |
 
 ### The re-ranked open list (by what an analyst feels)
-Open items N4, N7–N11, P5 and P10a-5 are tracked on the board as `LA-PERF-*` rows (`docs/BACKLOG.md` §3.12, 2026-11-12; P11 closed as a measured no-go 2026-11-13).
+Open items N4, N7–N11 and P5 are tracked on the board as `LA-PERF-*` rows (`docs/BACKLOG.md` §3.12, 2026-11-12; P11 closed as a measured no-go 2026-11-13).
 
 **Tier 1 — freezes the page**
 - **N1 Radial layout hangs the tab (> 3 min at 767 nodes / 4,000 links).** Cap or refuse Radial above a node count (a `layered_max_nodes` = 30 cap already exists as the pattern), and say so on screen; then decide on a worker (PERF-D5). Severity: high; a one-line cap removes the hang. ✅ **SHIPPED 2026-10-25** (3 builder / verifier rounds; targeted tests only): the Radial, Information density, Clustering and every other layout are capped at the one place they reach G6 (`layoutConfig`, caps through the `display` limits: Java `LaLimit`, `la-limits.ts`, docs, parity test), Concentric is the fallback, the cap notice no longer covers the legend. `d4fd1aa11`, `65593934a`, `92903f91b`.
@@ -455,6 +455,23 @@ the analyst asked for something new. Everything else is served from the client.
 | PERF-P10a-4 | Debounce `pushFilter` and treat "Apply locally" as local (no request) | Test: a burst of filter edits produces one request after the pause; local apply makes none |
 | PERF-P10a-5 | Expand and Grow fetch only the delta (new nodes and edges since the last `at`), merged into the existing graph; this depends on the server delta response (server item 7) | Test: an expand's request body asks for the delta; the merged graph equals a full refetch (parity test) |
 | PERF-P10a-6 | Audit every action for hidden fetches: none of hide, colour, layout, selection, legend or minimap may call the server | Trace per action (P0-1): zero network requests for the local set |
+
+❌ **P10a-5 measured, NO-GO, 2026-11-13 (operator: "Close as no-go"; board row `LA-PERF-P10A5-1` closed; nothing shipped).**
+A lane built the delta, its targeted tests passed, and the code was discarded after this measurement:
+- **What was tried.** `POST /inv/projection/neighbors` took an optional `known: [[source, target, kind, attr...]]` (the
+  links the caller holds, as an earlier answer showed them) and dropped the matching rows AFTER masking, so a delta was always
+  a subset of that viewer's full answer and a raw id matched nothing; the body-hashing cache key kept deltas apart (PERF-D2).
+  Expand / Grow sent each held link of the node (only when its row folds back to that link's id) and fell back to a full read
+  on any doubt (more left out than named, or the node cap could bind).
+- **Measured (Preview install :8080, `la-showcase` `telecom_links_dataset`, after a 4,000-row projection; medians of 9;
+  each call misses the cache).** Hub `99970000100` (257 of its 730 links held): rows 730 → 473, response 51,489 → 33,792 B
+  (−34 %), gzip 8,339 → 5,874 B (−2.5 KB), **request 173 → 17,402 B**, server 396 → 363 ms (noise; the ~400 ms floor, N9).
+  The suspect `99979100001` is not in that projection: nothing held, nothing saved.
+- **Why no-go.** Net loss on the wire under gzip (about 23.3 KB against 8.5 KB on the hub): request bodies are not compressed,
+  and each named link (~68 B) costs more than the gzipped row it saves (~10 B). Any design that lists what the client holds
+  has this problem. The cheap-request alternative, a server token (the held projection's ETag → ProjectionCache entry checked
+  against the same viewer), was not built: entries live 60 s, so most expands would fall back. Server time is the per-request
+  floor, not the body. Reopen only with a different mechanism and a measurement that beats the full read.
 
 **Guardrails.** Masking and access are checked on every served result, cached or not. A cached graph is keyed to the
 viewer: it must never be shared between two viewers with different row scope (see PERF-D2). A stale result must
