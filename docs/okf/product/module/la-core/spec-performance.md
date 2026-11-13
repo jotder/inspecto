@@ -93,7 +93,7 @@ shown, `PerformanceObserver` long tasks. One run per row; the box was not otherw
   labels on hover above 1,000 links" shows; zoomed in, links carry no arrowheads and nodes no labels. Hovering a node
   shows the arrowheads of its links. With *Node labels* turned on, nodes stay unlabelled at rest, and a hover shows the
   node's label, its links' arrowheads and the labels of the nodes at their other ends.
-- **Layout on expand (P6): no measured gain.** An Investigation from `99979100001`, 1 degree (403 nodes / 403 links):
+- **Layout on expand (P6): NOT measured after all.** ⚠ Corrected the same day: every expand below took the full-relayout fallback (`graph.render()`, logged live), because the Expand returned its entities under a different id than the start graph (`LA-EXPAND-PLACEMENT-1`), so no new node had a drawn neighbour. The numbers are the fallback's cost, not P6's. An Investigation from `99979100001`, 1 degree (403 nodes / 403 links):
 
 | Expand | Nodes | Long tasks (ms) | Total |
 |---|---|---|---|
@@ -102,5 +102,5 @@ shown, `PerformanceObserver` long tasks. One run per row; the box was not otherw
 | toolbox Expand (first 25 unexpanded) | 418 → 444 | 775 · 112 · 117 · 52 | 1,056 ms |
 
   Before (2026-11-12, another build and day, ~405 nodes): 378–435 ms per 2–5-node expand. So the expand still costs a
-  re-fit and repaint of the whole canvas; skipping the layout did not make it cheaper here. Also seen: the new
-  entities land in a separate group far from the graph, board row `LA-EXPAND-PLACEMENT-1` (not root-caused).
+  full layout on every expand of a started graph; P6 needs re-measuring once `LA-EXPAND-PLACEMENT-1` is fixed. The
+  separate far group is the duplicated entities that the relayout pushed away from the drawn graph.
