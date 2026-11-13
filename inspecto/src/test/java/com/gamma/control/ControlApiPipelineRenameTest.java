@@ -256,6 +256,11 @@ class ControlApiPipelineRenameTest {
             expectation.put("target", "mini_etl");
             expectation.put("severity", "ERROR");
             store.write("expectation", "mini_exp", expectation);
+            // and one targeting the pipeline's store by data path (CENSUS-EXPECTATION-TARGET-PATH-1).
+            Map<String, Object> pathExp = new LinkedHashMap<>();
+            pathExp.put("target", "mini_etl/database");
+            pathExp.put("severity", "ERROR");
+            store.write("expectation", "mini_path_exp", pathExp);
 
             // a decision rule targeting the pipeline.
             Map<String, Object> rule = new LinkedHashMap<>();
@@ -281,8 +286,8 @@ class ControlApiPipelineRenameTest {
             HttpResponse<String> r = post(c.port, "/pipelines/mini_etl/rename", "{\"newId\":\"mini_v2\"}");
             assertEquals(200, r.statusCode(), r.body());
             JsonNode out = V1Body.of(r.body());
-            assertEquals(9, out.get("dependentsRewritten").asInt(),
-                    "2 enrich + 2 jobs + expectation + rule + 2 datasets + alert");
+            assertEquals(10, out.get("dependentsRewritten").asInt(),
+                    "2 enrich + 2 jobs + 2 expectations + rule + 2 datasets + alert");
 
             for (Path p : List.of(root.resolve("mini_enrich.toon"), root.resolve("orders").resolve("nested_enrich.toon"))) {
                 Map<String, Object> enrichAfter = ConfigLoader.filesystem().decode(p.toString());
@@ -302,6 +307,8 @@ class ControlApiPipelineRenameTest {
             }
 
             assertEquals("mini_v2", String.valueOf(store.get("expectation", "mini_exp").orElseThrow().content().get("target")));
+            assertEquals("mini_v2/database", String.valueOf(store.get("expectation", "mini_path_exp").orElseThrow().content().get("target")),
+                    "a store-path target: only its first segment is rewritten");
             assertEquals("mini_v2", String.valueOf(store.get("decision-rule", "mini_rule").orElseThrow().content().get("target")));
             assertEquals("mini_v2", String.valueOf(store.get("dataset", "mini_ds1").orElseThrow().content().get("sourceName")));
             assertEquals("mini_v2/database", String.valueOf(store.get("dataset", "mini_ds2").orElseThrow().content().get("physicalRef")));

@@ -49,6 +49,24 @@ public final class LinkCensus {
         public boolean enforced() {
             return !checks.isEmpty();
         }
+
+        /**
+         * Whether the value is a data path under the Space data root whose first segment is the store: a Dataset's
+         * {@code physicalRef}, and an Expectation's {@code target} ({@code ExpectationEvaluator} reads
+         * {@code <dataRoot>/<target>/**}, so {@code orders/database} names the store {@code orders}). A Decision
+         * Rule's {@code target} is a bare id and is not one.
+         */
+        public boolean storePath() {
+            return fromKind.equals("dataset") && keyPath.equals("physicalRef")
+                    || fromKind.equals("expectation") && keyPath.equals("target");
+        }
+
+        /** What {@code value} names: trimmed, and for a {@link #storePath} only its first path segment. */
+        public String named(String value) {
+            String v = value.trim();
+            int slash = v.indexOf('/');
+            return storePath() && slash >= 0 ? v.substring(0, slash) : v;
+        }
     }
 
     private static Link link(String from, String key, String to, Type type, OnDelete d, OnRename r, Check... checks) {

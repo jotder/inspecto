@@ -100,6 +100,21 @@ class LinkGraphTest {
                 "no universe, no judgement; a dataset-typed rule target is not judged as a Dataset link");
     }
 
+    /** CENSUS-EXPECTATION-TARGET-PATH-1: an Expectation target is a data path; its first segment is the store. */
+    @Test
+    void anExpectationTargetIsAStorePathJudgedByItsFirstSegment() {
+        Map<String, List<ComponentRegistry.Component>> byType = Map.of(
+                "expectation", List.of(
+                        c("expectation", "path", Map.of("target", "Orders/database")),
+                        c("expectation", "nostore", Map.of("target", "gone/database"))),
+                "decision-rule", List.of(c("decision-rule", "r", Map.of("target", "orders/database"))));
+        LinkGraph g = LinkGraph.ofComponents(byType, Set.of("orders"));
+        assertEquals(List.of(LinkGraph.Status.RESOLVED, LinkGraph.Status.DANGLING),
+                g.edges("expectation", "target").stream().map(LinkGraph.Edge::status).toList());
+        assertEquals(LinkGraph.Status.DANGLING, g.edges("decision-rule", "target").get(0).status(),
+                "a Decision Rule target is a bare id, not a path");
+    }
+
     @Test
     void configRootReadsTheLoaderFileSetAtAnyDepthSkippingReserved(@TempDir Path root) throws IOException {
         Files.createDirectories(root.resolve("orders"));
