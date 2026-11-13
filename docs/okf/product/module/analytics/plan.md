@@ -37,13 +37,18 @@ ratcheting duplication guard (Must items M1–M10).
   forest; `stats.correlation` names `method: pearson | spearman`. Windowed and ratio Measures are Measure grammar, not
   a kernel function, so they are not catalogued.
 - **Anomaly Model form authors `method` / `forest`** (D-AN29, closed 2026-10-20 with `ANOMALY-ML-SCORING-1`).
+- **Last residuals closed (2026-11-13, row `ANALYTICS-CORE-1` closed):** the 61 hand-wrapped `"" + name + ""`
+  identifier quotes in the 15 classes the row named now go through `SqlIdent.q` (same SQL for every plain name; a name
+  holding `"` is now escaped, not broken out of; `PatternRoutes` was already safe, its columns are checked against
+  `[A-Za-z_][A-Za-z0-9_]*` and its Dataset must resolve). `PartitionCompactor` reads by name
+  (`union_by_name=true`, operator call 2026-11-13): before, a partition whose files differ in column set either
+  failed to compact or silently dropped the newer columns (`PartitionCompactorSchemaDriftTest`).
 - **Steps for C6 and C9 (2026-11-01, `ANALYTICS-STEPS-TS-1`):** `transform.timeseries.changepoint`,
   `transform.cohort.retention`, `transform.cohort.funnel` (`steps:` kinds `changepoint`, `retention`, `funnel`) —
   [spec § Change-point and cohort Steps](spec.md#change-point-and-cohort-steps).
 
 ## Left
 
-- Hand-wrapped scratch-name sites listed on the row; `PartitionCompactor` `union_by_name` (operator-owned).
 - C7 graph traversal in SQL — no longer blocked (DuckDB 2.0.0.0 is pinned since 2026-10-23); it waits for its
   benchmark on board row `DUCKDB-2-LOOP-QUERIES-1`, candidate C1 / C2 of
   [`duckdb-2-plan.md`](../../../../archived-documents/plans-archive/duckdb-2-plan.md) §7.

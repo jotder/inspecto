@@ -19,7 +19,7 @@ computed several ways in several modules; the kernel is the single home, and cal
 onto it.
 
 The concept page of record, with every formula, is
-[analytics-kernel](spec.md); the plan is row `ANALYTICS-CORE-1` in
+[analytics-kernel](spec.md); the plan (row `ANALYTICS-CORE-1`, closed 2026-11-13) is
 [`analytics-core-plan.md`](../../../../archived-documents/plans-archive/analytics-core-plan.md).
 
 ## Where it fits

@@ -78,7 +78,7 @@ Of the remaining six, M8 needs no decision from anyone and can start now.
 | C3 | `ARCH-MOSCOW-UNTRACKED-1` item 11 *(no row of its own)* | OpenAPI quality: 430 of 559 operations have skeleton summaries. Only `backend-smoke.spec.ts` covers the operations panes end to end. |
 | C4 | `MODULE-REORG-P4-3` | A Run already started is not interrupted when its module is switched off. No work item until a switchable module owns a subscription. |
 | C5 | `MODULE-REORG-P7-INCIDENTS` | Delete `AlertMigration` one release after the Alert store ships. |
-| C6 | `ANALYTICS-CORE-1` (Could batch) | Decisions D-AN10 to D-AN13 and D-AN20 to D-AN29 await confirmation. |
+| C6 | `ANALYTICS-CORE-1` (Could batch) | Closed 2026-11-13: decisions D-AN10 to D-AN35 operator-confirmed 2026-11-12, the last residuals built. |
 | C7 | Consignment addressing | The ingest-side accessor has no consumer; `retire_superseded` is off by default. |
 | C8 | Branch-aware executor residuals | The pre-fetch intake cap needs a listing-with-sizes connector seam. |
 | C9 | `REALTIME-DECISIONING-1` | The engine is batch; windowed Alert Rules on a `trigger: stream` Pipeline are in progress (PA-9a and PA-9b built, the rest designed). Large, and worth it only for card-authorisation or pre-call-blocking bids. |
