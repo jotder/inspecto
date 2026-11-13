@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-398 test class(es): 398 unit, 0 real-HTTP control-plane, 0 IT.
+399 test class(es): 399 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -232,6 +232,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `ParameterDeclContractTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ParameterDeclContractTest.java` | The declaration's rendering + validation contract (job-parameter-contract §7.2): defaults preserve |
 | `ParameterResolverTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ParameterResolverTest.java` | P3a parameter resolution (§7): layer order (config → deduce → default), the $-context, and fail-closed |
 | `PartitionCompactorRegistryTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/PartitionCompactorRegistryTest.java` | §11.3's compaction state transition: {@link PartitionCompactor} must flip the registry rows of the files it |
+| `PartitionCompactorSchemaDriftTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/PartitionCompactorSchemaDriftTest.java` | Compaction reads a partition's files BY NAME (operator call on ANALYTICS-CORE-1, 2026-11-13): a store that gained a |
 | `PipelineJobRunnerPathJailTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/PipelineJobRunnerPathJailTest.java` | {@code JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1} (operator 2026-09-17, option 1): the two operator-authored paths a |
 | `PipelineJobRunnerTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/PipelineJobRunnerTest.java` | T32 Phase A — {@link PipelineJobRunner} runs an authored pipeline for real over embedded DuckDB: it seeds a |
 | `PlatformServicesTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/PlatformServicesTest.java` | The S1-1 seam contract (platform-services plan §3): grant filtering is honest (a registered but |

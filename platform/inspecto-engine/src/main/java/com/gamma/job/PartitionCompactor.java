@@ -24,7 +24,8 @@ import java.util.stream.Stream;
 /**
  * The {@code compact} maintenance task (PIP-7): merge the many small per-batch Parquet files inside each
  * partition directory under {@code dir} into one, via DuckDB's own read/write kernel
- * ({@code COPY (SELECT * FROM read_parquet([...])) TO merged}).
+ * ({@code COPY (SELECT * FROM read_parquet([...], union_by_name=true)) TO merged}; by name since 2026-11-13,
+ * operator call on ANALYTICS-CORE-1).
  *
  * <p><b>Safety model</b> (there is no lock between jobs and ingest — {@code DeletionFence} is advisory):
  * <ul>
@@ -125,7 +126,9 @@ final class PartitionCompactor {
             // 2. Merge into a glob-invisible temp, DuckDB doing the schema-tolerant heavy lifting.
             String list = SqlViews.pathList(candidates.stream().map(p -> p.toAbsolutePath().toString()).toList());
             try (Statement st = conn.createStatement()) {
-                st.execute("COPY (SELECT * FROM " + SqlViews.parquet(list, false, SqlViews.Hive.AUTO) + ") TO "
+                // By NAME, like every store read: a store that gained a column mid-life holds files of two
+                // schemas in one partition, and a positional read fails or puts values under the wrong column.
+                st.execute("COPY (SELECT * FROM " + SqlViews.parquet(list, true, SqlViews.Hive.AUTO) + ") TO "
                         + SqlIdent.pathStr(tmp) + " (FORMAT PARQUET)");
             }
 
