@@ -88,7 +88,7 @@ is a Pipeline or its store (`PipelineLinkRewrite.holders`, shared with `Pipeline
 the links whose target kind is that kind and whose value is the id (trimmed, case-insensitive).
 
 **Limits.** A file renamed **and** changed in one step loses its `uid` (new path, new hash): it reads as a delete
-plus an add, and the delete is reported with its dependents. A case-only change of an id is a rename. Only
+plus an add, and the delete is reported with its dependents. A case-only change of an id is not reported (ids match case-insensitively). Only
 Pipeline renames can be rewritten; other kinds are reported.
 
 **Opt-in rewrite (D-SE3).** Off by default. A Space opts in with `rename_rewrite: true` in its `space.toon` (beside
@@ -155,6 +155,7 @@ Gated on `canAuthorWorkbench` (it lists every config path); available on every e
 | `ready` | `checkedAt`, `lockWrittenAt`, `baseline` (`lock` or `none`, with `baselineNote` why), `files`, `links`, and three lists — `broken` (dangling links), `duplicates` (two or more files claiming one `kind:id`, case-insensitive) and `changedOutside` (§4). Each list is `{total, items}`, at most 200 items. |
 | `disabled` | the kill switch is off. |
 | `closed` | the Space was closed (or deleted) and not started again. |
+| `absent` | its config folder no longer exists; nothing is written. |
 | `unavailable` | the bound Space has no Space folder (single-tenant default). |
 | `failed` | the computation threw; `error` says why. |
 
