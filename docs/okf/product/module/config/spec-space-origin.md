@@ -157,6 +157,10 @@ Deliberately not done: a registry component written by the upgrade gets no MET-5
 writes raw files, as a Space bundle import does); nothing is deleted; a Pipeline the upgrade writes takes effect as after
 any config write. Rollback: none needed for the record (ignore it); a written file is restored from its history or by hand.
 
+Known gap, open on the board as `SPACE-UPGRADE-STUCK-VERSION-1`: when every file still left is a conflict, and the operator
+resolves it by hand, no apply can record the new version (409 "nothing to apply"); the next template version re-reads
+every file.
+
 ## 6. Tests
 
 `SpaceOriginTest` (create with/without version, unrecorded Space, adopt full/partial/none, the report's space and

@@ -94,6 +94,9 @@ the approval that lands it).
 - **Lock enforcement** (SE-1b): the promotion's writes fall inside the request's write window, so the Space lock does
   not report them as outside edits; nothing else ties the two.
 - **Parameter files kept by the server**: the values travel in each request.
+- **Known gaps, open on the board as `SPACE-PROMOTION-PARAM-TYPES-1`**: a parameter value can change the type of the
+  value it fills while the file still parses (`k: v` makes a list item an object, `[2]: a,b` makes text an array, an
+  empty value makes `{}`); a held apply keeps the raw bundle in its Pending Change's recorded request body.
 
 ## References
 

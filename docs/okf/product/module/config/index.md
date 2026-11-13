@@ -37,5 +37,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P2 | feature | SPACE-LINK-CENSUS-1 one declared census of the links between a Space's config files | — |
 | — | P3 | feature | SPACE-EVOLUTION-1 a Space the server understands as a whole, reached without breaking one | — |
 | `SPACE-LOCK-CLOSE-RESIDUALS-1` | P3 | defect | the SE-1a Space lock (shadow, report-only) can overrun a Space's close budget and recreate the folders of a deleted Space | — |
+| `SPACE-UPGRADE-STUCK-VERSION-1` | P3 | defect | a Space Template upgrade whose last remaining files are conflicts never records the new version | — |
+| `SPACE-PROMOTION-PARAM-TYPES-1` | P3 | defect | a promotion parameter value can change the type of the value it fills | — |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | NARROWED 2026-11-01 (twice): the ingest lane WRITES an allow-listed s3:// dirs.database and REGISTERS that output in DuckLake; what is le… | — |
