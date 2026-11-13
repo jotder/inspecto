@@ -116,6 +116,9 @@ Moved to [Events and event log — API](api-events.md).
   directories. `flush()` and `close()` wait for an in-flight flush. `prune`, `close` and replay still flush
   under the lock. Measured per append (50-event threshold): p99 fell from 153–245 ms to 5.7–7.3 ms. The
   ~2.6 ms median is the journal force, which stays.
+- **Torn UTF-8 on replay (`EVENT-JOURNAL-TORN-UTF8-1`, 2026-11-13).** A kill can land inside a multi-byte
+  character of the last journal line. `ParquetEventStore.replayJournal` therefore decodes the journal, every
+  segment and the held file leniently (malformed bytes become U+FFFD) rather than failing the whole replay.
 
 ## References
 

@@ -84,6 +84,6 @@ the Space role names). Operator 2026-10-16: deploy every fix there; zip/linux bu
   `jcmd <pid> Thread.print` works on the bundled runtime (74 Java threads against ~3,550 OS threads: the rest is native/DuckDB).
 - **Measured demo-scale baseline (2026-10-25, `f6c168147`):** boot 3 min 35 s to `/health` after a fresh swap (185 s of it before
   the first application log line — unexplained), idle CPU 95% of a core for ~4 min after boot then 6.9%, 1.4 GB working set,
-  collectors poll once a minute per source. Largest graph in the Spaces is 767 nodes / 4,000 rows. Details: `docs/superpower/la-performance-plan.md` §0b.
+  collectors poll once a minute per source. Largest graph in the Spaces is 767 nodes / 4,000 rows. Details: `docs/archived-documents/plans-archive/la-performance-plan.md` §0b.
 
 Related: [[oidc-wso2-keycloak]], [[bundle-and-process-traps]].

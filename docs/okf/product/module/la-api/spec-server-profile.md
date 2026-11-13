@@ -1,6 +1,6 @@
 # LA server profile — N7 / N8 / N9 (LA-PERF-SERVER-1, 2026-11-12)
 
-Evidence for `docs/superpower/la-performance-plan.md` §0b. Claims here are measurements, not code reading.
+Evidence for the LA performance plan §0b (archived: `docs/archived-documents/plans-archive/la-performance-plan.md`). Claims here are measurements, not code reading.
 
 **Method.** The Preview bundle of 2026-11-09 booted over a copy of the `la-showcase` Space (one Investigation), demo
 sign-in, port 8085, JDK 27 with JFR (`settings=profile`). A `curl` loop drove each request, `jcmd JFR.dump` after each
@@ -83,3 +83,23 @@ after boot. In that burst `system.freshness-sweep` took **11,435 ms**; at later 
 run straddling a later burst (20:40, the same ~20 jobs including two `la_index_build`) peaked at 2.2 s. JFR shows no
 Java wait over 2 s on a request (virtual) thread, and no GC or file event above 1 s, so the time was native or CPU.
 Verdict: **the tail goes with the first job burst after boot.** N10 did not remove it, and its exact stage was not caught.
+
+## As built when the LA performance plan closed (2026-11-13)
+
+- **Projection cache + ETag/304 (P4-2):** `ProjectionCache` is looked up AFTER every gate and the masking; per-entry cap
+  5,000 rows / 2 MB, 32 MB total. Key = Dataset fingerprint + masking mode, Entity Types, Space masking key and masking
+  description + the whole viewer (Subject id, capabilities, data scopes, attributes, roles), so it is stricter than
+  PERF-D2 asks: two Subjects never share an entry. Pinned by `ControlApiProjectionCacheKeyTest`. The Working Set relation
+  cache holds the RAW log after `openForRead` and masks per request; the masking profile is in its ETag
+  (`WorkingSetEtag`). Every error drops the ETag (`ControlApi.respond` strips it at status >= 400).
+- **Compact edge wire (P10, PERF-D3):** `POST /inv/projection` and `/inv/projection/neighbors` answer
+  `application/vnd.inspecto.la-edges.v2+json` = `{masking, columns, attrCols, rows, truncated, columnTypes, source?}`,
+  rows as arrays (`InvRoutes.edgeArrays`, ends masked in place). A media type, not a `v2` path, so every path-keyed table
+  (rate classes, capability manifest, OpenAPI, cache keys) stays put. `ApiContext.respondJson` keeps a `…+json` type only
+  on success; errors are plain JSON with no ETag. Gotcha: an `Idempotency-Key` replay is sent as `application/json`. The
+  SPA decodes in `edge-wire.ts` BEFORE its conditional-read cache. Measured: raw bytes −41 %, gzip only −1 to −7 %, no
+  server or parse-time change (gzip had already removed the repetition). `columnTypes` is not cached (no measured cost).
+- **N9 decision:** audit append stays per-event durable; the Parquet flush moved off the lock as journal segments
+  ([`../event/architecture.md`](../event/architecture.md)). The first-job-burst-after-boot tail is accepted as a cold-start cost.
+- History and every run: `archived-documents/plans-archive/la-performance-plan.md`. Browser side and the measured
+  no-gos: [`../la-core/spec-performance.md`](../la-core/spec-performance.md).

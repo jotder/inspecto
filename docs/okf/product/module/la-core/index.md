@@ -16,7 +16,7 @@ tags: [product-item, module]
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [LA-COLUMN-ROLES-2 — design notes for the three parts that need a decision (2026-11-05)](plan-column-roles-2.md) · [Link analysis core and ports - plan of record](plan.md) |
-| spec | current | [Inspecto LA - first-time user use cases (blank product to first findings)](spec-first-time-user-use-cases.md) · [Link analysis core and ports - spec](spec.md) |
+| spec | current | [Inspecto LA - first-time user use cases (blank product to first findings)](spec-first-time-user-use-cases.md) · [Link analysis performance - decisions, seams and measured no-gos](spec-performance.md) · [Link analysis core and ports - spec](spec.md) |
 | architecture | current | [Link Analysis backend architecture (la/ modules, entity store, host wiring)](architecture-backend.md) · [Link Analysis — data onboarding](architecture-data-onboarding.md) · [Link Analysis — HTTP surface](architecture-http-surface.md) · [Link Analysis — Investigation UI](architecture-investigation-ui.md) · [Link Analysis — masking](architecture-masking.md) · [Link Analysis](architecture.md) |
 | features | current | [Link Analysis — features](features-link-analysis.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
@@ -34,6 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `LA-PERF-LIVE-CHECKS-1` | P3 | chore | drive two shipped LA performance changes live on a visible pane. | — |
 | `LA-BASIC-PLACEHOLDER-CASE-1` | P2 | defect | in Basic, Attach to Case lists invented placeholder Cases, seals the Snapshot and reports it attached. | — |
 | `LA-SAMPLE-EMPTY-DATASET-1` | P2 | defect | the la-sample Space's only Dataset is empty on the Basic install, so its example and its only saved view fail. | — |
 | `LA-DOCK-PAGE-GROWS-1` | P2 | defect | opening the Link Analysis bottom Data dock makes the page taller than the window. | — |
