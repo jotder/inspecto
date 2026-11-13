@@ -34,6 +34,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * <b>Phase 4 S4c — the drain, D-13's resume half.</b> Reached through
@@ -167,7 +168,7 @@ public final class DrainCommand {
             try (Statement st = conn.createStatement()) {
                 for (Map.Entry<String, Path> e : parkTables.entrySet()) {
                     String table = "parked_" + e.getKey().replaceAll("[^A-Za-z0-9_]", "_");
-                    st.execute("CREATE TABLE \"" + table + "\" AS SELECT * FROM "
+                    st.execute("CREATE TABLE " + q(table) + " AS SELECT * FROM "
                             + SqlViews.parquetFile(e.getValue()));
                     seeded.put(e.getKey(), table);
                 }

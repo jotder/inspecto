@@ -7,6 +7,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * <b>T32 Phase A — seed a pipeline job's {@code source_store} as a DuckDB view.</b> A pipeline run as a
@@ -60,7 +61,7 @@ public final class SourceStoreReader {
         com.gamma.consignment.ConsignmentSelector.Resolution read =
                 com.gamma.consignment.ConsignmentSelector.resolveWithFiles(conn, format, glob, true);
         try (Statement st = conn.createStatement()) {
-            st.execute("CREATE VIEW \"" + viewName + "\" AS SELECT * FROM " + read.reader() + where);
+            st.execute("CREATE VIEW " + q(viewName) + " AS SELECT * FROM " + read.reader() + where);
         }
         return read.kept();
     }

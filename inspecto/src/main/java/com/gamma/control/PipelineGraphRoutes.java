@@ -52,6 +52,7 @@ import java.util.Optional;
 import java.util.Set;
 import com.gamma.access.WriteGates;
 import static com.gamma.util.Values.mapAt;
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * Pipeline graph, document, dry-run, run-to-here and trigger routes: the editable graph round-trip over
@@ -948,7 +949,7 @@ final class PipelineGraphRoutes implements RouteModule {
             // (TESTRUN-REFERENCE-REFUSAL-UNNAMED-1). The resolved target is carried, because "which file
             // did you actually look for" is the next question every time.
             try (java.sql.Statement st = conn.createStatement()) {
-                st.execute("CREATE OR REPLACE VIEW \"" + view + "\" AS SELECT * FROM " + sql);
+                st.execute("CREATE OR REPLACE VIEW " + q(view) + " AS SELECT * FROM " + sql);
             } catch (java.sql.SQLException missing) {
                 throw new ApiException(422, PipelineValidator.JOIN_REFERENCE_MISSING,
                         "reference '" + reference + "' could not be read — resolved to " + sql

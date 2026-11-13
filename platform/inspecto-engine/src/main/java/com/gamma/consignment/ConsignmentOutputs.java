@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.ToLongFunction;
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * <b>§11.3 slice 2 — turning ephemeral {@link PartitionOutput}s into registry rows.</b> The pure mapping half of
@@ -174,7 +175,7 @@ public final class ConsignmentOutputs {
         Map<String, Long> counts = new HashMap<>();
         if (partCols == null || partCols.isEmpty()) {
             try (Statement st = conn.createStatement();
-                 ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM \"" + table + "\"")) {
+                 ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM " + q(table))) {
                 counts.put("", rs.next() ? rs.getLong(1) : 0L);
             }
             return counts;
@@ -215,7 +216,7 @@ public final class ConsignmentOutputs {
     public static Map<String, EventTimeBounds> boundsByPartition(Connection conn, String table,
                                                                  List<String> partCols) throws SQLException {
         if (!hasEventTime(conn, table)) return Map.of();
-        return boundsByPartition(conn, table, partCols, "\"" + TransformCompiler.EVENT_TIME_COL + "\"");
+        return boundsByPartition(conn, table, partCols, q(TransformCompiler.EVENT_TIME_COL));
     }
 
     /**
@@ -264,7 +265,7 @@ public final class ConsignmentOutputs {
      *  {@code DataTransformer} do). */
     private static boolean hasEventTime(Connection conn, String table) throws SQLException {
         try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT * FROM \"" + table + "\" LIMIT 0")) {
+             ResultSet rs = st.executeQuery("SELECT * FROM " + q(table) + " LIMIT 0")) {
             var md = rs.getMetaData();
             for (int i = 1; i <= md.getColumnCount(); i++)
                 if (TransformCompiler.EVENT_TIME_COL.equals(md.getColumnName(i))) return true;

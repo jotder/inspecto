@@ -63,6 +63,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * <b>T32 Phase A — run an authored {@code *_flow.toon} pipeline for real, as a {@link JobType#PIPELINE} job.</b>
@@ -346,7 +347,7 @@ public final class PipelineJobRunner implements Job {
                 String view = SEED_VIEW_PREFIX + "_" + safe(seed.node());
                 String predicate = incremental
                         ? watermarks.get(pipelineId, seed.store())
-                            .map(wm -> "\"" + incCol + "\" > " + SqlIdent.sqlStr(wm)).orElse(null)
+                            .map(wm -> q(incCol) + " > " + SqlIdent.sqlStr(wm)).orElse(null)
                         : null;
                 List<String> read = SourceStoreReader.registerView(conn, view, dir, seed.store(), seed.format(), predicate);
                 reportSources(ctx, seed.store(), read);
@@ -542,7 +543,7 @@ public final class PipelineJobRunner implements Job {
                 EnrichmentConfig.Reference parsed = parsedReference(reference);
                 String sql = ReferenceReader.sqlFor(parsed, pipelines == null ? null : pipelines.get());
                 try (Statement st = conn.createStatement()) {
-                    st.execute("CREATE OR REPLACE VIEW \"" + view + "\" AS SELECT * FROM " + sql);
+                    st.execute("CREATE OR REPLACE VIEW " + q(view) + " AS SELECT * FROM " + sql);
                 }
                 log.info("[PIPELINEJOB] {} resolved reference '{}' for join", cfg.name(), reference);
                 return view;
@@ -898,10 +899,10 @@ public final class PipelineJobRunner implements Job {
      * over an integer column would be wrong).
      */
     private static String queryMaxAsText(Connection conn, String view, String col) throws Exception {
-        String q = "\"" + col + "\"";
+        String q = q(col);
         String expr = isVarcharColumn(conn, view, col) ? "max(" + q + " || '')" : "max(" + q + ")";
         try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT " + expr + "::VARCHAR FROM \"" + view + "\"")) {
+             ResultSet rs = st.executeQuery("SELECT " + expr + "::VARCHAR FROM " + q(view))) {
             return rs.next() ? rs.getString(1) : null;
         }
     }
@@ -910,7 +911,7 @@ public final class PipelineJobRunner implements Job {
     private static boolean isVarcharColumn(Connection conn, String view, String col) throws Exception {
         try (Statement st = conn.createStatement();
              ResultSet rs = st.executeQuery(
-                     "SELECT any_value(typeof(\"" + col + "\")) FROM \"" + view + "\"")) {
+                     "SELECT any_value(typeof(" + q(col) + ")) FROM " + q(view))) {
             return rs.next() && "VARCHAR".equalsIgnoreCase(rs.getString(1));
         }
     }

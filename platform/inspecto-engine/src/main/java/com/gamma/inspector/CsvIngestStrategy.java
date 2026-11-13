@@ -26,6 +26,7 @@ import static com.gamma.inspector.ConsignmentIngestStrategy.msg;
 import static com.gamma.inspector.ConsignmentIngestStrategy.openTempDb;
 import static com.gamma.inspector.ConsignmentIngestStrategy.partitionColumns;
 import static com.gamma.inspector.ConsignmentIngestStrategy.writeAndTrace;
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * Built-in CSV ingest path. Tags every accepted row with {@code __src_id}, transforms once, writes
@@ -188,7 +189,7 @@ final class CsvIngestStrategy implements ConsignmentIngestStrategy {
                     if (cfg.refusal().restricted()) {
                         try (Statement st = conn.createStatement()) {
                             st.execute("CREATE OR REPLACE TEMP VIEW \"__refusal_src\" AS SELECT *, CAST(" + m.srcId()
-                                    + " AS INTEGER) AS __src_id FROM \"" + tempTable + "\"");
+                                    + " AS INTEGER) AS __src_id FROM " + q(tempTable));
                         }
                         String code = RefusalQuarantine.judge(conn, m.selection().schema(), cfg, "__refusal_src");
                         ConsignmentIngestStrategy.dropView(conn, "__refusal_src");
@@ -202,11 +203,11 @@ final class CsvIngestStrategy implements ConsignmentIngestStrategy {
                     try (Statement st = conn.createStatement()) {
                         if (!rawCreated) {
                             st.execute("CREATE TABLE raw_input AS SELECT *, CAST(" + m.srcId()
-                                    + " AS INTEGER) AS __src_id FROM \"" + tempTable + "\" WHERE false");
+                                    + " AS INTEGER) AS __src_id FROM " + q(tempTable) + " WHERE false");
                             rawCreated = true;
                         }
                         st.execute("INSERT INTO raw_input SELECT *, " + m.srcId()
-                                + " FROM \"" + tempTable + "\"");
+                                + " FROM " + q(tempTable));
                     }
                     dropTable(conn, tempTable);
 

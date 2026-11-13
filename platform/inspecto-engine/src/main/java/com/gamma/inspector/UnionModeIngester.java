@@ -17,6 +17,7 @@ import java.util.Map;
 import com.gamma.consignment.EventTimeBounds;
 
 import static com.gamma.inspector.ConsignmentIngestStrategy.*;
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * Union-mode execution for the streaming plugin-ingester path. Each batch member's records are
@@ -150,7 +151,7 @@ final class UnionModeIngester {
                         if (memberTables.isEmpty()) continue;
 
                         try (Statement st = conn.createStatement()) {
-                            st.execute("CREATE VIEW \"" + unionTable + "\" AS " + unionAll(memberTables));
+                            st.execute("CREATE VIEW " + q(unionTable) + " AS " + unionAll(memberTables));
                         }
 
                         String destTable = "transformed_" + segKey;

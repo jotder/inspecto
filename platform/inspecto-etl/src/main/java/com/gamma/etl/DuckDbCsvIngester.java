@@ -19,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * Native, vectorized CSV ingester that delegates parsing to DuckDB's built-in
@@ -140,10 +141,10 @@ public final class DuckDbCsvIngester {
 
         long parsed;
         try (Statement st = conn.createStatement()) {
-            st.execute("DROP TABLE IF EXISTS \"" + targetTable + "\"");
-            st.execute("CREATE TABLE \"" + targetTable + "\" AS SELECT " + spec.projection()
+            st.execute("DROP TABLE IF EXISTS " + q(targetTable));
+            st.execute("CREATE TABLE " + q(targetTable) + " AS SELECT " + spec.projection()
                     + " FROM " + spec.readCsv() + filterWhere(cfg));
-            try (ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM \"" + targetTable + "\"")) {
+            try (ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM " + q(targetTable))) {
                 rs.next();
                 parsed = rs.getLong(1);
             }
@@ -185,8 +186,8 @@ public final class DuckDbCsvIngester {
         ReadSpec spec = buildReadSpec(file, schemaConfig, cfg);
         if (cfg.xlsx() != null) ExcelExtension.ensureLoaded(conn);
         try (Statement st = conn.createStatement()) {
-            st.execute("DROP VIEW IF EXISTS \"" + viewName + "\"");
-            st.execute("CREATE VIEW \"" + viewName + "\" AS SELECT " + spec.projection()
+            st.execute("DROP VIEW IF EXISTS " + q(viewName));
+            st.execute("CREATE VIEW " + q(viewName) + " AS SELECT " + spec.projection()
                     + ", CAST(" + srcId + " AS INTEGER) AS __src_id FROM " + spec.readCsv()
                     + filterWhere(cfg));
         }
@@ -799,7 +800,7 @@ public final class DuckDbCsvIngester {
         PipelineConfig.CsvSettings.Rejects rj = cfg.csv().rejects();
         String sql =
                 "SELECT e.line, e.column_name, e.error_type, e.csv_line " +
-                "FROM \"" + rj.tableOrDefault() + "\" e JOIN \"" + rj.scanOrDefault() + "\" s USING (scan_id) " +
+                "FROM " + q(rj.tableOrDefault()) + " e JOIN " + q(rj.scanOrDefault()) + " s USING (scan_id) " +
                 "WHERE s.file_path = " + SqlIdent.sqlStr(filePath) + " ORDER BY e.line";
 
         Path errorFilePath = ParserSpec.errorFile(file, cfg);

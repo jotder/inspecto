@@ -14,6 +14,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * <b>PIPELINE-DRYRUN-1 gate 2/4 — the no-op {@link PipelineExecutor.SinkWriter} for a whole-pipeline dry
@@ -85,7 +86,7 @@ public final class DryRunSinkWriter implements PipelineExecutor.SinkWriter {
     /** {@code count(*)} over the sink's live input relation; {@code -1} when it cannot be determined. */
     private long previewCount(String inputTable) {
         try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT count(*) FROM \"" + inputTable + "\"")) {
+             ResultSet rs = st.executeQuery("SELECT count(*) FROM " + q(inputTable))) {
             return rs.next() ? rs.getLong(1) : -1;
         } catch (Exception e) {
             log.warn("[PIPELINEJOB] dry run: could not preview row count for '{}': {}", inputTable, e.getMessage());

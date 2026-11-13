@@ -16,6 +16,7 @@ import java.sql.Connection;
 import java.sql.Statement;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * Streams a raw CSV (or CSV.GZ) file into a {@code raw_input} VARCHAR staging
@@ -118,8 +119,8 @@ public final class CsvIngester {
 
             // ── create staging table ──────────────────────────────────────────
             try (Statement stmt = conn.createStatement()) {
-                stmt.execute("DROP TABLE IF EXISTS \"" + targetTable + "\"");
-                StringBuilder ddl = new StringBuilder("CREATE TABLE \"" + targetTable + "\" (");
+                stmt.execute("DROP TABLE IF EXISTS " + q(targetTable));
+                StringBuilder ddl = new StringBuilder("CREATE TABLE " + q(targetTable) + " (");
                 for (int i = 0; i < fields.size(); i++) {
                     ddl.append('"').append(fields.get(i).get("name")).append("\" VARCHAR");
                     if (i < fields.size() - 1) ddl.append(", ");

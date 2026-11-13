@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * {@code POST /inv/pattern/branching} (LA-14b, server half) — run a branching motif (structuring & co.) over a
@@ -143,9 +144,9 @@ public final class PatternRoutes implements RouteModule {
                 rows = indexed.result().rows();
                 rowCapped = indexed.result().truncated();
             } else {
-                String sql = "SELECT CAST(\"" + sourceCol + "\" AS VARCHAR) AS s, CAST(\"" + targetCol + "\" AS VARCHAR) AS t,"
-                        + " epoch_ms(TRY_CAST(CAST(\"" + timeCol + "\" AS VARCHAR) AS TIMESTAMP)) AS ts FROM \"" + datasetId + "\""
-                        + " WHERE \"" + sourceCol + "\" IS NOT NULL AND \"" + targetCol + "\" IS NOT NULL AND (" + filter.sql() + ")"
+                String sql = "SELECT CAST(" + q(sourceCol) + " AS VARCHAR) AS s, CAST(" + q(targetCol) + " AS VARCHAR) AS t,"
+                        + " epoch_ms(TRY_CAST(CAST(" + q(timeCol) + " AS VARCHAR) AS TIMESTAMP)) AS ts FROM " + q(datasetId)
+                        + " WHERE " + q(sourceCol) + " IS NOT NULL AND " + q(targetCol) + " IS NOT NULL AND (" + filter.sql() + ")"
                         + " ORDER BY s, t, ts";
                 SqlSandboxPolicy policy = SqlSandboxPolicy.withCaps(null, 0, timeoutSeconds);
                 DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(

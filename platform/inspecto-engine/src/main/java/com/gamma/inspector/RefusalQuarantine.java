@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * Opt-in content refusal ({@code processing.refusal: restricted_quarantine}, default off).
@@ -193,7 +194,7 @@ final class RefusalQuarantine {
         for (int z : DIGIT_ZEROS) for (int i = 0; i < 10; i++) { uni.appendCodePoint(z + i); asc.append((char) ('0' + i)); }
         List<String> cells = new ArrayList<>();
         for (Column c : cols) {
-            String n = "translate(regexp_replace(CAST(\"" + c.name() + "\" AS VARCHAR), '[\\p{Mn}\\p{Me}\\p{Cf}]', '', 'g'), '"
+            String n = "translate(regexp_replace(CAST(" + q(c.name()) + " AS VARCHAR), '[\\p{Mn}\\p{Me}\\p{Cf}]', '', 'g'), '"
                     + uni + "', '" + asc + "')";
             // No IBAN skip (round-4 decision): "DE00 4111 1111 1111 1111" is a card number dressed as an IBAN.
             // An operator exempts a known IBAN column with refusal_scan_exempt instead.
@@ -215,7 +216,7 @@ final class RefusalQuarantine {
         String luhn = "list_sum(list_transform(range(1, length(d) + 1), lambda k: CASE WHEN k % 2 = 0 THEN " + d
                 + " * 2 - CASE WHEN " + d + " > 4 THEN 9 ELSE 0 END ELSE " + d + " END)) % 10 = 0";
         String card = "d IS NOT NULL AND regexp_full_match(d, '" + CardNumbers.IIN_REGEX + "') AND " + luhn;
-        return "SELECT 1 FROM \"" + relation + "\" WHERE len(list_filter(" + cands + ", lambda d: " + card + ")) > 0 LIMIT 1";
+        return "SELECT 1 FROM " + q(relation) + " WHERE len(list_filter(" + cands + ", lambda d: " + card + ")) > 0 LIMIT 1";
     }
 
     private static String len(int k) { return "length(g[i + " + k + "])"; }

@@ -26,6 +26,7 @@ import static com.gamma.inspector.ConsignmentIngestStrategy.partitionColumns;
 import static com.gamma.inspector.ConsignmentIngestStrategy.scratchDir;
 import static com.gamma.inspector.ConsignmentIngestStrategy.unionAll;
 import static com.gamma.inspector.ConsignmentIngestStrategy.writeAndTrace;
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * The native {@code read_csv} streaming ingest engine for {@link CsvIngestStrategy}: the fully
@@ -165,7 +166,7 @@ final class NativeCsvStreamingEngine {
 
     private static void dropView(Connection conn, String view) {
         try (Statement st = conn.createStatement()) {
-            st.execute("DROP VIEW IF EXISTS \"" + view + "\"");
+            st.execute("DROP VIEW IF EXISTS " + q(view));
         } catch (Exception e) {
             log.debug("Could not drop view {} ({})", view, e.getMessage());
         }
@@ -456,7 +457,7 @@ final class NativeCsvStreamingEngine {
 
     private static long countRows(Connection conn, String table) throws java.sql.SQLException {
         try (Statement st = conn.createStatement();
-             java.sql.ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM \"" + table + "\"")) {
+             java.sql.ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM " + q(table))) {
             rs.next();
             return rs.getLong(1);
         }

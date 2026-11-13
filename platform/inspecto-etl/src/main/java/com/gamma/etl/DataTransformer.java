@@ -7,6 +7,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.*;
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * Builds the {@code transformed} table from a raw-ingestion table by applying the
@@ -97,9 +98,9 @@ public final class DataTransformer {
         // predicate is written against the *target* column names, and SQL cannot reference a
         // SELECT's own output aliases from its own WHERE. The pre-parse include_*/exclude_*
         // filters are a different moment entirely (DuckDbCsvIngester.filterWhere, inside read_csv).
-        String sql = "CREATE TABLE \"" + destTable + "\" AS " + select;
+        String sql = "CREATE TABLE " + q(destTable) + " AS " + select;
         if (cfg.csv().hasRowPredicate())
-            sql = "CREATE TABLE \"" + destTable + "\" AS SELECT * FROM (" + select + ") AS __shaped "
+            sql = "CREATE TABLE " + q(destTable) + " AS SELECT * FROM (" + select + ") AS __shaped "
                     + "WHERE COALESCE((" + cfg.csv().where() + "), FALSE)";
 
         try (Statement stmt = conn.createStatement()) {
@@ -222,7 +223,7 @@ public final class DataTransformer {
                 // coercion failure of the first (RECORD-TRANSFORMER-1 (c))
                 select.append("SUM(CASE WHEN ");
                 for (String raw : inputs) {
-                    String col = "\"" + sourceTable + "\".\"" + raw + '"';
+                    String col = q(sourceTable) + "." + q(raw);
                     select.append("NULLIF(TRIM(CAST(").append(col).append(" AS VARCHAR)), '') IS NOT NULL AND ");
                 }
                 select.append("(").append(expr).append(") IS NULL THEN 1 ELSE 0 END)");

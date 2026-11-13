@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Stream;
+import static com.gamma.util.SqlIdent.q;
 
 /**
  * A <b>bounded test run over real inbox files</b> — the Build→Test→Run journey's Step 5a. Parses the
@@ -167,7 +168,7 @@ public final class PipelineTestRun {
             int room = SEED_ROWS - rows.size();
             if (room <= 0) return;
             try (Statement st = conn.createStatement();
-                 ResultSet rs = st.executeQuery("SELECT * FROM \"" + source + "\" LIMIT " + room)) {
+                 ResultSet rs = st.executeQuery("SELECT * FROM " + q(source) + " LIMIT " + room)) {
                 for (Map<String, Object> row : JdbcRows.toMaps(rs)) {
                     row.remove(SRC_ID);
                     rows.add(row);
