@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-411 test class(es): 163 unit, 248 real-HTTP control-plane, 0 IT.
+413 test class(es): 164 unit, 249 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -92,6 +92,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiClientIpTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiClientIpTest.java` | SEC review F3 over real HTTP: {@code ApiContext.ip} — the per-IP rate-limit key and the audit trail's |
 | `ControlApiCollectorNotifyTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCollectorNotifyTest.java` | Real-HTTP tests for {@code POST /collectors/{id}/notify} (ACQ-6 push discovery): v1 202+runId+Location with |
 | `ControlApiCollectorsAndConnectionsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCollectorsAndConnectionsTest.java` | Integration tests over real HTTP for the Acquisition/Sources UI backend: {@code GET /collectors} (flattened source <!-- vocab-allow: quoted Javadoc --> |
+| `ControlApiColumnContractSaveTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiColumnContractSaveTest.java` | SE-3a — the Schema save warning over real HTTP (D-SE4 step 1, report-only): a save through the config write |
 | `ControlApiColumnImpactTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiColumnImpactTest.java` | {@code GET /config/schema/{name}/columns/{column}/impact} (`SPACE-LINK-CENSUS-1` LC-5) over real HTTP: the read's |
 | `ControlApiCommitRetryTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCommitRetryTest.java` | The X1 retry affordance over real HTTP ({@code GET /runs/{name}/retries}, |
 | `ControlApiComponentSharesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiComponentSharesTest.java` | Component sharing RBAC (R3, {@code docs/superpower/rbac-abac-plan.md} §3) over real HTTP: the |
@@ -381,6 +382,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `CollectorServiceTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CollectorServiceTest.java` | End-to-end tests for {@link CollectorService} (M1) — registry runs, batch-commit |
 | `CollectorServiceTriggerTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CollectorServiceTriggerTest.java` | T13 / §3.8 — entry-node triggers driving the live loop. A pipeline with no {@code trigger:} rides the |
 | `CollectorWatcherTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CollectorWatcherTest.java` | ACQ-6 push discovery: a file landing in a {@code source.discovery: watch} inbox triggers a run. <!-- vocab-allow: quoted Javadoc --> |
+| `ColumnContractTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ColumnContractTest.java` | SE-3a — the column contract: each change class, the rename heuristic and its limits, the published set read |
 | `ConfigKindOwnershipTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ConfigKindOwnershipTest.java` | {@code MODULE-REORG-1 P4e} (P4-3 b) - who owns each registry kind, and what an import does with it. |
 | `ConfigRegistryTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ConfigRegistryTest.java` | Unit tests for the O(1) config index (P3): lookups address pipelines by their <b>in-file |
 | `ContractVerdictsTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ContractVerdictsTest.java` | DUCKLE-C7 second half: the reader-dependent contract verdicts, over real config trees. Fixture: {@code prod} |

@@ -81,7 +81,9 @@ public final class SchemaCompatibility {
         return findings;
     }
 
-    private static boolean isWidening(String oldType, String newType) {
+    /** Whether {@code oldType → newType} is an allowed widening (upper-case type names). Shared with the column
+     *  contract (SE-3a), so both judge a type change alike. */
+    public static boolean isWidening(String oldType, String newType) {
         if ("VARCHAR".equals(newType)) return true;   // everything reads back as text
         return WIDENINGS.getOrDefault(oldType, Set.of()).contains(newType);
     }

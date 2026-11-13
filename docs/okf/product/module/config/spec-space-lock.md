@@ -115,6 +115,9 @@ Gated on `canAuthorWorkbench` (it lists every config path); available on every e
 | `computing` | no report yet; ask again. |
 | `ready` | `checkedAt`, `lockWrittenAt`, `baseline` (`lock` or `none`, with `baselineNote` why), `files`, `links`, and three lists — `broken` (dangling links), `duplicates` (two or more files claiming one `kind:id`, case-insensitive) and `changedOutside` (§4). Each list is `{total, items}`, at most 200 items. |
 | `disabled` | the kill switch is off. |
+
+A `ready` report also carries `columnChanges` — Schema column changes and the consumers they break (SE-3a,
+[spec-column-contract.md](spec-column-contract.md)); the lock then holds an additive `columns` field.
 | `unavailable` | the bound Space has no Space folder (single-tenant default). |
 | `failed` | the computation threw; `error` says why. |
 
