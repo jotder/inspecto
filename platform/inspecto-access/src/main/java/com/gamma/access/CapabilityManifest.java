@@ -401,6 +401,9 @@ public final class CapabilityManifest {
             new Entry("POST", "/tests/run", Roles.CAN_AUTHOR_WORKBENCH),
             // SpaceIntegrityRoutes — SE-1a: the Space lock's report lists every config path, so it is an author's read.
             new Entry("GET", "/integrity", Roles.CAN_AUTHOR_WORKBENCH),
+            // LC-6: accepting a hand edit clears the record of an out-of-band change to any config, settings such as
+            // roles.toon included — an administrator's act.
+            new Entry("POST", "/integrity/accept", Roles.CAN_ADMINISTER),
             // SpaceOriginRoutes — SE-5a: the origin report lists config paths (an author's read, like /integrity); adopting
             // a template records the Space's origin, an administrator's act.
             new Entry("GET", "/origin", Roles.CAN_AUTHOR_WORKBENCH),

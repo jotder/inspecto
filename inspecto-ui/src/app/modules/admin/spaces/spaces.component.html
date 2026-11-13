@@ -81,6 +81,20 @@
                                 @if (isCurrent(s)) {
                                     <inspecto-status-badge value="ACTIVE" label="Active"></inspecto-status-badge>
                                 }
+                                <!-- LC-4: the Space lock's findings; nothing while it computes or is off -->
+                                @if (integrityOf(s); as i) {
+                                    <span
+                                        class="inline-flex"
+                                        tabindex="0"
+                                        data-testid="space-integrity"
+                                        [matTooltip]="i.detail"
+                                    >
+                                        <inspecto-chip variant="soft" [tone]="i.total > 0 ? 'warning' : 'neutral'">{{
+                                            i.label
+                                        }}</inspecto-chip>
+                                        <span class="sr-only">{{ i.detail }}</span>
+                                    </span>
+                                }
                             </div>
                             <div class="text-secondary mt-0.5 font-mono text-xs">{{ s.id }}</div>
                             @if (s.description) {

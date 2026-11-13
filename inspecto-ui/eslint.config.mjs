@@ -65,6 +65,7 @@ const coreGraphFiles = [
     'graph-view.component',
     'graph-export',
     'node-rules', // conditional-formatting predicate the core graph-view reads (no library deps)
+    'graph-sliced-layout', // LA-PERF-N4-1: the Force layouts in time slices, wraps G6 only (no library deps)
     'graph-layouts', // layout ids / labels / capped fallback as plain data: la-limits imports it WITHOUT pulling G6 into the entry chunk
 ];
 const CORE_MSG =

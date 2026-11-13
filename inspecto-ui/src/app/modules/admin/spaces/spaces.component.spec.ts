@@ -118,4 +118,19 @@ describe('SpacesComponent', () => {
         const el = create(true, SPACES.slice(0, 1), true).nativeElement as HTMLElement;
         expect(el.querySelector('[aria-label="Compare Spaces"]')).toBeNull();
     });
+
+    it('shows the integrity count of each Space with its three numbers, and nothing for a Space without a ready report (LC-4)', async () => {
+        const list: Space[] = [
+            { ...SPACES[0], integrity: { status: 'ready', broken: 2, duplicates: 0, changedOutside: 1 } },
+            { ...SPACES[1], integrity: { status: 'computing' } },
+            { id: 'gamma', displayName: 'Gamma', description: '', createdAt: '' },
+        ];
+        const el = create(true, list).nativeElement as HTMLElement;
+        const counts = Array.from(el.querySelectorAll('[data-testid="space-integrity"]'));
+        expect(counts.length).toBe(1);
+        expect(counts[0].textContent).toContain('3 integrity findings');
+        expect(counts[0].textContent).toContain('Broken links: 2 · Duplicates: 0 · Changed outside the server: 1');
+        expect(el.textContent).not.toContain('0 integrity findings');
+        await expectNoA11yViolations(el);
+    });
 });

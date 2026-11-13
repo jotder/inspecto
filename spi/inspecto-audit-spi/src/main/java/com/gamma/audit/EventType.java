@@ -42,6 +42,16 @@ public final class EventType {
      *  not mix; canonical subdirs must exist). Emitted at boot as a {@link EventLevel#WARN} advisory — a
      *  violation is never fatal. The {@code kind} attribute names the rule; {@code path} the offending entry. */
     public static final String LAYOUT_CONTRACT_VIOLATION = "LAYOUT_CONTRACT_VIOLATION";
+    /** The Space lock found a config link whose target does not exist ({@code spec-space-lock.md} §11,
+     *  `SPACE-LINK-CENSUS-1` LC-4) — once per newly broken link, not on every computation. {@link EventLevel#WARN};
+     *  attributes {@code space}, {@code path} (the linking file), {@code fromKind}, {@code fromName}, {@code key},
+     *  {@code toKind} and {@code target} (the missing value). */
+    public static final String CONFIG_LINK_BROKEN = "CONFIG_LINK_BROKEN";
+    /** The Space lock found a config file changed outside the server ({@code config.changed.outside},
+     *  {@code spec-space-lock.md} §11, LC-6) — once per new finding. {@link EventLevel#INFO}; attributes {@code space},
+     *  {@code path}, {@code kind}, {@code id}, {@code change} ({@code added|modified|moved|removed}) and
+     *  {@code brokenLinks} (how many dangling links that file now holds). */
+    public static final String CONFIG_CHANGED_OUTSIDE = "CONFIG_CHANGED_OUTSIDE";
     public static final String PIPELINE_REGISTERED = "PIPELINE_REGISTERED";
     /** A registered pipeline's config path was removed from the active registry ahead of the next
      *  poll cycle (e.g. an onboarding draft discard) — see {@code CollectorService#unregisterPipeline}. */

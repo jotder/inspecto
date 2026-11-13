@@ -109,7 +109,7 @@ describe('GraphViewComponent', () => {
 
 describe('layoutConfig node size and spacing (operator 2026-10-24)', () => {
     it('with neither given, every layout is exactly what it was before they existed', () => {
-        expect(layoutConfig('force')).toEqual({ type: 'd3-force', collide: { radius: 28 } });
+        expect(layoutConfig('force')).toEqual({ type: 'sliced-d3-force', collide: { radius: 28 } });
         expect(layoutConfig('dagre')).toEqual({ type: 'antv-dagre', rankdir: 'LR', nodesep: 18, ranksep: 60 });
         expect(layoutConfig('radial')).toEqual({ type: 'radial', unitRadius: 120, preventOverlap: true });
         expect(layoutConfig('concentric')).toEqual({
@@ -118,7 +118,7 @@ describe('layoutConfig node size and spacing (operator 2026-10-24)', () => {
             preventOverlap: true,
             nodeSize: 40,
         });
-        expect(layoutConfig('fruchterman')).toEqual({ type: 'fruchterman', gravity: 5, speed: 5 });
+        expect(layoutConfig('fruchterman')).toEqual({ type: 'sliced-fruchterman', gravity: 5, speed: 5 });
         expect(layoutConfig('org')['getWidth' as never]).toBeDefined();
         // spacing 1 and the host's own node size is the same as passing nothing
         for (const l of GRAPH_LAYOUTS) {
@@ -166,7 +166,7 @@ describe('GRAPH_LAYOUTS (LA-09)', () => {
     });
 
     it('offers the layouts LA-09 adds, each mapped to its installed G6 built-in', () => {
-        expect(layoutConfig('fruchterman')).toMatchObject({ type: 'fruchterman' });
+        expect(layoutConfig('fruchterman')).toMatchObject({ type: 'sliced-fruchterman' });
         expect(layoutConfig('fishbone')).toMatchObject({ type: 'fishbone' });
         expect(layoutConfig('dendrogram')).toMatchObject({ type: 'dendrogram', radial: false });
         // the pre-existing radial variant is the SAME engine and must stay radial

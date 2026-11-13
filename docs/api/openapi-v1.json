@@ -2826,10 +2826,23 @@
         "tags" : [ "spaces" ],
         "summary" : "GET /integrity - the Space lock's report: broken links, duplicates, files changed outside the server",
         "operationId" : "getIntegrity",
-        "description" : "SE-1a. Reached as /spaces/{id}/integrity. Report-only: always 200 with status computing (the lock is computed in the background after boot and after server writes; ask again), ready {checkedAt, lockWrittenAt, baseline, baselineNote?, files, links, broken, duplicates, changedOutside - each list {total, items} with at most 200 items; columnChanges (SE-3a) {status, baseline, schemas, unknownSchemas, total, breaking, items, notAnalysed} - Schema column changes (added, type-widened, removed, renamed, type-narrowed) with the consumers each breaking one breaks, disabled under -Dcolumn.contract=off, spec docs/okf/product/module/config/spec-column-contract.md}, disabled (-Dspace.integrity=off) or unavailable (single-tenant default Space). Requires canAuthorWorkbench. Spec: docs/okf/product/module/config/spec-space-lock.md.",
+        "description" : "SE-1a. Reached as /spaces/{id}/integrity. Report-only: always 200 with status computing (the lock is computed in the background after boot and after server writes; ask again), ready {checkedAt, lockWrittenAt, baseline, baselineNote?, files, links, broken, duplicates, changedOutside - each list {total, items} with at most 200 items; columnChanges (SE-3a) {status, baseline, schemas, unknownSchemas, total, breaking, items, notAnalysed} - Schema column changes (added, type-widened, removed, renamed, type-narrowed) with the consumers each breaking one breaks, disabled under -Dcolumn.contract=off, spec docs/okf/product/module/config/spec-column-contract.md}, disabled (-Dspace.integrity=off) or unavailable (single-tenant default Space). A Space report also carries linksMode {configured: report|refuse-activation|unreadable, effective: report|refuse-activation, note?} - the safety-policy.toon links: mode (LC-4). Requires canAuthorWorkbench. Spec: docs/okf/product/module/config/spec-space-lock.md.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); data = {status, ...}."
+          }
+        }
+      }
+    },
+    "/integrity/accept" : {
+      "post" : {
+        "tags" : [ "spaces" ],
+        "summary" : "POST /integrity/accept - accept files changed outside the server so they leave the integrity report",
+        "operationId" : "postIntegrityAccept",
+        "description" : "LC-6 of SPACE-LINK-CENSUS-1. Reached as /spaces/{id}/integrity/accept. Body {paths?: [config-relative path, ...]}; absent = accept every file currently changedOutside (a git checkout, a template clone). Computes the lock afresh first, so the accepted hashes are the files' current ones; re-signs the lock; AUDIT event config.changed-outside.accepted under the caller's name. Requires canAdminister. Every edition. 503 lock off (-Dspace.integrity=off), no Space folder or no lock could be computed, 400 bad body, 404 a path that is not a config file of the Space, 200 {accepted:[{path, change, hash?}], notChangedOutside:[path], changedOutside (left), acceptedBy}. Spec: docs/okf/product/module/config/spec-space-lock.md.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope)."
           }
         }
       }
@@ -15505,6 +15518,25 @@
           },
           "createdAt" : {
             "type" : [ "string", "null" ]
+          },
+          "integrity" : {
+            "type" : "object",
+            "description" : "GET /spaces only, and only for a caller holding canAuthorWorkbench in that Space (everyone on Basic): the Space lock's counts from the report in memory (LC-4). status computing|ready|disabled|unavailable|failed; broken, duplicates and changedOutside totals only when ready. Details: GET /spaces/{id}/integrity.",
+            "required" : [ "status" ],
+            "properties" : {
+              "status" : {
+                "type" : "string"
+              },
+              "broken" : {
+                "type" : "integer"
+              },
+              "duplicates" : {
+                "type" : "integer"
+              },
+              "changedOutside" : {
+                "type" : "integer"
+              }
+            }
           }
         }
       },
