@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.intelligence`](../../../../../product-map/module/intelligence.toon).
 
-37 test class(es): 37 unit, 0 real-HTTP control-plane, 0 IT.
+38 test class(es): 38 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -54,6 +54,7 @@ mvn -o test -pl features/inspecto-intelligence -Dtest=AgentApprovalsTest,Approva
 | `ActionBudgetTest` | `com.gamma.intelligence.policy` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/policy/ActionBudgetTest.java` | Unit coverage for the rolling-window rate budget (AGT-5 P4). The clock is injected, so window rollover |
 | `AutonomyPolicyEngineTest` | `com.gamma.intelligence.policy` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/policy/AutonomyPolicyEngineTest.java` | AGT-5 P4 (L3) policy substrate: the kill switch / mode / budget precedence in |
 | `OpsMonitorTest` | `com.gamma.intelligence.policy` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/policy/OpsMonitorTest.java` | AGT-5 P4 slice 2: the {@code ops_monitor} driver — that a {@code pipeline.batch.failed} Signal is |
+| `AgentStateZoneTest` | `com.gamma.intelligence.store` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/store/AgentStateZoneTest.java` | SE-4 step 1 for the assist agent's files ({@code agent/}): a ring and the autonomy policy load from |
 | `AgentWriteRootTest` | `com.gamma.intelligence.store` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/store/AgentWriteRootTest.java` | Unit coverage for the {@code -Dassist.write.root} path resolver shared by the agent stores (M7). |
 | `DurableJsonlRingTest` | `com.gamma.intelligence.store` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/store/DurableJsonlRingTest.java` | Unit coverage for the bounded/durable JSONL ring (M7) — the mechanic shared by ApprovalStore, |
 | `FeedbackStoreTest` | `com.gamma.intelligence.triage` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/triage/FeedbackStoreTest.java` | AGT-5 P5: durable Triage Run feedback storage + rating parsing. |

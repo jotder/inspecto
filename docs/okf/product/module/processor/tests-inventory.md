@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-426 test class(es): 171 unit, 255 real-HTTP control-plane, 0 IT.
+431 test class(es): 175 unit, 256 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -29,6 +29,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ShippedExamplesRoundTripTest` | `com.gamma.config.io` | unit | `inspecto/src/test/java/com/gamma/config/io/ShippedExamplesRoundTripTest.java` | Contract test over the CORE module's shipped {@code examples/} tree: every committed sample |
 | `AbsentModuleRoutesTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AbsentModuleRoutesTest.java` | MODULE-REORG-1 P3b: the known-modules copy the processor ships, and the stub surface read from it. The 503 bodies and |
 | `AccessGrantsTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AccessGrantsTest.java` | RBAC R2 grant resolution ({@link AccessGrants}): nearest-ancestor inheritance over the Access |
+| `ActivationHoldsTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ActivationHoldsTest.java` | SE-1b (D-SE12): the activation check's decision for each opt-in, from the lock's facts of one object. |
 | `AgentRoutesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/AgentRoutesTest.java` | Integration tests for the AGT-5 (P0) {@code /agent/*} routes over real HTTP, against a fake {@link IntelligenceAgent}. |
 | `AlertRoutesWindowGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/AlertRoutesWindowGateTest.java` | PA-9b: the save gates of a windowed Alert Rule ({@link AlertRoutes#requireWindow}), each 422 paired with the accepted |
 | `AlertRuleUnmodelledKeysTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/AlertRuleUnmodelledKeysTest.java` | {@code MODULE-REORG-P4-2} - the Alert Rule unmodelled-key policy, over real HTTP with a real Subject. |
@@ -62,6 +63,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiAccessPolicyLintTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAccessPolicyLintTest.java` | Save-time guards for the policy-authoring failure modes F1–F9 |
 | `ControlApiAccessRolesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAccessRolesTest.java` | Role settings over real HTTP ({@code GET/PUT /access/roles} — RBAC R1, |
 | `ControlApiAccessTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAccessTest.java` | Lens access configuration over real HTTP ({@code AccessRoutes} — |
+| `ControlApiActivationHoldsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiActivationHoldsTest.java` | SE-1b (D-SE12) over real HTTP: the activation holds, end to end — the Space lock reports, {@link ActivationHolds} |
 | `ControlApiAgentInvokeTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAgentInvokeTest.java` | Real-HTTP tests for the S6 "gated agentic write" round-trip: an A2UI {@code invoke} action against |
 | `ControlApiAlertAckTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAlertAckTest.java` | MODULE-REORG-P7-INCIDENTS slice 3 — {@code POST /alerts/{id}/ack\|resolve} over real HTTP. Rule-fired Alerts live in |
 | `ControlApiAlertFromEventTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAlertFromEventTest.java` | MODULE-REORG-P7 ALERT residue retirement - a {@code SEQUENCE_GAP} / conservation-imbalance Event is an Alert on |
@@ -334,6 +336,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `PendingChangesKeyTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/PendingChangesKeyTest.java` | The Pending Change MAC key (`ASSURE-MAKER-CHECKER-1` round-3 findings 2 and 4): it lives OUTSIDE the config |
 | `PendingChangesLockTimeoutTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/PendingChangesLockTimeoutTest.java` | The Pending Change store lock waits a BOUNDED time: a held lock yields 503 STORE_BUSY, never a hang. |
 | `PendingChangesMultiPodTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/PendingChangesMultiPodTest.java` | Deciding a Pending Change across Pods (`ASSURE-MAKER-CHECKER-MULTIPOD-1`): two control planes over the SAME |
+| `PendingChangesStateZoneTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/PendingChangesStateZoneTest.java` | SE-4 step 1 for the Pending Change store: a record under {@code state/pending-changes} is read, one under |
 | `PersonalAlertHistoryTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/PersonalAlertHistoryTest.java` | MODULE-REORG-P7-INCIDENTS slice 2 (operator decision 2026-10-07): <b>Basic keeps Alert history and |
 | `PipelineSinksFileRoundTripTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/PipelineSinksFileRoundTripTest.java` | The plural {@code sinks:} block through the <b>real file</b>: graph → {@code lower} → |
 | `PipelineStepsFileRoundTripTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/PipelineStepsFileRoundTripTest.java` | The multiplicity chain through the <b>real file</b>: graph → {@code lower} → {@code ConfigCodec.toToon} |
@@ -369,6 +372,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `WriteGateOrderTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/WriteGateOrderTest.java` | The four-stage write gate: <b>its ORDER, and {@link WriteGates} itself</b> — one of |
 | `BaselineEvaluatorGoldenTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/BaselineEvaluatorGoldenTest.java` | Golden figures of the {@code baseline} Expectation kind (ANALYTICS-CORE-1 M4 / M2): every profiled cell over parquet |
 | `BaselineEvaluatorTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/BaselineEvaluatorTest.java` | DUCKLE-C8 — the {@code baseline} kind's decision logic (median of the accepted window, limits in either |
+| `BaselineProfileStoreStateZoneTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/BaselineProfileStoreStateZoneTest.java` | SE-4 step 1: a baseline history under {@code state/expectation-baselines} is read before {@code config/}'s; writes stay in config. |
 | `BaselineProfileStoreTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/BaselineProfileStoreTest.java` | DUCKLE-C8 — the durable profile history + accepted-profile store behind the {@code baseline} kind. |
 | `ExpectationEvaluatorParityTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/ExpectationEvaluatorParityTest.java` | Golden corpus for the {@code non_null} / {@code range} / {@code regex} shorthand kinds: the failing-row |
 | `LaDailyFeedTemplateRulesTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/LaDailyFeedTemplateRulesTest.java` | LA-DATA-TRUST-1 S3, S4, S7 / S8: the rules the shipped {@code spaces/_templates/la-daily-feed} template carries load through |
@@ -377,6 +381,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ModelSettingsStoreTest` | `com.gamma.model` | unit | `inspecto/src/test/java/com/gamma/model/ModelSettingsStoreTest.java` | Covers the S9 core-owned model-settings bridge: {@link ModelSettingsStore} reads the same |
 | `ReportServiceTest` | `com.gamma.report` | unit | `inspecto/src/test/java/com/gamma/report/ReportServiceTest.java` | Tests for {@link ReportService} — it must roll the raw {@code StatusStore} audit up |
 | `AcquisitionDriverTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/AcquisitionDriverTest.java` | B3b — the <b>acquisition driver</b>: {@link PipelineScheduler#dispatchAcquireCycle()} fetches remote files on |
+| `ActivationFactsTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ActivationFactsTest.java` | SE-1b (D-SE12): the facts one Space lock computation gives the activation holds. |
 | `AffectedPipelinesTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/AffectedPipelinesTest.java` | DUCKLE-C7 first slice: which Pipelines a change reaches, over real config trees. Fixture: {@code prod} |
 | `AlertStoreWiringTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/AlertStoreWiringTest.java` | {@code ServiceStores.openAlertStore} — the {@code ALERTS} family's opener (MODULE-REORG-P7-INCIDENTS slice 2). |
 | `BundleExporterTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/BundleExporterTest.java` | Packages a data-source bundle / whole space into a zip + bundle.toon manifest. <!-- vocab-allow: quoted Javadoc --> |

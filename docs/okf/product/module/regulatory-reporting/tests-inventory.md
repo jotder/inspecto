@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.regulatory-reporting`](../../../../../product-map/module/regulatory-reporting.toon).
 
-8 test class(es): 5 unit, 3 real-HTTP control-plane, 0 IT.
+9 test class(es): 6 unit, 3 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -31,5 +31,6 @@ mvn -o test -pl features/inspecto-regulatory-reporting -Dtest=ControlApiRegulato
 | `PartnerSettlementDisputePackTest` | `com.gamma.regreporting` | unit | `features/inspecto-regulatory-reporting/src/test/java/com/gamma/regreporting/PartnerSettlementDisputePackTest.java` | {@code PACK-PARTNER-SETTLEMENT-1} slice S7, the template half: the shipped {@code settlement-dispute-pack} Report Templates |
 | `RegulatoryReportRoutesContractTest` | `com.gamma.regreporting` | unit | `features/inspecto-regulatory-reporting/src/test/java/com/gamma/regreporting/RegulatoryReportRoutesContractTest.java` | {@link RegulatoryReportRoutes} against the platform test kit's RouteModule TCK: every mutating route is capability-gated. |
 | `RegulatoryReportRoutesManifestParityTest` | `com.gamma.regreporting` | unit | `features/inspecto-regulatory-reporting/src/test/java/com/gamma/regreporting/RegulatoryReportRoutesManifestParityTest.java` | The module's {@code module.toon} {@code provides.routes} must list EXACTLY the routes its {@code RouteModule} |
+| `RegulatoryReportsStateZoneTest` | `com.gamma.regreporting` | unit | `features/inspecto-regulatory-reporting/src/test/java/com/gamma/regreporting/RegulatoryReportsStateZoneTest.java` | SE-4 step 1 for the Regulatory Report store: read from {@code state/regulatory-reports} first, then {@code config/}; |
 | `ReportRendererTest` | `com.gamma.regreporting` | unit | `features/inspecto-regulatory-reporting/src/test/java/com/gamma/regreporting/ReportRendererTest.java` | {@link ReportRenderer}: the three formats, repeating groups, escaping, and every refusal (never truncation). |
 | `ReportTemplateTest` | `com.gamma.regreporting` | unit | `features/inspecto-regulatory-reporting/src/test/java/com/gamma/regreporting/ReportTemplateTest.java` | {@link ReportTemplate}: the built-in loads, a bad template lists EVERY problem, and a Space template wins. |

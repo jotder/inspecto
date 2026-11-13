@@ -33,7 +33,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <ol>
  *   <li>a chain of literal {@code .resolve("a").resolve("b")…} calls — the path {@code a/b}, directories
  *       included (a reserved directory covers everything under it);</li>
- *   <li>{@code AgentWriteRoot.resolve("x")} — the path {@code agent/x} (the assist write root's subtree);</li>
+ *   <li>{@code AgentWriteRoot.resolve("x")} — the path {@code agent/x} (the assist write root's subtree), and
+ *       {@code SpaceStateDirs.writeDir(root, "x")} — the path {@code x} (SE-4 step 1);</li>
  *   <li>any string literal naming a {@code .toon / .json / .jsonl / .tsv / .journal / .key} file (a constant
  *       passed to {@code resolve(FILE)}, {@code ToonHelper.load}, …) — covered when it is reserved itself or is
  *       the last segment of a reserved shape-1/2 path.</li>
@@ -45,6 +46,8 @@ class ImportLoaderInventoryTest {
     private static final Pattern CHAIN = Pattern.compile("((?:\\.resolve\\(\\s*\"[^\"\\\\]+\"\\s*\\))+)");
     private static final Pattern SEG = Pattern.compile("\"([^\"]+)\"");
     private static final Pattern AGENT = Pattern.compile("AgentWriteRoot\\.resolve\\(\\s*\"([^\"]+)\"\\s*\\)");
+    /** SE-4 step 1: {@code SpaceStateDirs.writeDir(root, "dir")} — the config-root directory {@code dir} a store reads and writes. */
+    private static final Pattern STATE_DIR = Pattern.compile("SpaceStateDirs\\.writeDir\\([^,()]+,\\s*\"([^\"]+)\"\\s*\\)");
     private static final Pattern NAME = Pattern.compile(
             "\"([A-Za-z0-9._][A-Za-z0-9._/-]*\\.(?:toon|json|jsonl|tsv|journal|key))\"");
 
@@ -191,6 +194,8 @@ class ImportLoaderInventoryTest {
                     }
                     Matcher a = AGENT.matcher(text);
                     while (a.find()) found.add("agent/" + a.group(1));
+                    Matcher w = STATE_DIR.matcher(text);
+                    while (w.find()) found.add(w.group(1));
                     Matcher n = NAME.matcher(text);
                     while (n.find()) found.add(n.group(1));
                     for (String p : found) {

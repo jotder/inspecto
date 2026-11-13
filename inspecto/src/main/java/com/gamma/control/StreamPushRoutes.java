@@ -113,6 +113,11 @@ final class StreamPushRoutes implements RouteModule {
         if (paused || !cfg.active())
             throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline paused: '" + pipeline + "' is "
                     + (paused ? "paused" : "not active") + " — retry once it runs");
+        // SE-1b (D-SE12): a held Pipeline is as inactive (the stream lane's drain asks the same hold), so the same 409.
+        String held = com.gamma.pipeline.ActivationGate.reason(HostContext.of(api).service().spaceId(), "pipeline", pipeline);
+        if (held != null)
+            throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline held: '" + pipeline + "' is held — " + held
+                    + " — retry once it runs");
         String poll = cfg.dirs().poll();
         if (poll == null || poll.isBlank())
             throw new ApiException(422, ErrorCodes.MALFORMED_REQUEST, "Pipeline '" + pipeline + "' declares no dirs.poll");

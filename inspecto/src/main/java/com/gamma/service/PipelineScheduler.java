@@ -319,6 +319,24 @@ final class PipelineScheduler {
 
     private volatile boolean wasFrozen;
 
+    /** This scheduler's Space, for the activation holds ({@link #runnable}); set by {@code CollectorService}. */
+    private volatile String spaceId = com.gamma.event.EventLog.DEFAULT_SPACE_ID;
+
+    void spaceId(String id) {
+        if (id != null) this.spaceId = id;
+    }
+
+    /**
+     * The one predicate every automatic path asks (the poll cycle, the acquisition cycle, both event triggers, the
+     * stream lanes): not paused, {@code active: true}, and not held. SE-1b (D-SE12): a held Pipeline acts as an
+     * inactive one ({@link com.gamma.pipeline.ActivationGate}); a manual run still goes, as for an inactive one.
+     * The hold is asked last, so a paused or inactive Pipeline costs nothing extra.
+     */
+    private boolean runnable(String id, PipelineConfig cfg) {
+        return !paused.contains(id) && cfg.active()
+                && com.gamma.pipeline.ActivationGate.reason(spaceId, "pipeline", id) == null;
+    }
+
     /**
      * Pick the pipelines to run on this tick and claim each one. The <em>only</em> part of a cycle that needs
      * {@link #registryLock}, and it is bounded work — the lock is never held across a run, which is what lets
@@ -341,7 +359,7 @@ final class PipelineScheduler {
                 PipelineConfig cfg = configRegistry.configForPath(p).orElse(null);
                 if (cfg == null) continue;                                   // unloadable — already warned
                 String id = cfg.identity().pipelineName();
-                if (paused.contains(id) || !cfg.active()) continue;          // paused or not activated
+                if (!runnable(id, cfg)) continue;          // paused, not activated, or held
                 if (cfg.template()) continue;                                // authoring template — never runs
                 if (!dueThisTick(cfg, id, nowMs)) continue;                  // T13: trigger gates the loop
                 // Per-pipeline exclusion: a pipeline still running from an earlier tick is SKIPPED, not
@@ -565,7 +583,7 @@ final class PipelineScheduler {
             PipelineConfig cfg = configRegistry.configForPath(p).orElse(null);
             if (cfg == null) continue;
             String id = cfg.identity().pipelineName();
-            if (paused.contains(id) || !cfg.active()) continue;
+            if (!runnable(id, cfg)) continue;
             if (id.equals(event.pipeline())) continue;                       // self-loop guard
             PipelineTrigger t = PipelineTrigger.of(cfg.triggerConfig());
             if (t.scheduler() != PipelineTrigger.Scheduler.EVENT) continue;
@@ -612,7 +630,7 @@ final class PipelineScheduler {
             PipelineConfig cfg = configRegistry.configForPath(p).orElse(null);
             if (cfg == null) continue;
             String id = cfg.identity().pipelineName();
-            if (paused.contains(id) || !cfg.active()) continue;
+            if (!runnable(id, cfg)) continue;
             if (id.equals(producerPipeline)) continue;                       // self-loop guard
             PipelineTrigger t = PipelineTrigger.of(cfg.triggerConfig());
             if (t.scheduler() != PipelineTrigger.Scheduler.EVENT) continue;
@@ -698,7 +716,7 @@ final class PipelineScheduler {
                 PipelineConfig cfg = configRegistry.configForPath(p).orElse(null);
                 if (cfg == null) continue;
                 String id = cfg.identity().pipelineName();
-                if (paused.contains(id) || !cfg.active() || cfg.template()) continue;
+                if (!runnable(id, cfg) || cfg.template()) continue;
                 if (!CollectorConnectors.isRemote(cfg)) continue;   // local: nothing to acquire
                 // B4 back-pressure: if the inbox backlog has reached the high-water mark, de-schedule
                 // acquisition for this pipeline this tick — its already-landed files wait in the durable inbox
@@ -795,7 +813,7 @@ final class PipelineScheduler {
                 PipelineConfig cfg = configRegistry.configForPath(p).orElse(null);
                 if (cfg == null) continue;
                 String id = cfg.identity().pipelineName();
-                if (paused.contains(id) || !cfg.active() || cfg.template()) continue;
+                if (!runnable(id, cfg) || cfg.template()) continue;
                 if (!CollectorConnectors.isRemote(cfg)) continue;
                 PipelineTrigger t;
                 try {
@@ -865,7 +883,7 @@ final class PipelineScheduler {
     private void drainNow(String id) {
         if (frozen()) return;
         PipelineConfig cfg = configRegistry.get(id).orElse(null);
-        if (cfg == null || paused.contains(id) || !cfg.active()) return;   // paused since the last reconcile
+        if (cfg == null || !runnable(id, cfg)) return;   // paused since the last reconcile
         RunLease.Claim claim = acquireGuard.tryAcquire(id);
         if (claim != null) {
             try (claim; com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
