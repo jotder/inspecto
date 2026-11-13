@@ -129,7 +129,7 @@ public final class DataTransformer {
         List<Map<String, Object>> cols = dataColumns(schemaConfig, cfg.csv(), sourceTable);
         for (int i = 0; i < cols.size(); i++) {
             select.append(cols.get(i).get("expr"));
-            select.append(" AS \"").append(cols.get(i).get("name")).append('"');
+            select.append(" AS ").append(q(String.valueOf(cols.get(i).get("name"))));
             if (i < cols.size() - 1) select.append(", ");
         }
 
@@ -149,7 +149,7 @@ public final class DataTransformer {
                 select.append(", ");
                 select.append(TransformCompiler.partitionColumn(pd, sourceTable, fieldTypes, fieldFormats,
                         cfg.csv(), zones));
-                select.append(" AS \"").append(pd.column()).append('"');
+                select.append(" AS ").append(q(pd.column()));
             }
         }
 
@@ -165,8 +165,8 @@ public final class DataTransformer {
                 .append(" AS ").append(TransformCompiler.EVENT_TIME_COL);
 
         // ── lineage tag ───────────────────────────────────────────────────────
-        select.append(", \"").append(sourceTable).append("\".\"__src_id\" AS __src_id");
-        select.append(" FROM \"").append(sourceTable).append('"');
+        select.append(", ").append(q(sourceTable)).append(".\"__src_id\" AS __src_id");
+        select.append(" FROM ").append(q(sourceTable));
         return select.toString();
     }
 
@@ -231,7 +231,7 @@ public final class DataTransformer {
             }
         }
         if (targets.isEmpty()) return 0;   // nothing coercing — no failure is possible
-        select.append(" FROM \"").append(sourceTable).append('"');
+        select.append(" FROM ").append(q(sourceTable));
 
         try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(select.toString())) {
             if (!rs.next()) return 0;

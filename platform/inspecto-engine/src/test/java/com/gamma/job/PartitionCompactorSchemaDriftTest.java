@@ -22,8 +22,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Compaction reads a partition's files BY NAME (operator call on ANALYTICS-CORE-1, 2026-11-13): a store that gained a
- * column mid-life, or wrote its columns in another order, holds files of two schemas in one partition. A positional
- * read fails on those or puts values under the wrong column; the merged file must keep every value under its own name.
+ * column mid-life holds files of two schemas in one partition. Without {@code union_by_name} the merge either fails
+ * (the wider file listed first) or keeps only the first file's columns and silently drops the newer ones (the narrower
+ * file first, the case here); the merged file must keep every column, each value under its own name.
  */
 class PartitionCompactorSchemaDriftTest {
 

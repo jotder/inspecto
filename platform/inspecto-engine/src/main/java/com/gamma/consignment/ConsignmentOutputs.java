@@ -181,8 +181,8 @@ public final class ConsignmentOutputs {
             return counts;
         }
         StringBuilder sql = new StringBuilder("SELECT ");
-        for (String col : partCols) sql.append('"').append(col).append("\", ");
-        sql.append("COUNT(*) AS n FROM \"").append(table).append("\" GROUP BY 1");
+        for (String col : partCols) sql.append(q(col)).append(", ");
+        sql.append("COUNT(*) AS n FROM ").append(q(table)).append(" GROUP BY 1");
         for (int i = 1; i < partCols.size(); i++) sql.append(", ").append(i + 1);
 
         try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql.toString())) {
@@ -239,8 +239,8 @@ public final class ConsignmentOutputs {
 
         StringBuilder sql = new StringBuilder("SELECT ");
         for (String c : partCols == null ? List.<String>of() : partCols)
-            sql.append('"').append(c).append("\", ");
-        sql.append(agg).append(" FROM \"").append(table).append('"');
+            sql.append(q(c)).append(", ");
+        sql.append(agg).append(" FROM ").append(q(table));
         int nKeys = partCols == null ? 0 : partCols.size();
         for (int i = 0; i < nKeys; i++) sql.append(i == 0 ? " GROUP BY 1" : ", " + (i + 1));
 

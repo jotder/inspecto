@@ -122,7 +122,7 @@ public final class CsvIngester {
                 stmt.execute("DROP TABLE IF EXISTS " + q(targetTable));
                 StringBuilder ddl = new StringBuilder("CREATE TABLE " + q(targetTable) + " (");
                 for (int i = 0; i < fields.size(); i++) {
-                    ddl.append('"').append(fields.get(i).get("name")).append("\" VARCHAR");
+                    ddl.append(q(String.valueOf(fields.get(i).get("name")))).append(" VARCHAR");
                     if (i < fields.size() - 1) ddl.append(", ");
                 }
                 ddl.append(')');

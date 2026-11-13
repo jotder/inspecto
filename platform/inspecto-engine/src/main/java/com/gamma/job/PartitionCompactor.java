@@ -127,7 +127,7 @@ final class PartitionCompactor {
             String list = SqlViews.pathList(candidates.stream().map(p -> p.toAbsolutePath().toString()).toList());
             try (Statement st = conn.createStatement()) {
                 // By NAME, like every store read: a store that gained a column mid-life holds files of two
-                // schemas in one partition, and a positional read fails or puts values under the wrong column.
+                // schemas in one partition; without union_by_name the merge fails or drops the newer columns.
                 st.execute("COPY (SELECT * FROM " + SqlViews.parquet(list, true, SqlViews.Hive.AUTO) + ") TO "
                         + SqlIdent.pathStr(tmp) + " (FORMAT PARQUET)");
             }

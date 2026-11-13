@@ -243,8 +243,8 @@ public final class DuckDbCsvIngester {
         StringBuilder proj = new StringBuilder();
         for (int i = 0; i < fields.size(); i++) {
             if (i > 0) proj.append(", ");
-            proj.append("\"c").append(selectorIdx[i]).append("\" AS \"")
-                .append(fields.get(i).get("name")).append('"');
+            proj.append(q("c" + selectorIdx[i])).append(" AS ")
+                .append(q(String.valueOf(fields.get(i).get("name"))));
         }
 
         String readCsv = "read_csv(" + SqlIdent.sqlStr(filePath)
@@ -292,7 +292,7 @@ public final class DuckDbCsvIngester {
             if (i > 0) proj.append(", ");
             // DuckDB substring is 1-based; config start is 0-based.
             proj.append(trimExpr(fw.trim(), "substring(\"line\", " + (s.start() + 1) + ", " + s.length() + ")"))
-                .append(" AS \"").append(fields.get(i).get("name")).append('"');
+                .append(" AS ").append(q(String.valueOf(fields.get(i).get("name"))));
         }
 
         String readCsv = "(SELECT \"line\" FROM read_csv(" + SqlIdent.sqlStr(filePath)
@@ -344,7 +344,7 @@ public final class DuckDbCsvIngester {
             if (i > 0) proj.append(", ");
             String cell = SqlIdent.q(String.valueOf(fields.get(i).get("selector")));
             proj.append(xlsxSerialAsText(cell, String.valueOf(fields.get(i).get("type")), cfg.csv()))
-                .append(" AS \"").append(fields.get(i).get("name")).append('"');
+                .append(" AS ").append(q(String.valueOf(fields.get(i).get("name"))));
         }
 
         return new ReadSpec(proj.toString(), xlsxReadRelation(filePath, x, true));
@@ -423,7 +423,7 @@ public final class DuckDbCsvIngester {
         for (int i = 0; i < fields.size(); i++) {
             if (i > 0) proj.append(", ");
             proj.append("CAST(").append(SqlIdent.q(String.valueOf(fields.get(i).get("selector"))))
-                .append(" AS VARCHAR) AS \"").append(fields.get(i).get("name")).append('\"');
+                .append(" AS VARCHAR) AS ").append(q(String.valueOf(fields.get(i).get("name"))));
         }
 
         return new ReadSpec(proj.toString(), parquetReadRelation(filePath, cfg.parquet()));
@@ -450,7 +450,7 @@ public final class DuckDbCsvIngester {
                 if (i > 0) proj.append(", ");
                 proj.append("json_extract_string(\"line\", ")
                     .append(jsonPath(selectorSegments(fields.get(i).get("selector")), 0))
-                    .append(") AS \"").append(fields.get(i).get("name")).append('"');
+                    .append(") AS ").append(q(String.valueOf(fields.get(i).get("name"))));
             }
             String readCsv = "(SELECT \"line\" FROM read_csv(" + SqlIdent.sqlStr(filePath)
                     + ", columns={'line':'VARCHAR'}"
@@ -496,7 +496,7 @@ public final class DuckDbCsvIngester {
                 proj.append("json_extract_string(").append(SqlIdent.q(segs.get(0))).append(", ")
                     .append(jsonPath(segs, 1)).append(")");
             }
-            proj.append(" AS \"").append(fields.get(i).get("name")).append('"');
+            proj.append(" AS ").append(q(String.valueOf(fields.get(i).get("name"))));
         }
 
         StringBuilder rj = new StringBuilder("read_json(");
@@ -559,7 +559,7 @@ public final class DuckDbCsvIngester {
             if (i > 0) proj.append(", ");
             proj.append("json_extract_string(\"rec\", ")
                 .append(jsonPath(selectorSegments(fields.get(i).get("selector")), 0))
-                .append(") AS \"").append(fields.get(i).get("name")).append('"');
+                .append(") AS ").append(q(String.valueOf(fields.get(i).get("name"))));
         }
 
         StringBuilder src = new StringBuilder("read_json_objects(");
@@ -722,8 +722,8 @@ public final class DuckDbCsvIngester {
                         + "' selector '" + sel + "' has no matching capture group (declared: "
                         + groupNames + ")");
             if (i > 0) proj.append(", ");
-            proj.append("rec[").append(SqlIdent.sqlStr(sel)).append("] AS \"")
-                .append(fields.get(i).get("name")).append('"');
+            proj.append("rec[").append(SqlIdent.sqlStr(sel)).append("] AS ")
+                .append(q(String.valueOf(fields.get(i).get("name"))));
         }
         return proj.toString();
     }
@@ -984,7 +984,7 @@ public final class DuckDbCsvIngester {
     static String filterWhere(PipelineConfig cfg) {
         PipelineConfig.CsvSettings c = cfg.csv();
         if (!c.hasRowFilters()) return "";
-        String col = "\"c" + c.filterTargetColumn() + "\"";
+        String col = q("c" + c.filterTargetColumn());
 
         List<String> includes = new ArrayList<>();
         for (String p : c.includePrefixes()) includes.add(col + " LIKE " + SqlIdent.sqlStr(p + "%"));
