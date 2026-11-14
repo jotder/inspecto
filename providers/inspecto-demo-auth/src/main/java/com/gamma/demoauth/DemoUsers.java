@@ -1,6 +1,7 @@
 package com.gamma.demoauth;
 
 import com.gamma.spi.auth.ApiException;
+import com.gamma.util.SpaceFolders;
 import com.gamma.util.ToonHelper;
 
 import java.nio.file.Files;
@@ -75,13 +76,15 @@ final class DemoUsers {
      * Every Space's Demo Users under {@code -Dspaces.root}, keyed by id — what the sign-in picker lists.
      * A duplicate id across Spaces that differs is refused with a typed 409 {@link #ROSTER_CONFLICT}: one id must
      * mean one person on the picker. The message names the user and both Space ids, never a path.
+     * Only folders the core boots as Spaces are read ({@link SpaceFolders#notASpaceReason}): a hidden, reserved or
+     * backup-named copy's stale roster neither signs anyone in nor conflicts (DEMO-AUTH-STALE-ROSTER-1).
      */
     static Map<String, User> all(Path spacesRoot) {
         Map<String, User> byId = new LinkedHashMap<>();
         Map<String, String> spaceOf = new LinkedHashMap<>();
         if (spacesRoot == null || !Files.isDirectory(spacesRoot)) return byId;
         try (var dirs = Files.list(spacesRoot)) {
-            for (Path space : dirs.sorted().toList()) {
+            for (Path space : dirs.filter(d -> SpaceFolders.notASpaceReason(d) == null).sorted().toList()) {
                 String name = space.getFileName().toString();
                 for (User u : load(space.resolve("config"))) {
                     User prior = byId.putIfAbsent(u.id(), u);
@@ -108,9 +111,9 @@ final class DemoUsers {
     }
 
     /**
-     * How many Spaces are attached (folders under {@code -Dspaces.root} that hold {@code config/} and are not hidden
-     * {@code .} or reserved {@code _}, as {@code SpaceManager.notASpaceReason} rules; 1 for a legacy write root, else
-     * 0). DEMO-AUTH-NO-ROSTER-1: counting {@code _templates} made a bundle with no Space say it had one.
+     * How many Spaces are attached (folders under {@code -Dspaces.root} the core boots as Spaces,
+     * {@link SpaceFolders#notASpaceReason}; 1 for a legacy write root, else 0). DEMO-AUTH-NO-ROSTER-1: counting
+     * {@code _templates} made a bundle with no Space say it had one; DEMO-AUTH-STALE-ROSTER-1: so did a backup copy.
      */
     static int spacesAttached() {
         String spaces = System.getProperty("spaces.root");
@@ -118,8 +121,7 @@ final class DemoUsers {
             Path root = Path.of(spaces.trim());
             if (!Files.isDirectory(root)) return 0;
             try (var dirs = Files.list(root)) {
-                return (int) dirs.filter(d -> !d.getFileName().toString().startsWith("_")
-                        && !d.getFileName().toString().startsWith(".") && Files.isDirectory(d.resolve("config"))).count();
+                return (int) dirs.filter(d -> SpaceFolders.notASpaceReason(d) == null).count();
             } catch (java.io.IOException e) {
                 return 0;
             }
