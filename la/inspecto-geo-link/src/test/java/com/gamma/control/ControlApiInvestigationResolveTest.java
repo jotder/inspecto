@@ -338,24 +338,30 @@ class ControlApiInvestigationResolveTest {
     @Test
     void typedMaskingIsPerMemberKey(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            // MASKING-TWO-VOCABULARIES-1: the four sensitive classes (MSISDN, IMSI, ACCOUNT, PII) mask whatever an Entity Type's
-            // `masked` says - only maskingMode none turns masking off - so the UNMASKED msisdn type claims a non-sensitive class here
+            // MASKING-TWO-VOCABULARIES-1: a type whose id or class is one of the four sensitive classes (MSISDN, IMSI, ACCOUNT,
+            // PII) is masked whatever its `masked` says - only maskingMode none turns masking off - so the UNMASKED type here is a
+            // `phone` type claiming a non-sensitive class, and its keys are phone:<e164>
+            String phoneA = "phone:+447700900123";
             new ComponentStore(root.resolve("registry")).write("dataset", "calls_ds", Map.of("view", "calls_view",
                     "columns", List.of(Map.of("name", "caller", "classification", "PHONE"),
                             Map.of("name", "callee", "classification", "PHONE"))));
             data(send(c, "PUT", "/settings/link-analysis", "{\"maskingMode\":\"typed\",\"entityTypes\":["
-                    + "{\"id\":\"msisdn\",\"label\":\"MSISDN\",\"normaliser\":\"e164\",\"masked\":false,\"classifications\":[\"PHONE\"]},"
+                    + "{\"id\":\"phone\",\"label\":\"Phone\",\"normaliser\":\"e164\",\"masked\":false,\"classifications\":[\"PHONE\"]},"
                     + "{\"id\":\"imsi\",\"label\":\"IMSI\",\"normaliser\":\"digits\",\"masked\":true,\"classifications\":[\"IMSI\"]}]}",
                     null), 200);
-            base(c);
+            assertIdentity(c, phoneA, IMSI);
+            assertIdentity(c, "phone:+447700900555", "phone:07700900999");
+            data(post(c, "/inv/investigations", CREATE), 200);
+            op(c, "case-a", "{\"op\":\"seed\",\"ids\":[\"" + A + "\"]}");
+            op(c, "case-a", "{\"op\":\"expand\"}");
             JsonNode r = op(c, "case-a", RESOLVE);
             JsonNode groups = r.at("/resolution/groups");
             JsonNode x = null;
-            for (JsonNode g : groups) if (texts(g.get("members")).contains(KEY_A)) x = g;
+            for (JsonNode g : groups) if (texts(g.get("members")).contains(phoneA)) x = g;
             assertTrue(x != null, groups.toString());
             List<String> members = texts(x.get("members"));
             assertTrue(members.get(0).startsWith("masked:"), "the IMSI member (a masked type) is masked: " + members);
-            assertEquals(KEY_A, members.get(1), "the MSISDN member (an unmasked type) stays readable in the same group");
+            assertEquals(phoneA, members.get(1), "the phone member (an unmasked type) stays readable in the same group");
             assertEquals(members.get(0), x.get("id").asText(), "the group id is rendered as the member it is");
             assertEquals(List.of(A), texts(x.get("entities")));
             assertFalse(r.toString().contains("234150000000001"), "no raw IMSI anywhere: " + r);

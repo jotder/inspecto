@@ -99,7 +99,7 @@ public final class EntityListFacts {
         return switch (LinkAnalysisSettings.forRoot(root).effectiveMaskingMode()) {
             case "none" -> false;
             case "all" -> true;
-            default -> type(root, l.entityType()).map(EntityTypes.EntityType::masked).orElse(true);
+            default -> type(root, l.entityType()).map(EntityTypes::maskedInForce).orElse(true);
         };
     }
 }

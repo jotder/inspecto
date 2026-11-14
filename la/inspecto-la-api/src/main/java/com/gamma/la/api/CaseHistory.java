@@ -375,7 +375,7 @@ final class CaseHistory {
             case "none" -> false;
             case "all" -> true;
             default -> settings.effectiveEntityTypes().stream().filter(t -> t.id().equalsIgnoreCase(type)).findFirst()
-                    .map(EntityTypes.EntityType::masked).orElse(true);
+                    .map(EntityTypes::maskedInForce).orElse(true);
         };
     }
 

@@ -197,7 +197,7 @@ final class EntityMasking {
             // replay determinism is untouched.
             String listType = String.valueOf(l.get("entityType"));
             boolean maskedNow = types.stream().filter(t -> t.id().equalsIgnoreCase(listType)).findFirst()
-                    .map(EntityTypes.EntityType::masked).orElse(true);
+                    .map(EntityTypes::maskedInForce).orElse(true);
             if (!Boolean.FALSE.equals(l.get("masked")) || maskedNow) {
                 typedSeeds.addAll(members);
                 typedSeeds.addAll(ids);
@@ -212,7 +212,7 @@ final class EntityMasking {
                 String named = String.valueOf(p.get("entityType"));
                 // An entityType naming no in-force Entity Type is masked (fail closed).
                 if (types.stream().filter(t -> t.id().equalsIgnoreCase(named)).findFirst()
-                        .map(EntityTypes.EntityType::masked).orElse(true))
+                        .map(EntityTypes::maskedInForce).orElse(true))
                     typedSeeds.addAll(ids);
             }
         }
@@ -250,7 +250,7 @@ final class EntityMasking {
     }
 
     private static boolean maskedType(List<EntityTypes.EntityType> types, String named) {
-        return types.stream().filter(t -> t.id().equalsIgnoreCase(named)).findFirst().map(EntityTypes.EntityType::masked).orElse(true);
+        return types.stream().filter(t -> t.id().equalsIgnoreCase(named)).findFirst().map(EntityTypes::maskedInForce).orElse(true);
     }
 
     /**
@@ -273,7 +273,7 @@ final class EntityMasking {
                 Map<?, ?> sealed = sealedTypes.get(type) instanceof Map<?, ?> d ? d : null;
                 var now = types.stream().filter(x -> x.id().equalsIgnoreCase(type)).findFirst();
                 boolean masked = sealed == null || !Boolean.FALSE.equals(sealed.get("masked"))
-                        || now.map(EntityTypes.EntityType::masked).orElse(true);
+                        || now.map(EntityTypes::maskedInForce).orElse(true);
                 if (!masked) continue;
                 typedSeeds.add(key);
                 String normaliser = sealed != null ? String.valueOf(sealed.get("normaliser"))

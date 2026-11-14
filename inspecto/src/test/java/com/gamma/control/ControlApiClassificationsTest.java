@@ -92,18 +92,20 @@ class ControlApiClassificationsTest {
         }
     }
 
-    /** The Space's own Entity Types: their ids and claims join the vocabulary, masked when the type is masked. */
+    /** The Space's own Entity Types: their ids and claims join the vocabulary, masked when the type is masked in force. */
     @Test
     void theSpacesEntityTypesJoinTheVocabularySortedWithWhetherEachClassMasks(@TempDir Path cfg, @TempDir Path root) throws Exception {
         new LinkAnalysisSettings(null, null, null, null, null, null,
                 List.of(new EntityType("badge", "Staff badge", "upper-trim", true, List.of("BADGE_NO")),
-                        new EntityType("desk", "Desk", "upper-trim", false, List.of(" desk_code ", "pii"))),
+                        new EntityType("desk", "Desk", "upper-trim", false, List.of(" desk_code ", "pii")),
+                        new EntityType("room", "Room", "upper-trim", false, List.of("ROOM_NO"))),
                 null, null, null, null, null, null, null, null).write(root.resolve(LinkAnalysisSettings.FILE));
         try (Ctx c = open(cfg, root)) {
             JsonNode items = items(c);
             List<String> classes = new ArrayList<>();
             items.forEach(i -> classes.add(i.get("class").asText()));
-            assertEquals(List.of("ACCOUNT", "BADGE", "BADGE_NO", "DESK", "DESK_CODE", "IMSI", "INTERNAL", "MSISDN", "PII"), classes,
+            assertEquals(List.of("ACCOUNT", "BADGE", "BADGE_NO", "DESK", "DESK_CODE", "IMSI", "INTERNAL", "MSISDN", "PII",
+                            "ROOM", "ROOM_NO"), classes,
                     "SENSITIVE, INTERNAL, each type's id and claims, normalised, once each, sorted");
 
             assertEquals("{\"class\":\"MSISDN\",\"masked\":true,\"source\":\"sensitive\"}", item(items, "MSISDN").toString());
@@ -111,8 +113,12 @@ class ControlApiClassificationsTest {
             assertEquals("{\"class\":\"BADGE_NO\",\"masked\":true,\"source\":\"entity-type\",\"entityType\":\"badge\",\"label\":\"Staff badge\"}",
                     item(items, "BADGE_NO").toString(), "a class a masked type claims masks");
             assertTrue(item(items, "BADGE").get("masked").asBoolean(), "the id of a masked type masks");
-            assertFalse(item(items, "DESK_CODE").get("masked").asBoolean(), "a class only an unmasked type claims does not");
-            assertFalse(item(items, "DESK").get("masked").asBoolean());
+            assertFalse(item(items, "ROOM_NO").get("masked").asBoolean(), "a class only an unmasked type claims does not");
+            assertFalse(item(items, "ROOM").get("masked").asBoolean());
+            // MASKING-TWO-VOCABULARIES-1: desk claims PII, so it is masked in force whatever its flag says, and so are its id
+            // and its other classes (EntityTypes.maskedInForce)
+            assertTrue(item(items, "DESK_CODE").get("masked").asBoolean(), "a type claiming a SENSITIVE class masks its other classes");
+            assertTrue(item(items, "DESK").get("masked").asBoolean());
             JsonNode pii = item(items, "PII");
             assertTrue(pii.get("masked").asBoolean(), "an unmasked type claiming a SENSITIVE class never unmasks it");
             assertEquals("sensitive", pii.get("source").asText());

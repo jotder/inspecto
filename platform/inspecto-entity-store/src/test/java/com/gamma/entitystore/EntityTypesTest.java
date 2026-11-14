@@ -65,6 +65,21 @@ class EntityTypesTest {
         assertNull(EntityTypes.maskedTypeOf(types, "branch"), "an unmasked type is never the masked type");
     }
 
+    /** MASKING-TWO-VOCABULARIES-1: {@code masked: false} never unmasks a type whose id or a claimed class is sensitive. */
+    @Test
+    void aTypeIsMaskedInForceWhenFlaggedOrWhenItsIdOrAClassIsSensitive() {
+        assertTrue(EntityTypes.maskedInForce(new EntityType("customer", "Customer", "upper-trim", true, List.of("CUSTOMER_REF"))));
+        assertTrue(EntityTypes.maskedInForce(new EntityType("msisdn", "Phone", "e164", false, List.of("PHONE"))), "a sensitive id");
+        assertTrue(EntityTypes.maskedInForce(new EntityType("phone", "Phone", "e164", false, List.of("PHONE", " msisdn "))),
+                "a sensitive claimed class");
+        EntityType phone = new EntityType("phone", "Phone", "e164", false, List.of("PHONE"));
+        assertFalse(EntityTypes.maskedInForce(phone), "nothing sensitive: the flag decides");
+        EntityType carrier = new EntityType("carrier", "Carrier", "e164", false, List.of("CARRIER_REF", "PII"));
+        assertTrue(EntityTypes.maskedClasses(List.of(carrier)).test("carrier_ref"),
+                "a type masked in force masks its other classes too");
+        assertFalse(EntityTypes.maskedClasses(List.of(phone)).test("PHONE"));
+    }
+
     @Test
     void theDefaultsAreTheSeededNineThenTheNeutralStarterTypesAndValidate() {
         // ENTITY-TYPE-CATALOG-1 P3: the nine original ids first (data contracts), then the neutral types every domain shares

@@ -81,10 +81,8 @@ public final class ClassificationVocabulary {
      * {@link #SOURCE_SENSITIVE} before {@link #SOURCE_ENTITY_TYPE} before {@link #SOURCE_NOT_MASKED}.
      *
      * <p>{@code masked} says whether a column of the class is masked for a reader who may not reveal it: the class is
-     * {@link ColumnClassification#SENSITIVE}, OR a masked Entity Type claims it, OR it is the id of a masked Entity Type.
-     * ⚠ That is the union the masking readers are moving to (a peer lane changes publication and evidence masking to
-     * SENSITIVE ∪ the masked Entity Types' classes); until it lands, a reader that masks SENSITIVE alone leaves an
-     * Entity Type's class unmasked although this says {@code true}. Keep this predicate and theirs one rule.
+     * {@link ColumnClassification#SENSITIVE}, OR an Entity Type masked in force ({@link EntityTypes#maskedInForce}) claims it
+     * or has it as its id - the rule every masking reader applies ({@link EntityTypes#maskedClasses}). Keep them one rule.
      */
     public static List<Entry> vocabulary(List<EntityTypes.EntityType> types) {
         Map<String, Entry> out = new java.util.TreeMap<>();
@@ -99,7 +97,7 @@ public final class ClassificationVocabulary {
                 if (n != null) classes.add(n);
             }
             for (String c : classes)
-                out.merge(c, new Entry(c, t.masked(), SOURCE_ENTITY_TYPE, t.id(), t.label()), (a, b) -> a.entityType() != null
+                out.merge(c, new Entry(c, EntityTypes.maskedInForce(t), SOURCE_ENTITY_TYPE, t.id(), t.label()), (a, b) -> a.entityType() != null
                         ? new Entry(a.cls(), a.masked() || b.masked(), a.source(), a.entityType(), a.label())
                         : new Entry(a.cls(), a.masked() || b.masked(), a.source(), b.entityType(), b.label()));
         }

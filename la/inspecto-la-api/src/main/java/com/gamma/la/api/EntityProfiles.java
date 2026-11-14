@@ -207,7 +207,7 @@ final class EntityProfiles {
         return switch (mode) {
             case "none" -> false;
             case "all" -> true;
-            default -> type.masked();
+            default -> EntityTypes.maskedInForce(type);   // a sensitive class masks whatever the type's flag says
         };
     }
 

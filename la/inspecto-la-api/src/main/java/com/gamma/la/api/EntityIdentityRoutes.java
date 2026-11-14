@@ -495,7 +495,7 @@ public final class EntityIdentityRoutes implements RouteModule {
                 case "none" -> false;
                 case "all" -> true;
                 default -> EntityListFacts.type(root, typedKey.substring(0, typedKey.indexOf(':')))
-                        .map(EntityTypes.EntityType::masked).orElse(true);
+                        .map(EntityTypes::maskedInForce).orElse(true);
             };
         }
     }

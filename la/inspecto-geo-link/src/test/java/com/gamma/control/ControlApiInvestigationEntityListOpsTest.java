@@ -511,22 +511,53 @@ class ControlApiInvestigationEntityListOpsTest {
     }
 
     /**
-     * LA-17 step 5 (b): the Entity Type's {@code masked} flag is the one truth. A Space that redefines {@code msisdn} as
-     * {@code masked: false} sees its ids RAW under {@code typed} — in the Investigation (a seed typed MSISDN, an
-     * excludeBy over an msisdn list) exactly as on the Entity List route. (Before step 5 the Investigation forced
-     * msisdn / imsi / account masked whatever the type said.)
+     * MASKING-TWO-VOCABULARIES-1: a type whose id or claimed class is one of the four sensitive classes (MSISDN, IMSI,
+     * ACCOUNT, PII) is masked whatever its {@code masked} flag says - only {@code maskingMode: none} turns masking off. A
+     * Space that redefines {@code msisdn} as {@code masked: false} still sees its ids MASKED under {@code typed}, in the
+     * Investigation (a seed typed MSISDN, an excludeBy over an msisdn list) exactly as on the Entity List route.
      */
     @Test
-    void anMsisdnTypeRedefinedAsUnmaskedStaysRawInTheInvestigationAndOnTheListRoute(@TempDir Path cfg, @TempDir Path root)
+    void anMsisdnTypeRedefinedAsUnmaskedStaysMaskedInTheInvestigationAndOnTheListRoute(@TempDir Path cfg, @TempDir Path root)
             throws Exception {
         try (Ctx c = open(cfg, root)) {
             data(send(c, "PUT", "/settings/link-analysis", "{\"maskingMode\":\"typed\",\"entityTypes\":[{\"id\":\"msisdn\","
                     + "\"label\":\"MSISDN\",\"normaliser\":\"e164\",\"masked\":false,\"classifications\":[\"MSISDN\"]}]}"), 200);
             list(c, "mules", "exclusion", "+447700900123", "+447700900555");
+            HttpResponse<String> listed = send(c, "GET", "/entity-lists/mules", null);
+            for (JsonNode m : data(listed, 200).get("members")) assertTrue(m.asText().startsWith("masked:"), listed.body());
+            data(post(c, "/inv/investigations", CREATE), 200);
+            HttpResponse<String> seededR = post(c, "/inv/investigations/case-a/ops",
+                    "{\"op\":\"seed\",\"ids\":[\"alice\"],\"entityType\":\"MSISDN\"}");
+            JsonNode seeded = data(seededR, 200);
+            assertTrue(seeded.at("/delta/admitted/0").asText().matches("masked:[0-9a-f]{16}"), seeded.toString());
+            assertEquals(1, seeded.at("/masking/masked").asInt(), seeded.toString());
+            op(c, "case-a", "{\"op\":\"expand\"}");
+            HttpResponse<String> excluded = post(c, "/inv/investigations/case-a/ops", EXCLUDE_BY);
+            JsonNode x = data(excluded, 200);
+            assertTrue(x.at("/delta/removed/0").asText().matches("masked:[0-9a-f]{16}"), x.toString());
+            assertTrue(x.at("/list/unmatched/0").asText().matches("masked:[0-9a-f]{16}"), x.toString());
+            String all = String.join("\n", listed.body(), seededR.body(), excluded.body());
+            assertFalse(all.contains("900123") || all.contains("900555") || all.contains("\"alice\""), all);
+        }
+    }
+
+    /**
+     * LA-17 step 5 (b), the twin: a type whose id and classes are NOT sensitive follows its {@code masked} flag - redefined as
+     * {@code masked: false}, its ids stay RAW under {@code typed}, in the Investigation exactly as on the Entity List route.
+     */
+    @Test
+    void aNonSensitiveTypeRedefinedAsUnmaskedStaysRawInTheInvestigationAndOnTheListRoute(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            data(send(c, "PUT", "/settings/link-analysis", "{\"maskingMode\":\"typed\",\"entityTypes\":[{\"id\":\"phone\","
+                    + "\"label\":\"Phone\",\"normaliser\":\"e164\",\"masked\":false,\"classifications\":[\"PHONE\"]}]}"), 200);
+            data(post(c, "/entity-lists", "{\"id\":\"mules\",\"title\":\"mules\",\"purpose\":\"exclusion\","
+                    + "\"entityType\":\"phone\",\"reason\":\"referral\"}"), 201);
+            members(c, "mules", "add", "+447700900123", "+447700900555");
             assertEquals(List.of("+447700900123", "+447700900555"),
                     texts(data(send(c, "GET", "/entity-lists/mules", null), 200).get("members")));
             data(post(c, "/inv/investigations", CREATE), 200);
-            JsonNode seeded = op(c, "case-a", "{\"op\":\"seed\",\"ids\":[\"alice\"],\"entityType\":\"MSISDN\"}");
+            JsonNode seeded = op(c, "case-a", "{\"op\":\"seed\",\"ids\":[\"alice\"],\"entityType\":\"PHONE\"}");
             assertEquals("alice", seeded.at("/delta/admitted/0").asText(), seeded.toString());
             assertEquals(0, seeded.at("/masking/masked").asInt(), seeded.toString());
             op(c, "case-a", "{\"op\":\"expand\"}");

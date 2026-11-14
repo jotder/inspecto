@@ -144,14 +144,31 @@ public final class EntityTypes {
     }
 
     /**
-     * The first MASKED type of {@code types} that claims {@code classification} or whose id it is (trimmed, any case), else
-     * {@code null}. A type id counts because the save gate and onboarding read a column classed with it as that type.
+     * Whether ids of {@code type} are masked under {@code typed} (MASKING-TWO-VOCABULARIES-1): the type is {@code masked}, OR its
+     * id or a class it claims is one of the four sensitive classes ({@link ColumnClassification#SENSITIVE}). A type's
+     * {@code masked: false} never unmasks those; only {@code maskingMode: none} turns masking off. The ONE type-keyed rule.
+     */
+    public static boolean maskedInForce(EntityType type) {
+        if (type.masked()) return true;
+        String id = ColumnClassification.normalise(type.id());
+        if (id != null && ColumnClassification.SENSITIVE.contains(id)) return true;
+        for (String c : type.classifications()) {
+            String n = ColumnClassification.normalise(c);
+            if (n != null && ColumnClassification.SENSITIVE.contains(n)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * The first type of {@code types} masked in force ({@link #maskedInForce}) that claims {@code classification} or whose id it is
+     * (trimmed, any case), else {@code null}. A type id counts because the save gate and onboarding read a column classed with it
+     * as that type.
      */
     public static EntityType maskedTypeOf(List<EntityType> types, String classification) {
         String c = ColumnClassification.normalise(classification);
         if (c == null) return null;
         for (EntityType t : types) {
-            if (!t.masked()) continue;
+            if (!maskedInForce(t)) continue;
             if (t.id().equalsIgnoreCase(c)) return t;
             for (String x : t.classifications()) if (x.trim().equalsIgnoreCase(c)) return t;
         }

@@ -828,7 +828,9 @@ so it gets the rule through the `MaskedClasses` SPI (`com.gamma.mask`, provided 
 control plane; with no provider, the engine's own tests, the four sensitive classes alone hold).
 
 - 🔴 An Entity Type's `masked: false` does **not** unmask a sensitive class: a column classed `MSISDN` masks whatever the
-  `msisdn` type says. Only `maskingMode: none` turns BI and Link Analysis masking off for a Space.
+  `msisdn` type says. A type whose id or any claimed class is sensitive counts as masked (`EntityTypes.maskedInForce`):
+  its ids mask in Link Analysis and every class it claims masks everywhere. Only `maskingMode: none` turns BI and Link
+  Analysis masking off for a Space.
 - In BI, `typed` and `all` now mask the same columns (only the reported mode and its basis text differ). In Link
   Analysis they still differ: `all` masks every entity id and every non-fractional reference-row value.
 - `quality.pii.mask` is unchanged: its `classifications:` list is the author's and must stay within the four sensitive
