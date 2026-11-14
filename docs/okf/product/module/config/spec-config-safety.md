@@ -655,9 +655,11 @@ gate `SaveGate.check`, see [one save gate](#one-save-gate-for-every-door--savega
 *silent loss* — the save answers `written: true` and the engine never looks at it.
 
 **Four of the nine config types have a census: `pipeline`, `alert`, `meta` and `enrichment`.** The
-other five (`job`, `schema`, `expectation`, `widget`, `dashboard`) are **fail-open by
-omission, and that is stated rather than accidental**: `unknownKeyFindings` returns nothing for a type
-with no census.
+other five (`job`, `schema`, `expectation`, `widget`, `dashboard`) have no census **in this class**:
+`unknownKeyFindings` returns nothing for a type with no census. Three of them are gated elsewhere:
+`widget`, `dashboard` and `expectation` are refused at the top level by
+`ComponentRoutes.refuseUnknownComponentKeys` (checked in code 2026-11-14). So `job` and `schema` are the
+two types that are **fail-open by omission, and that is stated rather than accidental**.
 
 🔴 **Why the missing five cannot simply be switched on.** Two authorities read every config: what
 `ConfigSpecs` *declares*, and what the engine's hand-written parser *navigates*. An accepted set derived

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-432 test class(es): 176 unit, 256 real-HTTP control-plane, 0 IT.
+433 test class(es): 177 unit, 256 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -365,6 +365,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `StepConfigSaveFindingsTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/StepConfigSaveFindingsTest.java` | {@link ConfigRoutes#stepConfigFindings} — the save-time half of the lookup / profile / dedup / filter |
 | `TelcoFraudTemplateGoldenTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/TelcoFraudTemplateGoldenTest.java` | {@code ASSURE-PACK-TELCO-FRAUD-1} golden test. Boots the shipped {@code spaces/_templates/telco-fraud} Space |
 | `TelcoRerateGoldenTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/TelcoRerateGoldenTest.java` | {@code PACK-RERATING-1} slices R1 and R2 golden test (R2 adds the explanation Job {@code rr_explain}, the root-cause Job |
+| `TemplateIdentifierClassificationTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/TemplateIdentifierClassificationTest.java` | TEMPLATE-CONFIDENTIAL-UNMASKED-1: {@code CONFIDENTIAL} is in neither masking vocabulary |
 | `TimeBoundsTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/TimeBoundsTest.java` | {@code /events} time bounds are anchored in the {@linkplain OperationsZone operations zone}, not the |
 | `TrustedProxiesTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/TrustedProxiesTest.java` | SEC review F3: the resolution rules of {@link TrustedProxies}, pinned directly (the HTTP half is |
 | `TypeFlowSaveTimeFindingsTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/TypeFlowSaveTimeFindingsTest.java` | {@link ConfigRoutes#routeColumnFindings} and {@link ConfigRoutes#summarizeMeasureFindings} — |

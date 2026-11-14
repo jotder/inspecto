@@ -256,8 +256,10 @@ above the generated commit list.
   ⛔ The census stops at the **top level** for this type — author-chosen KPI, table and report names one
   level down are never checked, because `SemanticModel.load` iterates them by `entrySet()` and they are an
   unbounded namespace. Both committed `*_meta.toon` files pass unchanged.
-- The remaining **six** config types (`enrichment`, `job`, `schema`, `expectation`, `widget`,
-  `dashboard`) are still fail-open by omission. ⛔ They cannot simply be switched on: four of them have
+- Of the remaining six config types, four gained a check later: `enrichment` has a census in
+  `AcceptedConfigKeys`, and `widget`, `dashboard` and `expectation` are refused at the top level in
+  `ComponentRoutes.refuseUnknownComponentKeys` (checked in code 2026-11-14). `job` and `schema` are still
+  fail-open by omission. ⛔ They cannot simply be switched on: both have
   confirmed undeclared-but-engine-read keys, and `job` funnels any unrecognised key into an open `params`
   bag. ⚠ `widget` and `dashboard` are a different case again — they never reach `/config/write` at all
   (the UI saves them through `POST`/`PUT /components/{kind}`), so a census here would change nothing.

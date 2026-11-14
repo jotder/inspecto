@@ -149,8 +149,8 @@ Group letters match §6. Scores are the assessor's; levels are calibrated (§2).
   A docs-only review of these is tracked by `DOCS-AGENT-WRITTEN-REVIEW-1`.
 
 ### 4.5 Gaps found that have no BACKLOG row (each is itself a finding)
-- Masking: AML `account_id` and mobile-money `wallet_id` / `msisdn` are classified `CONFIDENTIAL`, outside
-  `ColumnClassification.SENSITIVE` (verified in the schemas and `ColumnClassification.java`), so they are not masked.
+- Masking: AML `account_id` and mobile-money `wallet_id` / `msisdn` were classified `CONFIDENTIAL`, outside
+  `ColumnClassification.SENSITIVE`, so they were not masked; reclassified 2026-11-14 (`TEMPLATE-CONFIDENTIAL-UNMASKED-1`, pinned by `TemplateIdentifierClassificationTest`).
 - Release-signing path never exercised; OpenAPI summary/schema quality; retention for Cases / anomaly scores / action
   requests; native ITSM connector; e2e UI coverage of ops panes (only `backend-smoke.spec.ts`). See §6 per item.
 
@@ -1206,7 +1206,7 @@ Not verified: vendor control and typology counts (general-market). Also not veri
   - Scenario library is 4 rules + 2 models vs the hundreds of out-of-box scenarios (CTR, rapid movement, dormant reactivation, trade-based, peer-group by segment, customer due-diligence risk rating) leaders ship (general market) — no row.
   - No sanctions/PEP list-feed ingestion or list-management workflow (delta updates, list versioning by publisher); lists are created by hand through the API — no row.
   - STR is illustrative; no goAML / FinCEN SAR schema — `REGULATORY-SAR-STR-TEMPLATES-1` (P3, hold: demand).
-  - Daily batch only; no real-time transaction screening / interdiction — `REALTIME-DECISIONING-1` (P3). Ledger `account_id` is classified `CONFIDENTIAL`, which is not in `ColumnClassification.SENSITIVE` (`MSISDN IMSI ACCOUNT PII`), so account numbers are stored unmasked — no row.
+  - Daily batch only; no real-time transaction screening / interdiction — `REALTIME-DECISIONING-1` (P3). Ledger `account_id` was classified `CONFIDENTIAL`, which is not in `ColumnClassification.SENSITIVE` (`MSISDN IMSI ACCOUNT PII`), so account numbers were stored unmasked — reclassified 2026-11-14 (`TEMPLATE-CONFIDENTIAL-UNMASKED-1`, pinned by `TemplateIdentifierClassificationTest`) to `ACCOUNT`.
 - **RFP stance on the 5 most-asked requirements for this category:**
 
 | Requirement | Stance | Evidence or caveat |
@@ -1259,7 +1259,7 @@ Not verified: vendor control and typology counts (general-market). Also not veri
   - Agent Risk Score `mm_agent` (3 factors) and wallet Anomaly Model `mm_wallet_activity` with **KYC-tier peer groups** (`peers.by: kyc_tier`, `minGroupSize: 30`), both with pending Alert Rules.
   - Tests: `MobileMoneyPackGoldenTest` 5 (corpus = generator; every control flags exactly its planted cases and no look-alike; every dashboard tile renders the planted offenders), `MobileMoneyRiskScoreGoldenTest` 2, `PackFraudAmlAnomalyPropertyTest` 2 of 5 (planted wallet top, look-alikes normal), `ControlApiAnomalyTemplateApplyTest` 1 (peer model applies under the deployed safety policy, real HTTP), plus the shared seed-gate test.
   - Five feeds, ~725 wallet txns / 359 wallets / 359 subscribers / 56 settlement / 38 bank lines (`data/samples/`); 4 KPIs, 11-tile dashboard, runbooks (95 lines). Closed `PACK-MOBILE-MONEY-1` (2026-10-09).
-  - Masking: `wallet_id` and `msisdn` are classified `CONFIDENTIAL` in `config/wallets/wallets_schema.toon` and `config/core_subscribers/core_subscribers_schema.toon`, which `ColumnClassification.SENSITIVE` (`platform/inspecto-util/.../ColumnClassification.java:26`) does not mask — while the industry pack marks `wallet` / `msisdn` Entity Types `masked: true`.
+  - Masking (fixed: reclassified 2026-11-14 (`TEMPLATE-CONFIDENTIAL-UNMASKED-1`, pinned by `TemplateIdentifierClassificationTest`)): `wallet_id` and `msisdn` were classified `CONFIDENTIAL` in `config/wallets/wallets_schema.toon` and `config/core_subscribers/core_subscribers_schema.toon`, which `ColumnClassification.SENSITIVE` (`platform/inspecto-util/.../ColumnClassification.java:26`) does not mask — while the industry pack marks `wallet` / `msisdn` Entity Types `masked: true`.
   - Matrix row R: Y vs LATRO Assure Fintech, Subex FraudZap, Mobileum RAID mobile-money risk (matrix l.18-20, 50).
 - **Strengths vs market:**
   - RA (float, settlement, fee, commission) and fraud/AML-lite (split, round-trip, dormant, KYC) in one pack — LATRO's Assure Fintech is the closest peer and is largely managed-service; this is self-run configuration.
@@ -1267,7 +1267,7 @@ Not verified: vendor control and typology counts (general-market). Also not veri
 - **Gaps vs market / RFP risk:**
   - No screening, no STR template and no Link Analysis view inside the pack (LA is the separate `la-mobile-money` template) — a mobile-money AML RFP needs the `aml` pack alongside — no row.
   - Daily batch; no real-time agent/wallet blocking — `REALTIME-DECISIONING-1` (P3).
-  - MSISDN / wallet ids stored unmasked (`CONFIDENTIAL` not a masked class) — no row.
+  - MSISDN / wallet ids were stored unmasked (`CONFIDENTIAL` not a masked class) — reclassified 2026-11-14 (`TEMPLATE-CONFIDENTIAL-UNMASKED-1`, pinned by `TemplateIdentifierClassificationTest`).
   - Pending score Alert Rules must be created by hand after the first run (architecture.md Limits) — accepted design (`TEMPLATE-RISK-SCORE-ALERT-RULE-1` closed).
 - **RFP stance on the 5 most-asked requirements for this category:**
 

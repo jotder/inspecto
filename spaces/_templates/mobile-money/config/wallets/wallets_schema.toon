@@ -3,8 +3,8 @@ raw:
   format: CSV
   fields[6]{name,selector,type,description,unit,classification}:
     snapshot_date,"0",DATE,"Register snapshot day","","INTERNAL"
-    wallet_id,"1",VARCHAR,"Wallet identifier","","CONFIDENTIAL"
-    msisdn,"2",VARCHAR,"The line the wallet is provisioned on","","CONFIDENTIAL"
+    wallet_id,"1",VARCHAR,"Wallet identifier","","ACCOUNT"
+    msisdn,"2",VARCHAR,"The line the wallet is provisioned on","","MSISDN"
     kyc_tier,"3",INTEGER,"KYC tier (1 basic, 2 standard, 3 full)","","INTERNAL"
     status,"4",VARCHAR,"ACTIVE, SUSPENDED or CLOSED","","INTERNAL"
     last_activity_date,"5",DATE,"Last day the wallet moved money before the snapshot","","INTERNAL"
