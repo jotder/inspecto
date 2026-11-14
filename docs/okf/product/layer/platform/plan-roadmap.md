@@ -1,6 +1,6 @@
 # Inspecto — Forward Roadmap
 
-**Status:** **§3 NEXT horizon, §6 sequence and vocabulary reconciled 2026-07-25** — §3.1–§3.3 have all shipped, and the banned term *Flow* is renamed to **Pipeline** per the binding [GLOSSARY](../../../../GLOSSARY.md). <!-- vocab-allow: names the Flow→Pipeline rename itself --> The **§1 theme horizons and the §2 NOW horizon still read as of 2026-06-19** and need their own status pass (see §9). · **Companion:** [../product/brochure-stakeholder-overview.md](../product/brochure-stakeholder-overview.md) · **Engineering detail:** [../../module/engine/architecture-pipeline-graph.md](../../module/engine/architecture-pipeline-graph.md)
+**Status:** **§3 NEXT horizon, §6 sequence and vocabulary reconciled 2026-07-25** — §3.1–§3.3 have all shipped, and the banned term *Flow* is renamed to **Pipeline** per the binding [GLOSSARY](../../../../GLOSSARY.md). <!-- vocab-allow: names the Flow→Pipeline rename itself --> The **§1 theme horizons and the §2 NOW horizon had their status pass 2026-11-15** (`ARCH-DOC-CONTRADICTIONS-1`; see §9). · **Companion:** [../product/brochure-stakeholder-overview.md](../product/brochure-stakeholder-overview.md) · **Engineering detail:** [../../module/engine/architecture-pipeline-graph.md](../../module/engine/architecture-pipeline-graph.md)
 
 > **Timeline convention.** This roadmap sequences work into **Now / Next / Later** horizons and gives **relative effort** sizing (S/M/L). It deliberately does **not** assign calendar dates — the cadence is one minor release per milestone on the active line, and dates are set per planning cycle, not here. Where an item gates revenue or another item, that dependency is called out explicitly.
 
@@ -10,8 +10,8 @@
 
 | # | Theme | Why it matters | Primary horizon |
 |---|---|---|---|
-| T1 | **Commercial readiness** | Professional-edition security is the gate to selling into regulated buyers. | Next |
-| T2 | **Breadth of ingestion** | Object storage and more native formats widen the addressable feed set. | Next |
+| T1 | **Commercial readiness** | Standard-edition security is the gate to selling into regulated buyers. | Next → gating item shipped 2026-07-24 (§3.1) |
+| T2 | **Breadth of ingestion** | Object storage and more native formats widen the addressable feed set. | Next → gating items shipped 2026-07-07 / 2026-07-22 (§3.3, §3.2) |
 | T3 | **Self-service authoring** | Visual Pipelines + AI assist move authoring from expert-only to operator-owned. | Now → Next |
 | T4 | **Trust & transparency** | Provenance/lineage + conservation checks as a default operational guarantee. | Now |
 | T5 | **Scale-out optionality** | Keep Advanced distributed seams open without compromising the lean single-node core. | Later |
@@ -24,12 +24,12 @@ These are built and integrated on the development line; the work remaining is ve
 
 | ID | Item | Effort | State | Exit criteria |
 |---|---|---|---|---|
-| N1 | **Pipeline-graph platform** — authoring, validation, execution as first-class jobs, multi-source merge, incremental Pipelines, materialized views, visual editor | L | Built & tested | A representative `type: pipeline` job runs end-to-end against seeded data; visual editor verified live; design doc §14 closed |
-| N2 | **Data-plane provenance** — per-edge counts, conservation invariant → managed alerts, Sankey overlay | M | Built & tested (off by default) | Provenance verified against a real Pipeline-job run (not just synthetic injection); overlay confirmed against recorded data |
+| N1 | **Pipeline-graph platform** — authoring, validation, execution as first-class jobs, multi-source merge, incremental Pipelines, materialized views, visual editor | L | Built & tested; the live seeded end-to-end run is **RESOLVED 2026-07-07** (`REQUIREMENTS.md` §R1, `examples/06-serve/pipeline-job`) | A representative `type: pipeline` job runs end-to-end against seeded data; visual editor verified live; design doc §14 closed |
+| N2 | **Data-plane provenance** — per-edge counts, conservation invariant → managed alerts, Sankey overlay | M | Built & tested (off by default); the live-feed soak is still owed (`BACKLOG.md` §2 **OPS-5**) | Provenance verified against a real Pipeline-job run (not just synthetic injection); overlay confirmed against recorded data |
 | N3 | **`sink.view` consumer** — REST query of a Pipeline's logical views | S | Shipped in mainline | Done — `/views`, `/views/{name}`, `/views/{name}/data` live with tests |
 | N4 | **Edition realignment** — auth-free common core | M | 🟡 **Built and GATED — corrected 2026-09-09.** "uncommitted/ungated" is stale: `EDG-01` decided the model and all seven cells landed by 2026-09-08, and `edition-standard` / `edition-advanced` are real Maven profiles. | ⚠ **Only the RELEASE half of the original trigger is still open**, and that is true of the whole product — the newest master-ancestor tag is `v3.11.0`, so nothing after 3.x has ever shipped. ⛔ Do not read this row as "the three-edition model is unproven": it is built, gated and tested; it is unreleased. |
 
-**Now-horizon focus:** finish live end-to-end verification of N1/N2 with real job configs (current verification used synthetic data on a config-less dev backend), then make the release call on N4.
+**Now-horizon focus:** the N2 live-feed soak (N1's live run is done), then the release call on N4.
 
 ---
 
@@ -163,7 +163,7 @@ N4 Edition realignment          [NFS/SMB-CIFS REFUSED, not open]         complet
 | Breadth of ingestion | Number of source backends and parsing frontends onboarding with zero core change. |
 | Self-service | Share of feeds authored/operated entirely from the console vs. hand-edited config. |
 | Trust & transparency | Provenance enabled on production Pipelines; conservation alerts surfaced and triaged as managed objects. |
-| Leanness preserved | Core fat-JAR size and core dependency count holding flat as connectors/editions grow. |
+| Leanness preserved | Core jar size (the processor `inspecto.jar` plus the thin core jars) and core dependency count holding flat as connectors/editions grow. |
 
 ---
 
@@ -181,9 +181,10 @@ N4 Edition realignment          [NFS/SMB-CIFS REFUSED, not open]         complet
 The 2026-07-25 pass reconciled §3, §6 and the *Flow → Pipeline* vocabulary only. Deliberately **not** <!-- vocab-allow: names the rename itself -->
 restated, because each needs a status call rather than a doc edit:
 
-- **§1 theme horizons** — T1 and T2 still read *Primary horizon: Next*, though their gating items (§3.1,
-  §3.2) have shipped.
-- **§2 NOW horizon** — N1/N2/N4 still read as of 2026-06-19. At least two are known to have moved:
+- ✅ **§1 theme horizons** — *done 2026-11-15*: T1 and T2 now record that their gating items (§3.1–§3.3)
+  shipped. They had read *Primary horizon: Next* after the items shipped.
+- ✅ **§2 NOW horizon** — *done 2026-11-15*: N1 and N2 now carry the states below (N4 was corrected
+  2026-09-09). They had read as of 2026-06-19:
   N1's live end-to-end verification is recorded as **RESOLVED 2026-07-07** in
   [`../../../../REQUIREMENTS.md`](../../../../REQUIREMENTS.md) §R1 (seeded `type: pipeline` run,
   `examples/06-serve/pipeline-job`), and N4's edition model shipped as real Maven build flavors

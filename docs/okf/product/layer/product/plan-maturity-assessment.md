@@ -11,6 +11,12 @@ timestamp: 2026-10-20T00:00:00Z
 > **As of 2026-10-20** (origin/master `56ba62d23`). Audience: product owner, presales, solution architects, leadership.
 > Internal — it names our gaps frankly; brochures stay the external voice. Re-assess at each release or quarter:
 > a score is a photograph, and several of the docs it read had already drifted from the code (§4.4).
+>
+> ⚠ **Since this photograph:** `OFFERING-DECLARATION-DRIFT-1`, cited below as open, was **closed 2026-10-20**
+> (`78fc6e583`: `business-assurance` moved to Standard with `minEdition: standard`, the LA showcase templates
+> listed in `offerings/preview.toon`, `la-daily-feed` kept in Basic by decision), and since 2026-11-08 the LA
+> showcases have Basic tiers listed in `offerings/basic.toon`. Findings below that cite its D1 or D2 describe the
+> state before those changes.
 
 ## 1. Verdict
 
@@ -1479,7 +1485,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Template: 12 files. Pipeline plus schema; poll Collector (`XDR_{yyyyMMdd}.csv`); freshness and index-lag Alert Rules; row-band Expectation; `la_index_build` and `la_rows_band_evaluate` Jobs. Only **2 sample days of a few rows each** (`data/samples/daily_xdr/`).
   - Tests: `LaDailyFeedTemplateRulesTest` 6. `LaDailyIngestAcceptanceTest` covers 7 days, a late day, a re-run, a correction, a part-count change, a missing day and a dimension change. `ScheduledDailyChainTest` (geo-link) runs on the scheduler alone. Benches `LaDailyIngestScaleBench` / `DailyIndexScaleBench`: 10^7 rows a day ingest in 35–40 s, 10^8 in 489 s, APPEND 31 s onto 10^8 (BACKLOG `LA-DAILY-INGEST-1`).
   - Live drive on 2026-10-14 (`module/la-core/tests-data-trust-live-drive.md`): 8 steps, 1 FAIL (corrected day, since fixed by `f3a90e6a3`). At that time the template shipped no index Job; the Jobs were added later and are pinned by `theTemplateShipsTheJobsThatIndexAndEvaluateOnEveryCommit`.
-  - **Edition mismatch.** The pack ships Alert Rules, but the Alert Rule dispatcher (`alert.dispatch`, declared by `inspecto-ops`) is Standard and up (`layer/platform/architecture-editions.md` §28; `OFFERING-DECLARATION-DRIFT-1` D1, open, hold: operator). The template has no `minEdition`, so the `tools/check-offerings.mjs` check 5 guard cannot catch it.
+  - **Edition mismatch.** The pack ships Alert Rules, but the Alert Rule dispatcher (`alert.dispatch`, declared by `inspecto-ops`) is Standard and up (`layer/platform/architecture-editions.md` §28; `OFFERING-DECLARATION-DRIFT-1` D1, closed 2026-10-20). The template has no `minEdition`, so the `tools/check-offerings.mjs` check 5 guard cannot catch it.
   - The index Job runs as `owner: admin` (`config/jobs/la_index_build_job.toon`), but Basic ships no Authenticator. By code read (2026-10-23, `LA-DAILY-INGEST-1`): on an open server the run authority is skipped (`JobAuthority.runAuthority`) and the template's Dataset has no `shares`, so `ComponentAccess.canViewAs` allows `admin`; with an Authenticator, `TemplateSeedGate.stampJobs` re-stamps the owner to the applier unless the applier holds `canConfigureAccess`. `LaIndexBuildJob` and `ScheduledLinkIndexBuilder` consult no edition feature (`platform/inspecto-engine/.../LaIndexBuildJob.java:59`, `la/inspecto-geo-link/.../ScheduledLinkIndexBuilder.java`), so the index probably builds on Basic while every index-consuming Investigation route is 503 there (unverified live).
   - The row-band Expectation "does not judge a day until 3 prior days exist" (`admin-guide.md`), and only 2 sample days ship. The out-of-box verify cannot show the band working.
 - **Strengths vs market:**
@@ -1576,7 +1582,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Absent-surface parity tests per module: `AnomalyAbsentSurfaceParityTest`, `ReconAbsentSurfaceParityTest`, `ScoringAbsentSurfaceParityTest`, `ScreeningAbsentSurfaceParityTest`, `EntityListAbsentSurfaceParityTest`, `GeoLinkAbsentSurfaceParityTest`, plus `OpsEditionFeaturesTest`.
   - The `tools/check-offerings.mjs` guard (CI `guards`) asserts Offering == bundle == pom profile and checks `minEdition` against each pack (check 5).
   - Real IdP sign-in proven once against WSO2 IS 7.3.0 (`module/la-core/admin-guide-real-signin.md`, 2026-10-13).
-  - Open: `OFFERING-DECLARATION-DRIFT-1` (P3 defect, tagged `edition.standard`, hold: operator).
+  - ~~Open: `OFFERING-DECLARATION-DRIFT-1`~~ closed 2026-10-20 (`78fc6e583`).
 - **Strengths vs market:**
   - One SKU spans assurance, case and investigation, where competitors sell separate products. Examples: Linkurious + a case tool; i2 ANB + EIA; Subex or Mobileum modules priced per function (general market, and `layer/product/brochure-competitive-landscape.md`).
   - The full evidential Link Analysis is in the mid tier, following the principle "never sell weaker analysis or weaker evidence" (`docs/EDITIONS.md` "Inspecto LA feature placement").
@@ -1593,7 +1599,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
 | Case and Incident workflow with SLA | Comply | `caseManagement`, `incidents`, `workflowSla` Add-ons built |
 | High availability | Not offered | single node; HA is Advanced roadmap |
 | Industry content (fraud, AML, RA) | Comply | 5 content packs with `minEdition: standard` |
-- **To reach the next level:** cut 4.0.0 so the edition exists as a released, signed artifact; run the real-IdP runbook against a second IdP (Keycloak/Entra); close `OFFERING-DECLARATION-DRIFT-1`.
+- **To reach the next level:** cut 4.0.0 so the edition exists as a released, signed artifact; run the real-IdP runbook against a second IdP (Keycloak/Entra). (`OFFERING-DECLARATION-DRIFT-1`, the third step here, closed 2026-10-20.)
 
 #### edition.advanced — Advanced
 - **What it is (customer view):** the organisation build. It is Standard plus attribute-based access policy (`policy`), a PostgreSQL Investigation store for multi-node use (`la-store-pg`), operational objects on Postgres, and the intelligence module.

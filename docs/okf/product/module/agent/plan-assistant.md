@@ -428,7 +428,7 @@ So the honest reading of §2 is: `AGT-1`, `AGT-2` and `AGT-4` (the assist agent)
 | 2026-08-01 | The run-claim hand-off seam moved to `PipelineRunGuard`; **never investigate inline** | `embedded-intelligence.md`; `OPS` §3.1 |
 | 2026-08-31 | Embedding-retrieval upgrade assessed **not warranted** at a 256-entry corpus; the drop-in seam is preserved behind the similarity score | `embedded-intelligence.md`; `BACKLOG.md` §6 |
 | 2026-09-08 | **AGT-5's external gate discharged** — the upstream per-tool dry-run seam shipped, so the row moved from externally-gated to actionable, and `AGT-6b`'s stated prerequisite is met | `BACKLOG.md` §2 → §3 |
-| standing | **Agent-absent is the intended shipped default**, and ⛔ no packaging switch until the Java floor conflict is resolved | `BACKLOG.md` `PKG-5`; `build-test.md` |
+| ~~standing~~ | ~~**Agent-absent is the intended shipped default**, and no packaging switch until the Java floor conflict is resolved~~ — superseded 2026-09-12: `PKG-5` stages `inspecto-agent` in Standard and Advanced (`bundleModules()` in `tools/bundle-modules.mjs`); see the *Bundling the agent modules* row below | `okf/product/layer/platform/plan-editions.md` §6 |
 | 2026-09-08 | This spec: every `AGT` edition cell corrected to "no bundle ships it"; `EOI-7`'s "no SNAPSHOT anywhere" refuted against the parent pom; the four-way version drift and the dead upstream path recorded | this file §2 |
 
 ## 5. Not built
