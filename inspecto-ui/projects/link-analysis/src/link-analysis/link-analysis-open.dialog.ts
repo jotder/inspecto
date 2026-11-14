@@ -14,6 +14,7 @@ import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/comp
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { InvService, InvestigationListItem } from '@inspecto/link-analysis/api/inv.service';
+import { LA_LOCKED_REASON_FALLBACK, isCapabilityUnavailable } from '@inspecto/link-analysis/la-host';
 import { needsPermission } from './disabled-reasons';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { LinkAnalysisService, LinkAnalysisView, SAVED_VIEW_NOT_EVIDENCE } from './link-analysis.service';
@@ -46,6 +47,11 @@ export interface LaOpenDialogData {
     viewDeleteBlock?(view: LinkAnalysisView): string;
     /** Why Rename cannot change this view in place (a view-only share); ''/absent = it can. */
     viewEditBlock?(view: LinkAnalysisView): string;
+    /**
+     * Why there are no Investigations here (`/bootstrap` `featureReasons.investigations` on the Explorer level, e.g. Basic);
+     * ''/absent = they are included. Set, the Investigations tab is one neutral line and calls nothing.
+     */
+    investigationsLocked?: string;
 }
 
 export type LaOpenResult =
@@ -137,6 +143,9 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                 }
             </div>
 
+            @if (tab() === 'investigations' && locked()) {
+                <p class="text-secondary m-0 text-sm" data-testid="la-open-inv-locked">{{ locked() }}</p>
+            } @else {
             <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <mat-form-field class="min-w-48 flex-1" subscriptSizing="dynamic"><!-- form-allow: a search box over the list -->
                     <mat-label>Search name or id</mat-label>
@@ -337,6 +346,7 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                     }
                 </section>
             </div>
+            }
         </mat-dialog-content>
         <mat-dialog-actions align="end">
             <button mat-button mat-dialog-close>Close</button>
@@ -381,7 +391,11 @@ export class LinkAnalysisOpenDialog {
 
     readonly loading = signal(false);
     readonly busy = signal(false);
-    readonly error = signal('');
+    /** Each tab's own failure (LA-BASIC-503-EXPLAINED-1: the Investigations box used to stay on Saved views too). */
+    private readonly errors = signal<Partial<Record<OpenTab, string>>>({});
+    readonly error = computed(() => this.errors()[this.tab()] ?? '');
+    /** Why there are no Investigations here: the edition's reason, or learnt from a 503 CAPABILITY_UNAVAILABLE. */
+    readonly locked = signal(this.data.investigationsLocked ?? '');
     readonly renaming = signal(false);
     readonly allViews = signal<OpenViewRow[]>([]);
     /** The view ids carrying the Tag filter's tag; null = no tag filter. */
@@ -528,13 +542,17 @@ export class LinkAnalysisOpenDialog {
 
     constructor() {
         void this.loadViews();
-        if (this.tab() === 'investigations') void this.loadInvestigations();
+        if (this.tab() === 'investigations' && !this.locked()) void this.loadInvestigations();
     }
 
     setTab(tab: OpenTab): void {
         this.tab.set(tab);
         this.dataset.setValue('');
-        if (tab === 'investigations' && this.listed() === null) void this.loadInvestigations();
+        if (tab === 'investigations' && this.listed() === null && !this.locked()) void this.loadInvestigations();
+    }
+
+    private fail(tab: OpenTab, message: string): void {
+        this.errors.update((all) => ({ ...all, [tab]: message }));
     }
 
     selectInvestigation(id: string): void {
@@ -563,7 +581,7 @@ export class LinkAnalysisOpenDialog {
                 defs.map((d) => ({ view: this.viewsService.fromContent(d.name, d.content), modified: d.modified ?? null })),
             );
         } catch (err) {
-            this.error.set(apiErrorMessage(err, 'Could not list the saved views.'));
+            this.fail('views', apiErrorMessage(err, 'Could not list the saved views.'));
         } finally {
             this.loading.set(false);
         }
@@ -577,7 +595,8 @@ export class LinkAnalysisOpenDialog {
             this.truncated.set(res.truncated);
         } catch (err) {
             this.listed.set([]);
-            this.error.set(apiErrorMessage(err, 'Could not list the Investigations.'));
+            if (isCapabilityUnavailable(err)) this.locked.set(LA_LOCKED_REASON_FALLBACK);
+            else this.fail('investigations', apiErrorMessage(err, 'Could not list the Investigations.'));
         } finally {
             this.loading.set(false);
         }
@@ -677,12 +696,13 @@ export class LinkAnalysisOpenDialog {
     }
 
     private async write(work: () => Promise<void>, fallback: string): Promise<void> {
+        const tab = this.tab();
         this.busy.set(true);
-        this.error.set('');
+        this.fail(tab, '');
         try {
             await work();
         } catch (err) {
-            this.error.set(apiErrorMessage(err, fallback));
+            this.fail(tab, apiErrorMessage(err, fallback));
         } finally {
             this.busy.set(false);
         }

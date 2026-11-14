@@ -1855,8 +1855,10 @@ archived: [`link-analysis-backlog-plan.md`](../../../../archived-documents/plans
   so an ops service that was down, unauthorised or unreachable rendered exactly like an edition that
   simply has no ops module — two placeholder Cases, offered as attachable targets, in the one dialog whose
   purpose is attaching EVIDENCE. 🔴 **Attaching evidence to a fabricated Case id is a silent wrong answer
-  in an investigative tool**, and nothing downstream would have caught it. The placeholders survive on the
-  ops-absent path (a deployment fact the analyst can act on); a real error clears the list and renders an
+  in an investigative tool**, and nothing downstream would have caught it. Since 2026-11-14
+  (`LA-BASIC-PLACEHOLDER-CASE-1`) there are no placeholders at all: on the ops-absent path the field shows one neutral
+  line, "Needs Case management (Standard and above).", Attach to Case is disabled, and the server refuses an attach
+  without Case management (503) or to a Case that does not exist or is not visible (404). A real error clears the list and renders an
   `<inspecto-alert variant="error">` in the picker's place. The three states live in ONE place,
   `LinkAnalysisCaseFieldComponent`, so the two dialogs that ask for a Case cannot drift on them.
   ⚠ The snapshot/attach flow is still client-side in the SPA, so this is about the UI's honesty, not

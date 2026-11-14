@@ -31,6 +31,8 @@ the dialog was opened with a synthetic key event and works).
 
 ## Findings, by severity
 
+> **Status 2026-11-14:** D-1 to D-4 are fixed and their rows closed (D-3 was already fixed by `e59b7d540`); D-5 to D-14 stay open on the board.
+
 Severity: **P1** blocks a user's task · **P2** misleads or breaks a main path · **P3** friction, layout or
 wording. Each defect has a row in `docs/BACKLOG.md` (id in brackets).
 

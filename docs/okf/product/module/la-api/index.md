@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.la-api` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `LA-EMPTY-DATASET-WORDING-1` | P3 | defect | an empty Pipeline-fed Dataset is reported in developer words, and the Data page does not say it is empty (filed 2026-11-14, left by LA-SA… | — |

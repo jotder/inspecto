@@ -5,7 +5,8 @@ import { apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoOptionPickerComponent } from '@inspecto/core/components/option-picker.component';
 import { LA_CASES } from '@inspecto/link-analysis/la-host';
-import { CaseRef, LinkAnalysisSnapshotsService } from './link-analysis-snapshots.service';
+import { NEEDS_CASE_MANAGEMENT } from './disabled-reasons';
+import { CaseRef } from './link-analysis-snapshots.service';
 
 /**
  * **Which Case, if any** — the one place that asks it, shared by the Save-analysis and Attach-to-Case
@@ -13,11 +14,11 @@ import { CaseRef, LinkAnalysisSnapshotsService } from './link-analysis-snapshots
  *
  * ⚠ Three states, and they must stay distinguishable:
  *  - **ops module present** → real Cases from `GET /objects?type=CASE`.
- *  - **ops module absent** (`bootstrap.features.ops` false) → placeholder Cases, so the flow can be
- *    exercised UI-first. A deployment fact the analyst can act on.
- *  - **the lookup FAILED** → no Case is offered at all, and the error says so. ⛔ Never fall back to the
- *    placeholders here: attaching evidence to a fabricated Case id is a silent wrong answer, and a down
- *    or unauthorised ops service would otherwise render exactly like an edition that has no ops module.
+ *  - **ops module absent** (`bootstrap.features.ops` false, e.g. Basic) → no Case is offered and one neutral
+ *    line says why. ⛔ Never invented placeholder Cases (LA-BASIC-PLACEHOLDER-CASE-1): evidence attached to a
+ *    Case that does not exist is a silent wrong answer, and the server refuses that attach anyway.
+ *  - **the lookup FAILED** → no Case is offered at all, and the error says so — a down or unauthorised ops
+ *    service must not render like an edition that has no ops module.
  *
  * The host decides whether a Case is *required* — it is on Attach-to-Case, optional on Save-analysis —
  * and renders its own submit-time error line, because the option picker's own `invalid()` reacts only to
@@ -36,7 +37,9 @@ import { CaseRef, LinkAnalysisSnapshotsService } from './link-analysis-snapshots
         },
     ],
     template: `
-        @if (loadError()) {
+        @if (!opsEnabled()) {
+            <p class="text-secondary m-0 text-xs" data-testid="la-case-field-locked">{{ locked }}</p>
+        } @else if (loadError()) {
             <inspecto-alert variant="error" title="Cases could not be loaded">
                 {{ loadError() }} — no Case can be offered until the lookup succeeds.
             </inspecto-alert>
@@ -45,7 +48,7 @@ import { CaseRef, LinkAnalysisSnapshotsService } from './link-analysis-snapshots
                 [formControl]="control"
                 [label]="label()"
                 [options]="caseOptions()"
-                [help]="casesHelp()"
+                [help]="casesHelp"
                 [required]="required()"
                 [placeholder]="placeholder()"
             ></inspecto-option-picker>
@@ -59,20 +62,16 @@ export class LinkAnalysisCaseFieldComponent implements ControlValueAccessor, OnI
     readonly placeholder = input('Select');
 
     private readonly caseMgmt = inject(LA_CASES);
-    private readonly store = inject(LinkAnalysisSnapshotsService);
-    private readonly opsEnabled = this.caseMgmt.available;
+    readonly opsEnabled = this.caseMgmt.available;
+    readonly locked = NEEDS_CASE_MANAGEMENT;
 
     readonly cases = signal<CaseRef[]>([]);
-    /** Non-empty once the lookup FAILED — distinct from the ops-absent path, which has placeholders. */
+    /** Non-empty once the lookup FAILED — distinct from the ops-absent path, which offers nothing. */
     readonly loadError = signal('');
     readonly control = new FormControl('', { nonNullable: true });
 
     readonly caseOptions = computed(() => this.cases().map((c) => ({ value: c.id, label: `${c.id} · ${c.title}` })));
-    readonly casesHelp = computed(() =>
-        this.opsEnabled()
-            ? 'Open Cases from the objects store.'
-            : 'Placeholder Cases — the ops module is not installed.',
-    );
+    readonly casesHelp = 'Open Cases from the objects store.';
 
     private onChange: (v: string) => void = () => {};
     private onTouched: () => void = () => {};
@@ -85,10 +84,7 @@ export class LinkAnalysisCaseFieldComponent implements ControlValueAccessor, OnI
     }
 
     ngOnInit(): void {
-        if (!this.opsEnabled()) {
-            this.cases.set([...this.store.mockCases]);
-            return;
-        }
+        if (!this.opsEnabled()) return;
         this.caseMgmt.list().subscribe({
             next: (rows) => this.cases.set(rows),
             error: (err) => {

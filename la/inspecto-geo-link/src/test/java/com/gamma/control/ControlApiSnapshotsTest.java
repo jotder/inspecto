@@ -7,6 +7,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.service.CollectorService;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -19,6 +21,7 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -40,6 +43,18 @@ class ControlApiSnapshotsTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private final HttpClient client = HttpClient.newHttpClient();
+
+    /** Case management present (the stand-in ops module) with the Cases these tests attach to; a test may disarm it. */
+    @BeforeEach
+    void armCases() {
+        Map<String, Map<String, Object>> cases = CaseTeamObjectEngine.arm();
+        for (String id : List.of("CASE-7", "case-9")) cases.put(id, CaseTeamObjectEngine.caseOf(id, "jdoe", "jdoe", false));
+    }
+
+    @AfterEach
+    void disarmCases() {
+        CaseTeamObjectEngine.CASES = null;
+    }
 
     private record Ctx(CollectorService svc, ControlApi api, int port, Path root) implements AutoCloseable {
         public void close() {
@@ -209,6 +224,83 @@ class ControlApiSnapshotsTest {
             HttpResponse<String> r = post(c.port, "/inv/snapshots/attach",
                     "{\"snapshotId\":\"nope\",\"caseId\":\"CASE-7\"}");
             assertEquals(404, r.statusCode(), r.body());
+        }
+    }
+
+    /**
+     * LA-BASIC-PLACEHOLDER-CASE-1: Basic (no Case management) once answered 200 to an attach to an invented Case id. Now
+     * the edition gate refuses it with CAPABILITY_UNAVAILABLE and nothing is recorded; the seal itself still works.
+     */
+    @Test
+    void refusesAttachWhereThereIsNoCaseManagement(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        CaseTeamObjectEngine.CASES = null;   // a bundle without the ops module (Basic)
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(200, post(c.port, "/inv/snapshots", snapshot("snap-1")).statusCode(), "sealing needs no Case");
+            HttpResponse<String> r = post(c.port, "/inv/snapshots/attach",
+                    "{\"snapshotId\":\"snap-1\",\"caseId\":\"CASE-2026-0318\"}");
+            assertEquals(503, r.statusCode(), r.body());
+            assertEquals("CAPABILITY_UNAVAILABLE", JSON.readTree(r.body()).get("error").get("errorCode").asText(), r.body());
+            assertTrue(r.body().contains("Standard and above"), r.body());
+            assertFalse(Files.exists(root.resolve("audit").resolve("snapshots").resolve("attachments.jsonl")),
+                    "a refused attach records nothing");
+        }
+    }
+
+    /** LA-BASIC-PLACEHOLDER-CASE-1: with Case management, a Case id that names no Case is refused, not recorded. */
+    @Test
+    void refusesAttachToACaseThatDoesNotExist(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(200, post(c.port, "/inv/snapshots", snapshot("snap-1")).statusCode());
+            HttpResponse<String> r = post(c.port, "/inv/snapshots/attach",
+                    "{\"snapshotId\":\"snap-1\",\"caseId\":\"CASE-2026-0318\"}");
+            assertEquals(404, r.statusCode(), r.body());
+            assertTrue(r.body().contains("no case 'CASE-2026-0318'"), r.body());
+            assertFalse(Files.exists(root.resolve("audit").resolve("snapshots").resolve("attachments.jsonl")),
+                    "a refused attach records nothing");
+        }
+    }
+
+    /**
+     * A Case that exists but that the caller may not see (SEC-7d: its caseType is outside the caller's data scopes; owner and
+     * assignee are someone else) answers exactly like a missing one - existence-hiding - and records nothing.
+     */
+    @Test
+    void refusesAttachToACaseTheCallerCannotSeeAsIfItWereMissing(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        CaseTeamObjectEngine.CASES.put("CASE-HIDDEN", Map.of("kind", "case", "id", "CASE-HIDDEN", "correlationId", "CASE-HIDDEN",
+                "owner", "jdoe", "assignee", "jdoe", "attributes", Map.of("caseType", "fraud"), "closed", false));
+        Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
+            case "Bearer owner" -> Optional.of(new Subject("jdoe", Set.of("canManageIncidents")));
+            case "Bearer other" -> Optional.of(new Subject("analyst-2", Set.of("canManageIncidents"), Set.of("aml")));
+            default -> Optional.empty();
+        });
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(200, postAs(c.port, "/inv/snapshots", snapshot("snap-1"), "Bearer other").statusCode());
+            HttpResponse<String> r = postAs(c.port, "/inv/snapshots/attach",
+                    "{\"snapshotId\":\"snap-1\",\"caseId\":\"CASE-HIDDEN\"}", "Bearer other");
+            assertEquals(404, r.statusCode(), r.body());
+            assertTrue(r.body().contains("no case 'CASE-HIDDEN'"), "the same answer as a missing Case: " + r.body());
+            assertFalse(Files.exists(root.resolve("audit").resolve("snapshots").resolve("attachments.jsonl")),
+                    "a refused attach records nothing");
+            // the control: the same Case IS attachable by a caller who can see it
+            assertEquals(200, postAs(c.port, "/inv/snapshots/attach",
+                    "{\"snapshotId\":\"snap-1\",\"caseId\":\"CASE-HIDDEN\"}", "Bearer owner").statusCode());
+        } finally {
+            Authenticators.forTest(null);
+        }
+    }
+
+    /** An id that names an object of another kind (an Incident, not a Case) is not a Case: 404, nothing recorded. */
+    @Test
+    void refusesAttachToAnObjectThatIsNotACase(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        CaseTeamObjectEngine.CASES.put("INC-1", Map.of("kind", "incident", "id", "INC-1", "correlationId", "INC-1",
+                "owner", "jdoe", "assignee", "jdoe", "attributes", Map.of(), "closed", false));
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(200, post(c.port, "/inv/snapshots", snapshot("snap-1")).statusCode());
+            HttpResponse<String> r = post(c.port, "/inv/snapshots/attach", "{\"snapshotId\":\"snap-1\",\"caseId\":\"INC-1\"}");
+            assertEquals(404, r.statusCode(), r.body());
+            assertTrue(r.body().contains("no case 'INC-1'"), r.body());
+            assertFalse(Files.exists(root.resolve("audit").resolve("snapshots").resolve("attachments.jsonl")),
+                    "a refused attach records nothing");
         }
     }
 

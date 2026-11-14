@@ -2089,7 +2089,7 @@ describe('LinkAnalysisComponent', () => {
         expect(louvain).toHaveBeenCalledTimes(2);
     });
     it('evidence: Attach to Case is ONE dialog that seals the displayed graph (stranded excluded) and attaches it', async () => {
-        const { fixture } = create();
+        const { fixture } = create({ features: { ...STANDARD_EDITION_FEATURES, ops: signal(true) } });
         fixture.detectChanges();
         await runQuery(fixture);
         const c = fixture.componentInstance;
@@ -2116,6 +2116,21 @@ describe('LinkAnalysisComponent', () => {
 
         await runQuery(fixture); // a fresh graph is a new answer — the old snapshot no longer describes it
         expect(c.latestSnapshot()).toBeNull();
+    });
+    /** LA-BASIC-PLACEHOLDER-CASE-1 (D-1): without Case management (Basic) the action is disabled with the reason, and opens nothing. */
+    it('evidence: without Case management, Attach to Case is disabled with the reason and opens no dialog', async () => {
+        const { fixture } = create(); // the host reports no ops module
+        fixture.detectChanges();
+        await runQuery(fixture);
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        expect(c.attachUnavailable()).toBe('Needs Case management (Standard and above).');
+        const btn = fixture.nativeElement.querySelector('[data-testid="la-selection-attach"]') as HTMLButtonElement;
+        expect(btn.getAttribute('aria-disabled')).toBe('true'); // disabledInteractive: focusable, so its tooltip reads
+        expect(btn.getAttribute('aria-label')).toBe('Attach to Case: Needs Case management (Standard and above).');
+        const open = vi.spyOn(fixture.debugElement.injector.get(MatDialog), 'open');
+        c.openAttachToCase();
+        expect(open).not.toHaveBeenCalled();
     });
     it('evidence: a snapshot taken while an Investigation is open carries its id (the Dossier anchor)', async () => {
         const { fixture } = create();
@@ -2411,7 +2426,7 @@ describe('LinkAnalysisComponent', () => {
         expect(em.edgeIds).toHaveLength(2); // a-b and b-c, not the a-c shortcut
     });
     it('evidence: Attach to Case is on the rail with only an Investigation canvas open (no query graph) and seals the Working Set', async () => {
-        const { fixture } = create();
+        const { fixture } = create({ features: { ...STANDARD_EDITION_FEATURES, ops: signal(true) } });
         fixture.detectChanges();
         const c = fixture.componentInstance;
         const el = fixture.nativeElement as HTMLElement;
@@ -3927,7 +3942,7 @@ describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', (
     });
 
     it('every selection action is a named button; Exclude appears only inside an Investigation', async () => {
-        const { fixture, c, el } = await drawn();
+        const { fixture, c, el } = await drawn({ features: { ...STANDARD_EDITION_FEATURES, ops: signal(true) } });
         c.onSelectionChange(['a', 'b']);
         fixture.detectChanges();
         // The floating bar's actions live in the second toolbar's Graph edits and Selection groups (§5.2).
