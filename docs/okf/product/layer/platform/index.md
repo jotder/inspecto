@@ -49,7 +49,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `REALTIME-DECISIONING-1` | P3 | feature | Real-time Detection Add-on and the CEP App (PRODUCT-ASSEMBLY-1 phase PA-9) | — |
 | `REALTIME-INLINE-DECISION-1` | P3 | feature | inline allow / block decision on each record of a stream | demand |
 | `SCALEOUT-HELM-NPOD-1` | P2 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
-| `SCALEOUT-D14-D16-DECISIONS-1` | P2 | chore | D14 and D16 SIGNED yes 2026-10-20 (operator, accepted the recommended answer); D15 stays open (operator-signed 2026-10-18 per the index,… | operator |
+| `SCALEOUT-D14-D16-DECISIONS-1` | P2 | chore | D14 and D16 SIGNED yes 2026-10-20 (operator, accepted the recommended answer); D15 SIGNED 2026-10-18 (operator: refuse ZK/etcd, fund the… | operator |
 | `SCALEOUT-LIVE-HALVES-1` | P3 | chore | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
 | `MODULE-REORG-P4-3` | P3 | feature | a disabled module's in-flight work and long-lived subscriptions (the only P4 residue). | — |
 | `MODULE-REORG-P3-THIN-JARS` | P3 | feature | thin per-module jars + Offering-driven launcher classpath. | — |
@@ -58,4 +58,3 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `CUSTOMER-BUILD-DOMAIN-APPS-1` | P3 | feature | a customer of a Domain product must hold every optional App the Product's composed Space Template joins, or the customer build is refused. | demand |
 | `PRODUCT-MAP-APP-EDITION-PRICES-1` | P3 | feature | an App has one Order Code (INS-APP-<ID>), so a price per App × Edition (D-PA6) has no key yet. | demand |
 | `DOCS-AGENT-WRITTEN-REVIEW-1` | P3 | chore | ~200 hub docs were written by agents on 2026-10-19 (PRODUCT-DOCS-HUB-1) | — |
-| `ARCH-DOC-CONTRADICTIONS-1` | P3 | chore | fourteen places where current docs contradict each other, found by the MoSCoW research pass (filed 2026-11-12); settle each against the c… | — |

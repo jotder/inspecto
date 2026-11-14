@@ -46,5 +46,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `SQL-STEP-METADATA-ROUNDTRIP-1` | P3 | defect | switching a sql Step's pane from Fields to SQL and back drops the column metadata (filed 2026-11-14, seen while fixing SQL-STEP-METADATA-… | — |
 | `PACK-SALES-MARKETING-1` | P3 | feature | Sales & Marketing BI pack: sales, commissions, marketing and churn analytics | operator |
 | `DOCS-AGENT-WRITTEN-REVIEW-1` | P3 | chore | ~200 hub docs were written by agents on 2026-10-19 (PRODUCT-DOCS-HUB-1) | — |
-| `ARCH-DOC-CONTRADICTIONS-1` | P3 | chore | fourteen places where current docs contradict each other, found by the MoSCoW research pass (filed 2026-11-12); settle each against the c… | — |
 | `DOCS-FUNCTIONALITY-HUBS-1` | P3 | chore | decide whether functionality/ Product Map Items get their own hubs or stay sections of their module's features slot (none exist yet, so n… | operator |
