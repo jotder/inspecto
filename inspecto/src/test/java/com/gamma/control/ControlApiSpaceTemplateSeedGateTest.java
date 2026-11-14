@@ -237,6 +237,34 @@ class ControlApiSpaceTemplateSeedGateTest {
         }
     }
 
+    /**
+     * CLASSIFICATION-BULK-IMPORT-UNGATED-1: a split schema keeps its fields in the sibling {@code _structure.csv}. The
+     * seed reads the schema merged with it, as every reader does, so a class stated only in the CSV is judged too.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void aTemplateSchemaWhoseStructureCsvStatesAnUnknownClassRefusesTheWholeTemplate(@TempDir Path root) throws Exception {
+        copyTree(Path.of("..", "spaces", "_templates", "orders-starter"), root.resolve("_templates").resolve("split"));
+        Path schema = root.resolve("_templates").resolve("split").resolve("config/orders/orders_schema.toon");
+        java.util.Map<String, Object> doc = com.gamma.config.io.ConfigCodec.toMap(Files.readString(schema));
+        List<java.util.Map<String, Object>> fields =
+                (List<java.util.Map<String, Object>>) ((java.util.Map<String, Object>) doc.get("raw")).remove("fields");
+        Files.writeString(schema, com.gamma.config.io.ConfigCodec.toToon(doc));
+        Path csv = com.gamma.util.StructureCsv.siblingFor(schema);
+        Files.writeString(csv, com.gamma.util.StructureCsv.encode(fields));
+        assertFalse(Files.readString(schema).contains("INTERNAL"), "the classes are in the CSV alone");
+        try (Ctx c = open(root)) {
+            // the probe: the split copy, every column of a known class, seeds - so the refusal below is the class alone
+            assertEquals(200, send(c, "POST", "/spaces", "{\"id\":\"ok\",\"template\":\"split\"}", ADMIN).statusCode());
+            Files.writeString(csv, Files.readString(csv).replaceFirst("INTERNAL", "CONFIDENTIAL"));
+            HttpResponse<String> r = send(c, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"split\"}", ADMIN);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("template schema 'orders_schema.toon' is refused"), r.body());
+            assertTrue(r.body().contains("raw.fields[0].classification") && r.body().contains("'CONFIDENTIAL'"), r.body());
+            assertFalse(Files.exists(root.resolve("acme")), "a refused template leaves no Space directory");
+        }
+    }
+
     @Test
     void aTemplateKindTheCallerLacksTheCapabilityForIsRefused(@TempDir Path root) throws Exception {
         seedAlertTemplate(root, VALID_ALERT);

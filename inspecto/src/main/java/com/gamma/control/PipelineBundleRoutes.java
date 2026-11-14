@@ -411,6 +411,9 @@ final class PipelineBundleRoutes implements RouteModule {
             // — a pipeline bundle never carries one (see classifyRequirements and SaveGate.Referents).
             List<Finding> findings = new ArrayList<>(SaveGate.check(api, "pipeline", retargeted, writeRoot, destDir,
                     SaveGate.Referents.MAY_ARRIVE_LATER));
+            // CLASSIFICATION-BULK-IMPORT-UNGATED-1: the satellites landed as bytes; a schema among them is judged
+            // for its column classes here, so an unknown one takes the ERROR path below and the tree is restored.
+            findings.addAll(com.gamma.service.ClassificationVocabulary.findingsWritten(writeRoot, written));
             // Import-time referential integrity (W5): resolve the bundle's declared dependencies against
             // THIS space now, instead of discovering them at the first poll. WARNING-level — see the helper.
             List<Map<String, Object>> requirements = classifyRequirements(api, manifest, retargeted, findings);

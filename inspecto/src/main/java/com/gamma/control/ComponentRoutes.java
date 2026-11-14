@@ -26,6 +26,7 @@ import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineReferences;
 import com.gamma.pipeline.exec.ComponentPreview;
+import com.gamma.service.ClassificationVocabulary;
 import com.gamma.sql.SqlGuard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

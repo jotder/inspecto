@@ -12,6 +12,7 @@ import com.gamma.config.spec.FindingCodes;
 import com.gamma.config.spec.Severity;
 import com.gamma.etl.EditionFeatures;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.service.ClassificationVocabulary;
 
 import java.nio.file.Path;
 import java.util.ArrayList;

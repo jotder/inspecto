@@ -751,7 +751,7 @@ A column classification was free text. Masking reads it, so a class no reader kn
 told: three shipped templates classed personal identifiers `CONFIDENTIAL` and served them raw. Operator decision
 2026-11-14: **a closed vocabulary, refused at save.**
 
-**What is known, per Space** (`ClassificationVocabulary`, `inspecto/src/main/java/com/gamma/control/`):
+**What is known, per Space** (`ClassificationVocabulary`, `inspecto/src/main/java/com/gamma/service/`):
 
 | Class | Why it is known |
 |---|---|
@@ -788,12 +788,26 @@ and its unknown class still masks nothing; the gate stops new ones.
 - At `SaveGate` the whole draft is judged: the author is present, so a schema or Pipeline with a stale class
   is refused until the class is fixed. ⚠ That includes a Pipeline history restore.
 
-🔴 **Not gated: the bulk file importers** (`CLASSIFICATION-BULK-IMPORT-UNGATED-1`). They write config files
-as bytes and run no schema gate of any kind, so an old document can still land an unknown class:
-the schema satellites of a pipeline bundle (`PipelineBundleRoutes` writes them before it judges the Pipeline
-document alone), and `BundleImporter.writeConfig` (a zip bundle Collector import, a template upgrade apply,
-a Space created from a bundle). The file is refused the next time an author saves it. The seed gate also reads a
-template schema without its sibling `_structure.csv`, so a class stated only there is not judged at Space create.
+**The bulk file importers** (`CLASSIFICATION-BULK-IMPORT-UNGATED-1`, closed 2026-11-14). They write config
+files as bytes, so they are judged on disk after the write, inside their import journal:
+`ClassificationVocabulary.findingsWritten(root, written)` reads every written `.toon` outside `registry/` (a schema
+file is whatever name its Pipeline gives it, so no suffix filter), a written `<base>_structure.csv` together with its
+schema, and the `registry/datasets/` and `registry/schemas/` entries. Entity Types are read from the target AFTER the
+write, so a Space bundle that brings its own `link-analysis.toon` is judged against it. Nothing stored is kept: an
+import is not an edit. A refusal rolls the whole import back and answers:
+
+| Door | Refusal |
+|---|---|
+| Pipeline bundle `POST /pipelines/import` (schema satellites) | 422, `written: false`, an `ERR_UNKNOWN_CLASSIFICATION` finding |
+| Collector zip bundle `POST /import` | 422 `CONFIG_VALIDATION_FAILED` |
+| Template upgrade `POST /spaces/{id}/origin/upgrade` | 422 `CONFIG_VALIDATION_FAILED`; the origin record is unchanged |
+| Space from a bundle `POST /spaces/import` | 422 `CONFIG_VALIDATION_FAILED`; no Space and no directory, so a retry under the same id works |
+| Space promotion apply | 422 with `findings`, the route's own refusal shape; removals are put back too |
+
+`TemplateSeedGate` reads a template schema merged with its `_structure.csv`. An App install writes no Space config: an
+App template with an unknown class still installs, and is refused when a Space is created from it.
+⚠ Only the unknown-class refusal of `createFromBundle` removes the half-made Space directory; its other refusals
+(a refused entry name, an I/O failure, a failure after the write) still leave it, and a retry answers 409.
 
 ⚠ **Two masking sets, not one.** `ColumnClassification.SENSITIVE` and "a class a masked Entity Type claims"
 share only `MSISDN`, `IMSI` and `ACCOUNT`. `PII` is not masked in a BI result in `typed` mode; `WALLET`,

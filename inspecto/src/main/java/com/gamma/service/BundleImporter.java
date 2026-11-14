@@ -209,6 +209,9 @@ public final class BundleImporter {
      * table for it to overwrite, and it still gets the segment rules. Every write goes through {@code journal},
      * so a caller whose later gate refuses the import can {@link ImportJournal#rollback} all of it; a failure
      * during the writes themselves rolls back here.
+     *
+     * @throws UnknownClassificationException a written file states a column classification this Space does not
+     *         know; rolled back here
      */
     public static Unpacked writeConfig(Bundle bundle, Path configDir, boolean refuseReserved, ImportJournal journal)
             throws IOException {
@@ -233,6 +236,10 @@ public final class BundleImporter {
                 journal.write(target, e.getValue(), ".import-");
                 written.add(root.relativize(target).toString().replace('\\', '/'));
             }
+            // CLASSIFICATION-BULK-IMPORT-UNGATED-1: the files landed as bytes, past every save gate - judge the column
+            // classes they state against this Space now, and take the whole import back when one is unknown.
+            List<com.gamma.config.spec.Finding> unknown = ClassificationVocabulary.findingsWritten(root, written);
+            if (!unknown.isEmpty()) throw new UnknownClassificationException(unknown);
         } catch (IOException | RuntimeException failed) {
             // the write failure is the answer; a rollback failure rides along rather than replacing it. What the
             // rollback left alone stays on journal.notRolledBack() for the caller to report.

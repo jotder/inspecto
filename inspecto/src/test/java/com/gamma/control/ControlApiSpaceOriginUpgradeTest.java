@@ -290,6 +290,39 @@ class ControlApiSpaceOriginUpgradeTest {
         }
     }
 
+    /**
+     * CLASSIFICATION-BULK-IMPORT-UNGATED-1: the apply writes the template's files as bytes, past every save gate, so an
+     * incoming schema is judged for its column classes where it lands. An unknown one refuses the whole set.
+     */
+    @Test
+    void anIncomingSchemaOfAnUnknownClassIsRefusedAndNothingIsWrittenOrRecorded(@TempDir Path root) throws Exception {
+        String schemaFile = "orders/orders_schema.toon";
+        String known = "\"Sales region code\",\"\",\"INTERNAL\"";
+        try (Ctx c = open(root)) {
+            bump(c);
+            Path incoming = c.template().resolve("config").resolve(schemaFile);
+            assertTrue(Files.readString(incoming).contains(known), "the REGION row this test reclassifies");
+            Files.writeString(incoming, Files.readString(incoming).replace(known, "\"Sales region code\",\"\",\"CONFIDENTIAL\""));
+            Path config = c.shop().resolve("config");
+            String schema = Files.readString(config.resolve(schemaFile)), revenue = Files.readString(config.resolve(REVENUE));
+            SpaceOrigin.Origin recorded = SpaceOrigin.read(c.shop()).orElseThrow();
+
+            HttpResponse<String> r = apply(c, "ops", "{\"toVersion\":\"2\"}");
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("CONFIG_VALIDATION_FAILED") && r.body().contains("ERR_UNKNOWN_CLASSIFICATION"), r.body());
+            assertTrue(r.body().contains(schemaFile + ": raw.fields[2].classification") && r.body().contains("'CONFIDENTIAL'"), r.body());
+            assertEquals(schema, Files.readString(config.resolve(schemaFile)), "the schema is the Space's own again");
+            assertEquals(revenue, Files.readString(config.resolve(REVENUE)), "the widget of the same set was taken back");
+            assertEquals(recorded, SpaceOrigin.read(c.shop()).orElseThrow(), "the origin record was not rewritten");
+
+            Files.writeString(incoming, Files.readString(incoming).replace("\"CONFIDENTIAL\"", "\"PII\""));
+            HttpResponse<String> ok = apply(c, "ops", "{\"toVersion\":\"2\"}");
+            assertEquals(200, ok.statusCode(), ok.body());
+            assertTrue(V1Body.of(ok.body()).get("applied").toString().contains(schemaFile), ok.body());
+            assertArrayEquals(Files.readAllBytes(incoming), Files.readAllBytes(config.resolve(schemaFile)));
+        }
+    }
+
     @Test
     void underAnApprovalPolicyTheSetIsOnePendingChangeAppliedOnApproval(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {

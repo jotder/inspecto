@@ -1,6 +1,7 @@
 package com.gamma.control;
 
 import com.gamma.config.io.ConfigLoader;
+import com.gamma.service.ClassificationVocabulary;
 import com.gamma.util.ColumnClassification;
 import org.junit.jupiter.api.Test;
 
@@ -9,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -76,8 +78,11 @@ class TemplateIdentifierClassificationTest {
                 for (Path file : files) {
                     read++;
                     try {
+                        Map<String, Object> doc = ConfigLoader.filesystem().decode(file.toString());
+                        // a split schema keeps its fields in the sibling structure CSV: read merged, as the seed gate reads it
+                        if (file.getFileName().toString().endsWith("_schema.toon")) ConfigFileSupport.mergeSiblingStructure(file, doc);
                         // no type or id: nothing counts as already stored, so the file's own classes are all judged
-                        ClassificationVocabulary.require(config, null, null, ConfigLoader.filesystem().decode(file.toString()));
+                        ClassificationVocabulary.require(config, null, null, doc);
                     } catch (IllegalArgumentException refused) {
                         unknown.add(TEMPLATES.relativize(file) + ": " + refused.getMessage());
                     }
