@@ -112,7 +112,7 @@ class DecisionRuleWritersTest {
                 }
         }
         for (String pinned : new String[] {"ComponentRoutes#writeComponent", "DataSourceRoutes#importBundle",
-                "PipelineRenameRoutes#rewrite", "BundleRoutes#write", "SpaceManager#createFromBundle"})
+                "PipelineLinkRewrite#rewrite", "BundleRoutes#write", "SpaceManager#createFromBundle"})
             assertTrue(sites.containsKey(pinned), "the writer scan went blind to " + pinned + ": " + sites.keySet());
 
         Set<String> open = new LinkedHashSet<>();
@@ -137,6 +137,10 @@ class DecisionRuleWritersTest {
 
     private static boolean calls(Map<String, String> bodies, String site) {
         String b = bodies.get(site);
-        return b != null && b.contains("DecisionRuleGuard.");
+        // a METHOD call, not a constant: `DecisionRuleGuard.TYPE.equals(kind)` alone guards nothing
+        return b != null && GUARD_CALL.matcher(b).find();
     }
+
+    private static final java.util.regex.Pattern GUARD_CALL =
+            java.util.regex.Pattern.compile("DecisionRuleGuard\\.[a-z][A-Za-z0-9_]*\\s*\\(");
 }

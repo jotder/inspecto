@@ -34,6 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `ENTITLEMENT-UNLISTED-FEATURES-1` | P2 | defect | three edition features are declared in code but missing from their module's manifest, so a signed entitlement may not withhold them (file… | — |
 | `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
 | `NATIVE-LICENCE-LINUX-MACOS-1` | P3 | chore | two licence calls on the tokenizers natives wait on the operator ((a) accepted 2026-11-01). | operator |
 | `PRODUCT-ASSEMBLY-1` | P2 | feature | assemble finished domain Products and the Platform with chosen Add-ons from definition files, with one tool — PA-0…PA-7 SHIPPED 2026-11-1… | — |
@@ -43,8 +44,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `DEPLOY-SERVICE-WRAPPER-1` | P2 | chore | the live acceptance is UNRUN. | — |
 | — | P2 | feature | Postgres multi-user | operator |
 | `TOOL-TESTS-UNWIRED-BASELINE-1` | P3 | chore | 46 of 112 tools/*.test.mjs are named by no workflow, so no gate runs them. | demand |
-| `WRITER-SCAN-BLIND-RENAME-1` | P2 | defect | DecisionRuleWritersTest fails on origin/master, so every lane's gate is red. | — |
-| `MODULE-MANIFEST-REALTIME-1` | P2 | defect | ModuleManifestGuardTest fails on origin/master, so every lane's gate is red. | — |
 | `TEST-ENV-PG-ASN-UNRUN-1` | P3 | chore | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
 | `REALTIME-DECISIONING-1` | P3 | feature | Real-time Detection Add-on and the CEP App (PRODUCT-ASSEMBLY-1 phase PA-9) | — |
 | `REALTIME-INLINE-DECISION-1` | P3 | feature | inline allow / block decision on each record of a stream | demand |

@@ -22,8 +22,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * MODULE-REORG-1 P2a guard: every top-level Maven module with {@code src/main/java} ships a
- * {@code META-INF/inspecto/module.toon}, and each manifest's {@code provides.features} equals the ids the
- * module's RouteModules return from {@code featureIds()} — so the manifest cannot drift from the code.
+ * {@code META-INF/inspecto/module.toon}, and each manifest's {@code provides.features} holds every id the
+ * module's RouteModules return from {@code featureIds()} and only ids the module's code declares — there or in an
+ * {@code EditionFeatureProvider}'s {@code features()} (PA-9d: {@code inspecto-realtime} has no routes; its feature
+ * is declared only there, and {@code Entitlements.featureEntitled} reads the manifest to withhold it) — so the
+ * manifest cannot drift from the code.
  * Manifests are read from the SOURCE tree (not the class path), so a module that is not on this test's class path
  * is still checked. The {@code providers/asn-parser/asn-decoders/asn-facade} manifest is a nested reactor and is checked for
  * existence only.
@@ -31,7 +34,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class ModuleManifestGuardTest {
 
     private static final Pattern FEATURE_IDS = Pattern.compile("featureIds\\(\\)\\s*\\{[^}]*?Set\\.of\\(([^)]*)\\)");
+    private static final Pattern EDITION_FEATURES = Pattern.compile("\\bfeatures\\(\\)\\s*\\{[^}]*?Set\\.of\\(([^)]*)\\)");
     private static final Pattern STRING = Pattern.compile("\"([^\"]+)\"");
+    private static final Pattern CONSTANT = Pattern.compile("\\bEditionFeatures\\.([A-Z_]+)\\b");
 
     private static Path repoRoot() throws IOException {
         return ReactorModules.root();
@@ -70,9 +75,13 @@ class ModuleManifestGuardTest {
                 continue;
             }
             if (!ids.add(m.id())) problems.add(name + ": duplicate id " + m.id());
-            Set<String> inCode = featureIdsInCode(module);
-            if (!inCode.equals(new TreeSet<>(m.provides().features())))
-                problems.add(name + ": provides.features " + m.provides().features() + " != featureIds() in code " + inCode);
+            Set<String> routes = featureIdsInCode(module, FEATURE_IDS, "");
+            Set<String> inCode = new TreeSet<>(routes);
+            inCode.addAll(featureIdsInCode(module, EDITION_FEATURES, "implements EditionFeatureProvider"));
+            Set<String> manifest = new TreeSet<>(m.provides().features());
+            if (!manifest.containsAll(routes) || !inCode.containsAll(manifest))
+                problems.add(name + ": provides.features " + manifest + " must hold every featureIds() in code " + routes
+                        + " and only ids the code declares (featureIds() or EditionFeatureProvider.features()) " + inCode);
         }
         assertTrue(Files.isRegularFile(manifestOf(asnFacade())), "asn-decoders manifest missing");
         assertTrue(problems.isEmpty(), "module manifest problems:\n" + String.join("\n", problems));
@@ -116,17 +125,31 @@ class ModuleManifestGuardTest {
             assertEquals(ModuleStatus.State.ACTIVE, s.state(), s.id() + " would be inert in a full install: " + s.reasons());
     }
 
-    private static Set<String> featureIdsInCode(Path module) throws IOException {
+    /** The ids {@code method}'s {@code Set.of(...)} returns, in every main source file that contains {@code fileMarker}. */
+    private static Set<String> featureIdsInCode(Path module, Pattern method, String fileMarker) throws IOException {
         Set<String> out = new TreeSet<>();
         try (Stream<Path> s = Files.walk(module.resolve("src/main/java"))) {
             for (Path p : s.filter(f -> f.toString().endsWith(".java")).toList()) {
-                Matcher m = FEATURE_IDS.matcher(Files.readString(p));
+                String text = Files.readString(p);
+                if (!text.contains(fileMarker)) continue;
+                Matcher m = method.matcher(text);
                 while (m.find()) {
                     Matcher q = STRING.matcher(m.group(1));
                     while (q.find()) out.add(q.group(1));
+                    Matcher c = CONSTANT.matcher(m.group(1));
+                    while (c.find()) out.add(editionFeature(c.group(1)));
                 }
             }
         }
         return out;
+    }
+
+    /** The value of the {@code EditionFeatures} constant {@code name}. */
+    private static String editionFeature(String name) {
+        try {
+            return (String) com.gamma.etl.EditionFeatures.class.getField(name).get(null);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("EditionFeatures." + name + " does not resolve", e);
+        }
     }
 }

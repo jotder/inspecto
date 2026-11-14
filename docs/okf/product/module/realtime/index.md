@@ -34,5 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `MODULE-MANIFEST-REALTIME-1` | P2 | defect | ModuleManifestGuardTest fails on origin/master, so every lane's gate is red. | — |
 | `REALTIME-DECISIONING-1` | P3 | feature | Real-time Detection Add-on and the CEP App (PRODUCT-ASSEMBLY-1 phase PA-9) | — |

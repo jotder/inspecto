@@ -2,6 +2,7 @@ package com.gamma.service;
 
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.config.io.ConfigLoader;
+import com.gamma.control.DecisionRuleGuard;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.LinkCensus;
@@ -35,24 +36,17 @@ public final class PipelineLinkRewrite {
 
     private PipelineLinkRewrite() {}
 
-    /** Sees a registry component before and after its rewrite; throws to stop it. */
-    @FunctionalInterface
-    public interface ComponentCheck {
-        void check(String kind, Map<String, Object> before, Map<String, Object> after);
-    }
-
     /** One file or registry component holding renamed links, with the links that name the old id. */
     public record Holder(String kind, Path file, String name, Set<LinkCensus.Link> links) {}
 
     /**
      * Rewrite (or, with {@code planned}, only list) every holder of a kind {@code kinds} accepts. Holders come
      * in graph order — Enrichments, Jobs, then Expectations, Decision Rules, Datasets, Alert Rules — and a
-     * registry component is written through its store, a config file atomically in place. {@code componentCheck}
-     * sees each registry component before and after its rewrite and may throw to stop it (the Decision Rule guard).
+     * registry component is written through its store, a config file atomically in place. A Decision Rule's rewrite
+     * runs {@link DecisionRuleGuard#checkTargetRewrite} first, which throws to stop it.
      * Best-effort per file. Returns the count of holders rewritten.
      */
-    public static int rewrite(Path writeRoot, String oldId, String newId, Predicate<String> kinds, List<String> planned,
-                              ComponentCheck componentCheck) {
+    public static int rewrite(Path writeRoot, String oldId, String newId, Predicate<String> kinds, List<String> planned) {
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
         Map<String, Map<String, ComponentRegistry.Component>> listed = new HashMap<>();
         int count = 0;
@@ -83,7 +77,8 @@ public final class PipelineLinkRewrite {
             if (c == null) continue;
             Map<String, Object> updated = rewritten(h, c.content(), oldId, newId);
             if (updated == c.content()) continue;
-            componentCheck.check(h.kind(), c.content(), updated);
+            // A rename moves target only; a decision-rule's invoke-api consequences (and its stamped makers) stay.
+            if (DecisionRuleGuard.TYPE.equals(h.kind())) DecisionRuleGuard.checkTargetRewrite(c.content(), updated);
             if (planned != null) {
                 planned.add(h.kind() + " '" + c.name() + "'");
                 continue;
