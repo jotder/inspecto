@@ -57,7 +57,7 @@ import { DeepLinkService } from '@inspecto/link-analysis/open/open-link';
 import { graphRunRows, summarizeGraphRun } from './graph-run-summary';
 import { withOrphans } from './remove-nodes';
 import { indexSourceNote } from './index-source';
-import { DISABLED_REASON } from './disabled-reasons';
+import { DISABLED_REASON, NEEDS_CASE_MANAGEMENT } from './disabled-reasons';
 import { IndexMappingTarget } from './link-analysis-index-build.component';
 import {
     EntityListSummary,
@@ -3301,6 +3301,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             viewSaveBlock: this.viewSaveBlocked(),
             viewDeleteBlock: (v) => viewDeleteBlock(v, this.viewAccess()),
             viewEditBlock: (v) => viewEditBlock(v, this.viewAccess()),
+            investigationsLocked: this.investigationsEnabled() ? '' : this.investigationsLockedReason(),
         };
         this.dialog
             .open<LinkAnalysisOpenDialog, LaOpenDialogData, LaOpenResult>(LinkAnalysisOpenDialog, {
@@ -3984,10 +3985,14 @@ Its prior copies stay in its version history.`,
         return this.snapshotData()?.graph.nodes.length ? '' : DRAW_FIRST;
     });
 
-    /** Why "Attach to Case" is unavailable to this user — empty when it is available. Attaching needs `canManageIncidents`. */
-    readonly attachUnavailable = computed(() =>
-        this.lens.canManageIncidents() ? '' : needsPermission('canManageIncidents'),
-    );
+    /**
+     * Why "Attach to Case" is unavailable here — empty when it is available. It needs Case management in the host (none on
+     * Basic: LA-BASIC-PLACEHOLDER-CASE-1) and `canManageIncidents`.
+     */
+    readonly attachUnavailable = computed(() => {
+        if (!this.opsEnabled()) return NEEDS_CASE_MANAGEMENT;
+        return this.lens.canManageIncidents() ? '' : needsPermission('canManageIncidents');
+    });
 
     /** LA-17 "Merge with...": enabled only inside an Investigation, with the capability, on two unmasked typed entities. */
     readonly mergeUnavailable = computed(() => {

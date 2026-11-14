@@ -12,6 +12,7 @@ import {
     ComponentsService,
     RelationsPreview,
 } from 'app/inspecto/api';
+import { DefinitionDrawerComponent } from 'app/inspecto/components/definition-drawer.component';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { PipelineTransformSqlDefinitionComponent } from './pipeline-transform-sql-definition.component';
@@ -76,6 +77,33 @@ function field(partial: Partial<SqlField> & Pick<SqlField, 'name' | 'fn'>): SqlF
     return { id: partial.name, from: '', args: {}, ...partial };
 }
 
+/**
+ * The pane inside the definition drawer, wired exactly as `pipeline-editor.component.html` wires it: the
+ * drawer's Apply is enabled by `[dirty]`, which only the pane's `dirtyChange` sets.
+ */
+@Component({
+    standalone: true,
+    imports: [DefinitionDrawerComponent, PipelineTransformSqlDefinitionComponent],
+    changeDetection: ChangeDetectionStrategy.Eager,
+    template: `
+        <inspecto-definition-drawer title="Clean up orders" kindLabel="Step" [dirty]="dirty()" (apply)="pane.submit()">
+            <app-pipeline-transform-sql-definition
+                #pane
+                [node]="node"
+                [upstreamColumns]="upstreamColumns"
+                (applied)="applied = $event"
+                (dirtyChange)="dirty.set($event)"
+            />
+        </inspecto-definition-drawer>
+    `,
+})
+class DrawerHostComponent {
+    node: AuthoredNode = sqlNode();
+    upstreamColumns = ['order_id', 'msisdn'];
+    readonly dirty = signal(false);
+    applied?: AuthoredNode;
+}
+
 async function create(
     node: AuthoredNode = sqlNode(),
     sampleRows?: Record<string, unknown>[],
@@ -84,36 +112,7 @@ async function create(
 ) {
     TestBed.configureTestingModule({
         imports: [HostComponent],
-        providers: [
-            provideNoopAnimations(),
-            // the preview table's theme service walks up to GAMMA_APP_CONFIG — stub it, as the data-table's own spec does
-            { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
-            // the classification picker reads the Space's vocabulary (GET /classifications)
-            {
-                provide: ClassificationsService,
-                useValue: { items: signal(VOCABULARY), status: signal('ready'), ensureLoaded: () => undefined },
-            },
-            {
-                provide: ComponentsService,
-                useValue: {
-                    previewTransform: (config: Record<string, unknown>, rows: Record<string, unknown>[]) => {
-                        previewCalls.push({ config, rows });
-                        return of(previewAnswer);
-                    },
-                    describeTransform: (inputColumns: { name: string; type: string }[], sql: string) => {
-                        describeCalls.push({ inputColumns, sql });
-                        if (describeError) {
-                            // The real envelope: HttpErrorResponse.status + the API's { error: { message } } body.
-                            return throwError(() => ({
-                                status: describeStatus,
-                                error: { error: { message: describeError } },
-                            }));
-                        }
-                        return of(describeAnswer);
-                    },
-                },
-            },
-        ],
+        providers: paneProviders(),
     });
     await TestBed.compileComponents();
     const fixture = TestBed.createComponent(HostComponent);
@@ -123,6 +122,48 @@ async function create(
     fixture.componentInstance.upstreamColumnTypes = upstreamColumnTypes;
     fixture.detectChanges();
     return fixture;
+}
+
+async function createInDrawer(node: AuthoredNode = sqlNode()) {
+    TestBed.configureTestingModule({ imports: [DrawerHostComponent], providers: paneProviders() });
+    await TestBed.compileComponents();
+    const fixture = TestBed.createComponent(DrawerHostComponent);
+    fixture.componentInstance.node = node;
+    fixture.detectChanges();
+    return fixture;
+}
+
+function paneProviders() {
+    return [
+        provideNoopAnimations(),
+        // the preview table's theme service walks up to GAMMA_APP_CONFIG — stub it, as the data-table's own spec does
+        { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
+        // the classification picker reads the Space's vocabulary (GET /classifications)
+        {
+            provide: ClassificationsService,
+            useValue: { items: signal(VOCABULARY), status: signal('ready'), ensureLoaded: () => undefined },
+        },
+        {
+            provide: ComponentsService,
+            useValue: {
+                previewTransform: (config: Record<string, unknown>, rows: Record<string, unknown>[]) => {
+                    previewCalls.push({ config, rows });
+                    return of(previewAnswer);
+                },
+                describeTransform: (inputColumns: { name: string; type: string }[], sql: string) => {
+                    describeCalls.push({ inputColumns, sql });
+                    if (describeError) {
+                        // The real envelope: HttpErrorResponse.status + the API's { error: { message } } body.
+                        return throwError(() => ({
+                            status: describeStatus,
+                            error: { error: { message: describeError } },
+                        }));
+                    }
+                    return of(describeAnswer);
+                },
+            },
+        },
+    ];
 }
 
 function comp(fixture: ReturnType<typeof TestBed.createComponent<HostComponent>>) {
@@ -784,5 +825,97 @@ describe('Transform pane: SQL-view apply over described columns', () => {
         await expectNoA11yViolations(dialog()!);
         dialogButton('Cancel')!.click();
         await settle(fixture);
+    });
+});
+
+/**
+ * SQL-STEP-METADATA-NO-APPLY-1: dirty compared only the generated SQL, and the metadata never reaches the
+ * SQL — so a description, unit, classification or synonym edit left the drawer's Apply greyed out and the
+ * edit could not be saved. These go through the drawer the way the editor mounts it, never `submit()`.
+ */
+describe('Transform pane in the definition drawer: Apply arms on every edit', () => {
+    type DrawerFixture = ReturnType<typeof TestBed.createComponent<DrawerHostComponent>>;
+
+    const applyButton = (fixture: DrawerFixture) =>
+        Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find(
+            (b) => b.textContent?.trim() === 'Apply',
+        )!;
+
+    function openMetadata(fixture: DrawerFixture, name: string): HTMLElement {
+        (fixture.nativeElement as HTMLElement)
+            .querySelector<HTMLButtonElement>(`button[aria-label="Describe ${name}"]`)!
+            .click();
+        fixture.detectChanges();
+        return (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+            `[aria-label="Metadata for ${name}"]`,
+        )!;
+    }
+
+    function type(fixture: DrawerFixture, el: HTMLInputElement | HTMLSelectElement, value: string): void {
+        el.value = value;
+        el.dispatchEvent(new Event(el instanceof HTMLSelectElement ? 'change' : 'input'));
+        fixture.detectChanges();
+    }
+
+    it('arms Apply for each of the four metadata keys, and disarms when the value is cleared again', async () => {
+        const fixture = await createInDrawer();
+        expect(applyButton(fixture).disabled).toBe(true); // opening is not an edit
+        const group = openMetadata(fixture, 'msisdn');
+        const [description, unit, synonym] = Array.from(group.querySelectorAll<HTMLInputElement>('input'));
+        const classification = group.querySelector<HTMLSelectElement>('select')!;
+        for (const [el, value] of [
+            [description, 'Subscriber number'],
+            [unit, 'seconds'],
+            [classification, 'MSISDN'],
+            [synonym, 'msisdn_alias'],
+        ] as const) {
+            type(fixture, el, value);
+            expect(applyButton(fixture).disabled).toBe(false);
+            expect(fixture.componentInstance.dirty()).toBe(true);
+            type(fixture, el, '');
+            expect(applyButton(fixture).disabled).toBe(true);
+        }
+    });
+
+    it('arms Apply when a stored value is cleared or changed, and disarms when it is put back', async () => {
+        const stored = [field({ name: 'msisdn', from: 'msisdn', fn: 'keep', unit: 's', classification: 'PII' })];
+        const fixture = await createInDrawer(
+            sqlNode({ sql: 'SELECT\n  msisdn AS msisdn\nFROM input', fields: stored }),
+        );
+        expect(applyButton(fixture).disabled).toBe(true);
+        const group = openMetadata(fixture, 'msisdn');
+        const unit = group.querySelectorAll<HTMLInputElement>('input')[1];
+        const classification = group.querySelector<HTMLSelectElement>('select')!;
+
+        type(fixture, unit, ''); // removes the key
+        expect(applyButton(fixture).disabled).toBe(false);
+        type(fixture, unit, 's');
+        expect(applyButton(fixture).disabled).toBe(true);
+
+        type(fixture, classification, 'INTERNAL');
+        expect(applyButton(fixture).disabled).toBe(false);
+        type(fixture, classification, 'PII');
+        expect(applyButton(fixture).disabled).toBe(true);
+    });
+
+    it('Apply writes the metadata and leaves the drawer clean', async () => {
+        const fixture = await createInDrawer();
+        type(fixture, openMetadata(fixture, 'msisdn').querySelector('input')!, 'Subscriber number');
+        applyButton(fixture).click();
+        fixture.detectChanges();
+        const fields = fixture.componentInstance.applied!.config!['fields'] as SqlField[];
+        expect(fields[1].description).toBe('Subscriber number');
+        expect(applyButton(fixture).disabled).toBe(true);
+    });
+
+    it('still arms Apply on a SQL-changing edit, and disarms when it is reverted', async () => {
+        const fixture = await createInDrawer();
+        const name = (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>(
+            'input[aria-label="Field name, row 1"]',
+        )!;
+        type(fixture, name, 'order_ref');
+        expect(applyButton(fixture).disabled).toBe(false);
+        type(fixture, name, 'order_id');
+        expect(applyButton(fixture).disabled).toBe(true);
     });
 });

@@ -33,17 +33,6 @@ export class LinkAnalysisSnapshotsService {
     readonly count = computed(() => this.snapshots().length);
 
     /**
-     * Cases offered when the ops module is absent (`bootstrap.features.ops` false) — placeholder rows so the
-     * attach flow can be exercised UI-first. With ops present the dialog lists real Cases instead.
-     * ⚠ Never offered as a fallback when a real lookup FAILS: a failed lookup is an error state, not an
-     * excuse to hand an analyst Case ids that do not exist.
-     */
-    readonly mockCases: readonly CaseRef[] = [
-        { id: 'CASE-2026-0318', title: 'Suspected layering network (placeholder Case)' },
-        { id: 'CASE-2026-0322', title: 'Burner rotation cluster (placeholder Case)' },
-    ];
-
-    /**
      * Seal one snapshot. Errors propagate — a 409 means this id is already sealed, which the caller should
      * surface rather than swallow, since it means the analysis on screen is NOT the one on disk.
      */

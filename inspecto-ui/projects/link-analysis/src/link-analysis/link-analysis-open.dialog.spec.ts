@@ -2,7 +2,8 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Observable, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ComponentsService, TagsService } from '@inspecto/core/api';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
@@ -19,7 +20,14 @@ const view = (id: string, title: string, datasetId: string) => ({
     content: { title, description: `about ${title}`, sourceId: 'entity-projection', query: { projection: { datasetId } } },
 });
 
-function create(opts: { tab?: 'views' | 'investigations'; confirm?: boolean } = {}) {
+function create(
+    opts: {
+        tab?: 'views' | 'investigations';
+        confirm?: boolean;
+        investigationsLocked?: string;
+        listInvestigations?: () => Observable<unknown>;
+    } = {},
+) {
     const components = {
         list: vi.fn(() => of([view('calls-hub', 'Calls hub', 'calls'), view('transfers', 'Transfers', 'transfers')])),
         create: vi.fn(() => of({})),
@@ -27,7 +35,7 @@ function create(opts: { tab?: 'views' | 'investigations'; confirm?: boolean } = 
         remove: vi.fn(() => of({})),
     };
     const inv = {
-        listInvestigations: vi.fn(() =>
+        listInvestigations: vi.fn(opts.listInvestigations ?? (() =>
             of({
                 items: [
                     { id: 'inv-1', title: 'Mule ring', dataset: 'transfers', owner: 'ana', ownerName: 'Ana Analyst', createdAt: '2026-10-25T09:00:00Z', headStep: 4, access: 'owner', readOnly: false },
@@ -37,7 +45,7 @@ function create(opts: { tab?: 'views' | 'investigations'; confirm?: boolean } = 
                 limit: 100,
                 offset: 0,
                 truncated: false,
-            }),
+            })),
         ),
         investigationLog: vi.fn((id: string) => of({ header: { id, pack: id === 'inv-1' ? 'mobile-money' : null }, entries: [], total: 0, truncated: false })),
     };
@@ -53,6 +61,7 @@ function create(opts: { tab?: 'views' | 'investigations'; confirm?: boolean } = 
         offer: vi.fn(),
         canDeleteInvestigations: true,
         store: store as unknown as InvestigationSessionStore,
+        investigationsLocked: opts.investigationsLocked,
     };
     TestBed.configureTestingModule({
         imports: [LinkAnalysisOpenDialog],
@@ -83,6 +92,46 @@ describe('LinkAnalysisOpenDialog (§5.11)', () => {
         expect(withinDays(null, 0)).toBe(true);
         expect(withinDays(null, 7)).toBe(false);
         expect(withinDays('2026-10-26T00:00:00Z', 7, Date.parse('2026-10-27T00:00:00Z'))).toBe(true);
+    });
+
+    /** LA-BASIC-503-EXPLAINED-1 (D-4): Basic showed a red error with a jargon list under live filters. */
+    it('without Investigations (Basic): one neutral line from the edition reason, no filters, no call', async () => {
+        const reason = 'Investigations are in Standard and above, with the Investigations add-on.';
+        const { c, el, inv, settle } = create({ investigationsLocked: reason });
+        await settle();
+        c.setTab('investigations');
+        await settle();
+        expect(inv.listInvestigations).not.toHaveBeenCalled();
+        expect(el.querySelector('[data-testid="la-open-inv-locked"]')?.textContent).toContain(reason);
+        expect(el.querySelector('inspecto-alert')).toBeNull();
+        expect(el.querySelector('[aria-label="Results"]')).toBeNull();
+        expect(el.textContent).not.toContain('Owner');
+        await expectNoA11yViolations(el);
+    });
+
+    it('a 503 CAPABILITY_UNAVAILABLE reads as the same neutral line, never the server jargon in red', async () => {
+        const unavailable = new HttpErrorResponse({
+            status: 503,
+            error: { error: { errorCode: 'CAPABILITY_UNAVAILABLE', message: 'Link Analysis Investigations (Investigations, Drafts, Dossier ...' } },
+        });
+        const { el, settle } = create({ tab: 'investigations', listInvestigations: () => throwError(() => unavailable) });
+        await settle();
+        expect(el.querySelector('[data-testid="la-open-inv-locked"]')?.textContent).toContain('Standard and above');
+        expect(el.querySelector('inspecto-alert')).toBeNull();
+        expect(el.textContent).not.toContain('Dossier');
+    });
+
+    it('a failure on the Investigations tab stays on that tab', async () => {
+        const down = new HttpErrorResponse({ status: 500, error: { error: { errorCode: 'INTERNAL', message: 'disk full' } } });
+        const { c, el, settle } = create({ tab: 'investigations', listInvestigations: () => throwError(() => down) });
+        await settle();
+        expect(el.querySelector('inspecto-alert')?.textContent).toContain('disk full');
+        c.setTab('views');
+        await settle();
+        expect(el.querySelector('inspecto-alert')).toBeNull();
+        c.setTab('investigations');
+        await settle();
+        expect(el.querySelector('inspecto-alert')?.textContent).toContain('disk full');
     });
 
     it('searches and previews saved views with the Not-evidence note; axe-clean', async () => {

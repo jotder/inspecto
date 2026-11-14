@@ -288,7 +288,6 @@ export class InspectoOptionPickerComponent implements ControlValueAccessor {
     onTouched: () => void = () => {};
 
     open(): void {
-        this.touched.set(true);
         this.onTouched();
         this.dialog
             .open(OptionPickerDialog, {
@@ -305,6 +304,8 @@ export class InspectoOptionPickerComponent implements ControlValueAccessor {
             })
             .afterClosed()
             .subscribe((picked) => {
+                // Visited once the popup closes: "<label> is required." never shows while the list is still open.
+                this.touched.set(true);
                 if (this.readOnly() || picked === undefined) return; // dismissed or read-only — never write a null over a stored value
                 this.value.set(picked);
                 this.onChange(picked);

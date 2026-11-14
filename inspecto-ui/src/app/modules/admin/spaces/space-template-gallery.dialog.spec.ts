@@ -126,6 +126,21 @@ describe('SpaceTemplateGalleryDialog', () => {
         expect(closed).toHaveBeenCalledWith(expect.objectContaining({ id: 'fraud-mgmt' }));
     });
 
+    /**
+     * LA-SAMPLE-EMPTY-DATASET-1 (D-2): `la-sample` created here had an empty Dataset - its samples sit in data/samples and
+     * a Basic Pipeline never polls on its own. A template that ships samples is created with them loaded and run.
+     */
+    it('creates a template that ships samples WITH them loaded, and says so', () => {
+        const sample: SpaceTemplateInfo = { ...TEMPLATES[1], id: 'la-sample', name: 'Link Analysis sample', samples: true };
+        const { fixture, created } = create(['default'], [sample]);
+        const c = fixture.componentInstance;
+        c.choose(sample);
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('[data-testid="template-loads-samples"]')).not.toBeNull();
+        c.submit();
+        expect(created).toHaveBeenCalledWith(expect.objectContaining({ template: 'la-sample', loadSamples: true }));
+    });
+
     it('has no a11y violations (gallery step)', async () => {
         const { fixture } = create();
         await expectNoA11yViolations(fixture.nativeElement);

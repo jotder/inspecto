@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.demo-auth`](../../../../../product-map/module/demo-auth.toon).
 
-6 test class(es): 4 unit, 2 real-HTTP control-plane, 0 IT.
+7 test class(es): 4 unit, 3 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -29,5 +29,6 @@ mvn -o test -pl providers/inspecto-demo-auth -Dtest=DemoAuthenticatorPrincipalsT
 | `DemoAuthenticatorTckTest` | `com.gamma.demoauth` | unit | `providers/inspecto-demo-auth/src/test/java/com/gamma/demoauth/DemoAuthenticatorTckTest.java` | {@link DemoAuthenticator} against the platform's Authenticator TCK (MODULE-REORG-1 P5b); loopback bind is its load-time gate. |
 | `DemoAuthHttpTest` | `com.gamma.demoauth` | real-HTTP control-plane test | `providers/inspecto-demo-auth/src/test/java/com/gamma/demoauth/DemoAuthHttpTest.java` | {@code DEMO-AUTH-1} over real HTTP, with the module's own ServiceLoader registrations on the classpath: the picker, |
 | `DemoRosterErrorsHttpTest` | `com.gamma.demoauth` | real-HTTP control-plane test | `providers/inspecto-demo-auth/src/test/java/com/gamma/demoauth/DemoRosterErrorsHttpTest.java` | Demo failure modes the sign-in page must explain, over real HTTP: a roster conflict, no Space attached, and |
+| `DemoRosterSpaceFoldersHttpTest` | `com.gamma.demoauth` | real-HTTP control-plane test | `providers/inspecto-demo-auth/src/test/java/com/gamma/demoauth/DemoRosterSpaceFoldersHttpTest.java` | DEMO-AUTH-STALE-ROSTER-1, over real HTTP: Demo Users come only from folders the core boots as Spaces. A hidden, |
 | `DemoTokenRelayTckTest` | `com.gamma.demoauth` | unit | `providers/inspecto-demo-auth/src/test/java/com/gamma/demoauth/DemoTokenRelayTckTest.java` | {@link DemoTokenRelay} against the platform's TokenRelay TCK (MODULE-REORG-1 P5b); loopback bind is its load-time gate. |
 | `DemoUsersConflictTest` | `com.gamma.demoauth` | unit | `providers/inspecto-demo-auth/src/test/java/com/gamma/demoauth/DemoUsersConflictTest.java` | LIVEFIX2 #3: a Demo User defined differently in two Spaces is refused with BOTH Spaces named. |

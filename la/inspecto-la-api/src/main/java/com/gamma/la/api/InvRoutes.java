@@ -1,5 +1,7 @@
 package com.gamma.la.api;
 
+import com.gamma.la.core.CasePort;
+import com.gamma.la.core.CasePorts;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.DatasetProvider;
@@ -203,12 +205,17 @@ public final class InvRoutes implements RouteModule {
      *
      * <p>🔴 <b>This never reopens the snapshot.</b> Attachment is a relationship, not part of the sealed
      * content; writing it into the record would mutate a sealed object and invalidate the fingerprint that
-     * makes it evidence. It appends to a separate log instead. ⚠ The Case id is deliberately NOT verified to
-     * exist: the ops module owns Cases and is absent in some editions, so a hard dependency would make
-     * evidence capture fail wherever Case management is not installed.
+     * makes it evidence. It appends to a separate log instead.
+     *
+     * <p>Gates, fail-closed in order: write root unset → 503; Case management not installed (Basic, or no ops module)
+     * → 503 {@code CAPABILITY_UNAVAILABLE}; a bad {@code snapshotId} or no {@code caseId} → 422; no sealed snapshot →
+     * 404; {@code caseId} not a Case the caller can see → 404. ⛔ The Case IS verified (LA-BASIC-PLACEHOLDER-CASE-1):
+     * Basic once recorded evidence against Case ids that did not exist and reported success.
      */
     private Object attachSnapshot(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis snapshot attach");
+        CasePort cases = CasePorts.available(api).orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
+                "Cases are in Standard and above - this installation has no Case management, so nothing can be attached to a Case"));
         String snapshotId = str(body.get("snapshotId"));
         String caseId = str(body.get("caseId"));
         if (snapshotId == null || !SnapshotStore.SAFE_ID.matcher(snapshotId).matches())
@@ -217,6 +224,9 @@ public final class InvRoutes implements RouteModule {
 
         SnapshotStore store = new SnapshotStore(writeRoot);
         if (store.read(snapshotId) == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no sealed snapshot '" + snapshotId + "'");
+        Map<String, Object> c = cases.summary(api, caseId).orElse(null);
+        if (c == null || !"case".equals(c.get("kind")) || !cases.visibleTo(ex, c))
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no case '" + caseId + "'");
         store.attach(snapshotId, caseId, java.time.Instant.now().toString());
         emitSnapshotEvent(ex, LinkEventTypes.LINK_SNAPSHOT_ATTACHED, "link.snapshot.attached",
                 "link.snapshot.attached — " + snapshotId + " → " + caseId,

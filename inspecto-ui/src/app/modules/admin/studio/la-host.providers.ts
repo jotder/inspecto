@@ -133,7 +133,7 @@ export function provideLaHostServices(): Provider[] {
             },
         },
         {
-            // The host decides real vs placeholder: `available` is false when `inspecto-ops` is not installed.
+            // The host decides whether Cases exist here: `available` is false when `inspecto-ops` is not installed.
             provide: LA_CASES,
             useFactory: (): LaCases => {
                 const objects = inject(ObjectsService);

@@ -242,7 +242,7 @@ export interface LaOpenedCase {
 
 /**
  * Case management as Link Analysis uses it. `available` is the HOST's decision: false when Case management
- * (the ops module) is not installed — Link Analysis then shows its own placeholder Cases and never calls
+ * (the ops module) is not installed — Link Analysis then offers no Case action (it says why) and never calls
  * `list` / `openFromEntities`.
  */
 export interface LaCases {
@@ -264,7 +264,7 @@ export const LA_CASES = hostToken<LaCases>('LA_CASES', 'Case management');
 /**
  * The host's installed-module facts that Link Analysis / Geo adapt to. Each is a signal the HOST owns (Inspecto:
  * `SessionService`, set from `/bootstrap`); a flag that is off hides the feature, it never errors.
- * - `ops` - Case management (`inspecto-ops`) is installed: Case actions are real, not placeholders.
+ * - `ops` - Case management (`inspecto-ops`) is installed: Case actions are offered (off, they are disabled with the reason).
  * - `exchange` - the multi-Space runtime hosts the cross-Space Exchange: an Investigation can be shared.
  * - `geoLink` - the Link Analysis / Geo routes are registered in this bundle (server-side Entity Lists, Identity groups).
  * - `investigations` - the Investigation surface is included in this edition (Investigations, Drafts, Dossier, templates,
@@ -295,6 +295,12 @@ export const LA_LOCKED_REASON_FALLBACK = 'Investigations need the Investigations
 /** The one line a locked Investigation action shows: the host's `featureReasons.investigations`, else the fallback. */
 export function investigationsLockedReason(features: LaFeatures): string {
     return features.featureReasons?.()['investigations'] || LA_LOCKED_REASON_FALLBACK;
+}
+
+/** A 503 `CAPABILITY_UNAVAILABLE`: this edition or installation does not include the route - a deployment fact, not a fault. */
+export function isCapabilityUnavailable(err: unknown): boolean {
+    const e = err as { status?: number; error?: { error?: { errorCode?: string } } } | null;
+    return e?.status === 503 && e.error?.error?.errorCode === 'CAPABILITY_UNAVAILABLE';
 }
 
 /**

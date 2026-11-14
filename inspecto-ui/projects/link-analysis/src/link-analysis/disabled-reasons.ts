@@ -27,6 +27,9 @@ export const mostDegrees = (max: number): string =>
 /** "Needs <permission>." (G14): the permission's plain name, never an id or the word "capability". */
 export const needsPermission = (permission: string): string => `Needs ${permission}.`;
 
+/** Why a Case action is unavailable where the host has no Case management (`LA_CASES.available` false; Basic has none). */
+export const NEEDS_CASE_MANAGEMENT = 'Needs Case management (Standard and above).';
+
 /** The one sentence for a tool that needs a time column it does not have (X8). */
 export const NEEDS_TIME_COLUMN =
     'Needs a time column: add one in Settings ▸ Graph model, then pick it in the toolbar’s time filter.';

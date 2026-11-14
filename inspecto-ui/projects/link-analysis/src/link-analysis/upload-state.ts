@@ -68,7 +68,8 @@ export function uploadErrorMessage(err: unknown, fallback: string, action: 'uplo
         case 429:
             return 'Too many requests. Wait a few seconds and try again.';
         case 503:
-            return 'Uploads are not available here - the link-analysis module or a write root is missing.';
+            // The server's reason, not a guess (LA-BASIC-503-EXPLAINED-1: "module or write root missing" was shown on Basic).
+            return 'Uploads are not available here: ' + server;
         default:
             return server;
     }

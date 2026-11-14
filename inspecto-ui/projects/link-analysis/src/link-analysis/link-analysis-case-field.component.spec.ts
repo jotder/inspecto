@@ -9,7 +9,6 @@ import { ObjectsService } from '@inspecto/core/api/objects.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
 import { LinkAnalysisCaseFieldComponent } from './link-analysis-case-field.component';
-import { LinkAnalysisSnapshotsService } from './link-analysis-snapshots.service';
 
 @Component({
     standalone: true,
@@ -26,28 +25,18 @@ class Host {
 }
 
 function create(opsEnabled: boolean, list: () => unknown) {
-    // ⚠ NOT `new LinkAnalysisSnapshotsService()`: since LA-03 the service injects HttpClient, so
-    // constructing it outside an injector throws NG0203. This component only reads `mockCases`, so a
-    // literal stand-in is both sufficient and honest about what is under test.
-    const store = {
-        mockCases: [
-            { id: 'CASE-2026-0318', title: 'Suspected layering network (placeholder Case)' },
-            { id: 'CASE-2026-0322', title: 'Burner rotation cluster (placeholder Case)' },
-        ],
-    } as unknown as LinkAnalysisSnapshotsService;
     TestBed.configureTestingModule({
         imports: [Host],
         providers: [
             ...provideLaHostServices(),
             provideNoopAnimations(),
-            { provide: LinkAnalysisSnapshotsService, useValue: store },
             { provide: SessionService, useValue: { opsEnabled: () => opsEnabled } },
             { provide: ObjectsService, useValue: { list } },
         ],
     });
     const fixture = TestBed.createComponent(Host);
     fixture.detectChanges();
-    return { fixture, store, el: fixture.nativeElement as HTMLElement };
+    return { fixture, el: fixture.nativeElement as HTMLElement };
 }
 
 const REAL = () => of([{ id: 'CASE-9', title: 'Real case' }]);
@@ -63,16 +52,25 @@ describe('LinkAnalysisCaseFieldComponent — three states, kept distinguishable'
         expect(el.querySelector('inspecto-option-picker')).not.toBeNull();
     });
 
-    it('ops absent: offers the placeholders, and SAYS they are placeholders', () => {
-        const { fixture, el, store } = create(false, REAL);
+    /** LA-BASIC-PLACEHOLDER-CASE-1: Basic listed two invented Cases and attached evidence to them. */
+    it('ops absent: offers NO Case (no picker, no lookup) and says why in one neutral line', async () => {
+        const list = vi.fn(REAL);
+        const { fixture, el } = create(false, list);
         const field = fixture.debugElement.children[0].componentInstance as LinkAnalysisCaseFieldComponent;
-        expect(field.cases().map((c) => c.id)).toEqual(store.mockCases.map((c) => c.id));
-        expect(field.loadError()).toBe('');
-        expect(el.textContent).toContain('ops module is not installed');
+        expect(field.cases()).toEqual([]);
+        expect(field.caseOptions()).toEqual([]);
+        expect(list).not.toHaveBeenCalled();
+        expect(el.querySelector('inspecto-option-picker')).toBeNull();
+        expect(el.querySelector('[data-testid="la-case-field-locked"]')?.textContent).toContain(
+            'Needs Case management (Standard and above).',
+        );
+        expect(el.textContent).not.toContain('CASE-');
+        expect(el.querySelector('[role="alert"]')).toBeNull(); // a deployment fact, not an error
+        await expectNoA11yViolations(el);
     });
 
-    it('lookup failed: offers NOTHING, and never falls back to the placeholders', async () => {
-        const { fixture, el, store } = create(true, DOWN);
+    it('lookup failed: offers NOTHING, and is not mistaken for an edition without Cases', async () => {
+        const { fixture, el } = create(true, DOWN);
         const field = fixture.debugElement.children[0].componentInstance as LinkAnalysisCaseFieldComponent;
 
         expect(field.cases()).toEqual([]);
@@ -80,8 +78,7 @@ describe('LinkAnalysisCaseFieldComponent — three states, kept distinguishable'
         expect(field.loadError()).not.toBe('');
         // The distinction this component exists for: a down/unauthorised ops service must NOT render
         // like an edition that simply has no ops module.
-        for (const mock of store.mockCases) expect(el.textContent).not.toContain(mock.id);
-        expect(el.textContent).not.toContain('ops module is not installed');
+        expect(el.querySelector('[data-testid="la-case-field-locked"]')).toBeNull();
         expect(el.querySelector('inspecto-option-picker')).toBeNull();
         expect(el.querySelector('[role="alert"]')?.textContent).toContain('no Case can be offered');
         await expectNoA11yViolations(el);

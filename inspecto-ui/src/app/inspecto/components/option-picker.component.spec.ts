@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { Subject, of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { InspectoOptionPickerComponent, OptionPickerDialog, PickerOption } from './option-picker.component';
@@ -154,6 +154,20 @@ describe('InspectoOptionPickerComponent', () => {
         expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
 
         trigger(fixture).click();
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain('Format is required');
+    });
+
+    /** LA-BASIC-PLACEHOLDER-CASE-1 (D-1): "Case is required." showed the moment the list opened, before any choice. */
+    it('says nothing while the popup is open; a dismissal without a pick then shows the required error', () => {
+        const { fixture, open } = create(null);
+        const closed = new Subject<string | undefined>();
+        open.mockReturnValueOnce({ afterClosed: () => closed });
+        trigger(fixture).click();
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
+
+        closed.next(undefined);
         fixture.detectChanges();
         expect(fixture.nativeElement.querySelector('[role="alert"]')?.textContent).toContain('Format is required');
     });
