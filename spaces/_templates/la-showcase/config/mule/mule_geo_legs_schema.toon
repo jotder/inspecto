@@ -4,8 +4,8 @@ raw:
   fields[13]{name,selector,type,description,unit,classification}:
     SCENE,"0",VARCHAR,"ring or cashout","","INTERNAL"
     ROLE,"1",VARCHAR,"structuring, pass_through, offshore, circular, funding, till_06 or ordinary_till","","INTERNAL"
-    FROM_ACCOUNT,"2",VARCHAR,"Payer account","","CONFIDENTIAL"
-    TO_ACCOUNT,"3",VARCHAR,"Payee account","","CONFIDENTIAL"
+    FROM_ACCOUNT,"2",VARCHAR,"Payer account","","ACCOUNT"
+    TO_ACCOUNT,"3",VARCHAR,"Payee account","","ACCOUNT"
     CHANNEL,"4",VARCHAR,"Transfer channel","","INTERNAL"
     FROM_CITY,"5",VARCHAR,"Payer city","","INTERNAL"
     TO_CITY,"6",VARCHAR,"Payee city","","INTERNAL"

@@ -745,6 +745,66 @@ Pinned by `AcceptedConfigKeysTest` (the checker), `AlertKeyCoverageContractTest`
 `AcceptedConfigKeysDocContractTest` (the generated pipeline table). Each ratchet includes a
 *falsify-the-scan* test, because a scan that silently matches nothing passes every other assertion.
 
+## The classification vocabulary — a save refuses a class the Space does not know (`CLASSIFICATION-UNMASKED-CLASS-1`, 2026-11-14)
+
+A column classification was free text. Masking reads it, so a class no reader knows masks nothing, and nobody was
+told: three shipped templates classed personal identifiers `CONFIDENTIAL` and served them raw. Operator decision
+2026-11-14: **a closed vocabulary, refused at save.**
+
+**What is known, per Space** (`ClassificationVocabulary`, `inspecto/src/main/java/com/gamma/control/`):
+
+| Class | Why it is known |
+|---|---|
+| `MSISDN`, `IMSI`, `ACCOUNT`, `PII` | `ColumnClassification.SENSITIVE`: Risk Score evidence, publication, embed links and BI in `maskingMode: all` mask them |
+| a class an Entity Type of the Space claims, or the id of one | Onboarding and the Link Analysis coverage route read the column as that Entity Type (`OnboardMatches.typeOf`, which also matches a type id; onboarding proposes the id for a type that claims no class). BI results in the default `typed` mode mask a **claimed** class when the type is `masked`. ⚠ The masking readers do not match a type id (`BiResultMasking.typeOf`, `EntityMasking.typeOf`), so an id that is not also a claimed class saves and masks nothing (`MASKING-TWO-VOCABULARIES-1`) |
+| `INTERNAL` | `ColumnClassification.NOT_MASKED`: the stated "needs no masking". No reader acts on it |
+| empty | nothing stated |
+
+Anything else is an ERROR with the code `ERR_UNKNOWN_CLASSIFICATION`; the message names the column, the classes
+that mask and `INTERNAL`. Matching is case-insensitive and trims, as every reader does.
+
+**Where it runs.** Two doors, because a classification is saved through two:
+
+- `SaveGate.check` for the config types `schema` and `pipeline` (a Step's `fields[]` row carries the same
+  metadata): `POST /config/write`, `POST /config/patch`, the validate routes, and the Pipeline document of a
+  pipeline bundle import. `TemplateSeedGate` runs the class check alone on a template's `*_schema.toon` files
+  (the rest of the schema gate was never run at a seed).
+- `ComponentRoutes.validateKind` for the component kinds `dataset` and `schema`: the authoring route, both
+  bulk writers (a bundle import, a BI template apply) and the onboarding column route
+  (`OnboardImport.setColumn` ends in the same call, so it has no check of its own).
+
+The walk is generic: any map of the document that states a `classification` is judged, so a new place that
+carries the label is covered without a new rule.
+
+🔴 **Save-time only, and the two doors differ on a class already stored.** A file already on disk still loads,
+and its unknown class still masks nothing; the gate stops new ones.
+
+- At the component door a class the stored component already carries is **kept**: only a class the save
+  introduces is refused. Half the writers of a Dataset have no author present (the inbox watch, compaction, a
+  pending Alert Rule, a role or unit change), and a Space's vocabulary shrinks when an Entity Type is retired;
+  neither may make every later edit of that Dataset fail. The tolerance is per component and per class.
+  ⛔ `TemplateSeedGate` judges a template's components a second time with nothing stored: the staged tree IS
+  the document, so the tolerance alone would keep every class of the template itself.
+- At `SaveGate` the whole draft is judged: the author is present, so a schema or Pipeline with a stale class
+  is refused until the class is fixed. ⚠ That includes a Pipeline history restore.
+
+🔴 **Not gated: the bulk file importers** (`CLASSIFICATION-BULK-IMPORT-UNGATED-1`). They write config files
+as bytes and run no schema gate of any kind, so an old document can still land an unknown class:
+the schema satellites of a pipeline bundle (`PipelineBundleRoutes` writes them before it judges the Pipeline
+document alone), and `BundleImporter.writeConfig` (a zip bundle Collector import, a template upgrade apply,
+a Space created from a bundle). The file is refused the next time an author saves it. The seed gate also reads a
+template schema without its sibling `_structure.csv`, so a class stated only there is not judged at Space create.
+
+⚠ **Two masking sets, not one.** `ColumnClassification.SENSITIVE` and "a class a masked Entity Type claims"
+share only `MSISDN`, `IMSI` and `ACCOUNT`. `PII` is not masked in a BI result in `typed` mode; `WALLET`,
+`IMEI` or `ID_DOCUMENT` are not masked in Risk Score evidence. Link Analysis reference rows mask the union
+(`ReferenceRows.java`). The vocabulary accepts both sets; it does not merge them (`MASKING-TWO-VOCABULARIES-1`).
+
+**Shipped configs.** `CONFIDENTIAL` was the only class in the shipped templates outside the vocabulary: 44
+columns, all reclassified (8 in `TEMPLATE-CONFIDENTIAL-UNMASKED-1`, 36 with the gate). Identifiers took the
+class their template's Datasets already used; cell ids, coordinates, voucher serials and settlement amounts took
+`INTERNAL`. `TemplateIdentifierClassificationTest` keeps it so.
+
 ## Open rows this concept owns
 
 - ~~**`COMPONENT-KIND-KEY-CENSUS-1`**~~ ✅ **CLOSED 2026-09-16 (`afaa4005c`).** The `widget`/`dashboard`

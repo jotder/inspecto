@@ -176,6 +176,10 @@ final class TemplateSeedGate {
             Path parent = file.getParent();
             String type = parent.equals(config.resolve("jobs")) && name.endsWith(".toon") ? "job"
                     : name.endsWith("_pipeline.toon") && !parent.startsWith(config.resolve("registry")) ? "pipeline" : null;
+            // CLASSIFICATION-UNMASKED-CLASS-1: a template's schema file is judged for its column classes only - the
+            // rest of the schema gate was never run at a seed, and switching it on is not this change.
+            boolean schemaFile = type == null && name.endsWith("_schema.toon") && !parent.startsWith(config.resolve("registry"));
+            if (schemaFile) type = "schema";
             if (type == null) continue;
             Map<String, Object> draft;
             try {
@@ -183,8 +187,9 @@ final class TemplateSeedGate {
             } catch (IOException | RuntimeException unreadable) {
                 throw refused(type, name, unreadable.getMessage());
             }
-            List<com.gamma.config.spec.Finding> findings = SaveGate.check(null, type, draft, config, parent,
-                    SaveGate.Referents.MAY_ARRIVE_LATER, policy);
+            List<com.gamma.config.spec.Finding> findings = schemaFile
+                    ? ClassificationVocabulary.findings(type, draft, config)
+                    : SaveGate.check(null, type, draft, config, parent, SaveGate.Referents.MAY_ARRIVE_LATER, policy);
             for (com.gamma.config.spec.Finding f : findings)
                 if (f.severity() == com.gamma.config.spec.Severity.ERROR)
                     throw refused(type, name, f.fieldPath() + ": " + f.message());
@@ -216,6 +221,9 @@ final class TemplateSeedGate {
         String id = c.name();
         Map<String, Object> body = new LinkedHashMap<>(c.content());
         ComponentRoutes.validateKind(config, dataRoot, type, id, body);
+        // The staged tree IS the document being judged, so validateKind's "a class already stored is kept" would keep
+        // every class of the template itself; judge it again with nothing stored (CLASSIFICATION-UNMASKED-CLASS-1).
+        if ("dataset".equals(type) || "schema".equals(type)) ClassificationVocabulary.require(config, type, null, body);
         if (DecisionRuleGuard.TYPE.equals(type)) {
             body.remove("createdBy");
             body.remove("updatedBy");

@@ -2,10 +2,10 @@ raw:
   name: HLR_EIR
   format: CSV
   fields[5]{name,selector,type,description,unit,classification}:
-    msisdn,"0",VARCHAR,"MSISDN","","CONFIDENTIAL"
-    imsi,"1",VARCHAR,"IMSI","","CONFIDENTIAL"
-    imei,"2",VARCHAR,"IMEI seen with this IMSI","","CONFIDENTIAL"
-    forwarding_to,"3",VARCHAR,"Unconditional call-forwarding target, else empty","","CONFIDENTIAL"
+    msisdn,"0",VARCHAR,"MSISDN","","MSISDN"
+    imsi,"1",VARCHAR,"IMSI","","IMSI"
+    imei,"2",VARCHAR,"IMEI seen with this IMSI","","PII"
+    forwarding_to,"3",VARCHAR,"Unconditional call-forwarding target, else empty","","MSISDN"
     sim_swap_at,"4",TIMESTAMP,"When this IMSI replaced the previous one, else empty","","INTERNAL"
 mapping:
   canonicalName: hlr_eir

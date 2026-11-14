@@ -11,7 +11,7 @@ raw:
     duration_s,"6",INTEGER,"Answered duration (DATA: session seconds)","s","INTERNAL"
     charge,"7",DOUBLE,"Rated charge","USD","INTERNAL"
     roaming,"8",VARCHAR,"Y when the a_number was roaming","","INTERNAL"
-    cell_id,"9",VARCHAR,"Serving cell","","CONFIDENTIAL"
+    cell_id,"9",VARCHAR,"Serving cell","","INTERNAL"
 mapping:
   canonicalName: cdr
   rawName: CDR

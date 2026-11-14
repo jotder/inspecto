@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-433 test class(es): 177 unit, 256 real-HTTP control-plane, 0 IT.
+435 test class(es): 178 unit, 257 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -52,6 +52,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `BypassFeatureGoldenTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/BypassFeatureGoldenTest.java` | {@code TELCO-BYPASS-SIMBOX-1} slice B1 golden test. Boots the shipped {@code spaces/_templates/telco-bypass} Space |
 | `CapabilitiesNowUnknownRoleTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/CapabilitiesNowUnknownRoleTest.java` | A role name the table does not define must not lift an Access Profile deny: {@code AccessGrants} treats any |
 | `CapabilityManifestTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/CapabilityManifestTest.java` | RBAC R4: {@link CapabilityManifest} must match the actual {@code ApiContext.withCapability} |
+| `ClassificationVocabularyTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ClassificationVocabularyTest.java` | {@link ClassificationVocabulary} (CLASSIFICATION-UNMASKED-CLASS-1): which column classifications a Space knows, and |
 | `CollectorSaveFindingsTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/CollectorSaveFindingsTest.java` | {@link ConfigRoutes#collectorFindings} — the save-time half of the Collector's remote-only keys |
 | `ConfigWriteFunnelTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ConfigWriteFunnelTest.java` | `ASSURE-MAKER-CHECKER-1` S0 + S2 — <b>every config-writing control-plane route passes through the funnels, |
 | `ConsignmentGroupingFileRoundTripTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ConsignmentGroupingFileRoundTripTest.java` | Consignment formation ({@code collector.consignment:} — the home since CONSIGNMENT-HOME-1, 2026-09-02; |
@@ -91,6 +92,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiBundleNewKindsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBundleNewKindsTest.java` | Metadata Bundle v2 (2026-07-18 follow-up): the three own-store kinds {@code authored-pipeline}/ |
 | `ControlApiBundleTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBundleTest.java` | Metadata Bundle v2 backend (SPC-4) over real HTTP: export (real content + contentHash), the |
 | `ControlApiCatalogTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCatalogTest.java` | Integration tests for the v3.2.0 {@code /catalog*} routes over real HTTP (P6). |
+| `ControlApiClassificationVocabularyTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiClassificationVocabularyTest.java` | CLASSIFICATION-UNMASKED-CLASS-1 over real HTTP: every door that saves a column classification refuses one the Space |
 | `ControlApiClientIpTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiClientIpTest.java` | SEC review F3 over real HTTP: {@code ApiContext.ip} — the per-IP rate-limit key and the audit trail's |
 | `ControlApiCollectorNotifyTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCollectorNotifyTest.java` | Real-HTTP tests for {@code POST /collectors/{id}/notify} (ACQ-6 push discovery): v1 202+runId+Location with |
 | `ControlApiCollectorsAndConnectionsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCollectorsAndConnectionsTest.java` | Integration tests over real HTTP for the Acquisition/Sources UI backend: {@code GET /collectors} (flattened source <!-- vocab-allow: quoted Javadoc --> |

@@ -267,6 +267,17 @@ above the generated commit list.
 - Unaffected: `PipelineGraphRoutes` (needs a migration pass first) and `RecipeCompiler`, where the intended
   run-time WARNING has nowhere to go until a non-fatal diagnostic channel exists.
 
+**Breaking — a save refuses an unknown column classification (2026-11-14, `CLASSIFICATION-UNMASKED-CLASS-1`)**
+- A `classification` on a Schema field, a Dataset column or a Step's output column must be `MSISDN`, `IMSI`,
+  `ACCOUNT`, `PII`, a class an Entity Type of the Space claims, `INTERNAL`, or empty. Any other word is refused with
+  `ERR_UNKNOWN_CLASSIFICATION` (a finding code on the config routes; in the message of a
+  `CONFIG_VALIDATION_FAILED` 422 on the component routes; a `failed` item in a bundle import's 200) on `POST /config/write`, `POST /config/patch`,
+  `POST`/`PUT /components/dataset` and `/components/schema`, a bundle import and the onboarding column route. A Dataset or schema component keeps a class it already stores; only a new one is refused.
+- ⚠ Breaking for a config that **previously saved silently**: `CONFIDENTIAL` (and any other invented label)
+  masked nothing and is now refused. Reclassify it: an identifier to the class that masks it, anything else to
+  `INTERNAL`. A file already on disk still loads; it is refused the next time it is saved.
+- Detail: [config safety](../config/spec-config-safety.md), "The classification vocabulary".
+
 **Breaking — `flow` → `pipeline` on the wire (vocabulary Tier 3 cutover, 2026-09-24)**
 - The Tier 3 dual-emit is **over**: JSON responses carry only the canonical key. `GET /views` and
   `GET /views/{store}` summaries drop `flow` (keep `pipeline`); the `/lineage` `downstream[]` entries drop

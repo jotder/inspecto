@@ -11,7 +11,7 @@ raw:
     rating_run_id,"6",VARCHAR,"The re-rating run that produced the row","","INTERNAL"
     rated_at,"7",TIMESTAMP,"When the run produced the row; the compare uses the latest run per agreement and period","","INTERNAL"
     units,"8","DECIMAL(18,4)","Units after the agreement rounding rule","","INTERNAL"
-    amount_expected,"9","DECIMAL(18,4)","Independently priced amount; blank when the usage could not be priced","","CONFIDENTIAL"
+    amount_expected,"9","DECIMAL(18,4)","Independently priced amount; blank when the usage could not be priced","","INTERNAL"
     currency,"10",VARCHAR,"Currency of amount_expected (ISO 4217)","","INTERNAL"
     record_count,"11",INTEGER,"Usage records behind the row","","INTERNAL"
     reason,"12",VARCHAR,"no_rate_found, ambiguous_rate or unknown_agreement when amount_expected is blank","","INTERNAL"

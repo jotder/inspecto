@@ -2,10 +2,10 @@ raw:
   name: CRM_KYC
   format: CSV
   fields[7]{name,selector,type,description,unit,classification}:
-    msisdn,"0",VARCHAR,"MSISDN","","CONFIDENTIAL"
-    id_doc_hash,"1",VARCHAR,"Hash of the identity document","","CONFIDENTIAL"
-    address_hash,"2",VARCHAR,"Hash of the registered address","","CONFIDENTIAL"
-    account_holder,"3",VARCHAR,"Customer id","","CONFIDENTIAL"
+    msisdn,"0",VARCHAR,"MSISDN","","MSISDN"
+    id_doc_hash,"1",VARCHAR,"Hash of the identity document","","PII"
+    address_hash,"2",VARCHAR,"Hash of the registered address","","PII"
+    account_holder,"3",VARCHAR,"Customer id","","ACCOUNT"
     activation_date,"4",DATE,"Line activation day","","INTERNAL"
     subscriber_type,"5",VARCHAR,"prepaid, postpaid or business","","INTERNAL"
     kyc_complete,"6",BOOLEAN,"KYC checks complete","","INTERNAL"

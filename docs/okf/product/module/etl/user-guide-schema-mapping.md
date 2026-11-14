@@ -151,7 +151,8 @@ catalog and by persisting `fields[]`.
     the graph PUT) refuses with **`ERR_STEP_COLUMN_METADATA_INVALID`**, always ERROR, when a value is a map or
     list, or when a row carrying metadata has a blank name or a name another row also outputs
     (case-insensitive). Route-branch sub-chains are walked too. Proof: `ControlApiStepColumnMetadataTest`.
-    The classification vocabulary is the schema's: free text, normalised upper-case.
+    The classification vocabulary is the schema's: closed per Space and refused at save when unknown
+    (`ERR_UNKNOWN_CLASSIFICATION`), normalised upper-case.
   - **The reader — Catalog:** `PipelineSchemas.stepOutputs` → `MetadataGraphBuilder.addStepOutputs` adds a
     **`NodeKind.STEP`** node `step:<pipeline>/step<n>` (n counts `sql` Steps with `fields[]`, depth first,
     branches included; label `sql #n`), `origin -DECLARES-> step`, `step -DESCRIBES-> col:<pipeline>/step<n>/<NAME>`

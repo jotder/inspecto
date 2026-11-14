@@ -10,7 +10,7 @@ raw:
     b_number,"5",VARCHAR,"Called number as dialled; the sequential-dialling and own-network signals expect bare E.164 digits (DATA: the APN)","","MSISDN"
     duration_s,"6",INTEGER,"Answered duration, 0 when unanswered (DATA: session seconds)","s","INTERNAL"
     roaming,"7",VARCHAR,"Y when the a_number was roaming; those calls are left out of the SIM-day signals","","INTERNAL"
-    cell_id,"8",VARCHAR,"Serving cell","","CONFIDENTIAL"
+    cell_id,"8",VARCHAR,"Serving cell","","INTERNAL"
     answered,"9",VARCHAR,"OPTIONAL. Y or N: whether the attempt was answered","","INTERNAL"
     release_cause,"10",VARCHAR,"OPTIONAL. Release cause (ITU Q.850 code, 16 = normal clearing); used for the answer rate when answered is blank","","INTERNAL"
     imei,"11",VARCHAR,"OPTIONAL. Device identity of the calling or called SIM","","PII"

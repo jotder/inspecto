@@ -2,7 +2,7 @@ raw:
   name: FRAUD_BLOCKLIST
   format: CSV
   fields[3]{name,selector,type,description,unit,classification}:
-    msisdn,"0",VARCHAR,"MSISDN","","CONFIDENTIAL"
+    msisdn,"0",VARCHAR,"MSISDN","","MSISDN"
     listed_at,"1",TIMESTAMP,"Listed at","","INTERNAL"
     reason,"2",VARCHAR,"Typology","","INTERNAL"
 mapping:

@@ -2,10 +2,10 @@ raw:
   name: CELL_SITE
   format: CSV
   fields[4]{name,selector,type,description,unit,classification}:
-    cell_id,"0",VARCHAR,"Cell identifier, the key of voice_cdr.cell_id","","CONFIDENTIAL"
-    site_id,"1",VARCHAR,"Site the cell belongs to","","CONFIDENTIAL"
-    lat,"2",DOUBLE,"Latitude in decimal degrees","deg","CONFIDENTIAL"
-    lon,"3",DOUBLE,"Longitude in decimal degrees","deg","CONFIDENTIAL"
+    cell_id,"0",VARCHAR,"Cell identifier, the key of voice_cdr.cell_id","","INTERNAL"
+    site_id,"1",VARCHAR,"Site the cell belongs to","","INTERNAL"
+    lat,"2",DOUBLE,"Latitude in decimal degrees","deg","INTERNAL"
+    lon,"3",DOUBLE,"Longitude in decimal degrees","deg","INTERNAL"
 mapping:
   canonicalName: cell_site
   rawName: CELL_SITE

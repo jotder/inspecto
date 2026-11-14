@@ -14,11 +14,11 @@ raw:
     service,"9",VARCHAR,"VOICE, SMS or DATA","","INTERNAL"
     destination_class,"10",VARCHAR,"Destination class the partner prices the line at","","INTERNAL"
     units,"11","DECIMAL(18,4)","Billed units (minutes, messages, megabytes)","","INTERNAL"
-    amount,"12","DECIMAL(18,4)","Billed amount in the line currency; negative for a credit","","CONFIDENTIAL"
+    amount,"12","DECIMAL(18,4)","Billed amount in the line currency; negative for a credit","","INTERNAL"
     currency,"13",VARCHAR,"Line currency (ISO 4217)","","INTERNAL"
     fx_rate_applied,"14","DECIMAL(18,8)","OPTIONAL. Rate the partner converted at; used only to name an fx_difference","","INTERNAL"
     line_kind,"15",VARCHAR,"usage, adjustment, tax, credit or fee","","INTERNAL"
-    control_total_amount,"16","DECIMAL(18,4)","Header control total: the amount the partner says the statement version adds up to","","CONFIDENTIAL"
+    control_total_amount,"16","DECIMAL(18,4)","Header control total: the amount the partner says the statement version adds up to","","INTERNAL"
     control_total_lines,"17",INTEGER,"Header control total: the line count the partner says the statement version has","","INTERNAL"
     received_at,"18",TIMESTAMP,"When the statement was received","","INTERNAL"
 mapping:

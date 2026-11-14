@@ -2,7 +2,7 @@ raw:
   name: MULE_ACCOUNT_LOCATIONS
   format: CSV
   fields[6]{name,selector,type,description,unit,classification}:
-    ACCOUNT,"0",VARCHAR,"Account id","","CONFIDENTIAL"
+    ACCOUNT,"0",VARCHAR,"Account id","","ACCOUNT"
     CITY,"1",VARCHAR,"City the account is placed in (synthetic)","","INTERNAL"
     COUNTRY,"2",VARCHAR,"ISO country of the city","","INTERNAL"
     LAT,"3",DOUBLE,"Latitude - city centroid plus a small deterministic jitter","deg","INTERNAL"

@@ -40,7 +40,7 @@ export const COLUMNS = [
     ['usage_units', 'BIGINT', 'Charged units: seconds (VOICE), events (SMS) or MB (DATA)', 'INTERNAL'],
     ['charge', 'DOUBLE', 'Charge carried on the record, when the network rated it', 'INTERNAL'],
     ['roaming', 'VARCHAR', 'Y when the a_number was roaming', 'INTERNAL'],
-    ['cell_id', 'VARCHAR', 'Serving cell', 'CONFIDENTIAL'],
+    ['cell_id', 'VARCHAR', 'Serving cell', 'INTERNAL'],
     ['partner', 'VARCHAR', 'Terminating interconnect partner (blank = on-net)', 'INTERNAL'],
     ['answered', 'VARCHAR', 'OPTIONAL. Y or N: whether the attempt was answered', 'INTERNAL'],
     ['release_cause', 'VARCHAR', 'OPTIONAL. Release cause (ITU Q.850 code, 16 = normal clearing)', 'INTERNAL'],

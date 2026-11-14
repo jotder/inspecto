@@ -71,4 +71,4 @@ Peak DuckDB memory by CDR rows in one day, on the default memory cap (3,246 MiB)
 
 ## Safety
 
-`msisdn` is classified `MSISDN`, `imsi` `IMSI`, `imei` `PII`, and `cell_id` and the cell coordinates `CONFIDENTIAL`; `tb_features` carries `msisdn`, a dealer id and example record ids only; `tb_factors` and `tb_findings` carry the SIM (classified `MSISDN`), numbers and the stored factors (signal values, no call detail beyond the three example record ids). The pack publishes nothing and never acts on a call: barring is a later, approval-gated Action Request.
+`msisdn` is classified `MSISDN`, `imsi` `IMSI`, `imei` `PII`, and `cell_id` and the cell coordinates `INTERNAL` (they name a site, not a person, so nothing masks them); `tb_features` carries `msisdn`, a dealer id and example record ids only; `tb_factors` and `tb_findings` carry the SIM (classified `MSISDN`), numbers and the stored factors (signal values, no call detail beyond the three example record ids). The pack publishes nothing and never acts on a call: barring is a later, approval-gated Action Request.

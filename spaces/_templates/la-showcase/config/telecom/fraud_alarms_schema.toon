@@ -2,7 +2,7 @@ raw:
   name: FRAUD_ALARMS
   format: CSV
   fields[3]{name,selector,type,description,unit,classification}:
-    msisdn,"0",VARCHAR,"MSISDN","","CONFIDENTIAL"
+    msisdn,"0",VARCHAR,"MSISDN","","MSISDN"
     raised_at,"1",TIMESTAMP,"Raised at","","INTERNAL"
     alarm_type,"2",VARCHAR,"Typology","","INTERNAL"
 mapping:

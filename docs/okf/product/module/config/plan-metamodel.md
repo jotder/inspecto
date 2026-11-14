@@ -273,8 +273,9 @@ screen*, and the glossary's Catalog definition ("Schemas and Datasets") predates
   2026-08-22) is the one vocabulary: every DuckDB scalar reachable by `TRY_CAST` from text is honoured and
   compiles to a known cast; a type outside it is **refused at config load** (`Identifiers.validateSchema`)
   rather than degraded to `VARCHAR` — before 2026-08-22 a `type: BIGINT` silently produced a string column.
-  `classification` is a free string (`PII` / `INTERNAL` by convention, SCH-03) — **metadata only, nothing
-  enforces masking on it** (SEC-08, Enterprise-only, unbuilt); no enum and no owner page exists (§5).
+  `classification` was a free string when this was written; since 2026-11-14 it is a closed vocabulary per
+  Space, refused at save, and masking reads it (`okf/product/module/config/spec-config-safety.md`, "The
+  classification vocabulary").
 - **Resolution.** `PipelineConfigParser.resolveSchemaRef` (`platform/inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java:1232-1239`):
   beside the config only, via `PathJail.resolveConfigRef` (never the CWD, since 2026-09-23); `schema/<id>` → `registry/schemas/<id>.toon`, `grammar/<id>` →
   `registry/grammars/<id>.toon`, `mapping/<id>` → `registry/mappings/<id>.csv`; `ConfigSafetyValidator` and
@@ -419,7 +420,7 @@ seams that already exist, the first of which is that **the store IS the registry
 | **Delete protection covers only pipeline `use:` refs and Exchange grants** | `ComponentRoutes.java:322-344`; `ComponentIntegrity` runs only in `metadata_validate` and bundle import | Deleting a dataset a widget binds, or a widget a dashboard tiles, succeeds and leaves a broken ref the next `metadata_validate` reports after the fact. `MET-3` reads "delete-protection" as if it were general |
 | **No `ConfigSpec` for `mapping`** (and for 14 other writable kinds) | `ConfigSpecs.TYPES` = 9 | The Components pane cannot render a spec-driven form for them; `GLOSSARY.md` §13 lists it as OPEN (a) |
 | **The Components pane sends no `If-Match`** | zero hits in `inspecto-ui/src/app` | Last-write-wins on grammar / schema / mapping / transform / sink edits (shared with `API` §5's item) |
-| **No owner for the field-classification vocabulary** (`PII` / `INTERNAL`) | free string in `SchemaExtractor` tests and the UI grid; no enum, no page | SCH-03 is "metadata only"; nobody can say what values are legal |
+| ✅ **Closed 2026-11-14** (`CLASSIFICATION-UNMASKED-CLASS-1`): the field-classification vocabulary has an owner | `ClassificationVocabulary`; page: `spec-config-safety.md`, "The classification vocabulary" | was: free string, nobody could say what values are legal |
 | **No concept file owns the Catalog read model** (`com.gamma.catalog`) | eight okf files mention `MetadataGraph*`; none owns it; the values live only in the glossary | `NodeKind`, `EdgeKind`, `IdScheme`, `MetadataGraphBuilder`, `CatalogOverlay` are documented by this spec alone |
 | **`component-registry.md` is 4 KB for the spine of the product** and omitted `.history/`, `ComponentIntegrity`, `mapping`, `/pipelines/step-types` | the concept page | Corrected in part with this spec; a fuller concept page is owed |
 | **`/catalog/streams` (per-Collector) vs the grouped `stream:` node** are two Stream read models under one word | `CatalogRoutes.java:30`; `MetadataGraphBuilder` grouping | The glossary binds the grouped sense; the grid shows the other |
@@ -569,5 +570,5 @@ declared type.
 | **No test pins `NodeKind` / `IdScheme` / `EdgeKind` values** as a contract; the SPA's union is open and names kinds the server never emits | `models.ts:243-278` vs `NodeKind.java` |
 | **No dedicated `ComponentIntegrityTest`** — coverage rides the bundle-import tests | §8.2 |
 | **No test of a migrated `fields[]` schema in a committed Space** — none is migrated | §8.5 |
-| **No classification-vocabulary test** — there is no vocabulary | §3.7 |
+| ✅ Closed 2026-11-14: `ClassificationVocabularyTest`, `ControlApiClassificationVocabularyTest` | §3.7 |
 | **No client-side `If-Match` test on Components** — no client code sends it | §3.9 |

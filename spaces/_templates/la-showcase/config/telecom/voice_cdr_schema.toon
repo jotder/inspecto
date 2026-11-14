@@ -2,14 +2,14 @@ raw:
   name: VOICE_CDR
   format: CSV
   fields[9]{name,selector,type,description,unit,classification}:
-    a_number,"0",VARCHAR,"Calling MSISDN (A-number)","","CONFIDENTIAL"
-    b_number,"1",VARCHAR,"Called number (B-number)","","CONFIDENTIAL"
+    a_number,"0",VARCHAR,"Calling MSISDN (A-number)","","MSISDN"
+    b_number,"1",VARCHAR,"Called number (B-number)","","MSISDN"
     start_time,"2",TIMESTAMP,"Call start","","INTERNAL"
     duration_s,"3",INTEGER,"Call duration in seconds","","INTERNAL"
     call_type,"4",VARCHAR,"outgoing or forwarded (a leg re-routed by call forwarding)","","INTERNAL"
-    redirecting_number,"5",VARCHAR,"The forwarding party of a forwarded leg, else empty","","CONFIDENTIAL"
-    imsi,"6",VARCHAR,"IMSI of the A party","","CONFIDENTIAL"
-    imei,"7",VARCHAR,"IMEI of the A party's handset","","CONFIDENTIAL"
+    redirecting_number,"5",VARCHAR,"The forwarding party of a forwarded leg, else empty","","MSISDN"
+    imsi,"6",VARCHAR,"IMSI of the A party","","IMSI"
+    imei,"7",VARCHAR,"IMEI of the A party's handset","","PII"
     destination_type,"8",VARCHAR,"onnet, international or premium_intl","","INTERNAL"
 mapping:
   canonicalName: voice_cdr

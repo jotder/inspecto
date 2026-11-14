@@ -331,16 +331,15 @@ table** and **one Catalog node**. Authored as `parsing.plugin.segments` (legacy 
 `okf/product/module/etl/plan-ingestion.md`, `okf/product/module/engine/spec-parser-plugins.md`. ⛔ Not a path token, not a
 time slice, and ⛔ unrelated to the *market* segment in the brochures — an accidental homonym.
 
-**Field Classification** *(defined 2026-09-10 — `SPEC-GLOSSARY-1`)* — A per-Schema-field **sensitivity label**
-(`PII`, `INTERNAL`, …) carried in the `fields[]` header of a schema TOON and in the Components CSV. 🔴 **It is
-free text and nothing enforces it.** There is no enum and no validating `FieldSpec` — `classification` appears
-in `ConfigSpecs` only inside a description string, two lines below a field that *does* use the enum mechanism —
-the UI renders a bare text input, and `SchemaProjection`'s own javadoc says the metadata columns are never read
-by the ETL. Its single consumer copies it to a Catalog node **display** attribute. The two steps that would
-enforce it are `quality.pii.mask` (the Advanced-only `mask` Step, built 2026-10-06; it acts only where a
-pipeline authors it) and `quality.compliance.redact` (`PLANNED`). Dataset-wide masking stays unbuilt
-(`okf/product/layer/platform/spec-editions.md` SEC-08). ⛔ So a label alone is a **statement of intent, never a control**. Do not describe it as
-protection unless a `mask` Step reads it. ⛔ And `INTERNAL` here is not the API error code
+**Field Classification** *(defined 2026-09-10 — `SPEC-GLOSSARY-1`; rewritten 2026-11-14,
+`CLASSIFICATION-UNMASKED-CLASS-1`)* — The label on a Schema field, a Dataset column or a Step's output column
+that says what the column holds (`MSISDN`, `ACCOUNT`, `PII`, `INTERNAL`, …). It is a **closed vocabulary per
+Space**, checked when a config is saved: the four sensitive classes (`MSISDN`, `IMSI`,
+`ACCOUNT`, `PII`), a class an Entity Type of the Space claims, or `INTERNAL` for a column that needs no masking.
+An empty label is allowed; any other word is refused (`ERR_UNKNOWN_CLASSIFICATION`). 🔴 A label masks only where
+a reader acts on it, and the readers use two sets that share only `MSISDN`, `IMSI` and `ACCOUNT`
+(`okf/product/module/config/spec-config-safety.md`, "The classification vocabulary"). ⛔ `CONFIDENTIAL` is not a
+class: it masked nothing and is refused. ⛔ And `INTERNAL` here is not the API error code
 `INTERNAL` (`ErrorCodes`): one word, two concepts, one layer apart.
 
 ---
@@ -1155,7 +1154,7 @@ browser-only caps, never above the Space value). Edited at *Settings → Link An
 `imsi`, `imei`, `msisdn`, `wallet`, `account`, `agent`, `handset`, `cell`), configured **per Space** in
 `link-analysis.toon`. It carries a normaliser (one of a closed set shared by Java and the SPA) and a `masked` flag, and names the Dataset column
 `classification` values that map to it. Its Instance is a typed **Entity**, keyed `<type>:<normalised value>`; an
-untyped Entity keeps `entity:<value>`. ⛔ Never call it a *classification* — a classification is a column's free-text
+untyped Entity keeps `entity:<value>`. ⛔ Never call it a *classification* — a classification is a column's
 label (`columns[].classification`); the Entity Type is what that label maps to. Design:
 [`archived-documents/plans-archive/link-analysis-entity-model-design.md`](archived-documents/plans-archive/link-analysis-entity-model-design.md).
 

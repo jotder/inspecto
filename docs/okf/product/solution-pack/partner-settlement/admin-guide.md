@@ -99,6 +99,6 @@ the one settlement currency the KPI tiles count; change the KPIs' `unit` and tit
 
 ## Safety
 
-The pack publishes nothing, posts no payment or ledger entry and fetches no rate. Amounts are classified `CONFIDENTIAL`; no personal
+The pack publishes nothing, posts no payment or ledger entry and fetches no rate. Amounts are classified `INTERNAL` (not masked); no personal
 data is held (partners are organisations). The Alert Rules and Reconciliations need the edition's Alert Rule and Reconciliation
 capabilities to author, as for any Space.

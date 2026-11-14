@@ -2,10 +2,10 @@ raw:
   name: RECHARGE
   format: CSV
   fields[5]{name,selector,type,description,unit,classification}:
-    msisdn,"0",VARCHAR,"MSISDN topped up","","CONFIDENTIAL"
-    voucher_id,"1",VARCHAR,"Voucher serial, else empty","","CONFIDENTIAL"
+    msisdn,"0",VARCHAR,"MSISDN topped up","","MSISDN"
+    voucher_id,"1",VARCHAR,"Voucher serial, else empty","","INTERNAL"
     agent_id,"2",VARCHAR,"Selling agent, else empty","","INTERNAL"
-    card_hash,"3",VARCHAR,"Hash of the paying card, else empty","","CONFIDENTIAL"
+    card_hash,"3",VARCHAR,"Hash of the paying card, else empty","","PII"
     ts,"4",TIMESTAMP,"Top-up time","","INTERNAL"
 mapping:
   canonicalName: recharge

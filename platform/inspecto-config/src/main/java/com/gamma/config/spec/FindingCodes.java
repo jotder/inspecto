@@ -150,6 +150,9 @@ public final class FindingCodes {
      *  author is present to be told. */
     public static final String ERR_UNKNOWN_CONFIG_KEY = "ERR_UNKNOWN_CONFIG_KEY";
 
+    /** A column classification the Space does not know: it would mask nothing (CLASSIFICATION-UNMASKED-CLASS-1). */
+    public static final String ERR_UNKNOWN_CLASSIFICATION = "ERR_UNKNOWN_CLASSIFICATION";
+
     /** The same dead-key finding where a config already on disk is merely being read, not authored —
      *  refusing there would brick a deployed pipeline over a key that was never load-bearing. */
     public static final String WARN_UNKNOWN_CONFIG_KEY = "WARN_UNKNOWN_CONFIG_KEY";

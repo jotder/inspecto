@@ -505,6 +505,7 @@ com.gamma.config.spec.FindingCodes | public static final String ERR_STEP_COLUMN_
 com.gamma.config.spec.FindingCodes | public static final String ERR_STEP_CONFIG_INVALID
 com.gamma.config.spec.FindingCodes | public static final String ERR_STEP_DISABLE_UNPARKABLE
 com.gamma.config.spec.FindingCodes | public static final String ERR_SUMMARIZE_MEASURE_TYPE
+com.gamma.config.spec.FindingCodes | public static final String ERR_UNKNOWN_CLASSIFICATION
 com.gamma.config.spec.FindingCodes | public static final String ERR_UNKNOWN_CONFIG_KEY
 com.gamma.config.spec.FindingCodes | public static final String ERR_WEBHOOK_CONNECTION_NOT_HTTPS
 com.gamma.config.spec.FindingCodes | public static final String ERR_WEBHOOK_CONNECTION_UNKNOWN

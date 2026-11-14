@@ -856,6 +856,8 @@ final class ComponentRoutes implements RouteModule {
                              String type, String id, Map<String, Object> content) {
         validateKind(type, id, content);
         if ("dataset".equals(type)) DatasetEntryRules.validateMapping(writeRoot, id, content);   // LA-DATA-PAGE-1
+        // CLASSIFICATION-UNMASKED-CLASS-1: a class the Space does not know masks nothing, so it is refused.
+        if ("dataset".equals(type) || "schema".equals(type)) ClassificationVocabulary.require(writeRoot, type, id, content);
         // An optional module's own kinds and reserved store names (the risk-score kind and its risk_scores_ outputs):
         // absent module = the kind stays opaque config and nothing is reserved. ENTITLEMENT-SPI-NARROWING-1: allInstalled -
         // validators only refuse, so a left-out module's kinds and store names stay checked and reserved.

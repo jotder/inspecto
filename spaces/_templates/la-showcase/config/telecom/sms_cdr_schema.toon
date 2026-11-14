@@ -2,8 +2,8 @@ raw:
   name: SMS_CDR
   format: CSV
   fields[4]{name,selector,type,description,unit,classification}:
-    orig_msisdn,"0",VARCHAR,"Originating MSISDN","","CONFIDENTIAL"
-    term_msisdn,"1",VARCHAR,"Terminating MSISDN","","CONFIDENTIAL"
+    orig_msisdn,"0",VARCHAR,"Originating MSISDN","","MSISDN"
+    term_msisdn,"1",VARCHAR,"Terminating MSISDN","","MSISDN"
     ts,"2",TIMESTAMP,"Submit time","","INTERNAL"
     message_type,"3",VARCHAR,"text","","INTERNAL"
 mapping:

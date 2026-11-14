@@ -191,6 +191,52 @@ class ControlApiSpaceTemplateSeedGateTest {
         }
     }
 
+    /**
+     * CLASSIFICATION-UNMASKED-CLASS-1: a template's own Dataset is judged as a new one. The staged tree is the tree the
+     * gate reads, so "a class the stored component already carries" must not excuse the template's own file.
+     */
+    @Test
+    void aTemplateDatasetOfAnUnknownClassRefusesTheWholeTemplate(@TempDir Path root) throws Exception {
+        Path cfg = root.resolve("_templates").resolve("classed").resolve("config");
+        Files.createDirectories(cfg.resolve("registry").resolve("datasets"));
+        Files.writeString(cfg.getParent().resolve("template.toon"), "name: Classed\n");
+        Files.writeString(cfg.resolve("registry").resolve("datasets").resolve("calls.toon"), """
+                physicalRef: calls/database
+                columns[2]{name,type,classification}:
+                  a_party,string,MSISDN
+                  cell,string,CONFIDENTIAL
+                """);
+        try (Ctx c = open(root)) {
+            HttpResponse<String> r = send(c, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"classed\"}", ADMIN);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains(com.gamma.config.spec.FindingCodes.ERR_UNKNOWN_CLASSIFICATION), r.body());
+            assertFalse(Files.exists(root.resolve("acme")), "a refused template leaves no Space directory");
+        }
+    }
+
+    /**
+     * CLASSIFICATION-UNMASKED-CLASS-1: a template's schema FILE (beside its pipeline, outside {@code registry/}) is
+     * judged for its column classes at the seed, so a template cannot plant a class that masks nothing.
+     */
+    @Test
+    void aTemplateSchemaFileOfAnUnknownClassRefusesTheWholeTemplate(@TempDir Path root) throws Exception {
+        copyTree(Path.of("..", "spaces", "_templates", "orders-starter"), root.resolve("_templates").resolve("classed"));
+        Path schema = root.resolve("_templates").resolve("classed").resolve("config/orders/orders_schema.toon");
+        String known = "\"Sales region code\",\"\",\"INTERNAL\"";
+        assertTrue(Files.readString(schema).contains(known), "the REGION row this test reclassifies");
+        try (Ctx c = open(root)) {
+            // the probe: the untouched copy, every column of a known class, seeds - so the refusal below is the class alone
+            assertEquals(200, send(c, "POST", "/spaces", "{\"id\":\"ok\",\"template\":\"classed\"}", ADMIN).statusCode());
+            Files.writeString(schema, Files.readString(schema).replace(known, "\"Sales region code\",\"\",\"CONFIDENTIAL\""));
+            HttpResponse<String> r = send(c, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"classed\"}", ADMIN);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("template schema 'orders_schema.toon' is refused"), r.body());
+            assertTrue(r.body().contains("raw.fields[2].classification") && r.body().contains("'CONFIDENTIAL'"), r.body());
+            assertFalse(Files.exists(root.resolve("acme")), "a refused template leaves no Space directory");
+            assertFalse(send(c, "GET", "/spaces", null, ADMIN).body().contains("\"acme\""));
+        }
+    }
+
     @Test
     void aTemplateKindTheCallerLacksTheCapabilityForIsRefused(@TempDir Path root) throws Exception {
         seedAlertTemplate(root, VALID_ALERT);

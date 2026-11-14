@@ -25,6 +25,12 @@ public final class ColumnClassification {
     /** Column classifications publication refuses and Risk Score evidence masks. */
     public static final Set<String> SENSITIVE = Set.of("MSISDN", "IMSI", "ACCOUNT", "PII");
 
+    /**
+     * The classes that state "this column needs no masking" (CLASSIFICATION-UNMASKED-CLASS-1). No reader acts on
+     * them; they exist so that a save can refuse a class nobody knows instead of accepting any text.
+     */
+    public static final Set<String> NOT_MASKED = Set.of("INTERNAL");
+
     /** Tie-break among masked (or among unmasked) classes, most restrictive first; others rank after, by name. */
     public static final List<String> RESTRICTIVENESS = List.of("MSISDN", "IMSI", "ACCOUNT", "PII");
 

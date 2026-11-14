@@ -1,11 +1,15 @@
 package com.gamma.control;
 
+import com.gamma.config.io.ConfigLoader;
 import com.gamma.util.ColumnClassification;
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -47,5 +51,40 @@ class TemplateIdentifierClassificationTest {
                         f[0] + " " + col + " is classified " + cls + ", which is not masked");
             }
         }
+    }
+
+    /**
+     * CLASSIFICATION-UNMASKED-CLASS-1: no shipped schema or Dataset states a class its own template does not know
+     * ({@link ClassificationVocabulary}, judged against the Entity Types of that template's {@code link-analysis.toon}),
+     * so no template column is classed with a word that masks nothing, and every template passes the save gate.
+     */
+    @Test
+    void noTemplateSchemaOrDatasetStatesAClassItsTemplateDoesNotKnow() throws Exception {
+        List<String> unknown = new ArrayList<>();
+        int read = 0;
+        try (DirectoryStream<Path> templates = Files.newDirectoryStream(TEMPLATES, Files::isDirectory)) {
+            for (Path template : templates) {
+                Path config = template.resolve("config");
+                if (!Files.isDirectory(config)) continue;
+                List<Path> files;
+                try (Stream<Path> walk = Files.walk(config)) {
+                    files = walk.filter(p -> {
+                        String rel = config.relativize(p).toString().replace('\\', '/');
+                        return rel.endsWith("_schema.toon") || (rel.startsWith("registry/datasets/") && rel.endsWith(".toon"));
+                    }).sorted().toList();
+                }
+                for (Path file : files) {
+                    read++;
+                    try {
+                        // no type or id: nothing counts as already stored, so the file's own classes are all judged
+                        ClassificationVocabulary.require(config, null, null, ConfigLoader.filesystem().decode(file.toString()));
+                    } catch (IllegalArgumentException refused) {
+                        unknown.add(TEMPLATES.relativize(file) + ": " + refused.getMessage());
+                    }
+                }
+            }
+        }
+        assertTrue(read > 400, "the sweep found the shipped schemas and Datasets: " + read);
+        assertTrue(unknown.isEmpty(), String.join("\n", unknown));
     }
 }

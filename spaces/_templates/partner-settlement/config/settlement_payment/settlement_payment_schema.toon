@@ -8,7 +8,7 @@ raw:
     direction,"3",VARCHAR,"we_pay (money left us, or a note reducing what we owe) or they_pay (money came to us)","","INTERNAL"
     payment_date,"4",DATE,"Value date of the payment, or the date of the note","","INTERNAL"
     kind,"5",VARCHAR,"payment, credit_note or debit_note","","INTERNAL"
-    amount,"6","DECIMAL(18,4)","Positive amount in the record currency; the kind and the direction give the sign","","CONFIDENTIAL"
+    amount,"6","DECIMAL(18,4)","Positive amount in the record currency; the kind and the direction give the sign","","INTERNAL"
     currency,"7",VARCHAR,"Record currency (ISO 4217)","","INTERNAL"
     recorded_at,"8",TIMESTAMP,"When finance recorded it","","INTERNAL"
 mapping:
