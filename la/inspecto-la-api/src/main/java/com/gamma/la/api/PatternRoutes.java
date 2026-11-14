@@ -4,7 +4,7 @@ import com.gamma.entitystore.LaLimit;
 import com.gamma.entitystore.LaLimitValues;
 import com.gamma.la.core.LinkEventTypes;
 import com.gamma.la.core.LinkTemporalDetector;
-import com.gamma.la.storage.IndexReader.LinkTime;
+import com.gamma.la.core.TemporalCut;
 import com.gamma.la.core.PatternQueryCompiler;
 import com.gamma.la.core.DatasetProviders;
 import com.gamma.la.core.DatasetProvider;
@@ -133,42 +133,38 @@ public final class PatternRoutes implements RouteModule {
         InvRoutes.refuseIfSensitive(writeRoot, "a temporal scan (up to " + maxRows + " rows)", maxRows, 0);
 
         // LA-INVESTIGATION-OPS-DEFERRED-1: answered from the edge index when - and only when - it can answer exactly (IndexedTemporal),
-        // else from the flat Dataset. Both hand the SAME ordered (source, target, time) rows to the one detection below.
-        IndexedRead.Outcome<IndexedTemporal.Result> indexed = IndexedTemporal.attempt(writeRoot, api.dataRoot(), relationSql,
-                new IndexedTemporal.Request(datasetId, sourceCol, targetCol, timeCol, body.get("filter"), maxRows),
+        // else from the flat Dataset. DUCKDB-2-LOOP-QUERIES-1 C3: both run the SAME TemporalCut statement over the same ordered,
+        // capped (source, target, time) rows, so only the series that can hold a finding reach the one detection below.
+        TemporalCut.Spec spec = new TemporalCut.Spec(burst, entity, windowMs, minEvents, maxCv);
+        IndexedRead.Outcome<TemporalCut.Result> indexed = IndexedTemporal.attempt(writeRoot, api.dataRoot(), relationSql,
+                new IndexedTemporal.Request(datasetId, sourceCol, targetCol, timeCol, body.get("filter"), maxRows, spec),
                 InvRoutes.traversalPolicy(writeRoot));
         try {
-            List<LinkTime> rows = new ArrayList<>();
-            boolean rowCapped;
+            TemporalCut.Result cut;
             if (indexed.served()) {
-                rows = indexed.result().rows();
-                rowCapped = indexed.result().truncated();
+                cut = indexed.result();
             } else {
-                String sql = "SELECT CAST(" + q(sourceCol) + " AS VARCHAR) AS s, CAST(" + q(targetCol) + " AS VARCHAR) AS t,"
+                String inner = "SELECT CAST(" + q(sourceCol) + " AS VARCHAR) AS s, CAST(" + q(targetCol) + " AS VARCHAR) AS t,"
                         + " epoch_ms(TRY_CAST(CAST(" + q(timeCol) + " AS VARCHAR) AS TIMESTAMP)) AS ts FROM " + q(datasetId)
-                        + " WHERE " + q(sourceCol) + " IS NOT NULL AND " + q(targetCol) + " IS NOT NULL AND (" + filter.sql() + ")"
-                        + " ORDER BY s, t, ts";
+                        + " WHERE " + q(sourceCol) + " IS NOT NULL AND " + q(targetCol) + " IS NOT NULL AND (" + filter.sql() + ")";
                 SqlSandboxPolicy policy = SqlSandboxPolicy.withCaps(null, 0, timeoutSeconds);
+                long outRows = TemporalCut.maxOutputRows(maxRows, spec);
                 DatasetProvider.Result r = DatasetProviders.require().run(new DatasetProvider.Request(
-                        datasetId, relationSql, sql, maxRows, 0, List.of(), List.of(), filter.binds()), policy);
-                for (Map<String, Object> row : r.rows())                       // rows arrive grouped by link, times ascending
-                    rows.add(new LinkTime(String.valueOf(row.get("s")), String.valueOf(row.get("t")),
-                            row.get("ts") instanceof Number ts ? ts.longValue() : null));
-                rowCapped = r.truncated();
+                        datasetId, relationSql, TemporalCut.sql(inner, maxRows, spec), (int) Math.min(Integer.MAX_VALUE, outRows),
+                        0, List.of(), List.of(), filter.binds()), policy);
+                cut = TemporalCut.read(r.rows());
             }
+            List<TemporalCut.Row> rows = cut.rows();                           // kept series only, grouped, times ascending
+            boolean rowCapped = cut.rowCapped();
 
             List<Found> found = new ArrayList<>();
-            int skipped = 0;
+            int skipped = cut.skippedNoTime();
             if (entity) {
                 // an entity's series is every event it takes part in, as source or as target (a self-loop row is ONE event)
                 Map<String, long[]> byEntity = new LinkedHashMap<>();
                 Map<String, Integer> sizes = new LinkedHashMap<>();
-                for (LinkTime row : rows) {
-                    if (row.ms() == null) {
-                        skipped++;
-                        continue;
-                    }
-                    for (String who : row.source().equals(row.target()) ? List.of(row.source()) : List.of(row.source(), row.target())) {
+                for (TemporalCut.Row row : rows) {
+                    for (String who : row.s().equals(row.t()) ? List.of(row.s()) : List.of(row.s(), row.t())) {
                         long[] arr = byEntity.getOrDefault(who, new long[8]);
                         int n = sizes.getOrDefault(who, 0);
                         if (n == arr.length) arr = Arrays.copyOf(arr, n * 2);
@@ -186,18 +182,14 @@ public final class PatternRoutes implements RouteModule {
                 String curS = null, curT = null;
                 long[] times = new long[64];
                 int n = 0;
-                for (LinkTime row : rows) {
-                    String s = row.source(), t = row.target();
+                for (TemporalCut.Row row : rows) {
+                    String s = row.s(), t = row.t();
                     if (curS != null && (!s.equals(curS) || !t.equals(curT))) {
                         collect(found, curS, curT, Arrays.copyOf(times, n), burst, windowMs, minEvents, maxCv);
                         n = 0;
                     }
                     curS = s;
                     curT = t;
-                    if (row.ms() == null) {
-                        skipped++;
-                        continue;
-                    }
                     if (n == times.length) times = Arrays.copyOf(times, n * 2);
                     times[n++] = row.ms();
                 }

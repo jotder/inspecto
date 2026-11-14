@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.la-storage`](../../../../../product-map/module/la-storage.toon).
 
-15 test class(es): 15 unit, 0 real-HTTP control-plane, 0 IT.
+16 test class(es): 16 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -40,3 +40,4 @@ mvn -o test -pl la/inspecto-la-storage -Dtest=BucketFunctionTest,IndexAppendTest
 | `IndexReaderTest` | `com.gamma.la.storage` | unit | `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexReaderTest.java` | D-3 step 5 - the sealed per-request reader. The index is generated at test time; nothing is committed. |
 | `IndexStoreTest` | `com.gamma.la.storage` | unit | `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/IndexStoreTest.java` |  |
 | `SqlGraphEngineParityTest` | `com.gamma.la.storage` | unit | `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/SqlGraphEngineParityTest.java` | D-3 step 7 - the index engine answers what the in-memory engine answers over the SAME graph. The graph is a VALUES relation with |
+| `TemporalCutParityTest` | `com.gamma.la.storage` | unit | `la/inspecto-la-storage/src/test/java/com/gamma/la/storage/TemporalCutParityTest.java` | DUCKDB-2-LOOP-QUERIES-1 C3: the {@link TemporalCut} statement must hand the detector every series it would report, so the |

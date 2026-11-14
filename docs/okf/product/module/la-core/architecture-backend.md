@@ -449,6 +449,19 @@ This section is on its own page: [architecture-masking.md](architecture-masking.
   422s, the SQL prune over the whole Dataset, key normalisation), its `Stage` with edge kind, node kind and threshold
   band, and `Stage.motif()` — the mapping onto the matcher's neutral stage, where a node kind other than `entity`
   admits no nodes. `PatternRoutes` (la-api) still masks, labels and shapes the answer.
+* **Temporal scan: cut in DuckDB, detected in Java** (`DUCKDB-2-LOOP-QUERIES-1` C3, 2026-11-14). Behind
+  `/inv/pattern/temporal` and the Investigation `temporal` op, one statement (`TemporalCut`, la-core) reads the capped,
+  ordered `(source, target, time)` rows and returns only the series that can hold a finding - a burst when an event's
+  `(minEvents - 1)`-th successor is within the window (`lead`, not a `RANGE` count: one hot link of 2 000 000 events ran a
+  `RANGE` frame past the 10 s timeout), a regular series when its gap CV is within `maxCv` plus a float tolerance - with
+  `skippedNoTime` and `rowCapped`. The flat read and the link index (`IndexReader.scanTemporalCut`) share it, and
+  `LinkTemporalDetector` decides on what is kept, so findings and sealed fingerprints are the same as reading every row
+  (`TemporalCutParityTest`). About 0.4 % of the rows reach the JVM, so `pattern.temporal_max_rows` defaults to 2 000 000
+  (was 400 000). Bench and the refused `USING KEY` traversal (C1):
+  [`2026-11-14-duckdb-loop-queries-plan.md`](../../../../archived-documents/plans-archive/2026-11-14-duckdb-loop-queries-plan.md).
+* **Index traversal stays per-key** (C1 measured 2026-11-14, refused): a `WITH RECURSIVE ... USING KEY` reachability over
+  the index joins the whole `out` copy per iteration, so it lost to the per-level bucket lookups 5x at 10^6 and 40x at
+  10^7 edges at depth 2. `SqlGraphEngine` / `IndexedTraversal` keep their 2-hop / 20-key caps.
 
 * **Input** is a sealed `GraphInput`: `Materialised` (from the Working Set, `WorkingSetGraphInput`) or `IndexRef`.
   `RoutingGraphEngine` routes **by input type only**, never by size: Materialised → `InMemoryGraphEngine`
