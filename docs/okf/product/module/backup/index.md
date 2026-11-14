@@ -19,7 +19,7 @@ tags: [product-item, module]
 | spec | current | [Backup and restore — spec](spec.md) |
 | architecture | current | [Backup and restore — architecture](architecture.md) |
 | features | current | [Backup and restore — features](features.md) |
-| feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
+| feature-db | current | [Backup and restore — feature database](feature-db.md) |
 | user-guide | n/a | no screen or end-user configuration of its own; the tasks are maintenance Jobs authored by administrators, covered by admin-guide-backup-restore |
 | admin-guide | current | [Backup & Restore Runbook (System Maintenance MNT-5/MNT-6)](admin-guide-backup-restore.md) |
 | api | n/a | no HTTP routes of its own; the tasks run through the generic Jobs routes (POST /jobs, POST /jobs/{name}/trigger) |
@@ -32,6 +32,4 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.backup` — the board is the only list; change the row there.
 
-| Row | Priority | Kind | Title | Hold |
-|---|---|---|---|---|
-| `ENTITLEMENT-UNLISTED-FEATURES-1` | P2 | defect | three edition features are declared in code but missing from their module's manifest, so a signed entitlement may not withhold them (file… | — |
+_No open rows._

@@ -40,9 +40,10 @@ const GROUPS: { role: string; title: string; note: string }[] = [
 ];
 
 /**
- * Settings > **Modules** (MODULE-REORG-1 P2b): the installed Modules by offering role and, for those that declare
- * Features and are not Base/Internal, a per-Space switch. The draft is the set of disabled Feature ids, replaced in
- * one explicit PUT (`canAdminister`). Unknown ids already in the Space's settings are listed and sent back untouched.
+ * Settings > **Modules** (MODULE-REORG-1 P2b): the installed Modules by offering role and, for those that declare a
+ * Feature the Space can switch off (`installed`) and are not Base/Internal, a per-Space switch. The draft is the set of
+ * disabled Feature ids, replaced in one explicit PUT (`canAdminister`). Unknown ids already in the Space's settings are
+ * listed and sent back untouched.
  */
 @Component({
     selector: 'inspecto-module-settings',
@@ -199,6 +200,8 @@ export class ModuleSettingsComponent implements OnInit {
     readonly unreadable = signal(false);
     readonly modules = signal<InstalledModule[]>([]);
     readonly inert = signal<string[]>([]);
+    /** The Feature ids a Space can switch off (`GET /settings/modules` `installed`); an edition Feature is not one. */
+    private readonly installed = signal<string[]>([]);
 
     private readonly saved = signal<string[]>([]);
     /** Feature ids switched off in the draft (sorted, so equality is order-free). */
@@ -214,19 +217,19 @@ export class ModuleSettingsComponent implements OnInit {
     readonly hiding = computed(() =>
         this.modules()
             .filter(
-                (m) =>
-                    this.switchable(m) && !this.isOn(m) && m.provides.features.some((f) => !this.saved().includes(f)),
+                (m) => this.switchable(m) && !this.isOn(m) && this.switches(m).some((f) => !this.saved().includes(f)),
             )
             .map((m) => m.title),
     );
 
     ngOnInit(): void {
         let modules: InstalledModule[] | null = null;
-        let settings: { disabled: string[]; inert: string[]; unreadable: boolean } | null = null;
+        let settings: { disabled: string[]; inert: string[]; installed: string[]; unreadable: boolean } | null = null;
         const done = () => {
             if (!modules || !settings) return;
             this.modules.set(modules);
             this.inert.set(settings.inert ?? []);
+            this.installed.set(settings.installed ?? []);
             this.unreadable.set(!!settings.unreadable);
             this.adopt(settings.disabled ?? []);
             this.loading.set(false);
@@ -252,18 +255,26 @@ export class ModuleSettingsComponent implements OnInit {
         });
     }
 
-    /** A Module gets a switch only when it declares Features and a Space may turn it off (not Base/Internal). */
+    /**
+     * The Module's Features a Space can switch off: those the server lists as `installed`. An edition Feature a module also
+     * declares (`alert.dispatch`, `sink.archive`) follows the entitlement, not the Space, and the PUT refuses it.
+     */
+    private switches(m: InstalledModule): string[] {
+        return m.provides.features.filter((f) => this.installed().includes(f));
+    }
+
+    /** A Module gets a switch only when it declares a switchable Feature and a Space may turn it off (not Base/Internal). */
     switchable(m: InstalledModule): boolean {
-        return m.provides.features.length > 0 && m.offeringRole !== 'base' && m.offeringRole !== 'internal';
+        return this.switches(m).length > 0 && m.offeringRole !== 'base' && m.offeringRole !== 'internal';
     }
 
     isOn(m: InstalledModule): boolean {
-        return m.provides.features.every((f) => !this.draft().includes(f));
+        return this.switches(m).every((f) => !this.draft().includes(f));
     }
 
     set(m: InstalledModule, on: boolean): void {
-        const rest = this.draft().filter((f) => !m.provides.features.includes(f));
-        this.draft.set((on ? rest : [...rest, ...m.provides.features]).sort());
+        const rest = this.draft().filter((f) => !this.switches(m).includes(f));
+        this.draft.set((on ? rest : [...rest, ...this.switches(m)]).sort());
         this.saveError.set(null);
         this.savedNote.set(null);
     }

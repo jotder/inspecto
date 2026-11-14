@@ -19,7 +19,7 @@ tags: [product-item, module]
 | spec | current | [Attribute-based access policy — implementation spec](spec.md) |
 | architecture | current | [Attribute-based access policy — architecture](architecture.md) |
 | features | current | [Attribute-based access policy — features](features.md) |
-| feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
+| feature-db | current | [Attribute-based access policy — feature database](feature-db.md) |
 | user-guide | current | [Attribute-based access policy — user guide](user-guide.md) |
 | admin-guide | current | [Attribute-based access policy — admin guide](admin-guide.md) |
 | api | n/a | implements the AccessDecider and EditionFeatureProvider contracts owned by module.auth-spi and the core; the /access/policies routes are core routes documented in module.access api-access.md |
@@ -32,6 +32,4 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.policy` — the board is the only list; change the row there.
 
-| Row | Priority | Kind | Title | Hold |
-|---|---|---|---|---|
-| `ENTITLEMENT-UNLISTED-FEATURES-1` | P2 | defect | three edition features are declared in code but missing from their module's manifest, so a signed entitlement may not withhold them (file… | — |
+_No open rows._

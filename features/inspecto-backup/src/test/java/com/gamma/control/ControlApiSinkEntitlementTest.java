@@ -1,0 +1,133 @@
+package com.gamma.control;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gamma.etl.EditionFeatures;
+import com.gamma.etl.PipelineConfigBatchTest;
+import com.gamma.module.Entitlements;
+import com.gamma.service.CollectorService;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpRequest.BodyPublishers;
+import java.net.http.HttpResponse;
+import java.net.http.HttpResponse.BodyHandlers;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.Signature;
+import java.util.Base64;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * ENTITLEMENT-UNLISTED-FEATURES-1 over real HTTP: the compliance archive ({@code sink.archive}) and DuckLake registration
+ * ({@code sink.ducklake}), which this module declares through its {@code EditionFeatureProvider}, are withheld with the
+ * module. A signed entitlement that leaves {@code backup} out refuses a Pipeline using either at save (422
+ * {@code ERR_EDITION_FEATURE}, naming the entitlement) and {@code /bootstrap} gives both a {@code featureReasons} entry;
+ * one that lists {@code backup} saves the same Pipeline.
+ */
+class ControlApiSinkEntitlementTest {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private final HttpClient client = HttpClient.newHttpClient();
+    private KeyPair issuer;
+
+    @TempDir Path tmp;
+
+    @BeforeEach
+    void trustATestIssuer() throws Exception {
+        issuer = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        Entitlements.trustForTests(Map.of("test-issuer", issuer.getPublic()));
+        Entitlements.clockForTests(java.time.Clock.fixed(java.time.Instant.parse("2026-11-12T00:00:00Z"), java.time.ZoneOffset.UTC));
+        System.setProperty(Entitlements.FILE_PROPERTY, tmp.resolve("conf/none.toon").toString());
+        Entitlements.reset();
+    }
+
+    @AfterEach
+    void restore() {
+        System.clearProperty(Entitlements.FILE_PROPERTY);
+        Entitlements.trustForTests(null);
+        Entitlements.clockForTests(null);
+    }
+
+    private record Ctx(CollectorService svc, ControlApi api, int port) implements AutoCloseable {
+        public void close() { api.close(); svc.close(); }
+    }
+
+    private Ctx open() throws Exception {
+        Path pipe = PipelineConfigBatchTest.writePipeline(Files.createDirectories(tmp.resolve("cfg")), "");
+        System.setProperty("assist.write.root", Files.createDirectories(tmp.resolve("wr")).toString());
+        try {
+            CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
+            ControlApi api = new ControlApi(svc, 0);
+            api.start();
+            return new Ctx(svc, api, api.port());
+        } finally {
+            System.clearProperty("assist.write.root");
+        }
+    }
+
+    private HttpResponse<String> send(Ctx c, String method, String path, String body) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port() + "/api/v1" + path))
+                .method(method, body == null ? BodyPublishers.noBody() : BodyPublishers.ofString(body)).build(),
+                BodyHandlers.ofString());
+    }
+
+    /** Write and sign an entitlement for this build (Basic: a test boots no Authenticator) listing {@code modules}. */
+    private void entitle(List<String> modules) throws Exception {
+        String toon = String.join("\n",
+                "schema: inspecto.entitlement/1", "id: acme-2026-11-12", "customer: acme", "title: Acme Ltd", "product: inspecto",
+                "edition: basic", "apps[0]:", "addons[0]:",
+                "modules[" + modules.size() + "]:" + (modules.isEmpty() ? "" : " " + String.join(",", modules)),
+                "nodes: 1", "notBefore: 2026-11-11", "expires: 2027-11-11", "issued: 2026-11-11", "keyId: test-issuer", "");
+        Path dir = Files.createDirectories(tmp.resolve("conf"));
+        Path file = dir.resolve("entitlement.toon");
+        Files.writeString(file, toon, StandardCharsets.UTF_8);
+        Signature s = Signature.getInstance("Ed25519");
+        s.initSign(issuer.getPrivate());
+        s.update(toon.getBytes(StandardCharsets.UTF_8));
+        Files.writeString(dir.resolve("entitlement.sig"), Base64.getEncoder().encodeToString(s.sign()));
+        System.setProperty(Entitlements.FILE_PROPERTY, file.toString());
+        Entitlements.reset();
+    }
+
+    private static final String ARCHIVE_AND_LAKE = """
+            {"type":"pipeline","config":{"name":"%s","active":false,
+              "dirs":{"poll":"in","database":"out"},"processing":{"threads":1,"schema_file":"cdr.toon"},
+              "collector":{"connector":"sftp","post_action":{"on_success":"MOVE","archive_path":"archive"}},
+              "output":{"format":"PARQUET","ducklake":{"enabled":true,"catalog_url":"lake.ducklake","data_path":"lake","table":"t"}}}}""";
+
+    private JsonNode featureReasons(Ctx c) throws Exception {
+        JsonNode boot = JSON.readTree(send(c, "GET", "/bootstrap", null).body());
+        return (boot.has("data") ? boot.get("data") : boot).path("featureReasons");
+    }
+
+    @Test
+    void anEntitlementWithoutTheModuleRefusesBothSinkFeaturesAndOneWithItSavesThem() throws Exception {
+        entitle(List.of());
+        try (Ctx c = open()) {
+            JsonNode reasons = featureReasons(c);
+            assertEquals("Not in this installation's entitlement.", reasons.path(EditionFeatures.SINK_ARCHIVE).asText(), reasons.toString());
+            assertEquals("Not in this installation's entitlement.", reasons.path(EditionFeatures.SINK_DUCKLAKE).asText(), reasons.toString());
+            HttpResponse<String> r = send(c, "POST", "/config/write", ARCHIVE_AND_LAKE.formatted("refused"));
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("ERR_EDITION_FEATURE") && r.body().contains(EditionFeatures.SINK_ARCHIVE)
+                    && r.body().contains(EditionFeatures.SINK_DUCKLAKE) && r.body().contains(Entitlements.NOT_ENTITLED), r.body());
+
+            entitle(List.of("backup"));
+            HttpResponse<String> ok = send(c, "POST", "/config/write", ARCHIVE_AND_LAKE.formatted("saved"));
+            assertTrue(ok.statusCode() / 100 == 2, ok.statusCode() + " " + ok.body());
+            assertFalse(featureReasons(c).has(EditionFeatures.SINK_ARCHIVE), featureReasons(c).toString());
+        }
+    }
+}

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.backup`](../../../../../product-map/module/backup.toon).
 
-11 test class(es): 10 unit, 1 real-HTTP control-plane, 0 IT.
+12 test class(es): 10 unit, 2 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -29,6 +29,7 @@ mvn -o test -pl features/inspecto-backup -Dtest=BackupSignalsTest,BackupTaskProv
 | `BackupTaskProviderTckTest` | `com.gamma.backup` | unit | `features/inspecto-backup/src/test/java/com/gamma/backup/BackupTaskProviderTckTest.java` | {@link BackupTaskProvider} against the platform's MaintenanceTaskProvider TCK (MODULE-REORG-1 P5b). |
 | `BackupTaskSecretExclusionTest` | `com.gamma.backup` | unit | `features/inspecto-backup/src/test/java/com/gamma/backup/BackupTaskSecretExclusionTest.java` | What no backup may carry, as {@link BackupTask#secret} decides it. |
 | `ControlApiRestoreJobGateTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-backup/src/test/java/com/gamma/control/ControlApiRestoreJobGateTest.java` | MAINT-RESTORE-ESCALATION-1: a {@code restore} maintenance Job writes an archive's files into any jailed |
+| `ControlApiSinkEntitlementTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-backup/src/test/java/com/gamma/control/ControlApiSinkEntitlementTest.java` | ENTITLEMENT-UNLISTED-FEATURES-1 over real HTTP: the compliance archive ({@code sink.archive}) and DuckLake registration |
 | `ProfessionalSinkFeaturesAcceptedTest` | `com.gamma.control` | unit | `features/inspecto-backup/src/test/java/com/gamma/control/ProfessionalSinkFeaturesAcceptedTest.java` | The STANDARD half of `PROCESSOR-RELEASE-READINESS-1` G9 for the two sink features: with this module on |
 | `BackupCatalogSpaceRootTest` | `com.gamma.job` | unit | `features/inspecto-backup/src/test/java/com/gamma/job/BackupCatalogSpaceRootTest.java` | {@code BACKUP-CATALOG-SPACE-ROOT-1} — <b>a backup in a named Space registers its {@code maintenance_backups} |
 | `BackupJobPathResolutionTest` | `com.gamma.job` | unit | `features/inspecto-backup/src/test/java/com/gamma/job/BackupJobPathResolutionTest.java` | The three backup tasks resolve a RELATIVE path value against the <b>Space config root</b>, not the |

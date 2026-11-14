@@ -174,7 +174,7 @@ provides:
 |---|---|
 | `buildRole` · `offeringRole` · `bindingTime` | the three axes: `foundation` `contract` `platform` `implementation` · `base` `optional` `provider` `internal` · `build` `boot` `space` `run` |
 | `absentMessage` | the text of the 503 answered when the module is absent |
-| `provides.features` | must hold every id the code's `RouteModule.featureIds()` returns, and only ids the module declares in code (`featureIds()` or an `EditionFeatureProvider`); `Entitlements.featureEntitled` maps a feature to its module through this list (guard-tested by `ModuleManifestGuardTest`) |
+| `provides.features` | must hold every id the code's `RouteModule.featureIds()` returns and every id its `EditionFeatureProvider` declares, and only ids the module declares in code; an edition feature that belongs to another module or to the edition stays unlisted only by a reasoned entry in the guard's `UNLISTED` list. `Entitlements.featureEntitled` maps a feature to its module through this list, so an unlisted feature is never withheld by an entitlement (guard: `ModuleManifestGuardTest`) |
 | `provides.contracts` | the contribution-point interfaces the module implements |
 | `provides.storeFamilies` | operational store families the module owns (`StoreFamilyProvider`) |
 | `provides.consequences` | Consequence ids it registers (`ConsequenceProvider`) |

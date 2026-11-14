@@ -200,6 +200,10 @@ public final class EditionFeatures {
                             + REALTIME_ORDER_CODE + ", module inspecto-realtime)"
                     : what + " needs the Real-time Detection Add-on (" + REALTIME_ORDER_CODE + "), provided by the optional "
                             + "inspecto-realtime module (Standard edition and above) - this build does not include it";
+        // ENTITLEMENT-UNLISTED-FEATURES-1: built and declared, but the install's signed entitlement leaves out every module
+        // that provides it - say so, never "this build does not include it" on a build that does.
+        if (declared(feature) && !com.gamma.module.Entitlements.featureEntitled(feature))
+            return what + " is " + com.gamma.module.Entitlements.NOT_ENTITLED;
         if (PII_MASK.equals(feature))
             return what + " is an Advanced feature — this build does not include it";
         if (GEO_MAP.equals(feature) || ENTITY_PAGES.equals(feature))
