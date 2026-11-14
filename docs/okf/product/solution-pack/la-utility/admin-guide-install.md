@@ -123,7 +123,8 @@ person, and one open Draft. To lay the Space out offline instead of unzipping th
 **The Alert Rule.** `utility_transformer_loss` fires (CRITICAL) when a metered transformer's monthly loss in
 `transformer_loss` reaches 15 %. The Alert carries the highest monthly loss. It fires while the months land, because
 TX-019 reaches 15 % from March 2026 (TX-007 from July); with all twelve months in, the loss is 24.7 % on TX-019 and 17.9 % on TX-007, and every
-other metered transformer, the holiday home's included, stays under 7 %. Open `transformer_loss` (`loss_band = loss over
+other metered transformer stays under 7 %. The holiday home's transformer (`TX-031`) is not metered, so it has no energy
+balance and cannot raise the Alert. Open `transformer_loss` (`loss_band = loss over
 threshold`) to see which transformer. The rule is not grouped by transformer, because `transformer_loss` is a Job
 output: a `by` column cannot be checked against its Schema when the Space is created.
 
