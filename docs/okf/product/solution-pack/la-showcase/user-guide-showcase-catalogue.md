@@ -41,6 +41,7 @@ This page helps you pick one. The screens are the shared studio ones, described 
 3. **Testers:** the exercise answers are the tester's checklist, including the look-alikes that must **not** appear;
    most guides also end with a *Tester's checklist* or *For testers* section. The answers are in the guide, not in the data, so you can work
    blind.
+4. **New to Link Analysis?** The [new-user guide](user-guide-new-users.md) reads any showcase in five steps: data, mapping, observation, intentions, how-to.
 
 ## How to install a showcase
 
