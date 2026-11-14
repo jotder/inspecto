@@ -807,12 +807,6 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 
 - **P2** · `DEMO-AUTH-STALE-ROSTER-1` — **a roster in a folder that is not a Space can still sign a user in (filed 2026-11-14, found while fixing `DEMO-AUTH-NO-ROSTER-1`; not reproduced over HTTP).** `DemoUsers.all` reads `config/demo-users.toon` from every folder under `spaces.root`, including hidden and backup-named folders that `SpaceManager.notASpaceReason` refuses as Spaces, so a stale `backup-acme/` roster can sign someone in or raise a roster conflict. `spacesAttached` now skips `_`/`.` folders but still counts backup, snapshot or scratch-named ones, because the copy-name rule lives in a core class the module cannot use. Prove it with a real-HTTP test, then read rosters only from folders the core accepts as Spaces (move or expose that rule). Also: in legacy write-root mode the page says the file belongs in an attached Space, while it sits in the write root. [items: module.demo-auth · kind: defect]
-  `DemoAuthenticator` names its principals from a Space's `config/demo-users.toon`, so a `spaces/` holding only
-  `_templates` answers `/bootstrap` with `authMode: demo`, `mock: true` and `demoUsers: []`; the sign-in page then
-  renders the SSO panel and a bare "Sign-in failed", with no hint that the roster is the missing piece. Hit on
-  2026-11-13 after the 2026-10-27 bundle rebuild emptied `inspecto-demo/spaces/`; unblocked by hand-seeding
-  `spaces/demo/config/demo-users.toon`. Either ship a fallback roster with the demo build, or have the sign-in page
-  say that no attached Space carries a Demo User roster.
 
 - **P3** · `SPACE-CREATE-PARTIAL-1` — **creating a Space half-succeeds when the caller lacks `canAuthorWorkbench`.** [items: module.config, module.access · kind: defect]
   `POST /spaces` succeeds, the branding `PUT` that follows is refused, and the UI shows only

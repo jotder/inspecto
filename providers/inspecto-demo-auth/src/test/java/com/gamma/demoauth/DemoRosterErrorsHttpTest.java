@@ -170,6 +170,11 @@ class DemoRosterErrorsHttpTest {
             Files.writeString(config.resolve(DemoUsers.FILE), "users[1]{id,roles}:\n  admin,admin\n");
             new DemoAuthenticator();
             assertTrue(logs.list.isEmpty(), "a build WITH a roster boots silently: " + logs.list);
+            // a roster that cannot be read is a warning at boot, never a server that does not start
+            Files.writeString(config.resolve(DemoUsers.FILE), "users: not-a-table\n");
+            new DemoAuthenticator();
+            assertEquals(1, logs.list.size(), "one warning for the unreadable roster: " + logs.list);
+            assertTrue(logs.list.get(0).getFormattedMessage().contains("could not be read"), logs.list.get(0).getFormattedMessage());
         } finally {
             logger.detachAppender(logs);
         }

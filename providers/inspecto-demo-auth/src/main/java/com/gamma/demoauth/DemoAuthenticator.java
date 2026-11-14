@@ -35,8 +35,14 @@ public final class DemoAuthenticator implements Authenticator {
         LoopbackOnly.require();
         // DEMO-AUTH-NO-ROSTER-1: ControlApi resolves the Authenticator at boot (the relay only on the first request),
         // so this is where the operator learns that nobody can sign in.
-        String noUsers = DemoTokenRelay.noDemoUsersWarning();
-        if (noUsers != null) org.slf4j.LoggerFactory.getLogger(DemoAuthenticator.class).warn(noUsers);
+        // A warning only: an unreadable roster must not stop the server booting (sign-in reports it per request, as before).
+        try {
+            String noUsers = DemoTokenRelay.noDemoUsersWarning();
+            if (noUsers != null) org.slf4j.LoggerFactory.getLogger(DemoAuthenticator.class).warn(noUsers);
+        } catch (RuntimeException unreadable) {
+            org.slf4j.LoggerFactory.getLogger(DemoAuthenticator.class)
+                    .warn("demo sign-in: the Demo User rosters could not be read at boot: {}", unreadable.getMessage());
+        }
     }
 
     @Override
