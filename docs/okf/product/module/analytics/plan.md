@@ -49,9 +49,9 @@ ratcheting duplication guard (Must items M1–M10).
 
 ## Left
 
-- C7 graph traversal in SQL — no longer blocked (DuckDB 2.0.0.0 is pinned since 2026-10-23); it waits for its
-  benchmark on board row `DUCKDB-2-LOOP-QUERIES-1`, candidate C1 / C2 of
-  [`duckdb-2-plan.md`](../../../../archived-documents/plans-archive/duckdb-2-plan.md) §7.
+- C7 graph traversal in SQL — **measured and refused 2026-11-14** (`DUCKDB-2-LOOP-QUERIES-1` C1, now closed): a
+  `USING KEY` reachability over the link index lost to the per-key index read 5x at 10^6 edges and 40x at 10^7
+  ([la-core architecture](../la-core/architecture-backend.md)). Nothing of the Analytics Kernel is left open.
 
 ## Refused (Won't, this horizon)
 
