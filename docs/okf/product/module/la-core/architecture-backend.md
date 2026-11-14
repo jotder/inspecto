@@ -462,6 +462,16 @@ This section is on its own page: [architecture-masking.md](architecture-masking.
 * **Index traversal stays per-key** (C1 measured 2026-11-14, refused): a `WITH RECURSIVE ... USING KEY` reachability over
   the index joins the whole `out` copy per iteration, so it lost to the per-level bucket lookups 5x at 10^6 and 40x at
   10^7 edges at depth 2. `SqlGraphEngine` / `IndexedTraversal` keep their 2-hop / 20-key caps.
+* **Two more DuckDB 2.0 loop candidates measured and refused** (2026-11-14, opt-in benches in `la/inspecto-la-storage`
+  tests; same answers in every run):
+  * **C4, branching legs with `ASOF JOIN`** (`BranchingLegsBench`): the `afterPrevious` test of `PatternQueryCompiler.legs`
+    stays the correlated `e.ts > (SELECT min(p.ts) FROM prev p WHERE p.t = e.s)`. `ASOF JOIN` took 3.2 s vs 2.3 s at
+    10^6 rows and 84 s vs 26 s at 10^7; an explicit `GROUP BY` join tied at 10^6 and took 54 s at 10^7. DuckDB already
+    decorrelates the subquery well.
+  * **C2, components by `USING KEY` label propagation** (`ComponentsLabelPropagationBench`): equal to
+    `GraphAlgorithms.connectedComponents` at 10^6 edges in 3.0 s vs the JVM's 3.6 s, but one round per step of a
+    component's diameter, so adding a single 200-node chain made it 52.8 s (the JVM stayed at 3.5 s). Components stay
+    in memory.
 
 * **Input** is a sealed `GraphInput`: `Materialised` (from the Working Set, `WorkingSetGraphInput`) or `IndexRef`.
   `RoutingGraphEngine` routes **by input type only**, never by size: Materialised → `InMemoryGraphEngine`

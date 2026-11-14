@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `DUCKDB-2-LOOP-QUERIES-1` | P3 | feature | the looping / graph-style query candidates still open now that 2.0.0.0 is pinned: C2 components by USING KEY label propagation, C4 branch… | — |
+| `DUCKDB-2-LOOP-QUERIES-1` | P3 | feature | the two looping / graph-style query candidates still open now that 2.0.0.0 is pinned: C5 the expand ladder as one statement, C8 ducklake… | — |
