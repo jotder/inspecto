@@ -90,6 +90,18 @@ class PresetRolesTest {
         assertEquals("served_sim", r.to());
     }
 
+    /** MASKING-UNION-RESIDUALS-1: a column classed with a type's id ({@code sim}, which claims only SIM_CARD) holds that type. */
+    @Test
+    void aColumnClassedWithATypesIdHoldsThatType() {
+        List<EntityTypes.EntityType> types = List.of(EntityTypes.coreDefault("msisdn"),
+                new EntityTypes.EntityType("sim", "SIM", "digits", false, List.of("SIM_CARD")));
+        Map<String, Object> d = Map.of("columns", List.of(Map.of("name", "served_number", "classification", "MSISDN"),
+                Map.of("name", "served_sim", "classification", " Sim ")));
+        PresetQueries.Roles r = PresetQueries.roles(d, CDR, types, null, List.of());
+        assertEquals("served_number", r.from());
+        assertEquals("served_sim", r.to());
+    }
+
     @Test
     void withoutAMappedAmountThePackHintStillPicksOne() {
         Map<String, Object> dataset = Map.of("defaultLinkMapping", Map.of("from", "caller", "to", "callee"));

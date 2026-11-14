@@ -26,15 +26,18 @@ const SERVED: LinkAnalysisLimits = {
     entityTypesInForce: [type('account'), type('device')],
 };
 
-function make(opts: { canEdit?: boolean; confirm?: boolean; del?: ReturnType<typeof vi.fn> } = {}) {
+function make(
+    opts: { canEdit?: boolean; confirm?: boolean; del?: ReturnType<typeof vi.fn>; served?: LinkAnalysisLimits } = {},
+) {
     const del = opts.del ?? vi.fn(() => of(SERVED));
+    const served = opts.served ?? SERVED;
     TestBed.configureTestingModule({
         imports: [LinkAnalysisEntityTypesComponent],
         providers: [
             provideNoopAnimations(),
             {
                 provide: LinkAnalysisSettingsService,
-                useValue: { limits: signal(SERVED), get: vi.fn(() => of(SERVED)), deleteEntityType: del },
+                useValue: { limits: signal(served), get: vi.fn(() => of(served)), deleteEntityType: del },
             },
             { provide: LensService, useValue: { canAuthorWorkbench: () => opts.canEdit ?? true } },
             {
@@ -84,6 +87,21 @@ describe('LinkAnalysisEntityTypesComponent (⚙ Settings → Entity Types, sweep
         const { el } = make();
         expect(el.textContent).toContain('Upper case, spaces trimmed');
         expect(el.textContent).not.toContain('upper-trim');
+    });
+
+    it("marks a type masked by the server's effective flag, not the configured one (MASKING-UNION-RESIDUALS-1)", () => {
+        const { el } = make({
+            served: {
+                ...SERVED,
+                entityTypesInForce: [
+                    { ...type('msisdn'), masked: false, maskedInForce: true },
+                    { ...type('device'), masked: false, maskedInForce: false },
+                ],
+            },
+        });
+        const rows = Array.from(el.querySelectorAll('li')).map((li) => li.textContent ?? '');
+        expect(rows.find((r) => r.includes('msisdn'))).toContain('· masked');
+        expect(rows.find((r) => r.includes('device'))).not.toContain('masked');
     });
 
     it('without the right to change settings there is no New or Delete', () => {

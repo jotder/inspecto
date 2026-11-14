@@ -71,7 +71,7 @@ authoritative for the Edition column**; this table mirrors it.
 | `DAT-5` | Row-level calculated columns on Datasets | Should | ✅ SHIPPED 2026-07-08; window functions 2026-07-24. Design of record: §6.2 of this spec (why a real SQL parser
 was refused) and `okf/product/module/processor/spec-queries.md` §3.3–§3.5. *(Provenance:
 `docs/archived-documents/plans-archive/calculated-columns-design.md`, not maintained.)* | All |
-| `DAT-6` | Optional Postgres state store | Should | ✅ SHIPPED — **single operator only** (one shared `Connection` per store); the multi-user deployment is `OPS-03`, **PARKED**; the proving test is **opt-in** and covers 9 of 12 families (§3.8) ⚠ **How the driver reaches a deployment (2026-09-09):** as the third-party `postgresql.jar` sidecar that `package.ps1 -Edition Standard|Advanced` stages — it is test-scoped in the reactor, so it is staged but **not** first-party (`editions.md` §3.3). 🔴 `REQUIREMENTS.md` added "NOT via `inspecto-connectors`, which no bundle ships"; the second half went stale on 2026-09-07 when `CONNECTORS-BUNDLE-1` made that sidecar ride **every** bundle (`from: 'all'` in `tools/bundle-modules.mjs`). The driver is simply a separate jar, not a connector. | S/E (`OPS-02`) |
+| `DAT-6` | Optional Postgres state store | Should | ✅ SHIPPED — **single operator only** (one shared `Connection` per store); the multi-user deployment is `OPS-03`: park lifted 2026-09-15, pool, schema-per-Space and the two-node soak built, ⏸ **POSTPONED 2026-10-23** (operator: the next release ships without Postgres; board row *Postgres multi-user*); the proving tests are **opt-in** and round-trip 15 of the 16 families, all but Alerts (§3.8) ⚠ **How the driver reaches a deployment (2026-09-09):** as the third-party `postgresql.jar` sidecar that `package.ps1 -Edition Standard|Advanced` stages — it is test-scoped in the reactor, so it is staged but **not** first-party (`editions.md` §3.3). 🔴 `REQUIREMENTS.md` added "NOT via `inspecto-connectors`, which no bundle ships"; the second half went stale on 2026-09-07 when `CONNECTORS-BUNDLE-1` made that sidecar ride **every** bundle (`from: 'all'` in `tools/bundle-modules.mjs`). The driver is simply a separate jar, not a connector. | S/E (`OPS-02`) |
 
 **Corrections this table makes to its predecessor and the concept pages**, each verified against source:
 
@@ -398,8 +398,10 @@ the operational stores, DuckDB retained as the query engine over Parquet; busine
 
 **Proving it** (DAT-6): `PostgresStateStoreTest` needs a server you supply (`-Dinspecto.test.pg.url` /
 `INSPECTO_TEST_PG_URL`; the embedded harness was deleted 2026-09-07) and otherwise **skips all 11 methods
-per test** so the absence shows in the count; it round-trips **nine** store classes and **not** the dedup
-ledger, acquisition ledger or delivery receipts. 🔴 **The CWD trap**: a default-ON family under
+per test** so the absence shows in the count. It round-trips 11 of the 16 families (one method each) and `PostgresOpsStoreTest` the four
+object families, so **15 of the 16** are covered; only Alerts (`DbAlertStore`) has no Postgres round-trip
+(re-counted 2026-11-15; the "nine, not the dedup ledger, acquisition ledger or delivery receipts" this sentence
+said was stale). 🔴 **The CWD trap**: a default-ON family under
 `SpaceRoot.legacy()` mints a database in the working directory of every single-tenant install and every test
 JVM; the root `pom.xml` pins `-Ddedup.ledger.backend=jdbc:duckdb:`, `-Dconsignment.outputs.backend=jdbc:duckdb:`,
 `-Dstatus.backend=jdbc:duckdb:` for surefire — ⚠ a raw `jdbc:` *backend* value is a third source that bypasses
@@ -531,7 +533,7 @@ earlier one, both appear.
 | 2026-08-14 (PG-1) | One selection `-Dinspecto.db`; it **moves, never enables**; unhonourable Postgres **fails at boot**; the driver is a **sidecar**, not a Maven profile | deployments had come up healthy with stores silently off; a profile would gate a runtime dependency |
 | 2026-08-15 | The operational-DB screen **never writes** | the process serving the UI is the one that needs the DB; a `PUT` would be a second declaration of the same fact |
 | 2026-09-07 (operator) | `PostgresStateStoreTest` needs a server you supply; skips **per test** | an `@BeforeAll` assumption prints "Tests run: 0" and hides the absent coverage |
-| 2026-09-06 (operator) | **Postgres multi-user PARKED** until a multi-operator install exists | no consumer |
+| 2026-09-06 (operator) | **Postgres multi-user PARKED** until a multi-operator install exists — park lifted 2026-09-15 (the trigger fired), work postponed 2026-10-23 (next release ships without Postgres) | no consumer |
 | 2026-08-28 (operator) | Object-storage export: **analysis kept, not scheduled**; whole Space on S3 recommended **against** | no atomic rename on S3 changes the crash-safe commit's meaning |
 
 ## 5. Not built
@@ -543,7 +545,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 
 | Item | Board id | What remains |
 |---|---|---|
-| **Postgres multi-user** — pool, `browseConnection()`, schema-per-Space, `TriageRunStore`, the three uncovered stores, a concurrency test | `BACKLOG.md` §3 *Postgres multi-user* (PARKED by §6); `EDITIONS.md` OPS-03 | |
+| **Postgres multi-user** — pool, `browseConnection()` removal, schema-per-Space and the concurrency tests are built | `BACKLOG.md` §3 *Postgres multi-user* (park lifted 2026-09-15; ⏸ postponed 2026-10-23, hold: operator); `EDITIONS.md` OPS-03 | a real two-host run and an hours-long deployment soak |
 | `graph` / `spatial` / `search` / `api` query types; more `$`-resolvers | no board row (deleted 2026-11-12 as obsolete) | Deliberately not built |
 | §7.4 rollup cache (deliberately unbuilt); `generation` deleted 2026-09-24 | `okf/product/module/engine/spec-db-layer.md` §3.9 — no board row | Until read-time aggregation is measurably slow |
 | `retire_superseded` must be configured or a recompute keeps an extra copy forever; `DatasetRelation.temporalColumn` has no caller | `BACKLOG.md` §3 *Consignment addressing* | |
@@ -573,8 +575,8 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | ✅ ~~No UI triggers `materialize`; no committed job schedules one~~ — resolved 2026-09-14: Materialize in the Dataset editor, `POST /datasets/{id}/materialize`, `orders_by_region_materialize_job.toon` (§3.6) | | |
 | **`memory_limit` had no default in code** while two pages said it did | `DuckDbUtil.memoryLimit` → DuckDB default; `BACKLOG.md` GAP-4 | Corrected in both pages with this spec; ✅ GAP-4 then shipped a code default 2026-09-26 |
 | **The `transform.dim.scd2` processor, `valid_to`, feed effective dates and per-row as-of joins are unbuilt**; `load: scd2` itself IS honoured (version store + single-instant `as_of`) | `ProcessorCatalog` `transform.dim.scd2` PLANNED; `ReferenceScd2CharacterizationTest` | A fact cannot be joined to the dimension as of its own event time |
-| **`DuckLakeRegistrar` has no test**; the warehouse runbook has no code | `inspecto-etl` test tree; `warehouse_setup.sql` at the repo root | `SP-SNK-03` is ✅ on the board for a registrar nothing exercises |
-| **The Postgres test covers 9 of 12 families** and the page said 6, 7 and 10 | `PostgresStateStoreTest` methods | Corrected with this spec; the three uncovered stores are `DbDedupLedger`, `DbAcquisitionLedger`, `DbDeliveryReceiptStore` |
+| ~~**`DuckLakeRegistrar` has no test**~~ — wrong: `DuckLakeRegistrarTest`, `…IdempotentTest`, `…PerSinkTest` and `…RegisterWiringTest` exist (`platform/inspecto-etl/src/test/java/com/gamma/etl/`); its non-fatal promise stays unproven (§8). The warehouse runbook has no code | `inspecto-etl` test tree; `warehouse_setup.sql` at the repo root | |
+| ~~**The Postgres test covers 9 of 12 families**~~ — 15 of 16 today (re-counted 2026-11-15), only Alerts uncovered | `PostgresStateStoreTest` and `PostgresOpsStoreTest` methods | The dedup ledger, acquisition ledger and delivery receipts this row named as uncovered all have a round-trip now (§3.8) |
 | **`DatasetRelation.temporalColumn` has no caller** | `BACKLOG.md` §3 note | Dead seam |
 
 ## 6. Refused & superseded
@@ -728,8 +730,8 @@ run time; `SchemaFieldTypes` at load (`MET`); `expression-guard` and `measure-gr
 |---|---|
 | ✅ ~~No client-side test of `/queries/{id}/run`~~ — `queries.component.spec.ts` covers *Run saved* | §2 |
 | ✅ ~~No test of a materialization from the product~~ — `ControlApiDatasetMaterializeTest` drives the route | §3.6 |
-| **`DuckLakeRegistrar` has no test; the warehouse runbook has no code** | `inspecto-etl` test tree; repo root |
-| **Postgres coverage is opt-in and partial** — 9 of 12 families, only with a server | §3.8 |
+| **The warehouse runbook has no code**; `DuckLakeRegistrar` has four test classes but none proves its non-fatal promise (§8) | `inspecto-etl` test tree; repo root |
+| **Postgres coverage is opt-in and partial** — 15 of 16 families (all but Alerts), only with a server | §3.8 |
 | **No test that the DuckDB session zone equals the host zone** — pinned by ⛔ comments at three call sites | `duckdb.md` |
 | **No test that `retire_superseded` is ENABLED anywhere** — only a WARN; the demo job ships disabled on purpose, pinned by `DemoRetireSupersededJobShipsDisabledTest` | §3.2 |
 | **No per-fact-row as-of join, `valid_to` or feed effective date for `load: scd2`** (the version store and single-instant `as_of` are built and tested) | §3.2 |

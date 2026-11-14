@@ -146,17 +146,11 @@ final class DatasetDiscovery {
             for (Object o : cols) {
                 if (!(o instanceof Map<?, ?> c) || !(c.get("classification") instanceof String k) || k.isBlank()) continue;
                 String real = real(columns, c.get("name"));
-                EntityTypes.EntityType type = typeOf(k, types);
+                EntityTypes.EntityType type = EntityTypes.typeNamedBy(types, k);
                 if (real == null || type == null) continue;
                 out.computeIfAbsent(type.id(), id -> new Held(type, new ArrayList<>())).columns().add(real);
             }
         return List.copyOf(out.values());
-    }
-
-    private static EntityTypes.EntityType typeOf(String classification, List<EntityTypes.EntityType> types) {
-        for (EntityTypes.EntityType t : types)
-            for (String c : t.classifications()) if (c.trim().equalsIgnoreCase(classification.trim())) return t;
-        return null;
     }
 
     /** The id of the Entity Type {@code column} holds (what an entity summary of a busiest row asks for), or null. */

@@ -99,6 +99,13 @@ const coreMustNotImportLa = [
         ],
         message: CORE_MSG,
     },
+    {
+        // Core must not import a host feature either (ARCH-MOSCOW-UNTRACKED-1 item 8, 2026-11-15): measured 0 such
+        // imports outside specs, so this only keeps it that way.
+        group: ['app/modules/**', '**/modules/**'],
+        message:
+            'Core (app/inspecto/**) must not import a feature (app/modules/**): move what core needs into core, or inject it.',
+    },
 ];
 // Inside the core slice of graph/ a sibling import is relative (`./x`): only the other core graph files are allowed.
 const coreGraphSiblingsOnly = [{ group: ['./*', ...coreGraphFiles.map((f) => `!./${f}`)], message: CORE_MSG }];

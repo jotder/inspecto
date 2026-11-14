@@ -206,12 +206,6 @@ public final class EvidenceMasker {
         return stores;
     }
 
-    /** {@link #schemaClassification(Path, Set, Predicate)} under {@link #SENSITIVE}, merged into {@code out} strictest-wins. */
-    public static void schemaClassification(Path configRoot, Set<String> stores, Map<String, String> out) {
-        schemaClassification(configRoot, stores, SENSITIVE::contains)
-                .forEach((col, cl) -> out.merge(col, cl, ColumnClassification::stricter));
-    }
-
     /**
      * What the pipeline schemas behind {@code stores} classify, lower-cased stored column to class. Only raw
      * {@code raw.fields[].classification} values {@code masked} accepts count. A class follows the schema's

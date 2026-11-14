@@ -244,6 +244,16 @@ final class SettingsRoutes implements RouteModule {
         return out;
     }
 
+    /**
+     * {@link EntityTypes#shape} plus each type's {@code maskedInForce} ({@link EntityTypes#maskedInForce}, MASKING-UNION-RESIDUALS-1):
+     * whether its ids mask, which a {@code masked: false} type with a sensitive id or class does. Read-only: a PUT ignores it.
+     */
+    private static List<Map<String, Object>> inForceShape(List<EntityTypes.EntityType> types) {
+        List<Map<String, Object>> out = EntityTypes.shape(types);
+        for (int i = 0; i < types.size(); i++) out.get(i).put("maskedInForce", EntityTypes.maskedInForce(types.get(i)));
+        return out;
+    }
+
     /** The wire shape the UI's Link Analysis settings expect — null means "inherit the shipped default". */
     private static Map<String, Object> linkAnalysisShape(LinkAnalysisSettings s) {
         Map<String, Object> m = new LinkedHashMap<>();
@@ -255,7 +265,7 @@ final class SettingsRoutes implements RouteModule {
         m.put("fourEyesBudgetAbove", s.fourEyesBudgetAbove());
         m.put("fourEyesFanOutAbove", s.fourEyesFanOutAbove());
         m.put("entityTypes", s.entityTypes() == null ? null : EntityTypes.shape(s.entityTypes()));
-        m.put("entityTypesInForce", EntityTypes.shape(s.effectiveEntityTypes()));
+        m.put("entityTypesInForce", inForceShape(s.effectiveEntityTypes()));
         m.put("mergedDistinctCap", s.mergedDistinctCap());
         m.put("mergedDistinctCapInForce", s.effectiveMergedDistinctCap());
         m.put("seedByDistinctCap", s.seedByDistinctCap());

@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -89,6 +90,8 @@ class EntityMaskingTest {
         EntityMasking m = EntityMasking.of(inv(root), EXPAND_ONLY, List.of());
         assertEquals(2, m.describe().get("masked"), m.describe().toString());
         assertTrue(String.valueOf(m.describe().get("basis")).contains("caller"), m.describe().toString());
+        assertTrue(String.valueOf(m.describe().get("basis")).contains("classified as masked Entity Type(s) [msisdn]"),
+                m.describe().toString());
     }
 
     /** MASKING-TWO-VOCABULARIES-1: PII, which no Entity Type claims, masks a bound column as it does at every other egress. */
@@ -97,7 +100,11 @@ class EntityMaskingTest {
         callsPipeline(root, "PII", "");
         EntityMasking m = EntityMasking.of(inv(root), EXPAND_ONLY, List.of());
         assertEquals(2, m.describe().get("masked"), m.describe().toString());
-        assertTrue(String.valueOf(m.describe().get("basis")).contains("caller"), m.describe().toString());
+        String basis = String.valueOf(m.describe().get("basis"));
+        assertTrue(basis.contains("caller"), m.describe().toString());
+        // MASKING-UNION-RESIDUALS-1: no masked type names PII, so the class is named plainly, never as an Entity Type
+        assertTrue(basis.contains("are classified PII,"), basis);
+        assertFalse(basis.contains("Entity Type(s)"), basis);
     }
 
     @Test

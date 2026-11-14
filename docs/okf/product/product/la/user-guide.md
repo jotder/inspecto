@@ -27,6 +27,7 @@
 - [Link Analysis police showcase — user guide](../../solution-pack/la-police/user-guide.md)
 - [Link Analysis procurement fraud showcase — user guide](../../solution-pack/la-procurement/user-guide.md)
 - [Link Analysis sample — user guide](../../solution-pack/la-sample/user-guide.md)
+- [Link Analysis showcase Spaces — new-user guide](../../solution-pack/la-showcase/user-guide-new-users.md)
 - [Link Analysis showcase catalogue — user guide](../../solution-pack/la-showcase/user-guide-showcase-catalogue.md)
 - [Link Analysis showcase — user guide](../../solution-pack/la-showcase/user-guide.md)
 - [Link Analysis showcase (feature off) — user guide](../../solution-pack/la-showcase-off/user-guide.md)

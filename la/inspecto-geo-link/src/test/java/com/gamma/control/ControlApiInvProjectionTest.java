@@ -715,6 +715,36 @@ class ControlApiInvProjectionTest {
         }
     }
 
+    /** MASKING-UNION-RESIDUALS-1: a classification equal to a type's ID types the column too (a claim of another type wins). */
+    @Test
+    void columnTypesTypeAColumnClassedWithATypesId(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedCalls(c);
+            java.nio.file.Files.writeString(c.root.resolve("link-analysis.toon"), """
+                    entity_types[2]:
+                      - id: msisdn
+                        label: Phone number
+                        normaliser: e164
+                        masked: true
+                        classifications[1]: MSISDN
+                      - id: sweep_test
+                        label: sweep test
+                        normaliser: default
+                        masked: false
+                        classifications[1]: SWEEP
+                    """);
+            new ComponentStore(c.root.resolve("registry")).write("dataset", "calls_ds", Map.of("view", "calls_view",
+                    "columns", List.of(Map.of("name", "caller", "classification", "msisdn"),
+                            Map.of("name", "callee", "classification", " Sweep_Test "))));
+            HttpResponse<String> r = project(c.port, "{\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"}");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode types = json(r.body()).get("columnTypes");
+            assertEquals("msisdn", types.at("/caller/id").asText(), r.body());
+            assertEquals("sweep_test", types.at("/callee/id").asText(), r.body());
+            assertEquals("default", types.at("/callee/normaliser").asText());
+        }
+    }
+
     /** Parse a v1 response and peel the envelope's {@code data} (mirrors the control module's V1Body, which
      *  lives in inspecto's TEST tree and is not visible from another module — the inspecto-policy precedent). */
     private static com.fasterxml.jackson.databind.JsonNode json(String raw) throws Exception {

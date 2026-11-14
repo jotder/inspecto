@@ -65,6 +65,24 @@ class EntityTypesTest {
         assertNull(EntityTypes.maskedTypeOf(types, "branch"), "an unmasked type is never the masked type");
     }
 
+    /**
+     * MASKING-UNION-RESIDUALS-1: the Entity Type a class names is the first that CLAIMS it, else the first whose id it is - so
+     * a claim wins over another type's id, whatever their order - trimmed, in any case; blank or unknown names none.
+     */
+    @Test
+    void theTypeAClassNamesIsTheClaimingTypeElseTheTypeWithThatId() {
+        EntityType wallet = new EntityType("wallet", "Wallet", "upper-trim", false, List.of("MOBILE_MONEY"));
+        EntityType account = new EntityType("account", "Account", "upper-trim", false, List.of("ACCOUNT", "WALLET"));
+        List<EntityType> types = List.of(wallet, account);
+        assertSame(account, EntityTypes.typeNamedBy(types, "WALLET"), "a claim wins over an earlier type's id");
+        assertSame(wallet, EntityTypes.typeNamedBy(types, " mobile_money "));
+        assertSame(account, EntityTypes.typeNamedBy(types, "Account"));
+        assertSame(wallet, EntityTypes.typeNamedBy(List.of(wallet), " Wallet "), "no claim: the type whose id it is");
+        for (String none : List.of("PII", "INTERNAL", " ", ""))
+            assertNull(EntityTypes.typeNamedBy(types, none), none);
+        assertNull(EntityTypes.typeNamedBy(types, null));
+    }
+
     /** MASKING-TWO-VOCABULARIES-1: {@code masked: false} never unmasks a type whose id or a claimed class is sensitive. */
     @Test
     void aTypeIsMaskedInForceWhenFlaggedOrWhenItsIdOrAClassIsSensitive() {

@@ -290,6 +290,35 @@ class ControlApiIndexTest {
         }
     }
 
+    /** MASKING-UNION-RESIDUALS-1: an endpoint column classed with a type's ID (a type claiming another class) is typed by it. */
+    @Test
+    void anEndpointClassedWithATypesIdCountsNodesOfThatType(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (Ctx c = open(cfg, root, """
+                entity_types[2]:
+                  - id: sub
+                    label: Sub
+                    normaliser: default
+                    masked: false
+                    classifications[1]: SUB_REF
+                  - id: dev
+                    label: Dev
+                    normaliser: default
+                    masked: false
+                    classifications[1]: DEV_REF
+                """)) {
+            new ComponentStore(root.resolve("registry")).write("dataset", "typed_ds", Map.of("view", "sights_view", "owner", "analyst-1",
+                    "shares", List.of(), "columns", List.of(Map.of("name", "who", "classification", " Sub "),
+                            Map.of("name", "other", "classification", "dev"))));
+            awaitStatus(c, start(c, "{\"dataset\":\"typed_ds\",\"sourceCol\":\"who\",\"targetCol\":\"other\"}", OWNER), OWNER, "COMPLETED");
+            JsonNode typed = null;
+            for (JsonNode i : ok(c, "GET", "/inv/index", null, OWNER).get("indexes"))
+                if ("typed_ds".equals(i.get("dataset").asText())) typed = i;
+            assertTrue(typed != null, "typed_ds is listed");
+            assertEquals(JSON.readTree("{\"sub\":2,\"dev\":2}"), typed.get("typeNodes"), "sources {alice, bob}, targets {bob, carol}");
+        }
+    }
+
     @Test
     void theIndexGoesStaleWhenTheDatasetsRelationChanges(@TempDir Path cfg, @TempDir Path root) throws Exception {
         subjects();

@@ -1064,10 +1064,9 @@ and there is a **real embedded-Postgres round-trip test**
 ([`PostgresStateStoreTest`](../../../../../inspecto/src/test/java/com/gamma/service/PostgresStateStoreTest.java),
 moved to `inspecto` 2026-09-17 so it runs in the DEFAULT reactor — the four `com.gamma.ops` store cases stayed
 behind as [`PostgresOpsStoreTest`](../../../../../features/inspecto-ops/src/test/java/com/gamma/service/PostgresOpsStoreTest.java))
-covering **9 of the 12 families** (note, tag assignment, job run, file stage, consignment output, status, provenance,
-object, link) — **the dedup ledger, the acquisition ledger and delivery receipts are the three it does not cover**
-(measured 2026-09-08; this sentence said "6 of the 9" and named two covered stores as uncovered). Both DDLs are portable by construction (`VARCHAR`/`BIGINT`/`INTEGER`, no PK, no upsert), but that
-is reasoned, not proved.
+the two together covering **15 of the 16 families** (every `OperationalDb.Family` constant but
+`ALERTS`, plus the four object families) — **Alerts (`DbAlertStore`) is the one with no Postgres round-trip**
+(re-counted 2026-11-15; this sentence said "9 of the 12", measured 2026-09-08, and before that "6 of the 9"). For Alerts, Postgres portability is reasoned, not proved.
 
 ### 5.0 One selection: `-Dinspecto.db` (2026-08-14)
 

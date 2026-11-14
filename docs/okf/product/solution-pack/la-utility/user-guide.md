@@ -54,8 +54,9 @@ canvas).
    bank accounts are hubs.
 3. **Open `prepaid_token_fraud_vendor`.** Prepaid premises linked to the vending points that sold them tokens. Compare
    `V-01` and `V-08`: both are busy; read `kWh per unit of money` and `night` in `via`.
-4. **Open the `transformer_loss` Dataset** (Discover). Sort by `loss_pct`: two transformers stand out. On Standard
-   and above the saved Geo View `utility_transformer_loss_map` shows the same on a map.
+4. **Transformer loss.** On Standard and above the saved Geo View `utility_transformer_loss_map` shows two
+   transformers over the threshold. Basic has no screen for it: `transformer_loss_dataset` has no Mapping, so
+   Discover does not show `loss_pct`; the figures are in the answer to exercise 1.
 5. **New data arrives.** Copy the files of `data/staged/<feed>/` into `data/inbox/<feed>/` (admin guide). The
    Pipelines land October 2026 and the Jobs rebuild the links and the loss; reopen a view to see them.
 
@@ -68,7 +69,8 @@ Work blind first: each has the steps to find it, then the answer. The answers ar
 *Steps:* start from the energy: in `transformer_loss`, find the transformers whose `loss_band` turns
 `loss over threshold`. In `meter_read`, find the premises under them whose reads fall sharply part-way through the
 year. Seed those premises in `meter_tampering_contractor` and expand once: they share one contractor. Compare each
-premise's reads in the weeks before and after that contractor's visit day (in `via`).
+premise's reads in the weeks before and after that contractor's first visit day (`ts` on the `visited_by` link;
+`via` lists the visits).
 
 **Answer:** contractor **`C-14`** visited **32 premises**; **22** of them register **40–70 % less** within two weeks
 of its visit (visits between 2025-12-06 and 2026-06-28; six meters flag `tamper_flag = 1` on the visit day). All 22
@@ -160,5 +162,6 @@ after `node tools/seed-la-utility.mjs --apply`, sign in as each persona and chec
 5. **Draft:** `rp.analyst` has one open Draft that annotates `C-14` about `C-22` (exercise 2); promote it to widen
    the case, or leave it.
 
-**Not the story:** the holiday home `PRM-0773` (exercise 1's look-alike) is on a transformer whose loss stays under
-7 % all year, so it never contributes to the Alert; without `TX-007` and `TX-019` the rule would not fire at all.
+**Not the story:** the holiday home `PRM-0773` (exercise 1's look-alike) is on `TX-031`, which is not metered: it has no
+row in `transformer_loss`, so its winter drop never reaches the Alert. Every other metered transformer stays under 7 %;
+without `TX-007` and `TX-019` the rule would not fire at all.

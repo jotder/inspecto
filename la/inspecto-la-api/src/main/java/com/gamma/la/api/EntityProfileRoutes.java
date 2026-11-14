@@ -162,14 +162,15 @@ public final class EntityProfileRoutes implements RouteModule {
 
     /**
      * What still uses Entity Type {@code id}, one phrase per kind, empty when nothing does. A use is: a column of any registered
-     * Dataset whose classification the type claims (named {@code dataset.column} when the caller may view the Dataset, else
+     * Dataset whose classification names the type ({@link EntityTypes#typeNamedBy}: claimed, else its id) (named {@code dataset.column} when the caller may view the Dataset, else
      * counted); a live Entity List of the type (a retired one can seed nothing again); an Investigation whose header (its endpoint
      * types, ONB-LA-ENDPOINT-TYPE-1), main log or an open Draft's log names the type as an {@code entityType} /
      * {@code sourceType} / {@code targetType} anywhere in an entry - a sealed seed, Seed by list, expand or connect, undone or
      * not, since a replay reads every entry.
      */
     static List<String> uses(HttpExchange ex, Path writeRoot, String id) throws java.io.IOException {
-        EntityTypes.EntityType t = type(writeRoot, id);
+        type(writeRoot, id);
+        List<EntityTypes.EntityType> types = LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes();
         List<String> out = new ArrayList<>();
         List<String> columns = new ArrayList<>();
         int hidden = 0;
@@ -178,8 +179,8 @@ public final class EntityProfileRoutes implements RouteModule {
             boolean visible = com.gamma.access.ComponentAccess.canView(ex, d.content());
             for (Object o : cols) {
                 if (!(o instanceof Map<?, ?> c) || c.get("name") == null || c.get("classification") == null) continue;
-                String cls = String.valueOf(c.get("classification")).trim();
-                if (t.classifications().stream().noneMatch(x -> x.trim().equalsIgnoreCase(cls))) continue;
+                EntityTypes.EntityType named = EntityTypes.typeNamedBy(types, c.get("classification"));
+                if (named == null || !named.id().equals(id)) continue;
                 if (visible) columns.add(d.name() + "." + c.get("name"));
                 else hidden++;
             }

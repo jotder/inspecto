@@ -32,7 +32,7 @@ the user. See [`../../../../EDITIONS.md`](../../../../EDITIONS.md) for the full 
 | Platform base (Collectors, Pipelines, Studio & BI, Alerts, maker-checker) | ✅ | ✅ | ✅ |
 | Link Analysis explorer | ✅ | ✅ | ✅ (Postgres investigation store) |
 | Add-ons: Incidents, Case Management, Action Requests, Reconciliation, Risk Scores (Entity Lists are in Basic), Anomaly Detection, Screening, Regulatory Reporting, Exchange, AI assist | — | ✅ | ✅ (adds the intelligence agent) |
-| Content packs | Business Assurance (placement is an open decision, `OFFERING-DECLARATION-DRIFT-1`), Link Analysis daily feed, Orders starter | adds Revenue Assurance, Telecom Fraud, Payment Fraud, AML, Mobile Money | same as Standard |
+| Content packs | Link Analysis daily feed, the Link Analysis showcases' Basic tiers, Orders starter | adds Business Assurance (moved from Basic 2026-10-20, `OFFERING-DECLARATION-DRIFT-1`, closed), Revenue Assurance, Telecom Fraud, Payment Fraud, AML, Mobile Money | same as Standard |
 
 ## 3. Solutions (level 2)
 
