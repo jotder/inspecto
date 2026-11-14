@@ -166,6 +166,12 @@ class ControlApiClassificationBulkImportTest {
                     "names the file and the column: " + r.body());
             assertEquals(before, tree(c.config("beta")), "the Pipeline and schema that travelled with it were taken back too");
 
+            // a junk CSV planted beside the entry must not hide it from the judge (no reader merges one into a Dataset)
+            entries.put("registry/datasets/calls_structure.csv", "garbage".getBytes(StandardCharsets.UTF_8));
+            assertEquals(422, post(c, "/spaces/beta/import", zip(entries)).statusCode(), "a sibling CSV does not hide the entry");
+            assertEquals(before, tree(c.config("beta")));
+            entries.remove("registry/datasets/calls_structure.csv");
+
             entries.put("registry/datasets/calls.toon", dataset.formatted("INTERNAL").getBytes(StandardCharsets.UTF_8));
             HttpResponse<String> ok = post(c, "/spaces/beta/import", zip(entries));
             assertEquals(200, ok.statusCode(), ok.body());

@@ -140,14 +140,22 @@ public final class ClassificationVocabulary {
             Map<String, Object> doc;
             try {
                 doc = ConfigCodec.toMap(Files.readString(file, StandardCharsets.UTF_8));
-                Path csv = StructureCsv.siblingFor(file);
-                if (Files.exists(csv)) {
+            } catch (RuntimeException unparseable) {
+                continue;   // no reader can act on it either
+            }
+            // A schema file's sibling CSV holds its fields; a registry entry has none (ComponentStore reads .toon only),
+            // so a CSV planted beside one must not change what is judged. A CSV that does not parse leaves the TOON judged alone.
+            Path csv = StructureCsv.siblingFor(file);
+            if (!root.relativize(file).startsWith("registry") && Files.exists(csv)) {
+                try {
+                    List<Map<String, String>> fields =
+                            StructureCsv.parse(Files.readString(csv, StandardCharsets.UTF_8), csv.toString());
                     Map<String, Object> raw = Values.mapAt(doc, "raw");
                     if (raw == null) doc.put("raw", raw = new LinkedHashMap<>());
-                    raw.put("fields", StructureCsv.parse(Files.readString(csv, StandardCharsets.UTF_8), csv.toString()));
+                    raw.put("fields", fields);
+                } catch (RuntimeException unparseable) {
+                    // judged without it
                 }
-            } catch (RuntimeException unparseable) {
-                continue;
             }
             List<Finding> found = new ArrayList<>();
             walk(doc, "", types, Set.of(), found);

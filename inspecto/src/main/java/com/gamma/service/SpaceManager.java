@@ -533,7 +533,11 @@ public final class SpaceManager implements AutoCloseable {
             try {
                 BundleImporter.writeConfig(bundle, base.resolve("config"), false, new ImportJournal());   // a NEW Space: nothing to overwrite
             } catch (UnknownClassificationException unknown) {
-                deleteRecursively(base);   // or the directory just made answers the corrected bundle "already exists"
+                try {
+                    deleteRecursively(base);   // or the directory just made answers the corrected bundle "already exists"
+                } catch (IOException leftBehind) {
+                    unknown.addSuppressed(leftBehind);   // the refusal stays the answer
+                }
                 throw unknown;
             }
             Path manifest = base.resolve("space.toon");
