@@ -74,6 +74,47 @@ MAJOR" row, moved here so it accrues in one place; add a line in the same commit
 The GitHub release is cut by `.github/workflows/release.yml` with `--generate-notes`; paste this section
 above the generated commit list.
 
+**Breaking — surfaces that shipped in `v3.11.0` (M4 audit, 2026-11-15)**
+*Found by diffing the `v3.11.0` route table, `-D` reads, `main()` classes and `@PublicApi` types against `master`.
+Most of these commits are not marked `!`, so a commit-type scan misses them.*
+- **Every business route is under `/api/v1`** and answers the v1 envelope (`{data, metadata, diagnostics}`; an
+  error is `{error}`). The unversioned routes are removed, and `-Dapi.legacy.routes` / `-Dapi.legacy.sunset` no
+  longer exist (`a2c2d983`, API-5, 2026-07-25). Only `/health`, `/ready` and `/metrics` stay unversioned. A 3.x
+  client must change its base URL and read `data`.
+- **The run routes moved from `/pipelines/{name}/…` to `/runs/{name}/…`, no alias** (`2c6f0abf`, an unmarked
+  `refactor`, 2026-06-30): `trigger`, `pause`, `resume`, `commits`, `batches`, `files`, `lineage`, `quarantine`,
+  `reprocess` and `report`. The 3.x pipeline list is `GET /runs` (now paged); `GET /pipelines` lists registered
+  Pipeline definitions, a different shape. `reprocess` still takes `batchId` and `lineage` still `?batchId=`, but
+  `batches` / `files` rows key on `consignment_id` (`8c4cb568`).
+- **No bearer tokens:** `-Dcontrol.token`, `-Dassist.read.token` and `-Dassist.write.token` are removed with the
+  core's authentication (`b64da585`, 2026-06-16). Basic has no authentication; Standard and Advanced authenticate
+  through OIDC (`authMode: oidc`). A 3.x deployment that relied on the token must put Basic behind its own gateway
+  or move to Standard.
+- **The catalog speaks the new vocabulary, no alias** (`05f6c35d`, `a3180790`): `GET /catalog/graph` node kinds
+  `SOURCE` → `STREAM`, `EVENT_TABLE` → `TABLE`, `TRANSFORMED_TABLE` → `DERIVED_TABLE`, `REFERENCE_TABLE` →
+  `REFERENCE_DATASET`; edge kind `USES` → `CONSUMES`; the id token `source:` → `stream:`. A `kinds=` / `edgeKinds=`
+  filter or a stored node id with an old value matches nothing.
+- **Job Types are string ids** (`1826905b`, 2026-07-09): `GET /jobs` and run records report `type` in lower case
+  (`"maintenance"`, was `"MAINTENANCE"`). **The `ingest` Job Type is removed** (`f787862a`, 2026-06-17): make a
+  `type: ingest` Job an `active: true` Pipeline.
+- **A Job's relative `dir` / `data_dir` / `backup_dir` / `archive` / `target_dir` resolves against the Space config
+  root**, not the process working directory, and is refused where the two disagree (`a7ab607b`, 2026-09-16).
+- **The assistant:** `POST /assist/{intent}` returns `confidence` as a number in [0, 1], not the string `"local"`
+  (`0052240a`, 2026-06-05). Removed, no longer read: `-Dassist.enabled`, `-Dassist.profile`, `-Dassist.ollama.baseUrl`
+  (`6b0f8418`). The model is set in the file named by `-Dassist.settings.file` ([agent admin
+  guide](../agent/admin-guide.md)), and its host must be on the Space's model endpoint allowlist (`7e113110`, below).
+- **CLI:** the processor jar has no `Main-Class`, so `java -jar` on it no longer runs (`f13479dc`, 2026-10-08); run
+  `com.gamma.inspector.CollectorProcessor` on the bundle's classpath, as the bundle's run scripts do. The URA File
+  Management Suite (ura.sh / ura.bat — `search`, `copy`, `organize`, `copy-tars`, `extract`, `backup`,
+  `prepare-inbox`, `create-schema`, `move-by-date`, `extract-unknown`, `extract-move`) is removed (`5863853d`,
+  2026-11-07); Add data and Collectors replace it, `reprocess` is `POST /api/v1/runs/{name}/reprocess`, and
+  `MainApp` keeps only `migrate-configs`.
+- **Java, no alias** (`a3180790`): `com.gamma.inspector.SourceProcessor` → `CollectorProcessor`, <!-- vocab-allow: names the rename itself -->
+  `MultiSourceProcessor` → `MultiCollectorProcessor`, `com.gamma.service.SourceService` → `CollectorService`. <!-- vocab-allow: names the rename itself -->
+  `AssistAgent.init(SourceService)` → `init(ReadModel)` (`c23489da`); `AssistResult.confidence` `String` → <!-- vocab-allow: names the rename itself -->
+  `double` (`0052240a`); `JobConfig.type()` returns `String`, not `JobType` (two deprecated `JobType`
+  constructors remain) (`1826905b`).
+
 **Security fixes — behaviour an integrator can see (SEC review, 2026-09-24)**
 - `POST /public/delivery-status/{adapterId}` refuses a body over **256 KiB** with **413
   `PAYLOAD_TOO_LARGE`** (a new, additive `ErrorCode`) and is throttled per caller IP (burst 60, then 5/s)
@@ -110,6 +151,24 @@ above the generated commit list.
   in the new `-Dcontrol.trustedProxies` (IPs/CIDRs), and then the right-most untrusted hop wins, not the
   first. A deployment behind a proxy must list it, or it audits and throttles every caller as the proxy.
   An unparseable entry fails the boot.
+- **Breaking (Standard/Advanced) — tighter route gates, all unmarked `fix:` commits:** `POST /alerts/evaluate`,
+  `/expectations/evaluate` and `/expectations/{id}/evaluate` need `canOperateRuns`; `POST /connections/test`,
+  `/connections/{id}/test` and `/connections/{id}/probe` need `canOnboardConnections` (`ad29e683`, 2026-09-17);
+  `POST /enrichment/preview` needs `canAuthorWorkbench` (`d4f4ced7`); `POST /db/query` and `GET /db/table` on an
+  operational (`ops:*`) group need `canAuthorWorkbench` (`718f4003`); `POST /spaces` and `POST /spaces/import` need
+  `canAdminister`, even with no Space hosted (`b552029f`, `62905386`); `POST /assist/settings` needs
+  `canAdminister`, not `canAuthorWorkbench` (`7e113110`). Each answers 403 `PERMISSION_DENIED` otherwise. Basic
+  is unchanged.
+- **Breaking (every edition, 2026-09-30, `7e113110`):** the assistant calls only a model host named in the Space's
+  `egress.toon` `models` list (`PUT /settings/egress`, `canAdminister`). The list is empty by default, so even a
+  local Ollama must be listed as `localhost` or `127.0.0.1`; a refused endpoint falls back to the offline stub and
+  is logged.
+- **Breaking (2026-09-27, `558b248d`):** a `POST /bundle/import` or `POST /import` bundle carrying a Requirement is
+  refused whole (403); create Requirements through `POST /requirements`. Writes to `/components/requirement`,
+  `/components/access-profile` and `/components/access-catalog` are 403 for every caller, and
+  `/components/alert-rule` needs `canAuthorAlertRules`.
+- **Behaviour change (2026-09-17, `94db59b4`):** with `notify.smtp.starttls` set to `true`, a relay that does not
+  offer STARTTLS fails the send instead of falling back to plain text.
 
 **Breaking — Metadata Bundle Pipelines (2026-09-25, BUNDLE-AUTHORED-PIPELINE-STORE-1 option B)**
 - New bundle kind **`pipeline`**: a REGISTERED `*_pipeline.toon`. `POST /bundle/export` returns its content
@@ -208,6 +267,9 @@ above the generated commit list.
   `on_pipeline` and `on_signal` firings now inherit it instead of hardcoding `false`, which narrowly
   overturns the old *"cron/event/signal fires are always real"* rule — a fire is dry exactly when the
   batch that caused it was simulated.
+- ⚠ Before 2026-09-20 `?dryRun=true` meant only *skip the post-action*. That meaning was renamed
+  `?skipPostAction` (`9e101cdc`) the same day `?dryRun` took the one above (`5af44d2f`), so a caller that sent
+  `?dryRun=true` to poll without acking now lands nothing and must send `?skipPostAction=true`.
 
 **Breaking — the Assistant's RCA record is a Triage Run, not a Case (2026-09-24, `GLOSSARY-CASE-1`)**
 - Routes renamed, **no alias**: `GET /agent/cases` → `GET /agent/triage-runs` (list key `cases` →
@@ -266,6 +328,8 @@ above the generated commit list.
   See [config safety](../config/spec-config-safety.md) §"The accepted-key census" for the per-type blockers.
 - Unaffected: `PipelineGraphRoutes` (needs a migration pass first) and `RecipeCompiler`, where the intended
   run-time WARNING has nowhere to go until a non-fatal diagnostic channel exists.
+- **Extended to Expectations, Notification Rules and Channels (2026-10-07, `3fc16cfb`, unmarked):** an unmodelled
+  key other than an `x-` key now returns **422**; it used to be dropped behind a 200.
 
 **Breaking — one masking rule (2026-11-14, `MASKING-TWO-VOCABULARIES-1`)**
 - A column is masked for a viewer who cannot reveal if its class is `MSISDN`, `IMSI`, `ACCOUNT`, `PII`, a class a
@@ -322,13 +386,39 @@ above the generated commit list.
   rewrites them to `fields[]` (`--dry-run` first).
 - Dedup is folded into acquisition (`61dc8280`): `transform.dedup.fingerprint` is gone; the marker-based
   `duplicate_check` and the windowed `dedup` ledger are the two surviving mechanisms.
-- `$`-token evaluation in job parameters: an unknown or malformed token is **REJECTED** at save
-  (`e8a8a755`); a literal dollar is written `$$` (`8504b782`).
+- `$`-token evaluation in job parameters: an authored value that is a whole `$`-token now resolves at fire time
+  (`8504b782`), and a token nothing registered **REJECTS the Run** — at fire time, not at save (`e8a8a755`,
+  `8504b782`); a literal dollar is written `$$` (`e8a8a755`). *(This line said "REJECTED at save" and gave `$$` to
+  `8504b782` until 2026-11-15.)*
 - `consignment.outputs.backend` defaults to `duckdb`; `ReprocessCommand` refuses a batch younger than
   `min_age_days` (§6.2).
 - A sink whose `partitions[].column` is blank **fails the sink branch** instead of writing unpartitioned.
-- The pipeline TOON `source:` block is unchanged, but every Java/TS/API name says **Collector** <!-- vocab-allow: names the rename itself -->
-  (GLOSSARY §13); `?flow=` query params are dual-read, `?pipeline=` is canonical.
+- The pipeline TOON acquisition block is **`collector:`**, renamed from `source:` with no alias (`a3180790`), <!-- vocab-allow: names the rename itself -->
+  and every Java/TS/API name says **Collector** (GLOSSARY §13); since `2c310d1c` a `source:` key is refused at
+  `/config/write` as a key nothing reads. `?flow=` query params are dual-read, `?pipeline=` is canonical.
+  *(This line said the `source:` block was unchanged until 2026-11-15.)*
+- **Editions renamed** (`f1b64ce0`, 2026-10-17): Personal → Basic, Professional → Standard, Enterprise → Advanced.
+  The Maven profiles `edition-professional` and `edition-enterprise` are removed (use `edition-standard`,
+  `edition-advanced`, `edition-preview`), and `package.ps1 -Edition` takes `Basic|Standard|Advanced|Preview`.
+- `package.ps1`'s `-Ui` and `-DemoAuth` are removed, no alias (`728dbd60`, 2026-11-10): use `-Product inspecto|la`
+  and `-Distribution production|demo`. An Inspecto LA bundle ships only the `la-*` templates.
+- **Bundles ship no Spaces** (`eeb8524f`, 2026-09-25): a fresh bundle boots with zero Spaces until one is attached
+  or created from the `spaces/_templates` gallery.
+- **Advanced needs PostgreSQL** (`6b169d17`, 2026-09-25): operational objects are durable by default, and an
+  Advanced bundle without `INSPECTO_DB_URL` does not boot.
+- A Schema type the engine cannot cast is **refused at config load** instead of stored as text (`82c947ef`,
+  2026-08-22); a declared `INTEGER` now lands as `INTEGER`, which changes that store's Parquet schema on the next
+  write and can trip the schema BACKWARD gate.
+- A `chain_config` value that is a JSON object, array or `null` is refused at parse, naming the key (`c2a07aeb`,
+  2026-09-01); every value reaches the processor as text.
+- An active Pipeline with `processing.dedup` refuses to arm unless it authors an `output_store:` (`04004af8`,
+  2026-08-11): record dedup is a Stage-2 transform. Keep the Pipeline inactive or run it at rest.
+- `derive` no longer knows `group_by`; a config that still names it fails closed (`cd900f7d`, 2026-10-12).
+- JSON selectors are dotted paths (`ff14b6e9`, 2026-07-31): a JSON key that contains a literal `.` must be escaped
+  (`odd\.key`, written `odd\\.key` in TOON).
+- The Decision Rule consequence `invoke-api` takes `params.connection` (an `https` Connection id), not
+  `params.url`; it proposes a pending Action Request and no longer emits the `decision-rule.invoke-api` signal
+  (`24c5c171`, 2026-09-27).
 
 - **Consignment rename, persisted surfaces (D-12, confirmed 2026-09-06):** `batch_id` DDL columns in `DbProvenanceStore` /
   `DbStatusStore` → `consignment_id` (versioned migration, `payload` literal rewritten); the `__batch_id` system column in
@@ -358,12 +448,20 @@ above the generated commit list.
   `step-types` count guard. Its last reader was the Recipe view (removed in `6d3c68fa`); the palette's one
   source is `GET /pipelines/node-types` (+ `/pipelines/processor-catalog`). The recipe grammar itself is
   unchanged — `RecipeCompiler`'s verb switch is the vocabulary.
+- `/inv/entity-lists…` moved to **`/entity-lists…`**, no alias (`2a739d06`, an unmarked `refactor`, 2026-10-01):
+  the list, one list, create, `members`, `retire` and `match`. Gates and handlers are unchanged; the routes now
+  come from the `inspecto-entity-list` module.
 
 **Breaking — Java `@PublicApi` (binds only within a released major; none of this was published in 3.x)**
 - Three store interfaces gained abstract methods for `incident_purge` (MNT-14, 2026-07-27).
 - `com.gamma.ops.NoteTargets` → `com.gamma.ops.AnnotationKinds` (no alias). ⚠ Relocated again in EDG-01 cell 7 (2026-09-08) to **`com.gamma.objects.AnnotationKinds`** — it is core vocabulary with no store coupling, so it stayed in the mandatory build when `com.gamma.ops` became an optional module.
 - Maven artifactIds `file-processor-*` → `inspecto-*` (2026-08-10); the deployment bundle name is
   unchanged — renaming it is a separate, unmade decision.
+- `CollectorService.PipelineView`, `.PipelineRun` and `.InboxStatus` are top-level records in `com.gamma.service`
+  (`7eab72d4`). `CollectorService.objects()` returns `Optional<ObjectAccess>`, because operational objects moved
+  to the optional `inspecto-ops` module (`e8d98918`). `ConsignmentOutput` loses its `generation` component and
+  every constructor's `int generation` parameter (`09740d56`). For the types that did ship in `v3.11.0`, see the
+  first group above.
 
 **Operator-visible behaviour**
 - **Behaviour change (2026-10-25, `DATASET-CALC-NAME-COLLISION-1`):** a Dataset's `calculated` column may not reuse a
@@ -462,6 +560,33 @@ above the generated commit list.
   unconfigured `duckdbMemoryLimit` is served as the computed code default (40 % RAM ÷ 4, ≥ 1 GiB), not `null`.
 - The event store prunes by whole day partitions once an `event_prune` maintenance job exists (COMPLY-3);
   releases are SBOM'd and signed in CI only (COMPLY-1/2).
+- **Breaking (2026-10-09, `ecd21833`):** `GET /runs` serves `configPath` relative to the Space config root (the bare
+  file name for a config outside it), never the host's absolute path.
+- **Breaking (2026-10-09, `6d901200`):** a Reconciliation side whose Dataset has no temporal column is a **422**
+  naming the Dataset (mark a column `role: temporal` or set its `dateField`), whether or not the other sides are
+  dated, and a `recon.run` Job fails with the same message. There is no whole-period fallback.
+- **Breaking (`e242ace5`, `738461e4`):** the operational object types are `INCIDENT`, `CASE` and `TASK`. An object
+  read or `?type=` filter says `"INCIDENT"` where it said `"ISSUE"`, no alias. `ALERT` is no longer an object type:
+  it is refused like any unknown type, stored `ALERT` rows load inert, and the Alert lifecycle lives in
+  `com.gamma.alert`.
+- **Breaking (2026-10-10, `c084e0fd`):** a pending Alert Rule names its trigger `afterScore: {kind: risk-score |
+  anomaly-model, model}`, in the pending-rules file and in `GET /alerts/rules/pending`; the flat
+  `afterRiskScore: <model>` form is refused.
+- **Breaking (Link Analysis):** `graph_run.threads` / `graph_run.queue` and `index.threads` / `index.queue` are
+  install-wide limits, no longer Space settings — `PUT /settings/link-analysis` refuses them as unknown keys
+  (`5b839765`, 2026-10-15). A value-Measure Alert Rule bound to an Investigation is not evaluated until its owner
+  enables standing detection (`POST /inv/investigations/{id}/standing-detection`) (`cf13f2c3`, 2026-10-04). Under
+  the default `typed` masking mode, subscriber, IMEI and wallet ids and seeds of unknown `entityType` are masked
+  (`0d74028c`; its `masked: false` override is narrowed by `MASKING-TWO-VOCABULARIES-1` above).
+- **Behaviour change (2026-10-03, `13dee729`):** the engine's in-memory DuckDB connections have extension autoload
+  off and read only the directories their caller declares, so a hand-written view that reads over `http://` or
+  outside those roots now fails its Run. The spill default moved from the temp dir to `<tmpdir>/.duckdb_tmp`.
+- **Behaviour change (2026-10-04, `62af7a99`, `85295c56`):** for an inbox file whose name carries a long digit run
+  (not a timestamp), the output file, the reject sidecar, the chunk scratch and the replay input are named by the
+  fingerprinted stem (`fp-<hex>` in place of the digits). Names without such a run are unchanged.
+- **New defaults (no refusal):** `processing.threads` follows the host's logical cores, not 4 (`84d2c975`);
+  `processing.chunking.max_file_bytes` is 8 GiB, not off (`30c80bd5`); `-Dingest.maxFilesPerCycle` caps intake at
+  500 files per cycle, and `0` keeps it unbounded (`eef4d010`).
 
 ⛔ **The `consignment.process` contract stays FROZEN, including its correlation identifier** — plugins
 already depend on it, so the token work must not change that shape as a side effect. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
