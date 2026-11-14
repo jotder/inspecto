@@ -38,9 +38,9 @@ import static com.gamma.util.SqlIdent.sqlStr;
  * (4) the stale files are deleted. Recovery (start of every replace) reads each day folder: a {@code .tmp}
  * means step 3 never ran, so the stale files are restored (the OLD partition); no {@code .tmp} but
  * {@code .stale} means step 3 ran, so the stale files are dropped (the NEW partition). A crash therefore
- * leaves the old or the new partition, never a mix. A reader inside the step 2-3 window sees that one day
- * briefly empty — the same discipline as the full-snapshot swap. The sink's ownership marker is a dot-file
- * at its root and a replace never touches it.
+ * leaves the old or the new partition, never a mix. Steps 2-4 wait for the Jobs reading the sink
+ * ({@link SnapshotSwapLock}) — the same discipline as the full-snapshot swap. The sink's ownership marker is a
+ * dot-file at its root and a replace never touches it.
  */
 final class IncrementalSink {
 
@@ -186,7 +186,9 @@ final class IncrementalSink {
                     } else if (!Files.isDirectory(dir)) {
                         continue;
                     }
-                    swapDay(dir, tmp, part);
+                    try (SnapshotSwapLock.Held swap = SnapshotSwapLock.write(sink)) {   // readers pin the whole sink
+                        swapDay(dir, tmp, part);
+                    }
                     rows += n;
                 }
                 if (inc.retain() > 0) {
