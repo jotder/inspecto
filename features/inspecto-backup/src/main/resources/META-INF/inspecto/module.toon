@@ -5,4 +5,5 @@ buildRole: implementation
 offeringRole: optional
 bindingTime: boot
 provides:
+  features[2]: sink.archive,sink.ducklake
   contracts[1]: MaintenanceTaskProvider

@@ -5,4 +5,5 @@ buildRole: implementation
 offeringRole: provider
 bindingTime: boot
 provides:
+  features[1]: quality.pii.mask
   contracts[1]: AccessDecider

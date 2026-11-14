@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -26,7 +27,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * module's RouteModules return from {@code featureIds()} and only ids the module's code declares — there or in an
  * {@code EditionFeatureProvider}'s {@code features()} (PA-9d: {@code inspecto-realtime} has no routes; its feature
  * is declared only there, and {@code Entitlements.featureEntitled} reads the manifest to withhold it) — so the
- * manifest cannot drift from the code.
+ * manifest cannot drift from the code. ENTITLEMENT-UNLISTED-FEATURES-1: the other way round too — every id an
+ * {@code EditionFeatureProvider} declares is listed, so a signed entitlement that leaves the module out withholds it, unless
+ * {@link #UNLISTED} names it with the reason it stays with the edition rather than the module.
  * Manifests are read from the SOURCE tree (not the class path), so a module that is not on this test's class path
  * is still checked. The {@code providers/asn-parser/asn-decoders/asn-facade} manifest is a nested reactor and is checked for
  * existence only.
@@ -37,6 +40,19 @@ class ModuleManifestGuardTest {
     private static final Pattern EDITION_FEATURES = Pattern.compile("\\bfeatures\\(\\)\\s*\\{[^}]*?Set\\.of\\(([^)]*)\\)");
     private static final Pattern STRING = Pattern.compile("\"([^\"]+)\"");
     private static final Pattern CONSTANT = Pattern.compile("\\bEditionFeatures\\.([A-Z_]+)\\b");
+
+    /**
+     * The ids a module declares through an {@code EditionFeatureProvider} and deliberately does NOT list in
+     * {@code provides.features} ({@code "<module dir>:<id>"} to the reason): edition features the module only carries as
+     * the Standard+ classpath marker, so a signed entitlement that leaves the module out keeps them. Listing one would also
+     * put it on the module's per-Space switch. An entry no longer declared-and-unlisted is itself a problem.
+     */
+    private static final Map<String, String> UNLISTED = Map.of(
+            "inspecto-ops:investigations", "a route feature la-api and geo-link list; the laInvestigations Add-on, which brings ops, withholds it",
+            "inspecto-ops:geoMap", "a route feature la-api lists; Standard and up whatever the Add-ons (D-LAE5)",
+            "inspecto-ops:entityPages", "a route feature la-api lists; Standard and up whatever the Add-ons (D-LAE4)",
+            "inspecto-ops:laWidgets", "a UI flag reported only while geoLink is on; Standard and up whatever the Add-ons (D-LAE2)",
+            "inspecto-ops:pipeline.automation", "a Standard edition feature (DT-5) ops only marks; Standard without the Incidents Add-on keeps it");
 
     private static Path repoRoot() throws IOException {
         return ReactorModules.root();
@@ -63,6 +79,7 @@ class ModuleManifestGuardTest {
         Path root = repoRoot();
         List<String> problems = new ArrayList<>();
         Set<String> ids = new HashSet<>();
+        Set<String> unlistedSeen = new HashSet<>();
         for (Path module : modulesWithMainJava(root)) {
             String name = module.getFileName().toString();
             Path mf = manifestOf(module);
@@ -77,12 +94,22 @@ class ModuleManifestGuardTest {
             if (!ids.add(m.id())) problems.add(name + ": duplicate id " + m.id());
             Set<String> routes = featureIdsInCode(module, FEATURE_IDS, "");
             Set<String> inCode = new TreeSet<>(routes);
-            inCode.addAll(featureIdsInCode(module, EDITION_FEATURES, "implements EditionFeatureProvider"));
+            Set<String> declared = featureIdsInCode(module, EDITION_FEATURES, "implements EditionFeatureProvider");
+            inCode.addAll(declared);
             Set<String> manifest = new TreeSet<>(m.provides().features());
             if (!manifest.containsAll(routes) || !inCode.containsAll(manifest))
                 problems.add(name + ": provides.features " + manifest + " must hold every featureIds() in code " + routes
                         + " and only ids the code declares (featureIds() or EditionFeatureProvider.features()) " + inCode);
+            for (String id : declared) {
+                if (manifest.contains(id)) continue;
+                if (UNLISTED.containsKey(name + ":" + id)) unlistedSeen.add(name + ":" + id);
+                else problems.add(name + ": its EditionFeatureProvider declares '" + id + "', which provides.features " + manifest
+                        + " does not list - a signed entitlement that leaves the module out would still allow it. List it, or add it"
+                        + " to UNLISTED with the reason it stays with the edition");
+            }
         }
+        for (String stale : new TreeSet<>(UNLISTED.keySet()))
+            if (!unlistedSeen.contains(stale)) problems.add("UNLISTED names " + stale + ", which is no longer declared-and-unlisted");
         assertTrue(Files.isRegularFile(manifestOf(asnFacade())), "asn-decoders manifest missing");
         assertTrue(problems.isEmpty(), "module manifest problems:\n" + String.join("\n", problems));
     }

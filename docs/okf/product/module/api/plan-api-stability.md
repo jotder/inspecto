@@ -267,6 +267,17 @@ above the generated commit list.
 - Unaffected: `PipelineGraphRoutes` (needs a migration pass first) and `RecipeCompiler`, where the intended
   run-time WARNING has nowhere to go until a non-fatal diagnostic channel exists.
 
+**Breaking — an entitlement withholds a left-out module's edition features (2026-11-14, `ENTITLEMENT-UNLISTED-FEATURES-1`)**
+- With a signed entitlement installed, a module it leaves out now also withholds its edition features: a save that
+  uses an archive or DuckLake sink (`inspecto-backup`), a `mask` Step (`inspecto-policy`) or an Alert Rule
+  (`inspecto-ops`) returns **422** `ERR_EDITION_FEATURE`, "not in this installation's entitlement". They saved with
+  200 before. ⚠ A Standard entitlement with none of the Incidents, Workflow & SLA and LA Investigations Add-ons
+  therefore has no Alert Rules (decided by the assistant under the operator's delegation, 2026-11-14 — pending
+  operator confirmation). Without an entitlement file nothing is refused; `/modules` and Settings > Modules now list
+  these ids among the module's features.
+- The refusal of a feature whose providing modules are all left out now names the entitlement instead of an edition.
+- Detail: [entitlements](../../layer/platform/admin-guide-entitlements.md).
+
 **Breaking — a save refuses an unknown column classification (2026-11-14, `CLASSIFICATION-UNMASKED-CLASS-1`)**
 - A `classification` on a Schema field, a Dataset column or a Step's output column must be `MSISDN`, `IMSI`,
   `ACCOUNT`, `PII`, a class an Entity Type of the Space claims, `INTERNAL`, or empty. Any other word is refused with

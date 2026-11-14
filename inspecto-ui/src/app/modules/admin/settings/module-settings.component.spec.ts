@@ -28,11 +28,16 @@ const mod = (
     enabledInSpace: true,
 });
 
-function setup(opts: { canAdminister?: boolean; save?: ModuleSettingsService['save'] } = {}) {
+/** The Feature ids the server lets a Space switch off (`GET /settings/modules` `installed`). */
+const INSTALLED = ['breaks', 'geoLink', 'reconciliation'];
+
+function setup(
+    opts: { canAdminister?: boolean; save?: ModuleSettingsService['save']; modules?: InstalledModule[] } = {},
+) {
     const api = {
         modules: vi.fn(() =>
             of({
-                modules: [
+                modules: opts.modules ?? [
                     mod('engine', 'base', ['authoring']),
                     mod('recon', 'optional', ['reconciliation', 'breaks']),
                     mod('geo', 'provider', ['geoLink'], 'INERT'),
@@ -41,9 +46,10 @@ function setup(opts: { canAdminister?: boolean; save?: ModuleSettingsService['sa
                 diagnostics: [],
             }),
         ),
-        get: vi.fn(() => of({ disabled: ['ghost'], inert: ['ghost'], installed: [], unreadable: false })),
+        get: vi.fn(() => of({ disabled: ['ghost'], inert: ['ghost'], installed: INSTALLED, unreadable: false })),
         save: vi.fn(
-            opts.save ?? ((disabled: string[]) => of({ disabled, inert: ['ghost'], installed: [], unreadable: false })),
+            opts.save ??
+                ((disabled: string[]) => of({ disabled, inert: ['ghost'], installed: INSTALLED, unreadable: false })),
         ),
     };
     const session = { reloadFeatures: vi.fn(() => Promise.resolve()) };
@@ -107,6 +113,22 @@ describe('ModuleSettingsComponent', () => {
         expect(navigation.get).toHaveBeenCalled();
         expect(el.querySelector('div[tabindex="-1"]')!.textContent).toContain('Module settings saved');
         expect(c.hasUnsavedChanges()).toBe(false);
+    });
+
+    it('switches only the Features the server lists as installed: an edition Feature is never sent', () => {
+        const { c, el, api, button, fixture } = setup({
+            modules: [
+                mod('ops', 'optional', ['reconciliation', 'alert.dispatch']),
+                mod('backup', 'optional', ['sink.archive', 'sink.ducklake']),
+            ],
+        });
+        expect(el.querySelector('mat-slide-toggle[data-module="backup"]')).toBeNull(); // no switchable Feature, no switch
+        expect(el.textContent).toContain('Features: sink.archive, sink.ducklake');
+        c.set(c.modules()[0], false);
+        fixture.detectChanges();
+        expect(c.isOn(c.modules()[0])).toBe(false);
+        button('Save modules')!.click();
+        expect(api.save).toHaveBeenCalledWith(['ghost', 'reconciliation']);
     });
 
     it('shows a 422 in the live region and stays dirty', () => {

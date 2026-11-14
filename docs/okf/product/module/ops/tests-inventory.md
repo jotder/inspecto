@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.ops`](../../../../../product-map/module/ops.toon).
 
-71 test class(es): 47 unit, 24 real-HTTP control-plane, 0 IT.
+72 test class(es): 47 unit, 25 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -30,6 +30,7 @@ mvn -o test -pl features/inspecto-ops -Dtest=AlertMigrationOpsTest,AlertServiceP
 | `PerEntityAlertObjectsTest` | `com.gamma.alert` | unit | `features/inspecto-ops/src/test/java/com/gamma/alert/PerEntityAlertObjectsTest.java` | ASSURE-PER-ENTITY-ALERTS-1 against the REAL object engine: a healed key's Incident moves through the real |
 | `ScalarMeasureAlertObjectsTest` | `com.gamma.alert` | unit | `features/inspecto-ops/src/test/java/com/gamma/alert/ScalarMeasureAlertObjectsTest.java` | ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1 (2) against the REAL object engine: a scalar (no-{@code by}) Dataset |
 | `ControlApiAccessDeciderObjectsTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiAccessDeciderObjectsTest.java` | The ABAC A3 row-level PEP on the operational-objects routes (no policy module — a fake |
+| `ControlApiAlertRulesEntitlementTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiAlertRulesEntitlementTest.java` | ENTITLEMENT-UNLISTED-FEATURES-1 over real HTTP: Alert Rules ({@code alert.dispatch}), which this module declares through |
 | `ControlApiDbBrowserOpsTablesTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiDbBrowserOpsTablesTest.java` | The operational-store half of the raw table browser, split out of {@code ControlApiDbBrowserTest} when |
 | `ControlApiDecisionRuleApplyTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiDecisionRuleApplyTest.java` | The Incident-promoting half of {@code POST /decision-rules/{name}/apply}, split out of |
 | `ControlApiExpectationTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiExpectationTest.java` | Real-HTTP + real-DuckDB tests for the ING-6 Expectation engine ({@code /expectations*}): authored CRUD |

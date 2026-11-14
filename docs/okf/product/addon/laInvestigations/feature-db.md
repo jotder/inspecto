@@ -13,7 +13,7 @@ tags: [feature-db, addon]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`addon.laInvestigations`](../../../../../product-map/addon/laInvestigations.toon).
 
-56 row(s).
+57 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
@@ -22,6 +22,7 @@ tags: [feature-db, addon]
 | sla-policy | config kind | ops | standard;advanced;preview | incidents;laInvestigations;workflowSla | ga | `sla-policy` | `features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon` |
 | workflow | config kind | ops | standard;advanced;preview | incidents;laInvestigations;workflowSla | ga | `workflow` | `features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon` |
 | create-incident | consequence | ops | standard;advanced;preview | incidents;laInvestigations;workflowSla | ga | `create-incident` | `features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon` |
+| alert.dispatch | feature | ops | standard;advanced;preview | incidents;laInvestigations;workflowSla | ga | `alert.dispatch` | `features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon` |
 | ops | feature | ops | standard;advanced;preview | incidents;laInvestigations;workflowSla | ga | `ops` | `features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon` |
 | RCA templates (`*_rca.toon`) | inventory | ops | standard;advanced;preview | incidents;laInvestigations;workflowSla | ga | consumed by `GET /rca/templates`; **no example file/shape in the tree yet** | `docs/FEATURE_INVENTORY.md §1J` |
 | objects.analytics | job type | ops | standard;advanced;preview | incidents;laInvestigations;workflowSla | ga | `objects.analytics` | `features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon` |
