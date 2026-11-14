@@ -311,9 +311,11 @@ files fixes nothing; the path is gone at the rename.
 directory for the JVM. A `sql.template` Job holds the read lock on its source stores from the moment it pins
 them until its `CREATE TABLE … AS` has finished, and releases it before its own swap (so a Job reading the
 store it writes never waits on itself). Every swap holds the write lock only around hide and reveal. Read locks
-are taken in path order and a writer never waits holding another lock, so there is no deadlock.
+are taken in path order, and a writer holds no other SnapshotSwapLock while it waits (`IncrementalSink` waits holding its own
+sink monitor and file lock, which no reader takes), so there is no deadlock.
 Limits: only `sql.template` sources take the read lock today (`SNAPSHOT-SWAP-UNLOCKED-READERS-1`); a publish
-waits for the slowest locked reader of its store, bounded by the writer's deadline; one JVM only. Hidden files
+waits for the slowest locked reader of its store, and an interrupt does not stop a running DuckDB statement,
+so the wait is bounded only by the writer's deadline (24 h by default), and the fair lock queues new readers behind it; one JVM only. Hidden files
 never match the readers' `**/*.parquet` glob and are not counted as storage.
 
 ## The parameter contract & runtime Expressions (shipped 2026-08-07/10)
