@@ -32,6 +32,4 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.util` — the board is the only list; change the row there.
 
-| Row | Priority | Kind | Title | Hold |
-|---|---|---|---|---|
-| `MASKING-TWO-VOCABULARIES-1` | P2 | feature | the two masking sets share only MSISDN, IMSI and ACCOUNT, so one label cannot mask a column everywhere (filed 2026-11-14, split from CLAS… | operator |
+_No open rows._

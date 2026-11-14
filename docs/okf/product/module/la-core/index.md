@@ -34,6 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `MASKING-UNION-RESIDUALS-1` | P3 | defect | readers that still type or check a column without the one masking rule (filed 2026-11-14, left by MASKING-TWO-VOCABULARIES-1). | — |
 | `LA-BASIC-PLACEHOLDER-CASE-1` | P2 | defect | in Basic, Attach to Case lists invented placeholder Cases, seals the Snapshot and reports it attached. | — |
 | `LA-SAMPLE-EMPTY-DATASET-1` | P2 | defect | the la-sample Space's only Dataset is empty on the Basic install, so its example and its only saved view fail. | — |
 | `LA-DOCK-PAGE-GROWS-1` | P2 | defect | opening the Link Analysis bottom Data dock makes the page taller than the window. | — |

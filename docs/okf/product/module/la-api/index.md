@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.la-api` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `MASKING-UNION-RESIDUALS-1` | P3 | defect | readers that still type or check a column without the one masking rule (filed 2026-11-14, left by MASKING-TWO-VOCABULARIES-1). | — |

@@ -267,6 +267,15 @@ above the generated commit list.
 - Unaffected: `PipelineGraphRoutes` (needs a migration pass first) and `RecipeCompiler`, where the intended
   run-time WARNING has nowhere to go until a non-fatal diagnostic channel exists.
 
+**Breaking — one masking rule (2026-11-14, `MASKING-TWO-VOCABULARIES-1`)**
+- A column is masked for a viewer who cannot reveal if its class is `MSISDN`, `IMSI`, `ACCOUNT`, `PII`, a class a
+  masked Entity Type claims, or a masked Entity Type's id — at every reader. So a BI result in the default `typed` mode
+  now masks `PII` columns, Risk Score evidence masks `WALLET` / `IMEI` / `ID_DOCUMENT` columns, and an Entity Type's
+  `masked: false` no longer unmasks one of the four sensitive classes. `maskingMode: none` is unchanged.
+- `publish.postgres` drops or refuses those columns unless listed in `include_sensitive`; four-eyes approvals over
+  such Datasets must be given again.
+- Detail: [config safety](../config/spec-config-safety.md), "One masking rule".
+
 **Breaking — an entitlement withholds a left-out module's edition features (2026-11-14, `ENTITLEMENT-UNLISTED-FEATURES-1`)**
 - With a signed entitlement installed, a module it leaves out now also withholds its edition features: a save that
   uses an archive or DuckLake sink (`inspecto-backup`), a `mask` Step (`inspecto-policy`) or an Alert Rule

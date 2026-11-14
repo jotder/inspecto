@@ -782,10 +782,8 @@ source: sensitive | entity-type | not-masked, entityType?, label?}`, sorted. It 
 `GET /inv/entity-types` (reads are gated at the Space/ABAC layer, not by capability). The schema metadata grid and
 the `sql` Step's output grid offer it as a picker (`<inspecto-classification-select>`) that marks the classes that
 mask, keeps a stored class the Space does not know as a flagged "(unknown)" option so an old config can be fixed,
-and falls back to a text input if the list cannot be read (the save still judges). ⚠ `masked` is the union
-(sensitive, or claimed by or the id of a masked Entity Type); until `MASKING-TWO-VOCABULARIES-1` lands, Risk Score
-evidence and publication mask only the four sensitive classes, so an Entity Type class marked "masks" is not masked
-there.
+and falls back to a text input if the list cannot be read (the save still judges). `masked` is the one masking rule
+below, so a class marked "masks" masks at every reader.
 
 🔴 **Save-time only, and the two doors differ on a class already stored.** A file already on disk still loads,
 and its unknown class still masks nothing; the gate stops new ones.
@@ -820,10 +818,23 @@ App template with an unknown class still installs, and is refused when a Space i
 ⚠ Only the unknown-class refusal of `createFromBundle` removes the half-made Space directory; its other refusals
 (a refused entry name, an I/O failure, a failure after the write) still leave it, and a retry answers 409.
 
-⚠ **Two masking sets, not one.** `ColumnClassification.SENSITIVE` and "a class a masked Entity Type claims"
-share only `MSISDN`, `IMSI` and `ACCOUNT`. `PII` is not masked in a BI result in `typed` mode; `WALLET`,
-`IMEI` or `ID_DOCUMENT` are not masked in Risk Score evidence. Link Analysis reference rows mask the union
-(`ReferenceRows.java`). The vocabulary accepts both sets; it does not merge them (`MASKING-TWO-VOCABULARIES-1`).
+**One masking rule** (`MASKING-TWO-VOCABULARIES-1`, 2026-11-14; decided by the assistant under the operator's
+delegation: fail closed). A column is masked for a viewer who cannot reveal if its class is one of the four sensitive
+classes, is claimed by a masked Entity Type of the Space, or is the id of one — `EntityTypes.maskedClasses(types)`
+(`platform/inspecto-entity-store`). Every reader that masks or refuses by class uses it: Risk Score, Anomaly and
+Screening evidence, audit, object and notification reads, the assistant's egress, BI in both `typed` and `all`, Link
+Analysis (`EntityMasking`, `ReferenceRows`), embed links and `publish.postgres`. The engine cannot see Entity Types,
+so it gets the rule through the `MaskedClasses` SPI (`com.gamma.mask`, provided by `SpaceMaskedClasses` in the
+control plane; with no provider, the engine's own tests, the four sensitive classes alone hold).
+
+- 🔴 An Entity Type's `masked: false` does **not** unmask a sensitive class: a column classed `MSISDN` masks whatever the
+  `msisdn` type says. Only `maskingMode: none` turns BI and Link Analysis masking off for a Space.
+- In BI, `typed` and `all` now mask the same columns (only the reported mode and its basis text differ). In Link
+  Analysis they still differ: `all` masks every entity id and every non-fractional reference-row value.
+- `quality.pii.mask` is unchanged: its `classifications:` list is the author's and must stay within the four sensitive
+  classes.
+- ⚠ `publish.postgres` now drops or refuses a column with a masked Entity Type's class (e.g. `WALLET`) unless it is in
+  `include_sensitive`, and a four-eyes approval over such a Dataset goes stale and must be given again.
 
 **Shipped configs.** `CONFIDENTIAL` was the only class in the shipped templates outside the vocabulary: 44
 columns, all reclassified (8 in `TEMPLATE-CONFIDENTIAL-UNMASKED-1`, 36 with the gate). Identifiers took the
