@@ -308,7 +308,16 @@ Act on the canvas, read in the dock, configure in **⚙ Settings**.
   embedded page that is not allowed to go full screen, for one) a message says so. Every control is an icon: hover
   it for its name. Counts (Held, Hidden, collapsed, Attach) are a small number on the icon. When the header is too
   narrow, the canvas toolbar's groups after Canvas mode fold into **More canvas tools** (`⋯`), and a long selection
-  row drops under the rail rather than being clipped.
+  row drops under the rail rather than being clipped. The page never grows past the window: long content scrolls
+  inside its own panel (LA-NO-LONG-PAGES-1, 2026-11-10). In the Inspecto LA app, **Collapse** for the left navigation
+  rail sits in this header before the title, the rail is drag-resizable (160-400 px) when expanded, and
+  **Show / Hide the toolbox** is a toggle after **⚙ Settings**.
+* **The open saved view is named after the title** (the description is its tooltip). Click the name for the *Saved
+  view* dialog: **Name** and **Description**, the facts (Dataset, layout, industry pack, Investigations, id) and
+  **Version history**. **Save** changes only the name and description, never the graph on screen; a view you may not
+  change is shown read-only with the reason (LA-VIEW-DETAILS-1, 2026-11-10).
+* **Start area (empty canvas):** one bounded panel with tabs (*Start a graph*, *Preset queries*, *Build a question*,
+  *Explore the Dataset*) that scrolls inside itself; a preset or builder answer opens in a closable card.
 * **Tool rail (file and view):** **File ▾** first ([§10](#10-saving-exporting-and-the-file-menu)), then **Search
   nodes**, **Filter node types**, **Graph layout**, **Filter edges by time**, **Help**, **Glossary**, **Display
   options** (the brush), **Undo** and **Redo** (display and filter changes), **Fit the graph to the screen**, **Show
@@ -1171,7 +1180,10 @@ Inspecto LA level (see [EDITIONS](../../../../EDITIONS.md) and the [level admin 
 
 **Masking.** Per Space, ids are shown *typed* (only sensitive types masked), *all* masked, or *none*; a Space that sets
 nothing uses *typed* in Standard and above and *none* in Basic. The same rule applies on the graph, the node list,
-paths, patterns, Value Measures and the Working Set.
+paths, patterns, Value Measures and the Working Set. One rule decides what is masked everywhere (MASKING-TWO-VOCABULARIES-1,
+2026-11-14): a column in a sensitive class, or a class or id that a masked Entity Type claims. Risk Score evidence,
+publication and embed links, BI in *typed* mode and Link Analysis all use it, and an Entity Type's `masked: false` no
+longer unmasks a sensitive class; only masking mode *none* turns masking off.
 
 ---
 
