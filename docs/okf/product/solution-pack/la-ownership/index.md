@@ -32,6 +32,4 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `solution-pack.la-ownership` — the board is the only list; change the row there.
 
-| Row | Priority | Kind | Title | Hold |
-|---|---|---|---|---|
-| `LA-OWNERSHIP-NO-CRON-FALLBACK-1` | P3 | defect | la-ownership's ownership_links is the only link Job of the twelve 2026-11-09 showcases with no cron: "*/5 * * * *" fallback. | — |
+_No open rows._

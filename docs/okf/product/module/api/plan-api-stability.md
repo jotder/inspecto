@@ -685,8 +685,8 @@ These carry forward across the 1.x → 2.0 boundary unchanged; 2.0 broke only th
 ## Why no `module-info.java`
 
 A JPMS module descriptor exporting only the public packages was considered and
-**declined**: the project ships a fat, shaded JAR that bundles several
-automatic-module dependencies (DuckDB JDBC, univocity, JToon, Jackson, SLF4J,
+**declined**: the project ships one thin jar per first-party module beside a shaded `inspecto.jar`
+(the processor) that bundles several automatic-module dependencies (DuckDB JDBC, univocity, JToon, Jackson, SLF4J,
 commons-*, gson, opencsv). Layering JPMS over that combination is high-risk
 (split packages, automatic-module naming, shade interactions) for little gain
 over the annotation + this policy. The `@PublicApi` marker is the lighter,

@@ -109,7 +109,7 @@ class UtilityLinksJobGoldenTest {
         assertEquals(List.of(), rule.by(), "transformer_loss is a Job output: a by column cannot be checked when the Space is created");
         assertEquals("gte", rule.comparator());
         // the rule's own measure and threshold over the real transformer_loss output: it fires, and only because of the two
-        // tampered transformers - without them every other transformer (the holiday home's included) stays under the threshold
+        // tampered transformers - without them every other metered transformer stays under the threshold
         String t = parquet("transformer_loss");
         Set<String> tampered = new TreeSet<>(ids(truth.get("stories").get("meter_tampering").get("entities")).stream().filter(e -> e.startsWith("TX-")).toList());
         String in = "('" + String.join("', '", tampered) + "')";
@@ -120,11 +120,13 @@ class UtilityLinksJobGoldenTest {
         for (Map<String, Object> r : rows("SELECT DISTINCT transformer_id FROM " + t + " WHERE loss_pct >= " + rule.threshold()))
             over.add((String) r.get("transformer_id"));
         assertEquals(tampered, over, "transformer_loss names the two the Alert is about");
-        // the look-alike (the holiday home, empty every winter) sits on another transformer
+        // the look-alike (the holiday home, empty every winter) is on an UNMETERED transformer: it has no energy balance at
+        // all, so its winter drop can never reach the loss Alert (the guides say so; metering it would change that claim)
         String home = truth.get("stories").get("meter_tampering").get("lookalikes").get(0).asText();
         String homeTx = (String) rows("SELECT transformer_id FROM " + parquet("premise/database", "/**/*.parquet") + " WHERE premise_id = '" + home + "'")
                 .get(0).get("transformer_id");
-        assertFalse(over.contains(homeTx), home + " on " + homeTx);
+        assertFalse(ids(truth.get("metered_transformers")).contains(homeTx), home + " on " + homeTx + " is not metered");
+        assertEquals(0, count("SELECT count(*) FROM " + t + " WHERE transformer_id = '" + homeTx + "'"), homeTx + " has no row in transformer_loss");
     }
 
     @Test

@@ -108,5 +108,5 @@ Moved to [Storage — API](api-storage.md).
 - Business data is never in the operational database, in any edition.
 - The `.restricted` refusal store is excluded from reads, listings and backups
   ([parsing-ingest](../etl/architecture.md)).
-- Postgres round-trip tests cover nine of the twelve families; the dedup ledger, acquisition ledger
-  and delivery receipts are covered by reasoning only.
+- Postgres round-trip tests cover fifteen of the sixteen families; Alerts (`DbAlertStore`) is covered by
+  reasoning only.

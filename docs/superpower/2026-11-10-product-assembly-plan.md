@@ -2236,7 +2236,7 @@ These are the parallel lanes. Each is code-only, needs no host, and touches file
 | Mapping | `MAPPING-EPOCH-TIMESTAMP-1` | Base |
 | Egress security | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` (e): an all-digits host such as `2130706433` passes `BARE_HOST` (`ObjectStoreDatabase.java:39`) | Base |
 | Inspecto LA UI | the 14 defects from the 2026-11-10 UI test (`LA-BASIC-PLACEHOLDER-CASE-1` … `LA-UI-TEXT-PASS-2`); `LA-SAMPLE-EMPTY-DATASET-1`'s likely cause is a Space created without `loadSamples` | LA App |
-| Showcases | `LA-OWNERSHIP-NO-CRON-FALLBACK-1`, `LA-UTILITY-LOOKALIKE-CHECKS-1` | LA App |
+| Showcases | `LA-UTILITY-LOOKALIKE-CHECKS-1` (`LA-OWNERSHIP-NO-CRON-FALLBACK-1` closed 2026-11-14) | LA App |
 
 ### 13.4 The board read by Product
 

@@ -160,5 +160,6 @@ after `node tools/seed-la-utility.mjs --apply`, sign in as each persona and chec
 5. **Draft:** `rp.analyst` has one open Draft that annotates `C-14` about `C-22` (exercise 2); promote it to widen
    the case, or leave it.
 
-**Not the story:** the holiday home `PRM-0773` (exercise 1's look-alike) is on a transformer whose loss stays under
-7 % all year, so it never contributes to the Alert; without `TX-007` and `TX-019` the rule would not fire at all.
+**Not the story:** the holiday home `PRM-0773` (exercise 1's look-alike) is on `TX-031`, which is not metered: it has no
+row in `transformer_loss`, so its winter drop never reaches the Alert. Every other metered transformer stays under 7 %;
+without `TX-007` and `TX-019` the rule would not fire at all.

@@ -740,9 +740,9 @@ definition of "done" for every unbuilt script. Board row: *Deployment topology l
 | `SCR-10` | Bundle-docs ACL fix | — | thirteen files under `archived-documents/plans-archive/` carry a broken deny-ACL and are **silently skipped from every bundle**; needs an Administrator `takeown` + `icacls` pass |
 | ~~`SCR-2`~~ | ~~Launcher `lib/` support~~ | — | ✅ **SUPERSEDED by PG-1**: `postgresql.jar` is staged into every Standard and Advanced bundle and auto-detected |
 | ~~`SCR-8`~~ | ~~`package.ps1 -Edition Advanced`~~ | — | ✅ **SHIPPED as EDG-01.** The row named a blocker that was already gone |
-| ~~`SCR-11`~~ | ~~Container image~~ | — | ✅ **SHIPPED as PKG-3** — the Dockerfile is generated at `package.ps1:1041-1065`. ⛔ Kubernetes stays out of scope until decision D1 says otherwise |
+| ~~`SCR-11`~~ | ~~Container image~~ | — | ✅ **SHIPPED as PKG-3** — the Dockerfile is generated at `package.ps1:1041-1065`. Kubernetes is in scope for Advanced only since D1′ (signed 2026-09-10, §6 *Orchestration platform support*) |
 * **The Standard runtime not re-verified against the token library** — skip-runtime until confirmed.
-* **Multi-user relational deployment** — parked until a multi-operator install exists.
+* **Multi-user relational deployment** — park lifted 2026-09-15 (a multi-operator install exists); the buildable part is done and the two-host run is ⏸ postponed 2026-10-23 (board row *Postgres multi-user*, hold: operator).
 * **Step-processor gaps** — eighteen partial and sixty-seven planned rows on the board.
 * **Policy-authoring experience** — hand-authored files only today.
 
@@ -878,7 +878,7 @@ citations elsewhere in this spec still resolve.
 | **Active/active deployment** | ⚠ **SUPERSEDED 2026-09-10** for Advanced | Active/active becomes **partitioned scale-out** (shared-nothing by Space — a pod owns Spaces; no replicated active/active), per the signed `superpower/enterprise-scale-out-plan.md` §4. Basic/Standard: still not offered; Standard gets the T4 active/**passive** standby instead (§3.9) |
 | **Orchestration platform support** | ⚠ **That decision changed 2026-09-10** | Kubernetes is the **Advanced** orchestrator (T5, §3.9); the container image is the Advanced unit of deployment. Basic/Standard remain orchestrator-free single artifacts. → `superpower/enterprise-scale-out-plan.md` §4, §9 D1′ |
 | **A government cryptographic variant** | 🔭 **DEFERRED**, demand-gated | The pattern is documented against the same transport seam; the work starts only against a concrete opportunity |
-| **Multi-user relational deployment** | ⛔ **PARKED** 2026-09-06 | Until a multi-operator install exists. The plan is written |
+| **Multi-user relational deployment** | ⛔ **PARKED** 2026-09-06 → park **LIFTED** 2026-09-15 → ⏸ **POSTPONED** 2026-10-23 | The trigger (a multi-operator install) fired 2026-09-15; pool, schema-per-Space and the two-node soak are built; the rest waits until after the release that ships without Postgres (board row *Postgres multi-user*) |
 | **The profiles varying the shaded fat JAR** | **NEVER TRUE** — corrected in this commit | One unconditional shade configuration, no child profiles; optional modules ship as sidecars (§3.2) |
 | **"Framework-free core, network dependencies isolated"** as a shipped property | **PARTLY SUPERSEDED** 2026-09-07 | The connector sidecar now ships in every edition. The isolation is real in the reactor and absent in the bundle (§2, `PKG-2`) |
 

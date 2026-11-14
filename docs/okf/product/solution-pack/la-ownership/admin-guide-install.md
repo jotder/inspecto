@@ -126,8 +126,8 @@ Job output: a `by` column cannot be checked against its Schema when the Space is
 **Checked live (2026-11-09 release).** On the Preview demo product, with all twelve showcases of that day in one server,
 the 18 files landed with 0 rejected, the Alert Rule raised one OPEN Alert at **1 (CRITICAL)**,
 `seed-la-ownership.mjs --apply` created 17 steps with none failed, and every persona got the answers in the table above
-(the held expand ran once the manager approved it). Unlike the other link Jobs, `ownership_links` has no `*/5` cron
-fallback: a file that lands while it runs is not caught up until the next landing (`LA-OWNERSHIP-NO-CRON-FALLBACK-1`).
+(the held expand ran once the manager approved it). At that run `ownership_links` had no `*/5` cron
+fallback; it has carried one, like the other link Jobs, since 2026-11-14 (`LA-OWNERSHIP-NO-CRON-FALLBACK-1`).
 On Basic the rule stayed unarmed and the Space had no Alert. Method and record:
 [showcase release, record](../la-showcase/admin-guide-showcase-release.md#record-the-2026-11-09-release).
 

@@ -315,8 +315,8 @@ What "inert" means, as seen live on Basic:
   premises, not 8 000); each hub says so.
 - **Link Jobs also run on `cron: "*/5 * * * *"`**, because until 2026-11-13 a `pipeline.commit` that landed while a
   run was in flight was skipped, not queued (`JOB-SIGNAL-OVERLAP-SKIP-1`, fixed: it now queues one follow-up Run that
-  waits). The cron is kept as a harmless catch-up. Exception: `la-ownership`'s `ownership_links` has no cron yet
-  (BACKLOG `LA-OWNERSHIP-NO-CRON-FALLBACK-1`). A counts or link Job that judges a month waits until that month's
+  waits). The cron is kept as a harmless catch-up (`la-ownership`'s `ownership_links` got its cron last, on 2026-11-14,
+  `LA-OWNERSHIP-NO-CRON-FALLBACK-1`). A counts or link Job that judges a month waits until that month's
   every side has landed (`la-utility`'s `transformer_loss` joins both reads; `la-telco-ra` waits for the billing file).
 
 ### Deliberate decisions and gotchas
