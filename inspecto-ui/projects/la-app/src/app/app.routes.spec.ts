@@ -37,7 +37,7 @@ describe('la-app routes', () => {
             // /entities stays open: the Space guide's columns step links there on every edition (Basic has no Entities area).
             expect(r.canActivate, item.path).toEqual(item.path === 'entities' ? undefined : [areaGuard]);
         }
-        expect(child('').component).toBeTruthy();
+        expect(child('').loadComponent).toBeTruthy();
         expect(child('**').redirectTo).toBe('');
     });
 

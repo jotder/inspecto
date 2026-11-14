@@ -4,7 +4,6 @@ import {
     computed,
     ElementRef,
     inject,
-    InjectionToken,
     OnInit,
     signal,
     viewChild,
@@ -37,15 +36,9 @@ import { AlertRuleFormData, AlertRuleFormDialog, AlertRuleFormResult } from './a
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 import { AiStatusData, AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { ALERTS_INVESTIGATION_ROUTE } from './alerts-investigation-route';
 
-/**
- * Where *Open Investigation* goes: the host's Link Analysis route. The console's default is the Studio route; the
- * standalone Link Analysis app provides its own `/link-analysis`.
- */
-export const ALERTS_INVESTIGATION_ROUTE = new InjectionToken<string>('ALERTS_INVESTIGATION_ROUTE', {
-    providedIn: 'root',
-    factory: () => '/studio/link-analysis',
-});
+export { ALERTS_INVESTIGATION_ROUTE };
 
 /**
  * Alerts — the core alert engine's surface (v4.1, B5): recent fired alerts (GET /alerts) over the

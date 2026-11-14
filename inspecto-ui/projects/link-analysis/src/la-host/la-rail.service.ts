@@ -14,6 +14,8 @@ function readExpanded(): boolean {
 /**
  * The la-app navigation rail's expanded/slim state, shared so the Link Analysis header can carry the toggle while the
  * shell draws the rail. `available` stays false in a host without a rail (the full console), which hides the toggle.
+ * It sits in the host seam (`la-host/`) because the la-app shell needs it at startup: the rest of the library stays out
+ * of the initial bundle (`tools/bundle-budget.json`).
  */
 @Injectable({ providedIn: 'root' })
 export class LaRailService {

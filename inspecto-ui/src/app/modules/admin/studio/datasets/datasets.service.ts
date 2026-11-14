@@ -1,8 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, catchError, map, of } from 'rxjs';
+import { Observable, catchError, defer, map, of, switchMap } from 'rxjs';
 import { BiQueryService, ComponentsService, apiUrl } from 'app/inspecto/api';
-import { DatasetFacts, STARTER_TEMPLATE, factsOf, factsQuery, starterBoard } from './dataset-page';
+import type { DatasetFacts } from './dataset-page';
 import { CalculatedColumn, Dataset, DatasetColumn, DatasetConfig, DatasetKind, NamedMeasure } from './dataset-types';
 import { isSharedRef } from 'app/inspecto/api/shared-ref';
 
@@ -51,13 +51,21 @@ export class DatasetsService {
         return this.components.remove('dataset', id);
     }
 
-    /** Rows and time span of a Dataset (the Dataset page's summary, ONBOARDING-FIRST-RUN-1 C5), over `POST /bi/query`. */
+    /**
+     * Rows and time span of a Dataset (the Dataset page's summary, ONBOARDING-FIRST-RUN-1 C5), over `POST /bi/query`.
+     * The Dataset page's rules are loaded on use, here and in {@link applyStarter}: they reach Link Analysis library code,
+     * and this service is in the initial bundle through the Link Analysis host seam (`tools/bundle-budget.json`).
+     */
     facts(ds: Dataset): Observable<DatasetFacts> {
-        return this.bi.run(factsQuery(ds)).pipe(
-            map((r) =>
-                factsOf(
-                    r.rows[0],
-                    r.resultSet.columns.map((c) => c.name),
+        return defer(() => import('./dataset-page')).pipe(
+            switchMap(({ factsQuery, factsOf }) =>
+                this.bi.run(factsQuery(ds)).pipe(
+                    map((r) =>
+                        factsOf(
+                            r.rows[0],
+                            r.resultSet.columns.map((c) => c.name),
+                        ),
+                    ),
                 ),
             ),
         );
@@ -76,9 +84,17 @@ export class DatasetsService {
     }
 
     applyStarter(datasetId: string, columns: Record<string, string>): Observable<string> {
-        return this.http
-            .post(apiUrl(`/bi/templates/${STARTER_TEMPLATE}/apply`), { dataset: datasetId, prefix: datasetId, columns })
-            .pipe(map(() => starterBoard(datasetId)));
+        return defer(() => import('./dataset-page')).pipe(
+            switchMap(({ STARTER_TEMPLATE, starterBoard }) =>
+                this.http
+                    .post(apiUrl(`/bi/templates/${STARTER_TEMPLATE}/apply`), {
+                        dataset: datasetId,
+                        prefix: datasetId,
+                        columns,
+                    })
+                    .pipe(map(() => starterBoard(datasetId))),
+            ),
+        );
     }
 
     /**

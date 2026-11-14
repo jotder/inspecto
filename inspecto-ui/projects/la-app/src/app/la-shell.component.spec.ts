@@ -16,7 +16,7 @@ import { SpaceGuideService } from '@inspecto/core/onboarding/space-guide.service
 import { LensService } from 'app/inspecto/api';
 import { of } from 'rxjs';
 import { BootstrapProduct } from '@inspecto/core/product/product-host';
-import { LaRailService } from '@inspecto/link-analysis/la-rail.service';
+import { LaRailService } from '@inspecto/link-analysis/la-host/la-rail.service';
 import {
     LA_APP_CURRENT_APP_KEY,
     LA_APP_SETTINGS_NAV,
@@ -286,7 +286,8 @@ describe('la-app shell and landing page', () => {
         const button = el.querySelector('[data-testid="la-next-steps-open"]') as HTMLButtonElement;
         expect(button.getAttribute('aria-label')).toBe('What can I do next?');
         button.click();
-        expect(open).toHaveBeenCalledWith(NextStepsDialog, expect.anything());
+        // the dialog is loaded on demand (kept out of the initial bundle), so it opens once its chunk resolves
+        await vi.waitFor(() => expect(open).toHaveBeenCalledWith(NextStepsDialog, expect.anything()));
     });
 
     it('opens the keyboard-shortcuts help on ? - its own list - but not while typing in a field', async () => {

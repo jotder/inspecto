@@ -3,9 +3,8 @@ import { CanActivateFn, Route, Router, UrlSegment } from '@angular/router';
 import { authGuard } from '@inspecto/core/auth/auth.guard';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { productNav } from '@inspecto/core/product/product-host';
-import { ALERTS_INVESTIGATION_ROUTE } from 'app/modules/admin/alerts/alerts.component';
+import { ALERTS_INVESTIGATION_ROUTE } from 'app/modules/admin/alerts/alerts-investigation-route';
 import { LaShellComponent } from './la-shell.component';
-import { LandingComponent } from './landing.component';
 import { PRODUCT } from './product.generated';
 
 /**
@@ -53,7 +52,12 @@ export const laAppRoutes: Route[] = [
         component: LaShellComponent,
         canActivate: [authGuard],
         children: [
-            { path: '', pathMatch: 'full', component: LandingComponent },
+            // Lazy like every page: My Work reads Link Analysis services, which must stay out of the initial bundle.
+            {
+                path: '',
+                pathMatch: 'full',
+                loadComponent: () => import('./landing.component').then((m) => m.LandingComponent),
+            },
             // Add data (OB-14), the first-run page's "Use my own data": the one Add data screen both apps use (LA-ONBOARD-1 phase 4).
             { path: 'add-data', loadComponent: () => import('./add-data.page').then((m) => m.AddDataPageComponent) },
             // LA-DATA-PAGE-1: the Datasets, their Entities and their Mappings.

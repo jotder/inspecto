@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { InspectoSplitDirective } from '@inspecto/core/components/split.directive';
-import { LaRailService } from '@inspecto/link-analysis/la-rail.service';
+import { LaRailService } from '@inspecto/link-analysis/la-host/la-rail.service';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
@@ -25,10 +25,9 @@ import { APP_ENVIRONMENT } from '@inspecto/core/api/app-environment';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { LA_APP_SHORTCUTS, ShortcutsHelpDialog, isEditingTarget } from 'app/inspecto/shortcuts-help.dialog';
 import { appAreas, appOfUrl, areaIcon, productNav, ProductNavEntry } from '@inspecto/core/product/product-host';
-import { NextStepsDialog } from './next-steps.dialog';
 import { PRODUCT } from './product.generated';
 
-export { LA_RAIL_EXPANDED_KEY } from '@inspecto/link-analysis/la-rail.service';
+export { LA_RAIL_EXPANDED_KEY } from '@inspecto/link-analysis/la-host/la-rail.service';
 
 /** Where the App last chosen in the switcher is remembered, per Product (a per-viewer convenience; PA-5b). */
 export const LA_APP_CURRENT_APP_KEY = `la-app.app.${PRODUCT.id}`;
@@ -295,9 +294,14 @@ export class LaShellComponent {
         }
     }
 
-    /** *What can I do next?* (UC-15 rule 4). */
+    /**
+     * *What can I do next?* (UC-15 rule 4). Loaded on demand: the dialog reads Add data's access rules (Link Analysis
+     * library code), which must stay out of the app's initial bundle (`tools/bundle-budget.json`).
+     */
     protected openNextSteps(): void {
-        this.dialog.open(NextStepsDialog, { width: '560px', maxHeight: '90vh', autoFocus: 'first-tabbable' });
+        void import('./next-steps.dialog').then(({ NextStepsDialog }) =>
+            this.dialog.open(NextStepsDialog, { width: '560px', maxHeight: '90vh', autoFocus: 'first-tabbable' }),
+        );
     }
 
     /** `?` (a bare press, never while editing text) opens the keyboard-shortcuts help, as in the main app. */
