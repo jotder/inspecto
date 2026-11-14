@@ -3,15 +3,17 @@
     "Thresholds for tools/check-bundle-shape.mjs (reads dist/<app>/stats.json, written by `ng build --stats-json`). Complements the angular.json budgets (size only) with chunk PLACEMENT.",
     "Re-baseline DELIBERATELY, in the same change that legitimately grows or reshapes a bundle: (1) `npm run build -- --stats-json` and `npm run build -- la-app --stats-json`; (2) `npm run check:bundle-shape` and read the FAIL lines; (3) if the move is intended, set maxMainBytes / maxInitialBytes to about +3% over the new measured size (the guard prints kB = 1000 B) and update the initialFiles / lazyChunks expected values; (4) put the new numbers in the commit message. Never raise a ceiling to silence an UNEXPLAINED jump - the FAIL line names the module that moved.",
     "maxInitialBytes covers main + every chunk main imports STATICALLY + polyfills + styles. forbiddenInInitial patterns are regexes over metafile input paths (forward slashes), checked in main and in the statically-imported chunks. A static import of a library barrel evaluates everything it re-exports, so projects/link-analysis/src/public-api.ts must stay light (see its header).",
-    "Measured 2026-10-02 (production): gamma main 1877959 B, eager (main + static chunks + polyfills + styles) 4888709 B in 29 files, 114 lazy JS chunks; la-app main 1980572 B, eager 3037577 B in 8 files, 15 lazy JS chunks. NB the Angular CLI report counts only main+polyfills+styles as initial (2.50 MB for gamma); the guard also counts the chunks main imports statically."
+    "Measured 2026-10-02 (production): gamma main 1877959 B, eager (main + static chunks + polyfills + styles) 4888709 B in 29 files, 114 lazy JS chunks; la-app main 1980572 B, eager 3037577 B in 8 files, 15 lazy JS chunks. NB the Angular CLI report counts only main+polyfills+styles as initial (2.50 MB for gamma); the guard also counts the chunks main imports statically.",
+    "Re-baselined 2026-11-15 (UI-BUNDLE-SHAPE-RED-1), FILE COUNTS ONLY - no byte ceiling raised. The red was 26 violations: Link Analysis library code statically reached from both entries (gamma: la-host.providers -> DatasetsService -> dataset-page -> add-data.model; la-app: the shell's rail service and next-steps dialog, the landing page's My Work, the Alerts page imported by app.routes for its token, and the viz registration importing the whole @inspecto/core/viz barrel -> query panel -> data table -> ag-Grid + CodeMirror). Fixed by lazy imports and deep paths, after which: gamma main 366712 B, eager 4096069 B in 34 files, 172 lazy JS chunks; la-app main 390667 B, eager 2363534 B in 16 files, 91 lazy JS chunks (was 4005865 B in 23 files). The counts grew for an explained reason: lazy entry chunks went from ~62 dynamic-import targets (2026-10-02) to 80 (la-app now mounts console pages whole as App areas, PA-5b; gamma gained Studio / onboarding routes), esbuild cuts one shared chunk per distinct set of entries that share code, and PERF-P7 (2026-10-25) took main from 1.88 MB to under 0.4 MB, so code main shares with lazy routes now sits in static chunks instead of inside main. The bytes went DOWN (gamma eager 4.89 -> 4.10 MB, la-app 3.04 -> 2.36 MB), so the extra files are splits, not weight.",
+    "Byte ceilings tightened 2026-11-15 to about +3% over the measurement of the same day: gamma main 366712 B -> 378000, eager 4096069 B -> 4219000; la-app main 390667 B -> 403000, eager 2363534 B -> 2435000. The old ceilings (1935000 / 5035000 / 2040000 / 3130000) dated from before PERF-P7 and the lazy split, so 0.6-1.7 MB of creep would have passed unnoticed."
   ],
   "apps": {
     "gamma": {
       "stats": "dist/gamma/stats.json",
-      "maxMainBytes": 1935000,
-      "maxInitialBytes": 5035000,
-      "initialFiles": { "expected": 29, "tolerance": 2 },
-      "lazyChunks": { "expected": 114, "tolerance": 10 },
+      "maxMainBytes": 378000,
+      "maxInitialBytes": 4219000,
+      "initialFiles": { "expected": 34, "tolerance": 2 },
+      "lazyChunks": { "expected": 172, "tolerance": 10 },
       "forbiddenInInitial": [
         { "pattern": "node_modules/maplibre-gl/", "why": "MapLibre (1.2 MB) belongs in the lazy Geo chunk" },
         { "pattern": "^projects/link-analysis/src/(?!la-host/|public-api\\.ts$|[a-z-]+/[a-z-]+\\.viz\\.ts$)", "why": "Link Analysis / Geo library code beyond the host seam and viz registration must stay lazy (public-api.ts barrel too heavy?)" }
@@ -23,10 +25,10 @@
     },
     "la-app": {
       "stats": "dist/la-app/stats.json",
-      "maxMainBytes": 2040000,
-      "maxInitialBytes": 3130000,
-      "initialFiles": { "expected": 8, "tolerance": 1 },
-      "lazyChunks": { "expected": 15, "tolerance": 4 },
+      "maxMainBytes": 403000,
+      "maxInitialBytes": 2435000,
+      "initialFiles": { "expected": 16, "tolerance": 1 },
+      "lazyChunks": { "expected": 91, "tolerance": 4 },
       "forbiddenInInitial": [
         { "pattern": "node_modules/maplibre-gl/", "why": "MapLibre (1.2 MB) belongs in the lazy Geo chunk" },
         { "pattern": "node_modules/@antv/g6/", "why": "G6 belongs in the lazy Link Analysis chunk (gamma main carries it for other features; la-app must not)" },

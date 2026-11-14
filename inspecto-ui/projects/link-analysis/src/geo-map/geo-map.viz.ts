@@ -1,4 +1,5 @@
-import { getVizComponentLoader, registerVizComponent } from '@inspecto/core/viz';
+// The deep path, not the `@inspecto/core/viz` barrel (see link-analysis.viz.ts).
+import { getVizComponentLoader, registerVizComponent } from '@inspecto/core/viz/viz-components';
 
 /**
  * Geo's own viz-embed registration (SEP-06): the `geo-map-view` render host, as an ASYNC loader so MapLibre stays out

@@ -1,4 +1,6 @@
-import { getVizComponentLoader, registerVizComponent } from '@inspecto/core/viz';
+// The deep path, not the `@inspecto/core/viz` barrel: this file is eager in every host (public-api.ts), and the barrel
+// reaches the query panel, the data table, ag-Grid and the SQL editor.
+import { getVizComponentLoader, registerVizComponent } from '@inspecto/core/viz/viz-components';
 
 /**
  * Link Analysis's own viz-embed registration (SEP-06): the `link-analysis-view` and `working-set` render hosts, as
