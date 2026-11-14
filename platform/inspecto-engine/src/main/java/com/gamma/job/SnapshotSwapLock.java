@@ -43,14 +43,19 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  *       away before the scan ends.</li>
  * </ul>
  *
+ * <p><b>Who waits for whom:</b> a reader that holds no store yet queues behind a writer already waiting, so new readers
+ * cannot starve a publish, and only a reader that already holds a store may overtake queued writers (waiting just for a
+ * swap under way), so readers holding several stores cannot deadlock ({@link #pin}).
+ *
  * <p>The lock key is the store directory; a pipeline-shaped store's {@code database/} read root counts as the store
  * itself, so {@code orders} and {@code orders/database} meet on one lock.
  *
  * <p>⚠ Limits. A reader that pins outside {@code ConsignmentSelector}, or scans a store without a pin or a lock, can
  * still fail across a swap; so can one that names a sub-directory of a store (a partition, an explicit deeper ref),
- * which locks that sub-directory only. A publish waits for the slowest holding reader of its store; an interrupt does
- * not stop a running DuckDB statement, so the writer's deadline bounds the wait. One JVM only: another process writing
- * the same data root is not excluded.
+ * which locks that sub-directory only. A publish waits for the slowest reader holding its store when it queued, and for
+ * any reader that overtook it while already holding another store; an interrupt does not stop a running DuckDB
+ * statement, so the writer's deadline bounds the wait. While a publish waits, a new reader of that store waits too
+ * (a BI pin included). One JVM only: another process writing the same data root is not excluded.
  */
 public final class SnapshotSwapLock {
 
@@ -58,6 +63,9 @@ public final class SnapshotSwapLock {
 
     /** The read locks this thread's open {@link #hold()} block has taken; absent outside a block. */
     private static final ThreadLocal<List<ReentrantReadWriteLock>> HOLDING = new ThreadLocal<>();
+
+    /** How many read locks of this class this thread holds now (through {@link #read}, {@link #hold()} or a pin). */
+    private static final ThreadLocal<int[]> READS = ThreadLocal.withInitial(() -> new int[1]);
 
     private static final Held NONE = () -> { };
 
@@ -79,12 +87,18 @@ public final class SnapshotSwapLock {
                 Lock l = lock(dir).readLock();
                 l.lockInterruptibly();
                 held.add(l);
+                READS.get()[0]++;
             }
         } catch (InterruptedException | RuntimeException e) {
-            held.forEach(Lock::unlock);
+            release(held);
             throw e;
         }
-        return () -> held.forEach(Lock::unlock);
+        return () -> release(held);
+    }
+
+    private static void release(List<Lock> held) {
+        held.forEach(Lock::unlock);
+        READS.get()[0] -= held.size();
     }
 
     /**
@@ -99,7 +113,7 @@ public final class SnapshotSwapLock {
         return () -> {
             if (HOLDING.get() != held) return;
             HOLDING.remove();
-            held.forEach(l -> l.readLock().unlock());
+            release(held.stream().<Lock>map(ReentrantReadWriteLock::readLock).toList());
         };
     }
 
@@ -107,10 +121,12 @@ public final class SnapshotSwapLock {
      * The read lock of {@code storeRoot} for a pin: the caller enumerates the store's files while holding it. Inside a
      * {@link #hold()} block the lock stays held until the block closes and the returned handle does nothing.
      *
-     * <p>It is taken by barging past queued writers: a pin waits only while a swap holds the write lock (hide and
-     * reveal, milliseconds), never for a writer queued behind a Job that reads the store for an hour. So pins in any
-     * order cannot deadlock: their only wait is on a writer that already holds its lock, and such a writer waits for
-     * nothing.
+     * <p>A thread that holds no store yet queues fairly, behind a writer already waiting, so new readers can never keep a
+     * publish waiting. A thread that already holds a store overtakes queued writers and waits only while a swap holds
+     * the write lock (hide and reveal, milliseconds); it must, or two such readers each holding one store and pinning
+     * the other's would deadlock behind the writers queued on both. That keeps pins in any order deadlock-free: a thread
+     * that waits behind a writer holds nothing anyone waits for, and a thread that holds something waits only for a
+     * writer that already has its lock, which waits for nothing.
      *
      * @param storeRoot the directory the pin enumerates; a URI (an object-store location) takes no lock
      */
@@ -125,14 +141,21 @@ public final class SnapshotSwapLock {
         ReentrantReadWriteLock rw = lock(dir);
         List<ReentrantReadWriteLock> holding = HOLDING.get();
         if (holding != null && holding.contains(rw)) return NONE;
-        while (!rw.readLock().tryLock()) {
-            if (Thread.interrupted()) {
-                Thread.currentThread().interrupt();
-                throw new IllegalStateException("interrupted waiting for a snapshot swap of " + dir + " to finish");
+        try {
+            if (READS.get()[0] == 0) {
+                rw.readLock().lockInterruptibly();   // fair: behind a writer already waiting
+            } else {
+                while (!rw.readLock().tryLock()) {   // overtakes queued writers; fails only while a swap holds the lock
+                    if (Thread.interrupted()) throw new InterruptedException();
+                    LockSupport.parkNanos(200_000L);
+                }
             }
-            LockSupport.parkNanos(200_000L);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("interrupted waiting for a snapshot swap of " + dir + " to finish");
         }
-        if (holding == null) return rw.readLock()::unlock;
+        READS.get()[0]++;
+        if (holding == null) return () -> release(List.of(rw.readLock()));
         holding.add(rw);
         return NONE;
     }

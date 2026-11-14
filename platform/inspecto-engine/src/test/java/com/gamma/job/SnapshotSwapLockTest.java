@@ -308,8 +308,9 @@ class SnapshotSwapLockTest {
         AtomicReference<String> pinned = new AtomicReference<>();
         Thread reader = new Thread(() -> pinned.set(ConsignmentSelector.sourceLiteral(links.toString(), "parquet")));
         reader.start();
-        long deadline = System.nanoTime() + 30_000_000_000L;
-        while (reader.getState() != Thread.State.TIMED_WAITING && reader.getState() != Thread.State.TERMINATED) {
+        long deadline = System.nanoTime() + 30_000_000_000L;   // queued for the lock, or spinning past queued writers
+        while (!SnapshotSwapLock.hasQueuedThreads(links) && reader.getState() != Thread.State.TIMED_WAITING
+                && reader.getState() != Thread.State.TERMINATED) {
             if (System.nanoTime() > deadline) fail("the pin neither waited nor finished");
             Thread.sleep(5);
         }
@@ -400,6 +401,96 @@ class SnapshotSwapLockTest {
             while (rs.next()) out.add(rs.getInt(1));
         }
         return out;
+    }
+
+    /** Until {@code t} is parked (in a lock queue or on a latch) or has finished. */
+    private static void awaitParked(Thread t) throws InterruptedException {
+        long deadline = System.nanoTime() + 30_000_000_000L;
+        while (t.getState() != Thread.State.WAITING && t.getState() != Thread.State.TERMINATED) {
+            if (System.nanoTime() > deadline) fail(t.getName() + " neither parked nor finished");
+            Thread.sleep(5);
+        }
+    }
+
+    @Test
+    void aNewReaderQueuesBehindAWaitingPublishSoOverlappingReadersCannotStarveIt(@TempDir Path dir) throws Exception {
+        Path store = dir.resolve("links");
+        AtomicReference<Throwable> failed = new AtomicReference<>();
+        java.util.concurrent.atomic.AtomicBoolean swapped = new java.util.concurrent.atomic.AtomicBoolean();
+        Thread writer = new Thread(() -> {
+            try (SnapshotSwapLock.Held swap = SnapshotSwapLock.write(store)) { swapped.set(true); } catch (Throwable t) { failed.set(t); }
+        }, "writer");
+        CountDownLatch secondDone = new CountDownLatch(1);
+        AtomicReference<Boolean> secondPinnedAfterPublish = new AtomicReference<>();
+        Thread second = new Thread(() -> {   // a Job that holds what it pins (materialize, a pipeline)
+            try (SnapshotSwapLock.Held reading = SnapshotSwapLock.hold();
+                 SnapshotSwapLock.Held pinned = SnapshotSwapLock.pin(store.toString())) {
+                secondPinnedAfterPublish.set(swapped.get());
+                secondDone.await();
+            } catch (Throwable t) {
+                failed.set(t);
+            }
+        }, "second reader");
+
+        SnapshotSwapLock.Held first = SnapshotSwapLock.read(List.of(store));   // a reader in flight
+        try {
+            writer.start();
+            awaitQueuedOrDone(store, writer);   // the publish waits for it
+            second.start();
+            awaitParked(second);                // queued behind the publish, or (starving it) pinned past it
+        } finally {
+            first.close();                      // the only reader the publish had to wait for is done
+        }
+        writer.join(10_000);
+        boolean published = swapped.get();
+        secondDone.countDown();
+        second.join(30_000);
+        writer.join(30_000);
+
+        assertTrue(published, "the publish went ahead once the reader in flight was done, not after the reader that came later");
+        assertEquals(Boolean.TRUE, secondPinnedAfterPublish.get(), "the later reader pinned only after the publish");
+        assertNull(failed.get());
+    }
+
+    @Test
+    void readersHoldingOneStoreAndPinningTheOtherDoNotDeadlockBehindQueuedWriters(@TempDir Path dir) throws Exception {
+        Path a = dir.resolve("a"), b = dir.resolve("b");
+        CountDownLatch ready = new CountDownLatch(2), go = new CountDownLatch(1);
+        AtomicReference<Throwable> failed = new AtomicReference<>();
+        List<Thread> readers = new ArrayList<>();
+        for (Path[] own : List.of(new Path[]{a, b}, new Path[]{b, a})) {
+            Thread t = new Thread(() -> {
+                try (SnapshotSwapLock.Held reading = SnapshotSwapLock.hold();
+                     SnapshotSwapLock.Held first = SnapshotSwapLock.pin(own[0].toString())) {
+                    ready.countDown();
+                    go.await();
+                    try (SnapshotSwapLock.Held second = SnapshotSwapLock.pin(own[1].toString())) { /* both held */ }
+                } catch (Throwable e) {
+                    failed.set(e);
+                }
+            });
+            t.setDaemon(true);   // a deadlock would keep it forever
+            readers.add(t);
+            t.start();
+        }
+        ready.await();
+        List<Thread> writers = new ArrayList<>();
+        for (Path store : List.of(a, b)) {
+            Thread w = new Thread(() -> {
+                try (SnapshotSwapLock.Held swap = SnapshotSwapLock.write(store)) { /* the swap */ } catch (Throwable e) { failed.set(e); }
+            });
+            w.setDaemon(true);
+            writers.add(w);
+            w.start();
+            awaitQueuedOrDone(store, w);
+        }
+        go.countDown();
+        for (Thread t : readers) t.join(10_000);
+        for (Thread w : writers) w.join(10_000);
+
+        assertTrue(readers.stream().noneMatch(Thread::isAlive), "each reader took its second store past the queued writer");
+        assertTrue(writers.stream().noneMatch(Thread::isAlive), "and both publishes went ahead after");
+        assertNull(failed.get());
     }
 
     @Test

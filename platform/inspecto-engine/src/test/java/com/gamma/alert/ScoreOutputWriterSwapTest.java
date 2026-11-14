@@ -68,6 +68,54 @@ class ScoreOutputWriterSwapTest {
     }
 
     @Test
+    void aConcurrentRunOfTheSameModelNeverSweepsAnotherRunsFileInFlight(@TempDir Path data) throws Exception {
+        DuckDbUtil.loadDriver();
+        List<ScoreColumns.Column> cols = List.of(ScoreColumns.Column.measure("score", "DOUBLE"));
+        Instant first = Instant.parse("2026-11-01T00:00:00Z"), second = first.plusSeconds(60);
+        java.util.concurrent.CountDownLatch written = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch reveal = new java.util.concurrent.CountDownLatch(1);
+        Thread firstRun = Thread.currentThread();
+        ScoreOutputWriter.afterCopy = () -> {
+            if (Thread.currentThread() != firstRun) return;
+            written.countDown();
+            try { reveal.await(); } catch (InterruptedException e) { throw new IllegalStateException(e); }
+        };
+        AtomicReference<Throwable> failed = new AtomicReference<>();
+        Thread secondRun = new Thread(() -> {
+            try {
+                written.await();   // the first run's files are written as .tmp, not yet revealed
+                ScoreOutputWriter.write(data, KIND, "m1", "msisdn", cols,
+                        List.of(new ScoreOutputWriter.Row("e1", List.of(0.7))), "v1", "r2", second, ScoreRunFiles.Retention.OFF);
+            } catch (Throwable t) {
+                failed.set(t);
+            } finally {
+                reveal.countDown();
+            }
+        });
+        secondRun.start();
+        Thread releaser = new Thread(() -> {   // let the first run reveal once the second has waited its turn, or finished
+            long deadline = System.nanoTime() + 30_000_000_000L;
+            while (secondRun.getState() != Thread.State.BLOCKED && secondRun.isAlive() && System.nanoTime() < deadline) {
+                try { Thread.sleep(5); } catch (InterruptedException e) { return; }
+            }
+            reveal.countDown();
+        });
+        releaser.start();
+        try {
+            ScoreOutputWriter.write(data, KIND, "m1", "msisdn", cols,
+                    List.of(new ScoreOutputWriter.Row("e1", List.of(0.5))), "v1", "r1", first, ScoreRunFiles.Retention.OFF);
+        } finally {
+            ScoreOutputWriter.afterCopy = () -> { };
+        }
+        secondRun.join(30_000);
+        releaser.join(30_000);
+
+        assertNull(failed.get(), String.valueOf(failed.get()));
+        assertEquals(List.of(KIND.ownerMarker(), ScoreRunFiles.name(first, "r1"), ScoreRunFiles.name(second, "r2")),
+                names(data.resolve(KIND.scores("m1"))), "both runs landed");
+    }
+
+    @Test
     void aRunSweepsTheLeftoversOfACrashedRun(@TempDir Path data) throws Exception {
         DuckDbUtil.loadDriver();
         List<ScoreColumns.Column> cols = List.of(ScoreColumns.Column.measure("score", "DOUBLE"));

@@ -54,8 +54,9 @@ public final class ScoreOutputWriter {
      * Append this run to the history Dataset {@code kind.scores(modelId)} and swap {@code kind.latest(modelId)} to it.
      * Both directories must be this model's (created with its marker, or already carrying it); both files land as
      * {@code *.tmp} and are revealed by an atomic move, so a reader never sees a half-written file; the {@code *.tmp} /
-     * {@code *.stale} a crashed run left are swept first. Retention then prunes older history runs, never
-     * {@code _latest} or this run, waiting for the readers holding the history ({@link SnapshotSwapLock}).
+     * {@code *.stale} a crashed run left are swept first (runs of one model take turns in this JVM, so no other run's
+     * file is in flight). Retention then prunes older history runs, never {@code _latest} or this run, waiting for the
+     * readers holding the history ({@link SnapshotSwapLock}).
      *
      * <p>Kind column values bind by type: {@code VARCHAR} a String, {@code DOUBLE} / {@code INTEGER} a Number,
      * {@code BOOLEAN} a Boolean, {@code TIMESTAMP} a {@link LocalDateTime}; {@code null} binds SQL NULL.
@@ -69,43 +70,54 @@ public final class ScoreOutputWriter {
         Path latest = dataDir.resolve(kind.latest(modelId)).normalize();
         if (!history.startsWith(dataDir.normalize()) || !latest.startsWith(dataDir.normalize()))
             throw new IllegalArgumentException("scores Dataset escapes the data root");
-        ScoreOutputDirs.claim(history, kind.ownerMarker(), kind.kind(), modelId);
-        ScoreOutputDirs.claim(latest, kind.ownerMarker(), kind.kind(), modelId);
-        cleanLeftovers(history);   // a crashed prior run leaves only invisible .tmp/.stale files
-        cleanLeftovers(latest);
-        String name = ScoreRunFiles.name(scoredAt, runId);
-        Path histTmp = history.resolve(name + ".tmp");
-        Path latestTmp = latest.resolve(name + ".tmp");
-        List<ScoreColumns.Column> columns = ScoreColumns.table(kindColumns);
-        List<String> ddl = new ArrayList<>(columns.size());
-        for (ScoreColumns.Column c : columns) ddl.add(c.name() + " " + c.type());
-        try (Connection c = DuckDbUtil.openInMemory(DuckDbUtil.spillDirUnder(dataDir), List.of(history, latest));
-             Statement st = c.createStatement()) {
-            st.execute("CREATE TABLE s (" + String.join(", ", ddl) + ")");
-            try (PreparedStatement ps = c.prepareStatement("INSERT INTO s VALUES ("
-                    + String.join(", ", Collections.nCopies(columns.size(), "?")) + ")")) {
-                Timestamp ts = Timestamp.from(scoredAt);
-                for (Row r : rows) {
-                    int i = 1;
-                    ps.setString(i++, modelId);
-                    ps.setString(i++, entityType);
-                    ps.setString(i++, r.entityKey());
-                    for (int k = 0; k < kindColumns.size(); k++) bind(ps, i++, kindColumns.get(k), r.values().get(k));
-                    ps.setString(i++, modelVersion);
-                    ps.setString(i++, runId);
-                    ps.setTimestamp(i, ts);
-                    ps.addBatch();
+        // One run of a model writes at a time in this JVM, so the sweep below can only find a crashed run's files, never
+        // the in-flight .tmp of a concurrent run. Lock order: this monitor, then the store's swap lock.
+        synchronized (RUNS.computeIfAbsent(history.toAbsolutePath(), k -> new Object())) {
+            ScoreOutputDirs.claim(history, kind.ownerMarker(), kind.kind(), modelId);
+            ScoreOutputDirs.claim(latest, kind.ownerMarker(), kind.kind(), modelId);
+            cleanLeftovers(history);   // a crashed prior run leaves only invisible .tmp/.stale files
+            cleanLeftovers(latest);
+            String name = ScoreRunFiles.name(scoredAt, runId);
+            Path histTmp = history.resolve(name + ".tmp");
+            Path latestTmp = latest.resolve(name + ".tmp");
+            List<ScoreColumns.Column> columns = ScoreColumns.table(kindColumns);
+            List<String> ddl = new ArrayList<>(columns.size());
+            for (ScoreColumns.Column c : columns) ddl.add(c.name() + " " + c.type());
+            try (Connection c = DuckDbUtil.openInMemory(DuckDbUtil.spillDirUnder(dataDir), List.of(history, latest));
+                 Statement st = c.createStatement()) {
+                st.execute("CREATE TABLE s (" + String.join(", ", ddl) + ")");
+                try (PreparedStatement ps = c.prepareStatement("INSERT INTO s VALUES ("
+                        + String.join(", ", Collections.nCopies(columns.size(), "?")) + ")")) {
+                    Timestamp ts = Timestamp.from(scoredAt);
+                    for (Row r : rows) {
+                        int i = 1;
+                        ps.setString(i++, modelId);
+                        ps.setString(i++, entityType);
+                        ps.setString(i++, r.entityKey());
+                        for (int k = 0; k < kindColumns.size(); k++) bind(ps, i++, kindColumns.get(k), r.values().get(k));
+                        ps.setString(i++, modelVersion);
+                        ps.setString(i++, runId);
+                        ps.setTimestamp(i, ts);
+                        ps.addBatch();
+                    }
+                    ps.executeBatch();
                 }
-                ps.executeBatch();
+                st.execute("COPY s TO " + parquetPath(histTmp) + " (FORMAT PARQUET)");
+                st.execute("COPY s TO " + parquetPath(latestTmp) + " (FORMAT PARQUET)");
             }
-            st.execute("COPY s TO " + parquetPath(histTmp) + " (FORMAT PARQUET)");
-            st.execute("COPY s TO " + parquetPath(latestTmp) + " (FORMAT PARQUET)");
+            afterCopy.run();
+            Files.move(histTmp, history.resolve(name), StandardCopyOption.ATOMIC_MOVE);
+            ScoreOutputDirs.swapIn(latest, latestTmp, name, ScoreRunFiles.GLOB);
+            prune(history, retention, scoredAt, name);
+            return history;
         }
-        Files.move(histTmp, history.resolve(name), StandardCopyOption.ATOMIC_MOVE);
-        ScoreOutputDirs.swapIn(latest, latestTmp, name, ScoreRunFiles.GLOB);
-        prune(history, retention, scoredAt, name);
-        return history;
     }
+
+    /** One monitor per history directory: the runs of a model take turns ({@link #write}). */
+    private static final java.util.concurrent.ConcurrentHashMap<Path, Object> RUNS = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Test seam: runs once a run's files are written as {@code .tmp} and before they are revealed. */
+    static volatile Runnable afterCopy = () -> { };
 
     private static void bind(PreparedStatement ps, int i, ScoreColumns.Column c, Object v) throws SQLException {
         if (v == null) {   // SQL NULL, e.g. an insufficient Churn Score has no score (never 0)

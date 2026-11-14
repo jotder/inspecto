@@ -314,8 +314,10 @@ store it writes never waits on itself). Every swap holds the write lock only aro
 are taken in path order, and a writer holds no other SnapshotSwapLock while it waits (`IncrementalSink` waits holding its own
 sink monitor and file lock, which no reader takes), so there is no deadlock.
 **Every reader and writer, since 2026-11-15** (`SNAPSHOT-SWAP-UNLOCKED-READERS-1`). Three ways to take the lock:
-- **Pin:** `ConsignmentSelector` lists and pins a store's files under the read lock, waiting only while a swap is
-  under way (a pin overtakes a writer that is merely queued, so pins cannot deadlock).
+- **Pin:** `ConsignmentSelector` lists and pins a store's files under the read lock. A reader that holds no store yet
+  queues behind a writer already waiting, so new readers cannot starve a publish; only a reader that already holds a
+  store may overtake queued writers (waiting just for a swap under way), so readers holding several stores cannot
+  deadlock. While a publish is queued, a new reader of that store waits for it too.
 - **Interactive readers** (BI, Alert Rule measures, Link Analysis, the DB browser — everything that runs through
   `QueryExecutor`): pin under the lock, then scan **unlocked**; if the scan fails because a pinned file is gone,
   re-render the relation (`DatasetRelation` registers how) and run it once more inside `SnapshotSwapLock.hold()`.
@@ -328,7 +330,9 @@ Every writer that hides, replaces or deletes a live `*.parquet` holds the write 
 rollback, `ScoreOutputWriter` prune; `ScoreOutputWriter` also sweeps a crashed run's `.tmp` / `.stale`. A swap
 refuses a thread that already holds a read lock on the same store instead of waiting forever. `<store>/database`
 keys as `<store>`.
-Limits: a publish waits for the slowest Job reader of its store (bounded by the writer's deadline, 24 h by default);
+Limits: a publish waits for the readers in flight when it queued, plus any reader that overtook it while holding
+another store (bounded by the writer's deadline, 24 h by default); runs of one score model take turns (a monitor per
+history directory), so the leftover sweep never meets another run's file;
 one JVM only; readers that run a relation on their own connection, and glob reads with the registry off, are not
 covered (`SNAPSHOT-SWAP-READER-RESIDUALS-1`). Hidden files
 never match the readers' `**/*.parquet` glob and are not counted as storage.
