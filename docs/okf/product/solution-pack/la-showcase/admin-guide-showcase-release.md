@@ -111,6 +111,6 @@ and `la-crypto` on Preview (one OPEN Alert at 2, refreshed in place from 1, no R
 
 Found by this boot-test and filed in `docs/BACKLOG.md`: `LA-TELCO-RA-FIRST-BOOT-RESOLVED-ALERT-1` (the stray RESOLVED
 Alert above), `JOB-LOADER-SAVED-VIEW-SUFFIX-1` (`la-logistics`' saved view `driver_team_inside_job.toon` is read by the
-Job loader, a WARN at every boot), `LA-OWNERSHIP-NO-CRON-FALLBACK-1` (`ownership_links` has no `*/5` cron fallback),
+Job loader, a WARN at every boot), `LA-OWNERSHIP-NO-CRON-FALLBACK-1` (`ownership_links` had no `*/5` cron fallback; closed 2026-11-14),
 `ALERT-EVALUATE-NO-BREACH-WORDING-1`. Not covered by it: `LA-SHOWCASE-RELEASE-RESIDUALS-1` (the Linux product, the
 Link Analysis UI on these tiers, an OIDC sign-in build, the Geo Views on Standard).

@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **105<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 92<!--count:backlog-p3--> × P3** —
+> **104<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 91<!--count:backlog-p3--> × P3** —
+> ⬇ **105 → 104 (P3 92 → 91) on 2026-11-14**: closed P3 defect `LA-OWNERSHIP-NO-CRON-FALLBACK-1` [items: solution-pack.la-ownership · kind: defect] — `ownership_links` now carries `cron: "*/5 * * * *"` beside `on_signal: pipeline.commit`, as `la-card` and `la-utility` do, the harmless catch-up every showcase link Job has (since `JOB-SIGNAL-OVERLAP-SKIP-1` was fixed on 2026-11-13 a commit landing mid-run queues a follow-up Run, so the gap was smaller than filed); `LaOwnershipTemplateTest` pins both triggers.
 > ↔ **105 (no count change, P2 13, P3 92) on 2026-11-14**: operator CONFIRMED two assistant decisions of 2026-11-14 that were pending: (1) `ENTITLEMENT-UNLISTED-FEATURES-1` — a Standard entitlement without the Incidents, Workflow & SLA or LA Investigations Add-on has no Alert Rules; (2) `MASKING-TWO-VOCABULARIES-1` — masking fails closed: an Entity Type's `masked: false` never unmasks a sensitive class, and every class of a type that claims one masks.
 > ↔ **105 (P2 14 → 13, P3 91 → 92) on 2026-11-14**: closed P2 feature `MASKING-TWO-VOCABULARIES-1` [items: module.util, module.processor · kind: feature] — decided by the assistant under the operator's delegation (fail closed): one masking rule, a sensitive class or a class or id a masked Entity Type claims, at every reader; an Entity Type's `masked: false` no longer unmasks a sensitive class. Breaking: BI `typed` masks `PII`, evidence masks typed classes, publication drops them unless `include_sensitive`. As built: `okf/product/module/config/spec-config-safety.md`, "One masking rule". Filed P3 defect `MASKING-UNION-RESIDUALS-1` [items: module.la-core, module.la-api, module.engine · kind: defect].
 > ↔ **105 (no count change, P2 14, P3 91) on 2026-11-14**: closed P3 defect `SQL-STEP-METADATA-NO-APPLY-1` [items: layer.product, module.etl · kind: defect] — confirmed with a spec that drives the real drawer: the pane's dirty check compared only the generated SQL, so editing a column's description, unit, classification or synonym never enabled Apply. It now compares the metadata too, and reverting an edit disables Apply again. Filed P3 defect `SQL-STEP-METADATA-ROUNDTRIP-1` [items: layer.product, module.etl · kind: defect].
@@ -556,10 +557,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 92<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 91<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 92<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 105<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 91<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 104<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -885,7 +886,6 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 
 - **P3** · `LA-TELCO-RA-FIRST-BOOT-RESOLVED-ALERT-1` — **on a first boot `la-telco-ra`'s Alert Rule fires, clears and fires again, leaving a stray RESOLVED Alert beside the OPEN one.** Release proof 2026-11-09 (built from `1963c661b`): `telco_ra_usage_without_billing` fired at 4 (13:40:27), cleared at 0 (13:40:32), fired again at 1 and was refreshed in place to 300. The release predates the link Job's landing fix (`LA-TELCO-RA-LANDING-ORDER-1`, `f842417fb`), but `telco_ra_unbilled_counts` already had its billing-landed gate, so the cause is not known: find why the count read 0 between two non-zero runs while the months landed, then pin a first-boot landing order in `TelcoRaLinksJobGoldenTest`. → `okf/product/solution-pack/la-showcase/admin-guide-showcase-release.md` [items: solution-pack.la-telco-ra, addon.incidents · kind: defect]
 
-- **P3** · `LA-OWNERSHIP-NO-CRON-FALLBACK-1` — **`la-ownership`'s `ownership_links` is the only link Job of the twelve 2026-11-09 showcases with no `cron: "*/5 * * * *"` fallback.** A `pipeline.commit` that lands while it runs is skipped (`JOB-SIGNAL-OVERLAP-SKIP-1`) and nothing catches up until the next landing. One line in the template's Job file, as `la-card` and `la-utility` carry it. Found in the release proof 2026-11-09. → `okf/product/solution-pack/la-showcase/admin-guide-showcase-release.md` [items: solution-pack.la-ownership · kind: defect]
 
 - **P3** · `LA-UTILITY-LOOKALIKE-CHECKS-1` — **two `la-utility` look-alike checks are weaker than they read.** (1) The prepaid look-alike `V-01` sells in another city, so `UtilityLinksJobGoldenTest`'s "no look-alike joins the story" check for prepaid token fraud cannot fail. (2) Look-alikes are kept free of direct links only; some sit two hops from a story through a shared contractor. Fix: a look-alike vending point in the story's city, and a two-hop check (or a stated decision that two hops is acceptable). The plan's two known gaps. → `archived-documents/plans-archive/2026-11-07-la-showcase-police-insurance-utility-plan.md` [items: solution-pack.la-utility · kind: defect]
 

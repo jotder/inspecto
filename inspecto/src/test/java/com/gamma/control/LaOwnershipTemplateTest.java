@@ -120,6 +120,9 @@ class LaOwnershipTemplateTest {
         Map<String, Object> ds = ToonHelper.load(CFG.resolve("registry/datasets/ownership_sanctions_counts_dataset.toon").toString());
         assertEquals("ownership_sanctions_counts", ds.get("physicalRef"));
 
+        JobConfig links = JobConfig.load(CFG.resolve("jobs/ownership_links_job.toon").toString());
+        assertEquals("pipeline.commit", links.onSignal());
+        assertEquals("*/5 * * * *", links.cron(), "the 5-minute catch-up every showcase link Job carries (LA-OWNERSHIP-NO-CRON-FALLBACK-1)");
         JobConfig counts = JobConfig.load(CFG.resolve("jobs/ownership_sanctions_counts_job.toon").toString());
         assertEquals("sql.template", counts.type());
         assertEquals("ownership_sanctions_counts", counts.params().get("sink_dataset"));
