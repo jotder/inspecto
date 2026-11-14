@@ -41,4 +41,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | feature | D-11 hand-authored relations component | demand |
 | `SNAPSHOT-SWAP-UNLOCKED-READERS-1` | P3 | defect | readers other than a sql.template Job can still fail while a snapshot is published (filed 2026-11-14, left by JOB-SNAPSHOT-SWAP-READER-RA… | — |
 | `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
-| `SQL-STEP-METADATA-NO-APPLY-1` | P3 | defect | editing a sql Step's column metadata does not arm the drawer's Apply (filed 2026-11-14, seen while building UI-CLASSIFICATION-PICKER-1; n… | — |
+| `SQL-STEP-METADATA-ROUNDTRIP-1` | P3 | defect | switching a sql Step's pane from Fields to SQL and back drops the column metadata (filed 2026-11-14, seen while fixing SQL-STEP-METADATA-… | — |

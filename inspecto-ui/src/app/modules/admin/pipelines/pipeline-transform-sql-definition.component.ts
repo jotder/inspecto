@@ -437,13 +437,19 @@ export class PipelineTransformSqlDefinitionComponent {
     }
 
     /**
-     * The comparison dirty is computed from: the SQL the engine would run. Not the rows — switching
-     * views must not arm Apply, and a row edit that leaves the SQL identical changes nothing the engine
-     * sees. (A hand-written SQL shown as fields regenerates in canonical spelling, so THAT switch can
-     * arm Apply; the pane says so beside the tab.)
+     * The comparison dirty is computed from: the SQL the engine would run, plus each row's column
+     * metadata. Not the whole rows — switching views must not arm Apply, and a row edit that leaves the
+     * SQL identical changes nothing the engine sees. (A hand-written SQL shown as fields regenerates in
+     * canonical spelling, so THAT switch can arm Apply; the pane says so beside the tab.)
+     *
+     * <p>⚠ The metadata never reaches the SQL but IS what Apply writes into `fields[]` for the Catalog —
+     * comparing the SQL alone left Apply greyed out over a description, unit, classification or synonym
+     * edit, so it could not be saved (SQL-STEP-METADATA-NO-APPLY-1). A blank and an absent key compare
+     * equal, as {@link setMetadata} stores a blank as no key.
      */
     private snapshot(): string {
-        return this.generatedSql();
+        const metadata = this.fields().map((f) => FIELD_METADATA_KEYS.map((k) => f[k] ?? ''));
+        return JSON.stringify([this.generatedSql(), metadata]);
     }
 
     private touched(): void {
