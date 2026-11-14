@@ -28,7 +28,6 @@ import {
 } from '@inspecto/link-analysis/la-host';
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisCaseFieldComponent } from './link-analysis-case-field.component';
-import { LinkAnalysisSnapshotsService } from './link-analysis-snapshots.service';
 import { LinkAnalysisComponent } from './link-analysis.component';
 import { LinkAnalysisService } from './link-analysis.service';
 import { LinkViewWidgetComponent } from './link-view-widget.component';
@@ -226,22 +225,12 @@ describe('Link Analysis host-service tokens', () => {
     });
 
     it.each([
-        [false, ['CASE-2026-0318', 'CASE-2026-0322']],
+        [false, []],
         [true, ['CASE-FAKE']],
     ])('the Case field follows the host: available=%s offers %j', (available, ids) => {
-        const store = {
-            mockCases: [
-                { id: 'CASE-2026-0318', title: 'p' },
-                { id: 'CASE-2026-0322', title: 'p' },
-            ],
-        };
         TestBed.configureTestingModule({
             imports: [LinkAnalysisCaseFieldComponent],
-            providers: [
-                provideNoopAnimations(),
-                { provide: LA_CASES, useValue: fakeCases(available) },
-                { provide: LinkAnalysisSnapshotsService, useValue: store },
-            ],
+            providers: [provideNoopAnimations(), { provide: LA_CASES, useValue: fakeCases(available) }],
         });
         const fixture = TestBed.createComponent(LinkAnalysisCaseFieldComponent);
         fixture.detectChanges();

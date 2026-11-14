@@ -35,11 +35,15 @@ interface Options {
     uploads?: UploadRecord[];
     canUpload?: boolean;
     geoLink?: boolean;
+    /** The Investigations level (`/bootstrap` features.investigations): false on Basic, where the upload routes answer 503. */
+    investigations?: boolean;
     confirm?: boolean;
     uploadResult?: unknown;
 }
 
-function create({ targets = [TARGET], uploads = [DONE, PENDING], canUpload = true, geoLink = true, confirm = true, uploadResult }: Options = {}) {
+const BASIC_REASON = 'Investigations are in Standard and above, with the Investigations add-on.';
+
+function create({ targets = [TARGET], uploads = [DONE, PENDING], canUpload = true, geoLink = true, investigations = true, confirm = true, uploadResult }: Options = {}) {
     const inv = {
         uploadTargets: vi.fn(() => of({ collectors: targets })),
         listUploads: vi.fn(() => of({ collector: 'up_feed', total: uploads.length, truncated: false, uploads })),
@@ -53,7 +57,16 @@ function create({ targets = [TARGET], uploads = [DONE, PENDING], canUpload = tru
             provideNoopAnimations(),
             { provide: InvService, useValue: inv },
             { provide: InspectoConfirmService, useValue: confirmSvc },
-            { provide: LA_FEATURES, useValue: { ops: signal(false), exchange: signal(false), geoLink: signal(geoLink) } },
+            {
+                provide: LA_FEATURES,
+                useValue: {
+                    ops: signal(false),
+                    exchange: signal(false),
+                    geoLink: signal(geoLink),
+                    investigations: signal(investigations),
+                    featureReasons: signal(investigations ? {} : { investigations: BASIC_REASON }),
+                },
+            },
             { provide: LensService, useValue: { canUploadData: signal(canUpload) } },
         ],
     });
@@ -138,6 +151,20 @@ describe('LinkAnalysisUploadsComponent', () => {
             expect(el.querySelector('section')).toBeNull();
             expect(inv.uploadTargets).not.toHaveBeenCalled();
         }
+    });
+
+    /** LA-BASIC-503-EXPLAINED-1 (D-4): Basic showed "the link-analysis module or a write root is missing" for a 503 by design. */
+    it('without the Investigations level: one neutral line with the server reason, and no call', async () => {
+        const { el, inv, settle } = create({ investigations: false });
+        await settle();
+        expect(inv.uploadTargets).not.toHaveBeenCalled();
+        const note = el.querySelector('[data-testid="la-upload-locked"]')?.textContent ?? '';
+        expect(note).toContain(BASIC_REASON);
+        expect(note).toContain('use Add data');
+        expect(el.querySelector('inspecto-alert')).toBeNull(); // not an error
+        expect(el.textContent).not.toContain('write root');
+        expect(el.querySelector('button[aria-label="Refresh the uploads"]')).toBeNull();
+        await expectNoA11yViolations(el);
     });
 
     it('explains an empty target list and passes axe', async () => {

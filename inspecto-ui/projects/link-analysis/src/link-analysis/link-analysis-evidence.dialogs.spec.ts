@@ -33,13 +33,6 @@ function fakeSnapshots(over: Partial<Record<'save' | 'attachTo', unknown>> = {})
     return {
         snapshots,
         count: () => snapshots().length,
-        // The real service's placeholders, verbatim: a spec indexes mockCases[0], and a fake that
-        // answers an EMPTY list fails with 'cannot read id of undefined' — a fake must mimic the
-        // shape it stands in for, not just its method names.
-        mockCases: [
-            { id: 'CASE-2026-0318', title: 'Suspected layering network (placeholder Case)' },
-            { id: 'CASE-2026-0322', title: 'Burner rotation cluster (placeholder Case)' },
-        ],
         save: (s: GraphSnapshot) => {
             snapshots.update((all) => [s, ...all.filter((x) => x.id !== s.id)]);
             return of(s);
@@ -200,7 +193,7 @@ describe('LinkAnalysisSnapshotDialog — the Case is optional', () => {
         );
         expect(errorAlert).toBeTruthy();
         expect(el.querySelector('inspecto-option-picker')).toBeNull();
-        for (const mock of store.mockCases) expect(el.textContent).not.toContain(mock.id);
+        expect(el.textContent).not.toContain('placeholder');
 
         // ...but Save is NOT disabled, and the analysis is kept. This is the 2026-09-22 decision: the
         // analysis stands on its own, so a failed Case lookup must never be a dead end.

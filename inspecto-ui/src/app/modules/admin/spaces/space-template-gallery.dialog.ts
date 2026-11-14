@@ -4,7 +4,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, Space, SpacesService, SpaceTemplateInfo } from 'app/inspecto/api';
+import { apiErrorMessage, SampleSpace, Space, SpacesService, SpaceTemplateInfo } from 'app/inspecto/api';
+import { failedSampleRuns } from 'app/inspecto/spaces/sample-space.dialog';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
@@ -34,7 +35,8 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
  * "New space from template" gallery (W5) — step 1 picks a Space Template from the vertical cards
  * (Telecom RA / Fraud Management / Financial Auditing / Link Analysis); step 2 asks the minimum
  * (id — pre-filled from the template, unique — plus optional display name/description, both
- * pre-filled) and submits `POST /spaces` with the template id. Closes with the created {@link Space}.
+ * pre-filled) and submits `POST /spaces` with the template id — and `loadSamples` when the template ships sample
+ * data, so its Datasets are filled (LA-SAMPLE-EMPTY-DATASET-1). Closes with the created {@link Space}.
  */
 @Component({
     selector: 'app-space-template-gallery-dialog',
@@ -111,6 +113,11 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                     <p class="text-secondary text-sm">
                         {{ selected()!.description }}
                     </p>
+                    @if (selected()!.samples) {
+                        <p class="text-secondary text-sm" data-testid="template-loads-samples">
+                            Its sample data is loaded and each of its Pipelines runs once, so its Datasets are not empty.
+                        </p>
+                    }
                     <inspecto-pen-field
                         cdkFocusInitial
                         label="Id"
@@ -202,18 +209,28 @@ export class SpaceTemplateGalleryDialog {
             return;
         }
         const v = this.form.getRawValue();
+        const t = this.selected()!;
         this.saving.set(true);
         this.api
             .create({
                 id: v.id,
                 display_name: v.display_name || undefined,
                 description: v.description || undefined,
-                template: this.selected()!.id,
+                template: t.id,
+                // LA-SAMPLE-EMPTY-DATASET-1: a template's samples sit in data/samples, not the inbox, and a Basic Pipeline
+                // never polls on its own - created without them, its Datasets stay empty. Load them and run once.
+                ...(t.samples ? { loadSamples: true } : {}),
             })
             .subscribe({
                 next: (space) => {
                     this.saving.set(false);
-                    this.toastr.success(`Space "${space.id}" created from ${this.selected()!.name}`);
+                    this.toastr.success(`Space "${space.id}" created from ${t.name}`);
+                    const failed = failedSampleRuns(space as SampleSpace);
+                    if (failed.length)
+                        this.toastr.warning(
+                            `The sample data did not load into ${failed.map((p) => `Pipeline ${p.pipeline}`).join(', ')}: ` +
+                                failed.map((p) => p.error ?? p.status).join('; '),
+                        );
                     this.ref.close(space);
                 },
                 error: (e) => {

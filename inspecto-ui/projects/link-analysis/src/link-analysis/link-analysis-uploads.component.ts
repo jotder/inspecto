@@ -8,7 +8,7 @@ import { firstValueFrom } from 'rxjs';
 import { InvService, UploadRecord, UploadTarget } from '@inspecto/link-analysis/api/inv.service';
 import { LensService } from '@inspecto/core/api';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
-import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
+import { LA_FEATURES, investigationsLockedReason } from '@inspecto/link-analysis/la-host';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-state.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
@@ -45,18 +45,22 @@ import { formatBytes, isBusyRefusal, uploadErrorMessage, uploadFileProblem, uplo
             <section class="flex flex-col gap-2 text-sm" aria-label="Upload a CSV">
                 <div class="flex items-center gap-1">
                     <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Upload a CSV</h3>
-                    <button
-                        mat-icon-button
-                        class="ml-auto"
-                        [disabled]="loading()"
-                        (click)="refresh()"
-                        matTooltip="Re-read the uploads"
-                        aria-label="Refresh the uploads"
-                    >
-                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-path"></mat-icon>
-                    </button>
+                    @if (!lockedNote()) {
+                        <button
+                            mat-icon-button
+                            class="ml-auto"
+                            [disabled]="loading()"
+                            (click)="refresh()"
+                            matTooltip="Re-read the uploads"
+                            aria-label="Refresh the uploads"
+                        >
+                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-path"></mat-icon>
+                        </button>
+                    }
                 </div>
-                @if (error()) {
+                @if (lockedNote(); as note) {
+                    <p class="text-secondary m-0" data-testid="la-upload-locked">{{ note }}</p>
+                } @else if (error()) {
                     <inspecto-alert [variant]="unavailable() ? 'info' : 'error'" title="Upload">{{ error() }}</inspecto-alert>
                 }
                 @if (notice()) {
@@ -181,6 +185,16 @@ export class LinkAnalysisUploadsComponent {
     readonly canReplace = signal(false);
 
     readonly canUpload = computed(() => this.lens.canUploadData());
+    /**
+     * LA-BASIC-503-EXPLAINED-1: the upload routes belong to the Investigations level (`UploadRoutes` feature
+     * `investigations`), so without it they answer 503. Then one neutral line from `/bootstrap` `featureReasons`, and no call.
+     */
+    readonly lockedNote = computed(() =>
+        this.features.investigations()
+            ? ''
+            : `Uploading a CSV to a Collector comes with Investigations. ${investigationsLockedReason(this.features)} ` +
+              'To bring a file in here, use Add data.',
+    );
     readonly form = this.fb.nonNullable.group({ collector: [''] });
     private readonly chosenCollector = signal('');
     readonly collectorOptions = computed<PickerOption[]>(() =>
@@ -199,8 +213,8 @@ export class LinkAnalysisUploadsComponent {
             this.problem.set('');
             void this.loadUploads();
         });
-        // Off the module every route 503s, and without the capability every call 403s - no call for either.
-        if (this.features.geoLink() && this.canUpload()) void this.loadTargets();
+        // Off the module or the Investigations level every route 503s, and without the capability every call 403s - no call.
+        if (this.features.geoLink() && this.canUpload() && !this.lockedNote()) void this.loadTargets();
     }
 
     async refresh(): Promise<void> {
