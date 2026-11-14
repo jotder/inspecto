@@ -260,6 +260,50 @@ class ControlApiSnapshotsTest {
         }
     }
 
+    /**
+     * A Case that exists but that the caller may not see (SEC-7d: its caseType is outside the caller's data scopes; owner and
+     * assignee are someone else) answers exactly like a missing one - existence-hiding - and records nothing.
+     */
+    @Test
+    void refusesAttachToACaseTheCallerCannotSeeAsIfItWereMissing(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        CaseTeamObjectEngine.CASES.put("CASE-HIDDEN", Map.of("kind", "case", "id", "CASE-HIDDEN", "correlationId", "CASE-HIDDEN",
+                "owner", "jdoe", "assignee", "jdoe", "attributes", Map.of("caseType", "fraud"), "closed", false));
+        Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
+            case "Bearer owner" -> Optional.of(new Subject("jdoe", Set.of("canManageIncidents")));
+            case "Bearer other" -> Optional.of(new Subject("analyst-2", Set.of("canManageIncidents"), Set.of("aml")));
+            default -> Optional.empty();
+        });
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(200, postAs(c.port, "/inv/snapshots", snapshot("snap-1"), "Bearer other").statusCode());
+            HttpResponse<String> r = postAs(c.port, "/inv/snapshots/attach",
+                    "{\"snapshotId\":\"snap-1\",\"caseId\":\"CASE-HIDDEN\"}", "Bearer other");
+            assertEquals(404, r.statusCode(), r.body());
+            assertTrue(r.body().contains("no case 'CASE-HIDDEN'"), "the same answer as a missing Case: " + r.body());
+            assertFalse(Files.exists(root.resolve("audit").resolve("snapshots").resolve("attachments.jsonl")),
+                    "a refused attach records nothing");
+            // the control: the same Case IS attachable by a caller who can see it
+            assertEquals(200, postAs(c.port, "/inv/snapshots/attach",
+                    "{\"snapshotId\":\"snap-1\",\"caseId\":\"CASE-HIDDEN\"}", "Bearer owner").statusCode());
+        } finally {
+            Authenticators.forTest(null);
+        }
+    }
+
+    /** An id that names an object of another kind (an Incident, not a Case) is not a Case: 404, nothing recorded. */
+    @Test
+    void refusesAttachToAnObjectThatIsNotACase(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        CaseTeamObjectEngine.CASES.put("INC-1", Map.of("kind", "incident", "id", "INC-1", "correlationId", "INC-1",
+                "owner", "jdoe", "assignee", "jdoe", "attributes", Map.of(), "closed", false));
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(200, post(c.port, "/inv/snapshots", snapshot("snap-1")).statusCode());
+            HttpResponse<String> r = post(c.port, "/inv/snapshots/attach", "{\"snapshotId\":\"snap-1\",\"caseId\":\"INC-1\"}");
+            assertEquals(404, r.statusCode(), r.body());
+            assertTrue(r.body().contains("no case 'INC-1'"), r.body());
+            assertFalse(Files.exists(root.resolve("audit").resolve("snapshots").resolve("attachments.jsonl")),
+                    "a refused attach records nothing");
+        }
+    }
+
     @Test
     void refusesAttachWithoutACaseId(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
