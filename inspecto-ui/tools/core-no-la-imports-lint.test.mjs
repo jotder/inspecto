@@ -28,6 +28,9 @@ for (const spec of [
     'app/modules/admin/studio/link-analysis/entity-projection',
     'app/modules/admin/studio/geo-map/geo-map.routes',
     '../../modules/admin/studio/link-analysis/x',
+    // a host feature is not core's to import either (ARCH-MOSCOW-UNTRACKED-1 item 8)
+    'app/modules/admin/catalog/catalog.service',
+    '../../modules/admin/settings/settings.component',
     // D-5 step 3: the library lives in projects/link-analysis and is reached through its alias
     '@inspecto/link-analysis',
     '@inspecto/link-analysis/graph/graph-analysis',

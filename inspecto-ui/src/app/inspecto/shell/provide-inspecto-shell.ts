@@ -41,7 +41,7 @@ export const SHELL_DATE_FORMATS: MatDateFormats = {
  *   sign-in screen and, where the Product declares one, its sign-in pitch.
  * - Zone.js change detection (explicit opt-in). The zoneless flip was reverted: it shipped without a component-by-component
  *   audit and froze eight surfaces whose state is a plain field written from an async callback (sidebar, Connections Test,
- *   Spaces expand, ...). Re-attempt it only alongside that audit - see docs/BACKLOG.md.
+ *   Spaces expand, ...). Re-attempt it only alongside that audit - board row UI-ZONELESS-1.
  * - HttpClient with the four interceptors in this order: v1 envelope unwrap (W7 - first), Space scope rewrite, auth bearer
  *   and refresh (a pass-through unless the edition signs people in, W6d), error tracker.
  * - The router with scroll restoration and route-input binding, and the keep-alive reuse strategy (the Link Analysis page

@@ -480,7 +480,7 @@ names:
   given set of packages.
 - `python docs/superpower/assets/fanmatrix2.py <root> <Class,Class,...>`: fan-in and fan-out of named classes.
 
-Measured 2026-11-12 with `pkggraph.py .`: 115 packages, 7 cycles. Each cycle sits inside one module, so none
+Measured 2026-11-12 with `pkggraph.py .`: 115 packages, 7 cycles (re-measured 2026-11-15: 120 packages, the same 7 cycles). Each cycle sits inside one module, so none
 blocks a module extraction; each would have to be cut before that module could be divided.
 
 | Packages in the cycle | Module | Note |
