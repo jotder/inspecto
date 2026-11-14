@@ -122,6 +122,9 @@ src/app/
 - **Standalone** + `ChangeDetectionStrategy.OnPush` (default for new components).
 - Separate **container** components (inject services, hold state) from **presentational** shared
   components (`@Input`/`@Output`, no HTTP, in `inspecto/components`).
+- **A column classification is never a free-text input:** use `<inspecto-classification-select [(value)]>`
+  (`inspecto/components/classification-select.component.ts`, fed by `ClassificationsService` from
+  `GET /classifications`); the save refuses a class the Space does not know.
 - **Always reuse:** `<inspecto-status-badge [value] [label] [variant=pill|dot]>` (or
   `statusBadgeHtml(value, label?, 'dot'?)` in cell renderers — both paths render identical classes). A badge
   is 20 px tall (`leading-4` pinned — the app's `text-xs` has NO line-height, so an unpinned badge in an

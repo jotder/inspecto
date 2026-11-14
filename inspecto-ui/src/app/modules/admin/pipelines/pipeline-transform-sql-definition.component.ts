@@ -15,6 +15,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { AuthoredNode, ComponentsService, RelationsPreview } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { InspectoClassificationSelectComponent } from 'app/inspecto/components/classification-select.component';
 import { StepPreviewResultComponent } from 'app/inspecto/components/step-preview-result.component';
 import { SqlCodemirrorComponent } from 'app/inspecto/data-table/sql/sql-codemirror.component';
 import {
@@ -100,6 +101,7 @@ export interface FieldRow extends CompiledField {
         MatIconModule,
         StepPreviewResultComponent,
         InspectoAlertComponent,
+        InspectoClassificationSelectComponent,
         SqlCodemirrorComponent,
     ],
     templateUrl: './pipeline-transform-sql-definition.component.html',

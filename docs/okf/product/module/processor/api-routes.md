@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-385 route(s) registered; 385 in the OpenAPI contract, 0 not.
+386 route(s) registered; 386 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -90,6 +90,7 @@ tags: [api, routes, generated]
 | GET | `/catalog/resolve` | GET /catalog/resolve (generated skeleton) | catalog | — | `inspecto/src/main/java/com/gamma/control/CatalogRoutes.java` |
 | GET | `/catalog/streams` | GET /catalog/streams (generated skeleton) | catalog | — | `inspecto/src/main/java/com/gamma/control/CatalogRoutes.java` |
 | GET | `/catalog/tables/{tableId}` | GET /catalog/tables/{tableId} (generated skeleton) | catalog | — | `inspecto/src/main/java/com/gamma/control/CatalogRoutes.java` |
+| GET | `/classifications` | The Space's column classification vocabulary | Metadata & Catalog | — | `inspecto/src/main/java/com/gamma/control/ClassificationRoutes.java` |
 | GET | `/collectors` | GET /collectors (generated skeleton) | collectors | — | `inspecto/src/main/java/com/gamma/control/AcquisitionRoutes.java` |
 | POST | `/collectors/{collectorId}/notify` | POST /collectors/{collectorId}/notify (generated skeleton) | collectors | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/AcquisitionRoutes.java` |
 | GET | `/components/{componentId}` | GET /components/{componentId} (generated skeleton) | components | — | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java` |

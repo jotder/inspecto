@@ -23,6 +23,7 @@ export * from './system.service';
 export * from './jobs.service';
 export * from './enrichment.service';
 export * from './catalog.service';
+export * from './classifications.service';
 export * from './lineage.service';
 export * from './config.service';
 export * from './assist.service';

@@ -1,11 +1,17 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
 import { throwError } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { AuthoredNode, ComponentsService, RelationsPreview } from 'app/inspecto/api';
+import {
+    AuthoredNode,
+    Classification,
+    ClassificationsService,
+    ComponentsService,
+    RelationsPreview,
+} from 'app/inspecto/api';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { PipelineTransformSqlDefinitionComponent } from './pipeline-transform-sql-definition.component';
@@ -18,6 +24,12 @@ let describeStatus = 422;
 let describeAnswer: { columns: { name: string; type: string }[] } = {
     columns: [{ name: 'buyer', type: 'VARCHAR' }],
 };
+
+const VOCABULARY: Classification[] = [
+    { class: 'INTERNAL', masked: false, source: 'not-masked' },
+    { class: 'MSISDN', masked: true, source: 'sensitive' },
+    { class: 'PII', masked: true, source: 'sensitive' },
+];
 
 const previewAnswer: RelationsPreview = {
     inputColumns: ['customer'],
@@ -76,6 +88,11 @@ async function create(
             provideNoopAnimations(),
             // the preview table's theme service walks up to GAMMA_APP_CONFIG — stub it, as the data-table's own spec does
             { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
+            // the classification picker reads the Space's vocabulary (GET /classifications)
+            {
+                provide: ClassificationsService,
+                useValue: { items: signal(VOCABULARY), status: signal('ready'), ensureLoaded: () => undefined },
+            },
             {
                 provide: ComponentsService,
                 useValue: {
@@ -595,15 +612,17 @@ describe('Transform pane: column metadata', () => {
         btn.click();
         fixture.detectChanges();
         expect(btn.getAttribute('aria-expanded')).toBe('true');
-        const inputs = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLInputElement>(
-            '[role="group"] input',
-        );
-        expect(inputs.length).toBe(4);
-        const values = ['Subscriber number', '', 'MSISDN', 'msisdn_alias'];
+        const group = (fixture.nativeElement as HTMLElement).querySelector('[role="group"]')!;
+        const inputs = group.querySelectorAll<HTMLInputElement>('input');
+        expect(inputs.length).toBe(3); // description, unit, synonym; the classification is a picker
+        const values = ['Subscriber number', '', 'msisdn_alias'];
         inputs.forEach((el, i) => {
             el.value = values[i];
             el.dispatchEvent(new Event('input'));
         });
+        const select = group.querySelector('select')!;
+        select.value = 'MSISDN';
+        select.dispatchEvent(new Event('change'));
         fixture.detectChanges();
         const c = comp(fixture);
         c.submit();
@@ -642,6 +661,53 @@ describe('Transform pane: column metadata', () => {
         const fixture = await create(slot, undefined, ['order_id']);
         expect(comp(fixture).canDescribe()).toBe(false);
         expect(describeButton(fixture, 'order_id')).toBeNull();
+    });
+
+    // UI-CLASSIFICATION-PICKER-1: the classification is picked from the Space's vocabulary, not typed.
+    function classificationSelect(fixture: ReturnType<typeof TestBed.createComponent<HostComponent>>, name: string) {
+        describeButton(fixture, name)!.click();
+        fixture.detectChanges();
+        return (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>('[role="group"] select')!;
+    }
+
+    it('offers the Space vocabulary with the masking classes marked, and None removes the key', async () => {
+        const stored = [field({ name: 'm', from: 'msisdn', fn: 'keep', classification: 'PII' })];
+        const fixture = await create(sqlNode({ sql: 'x', fields: stored }));
+        const select = classificationSelect(fixture, 'm');
+        const groups = Array.from(select.querySelectorAll('optgroup')).map((g) => [
+            g.label,
+            Array.from(g.querySelectorAll('option')).map((o) => o.textContent!.trim()),
+        ]);
+        expect(groups).toEqual([
+            ['Masks the column', ['MSISDN (masks)', 'PII (masks)']],
+            ['Does not mask', ['INTERNAL']],
+        ]);
+        expect(select.value).toBe('PII');
+
+        select.value = '';
+        select.dispatchEvent(new Event('change'));
+        fixture.detectChanges();
+        const c = comp(fixture);
+        expect('classification' in c.fields()[0]).toBe(false);
+        expect(select.value).toBe('');
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('keeps a stored class the Space does not know, flagged, and replaces it on a pick', async () => {
+        const stored = [field({ name: 'm', from: 'msisdn', fn: 'keep', classification: 'CONFIDENTIAL' })];
+        const fixture = await create(sqlNode({ sql: 'x', fields: stored }));
+        const select = classificationSelect(fixture, 'm');
+        expect(select.value).toBe('CONFIDENTIAL');
+        expect(select.selectedOptions[0].textContent!.trim()).toBe('CONFIDENTIAL (unknown)');
+        expect(select.getAttribute('aria-invalid')).toBe('true');
+        const c = comp(fixture);
+        expect(c.fields()[0].classification).toBe('CONFIDENTIAL'); // opening never drops it
+
+        select.value = 'INTERNAL';
+        select.dispatchEvent(new Event('change'));
+        fixture.detectChanges();
+        expect(c.fields()[0].classification).toBe('INTERNAL');
+        expect(select.getAttribute('aria-invalid')).toBeNull();
     });
 
     it('has no axe violations with the metadata editor open', async () => {

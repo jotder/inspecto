@@ -61,14 +61,50 @@ public final class ClassificationVocabulary {
     /** Whether {@code classification} is known to a Space with {@code types}; blank is "none stated" and allowed. */
     public static boolean known(Object classification, List<EntityTypes.EntityType> types) {
         String cls = ColumnClassification.normalise(classification);
-        if (cls == null || ColumnClassification.SENSITIVE.contains(cls) || ColumnClassification.NOT_MASKED.contains(cls))
-            return true;
+        return cls == null || vocabulary(types).stream().anyMatch(e -> e.cls().equals(cls));
+    }
+
+    /** Where a class of the {@link #vocabulary} comes from. */
+    public static final String SOURCE_SENSITIVE = "sensitive";
+    public static final String SOURCE_ENTITY_TYPE = "entity-type";
+    public static final String SOURCE_NOT_MASKED = "not-masked";
+
+    /**
+     * One class a Space knows (UI-CLASSIFICATION-PICKER-1). {@code cls} is normalised (trimmed, upper case);
+     * {@code entityType} and {@code label} name the first Entity Type that claims the class or whose id it is, else null.
+     */
+    public record Entry(String cls, boolean masked, String source, String entityType, String label) {}
+
+    /**
+     * Every class a Space with {@code types} knows, sorted by class: the ONE list {@link #known} judges a save by, so
+     * {@code GET /classifications} (the picker) and the save gate cannot drift. {@code source} is
+     * {@link #SOURCE_SENSITIVE} before {@link #SOURCE_ENTITY_TYPE} before {@link #SOURCE_NOT_MASKED}.
+     *
+     * <p>{@code masked} says whether a column of the class is masked for a reader who may not reveal it: the class is
+     * {@link ColumnClassification#SENSITIVE}, OR a masked Entity Type claims it, OR it is the id of a masked Entity Type.
+     * ⚠ That is the union the masking readers are moving to (a peer lane changes publication and evidence masking to
+     * SENSITIVE ∪ the masked Entity Types' classes); until it lands, a reader that masks SENSITIVE alone leaves an
+     * Entity Type's class unmasked although this says {@code true}. Keep this predicate and theirs one rule.
+     */
+    public static List<Entry> vocabulary(List<EntityTypes.EntityType> types) {
+        Map<String, Entry> out = new java.util.TreeMap<>();
+        for (String c : ColumnClassification.SENSITIVE) out.put(c, new Entry(c, true, SOURCE_SENSITIVE, null, null));
         // mirrors control's OnboardMatches.typeOf (a type claims the class, else a type's id is it): service never imports control
         for (EntityTypes.EntityType t : types) {
-            if (t.id().equalsIgnoreCase(cls)) return true;
-            for (String c : t.classifications()) if (c.trim().equalsIgnoreCase(cls)) return true;
+            Set<String> classes = new LinkedHashSet<>();
+            String id = ColumnClassification.normalise(t.id());
+            if (id != null) classes.add(id);
+            for (String c : t.classifications()) {
+                String n = ColumnClassification.normalise(c);
+                if (n != null) classes.add(n);
+            }
+            for (String c : classes)
+                out.merge(c, new Entry(c, t.masked(), SOURCE_ENTITY_TYPE, t.id(), t.label()), (a, b) -> a.entityType() != null
+                        ? new Entry(a.cls(), a.masked() || b.masked(), a.source(), a.entityType(), a.label())
+                        : new Entry(a.cls(), a.masked() || b.masked(), a.source(), b.entityType(), b.label()));
         }
-        return false;
+        for (String c : ColumnClassification.NOT_MASKED) out.putIfAbsent(c, new Entry(c, false, SOURCE_NOT_MASKED, null, null));
+        return List.copyOf(out.values());
     }
 
     /** Why {@code classification} on {@code column} is refused. */

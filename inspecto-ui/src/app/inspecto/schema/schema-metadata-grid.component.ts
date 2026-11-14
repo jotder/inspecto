@@ -3,6 +3,7 @@ import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule } from '@angular
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { InspectoClassificationSelectComponent } from '../components/classification-select.component';
 import { SchemaFieldRow } from './schema-fields-editor.component';
 
 /** The per-column metadata this grid edits — `raw.fields[].{description,unit,classification}`,
@@ -25,13 +26,20 @@ export interface SchemaFieldMetadata {
  * {@link value} onto the columns table's rows by selector at submit.
  *
  * <p><b>Pure</b>, the fields editor's contract: no API client, hosts read {@link value} and own every
- * write. No validation — all three are free-text Catalog annotations.
+ * write. Description and unit are free text; classification is picked from the Space's vocabulary by
+ * `<inspecto-classification-select>` (which reads it), because a save refuses a class the Space does not know.
  */
 @Component({
     selector: 'inspecto-schema-metadata-grid',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatPaginatorModule],
+    imports: [
+        ReactiveFormsModule,
+        MatFormFieldModule,
+        MatInputModule,
+        MatPaginatorModule,
+        InspectoClassificationSelectComponent,
+    ],
     template: `
         <table class="w-full border-collapse">
             <thead>
@@ -63,10 +71,10 @@ export interface SchemaFieldMetadata {
                             />
                         </td>
                         <td class="py-1">
-                            <input
-                                class="w-full bg-transparent text-sm"
-                                formControlName="classification"
-                                [attr.aria-label]="'Classification for ' + (e.name || e.selector)"
+                            <inspecto-classification-select
+                                [label]="'Classification for ' + (e.name || e.selector)"
+                                [value]="e.group.get('classification')?.value ?? ''"
+                                (valueChange)="setClassification(e.group, $event)"
                             />
                         </td>
                     </tr>
@@ -138,6 +146,13 @@ export class InspectoSchemaMetadataGridComponent {
             // A freshly seeded grid is pristine: the host has applied nothing yet.
             this.form.markAsPristine();
         });
+    }
+
+    /** The classification picker's pick, written as a typed edit would be (dirty, so the host's Apply arms). */
+    setClassification(group: FormGroup, value: string): void {
+        const control = group.get('classification');
+        control?.setValue(value);
+        control?.markAsDirty();
     }
 
     onPage(e: PageEvent): void {

@@ -12713,6 +12713,19 @@
         }
       }
     },
+    "/classifications" : {
+      "get" : {
+        "tags" : [ "Metadata & Catalog" ],
+        "summary" : "The Space's column classification vocabulary",
+        "operationId" : "getClassifications",
+        "description" : "UI-CLASSIFICATION-PICKER-1. Answers {items[{class, masked, source, entityType?, label?}]}, sorted by class: every column classification this Space knows, the same list a save refuses an unknown class by (422 ERR_UNKNOWN_CLASSIFICATION). source is sensitive (MSISDN, IMSI, ACCOUNT, PII), entity-type (a class an Entity Type of the Space claims, or the id of one) or not-masked (INTERNAL); entityType and label name the Entity Type that claims the class, when one does. masked says whether a column of the class is masked for a reader who may not reveal it: a sensitive class, a class a masked Entity Type claims, or the id of a masked Entity Type. Read-only and not capability-gated (reads are open to the Space).",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped {items[{class, masked, source, entityType?, label?}]}."
+          }
+        }
+      }
+    },
     "/config/schema/{schemaId}/columns/{columnId}/impact" : {
       "get" : {
         "tags" : [ "config" ],

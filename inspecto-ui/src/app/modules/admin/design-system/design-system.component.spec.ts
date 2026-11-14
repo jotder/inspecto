@@ -1,4 +1,6 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { ClassificationsService } from 'app/inspecto/api/classifications.service';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { afterEach, describe, expect, it } from 'vitest';
 import { of } from 'rxjs';
@@ -25,6 +27,11 @@ async function create() {
             },
             // the embedded map host tracks the colour scheme
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
+            // the column-metadata grid's classification picker reads the Space's vocabulary
+            {
+                provide: ClassificationsService,
+                useValue: { items: signal([]), status: signal('ready'), ensureLoaded: () => undefined },
+            },
         ],
     });
     await TestBed.compileComponents(); // the embedded data-table has a @defer block

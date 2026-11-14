@@ -776,6 +776,14 @@ that mask and `INTERNAL`. Matching is case-insensitive and trims, as every reade
 The walk is generic: any map of the document that states a `classification` is judged, so a new place that
 carries the label is covered without a new rule.
 
+**Served to the editors** (`UI-CLASSIFICATION-PICKER-1`, 2026-11-14). `GET /classifications` returns the Space's
+vocabulary from the same method the gate judges with (`ClassificationVocabulary.vocabulary`): `{class, masked,
+source: sensitive | entity-type | not-masked, entityType?, label?}`, sorted. It is an open read like
+`GET /inv/entity-types` (reads are gated at the Space/ABAC layer, not by capability). The schema metadata grid and
+the `sql` Step's output grid offer it as a picker (`<inspecto-classification-select>`) that marks the classes that
+mask, keeps a stored class the Space does not know as a flagged "(unknown)" option so an old config can be fixed,
+and falls back to a text input if the list cannot be read (the save still judges).
+
 🔴 **Save-time only, and the two doors differ on a class already stored.** A file already on disk still loads,
 and its unknown class still masks nothing; the gate stops new ones.
 
