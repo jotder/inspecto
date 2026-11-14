@@ -181,7 +181,7 @@ public enum LaLimit {
             "The most matches one branching pattern search returns."),
     PATTERN_TIMEOUT_S("pattern.timeout_s", Layer.SPACE, false, "pattern", "s", 10, 1, 300,
             "Statement timeout of one pattern search."),
-    PATTERN_TEMPORAL_MAX_ROWS("pattern.temporal_max_rows", Layer.SPACE, false, "pattern", "rows", 400_000, 1, 20_000_000,
+    PATTERN_TEMPORAL_MAX_ROWS("pattern.temporal_max_rows", Layer.SPACE, false, "pattern", "rows", 2_000_000, 1, 20_000_000,
             "Event rows a temporal pattern scan may read."),
     PATTERN_TEMPORAL_LIMIT_DEFAULT("pattern.temporal_limit_default", Layer.SPACE, false, "pattern", "count", 400, 1, 20_000,
             "Links a temporal pattern scan returns when it states no limit."),

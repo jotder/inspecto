@@ -270,7 +270,7 @@ class ControlApiLaSpaceLimitsTest {
         try (Ctx c = open(cfg, root)) {
             String temporal = "{" + COLS + ",\"timeCol\":\"ts\",\"mode\":\"burst\"";
             JsonNode t = post(c, "/inv/pattern/temporal", temporal + "}").get("fences");
-            assertEquals(400_000, t.get("maxRows").asInt());
+            assertEquals(2_000_000, t.get("maxRows").asInt());
             assertEquals(2_000, t.get("maxResults").asInt());
             assertEquals(10_000, t.get("timeoutMs").asInt());
             String branching = "{" + COLS + ",\"stages\":[{\"shape\":\"fan-out\",\"minBranches\":1}]}";

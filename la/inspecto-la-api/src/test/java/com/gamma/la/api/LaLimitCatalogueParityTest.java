@@ -180,7 +180,7 @@ class LaLimitCatalogueParityTest {
         d.put(LaLimit.PATTERN_MATCHES_DEFAULT, 400L);
         d.put(LaLimit.PATTERN_MATCHES_MAX, 2_000L);
         d.put(LaLimit.PATTERN_TIMEOUT_S, 10L);
-        d.put(LaLimit.PATTERN_TEMPORAL_MAX_ROWS, 400_000L);
+        d.put(LaLimit.PATTERN_TEMPORAL_MAX_ROWS, 2_000_000L);
         d.put(LaLimit.PATTERN_TEMPORAL_LIMIT_DEFAULT, 400L);
         d.put(LaLimit.PATTERN_TEMPORAL_LIMIT_MAX, 2_000L);
         d.put(LaLimit.MEASURES_MAX_ENTITIES, 20_000L);
