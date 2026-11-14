@@ -440,7 +440,8 @@ final class PresetQueries {
             if (dataset.get("columns") instanceof List<?> cols)
                 for (Object o : cols)
                     if (o instanceof Map<?, ?> c && col(real, c.get("name")) != null && c.get("classification") instanceof String k
-                            && typeClaiming(k, types) != null) classified.put(col(real, c.get("name")), typeClaiming(k, types));
+                            && EntityTypes.typeNamedBy(types, k) != null)
+                        classified.put(col(real, c.get("name")), EntityTypes.typeNamedBy(types, k).id());
             String[] ends = ends(classified, recordType(dataset, recordTypes));
             from = ends[0];
             to = ends[1];
@@ -503,12 +504,5 @@ final class PresetQueries {
 
     private static String col(Map<String, String> real, Object name) {
         return name instanceof String s ? real.get(s.trim().toLowerCase(Locale.ROOT)) : null;
-    }
-
-    /** The id of the Entity Type claiming {@code classification}, or null. */
-    private static String typeClaiming(String classification, List<EntityTypes.EntityType> types) {
-        for (EntityTypes.EntityType t : types)
-            for (String c : t.classifications()) if (c.trim().equalsIgnoreCase(classification.trim())) return t.id();
-        return null;
     }
 }

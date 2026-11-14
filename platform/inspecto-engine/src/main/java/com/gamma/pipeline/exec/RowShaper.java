@@ -317,8 +317,9 @@ public final class RowShaper {
         com.gamma.etl.EditionFeatures.require(com.gamma.etl.EditionFeatures.PII_MASK);
         List<String> available = columnsOf(conn, input);
         List<String> named = namedColumns(conn, node, input, "columns");
-        MaskSpec spec = MaskSpec.of(node);
-        List<String> cols = spec.resolve(node, available, named, com.gamma.pipeline.SpaceConfigRoot.current());
+        java.nio.file.Path root = com.gamma.pipeline.SpaceConfigRoot.current();
+        MaskSpec spec = MaskSpec.of(node, root);
+        List<String> cols = spec.resolve(node, available, named, root);
         if ("hash".equals(spec.mode())) return tokenize(conn, node, input, p, cols, false);
         StringBuilder replace = new StringBuilder();
         for (String c : cols) {

@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * Shared pre-flight findings helpers for declarative-config drafts. The HTTP routes that used to
@@ -389,9 +390,13 @@ final class ConfigRoutes {
      * filter ({@code processing.csv_settings.where}) is checked the same way, first in the legacy order. A
      * {@code route} step's own branch predicates are bound here too (ROUTE_PREDICATE codes, via
      * {@link #branchPredicateFindings}); the legacy top-level block's stay {@link #routeColumnFindings}'.
+     *
+     * <p>A {@code mask} step's classes must be ones the Space whose config root is {@code writeRoot} masks
+     * ({@code EvidenceMasker.maskedClasses}, MASKING-UNION-RESIDUALS-1; the built-in Entity Types where it is null).
      */
-    static List<Finding> stepConfigFindings(String type, Map<String, Object> draft, Path configDir) {
+    static List<Finding> stepConfigFindings(String type, Map<String, Object> draft, Path configDir, Path writeRoot) {
         if (!"pipeline".equals(type)) return List.of();
+        Predicate<String> masks = com.gamma.mask.EvidenceMasker.maskedClasses(writeRoot);
         boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));
         List<TypeFlow.Column> known = new ArrayList<>(declaredColumns(draft, configDir));
         if (!known.isEmpty()) addMappedColumns(draft, configDir, known);
@@ -400,28 +405,28 @@ final class ConfigRoutes {
         List<String> fields = new ArrayList<>();
         List<Finding> predicates = new ArrayList<>();   // route-step branch predicates, ROUTE_PREDICATE codes
         if (draft.get("steps") instanceof List<?> steps)
-            columns = walkSteps(steps, "steps", columns, refusals, fields, predicates, active);
+            columns = walkSteps(steps, "steps", columns, refusals, fields, predicates, active, masks);
         Map<?, ?> proc = draft.get("processing") instanceof Map<?, ?> m ? m : Map.of();
         // Legacy projection order: filter, join, dedup, summarize, profile, route.
         // The legacy filter is processing.csv_settings.where (PipelineConfig.resolveSteps); blank = no filter.
         if (proc.get("csv_settings") instanceof Map<?, ?> csv && csv.get("where") != null
                 && !String.valueOf(csv.get("where")).isBlank()) {
-            String refusal = stepRefusal(PipelineConfig.Step.FILTER, csv, columns);
+            String refusal = stepRefusal(PipelineConfig.Step.FILTER, csv, columns, masks);
             if (refusal != null) { refusals.add(refusal); fields.add("processing.csv_settings.where"); }
         }
         if (proc.get("join") != null) columns = null;
         if (proc.get("dedup") instanceof Map<?, ?> dd) {
-            String refusal = stepRefusal(PipelineConfig.Step.DEDUP, dd, columns);
+            String refusal = stepRefusal(PipelineConfig.Step.DEDUP, dd, columns, masks);
             if (refusal != null) { refusals.add(refusal); fields.add("processing.dedup"); }
         }
         if (proc.get("summarize") != null) columns = null;
         if (proc.get("profile") instanceof Map<?, ?> pf) {
-            String refusal = stepRefusal(PipelineConfig.Step.PROFILE, pf, columns);
+            String refusal = stepRefusal(PipelineConfig.Step.PROFILE, pf, columns, masks);
             if (refusal != null) { refusals.add(refusal); fields.add("processing.profile"); }
             columns = null;
         }
         if (draft.get("route") instanceof Map<?, ?> route)
-            walkBranches(route, "route", columns, refusals, fields, predicates, active);
+            walkBranches(route, "route", columns, refusals, fields, predicates, active, masks);
         List<Finding> out = new ArrayList<>(predicates);
         for (int i = 0; i < refusals.size(); i++)
             out.add(new Finding(active ? Severity.ERROR : Severity.WARNING, fields.get(i), refusals.get(i),
@@ -556,19 +561,19 @@ final class ConfigRoutes {
     /** Walks one {@code steps[]} chain at {@code prefix}; returns the columns known after it (null = unknown). */
     private static List<TypeFlow.Column> walkSteps(List<?> steps, String prefix, List<TypeFlow.Column> columns,
                                                    List<String> refusals, List<String> fields,
-                                                   List<Finding> predicates, boolean active) {
+                                                   List<Finding> predicates, boolean active, Predicate<String> masks) {
         for (int i = 0; i < steps.size(); i++) {
             if (!(steps.get(i) instanceof Map<?, ?> entry) || entry.size() != 1) continue;
             String kind = String.valueOf(entry.keySet().iterator().next());
             Map<?, ?> cfg = entry.values().iterator().next() instanceof Map<?, ?> m ? m : Map.of();
             String at = prefix + "[" + i + "]." + kind;
-            String refusal = stepRefusal(kind, cfg, columns);
+            String refusal = stepRefusal(kind, cfg, columns, masks);
             if (refusal != null) { refusals.add(refusal); fields.add(at); }
             if (PipelineConfig.Step.ROUTE.equals(kind)) {
                 // The legacy top-level route: block's predicates are routeColumnFindings'; a route STEP's are bound here.
                 if (columns != null && cfg.get("branches") instanceof List<?> branches)
                     predicates.addAll(branchPredicateFindings(branches, at, columns, active));
-                walkBranches(cfg, at, columns, refusals, fields, predicates, active);
+                walkBranches(cfg, at, columns, refusals, fields, predicates, active, masks);
             }
             if (PipelineConfig.Step.LOOKUP.equals(kind)) {
                 if (columns != null && cfg.get("target") != null)
@@ -688,12 +693,12 @@ final class ConfigRoutes {
     /** Walks each branch's {@code steps[]} of one route config, each from its own copy of {@code columns}. */
     private static void walkBranches(Map<?, ?> route, String prefix, List<TypeFlow.Column> columns,
                                      List<String> refusals, List<String> fields,
-                                     List<Finding> predicates, boolean active) {
+                                     List<Finding> predicates, boolean active, Predicate<String> masks) {
         if (!(route.get("branches") instanceof List<?> branches)) return;
         for (int b = 0; b < branches.size(); b++)
             if (branches.get(b) instanceof Map<?, ?> branch && branch.get("steps") instanceof List<?> sub)
                 walkSteps(sub, prefix + ".branches[" + b + "].steps",
-                        columns == null ? null : new ArrayList<>(columns), refusals, fields, predicates, active);
+                        columns == null ? null : new ArrayList<>(columns), refusals, fields, predicates, active, masks);
     }
 
     /** The columns an outlier or binning step adds, with their DuckDB types; {@link IllegalArgumentException} if malformed. */
@@ -718,7 +723,7 @@ final class ConfigRoutes {
     }
 
     /** The first refusal the run would raise for one step's config, or {@code null}; {@code columns} null = unknown. */
-    private static String stepRefusal(String kind, Map<?, ?> cfg, List<TypeFlow.Column> columns) {
+    private static String stepRefusal(String kind, Map<?, ?> cfg, List<TypeFlow.Column> columns, Predicate<String> masks) {
         switch (kind) {
             case PipelineConfig.Step.LOOKUP -> {
                 String column = cfg.get("column") == null ? "" : String.valueOf(cfg.get("column")).trim();
@@ -1024,7 +1029,7 @@ final class ConfigRoutes {
                 return com.gamma.pipeline.exec.DistributionStep.numberRefusal(what, numbers, types);
             }
             case PipelineConfig.Step.MASK -> {
-                List<String> problems = com.gamma.pipeline.exec.MaskSpec.problems(cfg);
+                List<String> problems = com.gamma.pipeline.exec.MaskSpec.problems(cfg, masks);
                 if (!problems.isEmpty()) return "transform.mask: " + problems.get(0);
                 return cfg.get("columns") instanceof List<?> cols
                         ? undeclared("transform.mask column", cols, columns) : null;

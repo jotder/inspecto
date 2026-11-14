@@ -27,7 +27,7 @@ import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
                     <li class="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm" style="border-color: var(--gamma-border)">
                         <span class="font-medium">{{ t.label || t.id }}</span>
                         <code class="text-secondary text-xs">{{ t.id }}</code>
-                        <span class="text-secondary text-xs">· {{ normaliserLabel(t.normaliser) }}{{ t.masked ? ' · masked' : '' }}</span>
+                        <span class="text-secondary text-xs">· {{ normaliserLabel(t.normaliser) }}{{ (t.maskedInForce ?? t.masked) ? ' · masked' : '' }}</span>
                         @if (canEdit()) {
                             <button
                                 mat-button

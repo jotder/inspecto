@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.la-api`](../../../../../product-map/module/la-api.toon).
 
-52 test class(es): 52 unit, 0 real-HTTP control-plane, 0 IT.
+53 test class(es): 53 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -28,6 +28,7 @@ mvn -o test -pl la/inspecto-la-api -Dtest=CaseHistoryRoutesContractTest,ColumnPr
 | `CaseHistoryRoutesContractTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/CaseHistoryRoutesContractTest.java` | {@link CaseHistoryRoutes} against the platform test kit's RouteModule TCK (MODULE-REORG-1 P5a): no host, no processor boot. |
 | `ColumnProfileGoldenTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/ColumnProfileGoldenTest.java` | Golden figures of Link Analysis' column-profile SQL (ANALYTICS-CORE-1 M4): {@link ColumnProfile#stats} over numbers, text, |
 | `ConnectSeedsTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/ConnectSeedsTest.java` | LA-SEED-CONNECT-1: the pair table on a planted graph - the search itself, with no HTTP. |
+| `DatasetDiscoveryTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/DatasetDiscoveryTest.java` | {@link DatasetDiscovery#held}: the Entity Types a Dataset holds, by the one "type a class names" rule. |
 | `DatasetFilesRoutesTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/DatasetFilesRoutesTest.java` | LA-DATA-TRUST-1 S1: how a lineage ledger's written path is matched to an index manifest's data-root-relative input path. |
 | `DiscoverRoutesContractTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/DiscoverRoutesContractTest.java` | {@link DiscoverRoutes} against the platform test kit's RouteModule TCK: no host, no processor boot. |
 | `DossierBundleRoutesContractTest` | `com.gamma.la.api` | unit | `la/inspecto-la-api/src/test/java/com/gamma/la/api/DossierBundleRoutesContractTest.java` | {@link DossierBundleRoutes} against the platform test kit's RouteModule TCK (MODULE-REORG-P5-TCKS): no host, no processor boot. |

@@ -833,8 +833,13 @@ control plane; with no provider, the engine's own tests, the four sensitive clas
   Analysis masking off for a Space.
 - In BI, `typed` and `all` now mask the same columns (only the reported mode and its basis text differ). In Link
   Analysis they still differ: `all` masks every entity id and every non-fractional reference-row value.
-- `quality.pii.mask` is unchanged: its `classifications:` list is the author's and must stay within the four sensitive
-  classes.
+- `quality.pii.mask`: its `classifications:` list is the author's, and since 2026-11-15
+  (`MASKING-UNION-RESIDUALS-1`) may name any class the Space masks under this rule (e.g. `WALLET` where a masked
+  type claims it); a class that would mask nothing is refused at save and at run.
+- **Which Entity Type a class names** is one helper, `EntityTypes.typeNamedBy` (a type that claims it, else a type
+  whose id it is): the save gate, onboarding proposals, Link Analysis typing, discovery, presets, the index and the
+  "type still in use" check on retiring a type all use it. `GET /settings/link-analysis` reports each type in force
+  with `maskedInForce`, and the Entity Types list shows it.
 - ⚠ `publish.postgres` now drops or refuses a column with a masked Entity Type's class (e.g. `WALLET`) unless it is in
   `include_sensitive`, and a four-eyes approval over such a Dataset goes stale and must be given again.
 

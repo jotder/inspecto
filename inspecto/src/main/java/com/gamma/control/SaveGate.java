@@ -93,7 +93,7 @@ final class SaveGate {
         f.addAll(ConfigRoutes.routeArmingFindings(type, draft, configDir));
         f.addAll(ConfigRoutes.stepDisableFindings(type, draft));
         f.addAll(ConfigRoutes.dedupWindowFindings(type, draft));
-        f.addAll(ConfigRoutes.stepConfigFindings(type, draft, configDir));   // G4: the run's step refusals
+        f.addAll(ConfigRoutes.stepConfigFindings(type, draft, configDir, writeRoot));   // G4: the run's step refusals
         f.addAll(ConfigRoutes.stepColumnMetadataFindings(type, draft));   // AUTHORING-REDESIGN-1 (e)
         f.addAll(ClassificationVocabulary.findings(type, draft, writeRoot));   // CLASSIFICATION-UNMASKED-CLASS-1
         f.addAll(ConfigRoutes.collectorFindings(type, draft));   // post_action MOVE target; inert remote keys

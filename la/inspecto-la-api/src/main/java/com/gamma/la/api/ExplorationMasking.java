@@ -104,8 +104,7 @@ final class ExplorationMasking {
                         ? new ExplorationMasking(writeRoot, mode, false, "typed: no bound column of '" + dataset
                                 + "' is classified as a masked Entity Type, so its ids are shown as they are")
                         : new ExplorationMasking(writeRoot, mode, true, "typed: bound column(s) " + List.copyOf(cols.keySet())
-                                + " are classified as masked Entity Type(s) " + cols.values().stream().distinct().toList()
-                                + ", so every entity id is masked");
+                                + " are " + EntityMasking.classifiedAs(cols, types) + ", so every entity id is masked");
             }
         }
     }

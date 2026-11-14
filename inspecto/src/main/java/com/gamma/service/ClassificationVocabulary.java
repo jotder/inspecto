@@ -35,8 +35,8 @@ import java.util.stream.Stream;
  * class this Space does not know. Known, per Space:
  * <ul>
  *   <li>{@link ColumnClassification#SENSITIVE};</li>
- *   <li>a class an Entity Type of the Space claims, or the id of one (the rule {@code OnboardMatches.typeOf} reads
- *       a Dataset column by), masked or not;</li>
+ *   <li>a class an Entity Type of the Space claims, or the id of one ({@link EntityTypes#typeNamedBy}, the rule every
+ *       reader types a Dataset column by), masked or not;</li>
  *   <li>{@link ColumnClassification#NOT_MASKED}: the stated "needs no masking".</li>
  * </ul>
  * An empty classification stays allowed. Save-time only: a file already on disk still loads, and a component keeps
@@ -71,7 +71,8 @@ public final class ClassificationVocabulary {
 
     /**
      * One class a Space knows (UI-CLASSIFICATION-PICKER-1). {@code cls} is normalised (trimmed, upper case);
-     * {@code entityType} and {@code label} name the first Entity Type that claims the class or whose id it is, else null.
+     * {@code entityType} and {@code label} name the Entity Type the class names ({@link EntityTypes#typeNamedBy}: the first
+     * that claims it, else the first whose id it is), else null.
      */
     public record Entry(String cls, boolean masked, String source, String entityType, String label) {}
 
@@ -85,21 +86,21 @@ public final class ClassificationVocabulary {
      * or has it as its id - the rule every masking reader applies ({@link EntityTypes#maskedClasses}). Keep them one rule.
      */
     public static List<Entry> vocabulary(List<EntityTypes.EntityType> types) {
-        Map<String, Entry> out = new java.util.TreeMap<>();
-        for (String c : ColumnClassification.SENSITIVE) out.put(c, new Entry(c, true, SOURCE_SENSITIVE, null, null));
-        // mirrors control's OnboardMatches.typeOf (a type claims the class, else a type's id is it): service never imports control
+        Set<String> classes = new TreeSet<>(ColumnClassification.SENSITIVE);
         for (EntityTypes.EntityType t : types) {
-            Set<String> classes = new LinkedHashSet<>();
             String id = ColumnClassification.normalise(t.id());
             if (id != null) classes.add(id);
             for (String c : t.classifications()) {
                 String n = ColumnClassification.normalise(c);
                 if (n != null) classes.add(n);
             }
-            for (String c : classes)
-                out.merge(c, new Entry(c, EntityTypes.maskedInForce(t), SOURCE_ENTITY_TYPE, t.id(), t.label()), (a, b) -> a.entityType() != null
-                        ? new Entry(a.cls(), a.masked() || b.masked(), a.source(), a.entityType(), a.label())
-                        : new Entry(a.cls(), a.masked() || b.masked(), a.source(), b.entityType(), b.label()));
+        }
+        java.util.function.Predicate<String> masked = EntityTypes.maskedClasses(types);
+        Map<String, Entry> out = new java.util.TreeMap<>();
+        for (String c : classes) {
+            EntityTypes.EntityType named = EntityTypes.typeNamedBy(types, c);
+            out.put(c, new Entry(c, masked.test(c), ColumnClassification.SENSITIVE.contains(c) ? SOURCE_SENSITIVE : SOURCE_ENTITY_TYPE,
+                    named == null ? null : named.id(), named == null ? null : named.label()));
         }
         for (String c : ColumnClassification.NOT_MASKED) out.putIfAbsent(c, new Entry(c, false, SOURCE_NOT_MASKED, null, null));
         return List.copyOf(out.values());

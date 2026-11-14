@@ -663,6 +663,36 @@ class ControlApiSettingsTest {
         }
     }
 
+    /**
+     * MASKING-UNION-RESIDUALS-1: each Entity Type in force carries {@code maskedInForce}, the effective flag - true for a
+     * {@code masked: false} type whose id or a claimed class is sensitive - beside the configured {@code masked}; the stated
+     * list never stores it, and a PUT that echoes it back is accepted and ignores it.
+     */
+    @Test
+    void linkAnalysisEntityTypesInForceCarryTheEffectiveMaskedFlag(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            String path = "/spaces/acme/settings/link-analysis";
+            String list = "[{\"id\":\"msisdn\",\"label\":\"MSISDN\",\"normaliser\":\"e164\",\"masked\":false,\"classifications\":[\"MSISDN\"]},"
+                    + "{\"id\":\"phone\",\"label\":\"Phone\",\"normaliser\":\"e164\",\"masked\":false,\"classifications\":[\"PHONE\",\"PII\"]},"
+                    + "{\"id\":\"till\",\"label\":\"Till\",\"normaliser\":\"upper-trim\",\"masked\":false,\"classifications\":[\"TILL\"]},"
+                    + "{\"id\":\"vip\",\"label\":\"VIP\",\"normaliser\":\"upper-trim\",\"masked\":true,\"classifications\":[\"VIP\"],\"maskedInForce\":false}]";
+            HttpResponse<String> put = send(c.port, "PUT", path, "{\"entityTypes\":" + list + "}");
+            assertEquals(200, put.statusCode(), put.body());
+            JsonNode inForce = json(send(c.port, "GET", path, null)).get("entityTypesInForce");
+            assertEquals(4, inForce.size(), inForce.toString());
+            boolean[] want = {true, true, false, true};   // a sensitive id, a sensitive claimed class, nothing sensitive, flagged
+            boolean[] configured = {false, false, false, true};
+            for (int i = 0; i < 4; i++) {
+                assertEquals(want[i], inForce.get(i).get("maskedInForce").asBoolean(), inForce.get(i).toString());
+                assertEquals(configured[i], inForce.get(i).get("masked").asBoolean(), "the configured flag is unchanged: " + inForce.get(i));
+            }
+            for (JsonNode t : json(send(c.port, "GET", path, null)).get("entityTypes"))
+                assertFalse(t.has("maskedInForce"), "the stated list is the author's, never the effective flag: " + t);
+            assertFalse(Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon")).contains("maskedInForce"));
+        }
+    }
+
     /** LA-17 step 2: per-Space Entity Types — inherit the seeded nine, a stated list replaces them, 422 on bad. */
     @Test
     void linkAnalysisEntityTypesRoundTripAndRefuseBadLists(@TempDir Path root) throws Exception {
@@ -691,7 +721,10 @@ class ControlApiSettingsTest {
             HttpResponse<String> put = send(c.port, "PUT", path, "{\"maskingMode\":\"all\",\"entityTypes\":" + list + "}");
             assertEquals(200, put.statusCode(), put.body());
             assertEquals(JSON.readTree(stored), json(put).get("entityTypes"));
-            assertEquals(JSON.readTree(stored), json(put).get("entityTypesInForce"), "a stated list replaces the defaults");
+            com.fasterxml.jackson.databind.node.ArrayNode inForce = (com.fasterxml.jackson.databind.node.ArrayNode) JSON.readTree(stored);
+            ((com.fasterxml.jackson.databind.node.ObjectNode) inForce.get(0)).put("maskedInForce", true);
+            ((com.fasterxml.jackson.databind.node.ObjectNode) inForce.get(1)).put("maskedInForce", false);
+            assertEquals(inForce, json(put).get("entityTypesInForce"), "a stated list replaces the defaults; each says if it masks");
             assertTrue(Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon"))
                     .contains("entity_types"));
             assertEquals(JSON.readTree(stored), json(send(c.port, "GET", path, null)).get("entityTypes"),

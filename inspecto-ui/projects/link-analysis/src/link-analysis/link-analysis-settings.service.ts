@@ -112,6 +112,11 @@ export interface EntityTypeConfig {
     normaliser: EntityNormaliser;
     masked: boolean;
     classifications: string[];
+    /**
+     * Served on `entityTypesInForce` only (MASKING-UNION-RESIDUALS-1): whether the type's ids ARE masked — `masked`, or its id
+     * or a class it claims is sensitive. A PUT ignores it.
+     */
+    maskedInForce?: boolean;
 }
 
 const UNSET: LinkAnalysisLimits = {

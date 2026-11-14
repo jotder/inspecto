@@ -45,7 +45,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `REPORT-PDF-CHARTS-1` | P3 | feature | a report Job's PDF is a table snapshot, never a chart. | — |
 | `SNAPSHOT-SWAP-UNLOCKED-READERS-1` | P3 | defect | readers other than a sql.template Job can still fail while a snapshot is published (filed 2026-11-14, left by JOB-SNAPSHOT-SWAP-READER-RA… | — |
 | `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
-| `MASKING-UNION-RESIDUALS-1` | P3 | defect | readers that still type or check a column without the one masking rule (filed 2026-11-14, left by MASKING-TWO-VOCABULARIES-1). | — |
 | `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` | P3 | defect | a multi-file Consignment re-planned after a failover can write a second, differently named output, even on a shared output tree. | operator |
 | — | P2 | feature | Postgres multi-user | operator |
 | `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` | P3 | chore | report DuckDB 2.0.0's window_self_join hive-pruning defect upstream, then drop the workaround when it is fixed. | external |
