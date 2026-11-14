@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.config.io.ConfigCodec;
 import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.FindingCodes;
 import com.gamma.config.spec.Severity;
@@ -7,10 +8,13 @@ import com.gamma.entitystore.EntityTypes;
 import com.gamma.entitystore.EntityTypes.EntityType;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.pipeline.ComponentStore;
+import com.gamma.service.ClassificationVocabulary;
 import com.gamma.util.ColumnClassification;
+import com.gamma.util.StructureCsv;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -183,5 +187,137 @@ class ClassificationVocabularyTest {
                 Map.of("name", "BADGE", "classification", "BADGE_NO"))));
         assertTrue(ClassificationVocabulary.findings("schema", draft, root).isEmpty(), "known in the Space that defines it");
         assertEquals(1, ClassificationVocabulary.findings("schema", draft, other).size(), "refused in a Space that does not");
+    }
+
+    /**
+     * {@code known} states the Entity Type rule itself, because {@code com.gamma.service} does not import this package;
+     * {@link OnboardMatches#typeOf} is the reader it mirrors, and the two must not drift.
+     */
+    @Test
+    void theEntityTypeRuleAgreesWithTheOnboardingReader() {
+        for (String cls : List.of("WALLET", " till ", "id_document", "Id_Document", "CONFIDENTIAL", "wallets")) {
+            String norm = ColumnClassification.normalise(cls);
+            assertFalse(ColumnClassification.SENSITIVE.contains(norm) || ColumnClassification.NOT_MASKED.contains(norm),
+                    cls + " is known through an Entity Type or not at all");
+            assertEquals(OnboardMatches.typeOf(cls, DEFAULTS) != null, ClassificationVocabulary.known(cls, DEFAULTS), cls);
+        }
+        assertNotNull(OnboardMatches.typeOf("WALLET", DEFAULTS), "a claimed class");
+        assertNotNull(OnboardMatches.typeOf("id_document", DEFAULTS), "a type id");
+        assertNull(OnboardMatches.typeOf("CONFIDENTIAL", DEFAULTS), "an unknown class");
+        assertNull(OnboardMatches.typeOf("  ", DEFAULTS), "blank: no Entity Type reads it");
+        assertTrue(ClassificationVocabulary.known("  ", DEFAULTS), "and the vocabulary allows it as 'none stated'");
+    }
+
+    // ── findingsWritten: the files a bulk import landed (CLASSIFICATION-BULK-IMPORT-UNGATED-1) ──
+
+    private static final String SCHEMA = """
+            raw:
+              name: calls
+              format: CSV
+              fields[2]{name,selector,type,classification}:
+                A_NUMBER,"0",VARCHAR,MSISDN
+                CELL,"1",VARCHAR,%s
+            """;
+
+    private static Path put(Path root, String rel, String text) throws Exception {
+        Path p = root.resolve(rel);
+        Files.createDirectories(p.getParent());
+        return Files.writeString(p, text);
+    }
+
+    /** A schema file is whatever a Pipeline names, so every written {@code .toon} outside the registry is judged. */
+    @Test
+    void aWrittenSchemaFileUnderAnyNameAndAPipelineStepAreJudgedAndNamedByFile(@TempDir Path root) throws Exception {
+        put(root, "calls/calls_schema.toon", SCHEMA.formatted("CONFIDENTIAL"));
+        put(root, "calls/calls_v2.toon", SCHEMA.formatted("SECRETISH"));
+        put(root, "calls/clean_schema.toon", SCHEMA.formatted("INTERNAL"));
+        put(root, "calls/calls_pipeline.toon", ConfigCodec.toToon(Map.of("name", "CALLS", "steps", List.of(
+                Map.of("sql", Map.of("fields", List.of(
+                        Map.of("name", "SITE", "expr", "CELL", "classification", "CONFIDENTIAL"))))))));
+        put(root, "calls/untouched_schema.toon", SCHEMA.formatted("CONFIDENTIAL"));
+        String broken = "raw:\n  fields[2]{name,classification}:\n    CELL,CONFIDENTIAL\n";
+        assertThrows(RuntimeException.class, () -> ConfigCodec.toMap(broken), "the probe: this file does not parse");
+        put(root, "calls/broken_schema.toon", broken);
+
+        List<Finding> out = ClassificationVocabulary.findingsWritten(root, List.of("calls/calls_schema.toon",
+                "calls/calls_v2.toon", "calls/clean_schema.toon", "calls/calls_pipeline.toon", "calls/broken_schema.toon"));
+
+        assertEquals(List.of("calls/calls_schema.toon: raw.fields[1].classification",
+                        "calls/calls_v2.toon: raw.fields[1].classification",
+                        "calls/calls_pipeline.toon: steps[0].sql.fields[0].classification"),
+                out.stream().map(Finding::fieldPath).toList(),
+                "one per unknown class, in written order; a file not written, a known class and an unparseable file say nothing");
+        for (Finding f : out) {
+            assertEquals(Severity.ERROR, f.severity());
+            assertEquals(FindingCodes.ERR_UNKNOWN_CLASSIFICATION, f.code());
+        }
+        assertTrue(out.get(0).message().contains("'CELL'") && out.get(0).message().contains("'CONFIDENTIAL'"), out.get(0).message());
+        assertTrue(ClassificationVocabulary.findingsWritten(root, List.of("calls/clean_schema.toon")).isEmpty());
+    }
+
+    /** The fields of a split schema live in its sibling structure CSV: either file written, the merged schema is judged. */
+    @Test
+    void aSchemaIsJudgedMergedWithItsSiblingStructureCsv(@TempDir Path root) throws Exception {
+        String csv = StructureCsv.encode(List.of(
+                Map.of("name", "A_NUMBER", "type", "VARCHAR", "selector", "0", "classification", "MSISDN"),
+                Map.of("name", "CELL", "type", "VARCHAR", "selector", "1", "classification", "CONFIDENTIAL")));
+        put(root, "calls/calls_schema.toon", "raw:\n  name: calls\n  format: CSV\n");
+        put(root, "calls/calls_structure.csv", csv);
+        put(root, "bare/legacy.toon", "partitionKey: D\n");
+        put(root, "bare/legacy_structure.csv", csv);
+        put(root, "orphan/none_structure.csv", csv);
+
+        for (String written : List.of("calls/calls_schema.toon", "calls/calls_structure.csv")) {
+            List<Finding> out = ClassificationVocabulary.findingsWritten(root, List.of(written));
+            assertEquals(List.of("calls/calls_schema.toon: raw.fields[1].classification"),
+                    out.stream().map(Finding::fieldPath).toList(), written);
+        }
+        assertEquals(1, ClassificationVocabulary.findingsWritten(root,
+                List.of("calls/calls_schema.toon", "calls/calls_structure.csv")).size(), "both written: judged once");
+        assertEquals(List.of("bare/legacy.toon: raw.fields[1].classification"),
+                ClassificationVocabulary.findingsWritten(root, List.of("bare/legacy_structure.csv")).stream()
+                        .map(Finding::fieldPath).toList(), "a schema with no _schema suffix and no raw block of its own");
+        assertTrue(ClassificationVocabulary.findingsWritten(root, List.of("orphan/none_structure.csv")).isEmpty(),
+                "a structure CSV with no schema file beside it is read by nothing");
+
+        Files.writeString(root.resolve("calls/calls_structure.csv"), csv.replace("CONFIDENTIAL", "INTERNAL"));
+        assertTrue(ClassificationVocabulary.findingsWritten(root, List.of("calls/calls_structure.csv")).isEmpty());
+    }
+
+    /** In the registry only a Dataset and a schema carry column classes; nothing stored excuses the file itself. */
+    @Test
+    void aWrittenRegistryDatasetOrSchemaIsJudgedAndAnyOtherKindIsNot(@TempDir Path root) throws Exception {
+        String dataset = """
+                physicalRef: calls/database
+                columns[2]{name,type,classification}:
+                  a_party,string,MSISDN
+                  cell,string,%s
+                """;
+        put(root, "registry/datasets/calls.toon", dataset.formatted("CONFIDENTIAL"));
+        put(root, "registry/datasets/clean.toon", dataset.formatted("INTERNAL"));
+        put(root, "registry/schemas/calls.toon", SCHEMA.formatted("CONFIDENTIAL"));
+        put(root, "registry/widgets/map.toon", "title: Map\nclassification: quantile\n");
+
+        List<Finding> out = ClassificationVocabulary.findingsWritten(root, List.of("registry/datasets/calls.toon",
+                "registry/datasets/clean.toon", "registry/schemas/calls.toon", "registry/widgets/map.toon"));
+
+        assertEquals(List.of("registry/datasets/calls.toon: columns[1].classification",
+                "registry/schemas/calls.toon: raw.fields[1].classification"), out.stream().map(Finding::fieldPath).toList());
+        assertThrows(IllegalArgumentException.class, () -> ClassificationVocabulary.require(root, "dataset", null,
+                Map.of("classification", "quantile")), "the probe: the widget's word is unknown, so it was skipped, not passed");
+    }
+
+    /** The Entity Types are read from the root after the writes, so a bundle's own link-analysis.toon counts. */
+    @Test
+    void writtenFilesAreJudgedAgainstTheEntityTypesNowOnDisk(@TempDir Path root) throws Exception {
+        put(root, "staff/staff_schema.toon", SCHEMA.formatted("BADGE_NO"));
+        assertEquals(1, ClassificationVocabulary.findingsWritten(root, List.of("staff/staff_schema.toon")).size(),
+                "no Entity Type claims it yet");
+
+        List<EntityType> own = List.of(new EntityType("badge", "Staff badge", "upper-trim", true, List.of("BADGE_NO")));
+        new LinkAnalysisSettings(null, null, null, null, null, null, own, null, null, null, null, null, null, null, null)
+                .write(root.resolve(LinkAnalysisSettings.FILE));
+        assertTrue(ClassificationVocabulary.findingsWritten(root,
+                List.of(LinkAnalysisSettings.FILE, "staff/staff_schema.toon")).isEmpty(), "the Space's own type claims it");
     }
 }

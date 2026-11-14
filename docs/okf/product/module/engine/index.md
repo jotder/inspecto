@@ -42,7 +42,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
 | `ALERT-EVALUATE-NO-BREACH-WORDING-1` | P3 | defect | an alert.evaluate Job logs "no rule breached" on every run while an Alert it raised stays OPEN. | — |
 | `REPORT-PDF-CHARTS-1` | P3 | feature | a report Job's PDF is a table snapshot, never a chart. | — |
-| `JOB-SNAPSHOT-SWAP-READER-RACE-1` | P3 | defect | a Job reading a snapshot Dataset fails when the Job that writes that Dataset publishes a new snapshot during the read. | — |
+| `SNAPSHOT-SWAP-UNLOCKED-READERS-1` | P3 | defect | readers other than a sql.template Job can still fail while a snapshot is published (filed 2026-11-14, left by JOB-SNAPSHOT-SWAP-READER-RA… | — |
 | `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
 | `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` | P3 | defect | a multi-file Consignment re-planned after a failover can write a second, differently named output, even on a shared output tree. | operator |
 | — | P2 | feature | Postgres multi-user | operator |

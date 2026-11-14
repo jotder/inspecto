@@ -1,5 +1,7 @@
 package com.gamma.alert;
 
+import com.gamma.job.SnapshotSwapLock;
+
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -50,18 +52,21 @@ public final class ScoreOutputDirs {
 
     /**
      * Replace every {@code glob} file in {@code dir} with {@code tmp} (renamed {@code name}): the old files are hidden
-     * first by an atomic rename, the new one revealed by an atomic move, then the hidden ones deleted.
+     * first by an atomic rename, the new one revealed by an atomic move, then the hidden ones deleted. Hide and
+     * reveal wait for the Jobs reading {@code dir} ({@link SnapshotSwapLock}): the hide removes the path they pinned.
      */
     public static void swapIn(Path dir, Path tmp, String name, String glob) throws IOException {
         List<Path> stale = new ArrayList<>();
-        try (DirectoryStream<Path> old = Files.newDirectoryStream(dir, glob)) {
-            for (Path p : old) {
-                Path hidden = p.resolveSibling(p.getFileName() + ".stale");
-                Files.move(p, hidden, StandardCopyOption.ATOMIC_MOVE);
-                stale.add(hidden);
+        try (SnapshotSwapLock.Held swap = SnapshotSwapLock.write(dir)) {
+            try (DirectoryStream<Path> old = Files.newDirectoryStream(dir, glob)) {
+                for (Path p : old) {
+                    Path hidden = p.resolveSibling(p.getFileName() + ".stale");
+                    Files.move(p, hidden, StandardCopyOption.ATOMIC_MOVE);
+                    stale.add(hidden);
+                }
             }
+            Files.move(tmp, dir.resolve(name), StandardCopyOption.ATOMIC_MOVE);
         }
-        Files.move(tmp, dir.resolve(name), StandardCopyOption.ATOMIC_MOVE);
         for (Path p : stale) Files.deleteIfExists(p);
     }
 

@@ -40,7 +40,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `SPACE-PROMOTION-PARAM-TYPES-1` | P3 | defect | a promotion parameter value can change the type of the value it fills | — |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
 | `SPACE-CREATE-PARTIAL-1` | P3 | defect | creating a Space half-succeeds when the caller lacks canAuthorWorkbench. | — |
-| `CLASSIFICATION-BULK-IMPORT-UNGATED-1` | P2 | defect | the bulk file importers can still land a column classification the Space does not know (filed 2026-11-14, found by the review of CLASSIFI… | — |
 | `SPACE-ROOTED-DATA-ROOT-MIGRATION-1` | P3 | feature | an install whose data_root is rooted (or absent, i.e. -Dspaces.data.root) is still not relocatable, and there is no route that migrates it. | demand |
 | `UI-CLASSIFICATION-PICKER-1` | P3 | feature | the classification cell is still a plain text input, and no route serves the Space's known classes (filed 2026-11-14). | demand |
 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | NARROWED 2026-11-01 (twice): the ingest lane WRITES an allow-listed s3:// dirs.database and REGISTERS that output in DuckLake; what is le… | — |

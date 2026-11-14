@@ -96,6 +96,8 @@ final class SpaceRoutes implements RouteModule {
                         // a NEW Space: no stored rule, no live registry; carried Jobs server-stamped (MAINT-TASK-AUTHORITY-1)
                         return JobAuthority.stampBundle(e, DecisionRuleGuard.guardImport(e, null, b));
                     }));
+        } catch (com.gamma.service.UnknownClassificationException unknown) {   // no Space and no directory were left
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, unknown.getMessage());
         } catch (IllegalArgumentException badBundle) {   // not a bundle / invalid manifest / zip-slip
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, badBundle.getMessage());
         } catch (IllegalStateException conflict) {       // id / directory already exists

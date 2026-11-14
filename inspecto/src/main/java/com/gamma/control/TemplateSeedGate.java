@@ -6,6 +6,7 @@ import com.gamma.spi.auth.Subject;
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
+import com.gamma.service.ClassificationVocabulary;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -177,13 +178,15 @@ final class TemplateSeedGate {
             String type = parent.equals(config.resolve("jobs")) && name.endsWith(".toon") ? "job"
                     : name.endsWith("_pipeline.toon") && !parent.startsWith(config.resolve("registry")) ? "pipeline" : null;
             // CLASSIFICATION-UNMASKED-CLASS-1: a template's schema file is judged for its column classes only - the
-            // rest of the schema gate was never run at a seed, and switching it on is not this change.
+            // rest of the schema gate was never run at a seed, and switching it on is not this change. Read as every
+            // reader reads it, merged with its sibling structure CSV: the fields, and so the classes, may live there.
             boolean schemaFile = type == null && name.endsWith("_schema.toon") && !parent.startsWith(config.resolve("registry"));
             if (schemaFile) type = "schema";
             if (type == null) continue;
             Map<String, Object> draft;
             try {
                 draft = com.gamma.config.io.ConfigLoader.filesystem().decode(file.toString());
+                if (schemaFile) ConfigFileSupport.mergeSiblingStructure(file, draft);
             } catch (IOException | RuntimeException unreadable) {
                 throw refused(type, name, unreadable.getMessage());
             }

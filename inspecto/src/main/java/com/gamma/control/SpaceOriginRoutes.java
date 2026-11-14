@@ -238,6 +238,8 @@ final class SpaceOriginRoutes implements RouteModule {
             com.gamma.service.ImportJournal journal = new com.gamma.service.ImportJournal();
             try {
                 com.gamma.service.BundleImporter.writeConfig(bundle, config, true, journal);   // rolls itself back on a failed write
+            } catch (com.gamma.service.UnknownClassificationException unknown) {   // the writer took its files back
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, unknown.getMessage());
             } catch (IllegalArgumentException judged) {   // the writer's own import judge (backstop); nothing was written
                 throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, judged.getMessage() + " — apply it with the files it needs, or through its own route");
             }

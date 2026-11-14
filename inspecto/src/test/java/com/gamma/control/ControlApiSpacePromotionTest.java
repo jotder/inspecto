@@ -299,6 +299,46 @@ class ControlApiSpacePromotionTest {
         }
     }
 
+    /**
+     * CLASSIFICATION-BULK-IMPORT-UNGATED-1: a promotion writes the source's files as bytes, past every save gate, so a
+     * promoted schema is judged for its column classes where it lands. An unknown one takes back the whole set, the
+     * requested removal included; the same promotion under a known class lands.
+     */
+    @Test
+    void aPromotedSchemaOfAnUnknownClassIsRefusedWithTheTargetUnchangedAndAKnownOnePromotes(@TempDir Path root,
+                                                                                         @TempDir Path tmp) throws Exception {
+        String schema = "raw:\n  name: calls\n  format: CSV\n  fields[2]{name,selector,type,classification}:\n"
+                + "    A_NUMBER,\"0\",VARCHAR,MSISDN\n    CELL,\"1\",VARCHAR,%s\n";
+        try (Ctx c = open(root)) {
+            write(tmp.resolve("src-config"), "calls/calls_schema.toon", schema.formatted("CONFIDENTIAL"));
+            byte[] zip = sourceBundle(tmp);
+            JsonNode p = preview(c, zip);
+            assertEquals(List.of("calls/calls_schema.toon"), actions(p, "add"), p.toString());
+            Map<String, String> before = new java.util.TreeMap<>();
+            try (var all = Files.walk(c.config)) {
+                for (Path f : all.filter(Files::isRegularFile).toList()) before.put(c.config.relativize(f).toString(), Files.readString(f));
+            }
+
+            HttpResponse<String> r = post(c.port, "/spaces/alpha/promotion/apply", "admin",
+                    body(zip, Map.of("previewHash", p.get("changeSetHash").asText(), "removals", true)));
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("ERR_UNKNOWN_CLASSIFICATION")
+                    && r.body().contains("calls/calls_schema.toon: raw.fields[1].classification") && r.body().contains("'CONFIDENTIAL'"), r.body());
+            Map<String, String> after = new java.util.TreeMap<>();
+            try (var all = Files.walk(c.config)) {
+                for (Path f : all.filter(Files::isRegularFile).toList()) after.put(c.config.relativize(f).toString(), Files.readString(f));
+            }
+            assertEquals(before, after, "the changed file, the added schema and the removal were all taken back");
+
+            write(tmp.resolve("src-config"), "calls/calls_schema.toon", schema.formatted("INTERNAL"));
+            byte[] known = sourceBundle(tmp);
+            HttpResponse<String> ok = post(c.port, "/spaces/alpha/promotion/apply", "admin",
+                    body(known, Map.of("previewHash", preview(c, known).get("changeSetHash").asText())));
+            assertEquals(200, ok.statusCode(), ok.body());
+            assertTrue(Files.readString(c.config.resolve("calls/calls_schema.toon")).contains("INTERNAL"));
+        }
+    }
+
     @Test
     void aTargetEditedAfterThePreviewIs409(@TempDir Path root, @TempDir Path tmp) throws Exception {
         byte[] zip = sourceBundle(tmp);

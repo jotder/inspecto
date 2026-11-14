@@ -9,7 +9,9 @@ import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.Severity;
 import com.gamma.event.EventLog;
 import com.gamma.service.BundleImporter;
+import com.gamma.service.ClassificationVocabulary;
 import com.gamma.service.ImportJournal;
+import com.gamma.service.UnknownClassificationException;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
@@ -208,7 +210,12 @@ final class SpacePromotionRoutes implements RouteModule {
         synchronized (APPLY_LOCK) {
             // re-checked under the lock: nothing changed the target since the gates above read it
             if (!SpacePromotion.compute(root, r.bundle(), r.parameters(), space).hash().equals(cs.hash())) throw stale();
-            return write(api, root, space, cs, applied, toWrite, r.removals());
+            try {
+                return write(api, root, space, cs, applied, toWrite, r.removals());
+            } catch (UnknownClassificationException unknown) {   // write put the tree back before it threw
+                return ApiContext.respondJson(e, 422, Map.of("error", "a promoted file states a column classification this "
+                        + "Space does not know; nothing was written", "findings", unknown.findings()));
+            }
         }
     }
 
@@ -258,6 +265,9 @@ final class SpacePromotionRoutes implements RouteModule {
                 Files.delete(f);
                 removedPaths.add(c.path());
             }
+            // CLASSIFICATION-BULK-IMPORT-UNGATED-1: the files landed as bytes - an unknown column class takes them all back
+            List<Finding> unknown = ClassificationVocabulary.findingsWritten(root, written);
+            if (!unknown.isEmpty()) throw new UnknownClassificationException(unknown);
         } catch (IOException | RuntimeException failed) {
             for (Map.Entry<Path, byte[]> back : removed.entrySet()) {
                 try {

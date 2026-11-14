@@ -263,6 +263,25 @@ class ControlApiAppInstallTest {
         }
     }
 
+    /**
+     * CLASSIFICATION-BULK-IMPORT-UNGATED-1: an install writes the App's templates (under {@code _templates/}), never a
+     * Space's config, and an upgrade changes no Space. A class the template states is judged where it lands in a Space:
+     * at the Space create, by the seed gate.
+     */
+    @Test
+    void anAppTemplateOfAnUnknownClassInstallsButCreatesNoSpace() throws Exception {
+        try (Ctx c = open()) {
+            Map<String, String> files = appFiles("0.1.0", false);
+            files.put("templates/acme-spend/config/registry/datasets/acme_findings.toon", "name: acme_findings\n"
+                    + "physicalRef: acme_findings\ncolumns[1]{name,type,classification}:\n  party,string,CONFIDENTIAL\n");
+            assertEquals(200, send(c, "POST", "/apps", pkg("acme-spend", files, true, "acme-signing-1", null), ADMIN).statusCode());
+            HttpResponse<String> made = sendJson(c, "POST", "/spaces", "{\"id\":\"made\",\"template\":\"acme-spend\"}");
+            assertEquals(422, made.statusCode(), made.body());
+            assertTrue(made.body().contains("ERR_UNKNOWN_CLASSIFICATION") && made.body().contains("'party'"), made.body());
+            assertFalse(Files.exists(c.root().resolve("made")));
+        }
+    }
+
     @Test
     void theCapabilityGate401And403And200() throws Exception {
         try (Ctx c = open()) {

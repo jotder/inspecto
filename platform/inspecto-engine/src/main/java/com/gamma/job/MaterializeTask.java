@@ -44,9 +44,10 @@ import static com.gamma.util.SqlIdent.q;
  *
  * <h3>Refresh discipline (PIP-7's stage-and-atomic-swap)</h3>
  * The new snapshot lands invisibly ({@code *.parquet.tmp} — readers glob {@code *.parquet}); prior
- * snapshots are hidden ({@code → *.stale}) before the reveal (ATOMIC_MOVE), then deleted. A reader in the
- * swap window sees a briefly-empty Matrix rather than doubled rows — for a summary table, consistent
- * beats complete. A crash leaves only invisible {@code .tmp}/{@code .stale} files; the next run cleans them.
+ * snapshots are hidden ({@code → *.stale}) before the reveal (ATOMIC_MOVE), then deleted — never doubled
+ * rows. The hide removes the path a reader pinned, so the swap waits for the Jobs reading the target
+ * ({@link SnapshotSwapLock}); a reader that does not take the lock can fail across a swap. A crash leaves only
+ * invisible {@code .tmp}/{@code .stale} files; the next run cleans them.
  */
 final class MaterializeTask {
 
@@ -118,14 +119,16 @@ final class MaterializeTask {
 
         // Swap: hide prior snapshots, reveal the new one, drop the hidden ones (see class doc).
         List<Path> stale = new ArrayList<>();
-        try (DirectoryStream<Path> old = Files.newDirectoryStream(outDir, "*.parquet")) {
-            for (Path p : old) {
-                Path hidden = p.resolveSibling(p.getFileName() + ".stale");
-                Files.move(p, hidden, StandardCopyOption.ATOMIC_MOVE);
-                stale.add(hidden);
+        try (SnapshotSwapLock.Held swap = SnapshotSwapLock.write(outDir)) {
+            try (DirectoryStream<Path> old = Files.newDirectoryStream(outDir, "*.parquet")) {
+                for (Path p : old) {
+                    Path hidden = p.resolveSibling(p.getFileName() + ".stale");
+                    Files.move(p, hidden, StandardCopyOption.ATOMIC_MOVE);
+                    stale.add(hidden);
+                }
             }
+            Files.move(tmp, outDir.resolve(snapshot), StandardCopyOption.ATOMIC_MOVE);
         }
-        Files.move(tmp, outDir.resolve(snapshot), StandardCopyOption.ATOMIC_MOVE);
         for (Path p : stale) {
             try { Files.delete(p); } catch (IOException e) { log.warn("materialize: could not drop {}: {}", p, e.getMessage()); }
         }

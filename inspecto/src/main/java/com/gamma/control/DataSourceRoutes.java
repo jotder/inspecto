@@ -318,6 +318,8 @@ final class DataSourceRoutes implements RouteModule {
             BundleImporter.Unpacked unpacked;
             try {
                 unpacked = BundleImporter.writeConfig(bundle, config, true, journal);
+            } catch (com.gamma.service.UnknownClassificationException unknown) {   // the writer took its files back
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, unknown.getMessage());
             } catch (IllegalArgumentException jail) {
                 throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, jail.getMessage());
             }
