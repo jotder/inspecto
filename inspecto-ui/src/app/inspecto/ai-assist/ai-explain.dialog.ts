@@ -68,7 +68,11 @@ export function isUserFacingDoc(file: string): boolean {
 /** A cited doc's readable name: "Glossary", "User guide", "User guide: link analysis". */
 export function guideTitle(file: string): string {
     const base = file.replace(/\\/g, '/').split('/').pop()!.replace(/\.md$/i, '');
-    const named: Record<string, string> = { GLOSSARY: 'Glossary', USER_GUIDE: 'User guide', ADVANCED_GUIDE: 'Advanced guide' };
+    const named: Record<string, string> = {
+        GLOSSARY: 'Glossary',
+        USER_GUIDE: 'User guide',
+        ADVANCED_GUIDE: 'Advanced guide',
+    };
     if (named[base.toUpperCase()]) return named[base.toUpperCase()];
     const m = /^(user|admin)-guide-?(.*)$/i.exec(base);
     const words = (s: string) => s.replace(/[-_]+/g, ' ').trim();
@@ -78,7 +82,15 @@ export function guideTitle(file: string): string {
 }
 
 /** Where an engineer's note starts in a GLOSSARY row: everything from here on is not for the analyst. */
-const ENGINEER_MARKERS = ['⛔', '✅', '⚠', '🔴', '(internal document', 'Named by operator decision', 'Named by decision'];
+const ENGINEER_MARKERS = [
+    '⛔',
+    '✅',
+    '⚠',
+    '🔴',
+    '(internal document',
+    'Named by operator decision',
+    'Named by decision',
+];
 /** Abbreviations whose full stop does not end a sentence. */
 const NOT_A_SENTENCE_END = /(?:\be\.g|\bi\.e|\bvs|\betc|\bcf|\bapprox)\.$/i;
 /** A code span an analyst may read: an upper-case value such as a status (`COMPLETED`, `BUDGET_EXCEEDED`, `PII`). */
@@ -146,8 +158,9 @@ function stripGlossaryMarkup(raw: string): string {
     s = s.replace(/\*\*|\*|(?<=^|\s)_|_(?=\s|[.,;:)]|$)/g, '');
     s = s.replace(/(^|[\s(])\/[\w/*{}.:-]+/g, '$1'); // routes
     // ticket ids, with the word that pointed at them ("since BI-5" goes whole, never leaving "since ,")
-    s = s.replace(/(?:\b(?:since|per|under|see|in|by|from)\s+)?\b([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\b/g, (all, id: string) =>
-        /\d/.test(id) && !/^(SHA|UTF|ISO)-/.test(id) ? ' ' : all,
+    s = s.replace(
+        /(?:\b(?:since|per|under|see|in|by|from)\s+)?\b([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\b/g,
+        (all, id: string) => (/\d/.test(id) && !/^(SHA|UTF|ISO)-/.test(id) ? ' ' : all),
     );
     s = s.replace(/\s*[|]\s*/g, ', '); // "Table | Derived Table" is a list
     for (let i = 0; i < 3; i++) {
@@ -214,7 +227,8 @@ function stripGlossaryMarkup(raw: string): string {
                                     <ul class="mt-1 flex flex-col gap-1">
                                         @for (hit of entry.citations; track hit.file + hit.line) {
                                             <li [title]="hit.file + ':' + hit.line">
-                                                <span class="font-medium">{{ guideTitle(hit.file) }}</span>: {{ hit.snippet }}
+                                                <span class="font-medium">{{ guideTitle(hit.file) }}</span
+                                                >: {{ hit.snippet }}
                                             </li>
                                         }
                                     </ul>

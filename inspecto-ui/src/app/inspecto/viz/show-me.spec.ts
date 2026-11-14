@@ -97,13 +97,21 @@ describe('autoAssignChannels', () => {
         const values = autoAssignChannels(KPI_PLUGIN, fields);
         expect(values.value?.[0]).toEqual({ field: 'goals', agg: 'sum' });
         expect(values.compare).toBeUndefined();
-        const props = KPI_PLUGIN.transformProps([{ [channelMeasureId({ field: 'goals' })]: 10, [channelMeasureId({ field: 'shots' })]: 40 }], values);
+        const props = KPI_PLUGIN.transformProps(
+            [{ [channelMeasureId({ field: 'goals' })]: 10, [channelMeasureId({ field: 'shots' })]: 40 }],
+            values,
+        );
         expect(props.compare).toBeUndefined();
     });
 
     it('keeps an explicitly saved KPI compare', () => {
         const saved = { value: [{ field: 'goals' }], compare: [{ field: 'prev' }] };
-        expect(KPI_PLUGIN.transformProps([{ [channelMeasureId({ field: 'goals' })]: 10, [channelMeasureId({ field: 'prev' })]: 8 }], saved).compare).toBe(8);
+        expect(
+            KPI_PLUGIN.transformProps(
+                [{ [channelMeasureId({ field: 'goals' })]: 10, [channelMeasureId({ field: 'prev' })]: 8 }],
+                saved,
+            ).compare,
+        ).toBe(8);
     });
 });
 

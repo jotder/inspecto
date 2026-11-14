@@ -171,7 +171,11 @@ describe('DatasetRowsService — a Dataset bound to another space’s share', ()
     it('reads its server relation — the shared item is not a store in this space', async () => {
         const { svc, table, query, datasetRows } = setup();
         const res = await svc.rows(
-            { id: 'football-data_team_performance', sourceName: '', physicalRef: 'shared/football-data/team_performance' },
+            {
+                id: 'football-data_team_performance',
+                sourceName: '',
+                physicalRef: 'shared/football-data/team_performance',
+            },
             50,
         );
         expect(datasetRows).toHaveBeenCalledWith('football-data_team_performance', 50);

@@ -490,8 +490,8 @@ export function withDecodeProfile(
                                 >· {{ derivedColumnSummary() }}
                                 @if (ownDeriveSet()) {
                                     · set by this Pipeline, replacing the profile's
-                                }</span
-                            >
+                                }
+                            </span>
                         </div>
                         <table
                             class="w-full table-fixed text-sm"
@@ -1306,7 +1306,9 @@ export class PipelineParseDefinitionComponent {
     });
     /** Whether the Pipeline's own `asn1.derive` is the one in effect (it replaces the profile's whole). */
     readonly ownDeriveSet = computed(
-        () => derivedColumnsOf((this.parsingBlock()['asn1'] as Record<string, unknown> | undefined)?.['derive']).length > 0,
+        () =>
+            derivedColumnsOf((this.parsingBlock()['asn1'] as Record<string, unknown> | undefined)?.['derive']).length >
+            0,
     );
     /** "N derived columns on M segments". */
     readonly derivedColumnSummary = computed(() => {

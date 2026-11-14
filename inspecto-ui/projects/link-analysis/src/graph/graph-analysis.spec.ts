@@ -176,7 +176,17 @@ describe('centrality', () => {
             configureLaLimits({ 'browser_algorithms.betweennessCentrality': 20 }); // 63 nodes: 6 pivots
             expect(betweennessPivots(g.nodes.length)).toBe(6);
             const approx = betweennessCentrality(g);
-            expect(approx.slice(0, 3).map((s) => s.id).sort()).toEqual(exact.slice(0, 3).map((s) => s.id).sort());
+            expect(
+                approx
+                    .slice(0, 3)
+                    .map((s) => s.id)
+                    .sort(),
+            ).toEqual(
+                exact
+                    .slice(0, 3)
+                    .map((s) => s.id)
+                    .sort(),
+            );
             const top = (r: typeof exact, id: string) => r.find((s) => s.id === id)!.score;
             expect(top(approx, 'bridge') / top(exact, 'bridge')).toBeGreaterThan(0.5);
             expect(top(approx, 'bridge') / top(exact, 'bridge')).toBeLessThan(2);

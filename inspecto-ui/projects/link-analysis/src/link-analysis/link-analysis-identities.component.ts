@@ -66,9 +66,7 @@ import { isUnavailable } from './link-analysis-template.dialogs';
                     }
                 </div>
                 @if (!canManage()) {
-                    <p class="text-secondary m-0">
-                        Identities need Incident management, also to read.
-                    </p>
+                    <p class="text-secondary m-0">Identities need Incident management, also to read.</p>
                 } @else {
                     @if (error()) {
                         <inspecto-alert [variant]="unavailable() ? 'info' : 'error'" title="Identity resolution">{{
@@ -79,9 +77,18 @@ import { isUnavailable } from './link-analysis-template.dialogs';
                         <inspecto-alert variant="success" title="Identity resolution">{{ notice() }}</inspecto-alert>
                     }
                     @if (offerResolve()) {
-                        <div class="flex items-center gap-2" role="group" aria-label="Show the merge in this Investigation">
+                        <div
+                            class="flex items-center gap-2"
+                            role="group"
+                            aria-label="Show the merge in this Investigation"
+                        >
                             <span class="text-secondary">Show this merge in the open Investigation?</span>
-                            <button mat-stroked-button type="button" (click)="sealResolve()" data-testid="la-seal-resolve">
+                            <button
+                                mat-stroked-button
+                                type="button"
+                                (click)="sealResolve()"
+                                data-testid="la-seal-resolve"
+                            >
                                 Add a resolve step
                             </button>
                             <button mat-button type="button" (click)="offerResolve.set(false)">Not now</button>
@@ -240,7 +247,12 @@ export class LinkAnalysisIdentitiesComponent {
         effect(() => {
             const draft = this.session?.mergeDraft();
             if (!draft) return;
-            this.assertForm.patchValue({ typeA: draft.a.type, valueA: draft.a.value, typeB: draft.b.type, valueB: draft.b.value });
+            this.assertForm.patchValue({
+                typeA: draft.a.type,
+                valueA: draft.a.value,
+                typeB: draft.b.type,
+                valueB: draft.b.value,
+            });
             this.session?.mergeDraft.set(null);
         });
         // Off the module every route 503s, and without the capability every read 403s — no call for either.

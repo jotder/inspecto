@@ -21,17 +21,14 @@ import { LA_FEATURES, investigationsLockedReason } from '@inspecto/link-analysis
     template: `
         @if (investigations()) {
             <p class="text-secondary m-0 text-xs" data-testid="result-next-hint">
-                Click a row to find it. Start an Investigation from the top {{ count() }} results to record your
-                steps.
+                Click a row to find it. Start an Investigation from the top {{ count() }} results to record your steps.
             </p>
             <button mat-stroked-button type="button" class="mt-1" (click)="start.emit()">
                 <mat-icon svgIcon="heroicons_outline:magnifying-glass-circle"></mat-icon>
                 Start an Investigation from the top results
             </button>
         } @else {
-            <p class="text-secondary m-0 text-xs" data-testid="result-next-hint">
-                Click a row to find it.
-            </p>
+            <p class="text-secondary m-0 text-xs" data-testid="result-next-hint">Click a row to find it.</p>
             <inspecto-locked-action
                 class="mt-1"
                 label="Start an Investigation from the top results"

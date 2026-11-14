@@ -71,9 +71,15 @@ function saveBlob(blob: Blob, name: string): void {
                     label="At step"
                     [formControl]="atControl"
                     type="number"
-                    [error]="atControl.hasError('range') ? (atError()) : ''"
+                    [error]="atControl.hasError('range') ? atError() : ''"
                 />
-                <p class="text-secondary m-0 text-sm">{{ steps() == null ? 'Leave blank for the latest step.' : 'Leave blank for the latest step (0–' + steps() + ').' }}</p>
+                <p class="text-secondary m-0 text-sm">
+                    {{
+                        steps() == null
+                            ? 'Leave blank for the latest step.'
+                            : 'Leave blank for the latest step (0–' + steps() + ').'
+                    }}
+                </p>
                 <div class="flex flex-col gap-1">
                     <button mat-button [disabled]="busy()" (click)="loadSnapshots()">
                         {{ snapshotList() ? 'Reload snapshots' : 'Include snapshots…' }}
@@ -229,7 +235,9 @@ function saveBlob(blob: Blob, name: string): void {
                 }
             </div>
             <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Export bundle">
-                <button mat-stroked-button [disabled]="busy()" (click)="downloadBundle()">Download Dossier (sealed)</button>
+                <button mat-stroked-button [disabled]="busy()" (click)="downloadBundle()">
+                    Download Dossier (sealed)
+                </button>
                 <button mat-button [disabled]="busy()" (click)="bundleFile.click()">Verify a bundle…</button>
                 <input
                     #bundleFile

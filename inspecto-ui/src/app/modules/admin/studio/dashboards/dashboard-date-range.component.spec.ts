@@ -9,7 +9,10 @@ import { DashboardDateRangeComponent } from './dashboard-date-range.component';
 import { DateRangeSelection } from './dashboard-date-range';
 
 function create(selection: DateRangeSelection | null) {
-    TestBed.configureTestingModule({ imports: [DashboardDateRangeComponent], providers: [provideNoopAnimations(), provideLuxonDateAdapter()] });
+    TestBed.configureTestingModule({
+        imports: [DashboardDateRangeComponent],
+        providers: [provideNoopAnimations(), provideLuxonDateAdapter()],
+    });
     const f = TestBed.createComponent(DashboardDateRangeComponent);
     f.componentRef.setInput('selection', selection);
     f.componentRef.setInput('anchor', '2026-09-24');

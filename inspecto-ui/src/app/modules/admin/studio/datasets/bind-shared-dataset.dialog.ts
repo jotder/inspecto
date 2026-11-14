@@ -34,13 +34,7 @@ const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
  */
 @Component({
     standalone: true,
-    imports: [
-        InspectoOptionPickerComponent,
-        PenFieldComponent,
-        ReactiveFormsModule,
-        MatButtonModule,
-        MatDialogModule,
-    ],
+    imports: [InspectoOptionPickerComponent, PenFieldComponent, ReactiveFormsModule, MatButtonModule, MatDialogModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Bind shared dataset</h2>

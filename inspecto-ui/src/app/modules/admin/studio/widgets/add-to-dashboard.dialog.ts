@@ -34,13 +34,7 @@ const NEW_DASHBOARD = '__new__';
 @Component({
     selector: 'app-add-to-dashboard-dialog',
     standalone: true,
-    imports: [
-        InspectoOptionPickerComponent,
-        PenFieldComponent,
-        ReactiveFormsModule,
-        MatDialogModule,
-        MatButtonModule,
-    ],
+    imports: [InspectoOptionPickerComponent, PenFieldComponent, ReactiveFormsModule, MatDialogModule, MatButtonModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Add “{{ data.widgetId }}” to a dashboard</h2>

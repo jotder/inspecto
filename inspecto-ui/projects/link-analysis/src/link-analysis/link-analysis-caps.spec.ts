@@ -27,7 +27,9 @@ describe('LinkAnalysisCapsComponent', () => {
         toggle();
         const text = el.querySelector('[data-testid=caps-list]')!.textContent!;
         expect(el.querySelector('[data-testid=caps-toggle]')!.getAttribute('aria-label')).toBe('Limits'); // an icon button
-        expect(el.querySelector('[data-testid=caps-toggle] mat-icon')!.getAttribute('svgIcon')).toBe('heroicons_outline:scale');
+        expect(el.querySelector('[data-testid=caps-toggle] mat-icon')!.getAttribute('svgIcon')).toBe(
+            'heroicons_outline:scale',
+        );
         expect(el.querySelector('[data-testid=caps-toggle]')!.getAttribute('aria-expanded')).toBe('true');
         expect(text).toContain('Graph drawn: up to 1,000 nodes');
         expect(text).toContain('On screen tools: up to 2,500 nodes');
@@ -37,7 +39,9 @@ describe('LinkAnalysisCapsComponent', () => {
     it('adds the graph-run ceiling once the server has stated it', () => {
         const { el, toggle } = make(5000);
         toggle();
-        expect(el.querySelector('[data-testid=caps-list]')!.textContent).toContain('Whole Dataset tools: up to 5,000 nodes');
+        expect(el.querySelector('[data-testid=caps-list]')!.textContent).toContain(
+            'Whole Dataset tools: up to 5,000 nodes',
+        );
     });
 
     it('opens as an opaque card under its icon, anchored to the right edge (the Graph counts card’s bottom right)', () => {

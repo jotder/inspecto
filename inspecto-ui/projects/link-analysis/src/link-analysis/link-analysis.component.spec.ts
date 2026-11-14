@@ -32,7 +32,15 @@ import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.serv
 import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
-import { CANVAS_MIN_PX, CANVAS_TOOLS_FOLD_PX, LinkAnalysisComponent, defaultLayoutFor, mergeWorkingSets, nodeDisplayId, snapshotTitle } from './link-analysis.component';
+import {
+    CANVAS_MIN_PX,
+    CANVAS_TOOLS_FOLD_PX,
+    LinkAnalysisComponent,
+    defaultLayoutFor,
+    mergeWorkingSets,
+    nodeDisplayId,
+    snapshotTitle,
+} from './link-analysis.component';
 import { ConditionalReadCache } from '@inspecto/link-analysis/api/conditional-read-cache';
 import { GRAPH_CACHE_TTL_MS, PUSH_FILTER_DEBOUNCE_MS } from './graph-query-cache';
 import { LensService, SpacesService } from '@inspecto/core/api';
@@ -192,7 +200,12 @@ function create(
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
             {
                 provide: ToastrService,
-                useValue: { success: () => undefined, error: () => undefined, info: () => undefined, warning: () => undefined },
+                useValue: {
+                    success: () => undefined,
+                    error: () => undefined,
+                    info: () => undefined,
+                    warning: () => undefined,
+                },
             },
             {
                 provide: ActivatedRoute,
@@ -278,11 +291,24 @@ function fakeUnsaved(admit: (id: string) => string[] = (id) => [`${id}.n`]) {
                         links.push({ source: id, target: n, kind: 'link', count: 1, admittedBy: i + 1 });
                     }
             }
-            steps.push({ step: i + 1, op: st.op, needsApproval: false, admitted: [...entities.keys()].filter((x) => !before.has(x)) });
+            steps.push({
+                step: i + 1,
+                op: st.op,
+                needsApproval: false,
+                admitted: [...entities.keys()].filter((x) => !before.has(x)),
+            });
         });
         return of({
             workingSet: {
-                entities: [...entities].map(([id, hop]) => ({ id, type: null, hop, seed: id, admittedBy: 1, hidden: false, kept: false })),
+                entities: [...entities].map(([id, hop]) => ({
+                    id,
+                    type: null,
+                    hop,
+                    seed: id,
+                    admittedBy: 1,
+                    hidden: false,
+                    kept: false,
+                })),
                 links,
                 excluded: [...excluded].map(([id, reason]) => ({ id, step: 1, reason })),
                 hash: 'h',
@@ -437,8 +463,18 @@ describe('LinkAnalysisComponent', () => {
         const mixed: G6GraphData = {
             nodes: GRAPH.nodes,
             edges: [
-                { id: 'a->b', source: 'a', target: 'b', data: { kind: 'link', attrs: { when: '2026-01-01T00:00:00Z', channel: 'wire' } } },
-                { id: 'b->c', source: 'b', target: 'c', data: { kind: 'link', attrs: { when: '2026-06-01T00:00:00Z', channel: 'cash' } } },
+                {
+                    id: 'a->b',
+                    source: 'a',
+                    target: 'b',
+                    data: { kind: 'link', attrs: { when: '2026-01-01T00:00:00Z', channel: 'wire' } },
+                },
+                {
+                    id: 'b->c',
+                    source: 'b',
+                    target: 'c',
+                    data: { kind: 'link', attrs: { when: '2026-06-01T00:00:00Z', channel: 'cash' } },
+                },
             ],
         };
         const { fixture } = create({ graph: mixed });
@@ -616,7 +652,9 @@ describe('LinkAnalysisComponent', () => {
         expect(document.querySelector('[data-testid="la-file-delete-locked"]')?.textContent?.trim()).toBe(
             'Open an Investigation or saved view first.',
         );
-        expect(document.querySelector('[data-testid="la-save-view"]')?.getAttribute('aria-label')).toBe('Save view: Draw a graph first.');
+        expect(document.querySelector('[data-testid="la-save-view"]')?.getAttribute('aria-label')).toBe(
+            'Save view: Draw a graph first.',
+        );
 
         await runQuery(fixture);
         fixture.detectChanges();
@@ -657,7 +695,10 @@ describe('LinkAnalysisComponent', () => {
         expect(c.investigation.activeId()).toBeNull();
         expect(c.investigation.activeDraftId()).toBeNull();
         expect(c.openWorkLabel()).toBe('');
-        expect(navigate).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { investigation: null } }));
+        expect(navigate).toHaveBeenLastCalledWith(
+            [],
+            expect.objectContaining({ queryParams: { investigation: null } }),
+        );
     });
 
     it('Close: an imported view that was never saved is asked about first; Cancel keeps it', async () => {
@@ -864,7 +905,7 @@ describe('LinkAnalysisComponent', () => {
         expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { view: null } }));
     });
 
-    it('back on the kept-alive page without ?view=, the open view\'s id is put back in the address', async () => {
+    it("back on the kept-alive page without ?view=, the open view's id is put back in the address", async () => {
         const { fixture } = create({});
         fixture.componentInstance.openViewId.set('ring');
         const navigate = await consume(fixture);
@@ -874,7 +915,7 @@ describe('LinkAnalysisComponent', () => {
         );
     });
 
-    it('an incoming ?investigation= link does not get the open view\'s ?view= put back beside it', async () => {
+    it("an incoming ?investigation= link does not get the open view's ?view= put back beside it", async () => {
         const { fixture } = create({ queryParams: { investigation: 'inv-1' } });
         const c = fixture.componentInstance;
         vi.spyOn(c.investigation, 'adopt').mockResolvedValue(true);
@@ -1169,10 +1210,25 @@ describe('LinkAnalysisComponent', () => {
         (el.querySelector('[aria-label="Display options"][aria-haspopup]') as HTMLButtonElement).click();
         fixture.detectChanges();
         const menu = document.querySelector('.mat-mdc-menu-panel [aria-label="Display options"]') as HTMLElement;
-        const boxes = Array.from(menu.querySelectorAll('mat-checkbox')).map((b) => b.textContent!.trim().split(/\s+\(/)[0].trim());
-        for (const label of ['Legend', 'Graph counts', 'Node labels', 'Link labels', 'All link labels', 'Level of detail',
-            'Minimap', 'Grid', 'Community outlines', 'Group single-link neighbours', 'Community shading', 'Link bundling',
-            'Align while dragging', 'Highlight on hover']) {
+        const boxes = Array.from(menu.querySelectorAll('mat-checkbox')).map((b) =>
+            b.textContent!.trim().split(/\s+\(/)[0].trim(),
+        );
+        for (const label of [
+            'Legend',
+            'Graph counts',
+            'Node labels',
+            'Link labels',
+            'All link labels',
+            'Level of detail',
+            'Minimap',
+            'Grid',
+            'Community outlines',
+            'Group single-link neighbours',
+            'Community shading',
+            'Link bundling',
+            'Align while dragging',
+            'Highlight on hover',
+        ]) {
             expect(boxes.filter((b) => b === label)).toHaveLength(1);
         }
         fixture.destroy();
@@ -1207,10 +1263,13 @@ describe('LinkAnalysisComponent', () => {
         fixture.detectChanges();
         (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-testid="la-file"]')!.click();
         fixture.detectChanges();
-        const btn = (): HTMLButtonElement => document.querySelector<HTMLButtonElement>('[data-testid="la-save-snapshot"]')!;
+        const btn = (): HTMLButtonElement =>
+            document.querySelector<HTMLButtonElement>('[data-testid="la-save-snapshot"]')!;
         expect(btn().disabled).toBe(true);
         expect(btn().getAttribute('aria-label')).toBe('Save snapshot: Draw a graph first.');
-        expect(document.querySelector('[data-testid="la-snapshot-locked"]')?.textContent?.trim()).toBe('Draw a graph first.');
+        expect(document.querySelector('[data-testid="la-snapshot-locked"]')?.textContent?.trim()).toBe(
+            'Draw a graph first.',
+        );
         await runQuery(fixture);
         fixture.detectChanges();
         expect(btn().disabled).toBe(false);
@@ -1234,7 +1293,10 @@ describe('LinkAnalysisComponent', () => {
             names.set(icon, (names.get(icon) ?? new Set()).add(name));
         }
         for (const icon of ['hand-raised', 'queue-list', 'table-cells', 'pencil'])
-            expect(names.get(icon)?.size ?? 0, `${icon}: ${[...(names.get(icon) ?? [])].join(' | ')}`).toBeLessThanOrEqual(1);
+            expect(
+                names.get(icon)?.size ?? 0,
+                `${icon}: ${[...(names.get(icon) ?? [])].join(' | ')}`,
+            ).toBeLessThanOrEqual(1);
         expect([...(names.get('pause-circle') ?? [])]).toEqual(['Held']);
         expect(names.get('table-cells')).toEqual(new Set(['Show the table']));
         expect([...(names.get('scale') ?? [])]).toEqual(['Limits']);
@@ -1246,7 +1308,9 @@ describe('LinkAnalysisComponent', () => {
         fixture.detectChanges();
         await runQuery(fixture);
         fixture.detectChanges();
-        (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-testid="la-search-nodes"]')!.click();
+        (fixture.nativeElement as HTMLElement)
+            .querySelector<HTMLButtonElement>('[data-testid="la-search-nodes"]')!
+            .click();
         fixture.detectChanges();
         await fixture.whenStable();
         const box = document.querySelector<HTMLInputElement>('.cdk-overlay-container input[aria-label="Search nodes"]');
@@ -1879,7 +1943,9 @@ describe('LinkAnalysisComponent', () => {
 
         fixture.detectChanges();
         const pressed = Array.from(
-            (fixture.nativeElement as HTMLElement).querySelectorAll('[data-testid="la-group-mode"] [aria-pressed="true"]'),
+            (fixture.nativeElement as HTMLElement).querySelectorAll(
+                '[data-testid="la-group-mode"] [aria-pressed="true"]',
+            ),
         );
         expect(pressed.map((b) => b.getAttribute('data-mode'))).toEqual(['lasso']); // one highlighted
     });
@@ -1942,7 +2008,8 @@ describe('LinkAnalysisComponent', () => {
         c.clearSelection();
         fixture.detectChanges();
         const more = fixture.debugElement.query(By.css('[data-testid="la-canvas-tools-more"]'));
-        const item = (id: string) => document.querySelector(`[data-testid="la-more-cleanup-${id}"]`) as HTMLButtonElement;
+        const item = (id: string) =>
+            document.querySelector(`[data-testid="la-more-cleanup-${id}"]`) as HTMLButtonElement;
         more.injector.get(MatMenuTrigger).openMenu();
         fixture.detectChanges();
         expect(item('keep').disabled).toBe(true);
@@ -2006,11 +2073,17 @@ describe('LinkAnalysisComponent', () => {
         c.onSelectionChange([]);
         c.fitCanvasToolsToWidth(1150);
         fixture.detectChanges();
-        (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-testid="la-canvas-tools-more"]')!.click();
+        (fixture.nativeElement as HTMLElement)
+            .querySelector<HTMLButtonElement>('[data-testid="la-canvas-tools-more"]')!
+            .click();
         fixture.detectChanges();
         const panel = document.querySelector('.mat-mdc-menu-panel') as HTMLElement;
-        expect(panel.querySelector('[data-testid="la-more-select-first"]')?.textContent?.trim()).toBe('Select entities first.');
-        const disabled = Array.from(panel.querySelectorAll<HTMLButtonElement>('button[mat-menu-item]')).filter((b) => b.disabled);
+        expect(panel.querySelector('[data-testid="la-more-select-first"]')?.textContent?.trim()).toBe(
+            'Select entities first.',
+        );
+        const disabled = Array.from(panel.querySelectorAll<HTMLButtonElement>('button[mat-menu-item]')).filter(
+            (b) => b.disabled,
+        );
         expect(disabled.length).toBeGreaterThan(0);
         for (const b of disabled) expect(b.getAttribute('aria-label') ?? '', b.textContent ?? '').toMatch(/: \S/);
         expect(panel.querySelector('[data-testid="la-more-collapse"]')?.getAttribute('aria-label')).toBe(
@@ -2039,7 +2112,8 @@ describe('LinkAnalysisComponent', () => {
         const item = (id: string) => document.querySelector(`[data-testid="${id}"]`) as HTMLButtonElement | null;
         expect(item('la-more-collapse')).not.toBeNull();
         expect(item('la-more-collapsed')?.textContent).toContain('1 collapsed');
-        for (const t of ['paths', 'shortest', 'trim', 'keep', 'remove']) expect(item(`la-more-cleanup-${t}`), t).not.toBeNull();
+        for (const t of ['paths', 'shortest', 'trim', 'keep', 'remove'])
+            expect(item(`la-more-cleanup-${t}`), t).not.toBeNull();
 
         item('la-more-cleanup-trim')!.click();
         fixture.detectChanges();
@@ -2193,7 +2267,8 @@ describe('LinkAnalysisComponent', () => {
         const el = fixture.nativeElement as HTMLElement;
         // operator 2026-10-29: no strip under the canvas; the Graph counts card states the on-screen counts
         expect(el.querySelector('[data-testid="la-status"]')).toBeNull();
-        const text = (id: string) => el.querySelector(`[data-testid="${id}"]`)?.textContent?.replace(/\s+/g, ' ').trim() ?? null;
+        const text = (id: string) =>
+            el.querySelector(`[data-testid="${id}"]`)?.textContent?.replace(/\s+/g, ' ').trim() ?? null;
         c.setOverlayOpen('workingSet', true);
         fixture.detectChanges();
         expect(text('working-set-on-screen')).toBe('5 nodes · 3 links on screen');
@@ -2202,7 +2277,10 @@ describe('LinkAnalysisComponent', () => {
         fixture.detectChanges();
         expect(text('working-set-pill-on-screen')).toBe('· 5 nodes · 3 links on screen');
         c.investigation.activeId.set('inv-9');
-        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.investigation.log.set({
+            header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
+            entries: [],
+        } as never);
         c.investigation.workingSet.set({
             entities: [{ id: 'ws-a' }, { id: 'ws-b' }],
             links: [{ source: 'ws-a', target: 'ws-b', kind: 'k', count: 1 }],
@@ -2223,7 +2301,10 @@ describe('LinkAnalysisComponent', () => {
         await runQuery(fixture);
         const c = fixture.componentInstance;
         c.investigation.activeId.set('inv-9');
-        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.investigation.log.set({
+            header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
+            entries: [],
+        } as never);
         c.investigation.workingSet.set({
             entities: [
                 { id: 'ws-a', hop: 0, hidden: false, kept: false },
@@ -2300,7 +2381,10 @@ describe('LinkAnalysisComponent', () => {
         c.growExclude.filterRequest.set({ direction: 'out', degrees: 2, linkKinds: null, hold: true, threshold: 500 });
         c.nodeMenuTargets.set([nodeA.id]);
         await c.expandMenuTargets();
-        expect(onExpand.mock.calls[0][0]).toMatchObject({ req: { direction: 'out', degrees: 2 }, ctx: { frontier: ['ws-a'] } });
+        expect(onExpand.mock.calls[0][0]).toMatchObject({
+            req: { direction: 'out', degrees: 2 },
+            ctx: { frontier: ['ws-a'] },
+        });
         await c.expandMenuTargets({ direction: 'in' });
         expect(onExpand.mock.calls[1][0].req).toMatchObject({ direction: 'in', degrees: 2 });
         expect(c.growExclude.filterRequest()?.direction).toBe('out');
@@ -2431,9 +2515,11 @@ describe('LinkAnalysisComponent', () => {
         const c = fixture.componentInstance;
         const el = fixture.nativeElement as HTMLElement;
         const attach = () =>
-            Array.from(el.querySelectorAll('[data-testid="la-tool-rail"] button, [data-testid="la-canvas-toolbar"] button')).find((b) =>
-                (b.getAttribute('aria-label') ?? '').startsWith('Attach to Case'),
-            ) as HTMLButtonElement | undefined;
+            Array.from(
+                el.querySelectorAll('[data-testid="la-tool-rail"] button, [data-testid="la-canvas-toolbar"] button'),
+            ).find((b) => (b.getAttribute('aria-label') ?? '').startsWith('Attach to Case')) as
+                | HTMLButtonElement
+                | undefined;
         expect(c.graph()).toBeNull();
         expect(attach()).toBeUndefined(); // nothing to seal yet
 
@@ -2520,7 +2606,10 @@ describe('LinkAnalysisComponent', () => {
         await runQuery(fixture);
         const c = fixture.componentInstance;
         await c.expandNode('c', 'C', ['C']);
-        const alert = () => (fixture.nativeElement as HTMLElement).textContent?.includes('Some links are not shown: the server stopped reading at its row limit.');
+        const alert = () =>
+            (fixture.nativeElement as HTMLElement).textContent?.includes(
+                'Some links are not shown: the server stopped reading at its row limit.',
+            );
         fixture.detectChanges();
         expect(alert()).toBe(true);
 
@@ -2895,7 +2984,9 @@ describe('LinkAnalysisComponent', () => {
             const { el } = await ready();
             const header = el.querySelector('[data-testid="la-header"]') as HTMLElement;
             const end = header.querySelector('[data-testid="la-fullscreen"]')!.parentElement!;
-            const toolbox = (header.querySelector('[data-testid="la-toolbox-toggle"]') as HTMLElement).getAttribute('aria-label');
+            const toolbox = (header.querySelector('[data-testid="la-toolbox-toggle"]') as HTMLElement).getAttribute(
+                'aria-label',
+            );
             expect(Array.from(end.querySelectorAll('button')).map((b) => b.getAttribute('aria-label'))).toEqual([
                 'Full screen',
                 'About Link Analysis',
@@ -2904,7 +2995,11 @@ describe('LinkAnalysisComponent', () => {
             ]);
             expect(['Hide the toolbox', 'Show the toolbox']).toContain(toolbox);
             expect(header.querySelectorAll('inspecto-la-host-slot').length).toBe(1); // one About only
-            for (const gone of ['Open the graph-algorithms toolbox', 'Open the Investigation', 'Hide the side panels']) {
+            for (const gone of [
+                'Open the graph-algorithms toolbox',
+                'Open the Investigation',
+                'Hide the side panels',
+            ]) {
                 expect(header.querySelector(`button[aria-label="${gone}"]`), gone).toBeNull();
             }
             expect(header.querySelector('[data-testid="la-title"]')!.classList).toContain('text-lg');
@@ -2946,7 +3041,10 @@ describe('LinkAnalysisComponent', () => {
             await runQuery(fixture);
             const c = fixture.componentInstance;
             c.investigation.activeId.set('inv-9');
-            c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+            c.investigation.log.set({
+                header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
+                entries: [],
+            } as never);
             c.investigation.workingSet.set({
                 entities: [{ id: 'w1' }, { id: 'w2' }],
                 links: [{ source: 'w1', target: 'w2', kind: 'k', count: 1 }],
@@ -3042,9 +3140,9 @@ describe('LinkAnalysisComponent - the Explorer level: only the On screen tab (op
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         const c = fixture.componentInstance;
-        const tabs = Array.from(el.querySelectorAll<HTMLElement>('[role="tablist"][aria-label="Toolbox tab"] [role="tab"]')).map((t) =>
-            t.textContent?.trim(),
-        );
+        const tabs = Array.from(
+            el.querySelectorAll<HTMLElement>('[role="tablist"][aria-label="Toolbox tab"] [role="tab"]'),
+        ).map((t) => t.textContent?.trim());
         expect(tabs).toEqual(['On screen']);
         c.openInvestigation();
         fixture.detectChanges();
@@ -3382,7 +3480,13 @@ describe('LinkAnalysisComponent - third live run (Investigation canvas)', () => 
             r.c.setLayout('force-cluster');
             expect(r.c.pickedLayout()).toBeNull();
             expect(r.c.layoutId()).toBe('force');
-            await r.c.loadView({ id: 'v', name: 'V', sourceId: 'entity-projection', query: {}, layout: 'force-cluster' });
+            await r.c.loadView({
+                id: 'v',
+                name: 'V',
+                sourceId: 'entity-projection',
+                query: {},
+                layout: 'force-cluster',
+            });
             TestBed.tick();
             expect(r.c.pickedLayout()).toBeNull();
             expect(r.c.layoutId()).toBe('force');
@@ -3592,7 +3696,6 @@ describe('LinkAnalysisComponent - focus after the first draw (LA-A11Y-AUDIT-1 a,
     };
     const region = (el: HTMLElement) => el.querySelector('[data-testid="la-graph-region"]') as HTMLElement | null;
 
-
     /** A real focus target needs the fixture in the document; jsdom ignores focus() on a detached node. */
     function mount() {
         const made = create({ views: [MONEY] });
@@ -3714,7 +3817,9 @@ describe('LinkAnalysisComponent - one header row: File, the title, both toolbars
         expect(toggle.getAttribute('aria-label')).toBe('Limits');
         toggle.click();
         fixture.detectChanges();
-        expect(caps[0].querySelector('[data-testid="caps-list"]')!.textContent).toContain(`Graph drawn: up to ${c.caps.projection.toLocaleString('en')} nodes`);
+        expect(caps[0].querySelector('[data-testid="caps-list"]')!.textContent).toContain(
+            `Graph drawn: up to ${c.caps.projection.toLocaleString('en')} nodes`,
+        );
         // the render strip says neither
         const strip = el.querySelector('[aria-label="Render status"]') as HTMLElement;
         expect(strip.textContent).not.toContain('links drawn');
@@ -3764,7 +3869,7 @@ describe('LinkAnalysisComponent - display: node size, spacing and the automatic 
         );
     });
 
-    it('the legend is given the colours the canvas paints for LINK types too, not only the analyst\'s own choices', async () => {
+    it("the legend is given the colours the canvas paints for LINK types too, not only the analyst's own choices", async () => {
         const made = create({ graph: KINDS });
         made.fixture.detectChanges();
         await runQuery(made.fixture);
@@ -3778,7 +3883,7 @@ describe('LinkAnalysisComponent - display: node size, spacing and the automatic 
         expect(Object.keys(legend.edgeColors())).toEqual(['uses']);
     });
 
-    it('builds the automatic look from the graph the canvas DRAWS: an open Investigation\'s Working Set, not the query graph', () => {
+    it("builds the automatic look from the graph the canvas DRAWS: an open Investigation's Working Set, not the query graph", () => {
         const { fixture } = create({ graph: KINDS });
         const c = fixture.componentInstance;
         const workingSet = {
@@ -3851,7 +3956,7 @@ describe('LinkAnalysisComponent - display: node size, spacing and the automatic 
         expect(c.displayCustomized()).toBe(false);
     });
 
-    it('size and spacing are the analyst\'s alone: set from the Display menu, saved with the view, undoable', async () => {
+    it("size and spacing are the analyst's alone: set from the Display menu, saved with the view, undoable", async () => {
         const c = await drawn();
         c.setNodeSize(28);
         c.setLayoutSpacing(2);
@@ -3867,8 +3972,21 @@ describe('LinkAnalysisComponent - display: node size, spacing and the automatic 
     it('opening a view restores its size and spacing, and a view that never set them gets the defaults', async () => {
         const c = await drawn();
         await c.loadView({
-            id: 'v', name: 'V', sourceId: 'entity-projection', query: {},
-            display: { nodeLabels: false, edgeLabels: false, nodeColors: {}, edgeColors: {}, nodeShapes: {}, edgePatterns: {}, edgeSizes: {}, nodeSize: 40, layoutSpacing: 1 },
+            id: 'v',
+            name: 'V',
+            sourceId: 'entity-projection',
+            query: {},
+            display: {
+                nodeLabels: false,
+                edgeLabels: false,
+                nodeColors: {},
+                edgeColors: {},
+                nodeShapes: {},
+                edgePatterns: {},
+                edgeSizes: {},
+                nodeSize: 40,
+                layoutSpacing: 1,
+            },
         });
         expect(c.nodeSize()).toBe(40);
         expect(c.layoutSpacing()).toBe(1);
@@ -3887,7 +4005,7 @@ describe('LinkAnalysisComponent - display: node size, spacing and the automatic 
         expect(c.legendItems().find((i) => i.kind === 'device')?.color).toBe(d.nodeColors['device']);
     });
 
-    it('lets the analyst\'s own choice win over the automatic look, and never saves the automatic one', async () => {
+    it("lets the analyst's own choice win over the automatic look, and never saves the automatic one", async () => {
         const c = await drawn();
         const auto = c.displayOptions().nodeColors['device'];
         c.setNodeColor('device', c.swatches.find((s) => s !== auto)!);
@@ -3966,7 +4084,10 @@ describe('LinkAnalysisComponent - canvas pointer model (operator 2026-10-15)', (
         // the toolbar is always there, so a selection never changes the layout or re-fits the canvas
         expect(el.querySelector('[data-testid="la-selection-bar"]')).toBeNull();
         c.investigation.activeId.set('inv-1');
-        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.investigation.log.set({
+            header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
+            entries: [],
+        } as never);
         fixture.detectChanges();
         if (c.investigation.canvas())
             expect(el.querySelector('[data-testid="la-group-edits"] [aria-label^="Exclude"]')).not.toBeNull();
@@ -4057,7 +4178,9 @@ describe('LinkAnalysisComponent - the bottom dock (LA-STUDIO-UI-REORG-1 §5.9)',
         c.openDock('steps');
         fixture.detectChanges();
         expect(tabs(el)).toEqual(['Rows', 'Steps', 'Results']);
-        const steps = Array.from(el.querySelectorAll('[data-testid="dock-steps"] li')).map((li) => li.textContent!.trim());
+        const steps = Array.from(el.querySelectorAll('[data-testid="dock-steps"] li')).map((li) =>
+            li.textContent!.trim(),
+        );
         expect(steps).toEqual(['Start from 2 entities']);
     });
 
@@ -4068,7 +4191,10 @@ describe('LinkAnalysisComponent - the bottom dock (LA-STUDIO-UI-REORG-1 §5.9)',
         const c = fixture.componentInstance;
         const el = fixture.nativeElement as HTMLElement;
         c.investigation.activeId.set('inv-1');
-        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.investigation.log.set({
+            header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
+            entries: [],
+        } as never);
         c.openDock('oplog');
         fixture.detectChanges();
         const list = el.querySelector('[data-testid="la-dock-tabs"]') as HTMLElement;
@@ -4105,7 +4231,10 @@ describe('LinkAnalysisComponent - the bottom dock (LA-STUDIO-UI-REORG-1 §5.9)',
         expect(el.querySelector('#bottom-panel-body')).toBeNull(); // collapsed to its tab strip
 
         c.investigation.activeId.set('inv-1');
-        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.investigation.log.set({
+            header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
+            entries: [],
+        } as never);
         c.openDock('oplog');
         fixture.detectChanges();
         expect(tabs(el)).toEqual([
@@ -4138,7 +4267,10 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         await runQuery(made.fixture);
         const c = made.fixture.componentInstance;
         c.investigation.activeId.set('inv-1');
-        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.investigation.log.set({
+            header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
+            entries: [],
+        } as never);
         c.investigation.workingSet.set({
             entities: ids.map((id) => ({ id })),
             links: [],
@@ -4257,7 +4389,9 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         c.mergeNodes([a, b]);
         expect(warn).toHaveBeenCalledWith(expect.stringContaining('masked entity cannot be merged'));
         c.mergeNodes([a, 'not-on-the-canvas']);
-        expect(warn).toHaveBeenLastCalledWith('Only entities in the open Investigation can be merged. Expand to them first.');
+        expect(warn).toHaveBeenLastCalledWith(
+            'Only entities in the open Investigation can be merged. Expand to them first.',
+        );
         expect(c.investigation.mergeDraft()).toBeNull();
         expect(c.settingsOpen()).toBe(false);
         fixture.destroy();
@@ -4278,7 +4412,10 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         await runQuery(made.fixture);
         const c = made.fixture.componentInstance;
         c.investigation.activeId.set('inv-1');
-        c.investigation.log.set({ header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.investigation.log.set({
+            header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
+            entries: [],
+        } as never);
         c.investigation.workingSet.set({
             entities: [
                 { id: '99979100001', type: 'msisdn' },
@@ -4291,7 +4428,12 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         made.fixture.detectChanges();
         c.onSelectionChange((c.canvasData()?.nodes ?? []).map((n) => n.id));
         made.fixture.detectChanges();
-        expect(c.canvasData()?.nodes.map((n) => n.data.kind).sort()).toEqual(['account', 'msisdn']);
+        expect(
+            c
+                .canvasData()
+                ?.nodes.map((n) => n.data.kind)
+                .sort(),
+        ).toEqual(['account', 'msisdn']);
         expect(c.mergeUnavailable()).toBe('');
         c.mergeSelected();
         made.fixture.detectChanges();
@@ -4400,7 +4542,11 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
             }),
         );
         const expand = vi.fn(async () => ({ nodes: [], edges: [] }));
-        const { fixture, c, el } = await drawn({ expand, inv: { ...OLD_SERVER, previewNeighbors }, features: BASIC_EDITION_FEATURES });
+        const { fixture, c, el } = await drawn({
+            expand,
+            inv: { ...OLD_SERVER, previewNeighbors },
+            features: BASIC_EDITION_FEATURES,
+        });
         c.onSelectionChange(['a', 'b']);
         press(el, { key: 'g' });
         await settle(fixture);
@@ -4445,13 +4591,29 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
 
     it('one Expand of one node is ONE preview and ONE neighbours read: the closed panel re-reads nothing after the graph grows', async () => {
         const previewNeighbors = vi.fn(() =>
-            of({ addsNodes: 1, addsLinks: 1, held: [], heldCount: 0, excludedByLists: [], truncated: false, readPath: 'flat', linksWithinGraph: 0 }),
+            of({
+                addsNodes: 1,
+                addsLinks: 1,
+                held: [],
+                heldCount: 0,
+                excludedByLists: [],
+                truncated: false,
+                readPath: 'flat',
+                linksWithinGraph: 0,
+            }),
         );
         const expand = vi.fn(async (id: string) => ({
-            nodes: [{ id, data: { label: id, kind: 'entity' } }, { id: 'n1', data: { label: 'n1', kind: 'entity' } }],
+            nodes: [
+                { id, data: { label: id, kind: 'entity' } },
+                { id: 'n1', data: { label: 'n1', kind: 'entity' } },
+            ],
             edges: [{ id: id + '->n1', source: id, target: 'n1', data: { kind: 'link' } }],
         }));
-        const { fixture, c, el } = await drawn({ expand, inv: { ...OLD_SERVER, previewNeighbors }, features: BASIC_EDITION_FEATURES });
+        const { fixture, c, el } = await drawn({
+            expand,
+            inv: { ...OLD_SERVER, previewNeighbors },
+            features: BASIC_EDITION_FEATURES,
+        });
         c.onSelectionChange(['a']);
         press(el, { key: 'g' });
         await settle(fixture);
@@ -4475,10 +4637,13 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         fixture.detectChanges();
         const note = () => el.querySelector('[data-testid="expand-source"]')?.textContent?.trim() ?? null;
         expect(note()).toBe(
-            "Last neighbour expand on Links: Answered from the Dataset because this Dataset has no link index yet.", // the Dataset by its name
+            'Last neighbour expand on Links: Answered from the Dataset because this Dataset has no link index yet.', // the Dataset by its name
         );
         c.investigation.activeId.set('inv-1');
-        c.investigation.log.set({ header: { dataset: 'other-ds', sourceCol: 'src', targetCol: 'dst' }, entries: [] } as never);
+        c.investigation.log.set({
+            header: { dataset: 'other-ds', sourceCol: 'src', targetCol: 'dst' },
+            entries: [],
+        } as never);
         c.investigation.workingSet.set({ entities: [{ id: 'ws-a' }], links: [], excluded: [], hash: 'h' } as never);
         fixture.detectChanges();
         expect(note()).toBeNull(); // the Working Set's own read line speaks for this canvas
@@ -4487,10 +4652,16 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
     it('Basic preview: a 403 (restricted list) shows the server reason in the Grow panel, and Grow still runs', async () => {
         const reason = "entity list 'politicians' is restricted: you may not preview an exclusion by it";
         const previewNeighbors = vi.fn(() =>
-            throwError(() => new HttpErrorResponse({ status: 403, error: { error: { code: 'FORBIDDEN', message: reason } } })),
+            throwError(
+                () => new HttpErrorResponse({ status: 403, error: { error: { code: 'FORBIDDEN', message: reason } } }),
+            ),
         );
         const expand = vi.fn(async () => ({ nodes: [], edges: [] }));
-        const { fixture, c, el } = await drawn({ expand, inv: { ...OLD_SERVER, previewNeighbors }, features: BASIC_EDITION_FEATURES });
+        const { fixture, c, el } = await drawn({
+            expand,
+            inv: { ...OLD_SERVER, previewNeighbors },
+            features: BASIC_EDITION_FEATURES,
+        });
         c.onSelectionChange(['a']);
         press(el, { key: 'g' });
         await settle(fixture);
@@ -4500,19 +4671,28 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         expect(shown.textContent).toContain('The preview was refused');
         expect(shown.textContent).toContain(reason);
         expect(el.querySelector('[data-testid="la-expand-no-preview"]')).toBeNull();
-        expect((el.querySelector('[data-testid="la-expand-go"]') as HTMLButtonElement).getAttribute('aria-disabled')).not.toBe('true');
+        expect(
+            (el.querySelector('[data-testid="la-expand-go"]') as HTMLButtonElement).getAttribute('aria-disabled'),
+        ).not.toBe('true');
         await expectNoA11yViolations(el.querySelector('[data-testid="la-expand-dialog"]') as HTMLElement);
     });
 
     it('Basic Expand 3 degrees: each degree grows from what the previous added; one Ctrl+Z restores the graph', async () => {
         const next: Record<string, string> = { c: 'x1', x1: 'x2', x2: 'x3', x3: 'x4' };
         const expand = vi.fn(async (id: string) => ({
-            nodes: [{ id, data: { label: id, kind: 'entity' } }, { id: next[id], data: { label: next[id], kind: 'entity' } }],
+            nodes: [
+                { id, data: { label: id, kind: 'entity' } },
+                { id: next[id], data: { label: next[id], kind: 'entity' } },
+            ],
             edges: [{ id: id + '->' + next[id], source: id, target: next[id], data: { kind: 'link' } }],
         }));
         const { fixture, c, el } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
         c.onSelectionChange(['c']);
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 3, linkKinds: null, hold: true, threshold: 500 }, from: null });
+        await c.onExpand({
+            ctx: c.growContext(),
+            req: { direction: 'out', degrees: 3, linkKinds: null, hold: true, threshold: 500 },
+            from: null,
+        });
         fixture.detectChanges();
         expect(expand.mock.calls.map((a) => a[0])).toEqual(['c', 'x1', 'x2']);
         expect(c.graph()!.nodes.map((n) => n.id)).toEqual(expect.arrayContaining(['x1', 'x2', 'x3']));
@@ -4520,13 +4700,21 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
             'Expanded 3 degrees: added 3 nodes and 3 links (not recorded).',
         );
         press(el, { key: 'z', ctrlKey: true });
-        expect(c.graph()!.nodes.map((n) => n.id).sort()).toEqual(['a', 'b', 'c', 'd', 'e']);
+        expect(
+            c
+                .graph()!
+                .nodes.map((n) => n.id)
+                .sort(),
+        ).toEqual(['a', 'b', 'c', 'd', 'e']);
     });
 
     it('Basic Expand holds a busy node found at degree 2: it joins the Held tray and is not grown at degree 3', async () => {
         const next: Record<string, string> = { c: 'x1', x1: 'x2', x2: 'x3' };
         const expand = vi.fn(async (id: string) => ({
-            nodes: [{ id, data: { label: id, kind: 'entity' } }, { id: next[id], data: { label: next[id], kind: 'entity' } }],
+            nodes: [
+                { id, data: { label: id, kind: 'entity' } },
+                { id: next[id], data: { label: next[id], kind: 'entity' } },
+            ],
             edges: [{ id: id + '->' + next[id], source: id, target: next[id], data: { kind: 'link' } }],
         }));
         const { c } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
@@ -4543,7 +4731,11 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
             })),
         } as never;
         c.onSelectionChange(['c']);
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 3, linkKinds: null, hold: true, threshold: 500 }, from: null });
+        await c.onExpand({
+            ctx: c.growContext(),
+            req: { direction: 'out', degrees: 3, linkKinds: null, hold: true, threshold: 500 },
+            from: null,
+        });
         expect(expand.mock.calls.map((a) => a[0])).toEqual(['c', 'x1']);
         expect(c.growExclude.basicHeld().get('x2')).toBe(900);
     });
@@ -4552,15 +4744,24 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         const expand = vi.fn(async (id: string) => {
             const kids = Array.from({ length: 30 }, (_, i) => `${id}-${i}`);
             return {
-                nodes: [{ id, data: { label: id, kind: 'entity' } }, ...kids.map((k) => ({ id: k, data: { label: k, kind: 'entity' } }))],
+                nodes: [
+                    { id, data: { label: id, kind: 'entity' } },
+                    ...kids.map((k) => ({ id: k, data: { label: k, kind: 'entity' } })),
+                ],
                 edges: kids.map((k) => ({ id: id + '->' + k, source: id, target: k, data: { kind: 'link' } })),
             };
         });
         const { c } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
         c.onSelectionChange(['c']);
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 3, linkKinds: null, hold: true, threshold: 500 }, from: null });
+        await c.onExpand({
+            ctx: c.growContext(),
+            req: { direction: 'either', degrees: 3, linkKinds: null, hold: true, threshold: 500 },
+            from: null,
+        });
         expect(expand).toHaveBeenCalledTimes(1);
-        expect(c.growExclude.lastChange()?.text).toContain('Stopped after degree 1: the next degree would grow from 30 nodes, above the frontier cap of 25.');
+        expect(c.growExclude.lastChange()?.text).toContain(
+            'Stopped after degree 1: the next degree would grow from 30 nodes, above the frontier cap of 25.',
+        );
     });
 
     it('Basic Grow: the explorer grows through neighbours in the chosen direction, says so, and Ctrl+Z undoes it', async () => {
@@ -4577,10 +4778,23 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         }));
         const { fixture, c, el } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
         c.onSelectionChange(['c']);
-        expect(c.growContext()).toMatchObject({ mode: 'basic', frontier: ['c'], from: 'the 1 node you selected', blocked: null });
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: null });
+        expect(c.growContext()).toMatchObject({
+            mode: 'basic',
+            frontier: ['c'],
+            from: 'the 1 node you selected',
+            blocked: null,
+        });
+        await c.onExpand({
+            ctx: c.growContext(),
+            req: { direction: 'out', degrees: 1, linkKinds: null, hold: true, threshold: 500 },
+            from: null,
+        });
         fixture.detectChanges();
-        const ids = () => c.graph()!.nodes.map((n) => n.id).sort();
+        const ids = () =>
+            c
+                .graph()!
+                .nodes.map((n) => n.id)
+                .sort();
         expect(ids()).toEqual(['a', 'b', 'c', 'd', 'e', 'f']); // the incoming g was not kept
         expect(el.querySelector('[data-testid="la-change-line"]')?.textContent).toContain(
             'Expanded one degree: added 1 node and 1 link (not recorded).',
@@ -4593,18 +4807,27 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
 
     it('Basic Grow Undo is withdrawn once the graph changed after it (a later expand is never thrown away)', async () => {
         const expand = vi.fn(async (id: string) => ({
-            nodes: [{ id, data: { label: id.toUpperCase(), kind: 'entity' } }, { id: id + '2', data: { label: 'X', kind: 'entity' } }],
+            nodes: [
+                { id, data: { label: id.toUpperCase(), kind: 'entity' } },
+                { id: id + '2', data: { label: 'X', kind: 'entity' } },
+            ],
             edges: [{ id: id + '->' + id + '2', source: id, target: id + '2', data: { kind: 'link' } }],
         }));
         const { fixture, c, el } = await drawn({ expand, features: BASIC_EDITION_FEATURES });
         c.onSelectionChange(['a']);
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: null });
+        await c.onExpand({
+            ctx: c.growContext(),
+            req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 },
+            from: null,
+        });
         expect(c.growExclude.undoable()).toBe(true);
         await c.expandNode('b', 'B'); // another change to the graph
         fixture.detectChanges();
         expect(c.growExclude.undoable()).toBe(false);
         expect(el.querySelector('[data-testid="la-change-undo"]')).toBeNull();
-        expect(el.querySelector('[data-testid="la-change-stale"]')?.textContent).toContain('Undo unavailable: a later change followed.');
+        expect(el.querySelector('[data-testid="la-change-stale"]')?.textContent).toContain(
+            'Undo unavailable: a later change followed.',
+        );
         press(el, { key: 'z', ctrlKey: true });
         expect(c.graph()!.nodes.map((n) => n.id)).toContain('b2'); // the later expand survives
     });
@@ -4667,11 +4890,19 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         await settle(fixture);
         // the drawn store nodes, in one batched lookup by their keys; the cells are not asked
         expect(lookup).toHaveBeenCalledTimes(1);
-        expect(lookup).toHaveBeenCalledWith(expect.objectContaining({ dataset: 'stores', keyCol: 'store_id' }), ['A', 'B', 'C'], null);
+        expect(lookup).toHaveBeenCalledWith(
+            expect.objectContaining({ dataset: 'stores', keyCol: 'store_id' }),
+            ['A', 'B', 'C'],
+            null,
+        );
         const details = c.displayOptions().referenceDetails!;
         expect(details).toEqual({ stores: { a: { region: 'North' }, b: {} } });
         const colour = (id: string) =>
-            nodeRuleColor(c.displayOptions().nodeRules, { label: id, kind: 'store' } as G6Node['data'], (ref) => details[ref]?.[id]);
+            nodeRuleColor(
+                c.displayOptions().nodeRules,
+                { label: id, kind: 'store' } as G6Node['data'],
+                (ref) => details[ref]?.[id],
+            );
         expect(colour('a')).toBe('swatch-111111');
         expect(colour('b')).toBeUndefined(); // its region is masked: never coloured by the alias, which contains "r"
         expect(colour('c')).toBeUndefined(); // no row in the Reference
@@ -4706,7 +4937,11 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
             ],
             extra: { origin: 'import', identifyingColumn: 'store_id' },
         };
-        const { fixture, c, el } = await drawn({ features: BASIC_EDITION_FEATURES, graph: typed, datasets: [DS, stores] });
+        const { fixture, c, el } = await drawn({
+            features: BASIC_EDITION_FEATURES,
+            graph: typed,
+            datasets: [DS, stores],
+        });
         const lookup = vi.spyOn(TestBed.inject(NodeRiskService), 'lookup').mockResolvedValue({
             byKey: new Map([
                 ['A', { store_id: 'A', region: 'North' }],
@@ -4725,7 +4960,11 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         expect(el.querySelector('[data-testid="reference-filter"]')).not.toBeNull();
         await c.filterByDetails({ reference: c.drawnReferences()[0], column: 'region', text: 'north' });
         // only the store nodes were looked up, by their keys; B is South, C has no row: both hidden; the cells untouched
-        expect(lookup).toHaveBeenCalledWith(expect.objectContaining({ dataset: 'stores', keyCol: 'store_id' }), ['A', 'B', 'C'], null);
+        expect(lookup).toHaveBeenCalledWith(
+            expect.objectContaining({ dataset: 'stores', keyCol: 'store_id' }),
+            ['A', 'B', 'C'],
+            null,
+        );
         expect(c.hiddenNodeIds()).toEqual(['b', 'c']);
         expect(c.canvasData()!.nodes.map((n) => n.id)).toEqual(['a', 'd', 'e']);
         expect(c.detailsFilterActive()).toBe(true);
@@ -4817,7 +5056,9 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
 
     it('Basic Grow is blocked, with the reason, when the graph source has no neighbours read', async () => {
         const { c } = await drawn({ features: BASIC_EDITION_FEATURES });
-        expect(c.growContext().blocked).toBe('Expand needs a graph drawn from one Entity/Link mapping (its neighbours read).');
+        expect(c.growContext().blocked).toBe(
+            'Expand needs a graph drawn from one Entity/Link mapping (its neighbours read).',
+        );
     });
 
     it('X with nothing selected says to select first; with a selection it opens Exclude… and a Basic hide is undoable', async () => {
@@ -4837,7 +5078,9 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         await settle(fixture);
         expect(c.hiddenNodeIds()).toEqual(['a', 'b']);
         expect(c.canvasData()!.nodes.map((n) => n.id)).toEqual(['c', 'd', 'e']);
-        expect(el.querySelector('[data-testid="la-change-line"]')?.textContent).toContain('2 nodes hidden (not recorded).');
+        expect(el.querySelector('[data-testid="la-change-line"]')?.textContent).toContain(
+            '2 nodes hidden (not recorded).',
+        );
         (el.querySelector('[data-testid="la-change-undo"]') as HTMLButtonElement).click();
         fixture.detectChanges();
         expect(c.hiddenNodeIds()).toEqual([]);
@@ -4908,7 +5151,11 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         reset();
         (el.querySelector('[data-testid="la-canvas-tools-more"]') as HTMLButtonElement).click();
         await settle(fixture, 10);
-        (Array.from(document.querySelectorAll('.cdk-overlay-container button')).find((b) => b.textContent?.trim() === 'Expand…') as HTMLButtonElement).click();
+        (
+            Array.from(document.querySelectorAll('.cdk-overlay-container button')).find(
+                (b) => b.textContent?.trim() === 'Expand…',
+            ) as HTMLButtonElement
+        ).click();
         await landed('More menu');
         // 4. right-click a node → Expand…: the tab section starts from that node
         reset();
@@ -4917,10 +5164,14 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         (document.querySelector('[data-testid="la-node-menu-grow"]') as HTMLButtonElement).click();
         await landed('node menu');
         // the section is the real Expand form, recorded: its Expand walks the Investigation (ONE control, no "Expand next degree")
-        expect(section()!.closest('[data-testid="degrees"]')!.querySelector('[data-testid="expand-next-degree"]')).toBeNull();
+        expect(
+            section()!.closest('[data-testid="degrees"]')!.querySelector('[data-testid="expand-next-degree"]'),
+        ).toBeNull();
         const onExpand = vi.spyOn(c, 'onExpand').mockResolvedValue();
         (section()!.querySelector('[data-testid="la-expand-go"]') as HTMLButtonElement).click();
-        expect(onExpand).toHaveBeenCalledWith(expect.objectContaining({ ctx: expect.objectContaining({ mode: 'investigation' }) }));
+        expect(onExpand).toHaveBeenCalledWith(
+            expect.objectContaining({ ctx: expect.objectContaining({ mode: 'investigation' }) }),
+        );
     });
 
     it('LA-UNSAVED-INVESTIGATION-1 D3: no "Show the full graph" checkbox, and ONE Expand control (no "Expand next degree")', async () => {
@@ -4976,14 +5227,28 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         const ops: unknown[] = [];
         vi.spyOn(c.investigation, 'apply').mockImplementation(async (op) => {
             ops.push(op);
-            c.investigation.lastStep.set({ step: ops.length, op: op.op, delta: { admitted: [], excluded: ['ws-hub'], linksAdded: 0 } } as never);
+            c.investigation.lastStep.set({
+                step: ops.length,
+                op: op.op,
+                delta: { admitted: [], excluded: ['ws-hub'], linksAdded: 0 },
+            } as never);
             return true;
         });
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: null });
-        expect(ops).toEqual([{ op: 'expand', ids: ['ws-b'], direction: 'either', hubThreshold: 500, group: expect.any(String) }]);
+        await c.onExpand({
+            ctx: c.growContext(),
+            req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 },
+            from: null,
+        });
+        expect(ops).toEqual([
+            { op: 'expand', ids: ['ws-b'], direction: 'either', hubThreshold: 500, group: expect.any(String) },
+        ]);
         // Hold off goes through hubs: a sealed override, so it asks first; No sends nothing
         const ask = vi.spyOn(TestBed.inject(InspectoConfirmService), 'confirmDestructive').mockResolvedValue(false);
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 2, linkKinds: null, hold: false, threshold: 500 }, from: null });
+        await c.onExpand({
+            ctx: c.growContext(),
+            req: { direction: 'either', degrees: 2, linkKinds: null, hold: false, threshold: 500 },
+            from: null,
+        });
         expect(ask).toHaveBeenCalledWith(expect.stringContaining('1 held busy entity'), expect.anything());
         expect(ops).toHaveLength(1);
         await c.removeHeld();
@@ -5004,9 +5269,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         const session = TestBed.inject(SessionService);
         session.authMode.set('oidc');
         session.capabilities.set([]);
-        expect(c.growContext().blocked).toBe(
-            'Needs Incident management to change the step log.',
-        );
+        expect(c.growContext().blocked).toBe('Needs Incident management to change the step log.');
         expect(c.growWriteWhyNot()).toContain('Incident management');
     });
 });
@@ -5179,7 +5442,12 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         const c = fixture.componentInstance;
         expect(queried).toEqual([]); // the whole-Dataset projection never ran
         expect(expand).toHaveBeenCalledWith('MULE-HUB-01', 'MULE-HUB-01', { projection: MAPPING });
-        expect(c.graph()!.nodes.map((n) => n.id).sort()).toEqual(['HUB', 'MULE-HUB-01', 'MULE-HUB-01-R1', 'MULE-HUB-01-R2']);
+        expect(
+            c
+                .graph()!
+                .nodes.map((n) => n.id)
+                .sort(),
+        ).toEqual(['HUB', 'MULE-HUB-01', 'MULE-HUB-01-R1', 'MULE-HUB-01-R2']);
         expect(c.investigateIssue()).toBe('');
         expect(c.expandedNodeIds()).toEqual(['MULE-HUB-01']);
         expect(previewNeighbors).toHaveBeenCalledWith(
@@ -5207,7 +5475,9 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
             id: 'ring',
             name: 'ring',
             sourceId: 'entity-projection',
-            query: { projection: { datasetId: 'mule', sourceCol: 'PAYER', targetCol: 'PAYEE', linkKindCol: 'CHANNEL' } },
+            query: {
+                projection: { datasetId: 'mule', sourceCol: 'PAYER', targetCol: 'PAYEE', linkKindCol: 'CHANNEL' },
+            },
         };
         const account: EntityTypeSummary = {
             id: 'account',
@@ -5219,7 +5489,15 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
                 { dataset: 'mule', column: 'PAYEE', role: 'target' },
                 { dataset: 'mule', column: 'PAYER', role: 'source' },
             ],
-            headline: { assessed: false, reason: null, distinct: null, approximate: false, rows: null, dataAsOf: null, computedAt: null },
+            headline: {
+                assessed: false,
+                reason: null,
+                distinct: null,
+                approximate: false,
+                rows: null,
+                dataAsOf: null,
+                computedAt: null,
+            },
         };
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
         const { fixture } = create({
@@ -5283,14 +5561,22 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         });
         await settle(fixture);
         const c = fixture.componentInstance;
-        await c.startFrom({ kind: 'paste', datasetId: 'transfers', entityType: 'account', values: ['A-1', 'NOPE-9', 'A-2'] });
+        await c.startFrom({
+            kind: 'paste',
+            datasetId: 'transfers',
+            entityType: 'account',
+            values: ['A-1', 'NOPE-9', 'A-2'],
+        });
         expect(expand).toHaveBeenCalledTimes(3);
         expect([...c.expandedNodeIds()].sort()).toEqual(['A-1', 'A-2']);
-        expect(c.startNotice()).toEqual({ variant: 'warning', text: expect.stringContaining('NOPE-9 is not in Transfers.') });
+        expect(c.startNotice()).toEqual({
+            variant: 'warning',
+            text: expect.stringContaining('NOPE-9 is not in Transfers.'),
+        });
         fixture.detectChanges();
-        expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="start-outcome"]')?.textContent).toContain(
-            'NOPE-9',
-        );
+        expect(
+            (fixture.nativeElement as HTMLElement).querySelector('[data-testid="start-outcome"]')?.textContent,
+        ).toContain('NOPE-9');
     });
 
     it('a paste where nothing is found draws nothing and says what was not found', async () => {
@@ -5298,9 +5584,16 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         const { fixture } = create({ features: BASIC, datasets: [TRANSFERS], expand });
         await settle(fixture);
         const c = fixture.componentInstance;
-        await c.startFrom({ kind: 'paste', datasetId: 'transfers', entityType: 'account', values: ['NOPE-1', 'NOPE-2'] });
+        await c.startFrom({
+            kind: 'paste',
+            datasetId: 'transfers',
+            entityType: 'account',
+            values: ['NOPE-1', 'NOPE-2'],
+        });
         expect(c.graph()).toBeNull();
-        expect(c.startNotice()?.text).toBe('None of these are in Transfers: NOPE-1, NOPE-2. Check the spelling or pick another Dataset.');
+        expect(c.startNotice()?.text).toBe(
+            'None of these are in Transfers: NOPE-1, NOPE-2. Check the spelling or pick another Dataset.',
+        );
     });
 
     it('T-016: a start that found nothing keeps the picked Dataset in the re-created box, under its "not in" notice', async () => {
@@ -5342,11 +5635,17 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
 
     it('LA-UNSAVED-INVESTIGATION-1: a list start draws its members UNSAVED - nothing created, seed and ring recorded', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const getEntityList = vi.fn(() => of({ id: 'suspects', title: 'Suspects', entityType: 'account', members: ['S-1', 'S-2'] }));
+        const getEntityList = vi.fn(() =>
+            of({ id: 'suspects', title: 'Suspects', entityType: 'account', members: ['S-1', 'S-2'] }),
+        );
         const { fixture } = create({
             datasets: [TRANSFERS],
             expand,
-            inv: { previewNeighbors: preview(), getEntityList, previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
+            inv: {
+                previewNeighbors: preview(),
+                getEntityList,
+                previewUnsaved: fakeUnsaved(),
+            } as unknown as Partial<InvService>,
         });
         await settle(fixture);
         const c = fixture.componentInstance;
@@ -5366,18 +5665,31 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(u.steps).toEqual([
             { kind: 'seed', ids: ['S-1', 'S-2'], entityType: 'account' },
             // the drawn ring, as the screen drew it: from exactly the values found
-            { kind: 'expand', from: 'ids', ids: ['S-1', 'S-2'], walked: [['S-1', 'S-2']], stages: [expect.anything()], req: expect.objectContaining({ degrees: 1, direction: 'either', hold: true }) },
+            {
+                kind: 'expand',
+                from: 'ids',
+                ids: ['S-1', 'S-2'],
+                walked: [['S-1', 'S-2']],
+                stages: [expect.anything()],
+                req: expect.objectContaining({ degrees: 1, direction: 'either', hold: true }),
+            },
         ]);
         expect(c.graph()).not.toBeNull();
         expect(c.openWorkLabel()).toBe('the unsaved Investigation');
     });
     it('LA-EXPAND-PLACEMENT-1: a double click on an unsaved ring entity is a recorded Expand step, not the explorer read', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const getEntityList = vi.fn(() => of({ id: 'suspects', title: 'Suspects', entityType: 'account', members: ['S-1'] }));
+        const getEntityList = vi.fn(() =>
+            of({ id: 'suspects', title: 'Suspects', entityType: 'account', members: ['S-1'] }),
+        );
         const { fixture } = create({
             datasets: [TRANSFERS],
             expand,
-            inv: { previewNeighbors: preview(), getEntityList, previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
+            inv: {
+                previewNeighbors: preview(),
+                getEntityList,
+                previewUnsaved: fakeUnsaved(),
+            } as unknown as Partial<InvService>,
         });
         await settle(fixture);
         const c = fixture.componentInstance;
@@ -5397,9 +5709,15 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(expand).not.toHaveBeenCalled(); // the explorer read minted its own ids beside the Working Set's
         const steps = c.investigation.unsaved()!.steps;
         expect(steps).toHaveLength(3);
-        expect(steps[2]).toEqual(expect.objectContaining({ kind: 'expand', from: 'ids', ids: ['S-1.n'], walked: [['S-1.n']] }));
+        expect(steps[2]).toEqual(
+            expect.objectContaining({ kind: 'expand', from: 'ids', ids: ['S-1.n'], walked: [['S-1.n']] }),
+        );
         // one id per entity: every node drawn before is still there under the same id, and only S-1.n.n is new
-        expect(ids().filter((id) => !drawn.includes(id)).map((id) => c.graph()!.nodes.find((n) => n.id === id)!.data.label)).toEqual(['S-1.n.n']);
+        expect(
+            ids()
+                .filter((id) => !drawn.includes(id))
+                .map((id) => c.graph()!.nodes.find((n) => n.id === id)!.data.label),
+        ).toEqual(['S-1.n.n']);
         // a second double click on the entity it just read does not read it again
         await c.onNodeDblClick(ringNode.id);
         await settle(fixture);
@@ -5407,7 +5725,9 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
     });
     it('LA-PANELS-REDESIGN-1: the start box only draws a list on the Investigations level - no pending form, no queue', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const getEntityList = vi.fn(() => of({ id: 'suspects', title: 'Suspects', entityType: 'account', members: ['S-1', 'S-2'] }));
+        const getEntityList = vi.fn(() =>
+            of({ id: 'suspects', title: 'Suspects', entityType: 'account', members: ['S-1', 'S-2'] }),
+        );
         const { fixture } = create({
             datasets: [TRANSFERS],
             expand,
@@ -5425,11 +5745,15 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         const { fixture } = create({ datasets: [TRANSFERS] });
         await settle(fixture);
         fixture.detectChanges();
-        const reread = vi.spyOn(fixture.componentInstance as unknown as { refreshEntityLists(): void }, 'refreshEntityLists');
+        const reread = vi.spyOn(
+            fixture.componentInstance as unknown as { refreshEntityLists(): void },
+            'refreshEntityLists',
+        );
         fixture.componentInstance.openNewInvestigation(); // the start form lives in the Investigation tab (D1)
         fixture.detectChanges();
         const box = fixture.debugElement.query((d) => d.name === 'inspecto-link-analysis-start-box');
-        const kind = (box.componentInstance as { form: { controls: { kind: { setValue(v: string): void } } } }).form.controls.kind;
+        const kind = (box.componentInstance as { form: { controls: { kind: { setValue(v: string): void } } } }).form
+            .controls.kind;
         kind.setValue('paste');
         expect(reread).not.toHaveBeenCalled();
         kind.setValue('list');
@@ -5463,7 +5787,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(c.caseStart()?.entityType).toBe('wallet');
     });
 
-    it('a list start is typed by the list, whatever the Dataset\'s primary type', async () => {
+    it("a list start is typed by the list, whatever the Dataset's primary type", async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
         const getEntityList = vi.fn(() => of({ id: 'w', title: 'Wallets', entityType: 'wallet', members: ['W-1'] }));
         const { fixture } = create({
@@ -5497,7 +5821,11 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
     });
 
     it('?dataset= alone preselects that Dataset in the Start box and clears the param', async () => {
-        const { fixture } = create({ features: BASIC, datasets: [DS, TRANSFERS], queryParams: { dataset: 'transfers' } });
+        const { fixture } = create({
+            features: BASIC,
+            datasets: [DS, TRANSFERS],
+            queryParams: { dataset: 'transfers' },
+        });
         const navigate = await settle(fixture);
         fixture.detectChanges();
         const c = fixture.componentInstance;
@@ -5508,9 +5836,13 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
-    it('LA-BASIC-DISCOVER-1: About this Dataset sits under Basic\'s Start box and follows the Dataset picked there', async () => {
+    it("LA-BASIC-DISCOVER-1: About this Dataset sits under Basic's Start box and follows the Dataset picked there", async () => {
         const PAYMENTS: Dataset = { ...TRANSFERS, id: 'payments', name: 'Payments', sourceName: 'payments' };
-        const { fixture } = create({ features: BASIC, datasets: [TRANSFERS, PAYMENTS], queryParams: { dataset: 'transfers' } });
+        const { fixture } = create({
+            features: BASIC,
+            datasets: [TRANSFERS, PAYMENTS],
+            queryParams: { dataset: 'transfers' },
+        });
         await settle(fixture);
         fixture.detectChanges();
         const c = fixture.componentInstance;
@@ -5522,7 +5854,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         fixture.detectChanges();
         expect(c.aboutDataset()).toBe('payments');
         expect(el.querySelector('[data-testid="la-discover"]')?.textContent).toContain('About Payments');
-        c.pickedDataset.set('gone');   // a pick no longer offered falls back to the page's Dataset
+        c.pickedDataset.set('gone'); // a pick no longer offered falls back to the page's Dataset
         expect(c.aboutDataset()).toBe('transfers');
     });
 
@@ -5556,7 +5888,11 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
 
     it('LA-UNSAVED-INVESTIGATION-1: one entity starts unsaved over its binding; Degrees 2 walks one more degree, recorded', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
+        });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startUnsaved({
@@ -5571,14 +5907,23 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(u.steps.map((x) => x.kind)).toEqual(['seed', 'expand']);
         expect(u.steps[0]).toEqual({ kind: 'seed', ids: ['MULE-HUB-01'], entityType: MAPPING.entityType });
         // the ring and one degree more, each from what the server admitted
-        expect(u.steps[1]).toEqual(expect.objectContaining({ walked: [['MULE-HUB-01'], ['MULE-HUB-01.n']], req: expect.objectContaining({ degrees: 2 }) }));
+        expect(u.steps[1]).toEqual(
+            expect.objectContaining({
+                walked: [['MULE-HUB-01'], ['MULE-HUB-01.n']],
+                req: expect.objectContaining({ degrees: 2 }),
+            }),
+        );
         expect(c.investigateIssue()).toBe('');
         expect(c.toolboxTab()).toBe('investigation');
     });
 
     it('LA-UNSAVED-INVESTIGATION-1: an unsaved Expand the Space would hold for four-eyes is refused before it runs', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
+        });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startUnsaved({
@@ -5590,7 +5935,11 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         });
         Object.defineProperty(c, 'fourEyesLimits', { value: () => ({ budgetAbove: 1, fanOutAbove: null }) });
         const calls = expand.mock.calls.length;
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: 'outer' });
+        await c.onExpand({
+            ctx: c.growContext(),
+            req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 },
+            from: 'outer',
+        });
         expect(expand.mock.calls.length).toBe(calls); // nothing read
         expect(c.investigation.unsaved()!.steps).toHaveLength(2); // nothing recorded
         expect(c.growExclude.lastChange()?.text).toContain('cannot run unsaved. Save first');
@@ -5598,7 +5947,11 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
 
     it('LA-UNSAVED-INVESTIGATION-1: an unsaved Expand is recorded, and its Undo drops the step', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
+        });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startUnsaved({
@@ -5609,11 +5962,20 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
             degrees: 1,
         });
         const ctx = c.growContext();
-        await c.onExpand({ ctx, req: { direction: 'out', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: 'outer' });
+        await c.onExpand({
+            ctx,
+            req: { direction: 'out', degrees: 1, linkKinds: null, hold: true, threshold: 500 },
+            from: 'outer',
+        });
         const steps = c.investigation.unsaved()!.steps;
         expect(steps).toHaveLength(3);
         expect(steps[2]).toEqual(
-            expect.objectContaining({ kind: 'expand', from: 'outer', ids: [], req: expect.objectContaining({ direction: 'out' }) }),
+            expect.objectContaining({
+                kind: 'expand',
+                from: 'outer',
+                ids: [],
+                req: expect.objectContaining({ direction: 'out' }),
+            }),
         );
         expect(steps[2].kind === 'expand' && steps[2].walked?.length).toBe(1); // the exact values degree 1 expanded from
         c.growExclude.lastChange()!.undo!();
@@ -5622,7 +5984,11 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
 
     it('LA-INVESTIGATE-UX-2: unsaved Undo and Redo walk the steps back and forward with the canvas; a new step drops Redo', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
+        });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startUnsaved({
@@ -5670,7 +6036,11 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
 
     it('LA-INVESTIGATE-UX-2: an unsaved Clean up hides on the drawn Working Set, records one hide step, and Undo / Redo take it', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
+        });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startUnsaved({
@@ -5685,7 +6055,11 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         const shown = () => c.graph()!.nodes.length;
         const before = shown();
         c.cleanUpUnsaved({ ids: [leaf], reason: 'Clean up: dangling leaves' });
-        expect(c.investigation.unsaved()!.steps.at(-1)).toEqual({ kind: 'hide', ids: [leaf], reason: 'Clean up: dangling leaves' });
+        expect(c.investigation.unsaved()!.steps.at(-1)).toEqual({
+            kind: 'hide',
+            ids: [leaf],
+            reason: 'Clean up: dangling leaves',
+        });
         expect(hidden()).toBe(true);
         expect(shown()).toBe(before - 1); // a hidden entity is not drawn
         expect(c.growExclude.lastChange()?.text).toBe('Hid 1 (not saved yet).');
@@ -5702,7 +6076,11 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
     it('LA-INVESTIGATE-UX-2 item 5: an unsaved Exclude instead drops the entities and their links, and keeps them out of later expands', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
         const previewUnsaved = fakeUnsaved((id) => [`${id}.n`, 'SHARED']);
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved } as unknown as Partial<InvService> });
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), previewUnsaved } as unknown as Partial<InvService>,
+        });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startUnsaved({
@@ -5715,13 +6093,21 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         const ws = () => c.investigation.unsavedWs()!;
         expect(ws().entities.map((e) => e.id)).toContain('SHARED');
         c.cleanUpUnsaved({ ids: ['SHARED'], reason: 'Clean up: entity type device', exclude: true });
-        expect(c.investigation.unsaved()!.steps.at(-1)).toEqual({ kind: 'exclude', ids: ['SHARED'], reason: 'Clean up: entity type device' });
+        expect(c.investigation.unsaved()!.steps.at(-1)).toEqual({
+            kind: 'exclude',
+            ids: ['SHARED'],
+            reason: 'Clean up: entity type device',
+        });
         expect(ws().entities.map((e) => e.id)).not.toContain('SHARED');
         expect(ws().links.some((l) => l.source === 'SHARED' || l.target === 'SHARED')).toBe(false);
         expect(ws().excluded.map((x) => [x.id, x.reason])).toEqual([['SHARED', 'Clean up: entity type device']]);
         expect(c.growExclude.lastChange()?.text).toBe('Excluded 1 (not saved yet).');
         // the next degree sends the exclude first, with its reason, so the server never admits SHARED again
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: 'outer' });
+        await c.onExpand({
+            ctx: c.growContext(),
+            req: { direction: 'out', degrees: 1, linkKinds: null, hold: true, threshold: 500 },
+            from: 'outer',
+        });
         const sentSteps = previewUnsaved.mock.calls.at(-1)![0].steps;
         expect(sentSteps[0]).toEqual({ op: 'exclude', ids: ['SHARED'], reason: 'Clean up: entity type device' });
         expect(sentSteps.map((s) => s.op)).toEqual(['exclude', 'seed', 'expand']);
@@ -5736,7 +6122,11 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
     it('an unsaved Remove drops the node and the ones it leaves unlinked, keeps nothing out, and a later Expand brings it back', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
         const previewUnsaved = fakeUnsaved((id) => [`${id}.n`, 'SHARED']);
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved } as unknown as Partial<InvService> });
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), previewUnsaved } as unknown as Partial<InvService>,
+        });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startUnsaved({
@@ -5746,12 +6136,19 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
             timeColZone: '',
             degrees: 1,
         });
-        const ids = () => c.investigation.unsavedWs()!.entities.map((e) => e.id).sort();
+        const ids = () =>
+            c.investigation
+                .unsavedWs()!
+                .entities.map((e) => e.id)
+                .sort();
         expect(ids()).toEqual(['MULE-HUB-01', 'MULE-HUB-01.n', 'SHARED']);
         // the hub goes, and both its neighbours - each linked only to it - go with it
         const hub = c.graph()!.nodes.find((n) => n.data.label === 'MULE-HUB-01')!;
         c.removeSelected([hub.id]);
-        expect(c.investigation.unsaved()!.steps.at(-1)).toEqual({ kind: 'remove', ids: expect.arrayContaining(['MULE-HUB-01', 'MULE-HUB-01.n', 'SHARED']) });
+        expect(c.investigation.unsaved()!.steps.at(-1)).toEqual({
+            kind: 'remove',
+            ids: expect.arrayContaining(['MULE-HUB-01', 'MULE-HUB-01.n', 'SHARED']),
+        });
         expect(ids()).toEqual([]);
         expect(c.investigation.unsavedWs()!.excluded).toEqual([]);
         expect(c.growExclude.lastChange()?.text).toContain('Removed 3');
@@ -5763,7 +6160,11 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         c.removeSelected([shared.id]);
         expect(ids()).toEqual(['MULE-HUB-01', 'MULE-HUB-01.n']);
         // the next Expand sends no exclude, so the server admits SHARED again
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'out', degrees: 1, linkKinds: null, hold: true, threshold: 500 }, from: 'outer' });
+        await c.onExpand({
+            ctx: c.growContext(),
+            req: { direction: 'out', degrees: 1, linkKinds: null, hold: true, threshold: 500 },
+            from: 'outer',
+        });
         expect(previewUnsaved.mock.calls.at(-1)![0].steps.map((s) => s.op)).toEqual(['seed', 'expand']);
         expect(ids()).toContain('SHARED');
     });
@@ -5775,9 +6176,14 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         c.investigation.beginUnsaved({ projection: MAPPING, presets: {}, maxDegree: 3 }, { name: 'n', purpose: 'p' }, [
             { kind: 'seed', ids: ['A-1'] },
         ]);
-        const ask = vi.spyOn(TestBed.inject(InspectoConfirmService), 'confirmUnsavedChanges').mockResolvedValue('cancel');
+        const ask = vi
+            .spyOn(TestBed.inject(InspectoConfirmService), 'confirmUnsavedChanges')
+            .mockResolvedValue('cancel');
         await c.closeOpenWork();
-        expect(ask).toHaveBeenCalledWith(expect.stringContaining('not saved (one step)'), expect.objectContaining({ discardText: 'Discard' }));
+        expect(ask).toHaveBeenCalledWith(
+            expect.stringContaining('not saved (one step)'),
+            expect.objectContaining({ discardText: 'Discard' }),
+        );
         expect(c.investigation.unsaved()).not.toBeNull(); // Cancel keeps it
         ask.mockResolvedValue('discard');
         await c.newWork();
@@ -5795,7 +6201,11 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
     });
     it('Investigations level, the start box draws one entity with its ring - it seeds nothing', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
+        });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startFrom({ kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' });
@@ -5915,7 +6325,6 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(c.workingSetCanvas()).toBe(false); // the canvas draws the explorer graph
     });
 
-
     it('every unsaved degree is read by the server preview with the presets: the canvas IS the Working Set Save records', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
         // the server admits fewer than an explorer read would (its presets cut): one neighbour per entity
@@ -5935,16 +6344,43 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
             degrees: 1,
         });
         // the start's ring is the server's, not the explorer's ring
-        expect(c.graph()!.nodes.map((n) => n.data.label).sort()).toEqual(['MULE-HUB-01', 'MULE-HUB-01.n']);
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 3, linkKinds: null, hold: true, threshold: 500 }, from: 'outer' });
+        expect(
+            c
+                .graph()!
+                .nodes.map((n) => n.data.label)
+                .sort(),
+        ).toEqual(['MULE-HUB-01', 'MULE-HUB-01.n']);
+        await c.onExpand({
+            ctx: c.growContext(),
+            req: { direction: 'either', degrees: 3, linkKinds: null, hold: true, threshold: 500 },
+            from: 'outer',
+        });
         const step = c.investigation.unsaved()!.steps.at(-1)!;
-        expect(step.kind === 'expand' && step.walked).toEqual([['MULE-HUB-01.n'], ['MULE-HUB-01.n.n'], ['MULE-HUB-01.n.n.n']]);
+        expect(step.kind === 'expand' && step.walked).toEqual([
+            ['MULE-HUB-01.n'],
+            ['MULE-HUB-01.n.n'],
+            ['MULE-HUB-01.n.n.n'],
+        ]);
         // what is drawn is exactly the Working Set the last preview answered
-        const last = await firstValueFrom(previewUnsaved.mock.results.at(-1)!.value as Observable<{ workingSet: { entities: { id: string }[] } }>);
-        expect(c.graph()!.nodes.map((n) => n.data.label).sort()).toEqual(last.workingSet.entities.map((e) => e.id).sort());
+        const last = await firstValueFrom(
+            previewUnsaved.mock.results.at(-1)!.value as Observable<{ workingSet: { entities: { id: string }[] } }>,
+        );
+        expect(
+            c
+                .graph()!
+                .nodes.map((n) => n.data.label)
+                .sort(),
+        ).toEqual(last.workingSet.entities.map((e) => e.id).sort());
         // and each degree was sent as the step route body Save sends: the presets laid under, the fold filters on top
         const sent = previewUnsaved.mock.calls.at(-1)![0].steps.at(-1) as Record<string, unknown>;
-        expect(sent).toEqual(expect.objectContaining({ op: 'expand', ids: ['MULE-HUB-01.n.n.n'], direction: 'either', hubThreshold: 500 }));
+        expect(sent).toEqual(
+            expect.objectContaining({
+                op: 'expand',
+                ids: ['MULE-HUB-01.n.n.n'],
+                direction: 'either',
+                hubThreshold: 500,
+            }),
+        );
         // every preview sends the Working Set as one seed and ONE degree: never the history, so its cost does not grow with it
         for (const [body] of previewUnsaved.mock.calls) expect(body.steps.map((x) => x.op)).toEqual(['seed', 'expand']);
     });
@@ -5981,12 +6417,22 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
             await c.onExpand({ ctx: c.growContext(), req: REQ, from: 'outer' });
             return Object.assign(c, { previewUnsaved });
         }
-        const labels = (c: LinkAnalysisComponent) => c.graph()!.nodes.map((n) => n.data.label).sort();
+        const labels = (c: LinkAnalysisComponent) =>
+            c
+                .graph()!
+                .nodes.map((n) => n.data.label)
+                .sort();
 
         it('lowering Degrees drops the outermost entities from the canvas AND from the recorded step; Undo brings them back', async () => {
             const c = await expanded3();
             expect(c.lastExpandDegrees()).toBe(3);
-            expect(labels(c)).toEqual(['MULE-HUB-01', 'MULE-HUB-01.n', 'MULE-HUB-01.n.n', 'MULE-HUB-01.n.n.n', 'MULE-HUB-01.n.n.n.n']);
+            expect(labels(c)).toEqual([
+                'MULE-HUB-01',
+                'MULE-HUB-01.n',
+                'MULE-HUB-01.n.n',
+                'MULE-HUB-01.n.n.n',
+                'MULE-HUB-01.n.n.n.n',
+            ]);
             await c.onDegreesChange({ degrees: 2, req: { ...REQ, degrees: 2 } });
             // the terminal entity is gone from the canvas ...
             expect(labels(c)).toEqual(['MULE-HUB-01', 'MULE-HUB-01.n', 'MULE-HUB-01.n.n', 'MULE-HUB-01.n.n.n']);
@@ -5995,7 +6441,9 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
             expect(step.kind === 'expand' && step.walked).toEqual([['MULE-HUB-01.n'], ['MULE-HUB-01.n.n']]);
             expect(step.kind === 'expand' && step.req.degrees).toBe(2);
             expect(c.lastExpandDegrees()).toBe(2);
-            expect(c.growExclude.lastChange()?.text).toContain('Lowered to 2 degrees: removed 1 node and the links only they carried');
+            expect(c.growExclude.lastChange()?.text).toContain(
+                'Lowered to 2 degrees: removed 1 node and the links only they carried',
+            );
             await c.growExclude.lastChange()!.undo!();
             expect(labels(c)).toHaveLength(5);
             expect(c.lastExpandDegrees()).toBe(3);
@@ -6020,13 +6468,18 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
             expect(step.kind === 'expand' && step.req.direction).toBe('either');
             const sent = c.previewUnsaved.mock.calls.at(-1)![0].steps.at(-1) as Record<string, unknown>;
             expect(sent['direction']).toBe('either'); // what was drawn
-            expect(c.investigation.unsavedOps(c.investigation.unsaved()!.steps.slice(-1), c.investigation.unsaved()!.binding).every((o) => o.op !== 'expand' || o.direction === 'either')).toBe(true); // what Save sends
+            expect(
+                c.investigation
+                    .unsavedOps(c.investigation.unsaved()!.steps.slice(-1), c.investigation.unsaved()!.binding)
+                    .every((o) => o.op !== 'expand' || o.direction === 'either'),
+            ).toBe(true); // what Save sends
         });
 
         it('a Degrees change while an Expand is still walking is ignored, and an Expand while a resize runs is refused', async () => {
             const c = await expanded3();
             const steps = () => c.investigation.unsaved()!.steps;
-            const walkedOf = (i: number) => (steps()[i].kind === 'expand' ? (steps()[i] as { walked: string[][] }).walked.length : -1);
+            const walkedOf = (i: number) =>
+                steps()[i].kind === 'expand' ? (steps()[i] as { walked: string[][] }).walked.length : -1;
             hold();
             const running = c.onExpand({ ctx: c.growContext(), req: { ...REQ, degrees: 1 }, from: 'outer' });
             await c.onDegreesChange({ degrees: 1, req: { ...REQ, degrees: 1 } }); // lands mid-walk
@@ -6093,12 +6546,23 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
                 { name: 'BOOKED_AT', type: 'date' },
             ],
         }));
-        const sql = vi.fn(async () => ({ rows: [{ BOOKED_DATE: 'DATE', BOOKED_AT: 'TIMESTAMP' }], columns: [], truncated: false }));
-        const { fixture } = create({ datasets: [TRANSFERS], rows: { rows, sql } as unknown as Partial<DatasetRowsService> });
+        const sql = vi.fn(async () => ({
+            rows: [{ BOOKED_DATE: 'DATE', BOOKED_AT: 'TIMESTAMP' }],
+            columns: [],
+            truncated: false,
+        }));
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            rows: { rows, sql } as unknown as Partial<DatasetRowsService>,
+        });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.readStartColumns('transfers');
-        expect(sql).toHaveBeenCalledWith('transfers', 'SELECT typeof("BOOKED_DATE") AS "BOOKED_DATE", typeof("BOOKED_AT") AS "BOOKED_AT" FROM "transfers" LIMIT 1', 1);
+        expect(sql).toHaveBeenCalledWith(
+            'transfers',
+            'SELECT typeof("BOOKED_DATE") AS "BOOKED_DATE", typeof("BOOKED_AT") AS "BOOKED_AT" FROM "transfers" LIMIT 1',
+            1,
+        );
         expect(c.startColumns()).toEqual([
             { name: 'note', type: 'string' },
             { name: 'BOOKED_DATE', type: 'date', dbType: 'DATE' },
@@ -6113,11 +6577,20 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
                 () =>
                     new HttpErrorResponse({
                         status: 422,
-                        error: { error: { message: "'timeCol' must be a TIMESTAMP or TIMESTAMP WITH TIME ZONE column; 'BOOKED_DATE' is DATE" } },
+                        error: {
+                            error: {
+                                message:
+                                    "'timeCol' must be a TIMESTAMP or TIMESTAMP WITH TIME ZONE column; 'BOOKED_DATE' is DATE",
+                            },
+                        },
                     }),
             ),
         );
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved } as unknown as Partial<InvService> });
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), previewUnsaved } as unknown as Partial<InvService>,
+        });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startUnsaved({
@@ -6139,7 +6612,14 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
                 { id: `msisdn:${ALIAS}`, data: { label: ALIAS, kind: 'entity' } },
                 { id: 'msisdn:masked:00000000000000bb', data: { label: 'masked:00000000000000bb', kind: 'entity' } },
             ],
-            edges: [{ id: 'e', source: `msisdn:${ALIAS}`, target: 'msisdn:masked:00000000000000bb', data: { kind: 'link' } }],
+            edges: [
+                {
+                    id: 'e',
+                    source: `msisdn:${ALIAS}`,
+                    target: 'msisdn:masked:00000000000000bb',
+                    data: { kind: 'link' },
+                },
+            ],
         };
         const setUp = async (mayReveal: boolean) => {
             const { fixture } = create({ graph: MASKED_GRAPH });
@@ -6149,7 +6629,9 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
             Object.defineProperty(TestBed.inject(LensService), 'canRevealLinkEntities', { value: () => mayReveal });
             const resolve = vi
                 .spyOn(TestBed.inject(DeepLinkService), 'resolve')
-                .mockReturnValue(of({ entity: { type: 'msisdn', key: ALIAS, masked: true, revealed: '447700900123' } }));
+                .mockReturnValue(
+                    of({ entity: { type: 'msisdn', key: ALIAS, masked: true, revealed: '447700900123' } }),
+                );
             const prefill = vi.spyOn(LinkAnalysisStartBoxComponent.prototype, 'prefillEntity');
             return { fixture, c, resolve, prefill };
         };
@@ -6181,7 +6663,11 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
 
     it('a start whose ring the Space would hold for four-eyes is refused up front, and draws nothing', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
+        });
         await settle(fixture);
         const c = fixture.componentInstance;
         Object.defineProperty(c, 'fourEyesLimits', { value: () => ({ budgetAbove: 1, fanOutAbove: null }) });
@@ -6194,15 +6680,27 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         });
         expect(expand).not.toHaveBeenCalled();
         expect(c.investigation.unsaved()).toBeNull();
-        expect(c.startNotice()?.text).toContain("needs a second person's approval, so it cannot run unsaved. Save first");
+        expect(c.startNotice()?.text).toContain(
+            "needs a second person's approval, so it cannot run unsaved. Save first",
+        );
     });
 
     it('Start from selected: refused up front for four-eyes, and records nothing when its draw fails', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
+        });
         await settle(fixture);
         const c = fixture.componentInstance;
-        await c.startUnsaved({ start: { kind: 'dataset', datasetId: 'transfers' }, defaults: { name: 'A', purpose: 'B' }, timeCol: '', timeColZone: '', degrees: 0 });
+        await c.startUnsaved({
+            start: { kind: 'dataset', datasetId: 'transfers' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 0,
+        });
         c.onSelectionChange([c.graph()!.nodes[0].id]);
         // the draw (the server preview) fails: nothing is recorded
         vi.spyOn(c.investigation, 'previewUnsaved').mockRejectedValueOnce(new Error('down'));
@@ -6219,7 +6717,11 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
 
     it('an unsaved Expand through busy entities asks first, as the saved path does; No records nothing', async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
+        });
         await settle(fixture);
         const c = fixture.componentInstance;
         await c.startUnsaved({
@@ -6231,20 +6733,40 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         });
         const ask = vi.spyOn(TestBed.inject(InspectoConfirmService), 'confirmDestructive').mockResolvedValue(false);
         const calls = expand.mock.calls.length;
-        await c.onExpand({ ctx: c.growContext(), req: { direction: 'either', degrees: 1, linkKinds: null, hold: false, threshold: 500 }, from: 'outer' });
-        expect(ask).toHaveBeenCalledWith(expect.stringContaining('Busy entities can pull in many unrelated entities'), expect.anything());
+        await c.onExpand({
+            ctx: c.growContext(),
+            req: { direction: 'either', degrees: 1, linkKinds: null, hold: false, threshold: 500 },
+            from: 'outer',
+        });
+        expect(ask).toHaveBeenCalledWith(
+            expect.stringContaining('Busy entities can pull in many unrelated entities'),
+            expect.anything(),
+        );
         expect(expand.mock.calls.length).toBe(calls);
         expect(c.investigation.unsaved()!.steps).toHaveLength(2);
     });
 
-    it('Start from selected seeds every spelling of a merged node, as the tab\'s Start does', async () => {
+    it("Start from selected seeds every spelling of a merged node, as the tab's Start does", async () => {
         const expand = vi.fn(async (_id: string, label: string) => ring(label));
-        const { fixture } = create({ datasets: [TRANSFERS], expand, inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService> });
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), previewUnsaved: fakeUnsaved() } as unknown as Partial<InvService>,
+        });
         await settle(fixture);
         const c = fixture.componentInstance;
-        await c.startUnsaved({ start: { kind: 'dataset', datasetId: 'transfers' }, defaults: { name: 'A', purpose: 'B' }, timeCol: '', timeColZone: '', degrees: 0 });
+        await c.startUnsaved({
+            start: { kind: 'dataset', datasetId: 'transfers' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 0,
+        });
         const n = c.graph()!.nodes[0];
-        c.graph.set({ ...c.graph()!, nodes: [{ ...n, data: { ...n.data, spellings: ['ID-7', 'id 7'] } }, ...c.graph()!.nodes.slice(1)] });
+        c.graph.set({
+            ...c.graph()!,
+            nodes: [{ ...n, data: { ...n.data, spellings: ['ID-7', 'id 7'] } }, ...c.graph()!.nodes.slice(1)],
+        });
         c.onSelectionChange([n.id]);
         await c.startFromSelected();
         const [seed, ring1] = c.investigation.unsaved()!.steps;
@@ -6252,7 +6774,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(ring1).toEqual(expect.objectContaining({ kind: 'expand', walked: [['ID-7', 'id 7']] }));
     });
 
-    it('Add start entities… seeds the start form\'s values into the open Investigation as ONE step', async () => {
+    it("Add start entities… seeds the start form's values into the open Investigation as ONE step", async () => {
         const { fixture } = create({ datasets: [TRANSFERS] });
         await settle(fixture);
         const c = fixture.componentInstance;
@@ -6277,7 +6799,9 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         const { fixture } = create({ datasets: [TRANSFERS] });
         await settle(fixture);
         const c = fixture.componentInstance;
-        c.investigation.beginUnsaved({ projection: MAPPING, presets: {}, maxDegree: 3 }, { name: 'n', purpose: 'p' }, [{ kind: 'seed', ids: ['A-1'] }]);
+        c.investigation.beginUnsaved({ projection: MAPPING, presets: {}, maxDegree: 3 }, { name: 'n', purpose: 'p' }, [
+            { kind: 'seed', ids: ['A-1'] },
+        ]);
         vi.spyOn(TestBed.inject(InspectoConfirmService), 'confirmUnsavedChanges').mockResolvedValue('save');
         vi.spyOn(c, 'saveUnsaved').mockImplementation(async () => {
             c.investigation.unsaved.set(null);
@@ -6303,7 +6827,12 @@ describe('LinkAnalysisComponent - a case, and Find something interesting (LA-ONB
     };
     const ring = (v: string): G6GraphData => ({
         nodes: [v, `${v}-R1`, `${v}-R2`].map((id) => ({ id, data: { label: id, kind: 'entity' } })),
-        edges: [`${v}-R1`, `${v}-R2`].map((r) => ({ id: `${v}->${r}`, source: v, target: r, data: { kind: 'transfer' } })),
+        edges: [`${v}-R1`, `${v}-R2`].map((r) => ({
+            id: `${v}->${r}`,
+            source: v,
+            target: r,
+            data: { kind: 'transfer' },
+        })),
     });
     const noPreview = () => throwError(() => new HttpErrorResponse({ status: 404 }));
     async function ready(made: ReturnType<typeof create>) {
@@ -6330,7 +6859,15 @@ describe('LinkAnalysisComponent - a case, and Find something interesting (LA-ONB
             afterClosed: () => of({ listId: 'noisy', title: 'Noisy', purpose: 'exclusion', message: 'Added.' }),
         } as never);
         c.addFoundToList({
-            row: { key: 'S-1-R1', title: 'S-1-R1', reading: '', nodeIds: ['S-1-R1'], edgeIds: [], values: ['S-1-R1'], what: 'S-1-R1' },
+            row: {
+                key: 'S-1-R1',
+                title: 'S-1-R1',
+                reading: '',
+                nodeIds: ['S-1-R1'],
+                edgeIds: [],
+                values: ['S-1-R1'],
+                what: 'S-1-R1',
+            },
             what: 'S-1-R1',
             purpose: 'exclusion',
         });
@@ -6464,7 +7001,15 @@ describe('LinkAnalysisComponent - a case, and Find something interesting (LA-ONB
         expect(c.discoverStartWhyNot()).toBe('');
         expand.mockClear();
         await c.startFromFound({
-            row: { key: 'A-1-R1', title: 'A-1-R1', reading: '', nodeIds: ['A-1-R1'], edgeIds: [], values: ['A-1-R1'], what: '' },
+            row: {
+                key: 'A-1-R1',
+                title: 'A-1-R1',
+                reading: '',
+                nodeIds: ['A-1-R1'],
+                edgeIds: [],
+                values: ['A-1-R1'],
+                what: '',
+            },
             what: 'A-1-R1, the busiest account',
         });
         expect(expand).toHaveBeenCalledWith('A-1-R1', 'A-1-R1', expect.anything());
@@ -6497,7 +7042,9 @@ describe('LinkAnalysisComponent - a case, and Find something interesting (LA-ONB
         made.fixture.detectChanges();
         const menu = document.querySelector('.cdk-overlay-container form[aria-label="Save view as"]') as HTMLElement;
         expect(menu.querySelector('[data-testid="la-case-not-evidence"]')?.textContent).toContain('Not evidence');
-        expect(menu.querySelector('[data-testid="la-case-lists"]')?.textContent).toContain('It uses no Entity List yet.');
+        expect(menu.querySelector('[data-testid="la-case-lists"]')?.textContent).toContain(
+            'It uses no Entity List yet.',
+        );
         expect(menu.querySelector('[data-testid="locked-action"]')?.textContent).toContain(
             'Start an Investigation from this',
         );
@@ -6876,7 +7423,8 @@ describe('LinkAnalysisComponent - reorg P3 defects (LA-STUDIO-UI-REORG-1 verific
         expect(c.dockTabShown()).toBe('rows');
         expect(c.filterOpen()).toBe(true);
 
-        const cleanup = fixture.debugElement.query(By.directive(LinkAnalysisCleanupComponent)).componentInstance as LinkAnalysisCleanupComponent;
+        const cleanup = fixture.debugElement.query(By.directive(LinkAnalysisCleanupComponent))
+            .componentInstance as LinkAnalysisCleanupComponent;
         const menu = vi.spyOn(cleanup, 'openMenu').mockImplementation(() => undefined);
         c.openReduce('cleanup');
         expect(menu).toHaveBeenCalled();
@@ -6924,7 +7472,13 @@ describe('LinkAnalysisComponent - reorg P3 defects (LA-STUDIO-UI-REORG-1 verific
 
     it('LA-REORG-VIEW-PACK-OVERRIDE-1: a saved view keeps its pack for display but never overrides the Space pack', async () => {
         const { c, save } = await drawn();
-        await c.loadView({ id: 'mm', name: 'MM', sourceId: 'entity-projection', query: c.lastRun()!.query, profile: 'mobile-money' });
+        await c.loadView({
+            id: 'mm',
+            name: 'MM',
+            sourceId: 'entity-projection',
+            query: c.lastRun()!.query,
+            profile: 'mobile-money',
+        });
         expect(c.boundProfile()).toBeNull();
         expect(c.profileId()).toBe('generic');
         c.saveForm.setValue({ name: 'MM', description: '' });
@@ -6988,7 +7542,9 @@ describe('LinkAnalysisComponent - reorg P3 defects (LA-STUDIO-UI-REORG-1 verific
 describe('LinkAnalysisComponent - the node dialog Entity page link follows /bootstrap entityPages (LA-EDITION-PLACEMENT-1)', () => {
     type EntityPageOf = { entityPageOf: (type: string | undefined, key: string) => unknown; route: unknown };
     const onLinkAnalysisRoute = (c: unknown) =>
-        Object.defineProperty(c, 'route', { value: { snapshot: { pathFromRoot: [{ url: [{ path: 's1' }, { path: 'link-analysis' }] }] } } });
+        Object.defineProperty(c, 'route', {
+            value: { snapshot: { pathFromRoot: [{ url: [{ path: 's1' }, { path: 'link-analysis' }] }] } },
+        });
 
     it('is null when entityPages is off or absent (Basic), a link to the Entity page when it is on', () => {
         for (const [flags, expected] of [
@@ -7074,7 +7630,9 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         openFileMenu(fixture);
         expect(fileItem('la-save-view')!.disabled).toBe(true);
         expect(fileItem('la-save-view-as')!.disabled).toBe(true);
-        expect(document.querySelector('[data-testid="la-save-view-locked"]')?.textContent?.trim()).toBe('Needs Workbench author.');
+        expect(document.querySelector('[data-testid="la-save-view-locked"]')?.textContent?.trim()).toBe(
+            'Needs Workbench author.',
+        );
         // T-004: the reason is in the name of each disabled item, not only in a tooltip a disabled item never shows
         expect(fileItem('la-save-view')!.getAttribute('aria-label')).toBe('Save view: Needs Workbench author.');
         expect(fileItem('la-save-view-as')!.getAttribute('aria-label')).toBe('Save view as: Needs Workbench author.');
@@ -7105,7 +7663,9 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         expect(c.deleteBlocked()).toBe('Needs Workbench author.');
         openFileMenu(fixture);
         expect(fileItem('la-file-delete')!.disabled).toBe(true);
-        expect(document.querySelector('[data-testid="la-file-delete-locked"]')?.textContent?.trim()).toBe('Needs Workbench author.');
+        expect(document.querySelector('[data-testid="la-file-delete-locked"]')?.textContent?.trim()).toBe(
+            'Needs Workbench author.',
+        );
 
         session.capabilities.set(['canAuthorWorkbench']);
         session.actor.set('fm.analyst');
@@ -7160,7 +7720,8 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         fixture.detectChanges();
         await runQuery(fixture);
         const c = fixture.componentInstance;
-        const header = () => fixture.nativeElement.querySelector('[data-testid="la-open-view"]') as HTMLButtonElement | null;
+        const header = () =>
+            fixture.nativeElement.querySelector('[data-testid="la-open-view"]') as HTMLButtonElement | null;
         c.views.set([view]);
         fixture.detectChanges();
         expect(header()).toBeNull(); // a drawn graph that is no saved view names nothing
@@ -7210,7 +7771,8 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         // leaves and the canvas floor drops to 12rem, so canvas + dock never make the page taller than the window
         expect(row().className).toContain('max-sm:h-[28rem]');
         expect(row().classList).not.toContain('h-[28rem]');
-        const workspace = fixture.nativeElement.querySelector('aside[aria-label="Toolbox"]')!.parentElement as HTMLElement;
+        const workspace = fixture.nativeElement.querySelector('aside[aria-label="Toolbox"]')!
+            .parentElement as HTMLElement;
         expect(workspace.classList).toContain('min-h-[12rem]');
         expect(workspace.classList).not.toContain('min-h-[26.25rem]');
         expect(fixture.nativeElement.querySelector('#bottom-panel-body')?.classList).toContain('max-h-[45dvh]');
@@ -7296,19 +7858,44 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
 });
 
 describe('mergeWorkingSets (LA-UNSAVED-INVESTIGATION-1)', () => {
-    const e = (id: string, hop: number, extra: object = {}) => ({ id, type: null, hop, seed: id, admittedBy: 1, hidden: false, kept: false, ...extra });
+    const e = (id: string, hop: number, extra: object = {}) => ({
+        id,
+        type: null,
+        hop,
+        seed: id,
+        admittedBy: 1,
+        hidden: false,
+        kept: false,
+        ...extra,
+    });
     it('joins one previewed degree onto the Working Set so far: new entities one hop out, links once, busy flags kept', () => {
-        const prev = { entities: [e('a', 0), e('b', 1)], links: [{ source: 'a', target: 'b', kind: 'k', count: 1, admittedBy: 2 }], excluded: [], hash: '' };
+        const prev = {
+            entities: [e('a', 0), e('b', 1)],
+            links: [{ source: 'a', target: 'b', kind: 'k', count: 1, admittedBy: 2 }],
+            excluded: [],
+            hash: '',
+        };
         const next = {
             entities: [e('a', 0), e('b', 0, { highConnectivity: true }), e('c', 1)],
-            links: [{ source: 'a', target: 'b', kind: 'k', count: 1, admittedBy: 2 }, { source: 'b', target: 'c', kind: 'k', count: 1, admittedBy: 2 }],
+            links: [
+                { source: 'a', target: 'b', kind: 'k', count: 1, admittedBy: 2 },
+                { source: 'b', target: 'c', kind: 'k', count: 1, admittedBy: 2 },
+            ],
             excluded: [],
             hash: '',
         };
         const m = mergeWorkingSets(prev, next);
-        expect(m.entities.map((x) => [x.id, x.hop, !!x.highConnectivity])).toEqual([['a', 0, false], ['b', 1, true], ['c', 2, false]]);
+        expect(m.entities.map((x) => [x.id, x.hop, !!x.highConnectivity])).toEqual([
+            ['a', 0, false],
+            ['b', 1, true],
+            ['c', 2, false],
+        ]);
         expect(m.links).toHaveLength(2);
-        expect(mergeWorkingSets(prev, { ...next, entities: [...next.entities, e('s', 0)] }, ['s']).entities.find((x) => x.id === 's')!.hop).toBe(0);
+        expect(
+            mergeWorkingSets(prev, { ...next, entities: [...next.entities, e('s', 0)] }, ['s']).entities.find(
+                (x) => x.id === 's',
+            )!.hop,
+        ).toBe(0);
     });
 });
 

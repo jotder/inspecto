@@ -22,10 +22,31 @@ function ws(over: Partial<Record<string, Partial<WorkingSetEntity>>> = {}): Work
         kept: false,
         ...over[id],
     });
-    const link = (source: string, target: string, count: number) => ({ source, target, kind: 'call', count, admittedBy: 1 });
+    const link = (source: string, target: string, count: number) => ({
+        source,
+        target,
+        kind: 'call',
+        count,
+        admittedBy: 1,
+    });
     return {
-        entities: [ent('s', 0), ent('a', 1), ent('b', 2), ent('c', 3, 'imei'), ent('d', 2, 'imei'), ent('e', 3), ent('x', 1)],
-        links: [link('s', 'a', 10), link('a', 'b', 5), link('b', 'c', 1), link('a', 'd', 1), link('b', 'e', 2), link('s', 'x', 9)],
+        entities: [
+            ent('s', 0),
+            ent('a', 1),
+            ent('b', 2),
+            ent('c', 3, 'imei'),
+            ent('d', 2, 'imei'),
+            ent('e', 3),
+            ent('x', 1),
+        ],
+        links: [
+            link('s', 'a', 10),
+            link('a', 'b', 5),
+            link('b', 'c', 1),
+            link('a', 'd', 1),
+            link('b', 'e', 2),
+            link('s', 'x', 9),
+        ],
         excluded: [
             { id: 'p', step: 3, reason: 'Call centre' },
             { id: 'q', step: 5, reason: 'Not relevant' },
@@ -52,7 +73,7 @@ describe('investigation-cleanup (LA-INVESTIGATE-UX-1)', () => {
         ]);
     });
 
-    it('weakly linked: events summed over an entity\'s visible links, under the minimum', () => {
+    it("weakly linked: events summed over an entity's visible links, under the minimum", () => {
         // a: 10+5+1 = 16 · b: 5+1+2 = 8 · c: 1 · d: 1 · e: 2 · x: hidden (its 9 do not count for s either)
         expect(weaklyLinked(ws({ x: { hidden: true } }), 3).sort()).toEqual(['c', 'd', 'e']);
         expect(weaklyLinked(ws({ x: { hidden: true } }), 9).sort()).toEqual(['b', 'c', 'd', 'e']);

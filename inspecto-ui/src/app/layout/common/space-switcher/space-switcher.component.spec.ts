@@ -145,7 +145,9 @@ describe('SpaceSwitcherComponent', () => {
         function openMenu2(fixture: ReturnType<typeof create>['fixture']): HTMLButtonElement[] {
             fixture.nativeElement.querySelector('button').click();
             fixture.detectChanges();
-            return Array.from(document.querySelectorAll<HTMLButtonElement>('.mat-mdc-menu-panel button[mat-menu-item]'));
+            return Array.from(
+                document.querySelectorAll<HTMLButtonElement>('.mat-mdc-menu-panel button[mat-menu-item]'),
+            );
         }
     });
 

@@ -40,7 +40,8 @@ const ROLES: DatasetRole[] = ['dimension', 'measure', 'temporal', 'entity', 'det
                                 <span class="bg-card rounded px-2 py-0.5 font-mono text-xs">{{ col.type }}</span>
                             </td>
                             <td class="py-1 pr-3">
-                                <mat-form-field subscriptSizing="dynamic" class="w-32"><!-- form-allow: a table-cell select (one dialog per cell is worse, angular-ui skill) -->
+                                <mat-form-field subscriptSizing="dynamic" class="w-32"
+                                    ><!-- form-allow: a table-cell select (one dialog per cell is worse, angular-ui skill) -->
                                     <!-- form-allow: a table-cell select --><mat-select
                                         [ngModel]="col.role"
                                         (ngModelChange)="patch(col.name, { role: $event })"

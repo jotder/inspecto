@@ -10,7 +10,10 @@ const SAFE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
  * the Collector's file pattern, the content and the quotas); this only saves a round trip for the three things the browser
  * can see: the extension, the name's characters and the size cap.
  */
-export function uploadFileProblem(file: { name: string; size: number } | null, target: UploadTarget | undefined): string {
+export function uploadFileProblem(
+    file: { name: string; size: number } | null,
+    target: UploadTarget | undefined,
+): string {
     if (!file) return 'Choose a CSV file first.';
     if (/\.xlsx?$/i.test(file.name))
         return 'A spreadsheet workbook cannot be uploaded. Export the sheet as CSV (UTF-8) in your spreadsheet program and upload that.';
@@ -40,7 +43,11 @@ export function isBusyRefusal(err: unknown): boolean {
     return status === 409 && /being ingested right now/.test(apiErrorMessage(err, ''));
 }
 
-export function uploadErrorMessage(err: unknown, fallback: string, action: 'upload' | 'delete' | 'read' = 'upload'): string {
+export function uploadErrorMessage(
+    err: unknown,
+    fallback: string,
+    action: 'upload' | 'delete' | 'read' = 'upload',
+): string {
     const status = err instanceof HttpErrorResponse ? err.status : (err as { status?: number } | null)?.status;
     const server = apiErrorMessage(err, fallback);
     switch (status) {
@@ -76,16 +83,24 @@ export function uploadErrorMessage(err: unknown, fallback: string, action: 'uplo
 }
 
 /** The status badge value (its colour) and the words for one upload's ingest state. */
-export function uploadStateView(u: Pick<UploadRecord, 'state' | 'rejectedRows' | 'rejectedRowsCapped' | 'quarantineReason'>): { tone: string; label: string } {
+export function uploadStateView(
+    u: Pick<UploadRecord, 'state' | 'rejectedRows' | 'rejectedRowsCapped' | 'quarantineReason'>,
+): { tone: string; label: string } {
     switch (u.state) {
         case 'pending':
             return { tone: 'pending', label: 'Waiting for the Collector' };
         case 'ingested':
             return u.rejectedRows
-                ? { tone: 'warning', label: `Ingested, ${u.rejectedRowsCapped ? 'at least ' + u.rejectedRows.toLocaleString('en-US') : u.rejectedRows} ${u.rejectedRows === 1 && !u.rejectedRowsCapped ? 'row' : 'rows'} rejected` }
+                ? {
+                      tone: 'warning',
+                      label: `Ingested, ${u.rejectedRowsCapped ? 'at least ' + u.rejectedRows.toLocaleString('en-US') : u.rejectedRows} ${u.rejectedRows === 1 && !u.rejectedRowsCapped ? 'row' : 'rows'} rejected`,
+                  }
                 : { tone: 'success', label: 'Ingested' };
         case 'quarantined':
-            return { tone: 'quarantined', label: 'Quarantined' + (u.quarantineReason ? ` (${u.quarantineReason})` : '') };
+            return {
+                tone: 'quarantined',
+                label: 'Quarantined' + (u.quarantineReason ? ` (${u.quarantineReason})` : ''),
+            };
         default:
             return { tone: 'neutral', label: 'Picked up' };
     }

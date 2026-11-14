@@ -24,12 +24,7 @@ export function chainMessage(err: unknown, fallback: string): string {
     if (status === 500) return 'The chain did NOT verify — ' + apiErrorMessage(err, fallback);
     // A 404 here is the import's mapping Dataset, never an Entity List: do not borrow the Entity List wording.
     if (status === 404) return 'Not found — ' + apiErrorMessage(err, fallback);
-    return importFieldNames(entityListErrorMessage(
-        err,
-        fallback,
-        false,
-        IDENTITIES_NEED,
-    ));
+    return importFieldNames(entityListErrorMessage(err, fallback, false, IDENTITIES_NEED));
 }
 
 /** The import request's wire names, as the form labels them — a refusal never shows `aCol` / `bCol` to the analyst. */
@@ -67,7 +62,9 @@ export function importFieldNames(message: string): string {
         <section class="flex flex-col gap-2 text-xs" aria-label="Identity Fact log">
             <div class="flex items-center gap-1">
                 <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">Identity Fact log</h3>
-                <button mat-stroked-button class="ml-auto" [disabled]="busy() || !canManage()" (click)="load()">Refresh</button>
+                <button mat-stroked-button class="ml-auto" [disabled]="busy() || !canManage()" (click)="load()">
+                    Refresh
+                </button>
             </div>
             @if (error()) {
                 <inspecto-alert variant="error" [title]="chainBroken() ? 'Chain NOT verified' : 'Identity facts'">{{
@@ -97,40 +94,36 @@ export function importFieldNames(message: string): string {
                     Read-only: the Identity Fact log and its import need Incident management, also to read.
                 </p>
             } @else {
-            <form
-                class="flex flex-wrap items-start gap-2"
-                aria-label="Import identity assertions"
-                (submit)="$event.preventDefault(); import()"
-            >
-                <inspecto-option-picker label="Mapping Dataset" [formControl]="dataset" [options]="datasetOptions()" />
-                <inspecto-option-picker label="Column A" [formControl]="aCol" [options]="columnOptions()" />
-                <inspecto-option-picker label="Column B" [formControl]="bCol" [options]="columnOptions()" />
-                <inspecto-pen-field
-                    label="Type A (optional)"
-                    [formControl]="aType"
-                />
-                <inspecto-pen-field
-                    label="Type B (optional)"
-                    [formControl]="bType"
-                />
-                <inspecto-pen-field
-                    label="Reason"
-                    [formControl]="reason"
-                />
-                <button mat-flat-button type="submit" [disabled]="busy() || !valid()">Import identities</button>
-            </form>
-            <p class="text-secondary m-0">
-                Each row of the two columns asserts that the two values are one identity. Types default to the columns'
-                classified Entity Types; at most 1 000 rows by default.
-            </p>
-            @if (imported(); as r) {
-                <inspecto-alert [variant]="r.imported ? 'success' : 'info'" title="Import result">
-                    {{ r.imported }} assertion(s) added from {{ r.rowsRead }} row(s) read{{
-                        r.truncated ? ' (read truncated)' : ''
-                    }}. Skipped: {{ r.skipped.alreadyAsserted }} already asserted, {{ r.skipped.duplicate }} duplicate,
-                    {{ r.skipped.empty }} empty, {{ r.skipped.self }} self-pair.
-                </inspecto-alert>
-            }
+                <form
+                    class="flex flex-wrap items-start gap-2"
+                    aria-label="Import identity assertions"
+                    (submit)="$event.preventDefault(); import()"
+                >
+                    <inspecto-option-picker
+                        label="Mapping Dataset"
+                        [formControl]="dataset"
+                        [options]="datasetOptions()"
+                    />
+                    <inspecto-option-picker label="Column A" [formControl]="aCol" [options]="columnOptions()" />
+                    <inspecto-option-picker label="Column B" [formControl]="bCol" [options]="columnOptions()" />
+                    <inspecto-pen-field label="Type A (optional)" [formControl]="aType" />
+                    <inspecto-pen-field label="Type B (optional)" [formControl]="bType" />
+                    <inspecto-pen-field label="Reason" [formControl]="reason" />
+                    <button mat-flat-button type="submit" [disabled]="busy() || !valid()">Import identities</button>
+                </form>
+                <p class="text-secondary m-0">
+                    Each row of the two columns asserts that the two values are one identity. Types default to the
+                    columns' classified Entity Types; at most 1 000 rows by default.
+                </p>
+                @if (imported(); as r) {
+                    <inspecto-alert [variant]="r.imported ? 'success' : 'info'" title="Import result">
+                        {{ r.imported }} assertion(s) added from {{ r.rowsRead }} row(s) read{{
+                            r.truncated ? ' (read truncated)' : ''
+                        }}. Skipped: {{ r.skipped.alreadyAsserted }} already asserted,
+                        {{ r.skipped.duplicate }} duplicate, {{ r.skipped.empty }} empty,
+                        {{ r.skipped.self }} self-pair.
+                    </inspecto-alert>
+                }
             }
         </section>
     `,

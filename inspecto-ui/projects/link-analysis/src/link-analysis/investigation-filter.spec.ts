@@ -41,17 +41,32 @@ describe('investigation-filter (LA-INVESTIGATE-UX-1)', () => {
 
     it('redo re-sends an undone step as sealed; an undo entry has nothing to redo', () => {
         const base = { step: 4, author: 'a', at: '', undoneBy: 5, workingSetHash: '', text: '' };
-        expect(redoRequest({ ...base, kind: 'op', op: 'exclude', params: { ids: ['1'], reason: 'noise', note: undefined } })).toEqual({
+        expect(
+            redoRequest({
+                ...base,
+                kind: 'op',
+                op: 'exclude',
+                params: { ids: ['1'], reason: 'noise', note: undefined },
+            }),
+        ).toEqual({
             op: 'exclude',
             ids: ['1'],
             reason: 'noise',
         });
         expect(redoRequest({ ...base, kind: 'undo', undoes: 3 })).toBeNull();
         // a sealed null window was "all time"; the request says 'full' (a bare {op:'window'} is refused)
-        expect(redoRequest({ ...base, kind: 'op', op: 'window', params: { window: null } })).toEqual({ op: 'window', window: 'full' });
+        expect(redoRequest({ ...base, kind: 'op', op: 'window', params: { window: null } })).toEqual({
+            op: 'window',
+            window: 'full',
+        });
         // a note on links is sealed as {source, target, kind}; the request wants lk. ids, so it is not offered again
         expect(
-            redoRequest({ ...base, kind: 'op', op: 'annotate', params: { note: 'n', links: [{ source: 'a', target: 'b', kind: 'k' }] } as never }),
+            redoRequest({
+                ...base,
+                kind: 'op',
+                op: 'annotate',
+                params: { note: 'n', links: [{ source: 'a', target: 'b', kind: 'k' }] } as never,
+            }),
         ).toBeNull();
     });
 });

@@ -166,7 +166,12 @@ describe('LinkAnalysisComponent — Import as draft', () => {
         expect(post.request.method).toBe('POST');
         expect(post.request.url).toBe(`${base}/components/link-analysis-view`);
         expect(post.request.headers.has('If-Match')).toBe(false);
-        expect(post.request.body).toMatchObject({ id: 'fraud-ring', name: 'Fraud ring', layout: 'force', profile: 'telecom' });
+        expect(post.request.body).toMatchObject({
+            id: 'fraud-ring',
+            name: 'Fraud ring',
+            layout: 'force',
+            profile: 'telecom',
+        });
         http.expectNone(`${base}/bundle/import`);
         post.flush({});
         await saved;

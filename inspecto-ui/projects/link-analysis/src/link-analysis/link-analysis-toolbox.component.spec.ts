@@ -77,7 +77,9 @@ describe('LinkAnalysisToolboxComponent', () => {
         const { fixture } = make();
         fixture.detectChanges();
         const headers = Array.from(
-            (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('section > button[aria-controls]'),
+            (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+                'section > button[aria-controls]',
+            ),
         );
         expect(headers.length).toBeGreaterThan(0);
         // the label, the runs-on chip, the node cap, a badge and "suggested" sit in one row that must be allowed to wrap
@@ -229,7 +231,9 @@ describe('LinkAnalysisToolboxComponent', () => {
                 `Approximate: estimated from 1 of ${n} nodes, so close scores may swap places.`,
             );
             fixture.detectChanges();
-            expect(fixture.nativeElement.querySelector('[data-testid=ranking-note]')?.textContent).toContain('Approximate');
+            expect(fixture.nativeElement.querySelector('[data-testid=ranking-note]')?.textContent).toContain(
+                'Approximate',
+            );
             await expectNoA11yViolations(fixture.nativeElement);
 
             c.centralityMetric.set('degree');
@@ -512,9 +516,9 @@ describe('LinkAnalysisToolboxComponent', () => {
         const el = fixture.nativeElement as HTMLElement;
         expect(el.querySelector('[data-testid="stage-edge-kind"]')?.textContent).toContain('Link kind pays');
         expect(el.querySelector('[data-testid="stage-node-kind"]')?.textContent).toContain('Entity Type acct');
-        expect(
-            el.querySelector('[data-testid="stage-node-kind"] button')?.getAttribute('aria-label'),
-        ).toBe('Stage 1: any Entity Type');
+        expect(el.querySelector('[data-testid="stage-node-kind"] button')?.getAttribute('aria-label')).toBe(
+            'Stage 1: any Entity Type',
+        );
         (el.querySelector('[data-testid="stage-node-kind"] button') as HTMLButtonElement).click();
         expect(c.branchStages()![0].nodeKind).toBeUndefined();
         c.updateBranchStage(0, { nodeKind: 'acct' });
@@ -665,9 +669,9 @@ describe('LinkAnalysisToolboxComponent', () => {
         c.loadPatternPack('structuring');
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
-        expect(el.querySelector('[aria-label="Whole Dataset pattern search"]')?.textContent?.replace(/\s+/g, ' ')).toContain(
-            '1 match in the whole Dataset',
-        );
+        expect(
+            el.querySelector('[aria-label="Whole Dataset pattern search"]')?.textContent?.replace(/\s+/g, ' '),
+        ).toContain('1 match in the whole Dataset');
         expect(el.textContent).toContain('Cut at the match limit: more matches exist than are shown.');
         const item = el.querySelector<HTMLButtonElement>('[aria-label="Whole Dataset pattern matches"] button')!;
         expect(item.textContent).toContain('S1, S2 +1 ⇒ HUB ⇒ R1, R2 ⇒ OFF');
@@ -701,7 +705,9 @@ describe('LinkAnalysisToolboxComponent', () => {
         fixture.componentRef.setInput('side', 'server'); // a server control: the Server tab
         c.tab.set('server-paths');
         fixture.detectChanges();
-        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Draw a graph from an Entity/Link query first.');
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+            'Draw a graph from an Entity/Link query first.',
+        );
     });
 
     it('find paths (server): emits the walk request — To optional, depth clamped to the server fence', () => {
@@ -1252,7 +1258,9 @@ describe('LinkAnalysisToolboxComponent search around', () => {
             const { fixture, c } = make(GRAPH, [], false);
             TestBed.inject(GraphRunsService).catalogue.set(CATALOGUE as never);
             fixture.detectChanges();
-            const chips = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('section > button inspecto-chip')).map((x) => x.textContent!.trim());
+            const chips = Array.from(
+                (fixture.nativeElement as HTMLElement).querySelectorAll('section > button inspecto-chip'),
+            ).map((x) => x.textContent!.trim());
             expect(chips).not.toContain('Also on Whole Dataset');
             expect(c.alsoOn('both')).toBe('');
         });
@@ -1282,7 +1290,9 @@ describe('LinkAnalysisToolboxComponent search around', () => {
             expect(c.runsOn('explain')).toBe('both'); // its edge-index reads run on the server
             expect(c.toolCap('centrality')).toBe('Up to 1,000 nodes'); // betweenness is sampled above 500 (LA-PERF-P5-1)
             // T-087: a row that also runs on the other tab names it; no raw "both / browser / server" chip
-            const chips = Array.from(el.querySelectorAll('section > button inspecto-chip')).map((x) => x.textContent!.trim());
+            const chips = Array.from(el.querySelectorAll('section > button inspecto-chip')).map((x) =>
+                x.textContent!.trim(),
+            );
             expect(chips).toContain('Also on Whole Dataset');
             expect(chips.filter((t) => /^(both|browser|server|suggested)$/.test(t))).toEqual([]);
             await expectNoA11yViolations(el);

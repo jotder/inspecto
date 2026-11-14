@@ -17,7 +17,12 @@ import {
     selectionNodeCapValue,
     suspicionNodeCapValue,
 } from './graph-analysis';
-import { LA_LIMIT_FALLBACKS, LaLimitKey, configureLaLimits, resetLaLimits } from '@inspecto/link-analysis/link-analysis/la-limits';
+import {
+    LA_LIMIT_FALLBACKS,
+    LaLimitKey,
+    configureLaLimits,
+    resetLaLimits,
+} from '@inspecto/link-analysis/link-analysis/la-limits';
 
 /**
  * LA-CONFIG-LIMITS-1 CL-3 (operator, 2026-10-15): one browser cap PER ALGORITHM, `browser_algorithms.<id>`, replacing the
@@ -67,9 +72,24 @@ describe('per-algorithm browser caps (CL-3)', () => {
         expect(LA_LIMIT_FALLBACKS.analysis_node_cap).toBe(2500);
         expect(LA_LIMIT_FALLBACKS.suspicion_node_cap).toBe(1000);
         expect(browserAlgorithmCapValue('betweennessCentrality')).toBe(500);
-        for (const a of ['closenessCentrality', 'eigenvectorCentrality', 'katzCentrality', 'hits', 'cliques', 'maxFlow', 'linkPrediction'] as const)
+        for (const a of [
+            'closenessCentrality',
+            'eigenvectorCentrality',
+            'katzCentrality',
+            'hits',
+            'cliques',
+            'maxFlow',
+            'linkPrediction',
+        ] as const)
             expect(browserAlgorithmCapValue(a), a).toBe(1000);
-        for (const a of ['louvainCommunities', 'detectCommunities', 'shortestPath', 'allPaths', 'findCycles', 'bridges'] as const)
+        for (const a of [
+            'louvainCommunities',
+            'detectCommunities',
+            'shortestPath',
+            'allPaths',
+            'findCycles',
+            'bridges',
+        ] as const)
             expect(browserAlgorithmCapValue(a), a).toBe(2500);
         expect('browser_algorithms.suspicionScore' in LA_LIMIT_FALLBACKS).toBe(false);
     });
@@ -82,12 +102,15 @@ describe('per-algorithm browser caps (CL-3)', () => {
         expect(() => run(g)).toThrowError(`${name} is capped at 11 nodes (graph has 12).`);
     });
 
-    it.each(GUARDED)('%s: is its own cap - lowering every OTHER one, or the general cap, does not refuse it', (key, _name, run) => {
-        const g = ring(12);
-        const others = Object.fromEntries(GUARDED.filter(([k]) => k !== key).map(([k]) => [k, 2]));
-        configureLaLimits({ ...others, analysis_node_cap: 2, suspicion_node_cap: 2 });
-        expect(() => run(g)).not.toThrow();
-    });
+    it.each(GUARDED)(
+        '%s: is its own cap - lowering every OTHER one, or the general cap, does not refuse it',
+        (key, _name, run) => {
+            const g = ring(12);
+            const others = Object.fromEntries(GUARDED.filter(([k]) => k !== key).map(([k]) => [k, 2]));
+            configureLaLimits({ ...others, analysis_node_cap: 2, suspicion_node_cap: 2 });
+            expect(() => run(g)).not.toThrow();
+        },
+    );
 
     it('the general cap still guards the branching matcher and is the selection threshold', () => {
         configureLaLimits({ analysis_node_cap: 5, 'browser_algorithms.closenessCentrality': 100 });
@@ -106,7 +129,8 @@ describe('per-algorithm browser caps (CL-3)', () => {
 
     it('a nonsense per-algorithm value is refused and the previous one stands', () => {
         configureLaLimits({ 'browser_algorithms.hits': 40 });
-        for (const bad of [0, -3, Number.NaN, Number.POSITIVE_INFINITY]) configureLaLimits({ 'browser_algorithms.hits': bad });
+        for (const bad of [0, -3, Number.NaN, Number.POSITIVE_INFINITY])
+            configureLaLimits({ 'browser_algorithms.hits': bad });
         expect(browserAlgorithmCapValue('hits')).toBe(40);
         expect(suspicionNodeCapValue()).toBe(1000);
     });

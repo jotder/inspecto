@@ -148,213 +148,219 @@ const blank = (v: unknown): boolean => v === null || v === undefined || String(v
                 <inspecto-alert variant="warning" title="Limits unavailable">{{ limits.loadError() }}</inspecto-alert>
             } @else {
                 @if (shows('analysis')) {
-                <section class="flex flex-col gap-3" aria-labelledby="la-limits-analysis">
-                    <h2 id="la-limits-analysis" class="text-lg font-semibold" [class.sr-only]="single()">Analysis</h2>
-                    @if (!single()) {
-                        <p class="text-secondary text-sm">
-                            Limits for this Space, enforced by the server. Blank = the shipped default.
-                        </p>
-                    }
-                    @if (spaceItems().length) {
-                        <form
-                            class="flex flex-col gap-3"
-                            [formGroup]="spaceForm()"
-                            (ngSubmit)="save('space')"
-                            data-section="space"
-                        >
-                            <mat-accordion multi class="inspecto-flat-accordion flex flex-col gap-2">
-                                @for (g of spaceGroups(); track g.group; let first = $first) {
-                                    <mat-expansion-panel [expanded]="first" [attr.data-group]="g.group">
-                                        <mat-expansion-panel-header>
-                                            <mat-panel-title
-                                                >{{ groupLabel(g.group)
-                                                }}<span class="sr-only"> — Analysis</span></mat-panel-title
-                                            >
-                                            <mat-panel-description>{{ g.items.length }}</mat-panel-description>
-                                        </mat-expansion-panel-header>
-                                        <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-                                            @for (i of g.items; track i.key) {
-                                                <div class="flex min-w-0 flex-col">
-                                                    <ng-container
-                                                        [ngTemplateOutlet]="field"
-                                                        [ngTemplateOutletContext]="{
-                                                            $implicit: i,
-                                                            control: ctl(spaceForm(), i.key),
-                                                            max: i.max,
-                                                            placeholder: 'default ' + defaultText(i),
-                                                        }"
-                                                    />
-                                                </div>
-                                            }
-                                        </div>
-                                    </mat-expansion-panel>
+                    <section class="flex flex-col gap-3" aria-labelledby="la-limits-analysis">
+                        <h2 id="la-limits-analysis" class="text-lg font-semibold" [class.sr-only]="single()">
+                            Analysis
+                        </h2>
+                        @if (!single()) {
+                            <p class="text-secondary text-sm">
+                                Limits for this Space, enforced by the server. Blank = the shipped default.
+                            </p>
+                        }
+                        @if (spaceItems().length) {
+                            <form
+                                class="flex flex-col gap-3"
+                                [formGroup]="spaceForm()"
+                                (ngSubmit)="save('space')"
+                                data-section="space"
+                            >
+                                <mat-accordion multi class="inspecto-flat-accordion flex flex-col gap-2">
+                                    @for (g of spaceGroups(); track g.group; let first = $first) {
+                                        <mat-expansion-panel [expanded]="first" [attr.data-group]="g.group">
+                                            <mat-expansion-panel-header>
+                                                <mat-panel-title
+                                                    >{{ groupLabel(g.group)
+                                                    }}<span class="sr-only"> — Analysis</span></mat-panel-title
+                                                >
+                                                <mat-panel-description>{{ g.items.length }}</mat-panel-description>
+                                            </mat-expansion-panel-header>
+                                            <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+                                                @for (i of g.items; track i.key) {
+                                                    <div class="flex min-w-0 flex-col">
+                                                        <ng-container
+                                                            [ngTemplateOutlet]="field"
+                                                            [ngTemplateOutletContext]="{
+                                                                $implicit: i,
+                                                                control: ctl(spaceForm(), i.key),
+                                                                max: i.max,
+                                                                placeholder: 'default ' + defaultText(i),
+                                                            }"
+                                                        />
+                                                    </div>
+                                                }
+                                            </div>
+                                        </mat-expansion-panel>
+                                    }
+                                </mat-accordion>
+                                @if (errors()['space']; as e) {
+                                    <inspecto-alert variant="error" title="Not saved">{{ e }}</inspecto-alert>
                                 }
-                            </mat-accordion>
-                            @if (errors()['space']; as e) {
-                                <inspecto-alert variant="error" title="Not saved">{{ e }}</inspecto-alert>
-                            }
-                            @if (anyEditable(spaceItems())) {
-                                <div>
-                                    <button
-                                        mat-flat-button
-                                        color="primary"
-                                        type="submit"
-                                        [disabled]="saving() === 'space'"
-                                    >
-                                        Save Analysis limits
-                                    </button>
-                                </div>
-                            } @else {
-                                <inspecto-alert variant="info" title="Read only">
-                                    Changing these limits needs the Workbench authoring capability.
-                                </inspecto-alert>
-                            }
-                        </form>
-                    } @else {
-                        <p class="text-secondary text-sm">None reported.</p>
-                    }
-                </section>
+                                @if (anyEditable(spaceItems())) {
+                                    <div>
+                                        <button
+                                            mat-flat-button
+                                            color="primary"
+                                            type="submit"
+                                            [disabled]="saving() === 'space'"
+                                        >
+                                            Save Analysis limits
+                                        </button>
+                                    </div>
+                                } @else {
+                                    <inspecto-alert variant="info" title="Read only">
+                                        Changing these limits needs the Workbench authoring capability.
+                                    </inspecto-alert>
+                                }
+                            </form>
+                        } @else {
+                            <p class="text-secondary text-sm">None reported.</p>
+                        }
+                    </section>
                 }
 
                 @if (shows('host')) {
-                <section class="flex flex-col gap-3" aria-labelledby="la-limits-host">
-                    <h2 id="la-limits-host" class="text-lg font-semibold" [class.sr-only]="single()">Host resources</h2>
-                    @if (!single() || limits.podScoped()) {
-                        <p class="text-secondary text-sm">
-                            @if (!single()) {
-                                Install-wide limits shared by every Space on this server.
-                            }
-                            @if (limits.podScoped()) {
-                                In a cluster they apply to this server (pod) only.
-                            }
-                        </p>
-                    }
-                    @if (installItems().length) {
-                        <form
-                            class="flex flex-col gap-3"
-                            [formGroup]="installForm()"
-                            (ngSubmit)="save('install')"
-                            data-section="install"
-                        >
-                            <mat-accordion multi class="inspecto-flat-accordion flex flex-col gap-2">
-                                @for (g of installGroups(); track g.group; let first = $first) {
-                                    <mat-expansion-panel [expanded]="first" [attr.data-group]="g.group">
-                                        <mat-expansion-panel-header>
-                                            <mat-panel-title
-                                                >{{ groupLabel(g.group)
-                                                }}<span class="sr-only"> — Host resources</span></mat-panel-title
-                                            >
-                                            <mat-panel-description>{{ g.items.length }}</mat-panel-description>
-                                        </mat-expansion-panel-header>
-                                        <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-                                            @for (i of g.items; track i.key) {
-                                                <div class="flex min-w-0 flex-col">
-                                                    <ng-container
-                                                        [ngTemplateOutlet]="field"
-                                                        [ngTemplateOutletContext]="{
-                                                            $implicit: i,
-                                                            control: ctl(installForm(), i.key),
-                                                            max: i.max,
-                                                            placeholder: 'default ' + defaultText(i),
-                                                        }"
-                                                    />
-                                                </div>
-                                            }
-                                        </div>
-                                    </mat-expansion-panel>
+                    <section class="flex flex-col gap-3" aria-labelledby="la-limits-host">
+                        <h2 id="la-limits-host" class="text-lg font-semibold" [class.sr-only]="single()">
+                            Host resources
+                        </h2>
+                        @if (!single() || limits.podScoped()) {
+                            <p class="text-secondary text-sm">
+                                @if (!single()) {
+                                    Install-wide limits shared by every Space on this server.
                                 }
-                            </mat-accordion>
-                            @if (errors()['install']; as e) {
-                                <inspecto-alert variant="error" title="Not saved">{{ e }}</inspecto-alert>
-                            }
-                            @if (anyEditable(installItems())) {
-                                <div>
-                                    <button
-                                        mat-flat-button
-                                        color="primary"
-                                        type="submit"
-                                        [disabled]="saving() === 'install'"
-                                    >
-                                        Save host resources
-                                    </button>
-                                </div>
-                            } @else {
-                                <inspecto-alert variant="info" title="Read only">
-                                    Changing host resources needs the system administrator capability.
-                                </inspecto-alert>
-                            }
-                        </form>
-                    } @else {
-                        <p class="text-secondary text-sm">None reported.</p>
-                    }
-                </section>
+                                @if (limits.podScoped()) {
+                                    In a cluster they apply to this server (pod) only.
+                                }
+                            </p>
+                        }
+                        @if (installItems().length) {
+                            <form
+                                class="flex flex-col gap-3"
+                                [formGroup]="installForm()"
+                                (ngSubmit)="save('install')"
+                                data-section="install"
+                            >
+                                <mat-accordion multi class="inspecto-flat-accordion flex flex-col gap-2">
+                                    @for (g of installGroups(); track g.group; let first = $first) {
+                                        <mat-expansion-panel [expanded]="first" [attr.data-group]="g.group">
+                                            <mat-expansion-panel-header>
+                                                <mat-panel-title
+                                                    >{{ groupLabel(g.group)
+                                                    }}<span class="sr-only"> — Host resources</span></mat-panel-title
+                                                >
+                                                <mat-panel-description>{{ g.items.length }}</mat-panel-description>
+                                            </mat-expansion-panel-header>
+                                            <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+                                                @for (i of g.items; track i.key) {
+                                                    <div class="flex min-w-0 flex-col">
+                                                        <ng-container
+                                                            [ngTemplateOutlet]="field"
+                                                            [ngTemplateOutletContext]="{
+                                                                $implicit: i,
+                                                                control: ctl(installForm(), i.key),
+                                                                max: i.max,
+                                                                placeholder: 'default ' + defaultText(i),
+                                                            }"
+                                                        />
+                                                    </div>
+                                                }
+                                            </div>
+                                        </mat-expansion-panel>
+                                    }
+                                </mat-accordion>
+                                @if (errors()['install']; as e) {
+                                    <inspecto-alert variant="error" title="Not saved">{{ e }}</inspecto-alert>
+                                }
+                                @if (anyEditable(installItems())) {
+                                    <div>
+                                        <button
+                                            mat-flat-button
+                                            color="primary"
+                                            type="submit"
+                                            [disabled]="saving() === 'install'"
+                                        >
+                                            Save host resources
+                                        </button>
+                                    </div>
+                                } @else {
+                                    <inspecto-alert variant="info" title="Read only">
+                                        Changing host resources needs the system administrator capability.
+                                    </inspecto-alert>
+                                }
+                            </form>
+                        } @else {
+                            <p class="text-secondary text-sm">None reported.</p>
+                        }
+                    </section>
                 }
 
                 @if (shows('browser')) {
-                <section class="flex flex-col gap-3" aria-labelledby="la-limits-browser">
-                    <h2 id="la-limits-browser" class="text-lg font-semibold" [class.sr-only]="single()">My browser</h2>
-                    @if (!single()) {
-                        <p class="text-secondary text-sm">
-                            Your own values for this browser only, at most the Space value. Blank = the Space value.
-                        </p>
-                    }
-                    @if (browserItems().length) {
-                        <form
-                            class="flex flex-col gap-3"
-                            [formGroup]="browserForm()"
-                            (ngSubmit)="keepPersonal()"
-                            data-section="browser"
-                        >
-                            <mat-accordion multi class="inspecto-flat-accordion flex flex-col gap-2">
-                                @for (g of browserGroups(); track g.group; let first = $first) {
-                                    <mat-expansion-panel [expanded]="first" [attr.data-group]="g.group">
-                                        <mat-expansion-panel-header>
-                                            <mat-panel-title
-                                                >{{ groupLabel(g.group)
-                                                }}<span class="sr-only"> — My browser</span></mat-panel-title
-                                            >
-                                            <mat-panel-description>{{ g.items.length }}</mat-panel-description>
-                                        </mat-expansion-panel-header>
-                                        <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-                                            @for (i of g.items; track i.key) {
-                                                <div class="flex flex-col gap-1">
-                                                    <ng-container
-                                                        [ngTemplateOutlet]="field"
-                                                        [ngTemplateOutletContext]="{
-                                                            $implicit: i,
-                                                            control: ctl(browserForm(), i.key),
-                                                            max: spaceValue(i),
-                                                            placeholder: 'Space value ' + num(spaceValue(i)),
-                                                        }"
-                                                    />
-                                                    @if (limits.personal(i.key) !== null) {
-                                                        <div>
-                                                            <button
-                                                                mat-button
-                                                                type="button"
-                                                                [attr.aria-label]="
-                                                                    'Reset ' + label(i) + ' to the Space value'
-                                                                "
-                                                                (click)="limits.resetPersonal(i.key)"
-                                                            >
-                                                                Reset to Space value
-                                                            </button>
-                                                        </div>
-                                                    }
-                                                </div>
-                                            }
-                                        </div>
-                                    </mat-expansion-panel>
-                                }
-                            </mat-accordion>
-                            <div>
-                                <button mat-stroked-button type="submit">Keep in this browser</button>
-                            </div>
-                        </form>
-                    } @else {
-                        <p class="text-secondary text-sm">None reported.</p>
-                    }
-                </section>
+                    <section class="flex flex-col gap-3" aria-labelledby="la-limits-browser">
+                        <h2 id="la-limits-browser" class="text-lg font-semibold" [class.sr-only]="single()">
+                            My browser
+                        </h2>
+                        @if (!single()) {
+                            <p class="text-secondary text-sm">
+                                Your own values for this browser only, at most the Space value. Blank = the Space value.
+                            </p>
+                        }
+                        @if (browserItems().length) {
+                            <form
+                                class="flex flex-col gap-3"
+                                [formGroup]="browserForm()"
+                                (ngSubmit)="keepPersonal()"
+                                data-section="browser"
+                            >
+                                <mat-accordion multi class="inspecto-flat-accordion flex flex-col gap-2">
+                                    @for (g of browserGroups(); track g.group; let first = $first) {
+                                        <mat-expansion-panel [expanded]="first" [attr.data-group]="g.group">
+                                            <mat-expansion-panel-header>
+                                                <mat-panel-title
+                                                    >{{ groupLabel(g.group)
+                                                    }}<span class="sr-only"> — My browser</span></mat-panel-title
+                                                >
+                                                <mat-panel-description>{{ g.items.length }}</mat-panel-description>
+                                            </mat-expansion-panel-header>
+                                            <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+                                                @for (i of g.items; track i.key) {
+                                                    <div class="flex flex-col gap-1">
+                                                        <ng-container
+                                                            [ngTemplateOutlet]="field"
+                                                            [ngTemplateOutletContext]="{
+                                                                $implicit: i,
+                                                                control: ctl(browserForm(), i.key),
+                                                                max: spaceValue(i),
+                                                                placeholder: 'Space value ' + num(spaceValue(i)),
+                                                            }"
+                                                        />
+                                                        @if (limits.personal(i.key) !== null) {
+                                                            <div>
+                                                                <button
+                                                                    mat-button
+                                                                    type="button"
+                                                                    [attr.aria-label]="
+                                                                        'Reset ' + label(i) + ' to the Space value'
+                                                                    "
+                                                                    (click)="limits.resetPersonal(i.key)"
+                                                                >
+                                                                    Reset to Space value
+                                                                </button>
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                        </mat-expansion-panel>
+                                    }
+                                </mat-accordion>
+                                <div>
+                                    <button mat-stroked-button type="submit">Keep in this browser</button>
+                                </div>
+                            </form>
+                        } @else {
+                            <p class="text-secondary text-sm">None reported.</p>
+                        }
+                    </section>
                 }
             }
         </div>

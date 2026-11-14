@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    computed,
+    effect,
+    inject,
+    input,
+    output,
+    signal,
+    untracked,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { ColDef } from 'ag-grid-community';
 import { firstValueFrom } from 'rxjs';
@@ -58,7 +68,9 @@ const NO_WINDOW = 'this Investigation sets no time window, and its Files name no
                 <inspecto-status-badge [value]="strip().tone" [label]="strip().label"></inspecto-status-badge>
                 <span data-test="strip-text">{{ strip().text }}</span>
                 @if (coverageError()) {
-                    <span class="text-secondary text-xs" data-test="strip-days-reason">Days not assessed: {{ coverageError() }}</span>
+                    <span class="text-secondary text-xs" data-test="strip-days-reason"
+                        >Days not assessed: {{ coverageError() }}</span
+                    >
                 }
                 <button
                     mat-button
@@ -420,9 +432,9 @@ export class LinkAnalysisDataStripComponent {
             : this.setsNoWindow(id)
               ? this.coverageError.set(NO_WINDOW) // the bare read would be refused (422): go straight to the Files' span
               : firstValueFrom(this.inv.investigationCoverage(id)).then(
-                  (c) => current() && this.coverage.set(c),
-                  (err) => current() && this.coverageError.set(apiErrorMessage(err, 'the coverage read failed.')),
-              );
+                    (c) => current() && this.coverage.set(c),
+                    (err) => current() && this.coverageError.set(apiErrorMessage(err, 'the coverage read failed.')),
+                );
         const files = firstValueFrom(this.inv.datasetFiles(ds, { limit: PAGE })).then(
             (f) => {
                 if (!current()) return;

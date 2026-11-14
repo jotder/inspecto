@@ -80,7 +80,13 @@ function create(list: () => unknown, pending: unknown[] = []) {
             limit: 2,
             truncated: true,
             rows: [
-                { entityKey: '966501234567', score: 80, high: true, scoredAt: 't', segments: { band: picks['band'] ?? '2' } },
+                {
+                    entityKey: '966501234567',
+                    score: 80,
+                    high: true,
+                    scoredAt: 't',
+                    segments: { band: picks['band'] ?? '2' },
+                },
                 { entityKey: '966507654321', score: 10, high: false, scoredAt: 't', segments: { band: null } },
             ],
         }),

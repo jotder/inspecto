@@ -95,7 +95,11 @@ export class PredictionPanelComponent {
     }
 
     title(p: Prediction): string {
-        return p.kind === 'segmentation-model' ? 'Customer Segment' : p.kind === 'churn-model' ? 'Churn Score' : 'Forecast';
+        return p.kind === 'segmentation-model'
+            ? 'Customer Segment'
+            : p.kind === 'churn-model'
+              ? 'Churn Score'
+              : 'Forecast';
     }
 
     badge(p: Prediction) {

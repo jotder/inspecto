@@ -23,7 +23,9 @@ describe('FormMenuDirective', () => {
         TestBed.configureTestingModule({ imports: [Host], providers: [provideNoopAnimations()] });
         const f = TestBed.createComponent(Host);
         f.detectChanges();
-        const [form, plain] = f.debugElement.queryAll(By.directive(MatMenuTrigger)).map((d) => d.injector.get(MatMenuTrigger));
+        const [form, plain] = f.debugElement
+            .queryAll(By.directive(MatMenuTrigger))
+            .map((d) => d.injector.get(MatMenuTrigger));
         form.openMenu();
         f.detectChanges();
         await f.whenStable();

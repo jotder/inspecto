@@ -189,8 +189,9 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
                     @if (sealed(); as z) {
                         <p role="status" class="m-0 text-xs" data-test="temporal-sealed">
                             Sealed at step {{ z.step }}: {{ z.count }} {{ z.count === 1 ? 'finding' : 'findings' }} in
-                            the Working Set{{ z.outsideWorkingSet ? ' (' + z.outsideWorkingSet + ' outside it were left out)' : '' }}.
-                            Fingerprint {{ z.fingerprint.slice(0, 12) }}.
+                            the Working Set{{
+                                z.outsideWorkingSet ? ' (' + z.outsideWorkingSet + ' outside it were left out)' : ''
+                            }}. Fingerprint {{ z.fingerprint.slice(0, 12) }}.
                         </p>
                     }
                     @if (sealError()) {
@@ -238,8 +239,8 @@ const clamp = (v: number, lo: number, hi: number, fallback: number): number =>
                     </ul>
                 } @else {
                     <p class="text-secondary m-0 text-xs" data-test="temporal-none">
-                        Nothing matched. Try {{ mode() === 'burst' ? 'a larger burst window' : 'a larger irregularity' }} or
-                        fewer events.
+                        Nothing matched. Try
+                        {{ mode() === 'burst' ? 'a larger burst window' : 'a larger irregularity' }} or fewer events.
                     </p>
                 }
             }

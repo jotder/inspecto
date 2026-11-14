@@ -14,7 +14,14 @@ const STEP = {
     truncated: false,
     read: {
         pairs: [
-            { a: '5551110001', b: '5551110002', connected: true, hops: 2, routes: 2, route: ['5551110001', 'm1', '5551110002'] },
+            {
+                a: '5551110001',
+                b: '5551110002',
+                connected: true,
+                hops: 2,
+                routes: 2,
+                route: ['5551110001', 'm1', '5551110002'],
+            },
             { a: '5551110001', b: '5551110003', connected: false, notWalked: ['hub1'] },
         ],
         noLinks: ['5551110003'],
@@ -60,7 +67,11 @@ describe('InvestigationConnectOpComponent (LA-SEED-CONNECT-1)', () => {
             fixture.detectChanges();
             expect(el.querySelector('[data-testid="seed-summary"]')?.textContent).toContain('(up to 2, within 2 hops)');
             await cmp.connect();
-            expect(store.apply).toHaveBeenLastCalledWith({ op: 'connect', ids: ['5551110001', '5551110002'], maxHops: 2 });
+            expect(store.apply).toHaveBeenLastCalledWith({
+                op: 'connect',
+                ids: ['5551110001', '5551110002'],
+                maxHops: 2,
+            });
         } finally {
             resetLaLimits();
         }
@@ -73,10 +84,18 @@ describe('InvestigationConnectOpComponent (LA-SEED-CONNECT-1)', () => {
             const { cmp, store } = setup();
             cmp.text.set('5551110001 5551110002');
             await cmp.connect();
-            expect(store.apply).toHaveBeenLastCalledWith({ op: 'connect', ids: ['5551110001', '5551110002'], maxHops: 3 });
+            expect(store.apply).toHaveBeenLastCalledWith({
+                op: 'connect',
+                ids: ['5551110001', '5551110002'],
+                maxHops: 3,
+            });
             configureLaLimits({ 'connect.max_hops': 2, 'connect.default_hops': 5 }); // a default above the max is clamped
             await cmp.connect();
-            expect(store.apply).toHaveBeenLastCalledWith({ op: 'connect', ids: ['5551110001', '5551110002'], maxHops: 2 });
+            expect(store.apply).toHaveBeenLastCalledWith({
+                op: 'connect',
+                ids: ['5551110001', '5551110002'],
+                maxHops: 2,
+            });
         } finally {
             resetLaLimits();
         }
@@ -84,7 +103,9 @@ describe('InvestigationConnectOpComponent (LA-SEED-CONNECT-1)', () => {
 
     it('a click on a connected pair row hands its example route to the canvas, and records nothing', () => {
         const { fixture, cmp, store, el } = setup(true, STEP);
-        const row = Array.from(el.querySelectorAll('tbody tr')).find((r) => r.getAttribute('tabindex') === '0') as HTMLElement;
+        const row = Array.from(el.querySelectorAll('tbody tr')).find(
+            (r) => r.getAttribute('tabindex') === '0',
+        ) as HTMLElement;
         expect(row).toBeTruthy();
         row.click();
         fixture.detectChanges();
@@ -104,7 +125,7 @@ describe('InvestigationConnectOpComponent (LA-SEED-CONNECT-1)', () => {
         expect(store.apply).not.toHaveBeenCalled();
     });
 
-    it("cancels the native form submit (no page navigation)", async () => {
+    it('cancels the native form submit (no page navigation)', async () => {
         const { fixture, cmp, el } = setup();
         cmp.text.set('5551110001 5551110002');
         fixture.detectChanges();
@@ -112,7 +133,11 @@ describe('InvestigationConnectOpComponent (LA-SEED-CONNECT-1)', () => {
         const onSubmit = (e: Event) => seen.push(e);
         el.ownerDocument.addEventListener('submit', onSubmit);
         try {
-            (Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Connect start entities')) as HTMLButtonElement).click();
+            (
+                Array.from(el.querySelectorAll('button')).find((b) =>
+                    b.textContent?.includes('Connect start entities'),
+                ) as HTMLButtonElement
+            ).click();
             await fixture.whenStable();
         } finally {
             el.ownerDocument.removeEventListener('submit', onSubmit);
@@ -144,9 +169,17 @@ describe('InvestigationConnectOpComponent (LA-SEED-CONNECT-1)', () => {
     it('Expand from these nodes sends one expand over the nodes on the routes', async () => {
         const { fixture, store, el } = setup(true, STEP);
         fixture.detectChanges();
-        (Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Expand from these nodes')) as HTMLButtonElement).click();
+        (
+            Array.from(el.querySelectorAll('button')).find((b) =>
+                b.textContent?.includes('Expand from these nodes'),
+            ) as HTMLButtonElement
+        ).click();
         await fixture.whenStable();
-        expect(store.apply).toHaveBeenLastCalledWith({ op: 'expand', ids: ['5551110001', 'm1', '5551110002'], maxFanOut: 50 });
+        expect(store.apply).toHaveBeenLastCalledWith({
+            op: 'expand',
+            ids: ['5551110001', 'm1', '5551110002'],
+            maxFanOut: 50,
+        });
     });
 
     it('shows no table before a connect, and none for a step of another op', () => {

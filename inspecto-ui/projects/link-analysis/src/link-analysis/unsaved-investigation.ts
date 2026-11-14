@@ -147,11 +147,19 @@ export function expandStepDegrees(step: UnsavedStep | undefined): number | null 
  * LA-DEGREES-TRIM-1: the step cut to its first `degrees` degrees and the Working Set that many degrees drew (the
  * terminal entities and the links only they carried are gone). Null when it cannot be cut (not an Expand, nothing to cut).
  */
-export function trimExpandStep(step: UnsavedStep | undefined, degrees: number): { step: UnsavedStep; ws: WorkingSet } | null {
+export function trimExpandStep(
+    step: UnsavedStep | undefined,
+    degrees: number,
+): { step: UnsavedStep; ws: WorkingSet } | null {
     const have = expandStepDegrees(step);
     if (!have || step?.kind !== 'expand' || degrees < 1 || degrees >= have) return null;
     return {
-        step: { ...step, walked: step.walked!.slice(0, degrees), stages: step.stages!.slice(0, degrees), req: { ...step.req, degrees } },
+        step: {
+            ...step,
+            walked: step.walked!.slice(0, degrees),
+            stages: step.stages!.slice(0, degrees),
+            req: { ...step.req, degrees },
+        },
         ws: step.stages![degrees - 1],
     };
 }

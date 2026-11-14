@@ -17,9 +17,14 @@ describe('Layered rank width', () => {
     });
 
     it('ranks a chain one node per rank, and survives a cycle', () => {
-        const g = { nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], edges: [
-            { source: 'a', target: 'b' }, { source: 'b', target: 'c' }, { source: 'c', target: 'a' },
-        ] };
+        const g = {
+            nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+            edges: [
+                { source: 'a', target: 'b' },
+                { source: 'b', target: 'c' },
+                { source: 'c', target: 'a' },
+            ],
+        };
         expect(layeredWidestRank(g)).toBe(1);
     });
 

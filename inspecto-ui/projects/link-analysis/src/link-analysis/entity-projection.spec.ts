@@ -249,7 +249,8 @@ describe('EntityProjectionGraphSource.expand (Phase E, incremental expand)', () 
     it('DR-U4: carries the server `source` of a neighbours read onto the expanded graph', async () => {
         const source = { kind: 'index', version: 4, stale: false, fingerprint: 'known' } as const;
         const inv = {
-            neighbors: () => of({ rows: [{ source: 'alice', target: 'bob', kind: null, count: 1 }], truncated: false, source }),
+            neighbors: () =>
+                of({ rows: [{ source: 'alice', target: 'bob', kind: null, count: 1 }], truncated: false, source }),
         } as never;
         const src = new EntityProjectionGraphSource({ get: () => of(ds) } as never, inv);
         const g = (await src.expand('entity:bob', 'bob', {
@@ -449,8 +450,7 @@ describe('invErrorMessage - an empty Dataset store', () => {
     const noData =
         "Dataset 'mule_transfers_dataset' has no data yet: nothing has been ingested into its store (mule_transfers). " +
         "Run the Pipeline that fills it, or check the Dataset's physicalRef.";
-    const http = (status: number, message: string) =>
-        new HttpErrorResponse({ status, error: { error: { message } } });
+    const http = (status: number, message: string) => new HttpErrorResponse({ status, error: { error: { message } } });
 
     it('shows the server words plus a hint, with no DuckDB text', () => {
         const out = invErrorMessage(http(409, noData), 'The graph query failed.');

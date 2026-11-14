@@ -69,13 +69,17 @@ describe('LinkAnalysisSettingsComponent (⚙ Settings, §5.10)', () => {
         const { fixture, el, host } = make();
         const nav = el.querySelector('[data-testid="la-settings-nav-modules"]') as HTMLButtonElement;
         expect(nav.textContent!.trim()).toBe('Installed modules');
-        const groups = Array.from(el.querySelectorAll('nav[aria-label="Settings sections"] h3')).map((h) => h.textContent!.trim());
+        const groups = Array.from(el.querySelectorAll('nav[aria-label="Settings sections"] h3')).map((h) =>
+            h.textContent!.trim(),
+        );
         expect(groups.at(-1)).toBe('This Studio');
         nav.click();
         fixture.detectChanges();
         expect(host.section()).toBe('modules');
         expect((el.querySelector('[data-testid="mods"]')!.parentElement as HTMLElement).hidden).toBe(false);
-        expect(el.querySelector('[data-testid="la-settings-help"]')!.textContent).toContain('Link Analysis modules on this server');
+        expect(el.querySelector('[data-testid="la-settings-help"]')!.textContent).toContain(
+            'Link Analysis modules on this server',
+        );
         await expectNoA11yViolations(el);
     });
 

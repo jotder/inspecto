@@ -101,7 +101,8 @@ export function biQueryBody(spec: QuerySpec, cols: ColumnMeta[] = []): BiQueryBo
     if (!spec.measures.length && !spec.groupBy.length) return null; // the wire needs at least one of them
     const measures: BiQueryBody['measures'] = [];
     const ratios: NonNullable<BiQueryBody['ratios']> = [];
-    const wire = (m: QueryMeasure) => (m.agg === 'count' ? { agg: 'count' } : { agg: m.agg as string, field: m.field ?? m.id });
+    const wire = (m: QueryMeasure) =>
+        m.agg === 'count' ? { agg: 'count' } : { agg: m.agg as string, field: m.field ?? m.id };
     for (const m of spec.measures) {
         if (m.ratio) {
             if (!m.ratio.num.agg || !m.ratio.den.agg) return null; // a named-measure term inside the ratio

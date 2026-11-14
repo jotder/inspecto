@@ -117,7 +117,8 @@ import { Router } from '@angular/router';
                     />
                 </div>
                 <div class="flex gap-3">
-                    <mat-form-field class="flex-1" subscriptSizing="dynamic"><!-- form-allow: a typeahead over known assignees -->
+                    <mat-form-field class="flex-1" subscriptSizing="dynamic"
+                        ><!-- form-allow: a typeahead over known assignees -->
                         <mat-label>Assignee</mat-label>
                         <input matInput formControlName="assignee" [matAutocomplete]="assigneeAc" />
                         <mat-autocomplete #assigneeAc="matAutocomplete">
@@ -126,7 +127,8 @@ import { Router } from '@angular/router';
                             }
                         </mat-autocomplete>
                     </mat-form-field>
-                    <mat-form-field class="flex-1" subscriptSizing="dynamic"><!-- form-allow: a chip typeahead over the tag registry -->
+                    <mat-form-field class="flex-1" subscriptSizing="dynamic"
+                        ><!-- form-allow: a chip typeahead over the tag registry -->
                         <mat-label>Tags</mat-label>
                         <mat-chip-grid #tagGrid aria-label="Tags">
                             @for (t of tags(); track t) {
@@ -161,9 +163,11 @@ import { Router } from '@angular/router';
                         [options]="relationships"
                         formControlName="linkRelationship"
                     />
-                    <mat-form-field class="flex-[2]" subscriptSizing="dynamic"><!-- form-allow: a multiple choice, not one -->
+                    <mat-form-field class="flex-[2]" subscriptSizing="dynamic"
+                        ><!-- form-allow: a multiple choice, not one -->
                         <mat-label>Linked entities</mat-label>
-                        <mat-select formControlName="links" multiple required><!-- form-allow: a multiple choice, not one -->
+                        <mat-select formControlName="links" multiple required
+                            ><!-- form-allow: a multiple choice, not one -->
                             @for (o of candidates(); track o.id) {
                                 <mat-option [value]="o.id"
                                     >{{ o.objectType }} · {{ o.title || o.id }} ({{ o.status }})</mat-option

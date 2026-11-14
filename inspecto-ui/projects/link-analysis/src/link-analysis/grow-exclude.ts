@@ -146,7 +146,9 @@ export function previewSentence(p: GrowPreview, t: PackTerms, degrees = 1): stri
     if (held) parts.push(`${plural(held, `busy ${t.node}`, `busy ${t.nodes}`)} will be held`);
     const removed = (p.excludedByLists ?? []).reduce((s, l) => s + (l.removed || 0), 0);
     if (removed)
-        parts.push(`${plural(removed, t.node, t.nodes)} ${removed === 1 ? 'is' : 'are'} removed by your exclusion lists`);
+        parts.push(
+            `${plural(removed, t.node, t.nodes)} ${removed === 1 ? 'is' : 'are'} removed by your exclusion lists`,
+        );
     if (degrees > 1) parts.push(`degree${degrees > 2 ? `s 2–${degrees} are` : ' 2 is'} estimated after degree 1 runs`);
     let text = parts.join('; ') + '.';
     if (p.truncated) text += ' The read would hit its row limit, so the result would be incomplete.';
@@ -169,7 +171,8 @@ export function previewFailure(err: unknown): { unavailable: boolean; absent: bo
     const status = err instanceof HttpErrorResponse ? err.status : (err as { status?: number } | null)?.status;
     // absent = this server has no such route (an older build): not worth asking again this session
     const absent = status === 404 || status === 405 || status === 501;
-    if (absent || status === undefined || status === 0 || status === 503) return { unavailable: true, absent, message: '' };
+    if (absent || status === undefined || status === 0 || status === 503)
+        return { unavailable: true, absent, message: '' };
     return { unavailable: false, absent: false, message: apiErrorMessage(err, 'The preview was refused.') };
 }
 
@@ -244,7 +247,8 @@ export function listsInForce(
     const latest = ops.at(-1)?.step ?? null;
     const byList = new Map<string, number[]>();
     for (const e of ops)
-        if (e.op === 'excludeBy' && e.params?.listId) byList.set(e.params.listId, [...(byList.get(e.params.listId) ?? []), e.step]);
+        if (e.op === 'excludeBy' && e.params?.listId)
+            byList.set(e.params.listId, [...(byList.get(e.params.listId) ?? []), e.step]);
     const out: ListInForce[] = [];
     for (const [listId, steps] of byList) {
         const known = lists?.find((l) => l.id === listId);
@@ -411,7 +415,10 @@ export function neighboursPreviewBody(
  * (blank, or longer than `maxLength`, the Space's `input.id_length`) is left out rather than failing the preview.
  */
 export function drawnValues(
-    g: { nodes: { id: string; data: { label: string; spellings?: string[] } }[]; edges: { source: string; target: string }[] },
+    g: {
+        nodes: { id: string; data: { label: string; spellings?: string[] } }[];
+        edges: { source: string; target: string }[];
+    },
     frontier: readonly string[],
     max: number,
     maxLength: number,

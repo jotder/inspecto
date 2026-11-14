@@ -11,7 +11,12 @@ import { provideLaAppHostServices } from './la-host.providers';
 describe('EntityListsPageComponent', () => {
     it('renders the Entity Lists section on its own, without an Investigation', () => {
         TestBed.configureTestingModule({
-            providers: [provideHttpClient(), provideHttpClientTesting(), provideNoopAnimations(), ...provideLaAppHostServices()],
+            providers: [
+                provideHttpClient(),
+                provideHttpClientTesting(),
+                provideNoopAnimations(),
+                ...provideLaAppHostServices(),
+            ],
         });
         const fixture = TestBed.createComponent(EntityListsPageComponent);
         fixture.detectChanges();
@@ -23,15 +28,24 @@ describe('EntityListsPageComponent', () => {
 
     it('has no axe violations and exactly one h1 that names the section (axe, LA-A11Y-AUDIT-1)', async () => {
         TestBed.configureTestingModule({
-            providers: [provideHttpClient(), provideHttpClientTesting(), provideNoopAnimations(), ...provideLaAppHostServices()],
+            providers: [
+                provideHttpClient(),
+                provideHttpClientTesting(),
+                provideNoopAnimations(),
+                ...provideLaAppHostServices(),
+            ],
         });
         const fixture = TestBed.createComponent(EntityListsPageComponent);
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         expect(el.querySelectorAll('h1')).toHaveLength(1);
         // landmark-unique (real axe, 2026-10-13): the page wrapper was a second region also named "Entity Lists"
-        const names = Array.from(el.querySelectorAll('section[aria-label], section[aria-labelledby], form[aria-label]')).map(
-            (r) => r.getAttribute('aria-label') ?? el.querySelector(`#${r.getAttribute('aria-labelledby')}`)?.textContent?.trim(),
+        const names = Array.from(
+            el.querySelectorAll('section[aria-label], section[aria-labelledby], form[aria-label]'),
+        ).map(
+            (r) =>
+                r.getAttribute('aria-label') ??
+                el.querySelector(`#${r.getAttribute('aria-labelledby')}`)?.textContent?.trim(),
         );
         expect(new Set(names).size).toBe(names.length);
         await expectNoA11yViolations(el);
@@ -39,7 +53,12 @@ describe('EntityListsPageComponent', () => {
 
     it('LA-NO-LONG-PAGES-1: the lists and the Identity Fact log are two tabs over panels that scroll on their own; both stay mounted', async () => {
         TestBed.configureTestingModule({
-            providers: [provideHttpClient(), provideHttpClientTesting(), provideNoopAnimations(), ...provideLaAppHostServices()],
+            providers: [
+                provideHttpClient(),
+                provideHttpClientTesting(),
+                provideNoopAnimations(),
+                ...provideLaAppHostServices(),
+            ],
         });
         const fixture = TestBed.createComponent(EntityListsPageComponent);
         fixture.detectChanges();

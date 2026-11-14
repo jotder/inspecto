@@ -30,7 +30,14 @@ const ITEMS: LaLimitItem[] = [
     item({ key: 'projection_node_cap', browser: true, value: 900, inForce: 900 }),
     item({ key: 'display.lod_label_cap', browser: true, default: 300, inForce: 300, min: 10 }),
     item({ key: 'connect.max_seeds', group: 'connect', unit: 'count', default: 20, inForce: 25, value: 25 }),
-    item({ key: 'graph_run.ceiling_nodes', layer: 'install', group: 'graph_run', default: 500_000, inForce: 500_000, editable: false }),
+    item({
+        key: 'graph_run.ceiling_nodes',
+        layer: 'install',
+        group: 'graph_run',
+        default: 500_000,
+        inForce: 500_000,
+        editable: false,
+    }),
 ];
 
 const STORE_KEY = 'inspecto.la.limits.personal.s1.ana';
@@ -113,7 +120,10 @@ describe('LaLimitsService', () => {
         expect(svc.effective('projection_node_cap')).toBe(900);
         svc.setPersonal('display.lod_label_cap', 2); // below the item's min
         expect(svc.effective('display.lod_label_cap')).toBe(10);
-        expect(JSON.parse(localStorage.getItem(STORE_KEY)!)).toEqual({ projection_node_cap: 900, 'display.lod_label_cap': 10 });
+        expect(JSON.parse(localStorage.getItem(STORE_KEY)!)).toEqual({
+            projection_node_cap: 900,
+            'display.lod_label_cap': 10,
+        });
     });
 
     it('a personal value never applies to a non-browser item', () => {

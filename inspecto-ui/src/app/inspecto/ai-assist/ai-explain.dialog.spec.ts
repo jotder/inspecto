@@ -91,17 +91,23 @@ describe('AiExplainDialog', () => {
         expect(el.textContent).not.toContain('Definitions unavailable');
         expect(el.textContent).toContain('A thing on the graph.');
         expect(el.textContent).toContain('A call between two.');
-        expect(el.querySelector('[data-testid="explain-source"]')?.textContent?.trim()).toBe('Terms used on this screen.');
+        expect(el.querySelector('[data-testid="explain-source"]')?.textContent?.trim()).toBe(
+            'Terms used on this screen.',
+        );
     });
 
     it('cleans a glossary answer before showing it', () => {
-        runTool.mockReturnValue(of({ term: 'Dossier', definition: 'The *report* (`GET /inv/x`) of the `LA-10` thing. ⛔ Not a Case.' }));
+        runTool.mockReturnValue(
+            of({ term: 'Dossier', definition: 'The *report* (`GET /inv/x`) of the `LA-10` thing. ⛔ Not a Case.' }),
+        );
         const fixture = create(['Dossier']);
         expect(fixture.componentInstance.entries()[0].definition).toBe('The report of the thing.');
     });
 
     it('shows a term whose glossary line was cut off with no definition, never the fragment', () => {
-        runTool.mockReturnValue(of({ term: 'Connection', definition: 'Named endpoint + credentials (SFTP, a database, cloud' }));
+        runTool.mockReturnValue(
+            of({ term: 'Connection', definition: 'Named endpoint + credentials (SFTP, a database, cloud' }),
+        );
         const fixture = create(['Connection']);
         expect(fixture.componentInstance.entries()[0].definition).toBeUndefined();
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
@@ -148,7 +154,9 @@ describe('AiExplainDialog', () => {
         expect(fixture.componentInstance.unavailable()).toBe(true);
         // A 503 is the module being absent, so the docs fallback cannot help either — one call per term.
         expect(runTool).toHaveBeenCalledTimes(2);
-        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Definitions are unavailable here. Everything else works.');
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+            'Definitions are unavailable here. Everything else works.',
+        );
     });
 
     it('renders a term that resolves to nothing rather than dropping it', () => {
@@ -182,7 +190,24 @@ describe('cleanGlossaryDefinition (LA-UI-TEXT-PASS-1 X2)', () => {
         expect(clean).toBe(
             'The Link Analysis enquiry object: an ordered, replayable log of analyst steps over a graph, per Space, plus the Working Set it evaluates to.',
         );
-        for (const junk of ['`', '*', '⛔', '✅', '\\|', '|', 'D-E1', 'LA-10', 'GLOSSARY-CASE-1', '/inv', 'internal document', 'Named by', 'InvestigationRoutes', '()', 'ops', 'seed'])
+        for (const junk of [
+            '`',
+            '*',
+            '⛔',
+            '✅',
+            '\\|',
+            '|',
+            'D-E1',
+            'LA-10',
+            'GLOSSARY-CASE-1',
+            '/inv',
+            'internal document',
+            'Named by',
+            'InvestigationRoutes',
+            '()',
+            'ops',
+            'seed',
+        ])
             expect(clean, junk).not.toContain(junk);
     });
 
@@ -192,7 +217,10 @@ describe('cleanGlossaryDefinition (LA-UI-TEXT-PASS-1 X2)', () => {
      * 2026-10-29).
      */
     it.each([
-        ['Dataset', 'The umbrella for any queryable relation the BI layer can bind to: **Table** \\| **Derived Table** \\|'],
+        [
+            'Dataset',
+            'The umbrella for any queryable relation the BI layer can bind to: **Table** \\| **Derived Table** \\|',
+        ],
         ['Connection', 'Named endpoint + credentials for reaching a remote system (SFTP/FTP/FTPS, a database, cloud'],
         ['Table', 'A Hive-style root directory of **Parquet** files, **partitioned by date / partition key** and'],
         ['Widget', "A **Visualization Type + Config + a binding to a Dataset's resultset metadata** — i.e. the"],
@@ -241,8 +269,12 @@ describe('cleanGlossaryDefinition (LA-UI-TEXT-PASS-1 X2)', () => {
     });
 
     it('drops a code span with the "with" that introduced it, keeps an upper-case status, and lists piped items', () => {
-        expect(cleanGlossaryDefinition('Started via `runJob()` and ends `DONE` or `FAILED_HARD`.')).toBe('Started and ends DONE or FAILED_HARD.');
-        expect(cleanGlossaryDefinition('A label such as `PII` or `INTERNAL` (`D16`, `x-key`).')).toBe('A label such as PII or INTERNAL.');
+        expect(cleanGlossaryDefinition('Started via `runJob()` and ends `DONE` or `FAILED_HARD`.')).toBe(
+            'Started and ends DONE or FAILED_HARD.',
+        );
+        expect(cleanGlossaryDefinition('A label such as `PII` or `INTERNAL` (`D16`, `x-key`).')).toBe(
+            'A label such as PII or INTERNAL.',
+        );
         expect(cleanGlossaryDefinition('One of: A \\| B | C.')).toBe('One of: A, B, C.');
     });
 
@@ -251,16 +283,22 @@ describe('cleanGlossaryDefinition (LA-UI-TEXT-PASS-1 X2)', () => {
             cleanGlossaryDefinition(
                 'The decided outcome an Incident or a Case resolves with (built-in ladder: confirmed · false-positive · recovered; wire values `CONFIRMED` … `ACCEPTED_RISK`). Required to resolve an Incident.',
             ),
-        ).toBe('The decided outcome an Incident or a Case resolves with (built-in ladder: confirmed · false-positive · recovered).');
+        ).toBe(
+            'The decided outcome an Incident or a Case resolves with (built-in ladder: confirmed · false-positive · recovered).',
+        );
     });
 
     it('ends a cut row at its last complete sentence, and drops an id together with the word that pointed at it', () => {
-        expect(cleanGlossaryDefinition('A single collected file. It is then parsed and')).toBe('A single collected file.');
+        expect(cleanGlossaryDefinition('A single collected file. It is then parsed and')).toBe(
+            'A single collected file.',
+        );
         expect(
             cleanGlossaryDefinition(
                 'Watches an observability **Metric** — or, since BI-5, a BI **Measure** over a Dataset — against a threshold and fires an **Alert** when crossed. *(Widened)*',
             ),
-        ).toBe('Watches an observability Metric — or a BI Measure over a Dataset — against a threshold and fires an Alert when crossed.');
+        ).toBe(
+            'Watches an observability Metric — or a BI Measure over a Dataset — against a threshold and fires an Alert when crossed.',
+        );
     });
 
     it('keeps the first sentence only, and does not split on e.g.', () => {

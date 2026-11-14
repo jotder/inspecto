@@ -56,9 +56,18 @@ import {
                             label="Id"
                             [required]="true"
                             formControlName="id"
-                            [error]="fieldError(g, 'id', { required: 'Id is required', pattern: 'Id may hold only letters, digits and _' })"
+                            [error]="
+                                fieldError(g, 'id', {
+                                    required: 'Id is required',
+                                    pattern: 'Id may hold only letters, digits and _',
+                                })
+                            "
                         ></inspecto-pen-field>
-                        <inspecto-pen-field label="Label" formControlName="label" [error]="fieldError(g, 'label', {})"></inspecto-pen-field>
+                        <inspecto-pen-field
+                            label="Label"
+                            formControlName="label"
+                            [error]="fieldError(g, 'label', {})"
+                        ></inspecto-pen-field>
                         <inspecto-option-picker
                             label="Dataset"
                             formControlName="dataset"
@@ -83,7 +92,12 @@ import {
                             [required]="true"
                             formControlName="weight"
                             help="Negative = protective"
-                            [error]="fieldError(g, 'weight', { required: 'Weight is required', pattern: 'Weight must be a number' })"
+                            [error]="
+                                fieldError(g, 'weight', {
+                                    required: 'Weight is required',
+                                    pattern: 'Weight must be a number',
+                                })
+                            "
                         ></inspecto-pen-field>
                         <inspecto-pen-field
                             label="Cap"
@@ -428,7 +442,8 @@ export class RiskScoreFactorsComponent implements OnInit {
     private clearServerMarks(): void {
         this.rowErrors.set({});
         for (const g of this.rows.controls)
-            for (const c of Object.values(g.controls)) if (c.hasError('server')) c.updateValueAndValidity({ emitEvent: false });
+            for (const c of Object.values(g.controls))
+                if (c.hasError('server')) c.updateValueAndValidity({ emitEvent: false });
     }
 
     addFilter(i: number): void {

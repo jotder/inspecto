@@ -61,7 +61,9 @@ import { formatBytes, isBusyRefusal, uploadErrorMessage, uploadFileProblem, uplo
                 @if (lockedNote(); as note) {
                     <p class="text-secondary m-0" data-testid="la-upload-locked">{{ note }}</p>
                 } @else if (error()) {
-                    <inspecto-alert [variant]="unavailable() ? 'info' : 'error'" title="Upload">{{ error() }}</inspecto-alert>
+                    <inspecto-alert [variant]="unavailable() ? 'info' : 'error'" title="Upload">{{
+                        error()
+                    }}</inspecto-alert>
                 }
                 @if (notice()) {
                     <inspecto-alert variant="success" title="Upload">{{ notice() }}</inspecto-alert>
@@ -73,7 +75,12 @@ import { formatBytes, isBusyRefusal, uploadErrorMessage, uploadFileProblem, uplo
                             message="A Space administrator turns uploads on for a local Collector in its Pipeline (Accepts analyst upload). Until then there is nowhere to land a file."
                         ></inspecto-empty-state>
                     } @else {
-                        <form class="flex flex-col gap-1" [formGroup]="form" (ngSubmit)="upload()" aria-label="Upload a CSV file">
+                        <form
+                            class="flex flex-col gap-1"
+                            [formGroup]="form"
+                            (ngSubmit)="upload()"
+                            aria-label="Upload a CSV file"
+                        >
                             <inspecto-option-picker
                                 formControlName="collector"
                                 label="Collector"
@@ -126,7 +133,10 @@ import { formatBytes, isBusyRefusal, uploadErrorMessage, uploadFileProblem, uplo
                             @if (us.length) {
                                 <ul class="m-0 flex list-none flex-col gap-1 p-0" aria-label="Your uploads">
                                     @for (u of us; track u.file) {
-                                        <li class="rounded-md border px-2 py-1" style="border-color: var(--gamma-border)">
+                                        <li
+                                            class="rounded-md border px-2 py-1"
+                                            style="border-color: var(--gamma-border)"
+                                        >
                                             <div class="flex items-center gap-2">
                                                 <span class="min-w-0 flex-1 break-all font-semibold">{{ u.file }}</span>
                                                 <inspecto-status-badge
@@ -258,7 +268,7 @@ export class LinkAnalysisUploadsComponent {
         this.canReplace.set(false);
         this.notice.set('');
         this.problem.set(this.file() ? uploadFileProblem(this.file(), this.target()) : '');
-        input.value = '';   // choosing the same file again must fire `change`
+        input.value = ''; // choosing the same file again must fire `change`
     }
 
     async upload(replace = false): Promise<void> {

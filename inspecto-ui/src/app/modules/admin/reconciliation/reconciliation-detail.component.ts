@@ -970,20 +970,18 @@ export class ReconciliationDetailComponent implements OnInit {
                 const dups = duplicateImpacts(r, sets);
                 for (const b of this.overlay(live)) {
                     const impact = (b.type === 'cardinality_break' ? dups : impacts)[b.key];
-                    rows.push(
-                        {
-                            type: breakLabel(b.type),
-                            key: b.key,
-                            column: b.column ?? '',
-                            left: b.leftValue ?? '',
-                            right: b.rightValue ?? '',
-                            diff: b.diff ?? '',
-                            impact: impact ?? '',
-                            status: b.status,
-                            ageDays: breakAgeDays(b) ?? '',
-                            assignee: b.assignee ?? '',
-                        },
-                    );
+                    rows.push({
+                        type: breakLabel(b.type),
+                        key: b.key,
+                        column: b.column ?? '',
+                        left: b.leftValue ?? '',
+                        right: b.rightValue ?? '',
+                        diff: b.diff ?? '',
+                        impact: impact ?? '',
+                        status: b.status,
+                        ageDays: breakAgeDays(b) ?? '',
+                        assignee: b.assignee ?? '',
+                    });
                 }
                 if (!anyTruncated(sets)) break;
                 if (rows.length >= EXPORT_CAP) {

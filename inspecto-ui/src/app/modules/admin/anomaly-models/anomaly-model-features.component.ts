@@ -341,7 +341,8 @@ export class AnomalyModelFeaturesComponent implements OnInit {
         // The row pointers ("see the message above") go with the messages they point at: re-validating drops a
         // `server` mark, which no validator sets.
         for (const g of this.rows.controls)
-            for (const c of Object.values(g.controls)) if (c.hasError('server')) c.updateValueAndValidity({ emitEvent: false });
+            for (const c of Object.values(g.controls))
+                if (c.hasError('server')) c.updateValueAndValidity({ emitEvent: false });
     }
 
     isDirty(): boolean {

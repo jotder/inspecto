@@ -59,7 +59,12 @@ export function registerStatAggregates(alasql: any): void {
     alasql.aggr.QUANTILE_CONT = (v: unknown, p: unknown, acc: Acc | undefined, stage: number) =>
         stage === 3 ? (acc ? quantileCont(acc.xs, acc.p ?? 0.5) : null) : collect(v, acc, stage, Number(p));
     // RECENCY(col, 'asOf') — the offline spelling of the window-relative `recency` (D-AN12); the as-of rides in the accumulator.
-    alasql.aggr.RECENCY = (v: unknown, asOf: unknown, acc: { dates: string[]; asOf: string } | undefined, stage: number) => {
+    alasql.aggr.RECENCY = (
+        v: unknown,
+        asOf: unknown,
+        acc: { dates: string[]; asOf: string } | undefined,
+        stage: number,
+    ) => {
         if (stage === 3) return acc ? recencyDays(acc.dates, acc.asOf) : null;
         const a = stage === 1 || !acc ? { dates: [] as string[], asOf: String(asOf) } : acc;
         if (v !== null && v !== undefined) a.dates.push(String(v));

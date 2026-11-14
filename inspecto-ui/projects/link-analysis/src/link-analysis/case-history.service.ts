@@ -78,7 +78,11 @@ export class CaseHistoryService {
             return out;
         } catch (e) {
             if (e instanceof HttpErrorResponse && e.status === 503)
-                return { items: [], truncated: false, error: 'Case history needs Case management, which is not installed here.' };
+                return {
+                    items: [],
+                    truncated: false,
+                    error: 'Case history needs Case management, which is not installed here.',
+                };
             return { items: [], truncated: false, error: historyErrorMessage(e) };
         }
     }

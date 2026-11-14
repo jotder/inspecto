@@ -9,13 +9,56 @@ import { ListInForce, RemovedRow } from './grow-exclude';
 import { LinkAnalysisExclusionsComponent } from './link-analysis-exclusions.component';
 
 const IN_FORCE: ListInForce[] = [
-    { listId: 'cc', title: 'Call centres', ownerKind: 'analyst', restricted: false, removed: 12, step: 2, steps: [2], switchOffWhyNot: 'Applied at step 2; only the latest step can be switched off (with Undo). Later steps depend on it.' },
-    { listId: 'pol', title: 'Politicians', ownerKind: 'admin', restricted: true, removed: 5, step: 4, steps: [4], switchOffWhyNot: null },
+    {
+        listId: 'cc',
+        title: 'Call centres',
+        ownerKind: 'analyst',
+        restricted: false,
+        removed: 12,
+        step: 2,
+        steps: [2],
+        switchOffWhyNot:
+            'Applied at step 2; only the latest step can be switched off (with Undo). Later steps depend on it.',
+    },
+    {
+        listId: 'pol',
+        title: 'Politicians',
+        ownerKind: 'admin',
+        restricted: true,
+        removed: 5,
+        step: 4,
+        steps: [4],
+        switchOffWhyNot: null,
+    },
 ];
 const LISTS: ExclusionListSummary[] = [
-    { id: 'cc', title: 'Call centres', entityType: 'msisdn', ownerKind: 'analyst', autoApply: false, visibility: 'open', size: 12 },
-    { id: 'pol', title: 'Politicians', entityType: 'msisdn', ownerKind: 'admin', autoApply: true, visibility: 'restricted', size: 40 },
-    { id: 'test', title: 'Test numbers', entityType: 'msisdn', ownerKind: 'analyst', autoApply: false, visibility: 'open', size: 3 },
+    {
+        id: 'cc',
+        title: 'Call centres',
+        entityType: 'msisdn',
+        ownerKind: 'analyst',
+        autoApply: false,
+        visibility: 'open',
+        size: 12,
+    },
+    {
+        id: 'pol',
+        title: 'Politicians',
+        entityType: 'msisdn',
+        ownerKind: 'admin',
+        autoApply: true,
+        visibility: 'restricted',
+        size: 40,
+    },
+    {
+        id: 'test',
+        title: 'Test numbers',
+        entityType: 'msisdn',
+        ownerKind: 'analyst',
+        autoApply: false,
+        visibility: 'open',
+        size: 3,
+    },
 ];
 
 @Component({
@@ -73,12 +116,18 @@ describe('LinkAnalysisExclusionsComponent (LA-GROW-EXCLUDE-1 §3.3)', () => {
         const hint = () => el.querySelector('[data-testid="la-excl-hint"]') as HTMLElement | null;
         expect(hint()?.textContent).toContain('keeps numbers out of every step');
         expect(hint()?.textContent).toContain('Category lists come from your');
-        expect(hint()?.querySelector('[data-testid="la-hint-guide"]')?.textContent).toContain('Expand and clean up the graph');
+        expect(hint()?.querySelector('[data-testid="la-hint-guide"]')?.textContent).toContain(
+            'Expand and clean up the graph',
+        );
         await expectNoA11yViolations(el);
         host.mode.set('basic');
         fixture.detectChanges();
         expect(hint()?.textContent).toContain('hides numbers from this graph only (not recorded)');
-        (Array.from(hint()!.querySelectorAll('button')).find((b) => b.textContent?.includes('Got it')) as HTMLButtonElement).click();
+        (
+            Array.from(hint()!.querySelectorAll('button')).find((b) =>
+                b.textContent?.includes('Got it'),
+            ) as HTMLButtonElement
+        ).click();
         fixture.detectChanges();
         expect(hint()).toBeNull();
         expect(localStorage.getItem('inspecto.la.hint.exclusions')).toBe('1');
@@ -97,7 +146,11 @@ describe('LinkAnalysisExclusionsComponent (LA-GROW-EXCLUDE-1 §3.3)', () => {
         const { fixture, el } = create();
         const hint = () => el.querySelector('[data-testid="la-excl-hint"]');
         expect(hint()).not.toBeNull();
-        (Array.from(hint()!.querySelectorAll('button')).find((b) => b.textContent?.includes('Got it')) as HTMLButtonElement).click();
+        (
+            Array.from(hint()!.querySelectorAll('button')).find((b) =>
+                b.textContent?.includes('Got it'),
+            ) as HTMLButtonElement
+        ).click();
         fixture.detectChanges();
         expect(hint()).toBeNull();
     });
@@ -126,10 +179,18 @@ describe('LinkAnalysisExclusionsComponent (LA-GROW-EXCLUDE-1 §3.3)', () => {
 
     it('Show what was removed: a table, with the restricted lists only counted', async () => {
         const { fixture, el } = create();
-        (Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Show what was removed')) as HTMLButtonElement).click();
+        (
+            Array.from(el.querySelectorAll('button')).find((b) =>
+                b.textContent?.includes('Show what was removed'),
+            ) as HTMLButtonElement
+        ).click();
         fixture.detectChanges();
         const table = el.querySelector('[data-testid="la-excl-table"]') as HTMLTableElement;
-        expect(Array.from(table.querySelectorAll('th')).map((h) => h.getAttribute('scope'))).toEqual(['col', 'col', 'col']);
+        expect(Array.from(table.querySelectorAll('th')).map((h) => h.getAttribute('scope'))).toEqual([
+            'col',
+            'col',
+            'col',
+        ]);
         expect(table.textContent).toContain('+4477002');
         expect(table.textContent).toContain('busy number above 500 contacts');
         expect(el.querySelector('[data-testid="la-excl-restricted"]')?.textContent).toContain(
@@ -156,7 +217,11 @@ describe('LinkAnalysisExclusionsComponent (LA-GROW-EXCLUDE-1 §3.3)', () => {
         expect(el.querySelector('[data-testid="la-excl-first"]')?.textContent).toContain('No exclusion list yet');
         penEdit(fixture, penByLabel(el, 'List name')!, 'Call centres');
         fixture.detectChanges();
-        (Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Create your first list')) as HTMLButtonElement).click();
+        (
+            Array.from(el.querySelectorAll('button')).find((b) =>
+                b.textContent?.includes('Create your first list'),
+            ) as HTMLButtonElement
+        ).click();
         expect(host.events).toEqual(['create:Call centres']);
     });
 
@@ -178,8 +243,14 @@ describe('LinkAnalysisExclusionsComponent (LA-GROW-EXCLUDE-1 §3.3)', () => {
         const { fixture, el, host } = create();
         host.mode.set('basic');
         fixture.detectChanges();
-        expect(el.querySelector('[data-testid="la-excl-basic-line"]')?.textContent).toContain('3 numbers hidden on this graph (not recorded)');
-        (Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Show them again')) as HTMLButtonElement).click();
+        expect(el.querySelector('[data-testid="la-excl-basic-line"]')?.textContent).toContain(
+            '3 numbers hidden on this graph (not recorded)',
+        );
+        (
+            Array.from(el.querySelectorAll('button')).find((b) =>
+                b.textContent?.includes('Show them again'),
+            ) as HTMLButtonElement
+        ).click();
         byLabel(el, 'Close Hidden by lists').click();
         expect(host.events).toEqual(['again', 'closed']);
         await expectNoA11yViolations(el);

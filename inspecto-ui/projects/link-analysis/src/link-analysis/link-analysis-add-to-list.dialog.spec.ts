@@ -10,7 +10,12 @@ import { penByLabel, penEdit, penError, pickerSet } from '@inspecto/core/testing
 import { AddToListData, LinkAnalysisAddToListDialog } from './link-analysis-add-to-list.dialog';
 import { ENTITY_LIST_PURPOSES, purposeWords } from './link-analysis-entity-lists.dialogs';
 
-const list = (id: string, title: string, entityType: string, extra: Partial<EntityListSummary> = {}): EntityListSummary => ({
+const list = (
+    id: string,
+    title: string,
+    entityType: string,
+    extra: Partial<EntityListSummary> = {},
+): EntityListSummary => ({
     id,
     title,
     purpose: 'watch',
@@ -36,7 +41,9 @@ const DATA: AddToListData = {
 
 function create(over: Partial<AddToListData> = {}, inv: Partial<InvService> = {}) {
     const close = vi.fn();
-    const changeEntityListMembers = vi.fn(() => of({ ...list('x', 'x', 'account'), changed: 1, size: 4, members: [], atSeq: 2, headHash: null }));
+    const changeEntityListMembers = vi.fn(() =>
+        of({ ...list('x', 'x', 'account'), changed: 1, size: 4, members: [], atSeq: 2, headHash: null }),
+    );
     const createEntityList = vi.fn((req: { title: string; purpose: string; entityType: string }) =>
         of({ ...list('busy', req.title, req.entityType), purpose: req.purpose, members: [], atSeq: 1, headHash: null }),
     );
@@ -63,7 +70,15 @@ function create(over: Partial<AddToListData> = {}, inv: Partial<InvService> = {}
         for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r));
         f.detectChanges();
     };
-    return { f, el: f.nativeElement as HTMLElement, close, c: f.componentInstance, go, changeEntityListMembers, createEntityList };
+    return {
+        f,
+        el: f.nativeElement as HTMLElement,
+        close,
+        c: f.componentInstance,
+        go,
+        changeEntityListMembers,
+        createEntityList,
+    };
 }
 
 describe('LinkAnalysisAddToListDialog - Add to a list (LA-ONBOARD-1 phase 7, UC-10)', () => {

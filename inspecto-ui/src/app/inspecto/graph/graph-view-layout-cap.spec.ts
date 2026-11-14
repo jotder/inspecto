@@ -10,7 +10,9 @@ import { CAPPED_LAYOUT_FALLBACK, GraphDisplayOptions, GraphViewComponent, capped
 // the tests end (2026-10-26 gate). So `create()` (the only place a Graph is built) is stubbed on the prototype: these specs read the
 // component's layout decision, never a rendered graph, and behave the same in any order.
 beforeEach(() => {
-    vi.spyOn(GraphViewComponent.prototype as unknown as { create(): void }, 'create').mockImplementation(() => undefined);
+    vi.spyOn(GraphViewComponent.prototype as unknown as { create(): void }, 'create').mockImplementation(
+        () => undefined,
+    );
 });
 afterEach(() => vi.restoreAllMocks());
 

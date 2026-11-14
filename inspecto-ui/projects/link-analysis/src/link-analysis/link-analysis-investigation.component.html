@@ -7,416 +7,447 @@
             }
             @if (store.active()) {
                 @if (store.header(); as h) {
-    <la-fold title="General" [forceOpen]="true">
-                <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm" data-testid="inv-settings-general">
-                    <!-- LA-INVESTIGATION-RENAME-1: a lead with the capability renames it and restates its purpose in place -->
-                    <dt class="text-secondary">Name</dt>
-                    <dd class="m-0 min-w-0">
-                        @if (canEditDetails()) {
-                            <inspecto-pen-field
-                                ariaLabel="Name"
-                                [formControl]="detailsTitle"
-                                [maxlength]="200"
-                                [error]="detailsTitleError()"
-                                data-testid="inv-settings-title"
-                            />
-                        } @else {
-                            {{ store.displayTitle() || h.id }}
-                        }
-                    </dd>
-                    <dt class="text-secondary">Purpose</dt>
-                    <dd class="m-0 min-w-0">
-                        @if (canEditDetails()) {
-                            <inspecto-pen-field
-                                ariaLabel="Purpose"
-                                [multiline]="true"
-                                [formControl]="detailsPurpose"
-                                [maxlength]="purposeMax()"
-                                [error]="detailsPurposeError()"
-                                data-testid="inv-settings-purpose"
-                            />
-                        } @else {
-                            {{ h.purpose || '—' }}
-                        }
-                    </dd>
-                    <dt class="text-secondary">Dataset</dt>
-                    <dd class="m-0">{{ h.dataset }}</dd>
-                    <dt class="text-secondary">Time column</dt>
-                    <dd class="m-0">{{ h.timeCol ? h.timeCol + ' (' + (h.timeColZone || 'UTC') + ')' : '—' }}</dd>
-                    <dt class="text-secondary">Copied from</dt>
-                    <dd class="m-0">{{ h.parent ? 'Branched from ' + h.parent.id + ' after ' + h.parent.parentSteps + ' steps' : '—' }}</dd>
-                    <dt class="text-secondary">Industry pack</dt>
-                    <dd class="m-0">{{ h.pack || "The Space's pack" }}</dd>
-                </dl>
-                @if (detailsReadOnlyReason(); as why) {
-                    <p class="text-secondary m-0 text-xs" data-testid="inv-settings-details-readonly">{{ why }}</p>
-                }
-                <div>
-                    <button
-                        mat-stroked-button
-                        color="warn"
-                        type="button"
-                        (click)="deleteInvestigation(h.id, store.displayTitle() || h.id)"
-                        data-testid="inv-settings-delete"
-                    >
-                        Delete…
-                    </button>
-                </div>
-    </la-fold>
-    <la-fold title="Case">
-                <inspecto-link-analysis-investigation-case
-                    [investigationId]="h.id"
-                ></inspecto-link-analysis-investigation-case>
-    </la-fold>
-    <la-fold title="Members">
-                <inspecto-link-analysis-members [investigationId]="h.id"></inspecto-link-analysis-members>
-    </la-fold>
-    <la-fold title="Share and embed">
-                <inspecto-link-analysis-embed [investigationId]="h.id"></inspecto-link-analysis-embed>
-    </la-fold>
-    <la-fold title="Drafts">
-                <inspecto-link-analysis-drafts
-                    [investigationId]="h.id"
-                    [activeDraftId]="store.activeDraftId()"
-                    [refreshOn]="store.lastStep()"
-                    (scope)="store.useDraft($event)"
-                    (promoted)="store.open(h.id)"
-                ></inspecto-link-analysis-drafts>
-    </la-fold>
-                }
-            <!-- ── replay + drift ── -->
-    <la-fold title="Replay and drift">
-            <section class="flex flex-col gap-1" aria-label="Replay">
-                <div class="flex items-center gap-2">
-                    <mat-checkbox
-                        [ngModel]="reread() && !store.activeDraftId()"
-                        [disabled]="!!store.activeDraftId()"
-                        (ngModelChange)="reread.set($event)"
-                    >
-                        Compare with current data
-                    </mat-checkbox>
-                    <button
-                        mat-stroked-button
-                        class="ml-auto"
-                        [disabled]="store.busy()"
-                        (click)="store.replay(reread() && !store.activeDraftId())"
-                    >
-                        Replay
-                    </button>
-                </div>
-                @if (store.activeDraftId()) {
-                    <p class="text-secondary m-0 text-sm">
-                        A Draft cannot be compared with current data.
-                    </p>
-                }
-                @if (store.replayResult(); as r) {
-                    @if (r.equivalent) {
-                        <inspecto-alert variant="success" title="Replay matches">
-                            Every step gives the same result.
-                        </inspecto-alert>
-                    } @else {
-                        <inspecto-alert variant="error" title="Replay differs">
-                            The Working Set differs from what was recorded at step {{ r.mismatches.join(', ') }}.
-                        </inspecto-alert>
-                    }
-                    @if (r.reread) {
-                        @if (r.drift.length) {
-                            <table class="w-full text-sm" aria-label="Drift per expand step">
-                                <thead>
-                                    <tr class="text-secondary text-left">
-                                        <th scope="col">Step</th>
-                                        <th scope="col">Sealed rows</th>
-                                        <th scope="col">Rows now</th>
-                                        <th scope="col">Drift</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @for (d of r.drift; track d.step) {
-                                        <tr>
-                                            <td class="tabular-nums">{{ d.step }}</td>
-                                            <td class="tabular-nums">{{ d.sealedRows }}</td>
-                                            <td class="tabular-nums">{{ d.currentRows }}</td>
-                                            <td [class.font-semibold]="d.diverged">
-                                                {{ d.diverged ? 'changed' : 'same' }}
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                            <p class="text-secondary m-0 text-sm">
+                    <la-fold title="General" [forceOpen]="true">
+                        <dl
+                            class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm"
+                            data-testid="inv-settings-general"
+                        >
+                            <!-- LA-INVESTIGATION-RENAME-1: a lead with the capability renames it and restates its purpose in place -->
+                            <dt class="text-secondary">Name</dt>
+                            <dd class="m-0 min-w-0">
+                                @if (canEditDetails()) {
+                                    <inspecto-pen-field
+                                        ariaLabel="Name"
+                                        [formControl]="detailsTitle"
+                                        [maxlength]="200"
+                                        [error]="detailsTitleError()"
+                                        data-testid="inv-settings-title"
+                                    />
+                                } @else {
+                                    {{ store.displayTitle() || h.id }}
+                                }
+                            </dd>
+                            <dt class="text-secondary">Purpose</dt>
+                            <dd class="m-0 min-w-0">
+                                @if (canEditDetails()) {
+                                    <inspecto-pen-field
+                                        ariaLabel="Purpose"
+                                        [multiline]="true"
+                                        [formControl]="detailsPurpose"
+                                        [maxlength]="purposeMax()"
+                                        [error]="detailsPurposeError()"
+                                        data-testid="inv-settings-purpose"
+                                    />
+                                } @else {
+                                    {{ h.purpose || '—' }}
+                                }
+                            </dd>
+                            <dt class="text-secondary">Dataset</dt>
+                            <dd class="m-0">{{ h.dataset }}</dd>
+                            <dt class="text-secondary">Time column</dt>
+                            <dd class="m-0">
+                                {{ h.timeCol ? h.timeCol + ' (' + (h.timeColZone || 'UTC') + ')' : '—' }}
+                            </dd>
+                            <dt class="text-secondary">Copied from</dt>
+                            <dd class="m-0">
                                 {{
-                                    r.diverged
-                                        ? 'The Dataset has changed since at least one read was sealed.'
-                                        : 'Every sealed read still matches current data.'
+                                    h.parent
+                                        ? 'Branched from ' + h.parent.id + ' after ' + h.parent.parentSteps + ' steps'
+                                        : '—'
                                 }}
-                                The Working Set shown stays the sealed one.
+                            </dd>
+                            <dt class="text-secondary">Industry pack</dt>
+                            <dd class="m-0">{{ h.pack || "The Space's pack" }}</dd>
+                        </dl>
+                        @if (detailsReadOnlyReason(); as why) {
+                            <p class="text-secondary m-0 text-xs" data-testid="inv-settings-details-readonly">
+                                {{ why }}
                             </p>
-                        } @else {
-                            <p class="text-secondary m-0 text-sm">No expand steps to re-read.</p>
                         }
-                    }
+                        <div>
+                            <button
+                                mat-stroked-button
+                                color="warn"
+                                type="button"
+                                (click)="deleteInvestigation(h.id, store.displayTitle() || h.id)"
+                                data-testid="inv-settings-delete"
+                            >
+                                Delete…
+                            </button>
+                        </div>
+                    </la-fold>
+                    <la-fold title="Case">
+                        <inspecto-link-analysis-investigation-case
+                            [investigationId]="h.id"
+                        ></inspecto-link-analysis-investigation-case>
+                    </la-fold>
+                    <la-fold title="Members">
+                        <inspecto-link-analysis-members [investigationId]="h.id"></inspecto-link-analysis-members>
+                    </la-fold>
+                    <la-fold title="Share and embed">
+                        <inspecto-link-analysis-embed [investigationId]="h.id"></inspecto-link-analysis-embed>
+                    </la-fold>
+                    <la-fold title="Drafts">
+                        <inspecto-link-analysis-drafts
+                            [investigationId]="h.id"
+                            [activeDraftId]="store.activeDraftId()"
+                            [refreshOn]="store.lastStep()"
+                            (scope)="store.useDraft($event)"
+                            (promoted)="store.open(h.id)"
+                        ></inspecto-link-analysis-drafts>
+                    </la-fold>
                 }
-            </section>
-    </la-fold>
-    
-            @if (canPin) {
-                <!-- ── pin to a Widget (LA-21) ── -->
-    <la-fold title="Pin to a Widget">
-                <section
-                    class="flex flex-col gap-2 "
-    
-                    aria-label="Pin to a Widget"
-                >
-                    <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Pin to a Widget</h3>
-                    <p class="text-secondary m-0 text-sm">
-                        <strong>Frozen</strong>: as it is now. <strong>Live</strong>: follows the Investigation and stays
-                        in this Space. Only the owner sees its rows.
-                    </p>
-                    <form class="flex flex-col gap-2" [formGroup]="pinForm" (ngSubmit)="pinToWidget()">
-                        <inspecto-pen-field
-                            label="Widget name"
-                            formControlName="name"
-                            [error]="
-                                pinForm.controls.name.touched && pinForm.controls.name.hasError('required')
-                                    ? 'A name is required.'
-                                    : pinForm.controls.name.hasError('pattern')
-                                      ? 'Letters, digits, \'.\', \'_\' or \'-\', starting with a letter or digit.'
-                                      : ''
-                            "
-                        />
-                        <inspecto-option-picker
-                            label="Show"
-                            formControlName="relation"
-                            [options]="relationOptions"
-                        ></inspecto-option-picker>
-                        <mat-radio-group formControlName="mode" aria-label="Widget kind" class="flex gap-4">
-                            <mat-radio-button value="frozen">Frozen</mat-radio-button>
-                            <mat-radio-button value="live">Live</mat-radio-button>
-                        </mat-radio-group>
-                        <button mat-stroked-button type="submit" [disabled]="pinBusy()">Save Widget</button>
-                    </form>
-                    @if (pinnedWidget()) {
-                        <inspecto-alert variant="success" title="Widget saved">
-                            “{{ pinnedWidget() }}” is in the Widget library — add it to a dashboard from there.
-                        </inspecto-alert>
-                    }
-                    @if (pinError()) {
-                        <inspecto-alert variant="error" title="Widget not saved">{{ pinError() }}</inspecto-alert>
-                    }
-                </section>
-    </la-fold>
-            }
-            @if (store.activeId(); as activeId) {
-                <!-- ── LA-20 rows · LA-23 measures + templates · LA-12 dossier ── -->
-    <la-fold title="Oversight and approvals">
-                <inspecto-link-analysis-oversight
-                    [investigationId]="activeId"
-                    [log]="store.log()"
-                    [workingSet]="store.workingSet()"
-                    (decided)="store.open(activeId)"
-                ></inspecto-link-analysis-oversight>
-    </la-fold>
-    <la-fold title="Measures and templates">
-                <inspecto-link-analysis-template-measures
-                    [investigationId]="activeId"
-                    [log]="store.log()"
-                    (instantiated)="adoptInstantiated($event)"
-                ></inspecto-link-analysis-template-measures>
-    </la-fold>
-    <la-fold title="Dossier">
-                <inspecto-link-analysis-dossier [investigationId]="activeId"></inspecto-link-analysis-dossier>
-    </la-fold>
-    <la-fold title="References">
-                <inspecto-link-analysis-references [investigationId]="activeId"></inspecto-link-analysis-references>
-    </la-fold>
-            }
+                <!-- ── replay + drift ── -->
+                <la-fold title="Replay and drift">
+                    <section class="flex flex-col gap-1" aria-label="Replay">
+                        <div class="flex items-center gap-2">
+                            <mat-checkbox
+                                [ngModel]="reread() && !store.activeDraftId()"
+                                [disabled]="!!store.activeDraftId()"
+                                (ngModelChange)="reread.set($event)"
+                            >
+                                Compare with current data
+                            </mat-checkbox>
+                            <button
+                                mat-stroked-button
+                                class="ml-auto"
+                                [disabled]="store.busy()"
+                                (click)="store.replay(reread() && !store.activeDraftId())"
+                            >
+                                Replay
+                            </button>
+                        </div>
+                        @if (store.activeDraftId()) {
+                            <p class="text-secondary m-0 text-sm">A Draft cannot be compared with current data.</p>
+                        }
+                        @if (store.replayResult(); as r) {
+                            @if (r.equivalent) {
+                                <inspecto-alert variant="success" title="Replay matches">
+                                    Every step gives the same result.
+                                </inspecto-alert>
+                            } @else {
+                                <inspecto-alert variant="error" title="Replay differs">
+                                    The Working Set differs from what was recorded at step
+                                    {{ r.mismatches.join(', ') }}.
+                                </inspecto-alert>
+                            }
+                            @if (r.reread) {
+                                @if (r.drift.length) {
+                                    <table class="w-full text-sm" aria-label="Drift per expand step">
+                                        <thead>
+                                            <tr class="text-secondary text-left">
+                                                <th scope="col">Step</th>
+                                                <th scope="col">Sealed rows</th>
+                                                <th scope="col">Rows now</th>
+                                                <th scope="col">Drift</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @for (d of r.drift; track d.step) {
+                                                <tr>
+                                                    <td class="tabular-nums">{{ d.step }}</td>
+                                                    <td class="tabular-nums">{{ d.sealedRows }}</td>
+                                                    <td class="tabular-nums">{{ d.currentRows }}</td>
+                                                    <td [class.font-semibold]="d.diverged">
+                                                        {{ d.diverged ? 'changed' : 'same' }}
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                    <p class="text-secondary m-0 text-sm">
+                                        {{
+                                            r.diverged
+                                                ? 'The Dataset has changed since at least one read was sealed.'
+                                                : 'Every sealed read still matches current data.'
+                                        }}
+                                        The Working Set shown stays the sealed one.
+                                    </p>
+                                } @else {
+                                    <p class="text-secondary m-0 text-sm">No expand steps to re-read.</p>
+                                }
+                            }
+                        }
+                    </section>
+                </la-fold>
+
+                @if (canPin) {
+                    <!-- ── pin to a Widget (LA-21) ── -->
+                    <la-fold title="Pin to a Widget">
+                        <section class="flex flex-col gap-2" aria-label="Pin to a Widget">
+                            <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">
+                                Pin to a Widget
+                            </h3>
+                            <p class="text-secondary m-0 text-sm">
+                                <strong>Frozen</strong>: as it is now. <strong>Live</strong>: follows the Investigation
+                                and stays in this Space. Only the owner sees its rows.
+                            </p>
+                            <form class="flex flex-col gap-2" [formGroup]="pinForm" (ngSubmit)="pinToWidget()">
+                                <inspecto-pen-field
+                                    label="Widget name"
+                                    formControlName="name"
+                                    [error]="
+                                        pinForm.controls.name.touched && pinForm.controls.name.hasError('required')
+                                            ? 'A name is required.'
+                                            : pinForm.controls.name.hasError('pattern')
+                                              ? 'Letters, digits, \'.\', \'_\' or \'-\', starting with a letter or digit.'
+                                              : ''
+                                    "
+                                />
+                                <inspecto-option-picker
+                                    label="Show"
+                                    formControlName="relation"
+                                    [options]="relationOptions"
+                                ></inspecto-option-picker>
+                                <mat-radio-group formControlName="mode" aria-label="Widget kind" class="flex gap-4">
+                                    <mat-radio-button value="frozen">Frozen</mat-radio-button>
+                                    <mat-radio-button value="live">Live</mat-radio-button>
+                                </mat-radio-group>
+                                <button mat-stroked-button type="submit" [disabled]="pinBusy()">Save Widget</button>
+                            </form>
+                            @if (pinnedWidget()) {
+                                <inspecto-alert variant="success" title="Widget saved">
+                                    “{{ pinnedWidget() }}” is in the Widget library — add it to a dashboard from there.
+                                </inspecto-alert>
+                            }
+                            @if (pinError()) {
+                                <inspecto-alert variant="error" title="Widget not saved">{{
+                                    pinError()
+                                }}</inspecto-alert>
+                            }
+                        </section>
+                    </la-fold>
+                }
+                @if (store.activeId(); as activeId) {
+                    <!-- ── LA-20 rows · LA-23 measures + templates · LA-12 dossier ── -->
+                    <la-fold title="Oversight and approvals">
+                        <inspecto-link-analysis-oversight
+                            [investigationId]="activeId"
+                            [log]="store.log()"
+                            [workingSet]="store.workingSet()"
+                            (decided)="store.open(activeId)"
+                        ></inspecto-link-analysis-oversight>
+                    </la-fold>
+                    <la-fold title="Measures and templates">
+                        <inspecto-link-analysis-template-measures
+                            [investigationId]="activeId"
+                            [log]="store.log()"
+                            (instantiated)="adoptInstantiated($event)"
+                        ></inspecto-link-analysis-template-measures>
+                    </la-fold>
+                    <la-fold title="Dossier">
+                        <inspecto-link-analysis-dossier [investigationId]="activeId"></inspecto-link-analysis-dossier>
+                    </la-fold>
+                    <la-fold title="References">
+                        <inspecto-link-analysis-references
+                            [investigationId]="activeId"
+                        ></inspecto-link-analysis-references>
+                    </la-fold>
+                }
             }
         }
         @case ('oplog') {
             @if (store.active()) {
-            <section aria-label="Step log">
-                <div class="mb-1 flex items-center gap-1">
-                    <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Step log</h3>
-                    <button
-                        mat-button
-                        class="ml-auto"
-                        [disabled]="!canWrite() || store.busy() || !store.canUndo()"
-                        (click)="store.undo(store.undoTarget())"
-                        aria-label="Undo the latest step"
-                    >
-                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-uturn-left"></mat-icon>
-                        Undo
-                    </button>
-                </div>
-                @if (store.log(); as log) {
-                    @if (log.entries.length) {
-                        <ol class="m-0 flex list-none flex-col gap-1 p-0">
-                            @for (e of log.entries; track e.step) {
-                                <li class="rounded-md border px-2 py-1" style="border-color: var(--gamma-border)">
-                                    <div class="flex items-baseline gap-2">
-                                        <span class="font-mono text-sm tabular-nums">{{ e.step }}</span>
-                                        <span class="text-sm font-semibold">{{ opLabel(e) }}</span>
-                                        @if (e.undoneBy != null) {
-                                            <span class="text-secondary text-sm">undone by step {{ e.undoneBy }}</span>
-                                        }
-                                        <span class="text-secondary ml-auto text-[0.6875rem]">{{ time(e.at) }}</span>
-                                    </div>
-                                    <div class="text-sm" [class.line-through]="e.undoneBy != null">{{ e.text }}</div>
-                                    @if (readSuffix(e); as how) {
-                                        <div class="text-secondary text-[0.6875rem]" data-testid="step-read-source">
-                                            {{ how }}
+                <section aria-label="Step log">
+                    <div class="mb-1 flex items-center gap-1">
+                        <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Step log</h3>
+                        <button
+                            mat-button
+                            class="ml-auto"
+                            [disabled]="!canWrite() || store.busy() || !store.canUndo()"
+                            (click)="store.undo(store.undoTarget())"
+                            aria-label="Undo the latest step"
+                        >
+                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-uturn-left"></mat-icon>
+                            Undo
+                        </button>
+                    </div>
+                    @if (store.log(); as log) {
+                        @if (log.entries.length) {
+                            <ol class="m-0 flex list-none flex-col gap-1 p-0">
+                                @for (e of log.entries; track e.step) {
+                                    <li class="rounded-md border px-2 py-1" style="border-color: var(--gamma-border)">
+                                        <div class="flex items-baseline gap-2">
+                                            <span class="font-mono text-sm tabular-nums">{{ e.step }}</span>
+                                            <span class="text-sm font-semibold">{{ opLabel(e) }}</span>
+                                            @if (e.undoneBy != null) {
+                                                <span class="text-secondary text-sm"
+                                                    >undone by step {{ e.undoneBy }}</span
+                                                >
+                                            }
+                                            <span class="text-secondary ml-auto text-[0.6875rem]">{{
+                                                time(e.at)
+                                            }}</span>
                                         </div>
-                                    }
-                                    @if (e.params?.reason) {
-                                        <div class="text-secondary text-sm">Reason: {{ e.params!.reason }}</div>
-                                    }
-                                    @if (e.author) {
-                                        <div class="text-secondary text-[0.6875rem]">by {{ e.author }}</div>
-                                    }
+                                        <div class="text-sm" [class.line-through]="e.undoneBy != null">
+                                            {{ e.text }}
+                                        </div>
+                                        @if (readSuffix(e); as how) {
+                                            <div class="text-secondary text-[0.6875rem]" data-testid="step-read-source">
+                                                {{ how }}
+                                            </div>
+                                        }
+                                        @if (e.params?.reason) {
+                                            <div class="text-secondary text-sm">Reason: {{ e.params!.reason }}</div>
+                                        }
+                                        @if (e.author) {
+                                            <div class="text-secondary text-[0.6875rem]">by {{ e.author }}</div>
+                                        }
+                                    </li>
+                                }
+                            </ol>
+                            @if (log.truncated) {
+                                <p class="text-secondary m-0 mt-1 text-sm">
+                                    Showing the first {{ log.entries.length }} of {{ log.total }} steps.
+                                </p>
+                            }
+                        } @else {
+                            <p class="text-secondary m-0 text-sm">No steps yet. Pick a start entity to begin.</p>
+                        }
+                    }
+                </section>
+                <section aria-label="Re-order steps">
+                    @if (order(); as o) {
+                        <inspecto-alert variant="info" title="Re-ordering creates a fork">
+                            The original Investigation stays exactly as it is. A new Investigation is created with these
+                            steps in the new order, every expand re-reads the Dataset, and it records this one as its
+                            parent.
+                        </inspecto-alert>
+                        <ol class="m-0 mt-2 flex list-none flex-col gap-1 p-0">
+                            @for (step of o; track step; let i = $index; let first = $first; let last = $last) {
+                                <li
+                                    class="flex items-center gap-1 rounded-md border px-2 py-1"
+                                    style="border-color: var(--gamma-border)"
+                                >
+                                    <span class="min-w-0 flex-auto truncate text-sm">{{ stepLabel(step) }}</span>
+                                    <button
+                                        mat-icon-button
+                                        [disabled]="first"
+                                        (click)="move(i, -1)"
+                                        [attr.aria-label]="'Move step ' + step + ' up'"
+                                    >
+                                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:chevron-up"></mat-icon>
+                                    </button>
+                                    <button
+                                        mat-icon-button
+                                        [disabled]="last"
+                                        (click)="move(i, 1)"
+                                        [attr.aria-label]="'Move step ' + step + ' down'"
+                                    >
+                                        <mat-icon
+                                            class="icon-size-4"
+                                            svgIcon="heroicons_outline:chevron-down"
+                                        ></mat-icon>
+                                    </button>
                                 </li>
                             }
                         </ol>
-                        @if (log.truncated) {
-                            <p class="text-secondary m-0 mt-1 text-sm">
-                                Showing the first {{ log.entries.length }} of {{ log.total }} steps.
-                            </p>
-                        }
-                    } @else {
-                        <p class="text-secondary m-0 text-sm">No steps yet. Pick a start entity to begin.</p>
-                    }
-                }
-            </section>
-            <section aria-label="Re-order steps">
-                @if (order(); as o) {
-                    <inspecto-alert variant="info" title="Re-ordering creates a fork">
-                        The original Investigation stays exactly as it is. A new Investigation is created with these steps
-                        in the new order, every expand re-reads the Dataset, and it records this one as its parent.
-                    </inspecto-alert>
-                    <ol class="m-0 mt-2 flex list-none flex-col gap-1 p-0">
-                        @for (step of o; track step; let i = $index; let first = $first; let last = $last) {
-                            <li
-                                class="flex items-center gap-1 rounded-md border px-2 py-1"
-                                style="border-color: var(--gamma-border)"
+                        <div class="mt-2 flex gap-2">
+                            <button
+                                mat-flat-button
+                                color="primary"
+                                [disabled]="!canWrite() || store.busy() || !orderChanged()"
+                                (click)="createFork()"
                             >
-                                <span class="min-w-0 flex-auto truncate text-sm">{{ stepLabel(step) }}</span>
-                                <button
-                                    mat-icon-button
-                                    [disabled]="first"
-                                    (click)="move(i, -1)"
-                                    [attr.aria-label]="'Move step ' + step + ' up'"
-                                >
-                                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:chevron-up"></mat-icon>
-                                </button>
-                                <button
-                                    mat-icon-button
-                                    [disabled]="last"
-                                    (click)="move(i, 1)"
-                                    [attr.aria-label]="'Move step ' + step + ' down'"
-                                >
-                                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:chevron-down"></mat-icon>
-                                </button>
-                            </li>
-                        }
-                    </ol>
-                    <div class="mt-2 flex gap-2">
+                                Create fork
+                            </button>
+                            <button mat-button (click)="order.set(null)">Cancel</button>
+                        </div>
+                    } @else {
                         <button
-                            mat-flat-button
-                            color="primary"
-                            [disabled]="!canWrite() || store.busy() || !orderChanged()"
-                            (click)="createFork()"
+                            mat-button
+                            [disabled]="
+                                !canWrite() ||
+                                store.busy() ||
+                                store.effectiveSteps().length < 2 ||
+                                !!store.activeDraftId()
+                            "
+                            (click)="beginReorder()"
                         >
-                            Create fork
+                            Re-order steps…
                         </button>
-                        <button mat-button (click)="order.set(null)">Cancel</button>
-                    </div>
-                } @else {
-                    <button
-                        mat-button
-                        [disabled]="!canWrite() || store.busy() || store.effectiveSteps().length < 2 || !!store.activeDraftId()"
-                        (click)="beginReorder()"
-                    >
-                        Re-order steps…
-                    </button>
-                    @if (store.activeDraftId()) {
-                        <p class="text-secondary m-0 text-sm">
-                            Not available on a Draft.
-                        </p>
+                        @if (store.activeDraftId()) {
+                            <p class="text-secondary m-0 text-sm">Not available on a Draft.</p>
+                        }
                     }
-                }
-            </section>
+                </section>
             }
         }
         @case ('ws-rows') {
             @if (store.active()) {
                 @if (store.activeId(); as activeId) {
-                <inspecto-link-analysis-working-set-rows
-                    [investigationId]="activeId"
-                    [version]="store.log()"
-                ></inspecto-link-analysis-working-set-rows>
+                    <inspecto-link-analysis-working-set-rows
+                        [investigationId]="activeId"
+                        [version]="store.log()"
+                    ></inspecto-link-analysis-working-set-rows>
                 }
             }
         }
         @case ('coverage') {
             @if (store.active()) {
-            <section class="flex flex-col gap-1" aria-label="Coverage">
-                <div class="flex items-center gap-2">
-                    <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Coverage</h3>
-                    <button
-                        mat-stroked-button
-                        class="ml-auto"
-                        [disabled]="coverageBusy()"
-                        (click)="checkCoverage()"
-                        matTooltip="Which days of the Investigation's window have no rows at all in its Dataset"
-                    >
-                        Check coverage
-                    </button>
-                </div>
-                @if (coverageFor() === store.activeId()) {
-                    @if (coverageError()) {
-                        <inspecto-alert variant="error" title="Coverage not read">{{ coverageError() }}</inspecto-alert>
-                    }
-                    @if (coverage(); as c) {
-                        @if (c.missingDays.length) {
-                            <inspecto-alert variant="warning" title="Days with no data">
-                                {{ c.missingDays.length }} of {{ c.expectedDays }} days in the window have zero rows in
-                                {{ c.dataset }} ({{ c.zone }}): {{ c.missingDays.join(', ') }}. An empty result on these
-                                days says nothing about activity.
-                            </inspecto-alert>
-                        } @else {
-                            <inspecto-alert variant="success" title="Every day has data">
-                                All {{ c.expectedDays }} days in the window have rows in {{ c.dataset }} ({{ c.zone }}).
-                            </inspecto-alert>
+                <section class="flex flex-col gap-1" aria-label="Coverage">
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Coverage</h3>
+                        <button
+                            mat-stroked-button
+                            class="ml-auto"
+                            [disabled]="coverageBusy()"
+                            (click)="checkCoverage()"
+                            matTooltip="Which days of the Investigation's window have no rows at all in its Dataset"
+                        >
+                            Check coverage
+                        </button>
+                    </div>
+                    @if (coverageFor() === store.activeId()) {
+                        @if (coverageError()) {
+                            <inspecto-alert variant="error" title="Coverage not read">{{
+                                coverageError()
+                            }}</inspecto-alert>
                         }
-                        @if (c.collectors.assessed) {
-                            <table class="m-0 w-full text-sm" aria-label="Per-Collector coverage">
-                                <thead>
-                                    <tr class="text-secondary text-left">
-                                        <th scope="col">Collector</th>
-                                        <th scope="col">Days covered</th>
-                                        <th scope="col">Missing days</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @for (k of c.collectors.collectors; track k.collector) {
-                                        <tr>
-                                            <th scope="row" class="text-left font-medium">{{ k.collector }}</th>
-                                            <td>{{ k.coveredDays }} of {{ c.expectedDays }}</td>
-                                            <td>{{ k.missingDays.length ? k.missingDays.join(', ') : 'none' }}</td>
+                        @if (coverage(); as c) {
+                            @if (c.missingDays.length) {
+                                <inspecto-alert variant="warning" title="Days with no data">
+                                    {{ c.missingDays.length }} of {{ c.expectedDays }} days in the window have zero rows
+                                    in {{ c.dataset }} ({{ c.zone }}): {{ c.missingDays.join(', ') }}. An empty result
+                                    on these days says nothing about activity.
+                                </inspecto-alert>
+                            } @else {
+                                <inspecto-alert variant="success" title="Every day has data">
+                                    All {{ c.expectedDays }} days in the window have rows in {{ c.dataset }} ({{
+                                        c.zone
+                                    }}).
+                                </inspecto-alert>
+                            }
+                            @if (c.collectors.assessed) {
+                                <table class="m-0 w-full text-sm" aria-label="Per-Collector coverage">
+                                    <thead>
+                                        <tr class="text-secondary text-left">
+                                            <th scope="col">Collector</th>
+                                            <th scope="col">Days covered</th>
+                                            <th scope="col">Missing days</th>
                                         </tr>
+                                    </thead>
+                                    <tbody>
+                                        @for (k of c.collectors.collectors; track k.collector) {
+                                            <tr>
+                                                <th scope="row" class="text-left font-medium">{{ k.collector }}</th>
+                                                <td>{{ k.coveredDays }} of {{ c.expectedDays }}</td>
+                                                <td>{{ k.missingDays.length ? k.missingDays.join(', ') : 'none' }}</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            } @else {
+                                <p class="text-secondary m-0 text-sm">
+                                    Per-Collector coverage is not assessed for this Dataset.
+                                    @if (c.collectors.note) {
+                                        <span>{{ c.collectors.note }}</span>
                                     }
-                                </tbody>
-                            </table>
-                        } @else {
-                            <p class="text-secondary m-0 text-sm">
-                                Per-Collector coverage is not assessed for this Dataset.
-                                @if (c.collectors.note) {
-                                    <span>{{ c.collectors.note }}</span>
-                                }
-                            </p>
+                                </p>
+                            }
                         }
                     }
-                }
-            </section>
+                </section>
             }
         }
         @case ('annotations') {
@@ -424,64 +455,75 @@
                 @if (!store.workingSet()?.annotations?.length && !store.workingSet()?.linkAnnotations?.length) {
                     <p class="text-secondary m-0 text-sm">No annotations yet.</p>
                 }
-            @if (store.workingSet()?.annotations?.length) {
-                <section aria-label="Annotations">
-                    <h3 class="text-secondary m-0 mb-1 text-sm font-semibold uppercase tracking-wide">Annotations</h3>
-                    <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm">
-                        @for (a of store.workingSet()!.annotations; track a.step + ':' + a.id) {
-                            <li>
-                                <strong>{{ a.id }}</strong> — {{ a.note
-                                }}{{ a.confidence ? ' [' + a.confidence + ']' : '' }} (step {{ a.step }})
-                            </li>
-                        }
-                    </ul>
-                </section>
-            }
-    
-            @if (store.workingSet()?.linkAnnotations?.length) {
-                <section aria-label="Link annotations">
-                    <h3 class="text-secondary m-0 mb-1 text-sm font-semibold uppercase tracking-wide">Link annotations</h3>
-                    <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm">
-                        @for (
-                            a of store.workingSet()!.linkAnnotations;
-                            track a.step + ':' + (a.linkId ?? a.source + a.target)
-                        ) {
-                            <li [attr.title]="a.linkId">
-                                <strong>{{ a.source }} → {{ a.target }}{{ a.kind ? ' (' + a.kind + ')' : '' }}</strong> —
-                                {{ a.note }}{{ a.confidence ? ' [' + a.confidence + ']' : '' }} (step {{ a.step }})
-                            </li>
-                        }
-                    </ul>
-                </section>
-            }
-    
-            @if (linkOptions().length) {
-                <section class="flex flex-col gap-1" aria-label="Annotate a link">
-                    <inspecto-option-picker
-                        label="Link"
-                        [options]="linkOptions()"
-                        [ngModel]="linkPick()"
-                        (ngModelChange)="linkPick.set($event)"
-                        placeholder="Pick a link to annotate"
-                    ></inspecto-option-picker>
-                    <inspecto-pen-field
-                        label="Link note"
-                        [multiline]="true"
-                        [formControl]="linkNote"
-                        [maxlength]="2000"
-                        [error]="
-                            linkNote.touched && linkNote.hasError('required')
-                                ? 'Write the note first.'
-                                : linkNote.hasError('maxlength')
-                                  ? 'At most 2000 characters.'
-                                  : ''
-                        "
-                    />
-                    <button mat-stroked-button [disabled]="!canWrite() || store.busy() || !linkPick()" (click)="annotateLink()">
-                        Annotate link
-                    </button>
-                </section>
-            }
+                @if (store.workingSet()?.annotations?.length) {
+                    <section aria-label="Annotations">
+                        <h3 class="text-secondary m-0 mb-1 text-sm font-semibold uppercase tracking-wide">
+                            Annotations
+                        </h3>
+                        <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm">
+                            @for (a of store.workingSet()!.annotations; track a.step + ':' + a.id) {
+                                <li>
+                                    <strong>{{ a.id }}</strong> — {{ a.note
+                                    }}{{ a.confidence ? ' [' + a.confidence + ']' : '' }} (step {{ a.step }})
+                                </li>
+                            }
+                        </ul>
+                    </section>
+                }
+
+                @if (store.workingSet()?.linkAnnotations?.length) {
+                    <section aria-label="Link annotations">
+                        <h3 class="text-secondary m-0 mb-1 text-sm font-semibold uppercase tracking-wide">
+                            Link annotations
+                        </h3>
+                        <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm">
+                            @for (
+                                a of store.workingSet()!.linkAnnotations;
+                                track a.step + ':' + (a.linkId ?? a.source + a.target)
+                            ) {
+                                <li [attr.title]="a.linkId">
+                                    <strong
+                                        >{{ a.source }} → {{ a.target }}{{ a.kind ? ' (' + a.kind + ')' : '' }}</strong
+                                    >
+                                    — {{ a.note }}{{ a.confidence ? ' [' + a.confidence + ']' : '' }} (step
+                                    {{ a.step }})
+                                </li>
+                            }
+                        </ul>
+                    </section>
+                }
+
+                @if (linkOptions().length) {
+                    <section class="flex flex-col gap-1" aria-label="Annotate a link">
+                        <inspecto-option-picker
+                            label="Link"
+                            [options]="linkOptions()"
+                            [ngModel]="linkPick()"
+                            (ngModelChange)="linkPick.set($event)"
+                            placeholder="Pick a link to annotate"
+                        ></inspecto-option-picker>
+                        <inspecto-pen-field
+                            label="Link note"
+                            [multiline]="true"
+                            [formControl]="linkNote"
+                            [maxlength]="2000"
+                            [error]="
+                                linkNote.touched && linkNote.hasError('required')
+                                    ? 'Write the note first.'
+                                    : linkNote.hasError('maxlength')
+                                      ? 'At most 2000 characters.'
+                                      : ''
+                            "
+                        />
+                        <button
+                            mat-stroked-button
+                            [disabled]="!canWrite() || store.busy() || !linkPick()"
+                            (click)="annotateLink()"
+                        >
+                            Annotate link
+                        </button>
+                    </section>
+                }
             }
         }
         @case ('excluded') {
@@ -489,18 +531,18 @@
                 @if (!store.workingSet()?.excluded?.length) {
                     <p class="text-secondary m-0 text-sm">No entity is excluded.</p>
                 }
-            @if (store.workingSet()?.excluded?.length) {
-                <section aria-label="Excluded entities">
-                    <h3 class="text-secondary m-0 mb-1 text-sm font-semibold uppercase tracking-wide">Excluded</h3>
-                    <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm">
-                        @for (x of store.workingSet()!.excluded; track x.id) {
-                            <li>
-                                <strong>{{ x.id }}</strong> — {{ x.reason }} (step {{ x.step }})
-                            </li>
-                        }
-                    </ul>
-                </section>
-            }
+                @if (store.workingSet()?.excluded?.length) {
+                    <section aria-label="Excluded entities">
+                        <h3 class="text-secondary m-0 mb-1 text-sm font-semibold uppercase tracking-wide">Excluded</h3>
+                        <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm">
+                            @for (x of store.workingSet()!.excluded; track x.id) {
+                                <li>
+                                    <strong>{{ x.id }}</strong> — {{ x.reason }} (step {{ x.step }})
+                                </li>
+                            }
+                        </ul>
+                    </section>
+                }
             }
         }
         @default {
@@ -513,7 +555,12 @@
             <ng-template #startSlot><ng-content select="[laNewInvestigation]" /></ng-template>
             <ng-template #actBar>
                 <!-- LA-INVESTIGATE-UX-1: Undo and Redo of recorded steps, always in reach; LA-INVESTIGATE-UX-2: of unsaved ones too -->
-                <div class="la-act-bar flex flex-wrap items-center gap-1 py-1" role="toolbar" aria-label="Steps" data-testid="act-bar">
+                <div
+                    class="la-act-bar flex flex-wrap items-center gap-1 py-1"
+                    role="toolbar"
+                    aria-label="Steps"
+                    data-testid="act-bar"
+                >
                     <button
                         mat-stroked-button
                         type="button"
@@ -538,19 +585,27 @@
                         <mat-icon svgIcon="heroicons_outline:arrow-uturn-right"></mat-icon>
                         Redo
                     </button>
-                    <span class="text-secondary text-xs">{{ isUnsaved() ? 'Unsaved' : 'Recorded' }} steps · Ctrl+Z / Ctrl+Shift+Z</span>
+                    <span class="text-secondary text-xs"
+                        >{{ isUnsaved() ? 'Unsaved' : 'Recorded' }} steps · Ctrl+Z / Ctrl+Shift+Z</span
+                    >
                 </div>
             </ng-template>
             <ng-template #cleanupFold>
                 <!-- LA-INVESTIGATE-UX-1: Clean up — one press each, the count on the button, one recorded step; Undo takes it back -->
-                <la-fold title="Clean up" [hint]="cleanupHint()" [startOpen]="true" rememberKey="act.cleanup" data-testid="act-cleanup">
+                <la-fold
+                    title="Clean up"
+                    [hint]="cleanupHint()"
+                    [startOpen]="true"
+                    rememberKey="act.cleanup"
+                    data-testid="act-cleanup"
+                >
                     <p class="text-secondary m-0 text-xs">
                         @if (isUnsaved()) {
-                            Each press is one step, recorded with its reason when you Save. Start entities and kept entities are
-                            never taken away.
+                            Each press is one step, recorded with its reason when you Save. Start entities and kept
+                            entities are never taken away.
                         } @else {
-                            Each press is one recorded step with its reason in the step log. Start entities and kept entities are never
-                            taken away.
+                            Each press is one recorded step with its reason in the step log. Start entities and kept
+                            entities are never taken away.
                         }
                     </p>
                     <mat-checkbox
@@ -558,7 +613,9 @@
                         (ngModelChange)="cleanupExclude.set($event)"
                         data-testid="cleanup-exclude-instead"
                     >
-                        <span class="text-xs">Exclude instead of hide (excluded entities stay out of later expands)</span>
+                        <span class="text-xs"
+                            >Exclude instead of hide (excluded entities stay out of later expands)</span
+                        >
                     </mat-checkbox>
                     @if (!canWrite()) {
                         <p class="text-secondary m-0 text-xs">{{ expandNeeds }}</p>
@@ -570,10 +627,15 @@
                             data-testid="cleanup-leaves"
                             [disabled]="!canWrite() || store.busy() || !cleanup().leaves.length"
                             [disabledInteractive]="true"
-                            [matTooltip]="cleanup().leaves.length ? 'Entities with one link; press again to go one ring further' : 'No dangling leaves'"
+                            [matTooltip]="
+                                cleanup().leaves.length
+                                    ? 'Entities with one link; press again to go one ring further'
+                                    : 'No dangling leaves'
+                            "
                             (click)="cleanUp(cleanup().leaves, 'Clean up: dangling leaves')"
                         >
-                            {{ verb() }} {{ cleanup().leaves.length.toLocaleString('en') }} dangling {{ cleanup().leaves.length === 1 ? 'leaf' : 'leaves' }}
+                            {{ verb() }} {{ cleanup().leaves.length.toLocaleString('en') }} dangling
+                            {{ cleanup().leaves.length === 1 ? 'leaf' : 'leaves' }}
                         </button>
                         <div class="flex flex-wrap items-center gap-1">
                             <button
@@ -585,7 +647,8 @@
                                 [matTooltip]="weak().length ? '' : 'Every entity has at least this many events'"
                                 (click)="cleanUp(weak(), 'Clean up: fewer than ' + weakMin() + ' events')"
                             >
-                                {{ verb() }} {{ weak().length.toLocaleString('en') }} with fewer than {{ weakMin() }} events
+                                {{ verb() }} {{ weak().length.toLocaleString('en') }} with fewer than
+                                {{ weakMin() }} events
                             </button>
                             <inspecto-stepper-field
                                 label="Events"
@@ -598,7 +661,12 @@
                             ></inspecto-stepper-field>
                         </div>
                         @if (cleanup().types.length > 1) {
-                            <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Clean up an entity type" data-testid="cleanup-types">
+                            <div
+                                class="flex flex-wrap items-center gap-1"
+                                role="group"
+                                aria-label="Clean up an entity type"
+                                data-testid="cleanup-types"
+                            >
                                 @for (t of cleanup().types; track t.type) {
                                     <button
                                         mat-stroked-button
@@ -618,12 +686,24 @@
                                     mat-stroked-button
                                     type="button"
                                     data-testid="cleanup-paths"
-                                    [disabled]="!canWrite() || store.busy() || offPaths() === null || !offPaths()!.length"
+                                    [disabled]="
+                                        !canWrite() || store.busy() || offPaths() === null || !offPaths()!.length
+                                    "
                                     [disabledInteractive]="true"
-                                    [matTooltip]="offPaths() === null ? 'Too many paths to work out in the browser: fewer links, or clean up first' : ''"
-                                    (click)="cleanUp(offPaths() ?? [], 'Clean up: kept the paths between ' + selectedIds().join(' and '))"
+                                    [matTooltip]="
+                                        offPaths() === null
+                                            ? 'Too many paths to work out in the browser: fewer links, or clean up first'
+                                            : ''
+                                    "
+                                    (click)="
+                                        cleanUp(
+                                            offPaths() ?? [],
+                                            'Clean up: kept the paths between ' + selectedIds().join(' and ')
+                                        )
+                                    "
                                 >
-                                    Keep paths between the 2 selected ({{ verb().toLowerCase() }} {{ (offPaths()?.length ?? 0).toLocaleString('en') }})
+                                    Keep paths between the 2 selected ({{ verb().toLowerCase() }}
+                                    {{ (offPaths()?.length ?? 0).toLocaleString('en') }})
                                 </button>
                                 <inspecto-stepper-field
                                     label="Links"
@@ -642,22 +722,41 @@
                                 data-testid="cleanup-keep-only"
                                 [disabled]="!canWrite() || store.busy() || !keepOnlyIds().length"
                                 [disabledInteractive]="true"
-                                (click)="cleanUp(keepOnlyIds(), 'Clean up: kept only the ' + selectedIds().length + ' selected')"
+                                (click)="
+                                    cleanUp(
+                                        keepOnlyIds(),
+                                        'Clean up: kept only the ' + selectedIds().length + ' selected'
+                                    )
+                                "
                             >
-                                Keep only the {{ selectedIds().length }} selected ({{ verb().toLowerCase() }} {{ keepOnlyIds().length.toLocaleString('en') }})
+                                Keep only the {{ selectedIds().length }} selected ({{ verb().toLowerCase() }}
+                                {{ keepOnlyIds().length.toLocaleString('en') }})
                             </button>
                         } @else {
-                            <p class="text-secondary m-0 text-xs">Select entities on the canvas for Keep only these, or two for the paths between them.</p>
+                            <p class="text-secondary m-0 text-xs">
+                                Select entities on the canvas for Keep only these, or two for the paths between them.
+                            </p>
                         }
                         @if (!isUnsaved() && store.header()?.timeCol) {
                             <!-- LA-INVESTIGATE-UX-2 (2): read live from the Dataset; the Working Set carries no link times -->
-                            <div class="flex flex-col gap-1 self-stretch" role="group" aria-label="Outside a time window" data-testid="cleanup-window">
+                            <div
+                                class="flex flex-col gap-1 self-stretch"
+                                role="group"
+                                aria-label="Outside a time window"
+                                data-testid="cleanup-window"
+                            >
                                 <p class="text-secondary m-0 text-xs">
-                                    Outside a time window: entities none of whose links has an event in [From, To), read from the
-                                    Dataset now. Either end may be blank; a date and time has a zone, such as 2026-09-01T00:00Z.
+                                    Outside a time window: entities none of whose links has an event in [From, To), read
+                                    from the Dataset now. Either end may be blank; a date and time has a zone, such as
+                                    2026-09-01T00:00Z.
                                 </p>
                                 <!-- LA-INVESTIGATE-CLICKS-2 (1): the Expand filter's quick windows; a chip reads at once -->
-                                <div class="flex flex-wrap gap-1" role="group" aria-label="Last days up to the latest event" data-testid="cleanup-window-chips">
+                                <div
+                                    class="flex flex-wrap gap-1"
+                                    role="group"
+                                    aria-label="Last days up to the latest event"
+                                    data-testid="cleanup-window-chips"
+                                >
                                     @for (o of outsideChips; track o.value) {
                                         <button
                                             type="button"
@@ -668,9 +767,11 @@
                                             [disabled]="outsideBusy()"
                                             (click)="outsideChip(o.days)"
                                         >
-                                            <inspecto-chip [variant]="outsideChipOn() === o.value ? 'soft' : 'outline'" [tone]="outsideChipOn() === o.value ? 'primary' : 'neutral'">{{
-                                                o.label
-                                            }}</inspecto-chip>
+                                            <inspecto-chip
+                                                [variant]="outsideChipOn() === o.value ? 'soft' : 'outline'"
+                                                [tone]="outsideChipOn() === o.value ? 'primary' : 'neutral'"
+                                                >{{ o.label }}</inspecto-chip
+                                            >
                                         </button>
                                     }
                                 </div>
@@ -679,13 +780,17 @@
                                         label="From"
                                         [formControl]="outsideFrom"
                                         placeholder="Blank: from the start"
-                                        [error]="outsideFrom.hasError('pattern') ? 'An ISO instant with an offset or Z.' : ''"
+                                        [error]="
+                                            outsideFrom.hasError('pattern') ? 'An ISO instant with an offset or Z.' : ''
+                                        "
                                     />
                                     <inspecto-pen-field
                                         label="To"
                                         [formControl]="outsideTo"
                                         placeholder="Blank: to the end"
-                                        [error]="outsideTo.hasError('pattern') ? 'An ISO instant with an offset or Z.' : ''"
+                                        [error]="
+                                            outsideTo.hasError('pattern') ? 'An ISO instant with an offset or Z.' : ''
+                                        "
                                     />
                                 </div>
                                 @if (outsideInverted()) {
@@ -704,7 +809,9 @@
                                     Find what is outside the window
                                 </button>
                                 @if (outsideError()) {
-                                    <p class="text-warn m-0 text-xs" role="alert" data-testid="cleanup-window-error">{{ outsideError() }}</p>
+                                    <p class="text-warn m-0 text-xs" role="alert" data-testid="cleanup-window-error">
+                                        {{ outsideError() }}
+                                    </p>
                                 }
                                 @if (outsideIds(); as ids) {
                                     <button
@@ -714,10 +821,15 @@
                                         data-testid="cleanup-window-hide"
                                         [disabled]="!canWrite() || store.busy() || !ids.length"
                                         [disabledInteractive]="true"
-                                        [matTooltip]="ids.length ? '' : 'Nothing to take away: every other entity has a link event in the window'"
+                                        [matTooltip]="
+                                            ids.length
+                                                ? ''
+                                                : 'Nothing to take away: every other entity has a link event in the window'
+                                        "
                                         (click)="cleanUpOutside(ids)"
                                     >
-                                        {{ verb() }} {{ ids.length.toLocaleString('en') }} with no link event in the window
+                                        {{ verb() }} {{ ids.length.toLocaleString('en') }} with no link event in the
+                                        window
                                     </button>
                                 }
                             </div>
@@ -756,18 +868,33 @@
                     </button>
                 </div>
                 @if (!canWrite()) {
-                    <p id="unsaved-save-why" class="text-secondary m-0 text-sm" data-testid="unsaved-save-why">{{ saveNeeds }}</p>
+                    <p id="unsaved-save-why" class="text-secondary m-0 text-sm" data-testid="unsaved-save-why">
+                        {{ saveNeeds }}
+                    </p>
                 }
                 <p class="text-secondary m-0 text-sm">
                     Nothing is recorded yet. Save asks for a Name and a Purpose, then records these steps in order.
                 </p>
                 <ng-container [ngTemplateOutlet]="actBar" />
-                <section class="flex flex-col gap-2 rounded-md border p-2" style="border-color: var(--gamma-border)" aria-labelledby="unsaved-expand-title">
+                <section
+                    class="flex flex-col gap-2 rounded-md border p-2"
+                    style="border-color: var(--gamma-border)"
+                    aria-labelledby="unsaved-expand-title"
+                >
                     <h3 id="unsaved-expand-title" class="m-0 text-sm font-semibold">Expand</h3>
                     <ng-container [ngTemplateOutlet]="expandSlot" />
                 </section>
-                <section class="flex flex-col gap-1" aria-labelledby="unsaved-start-title" data-testid="unsaved-start-entities">
-                    <h3 id="unsaved-start-title" class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Start entities</h3>
+                <section
+                    class="flex flex-col gap-1"
+                    aria-labelledby="unsaved-start-title"
+                    data-testid="unsaved-start-entities"
+                >
+                    <h3
+                        id="unsaved-start-title"
+                        class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide"
+                    >
+                        Start entities
+                    </h3>
                     <div>
                         <button
                             mat-stroked-button
@@ -787,8 +914,8 @@
                 </section>
                 <ng-container [ngTemplateOutlet]="cleanupFold" />
                 <p class="text-secondary m-0 text-sm" data-testid="unsaved-save-first">
-                    Keep, Hide, Exclude, Annotate and the other steps change a recorded Working Set: Save first. Clean up
-                    hides, or excludes, while unsaved.
+                    Keep, Hide, Exclude, Annotate and the other steps change a recorded Working Set: Save first. Clean
+                    up hides, or excludes, while unsaved.
                 </p>
             } @else if (!store.active()) {
                 <!-- ── start ── -->
@@ -806,8 +933,8 @@
                             Creates an Investigation over <strong>{{ q.projection.datasetId }}</strong> ({{
                                 q.projection.sourceCol
                             }}
-                            → {{ q.projection.targetCol }}), starts from {{ q.seed }} and expands one degree. Use Expand… to go further:
-                            {{ pendingSummary() }}.
+                            → {{ q.projection.targetCol }}), starts from {{ q.seed }} and expands one degree. Use
+                            Expand… to go further: {{ pendingSummary() }}.
                         </p>
                         <inspecto-pen-field
                             label="Name"
@@ -824,13 +951,11 @@
                             [error]="purpose.hasError('maxlength') ? 'At most ' + purposeMax() + ' characters.' : ''"
                             data-testid="investigate-purpose"
                         />
-                        <p class="text-secondary m-0 text-sm">Why you are investigating (stated reason or legal basis). Shown in the Dossier.</p>
+                        <p class="text-secondary m-0 text-sm">
+                            Why you are investigating (stated reason or legal basis). Shown in the Dossier.
+                        </p>
                         @if (pendingTried() && purpose.invalid && !purpose.hasError('maxlength')) {
-                            <p
-                                class="text-warn m-0 text-sm"
-                                role="alert"
-                                data-testid="investigate-purpose-required"
-                            >
+                            <p class="text-warn m-0 text-sm" role="alert" data-testid="investigate-purpose-required">
                                 A purpose is required to start an Investigation.
                             </p>
                         }
@@ -852,11 +977,10 @@
                 } @else if (projection(); as p) {
                     <!-- Top results queued from the On screen / Whole Dataset tools: they become the first step -->
                     <p class="text-secondary m-0 text-sm" data-testid="investigation-queued-start">
-                        An Investigation is an ordered, append-only log of steps over <strong>{{ p.datasetId }}</strong> ({{
-                            p.sourceCol
-                        }}
-                        → {{ p.targetCol }}). Each step is recorded with who, when and why, so the step log replays
-                        identically. It reads the whole Dataset: the query's filter is not applied.
+                        An Investigation is an ordered, append-only log of steps over
+                        <strong>{{ p.datasetId }}</strong> ({{ p.sourceCol }} → {{ p.targetCol }}). Each step is
+                        recorded with who, when and why, so the step log replays identically. It reads the whole
+                        Dataset: the query's filter is not applied.
                     </p>
                     <inspecto-pen-field
                         label="Name (optional)"
@@ -872,10 +996,18 @@
                         [maxlength]="purposeMax()"
                         [error]="purpose.hasError('maxlength') ? 'At most ' + purposeMax() + ' characters.' : ''"
                     />
-                    <p class="text-secondary m-0 text-sm">Why you are investigating (stated reason or legal basis). Shown in the Dossier.</p>
-                    <inspecto-pen-field label="Time column (optional)" [formControl]="timeColumn" [placeholder]="timeCol()" />
                     <p class="text-secondary m-0 text-sm">
-                        Used for time windows and the coverage check.{{ timeCol() ? ' Blank uses ' + timeCol() + '.' : '' }}
+                        Why you are investigating (stated reason or legal basis). Shown in the Dossier.
+                    </p>
+                    <inspecto-pen-field
+                        label="Time column (optional)"
+                        [formControl]="timeColumn"
+                        [placeholder]="timeCol()"
+                    />
+                    <p class="text-secondary m-0 text-sm">
+                        Used for time windows and the coverage check.{{
+                            timeCol() ? ' Blank uses ' + timeCol() + '.' : ''
+                        }}
                     </p>
                     <inspecto-option-picker
                         label="Time column zone (optional)"
@@ -890,11 +1022,15 @@
                         (click)="start()"
                     >
                         Start Investigation{{
-                            store.queuedSeeds().length ? ' with ' + store.queuedSeeds().length + ' queued start entities' : ''
+                            store.queuedSeeds().length
+                                ? ' with ' + store.queuedSeeds().length + ' queued start entities'
+                                : ''
                         }}
                     </button>
                 } @else {
-                    <inspecto-alert variant="info" title="Nothing to investigate yet">{{ projectionIssue() }}</inspecto-alert>
+                    <inspecto-alert variant="info" title="Nothing to investigate yet">{{
+                        projectionIssue()
+                    }}</inspecto-alert>
                 }
                 <!-- the New form carries its own lock note at its top; this one serves the pending and queued starts -->
                 @if (!canWrite() && (pending() || store.queuedSeeds().length)) {
@@ -902,9 +1038,7 @@
                         Read-only: starting an Investigation needs Incident management.
                     </inspecto-alert>
                 }
-                <p class="text-secondary m-0 text-sm">
-                    Open an existing Investigation with File ▸ Open…
-                </p>
+                <p class="text-secondary m-0 text-sm">Open an existing Investigation with File ▸ Open…</p>
             } @else {
                 @if (store.header(); as h) {
                     <!-- 1. Header: title, purpose, Working Set counts, degree reached; ⋯ holds Settings…, Close and Delete -->
@@ -924,9 +1058,13 @@
                                 <div class="truncate font-semibold">{{ store.displayTitle() || h.id }}</div>
                             }
                             @if (h.purpose) {
-                                <div class="text-secondary truncate text-sm" [attr.title]="h.purpose">{{ h.purpose }}</div>
+                                <div class="text-secondary truncate text-sm" [attr.title]="h.purpose">
+                                    {{ h.purpose }}
+                                </div>
                             }
-                            <div class="text-secondary text-sm">{{ h.dataset }} · {{ h.sourceCol }} → {{ h.targetCol }}</div>
+                            <div class="text-secondary text-sm">
+                                {{ h.dataset }} · {{ h.sourceCol }} → {{ h.targetCol }}
+                            </div>
                         </div>
                         <button
                             mat-icon-button
@@ -989,8 +1127,11 @@
                             style="border-color: var(--gamma-border)"
                             aria-label="Lineage"
                         >
-                            <strong>Fork</strong> of <code>{{ parent.id }}</code>: its steps re-applied in the order
-                            {{ parent.order.join(', ') }}. The parent ({{ parent.parentSteps }} steps) is unchanged.
+                            <strong>Fork</strong> of <code>{{ parent.id }}</code
+                            >: its steps re-applied in the order {{ parent.order.join(', ') }}. The parent ({{
+                                parent.parentSteps
+                            }}
+                            steps) is unchanged.
                             @if (parentRemembered()) {
                                 <button mat-button class="!ml-1" (click)="openParent()">Open the parent</button>
                             }
@@ -1011,25 +1152,45 @@
                     </inspecto-alert>
                 }
                 <p class="m-0 text-sm tabular-nums" aria-label="Working Set" data-testid="act-counts">
-                    <strong>Working Set:</strong> {{ counts().entities }} {{ counts().entities === 1 ? 'entity' : 'entities' }} · {{ counts().links }} {{ counts().links === 1 ? 'link' : 'links' }} ·
-                    {{ counts().excluded }} excluded · {{ counts().hidden }} hidden · {{ counts().kept }} kept
-                    <span class="text-secondary" data-testid="degree-label">· degree {{ degree().current < 0 ? 0 : degree().current }} of {{ maxDegree() }}</span>
+                    <strong>Working Set:</strong> {{ counts().entities }}
+                    {{ counts().entities === 1 ? 'entity' : 'entities' }} · {{ counts().links }}
+                    {{ counts().links === 1 ? 'link' : 'links' }} · {{ counts().excluded }} excluded ·
+                    {{ counts().hidden }} hidden · {{ counts().kept }} kept
+                    <span class="text-secondary" data-testid="degree-label"
+                        >· degree {{ degree().current < 0 ? 0 : degree().current }} of {{ maxDegree() }}</span
+                    >
                     @if (hubs().length) {
                         <span class="text-secondary"> · {{ hubs().length }} busy held</span>
                     }
                 </p>
                 @if (showHowTo()) {
                     <!-- LA-INVESTIGATE-UX-1: the first-run orientation; ? brings it back -->
-                    <section class="rounded-md border p-2 text-sm" style="border-color: var(--gamma-border)" aria-labelledby="act-howto-title" data-testid="act-howto">
+                    <section
+                        class="rounded-md border p-2 text-sm"
+                        style="border-color: var(--gamma-border)"
+                        aria-labelledby="act-howto-title"
+                        data-testid="act-howto"
+                    >
                         <h3 id="act-howto-title" class="m-0 text-sm font-semibold">How to investigate</h3>
                         <ol class="m-0 mt-1 flex list-decimal flex-col gap-0.5 pl-5">
                             <li>Start from an entity: it is the first step.</li>
-                            <li>Expand: double-click an entity, right-click it, or press G. The Expand filter below decides what is added.</li>
+                            <li>
+                                Expand: double-click an entity, right-click it, or press G. The Expand filter below
+                                decides what is added.
+                            </li>
                             <li>Clean up what is noise: one press each, every one is a recorded step.</li>
                             <li>Back out with Undo (Ctrl+Z); Redo (Ctrl+Shift+Z) records it again.</li>
                             <li>Keep (K) what proves the point, hide (H) or exclude (X) what does not.</li>
                         </ol>
-                        <button mat-button type="button" class="mt-1" data-testid="act-howto-dismiss" (click)="dismissHowTo()">Got it</button>
+                        <button
+                            mat-button
+                            type="button"
+                            class="mt-1"
+                            data-testid="act-howto-dismiss"
+                            (click)="dismissHowTo()"
+                        >
+                            Got it
+                        </button>
                     </section>
                 }
                 <ng-container [ngTemplateOutlet]="actBar" />
@@ -1071,7 +1232,12 @@
                     </p>
                     <div class="flex flex-wrap gap-1">
                         @if (store.active()) {
-                            <button mat-flat-button color="primary" [disabled]="!canWrite() || store.busy()" (click)="seedQueued()">
+                            <button
+                                mat-flat-button
+                                color="primary"
+                                [disabled]="!canWrite() || store.busy()"
+                                (click)="seedQueued()"
+                            >
                                 Start from queued entities
                             </button>
                         }
@@ -1080,423 +1246,473 @@
                 </section>
             }
             @if (store.active()) {
-            <!-- ── LA-INV-EXPAND-1: Expand lives here (From · Degrees · Direction · Expand + preview · filters), beside the
+                <!-- ── LA-INV-EXPAND-1: Expand lives here (From · Degrees · Direction · Expand + preview · filters), beside the
                  degree reached; ONE control (the outer ring is a From). Every Expand entry point opens this tab and focuses it. ── -->
-            <section class="flex flex-col gap-2 rounded-md border p-2" style="border-color: var(--gamma-border)" aria-labelledby="act-expand-title" data-testid="degrees">
-                <div class="flex flex-wrap items-center gap-2">
-                    <h3 id="act-expand-title" class="m-0 text-sm font-semibold">Expand</h3>
-                    <ol class="m-0 flex list-none gap-1 p-0" aria-hidden="true">
-                        @for (d of degreeSteps(); track d) {
-                            <li>
-                                <inspecto-chip
-                                    [variant]="d <= degree().current ? 'soft' : 'outline'"
-                                    [tone]="d <= degree().current ? 'primary' : 'neutral'"
-                                    >{{ d }}</inspecto-chip
-                                >
-                            </li>
-                        }
-                    </ol>
-                </div>
-                <!-- the degree notes belong to the line above (the degree reached), so they come before the form -->
-                @if (windowNote(); as w) {
-                    <p class="text-secondary m-0 text-sm" data-testid="degree-window">Window: {{ w }}</p>
-                }
-                @if (blockedNote(); as why) {
-                    <p class="text-secondary m-0 text-sm" data-testid="degree-blocked">{{ why }}</p>
-                }
-                @if (degree().heldHubs.length) {
-                    <p class="text-secondary m-0 text-sm" data-testid="degree-hubs">
-                        {{ degree().heldHubs.length }} busy
-                        {{ degree().heldHubs.length === 1 ? 'entity is' : 'entities are' }} held. Untick “Hold busy
-                        entities” under Fan-out and busy, or choose Expand anyway on one (right-click it).
-                    </p>
-                }
-                @if (store.degreeOutcomes().length) {
-                    <ul
-                        class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm"
-                        aria-live="polite"
-                        aria-label="Degree results"
-                    >
-                        @for (o of store.degreeOutcomes(); track $index) {
-                            <li [class.text-warn]="o.truncated">{{ outcomeMessage(o) }}</li>
-                        }
-                    </ul>
-                }
-                @if (canWrite()) {
-                    <!-- the page projects the ONE Expand form (it holds the screen's start, presets and four-eyes limits) -->
-                    <ng-container [ngTemplateOutlet]="expandSlot" />
-                } @else {
-                    <p class="text-secondary m-0 text-sm" data-testid="expand-read-only">{{ expandNeeds }}</p>
-                }
-            </section>
-    
-            @if (store.truncatedSteps().length) {
-                <inspecto-alert variant="warning" title="Incomplete Working Set">
-                    The expand at step {{ store.truncatedSteps().join(', ') }} hit its row limit — some neighbours were not
-                    read. Name fewer entities to expand, or exclude a busy one first.
-                </inspecto-alert>
-            }
-            @if (store.workingSetGraph()?.truncated) {
-                <inspecto-alert variant="warning" title="Not all drawn">
-                    The Working Set has more entities than the canvas can draw. The drawing is partial; the counts above
-                    are complete.
-                </inspecto-alert>
-            }
-            @if (fallbackNote(); as note) {
-                <p class="text-secondary m-0 text-sm" role="status" data-testid="expand-fallback">{{ note }}</p>
-            }
-            @if (store.lastOverride(); as o) {
-                <p class="m-0 text-sm" role="status" data-testid="hub-override-recorded">
-                    Override recorded at step {{ o.step }}: expanded through busy
-                    {{ o.ids.slice(0, 5).join(', ') }}{{ o.ids.length > 5 ? ', …' : '' }}. Logged in the step log with
-                    your name.
-                </p>
-            }
-            @if (store.lastStep()?.protected?.length) {
-                <inspecto-alert variant="info" title="Kept entities were not excluded">
-                    {{ store.lastStep()!.protected!.join(', ') }} — a keep step protects them.
-                </inspecto-alert>
-            }
-            <ng-container [ngTemplateOutlet]="cleanupFold" />
-            <div class="flex flex-col gap-2" data-testid="act-selected">
-                <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Selected entity</h3>
-            <section
-                class="flex flex-col gap-2 "
-    
-                aria-label="Selected entity"
-            >
-                @if (store.selected(); as n) {
-                    <div class="text-sm">
-                        Selected: <strong>{{ n.data.label }}</strong>
-                        @if (n.data.label.startsWith('masked:')) {
-                            <span class="text-secondary">(masked)</span>
-                        }
-                        @if (!selectedInSet().length) {
-                            <span class="text-secondary">(not in the Working Set)</span>
-                        }
-                        @if (selectedHubs().length) {
-                            <inspecto-chip variant="soft" tone="warning" data-testid="selected-hub-badge">{{
-                                selectedHubBadge()
-                            }}</inspecto-chip>
-                        }
+                <section
+                    class="flex flex-col gap-2 rounded-md border p-2"
+                    style="border-color: var(--gamma-border)"
+                    aria-labelledby="act-expand-title"
+                    data-testid="degrees"
+                >
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h3 id="act-expand-title" class="m-0 text-sm font-semibold">Expand</h3>
+                        <ol class="m-0 flex list-none gap-1 p-0" aria-hidden="true">
+                            @for (d of degreeSteps(); track d) {
+                                <li>
+                                    <inspecto-chip
+                                        [variant]="d <= degree().current ? 'soft' : 'outline'"
+                                        [tone]="d <= degree().current ? 'primary' : 'neutral'"
+                                        >{{ d }}</inspecto-chip
+                                    >
+                                </li>
+                            }
+                        </ol>
                     </div>
-                    <div class="flex flex-wrap gap-1">
-                        @if (!selectedInSet().length) {
-                            <button mat-stroked-button [disabled]="!canWrite() || store.busy()" (click)="seed()">Start from it</button>
-                        }
-                        @if (selectedHubs().length && !isOverridden(selectedHubs()[0])) {
-                            <button
-                                mat-stroked-button
-                                data-testid="selected-expand-anyway"
-                                [disabled]="!canWrite() || store.busy()"
-                                (click)="expandAnyway(selectedHubs()[0])"
-                            >
-                                Expand anyway
-                            </button>
-                        }
-                    </div>
-                    @if (selectedInSet().length) {
-                        <p class="text-secondary m-0 text-xs" data-testid="selected-canvas-hint">
-                            Double-click it to expand with the filter; right-click it to keep, hide, exclude or shrink it.
+                    <!-- the degree notes belong to the line above (the degree reached), so they come before the form -->
+                    @if (windowNote(); as w) {
+                        <p class="text-secondary m-0 text-sm" data-testid="degree-window">Window: {{ w }}</p>
+                    }
+                    @if (blockedNote(); as why) {
+                        <p class="text-secondary m-0 text-sm" data-testid="degree-blocked">{{ why }}</p>
+                    }
+                    @if (degree().heldHubs.length) {
+                        <p class="text-secondary m-0 text-sm" data-testid="degree-hubs">
+                            {{ degree().heldHubs.length }} busy
+                            {{ degree().heldHubs.length === 1 ? 'entity is' : 'entities are' }} held. Untick “Hold busy
+                            entities” under Fan-out and busy, or choose Expand anyway on one (right-click it).
                         </p>
                     }
-                    @if (selectedInSet().length === 1) {
-                        <div class="flex flex-col gap-1" data-testid="neighbours-section">
-                            <button
-                                mat-stroked-button
-                                type="button"
-                                data-testid="neighbours-toggle"
-                                [attr.aria-expanded]="neighboursOpen()"
-                                [disabled]="store.busy()"
-                                (click)="toggleNeighbours()"
-                            >
-                                {{ neighboursOpen() ? 'Hide neighbours' : 'Pick neighbours…' }}
-                            </button>
-                            @if (neighboursOpen()) {
-                                @if (neighbourList(); as list) {
-                                    @if (list.loading) {
-                                        <p class="text-secondary m-0 text-sm" role="status">Reading neighbours…</p>
-                                    } @else if (list.error) {
-                                        <inspecto-alert variant="warning">{{ list.error }}</inspecto-alert>
-                                    } @else if (!list.rows.length) {
-                                        <p class="text-secondary m-0 text-sm">No neighbours found for this entity.</p>
-                                    } @else {
-                                        <p class="text-secondary m-0 text-sm">
-                                            {{ list.total }} neighbour{{ list.total === 1 ? '' : 's' }}, strongest first
-                                            (the whole Dataset, no time window). Reading this list is never held for approval;
-                                            the step you add reads only the neighbours you choose.
-                                        </p>
-                                        <ul
-                                            class="m-0 flex max-h-56 list-none flex-col gap-0.5 overflow-auto p-0 text-sm"
-                                            data-testid="neighbour-list"
-                                        >
-                                            @for (nb of list.rows; track nb.id) {
-                                                <li>
-                                                    <label class="flex items-center gap-2">
-                                                        <input
-                                                            type="checkbox"
-                                                            [checked]="picked().has(nb.id)"
-                                                            [disabled]="!canWrite() || store.busy()"
-                                                            (change)="togglePicked(nb.id)"
-                                                        />
-                                                        <span class="font-mono">{{ nb.id }}</span>
-                                                        <span class="text-secondary ml-auto tabular-nums">
-                                                            {{ nb.count }} event{{ nb.count === 1 ? '' : 's' }}@if (nb.kinds.length) {
-                                                                · {{ nb.kinds.join(', ') }}
-                                                            }
-                                                        </span>
-                                                    </label>
-                                                </li>
-                                            }
-                                        </ul>
-                                        @if (list.hasMore) {
-                                            <button
-                                                mat-button
-                                                type="button"
-                                                data-testid="neighbours-more"
-                                                [disabled]="store.busy() || list.loading"
-                                                (click)="store.moreNeighbours()"
-                                            >
-                                                Show more ({{ list.rows.length }} of {{ list.total }})
-                                            </button>
-                                        }
-                                        <div class="flex flex-wrap gap-1">
-                                            <button
-                                                mat-stroked-button
-                                                type="button"
-                                                data-testid="neighbours-add-selected"
-                                                [disabled]="!canWrite() || store.busy() || !picked().size"
-                                                (click)="addNeighbours()"
-                                            >
-                                                Add selected ({{ picked().size }})
-                                            </button>
-                                            <button
-                                                mat-stroked-button
-                                                type="button"
-                                                data-testid="neighbours-add-strongest"
-                                                [disabled]="!canWrite() || store.busy()"
-                                                (click)="addNeighbours(true)"
-                                            >
-                                                Add the {{ strongestCount }} strongest
-                                            </button>
-                                        </div>
-                                    }
-                                }
-                            }
-                        </div>
-                    }
-                    <!-- LA-19: a note changes nothing about traversal, display or counts -->
-                    @if (selectedNotes().length) {
-                        <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm" aria-label="Notes on this entity">
-                            @for (a of selectedNotes(); track a.step + ':' + a.id) {
-                                <li>
-                                    {{ a.note }} <span class="text-secondary">(step {{ a.step }})</span>
-                                </li>
+                    @if (store.degreeOutcomes().length) {
+                        <ul
+                            class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm"
+                            aria-live="polite"
+                            aria-label="Degree results"
+                        >
+                            @for (o of store.degreeOutcomes(); track $index) {
+                                <li [class.text-warn]="o.truncated">{{ outcomeMessage(o) }}</li>
                             }
                         </ul>
                     }
-                    <inspecto-pen-field
-                        label="Note"
-                        [multiline]="true"
-                        [formControl]="note"
-                        [maxlength]="2000"
-                        [error]="
-                            note.touched && note.hasError('required')
-                                ? 'Write the note first.'
-                                : note.hasError('maxlength')
-                                  ? 'At most 2000 characters.'
-                                  : ''
-                        "
-                        (keydown.enter)="note.value.trim() && annotate()"
-                    />
-                    <button mat-stroked-button [disabled]="!canWrite() || store.busy() || !selectedInSet().length" (click)="annotate()">
-                        Annotate
-                    </button>
-                } @else {
-                    <p class="text-secondary m-0 text-sm">
-                        Click an entity on the canvas to see it here; right-click it for everything you can do with it.
+                    @if (canWrite()) {
+                        <!-- the page projects the ONE Expand form (it holds the screen's start, presets and four-eyes limits) -->
+                        <ng-container [ngTemplateOutlet]="expandSlot" />
+                    } @else {
+                        <p class="text-secondary m-0 text-sm" data-testid="expand-read-only">{{ expandNeeds }}</p>
+                    }
+                </section>
+
+                @if (store.truncatedSteps().length) {
+                    <inspecto-alert variant="warning" title="Incomplete Working Set">
+                        The expand at step {{ store.truncatedSteps().join(', ') }} hit its row limit — some neighbours
+                        were not read. Name fewer entities to expand, or exclude a busy one first.
+                    </inspecto-alert>
+                }
+                @if (store.workingSetGraph()?.truncated) {
+                    <inspecto-alert variant="warning" title="Not all drawn">
+                        The Working Set has more entities than the canvas can draw. The drawing is partial; the counts
+                        above are complete.
+                    </inspecto-alert>
+                }
+                @if (fallbackNote(); as note) {
+                    <p class="text-secondary m-0 text-sm" role="status" data-testid="expand-fallback">{{ note }}</p>
+                }
+                @if (store.lastOverride(); as o) {
+                    <p class="m-0 text-sm" role="status" data-testid="hub-override-recorded">
+                        Override recorded at step {{ o.step }}: expanded through busy {{ o.ids.slice(0, 5).join(', ')
+                        }}{{ o.ids.length > 5 ? ', …' : '' }}. Logged in the step log with your name.
                     </p>
                 }
-            </section>
-            </div>
-                @if (hubs().length) {
-                <la-fold title="Busy entities" [hint]="hubs().length + ' held'" rememberKey="act.busy">
-                <section
-                    class="flex flex-col gap-1 "
-    
-                    aria-label="Busy entities"
-                    data-testid="hub-list"
-                >
-                    <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">
-                        Busy entities ({{ hubs().length }})
-                    </h3>
-                    <p class="text-secondary m-0 text-sm">
-                        Shown, but not expanded: each has more linked entities than the busy limit. Expanding through
-                        one is an override you confirm, and it is recorded.
-                    </p>
-                    <ul class="m-0 flex list-none flex-col gap-1 p-0 text-sm">
-                        @for (e of hubs().slice(0, 50); track e.id) {
-                            <li class="flex flex-wrap items-center gap-1">
-                                <span class="font-mono">{{ e.id }}</span>
-                                <inspecto-chip variant="soft" tone="warning">{{
-                                    hubBadge(e.contacts, e.id)
-                                }}</inspecto-chip>
-                                @if (!isOverridden(e.id)) {
+                @if (store.lastStep()?.protected?.length) {
+                    <inspecto-alert variant="info" title="Kept entities were not excluded">
+                        {{ store.lastStep()!.protected!.join(', ') }} — a keep step protects them.
+                    </inspecto-alert>
+                }
+                <ng-container [ngTemplateOutlet]="cleanupFold" />
+                <div class="flex flex-col gap-2" data-testid="act-selected">
+                    <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Selected entity</h3>
+                    <section class="flex flex-col gap-2" aria-label="Selected entity">
+                        @if (store.selected(); as n) {
+                            <div class="text-sm">
+                                Selected: <strong>{{ n.data.label }}</strong>
+                                @if (n.data.label.startsWith('masked:')) {
+                                    <span class="text-secondary">(masked)</span>
+                                }
+                                @if (!selectedInSet().length) {
+                                    <span class="text-secondary">(not in the Working Set)</span>
+                                }
+                                @if (selectedHubs().length) {
+                                    <inspecto-chip variant="soft" tone="warning" data-testid="selected-hub-badge">{{
+                                        selectedHubBadge()
+                                    }}</inspecto-chip>
+                                }
+                            </div>
+                            <div class="flex flex-wrap gap-1">
+                                @if (!selectedInSet().length) {
                                     <button
-                                        mat-button
-                                        type="button"
-                                        class="ml-auto"
-                                        [disabled]="!canWrite() || store.busy() || store.chainRunning()"
-                                        [attr.aria-label]="'Expand anyway from ' + e.id"
-                                        (click)="expandAnyway(e.id)"
+                                        mat-stroked-button
+                                        [disabled]="!canWrite() || store.busy()"
+                                        (click)="seed()"
+                                    >
+                                        Start from it
+                                    </button>
+                                }
+                                @if (selectedHubs().length && !isOverridden(selectedHubs()[0])) {
+                                    <button
+                                        mat-stroked-button
+                                        data-testid="selected-expand-anyway"
+                                        [disabled]="!canWrite() || store.busy()"
+                                        (click)="expandAnyway(selectedHubs()[0])"
                                     >
                                         Expand anyway
                                     </button>
                                 }
-                            </li>
-                        }
-                    </ul>
-                    @if (hubs().length > 50) {
-                        <p class="text-secondary m-0 text-sm">
-                            The first 50 are listed; select another on the canvas to expand through it.
-                        </p>
-                    }
-                </section>
-                </la-fold>
-                }
-                <la-fold title="More steps" hint="Connect, time window, threshold, compare, scope" rememberKey="act.more" data-testid="act-more">
-                <!-- 7. Steps, in visible groups: each action is a button and opens in place, one at a time -->
-                <section class="flex flex-col gap-2" aria-labelledby="act-steps-title" data-testid="act-step-groups">
-                    <h3 id="act-steps-title" class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Steps</h3>
-                    @for (g of stepGroups; track g.title) {
-                        <div class="flex flex-col gap-1" role="group" [attr.aria-label]="g.title" [attr.data-testid]="'step-group-' + g.id">
-                            <span class="text-sm font-semibold">{{ g.title }}</span>
-                            <div class="flex flex-wrap gap-1">
-                                @for (m of g.steps; track m.id) {
+                            </div>
+                            @if (selectedInSet().length) {
+                                <p class="text-secondary m-0 text-xs" data-testid="selected-canvas-hint">
+                                    Double-click it to expand with the filter; right-click it to keep, hide, exclude or
+                                    shrink it.
+                                </p>
+                            }
+                            @if (selectedInSet().length === 1) {
+                                <div class="flex flex-col gap-1" data-testid="neighbours-section">
                                     <button
                                         mat-stroked-button
                                         type="button"
-                                        [attr.data-testid]="'step-' + m.id"
-                                        [attr.aria-expanded]="moreStep() === m.id"
-                                        (click)="moreStep.set(moreStep() === m.id ? null : m.id)"
+                                        data-testid="neighbours-toggle"
+                                        [attr.aria-expanded]="neighboursOpen()"
+                                        [disabled]="store.busy()"
+                                        (click)="toggleNeighbours()"
                                     >
-                                        {{ m.label }}
+                                        {{ neighboursOpen() ? 'Hide neighbours' : 'Pick neighbours…' }}
                                     </button>
-                                }
-                            </div>
-                            @if (moreStepIn(g); as m) {
-                                <div class="flex flex-col gap-1 rounded-md border p-2" style="border-color: var(--gamma-border)" data-testid="step-open">
-                                    <div class="flex items-center">
-                                        <span class="text-sm font-semibold">{{ moreStepLabel() }}</span>
-                                        <button mat-icon-button class="ml-auto" (click)="moreStep.set(null)" aria-label="Close this step">
-                                            <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
-                                        </button>
-                                    </div>
-                                    @switch (m) {
-                                        @case ('window') { <inspecto-la-window-op></inspecto-la-window-op> }
-                                        @case ('threshold') { <inspecto-la-threshold-op></inspecto-la-threshold-op> }
-                                        @case ('snapshot') { <inspecto-la-snapshot-op></inspecto-la-snapshot-op> }
-                                        @case ('compare') { <inspecto-la-compare-op></inspecto-la-compare-op> }
-                                        @case ('connect') { <inspecto-la-connect-op [presets]="degreePresets()"></inspecto-la-connect-op> }
+                                    @if (neighboursOpen()) {
+                                        @if (neighbourList(); as list) {
+                                            @if (list.loading) {
+                                                <p class="text-secondary m-0 text-sm" role="status">
+                                                    Reading neighbours…
+                                                </p>
+                                            } @else if (list.error) {
+                                                <inspecto-alert variant="warning">{{ list.error }}</inspecto-alert>
+                                            } @else if (!list.rows.length) {
+                                                <p class="text-secondary m-0 text-sm">
+                                                    No neighbours found for this entity.
+                                                </p>
+                                            } @else {
+                                                <p class="text-secondary m-0 text-sm">
+                                                    {{ list.total }} neighbour{{ list.total === 1 ? '' : 's' }},
+                                                    strongest first (the whole Dataset, no time window). Reading this
+                                                    list is never held for approval; the step you add reads only the
+                                                    neighbours you choose.
+                                                </p>
+                                                <ul
+                                                    class="m-0 flex max-h-56 list-none flex-col gap-0.5 overflow-auto p-0 text-sm"
+                                                    data-testid="neighbour-list"
+                                                >
+                                                    @for (nb of list.rows; track nb.id) {
+                                                        <li>
+                                                            <label class="flex items-center gap-2">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    [checked]="picked().has(nb.id)"
+                                                                    [disabled]="!canWrite() || store.busy()"
+                                                                    (change)="togglePicked(nb.id)"
+                                                                />
+                                                                <span class="font-mono">{{ nb.id }}</span>
+                                                                <span class="text-secondary ml-auto tabular-nums">
+                                                                    {{ nb.count }} event{{ nb.count === 1 ? '' : 's' }}
+                                                                    @if (nb.kinds.length) {
+                                                                        · {{ nb.kinds.join(', ') }}
+                                                                    }
+                                                                </span>
+                                                            </label>
+                                                        </li>
+                                                    }
+                                                </ul>
+                                                @if (list.hasMore) {
+                                                    <button
+                                                        mat-button
+                                                        type="button"
+                                                        data-testid="neighbours-more"
+                                                        [disabled]="store.busy() || list.loading"
+                                                        (click)="store.moreNeighbours()"
+                                                    >
+                                                        Show more ({{ list.rows.length }} of {{ list.total }})
+                                                    </button>
+                                                }
+                                                <div class="flex flex-wrap gap-1">
+                                                    <button
+                                                        mat-stroked-button
+                                                        type="button"
+                                                        data-testid="neighbours-add-selected"
+                                                        [disabled]="!canWrite() || store.busy() || !picked().size"
+                                                        (click)="addNeighbours()"
+                                                    >
+                                                        Add selected ({{ picked().size }})
+                                                    </button>
+                                                    <button
+                                                        mat-stroked-button
+                                                        type="button"
+                                                        data-testid="neighbours-add-strongest"
+                                                        [disabled]="!canWrite() || store.busy()"
+                                                        (click)="addNeighbours(true)"
+                                                    >
+                                                        Add the {{ strongestCount }} strongest
+                                                    </button>
+                                                </div>
+                                            }
+                                        }
                                     }
                                 </div>
                             }
+                            <!-- LA-19: a note changes nothing about traversal, display or counts -->
+                            @if (selectedNotes().length) {
+                                <ul
+                                    class="m-0 flex list-none flex-col gap-0.5 p-0 text-sm"
+                                    aria-label="Notes on this entity"
+                                >
+                                    @for (a of selectedNotes(); track a.step + ':' + a.id) {
+                                        <li>
+                                            {{ a.note }} <span class="text-secondary">(step {{ a.step }})</span>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                            <inspecto-pen-field
+                                label="Note"
+                                [multiline]="true"
+                                [formControl]="note"
+                                [maxlength]="2000"
+                                [error]="
+                                    note.touched && note.hasError('required')
+                                        ? 'Write the note first.'
+                                        : note.hasError('maxlength')
+                                          ? 'At most 2000 characters.'
+                                          : ''
+                                "
+                                (keydown.enter)="note.value.trim() && annotate()"
+                            />
+                            <button
+                                mat-stroked-button
+                                [disabled]="!canWrite() || store.busy() || !selectedInSet().length"
+                                (click)="annotate()"
+                            >
+                                Annotate
+                            </button>
+                        } @else {
+                            <p class="text-secondary m-0 text-sm">
+                                Click an entity on the canvas to see it here; right-click it for everything you can do
+                                with it.
+                            </p>
+                        }
+                    </section>
+                </div>
+                @if (hubs().length) {
+                    <la-fold title="Busy entities" [hint]="hubs().length + ' held'" rememberKey="act.busy">
+                        <section class="flex flex-col gap-1" aria-label="Busy entities" data-testid="hub-list">
+                            <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">
+                                Busy entities ({{ hubs().length }})
+                            </h3>
+                            <p class="text-secondary m-0 text-sm">
+                                Shown, but not expanded: each has more linked entities than the busy limit. Expanding
+                                through one is an override you confirm, and it is recorded.
+                            </p>
+                            <ul class="m-0 flex list-none flex-col gap-1 p-0 text-sm">
+                                @for (e of hubs().slice(0, 50); track e.id) {
+                                    <li class="flex flex-wrap items-center gap-1">
+                                        <span class="font-mono">{{ e.id }}</span>
+                                        <inspecto-chip variant="soft" tone="warning">{{
+                                            hubBadge(e.contacts, e.id)
+                                        }}</inspecto-chip>
+                                        @if (!isOverridden(e.id)) {
+                                            <button
+                                                mat-button
+                                                type="button"
+                                                class="ml-auto"
+                                                [disabled]="!canWrite() || store.busy() || store.chainRunning()"
+                                                [attr.aria-label]="'Expand anyway from ' + e.id"
+                                                (click)="expandAnyway(e.id)"
+                                            >
+                                                Expand anyway
+                                            </button>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                            @if (hubs().length > 50) {
+                                <p class="text-secondary m-0 text-sm">
+                                    The first 50 are listed; select another on the canvas to expand through it.
+                                </p>
+                            }
+                        </section>
+                    </la-fold>
+                }
+                <la-fold
+                    title="More steps"
+                    hint="Connect, time window, threshold, compare, scope"
+                    rememberKey="act.more"
+                    data-testid="act-more"
+                >
+                    <!-- 7. Steps, in visible groups: each action is a button and opens in place, one at a time -->
+                    <section
+                        class="flex flex-col gap-2"
+                        aria-labelledby="act-steps-title"
+                        data-testid="act-step-groups"
+                    >
+                        <h3
+                            id="act-steps-title"
+                            class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide"
+                        >
+                            Steps
+                        </h3>
+                        @for (g of stepGroups; track g.title) {
+                            <div
+                                class="flex flex-col gap-1"
+                                role="group"
+                                [attr.aria-label]="g.title"
+                                [attr.data-testid]="'step-group-' + g.id"
+                            >
+                                <span class="text-sm font-semibold">{{ g.title }}</span>
+                                <div class="flex flex-wrap gap-1">
+                                    @for (m of g.steps; track m.id) {
+                                        <button
+                                            mat-stroked-button
+                                            type="button"
+                                            [attr.data-testid]="'step-' + m.id"
+                                            [attr.aria-expanded]="moreStep() === m.id"
+                                            (click)="moreStep.set(moreStep() === m.id ? null : m.id)"
+                                        >
+                                            {{ m.label }}
+                                        </button>
+                                    }
+                                </div>
+                                @if (moreStepIn(g); as m) {
+                                    <div
+                                        class="flex flex-col gap-1 rounded-md border p-2"
+                                        style="border-color: var(--gamma-border)"
+                                        data-testid="step-open"
+                                    >
+                                        <div class="flex items-center">
+                                            <span class="text-sm font-semibold">{{ moreStepLabel() }}</span>
+                                            <button
+                                                mat-icon-button
+                                                class="ml-auto"
+                                                (click)="moreStep.set(null)"
+                                                aria-label="Close this step"
+                                            >
+                                                <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                                            </button>
+                                        </div>
+                                        @switch (m) {
+                                            @case ('window') {
+                                                <inspecto-la-window-op></inspecto-la-window-op>
+                                            }
+                                            @case ('threshold') {
+                                                <inspecto-la-threshold-op></inspecto-la-threshold-op>
+                                            }
+                                            @case ('snapshot') {
+                                                <inspecto-la-snapshot-op></inspecto-la-snapshot-op>
+                                            }
+                                            @case ('compare') {
+                                                <inspecto-la-compare-op></inspecto-la-compare-op>
+                                            }
+                                            @case ('connect') {
+                                                <inspecto-la-connect-op
+                                                    [presets]="degreePresets()"
+                                                ></inspecto-la-connect-op>
+                                            }
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </section>
+                    <section class="flex flex-col gap-2" aria-label="Scope list" data-testid="scope-list">
+                        <span class="text-sm font-semibold">Scope list (this Investigation)</span>
+                        <inspecto-pen-field label="Entity ids" [formControl]="scopeIds" />
+                        <div class="flex flex-wrap gap-1">
+                            <button
+                                mat-stroked-button
+                                type="button"
+                                data-testid="scope-include"
+                                [disabled]="!canWrite() || store.busy()"
+                                (click)="scopeAdd()"
+                            >
+                                Include
+                            </button>
+                            <button
+                                mat-stroked-button
+                                type="button"
+                                data-testid="scope-exclude"
+                                [disabled]="!canWrite() || store.busy()"
+                                (click)="scopeExclude()"
+                            >
+                                Leave out
+                            </button>
+                            @if (selectedInSet().length) {
+                                <button
+                                    mat-stroked-button
+                                    type="button"
+                                    data-testid="scope-include-selected"
+                                    [disabled]="!canWrite() || store.busy()"
+                                    (click)="scopeAdd(selectedInSet())"
+                                >
+                                    Include selected
+                                </button>
+                            }
+                        </div>
+                        @if (scopeError()) {
+                            <p class="text-warn m-0 text-sm" data-testid="scope-error">{{ scopeError() }}</p>
+                        }
+                        @if (store.scope().include.length) {
+                            <ul class="m-0 flex list-none flex-wrap gap-1 p-0" aria-label="Included entities">
+                                @for (id of store.scope().include; track id) {
+                                    <li>
+                                        <button
+                                            type="button"
+                                            class="cursor-pointer border-0 bg-transparent p-0"
+                                            [attr.aria-label]="'Remove ' + id + ' from the include list'"
+                                            [disabled]="!canWrite()"
+                                            (click)="scopeRemove(id)"
+                                        >
+                                            <inspecto-chip variant="soft" tone="primary">{{ id }} ✕</inspecto-chip>
+                                        </button>
+                                    </li>
+                                }
+                            </ul>
+                            <mat-checkbox
+                                data-testid="scope-only"
+                                [ngModel]="store.scope().only"
+                                [disabled]="!canWrite()"
+                                (ngModelChange)="scopeOnly($event)"
+                            >
+                                Only these (an expand admits nothing outside the list)
+                            </mat-checkbox>
+                            <p class="text-secondary m-0 text-sm">
+                                Every expand goes through the listed busy entities{{
+                                    store.scope().only ? ' and admits only them' : ''
+                                }}; each step records what it used. Excluded entities stay out of every expand (Undo
+                                reverses).
+                            </p>
+                        }
+                    </section>
+                    @if (canWrite()) {
+                        <div class="flex flex-col gap-2" data-testid="act-add-start">
+                            <div>
+                                <button
+                                    mat-stroked-button
+                                    type="button"
+                                    data-testid="add-start-entities"
+                                    [attr.aria-expanded]="store.addingStart()"
+                                    (click)="store.addingStart.set(!store.addingStart())"
+                                >
+                                    Add start entities…
+                                </button>
+                            </div>
+                            @if (store.addingStart()) {
+                                <ng-container [ngTemplateOutlet]="startSlot" />
+                            }
                         </div>
                     }
-                </section>
-            <section
-                class="flex flex-col gap-2 "
-    
-                aria-label="Scope list"
-                data-testid="scope-list"
-            >
-                <span class="text-sm font-semibold">Scope list (this Investigation)</span>
-                <inspecto-pen-field
-                    label="Entity ids"
-                    [formControl]="scopeIds"
-                />
-                <div class="flex flex-wrap gap-1">
-                    <button
-                        mat-stroked-button
-                        type="button"
-                        data-testid="scope-include"
-                        [disabled]="!canWrite() || store.busy()"
-                        (click)="scopeAdd()"
-                    >
-                        Include
-                    </button>
-                    <button
-                        mat-stroked-button
-                        type="button"
-                        data-testid="scope-exclude"
-                        [disabled]="!canWrite() || store.busy()"
-                        (click)="scopeExclude()"
-                    >
-                        Leave out
-                    </button>
-                    @if (selectedInSet().length) {
-                        <button
-                            mat-stroked-button
-                            type="button"
-                            data-testid="scope-include-selected"
-                            [disabled]="!canWrite() || store.busy()"
-                            (click)="scopeAdd(selectedInSet())"
-                        >
-                            Include selected
-                        </button>
-                    }
-                </div>
-                @if (scopeError()) {
-                    <p class="text-warn m-0 text-sm" data-testid="scope-error">{{ scopeError() }}</p>
-                }
-                @if (store.scope().include.length) {
-                    <ul class="m-0 flex list-none flex-wrap gap-1 p-0" aria-label="Included entities">
-                        @for (id of store.scope().include; track id) {
-                            <li>
-                                <button
-                                    type="button"
-                                    class="cursor-pointer border-0 bg-transparent p-0"
-                                    [attr.aria-label]="'Remove ' + id + ' from the include list'"
-                                    [disabled]="!canWrite()"
-                                    (click)="scopeRemove(id)"
-                                >
-                                    <inspecto-chip variant="soft" tone="primary">{{ id }} ✕</inspecto-chip>
-                                </button>
-                            </li>
-                        }
-                    </ul>
-                    <mat-checkbox
-                        data-testid="scope-only"
-                        [ngModel]="store.scope().only"
-                        [disabled]="!canWrite()"
-                        (ngModelChange)="scopeOnly($event)"
-                    >
-                        Only these (an expand admits nothing outside the list)
-                    </mat-checkbox>
-                    <p class="text-secondary m-0 text-sm">
-                        Every expand goes through the listed busy entities{{ store.scope().only ? ' and admits only them' : '' }};
-                        each step records what it used. Excluded entities stay out of every expand (Undo reverses).
-                    </p>
-                }
-            </section>
-            @if (canWrite()) {
-                <div class="flex flex-col gap-2" data-testid="act-add-start">
-                    <div>
-                        <button
-                            mat-stroked-button
-                            type="button"
-                            data-testid="add-start-entities"
-                            [attr.aria-expanded]="store.addingStart()"
-                            (click)="store.addingStart.set(!store.addingStart())"
-                        >
-                            Add start entities…
-                        </button>
-                    </div>
-                    @if (store.addingStart()) {
-                        <ng-container [ngTemplateOutlet]="startSlot" />
-                    }
-                </div>
-            }
                 </la-fold>
                 <!-- 8. Links: the steps are the bottom dock's Step log (with Undo and Re-order); Replay is in Settings -->
                 <div class="flex flex-wrap items-center gap-x-4 text-sm" data-testid="act-links">

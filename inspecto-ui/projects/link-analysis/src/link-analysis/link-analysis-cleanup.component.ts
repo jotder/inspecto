@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, HostListener, computed, input, output, signal, viewChild } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    HostListener,
+    computed,
+    input,
+    output,
+    signal,
+    viewChild,
+} from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -87,7 +96,8 @@ const TOOLS: { id: CleanupTool; label: string; icon: string }[] = [
                     }
                 } @else if (t === 'shortest') {
                     <p class="m-0" data-testid="cleanup-effect">
-                        Lights {{ shortest()?.nodeIds?.length ?? 0 }} entities on the shortest paths; nothing is removed.
+                        Lights {{ shortest()?.nodeIds?.length ?? 0 }} entities on the shortest paths; nothing is
+                        removed.
                     </p>
                 } @else {
                     <p class="m-0" data-testid="cleanup-effect">{{ effect() }}</p>
@@ -108,7 +118,13 @@ const TOOLS: { id: CleanupTool; label: string; icon: string }[] = [
             </div>
         }
         @if (glowing()) {
-            <button mat-button type="button" (click)="clearGlow()" aria-label="Clear the shortest-path highlight" data-testid="cleanup-clear-glow">
+            <button
+                mat-button
+                type="button"
+                (click)="clearGlow()"
+                aria-label="Clear the shortest-path highlight"
+                data-testid="cleanup-clear-glow"
+            >
                 <mat-icon svgIcon="heroicons_outline:x-mark" aria-hidden="true"></mat-icon>
                 Clear highlight
             </button>

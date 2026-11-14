@@ -434,7 +434,12 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
             profile: {
                 ...TELECOM_PACK_FIXTURE.profile,
                 suggestedLists: [
-                    { title: 'Call centres', purpose: 'exclusion', entityType: 'msisdn', why: 'Busy numbers call almost everyone.' },
+                    {
+                        title: 'Call centres',
+                        purpose: 'exclusion',
+                        entityType: 'msisdn',
+                        why: 'Busy numbers call almost everyone.',
+                    },
                 ],
             },
         });
@@ -451,7 +456,10 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
                 await expectNoA11yViolations(el);
                 (el.querySelector('button[aria-label="Create the list Call centres"]') as HTMLButtonElement).click();
                 await settle();
-                const [type, config] = dialog.open.mock.calls[0] as unknown as [unknown, { data: { initial: unknown } }];
+                const [type, config] = dialog.open.mock.calls[0] as unknown as [
+                    unknown,
+                    { data: { initial: unknown } },
+                ];
                 expect(type).toBe(CreateEntityListDialog);
                 expect(config.data.initial).toEqual({
                     title: 'Call centres',
@@ -468,10 +476,15 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
             installDomainProfiles([], null);
             const { el, dialog, settle } = create({ lists: [] });
             await settle();
-            expect(el.querySelector('[data-testid="la-suggested-lists"]')?.textContent).toContain('Busy entities to leave out');
+            expect(el.querySelector('[data-testid="la-suggested-lists"]')?.textContent).toContain(
+                'Busy entities to leave out',
+            );
             (el.querySelector('button[aria-label="Create the list Entities to watch"]') as HTMLButtonElement).click();
             await settle();
-            const [, config] = dialog.open.mock.calls[0] as unknown as [unknown, { data: { initial: { entityType: unknown } } }];
+            const [, config] = dialog.open.mock.calls[0] as unknown as [
+                unknown,
+                { data: { initial: { entityType: unknown } } },
+            ];
             expect(config.data.initial.entityType).toBeNull();
         });
 

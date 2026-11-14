@@ -30,7 +30,10 @@ const COVERAGE: ReferenceCoverage = {
 
 describe('reference coverage (LA-REFERENCE-DETAILS-MORE-1)', () => {
     it('says how many entities the Reference describes and how many appear in each Dataset', () => {
-        expect(coverageLines(COVERAGE)).toEqual(['312 Account entities described.', '295 appear in transfers; 17 do not.']);
+        expect(coverageLines(COVERAGE)).toEqual([
+            '312 Account entities described.',
+            '295 appear in transfers; 17 do not.',
+        ]);
         expect(coverageLines({ ...COVERAGE, truncated: true })[0]).toBe(
             '312 Account entities described (counted over part of the rows).',
         );
@@ -53,12 +56,17 @@ describe('reference coverage (LA-REFERENCE-DETAILS-MORE-1)', () => {
         const el: HTMLElement = fixture.nativeElement;
         http.expectOne(apiUrl('/datasets/accounts/coverage')).flush(COVERAGE);
         fixture.detectChanges();
-        expect(el.querySelector('[data-testid="reference-coverage"]')!.textContent).toContain('295 appear in transfers; 17 do not.');
+        expect(el.querySelector('[data-testid="reference-coverage"]')!.textContent).toContain(
+            '295 appear in transfers; 17 do not.',
+        );
         await expectNoA11yViolations(el);
 
         fixture.componentInstance.refresh.set(1);
         fixture.detectChanges();
-        http.expectOne(apiUrl('/datasets/accounts/coverage')).flush({ error: { message: 'no' } }, { status: 500, statusText: 'x' });
+        http.expectOne(apiUrl('/datasets/accounts/coverage')).flush(
+            { error: { message: 'no' } },
+            { status: 500, statusText: 'x' },
+        );
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="reference-coverage"]')).toBeNull();
         http.verify();

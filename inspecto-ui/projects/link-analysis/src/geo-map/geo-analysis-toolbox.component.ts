@@ -37,7 +37,14 @@ export interface GeoAnalysisFocus {
     selector: 'inspecto-geo-analysis-toolbox',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [DecimalPipe, MatButtonModule, MatButtonToggleModule, MatIconModule, PenFieldComponent, ReactiveFormsModule],
+    imports: [
+        DecimalPipe,
+        MatButtonModule,
+        MatButtonToggleModule,
+        MatIconModule,
+        PenFieldComponent,
+        ReactiveFormsModule,
+    ],
     templateUrl: './geo-analysis-toolbox.component.html',
 })
 export class GeoAnalysisToolboxComponent {

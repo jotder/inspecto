@@ -88,7 +88,11 @@ const NO_LINK = '';
                         formControlName="title"
                         [error]="titleError()"
                     ></inspecto-pen-field>
-                    <inspecto-pen-field label="Summary" [multiline]="true" formControlName="summary"></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="Summary"
+                        [multiline]="true"
+                        formControlName="summary"
+                    ></inspecto-pen-field>
                     <h3 class="text-sm font-semibold">Steps</h3>
                     <ol class="flex flex-col gap-2" formArrayName="steps">
                         @for (s of steps.controls; track s; let i = $index) {
@@ -98,7 +102,11 @@ const NO_LINK = '';
                                     [required]="true"
                                     [multiline]="true"
                                     formControlName="text"
-                                    [error]="s.get('text')?.touched && s.get('text')?.hasError('required') ? 'A step needs text.' : ''"
+                                    [error]="
+                                        s.get('text')?.touched && s.get('text')?.hasError('required')
+                                            ? 'A step needs text.'
+                                            : ''
+                                    "
                                 ></inspecto-pen-field>
                                 <div class="flex flex-wrap items-end gap-2">
                                     <inspecto-option-picker

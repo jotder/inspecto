@@ -114,7 +114,11 @@ describe('StepperFieldComponent (− N +)', () => {
     });
 
     it('words a value when asked (0 = "Don\'t expand"), on screen and as aria-valuetext', async () => {
-        const { el, spin, inc, click } = create({ min: 0, value: 0, text: (n) => (n === 0 ? "Don't expand" : String(n)) });
+        const { el, spin, inc, click } = create({
+            min: 0,
+            value: 0,
+            text: (n) => (n === 0 ? "Don't expand" : String(n)),
+        });
         expect(spin.textContent!.trim()).toBe("Don't expand");
         expect(spin.getAttribute('aria-valuetext')).toBe("Don't expand");
         expect(spin.getAttribute('aria-valuemin')).toBe('0');

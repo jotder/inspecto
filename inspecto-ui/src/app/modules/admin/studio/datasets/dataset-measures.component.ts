@@ -34,7 +34,8 @@ import { NamedMeasure } from './dataset-types';
                         [ngModel]="m.label"
                         (ngModelChange)="patch(i, { label: $event })"
                     ></inspecto-pen-field>
-                    <mat-form-field subscriptSizing="dynamic"><!-- form-allow: a SQL expression editor -->
+                    <mat-form-field subscriptSizing="dynamic"
+                        ><!-- form-allow: a SQL expression editor -->
                         <mat-label>Expression</mat-label>
                         <input
                             matInput

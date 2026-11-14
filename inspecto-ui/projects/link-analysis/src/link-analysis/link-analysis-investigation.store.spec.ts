@@ -201,7 +201,10 @@ describe('InvestigationSessionStore (LA-10)', () => {
         await store.start(P, 'warrant 7');
         logs['inv-1'].entries.push(
             entry(1, { op: 'seed', params: { ids: ['4471'] } }),
-            entry(2, { op: 'expand', params: { ids: ['4471'], direction: 'out', budget: 500, window: null, maxFanOut: null } }),
+            entry(2, {
+                op: 'expand',
+                params: { ids: ['4471'], direction: 'out', budget: 500, window: null, maxFanOut: null },
+            }),
         );
         sets['inv-1'] = ws(['4471']);
         await store.open('inv-1');
@@ -323,7 +326,9 @@ describe('InvestigationSessionStore (LA-10)', () => {
                 () =>
                     new HttpErrorResponse({
                         status: 409,
-                        error: { error: { message: 'step 1 is not the newest step any more: step 2 (keep by lead-1) is' } },
+                        error: {
+                            error: { message: 'step 1 is not the newest step any more: step 2 (keep by lead-1) is' },
+                        },
                     }),
             ),
         );
@@ -525,7 +530,13 @@ describe('InvestigationSessionStore (LA-10)', () => {
         await store.open('inv-1');
 
         inv.deleteInvestigation.mockImplementationOnce(() =>
-            throwError(() => new HttpErrorResponse({ status: 409, error: { error: { message: "linked to open case 'CASE-1'" } } })),
+            throwError(
+                () =>
+                    new HttpErrorResponse({
+                        status: 409,
+                        error: { error: { message: "linked to open case 'CASE-1'" } },
+                    }),
+            ),
         );
         expect(await store.deleteInvestigation('inv-1')).toBe(false);
         expect(store.error()).toContain('CASE-1');
@@ -610,7 +621,12 @@ describe('InvestigationSessionStore (LA-10)', () => {
         });
         expect(ok).toBe(true);
         expect(inv.createInvestigation).toHaveBeenCalledWith(
-            expect.objectContaining({ title: 'Suspect s', purpose: 'fraud alert 12', timeCol: 'last_seen', eventsCol: 'events' }),
+            expect.objectContaining({
+                title: 'Suspect s',
+                purpose: 'fraud alert 12',
+                timeCol: 'last_seen',
+                eventsCol: 'events',
+            }),
         );
         const ops = inv.appendInvestigationOp.mock.calls.map((c) => (c as unknown[])[1] as Record<string, unknown>);
         expect(ops.map((o) => [o['op'], o['ids']])).toEqual([
@@ -924,7 +940,12 @@ describe('InvestigationSessionStore - third live run (la-showcase telecom)', () 
         logs['inv-9'] = { header: header('inv-9'), entries: [], total: 0, truncated: false };
         sets['inv-9'] = hubSet();
         inv.workingSetRelation.mockImplementation(() =>
-            of({ rows: [{ entityId: 's', contacts: null }, { entityId: 'h', highConnectivity: true, contacts: 650 }] }),
+            of({
+                rows: [
+                    { entityId: 's', contacts: null },
+                    { entityId: 'h', highConnectivity: true, contacts: 650 },
+                ],
+            }),
         );
         await store.open('inv-9');
         expect(inv.workingSetRelation).toHaveBeenCalledWith('inv-9', { of: 'entities', limit: 10_000 });
@@ -974,7 +995,10 @@ describe('InvestigationSessionStore - preset window recovered on reopen', () => 
                 : { rows: [{ latest: latest.value }], columns: [], truncated: false },
         );
         const ctx = setup([
-            { provide: LA_DATASETS, useValue: { get: () => of({ id: 'calls', name: 'calls', sourceName: 'calls_src' }) } },
+            {
+                provide: LA_DATASETS,
+                useValue: { get: () => of({ id: 'calls', name: 'calls', sourceName: 'calls_src' }) },
+            },
             { provide: DatasetRowsService, useValue: { sql } },
         ]);
         ctx.logs['inv-r'] = {
@@ -1059,9 +1083,7 @@ describe('InvestigationSessionStore - walk-through 6', () => {
             entities: [{ ...ws(['h']).entities[0], hop: 1, admittedBy: 2, highConnectivity: true, contacts: 628 }],
         };
         await store.open('inv-8');
-        expect(store.hubBadge('h', null, 999)).toBe(
-            'Busy: 628 linked entities (limit 500), expanded through override',
-        );
+        expect(store.hubBadge('h', null, 999)).toBe('Busy: 628 linked entities (limit 500), expanded through override');
     });
 });
 
@@ -1102,7 +1124,10 @@ describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', () => {
         await store.start(P, 'warrant 7', 'Burners');
         inv.appendInvestigationOp.mockImplementation(() => {
             logs['inv-1'].entries.push(entry(1, { op: 'seed' }));
-            sets['inv-1'] = { ...ws(['masked:inv-a', 'masked:inv-b']), exploreAliases: { 'masked:inv-a': 'masked:sp-a', 'masked:inv-b': 'masked:sp-b' } };
+            sets['inv-1'] = {
+                ...ws(['masked:inv-a', 'masked:inv-b']),
+                exploreAliases: { 'masked:inv-a': 'masked:sp-a', 'masked:inv-b': 'masked:sp-b' },
+            };
             return of(step(1, 'seed'));
         });
         await store.apply({ op: 'seed', ids: ['masked:inv-a'] });
@@ -1126,7 +1151,16 @@ describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', () => {
         neighbors.mockReturnValueOnce(page([{ id: 'b', count: 3 }], 3, true));
         await store.loadNeighbours('a');
         expect(store.neighbours()).toMatchObject({ total: 3, hasMore: true });
-        neighbors.mockReturnValueOnce(page([{ id: 'c', count: 2 }, { id: 'd', count: 1 }], 3, false));
+        neighbors.mockReturnValueOnce(
+            page(
+                [
+                    { id: 'c', count: 2 },
+                    { id: 'd', count: 1 },
+                ],
+                3,
+                false,
+            ),
+        );
         await store.moreNeighbours();
         expect(neighbors).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 1 }));
         expect(store.neighbours()?.rows.map((r) => r.id)).toEqual(['b', 'c', 'd']);
@@ -1136,7 +1170,9 @@ describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', () => {
     it('states a failed read in words and keeps nothing', async () => {
         const { store, inv } = setup();
         (inv as unknown as { neighbourList: unknown }).neighbourList = vi.fn(() =>
-            throwError(() => new HttpErrorResponse({ status: 403, error: { error: { message: 'too many contacts' } } })),
+            throwError(
+                () => new HttpErrorResponse({ status: 403, error: { error: { message: 'too many contacts' } } }),
+            ),
         );
         await store.start(P, 'warrant 7', 'Burners');
         await store.loadNeighbours('a');
@@ -1152,7 +1188,9 @@ describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', () => {
             sets['inv-1'] = ws(['a']);
             return of(step(1, 'expand'));
         });
-        expect(await store.expandPicked('a', ['b', 'c'], { budget: 100, includeHubs: true, expandHubs: ['x'] })).toBe(true);
+        expect(await store.expandPicked('a', ['b', 'c'], { budget: 100, includeHubs: true, expandHubs: ['x'] })).toBe(
+            true,
+        );
         expect(inv.appendInvestigationOp).toHaveBeenLastCalledWith('inv-1', {
             op: 'expand',
             ids: ['a'],
@@ -1172,11 +1210,15 @@ describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', () => {
 describe('InvestigationSessionStore - unsaved work and Save (LA-UNSAVED-INVESTIGATION-1)', () => {
     const RING = { direction: 'either' as const, degrees: 1, linkKinds: null, hold: true, threshold: 500 };
     const begin = (store: InvestigationSessionStore) =>
-        store.beginUnsaved({ projection: P, timeCol: 'call_ts', presets: { budget: 2000 }, maxDegree: 3 }, { name: 'Phone number', purpose: 'Review' }, [
-            { kind: 'seed', ids: ['a'], entityType: 'msisdn' },
-            { kind: 'expand', from: 'outer', ids: [], req: RING },
-            { kind: 'expand', from: 'ids', ids: ['b'], req: { ...RING, direction: 'out' } },
-        ]);
+        store.beginUnsaved(
+            { projection: P, timeCol: 'call_ts', presets: { budget: 2000 }, maxDegree: 3 },
+            { name: 'Phone number', purpose: 'Review' },
+            [
+                { kind: 'seed', ids: ['a'], entityType: 'msisdn' },
+                { kind: 'expand', from: 'outer', ids: [], req: RING },
+                { kind: 'expand', from: 'ids', ids: ['b'], req: { ...RING, direction: 'out' } },
+            ],
+        );
 
     /** The fake server: a seed puts its ids at hop 0, an expand admits `<id>-n` at the next hop. */
     function server(t: ReturnType<typeof setup>, refuseAt?: number, holdAt?: number) {
@@ -1185,7 +1227,10 @@ describe('InvestigationSessionStore - unsaved work and Save (LA-UNSAVED-INVESTIG
         t.inv.appendInvestigationOp.mockImplementation((_id: string, op: Record<string, unknown>) => {
             sent.push(op);
             const n = sent.length;
-            if (n === refuseAt) return throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message: 'too wide' } } }));
+            if (n === refuseAt)
+                return throwError(
+                    () => new HttpErrorResponse({ status: 422, error: { error: { message: 'too wide' } } }),
+                );
             const ids = op['ids'] as string[];
             const cur = t.sets['inv-1'];
             const admitted = op['op'] === 'seed' ? ids : ids.map((id) => id + '-n');
@@ -1195,8 +1240,15 @@ describe('InvestigationSessionStore - unsaved work and Save (LA-UNSAVED-INVESTIG
                 entities: [...cur.entities, ...admitted.map((id) => ({ ...ws([id]).entities[0], hop }))],
                 hash: `h${n}`,
             };
-            t.logs['inv-1'] = { ...t.logs['inv-1'], entries: [...t.logs['inv-1'].entries, entry(n, { op: op['op'] as never })] };
-            return of({ ...step(n, op['op'] as string), status: n === holdAt ? 'pending' : undefined, delta: { ...step(n, '').delta, admitted } });
+            t.logs['inv-1'] = {
+                ...t.logs['inv-1'],
+                entries: [...t.logs['inv-1'].entries, entry(n, { op: op['op'] as never })],
+            };
+            return of({
+                ...step(n, op['op'] as string),
+                status: n === holdAt ? 'pending' : undefined,
+                delta: { ...step(n, '').delta, admitted },
+            });
         });
         return sent;
     }
@@ -1222,7 +1274,12 @@ describe('InvestigationSessionStore - unsaved work and Save (LA-UNSAVED-INVESTIG
         begin(t.store);
         const out = await t.store.saveUnsaved('Operation Larch', 'Warrant 7');
         expect(t.inv.createInvestigation).toHaveBeenCalledWith(
-            expect.objectContaining({ title: 'Operation Larch', purpose: 'Warrant 7', timeCol: 'call_ts', entityType: 'msisdn' }),
+            expect.objectContaining({
+                title: 'Operation Larch',
+                purpose: 'Warrant 7',
+                timeCol: 'call_ts',
+                entityType: 'msisdn',
+            }),
         );
         expect(sent.map((o) => [o['op'], o['ids']])).toEqual([
             ['seed', ['a']],
@@ -1245,7 +1302,10 @@ describe('InvestigationSessionStore - unsaved work and Save (LA-UNSAVED-INVESTIG
             { kind: 'hide', ids: ['a-n', 'gone'], reason: 'Clean up: dangling leaves' },
         ]);
         // the preview takes seeds and expands only: a hide never reaches it
-        expect(t.store.unsavedOps(t.store.unsaved()!.steps, t.store.unsaved()!.binding).map((o) => o.op)).toEqual(['seed', 'expand']);
+        expect(t.store.unsavedOps(t.store.unsaved()!.steps, t.store.unsaved()!.binding).map((o) => o.op)).toEqual([
+            'seed',
+            'expand',
+        ]);
         const out = await t.store.saveUnsaved('N', 'P');
         expect(sent.slice(2)).toEqual([
             { op: 'hide', ids: ['a-n'] }, // 'gone' is not in the replayed Working Set
@@ -1262,7 +1322,10 @@ describe('InvestigationSessionStore - unsaved work and Save (LA-UNSAVED-INVESTIG
             { kind: 'expand', from: 'outer', ids: [], req: RING },
             { kind: 'remove', ids: ['a', 'a-n'] },
         ]);
-        expect(t.store.unsavedOps(t.store.unsaved()!.steps, t.store.unsaved()!.binding).map((o) => o.op)).toEqual(['seed', 'expand']);
+        expect(t.store.unsavedOps(t.store.unsaved()!.steps, t.store.unsaved()!.binding).map((o) => o.op)).toEqual([
+            'seed',
+            'expand',
+        ]);
         // the canvas ends with 'a' drawn again (a later Expand reached it), so only 'a-n' is hidden at Save
         t.store.unsavedWs.set({ entities: [{ id: 'a', hop: 0 }], links: [], excluded: [], hash: '' } as never);
         const out = await t.store.saveUnsaved('N', 'P');
@@ -1296,7 +1359,9 @@ describe('InvestigationSessionStore - unsaved work and Save (LA-UNSAVED-INVESTIG
         expect(sent).toHaveLength(2); // the third step is never sent
         expect(out.created).toBe(true);
         expect(out.recorded).toBe(1);
-        expect(out.message).toContain('Saved with 1 step. Step 2 (Expand 1 degree from the outer ring, both ways) was refused');
+        expect(out.message).toContain(
+            'Saved with 1 step. Step 2 (Expand 1 degree from the outer ring, both ways) was refused',
+        );
         expect(out.message).toContain('Step 3 was not recorded.');
         expect(t.store.error()).toBe(out.message);
         expect(t.store.activeId()).toBe('inv-1'); // the saved Investigation is open
@@ -1309,14 +1374,17 @@ describe('InvestigationSessionStore - unsaved work and Save (LA-UNSAVED-INVESTIG
         const out = await t.store.saveUnsaved('N', 'P');
         expect(sent).toHaveLength(2);
         expect(out.recorded).toBe(2);
-        expect(out.message).toContain("Step 2 (Expand 1 degree from the outer ring, both ways) is waiting for a second person's approval.");
+        expect(out.message).toContain(
+            "Step 2 (Expand 1 degree from the outer ring, both ways) is waiting for a second person's approval.",
+        );
         expect(out.message).toContain('Step 3 was not recorded.');
     });
 
     it('a refused create keeps the unsaved work, so nothing is lost', async () => {
         const t = setup();
-        t.inv.createInvestigation.mockImplementation(() =>
-            throwError(() => new HttpErrorResponse({ status: 403, error: { error: { message: 'no' } } })) as never,
+        t.inv.createInvestigation.mockImplementation(
+            () =>
+                throwError(() => new HttpErrorResponse({ status: 403, error: { error: { message: 'no' } } })) as never,
         );
         begin(t.store);
         const out = await t.store.saveUnsaved('N', 'P');
@@ -1332,7 +1400,11 @@ describe('InvestigationSessionStore - Save records what the screen drew (LA-UNSA
      * A fake server that keeps a real Working Set: a seed adds its ids at hop 0; an expand admits what \`admits\` gives for
      * the ids it named (at the next hop), and 422s an id the Working Set does not hold - as InvestigationRoutes does.
      */
-    function serve(t: ReturnType<typeof setup>, admits: (ids: string[], n: number) => string[], aliases: Record<string, string> = {}) {
+    function serve(
+        t: ReturnType<typeof setup>,
+        admits: (ids: string[], n: number) => string[],
+        aliases: Record<string, string> = {},
+    ) {
         const sent: Record<string, unknown>[] = [];
         t.sets['inv-1'] = { ...ws([]), exploreAliases: aliases } as WorkingSet;
         t.inv.appendInvestigationOp.mockImplementation((_id: string, op: Record<string, unknown>) => {
@@ -1342,15 +1414,27 @@ describe('InvestigationSessionStore - Save records what the screen drew (LA-UNSA
             const cur = t.sets['inv-1'];
             const held = new Set(cur.entities.map((e) => e.id));
             if (op['op'] === 'expand' && ids.some((id) => !held.has(id)))
-                return throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message: 'not in the Working Set' } } }));
-            const admitted = op['op'] === 'seed' ? ids.map((id) => Object.entries(aliases).find(([, e]) => e === id)?.[0] ?? id) : admits(ids, n);
+                return throwError(
+                    () =>
+                        new HttpErrorResponse({ status: 422, error: { error: { message: 'not in the Working Set' } } }),
+                );
+            const admitted =
+                op['op'] === 'seed'
+                    ? ids.map((id) => Object.entries(aliases).find(([, e]) => e === id)?.[0] ?? id)
+                    : admits(ids, n);
             const hop = op['op'] === 'seed' ? 0 : Math.max(0, ...cur.entities.map((e) => e.hop)) + 1;
             t.sets['inv-1'] = {
                 ...cur,
-                entities: [...cur.entities, ...admitted.filter((id) => !held.has(id)).map((id) => ({ ...ws([id]).entities[0], hop }))],
+                entities: [
+                    ...cur.entities,
+                    ...admitted.filter((id) => !held.has(id)).map((id) => ({ ...ws([id]).entities[0], hop })),
+                ],
                 hash: `h${n}`,
             };
-            t.logs['inv-1'] = { ...t.logs['inv-1'], entries: [...t.logs['inv-1'].entries, entry(n, { op: op['op'] as never })] };
+            t.logs['inv-1'] = {
+                ...t.logs['inv-1'],
+                entries: [...t.logs['inv-1'].entries, entry(n, { op: op['op'] as never })],
+            };
             return of({ ...step(n, op['op'] as string), delta: { ...step(0, '').delta, admitted } });
         });
         return sent;
@@ -1385,7 +1469,7 @@ describe('InvestigationSessionStore - Save records what the screen drew (LA-UNSA
         expect(t.store.workingSet()!.entities.map((e) => e.id)).toEqual(['a', 'z', 'y']);
     });
 
-    it('on a masked Space the drawn aliases are spoken in this Investigation\'s own ids before they are sent', async () => {
+    it("on a masked Space the drawn aliases are spoken in this Investigation's own ids before they are sent", async () => {
         const t = setup();
         // synthetic aliases: the explorer drew the Space's alias sp-*, the Investigation names them inv-*
         const aliases = { 'inv-1a': 'sp-1a', 'inv-2b': 'sp-2b' };
@@ -1403,7 +1487,9 @@ describe('InvestigationSessionStore - Save records what the screen drew (LA-UNSA
         const impl = t.inv.appendInvestigationOp.getMockImplementation()!;
         let n = 0;
         t.inv.appendInvestigationOp.mockImplementation((id: string, op: Record<string, unknown>) =>
-            ++n === 3 ? throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message: 'too wide' } } })) : impl(id, op),
+            ++n === 3
+                ? throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message: 'too wide' } } }))
+                : impl(id, op),
         );
         begin(t, [['a'], ['b']]);
         const out = await t.store.saveUnsaved('n', 'p');

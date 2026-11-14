@@ -90,7 +90,8 @@ function jsonObject(c: AbstractControl<string>): ValidationErrors | null {
                     formControlName="id"
                     [error]="idError()"
                 ></inspecto-pen-field>
-                <mat-form-field subscriptSizing="dynamic"><!-- form-allow: a JSON editor (the whole template) -->
+                <mat-form-field subscriptSizing="dynamic"
+                    ><!-- form-allow: a JSON editor (the whole template) -->
                     <mat-label>Template (JSON)</mat-label>
                     <textarea matInput rows="16" class="font-mono" spellcheck="false" formControlName="body"></textarea>
                     @if (form.controls.body.hasError('required')) {

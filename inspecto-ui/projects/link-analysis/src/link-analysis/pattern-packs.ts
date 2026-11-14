@@ -191,24 +191,21 @@ export const PATTERN_PACKS: PatternPack[] = [
         id: 'inbound-collector',
         label: 'Inbound collector',
         category: 'money',
-        description:
-            'Many parties sending into one account. Start from the collector and follow incoming links.',
+        description: 'Many parties sending into one account. Start from the collector and follow incoming links.',
         steps: [{}, { direction: 'in' }, { direction: 'in' }],
     },
     {
         id: 'forwarding-relay',
         label: 'Relay chain (any link kind)',
         category: 'telecom',
-        description:
-            'A relay A → B → C over any link kind, on the graph on screen. Set link kinds to narrow it.',
+        description: 'A relay A → B → C over any link kind, on the graph on screen. Set link kinds to narrow it.',
         steps: [{}, { direction: 'out' }, { direction: 'out' }],
     },
     {
         id: 'circular-flow',
         label: 'Circular flow',
         category: 'money',
-        description:
-            'Value or contacts returning to where they started (A → … → A).',
+        description: 'Value or contacts returning to where they started (A → … → A).',
         steps: [{}, { direction: 'out' }, { direction: 'out' }],
         tool: 'cycles',
     },

@@ -263,7 +263,9 @@ export class LinkAnalysisLegendComponent {
      * (`entity_type.<kind>`), else the kind itself. Display only.
      */
     protected nodeLabel(kind: string): string {
-        return this.typeLabels()[kind] || termLabel(domainProfile(activeDomainProfileId()), `entity_type.${kind}`, kind);
+        return (
+            this.typeLabels()[kind] || termLabel(domainProfile(activeDomainProfileId()), `entity_type.${kind}`, kind)
+        );
     }
     /** The Entity Type's canvas glyph in the kind's colour (the icon the node is drawn with); undefined = a plain swatch. */
     protected glyphOf(i: LegendItem): string | undefined {
@@ -357,7 +359,11 @@ export class LinkAnalysisLegendComponent {
                 }
                 <div class="mt-1 flex items-center">
                     @if (customizable()) {
-                        <button type="button" class="text-primary text-[0.6875rem] underline" (click)="customize.emit()">
+                        <button
+                            type="button"
+                            class="text-primary text-[0.6875rem] underline"
+                            (click)="customize.emit()"
+                        >
                             Customise counts
                         </button>
                     }
@@ -383,7 +389,9 @@ export class LinkAnalysisLegendComponent {
             >
                 Graph counts
                 @if (onScreenText(); as shown) {
-                    <span class="text-secondary font-normal tabular-nums" data-testid="working-set-pill-on-screen">· {{ shown }}</span>
+                    <span class="text-secondary font-normal tabular-nums" data-testid="working-set-pill-on-screen"
+                        >· {{ shown }}</span
+                    >
                 } @else if (countsNote()) {
                     <span class="text-secondary font-normal">· {{ countsOf() }}</span>
                 }

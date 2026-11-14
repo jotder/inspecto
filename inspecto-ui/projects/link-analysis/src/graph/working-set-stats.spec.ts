@@ -43,7 +43,9 @@ describe('workingSetStats', () => {
 
     it('leaves folded rows out when each link is one row: it would repeat the links count under a second name', () => {
         const one = { ...FULL, edges: FULL.edges.map((e) => ({ ...e, data: { ...e.data, count: 1 } })) } as G6GraphData;
-        const labels = workingSetStats(one, one, { labels: { links: 'Transfers', rows: 'Wallet transactions' } }).map((s) => s.label);
+        const labels = workingSetStats(one, one, { labels: { links: 'Transfers', rows: 'Wallet transactions' } }).map(
+            (s) => s.label,
+        );
         expect(labels).toContain('Transfers');
         expect(labels).not.toContain('Wallet transactions');
     });

@@ -52,11 +52,28 @@ async function create(
 ) {
     const inv = {
         investigationEmbeds: vi.fn(() => opts.embeds ?? of(list())),
-        investigationMembers: vi.fn(() => of({ investigationId: 'inv-1', owner: 'x', members: [], history: [], you: opts.you === undefined ? 'lead' : opts.you })),
+        investigationMembers: vi.fn(() =>
+            of({
+                investigationId: 'inv-1',
+                owner: 'x',
+                members: [],
+                history: [],
+                you: opts.you === undefined ? 'lead' : opts.you,
+            }),
+        ),
         mintInvestigationEmbed: vi.fn(
             () =>
                 opts.mint ??
-                of({ grantId: 'g2', investigationId: 'inv-1', token: TOKEN, url: '/public/investigations/' + TOKEN, expiresAt: 'x', label: null, maskingMode: 'typed', note: '' }),
+                of({
+                    grantId: 'g2',
+                    investigationId: 'inv-1',
+                    token: TOKEN,
+                    url: '/public/investigations/' + TOKEN,
+                    expiresAt: 'x',
+                    label: null,
+                    maskingMode: 'typed',
+                    note: '',
+                }),
         ),
         revokeInvestigationEmbed: vi.fn(() => of(grant({ status: 'revoked' }))),
     };
@@ -71,7 +88,11 @@ async function create(
             {
                 provide: LinkAnalysisSettingsService,
                 useValue: {
-                    get: () => of({ embedInForce: { defaultTtlHours: 24, maxTtlHours: 48, refuseClassifications: [] }, maskingModeInForce: 'typed' }),
+                    get: () =>
+                        of({
+                            embedInForce: { defaultTtlHours: 24, maxTtlHours: 48, refuseClassifications: [] },
+                            maskingModeInForce: 'typed',
+                        }),
                 },
             },
         ],
@@ -197,7 +218,10 @@ describe('LinkAnalysisEmbedComponent (LA-EMBED-SPA-1)', () => {
         scope.value = 'with_notes';
         scope.dispatchEvent(new Event('change'));
         const masking = d.querySelector('#embed-masking') as HTMLSelectElement;
-        expect([...masking.options].map((o) => o.value), 'a link is never offered looser masking than the Space').toEqual(['typed', 'all']);
+        expect(
+            [...masking.options].map((o) => o.value),
+            'a link is never offered looser masking than the Space',
+        ).toEqual(['typed', 'all']);
         masking.value = 'all';
         masking.dispatchEvent(new Event('change'));
         button(d, 'Create link')!.click();
@@ -234,7 +258,9 @@ describe('LinkAnalysisEmbedComponent (LA-EMBED-SPA-1)', () => {
     });
 
     it('shows the feature-dark 503 from a mint in the dialog and keeps no link', async () => {
-        const c = await create({ mint: throwError(() => http(503, 'embed links are disabled; set -Dla.embed.enabled=true')) });
+        const c = await create({
+            mint: throwError(() => http(503, 'embed links are disabled; set -Dla.embed.enabled=true')),
+        });
         const d = await openDialog(c);
         button(d, 'Create link')!.click();
         await new Promise((r) => setTimeout(r));
@@ -245,7 +271,9 @@ describe('LinkAnalysisEmbedComponent (LA-EMBED-SPA-1)', () => {
     });
 
     it('shows a 422 refusal from the server in the dialog', async () => {
-        const c = await create({ mint: throwError(() => http(422, "'ttl_hours' must be 1..48 (this Space's maximum)")) });
+        const c = await create({
+            mint: throwError(() => http(422, "'ttl_hours' must be 1..48 (this Space's maximum)")),
+        });
         const d = await openDialog(c);
         button(d, 'Create link')!.click();
         await new Promise((r) => setTimeout(r));

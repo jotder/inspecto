@@ -59,7 +59,8 @@ export function oversightErrorMessage(err: unknown, fallback: string): string {
                             <inspecto-status-badge [value]="statusTone(p)" [label]="p.status"></inspecto-status-badge>
                         </div>
                         <span
-                            >Requested by <strong>{{ p.requestedBy ?? 'unknown' }}</strong> at {{ when(p.requestedAt) }}</span
+                            >Requested by <strong>{{ p.requestedBy ?? 'unknown' }}</strong> at
+                            {{ when(p.requestedAt) }}</span
                         >
                         <span class="text-secondary">
                             Four-eyes threshold crossed: {{ p.sensitivity.exceeded.join('; ') }} ({{ limits(p) }})
@@ -128,7 +129,9 @@ export function oversightErrorMessage(err: unknown, fallback: string): string {
             </section>
         } @else {
             <!-- T-152: the fold never opens blank -->
-            <p class="text-secondary m-0 text-sm" data-testid="oversight-empty">No approvals needed for this Investigation.</p>
+            <p class="text-secondary m-0 text-sm" data-testid="oversight-empty">
+                No approvals needed for this Investigation.
+            </p>
         }
     `,
 })

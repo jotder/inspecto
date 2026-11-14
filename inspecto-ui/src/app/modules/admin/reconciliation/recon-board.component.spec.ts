@@ -260,7 +260,14 @@ describe('ReconBoardComponent', () => {
             ...RECORDED,
             breaks: [
                 { pair: 'AB', key: 'k1', type: 'missing_right', status: 'open', firstSeenAt: old, day: '2026-09-25' },
-                { pair: 'AB', key: 'k2', type: 'missing_right', status: 'open', firstSeenAt: recent, day: '2026-09-24' },
+                {
+                    pair: 'AB',
+                    key: 'k2',
+                    type: 'missing_right',
+                    status: 'open',
+                    firstSeenAt: recent,
+                    day: '2026-09-24',
+                },
                 { pair: 'AB', key: 'k3', type: 'missing_right', status: 'open', firstSeenAt: recent },
             ],
         };

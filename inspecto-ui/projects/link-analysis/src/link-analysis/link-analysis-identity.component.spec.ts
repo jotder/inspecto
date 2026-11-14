@@ -100,7 +100,13 @@ describe('LinkAnalysisIdentityComponent (DR-U8)', () => {
     it('explains a 403 as a capability, not a broken chain', async () => {
         const { f, el } = create({
             listIdentityGroups: vi.fn(() =>
-                throwError(() => new HttpErrorResponse({ status: 403, error: { error: { message: "missing capability 'canManageIncidents'" } } })),
+                throwError(
+                    () =>
+                        new HttpErrorResponse({
+                            status: 403,
+                            error: { error: { message: "missing capability 'canManageIncidents'" } },
+                        }),
+                ),
             ),
         });
         await f.whenStable();

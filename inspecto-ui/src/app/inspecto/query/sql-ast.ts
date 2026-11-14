@@ -116,7 +116,8 @@ function literal(n: SqlAstNode | null): Literal | null | 'null' {
     if (kind === 'NULL_LITERAL') return 'null';
     if (typeof text !== 'string') return null;
     if (kind === 'STRING') return { type: 'string', text };
-    if (kind === 'BOOLEAN' && (text === 'true' || text === 'false')) return { type: 'boolean', text: text.toUpperCase() };
+    if (kind === 'BOOLEAN' && (text === 'true' || text === 'false'))
+        return { type: 'boolean', text: text.toUpperCase() };
     if (NUMERIC_KINDS.has(kind)) return { type: 'number', text };
     return null; // HEX, BLOB and any kind this reader does not know: "cannot be shown", never guessed
 }

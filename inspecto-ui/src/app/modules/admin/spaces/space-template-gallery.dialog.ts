@@ -115,7 +115,8 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                     </p>
                     @if (selected()!.samples) {
                         <p class="text-secondary text-sm" data-testid="template-loads-samples">
-                            Its sample data is loaded and each of its Pipelines runs once, so its Datasets are not empty.
+                            Its sample data is loaded and each of its Pipelines runs once, so its Datasets are not
+                            empty.
                         </p>
                     }
                     <inspecto-pen-field

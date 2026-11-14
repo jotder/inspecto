@@ -334,7 +334,9 @@ describe('LinkAnalysisSnapshotDialog — create a Case in place (LA-CASE-CREATE-
         expect(close).not.toHaveBeenCalled();
         expect(el.textContent).toContain('The Case was not created');
         expect(el.textContent).toContain('missing capability canManageIncidents'); // the server's 403, verbatim
-        expect(el.querySelector<HTMLButtonElement>('inspecto-pen-field[formcontrolname="title"] button')?.disabled).toBe(true);
+        expect(
+            el.querySelector<HTMLButtonElement>('inspecto-pen-field[formcontrolname="title"] button')?.disabled,
+        ).toBe(true);
 
         fail = false;
         await fixture.componentInstance.save();
@@ -421,7 +423,10 @@ describe('LinkAnalysisAttachCaseDialog — one step: seal and attach (telecom S3
                 { provide: SessionService, useValue: { opsEnabled: () => true } },
                 {
                     provide: ObjectsService,
-                    useValue: { list: o.list ?? (() => of([{ id: 'CASE-9', title: 'Real case' }])), openCaseFromEntities },
+                    useValue: {
+                        list: o.list ?? (() => of([{ id: 'CASE-9', title: 'Real case' }])),
+                        openCaseFromEntities,
+                    },
                 },
                 { provide: MatDialogRef, useValue: { close, backdropClick: () => of(), keydownEvents: () => of() } },
                 {

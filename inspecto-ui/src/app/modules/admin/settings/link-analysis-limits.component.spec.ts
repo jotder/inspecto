@@ -34,8 +34,23 @@ function item(over: Partial<LaLimitItem> & { key: string }): LaLimitItem {
 
 const ITEMS: LaLimitItem[] = [
     item({ key: 'projection_node_cap', browser: true }),
-    item({ key: 'display.lod_label_cap', browser: true, group: 'display', default: 300, inForce: 300, description: 'Labels drop above this.' }),
-    item({ key: 'connect.max_seeds', group: 'connect', unit: 'count', default: 20, inForce: 20, max: 2000, description: 'Seeds per connect.' }),
+    item({
+        key: 'display.lod_label_cap',
+        browser: true,
+        group: 'display',
+        default: 300,
+        inForce: 300,
+        description: 'Labels drop above this.',
+    }),
+    item({
+        key: 'connect.max_seeds',
+        group: 'connect',
+        unit: 'count',
+        default: 20,
+        inForce: 20,
+        max: 2000,
+        description: 'Seeds per connect.',
+    }),
     item({
         key: 'graph_run.ceiling_nodes',
         layer: 'install',
@@ -72,7 +87,8 @@ function setup(items = ITEMS) {
     const el = fixture.nativeElement as HTMLElement;
     const section = (name: string) => el.querySelector<HTMLFormElement>(`form[data-section="${name}"]`)!;
     /** The pen field of one item (a row: label, value, pencil). */
-    const input = (name: string, key: string) => section(name).querySelector<HTMLElement>(`inspecto-pen-field[data-key="${key}"]`)!;
+    const input = (name: string, key: string) =>
+        section(name).querySelector<HTMLElement>(`inspecto-pen-field[data-key="${key}"]`)!;
     const type = (name: string, key: string, value: string) => penEdit(fixture, input(name, key), value);
     const submit = (name: string) => {
         section(name).querySelector<HTMLButtonElement>('button[type="submit"]')!.click();
@@ -93,7 +109,9 @@ describe('LinkAnalysisLimitsComponent', () => {
         const headings = Array.from(el.querySelectorAll('h2')).map((h) => h.textContent!.trim());
         expect(headings).toEqual(['Analysis', 'Host resources', 'My browser']);
         // each group is a collapsible panel: the first is open, the rest are collapsed; the items of a group sit in two columns
-        const groups = Array.from(section('space').querySelectorAll('mat-panel-title')).map((l) => l.textContent!.trim());
+        const groups = Array.from(section('space').querySelectorAll('mat-panel-title')).map((l) =>
+            l.textContent!.trim(),
+        );
         expect(groups).toEqual(['Canvas — Analysis', 'Display — Analysis', 'Connect — Analysis']);
         const open = Array.from(section('space').querySelectorAll('mat-expansion-panel-header')).map(
             (h) => h.getAttribute('aria-expanded') === 'true',
@@ -147,7 +165,9 @@ describe('LinkAnalysisLimitsComponent', () => {
     });
 
     it('a blank field is sent as null (inherit)', () => {
-        const { http, type, submit } = setup(ITEMS.map((i) => (i.key === 'connect.max_seeds' ? { ...i, value: 25 } : i)));
+        const { http, type, submit } = setup(
+            ITEMS.map((i) => (i.key === 'connect.max_seeds' ? { ...i, value: 25 } : i)),
+        );
         type('space', 'connect.max_seeds', '');
         submit('space');
         const req = http.expectOne(GET);
@@ -181,9 +201,13 @@ describe('LinkAnalysisLimitsComponent', () => {
         submit('browser');
         expect(svc.effective('projection_node_cap')).toBe(200);
         expect(laLimit('projection_node_cap')).toBe(200);
-        expect(JSON.parse(localStorage.getItem('inspecto.la.limits.personal.s1.ana')!)).toEqual({ projection_node_cap: 200 });
+        expect(JSON.parse(localStorage.getItem('inspecto.la.limits.personal.s1.ana')!)).toEqual({
+            projection_node_cap: 200,
+        });
 
-        const reset = el.querySelector<HTMLButtonElement>('button[aria-label="Reset Projection node cap (nodes) to the Space value"]')!;
+        const reset = el.querySelector<HTMLButtonElement>(
+            'button[aria-label="Reset Projection node cap (nodes) to the Space value"]',
+        )!;
         expect(reset).not.toBeNull();
         await expectNoA11yViolations(el);
         reset.click();
@@ -212,8 +236,26 @@ describe('LinkAnalysisLimitsComponent', () => {
         TestBed.tick();
         http.expectOne(GET).flush({
             items: [
-                item({ key: 'rate.link_analysis_per_s', layer: 'install', group: 'rate', unit: 'per_s', default: 0.5, inForce: 0.5, min: 0.01, max: 1000 }),
-                item({ key: 'index.build_memory_pct', layer: 'install', group: 'index', unit: 'pct_ram', default: null, inForce: null, min: 1, max: 95 }),
+                item({
+                    key: 'rate.link_analysis_per_s',
+                    layer: 'install',
+                    group: 'rate',
+                    unit: 'per_s',
+                    default: 0.5,
+                    inForce: 0.5,
+                    min: 0.01,
+                    max: 1000,
+                }),
+                item({
+                    key: 'index.build_memory_pct',
+                    layer: 'install',
+                    group: 'index',
+                    unit: 'pct_ram',
+                    default: null,
+                    inForce: null,
+                    min: 1,
+                    max: 95,
+                }),
             ],
             metadata: { podScoped: true },
         });
@@ -222,8 +264,14 @@ describe('LinkAnalysisLimitsComponent', () => {
         const host = el.querySelector<HTMLFormElement>('form[data-section="install"]')!;
         expect(el.textContent).toContain('this server (pod) only');
         expect(host.textContent).toContain('In force: none.');
-        expect(penText(host.querySelector<HTMLElement>('inspecto-pen-field[data-key="index.build_memory_pct"]')!)).toBe('default none');
-        penEdit(fixture, host.querySelector<HTMLElement>('inspecto-pen-field[data-key="rate.link_analysis_per_s"]')!, '0.75');
+        expect(penText(host.querySelector<HTMLElement>('inspecto-pen-field[data-key="index.build_memory_pct"]')!)).toBe(
+            'default none',
+        );
+        penEdit(
+            fixture,
+            host.querySelector<HTMLElement>('inspecto-pen-field[data-key="rate.link_analysis_per_s"]')!,
+            '0.75',
+        );
         host.querySelector<HTMLButtonElement>('button[type="submit"]')!.click();
         const req = http.expectOne(apiUrl('/system/link-analysis/limits'));
         expect(req.request.body).toEqual({ 'rate.link_analysis_per_s': 0.75 });

@@ -54,7 +54,9 @@ function mount() {
         fixture.detectChanges();
     };
     const button = (label: string) =>
-        Array.from(el.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === label) as HTMLButtonElement;
+        Array.from(el.querySelectorAll('button')).find(
+            (b) => b.getAttribute('aria-label') === label,
+        ) as HTMLButtonElement;
     return { fixture, el, host: fixture.componentInstance, click, button };
 }
 
@@ -64,7 +66,9 @@ describe('LinkAnalysisDiscoverComponent - Find something interesting (LA-ONBOARD
         const asked = Array.from(el.querySelectorAll('[role="group"] button')).map((b) => b.textContent!.trim());
         expect(asked).toEqual(['Busiest nodes', 'Tight groups', 'Route from A to B']);
         click('[data-testid="la-discover-busiest"]');
-        const readings = Array.from(el.querySelectorAll('[data-testid="la-discover-reading"]')).map((p) => p.textContent!.trim());
+        const readings = Array.from(el.querySelectorAll('[data-testid="la-discover-reading"]')).map((p) =>
+            p.textContent!.trim(),
+        );
         expect(readings[0]).toBe('HUB takes part in 5 transfers, the most on this graph.');
         expect(readings.every((r) => /\d+ transfers?/.test(r) && r.endsWith('.'))).toBe(true); // never a bare number
         expect(el.querySelector('[data-testid="la-discover-hint"]')?.textContent).toContain(
@@ -117,7 +121,9 @@ describe('LinkAnalysisDiscoverComponent - Find something interesting (LA-ONBOARD
         click('[data-testid="la-discover-busiest"]');
         expect(button('Start from these: HUB').disabled).toBe(true);
         expect(button('Add to a list: HUB').disabled).toBe(true);
-        expect(el.querySelector('[data-testid="la-discover-why-not"]')?.textContent).toContain('not drawn from a Dataset');
+        expect(el.querySelector('[data-testid="la-discover-why-not"]')?.textContent).toContain(
+            'not drawn from a Dataset',
+        );
         expect(el.querySelector('[data-testid="la-discover-hint"] button')).toBeNull(); // the hint keeps its sentence only
     });
 

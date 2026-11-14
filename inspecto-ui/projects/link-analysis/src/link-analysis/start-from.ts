@@ -1,6 +1,11 @@
 import type { EntityProjection, G6GraphData } from '@inspecto/core/graph';
 import type { EntityTypeSummary } from '@inspecto/link-analysis/api/entity-profile.service';
-import { DEFAULT_MAX_DEGREE, DomainProfileId, domainProfile, domainProfiles } from '@inspecto/link-analysis/graph/domain-profile';
+import {
+    DEFAULT_MAX_DEGREE,
+    DomainProfileId,
+    domainProfile,
+    domainProfiles,
+} from '@inspecto/link-analysis/graph/domain-profile';
 import type { LaDataset } from '@inspecto/link-analysis/la-host';
 import { PendingInvestigation, dayLabel } from './investigate-number';
 import type { LinkAnalysisView } from './link-analysis.service';
@@ -99,7 +104,11 @@ export function newInvestigationDefaults(i: NewInvestigationInput): { name: stri
         case 'paste': {
             const n = i.pasted;
             if (!(n > 0)) return { name: '', purpose: '' };
-            const values = plural(n, type ? `pasted ${type} value` : 'pasted value', type ? `pasted ${type} values` : 'pasted values');
+            const values = plural(
+                n,
+                type ? `pasted ${type} value` : 'pasted value',
+                type ? `pasted ${type} values` : 'pasted values',
+            );
             return {
                 name: values[0].toUpperCase() + values.slice(1),
                 purpose: `Review of ${plural(n, 'pasted value', 'pasted values')} and ${n === 1 ? 'its' : 'their'} links`,
@@ -300,7 +309,9 @@ export function someValues(values: readonly string[], max = 5): string {
  */
 export function notInDatasetMessage(unknown: readonly string[], dataset: string): string {
     const said =
-        unknown.length === 1 ? `${unknown[0]} is not in ${dataset}.` : `None of these are in ${dataset}: ${someValues(unknown)}.`;
+        unknown.length === 1
+            ? `${unknown[0]} is not in ${dataset}.`
+            : `None of these are in ${dataset}: ${someValues(unknown)}.`;
     return `${said} Check the spelling or pick another Dataset.`;
 }
 

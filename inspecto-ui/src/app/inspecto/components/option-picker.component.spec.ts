@@ -201,7 +201,9 @@ describe('OptionPickerDialog', () => {
         // a name on a role-less div is itself an axe violation (aria-prohibited-attr)
         expect(fixture.nativeElement.querySelector('mat-dialog-content [aria-label]')).toBeNull();
         // no options at all says so, never "No choice matches “”" (T-089, cross-lane from T2)
-        expect(fixture.nativeElement.querySelector('[data-testid="picker-empty"]')?.textContent?.trim()).toBe('No options');
+        expect(fixture.nativeElement.querySelector('[data-testid="picker-empty"]')?.textContent?.trim()).toBe(
+            'No options',
+        );
     });
 
     it('puts a run of grouped options in one named role="group", so assistive tech announces the group (T-171)', async () => {
@@ -216,7 +218,10 @@ describe('OptionPickerDialog', () => {
         // in the accessibility tree: a named group, not hidden, holding exactly its own options
         expect(groups[0].getAttribute('aria-label')).toBe('Not link-shaped');
         expect(groups[0].closest('[aria-hidden="true"]')).toBeNull();
-        expect(Array.from(groups[0].querySelectorAll('[role="option"]')).map((o) => o.textContent!.trim())).toEqual(['B', 'C']);
+        expect(Array.from(groups[0].querySelectorAll('[role="option"]')).map((o) => o.textContent!.trim())).toEqual([
+            'B',
+            'C',
+        ]);
         expect(el.querySelector('[role="listbox"] > div:not([role]) [role="option"]')?.textContent?.trim()).toBe('A');
         // the drawn heading is shown once and not read twice
         expect(groups[0].querySelector('[aria-hidden="true"]')?.textContent?.trim()).toBe('Not link-shaped');

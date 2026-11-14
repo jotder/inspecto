@@ -56,7 +56,11 @@ async function create(api: Partial<Record<keyof AlertsService, unknown>> = {}) {
             { provide: InspectoConfirmService, useValue: { confirmDestructive: vi.fn(async () => true) } },
             {
                 provide: LensService,
-                useValue: { canAuthorAlertRules: () => false, canOperateRuns: () => false, canWorkIncidents: () => false },
+                useValue: {
+                    canAuthorAlertRules: () => false,
+                    canOperateRuns: () => false,
+                    canWorkIncidents: () => false,
+                },
             },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },

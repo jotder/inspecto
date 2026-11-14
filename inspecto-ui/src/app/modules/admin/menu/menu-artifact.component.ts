@@ -85,7 +85,11 @@ import 'app/modules/admin/studio/widgets/widget.kind'; // side-effect: register 
                                         @if (view.isViewBound(widget)) {
                                             <app-dashboard-tile [widget]="widget" />
                                         } @else if (view.isKpiBound(widget)) {
-                                            <app-dashboard-tile [widget]="widget" [asOf]="view.kpiAsOf()" [range]="view.kpiRange()" />
+                                            <app-dashboard-tile
+                                                [widget]="widget"
+                                                [asOf]="view.kpiAsOf()"
+                                                [range]="view.kpiRange()"
+                                            />
                                         } @else if (view.datasetOf(tile); as dataset) {
                                             <app-dashboard-tile
                                                 [widget]="widget"

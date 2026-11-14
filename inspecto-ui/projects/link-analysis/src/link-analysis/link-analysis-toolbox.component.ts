@@ -236,7 +236,14 @@ const HAND_OFF: Partial<Record<string, ServerTool[]>> = {
 
 /** The metrics the Centrality group can rank by — each returns a {@link NodeScore} list. */
 type CentralityMetric =
-    'degree' | 'betweenness' | 'closeness' | 'eigenvector' | 'katz' | 'pagerank' | 'hub' | 'authority';
+    | 'degree'
+    | 'betweenness'
+    | 'closeness'
+    | 'eigenvector'
+    | 'katz'
+    | 'pagerank'
+    | 'hub'
+    | 'authority';
 
 /**
  * **Link Analysis — graph-algorithms toolbox** (the bottom panel's Analysis tab, extracted from the
@@ -1431,14 +1438,17 @@ export class LinkAnalysisToolboxComponent {
         if (!this.canSavePatternPack()) return;
         const stages = this.branchStages();
         this.dialog
-            .open<SavePatternPackDialog, SavePatternPackData, SavePatternPackResult | undefined>(SavePatternPackDialog, {
-                data: {
-                    steps: this.patternSteps(),
-                    stages,
-                    takenIds: this.patternPacks().map((p) => p.id),
+            .open<SavePatternPackDialog, SavePatternPackData, SavePatternPackResult | undefined>(
+                SavePatternPackDialog,
+                {
+                    data: {
+                        steps: this.patternSteps(),
+                        stages,
+                        takenIds: this.patternPacks().map((p) => p.id),
+                    },
+                    width: '28rem',
                 },
-                width: '28rem',
-            })
+            )
             .afterClosed()
             .subscribe((saved) => {
                 if (!saved) return;
@@ -1448,7 +1458,9 @@ export class LinkAnalysisToolboxComponent {
                 this.patternPacks.update((all) => [...all, pack]);
                 this.packPicked = true;
                 this.loadedPack.set(pack);
-                this.patternNote.set(`Saved as the pattern pack “${pack.label}”. Everyone in this Space can now pick it.`);
+                this.patternNote.set(
+                    `Saved as the pattern pack “${pack.label}”. Everyone in this Space can now pick it.`,
+                );
             });
     }
 
@@ -1791,7 +1803,8 @@ export class LinkAnalysisToolboxComponent {
         try {
             const found = possibleDuplicates(g);
             this.duplicates.set(found);
-            if (!found.length) this.analysisError.set('No possible duplicates: no two entities of one type share a neighbour.');
+            if (!found.length)
+                this.analysisError.set('No possible duplicates: no two entities of one type share a neighbour.');
         } catch (err) {
             this.duplicates.set([]);
             this.analysisError.set(err instanceof Error ? err.message : 'The analysis failed.');

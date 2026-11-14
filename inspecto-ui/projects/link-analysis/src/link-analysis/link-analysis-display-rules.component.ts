@@ -39,9 +39,7 @@ const REF_PREFIX = 'ref:';
                 </button>
             </div>
         } @empty {
-            <span class="text-secondary text-xs">
-                No display rules yet. Add one to colour nodes by an attribute.
-            </span>
+            <span class="text-secondary text-xs"> No display rules yet. Add one to colour nodes by an attribute. </span>
         }
         @if (note(); as n) {
             <span class="text-secondary text-xs" data-testid="la-rule-reference-note">{{ n }}</span>

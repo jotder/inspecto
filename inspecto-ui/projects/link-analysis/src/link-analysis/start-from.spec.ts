@@ -157,8 +157,11 @@ describe('start-from (LA-ONBOARD-1 OB-9)', () => {
 
     it('genericBinding: the card sends the active profile presets, so its expand carries the same fan-out cap as the toolbox', () => {
         installTelecomFixture();
-        const [d] = startCatalogue([ds('t', { primaryEntityType: 'msisdn', defaultLinkMapping: { from: 'a', to: 'b' } })], [], null)
-            .datasets;
+        const [d] = startCatalogue(
+            [ds('t', { primaryEntityType: 'msisdn', defaultLinkMapping: { from: 'a', to: 'b' } })],
+            [],
+            null,
+        ).datasets;
         const b = genericBinding('MULE-HUB-01', 'msisdn', d, 'telecom');
         expect(b.presets).toEqual(domainProfile('telecom').investigate!.expand);
         expect(presetRung(b.presets, false).maxFanOut).toBe(500);
@@ -202,10 +205,20 @@ describe('start-from (LA-ONBOARD-1 OB-9)', () => {
         );
         // T-041: one entity, the toast in canonical words (never Grow)
         expect(
-            startOutcome({ drawn: 1, nodes: 4, held: 3, unknown: [], notDrawn: 0, dataset: 'T', terms: { node: 'wallet', nodes: 'wallets' } }),
+            startOutcome({
+                drawn: 1,
+                nodes: 4,
+                held: 3,
+                unknown: [],
+                notDrawn: 0,
+                dataset: 'T',
+                terms: { node: 'wallet', nodes: 'wallets' },
+            }),
         ).toBe('Drew 1 entity and 3 linked wallets. 3 busy wallets are held; Expand… (G) goes one degree further.');
         // T-016: what a start that found nothing says
-        expect(notInDatasetMessage(['NOPE'], 'Transfers')).toBe('NOPE is not in Transfers. Check the spelling or pick another Dataset.');
+        expect(notInDatasetMessage(['NOPE'], 'Transfers')).toBe(
+            'NOPE is not in Transfers. Check the spelling or pick another Dataset.',
+        );
         expect(notInDatasetMessage(['A', 'B'], 'Transfers')).toBe(
             'None of these are in Transfers: A, B. Check the spelling or pick another Dataset.',
         );

@@ -65,7 +65,9 @@ export function investigableEntityOf(
     for (const [k, v] of Object.entries(attributes ?? {})) {
         if (!k.startsWith('key.') || !v?.trim() || v === 'NULL') continue;
         const column = k.slice(4).toLowerCase();
-        const type = domainProfiles().map((p) => p.investigate?.entityType).find((t) => !!t && column.includes(t));
+        const type = domainProfiles()
+            .map((p) => p.investigate?.entityType)
+            .find((t) => !!t && column.includes(t));
         if (type) return { seed: v.trim(), entityType: type };
     }
     return null;
@@ -388,7 +390,9 @@ export function expandApproval(
     const fanOut = rung.maxFanOut ?? null;
     const exceeded: string[] = [];
     if (limits.budgetAbove != null && budget > limits.budgetAbove)
-        exceeded.push(`row budget ${budget.toLocaleString('en')} is above ${limits.budgetAbove.toLocaleString('en')} (${BUDGET_KEY})`);
+        exceeded.push(
+            `row budget ${budget.toLocaleString('en')} is above ${limits.budgetAbove.toLocaleString('en')} (${BUDGET_KEY})`,
+        );
     if (limits.fanOutAbove != null && (fanOut === null || fanOut > limits.fanOutAbove))
         exceeded.push(
             fanOut === null
@@ -442,7 +446,10 @@ export function sealedRangeLabel(w: NonNullable<InvestigationLogEntry['params']>
  * expand step still in effect — what it admitted from the Working Set rows (`admittedBy`), the window from its params,
  * the truncation from its read. A step the rows do not place at a hop takes the next degree after the last line.
  */
-export function degreeOutcomesFromLog(entries: readonly InvestigationLogEntry[], ws: WorkingSet | null): DegreeOutcome[] {
+export function degreeOutcomesFromLog(
+    entries: readonly InvestigationLogEntry[],
+    ws: WorkingSet | null,
+): DegreeOutcome[] {
     const out: DegreeOutcome[] = [];
     for (const e of entries) {
         if (e.kind !== 'op' || e.op !== 'expand' || e.undoneBy != null) continue;
@@ -681,7 +688,9 @@ export function degreeOutcomeMessage(o: DegreeOutcome): string {
         return `${head}: request ${o.awaitingApproval} was denied${o.reason ? ` (${o.reason})` : ''} — nothing was read.`;
     if (o.awaitingApproval)
         return `${head}: waiting for approval — this expand exceeds ${
-            o.heldFor?.length ? `the Space's four-eyes limit (${thresholdWords(o.heldFor)})` : "the Space's four-eyes limit"
+            o.heldFor?.length
+                ? `the Space's four-eyes limit (${thresholdWords(o.heldFor)})`
+                : "the Space's four-eyes limit"
         }, so it runs once a second person approves request ${o.awaitingApproval}.${
             o.heldFor?.some((r) => r.startsWith('maxFanOut'))
                 ? ' Ask an approver, or use Expand with a fan-out at or below the threshold (Expand ▸ Limits).'

@@ -79,7 +79,14 @@ interface Membership {
     selector: 'inspecto-la-node-insight',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [MatButtonModule, InspectoAlertComponent, ChipComponent, RouterLink, DatePipe, LinkAnalysisEntitySummaryComponent],
+    imports: [
+        MatButtonModule,
+        InspectoAlertComponent,
+        ChipComponent,
+        RouterLink,
+        DatePipe,
+        LinkAnalysisEntitySummaryComponent,
+    ],
     template: `
         @if (ctx().entityPage; as page) {
             <p class="mt-2 text-sm">
@@ -98,7 +105,12 @@ interface Membership {
                         drawWhyNot="It is on the graph already."
                     ></inspecto-link-analysis-entity-summary>
                 } @else {
-                    <button mat-stroked-button type="button" data-testid="ni-summary-open" (click)="summaryOpen.set(true)">
+                    <button
+                        mat-stroked-button
+                        type="button"
+                        data-testid="ni-summary-open"
+                        (click)="summaryOpen.set(true)"
+                    >
                         Summarise its links in {{ ctx().summaryDataset }}
                     </button>
                 }
@@ -107,9 +119,7 @@ interface Membership {
         <section class="mt-4" aria-labelledby="ni-risk">
             <h3 id="ni-risk" class="text-base font-semibold">Risk</h3>
             @if (!mapping()) {
-                <p class="text-secondary text-sm" data-testid="risk-unmapped">
-                    No risk data for this Industry pack.
-                </p>
+                <p class="text-secondary text-sm" data-testid="risk-unmapped">No risk data for this Industry pack.</p>
             } @else {
                 @if (indicators()?.truncated) {
                     <inspecto-alert variant="warning" data-testid="risk-truncated"
@@ -567,9 +577,9 @@ export class NodeInsightComponent implements OnInit {
         const refs = c.references ?? [];
         this.details.set(refs.map((ref) => ({ ref, table: null })));
         for (const ref of refs)
-            void this.svc.lookup(ref, [c.key], c.investigationId).then((table) =>
-                this.details.update((all) => all.map((d) => (d.ref === ref ? { ref, table } : d))),
-            );
+            void this.svc
+                .lookup(ref, [c.key], c.investigationId)
+                .then((table) => this.details.update((all) => all.map((d) => (d.ref === ref ? { ref, table } : d))));
         if (c.graphKey) this.riskResult.set(this.svc.cachedRisk(this.cacheKey(c.graphKey)));
         void this.loadMemberships();
     }

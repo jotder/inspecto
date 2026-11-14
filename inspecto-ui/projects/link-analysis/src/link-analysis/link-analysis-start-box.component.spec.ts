@@ -158,7 +158,8 @@ describe('LinkAnalysisStartBoxComponent (LA-ONBOARD-1 phase 6, OB-9)', () => {
         const fixture = TestBed.createComponent(Host);
         fixture.componentInstance.catalogue.set(partial);
         fixture.detectChanges();
-        const box = fixture.debugElement.query(By.directive(LinkAnalysisStartBoxComponent)).componentInstance as LinkAnalysisStartBoxComponent;
+        const box = fixture.debugElement.query(By.directive(LinkAnalysisStartBoxComponent))
+            .componentInstance as LinkAnalysisStartBoxComponent;
         expect(box.form.controls.dataset.value).toBe('transfers');
         expect(box.form.controls.entityType.value).toBe('');
         fixture.componentInstance.catalogue.set(CATALOGUE);
@@ -311,7 +312,9 @@ describe('LinkAnalysisStartBoxComponent (LA-ONBOARD-1 phase 6, OB-9)', () => {
         const { fixture, el } = create();
         fixture.componentInstance.lists.set([]);
         kind(fixture, 'list');
-        expect(q(el, 'start-no-lists')?.textContent).toContain('No Entity List yet. Create one in Settings ▸ Entity Lists');
+        expect(q(el, 'start-no-lists')?.textContent).toContain(
+            'No Entity List yet. Create one in Settings ▸ Entity Lists',
+        );
     });
 
     it('a paste: values split on lines, commas and semicolons, repeats dropped', async () => {
@@ -457,10 +460,13 @@ describe('LinkAnalysisStartBoxComponent - the Investigation tab start form (LA-U
         const spin = degrees.querySelector('[role="spinbutton"]') as HTMLElement;
         expect(spin.getAttribute('aria-valuenow')).toBe('1');
         expect(degrees.querySelector('[data-testid="stepper-decrement"]')!.getAttribute('aria-disabled')).toBe('true');
-        for (let i = 0; i < 3; i++) (degrees.querySelector('[data-testid="stepper-increment"]') as HTMLButtonElement).click();
+        for (let i = 0; i < 3; i++)
+            (degrees.querySelector('[data-testid="stepper-increment"]') as HTMLButtonElement).click();
         fixture.detectChanges();
         expect(spin.getAttribute('aria-valuenow')).toBe('2'); // the profile's last degree
-        expect(degrees.querySelector('[data-testid="stepper-reason"]')!.textContent).toContain('2 degrees is the most this Industry pack allows.');
+        expect(degrees.querySelector('[data-testid="stepper-reason"]')!.textContent).toContain(
+            '2 degrees is the most this Industry pack allows.',
+        );
         submit(fixture);
         expect(fixture.componentInstance.starts).toEqual([]); // never the draw
         expect(fixture.componentInstance.creates).toEqual([
@@ -493,7 +499,8 @@ describe('LinkAnalysisStartBoxComponent - the Investigation tab start form (LA-U
         const degrees = q(el, 'new-degrees')!;
         const spin = degrees.querySelector('[role="spinbutton"]') as HTMLElement;
         expect(spin.getAttribute('aria-valuemax')).toBe('3');
-        for (let i = 0; i < 4; i++) (degrees.querySelector('[data-testid="stepper-increment"]') as HTMLButtonElement).click();
+        for (let i = 0; i < 4; i++)
+            (degrees.querySelector('[data-testid="stepper-increment"]') as HTMLButtonElement).click();
         fixture.detectChanges();
         expect(spin.getAttribute('aria-valuenow')).toBe('3');
         expect(degrees.querySelector('[data-testid="stepper-reason"]')!.textContent!.trim()).toBe(
@@ -507,7 +514,10 @@ describe('LinkAnalysisStartBoxComponent - the Investigation tab start form (LA-U
         await settle();
         fixture.detectChanges();
         submit(fixture);
-        expect(fixture.componentInstance.creates[0].defaults).toEqual({ name: 'Account', purpose: 'Review of an Account and its links' });
+        expect(fixture.componentInstance.creates[0].defaults).toEqual({
+            name: 'Account',
+            purpose: 'Review of an Account and its links',
+        });
     });
 
     it('with a graph drawn, Start from offers "Graph on screen": a seedless start over its mapping', () => {
@@ -569,7 +579,14 @@ describe('LinkAnalysisStartBoxComponent - the Investigation tab start form (LA-U
 });
 
 describe('newInvestigationDefaults: the full matrix (LA-UI-TEXT-PASS-1 X7)', () => {
-    const base = { typeLabel: 'Account', value: '', listTitle: '', pasted: 0, datasetName: 'Calls', maskingMode: 'none' };
+    const base = {
+        typeLabel: 'Account',
+        value: '',
+        listTitle: '',
+        pasted: 0,
+        datasetName: 'Calls',
+        maskingMode: 'none',
+    };
     const d = (over: Partial<NewInvestigationInput>) => newInvestigationDefaults({ ...base, kind: 'entity', ...over });
     const NO_GAPS = /\s{2}|^\s|\s$|Investigation —|whole the|list an Entity List|\bundefined\b|\bnull\b/;
 
@@ -577,26 +594,76 @@ describe('newInvestigationDefaults: the full matrix (LA-UI-TEXT-PASS-1 X7)', () 
         // one entity
         ['entity, no value yet', { value: '' }, '', 'Review of an Account and its links'],
         ['entity, a value, Space unmasked', { value: 'AC-1' }, 'Account AC-1', 'Review of an Account and its links'],
-        ['entity, a value, Space masked', { value: 'AC-1', maskingMode: 'partial' }, 'Account', 'Review of an Account and its links'],
-        ['entity, a value, masking unknown', { value: 'AC-1', maskingMode: null }, 'Account', 'Review of an Account and its links'],
+        [
+            'entity, a value, Space masked',
+            { value: 'AC-1', maskingMode: 'partial' },
+            'Account',
+            'Review of an Account and its links',
+        ],
+        [
+            'entity, a value, masking unknown',
+            { value: 'AC-1', maskingMode: null },
+            'Account',
+            'Review of an Account and its links',
+        ],
         ['entity, type not picked', { typeLabel: '', value: 'AC-1' }, 'AC-1', 'Review of an entity and its links'],
-        ['entity, type not picked and masked', { typeLabel: '', value: 'AC-1', maskingMode: 'full' }, 'Entity', 'Review of an entity and its links'],
-        ['entity, consonant type', { typeLabel: 'Party', value: 'P-1' }, 'Party P-1', 'Review of a Party and its links'],
+        [
+            'entity, type not picked and masked',
+            { typeLabel: '', value: 'AC-1', maskingMode: 'full' },
+            'Entity',
+            'Review of an entity and its links',
+        ],
+        [
+            'entity, consonant type',
+            { typeLabel: 'Party', value: 'P-1' },
+            'Party P-1',
+            'Review of a Party and its links',
+        ],
         ['entity, blank value', { value: '   ' }, '', 'Review of an Account and its links'],
         // Entity List
         ['list, none picked', { kind: 'list' }, '', 'Review of the members of an Entity List and their links'],
-        ['list, picked', { kind: 'list', listTitle: ' Watch ' }, 'Members of “Watch”', 'Review of the members of “Watch” and their links'],
+        [
+            'list, picked',
+            { kind: 'list', listTitle: ' Watch ' },
+            'Members of “Watch”',
+            'Review of the members of “Watch” and their links',
+        ],
         // pasted values
         ['paste, none', { kind: 'paste', pasted: 0 }, '', ''],
-        ['paste, one', { kind: 'paste', pasted: 1 }, '1 pasted Account value', 'Review of 1 pasted value and its links'],
-        ['paste, many', { kind: 'paste', pasted: 1234 }, '1,234 pasted Account values', 'Review of 1,234 pasted values and their links'],
-        ['paste, type not picked', { kind: 'paste', pasted: 2, typeLabel: '' }, '2 pasted values', 'Review of 2 pasted values and their links'],
+        [
+            'paste, one',
+            { kind: 'paste', pasted: 1 },
+            '1 pasted Account value',
+            'Review of 1 pasted value and its links',
+        ],
+        [
+            'paste, many',
+            { kind: 'paste', pasted: 1234 },
+            '1,234 pasted Account values',
+            'Review of 1,234 pasted values and their links',
+        ],
+        [
+            'paste, type not picked',
+            { kind: 'paste', pasted: 2, typeLabel: '' },
+            '2 pasted values',
+            'Review of 2 pasted values and their links',
+        ],
         // whole Dataset
         ['dataset, named', { kind: 'dataset' }, 'Calls', 'Review of the links in Calls'],
-        ['dataset, unnamed', { kind: 'dataset', datasetName: '' }, 'Whole Dataset', 'Review of the links in the Dataset'],
+        [
+            'dataset, unnamed',
+            { kind: 'dataset', datasetName: '' },
+            'Whole Dataset',
+            'Review of the links in the Dataset',
+        ],
         // graph on screen
         ['graph, unmasked', { kind: 'graph', graphName: 'ring' }, 'ring', 'Review of the graph on screen'],
-        ['graph, masked', { kind: 'graph', graphName: 'ring', maskingMode: 'partial' }, 'Graph on screen', 'Review of the graph on screen'],
+        [
+            'graph, masked',
+            { kind: 'graph', graphName: 'ring', maskingMode: 'partial' },
+            'Graph on screen',
+            'Review of the graph on screen',
+        ],
         ['graph, no name', { kind: 'graph', graphName: '' }, 'Graph on screen', 'Review of the graph on screen'],
     ])('%s', (_case, over, name, purpose) => {
         const out = d(over);

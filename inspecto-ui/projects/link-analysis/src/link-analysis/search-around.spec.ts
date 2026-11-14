@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-    describeSearchAround,
-    searchAroundIssues,
-    searchAroundToSteps,
-    stepsToSearchAround,
-} from './search-around';
+import { describeSearchAround, searchAroundIssues, searchAroundToSteps, stepsToSearchAround } from './search-around';
 
 describe('search-around', () => {
     const spec = {

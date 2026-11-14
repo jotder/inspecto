@@ -345,7 +345,9 @@
                                         [formGroupName]="i"
                                         [attr.data-condition]="i"
                                     >
-                                        <div class="grid grid-cols-1 items-center gap-2 sm:grid-cols-[2fr_2fr_3fr_auto]">
+                                        <div
+                                            class="grid grid-cols-1 items-center gap-2 sm:grid-cols-[2fr_2fr_3fr_auto]"
+                                        >
                                             <inspecto-option-picker
                                                 label="Column"
                                                 formControlName="column"
@@ -391,7 +393,10 @@
                                                 [attr.aria-label]="'Remove condition ' + (i + 1)"
                                                 (click)="removeCondition(i)"
                                             >
-                                                <mat-icon svgIcon="heroicons_outline:x-mark" aria-hidden="true"></mat-icon>
+                                                <mat-icon
+                                                    svgIcon="heroicons_outline:x-mark"
+                                                    aria-hidden="true"
+                                                ></mat-icon>
                                             </button>
                                         </div>
                                         @if (g.controls.op.value === 'contains') {

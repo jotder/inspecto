@@ -183,7 +183,9 @@ export class GrowExcludeStore {
                 p = this.basicAdapter ? await this.basicAdapter.preview(ids, req) : null;
             }
             if (seq !== this.previewSeq) return;
-            this.preview.set(p ? { state: 'ready', preview: p, message: '' } : { state: 'unavailable', preview: null, message: '' });
+            this.preview.set(
+                p ? { state: 'ready', preview: p, message: '' } : { state: 'unavailable', preview: null, message: '' },
+            );
         } catch (err) {
             if (seq !== this.previewSeq) return;
             const f = previewFailure(err);
@@ -217,7 +219,13 @@ export class GrowExcludeStore {
         const last = ops.at(-1);
         const group = last?.op === 'expand' ? last.params?.group : undefined;
         const run = this.expandRun();
-        if (run?.id === id && ops.slice(-run.steps.length).map((e) => e.step).join(',') === run.steps.join(','))
+        if (
+            run?.id === id &&
+            ops
+                .slice(-run.steps.length)
+                .map((e) => e.step)
+                .join(',') === run.steps.join(',')
+        )
             return { ...run, group };
         if (!group) return null;
         let i = ops.length;
@@ -231,7 +239,9 @@ export class GrowExcludeStore {
     /** After Save replayed an unsaved Expand as `degrees` steps: those newest steps are the last Expand. */
     bindLastExpand(degrees: number): void {
         const id = this.investigation.activeId();
-        const ops = (this.investigation.log()?.entries ?? []).filter((e) => e.kind === 'op' && e.undoneBy == null).slice(-degrees);
+        const ops = (this.investigation.log()?.entries ?? [])
+            .filter((e) => e.kind === 'op' && e.undoneBy == null)
+            .slice(-degrees);
         if (id && degrees > 0 && ops.length === degrees && ops.every((e) => e.op === 'expand'))
             this.expandRun.set({ id, steps: ops.map((e) => e.step) });
     }
@@ -267,7 +277,12 @@ export class GrowExcludeStore {
      * nobody, and at a four-eyes hold — and says which. The steps it made are ONE change for Undo (newest first, OP-4).
      * `extend` (LA-DEGREES-TRIM-1, raising Degrees) adds the degrees to the last Expand's run instead of starting a new one.
      */
-    async growInvestigation(ctx: GrowContext, req: GrowRequest, presets: DegreePresets, extend = false): Promise<boolean> {
+    async growInvestigation(
+        ctx: GrowContext,
+        req: GrowRequest,
+        presets: DegreePresets,
+        extend = false,
+    ): Promise<boolean> {
         const inv = this.investigation;
         const t = ctx.terms;
         let frontier = growIds(ctx, req);
@@ -288,10 +303,7 @@ export class GrowExcludeStore {
             }
             const step = inv.lastStep();
             if (step?.status === 'pending') {
-                stop =
-                    d === 1
-                        ? ''
-                        : ` Degree ${d} needs a second person’s approval, so the walk stopped there.`;
+                stop = d === 1 ? '' : ` Degree ${d} needs a second person’s approval, so the walk stopped there.`;
                 if (d === 1) {
                     this.lastChange.set({
                         text: 'This Expand is waiting for a second person’s approval — nothing changes until it is approved.',
@@ -333,7 +345,11 @@ export class GrowExcludeStore {
     }
 
     /** Undo of a raise (`extend`) takes back its steps only: the Expand it joined is the newest again, so rebind to it. */
-    private joinedUndo(change: Pick<LastChange, 'undo' | 'valid'>, id: string | null, joined: number[]): Pick<LastChange, 'undo' | 'valid'> {
+    private joinedUndo(
+        change: Pick<LastChange, 'undo' | 'valid'>,
+        id: string | null,
+        joined: number[],
+    ): Pick<LastChange, 'undo' | 'valid'> {
         const undo = change.undo;
         if (!undo || !id || !joined.length) return change;
         return {
@@ -348,7 +364,12 @@ export class GrowExcludeStore {
     /** "Remove held super nodes": ONE `exclude` of every held entity with the reason (§3.2, GE-4). */
     async removeHeld(ids: string[], threshold: number, t: PackTerms): Promise<boolean> {
         if (!ids.length) return false;
-        return this.excludeHere(ids, heldReason(threshold, t), t, `Removed ${ids.length.toLocaleString('en')} busy ${ids.length === 1 ? t.node : t.nodes}.`);
+        return this.excludeHere(
+            ids,
+            heldReason(threshold, t),
+            t,
+            `Removed ${ids.length.toLocaleString('en')} busy ${ids.length === 1 ? t.node : t.nodes}.`,
+        );
     }
 
     /** "Exclude… → From this Investigation only": one `exclude` op. */
@@ -356,7 +377,9 @@ export class GrowExcludeStore {
         if (!(await this.investigation.apply({ op: 'exclude', ids, reason }))) return false;
         const done = this.investigation.lastStep()?.delta?.excluded?.length ?? ids.length;
         this.lastChange.set({
-            text: text ?? `Excluded ${done.toLocaleString('en')} ${done === 1 ? t.node : t.nodes} from this Investigation.`,
+            text:
+                text ??
+                `Excluded ${done.toLocaleString('en')} ${done === 1 ? t.node : t.nodes} from this Investigation.`,
             ...this.undoOf(this.madeStep()),
         });
         return true;
@@ -372,7 +395,10 @@ export class GrowExcludeStore {
         if (exclude) {
             // LA-INVESTIGATE-UX-1 "Exclude instead": ONE exclude step that carries the reason itself
             if (!(await this.investigation.apply({ op: 'exclude', ids, reason }))) return false;
-            this.lastChange.set({ text: `Excluded ${ids.length.toLocaleString('en')}.`, ...this.undoOf(this.madeStep()) });
+            this.lastChange.set({
+                text: `Excluded ${ids.length.toLocaleString('en')}.`,
+                ...this.undoOf(this.madeStep()),
+            });
             return true;
         }
         if (!(await this.investigation.apply({ op: 'hide', ids }))) return false;
@@ -393,7 +419,10 @@ export class GrowExcludeStore {
         this.lastChange.set(
             step?.status === 'pending'
                 ? { text: 'Expanding through this busy item is waiting for a second person’s approval.' }
-                : { text: `Expanded through ${id} — the override is recorded in the log.`, ...this.undoOf(this.madeStep()) },
+                : {
+                      text: `Expanded through ${id} — the override is recorded in the log.`,
+                      ...this.undoOf(this.madeStep()),
+                  },
         );
         return true;
     }
@@ -427,7 +456,12 @@ export class GrowExcludeStore {
         this.busy.set(true);
         try {
             const made = await firstValueFrom(
-                this.inv.createEntityList({ title, purpose: 'exclusion', entityType, reason: 'Created from Hidden by lists' }),
+                this.inv.createEntityList({
+                    title,
+                    purpose: 'exclusion',
+                    entityType,
+                    reason: 'Created from Hidden by lists',
+                }),
             );
             await this.loadLists(true);
             return `Created “${made.title}”. Add to it with right-click → Exclude…`;
@@ -478,7 +512,11 @@ export class GrowExcludeStore {
             this.investigation.entityListsChanged.update((n) => n + 1);
             if (inInvestigation) {
                 if (!(await this.investigation.apply({ op: 'excludeBy', listId: id, reason })))
-                    return { ok: false, listId: id, message: this.investigation.error() || 'The list could not be applied.' };
+                    return {
+                        ok: false,
+                        listId: id,
+                        message: this.investigation.error() || 'The list could not be applied.',
+                    };
                 this.lastChange.set({
                     text: `Added to “${title}” and applied: ${values.length.toLocaleString('en')} ${values.length === 1 ? t.node : t.nodes} excluded now and in every later step.`,
                     ...this.undoOf(this.madeStep()),

@@ -70,7 +70,8 @@ function routeValidator(c: AbstractControl): ValidationErrors | null {
                     [error]="titleError()"
                 ></inspecto-pen-field>
 
-                <mat-form-field subscriptSizing="dynamic"><!-- form-allow: a typeahead with an autocomplete panel (the screen route suggestions) -->
+                <mat-form-field subscriptSizing="dynamic"
+                    ><!-- form-allow: a typeahead with an autocomplete panel (the screen route suggestions) -->
                     <mat-label>Screen</mat-label>
                     <input
                         matInput

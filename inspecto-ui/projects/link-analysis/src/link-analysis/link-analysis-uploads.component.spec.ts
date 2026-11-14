@@ -20,10 +20,22 @@ import { isBusyRefusal, uploadErrorMessage, uploadFileProblem, uploadStateView }
 })
 class Host {}
 
-const TARGET: UploadTarget = { collector: 'up_feed', pipeline: 'UP_FEED', includes: ['glob:**/UPL_*.csv'], maxBytes: 1024 };
+const TARGET: UploadTarget = {
+    collector: 'up_feed',
+    pipeline: 'UP_FEED',
+    includes: ['glob:**/UPL_*.csv'],
+    maxBytes: 1024,
+};
 const PENDING: UploadRecord = {
-    collector: 'up_feed', file: 'UPL_1.csv', bytes: 110, lines: 3, sha256: 'abc', uploader: 'me', replaced: false,
-    landedAt: '2026-10-19T10:00:00Z', state: 'pending',
+    collector: 'up_feed',
+    file: 'UPL_1.csv',
+    bytes: 110,
+    lines: 3,
+    sha256: 'abc',
+    uploader: 'me',
+    replaced: false,
+    landedAt: '2026-10-19T10:00:00Z',
+    state: 'pending',
 };
 const DONE: UploadRecord = { ...PENDING, file: 'UPL_0.csv', state: 'ingested', rejectedRows: 2 };
 
@@ -43,11 +55,31 @@ interface Options {
 
 const BASIC_REASON = 'Investigations are in Standard and above, with the Investigations add-on.';
 
-function create({ targets = [TARGET], uploads = [DONE, PENDING], canUpload = true, geoLink = true, investigations = true, confirm = true, uploadResult }: Options = {}) {
+function create({
+    targets = [TARGET],
+    uploads = [DONE, PENDING],
+    canUpload = true,
+    geoLink = true,
+    investigations = true,
+    confirm = true,
+    uploadResult,
+}: Options = {}) {
     const inv = {
         uploadTargets: vi.fn(() => of({ collectors: targets })),
         listUploads: vi.fn(() => of({ collector: 'up_feed', total: uploads.length, truncated: false, uploads })),
-        uploadCsv: vi.fn(() => uploadResult ?? of({ collector: 'up_feed', pipeline: 'UP_FEED', file: 'UPL_2.csv', bytes: 50, sha256: 'x', replaced: false, landedAt: 't' })),
+        uploadCsv: vi.fn(
+            () =>
+                uploadResult ??
+                of({
+                    collector: 'up_feed',
+                    pipeline: 'UP_FEED',
+                    file: 'UPL_2.csv',
+                    bytes: 50,
+                    sha256: 'x',
+                    replaced: false,
+                    landedAt: 't',
+                }),
+        ),
         deleteUpload: vi.fn(() => of({ collector: 'up_feed', file: 'UPL_1.csv', deleted: true })),
     };
     const confirmSvc = { confirmDestructive: vi.fn(async () => confirm) };
@@ -119,12 +151,17 @@ describe('upload-state helpers', () => {
     });
 
     it('shows the server message for a replace refused while a run is in flight', () => {
-        const busy = "'UPL_1.csv' may be being ingested right now (a run of the Pipeline is in flight); nothing was replaced - try again when the run finishes";
+        const busy =
+            "'UPL_1.csv' may be being ingested right now (a run of the Pipeline is in flight); nothing was replaced - try again when the run finishes";
         const e = new HttpErrorResponse({ status: 409, error: { error: { message: busy } } });
         expect(uploadErrorMessage(e, 'x')).toContain('being ingested right now');
         expect(uploadErrorMessage(e, 'x')).not.toContain('still waiting');
         expect(isBusyRefusal(e)).toBe(true);
-        expect(isBusyRefusal(new HttpErrorResponse({ status: 409, error: { error: { message: 'already in the inbox' } } }))).toBe(false);
+        expect(
+            isBusyRefusal(
+                new HttpErrorResponse({ status: 409, error: { error: { message: 'already in the inbox' } } }),
+            ),
+        ).toBe(false);
     });
 });
 
@@ -139,7 +176,7 @@ describe('LinkAnalysisUploadsComponent', () => {
         expect(rows[0].textContent).toContain('Ingested, 2 rows rejected');
         expect(rows[1].textContent).toContain('Waiting for the Collector');
         expect(el.querySelector('button[aria-label="Delete upload UPL_1.csv"]')).not.toBeNull();
-        expect(el.querySelector('button[aria-label="Delete upload UPL_0.csv"]')).toBeNull();   // ingested: cannot be withdrawn
+        expect(el.querySelector('button[aria-label="Delete upload UPL_0.csv"]')).toBeNull(); // ingested: cannot be withdrawn
         await expectNoA11yViolations(el);
     });
 
@@ -207,13 +244,28 @@ describe('LinkAnalysisUploadsComponent', () => {
         expect(el.textContent).toContain('still waiting');
         expect(el.querySelector('[data-testid="la-upload-replace"]')).not.toBeNull();
         expect(inv.uploadCsv).toHaveBeenLastCalledWith('up_feed', f, false);
-        inv.uploadCsv.mockReturnValue(of({ collector: 'up_feed', pipeline: 'P', file: 'UPL_1.csv', bytes: 50, sha256: 'x', replaced: true, landedAt: 't' }));
+        inv.uploadCsv.mockReturnValue(
+            of({
+                collector: 'up_feed',
+                pipeline: 'P',
+                file: 'UPL_1.csv',
+                bytes: 50,
+                sha256: 'x',
+                replaced: true,
+                landedAt: 't',
+            }),
+        );
         await cmp.upload(true);
         expect(inv.uploadCsv).toHaveBeenLastCalledWith('up_feed', f, true);
     });
 
     it('does not offer Replace while a run is in flight and shows why', async () => {
-        const { cmp, el, settle } = create({ uploadResult: http(409, "'UPL_1.csv' may be being ingested right now (a run of the Pipeline is in flight); nothing was replaced") });
+        const { cmp, el, settle } = create({
+            uploadResult: http(
+                409,
+                "'UPL_1.csv' may be being ingested right now (a run of the Pipeline is in flight); nothing was replaced",
+            ),
+        });
         await settle();
         cmp.file.set(csv('UPL_1.csv'));
         await cmp.upload(true);
@@ -225,7 +277,7 @@ describe('LinkAnalysisUploadsComponent', () => {
     it("never offers Replace for a waiting file that is not the caller's own", async () => {
         const { cmp, el, settle } = create({ uploadResult: http(409, 'already in the inbox') });
         await settle();
-        cmp.file.set(csv('UPL_7.csv'));   // not in the caller's list: someone else's waiting file
+        cmp.file.set(csv('UPL_7.csv')); // not in the caller's list: someone else's waiting file
         await cmp.upload();
         await settle();
         expect(el.textContent).toContain('still waiting');
@@ -252,6 +304,6 @@ describe('LinkAnalysisUploadsComponent', () => {
         confirmSvc.confirmDestructive.mockResolvedValue(true);
         await cmp.remove(PENDING);
         expect(inv.deleteUpload).toHaveBeenCalledWith('up_feed', 'UPL_1.csv');
-        expect(inv.listUploads).toHaveBeenCalledTimes(2);   // the first read, then the reload after the delete
+        expect(inv.listUploads).toHaveBeenCalledTimes(2); // the first read, then the reload after the delete
     });
 });

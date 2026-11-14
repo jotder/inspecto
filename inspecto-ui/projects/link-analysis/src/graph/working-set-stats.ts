@@ -84,7 +84,11 @@ export function workingSetStats(
             .map((v) => Number(v.replace(/,/g, '')))
             .filter((n) => Number.isFinite(n));
         if (!vs.length) continue;
-        out.push({ label: `Total ${col}`, value: compact.format(vs.reduce((a, b) => a + b, 0)), hint: `Sum of ${col}` });
+        out.push({
+            label: `Total ${col}`,
+            value: compact.format(vs.reduce((a, b) => a + b, 0)),
+            hint: `Sum of ${col}`,
+        });
     }
     const timeCol = opts.timeColumn ?? cols.find((c) => isTemporalColumn(full, c));
     if (timeCol) {

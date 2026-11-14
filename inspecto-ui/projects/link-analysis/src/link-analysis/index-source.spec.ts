@@ -92,7 +92,9 @@ describe('index source wording (DR-U4)', () => {
             source,
         };
         expect(recursivePathsToGraph(res, { nodes: [], edges: [] }).state.source).toEqual(source);
-        expect(recursivePathsToGraph({ ...res, source: undefined }, { nodes: [], edges: [] }).state.source).toBeUndefined();
+        expect(
+            recursivePathsToGraph({ ...res, source: undefined }, { nodes: [], edges: [] }).state.source,
+        ).toBeUndefined();
     });
 });
 

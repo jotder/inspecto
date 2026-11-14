@@ -91,7 +91,8 @@ import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
                         [error]="requiredError(form.controls.name)"
                     ></inspecto-pen-field>
                     <div>
-                        <mat-form-field class="w-full" subscriptSizing="dynamic"><!-- form-allow: a typeahead over the tag registry -->
+                        <mat-form-field class="w-full" subscriptSizing="dynamic"
+                            ><!-- form-allow: a typeahead over the tag registry -->
                             <mat-label>Apply tag</mat-label>
                             <input
                                 matInput

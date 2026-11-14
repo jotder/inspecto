@@ -20,7 +20,12 @@ describe('provideInspectoShell', () => {
     it('names the browser tab and the sign-in screen after the Product the host is built as', async () => {
         TestBed.configureTestingModule({
             providers: provideInspectoShell({
-                environment: { apiBaseUrl: '/api', appLogo: 'logo.svg', footerText: 'footer', productName: 'Inspecto LA' },
+                environment: {
+                    apiBaseUrl: '/api',
+                    appLogo: 'logo.svg',
+                    footerText: 'footer',
+                    productName: 'Inspecto LA',
+                },
                 product: TELCO,
                 routes: [],
             }),

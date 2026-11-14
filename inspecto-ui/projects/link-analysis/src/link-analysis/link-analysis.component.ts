@@ -466,7 +466,12 @@ function initialToolboxOpen(): boolean {
  * The snapshot dialog's suggested title — never a bare "— N nodes": "Investigation <title> — N nodes" on an
  * Investigation canvas, "<source> — N nodes" for a query graph, else "Graph — N nodes".
  */
-export function snapshotTitle(onInvestigation: boolean, invTitle: string | undefined, source: string, nodes: number): string {
+export function snapshotTitle(
+    onInvestigation: boolean,
+    invTitle: string | undefined,
+    source: string,
+    nodes: number,
+): string {
     const n = `${nodes} ${nodes === 1 ? 'node' : 'nodes'}`;
     if (onInvestigation) return invTitle?.trim() ? `Investigation ${invTitle.trim()} — ${n}` : `Investigation — ${n}`;
     return `${source.trim() || 'Graph'} — ${n}`;
@@ -710,7 +715,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly closeWhyNot = computed(() => (this.openWorkLabel() ? '' : OPEN_FIRST));
     readonly deleteWhyNot = computed(() => {
         if (this.deleteBlocked()) return this.deleteBlocked();
-        if (this.investigation.active() && !this.lens.canManageIncidents()) return needsPermission('canManageIncidents');
+        if (this.investigation.active() && !this.lens.canManageIncidents())
+            return needsPermission('canManageIncidents');
         return this.deleteLabel() ? '' : OPEN_FIRST;
     });
     private datasetsService = inject(LA_DATASETS);
@@ -821,10 +827,14 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
      * (operator 2026-11-02).
      */
     get toolboxTabs(): readonly { id: ToolboxTab; label: string }[] {
-        return this.investigationsEnabled() ? this.allToolboxTabs : this.allToolboxTabs.filter((t) => t.id === 'browser');
+        return this.investigationsEnabled()
+            ? this.allToolboxTabs
+            : this.allToolboxTabs.filter((t) => t.id === 'browser');
     }
     /** The side the one toolbox instance draws: Server on the Server tab, else Browser (it stays mounted, hidden). */
-    readonly toolboxSide = computed<'browser' | 'server'>(() => (this.toolboxTab() === 'server' ? 'server' : 'browser'));
+    readonly toolboxSide = computed<'browser' | 'server'>(() =>
+        this.toolboxTab() === 'server' ? 'server' : 'browser',
+    );
     /** LA-10: the open Investigation (op log + Working Set); the Investigation tab renders it. */
     readonly investigation = inject(InvestigationSessionStore);
     private readonly cdr = inject(ChangeDetectorRef);
@@ -977,13 +987,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     }
 
     toggleViewFlag(
-        flag:
-            | 'minimap'
-            | 'gridLine'
-            | 'edgeBundling'
-            | 'hulls'
-            | 'bubbleSets'
-            | 'snapline',
+        flag: 'minimap' | 'gridLine' | 'edgeBundling' | 'hulls' | 'bubbleSets' | 'snapline',
         on: boolean,
     ): void {
         this.viewOptions.update((o) => ({ ...o, [flag]: on }));
@@ -1014,7 +1018,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     readonly drawnReferences = computed(() => {
         if (this.investigation.active()) return [];
         // the whole drawn graph, hidden nodes included: a filter that hid every node of a type keeps its Show all
-        const types = new Set((this.baseGraph()?.nodes ?? []).map((n) => this.typeOfNode(n)).filter((t): t is string => !!t));
+        const types = new Set(
+            (this.baseGraph()?.nodes ?? []).map((n) => this.typeOfNode(n)).filter((t): t is string => !!t),
+        );
         return this.references().filter((r) => types.has(r.entityType));
     });
     /** The nodes the details filter hid (and only those: *Show all* brings back nothing another hide took off). */
@@ -1053,8 +1059,13 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                 this.growExclude.lastChange.set({ text: `Every drawn node's ${f.column} contains "${f.text}".` });
                 return;
             }
-            const cut = table.truncated ? ` (${f.reference.name} returned only part of its rows: nodes without one stay)` : '';
-            this.hideLocally(hide, `hidden: their ${f.column} in ${f.reference.name} does not contain "${f.text}"${cut}`);
+            const cut = table.truncated
+                ? ` (${f.reference.name} returned only part of its rows: nodes without one stay)`
+                : '';
+            this.hideLocally(
+                hide,
+                `hidden: their ${f.column} in ${f.reference.name} does not contain "${f.text}"${cut}`,
+            );
             const still = new Set(this.hiddenNodeIds());
             this.detailsHidden.update((h) => [...h.filter((id) => still.has(id)), ...hide]);
         } finally {
@@ -1076,7 +1087,11 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
      */
     private readonly referenceDetailsWanted = computed(
         () => {
-            const used = new Set(this.nodeRules().map((r) => r.reference).filter((r): r is string => !!r));
+            const used = new Set(
+                this.nodeRules()
+                    .map((r) => r.reference)
+                    .filter((r): r is string => !!r),
+            );
             const nodes = this.baseGraph()?.nodes ?? [];
             return this.drawnReferences()
                 .filter((r) => used.has(r.dataset))
@@ -1119,12 +1134,18 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                 notes.push(`${w.reference.name} could not be read: ${table.error}`);
                 continue;
             }
-            if (table.truncated) notes.push(`${w.reference.name} returned only part of its rows: nodes without one stay uncoloured`);
+            if (table.truncated)
+                notes.push(`${w.reference.name} returned only part of its rows: nodes without one stay uncoloured`);
             const masked = new Set(table.maskedColumns.map((c) => c.toLowerCase()));
             for (const r of this.nodeRules())
                 if (r.reference === w.reference.dataset && masked.has(r.attr.toLowerCase()))
                     notes.push(`${r.attr} in ${w.reference.name} is masked, so no node is coloured by it`);
-            details[w.reference.dataset] = detailValuesByNode(w.nodes, table.byKey, w.reference.keyCol, table.maskedColumns);
+            details[w.reference.dataset] = detailValuesByNode(
+                w.nodes,
+                table.byKey,
+                w.reference.keyCol,
+                table.maskedColumns,
+            );
         }
         if (run !== this.referenceDetailsRead) return;
         this.referenceDetails.set(details);
@@ -1478,7 +1499,10 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         // only once a node has been expanded, so a fresh query result is not dotted all over.
         if (!g || !done.length) return g;
         const seen = new Set(done);
-        return { ...g, nodes: g.nodes.map((n) => (seen.has(n.id) ? n : { ...n, data: { ...n.data, unexpanded: true } })) };
+        return {
+            ...g,
+            nodes: g.nodes.map((n) => (seen.has(n.id) ? n : { ...n, data: { ...n.data, unexpanded: true } })),
+        };
     });
     /** Ids of the exploration canvas nodes an expand has followed since the last run (no Investigation: nothing is sealed). */
     readonly expandedNodeIds = signal<string[]>([], { equal: sameStrings });
@@ -1493,8 +1517,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         // LA-UNEXPANDED-MARKER-1 (b): "Only unexpanded" keeps just the frontier (and the picked node, so a pick never vanishes)
         if (g && this.onlyUnexpanded()) {
             const keep = g.nodes.filter((n) => n.data.unexpanded || n.id === this.investigation.selected()?.id);
-            if (keep.some((n) => n.data.unexpanded))
-                for (const n of g.nodes) if (!keep.includes(n)) hidden.add(n.id);
+            if (keep.some((n) => n.data.unexpanded)) for (const n of g.nodes) if (!keep.includes(n)) hidden.add(n.id);
         }
         if (!g || !hidden.size) return this.markHeld(g);
         return this.markHeld({
@@ -1530,7 +1553,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
      */
     readonly playbackSealable = computed(() => {
         const timeCol = this.investigation.header()?.timeCol;
-        return this.investigation.active() && this.lens.canManageIncidents() && !!timeCol && timeCol === this.timeColumn();
+        return (
+            this.investigation.active() && this.lens.canManageIncidents() && !!timeCol && timeCol === this.timeColumn()
+        );
     });
 
     /** Seal the playback's window as the Investigation's `window` op, so the moment replays as a step. */
@@ -1782,8 +1807,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const picked = this.pickedLayout();
         const g = this.canvasData();
         // Never an over-cap layout, even in the instant before {@link dropOverCapLayout} drops the pick.
-        if (!picked || this.layoutOffReason(picked))
-            return defaultLayoutFor(g, this.investigation.canvas() !== null);
+        if (!picked || this.layoutOffReason(picked)) return defaultLayoutFor(g, this.investigation.canvas() !== null);
         return picked;
     });
     /**
@@ -1794,8 +1818,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     private readonly dropOverCapLayout = effect(() => {
         const picked = this.pickedLayout();
         // Not while a run is in flight: the graph on screen is the OLD one, and a view opening over it would lose its pick.
-        if (picked && !this.loading() && this.layoutOffReason(picked))
-            untracked(() => this.pickedLayout.set(null));
+        if (picked && !this.loading() && this.layoutOffReason(picked)) untracked(() => this.pickedLayout.set(null));
     });
     /** Why a layout button is disabled on this graph (tree shape or node cap); null when it can be picked. */
     layoutDisabledReason(l: { id: GraphLayoutId; tree?: boolean }): string | null {
@@ -1864,7 +1887,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         return DOCK_TABS.filter((t) => (t.inv ? open : t.unsaved ? unsaved : true));
     });
     /** The unsaved Investigation's steps in order, one line each (the dock's Steps tab). */
-    readonly unsavedStepLines = computed<readonly string[]>(() => (this.investigation.unsaved()?.steps ?? []).map(unsavedStepLine));
+    readonly unsavedStepLines = computed<readonly string[]>(() =>
+        (this.investigation.unsaved()?.steps ?? []).map(unsavedStepLine),
+    );
     readonly dockTabShown = computed<DockTab>(() =>
         this.dockTabs().some((t) => t.id === this.dockTab()) ? this.dockTab() : 'rows',
     );
@@ -1895,7 +1920,11 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const tabs = this.dockTabs();
         const at = tabs.findIndex((t) => t.id === this.dockTabShown());
         const to =
-            ev.key === 'ArrowRight' ? (at + 1) % tabs.length : ev.key === 'ArrowLeft' ? (at - 1 + tabs.length) % tabs.length : -1;
+            ev.key === 'ArrowRight'
+                ? (at + 1) % tabs.length
+                : ev.key === 'ArrowLeft'
+                  ? (at - 1 + tabs.length) % tabs.length
+                  : -1;
         if (to < 0) return;
         ev.preventDefault();
         this.dockTab.set(tabs[to].id);
@@ -1929,7 +1958,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                 .entityTypes()
                 .pipe(takeUntilDestroyed(this.destroyRef))
                 .subscribe({
-                    next: (l) => this.entityTypeLabels.set(Object.fromEntries((l?.items ?? []).map((t) => [t.id, t.label]))),
+                    next: (l) =>
+                        this.entityTypeLabels.set(Object.fromEntries((l?.items ?? []).map((t) => [t.id, t.label]))),
                     error: () => undefined, // the legend falls back to the pack's term, else the id
                 });
         } catch {
@@ -1939,7 +1969,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     /** The Entity Type a generic `entity` node stands for: the last run's one mapped type, else null (T-061). */
     private readonly genericEntityType = computed<string | null>(() => {
         const types = new Set(
-            this.brushEntityTypes().flatMap((m) => (m ? [m.entityType, m.sourceType, m.targetType] : [])).filter((t): t is string => !!t),
+            this.brushEntityTypes()
+                .flatMap((m) => (m ? [m.entityType, m.sourceType, m.targetType] : []))
+                .filter((t): t is string => !!t),
         );
         return types.size === 1 ? [...types][0] : null;
     });
@@ -1965,9 +1997,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         () => this.investigation.canvas()?.nodes.filter((n) => n.data.highConnectivity).length ?? 0,
     );
     /** Drawn Working Set entities no expand has followed yet (LA-UNEXPANDED-MARKER-1) — the legend's dotted-outline row. */
-    readonly unexpandedDrawn = computed(
-        () => this.canvasSource()?.nodes.filter((n) => n.data.unexpanded).length ?? 0,
-    );
+    readonly unexpandedDrawn = computed(() => this.canvasSource()?.nodes.filter((n) => n.data.unexpanded).length ?? 0);
     // ── domain profile: what the tiles are called, which columns are measure/time, which tools are suggested ──
     // UIR-D9 (§5.12): no picker. The Space's Industry pack applies, unless the open Investigation, a Template or an
     // *Investigate a number* binding bound another; a bound pack is shown read-only in ⚙ Settings → Graph model. A saved
@@ -2398,7 +2428,12 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.startDataset.set(ds.id);
         if (req.kind === 'dataset') {
             this.sourceId.set('entity-projection');
-            this.queryPanel?.patchFormFromView({ id: '', name: '', sourceId: 'entity-projection', query: { projection: ds.mapping } });
+            this.queryPanel?.patchFormFromView({
+                id: '',
+                name: '',
+                sourceId: 'entity-projection',
+                query: { projection: ds.mapping },
+            });
             await this.execute('entity-projection', { projection: ds.mapping });
             return;
         }
@@ -2438,11 +2473,15 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         req: Extract<StartRequest, { kind: 'list' | 'paste' | 'found' }>,
     ): Promise<{ values: string[]; entityType?: string } | null> {
         if (req.kind === 'paste') return { values: req.values, entityType: req.entityType };
-        if (req.kind === 'found') return { values: req.values, entityType: this.lastRun()?.query?.projection?.entityType };
+        if (req.kind === 'found')
+            return { values: req.values, entityType: this.lastRun()?.query?.projection?.entityType };
         try {
             const list = await firstValueFrom(this.inv.getEntityList(req.listId));
             if (!list.members) {
-                this.startNotice.set({ variant: 'warning', text: `The members of ${list.title} are not shown to you, so it cannot start a graph.` });
+                this.startNotice.set({
+                    variant: 'warning',
+                    text: `The members of ${list.title} are not shown to you, so it cannot start a graph.`,
+                });
                 return null;
             }
             if (!list.members.length) {
@@ -2451,7 +2490,10 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             }
             return { values: list.members, entityType: list.entityType || undefined };
         } catch (err) {
-            this.startNotice.set({ variant: 'warning', text: apiErrorMessage(err, 'The Entity List could not be read.') });
+            this.startNotice.set({
+                variant: 'warning',
+                text: apiErrorMessage(err, 'The Entity List could not be read.'),
+            });
             return null;
         }
     }
@@ -2487,7 +2529,11 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                     : null;
             const stored = typed && !typed.error ? (typed.rows[0] ?? {}) : {};
             this.startColumns.set(
-                cols.map((c) => ({ name: c.name, type: c.type, ...(typeof stored[c.name] === 'string' ? { dbType: stored[c.name] as string } : {}) })),
+                cols.map((c) => ({
+                    name: c.name,
+                    type: c.type,
+                    ...(typeof stored[c.name] === 'string' ? { dbType: stored[c.name] as string } : {}),
+                })),
             );
         } catch {
             this.startColumns.set([]); // the picker offers the Dataset's own time column only
@@ -2529,12 +2575,21 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.unsavedWs.set(null);
         this.unsavedHistory.set(emptyHistory());
         const zone = req.timeColZone || undefined;
-        const common = { presets: this.degreePresets(), maxDegree: this.maxDegree(), profileId: activeDomainProfileId() };
+        const common = {
+            presets: this.degreePresets(),
+            maxDegree: this.maxDegree(),
+            profileId: activeDomainProfileId(),
+        };
         if (req.start.kind === 'graph') {
             const p = this.investigationProjection();
             if (!p) return;
             this.investigation.beginUnsaved(
-                { ...common, projection: p, timeCol: req.timeCol || this.investigationTimeDefault() || undefined, timeColZone: zone },
+                {
+                    ...common,
+                    projection: p,
+                    timeCol: req.timeCol || this.investigationTimeDefault() || undefined,
+                    timeColZone: zone,
+                },
                 req.defaults,
             );
             return;
@@ -2557,7 +2612,11 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         let values: string[];
         let entityType: string | undefined;
         if (start.kind === 'entity') {
-            const bound = await this.bindInvestigation({ seed: start.value, entityType: start.entityType, dataset: ds.id });
+            const bound = await this.bindInvestigation({
+                seed: start.value,
+                entityType: start.entityType,
+                dataset: ds.id,
+            });
             if ('reason' in bound) {
                 this.startNotice.set({ variant: 'warning', text: bound.reason });
                 return;
@@ -2570,7 +2629,10 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             if (!v) return;
             values = v.values;
             entityType = v.entityType;
-            const name = start.kind === 'list' ? (this.entityLists().find((l) => l.id === start.listId)?.title ?? 'list') : 'pasted values';
+            const name =
+                start.kind === 'list'
+                    ? (this.entityLists().find((l) => l.id === start.listId)?.title ?? 'list')
+                    : 'pasted values';
             const generic = genericBinding(name, entityType ?? '', ds, activeDomainProfileId());
             binding = { ...generic, ...(entityType ? {} : { projection: ds.mapping }) };
             const laDs = (await this.datasetsLoaded).find((d) => d.id === ds.id);
@@ -2581,11 +2643,13 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             this.startNotice.set({ variant: 'warning', text: UNSAVED_FOUR_EYES_START });
             return;
         }
-        const drawn = await this.drawStart(ds, values, entityType);   // finds the values the Dataset holds
+        const drawn = await this.drawStart(ds, values, entityType); // finds the values the Dataset holds
         if (!drawn.length) return;
         // the start entities as the Space's reads name them: an alias on a masked Space (the preview takes no raw value there)
         const startNodes = new Set(this.expandedNodeIds());
-        const found = [...new Set((this.graph()?.nodes ?? []).filter((n) => startNodes.has(n.id)).flatMap((n) => rawIdsOf(n)))];
+        const found = [
+            ...new Set((this.graph()?.nodes ?? []).filter((n) => startNodes.has(n.id)).flatMap((n) => rawIdsOf(n))),
+        ];
         const unsaved: UnsavedBinding = {
             projection: binding.projection,
             timeCol: req.timeCol || binding.timeCol,
@@ -2604,7 +2668,10 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             walk = await this.walkUnsaved(unsaved, null, found, found, this.startRing(Math.max(1, req.degrees)));
         } catch (err) {
             // a refusal (a Time column the server cannot use, LA-INVESTIGATE-TIMECOL-DATE-1) is said, never swallowed
-            this.startNotice.set({ variant: 'warning', text: apiErrorMessage(err, 'The Investigation could not start.') });
+            this.startNotice.set({
+                variant: 'warning',
+                text: apiErrorMessage(err, 'The Investigation could not start.'),
+            });
             return;
         }
         if (!walk) {
@@ -2614,7 +2681,14 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.boundProfile.set(binding.profileId);
         this.investigation.beginUnsaved(unsaved, req.defaults, [
             seed,
-            { kind: 'expand', from: 'ids', ids: found, req: this.startRing(walk.walked.length), walked: walk.walked, stages: walk.stages },
+            {
+                kind: 'expand',
+                from: 'ids',
+                ids: found,
+                req: this.startRing(walk.walked.length),
+                walked: walk.walked,
+                stages: walk.stages,
+            },
         ]);
         this.drawUnsaved(walk.ws, unsaved);
         this.openInvestigation();
@@ -2645,7 +2719,14 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             return false;
         }
         // each degree's frontier, as the server read it: Save sends exactly these lists
-        const step: UnsavedStep = { kind: 'expand', from: from === 'outer' ? 'outer' : 'ids', ids: from === 'outer' ? [] : named, req, walked: walk.walked, stages: walk.stages };
+        const step: UnsavedStep = {
+            kind: 'expand',
+            from: from === 'outer' ? 'outer' : 'ids',
+            ids: from === 'outer' ? [] : named,
+            req,
+            walked: walk.walked,
+            stages: walk.stages,
+        };
         this.investigation.recordUnsaved(step);
         const added = walk.ws.entities.length - (before.graph?.nodes.length ?? 0);
         this.drawUnsaved(walk.ws, u.binding);
@@ -2653,7 +2734,11 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const after = this.graph();
         const t = ctx.terms;
         const text = `Expanded ${walk.walked.length === 1 ? 'one degree' : walk.walked.length + ' degrees'}: added ${Math.max(0, added).toLocaleString('en-GB')} ${added === 1 ? t.node : t.nodes} (not saved yet).`;
-        this.growExclude.lastChange.set({ text, valid: () => this.graph() === after, undo: () => void this.undoUnsaved() });
+        this.growExclude.lastChange.set({
+            text,
+            valid: () => this.graph() === after,
+            undo: () => void this.undoUnsaved(),
+        });
         this.drawAnnouncement.set(text);
         return true;
     }
@@ -2667,7 +2752,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     private readonly unsavedHistory = signal<HistoryStack<UnsavedCanvas>>(emptyHistory());
     /** The graph the newest unsaved change drew: Undo and Redo are offered only while the canvas still shows it. */
     private readonly unsavedDrawn = signal<G6GraphData | null>(null);
-    private readonly unsavedLive = computed(() => !!this.investigation.unsaved() && this.graph() === this.unsavedDrawn());
+    private readonly unsavedLive = computed(
+        () => !!this.investigation.unsaved() && this.graph() === this.unsavedDrawn(),
+    );
     readonly canUndoUnsaved = computed(() => this.unsavedLive() && this.unsavedHistory().past.length > 0);
     readonly canRedoUnsaved = computed(() => this.unsavedLive() && this.unsavedHistory().future.length > 0);
 
@@ -2744,7 +2831,11 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.commitUnsaved(before);
         const after = this.graph();
         const text = `${exclude ? 'Excluded' : 'Hid'} ${hide.size.toLocaleString('en-GB')} (not saved yet).`;
-        this.growExclude.lastChange.set({ text, valid: () => this.graph() === after, undo: () => void this.undoUnsaved() });
+        this.growExclude.lastChange.set({
+            text,
+            valid: () => this.graph() === after,
+            undo: () => void this.undoUnsaved(),
+        });
         this.drawAnnouncement.set(text);
     }
 
@@ -2810,7 +2901,11 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
      */
     readonly lastExpandDegrees = computed<number | null>(() => {
         const u = this.investigation.unsaved();
-        const n = u ? expandStepDegrees(u.steps.at(-1)) : this.investigation.activeId() ? this.growExclude.lastExpandDegrees() : null;
+        const n = u
+            ? expandStepDegrees(u.steps.at(-1))
+            : this.investigation.activeId()
+              ? this.growExclude.lastExpandDegrees()
+              : null;
         return n !== null && n <= this.maxDegree() ? n : null;
     });
     /** One lock for an Expand and a Degrees resize: either one, while the other runs, would draw over a Working Set it never saw. */
@@ -2820,7 +2915,15 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     private outerContext(): GrowContext {
         const ctx = this.growContext();
         const o = ctx.sources?.find((s) => s.value === 'outer');
-        return o ? { ...ctx, frontier: o.frontier, heldFrontier: o.heldFrontier, from: o.from, blocked: ctx.blocked ?? o.blocked } : ctx;
+        return o
+            ? {
+                  ...ctx,
+                  frontier: o.frontier,
+                  heldFrontier: o.heldFrontier,
+                  from: o.from,
+                  blocked: ctx.blocked ?? o.blocked,
+              }
+            : ctx;
     }
 
     /**
@@ -2897,7 +3000,11 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             degrees < have
                 ? `Lowered to ${to === 1 ? 'one degree' : to + ' degrees'}: removed ${moved.toLocaleString('en-GB')} ${moved === 1 ? t.node : t.nodes} and the ${t.links} only they carried (not saved yet).`
                 : `Raised to ${to} degrees: added ${moved.toLocaleString('en-GB')} ${moved === 1 ? t.node : t.nodes} (not saved yet).`;
-        this.growExclude.lastChange.set({ text, valid: () => this.graph() === after, undo: () => void this.undoUnsaved() });
+        this.growExclude.lastChange.set({
+            text,
+            valid: () => this.graph() === after,
+            undo: () => void this.undoUnsaved(),
+        });
         this.drawAnnouncement.set(text);
     }
 
@@ -2910,11 +3017,15 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.graph.set(g);
         this.lastRun.set(this.runOf('entity-projection', { projection: b.projection }, g));
         this.expandedNodeIds.set(g.nodes.filter((n) => rawIdsOf(n).some((id) => inner.has(id))).map((n) => n.id));
-        this.growExclude.basicHeld.set(new Map(ws.entities.filter((e) => e.highConnectivity).map((e) => [e.id, e.contacts ?? null])));
+        this.growExclude.basicHeld.set(
+            new Map(ws.entities.filter((e) => e.highConnectivity).map((e) => [e.id, e.contacts ?? null])),
+        );
     }
 
     /** How many entities are selected on the canvas (Start from selected names them). */
-    readonly selectionCount = computed(() => this.selectedNodes().filter((n) => n.data.kind !== SUPER_NODE_KIND).length);
+    readonly selectionCount = computed(
+        () => this.selectedNodes().filter((n) => n.data.kind !== SUPER_NODE_KIND).length,
+    );
 
     /** Would the Space hold an Expand with these presets for a second person's approval? (Then it cannot run unsaved.) */
     private heldUnsaved(presets: DegreePresets): boolean {
@@ -2948,7 +3059,14 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             this.toastr.info(UNSAVED_FOUR_EYES);
             return;
         }
-        this.investigation.recordUnsaved(seed, { kind: 'expand', from: 'ids', ids: values, req: this.startRing(walk.walked.length), walked: walk.walked, stages: walk.stages });
+        this.investigation.recordUnsaved(seed, {
+            kind: 'expand',
+            from: 'ids',
+            ids: values,
+            req: this.startRing(walk.walked.length),
+            walked: walk.walked,
+            stages: walk.stages,
+        });
         this.drawUnsaved(walk.ws, u.binding);
         this.commitUnsaved(before);
     }
@@ -2989,9 +3107,13 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             this.toastr.error(out.message || 'Could not save the Investigation.');
             return false;
         }
-        if (!out.message && u.steps.at(-1)?.kind === 'expand') this.growExclude.bindLastExpand(expandStepDegrees(u.steps.at(-1)) ?? 0);
+        if (!out.message && u.steps.at(-1)?.kind === 'expand')
+            this.growExclude.bindLastExpand(expandStepDegrees(u.steps.at(-1)) ?? 0);
         if (out.message) this.toastr.warning(out.message);
-        else this.toastr.success(`Saved ${answer.name}, ${out.recorded === 1 ? 'one step' : out.recorded + ' steps'} recorded.`);
+        else
+            this.toastr.success(
+                `Saved ${answer.name}, ${out.recorded === 1 ? 'one step' : out.recorded + ' steps'} recorded.`,
+            );
         this.showSeedlessStart();
         this.openInvestigation();
         return true;
@@ -3022,7 +3144,10 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     async addStartEntities(req: UnsavedStartRequest): Promise<void> {
         if (!this.investigation.active() || req.start.kind === 'graph' || req.start.kind === 'dataset') return;
         const start = req.start;
-        const v = start.kind === 'entity' ? { values: [start.value], entityType: start.entityType } : await this.startValues(start);
+        const v =
+            start.kind === 'entity'
+                ? { values: [start.value], entityType: start.entityType }
+                : await this.startValues(start);
         if (!v?.values.length) return;
         const type = v.entityType ?? this.investigation.binding()?.entityType;
         if (await this.investigation.apply({ op: 'seed', ids: v.values, ...(type ? { entityType: type } : {}) })) {
@@ -3053,7 +3178,9 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     }
 
     /** The canvas draws an Investigation's Working Set and it holds nothing yet: say so, with the way back to the graph. */
-    readonly emptyWorkingSet = computed(() => this.workingSetCanvas() && !this.investigation.workingSet()?.entities?.length);
+    readonly emptyWorkingSet = computed(
+        () => this.workingSetCanvas() && !this.investigation.workingSet()?.entities?.length,
+    );
 
     /**
      * ONE entity (the Start box, the `?seed=` deep link, an Entity profile's Investigate): on the Explorer level draw it and one
@@ -3102,7 +3229,11 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         try {
             const reads: ProjectedGraph[] = [];
             for (let i = 0; i < wanted.length; i += 5)
-                reads.push(...(await Promise.all(wanted.slice(i, i + 5).map((v) => source.expand!(v, v, q) as Promise<ProjectedGraph>))));
+                reads.push(
+                    ...(await Promise.all(
+                        wanted.slice(i, i + 5).map((v) => source.expand!(v, v, q) as Promise<ProjectedGraph>),
+                    )),
+                );
             const found = wanted.filter((_, i) => reads[i].edges.length > 0);
             const unknown = wanted.filter((_, i) => reads[i].edges.length === 0);
             if (!found.length) {
@@ -3118,7 +3249,12 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             try {
                 const p = await firstValueFrom(
                     this.inv.previewNeighbors(
-                        neighboursPreviewBody(projection, found, { direction: 'either', linkKinds: null, threshold: this.growThreshold() }, []),
+                        neighboursPreviewBody(
+                            projection,
+                            found,
+                            { direction: 'either', linkKinds: null, threshold: this.growThreshold() },
+                            [],
+                        ),
                     ),
                 );
                 held = new Map(p.held.map((h) => [h.id, h.contacts]));
@@ -3135,9 +3271,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             this.kindFilter.set([]);
             this.hiddenNodeIds.set([]);
             this.lastRun.set(this.runOf('entity-projection', q, g));
-            this.expandedNodeIds.set(
-                drawn.map((r, i) => seedNodeOf(r, found[i])).filter((id): id is string => !!id),
-            );
+            this.expandedNodeIds.set(drawn.map((r, i) => seedNodeOf(r, found[i])).filter((id): id is string => !!id));
             this.growExclude.basicHeld.set(held);
             const t = this.growTerms();
             this.startNotice.set({
@@ -3216,7 +3350,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const profiled = investigateBinding({ ...req, seed });
         const [datasets] = await Promise.all([this.datasetsLoaded, this.startTypesLoaded, this.viewsLoaded]);
         const startDs = profiled ? null : datasetForType(this.startCatalogue(), req.entityType, req.dataset);
-        const binding = profiled ?? (startDs ? genericBinding(seed, req.entityType, startDs, activeDomainProfileId()) : null);
+        const binding =
+            profiled ?? (startDs ? genericBinding(seed, req.entityType, startDs, activeDomainProfileId()) : null);
         const wanted = binding?.projection.datasetId ?? req.dataset;
         const ds = wanted ? datasets.find((d) => d.id === wanted) : undefined;
         let reason = !binding
@@ -3312,7 +3447,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             .subscribe((r) => {
                 this.reloadViews();
                 const open = this.openViewId();
-                if (open && !this.views().some((v) => v.id === open)) this.viewsService.get(open).subscribe((v) => !v && this.forgetOpenView());
+                if (open && !this.views().some((v) => v.id === open))
+                    this.viewsService.get(open).subscribe((v) => !v && this.forgetOpenView());
                 if (r?.kind === 'view') void this.loadView(r.view);
                 else if (r?.kind === 'investigation') {
                     this.investigation.adopt(r.id, r.title, this.investigation.activeRef() ?? undefined);
@@ -3333,12 +3469,15 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const view = this.openView();
         if (!view) return;
         this.dialog
-            .open<LinkAnalysisViewDetailsDialog, ViewDetailsDialogData, ViewDetailsDialogResult>(LinkAnalysisViewDetailsDialog, {
-                data: { view, editBlock: this.viewOverwriteBlocked(), history: (v) => this.openHistory(v) },
-                width: '34rem',
-                maxWidth: '95vw',
-                autoFocus: false,
-            })
+            .open<LinkAnalysisViewDetailsDialog, ViewDetailsDialogData, ViewDetailsDialogResult>(
+                LinkAnalysisViewDetailsDialog,
+                {
+                    data: { view, editBlock: this.viewOverwriteBlocked(), history: (v) => this.openHistory(v) },
+                    width: '34rem',
+                    maxWidth: '95vw',
+                    autoFocus: false,
+                },
+            )
             .afterClosed()
             .subscribe((r) => {
                 if (!r) return;
@@ -3378,7 +3517,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
 
     /** What File ▸ Delete removes: the open Investigation, else the open saved view; '' = nothing to delete. */
     readonly deleteLabel = computed<string>(() => {
-        if (this.investigation.active()) return this.lens.canManageIncidents() ? `Investigation ${this.investigation.displayTitle()}` : '';
+        if (this.investigation.active())
+            return this.lens.canManageIncidents() ? `Investigation ${this.investigation.displayTitle()}` : '';
         const v = this.views().find((x) => x.id === this.openViewId());
         return v ? `view ${v.name}` : '';
     });
@@ -3569,7 +3709,8 @@ Its prior copies stay in its version history.`,
 
     /** PERF-P10a-1/3: identical (Space, viewer, source, query) answers are served from the client; see graph-query-cache.ts. */
     private readonly queryCache = new GraphQueryCache<{ g: G6GraphData; masking: MaskingNote | null }>(
-        () => `${this.spaces.currentSpaceId() ?? ''}|${this.session.actor() ?? ''}|${this.limits.limits().maskingModeInForce ?? ''}`,
+        () =>
+            `${this.spaces.currentSpaceId() ?? ''}|${this.session.actor() ?? ''}|${this.limits.limits().maskingModeInForce ?? ''}`,
         () => Date.now(),
         // PERF-P10a-2: after expiry, requests that revalidate to 304 fold to the same graph - keep the previous object
         (a, b) =>
@@ -3681,7 +3822,8 @@ Its prior copies stay in its version history.`,
         this.drawAnnouncement.set(`Graph drawn, ${nodes} nodes, ${links} links`);
         this.cdr.detectChanges(); // the card is removed and the region mounted in this pass
         const now = document.activeElement;
-        const stillAtTrigger = !now || now === document.body || (before !== null && now === before && !before.isConnected);
+        const stillAtTrigger =
+            !now || now === document.body || (before !== null && now === before && !before.isConnected);
         if (stillAtTrigger) this.graphRegion?.nativeElement.focus({ preventScroll: false });
     }
 
@@ -3895,7 +4037,9 @@ Its prior copies stay in its version history.`,
             ),
             caseId: this.deepLinkedCaseId(),
             // The box-selected nodes win: "Attach selected to a Case" records exactly them, else what the emphasis lit.
-            selectedNodeIds: this.selectedOnCanvas().length ? this.selectedOnCanvas() : (this.emphasis()?.nodeIds ?? []),
+            selectedNodeIds: this.selectedOnCanvas().length
+                ? this.selectedOnCanvas()
+                : (this.emphasis()?.nodeIds ?? []),
             investigationId,
         };
     }
@@ -4284,7 +4428,8 @@ Its prior copies stay in its version history.`,
         if (!(e.ctrlKey || e.metaKey)) return;
         // LA-INVESTIGATE-UX-1: on an Investigation's canvas Ctrl+Z / Ctrl+Shift+Z undo and redo RECORDED steps (the
         // display changes keep the rail's own Undo / Redo); elsewhere they are the display history, as before.
-        const recorded = this.investigation.canvas() !== null && this.lens.canManageIncidents() && this.canvasKeyTarget(target);
+        const recorded =
+            this.investigation.canvas() !== null && this.lens.canManageIncidents() && this.canvasKeyTarget(target);
         if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
             e.preventDefault();
             // LA-GROW-EXCLUDE-1: the last Grow / Exclude offers its own Undo first (the result line says Ctrl+Z).
@@ -4352,10 +4497,7 @@ Its prior copies stay in its version history.`,
     }
 
     private fullscreenBlocked(): void {
-        this.toastr.warning(
-            'The browser blocked full screen.',
-            'Full screen',
-        );
+        this.toastr.warning('The browser blocked full screen.', 'Full screen');
     }
 
     onFullscreenChange(): void {
@@ -4539,7 +4681,10 @@ Its prior copies stay in its version history.`,
      * Expand button walks it, so four-eyes, masking and the budget gates apply unchanged. `change` alters the filter for
      * this step only ("Outgoing only"). Held (busy) entities among them stay held unless the filter expands through them.
      */
-    private async expandInInvestigation(nodes: G6GraphData['nodes'], change: Partial<GrowRequest> = {}): Promise<boolean> {
+    private async expandInInvestigation(
+        nodes: G6GraphData['nodes'],
+        change: Partial<GrowRequest> = {},
+    ): Promise<boolean> {
         const ws = this.investigation.workingSet();
         const ids = [...new Set(nodes.flatMap((n) => idsInWorkingSet(n, ws)))];
         if (!ids.length) {
@@ -4560,7 +4705,9 @@ Its prior copies stay in its version history.`,
         };
         const req = this.nodeExpandRequest(change);
         if (req.hold && !ctx.frontier.length) {
-            this.toastr.info(`${ids.length === 1 ? `This ${t.node} is` : `These ${t.nodes} are`} busy and held: use Expand anyway.`);
+            this.toastr.info(
+                `${ids.length === 1 ? `This ${t.node} is` : `These ${t.nodes} are`} busy and held: use Expand anyway.`,
+            );
             return false;
         }
         await this.onExpand({ ctx, req, from: 'selection' });
@@ -4664,9 +4811,18 @@ Its prior copies stay in its version history.`,
         } else {
             const g = this.graph();
             if (!g) return;
-            const gone = new Set(withOrphans(picked.map((n) => n.id), g.edges));
+            const gone = new Set(
+                withOrphans(
+                    picked.map((n) => n.id),
+                    g.edges,
+                ),
+            );
             const prev = { graph: g, expanded: this.expandedNodeIds() };
-            this.graph.set({ ...g, nodes: g.nodes.filter((n) => !gone.has(n.id)), edges: g.edges.filter((e) => !gone.has(e.source) && !gone.has(e.target)) });
+            this.graph.set({
+                ...g,
+                nodes: g.nodes.filter((n) => !gone.has(n.id)),
+                edges: g.edges.filter((e) => !gone.has(e.source) && !gone.has(e.target)),
+            });
             this.expandedNodeIds.update((ids) => ids.filter((id) => !gone.has(id)));
             removed = g.nodes.length - this.graph()!.nodes.length;
             const after = this.graph();
@@ -4686,7 +4842,11 @@ Its prior copies stay in its version history.`,
         this.clearSelection();
         const after = this.graph();
         const text = `Removed ${removed.toLocaleString('en-GB')} ${removed === 1 ? t.node : t.nodes}; an Expand may bring them back (not saved yet).`;
-        this.growExclude.lastChange.set({ text, valid: () => this.graph() === after, undo: () => void this.undoUnsaved() });
+        this.growExclude.lastChange.set({
+            text,
+            valid: () => this.graph() === after,
+            undo: () => void this.undoUnsaved(),
+        });
         this.drawAnnouncement.set(text);
     }
 
@@ -4903,7 +5063,12 @@ Its prior copies stay in its version history.`,
                         },
                         // The legend's ringed node, with its sealed contact count when served.
                         ...(node.data.highConnectivity
-                            ? [{ label: 'Connectivity', value: this.hubBadgeFor(ids?.serverNode(id) ?? id, node.data.contacts) }]
+                            ? [
+                                  {
+                                      label: 'Connectivity',
+                                      value: this.hubBadgeFor(ids?.serverNode(id) ?? id, node.data.contacts),
+                                  },
+                              ]
                             : []),
                         ...(node.data.unexpanded ? [{ label: 'Expansion', value: 'Not expanded yet' }] : []),
                         // LA-08: which Datasets this (possibly merged) entity was projected from.
@@ -4929,8 +5094,7 @@ Its prior copies stay in its version history.`,
                 else if (action === 'hide') {
                     this.recordHistory();
                     this.hiddenNodeIds.update((h) => (h.includes(id) ? h : [...h, id]));
-                }
-                else if (action === 'open-record' && objectRef) {
+                } else if (action === 'open-record' && objectRef) {
                     this.router.navigate(['/' + (objectRef.type === 'CASE' ? 'cases' : 'incidents'), objectRef.id]);
                 }
             });
@@ -4950,15 +5114,16 @@ Its prior copies stay in its version history.`,
     async findPathsFromCleanup(maxDepth: number): Promise<void> {
         const seeds = [...new Set(this.cleanupSeeds())];
         // The server walk reads the query graph's mappings and ids, so it cannot take an Investigation's Working Set ids.
-        const why = this.investigation.canvas() !== null
-            ? 'it walks the full graph, not an Investigation. Use Connect start entities in the Investigation instead.'
-            : !this.lastRun()
-              ? 'draw a graph from a Dataset first.'
-              : !this.traversalTargets().length
-                ? 'this graph has no link mapping the server can walk.'
-                : seeds.length < 2
-              ? 'it needs two start entities on the canvas.'
-              : null;
+        const why =
+            this.investigation.canvas() !== null
+                ? 'it walks the full graph, not an Investigation. Use Connect start entities in the Investigation instead.'
+                : !this.lastRun()
+                  ? 'draw a graph from a Dataset first.'
+                  : !this.traversalTargets().length
+                    ? 'this graph has no link mapping the server can walk.'
+                    : seeds.length < 2
+                      ? 'it needs two start entities on the canvas.'
+                      : null;
         this.openAnalysis();
         if (why) {
             this.toastr.warning('Find paths (server) cannot run: ' + why, 'Find paths');
@@ -5331,7 +5496,11 @@ Its prior copies stay in its version history.`,
     /** Download the rendered graph as a standalone `link-analysis.svg` (Phase F). */
     exportSvg(): void {
         const svg = this.graphView?.exportSvg();
-        if (svg) this.download(URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })), `${this.exportBaseName()}.svg`);
+        if (svg)
+            this.download(
+                URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })),
+                `${this.exportBaseName()}.svg`,
+            );
         else this.toastr.warning('Nothing rendered to export yet.');
     }
 
@@ -5438,7 +5607,10 @@ Its prior copies stay in its version history.`,
      */
     private caseOfState(): Pick<LinkAnalysisView, 'lists' | 'start'> {
         const { start: startList, exclusions } = this.caseLists();
-        const lists = startList || exclusions.length ? { ...(startList ? { start: startList } : {}), ...(exclusions.length ? { exclusions } : {}) } : undefined;
+        const lists =
+            startList || exclusions.length
+                ? { ...(startList ? { start: startList } : {}), ...(exclusions.length ? { exclusions } : {}) }
+                : undefined;
         const s = this.caseStart();
         if (!s) return lists ? { lists } : {};
         const nodes = this.graph()?.nodes ?? [];
@@ -5652,7 +5824,8 @@ Its prior copies stay in its version history.`,
         const members = new Set<string>();
         for (const id of listIds) {
             try {
-                for (const m of (await firstValueFrom(this.inv.getEntityList(id))).members ?? []) members.add(m.trim().toUpperCase());
+                for (const m of (await firstValueFrom(this.inv.getEntityList(id))).members ?? [])
+                    members.add(m.trim().toUpperCase());
             } catch {
                 // an unreadable list hides nothing
             }
@@ -5720,7 +5893,9 @@ Its prior copies stay in its version history.`,
     /** The active pack's words for what the canvas draws ("numbers", "calls"). */
     readonly growTerms = computed(() => packTerms(this.profile()));
     /** Recorded Investigation steps on its Working Set canvas, else the explorer graph (not recorded). */
-    readonly growMode = computed<'investigation' | 'basic'>(() => (this.investigation.canvas() ? 'investigation' : 'basic'));
+    readonly growMode = computed<'investigation' | 'basic'>(() =>
+        this.investigation.canvas() ? 'investigation' : 'basic',
+    );
     /** The Space's hub threshold in force — the default "Hold … with more than N contacts". */
     readonly growThreshold = computed(() => this.limits.limits().hubThresholdInForce ?? 500);
     /** Why an Investigation action cannot run for this user; empty = it can. */
@@ -5782,7 +5957,12 @@ Its prior copies stay in its version history.`,
                 s.blocked = `One Expand names at most ${cap.toLocaleString('en')} ${t.nodes}; select fewer, or remove busy ${t.nodes} first.`;
             sources.push(s);
         };
-        const pick = (mode: GrowContext['mode'], blocked: string | null, cap: number, hasWindow: boolean): GrowContext => {
+        const pick = (
+            mode: GrowContext['mode'],
+            blocked: string | null,
+            cap: number,
+            hasWindow: boolean,
+        ): GrowContext => {
             const first = sources.find((s) => !s.blocked) ?? sources[0];
             return {
                 mode,
@@ -5821,7 +6001,13 @@ Its prior copies stay in its version history.`,
                 if (!ids.length) s.blocked = 'None of the selected items is in the Working Set.';
                 add(s, cap);
             }
-            const d = degreeState(ws, this.maxDegree(), this.investigation.degreeOutcomes(), false, this.investigation.overrideSteps());
+            const d = degreeState(
+                ws,
+                this.maxDegree(),
+                this.investigation.degreeOutcomes(),
+                false,
+                this.investigation.overrideSteps(),
+            );
             add(
                 {
                     value: 'outer',
@@ -5850,7 +6036,13 @@ Its prior copies stay in its version history.`,
         const isHeld = (n: G6GraphData['nodes'][number]) => held.has(n.id) || rawIdsOf(n).some((r) => held.has(r));
         const done = new Set(this.expandedNodeIds());
         const cap = this.selectionExpandCap;
-        const basic = (value: ExpandSource['value'], label: string, pool: G6GraphData['nodes'], what: string, why: string | null = null) => {
+        const basic = (
+            value: ExpandSource['value'],
+            label: string,
+            pool: G6GraphData['nodes'],
+            what: string,
+            why: string | null = null,
+        ) => {
             const capped = pool.slice(0, cap);
             sources.push({
                 value,
@@ -5945,7 +6137,10 @@ Its prior copies stay in its version history.`,
         const held = new Set(items.map((h) => h.id));
         // DR-D2: the canvas may speak the Space's alias where the Working Set speaks its own (`exploreAliases`)
         const back = new Map(
-            Object.entries(this.investigation.workingSet()?.exploreAliases ?? {}).map(([inv, explore]) => [explore, inv]),
+            Object.entries(this.investigation.workingSet()?.exploreAliases ?? {}).map(([inv, explore]) => [
+                explore,
+                inv,
+            ]),
         );
         const isHeld =
             this.growMode() === 'investigation'
@@ -5953,7 +6148,9 @@ Its prior copies stay in its version history.`,
                 : (n: G6GraphData['nodes'][number]) => held.has(n.id);
         return {
             ...g,
-            nodes: g.nodes.map((n) => (isHeld(n) ? { ...n, data: { ...n.data, held: true, highConnectivity: true } } : n)),
+            nodes: g.nodes.map((n) =>
+                isHeld(n) ? { ...n, data: { ...n.data, held: true, highConnectivity: true } } : n,
+            ),
         };
     }
 
@@ -6087,7 +6284,9 @@ Its prior copies stay in its version history.`,
             }
             const held = this.growExclude.basicHeld();
             frontier = (this.graph()?.nodes ?? [])
-                .filter((n) => !known.has(n.id) && !(req.hold && (held.has(n.id) || rawIdsOf(n).some((r) => held.has(r)))))
+                .filter(
+                    (n) => !known.has(n.id) && !(req.hold && (held.has(n.id) || rawIdsOf(n).some((r) => held.has(r)))),
+                )
                 .map((n) => n.id);
             if (d < req.degrees) {
                 const cap = frontierCapStop(frontier.length, this.selectionExpandCap, d, t);
@@ -6220,7 +6419,9 @@ Its prior copies stay in its version history.`,
     /** An exclusion list written from this graph is one the case uses (A-1b). */
     private noteCaseExclusion(listId: string | undefined): void {
         if (!listId) return;
-        this.caseLists.update((c) => (c.exclusions.includes(listId) ? c : { ...c, exclusions: [...c.exclusions, listId] }));
+        this.caseLists.update((c) =>
+            c.exclusions.includes(listId) ? c : { ...c, exclusions: [...c.exclusions, listId] },
+        );
         this.refreshEntityLists();
     }
 
@@ -6284,10 +6485,13 @@ Its prior copies stay in its version history.`,
             terms: this.growTerms(),
         };
         this.dialog
-            .open<LinkAnalysisAddToListDialog, AddToListData, AddToListResult | undefined>(LinkAnalysisAddToListDialog, {
-                width: '30rem',
-                data,
-            })
+            .open<LinkAnalysisAddToListDialog, AddToListData, AddToListResult | undefined>(
+                LinkAnalysisAddToListDialog,
+                {
+                    width: '30rem',
+                    data,
+                },
+            )
             .afterClosed()
             .subscribe((r) => {
                 if (!r) return;
@@ -6355,7 +6559,9 @@ Its prior copies stay in its version history.`,
     /** Held (n): move focus into the held tray, where each held item can be expanded anyway or removed. */
     focusHeldTray(): void {
         this.host.nativeElement
-            .querySelector<HTMLElement>('inspecto-link-analysis-held-tray button, inspecto-link-analysis-held-tray [tabindex]')
+            .querySelector<HTMLElement>(
+                'inspecto-link-analysis-held-tray button, inspecto-link-analysis-held-tray [tabindex]',
+            )
             ?.focus();
     }
 
@@ -6514,7 +6720,11 @@ Its prior copies stay in its version history.`,
 
     /** "Investigate this" (no Investigation open): the start form, filled with the entity. */
     readonly canInvestigateNode = computed(
-        () => this.investigationsEnabled() && !this.investigation.active() && !this.investigation.unsaved() && this.nodeMenuTargets().length === 1,
+        () =>
+            this.investigationsEnabled() &&
+            !this.investigation.active() &&
+            !this.investigation.unsaved() &&
+            this.nodeMenuTargets().length === 1,
     );
 
     async investigateNode(nodeId: string): Promise<void> {
@@ -6530,9 +6740,12 @@ Its prior copies stay in its version history.`,
         let note = '';
         if (raw.startsWith('masked:')) {
             value = '';
-            if (!type) note = 'This entity is masked and its Entity Type is not known here, so it cannot fill the form. Type its value.';
+            if (!type)
+                note =
+                    'This entity is masked and its Entity Type is not known here, so it cannot fill the form. Type its value.';
             else if (!this.lens.canRevealLinkEntities())
-                note = 'This entity is masked and you may not reveal its value, so it cannot fill the form. Type the value if you know it.';
+                note =
+                    'This entity is masked and you may not reveal its value, so it cannot fill the form. Type the value if you know it.';
             else
                 try {
                     const res = await firstValueFrom(this.deepLinks.resolve({ entity: `${type}:${raw}` }, true));
@@ -6544,9 +6757,10 @@ Its prior copies stay in its version history.`,
                     note = apiErrorMessage(err, 'This entity is masked and its value could not be revealed.');
                 }
         }
-        afterNextRender(() => setTimeout(() => this.newInvForm?.prefillEntity(value, note, type)), { injector: this.injector });
+        afterNextRender(() => setTimeout(() => this.newInvForm?.prefillEntity(value, note, type)), {
+            injector: this.injector,
+        });
     }
-
 
     /** L = Lasso, F = Fisheye, Esc = back to Pan (the same guards as G / X). True when the key was ours. */
     private onCanvasModeKey(e: KeyboardEvent, target: HTMLElement | null): boolean {

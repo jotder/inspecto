@@ -65,7 +65,8 @@ export function nodeRuleMatches(
         case 'lt': {
             const a = Number(raw);
             const b = Number(rule.value);
-            if (raw.trim() === '' || rule.value.trim() === '' || !Number.isFinite(a) || !Number.isFinite(b)) return false;
+            if (raw.trim() === '' || rule.value.trim() === '' || !Number.isFinite(a) || !Number.isFinite(b))
+                return false;
             return rule.op === 'gt' ? a > b : a < b;
         }
     }

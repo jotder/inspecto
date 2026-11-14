@@ -20,7 +20,8 @@ export const FALLBACK_REASON_TEXT: Record<string, string> = {
     frontier_over_index_cap: 'too many entities were expanded at once for the link index',
     index_read_failed: 'the link index could not be read',
     rung_not_indexable: 'this kind of expand is not answered by the link index',
-    stale_unknown: 'the link index is older than this Space allows and the input files of this Dataset cannot be checked for changes',
+    stale_unknown:
+        'the link index is older than this Space allows and the input files of this Dataset cannot be checked for changes',
 };
 
 /** `Answered from the Dataset because ‹reason›` - the flat read, with the closed reason in plain words. */
@@ -32,7 +33,9 @@ export function datasetSourceNote(reason: string, details?: string): string {
 export function indexSourceNote(source: IndexSource | undefined | null): string | null {
     if (!source) return null;
     if (source.kind === 'dataset') return datasetSourceNote(source.reason, source.details);
-    const stale = source.stale ? ` (stale: ${source.staleReason ?? 'rows were added to the Dataset after the build'})` : '';
+    const stale = source.stale
+        ? ` (stale: ${source.staleReason ?? 'rows were added to the Dataset after the build'})`
+        : '';
     return `Answered from the link index v${source.version}${stale}.`;
 }
 

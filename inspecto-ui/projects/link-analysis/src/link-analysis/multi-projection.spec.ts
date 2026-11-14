@@ -207,7 +207,9 @@ describe('MultiProjectionGraphSource + invErrorMessage', () => {
         const src = new MultiProjectionGraphSource(inv);
         await expect(
             src.query({ multi: { nodes: [{ dataset: 'secret', idColumn: 'id' }], edges: [] } }),
-        ).rejects.toThrow(/^A Dataset in this query is unavailable \(missing or not shared with you\)\. Nothing was drawn\.$/);
+        ).rejects.toThrow(
+            /^A Dataset in this query is unavailable \(missing or not shared with you\)\. Nothing was drawn\.$/,
+        );
     });
 
     it('surfaces a 422 as the server message', () => {

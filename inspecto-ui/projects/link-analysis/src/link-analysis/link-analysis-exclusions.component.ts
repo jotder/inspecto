@@ -30,16 +30,30 @@ import { GROW_GUIDE, ListInForce, PackTerms, RemovedRow, hintSeen, markHintSeen 
         >
             <div class="flex items-center gap-2">
                 <mat-icon svgIcon="heroicons_outline:no-symbol" aria-hidden="true"></mat-icon>
-                <h2 id="la-excl-title" class="m-0 text-sm font-semibold" matTooltip="Exclusion lists and excluded items">
+                <h2
+                    id="la-excl-title"
+                    class="m-0 text-sm font-semibold"
+                    matTooltip="Exclusion lists and excluded items"
+                >
                     Hidden by lists
                 </h2>
-                <button mat-icon-button class="ml-auto" type="button" aria-label="Close Hidden by lists" (click)="closed.emit()">
+                <button
+                    mat-icon-button
+                    class="ml-auto"
+                    type="button"
+                    aria-label="Close Hidden by lists"
+                    (click)="closed.emit()"
+                >
                     <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
                 </button>
             </div>
 
             @if (showHint()) {
-                <div class="rounded-md border p-2 text-xs" style="border-color: var(--gamma-border)" data-testid="la-excl-hint">
+                <div
+                    class="rounded-md border p-2 text-xs"
+                    style="border-color: var(--gamma-border)"
+                    data-testid="la-excl-hint"
+                >
                     @if (mode() === 'investigation') {
                         <p class="m-0">
                             An exclusion list keeps {{ t().nodes }} out of every step. Category lists come from your
@@ -52,7 +66,9 @@ import { GROW_GUIDE, ListInForce, PackTerms, RemovedRow, hintSeen, markHintSeen 
                             them back. A list you add them to is kept, and applies to every step of an Investigation.
                         </p>
                     }
-                    <p class="text-secondary m-0" data-testid="la-hint-guide">More in the user guide: <cite>{{ guide.chapter }}</cite> ({{ guide.where }}).</p>
+                    <p class="text-secondary m-0" data-testid="la-hint-guide">
+                        More in the user guide: <cite>{{ guide.chapter }}</cite> ({{ guide.where }}).
+                    </p>
                     <button mat-button type="button" class="mt-1" (click)="dismissHint()">Got it</button>
                 </div>
             }
@@ -60,13 +76,25 @@ import { GROW_GUIDE, ListInForce, PackTerms, RemovedRow, hintSeen, markHintSeen 
             @if (mode() === 'investigation') {
                 <p class="m-0 text-sm" role="status" data-testid="la-excl-line">{{ line() }}</p>
                 @if (inForce().length) {
-                    <ul class="m-0 flex list-none flex-col gap-1 p-0" aria-label="Lists in force" data-testid="la-excl-in-force">
+                    <ul
+                        class="m-0 flex list-none flex-col gap-1 p-0"
+                        aria-label="Lists in force"
+                        data-testid="la-excl-in-force"
+                    >
                         @for (l of inForce(); track l.listId) {
                             <li class="flex flex-wrap items-center gap-1 text-xs">
                                 <inspecto-chip variant="outline" tone="primary">{{ l.title }}</inspecto-chip>
-                                <inspecto-chip variant="soft" [matTooltip]="ownerHint(l.ownerKind)">{{ ownerLabel(l.ownerKind) }}</inspecto-chip>
-                                <span [matTooltip]="l.restricted ? 'A restricted list: the count is rounded and its members are not shown' : ''"
-                                    >{{ l.restricted ? 'about ' : '' }}{{ l.removed.toLocaleString('en') }} removed</span
+                                <inspecto-chip variant="soft" [matTooltip]="ownerHint(l.ownerKind)">{{
+                                    ownerLabel(l.ownerKind)
+                                }}</inspecto-chip>
+                                <span
+                                    [matTooltip]="
+                                        l.restricted
+                                            ? 'A restricted list: the count is rounded and its members are not shown'
+                                            : ''
+                                    "
+                                    >{{ l.restricted ? 'about ' : ''
+                                    }}{{ l.removed.toLocaleString('en') }} removed</span
                                 >
                                 <button
                                     mat-button
@@ -74,7 +102,9 @@ import { GROW_GUIDE, ListInForce, PackTerms, RemovedRow, hintSeen, markHintSeen 
                                     class="ml-auto"
                                     [disabled]="!!(whyNot() || l.switchOffWhyNot)"
                                     [disabledInteractive]="true"
-                                    [matTooltip]="whyNot() || l.switchOffWhyNot || 'Switch it off — undoes its step (recorded)'"
+                                    [matTooltip]="
+                                        whyNot() || l.switchOffWhyNot || 'Switch it off — undoes its step (recorded)'
+                                    "
                                     [attr.aria-label]="'Switch off ' + l.title"
                                     (click)="!(whyNot() || l.switchOffWhyNot) && switchOff.emit(l.listId)"
                                 >
@@ -90,7 +120,9 @@ import { GROW_GUIDE, ListInForce, PackTerms, RemovedRow, hintSeen, markHintSeen 
                         @for (l of available(); track l.id) {
                             <li class="flex flex-wrap items-center gap-1 text-xs">
                                 <span>{{ l.title }}</span>
-                                <inspecto-chip variant="soft" [matTooltip]="ownerHint(l.ownerKind)">{{ ownerLabel(l.ownerKind) }}</inspecto-chip>
+                                <inspecto-chip variant="soft" [matTooltip]="ownerHint(l.ownerKind)">{{
+                                    ownerLabel(l.ownerKind)
+                                }}</inspecto-chip>
                                 <button
                                     mat-button
                                     type="button"
@@ -125,7 +157,12 @@ import { GROW_GUIDE, ListInForce, PackTerms, RemovedRow, hintSeen, markHintSeen 
                         <div id="la-excl-removed" class="flex flex-col gap-1">
                             @if (removed().rows.length) {
                                 <table class="w-full text-left text-xs" data-testid="la-excl-table">
-                                    <caption class="sr-only">Excluded {{ t().nodes }}</caption>
+                                    <caption class="sr-only">
+                                        Excluded
+                                        {{
+                                            t().nodes
+                                        }}
+                                    </caption>
                                     <thead>
                                         <tr>
                                             <th scope="col" class="pr-2">{{ nodeHeading() }}</th>
@@ -146,8 +183,8 @@ import { GROW_GUIDE, ListInForce, PackTerms, RemovedRow, hintSeen, markHintSeen 
                             }
                             @if (removed().restrictedCount) {
                                 <p class="text-secondary m-0 text-xs" data-testid="la-excl-restricted">
-                                    About {{ removed().restrictedCount.toLocaleString('en') }} more were removed by restricted
-                                    lists — their members are not shown.
+                                    About {{ removed().restrictedCount.toLocaleString('en') }} more were removed by
+                                    restricted lists — their members are not shown.
                                 </p>
                             }
                         </div>
@@ -159,17 +196,28 @@ import { GROW_GUIDE, ListInForce, PackTerms, RemovedRow, hintSeen, markHintSeen 
                     this graph (not recorded).
                 </p>
                 @if (basicHidden()) {
-                    <button mat-button type="button" class="self-start" (click)="showAgain.emit()">Show them again</button>
+                    <button mat-button type="button" class="self-start" (click)="showAgain.emit()">
+                        Show them again
+                    </button>
                 }
             }
 
             @if (lists() !== null && !lists()!.length) {
-                <div class="flex flex-col gap-2 rounded-md border p-2" style="border-color: var(--gamma-border)" data-testid="la-excl-first">
+                <div
+                    class="flex flex-col gap-2 rounded-md border p-2"
+                    style="border-color: var(--gamma-border)"
+                    data-testid="la-excl-first"
+                >
                     <p class="m-0 text-xs">
                         No exclusion list yet. A list keeps {{ t().nodes }} you never want to see — call centres, test
                         {{ t().nodes }} — out of every step.
                     </p>
-                    <inspecto-pen-field label="List name" [formControl]="newTitle" placeholder="e.g. Call centres" [maxlength]="200"></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="List name"
+                        [formControl]="newTitle"
+                        placeholder="e.g. Call centres"
+                        [maxlength]="200"
+                    ></inspecto-pen-field>
                     <button
                         mat-stroked-button
                         type="button"
@@ -227,7 +275,11 @@ export class LinkAnalysisExclusionsComponent {
     });
     readonly removedCount = computed(() => this.removed().rows.length + this.removed().restrictedCount);
     readonly categoryLists = computed(() => (this.lists() ?? []).filter((l) => l.ownerKind === 'admin'));
-    readonly categoryTitles = computed(() => this.categoryLists().map((l) => l.title).join(', '));
+    readonly categoryTitles = computed(() =>
+        this.categoryLists()
+            .map((l) => l.title)
+            .join(', '),
+    );
 
     ownerLabel(kind: 'admin' | 'analyst' | null | undefined): string {
         return kind === 'admin' ? 'Category' : kind === 'analyst' ? 'Analyst' : 'List';

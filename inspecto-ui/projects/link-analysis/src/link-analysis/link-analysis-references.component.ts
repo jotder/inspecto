@@ -21,7 +21,14 @@ import { investigationErrorMessage } from './investigation-state';
     selector: 'inspecto-link-analysis-references',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [PenFieldComponent, ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, InspectoAlertComponent],
+    imports: [
+        PenFieldComponent,
+        ReactiveFormsModule,
+        MatButtonModule,
+        MatFormFieldModule,
+        MatInputModule,
+        InspectoAlertComponent,
+    ],
     host: { class: 'block' },
     template: `
         <section
@@ -66,8 +73,16 @@ import { investigationErrorMessage } from './investigation-state';
                     <inspecto-pen-field class="w-full" label="System" [formControl]="system"></inspecto-pen-field>
                     <inspecto-pen-field class="w-full" label="Type" [formControl]="type"></inspecto-pen-field>
                     <inspecto-pen-field class="w-full" label="Id" [formControl]="refId"></inspecto-pen-field>
-                    <inspecto-pen-field class="w-full" label="URL (optional, http or https)" [formControl]="url"></inspecto-pen-field>
-                    <inspecto-pen-field class="w-full" label="Label (optional)" [formControl]="label"></inspecto-pen-field>
+                    <inspecto-pen-field
+                        class="w-full"
+                        label="URL (optional, http or https)"
+                        [formControl]="url"
+                    ></inspecto-pen-field>
+                    <inspecto-pen-field
+                        class="w-full"
+                        label="Label (optional)"
+                        [formControl]="label"
+                    ></inspecto-pen-field>
                     <button
                         mat-flat-button
                         type="submit"

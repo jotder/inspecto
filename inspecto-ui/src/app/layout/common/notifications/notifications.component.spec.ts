@@ -99,7 +99,10 @@ describe('NotificationBellComponent', () => {
             for (let tick = 0; tick < 3; tick++) {
                 vi.advanceTimersByTime(DEFAULT_REFRESH_MS);
                 const sent = http.match(() => true);
-                expect(sent.map((r) => r.request.url.replace(/.*\/notifications/, '')), `tick ${tick}`).toEqual(['/unread-count']);
+                expect(
+                    sent.map((r) => r.request.url.replace(/.*\/notifications/, '')),
+                    `tick ${tick}`,
+                ).toEqual(['/unread-count']);
                 sent[0].flush({ count: 0 });
             }
             fixture.destroy();

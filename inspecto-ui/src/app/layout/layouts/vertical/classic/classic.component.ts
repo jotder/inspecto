@@ -119,7 +119,7 @@ export class ClassicLayoutComponent implements OnInit, OnDestroy {
         this._router.events
             .pipe(
                 filter((e) => e instanceof NavigationEnd),
-                takeUntil(this._unsubscribeAll)
+                takeUntil(this._unsubscribeAll),
             )
             .subscribe(() => this.footerHidden.set(this._routeHidesFooter(this._router.routerState.snapshot.root)));
     }

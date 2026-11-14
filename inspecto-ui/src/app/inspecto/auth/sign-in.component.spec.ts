@@ -21,7 +21,18 @@ const FAILED_KEY = 'inspecto.signInFailed';
  * `inspecto/auth/session.service.spec.ts`. There is likewise no `mockAuthMode` client-side dev
  * switch to test — `session.service.ts:64` says so explicitly; `auth.mock` arrives on `/bootstrap`.
  */
-function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[]; bootstrapError?: string; configured?: boolean; noSpace?: boolean; noUsers?: boolean; productName?: string; signInPitch?: { title: string; body: string } } = {}) {
+function create(
+    opts: {
+        loginRequired?: boolean;
+        demoUsers?: DemoUser[];
+        bootstrapError?: string;
+        configured?: boolean;
+        noSpace?: boolean;
+        noUsers?: boolean;
+        productName?: string;
+        signInPitch?: { title: string; body: string };
+    } = {},
+) {
     TestBed.resetTestingModule();
     const session = {
         loginRequired: () => opts.loginRequired ?? true,
@@ -42,7 +53,16 @@ function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[]; bootstr
             { provide: SessionService, useValue: session },
             { provide: Router, useValue: router },
             ...(opts.productName || opts.signInPitch
-                ? [{ provide: APP_ENVIRONMENT, useValue: { ...appEnvironment(), productName: opts.productName, signInPitch: opts.signInPitch } }]
+                ? [
+                      {
+                          provide: APP_ENVIRONMENT,
+                          useValue: {
+                              ...appEnvironment(),
+                              productName: opts.productName,
+                              signInPitch: opts.signInPitch,
+                          },
+                      },
+                  ]
                 : []),
         ],
     });
@@ -196,7 +216,9 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
 
             expect(el.textContent).not.toMatch(/secured/i);
             expect(el.textContent).not.toMatch(/single sign-on|\bSSO\b/i);
-            expect(text(el.querySelector('h1')), 'SIGNIN-DEMO-HEADLINE-1: no brand pitch, the bare Product name').toBe('Inspecto');
+            expect(text(el.querySelector('h1')), 'SIGNIN-DEMO-HEADLINE-1: no brand pitch, the bare Product name').toBe(
+                'Inspecto',
+            );
             expect(el.querySelector('h1 + p'), 'T-001: the panel does not repeat the card').toBeNull();
             expect(text(el.querySelector('h2 + p'))).toBe('Choose a user to continue.');
             expect(el.textContent!.match(/Choose a user/g), 'T-001: said once').toHaveLength(1);
@@ -224,7 +246,10 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
             const { el } = create({
                 demoUsers: DEMO,
                 productName: 'Inspecto Telco',
-                signInPitch: { title: 'Find the leakage, catch the fraud, close the case.', body: 'Four Apps in one product.' },
+                signInPitch: {
+                    title: 'Find the leakage, catch the fraud, close the case.',
+                    body: 'Four Apps in one product.',
+                },
             });
             expect(text(el.querySelector('h1'))).toBe('Find the leakage, catch the fraud, close the case.');
             expect(el.textContent).not.toContain('MFS');
@@ -234,7 +259,10 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
 
         // LA-EDITIONS-RESIDUALS-1 (6): la-app's OIDC sign-in pitches its own product, never the console's Pipelines.
         it('OIDC sign-in: a host-provided pitch replaces the console headline', async () => {
-            const { el } = create({ productName: 'Inspecto LA', signInPitch: { title: 'Follow every link.', body: 'Investigate a number.' } });
+            const { el } = create({
+                productName: 'Inspecto LA',
+                signInPitch: { title: 'Follow every link.', body: 'Investigate a number.' },
+            });
             expect(text(el.querySelector('h1'))).toBe('Follow every link.');
             expect(text(el.querySelector('h1 + p'))).toBe('Investigate a number.');
             expect(el.textContent).not.toContain('Every Pipeline');

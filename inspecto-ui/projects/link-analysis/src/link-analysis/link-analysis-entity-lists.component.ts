@@ -78,9 +78,7 @@ import { SuggestedList, activeDomainProfileId, domainProfile } from '@inspecto/l
                     }
                 </div>
                 @if (!canWrite()) {
-                    <p class="text-secondary m-0">
-                        Read-only: changing Entity Lists needs Incident management.
-                    </p>
+                    <p class="text-secondary m-0">Read-only: changing Entity Lists needs Incident management.</p>
                 }
                 @if (error()) {
                     <inspecto-alert [variant]="unavailable() ? 'info' : 'error'" title="Entity Lists">{{
@@ -191,11 +189,20 @@ import { SuggestedList, activeDomainProfileId, domainProfile } from '@inspecto/l
                             (action)="create()"
                         ></inspecto-empty-state>
                         @if (canWrite() && suggestions().length) {
-                            <section class="flex flex-col gap-1" aria-labelledby="la-suggested-lists" data-testid="la-suggested-lists">
-                                <h4 id="la-suggested-lists" class="m-0 text-sm font-semibold">First lists to start with</h4>
+                            <section
+                                class="flex flex-col gap-1"
+                                aria-labelledby="la-suggested-lists"
+                                data-testid="la-suggested-lists"
+                            >
+                                <h4 id="la-suggested-lists" class="m-0 text-sm font-semibold">
+                                    First lists to start with
+                                </h4>
                                 <ul class="m-0 flex list-none flex-col gap-1 p-0">
                                     @for (sl of suggestions(); track sl.title) {
-                                        <li class="flex flex-wrap items-center gap-2 rounded-md border px-2 py-1" style="border-color: var(--gamma-border)">
+                                        <li
+                                            class="flex flex-wrap items-center gap-2 rounded-md border px-2 py-1"
+                                            style="border-color: var(--gamma-border)"
+                                        >
                                             <div class="min-w-0 flex-auto">
                                                 <span class="font-semibold">{{ sl.title }}</span>
                                                 <span class="text-secondary"> · {{ purposeLabel(sl.purpose) }}</span>

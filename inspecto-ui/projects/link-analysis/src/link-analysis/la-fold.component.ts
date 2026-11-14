@@ -31,10 +31,19 @@ import { ChangeDetectionStrategy, Component, OnInit, effect, input, signal } fro
                     <span class="sr-only">(changed)</span>
                 }
                 @if (hint()) {
-                    <span class="text-secondary min-w-0 flex-1 truncate text-right font-normal" [class.text-sm]="!dense()" [class.text-xs]="dense()">{{ hint() }}</span>
+                    <span
+                        class="text-secondary min-w-0 flex-1 truncate text-right font-normal"
+                        [class.text-sm]="!dense()"
+                        [class.text-xs]="dense()"
+                        >{{ hint() }}</span
+                    >
                 }
             </summary>
-            <div class="flex flex-col gap-2" [class]="dense() ? 'pb-2 pl-5 pr-1' : 'border-t p-3'" style="border-color: var(--gamma-border)">
+            <div
+                class="flex flex-col gap-2"
+                [class]="dense() ? 'pb-2 pl-5 pr-1' : 'border-t p-3'"
+                style="border-color: var(--gamma-border)"
+            >
                 <ng-content />
             </div>
         </details>

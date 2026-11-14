@@ -37,14 +37,19 @@ import { ChipComponent } from './chip.component';
                                 <inspecto-chip variant="soft" tone="primary">child rows</inspecto-chip>
                             }
                             <span class="text-secondary text-xs"
-                                >{{ set.rows.length }} of {{ set.rowCount }} row{{ set.rowCount === 1 ? '' : 's' }}</span
+                                >{{ set.rows.length }} of {{ set.rowCount }} row{{
+                                    set.rowCount === 1 ? '' : 's'
+                                }}</span
                             >
                         </div>
                         @if (!set.rows.length) {
                             <p class="text-secondary text-xs">No rows from the previewed records.</p>
                         } @else {
                             <div class="overflow-x-auto">
-                                <table class="w-full text-left text-xs" [attr.aria-label]="set.segment + ' sample rows'">
+                                <table
+                                    class="w-full text-left text-xs"
+                                    [attr.aria-label]="set.segment + ' sample rows'"
+                                >
                                     <thead>
                                         <tr>
                                             @for (col of set.columns; track col) {

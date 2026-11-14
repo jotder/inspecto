@@ -164,7 +164,12 @@ export class AlertsComponent implements OnInit {
 
     readonly ruleColumnDefs: ColDef<AlertRule>[] = [
         { field: 'name', headerName: 'Rule', flex: 1, minWidth: 160 },
-        { headerName: 'Metric / Measure', flex: 1, minWidth: 140, valueGetter: (p) => (p.data ? ruleMetricText(p.data) : '') },
+        {
+            headerName: 'Metric / Measure',
+            flex: 1,
+            minWidth: 140,
+            valueGetter: (p) => (p.data ? ruleMetricText(p.data) : ''),
+        },
         { headerName: 'Condition', minWidth: 170, valueGetter: (p) => (p.data ? ruleConditionText(p.data) : '') },
         {
             field: 'severity',

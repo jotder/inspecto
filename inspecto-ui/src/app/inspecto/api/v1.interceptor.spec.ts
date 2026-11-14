@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { HttpClient, HttpContext, HttpErrorResponse, provideHttpClient, withInterceptors, withXhr } from '@angular/common/http';
+import {
+    HttpClient,
+    HttpContext,
+    HttpErrorResponse,
+    provideHttpClient,
+    withInterceptors,
+    withXhr,
+} from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { environment } from '../../../environments/environment';

@@ -142,7 +142,9 @@ describe('LinkAnalysisMembersComponent (DR-U1)', () => {
         (el.querySelector('[aria-label="Revoke lead-1"]') as HTMLButtonElement).click();
         await f.whenStable();
         f.detectChanges();
-        expect(el.textContent).toContain('Refused: an Investigation always keeps one lead. Make someone else a lead first.');
+        expect(el.textContent).toContain(
+            'Refused: an Investigation always keeps one lead. Make someone else a lead first.',
+        );
         // X5: the plain reason only, never the raw server text as a suffix
         expect(el.textContent).not.toContain('cannot revoke the last lead');
         expect(el.textContent).not.toContain('Server:');

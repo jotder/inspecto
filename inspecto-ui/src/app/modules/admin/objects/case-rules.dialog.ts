@@ -47,9 +47,8 @@ import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
                         <div class="min-w-0 flex-auto">
                             <div class="truncate text-sm font-semibold">{{ r.name }}</div>
                             <div class="text-secondary truncate text-xs">
-                                ≥{{ r.threshold }} incidents{{ r.groupBy ? ' per ' + r.groupBy : '' }} in {{ r.windowMinutes }}m where {{ describe(r) }} → "{{
-                                    r.title
-                                }}"
+                                ≥{{ r.threshold }} incidents{{ r.groupBy ? ' per ' + r.groupBy : '' }} in
+                                {{ r.windowMinutes }}m where {{ describe(r) }} → "{{ r.title }}"
                             </div>
                         </div>
                         <button

@@ -36,7 +36,15 @@ const step = (over: Partial<InvestigationStepResult> = {}): InvestigationStepRes
     ({
         step: 3,
         op: 'expand',
-        delta: { admitted: ['b', 'c'], removed: [], linksAdded: 4, linksRemoved: 0, hidden: [], kept: [], excluded: [] },
+        delta: {
+            admitted: ['b', 'c'],
+            removed: [],
+            linksAdded: 4,
+            linksRemoved: 0,
+            hidden: [],
+            kept: [],
+            excluded: [],
+        },
         truncated: false,
         workingSet: { entities: 3, links: 4, excluded: 0, hash: 'h' },
         ...over,
@@ -59,7 +67,11 @@ function create(inv: Partial<Record<keyof InvService, unknown>> = {}, steps: Inv
             applied.push(op);
             const answer = steps[Math.min(at++, steps.length - 1)];
             const group = 'group' in op ? op.group : undefined;
-            session.lastStep.set(answer.status === 'pending' ? answer : { ...answer, step: record(op.op, group ? { group } : undefined) });
+            session.lastStep.set(
+                answer.status === 'pending'
+                    ? answer
+                    : { ...answer, step: record(op.op, group ? { group } : undefined) },
+            );
             return true;
         }),
         // the real undo takes back the NEWEST effective op step, and refuses (409) when it is not the one named
@@ -74,7 +86,10 @@ function create(inv: Partial<Record<keyof InvService, unknown>> = {}, steps: Inv
             const at2 = Math.max(...all.map((e) => e.step)) + 1;
             session.log.set({
                 ...session.log()!,
-                entries: [...all.map((e) => (e === last ? { ...e, undoneBy: at2 } : e)), { ...last, step: at2, kind: 'undo', undoneBy: null }],
+                entries: [
+                    ...all.map((e) => (e === last ? { ...e, undoneBy: at2 } : e)),
+                    { ...last, step: at2, kind: 'undo', undoneBy: null },
+                ],
             });
             return true;
         }),
@@ -92,7 +107,20 @@ function create(inv: Partial<Record<keyof InvService, unknown>> = {}, steps: Inv
             total: n,
             truncated: false,
             ...session.log(),
-            entries: [...all, { step: n, kind: 'op', op: op as InvestigationLogEntry['op'], params, undoneBy: null, author: null, at: '', workingSetHash: '', text: '' }],
+            entries: [
+                ...all,
+                {
+                    step: n,
+                    kind: 'op',
+                    op: op as InvestigationLogEntry['op'],
+                    params,
+                    undoneBy: null,
+                    author: null,
+                    at: '',
+                    workingSetHash: '',
+                    text: '',
+                },
+            ],
         });
         return n;
     }
@@ -113,11 +141,23 @@ function create(inv: Partial<Record<keyof InvService, unknown>> = {}, steps: Inv
 describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
     it('reads /inv/exclusion-lists with owner kind, auto-apply and visibility', async () => {
         const lane = create({
-            exclusionLists: () => of({ lists: [{ id: 'cc', title: 'CC', entityType: 'msisdn', ownerKind: 'analyst', autoApply: false, visibility: 'open', size: 1 }] }),
+            exclusionLists: () =>
+                of({
+                    lists: [
+                        {
+                            id: 'cc',
+                            title: 'CC',
+                            entityType: 'msisdn',
+                            ownerKind: 'analyst',
+                            autoApply: false,
+                            visibility: 'open',
+                            size: 1,
+                        },
+                    ],
+                }),
         });
         await lane.store.loadLists();
         expect(lane.store.lists()?.map((l) => l.id)).toEqual(['cc']);
-
     });
 
     it('falls back to the plain Entity Lists when the route is absent (404), keeping only live exclusion lists', async () => {
@@ -136,7 +176,15 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         });
         await store.loadLists();
         expect(store.lists()).toEqual([
-            { id: 'x', title: 'X', entityType: 'msisdn', ownerKind: 'analyst', autoApply: false, visibility: 'open', size: 2 },
+            {
+                id: 'x',
+                title: 'X',
+                entityType: 'msisdn',
+                ownerKind: 'analyst',
+                autoApply: false,
+                visibility: 'open',
+                size: 2,
+            },
         ]);
     });
 
@@ -160,22 +208,35 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         ]);
         expect(store.lastChange()?.text).toBe('Expanded 3 degrees: 5 numbers and 7 calls added; 1 busy number held.');
         expect(await store.undoLast()).toBe(true);
-        expect(session.undo.mock.calls).toEqual([[3, 'one'], [2, 'join'], [1, 'join']]); // the group, newest first, each naming its step
+        expect(session.undo.mock.calls).toEqual([
+            [3, 'one'],
+            [2, 'join'],
+            [1, 'join'],
+        ]); // the group, newest first, each naming its step
         expect(store.lastChange()?.text).toBe('Undone (3 steps).');
         expect(await store.undoLast()).toBe(false); // nothing of ours left: the screen's own Undo runs
     });
 
     describe('Degrees bound to the last Expand (LA-DEGREES-TRIM-1)', () => {
-        const three = () => [step(), step({ delta: { ...step().delta, admitted: ['d'] } }), step({ delta: { ...step().delta, admitted: ['e'] } })];
+        const three = () => [
+            step(),
+            step({ delta: { ...step().delta, admitted: ['d'] } }),
+            step({ delta: { ...step().delta, admitted: ['e'] } }),
+        ];
 
         it('lowering 3 to 1 undoes the outer two degrees, newest first, each naming its step', async () => {
             const { store, session } = create({}, three());
             await store.growInvestigation(CTX, { ...REQ, degrees: 3 }, {});
             expect(store.lastExpandDegrees()).toBe(3);
             expect(await store.trimLastExpand(1)).toBe(true);
-            expect(session.undo.mock.calls).toEqual([[3, 'one'], [2, 'one']]); // the first degree stays
+            expect(session.undo.mock.calls).toEqual([
+                [3, 'one'],
+                [2, 'one'],
+            ]); // the first degree stays
             expect(store.lastExpandDegrees()).toBe(1);
-            expect(store.lastChange()?.text).toBe('Lowered to 1 degree: the outer 2 degrees of the last Expand removed from the Working Set (2 steps undone, kept in the log).');
+            expect(store.lastChange()?.text).toBe(
+                'Lowered to 1 degree: the outer 2 degrees of the last Expand removed from the Working Set (2 steps undone, kept in the log).',
+            );
         });
 
         it('is not bound once another step follows (a colleague’s, or a click elsewhere): nothing is trimmed', async () => {
@@ -232,7 +293,11 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
     });
 
     describe('Degrees bound to the last Expand of a reopened Investigation (LA-DEGREES-TRIM-2)', () => {
-        const three = () => [step(), step({ delta: { ...step().delta, admitted: ['d'] } }), step({ delta: { ...step().delta, admitted: ['e'] } })];
+        const three = () => [
+            step(),
+            step({ delta: { ...step().delta, admitted: ['d'] } }),
+            step({ delta: { ...step().delta, admitted: ['e'] } }),
+        ];
         /** A saved step log as a reload reads it: nothing was recorded in this browser. */
         const reopened = (groups: (string | undefined)[]) => {
             const lane = create();
@@ -240,8 +305,21 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
                 header: {} as never,
                 total: groups.length + 1,
                 truncated: false,
-                entries: [{ op: 'seed' }, ...groups.map((group) => ({ op: 'expand', params: group ? { group } : undefined }))].map(
-                    (e, i) => ({ step: i + 1, kind: 'op', undoneBy: null, author: null, at: '', workingSetHash: '', text: '', ...e }) as InvestigationLogEntry,
+                entries: [
+                    { op: 'seed' },
+                    ...groups.map((group) => ({ op: 'expand', params: group ? { group } : undefined })),
+                ].map(
+                    (e, i) =>
+                        ({
+                            step: i + 1,
+                            kind: 'op',
+                            undoneBy: null,
+                            author: null,
+                            at: '',
+                            workingSetHash: '',
+                            text: '',
+                            ...e,
+                        }) as InvestigationLogEntry,
                 ),
             });
             return lane;
@@ -263,7 +341,10 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
             const { store, session } = reopened(['g1', 'g2', 'g2', 'g2']);
             expect(store.lastExpandDegrees()).toBe(3); // steps 3-5; the older Expand g1 (step 2) is not part of it
             expect(await store.trimLastExpand(1)).toBe(true);
-            expect(session.undo.mock.calls).toEqual([[5, 'one'], [4, 'one']]);
+            expect(session.undo.mock.calls).toEqual([
+                [5, 'one'],
+                [4, 'one'],
+            ]);
             expect(store.lastExpandDegrees()).toBe(1);
         });
 
@@ -293,7 +374,9 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         const { store, applied } = create({}, [wide]);
         expect(await store.growInvestigation({ ...CTX, frontierCap: 2 }, { ...REQ, degrees: 4 }, {})).toBe(true);
         expect(applied).toHaveLength(1);
-        expect(store.lastChange()?.text).toContain('Stopped after degree 1: the next degree would grow from 3 numbers, above the frontier cap of 2.');
+        expect(store.lastChange()?.text).toContain(
+            'Stopped after degree 1: the next degree would grow from 3 numbers, above the frontier cap of 2.',
+        );
         expect(store.undoable()).toBe(true);
     });
 
@@ -302,7 +385,9 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         const { store, applied, session } = create({}, [step(), held]);
         expect(await store.growInvestigation(CTX, { ...REQ, degrees: 3 }, {})).toBe(true);
         expect(applied).toHaveLength(2);
-        expect(store.lastChange()?.text).toContain('Degree 2 needs a second person’s approval, so the walk stopped there.');
+        expect(store.lastChange()?.text).toContain(
+            'Degree 2 needs a second person’s approval, so the walk stopped there.',
+        );
         expect(await store.undoLast()).toBe(true);
         expect(session.undo.mock.calls).toEqual([[1, 'one']]);
     });
@@ -321,10 +406,16 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
     it('clean-up records hide + annotate, and ONE Undo takes the pair back newest first', async () => {
         const { store, session, applied } = create();
         expect(await store.cleanUp(['a', 'b'], 'Trimmed to 2')).toBe(true);
-        expect(applied).toEqual([{ op: 'hide', ids: ['a', 'b'] }, { op: 'annotate', ids: ['a', 'b'], note: 'Trimmed to 2' }]);
+        expect(applied).toEqual([
+            { op: 'hide', ids: ['a', 'b'] },
+            { op: 'annotate', ids: ['a', 'b'], note: 'Trimmed to 2' },
+        ]);
         expect(store.lastChange()?.text).toContain('hid 2');
         expect(await store.undoLast()).toBe(true);
-        expect(session.undo.mock.calls).toEqual([[2, 'one'], [1, 'join']]); // one change, so one Redo records both again
+        expect(session.undo.mock.calls).toEqual([
+            [2, 'one'],
+            [1, 'join'],
+        ]); // one change, so one Redo records both again
         expect(store.lastChange()?.text).toBe('Undone (2 steps).');
     });
 
@@ -373,7 +464,9 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
     });
 
     it('Remove held is ONE exclude with the busy reason; Undo is the undo op', async () => {
-        const { store, applied, session } = create({}, [step({ op: 'exclude', delta: { ...step().delta, excluded: ['h1', 'h2'] } })]);
+        const { store, applied, session } = create({}, [
+            step({ op: 'exclude', delta: { ...step().delta, excluded: ['h1', 'h2'] } }),
+        ]);
         await store.removeHeld(['h1', 'h2'], 500, TERMS);
         expect(applied).toEqual([{ op: 'exclude', ids: ['h1', 'h2'], reason: 'busy number above 500 contacts' }]);
         expect(store.lastChange()?.text).toBe('Removed 2 busy numbers.');
@@ -384,21 +477,41 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
     it('Add to a list: the members write, then excludeBy in the Investigation; a held (202) write says it waits', async () => {
         const changeEntityListMembers = vi.fn(() => of({ id: 'cc', changed: 1 }));
         const { store, applied } = create({ changeEntityListMembers });
-        store.lists.set([{ id: 'cc', title: 'Call centres', entityType: 'msisdn', ownerKind: 'analyst', autoApply: false, visibility: 'open', size: 1 }]);
+        store.lists.set([
+            {
+                id: 'cc',
+                title: 'Call centres',
+                entityType: 'msisdn',
+                ownerKind: 'analyst',
+                autoApply: false,
+                visibility: 'open',
+                size: 1,
+            },
+        ]);
         const r = await store.addToList({ id: 'cc', entityType: 'msisdn' }, ['+4477'], 'switchboard', TERMS, true);
         expect(r.ok).toBe(true);
         expect(changeEntityListMembers).toHaveBeenCalledWith('cc', { add: ['+4477'], reason: 'switchboard' });
         expect(applied).toEqual([{ op: 'excludeBy', listId: 'cc', reason: 'switchboard' }]);
         expect(store.lastChange()?.text).toContain('Added to “Call centres” and applied');
-
     });
 
     it('Add to a NEW list creates an exclusion list first; a governed write is held, nothing applied', async () => {
         const createEntityList = vi.fn(() => of({ id: 'new-1', title: 'Shops' }));
-        const changeEntityListMembers = vi.fn(() => of({ status: 'pending', written: false, pendingChange: { id: 'p1' } }));
-        const { store, applied } = create({ createEntityList, changeEntityListMembers, exclusionLists: () => of({ lists: [] }) });
+        const changeEntityListMembers = vi.fn(() =>
+            of({ status: 'pending', written: false, pendingChange: { id: 'p1' } }),
+        );
+        const { store, applied } = create({
+            createEntityList,
+            changeEntityListMembers,
+            exclusionLists: () => of({ lists: [] }),
+        });
         const r = await store.addToList({ newTitle: 'Shops', entityType: 'msisdn' }, ['+44'], 'shops', TERMS, true);
-        expect(createEntityList).toHaveBeenCalledWith({ title: 'Shops', purpose: 'exclusion', entityType: 'msisdn', reason: 'shops' });
+        expect(createEntityList).toHaveBeenCalledWith({
+            title: 'Shops',
+            purpose: 'exclusion',
+            entityType: 'msisdn',
+            reason: 'shops',
+        });
         expect(r).toMatchObject({ ok: true, listId: 'new-1' });
         expect(r.message).toContain('Waiting for approval');
         expect(applied).toEqual([]);
@@ -406,7 +519,14 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
 
     it('a refused list write is a message, not a throw', async () => {
         const { store } = create({
-            changeEntityListMembers: () => throwError(() => new HttpErrorResponse({ status: 403, error: { error: { message: "missing capability 'canManageIncidents'" } } })),
+            changeEntityListMembers: () =>
+                throwError(
+                    () =>
+                        new HttpErrorResponse({
+                            status: 403,
+                            error: { error: { message: "missing capability 'canManageIncidents'" } },
+                        }),
+                ),
         });
         const r = await store.addToList({ id: 'vip', entityType: 'msisdn' }, ['+44'], 'x', TERMS, true);
         expect(r.ok).toBe(false);
@@ -418,8 +538,28 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         session.log.set({
             header: {} as never,
             entries: [
-                { step: 1, kind: 'op', op: 'excludeBy', params: { listId: 'old' }, undoneBy: null, author: null, at: '', workingSetHash: '', text: '' },
-                { step: 2, kind: 'op', op: 'excludeBy', params: { listId: 'cc' }, undoneBy: null, author: null, at: '', workingSetHash: '', text: '' },
+                {
+                    step: 1,
+                    kind: 'op',
+                    op: 'excludeBy',
+                    params: { listId: 'old' },
+                    undoneBy: null,
+                    author: null,
+                    at: '',
+                    workingSetHash: '',
+                    text: '',
+                },
+                {
+                    step: 2,
+                    kind: 'op',
+                    op: 'excludeBy',
+                    params: { listId: 'cc' },
+                    undoneBy: null,
+                    author: null,
+                    at: '',
+                    workingSetHash: '',
+                    text: '',
+                },
             ],
             total: 2,
             truncated: false,
@@ -437,7 +577,13 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         const previewExpand = vi.fn(http(404));
         const { store } = create({ previewExpand });
         await store.runPreview({ ...CTX, heldFrontier: ['hub'] }, { ...REQ, hold: false }, {});
-        expect(previewExpand).toHaveBeenCalledWith('inv-1', { op: 'expand', ids: ['a', 'hub'], budget: 100, direction: 'either', includeHubs: true });
+        expect(previewExpand).toHaveBeenCalledWith('inv-1', {
+            op: 'expand',
+            ids: ['a', 'hub'],
+            budget: 100,
+            direction: 'either',
+            includeHubs: true,
+        });
         expect(store.preview().state).toBe('unavailable');
         // an absent route is not asked again this session
         await store.runPreview(CTX, REQ, {});

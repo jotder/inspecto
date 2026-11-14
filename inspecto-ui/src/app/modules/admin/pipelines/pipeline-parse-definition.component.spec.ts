@@ -2089,7 +2089,9 @@ describe('Decode Profile read-back', () => {
         const el = (fixture.nativeElement as HTMLElement).querySelector('[data-test="decode-profile"]')!;
         const table = el.querySelector('[data-test="derived-columns"]');
         expect(table?.textContent).toContain('SERVED_MSISDN');
-        expect(table?.textContent).toContain('select servedSubscriptionIDs where subscriptionIDType = 0 take subscriptionIDValue');
+        expect(table?.textContent).toContain(
+            'select servedSubscriptionIDs where subscriptionIDType = 0 take subscriptionIDValue',
+        );
         expect(table?.textContent).toContain('sum of dedicatedAccountValue over dedicatedAccounts');
         expect(el.textContent).toContain('3 derived columns on 2 segments');
         expect(el.textContent).not.toContain('set by this Pipeline');

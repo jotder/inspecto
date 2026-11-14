@@ -176,9 +176,7 @@ export class LensService {
      *  arm a bound Alert Rule from Value Measures *Watch* and hold neither `canAuthorWorkbench` nor
      *  `canOperateRuns`. {@link identityCapability} for that reason (LA-BOUND-RULE-AUTHOR-READONLY-1,
      *  2026-10-28): such a subject is snapped to the Business lens, and lens-scoping revoked the grant. */
-    readonly canAuthorAlertRules = computed(() =>
-        this.identityCapability('canAuthorAlertRules', 'alerts.author'),
-    );
+    readonly canAuthorAlertRules = computed(() => this.identityCapability('canAuthorAlertRules', 'alerts.author'));
 
     /** May curate the space's shared Menu tree (Settings ▸ Menu Builder, `PUT /nav/menus`). Split out
      *  of {@link canAuthorWorkbench} 2026-07-25 (BACKLOG D4): a nav change is visible to every business

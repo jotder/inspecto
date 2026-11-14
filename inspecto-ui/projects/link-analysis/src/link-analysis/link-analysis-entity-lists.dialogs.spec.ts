@@ -37,7 +37,9 @@ const http = (status: number, message: string) => () =>
 
 /** Edit the property row bound to `name` as a person does (open, type, Enter). */
 function row(f: ComponentFixture<unknown>, name: string, value: string) {
-    const host = (f.nativeElement as HTMLElement).querySelector<HTMLElement>(`inspecto-pen-field[formcontrolname="${name}"]`)!;
+    const host = (f.nativeElement as HTMLElement).querySelector<HTMLElement>(
+        `inspecto-pen-field[formcontrolname="${name}"]`,
+    )!;
     penEdit(f, host, value);
 }
 

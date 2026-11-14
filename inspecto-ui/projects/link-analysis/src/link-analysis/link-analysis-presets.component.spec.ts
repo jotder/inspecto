@@ -98,10 +98,9 @@ function setup(opts: { list?: () => unknown; run?: () => unknown; initial?: stri
 
 describe('preset helpers', () => {
     it('draws every entity column value once, and sends only the parameters that were set', () => {
-        expect(presetEntityValues({ ...ANSWER, rows: [...ANSWER.rows, { entity: 'masked:aaaa', counterparts: 1 }] })).toEqual([
-            'masked:aaaa',
-            'masked:bbbb',
-        ]);
+        expect(
+            presetEntityValues({ ...ANSWER, rows: [...ANSWER.rows, { entity: 'masked:aaaa', counterparts: 1 }] }),
+        ).toEqual(['masked:aaaa', 'masked:bbbb']);
         expect(presetEntityValues(null)).toEqual([]);
         expect(presetParamValues({ min: ' 3 ', top: '', entity: null })).toEqual({ min: '3' });
     });
@@ -111,9 +110,12 @@ describe('preset helpers', () => {
         expect(presetSourceLine({ ...ANSWER, source: { kind: 'index', version: 73, stale: false } })).toBe(
             'Answered from the link index (version 73).',
         );
-        expect(presetSourceLine({ ...ANSWER, source: { kind: 'index', version: 4, stale: true, staleReason: '2 files added' } })).toContain(
-            'behind the data (2 files added)',
-        );
+        expect(
+            presetSourceLine({
+                ...ANSWER,
+                source: { kind: 'index', version: 4, stale: true, staleReason: '2 files added' },
+            }),
+        ).toContain('behind the data (2 files added)');
     });
 
     it('reads a measure with at most two decimals and leaves entity columns as they are', () => {
@@ -147,7 +149,7 @@ describe('LinkAnalysisPresetsComponent', () => {
         await expectNoA11yViolations(el);
     });
 
-    it("asks of the first Dataset when the page names none, as the Start box does", () => {
+    it('asks of the first Dataset when the page names none, as the Start box does', () => {
         const { inv, c } = setup({ initial: null });
         expect(inv.presets).toHaveBeenCalledWith('pays');
         expect(c.dataset.value).toBe('pays');
@@ -178,7 +180,11 @@ describe('LinkAnalysisPresetsComponent', () => {
 
     it("shows the server's refusal and offers nothing to draw", () => {
         const refused = setup({
-            run: () => throwError(() => new HttpErrorResponse({ status: 422, error: { message: 'needs the Dataset to map [amount]' } })),
+            run: () =>
+                throwError(
+                    () =>
+                        new HttpErrorResponse({ status: 422, error: { message: 'needs the Dataset to map [amount]' } }),
+                ),
         });
         refused.c.run();
         refused.fixture.detectChanges();
@@ -188,7 +194,14 @@ describe('LinkAnalysisPresetsComponent', () => {
     it('lists the Space presets saved from the builder and runs one through the builder route', () => {
         const saved = {
             ...LIST,
-            saved: [{ id: 'busiest', label: 'Busiest', description: 'The senders with the most links.', query: { by: 'from' as const } }],
+            saved: [
+                {
+                    id: 'busiest',
+                    label: 'Busiest',
+                    description: 'The senders with the most links.',
+                    query: { by: 'from' as const },
+                },
+            ],
         };
         const { fixture, el, c, inv, host } = setup({ list: () => of(saved) });
         expect(c.presetOptions().map((o) => o.value)).toContain('saved:busiest');
@@ -208,7 +221,9 @@ describe('LinkAnalysisPresetsComponent', () => {
         expect(el.querySelector('[data-testid="la-builder"]')).not.toBeNull();
     });
     it('offers no builder over a Dataset that does not say which columns link one entity to another', () => {
-        const { el, fixture, host } = setup({ list: () => of({ ...LIST, presets: [], roles: { ...LIST.roles, from: null, to: null } }) });
+        const { el, fixture, host } = setup({
+            list: () => of({ ...LIST, presets: [], roles: { ...LIST.roles, from: null, to: null } }),
+        });
         host.part.set('builder');
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="la-builder"]')).toBeNull();

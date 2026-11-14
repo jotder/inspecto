@@ -1,4 +1,15 @@
-import { ChangeDetectionStrategy, Component, ElementRef, HostListener, computed, effect, inject, input, model, viewChild } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    ElementRef,
+    HostListener,
+    computed,
+    effect,
+    inject,
+    input,
+    model,
+    viewChild,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -132,7 +143,10 @@ function storedSection(): LaSettingsSection | null {
                 aria-labelledby="la-settings-title"
                 tabindex="-1"
             >
-                <div class="flex shrink-0 items-center gap-2 border-b px-4 py-2" style="border-color: var(--gamma-border)">
+                <div
+                    class="flex shrink-0 items-center gap-2 border-b px-4 py-2"
+                    style="border-color: var(--gamma-border)"
+                >
                     <h2 id="la-settings-title" class="m-0 text-lg font-semibold">Settings</h2>
                     <span class="text-secondary truncate text-sm">· {{ current().label }}</span>
                     <button
@@ -175,13 +189,23 @@ function storedSection(): LaSettingsSection | null {
                         <p class="text-secondary mb-3 mt-0 text-xs" [attr.data-testid]="'la-settings-help'">
                             {{ current().help }}
                         </p>
-                        <div [hidden]="section() !== 'graph-model'"><ng-content select="[laSection=graph-model]" /></div>
-                        <div [hidden]="section() !== 'entity-types'"><ng-content select="[laSection=entity-types]" /></div>
-                        <div [hidden]="section() !== 'display-rules'"><ng-content select="[laSection=display-rules]" /></div>
-                        <div [hidden]="section() !== 'entity-lists'"><ng-content select="[laSection=entity-lists]" /></div>
+                        <div [hidden]="section() !== 'graph-model'">
+                            <ng-content select="[laSection=graph-model]" />
+                        </div>
+                        <div [hidden]="section() !== 'entity-types'">
+                            <ng-content select="[laSection=entity-types]" />
+                        </div>
+                        <div [hidden]="section() !== 'display-rules'">
+                            <ng-content select="[laSection=display-rules]" />
+                        </div>
+                        <div [hidden]="section() !== 'entity-lists'">
+                            <ng-content select="[laSection=entity-lists]" />
+                        </div>
                         <div [hidden]="section() !== 'identities'"><ng-content select="[laSection=identities]" /></div>
                         <div [hidden]="section() !== 'add-data'"><ng-content select="[laSection=add-data]" /></div>
-                        <div [hidden]="section() !== 'investigation'"><ng-content select="[laSection=investigation]" /></div>
+                        <div [hidden]="section() !== 'investigation'">
+                            <ng-content select="[laSection=investigation]" />
+                        </div>
                         <div [hidden]="section() !== 'modules'"><ng-content select="[laSection=modules]" /></div>
                     </div>
                 </div>
@@ -247,7 +271,10 @@ export class LinkAnalysisSettingsComponent {
     }
 
     async requestClose(): Promise<void> {
-        if (this.isDirty()() && !(await this.confirm.confirm('Close Settings? The graph model has changes that were not run.')))
+        if (
+            this.isDirty()() &&
+            !(await this.confirm.confirm('Close Settings? The graph model has changes that were not run.'))
+        )
             return;
         this.open.set(false);
     }

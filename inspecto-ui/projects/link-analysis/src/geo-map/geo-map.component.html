@@ -54,7 +54,8 @@
                 <mat-menu #searchMenu="matMenu">
                     <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
                     <div class="p-3" (click)="$event.stopPropagation()">
-                        <mat-form-field subscriptSizing="dynamic" class="w-64"><!-- form-allow: a live search box -->
+                        <mat-form-field subscriptSizing="dynamic" class="w-64"
+                            ><!-- form-allow: a live search box -->
                             <mat-label>Search points</mat-label>
                             <input
                                 matInput
@@ -78,7 +79,8 @@
                         (click)="$event.stopPropagation()"
                         aria-label="Find place"
                     >
-                        <mat-form-field subscriptSizing="dynamic"><!-- form-allow: a live search box -->
+                        <mat-form-field subscriptSizing="dynamic"
+                            ><!-- form-allow: a live search box -->
                             <mat-label>Find place</mat-label>
                             <input
                                 matInput

@@ -32,30 +32,34 @@ import { configureLaLimits, resetLaLimits } from './la-limits';
     changeDetection: ChangeDetectionStrategy.Eager,
     imports: [LinkAnalysisInvestigationComponent],
     template: `<inspecto-link-analysis-investigation
-        [projection]="projection()"
-        projectionIssue="Run a query first."
-        [timeCol]="timeCol()"
-        [pending]="pending()"
-        [degreePresets]="{ budget: 2000 }"
-        [maxDegree]="4"
-        (pendingDone)="pending.set(null)"
-        (settingsRequested)="settingsAsked = true"
-        (dockRequested)="dockAsked = $event"
-        [selectionCount]="selectionCount()"
-        (saveRequested)="saveAsked = saveAsked + 1"
-        (closeRequested)="closeAsked = closeAsked + 1"
-        (startFromSelected)="startAsked = startAsked + 1"
-        [unsavedCanUndo]="unsavedCanUndo()"
-        [unsavedCanRedo]="unsavedCanRedo()"
-        (unsavedUndo)="undoAsked = undoAsked + 1"
-        (unsavedRedo)="redoAsked = redoAsked + 1"
-        (unsavedCleanUp)="cleaned.push($event)"
-    ><p laNewInvestigation data-testid="projected-new-form">New Investigation form</p
-    ><p laExpand data-testid="projected-expand">Expand form</p></inspecto-link-analysis-investigation>
-    <!-- §5.8/§5.9: the parts the Act panel handed to the dock and the settings sections, over the same store -->
-    @for (s of sections; track s) {
-        <inspecto-link-analysis-investigation [section]="s" [attr.data-section]="s"></inspecto-link-analysis-investigation>
-    }`,
+            [projection]="projection()"
+            projectionIssue="Run a query first."
+            [timeCol]="timeCol()"
+            [pending]="pending()"
+            [degreePresets]="{ budget: 2000 }"
+            [maxDegree]="4"
+            (pendingDone)="pending.set(null)"
+            (settingsRequested)="settingsAsked = true"
+            (dockRequested)="dockAsked = $event"
+            [selectionCount]="selectionCount()"
+            (saveRequested)="saveAsked = saveAsked + 1"
+            (closeRequested)="closeAsked = closeAsked + 1"
+            (startFromSelected)="startAsked = startAsked + 1"
+            [unsavedCanUndo]="unsavedCanUndo()"
+            [unsavedCanRedo]="unsavedCanRedo()"
+            (unsavedUndo)="undoAsked = undoAsked + 1"
+            (unsavedRedo)="redoAsked = redoAsked + 1"
+            (unsavedCleanUp)="cleaned.push($event)"
+            ><p laNewInvestigation data-testid="projected-new-form">New Investigation form</p>
+            <p laExpand data-testid="projected-expand">Expand form</p></inspecto-link-analysis-investigation
+        >
+        <!-- §5.8/§5.9: the parts the Act panel handed to the dock and the settings sections, over the same store -->
+        @for (s of sections; track s) {
+            <inspecto-link-analysis-investigation
+                [section]="s"
+                [attr.data-section]="s"
+            ></inspecto-link-analysis-investigation>
+        }`,
 })
 class Host {
     readonly projection = signal<EntityProjection | null>({ datasetId: 'calls', sourceCol: 'A', targetCol: 'B' });
@@ -176,9 +180,19 @@ function create(
             of({ id, title: c.title ?? 'Burners', purpose: c.purpose ?? null, updatedBy: 'alice', updatedAt: 'x' }),
         ),
         createInvestigation: vi.fn(() => of(LOG.header)),
-        investigationLog: vi.fn(() => of(opts.timeCol ? { ...LOG, header: { ...LOG.header, timeCol: opts.timeCol } } : LOG)),
+        investigationLog: vi.fn(() =>
+            of(opts.timeCol ? { ...LOG, header: { ...LOG.header, timeCol: opts.timeCol } } : LOG),
+        ),
         compareInvestigationWindows: vi.fn(() =>
-            of({ entities: { onlyB: { count: opts.onlyB?.items.length ?? 0, items: opts.onlyB?.items ?? [], truncated: opts.onlyB?.truncated ?? false } } }),
+            of({
+                entities: {
+                    onlyB: {
+                        count: opts.onlyB?.items.length ?? 0,
+                        items: opts.onlyB?.items ?? [],
+                        truncated: opts.onlyB?.truncated ?? false,
+                    },
+                },
+            }),
         ),
         replayInvestigation: vi.fn(() => of({ workingSet: opts.ws ?? WS })),
         appendInvestigationOp: vi.fn(() => of({})),
@@ -256,7 +270,11 @@ function create(
                 : []),
             {
                 provide: LensService,
-                useValue: { canManageIncidents: signal(opts.canManage ?? true), canShareInvestigation: signal(false), canUploadData: signal(false) },
+                useValue: {
+                    canManageIncidents: signal(opts.canManage ?? true),
+                    canShareInvestigation: signal(false),
+                    canUploadData: signal(false),
+                },
             },
             { provide: LinkAnalysisSettingsService, useValue: { limits: signal({ entityTypesInForce: [] }) } },
             // the data-table's real theme service walks up to GAMMA_APP_CONFIG — stub it, as its own spec does
@@ -306,7 +324,9 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
             'Read-only: changing an Investigation needs Incident management.',
         );
         // Mark this position sits behind More steps ▾ (§5.8 block 7)
-        (fixture.debugElement.children[0].componentInstance as LinkAnalysisInvestigationComponent).moreStep.set('snapshot');
+        (fixture.debugElement.children[0].componentInstance as LinkAnalysisInvestigationComponent).moreStep.set(
+            'snapshot',
+        );
         fixture.detectChanges();
         // LA-INVESTIGATE-UX-1: Undo / Redo and every Clean up press are writes too
         for (const label of ['Mark this position', 'Fork a Draft']) {
@@ -372,7 +392,15 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
     });
 
     it('LA-INVESTIGATE-UX-1: Clean up states its count and records ONE step per press; Exclude instead carries the reason', async () => {
-        const e = (id: string, hop: number, type: string | null = 'msisdn') => ({ id, type, hop, seed: 'a', admittedBy: 1, hidden: false, kept: false });
+        const e = (id: string, hop: number, type: string | null = 'msisdn') => ({
+            id,
+            type,
+            hop,
+            seed: 'a',
+            admittedBy: 1,
+            hidden: false,
+            kept: false,
+        });
         const l = (source: string, target: string) => ({ source, target, kind: 'voice', count: 1, admittedBy: 2 });
         const ws: WorkingSet = {
             entities: [e('a', 0), e('b', 1), e('c', 2), e('d', 2, 'imei')],
@@ -399,12 +427,23 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         expect(press('cleanup-type-imei').textContent).toContain('Exclude 1 imei');
         press('cleanup-type-imei').click();
         await fixture.whenStable();
-        expect(inv.appendInvestigationOp.mock.calls[1]).toEqual(['inv-1', { op: 'exclude', ids: ['d'], reason: 'Clean up: entity type imei' }]);
+        expect(inv.appendInvestigationOp.mock.calls[1]).toEqual([
+            'inv-1',
+            { op: 'exclude', ids: ['d'], reason: 'Clean up: entity type imei' },
+        ]);
         await expectNoA11yViolations(el.querySelector('[data-testid="act-cleanup"]') as HTMLElement);
     });
 
     it('LA-INVESTIGATE-UX-2 (2): Clean up hides what has no link event in a time window, read live, as ONE recorded step', async () => {
-        const e = (id: string, hop: number) => ({ id, type: 'msisdn', hop, seed: 'a', admittedBy: 1, hidden: false, kept: false });
+        const e = (id: string, hop: number) => ({
+            id,
+            type: 'msisdn',
+            hop,
+            seed: 'a',
+            admittedBy: 1,
+            hidden: false,
+            kept: false,
+        });
         const l = (source: string, target: string) => ({ source, target, kind: 'voice', count: 1, admittedBy: 2 });
         const ws: WorkingSet = {
             entities: [e('a', 0), e('b', 1), e('c', 1), e('d', 2)],
@@ -413,7 +452,11 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
             hash: 'sha256:w1',
         };
         // the read lists the start entity a too: it is spared, as every Clean up spares it
-        const { fixture, store, el, inv } = create({ ws, timeCol: 'at', onlyB: { items: ['a', 'c', 'd'], truncated: false } });
+        const { fixture, store, el, inv } = create({
+            ws,
+            timeCol: 'at',
+            onlyB: { items: ['a', 'c', 'd'], truncated: false },
+        });
         await openInv(store);
         fixture.detectChanges();
         const q = (id: string) => el.querySelector(`[data-testid="${id}"]`) as HTMLElement;
@@ -445,7 +488,8 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         fixture.detectChanges();
         const q = (id: string) => el.querySelector(`[data-testid="${id}"]`) as HTMLElement;
         // an example instant in an empty field reads as a value: the fields say what blank means instead
-        for (const label of ['From', 'To']) expect(penByLabel(q('cleanup-window'), label)!.textContent).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+        for (const label of ['From', 'To'])
+            expect(penByLabel(q('cleanup-window'), label)!.textContent).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
         expect(penByLabel(q('cleanup-window'), 'From')!.textContent).toContain('the start');
         expect(penByLabel(q('cleanup-window'), 'To')!.textContent).toContain('the end');
         const chip = q('cleanup-window-last30');
@@ -784,7 +828,6 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         fixture.detectChanges();
         expect(el.querySelector('[aria-label="Link annotations"]')?.textContent).toContain('a → b (voice)');
     });
-
 
     describe('delete (LA-INVESTIGATION-DELETE-1)', () => {
         it('without the Incident management capability there is no Delete on the open Investigation', async () => {
@@ -1141,9 +1184,7 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         fixture.detectChanges();
         const list = el.querySelector('[data-testid="hub-list"]') as HTMLElement;
         // threshold from the sealed step, contacts from the Working Set rows — not "more than 500"
-        expect(list.textContent).toContain(
-            'Busy: 650 linked entities (limit 500), expanded through override',
-        );
+        expect(list.textContent).toContain('Busy: 650 linked entities (limit 500), expanded through override');
         expect(list.querySelector('button[aria-label="Expand anyway from hub"]')).toBeNull();
     });
 
@@ -1169,7 +1210,9 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         expect(first[1]['includeHubs']).toBeUndefined();
         store.degreeOutcomes.set([]); // the stub admitted nothing; clear it so the degree is not "blocked"
         fixture.detectChanges();
-        expect(el.querySelector('[data-testid="degree-hubs"]')?.textContent).toContain('Untick “Hold busy entities” under Fan-out and busy');
+        expect(el.querySelector('[data-testid="degree-hubs"]')?.textContent).toContain(
+            'Untick “Hold busy entities” under Fan-out and busy',
+        );
     });
     it('badges a hub with the sealed count its step read answered when the Working Set row has none', async () => {
         const { fixture, store, el } = create({ ws: HUB_WS });
@@ -1230,7 +1273,9 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         await openInv(store);
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="projected-expand"]')).toBeNull();
-        expect(el.querySelector('[data-testid="expand-read-only"]')!.textContent).toContain('Needs Incident management.');
+        expect(el.querySelector('[data-testid="expand-read-only"]')!.textContent).toContain(
+            'Needs Incident management.',
+        );
     });
 
     it('nothing seeded: the Expand section says why the next degree cannot run (UI test 2026-10-29)', async () => {
@@ -1260,7 +1305,15 @@ describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', { timeout: 45_000 }, () => 
         });
     it('LA-INVESTIGATE-UX-2: Pick neighbours… asked from the node menu opens and reads the list once the entity shows selected', async () => {
         const { fixture, store, el, inv } = create();
-        const neighbourList = vi.fn(() => of({ neighbours: [{ id: 'c', count: 9, kinds: ['call'] }], total: 1, offset: 0, limit: 50, hasMore: false }));
+        const neighbourList = vi.fn(() =>
+            of({
+                neighbours: [{ id: 'c', count: 9, kinds: ['call'] }],
+                total: 1,
+                offset: 0,
+                limit: 50,
+                hasMore: false,
+            }),
+        );
         (inv as unknown as { neighbourList: unknown }).neighbourList = neighbourList;
         await openInv(store);
         store.neighboursRequested.set('a');
@@ -1328,238 +1381,277 @@ describe('Neighbours (LA-EXPAND-PICK-NEIGHBOURS-1)', { timeout: 45_000 }, () => 
     });
 });
 
-describe('LinkAnalysisInvestigationComponent - the Act panel and its sections (LA-STUDIO-UI-REORG-1 §5.8/§5.9)', { timeout: 45_000 }, () => {
-    const act = (el: HTMLElement) =>
-        el.querySelector('inspecto-link-analysis-investigation:not([data-section])') as HTMLElement;
-    const part = (el: HTMLElement, s: InvestigationSection) =>
-        el.querySelector(`inspecto-link-analysis-investigation[data-section="${s}"]`) as HTMLElement;
+describe(
+    'LinkAnalysisInvestigationComponent - the Act panel and its sections (LA-STUDIO-UI-REORG-1 §5.8/§5.9)',
+    { timeout: 45_000 },
+    () => {
+        const act = (el: HTMLElement) =>
+            el.querySelector('inspecto-link-analysis-investigation:not([data-section])') as HTMLElement;
+        const part = (el: HTMLElement, s: InvestigationSection) =>
+            el.querySelector(`inspecto-link-analysis-investigation[data-section="${s}"]`) as HTMLElement;
 
-    it('draws the blocks in order, the rare ones folded, and keeps setup, governance and dock parts out of it', async () => {
-        const { fixture, store, el } = create();
-        await openInv(store);
-        store.selected.set({ id: 'a', data: { label: 'a' } } as never);
-        fixture.detectChanges();
-        const panel = act(el);
-        // LA-INVESTIGATE-UX-1: Clean up and More steps are folds (More steps holds the steps, the scope list, Add start)
-        expect(Array.from(panel.querySelectorAll('la-fold')).map((f) => f.getAttribute('title'))).toEqual(['Clean up', 'More steps']);
-        expect(panel.querySelector('[data-testid="act-more"] [data-testid="act-step-groups"]')).not.toBeNull();
-        const order = ['act-header', 'act-counts', 'act-bar', 'degrees', 'act-cleanup', 'act-selected', 'act-step-groups', 'scope-list', 'act-add-start', 'act-links'].map(
-            (id) => panel.querySelector(`[data-testid="${id}"]`),
-        );
-        expect(order.every(Boolean)).toBe(true);
-        for (let i = 1; i < order.length; i++) {
-            expect(order[i - 1]!.compareDocumentPosition(order[i]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        }
-        for (const gone of ['Op log', 'Coverage', 'Members', 'Pin to a Widget', 'Entity Lists', 'Open an Investigation']) {
-            expect(panel.querySelector(`la-fold[title="${gone}"], section[aria-label="${gone}"]`)).toBeNull();
-        }
-        // UIR-A2: Value Measures live only in the algorithm catalogue
-        expect(el.querySelector('inspecto-link-analysis-value-measures')).toBeNull();
-        expect(part(el, 'settings').querySelector('la-fold[title="Members"]')).not.toBeNull();
-        expect(part(el, 'oplog').querySelector('section[aria-label="Step log"]')).not.toBeNull();
-        await expectNoA11yViolations(panel);
-    });
-
-    it('LA-REORG-SETTINGS-GAPS-1: This Investigation opens with a General section (title, purpose, time, lineage, pack, Delete)', async () => {
-        const { fixture, store, el } = create();
-        await openInv(store);
-        fixture.detectChanges();
-        const settings = part(el, 'settings');
-        const folds = Array.from(settings.querySelectorAll('la-fold')).map((f) => f.getAttribute('title'));
-        expect(folds[0]).toBe('General');
-        const general = settings.querySelector('[data-testid="inv-settings-general"]')!;
-        const text = general.textContent!.replace(/\s+/g, ' ');
-        expect(text).toContain('Burners');
-        expect(text).toContain('calls');
-        expect(text).toMatch(/Time column ?— ?Copied from ?—/); // T-159: no "(timeless)", no "Original"
-
-        expect(text).toContain("The Space's pack");
-        expect(settings.querySelector('[data-testid="inv-settings-delete"]')).not.toBeNull();
-        await expectNoA11yViolations(settings);
-    });
-
-    describe('rename and restate the purpose (LA-INVESTIGATION-RENAME-1)', () => {
-        const pen = (el: HTMLElement, id: string) =>
-            part(el, 'settings').querySelector(`[data-testid="${id}"]`) as HTMLElement | null;
-
-        it('a lead edits Title and Purpose in place; the header, the Act panel and the remembered ref show the new name', async () => {
-            const { fixture, store, el, inv } = create({ role: 'lead' });
+        it('draws the blocks in order, the rare ones folded, and keeps setup, governance and dock parts out of it', async () => {
+            const { fixture, store, el } = create();
             await openInv(store);
+            store.selected.set({ id: 'a', data: { label: 'a' } } as never);
             fixture.detectChanges();
-            await fixture.whenStable();
-            fixture.detectChanges();
-            expect(inv.investigationMembers).toHaveBeenCalledWith('inv-1');
-            expect(penText(pen(el, 'inv-settings-title')!)).toBe('Burners');
-            expect(part(el, 'settings').querySelector('[data-testid="inv-settings-details-readonly"]')).toBeNull();
-
-            penEdit(fixture, pen(el, 'inv-settings-title')!, 'Ring around b');
-            await fixture.whenStable();
-            fixture.detectChanges();
-            expect(inv.editInvestigation).toHaveBeenCalledWith('inv-1', { title: 'Ring around b' });
-            expect(store.header()?.title).toBe('Ring around b');
-            expect(store.refs().find((r) => r.id === 'inv-1')?.title).toBe('Ring around b');
-            expect(act(el).querySelector('[data-testid="act-header"]')!.textContent).toContain('Ring around b');
-
-            penEdit(fixture, pen(el, 'inv-settings-purpose')!, 'Fraud referral FR-10');
-            await fixture.whenStable();
-            fixture.detectChanges();
-            expect(inv.editInvestigation).toHaveBeenLastCalledWith('inv-1', { purpose: 'Fraud referral FR-10' });
-            expect(store.header()?.purpose).toBe('Fraud referral FR-10');
-            await expectNoA11yViolations(part(el, 'settings'));
+            const panel = act(el);
+            // LA-INVESTIGATE-UX-1: Clean up and More steps are folds (More steps holds the steps, the scope list, Add start)
+            expect(Array.from(panel.querySelectorAll('la-fold')).map((f) => f.getAttribute('title'))).toEqual([
+                'Clean up',
+                'More steps',
+            ]);
+            expect(panel.querySelector('[data-testid="act-more"] [data-testid="act-step-groups"]')).not.toBeNull();
+            const order = [
+                'act-header',
+                'act-counts',
+                'act-bar',
+                'degrees',
+                'act-cleanup',
+                'act-selected',
+                'act-step-groups',
+                'scope-list',
+                'act-add-start',
+                'act-links',
+            ].map((id) => panel.querySelector(`[data-testid="${id}"]`));
+            expect(order.every(Boolean)).toBe(true);
+            for (let i = 1; i < order.length; i++) {
+                expect(
+                    order[i - 1]!.compareDocumentPosition(order[i]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+                ).toBeTruthy();
+            }
+            for (const gone of [
+                'Op log',
+                'Coverage',
+                'Members',
+                'Pin to a Widget',
+                'Entity Lists',
+                'Open an Investigation',
+            ]) {
+                expect(panel.querySelector(`la-fold[title="${gone}"], section[aria-label="${gone}"]`)).toBeNull();
+            }
+            // UIR-A2: Value Measures live only in the algorithm catalogue
+            expect(el.querySelector('inspecto-link-analysis-value-measures')).toBeNull();
+            expect(part(el, 'settings').querySelector('la-fold[title="Members"]')).not.toBeNull();
+            expect(part(el, 'oplog').querySelector('section[aria-label="Step log"]')).not.toBeNull();
+            await expectNoA11yViolations(panel);
         });
 
-        it('a blank title is refused in place and never sent', async () => {
-            const { fixture, store, el, inv } = create({ role: 'lead' });
+        it('LA-REORG-SETTINGS-GAPS-1: This Investigation opens with a General section (title, purpose, time, lineage, pack, Delete)', async () => {
+            const { fixture, store, el } = create();
             await openInv(store);
             fixture.detectChanges();
-            await fixture.whenStable();
-            fixture.detectChanges();
-            penEdit(fixture, pen(el, 'inv-settings-title')!, '   ');
-            refresh(fixture);
-            expect(penError(pen(el, 'inv-settings-title')!)).toBe('A name is required.');
-            expect(inv.editInvestigation).not.toHaveBeenCalled();
+            const settings = part(el, 'settings');
+            const folds = Array.from(settings.querySelectorAll('la-fold')).map((f) => f.getAttribute('title'));
+            expect(folds[0]).toBe('General');
+            const general = settings.querySelector('[data-testid="inv-settings-general"]')!;
+            const text = general.textContent!.replace(/\s+/g, ' ');
+            expect(text).toContain('Burners');
+            expect(text).toContain('calls');
+            expect(text).toMatch(/Time column ?— ?Copied from ?—/); // T-159: no "(timeless)", no "Original"
+
+            expect(text).toContain("The Space's pack");
+            expect(settings.querySelector('[data-testid="inv-settings-delete"]')).not.toBeNull();
+            await expectNoA11yViolations(settings);
         });
 
-        it('a server refusal shows why and puts the name in force back', async () => {
-            const { fixture, store, el, inv } = create({ role: 'lead' });
-            inv.editInvestigation.mockReturnValue(refused("'title' is at most 200 chars"));
-            await openInv(store);
-            fixture.detectChanges();
-            await fixture.whenStable();
-            fixture.detectChanges();
-            penEdit(fixture, pen(el, 'inv-settings-title')!, 'Too long');
-            await fixture.whenStable();
-            refresh(fixture);
-            expect(part(el, 'settings').textContent).toContain("'title' is at most 200 chars");
-            expect(penText(pen(el, 'inv-settings-title')!)).toBe('Burners');
-            expect(store.header()?.title).toBe('Burners');
-        });
+        describe('rename and restate the purpose (LA-INVESTIGATION-RENAME-1)', () => {
+            const pen = (el: HTMLElement, id: string) =>
+                part(el, 'settings').querySelector(`[data-testid="${id}"]`) as HTMLElement | null;
 
-        it('LA-INVESTIGATION-EDIT-HARDENING-1: a lead renames from the Act header through the same route; an analyst reads it', async () => {
-            const { fixture, store, el, inv } = create({ role: 'lead' });
-            await openInv(store);
-            fixture.detectChanges();
-            await fixture.whenStable();
-            fixture.detectChanges();
-            const title = () => act(el).querySelector('[data-testid="act-title"]') as HTMLElement | null;
-            expect(penText(title()!)).toBe('Burners');
-            penEdit(fixture, title()!, 'Ring around c');
-            await fixture.whenStable();
-            fixture.detectChanges();
-            expect(inv.editInvestigation).toHaveBeenCalledWith('inv-1', { title: 'Ring around c' });
-            expect(store.header()?.title).toBe('Ring around c');
-            expect(penText(pen(el, 'inv-settings-title')!)).toBe('Ring around c');
-            await expectNoA11yViolations(act(el).querySelector('[data-testid="act-header"]') as HTMLElement);
-            TestBed.resetTestingModule();
-
-            const analyst = create({ role: 'analyst' });
-            await openInv(analyst.store);
-            analyst.fixture.detectChanges();
-            await analyst.fixture.whenStable();
-            analyst.fixture.detectChanges();
-            const header = act(analyst.el).querySelector('[data-testid="act-header"]')!;
-            expect(header.querySelector('[data-testid="act-title"]')).toBeNull();
-            expect(header.textContent).toContain('Burners');
-        });
-
-        it('the purpose limit is the Space\'s input.purpose_length, not a number of the UI\'s own', async () => {
-            configureLaLimits({ 'input.purpose_length': 3000 });
-            try {
-                const { fixture, store, el } = create({ role: 'lead' });
+            it('a lead edits Title and Purpose in place; the header, the Act panel and the remembered ref show the new name', async () => {
+                const { fixture, store, el, inv } = create({ role: 'lead' });
                 await openInv(store);
                 fixture.detectChanges();
                 await fixture.whenStable();
                 fixture.detectChanges();
-                const c = fixture.debugElement.query(By.directive(LinkAnalysisInvestigationComponent))
-                    .componentInstance as LinkAnalysisInvestigationComponent;
-                expect(c.purposeMax()).toBe(3000);
-                c.purpose.setValue('x'.repeat(2000));
-                expect(c.purpose.hasError('maxlength')).toBe(false);
-                c.purpose.setValue('x'.repeat(3001));
-                expect(c.purpose.hasError('maxlength')).toBe(true);
-                expect(penOpen(fixture, pen(el, 'inv-settings-purpose')!).maxLength).toBe(3000);
-            } finally {
-                resetLaLimits();
+                expect(inv.investigationMembers).toHaveBeenCalledWith('inv-1');
+                expect(penText(pen(el, 'inv-settings-title')!)).toBe('Burners');
+                expect(part(el, 'settings').querySelector('[data-testid="inv-settings-details-readonly"]')).toBeNull();
+
+                penEdit(fixture, pen(el, 'inv-settings-title')!, 'Ring around b');
+                await fixture.whenStable();
+                fixture.detectChanges();
+                expect(inv.editInvestigation).toHaveBeenCalledWith('inv-1', { title: 'Ring around b' });
+                expect(store.header()?.title).toBe('Ring around b');
+                expect(store.refs().find((r) => r.id === 'inv-1')?.title).toBe('Ring around b');
+                expect(act(el).querySelector('[data-testid="act-header"]')!.textContent).toContain('Ring around b');
+
+                penEdit(fixture, pen(el, 'inv-settings-purpose')!, 'Fraud referral FR-10');
+                await fixture.whenStable();
+                fixture.detectChanges();
+                expect(inv.editInvestigation).toHaveBeenLastCalledWith('inv-1', { purpose: 'Fraud referral FR-10' });
+                expect(store.header()?.purpose).toBe('Fraud referral FR-10');
+                await expectNoA11yViolations(part(el, 'settings'));
+            });
+
+            it('a blank title is refused in place and never sent', async () => {
+                const { fixture, store, el, inv } = create({ role: 'lead' });
+                await openInv(store);
+                fixture.detectChanges();
+                await fixture.whenStable();
+                fixture.detectChanges();
+                penEdit(fixture, pen(el, 'inv-settings-title')!, '   ');
+                refresh(fixture);
+                expect(penError(pen(el, 'inv-settings-title')!)).toBe('A name is required.');
+                expect(inv.editInvestigation).not.toHaveBeenCalled();
+            });
+
+            it('a server refusal shows why and puts the name in force back', async () => {
+                const { fixture, store, el, inv } = create({ role: 'lead' });
+                inv.editInvestigation.mockReturnValue(refused("'title' is at most 200 chars"));
+                await openInv(store);
+                fixture.detectChanges();
+                await fixture.whenStable();
+                fixture.detectChanges();
+                penEdit(fixture, pen(el, 'inv-settings-title')!, 'Too long');
+                await fixture.whenStable();
+                refresh(fixture);
+                expect(part(el, 'settings').textContent).toContain("'title' is at most 200 chars");
+                expect(penText(pen(el, 'inv-settings-title')!)).toBe('Burners');
+                expect(store.header()?.title).toBe('Burners');
+            });
+
+            it('LA-INVESTIGATION-EDIT-HARDENING-1: a lead renames from the Act header through the same route; an analyst reads it', async () => {
+                const { fixture, store, el, inv } = create({ role: 'lead' });
+                await openInv(store);
+                fixture.detectChanges();
+                await fixture.whenStable();
+                fixture.detectChanges();
+                const title = () => act(el).querySelector('[data-testid="act-title"]') as HTMLElement | null;
+                expect(penText(title()!)).toBe('Burners');
+                penEdit(fixture, title()!, 'Ring around c');
+                await fixture.whenStable();
+                fixture.detectChanges();
+                expect(inv.editInvestigation).toHaveBeenCalledWith('inv-1', { title: 'Ring around c' });
+                expect(store.header()?.title).toBe('Ring around c');
+                expect(penText(pen(el, 'inv-settings-title')!)).toBe('Ring around c');
+                await expectNoA11yViolations(act(el).querySelector('[data-testid="act-header"]') as HTMLElement);
+                TestBed.resetTestingModule();
+
+                const analyst = create({ role: 'analyst' });
+                await openInv(analyst.store);
+                analyst.fixture.detectChanges();
+                await analyst.fixture.whenStable();
+                analyst.fixture.detectChanges();
+                const header = act(analyst.el).querySelector('[data-testid="act-header"]')!;
+                expect(header.querySelector('[data-testid="act-title"]')).toBeNull();
+                expect(header.textContent).toContain('Burners');
+            });
+
+            it("the purpose limit is the Space's input.purpose_length, not a number of the UI's own", async () => {
+                configureLaLimits({ 'input.purpose_length': 3000 });
+                try {
+                    const { fixture, store, el } = create({ role: 'lead' });
+                    await openInv(store);
+                    fixture.detectChanges();
+                    await fixture.whenStable();
+                    fixture.detectChanges();
+                    const c = fixture.debugElement.query(By.directive(LinkAnalysisInvestigationComponent))
+                        .componentInstance as LinkAnalysisInvestigationComponent;
+                    expect(c.purposeMax()).toBe(3000);
+                    c.purpose.setValue('x'.repeat(2000));
+                    expect(c.purpose.hasError('maxlength')).toBe(false);
+                    c.purpose.setValue('x'.repeat(3001));
+                    expect(c.purpose.hasError('maxlength')).toBe(true);
+                    expect(penOpen(fixture, pen(el, 'inv-settings-purpose')!).maxLength).toBe(3000);
+                } finally {
+                    resetLaLimits();
+                }
+            });
+
+            it('a member who is not a lead, or a caller without the capability, reads them with the reason', async () => {
+                const analyst = create({ role: 'analyst' });
+                await openInv(analyst.store);
+                analyst.fixture.detectChanges();
+                await analyst.fixture.whenStable();
+                analyst.fixture.detectChanges();
+                const settings = part(analyst.el, 'settings');
+                expect(settings.querySelector('[data-testid="inv-settings-title"]')).toBeNull();
+                expect(settings.querySelector('[data-testid="inv-settings-general"]')!.textContent).toContain(
+                    'Burners',
+                );
+                expect(settings.querySelector('[data-testid="inv-settings-details-readonly"]')!.textContent).toContain(
+                    'Only a lead can change the name or purpose.',
+                );
+                TestBed.resetTestingModule();
+
+                const nocap = create({ role: 'lead', canManage: false });
+                await openInv(nocap.store);
+                nocap.fixture.detectChanges();
+                await nocap.fixture.whenStable();
+                nocap.fixture.detectChanges();
+                const s2 = part(nocap.el, 'settings');
+                expect(s2.querySelector('[data-testid="inv-settings-title"]')).toBeNull();
+                expect(s2.querySelector('[data-testid="inv-settings-details-readonly"]')!.textContent).toContain(
+                    'Needs Incident management.',
+                );
+            });
+        });
+
+        it('LA-INV-EXPAND-1: no step list in the tab; one line opens the Step log dock, another the settings', async () => {
+            const { fixture, store, el } = create();
+            await openInv(store);
+            fixture.detectChanges();
+            // the steps are the dock's Step log only (it has them all, with Undo and Re-order)
+            expect(act(el).querySelector('[data-testid="act-last-steps"]')).toBeNull();
+            expect(act(el).querySelector('[aria-label="Last steps"]')).toBeNull();
+            expect(act(el).textContent).not.toContain('Last steps');
+            expect(part(el, 'oplog').querySelectorAll('section[aria-label="Step log"] ol > li').length).toBe(2);
+            const links = act(el).querySelector('[data-testid="act-links"]') as HTMLElement;
+            const open = links.querySelector('[data-testid="open-op-log"]') as HTMLButtonElement;
+            expect(open.textContent!.trim()).toBe('Open the Step log');
+            open.click();
+            expect(fixture.componentInstance.dockAsked).toBe('oplog');
+            (links.querySelector('[data-testid="act-settings-link"]') as HTMLButtonElement).click();
+            expect(fixture.componentInstance.settingsAsked).toBe(true);
+            await expectNoA11yViolations(links);
+        });
+
+        it('draws no dock part while no Investigation is open', () => {
+            const { el } = create();
+            for (const s of ['oplog', 'ws-rows', 'coverage', 'annotations', 'excluded'] as InvestigationSection[]) {
+                expect(part(el, s).querySelector('section')!.children.length).toBe(0);
             }
         });
+    },
+);
 
-        it('a member who is not a lead, or a caller without the capability, reads them with the reason', async () => {
-            const analyst = create({ role: 'analyst' });
-            await openInv(analyst.store);
-            analyst.fixture.detectChanges();
-            await analyst.fixture.whenStable();
-            analyst.fixture.detectChanges();
-            const settings = part(analyst.el, 'settings');
-            expect(settings.querySelector('[data-testid="inv-settings-title"]')).toBeNull();
-            expect(settings.querySelector('[data-testid="inv-settings-general"]')!.textContent).toContain('Burners');
-            expect(settings.querySelector('[data-testid="inv-settings-details-readonly"]')!.textContent).toContain(
-                'Only a lead can change the name or purpose.',
+describe(
+    'LinkAnalysisInvestigationComponent - the steps in visible groups (LA-UNSAVED-INVESTIGATION-1)',
+    { timeout: 45_000 },
+    () => {
+        it('every step is a button under its group heading (no menu), and opens in place under that group', async () => {
+            const { fixture, store, el } = create();
+            await openInv(store);
+            fixture.detectChanges();
+            const groups = el.querySelector('[data-testid="act-step-groups"]') as HTMLElement;
+            expect(el.querySelector('[data-testid="more-steps"]')).toBeNull(); // the "More steps" menu is gone
+            const heads = Array.from(groups.querySelectorAll('[role="group"]')).map((g) =>
+                g.getAttribute('aria-label'),
             );
-            TestBed.resetTestingModule();
-
-            const nocap = create({ role: 'lead', canManage: false });
-            await openInv(nocap.store);
-            nocap.fixture.detectChanges();
-            await nocap.fixture.whenStable();
-            nocap.fixture.detectChanges();
-            const s2 = part(nocap.el, 'settings');
-            expect(s2.querySelector('[data-testid="inv-settings-title"]')).toBeNull();
-            expect(s2.querySelector('[data-testid="inv-settings-details-readonly"]')!.textContent).toContain(
-                'Needs Incident management.',
-            );
+            expect(heads).toEqual(['Connect', 'Time', 'Compare']);
+            const buttons = Array.from(groups.querySelectorAll('button')).map((b) => b.textContent!.trim());
+            expect(buttons).toEqual([
+                'Connect start entities',
+                'Time window',
+                'Snapshot marker',
+                'Threshold',
+                'Compare',
+            ]);
+            const window = groups.querySelector('[data-testid="step-window"]') as HTMLButtonElement;
+            window.click();
+            fixture.detectChanges();
+            expect(window.getAttribute('aria-expanded')).toBe('true');
+            const open = groups.querySelector('[data-testid="step-group-time"] [data-testid="step-open"]');
+            expect(open?.querySelector('inspecto-la-window-op')).not.toBeNull();
+            window.click(); // a second press closes it
+            fixture.detectChanges();
+            expect(groups.querySelector('[data-testid="step-open"]')).toBeNull();
+            await expectNoA11yViolations(groups);
         });
-    });
-
-    it('LA-INV-EXPAND-1: no step list in the tab; one line opens the Step log dock, another the settings', async () => {
-        const { fixture, store, el } = create();
-        await openInv(store);
-        fixture.detectChanges();
-        // the steps are the dock's Step log only (it has them all, with Undo and Re-order)
-        expect(act(el).querySelector('[data-testid="act-last-steps"]')).toBeNull();
-        expect(act(el).querySelector('[aria-label="Last steps"]')).toBeNull();
-        expect(act(el).textContent).not.toContain('Last steps');
-        expect(part(el, 'oplog').querySelectorAll('section[aria-label="Step log"] ol > li').length).toBe(2);
-        const links = act(el).querySelector('[data-testid="act-links"]') as HTMLElement;
-        const open = links.querySelector('[data-testid="open-op-log"]') as HTMLButtonElement;
-        expect(open.textContent!.trim()).toBe('Open the Step log');
-        open.click();
-        expect(fixture.componentInstance.dockAsked).toBe('oplog');
-        (links.querySelector('[data-testid="act-settings-link"]') as HTMLButtonElement).click();
-        expect(fixture.componentInstance.settingsAsked).toBe(true);
-        await expectNoA11yViolations(links);
-    });
-
-    it('draws no dock part while no Investigation is open', () => {
-        const { el } = create();
-        for (const s of ['oplog', 'ws-rows', 'coverage', 'annotations', 'excluded'] as InvestigationSection[]) {
-            expect(part(el, s).querySelector('section')!.children.length).toBe(0);
-        }
-    });
-});
-
-describe('LinkAnalysisInvestigationComponent - the steps in visible groups (LA-UNSAVED-INVESTIGATION-1)', { timeout: 45_000 }, () => {
-    it('every step is a button under its group heading (no menu), and opens in place under that group', async () => {
-        const { fixture, store, el } = create();
-        await openInv(store);
-        fixture.detectChanges();
-        const groups = el.querySelector('[data-testid="act-step-groups"]') as HTMLElement;
-        expect(el.querySelector('[data-testid="more-steps"]')).toBeNull(); // the "More steps" menu is gone
-        const heads = Array.from(groups.querySelectorAll('[role="group"]')).map((g) => g.getAttribute('aria-label'));
-        expect(heads).toEqual(['Connect', 'Time', 'Compare']);
-        const buttons = Array.from(groups.querySelectorAll('button')).map((b) => b.textContent!.trim());
-        expect(buttons).toEqual(['Connect start entities', 'Time window', 'Snapshot marker', 'Threshold', 'Compare']);
-        const window = groups.querySelector('[data-testid="step-window"]') as HTMLButtonElement;
-        window.click();
-        fixture.detectChanges();
-        expect(window.getAttribute('aria-expanded')).toBe('true');
-        const open = groups.querySelector('[data-testid="step-group-time"] [data-testid="step-open"]');
-        expect(open?.querySelector('inspecto-la-window-op')).not.toBeNull();
-        window.click(); // a second press closes it
-        fixture.detectChanges();
-        expect(groups.querySelector('[data-testid="step-open"]')).toBeNull();
-        await expectNoA11yViolations(groups);
-    });
-});
+    },
+);
 
 describe('LinkAnalysisInvestigationComponent - unsaved work (LA-UNSAVED-INVESTIGATION-1)', { timeout: 45_000 }, () => {
     const begin = (store: InvestigationSessionStore) =>
@@ -1568,7 +1660,12 @@ describe('LinkAnalysisInvestigationComponent - unsaved work (LA-UNSAVED-INVESTIG
             { name: 'Account', purpose: 'Review of an Account and its links' },
             [
                 { kind: 'seed', ids: ['a', 'b'] },
-                { kind: 'expand', from: 'outer', ids: [], req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 } },
+                {
+                    kind: 'expand',
+                    from: 'outer',
+                    ids: [],
+                    req: { direction: 'either', degrees: 1, linkKinds: null, hold: true, threshold: 500 },
+                },
             ],
         );
 
@@ -1582,7 +1679,9 @@ describe('LinkAnalysisInvestigationComponent - unsaved work (LA-UNSAVED-INVESTIG
         expect(el.querySelector('[data-testid="projected-expand"]')).not.toBeNull();
         const start = el.querySelector('[data-testid="unsaved-start-selected"]') as HTMLButtonElement;
         expect(start.getAttribute('aria-disabled') === 'true' || start.disabled).toBe(true);
-        expect(el.querySelector('[data-testid="unsaved-start-entities"]')!.textContent).toContain('Select entities first.');
+        expect(el.querySelector('[data-testid="unsaved-start-entities"]')!.textContent).toContain(
+            'Select entities first.',
+        );
         fixture.componentInstance.selectionCount.set(2);
         fixture.detectChanges();
         start.click();
@@ -1614,11 +1713,24 @@ describe('LinkAnalysisInvestigationComponent - unsaved work (LA-UNSAVED-INVESTIG
     });
 
     it('LA-INVESTIGATE-UX-2: Clean up counts the unsaved Working Set and hands each hide, or exclude, to the page', async () => {
-        const e = (id: string, hop: number) => ({ id, type: 'msisdn', hop, seed: 'a', admittedBy: 1, hidden: false, kept: false });
+        const e = (id: string, hop: number) => ({
+            id,
+            type: 'msisdn',
+            hop,
+            seed: 'a',
+            admittedBy: 1,
+            hidden: false,
+            kept: false,
+        });
         const l = (source: string, target: string) => ({ source, target, kind: 'voice', count: 1, admittedBy: 2 });
         const { fixture, store, el, inv } = create();
         begin(store);
-        store.unsavedWs.set({ entities: [e('a', 0), e('b', 1), e('c', 2), e('d', 2)], links: [l('a', 'b'), l('b', 'c'), l('b', 'd')], excluded: [], hash: '' });
+        store.unsavedWs.set({
+            entities: [e('a', 0), e('b', 1), e('c', 2), e('d', 2)],
+            links: [l('a', 'b'), l('b', 'c'), l('b', 'd')],
+            excluded: [],
+            hash: '',
+        });
         fixture.detectChanges();
         await fixture.whenStable(); // ngModel applies [disabled] a tick later
         fixture.detectChanges();
@@ -1647,7 +1759,9 @@ describe('LinkAnalysisInvestigationComponent - unsaved work (LA-UNSAVED-INVESTIG
         fixture.detectChanges();
         const save = el.querySelector('[data-testid="unsaved-save"]') as HTMLButtonElement;
         expect(save.getAttribute('aria-disabled')).toBe('true');
-        expect(el.querySelector('[data-testid="unsaved-save-why"]')?.textContent?.trim()).toBe('Needs Incident management.');
+        expect(el.querySelector('[data-testid="unsaved-save-why"]')?.textContent?.trim()).toBe(
+            'Needs Incident management.',
+        );
         expect(save.getAttribute('aria-describedby')).toBe('unsaved-save-why');
         save.click();
         expect(fixture.componentInstance.saveAsked).toBe(0);
@@ -1655,24 +1769,28 @@ describe('LinkAnalysisInvestigationComponent - unsaved work (LA-UNSAVED-INVESTIG
     });
 });
 
-describe('LinkAnalysisInvestigationComponent - Add start entities… (LA-UNSAVED-INVESTIGATION-1 review)', { timeout: 45_000 }, () => {
-    it('opens the start form on the open Investigation, to pick start entities outside the Working Set', async () => {
-        const { fixture, store, el } = create();
-        await openInv(store);
-        fixture.detectChanges();
-        expect(el.querySelector('[data-testid="projected-new-form"]')).toBeNull();
-        const add = el.querySelector('[data-testid="add-start-entities"]') as HTMLButtonElement;
-        add.click();
-        fixture.detectChanges();
-        expect(add.getAttribute('aria-expanded')).toBe('true');
-        expect(el.querySelector('[data-testid="act-add-start"] [data-testid="projected-new-form"]')).not.toBeNull();
-        await expectNoA11yViolations(el.querySelector('[data-testid="act-add-start"]') as HTMLElement);
-    });
+describe(
+    'LinkAnalysisInvestigationComponent - Add start entities… (LA-UNSAVED-INVESTIGATION-1 review)',
+    { timeout: 45_000 },
+    () => {
+        it('opens the start form on the open Investigation, to pick start entities outside the Working Set', async () => {
+            const { fixture, store, el } = create();
+            await openInv(store);
+            fixture.detectChanges();
+            expect(el.querySelector('[data-testid="projected-new-form"]')).toBeNull();
+            const add = el.querySelector('[data-testid="add-start-entities"]') as HTMLButtonElement;
+            add.click();
+            fixture.detectChanges();
+            expect(add.getAttribute('aria-expanded')).toBe('true');
+            expect(el.querySelector('[data-testid="act-add-start"] [data-testid="projected-new-form"]')).not.toBeNull();
+            await expectNoA11yViolations(el.querySelector('[data-testid="act-add-start"]') as HTMLElement);
+        });
 
-    it('is not offered to a reader', async () => {
-        const { fixture, store, el } = create({ canManage: false });
-        await openInv(store);
-        fixture.detectChanges();
-        expect(el.querySelector('[data-testid="add-start-entities"]')).toBeNull();
-    });
-});
+        it('is not offered to a reader', async () => {
+            const { fixture, store, el } = create({ canManage: false });
+            await openInv(store);
+            fixture.detectChanges();
+            expect(el.querySelector('[data-testid="add-start-entities"]')).toBeNull();
+        });
+    },
+);

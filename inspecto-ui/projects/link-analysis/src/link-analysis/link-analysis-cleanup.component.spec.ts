@@ -36,7 +36,9 @@ describe('LinkAnalysisCleanupComponent', () => {
         expect(q('cleanup-effect')!.textContent).toContain('hides 1 of 4 entities');
         await expectNoA11yViolations(el);
         q('cleanup-apply')!.click();
-        expect(applied).toEqual([{ tool: 'paths', ids: ['d'], reason: 'Clean up: not on a path between start entities, L = 4' }]);
+        expect(applied).toEqual([
+            { tool: 'paths', ids: ['d'], reason: 'Clean up: not on a path between start entities, L = 4' },
+        ]);
         f.detectChanges();
         expect(q('cleanup-panel')).toBeNull();
     });

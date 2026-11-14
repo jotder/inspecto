@@ -4,7 +4,12 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
-import { Dossier, DossierBundleVerifyResult, DossierVerifyResult, InvService } from '@inspecto/link-analysis/api/inv.service';
+import {
+    Dossier,
+    DossierBundleVerifyResult,
+    DossierVerifyResult,
+    InvService,
+} from '@inspecto/link-analysis/api/inv.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { refresh } from '@inspecto/core/testing/pen-field';
 import { LinkAnalysisDossierComponent } from './link-analysis-dossier.component';
@@ -91,7 +96,11 @@ const FAILED: DossierVerifyResult = {
     contentChanged: ['entities'],
 };
 
-const BUNDLE = { format: 'inspecto-dossier-bundle/1', investigationId: 'inv-1', seal: { algorithm: 'SHA-256', value: 'x' } };
+const BUNDLE = {
+    format: 'inspecto-dossier-bundle/1',
+    investigationId: 'inv-1',
+    seal: { algorithm: 'SHA-256', value: 'x' },
+};
 
 const BUNDLE_TAMPERED: DossierBundleVerifyResult = {
     id: 'inv-1',
@@ -167,7 +176,7 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
         f.detectChanges();
         const block = el.querySelector('dl[aria-label="Data state at export time"]')?.textContent ?? '';
         expect(block).toContain('Not part of the custody hash');
-        expect(block).toContain('3 Sep 2026');   // a midnight asOf covers the day BEFORE, read once, by the shared formatter
+        expect(block).toContain('3 Sep 2026'); // a midnight asOf covers the day BEFORE, read once, by the shared formatter
         expect(block).not.toContain('2026-09-04T00:00:00Z');
         expect(block).toContain('version 3 — stale');
         expect(block).toContain('2026-09-02 (of 3 expected)');
@@ -253,7 +262,9 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
             Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Verify this Dossier'))!;
         expect(button().getAttribute('aria-disabled')).toBe('true');
         expect(button().getAttribute('aria-describedby')).toContain('why-verify-issued');
-        expect(el.querySelector('[data-testid="why-verify-issued"]')?.textContent?.trim()).toBe('Build the Dossier first.');
+        expect(el.querySelector('[data-testid="why-verify-issued"]')?.textContent?.trim()).toBe(
+            'Build the Dossier first.',
+        );
         await expectNoA11yViolations(el);
         await c.build();
         f.detectChanges();

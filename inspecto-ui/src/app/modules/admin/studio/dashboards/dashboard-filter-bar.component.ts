@@ -2,7 +2,11 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { FormsModule } from '@angular/forms';
-import { InspectoOptionPickerComponent, PickerOption, pickerOptions } from 'app/inspecto/components/option-picker.component';
+import {
+    InspectoOptionPickerComponent,
+    PickerOption,
+    pickerOptions,
+} from 'app/inspecto/components/option-picker.component';
 import { Condition, ConditionGroup } from 'app/inspecto/query';
 import { DrillEvent } from '../widgets/widget-host.component';
 

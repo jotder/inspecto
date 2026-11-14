@@ -58,7 +58,10 @@ function setup(opts: { served?: Partial<LinkAnalysisLimits>; save?: () => unknow
             { provide: ToastrService, useValue: toastr },
             {
                 provide: LensService,
-                useValue: { canAuthorWorkbench: () => opts.canEdit !== false, canManageExclusionCategories: () => false },
+                useValue: {
+                    canAuthorWorkbench: () => opts.canEdit !== false,
+                    canManageExclusionCategories: () => false,
+                },
             },
             { provide: ExclusionCategoriesService, useValue: { list: () => of({ lists: [] }) } },
         ],
@@ -75,7 +78,9 @@ function setup(opts: { served?: Partial<LinkAnalysisLimits>; save?: () => unknow
 }
 
 describe('LinkAnalysisSettingsComponent', () => {
-    const ET = [{ id: 'msisdn', label: 'Subscriber', normaliser: 'msisdn' as never, masked: true, classifications: ['PII'] }];
+    const ET = [
+        { id: 'msisdn', label: 'Subscriber', normaliser: 'msisdn' as never, masked: true, classifications: ['PII'] },
+    ];
     /** A document with EVERY limit stated, beside the non-limit keys this form edits. */
     const FULL: Partial<LinkAnalysisLimits> = {
         maskingMode: 'all',
@@ -89,7 +94,13 @@ describe('LinkAnalysisSettingsComponent', () => {
         maxInvestigationBytes: 1073741824,
         index: { enabled: true, maxDiskBytes: 1000, keepVersions: 5, maxAgeHours: 48 },
         indexInForce: { enabled: true, maxDiskBytes: 1000, keepVersions: 5, maxAgeHours: 48 },
-        graphRun: { maxNodes: 900, maxEdges: null, timeoutMs: 4000, maxResultItems: 55, propagatedRiskWeights: [1, 0.5] },
+        graphRun: {
+            maxNodes: 900,
+            maxEdges: null,
+            timeoutMs: 4000,
+            maxResultItems: 55,
+            propagatedRiskWeights: [1, 0.5],
+        },
         propagatedRiskWeightsInForce: [1, 0.5],
         graphRunInForce: { maxResultItems: 55 },
         drafts: { maxOpen: 9, hibernateAfterMinutes: 30, expireAfterDays: 14 },
@@ -174,18 +185,25 @@ describe('LinkAnalysisSettingsComponent', () => {
         expect(body()).not.toHaveProperty('embed');
     });
 
-    it.each(['1.5', '-0.1', 'a', '1,2', '0.1,0.2,0.3,0.4,0.5,0.6,0.7'])('refuses risk weights "%s" client-side', (bad) => {
-        const { c, api, submit } = setup();
-        c.form.controls.graphRun.controls.propagatedRiskWeights.setValue(bad);
-        submit();
-        expect(api.save).not.toHaveBeenCalled();
-    });
+    it.each(['1.5', '-0.1', 'a', '1,2', '0.1,0.2,0.3,0.4,0.5,0.6,0.7'])(
+        'refuses risk weights "%s" client-side',
+        (bad) => {
+            const { c, api, submit } = setup();
+            c.form.controls.graphRun.controls.propagatedRiskWeights.setValue(bad);
+            submit();
+            expect(api.save).not.toHaveBeenCalled();
+        },
+    );
 
     it("shows a 422 inline in the server's words and a 503 as a writes-disabled notice", async () => {
         const { el, api, submit } = setup({
             save: () =>
                 throwError(
-                    () => new HttpErrorResponse({ status: 422, error: { error: { message: "masking_mode must be one of typed, all, none" } } }),
+                    () =>
+                        new HttpErrorResponse({
+                            status: 422,
+                            error: { error: { message: 'masking_mode must be one of typed, all, none' } },
+                        }),
                 ),
         });
         submit();
@@ -201,10 +219,18 @@ describe('LinkAnalysisSettingsComponent', () => {
     it('the 422 shown inline is announced and axe-clean (LA-A11Y-AUDIT-1)', async () => {
         const { el, submit } = setup({
             save: () =>
-                throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message: 'graphRun.propagatedRiskWeights must be a list' } } })),
+                throwError(
+                    () =>
+                        new HttpErrorResponse({
+                            status: 422,
+                            error: { error: { message: 'graphRun.propagatedRiskWeights must be a list' } },
+                        }),
+                ),
         });
         submit();
-        expect(el.querySelector('[role="alert"]')?.textContent).toContain('graphRun.propagatedRiskWeights must be a list');
+        expect(el.querySelector('[role="alert"]')?.textContent).toContain(
+            'graphRun.propagatedRiskWeights must be a list',
+        );
         await expectNoA11yViolations(el);
     });
 
@@ -235,7 +261,9 @@ describe('LinkAnalysisSettingsComponent', () => {
 
         it('sends the sites allowed to frame the viewer as a list, and refuses anything that is not an https origin', () => {
             const { c, submit, body } = setup({ served: EMBED });
-            c.form.controls.embed.patchValue({ frameAncestors: ' https://portal.example.com , https://b.example:8443 ' });
+            c.form.controls.embed.patchValue({
+                frameAncestors: ' https://portal.example.com , https://b.example:8443 ',
+            });
             submit();
             expect((body()['embed'] as { frameAncestors: string[] }).frameAncestors).toEqual([
                 'https://portal.example.com',
@@ -251,7 +279,9 @@ describe('LinkAnalysisSettingsComponent', () => {
 
         it('refuses more than 20 classifications or a name over 64 characters', () => {
             const { c, api, submit } = setup();
-            c.form.controls.embed.patchValue({ refuseClassifications: Array.from({ length: 21 }, (_, i) => 'C' + i).join(',') });
+            c.form.controls.embed.patchValue({
+                refuseClassifications: Array.from({ length: 21 }, (_, i) => 'C' + i).join(','),
+            });
             submit();
             c.form.controls.embed.patchValue({ refuseClassifications: 'X'.repeat(65) });
             submit();
@@ -288,7 +318,9 @@ describe('LinkAnalysisSettingsComponent', () => {
         // Each setting is a pen field or an option picker: read only, every one of them is an inert, disabled row
         // (no pencil, nothing to open).
         const dom = Array.from(
-            el.querySelector('form')!.querySelectorAll<HTMLButtonElement>('inspecto-pen-field button, inspecto-option-picker button'),
+            el
+                .querySelector('form')!
+                .querySelectorAll<HTMLButtonElement>('inspecto-pen-field button, inspecto-option-picker button'),
         );
         expect(dom.length).toBeGreaterThan(0);
         for (const d of dom) expect(d.disabled, d.outerHTML.slice(0, 80)).toBe(true);

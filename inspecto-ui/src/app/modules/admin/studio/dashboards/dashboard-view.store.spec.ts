@@ -184,4 +184,3 @@ describe('DashboardViewStore — the dates a KPI tile reads over (D3)', () => {
         expect(s.kpiRange()).toBeNull();
     });
 });
-

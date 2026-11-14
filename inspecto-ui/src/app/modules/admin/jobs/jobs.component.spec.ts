@@ -157,7 +157,9 @@ describe('JobsComponent', () => {
             const c = create('ok').componentInstance;
             oidc(['canOperateRuns']);
             expect(hintsOf(c, failed)).toContain('Run again (last run failed)');
-            expect(hintsOf(c, { ...job, lastStatus: 'SUCCESS' } as JobView)).not.toContain('Run again (last run failed)');
+            expect(hintsOf(c, { ...job, lastStatus: 'SUCCESS' } as JobView)).not.toContain(
+                'Run again (last run failed)',
+            );
             oidc([]);
             expect(hintsOf(c, failed)).toEqual([]);
         });
