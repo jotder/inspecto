@@ -782,7 +782,10 @@ source: sensitive | entity-type | not-masked, entityType?, label?}`, sorted. It 
 `GET /inv/entity-types` (reads are gated at the Space/ABAC layer, not by capability). The schema metadata grid and
 the `sql` Step's output grid offer it as a picker (`<inspecto-classification-select>`) that marks the classes that
 mask, keeps a stored class the Space does not know as a flagged "(unknown)" option so an old config can be fixed,
-and falls back to a text input if the list cannot be read (the save still judges).
+and falls back to a text input if the list cannot be read (the save still judges). ⚠ `masked` is the union
+(sensitive, or claimed by or the id of a masked Entity Type); until `MASKING-TWO-VOCABULARIES-1` lands, Risk Score
+evidence and publication mask only the four sensitive classes, so an Entity Type class marked "masks" is not masked
+there.
 
 🔴 **Save-time only, and the two doors differ on a class already stored.** A file already on disk still loads,
 and its unknown class still masks nothing; the gate stops new ones.
