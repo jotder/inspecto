@@ -44,7 +44,9 @@ import static com.gamma.util.SqlIdent.sqlStr;
  * <h3>Refresh discipline</h3>
  * Mirrors {@link MaterializeTask}'s stage-and-atomic-swap: the new snapshot lands invisibly
  * ({@code *.parquet.tmp}), prior snapshots are hidden ({@code → *.stale}) before the atomic reveal, then
- * deleted — a reader in the swap window sees a briefly-empty Dataset, never doubled rows.
+ * deleted — never doubled rows. The hide removes the path a reader pinned, so the swap waits for the Jobs
+ * reading the store and this Job holds its sources the same way ({@link SnapshotSwapLock}); a reader that does
+ * not take the lock can still fail across a swap (JOB-SNAPSHOT-SWAP-READER-RACE-1).
  *
  * <p>Follows the built-in convention of constructor-injected {@code dataDir} (as {@code ReportJob}/
  * {@code MaintenanceJob}) rather than a {@code JobContext} data-plane façade — DuckDB is opened via the
@@ -59,6 +61,10 @@ final class SqlTemplateJob implements Job {
     /** The allow-list the authored SQL must pass. ⚠ Test seam only: {@code SqlTemplateJobSandboxTest} swaps it
      *  for a pass-everything guard to prove the connection seal on its own; production never reassigns it. */
     static volatile java.util.function.Function<String, List<Finding>> guard = SqlGuard::check;
+
+    /** Test seam: runs once the sources' files are pinned and before the statement opens them — the window a
+     *  writer's swap used to break (JOB-SNAPSHOT-SWAP-READER-RACE-1); production never reassigns it. */
+    static volatile Runnable afterPin = () -> { };
 
     private final JobConfig cfg;
     private final String dataDir;
@@ -113,11 +119,18 @@ final class SqlTemplateJob implements Job {
             // The connection half, behind the lexical guard: openInMemory seals it (nothing auto-installs/
             // -loads; it may reach only the data root — the sources it reads and the sink/route/quarantine
             // dirs it writes all live there), and the config is locked before the authored SQL runs.
-            for (String store : sources)
-                PipelineJobRunner.reportSources(ctx, store,
-                        SourceStoreReader.registerView(conn, safe(store, "source store"), dataDir, store, "PARQUET"));
-            com.gamma.util.DuckDbUtil.lockConfiguration(conn);
-            st.execute("CREATE TABLE " + OUT_TABLE + " AS " + sql);
+            // The views pin each source's files, which DuckDB opens by path only when the statement binds and
+            // scans them: hold the sources against a writer's swap until then (JOB-SNAPSHOT-SWAP-READER-RACE-1),
+            // and no longer: a swap below would wait forever on this Job's own read of a store it also writes.
+            List<Path> sourceDirs = sources.stream().map(s -> Path.of(dataDir).resolve(safe(s, "source store"))).toList();
+            try (SnapshotSwapLock.Held pinned = SnapshotSwapLock.read(sourceDirs)) {
+                for (String store : sources)
+                    PipelineJobRunner.reportSources(ctx, store,
+                            SourceStoreReader.registerView(conn, safe(store, "source store"), dataDir, store, "PARQUET"));
+                com.gamma.util.DuckDbUtil.lockConfiguration(conn);
+                afterPin.run();
+                st.execute("CREATE TABLE " + OUT_TABLE + " AS " + sql);
+            }
             // Decision Rules targeting this job check the materialized result before it becomes the
             // snapshot (tag/route/quarantine/drop): route lands as a snapshot Parquet Dataset under
             // <dataDir>/<destination> (same swap-in discipline as the sink), record-quarantine under
@@ -199,17 +212,20 @@ final class SqlTemplateJob implements Job {
         return ResultSetMeta.Role.DIMENSION;
     }
 
-    /** Hide prior snapshots, reveal the new one atomically, drop the hidden ones (see class doc). */
+    /** Hide prior snapshots, reveal the new one atomically, drop the hidden ones (see class doc). The hidden ones
+     *  can go at once: no reader holding the lock is left on them, and one with a file open keeps reading it. */
     private static void swapIn(Path outDir, Path tmp, String snapshot) throws IOException {
         List<Path> stale = new ArrayList<>();
-        try (DirectoryStream<Path> old = Files.newDirectoryStream(outDir, "*.parquet")) {
-            for (Path p : old) {
-                Path hidden = p.resolveSibling(p.getFileName() + ".stale");
-                Files.move(p, hidden, StandardCopyOption.ATOMIC_MOVE);
-                stale.add(hidden);
+        try (SnapshotSwapLock.Held swap = SnapshotSwapLock.write(outDir)) {
+            try (DirectoryStream<Path> old = Files.newDirectoryStream(outDir, "*.parquet")) {
+                for (Path p : old) {
+                    Path hidden = p.resolveSibling(p.getFileName() + ".stale");
+                    Files.move(p, hidden, StandardCopyOption.ATOMIC_MOVE);
+                    stale.add(hidden);
+                }
             }
+            Files.move(tmp, outDir.resolve(snapshot), StandardCopyOption.ATOMIC_MOVE);
         }
-        Files.move(tmp, outDir.resolve(snapshot), StandardCopyOption.ATOMIC_MOVE);
         for (Path p : stale) {
             try { Files.delete(p); } catch (IOException e) { log.warn("sql.template: could not drop {}: {}", p, e.getMessage()); }
         }

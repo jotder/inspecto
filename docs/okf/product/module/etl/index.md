@@ -39,4 +39,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | feature | Step Processor catalog | — |
 | `PARSING-DERIVE-EDITOR-1` | P3 | feature | slice 4 of Parsing D9: an optional profile editor for ASN.1 derive / children. | operator |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
+| `SNAPSHOT-SWAP-UNLOCKED-READERS-1` | P3 | defect | readers other than a sql.template Job can still fail while a snapshot is published (filed 2026-11-14, left by JOB-SNAPSHOT-SWAP-READER-RA… | — |
 | `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |

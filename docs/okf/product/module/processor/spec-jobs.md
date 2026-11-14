@@ -194,8 +194,9 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   `<sink>/.incremental.lock`); per day it stages `*.parquet.tmp`, hides the live files as `*.stale`,
   reveals by one atomic move, then drops the stale files. Recovery at the start of every replace: a
   surviving `.tmp` means the reveal never happened → restore the old files; only `.stale` → drop them.
-  So a crash leaves the old or the new partition, never a mix; a reader in the hide→reveal window sees
-  that one day briefly empty (the full-snapshot swap's discipline). Measured 2026-10-10 (6M source rows →
+  So a crash leaves the old or the new partition, never a mix. The hide→reveal holds the store's
+  `SnapshotSwapLock` write lock, so it waits for a `sql.template` Job reading that store
+  (`JOB-SNAPSHOT-SWAP-READER-RACE-1`, 2026-11-14; see "Snapshot swaps and readers" below). Measured 2026-10-10 (6M source rows →
   3M output rows over 30 days, aggregate SQL that reads the whole source): full snapshot 1.6-1.7 s and
   22.8 MB rewritten per run; incremental `lookback: 1` 0.9-1.0 s and ~0.8 MB (one day) rewritten; the
   30-day backfill took 3.0 s. The read side is unchanged unless the SQL filters its source by the window.
@@ -296,6 +297,26 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   * **Deliberate non-goals:** no Parquet/view surface for *raw* `inspecto_ops_objects` rows (row-level export
     has PII/ACL implications; these are aggregates) · no change to `GET /objects/analytics` or the mail UI ·
     no UI work at all.
+
+**Snapshot swaps and readers (`JOB-SNAPSHOT-SWAP-READER-RACE-1`, 2026-11-14).** Every snapshot writer
+(`SqlTemplateJob.swapIn`, `MaterializeTask`, `ScoreOutputDirs.swapIn` for the `_latest` score Datasets,
+`IncrementalSink.swapDay`) publishes by hiding the old `*.parquet` as `*.stale`, revealing the new file, then
+deleting the hidden ones. A reader that resolved its file list before the hide holds the old **path**, and DuckDB
+opens a file by path at bind and again at scan, so the rename alone fails it with "No files found that match the
+pattern" — the error the showcase logged. A reader that already has the file open keeps reading it. A glob read in
+the hide window does not see an empty Dataset either: it fails the same way. ⛔ So a grace period for `*.stale`
+files fixes nothing; the path is gone at the rename.
+
+`SnapshotSwapLock` (`platform/inspecto-engine/src/main/java/com/gamma/job/`) is one fair read/write lock per store
+directory for the JVM. A `sql.template` Job holds the read lock on its source stores from the moment it pins
+them until its `CREATE TABLE … AS` has finished, and releases it before its own swap (so a Job reading the
+store it writes never waits on itself). Every swap holds the write lock only around hide and reveal. Read locks
+are taken in path order, and a writer holds no other SnapshotSwapLock while it waits (`IncrementalSink` waits holding its own
+sink monitor and file lock, which no reader takes), so there is no deadlock.
+Limits: only `sql.template` sources take the read lock today (`SNAPSHOT-SWAP-UNLOCKED-READERS-1`); a publish
+waits for the slowest locked reader of its store, and an interrupt does not stop a running DuckDB statement,
+so the wait is bounded only by the writer's deadline (24 h by default), and the fair lock queues new readers behind it; one JVM only. Hidden files
+never match the readers' `**/*.parquet` glob and are not counted as storage.
 
 ## The parameter contract & runtime Expressions (shipped 2026-08-07/10)
 
