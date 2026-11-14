@@ -472,6 +472,16 @@ This section is on its own page: [architecture-masking.md](architecture-masking.
     `GraphAlgorithms.connectedComponents` at 10^6 edges in 3.0 s vs the JVM's 3.6 s, but one round per step of a
     component's diameter, so adding a single 200-node chain made it 52.8 s (the JVM stayed at 3.5 s). Components stay
     in memory.
+  * **C5, the expand ladder as one statement** (operator, closed without building): each degree of an Investigation's
+    ladder is its own sealed step with its own hub rule and, when sensitive, its own four-eyes approval before the next
+    degree runs; one statement cannot stop between degrees for an approval or seal each one, and its recursive form
+    carries C1's cost.
+  * **C8, DuckLake as the home of Drafts and Working Sets** (`DuckLakeDraftStoreSpike`, extension loaded from the local
+    cache with auto-install off): byte-identical text and time travel work, but every one-step append is a catalog
+    snapshot at about 23 ms (200 steps 4.6 s, 202 snapshots), and a second writer on the DuckDB-file catalog is refused
+    ("already attached"), so more than one pod would need a Postgres catalog - where `PgInvestigationStore` already
+    keeps the log with row locks and versioned writes. The sealed log already is the history. Kept on the file and
+    Postgres stores.
 
 * **Input** is a sealed `GraphInput`: `Materialised` (from the Working Set, `WorkingSetGraphInput`) or `IndexRef`.
   `RoutingGraphEngine` routes **by input type only**, never by size: Materialised → `InMemoryGraphEngine`

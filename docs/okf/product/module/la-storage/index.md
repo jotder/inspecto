@@ -35,4 +35,3 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LA-INDEX-SCALE-MEASURE-1` | P3 | chore | clauses (1) and (2) MEASURED 2026-10-05; clause (3) 10^9 still open, held for a customer sizing. | demand |
-| `DUCKDB-2-LOOP-QUERIES-1` | P3 | feature | the two looping / graph-style query candidates still open now that 2.0.0.0 is pinned: C5 the expand ladder as one statement, C8 ducklake… | — |
