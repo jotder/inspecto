@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.policy` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `ENTITLEMENT-UNLISTED-FEATURES-1` | P2 | defect | three edition features are declared in code but missing from their module's manifest, so a signed entitlement may not withhold them (file… | — |

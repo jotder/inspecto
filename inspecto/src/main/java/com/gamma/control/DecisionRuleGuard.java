@@ -64,7 +64,7 @@ public final class DecisionRuleGuard {
 
     private DecisionRuleGuard() {}
 
-    static final String TYPE = "decision-rule";
+    public static final String TYPE = "decision-rule";
     /** Server-stamped on a version restore: the restored version's makers (see the class doc). */
     static final String RESTORED_MAKERS = "restoredMakers";
     /** Server-stamped on every save: the version's complete maker set (see the class doc). */
@@ -180,7 +180,7 @@ public final class DecisionRuleGuard {
      * {@code target}): refused if the invoke-api consequences changed. The stamps are the stored rule's — the
      * content never came from a request body.
      */
-    static void checkTargetRewrite(Map<String, Object> before, Map<String, Object> after) {
+    public static void checkTargetRewrite(Map<String, Object> before, Map<String, Object> after) {
         if (!java.util.Objects.equals(signature(before), signature(after)))
             throw new IllegalStateException("a rewrite of Decision Rule '" + before.get("name")
                     + "' may not change its invoke-api consequences");

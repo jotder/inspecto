@@ -550,12 +550,7 @@ final class PipelineRenameRoutes implements RouteModule {
     /** Rewrite (or, with {@code planned}, only list) the dependents of a kind {@code kinds} accepts — the shared census
      *  rewrite ({@link PipelineLinkRewrite}); a Decision Rule's invoke-api consequences (and its stamped makers) stay. */
     private int rewrite(Path writeRoot, String oldId, String newId, Predicate<String> kinds, List<String> planned) {
-        return PipelineLinkRewrite.rewrite(writeRoot, oldId, newId, kinds, planned, PipelineRenameRoutes::checkComponent);
-    }
-
-    /** A rename moves target only; a decision-rule's invoke-api consequences (and its stamped makers) stay. */
-    static void checkComponent(String kind, Map<String, Object> before, Map<String, Object> after) {
-        if (DecisionRuleGuard.TYPE.equals(kind)) DecisionRuleGuard.checkTargetRewrite(before, after);
+        return PipelineLinkRewrite.rewrite(writeRoot, oldId, newId, kinds, planned);
     }
 
     /**
@@ -566,11 +561,10 @@ final class PipelineRenameRoutes implements RouteModule {
         ApprovalPolicy policy = ApprovalPolicy.forRoot(writeRoot);
         if (policy.holdsAnything()) {
             List<String> governed = new ArrayList<>();
-            PipelineLinkRewrite.rewrite(writeRoot, oldId, newId, kind -> policy.ruleFor(kind) != null, governed,
-                    PipelineRenameRoutes::checkComponent);
+            PipelineLinkRewrite.rewrite(writeRoot, oldId, newId, kind -> policy.ruleFor(kind) != null, governed);
             if (!governed.isEmpty()) return new SpaceLock.RewriteResult(0, List.copyOf(governed));
         }
-        return new SpaceLock.RewriteResult(PipelineLinkRewrite.rewrite(writeRoot, oldId, newId, kind -> true, null,
-                PipelineRenameRoutes::checkComponent), List.of());
+        return new SpaceLock.RewriteResult(PipelineLinkRewrite.rewrite(writeRoot, oldId, newId, kind -> true, null),
+                List.of());
     }
 }
