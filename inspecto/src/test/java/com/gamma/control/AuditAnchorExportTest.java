@@ -31,6 +31,13 @@ class AuditAnchorExportTest {
     private static final long T0 = Instant.parse("2026-09-20T10:00:00Z").toEpochMilli();
     private static final long DAY = 86_400_000L;
 
+    @org.junit.jupiter.api.BeforeEach
+    void noLeakedSpaceRoot() {
+        // the task reads its config root through -Dassist.write.root, the fallback SpaceConfigRoot uses only while no
+        // Space has registered "default" - an earlier class that booted one leaks it (seen on the Linux class order)
+        com.gamma.pipeline.SpaceConfigRoot.clear();
+    }
+
     @AfterEach
     void clear() {
         System.clearProperty("assist.write.root");

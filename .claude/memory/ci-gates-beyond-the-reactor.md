@@ -20,6 +20,11 @@ commit. Known reds the reactor cannot show:
 - `ImportLoaderInventoryTest` (new fixed file name a loader reads -> `ReservedConfigPaths` or allow-list) and
   `NoRawInMemoryDuckDbOpenContractTest` (`"jdbc:duckdb:"` literal in main source) fire only in full module runs.
 - Linux-only: a static root leaked between test classes (`SpaceConfigRoot.clear()` in @BeforeEach/@AfterEach) —
-  Windows class order hid it.
+  Windows class order hid it. (2026-11-15: three more tests hid behind it for two weeks, because the reactor stops at
+  the first failed module and 31 modules never ran in CI — read `gh run list` after a push, a red nightly hides others.)
+- A guard that matches pwsh's PRINTED error fails on the Linux runner: pwsh wraps error text at the console width
+  (80 columns there). Catch and read `$_.Exception.Message` instead (`check-bundle-spaces.mjs`, 2026-11-15).
+- Prettier moves line-based markers (`form-allow`, text a vocabulary guard reads): after formatting, run the line-based
+  guards again; put `<!-- prettier-ignore -->` on a binding prettier must not split.
 
 Related: [[new-route-checklist]], [[doc-guard-traps]].

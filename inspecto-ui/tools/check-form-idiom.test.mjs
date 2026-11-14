@@ -58,6 +58,11 @@ test('a listed file passes; a converted file left on the list fails', () => {
 
 test('form-allow on the line, spec files and unscanned folders pass', () => {
     assert.equal(run({ 'src/app/a.html': '<mat-form-field> <!-- form-allow: SQL editor -->\n' }, []).status, 0);
+    // Prettier's break of a long `<mat-form-field a b><!-- form-allow -->`: the marker sits on the line closing the tag
+    const broken = '<mat-form-field class="w-full" subscriptSizing="dynamic"\n    ><!-- form-allow: SQL editor -->\n';
+    assert.equal(run({ 'src/app/b.html': broken }, []).status, 0, 'marker on the line that closes the opening tag');
+    const unmarked = '<mat-form-field\n    class="w-full"\n>\n    <!-- form-allow: belongs to the next field -->\n';
+    assert.equal(run({ 'src/app/c.html': unmarked }, []).status, 1, 'a marker after the closed tag does not count');
     assert.equal(run({ 'src/app/a.component.spec.ts': BOXED }, []).status, 0);
     assert.equal(
         run({ 'src/app/c.ts': '/**\n * replaces a <mat-select> with the picker\n */\n// was <mat-form-field>\n' }, [])

@@ -233,6 +233,9 @@ class TelcoFraudTemplateGoldenTest {
                 .resolve("jobs").resolve("fraud_expectation_evaluate_job.toon").toString()), "job")));
 
         String priorWriteRoot = System.getProperty("assist.write.root"), priorData = System.getProperty("data.dir");
+        // the Job reads its registry through -Dassist.write.root, the fallback SpaceConfigRoot uses only while no Space
+        // has registered "default" - an earlier class that booted one leaks it (seen on the Linux class order)
+        com.gamma.pipeline.SpaceConfigRoot.clear();
         System.setProperty("assist.write.root", space.resolve("config").toString());
         System.setProperty("data.dir", space.resolve("data").toString());
         try (Scheduler s = new Scheduler();
