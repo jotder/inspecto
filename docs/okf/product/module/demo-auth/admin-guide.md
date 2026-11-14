@@ -59,7 +59,8 @@ users[2]{id,displayName,title,roles,landing}:
 |---|---|
 | Boot fails: "inspecto-demo-auth refuses to load: set -Dcontrol.bind=127.0.0.1" | Started without the loopback bind; use `serve-demo`. |
 | Log block "DEMO SIGN-IN IS DISABLED"; sign-in answers 409 `DEMO_ROSTER_CONFLICT` | The same Demo User is defined differently in two Spaces. Align or remove one `demo-users.toon`; no restart needed. |
-| Picker empty | No Space under `spaces.root`, or none defines Demo Users. |
+| Sign-in page says "No Space attached"; log "DEMO SIGN-IN HAS NO USERS … No Space is attached" | No Space folder (one holding `config/`, name not starting with `_` or `.`) under `spaces.root`; `_templates` does not count. Copy in a Space that carries `config/demo-users.toon`, then restart. |
+| Sign-in page says "No Demo Users"; log "DEMO SIGN-IN HAS NO USERS … No attached Space carries config/demo-users.toon" | Spaces are attached but none defines Demo Users. Add `config/demo-users.toon` to one; no restart needed, the page's *Try again* reads it. Nobody can sign in until then: there is no built-in roster. |
 | 401 right after sign-in | The bundle is not a `-Distribution demo` build, or the user was removed from the roster. |
 | Everyone signed out | The server restarted (new signing secret, by design). |
 | Signed in but menus missing | The user's role names do not exist in that Space's role table. |

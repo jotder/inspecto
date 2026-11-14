@@ -33,6 +33,10 @@ public final class DemoAuthenticator implements Authenticator {
 
     public DemoAuthenticator() {
         LoopbackOnly.require();
+        // DEMO-AUTH-NO-ROSTER-1: ControlApi resolves the Authenticator at boot (the relay only on the first request),
+        // so this is where the operator learns that nobody can sign in.
+        String noUsers = DemoTokenRelay.noDemoUsersWarning();
+        if (noUsers != null) org.slf4j.LoggerFactory.getLogger(DemoAuthenticator.class).warn(noUsers);
     }
 
     @Override

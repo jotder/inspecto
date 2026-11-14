@@ -35,7 +35,7 @@ A session refreshes itself for up to 8 hours. Restarting the server signs everyo
 | Message | Meaning |
 |---|---|
 | No Demo Users, and no Spaces attached | The server has no Space loaded; ask whoever runs the demo. |
-| No Demo Users listed | The Spaces define no `demo-users.toon`. |
+| No Demo Users (with *Try again*) | The Spaces define no `demo-users.toon`; ask whoever runs the demo to add one, then press *Try again*. |
 | An error naming a Demo User and two Spaces, with *Try again* | Two Spaces define that user differently; the demo operator must align them. |
 
 Operator setup: [admin-guide](admin-guide.md).

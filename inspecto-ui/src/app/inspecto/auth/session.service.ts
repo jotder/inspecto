@@ -238,6 +238,8 @@ export class SessionService {
     readonly demoUsers = signal<DemoUser[]>([]);
     /** A demo build with NO Space attached (`auth.spacesAttached` 0): the picker is empty and the page says why. */
     readonly demoNoSpace = signal(false);
+    /** DEMO-AUTH-NO-ROSTER-1: a demo build with Spaces attached but no Demo User in any of them — the page says why. */
+    readonly demoNoUsers = signal(false);
 
     private readonly accessToken = signal<string | null>(null);
     private oidc: OidcConfig | null = null;
@@ -348,6 +350,9 @@ export class SessionService {
         this.oidcConfigured.set(this.oidc.mock || (!!this.oidc.authorizeUrl && !!this.oidc.clientId));
         this.demoUsers.set(boot.auth?.demoUsers ?? []);
         this.demoNoSpace.set(boot.auth?.mock === true && boot.auth?.spacesAttached === 0);
+        this.demoNoUsers.set(
+            boot.auth?.mock === true && boot.auth?.demoUsers?.length === 0 && boot.auth?.spacesAttached !== 0,
+        );
         // A returning user still holds the httpOnly refresh cookie — mint an access token from it. A 401
         // just means "not signed in yet"; the guard will route to sign-in.
         if (!readResumable()) return; // never signed in here, or signed out: nothing to resume, no 401

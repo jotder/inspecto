@@ -24,6 +24,7 @@ function create(
         version: signal<string | null>(version),
         demoUsers: signal(state.demoUsers ?? []),
         demoNoSpace: signal(false),
+        demoNoUsers: signal(false),
         bootstrapError: signal<string | null>(state.bootstrapError ?? null),
         branding: signal({
             logoDataUrl: branding.logoDataUrl ?? null,

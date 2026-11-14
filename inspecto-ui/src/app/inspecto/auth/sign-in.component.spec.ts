@@ -21,7 +21,7 @@ const FAILED_KEY = 'inspecto.signInFailed';
  * `inspecto/auth/session.service.spec.ts`. There is likewise no `mockAuthMode` client-side dev
  * switch to test — `session.service.ts:64` says so explicitly; `auth.mock` arrives on `/bootstrap`.
  */
-function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[]; bootstrapError?: string; configured?: boolean; noSpace?: boolean; productName?: string; signInPitch?: { title: string; body: string } } = {}) {
+function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[]; bootstrapError?: string; configured?: boolean; noSpace?: boolean; noUsers?: boolean; productName?: string; signInPitch?: { title: string; body: string } } = {}) {
     TestBed.resetTestingModule();
     const session = {
         loginRequired: () => opts.loginRequired ?? true,
@@ -31,6 +31,7 @@ function create(opts: { loginRequired?: boolean; demoUsers?: DemoUser[]; bootstr
         branding: signal({ logoDataUrl: null, caption: null, footerText: null }),
         demoUsers: signal<DemoUser[]>(opts.demoUsers ?? []),
         demoNoSpace: signal(opts.noSpace ?? false),
+        demoNoUsers: signal(opts.noUsers ?? false),
         bootstrapError: signal<string | null>(opts.bootstrapError ?? null),
     };
     const router = { navigate: vi.fn() };
@@ -157,6 +158,23 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
         );
         expect(el.textContent).not.toContain('Sign in with SSO');
         expect(el.querySelector('[data-demo-user]')).toBeNull();
+    });
+
+    // DEMO-AUTH-NO-ROSTER-1: Spaces attached, none carries a roster. The page used to fall back to the SSO button,
+    // whose mock code the demo server refuses, and showed only "Sign-in failed".
+    it('a demo whose Spaces carry no roster says so, with no SSO button and no picker', async () => {
+        const { el } = create({ noUsers: true });
+        const note = el.querySelector('[data-testid="no-demo-users"]');
+        expect(note?.textContent?.replace(/\s+/g, ' ')).toContain(
+            'No Demo Users are configured in this installation: no attached Space has config\\demo-users.toon. Add one to a Space, then try again (no restart needed).',
+        );
+        expect(note?.querySelector('button')?.textContent).toContain('Try again');
+        expect(el.textContent).not.toContain('Sign in with SSO');
+        expect(el.textContent).not.toMatch(/secured|single sign-on/i);
+        expect(el.textContent).toContain('Not secure, local only.');
+        expect(el.querySelector('[data-demo-user]')).toBeNull();
+        expect(el.querySelector('[data-testid="no-space"]')).toBeNull();
+        await expectNoA11yViolations(el);
     });
 
     it('a roster conflict is shown with the server message, and the generic text stays for unknown errors', () => {
