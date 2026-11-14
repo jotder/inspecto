@@ -819,7 +819,7 @@ App template with an unknown class still installs, and is refused when a Space i
 (a refused entry name, an I/O failure, a failure after the write) still leave it, and a retry answers 409.
 
 **One masking rule** (`MASKING-TWO-VOCABULARIES-1`, 2026-11-14; decided by the assistant under the operator's
-delegation: fail closed). A column is masked for a viewer who cannot reveal if its class is one of the four sensitive
+delegation and operator-confirmed the same day: fail closed). A column is masked for a viewer who cannot reveal if its class is one of the four sensitive
 classes, is claimed by a masked Entity Type of the Space, or is the id of one — `EntityTypes.maskedClasses(types)`
 (`platform/inspecto-entity-store`). Every reader that masks or refuses by class uses it: Risk Score, Anomaly and
 Screening evidence, audit, object and notification reads, the assistant's egress, BI in both `typed` and `all`, Link

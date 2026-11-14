@@ -24,7 +24,7 @@ home (D-PA22, product assembly plan §12).
     reason: an archive or DuckLake sink (`inspecto-backup`), a `mask` Step (`inspecto-policy`), an Alert Rule
     (`inspecto-ops`, which the Incidents, Workflow & SLA and LA Investigations Add-ons bring). Before 2026-11-14 these
     saved with 200 (`ENTITLEMENT-UNLISTED-FEATURES-1`). ⚠ So a Standard entitlement with none of those three Add-ons
-    has no Alert Rules: new ones are refused, and ones already on disk are not armed at boot;
+    has no Alert Rules (operator-confirmed 2026-11-14): new ones are refused, and ones already on disk are not armed at boot;
   - `/modules` lists it `INERT` with that reason, and every module that requires it goes inert too;
   - an App whose modules are inert drops out of the Product's nav;
   - its Job types are not registered, so a Job of that type is refused as an unknown type;
