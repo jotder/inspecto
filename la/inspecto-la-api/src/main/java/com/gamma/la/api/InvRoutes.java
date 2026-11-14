@@ -956,8 +956,8 @@ public final class InvRoutes implements RouteModule {
 
     /**
      * LA-17 D-M6: the Entity Type each named column is typed by -- its Dataset's registry {@code columns[].classification}
-     * claimed (trimmed, case-insensitive) by an in-force Entity Type -- as column -> {@code {id, normaliser}}. A column
-     * with no classification, or one no type claims, is absent (untyped). The SPA mints {@code <type>:<key>} from this,
+     * naming an in-force Entity Type ({@link EntityTypes#typeNamedBy}: claimed, else its id) -- as column -> {@code {id, normaliser}}.
+     * A column with no classification, or one that names no type, is absent (untyped). The SPA mints {@code <type>:<key>} from this,
      * so every mint site agrees on which columns are typed; {@code EntityMasking} reads the same classification.
      */
     static Map<String, Map<String, Object>> columnTypes(Path writeRoot, String datasetId, List<String> columns) {
@@ -969,9 +969,8 @@ public final class InvRoutes implements RouteModule {
             for (Object o : cols)
                 if (o instanceof Map<?, ?> c && name.equalsIgnoreCase(String.valueOf(c.get("name")))
                         && c.get("classification") != null) {
-                    String cls = String.valueOf(c.get("classification")).trim();
-                    types.stream().filter(t -> t.classifications().stream().anyMatch(x -> x.trim().equalsIgnoreCase(cls)))
-                            .findFirst().ifPresent(t -> out.put(name, Map.of("id", t.id(), "normaliser", t.normaliser())));
+                    EntityTypes.EntityType t = EntityTypes.typeNamedBy(types, c.get("classification"));
+                    if (t != null) out.put(name, Map.of("id", t.id(), "normaliser", t.normaliser()));
                 }
         return out;
     }

@@ -70,7 +70,10 @@ export function formatInstant(iso: string | null | undefined): string {
  * Investigation that has no window of its own (the coverage read refuses an unbounded one). Null when no day is known.
  */
 export function daysWindow(days: { day: string }[] | null | undefined): { from: string; to: string } | null {
-    const ds = (days ?? []).map((d) => d.day).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    const ds = (days ?? [])
+        .map((d) => d.day)
+        .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+        .sort();
     if (!ds.length) return null;
     const last = new Date(`${ds[ds.length - 1]}T00:00:00Z`);
     last.setUTCDate(last.getUTCDate() + 1);
@@ -88,7 +91,10 @@ export function splitMissing(
     missing: string[],
     fileDays: { day: string; files: number }[] | null | undefined,
 ): { holes: string[]; notDelivered: string[] } {
-    const ds = (fileDays ?? []).filter((d) => d.files > 0 && /^\d{4}-\d{2}-\d{2}$/.test(d.day)).map((d) => d.day).sort();
+    const ds = (fileDays ?? [])
+        .filter((d) => d.files > 0 && /^\d{4}-\d{2}-\d{2}$/.test(d.day))
+        .map((d) => d.day)
+        .sort();
     if (!ds.length) return { holes: [...missing], notDelivered: [] };
     const [first, last] = [ds[0], ds[ds.length - 1]];
     const holes = missing.filter((d) => d >= first && d <= last);

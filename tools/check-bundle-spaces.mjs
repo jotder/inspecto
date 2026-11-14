@@ -181,10 +181,17 @@ try {
   if (walk(bundle2).some((p) => p.includes('/other/'))) fail(`-Only @('starter') still shipped the template 'other': ${shipped2.join(', ')}`);
   if (!same(arr(r2.Templates), ['starter']) || !same(arr(r2.NotShipped), ['other']))
     fail(`-Only reported Templates ${JSON.stringify(r2.Templates)} / NotShipped ${JSON.stringify(r2.NotShipped)} — expected ["starter"] / ["other"]`);
-  let refused = false;
-  try { execFileSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', only(['ghost'], join(work, 'bundle3'))], { encoding: 'utf8', stdio: 'pipe' }); }
-  catch (e) { refused = /not committed under spaces\/_templates: ghost/.test(`${e.stdout ?? ''}${e.stderr ?? ''}`); }
-  if (!refused) fail("-Only @('ghost') (a template that is not committed) did not throw naming it.");
+  // The refusal is read from the exception's own Message, never from pwsh's rendering of it: ConciseView wraps an error
+  // at the host's window width, and at 80 columns that splits this very message after "under" - the guard went red on
+  // the Linux runner (no TTY) every night from 2026-11-11 while passing on a 120-column Windows console.
+  const ghost = `$ErrorActionPreference='Stop'; Set-StrictMode -Version Latest; . ${q(HELPER)}; ` +
+    `try { $null = Copy-SpaceTemplates -RepoRoot ${q(repo)} -BundleDir ${q(join(work, 'bundle3'))} -Only @('ghost'); [Console]::Out.WriteLine('no throw') } ` +
+    `catch { [Console]::Out.WriteLine('threw: ' + $_.Exception.Message) }`;
+  let ghostOut = '';
+  try { ghostOut = execFileSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', ghost], { encoding: 'utf8', stdio: 'pipe' }); }
+  catch (e) { ghostOut = `${e.stdout ?? ''}${e.stderr ?? ''}`; }
+  if (!/^threw: .*not committed under spaces\/_templates: ghost$/m.test(ghostOut.replace(/\r/g, '')))
+    fail(`-Only @('ghost') (a template that is not committed) did not throw naming it:\n${ghostOut}`);
 
   console.log(`✓ Bundle-spaces guard: only spaces/_templates ships (${expected.length} committed files); committed/untracked/excluded Spaces and staged-only/untracked templates skipped; modified file shipped as committed; -Only ships exactly the named templates and refuses an uncommitted one.`);
 } finally {

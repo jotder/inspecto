@@ -246,24 +246,21 @@ public final class IndexRoutes implements RouteModule {
 
     /**
      * The in-force Entity Type a Dataset column is typed as: the class the pipeline-schema lineage gives the column, else the
-     * column's own declared {@code classification}, claimed by a type's {@code classifications[]} (the resolution
-     * {@link EntityMasking#maskedColumns} applies, for every type rather than the masked ones). Null when untyped or when
+     * column's own declared {@code classification}, naming a type ({@link EntityTypes#typeNamedBy}: claimed, else its id). Null when untyped or when
      * it cannot be resolved - typing only labels the index's {@code typeNodes} and never fails a build.
      */
     static EntityTypes.EntityType entityTypeOf(Path writeRoot, String dataset, String column) {
         try {
             List<EntityTypes.EntityType> types = LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes();
-            Function<String, Optional<EntityTypes.EntityType>> typeOf = cls -> types.stream()
-                    .filter(t -> t.classifications().stream().anyMatch(x -> x.trim().equalsIgnoreCase(cls.trim()))).findFirst();
             DatasetProvider provider = DatasetProviders.require();
             Map<String, Object> ds = provider.dataset(writeRoot, dataset).orElse(Map.of());
-            String cls = provider.schemaClassification(writeRoot, ds, c -> typeOf.apply(c).isPresent())
+            String cls = provider.schemaClassification(writeRoot, ds, c -> EntityTypes.typeNamedBy(types, c) != null)
                     .get(column.trim().toLowerCase(Locale.ROOT));
             if (cls == null && ds.get("columns") instanceof List<?> cols)
                 for (Object o : cols)
                     if (o instanceof Map<?, ?> c && column.equalsIgnoreCase(String.valueOf(c.get("name"))) && c.get("classification") != null)
                         cls = String.valueOf(c.get("classification"));
-            return cls == null ? null : typeOf.apply(cls).orElse(null);
+            return EntityTypes.typeNamedBy(types, cls);
         } catch (RuntimeException unresolvable) {
             return null;
         }

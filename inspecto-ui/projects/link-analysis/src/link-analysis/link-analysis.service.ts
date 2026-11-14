@@ -21,8 +21,7 @@ import type { LaDisplayOptions } from './link-width';
  * holds now. 🔴 An analyst who reads a reopened view as the graph they saved is reading a different graph
  * with the same name; in investigative use that is a false finding, not a stale cache.
  */
-export const SAVED_VIEW_NOT_EVIDENCE =
-    'a saved view re-reads live data, so it may differ when reopened.';
+export const SAVED_VIEW_NOT_EVIDENCE = 'a saved view re-reads live data, so it may differ when reopened.';
 
 export interface LinkAnalysisView {
     id: string;
@@ -200,7 +199,8 @@ function sharesOf(v: unknown): ViewShare[] {
         .map((e) => ({ subjectType: str(e['subjectType']), subjectId: str(e['subjectId']), access: str(e['access']) }));
 }
 
-const ids = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x !== '') : []);
+const ids = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x !== '') : [];
 
 /** A stored `lists` read defensively: an older view, or a hand-edited one, carries none or a wrong shape. */
 function listsOf(v: unknown): CaseLists | undefined {
@@ -208,7 +208,9 @@ function listsOf(v: unknown): CaseLists | undefined {
     const r = v as Record<string, unknown>;
     const start = typeof r['start'] === 'string' && r['start'] ? r['start'] : undefined;
     const exclusions = ids(r['exclusions']);
-    return start || exclusions.length ? { ...(start ? { start } : {}), ...(exclusions.length ? { exclusions } : {}) } : undefined;
+    return start || exclusions.length
+        ? { ...(start ? { start } : {}), ...(exclusions.length ? { exclusions } : {}) }
+        : undefined;
 }
 
 function startOf(v: unknown): CaseStart | undefined {

@@ -146,9 +146,7 @@ export class LinkAnalysisAddToListDialog {
     ]);
 
     readonly form = new FormGroup({
-        listId: new FormControl<string | null>(
-            this.targets.length ? null : this.data.entityType ? NEW_LIST : null,
-        ),
+        listId: new FormControl<string | null>(this.targets.length ? null : this.data.entityType ? NEW_LIST : null),
         newTitle: new FormControl('', { nonNullable: true }),
         purpose: new FormControl<EntityListPurpose>(this.data.purpose ?? 'watch', { nonNullable: true }),
         reason: new FormControl('Found with Find something interesting', {
@@ -168,9 +166,7 @@ export class LinkAnalysisAddToListDialog {
             : '',
     );
     readonly reasonError = computed(() =>
-        this.submitted() && !NOT_BLANK.test(this.value().reason ?? '')
-            ? 'A reason is required.'
-            : '',
+        this.submitted() && !NOT_BLANK.test(this.value().reason ?? '') ? 'A reason is required.' : '',
     );
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
 
@@ -199,7 +195,9 @@ export class LinkAnalysisAddToListDialog {
             } else {
                 list = this.targets.find((l) => l.id === v.listId)!;
             }
-            const r = await firstValueFrom(this.inv.changeEntityListMembers(list.id, { add: this.data.values, reason }));
+            const r = await firstValueFrom(
+                this.inv.changeEntityListMembers(list.id, { add: this.data.values, reason }),
+            );
             const message = isHeldListChange(r)
                 ? `Waiting for approval: adding to “${list.title}” needs a second person to approve it.`
                 : r.changed

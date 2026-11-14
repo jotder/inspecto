@@ -173,7 +173,7 @@ export interface DrillEvent extends DrillPair {
                                     [renderOptions]="widget.options"
                                     [kpiSize]="kpiSize()"
                                     [kpiAsOf]="asOf()"
-                                [kpiRange]="range()"
+                                    [kpiRange]="range()"
                                     (categoryClick)="onCategoryClick($event)"
                                     (channelClick)="onChannelClick($event)"
                                     (cellClick)="onCellClick($event)"

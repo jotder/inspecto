@@ -242,8 +242,16 @@
                 </fieldset>
                 } @if (f.type === 'number') {
                 <div class="grid gap-x-8 gap-y-1 sm:grid-cols-2">
-                    <inspecto-pen-field label="Smallest allowed" type="number" formControlName="min"></inspecto-pen-field>
-                    <inspecto-pen-field label="Largest allowed" type="number" formControlName="max"></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="Smallest allowed"
+                        type="number"
+                        formControlName="min"
+                    ></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="Largest allowed"
+                        type="number"
+                        formControlName="max"
+                    ></inspecto-pen-field>
                 </div>
                 } @if (f.type !== 'boolean' && f.type !== 'select') {
                 <inspecto-pen-field

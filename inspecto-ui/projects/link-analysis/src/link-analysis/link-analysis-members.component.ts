@@ -65,9 +65,7 @@ export function memberErrorMessage(err: unknown, fallback: string): string {
                 <inspecto-alert variant="error" title="Members">{{ error() }}</inspecto-alert>
             }
             @if (hidden()) {
-                <p class="text-secondary m-0">
-                    Only members of this Investigation can see who else is on it.
-                </p>
+                <p class="text-secondary m-0">Only members of this Investigation can see who else is on it.</p>
             } @else if (data(); as d) {
                 <ul class="m-0 flex list-none flex-col gap-1 p-0">
                     @for (m of d.members; track m.subject) {
@@ -133,9 +131,7 @@ export function memberErrorMessage(err: unknown, fallback: string): string {
                         You cannot change members. {{ needsIncidentManagement }}
                     </p>
                 } @else {
-                    <p class="text-secondary m-0">
-                        Only a lead can grant or revoke members.
-                    </p>
+                    <p class="text-secondary m-0">Only a lead can grant or revoke members.</p>
                 }
             }
         </section>

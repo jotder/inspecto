@@ -45,7 +45,10 @@ describe('glossaryEntries', () => {
 
 describe('LinkAnalysisGlossaryComponent', () => {
     it('is absent for a pack with no typology terms', () => {
-        installDomainProfiles([GENERIC_PROFILE, pack([{ key: 'entity_type.account', label: 'W', abbreviation: '', definition: '' }])], 'p');
+        installDomainProfiles(
+            [GENERIC_PROFILE, pack([{ key: 'entity_type.account', label: 'W', abbreviation: '', definition: '' }])],
+            'p',
+        );
         try {
             TestBed.configureTestingModule({ imports: [HostComponent], providers: [provideNoopAnimations()] });
             const fixture = TestBed.createComponent(HostComponent);
@@ -77,7 +80,9 @@ describe('LinkAnalysisGlossaryComponent', () => {
             fixture.detectChanges();
             const panel = document.querySelector('[role="dialog"][aria-label="Industry pack glossary"]') as HTMLElement;
             expect(panel).not.toBeNull();
-            const terms = Array.from(panel.querySelectorAll('dt')).map((t) => t.textContent?.replace(/\s+/g, ' ').trim());
+            const terms = Array.from(panel.querySelectorAll('dt')).map((t) =>
+                t.textContent?.replace(/\s+/g, ' ').trim(),
+            );
             expect(terms).toEqual(['IRSF (IRS)', 'SIM box']);
             expect(panel.textContent).toContain('A gateway of many SIMs.');
             expect(panel.textContent).toContain('No definition stated.');

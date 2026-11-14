@@ -7,7 +7,13 @@ import type { GraphViewInteraction, GraphViewPlugins } from '@inspecto/core/grap
 export type CanvasMode = 'pan' | 'lasso' | 'fisheye' | 'linkFilter';
 
 export const CANVAS_MODES: { id: CanvasMode; label: string; icon: string; key: string; hint: string }[] = [
-    { id: 'pan', label: 'Pan', icon: 'heroicons_outline:hand-raised', key: 'Esc', hint: 'drag to pan, Shift+drag to lasso' },
+    {
+        id: 'pan',
+        label: 'Pan',
+        icon: 'heroicons_outline:hand-raised',
+        key: 'Esc',
+        hint: 'drag to pan, Shift+drag to lasso',
+    },
     { id: 'lasso', label: 'Lasso', icon: 'heroicons_outline:cursor-arrow-rays', key: 'L', hint: 'drag to lasso' },
     {
         id: 'fisheye',

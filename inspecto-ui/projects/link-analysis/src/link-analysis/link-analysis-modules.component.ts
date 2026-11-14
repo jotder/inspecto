@@ -20,34 +20,34 @@ export function isLinkAnalysisModule(id: string): boolean {
     host: { class: 'block' },
     imports: [ChipComponent],
     template: `
-            <div class="text-sm">
-                @if (error()) {
-                    <p class="text-secondary text-sm" role="status" data-testid="modules-error">{{ error() }}</p>
-                } @else if (!modules()) {
-                    <p class="text-secondary text-sm" role="status">Loading…</p>
-                } @else {
-                    <ul
-                        class="flex flex-col gap-1 text-sm"
-                        data-testid="modules-list"
-                        aria-label="Link Analysis modules"
-                    >
-                        @for (m of modules(); track m.id) {
-                            <li class="flex flex-wrap items-center gap-2">
-                                <!-- the module id is for support only: a tooltip, never body text (T-083) -->
-                                <span class="font-medium" [title]="m.id" data-testid="module-name">{{ m.title || m.id }}</span>
-                                <inspecto-chip variant="soft" [tone]="tone(m)" [attr.data-testid]="'module-' + m.id">
-                                    {{ label(m) }}
-                                </inspecto-chip>
-                                @if (m.reasons?.length) {
-                                    <span class="text-secondary" data-testid="module-reason">{{ reason(m.reasons![0]) }}</span>
-                                }
-                            </li>
-                        } @empty {
-                            <li class="text-secondary">No Link Analysis modules are listed.</li>
-                        }
-                    </ul>
-                }
-            </div>
+        <div class="text-sm">
+            @if (error()) {
+                <p class="text-secondary text-sm" role="status" data-testid="modules-error">{{ error() }}</p>
+            } @else if (!modules()) {
+                <p class="text-secondary text-sm" role="status">Loading…</p>
+            } @else {
+                <ul class="flex flex-col gap-1 text-sm" data-testid="modules-list" aria-label="Link Analysis modules">
+                    @for (m of modules(); track m.id) {
+                        <li class="flex flex-wrap items-center gap-2">
+                            <!-- the module id is for support only: a tooltip, never body text (T-083) -->
+                            <span class="font-medium" [title]="m.id" data-testid="module-name">{{
+                                m.title || m.id
+                            }}</span>
+                            <inspecto-chip variant="soft" [tone]="tone(m)" [attr.data-testid]="'module-' + m.id">
+                                {{ label(m) }}
+                            </inspecto-chip>
+                            @if (m.reasons?.length) {
+                                <span class="text-secondary" data-testid="module-reason">{{
+                                    reason(m.reasons![0])
+                                }}</span>
+                            }
+                        </li>
+                    } @empty {
+                        <li class="text-secondary">No Link Analysis modules are listed.</li>
+                    }
+                </ul>
+            }
+        </div>
     `,
 })
 export class LinkAnalysisModulesComponent implements OnInit {

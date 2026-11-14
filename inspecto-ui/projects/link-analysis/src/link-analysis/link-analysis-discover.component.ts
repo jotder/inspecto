@@ -41,7 +41,9 @@ export interface FoundAction {
                 Quick questions
             </h3>
             @if (!graph()?.nodes?.length) {
-                <p class="text-secondary m-0 text-xs">Draw a graph first: these questions are asked of what is on screen.</p>
+                <p class="text-secondary m-0 text-xs">
+                    Draw a graph first: these questions are asked of what is on screen.
+                </p>
             } @else {
                 <div class="flex flex-wrap gap-1" role="group" aria-label="Questions">
                     <button mat-stroked-button type="button" data-testid="la-discover-busiest" (click)="ask('busiest')">
@@ -79,7 +81,11 @@ export interface FoundAction {
                             Find route
                         </button>
                         @if (routeWhyNot(); as why) {
-                            <p class="text-secondary m-0 text-xs" id="la-discover-route-why" data-testid="la-discover-route-why">
+                            <p
+                                class="text-secondary m-0 text-xs"
+                                id="la-discover-route-why"
+                                data-testid="la-discover-route-why"
+                            >
                                 {{ why }}
                             </p>
                         }
@@ -128,13 +134,18 @@ export interface FoundAction {
                                         </span>
                                     </div>
                                     @if (row.hint) {
-                                        <div class="mt-1 flex flex-wrap items-center gap-1" data-testid="la-discover-hint">
+                                        <div
+                                            class="mt-1 flex flex-wrap items-center gap-1"
+                                            data-testid="la-discover-hint"
+                                        >
                                             <p class="text-secondary m-0 text-xs">{{ row.hint }}</p>
                                             @if (!listWhyNot()) {
                                                 <button
                                                     mat-stroked-button
                                                     type="button"
-                                                    (click)="addToList.emit({ row, what: row.what, purpose: 'exclusion' })"
+                                                    (click)="
+                                                        addToList.emit({ row, what: row.what, purpose: 'exclusion' })
+                                                    "
                                                 >
                                                     Add to exclusion list
                                                 </button>
@@ -179,7 +190,9 @@ export class LinkAnalysisDiscoverComponent {
     readonly to = new FormControl<string | null>(null);
     readonly fromValue = toSignal(this.from.valueChanges, { initialValue: null });
     readonly toValue = toSignal(this.to.valueChanges, { initialValue: null });
-    readonly pickOptions = computed<PickerOption[]>(() => this.nodeOptions().map((n) => ({ value: n.id, label: n.label })));
+    readonly pickOptions = computed<PickerOption[]>(() =>
+        this.nodeOptions().map((n) => ({ value: n.id, label: n.label })),
+    );
     /** Why *Find route* cannot run yet (X6); '' = it can. */
     readonly routeWhyNot = computed(() => (this.fromValue() && this.toValue() ? '' : DISABLED_REASON.pickFromTo));
 

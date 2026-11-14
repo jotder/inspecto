@@ -35,7 +35,11 @@ describe('saved view access (mirrors the /components write gates)', () => {
 });
 
 describe('saved view edit in place (mirrors ComponentAccess.requireEdit)', () => {
-    const viewOnly = { shared: true, owner: 'lead', shares: [{ subjectType: 'user', subjectId: 'fm.analyst', access: 'view' }] };
+    const viewOnly = {
+        shared: true,
+        owner: 'lead',
+        shares: [{ subjectType: 'user', subjectId: 'fm.analyst', access: 'view' }],
+    };
 
     it('a view shared with me to view only cannot be saved over or renamed, said in words', () => {
         expect(viewEditBlock(viewOnly, author)).toBe(VIEW_EDIT_SHARE_REASON);

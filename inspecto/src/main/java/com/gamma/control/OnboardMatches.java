@@ -130,11 +130,8 @@ final class OnboardMatches {
 
     /** The Space's Entity Type a column {@code classification} names: one that claims it, else one whose id it is; null = none. */
     static String typeOf(String classification, List<EntityTypes.EntityType> types) {
-        if (classification == null || classification.isBlank()) return null;
-        EntityTypes.EntityType claimed = EntityShapes.typeClaiming(classification.trim(), types);
-        if (claimed != null) return claimed.id();
-        for (EntityTypes.EntityType t : types) if (t.id().equalsIgnoreCase(classification.trim())) return t.id();
-        return null;
+        EntityTypes.EntityType t = EntityTypes.typeNamedBy(types, classification);
+        return t == null ? null : t.id();
     }
 
     private static Set<String> values(List<EntityShapes.Column> sampled, String column) {

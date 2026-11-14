@@ -1,5 +1,12 @@
 import { Location } from '@angular/common';
-import { HttpBackend, HttpErrorResponse, HttpRequest, HttpResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
+import {
+    HttpBackend,
+    HttpErrorResponse,
+    HttpRequest,
+    HttpResponse,
+    provideHttpClient,
+    withInterceptors,
+} from '@angular/common/http';
 import { Component, input, output } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
@@ -79,11 +86,17 @@ describe('embed view page', () => {
         expect(el.textContent).toContain('seen twice');
         expect(el.textContent).toContain('cdr ****99');
         const g = graphOf(f).data()!;
-        expect(g.nodes.map((n) => n.data.label), 'ids drawn exactly as returned (masked)').toEqual(['msisdn:****12', 'b', 'a']);
+        expect(
+            g.nodes.map((n) => n.data.label),
+            'ids drawn exactly as returned (masked)',
+        ).toEqual(['msisdn:****12', 'b', 'a']);
         expect(g.edges.length).toBe(1);
         expect(el.querySelector('a, form, textarea, select'), 'no link out and no write control').toBeNull();
         expect(el.textContent, 'an embed grant carries no export permission').not.toContain('Export');
-        expect(el.querySelector('[tabindex="0"][role="group"] inspecto-graph-view'), 'the canvas sits in a focusable group').not.toBeNull();
+        expect(
+            el.querySelector('[tabindex="0"][role="group"] inspecto-graph-view'),
+            'the canvas sits in a focusable group',
+        ).not.toBeNull();
         expect(el.querySelectorAll('tbody tr').length).toBe(3);
         await expectNoA11yViolations(el);
     });
@@ -123,7 +136,10 @@ describe('embed view page', () => {
             TestBed.resetTestingModule();
             const off = await render({ view: () => throwError(() => new HttpErrorResponse({ status })) });
             expect(off.el.textContent).toContain('Could not reach the server');
-            expect(off.location.replaceState, 'an unreachable page keeps its address so a reload can work').not.toHaveBeenCalled();
+            expect(
+                off.location.replaceState,
+                'an unreachable page keeps its address so a reload can work',
+            ).not.toHaveBeenCalled();
         }
     });
 
@@ -141,7 +157,14 @@ describe('embed view page', () => {
 
     it('filters and pages the table and highlights an entity on the graph', async () => {
         TestBed.resetTestingModule();
-        const many: EmbedView = { ...VIEW, workingSet: { ...VIEW.workingSet, entities: Array.from({ length: 60 }, (_, i) => ({ entityId: 'e' + i, hop: i % 3 })), links: [{ source: 'e1', target: 'e2', kind: 'calls' }] } };
+        const many: EmbedView = {
+            ...VIEW,
+            workingSet: {
+                ...VIEW.workingSet,
+                entities: Array.from({ length: 60 }, (_, i) => ({ entityId: 'e' + i, hop: i % 3 })),
+                links: [{ source: 'e1', target: 'e2', kind: 'calls' }],
+            },
+        };
         const { el, f } = await render({}, many);
         expect(el.querySelectorAll('tbody tr').length).toBe(25);
         expect(el.textContent).toContain('Page 1 of 3');
@@ -185,7 +208,12 @@ describe('embed view page', () => {
                     useValue: {
                         handle: (r: HttpRequest<unknown>) => {
                             seen.push(r);
-                            return of(new HttpResponse({ status: 200, body: { data: typed, metadata: { apiVersion: 'v1' } } }));
+                            return of(
+                                new HttpResponse({
+                                    status: 200,
+                                    body: { data: typed, metadata: { apiVersion: 'v1' } },
+                                }),
+                            );
                         },
                     },
                 },
@@ -236,7 +264,10 @@ describe('embed view page', () => {
         f.detectChanges();
         expect(g.data()!.nodes.map((n) => n.id)).toEqual(['b']);
 
-        expect(seen.map((r) => r.method + ' ' + r.url), 'one read, nothing else').toEqual(['GET /api/v1/public/investigations/g1.secret']);
+        expect(
+            seen.map((r) => r.method + ' ' + r.url),
+            'one read, nothing else',
+        ).toEqual(['GET /api/v1/public/investigations/g1.secret']);
         expect(interceptor).not.toHaveBeenCalled();
         await expectNoA11yViolations(el);
     });

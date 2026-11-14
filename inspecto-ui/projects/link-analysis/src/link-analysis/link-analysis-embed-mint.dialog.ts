@@ -74,10 +74,10 @@ export function embedAbsoluteLink(token: string): string {
         <h2 mat-dialog-title>Share an Investigation by link</h2>
         <mat-dialog-content class="flex w-[34rem] max-w-full flex-col gap-3 text-sm">
             <p class="m-0">
-                The link shows a <strong>read-only, sealed view</strong>; ids are masked at least as this Space masks them
-                (<strong>{{ data.maskingMode }}</strong
-                >). Anyone with the link can read it until it expires or you revoke it; it can be shown inside another site only
-                if this Space lists that site.
+                The link shows a <strong>read-only, sealed view</strong>; ids are masked at least as this Space masks
+                them (<strong>{{ data.maskingMode }}</strong
+                >). Anyone with the link can read it until it expires or you revoke it; it can be shown inside another
+                site only if this Space lists that site.
             </p>
             @if (error()) {
                 <inspecto-alert variant="error" title="Share">{{ error() }}</inspecto-alert>

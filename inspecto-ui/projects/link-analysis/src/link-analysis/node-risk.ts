@@ -67,7 +67,9 @@ export function keyChunks(keys: string[], size = REFERENCE_KEY_CAP): string[][] 
 }
 
 /** `/inv/reference-rows` rows (each tagged with the key AS ASKED) by that key; the first row of a key wins. */
-export function indexByKey(rows: { key: string; row: Record<string, unknown> }[]): Map<string, Record<string, unknown>> {
+export function indexByKey(
+    rows: { key: string; row: Record<string, unknown> }[],
+): Map<string, Record<string, unknown>> {
     const out = new Map<string, Record<string, unknown>>();
     for (const r of rows) if (!out.has(r.key)) out.set(r.key, r.row);
     return out;

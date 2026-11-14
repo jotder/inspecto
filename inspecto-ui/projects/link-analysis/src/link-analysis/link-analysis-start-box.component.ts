@@ -112,7 +112,9 @@ export const SAVE_NEEDS = needsPermission('canManageIncidents');
                 Draw a few entities and their links, then Expand one degree at a time.
             </p>
         } @else {
-            <h3 class="m-0 text-base font-semibold" [id]="titleId()">{{ adding() ? 'Add start entities' : 'New Investigation' }}</h3>
+            <h3 class="m-0 text-base font-semibold" [id]="titleId()">
+                {{ adding() ? 'Add start entities' : 'New Investigation' }}
+            </h3>
             <p class="text-secondary mb-2 mt-1 text-sm">
                 Start, then Expand. Nothing is recorded until you Save; Save asks for a Name and a Purpose.
             </p>
@@ -159,7 +161,8 @@ export const SAVE_NEEDS = needsPermission('canManageIncidents');
                             help="Pick what you are looking for first, then type it."
                             formControlName="entityType"
                         ></inspecto-option-picker>
-                        <mat-form-field class="w-full" subscriptSizing="dynamic"><!-- form-allow: a typeahead over the Dataset values -->
+                        <mat-form-field class="w-full" subscriptSizing="dynamic"
+                            ><!-- form-allow: a typeahead over the Dataset values -->
                             <mat-label>{{ typeLabel() || 'Value' }}</mat-label>
                             <input
                                 matInput
@@ -176,7 +179,9 @@ export const SAVE_NEEDS = needsPermission('canManageIncidents');
                             }
                         </mat-form-field>
                         @if (prefillNote(); as note) {
-                            <p class="text-secondary m-0 text-xs" role="status" data-testid="start-prefill-note">{{ note }}</p>
+                            <p class="text-secondary m-0 text-xs" role="status" data-testid="start-prefill-note">
+                                {{ note }}
+                            </p>
                         }
                         @if (offerReveal()) {
                             <div>
@@ -225,7 +230,8 @@ export const SAVE_NEEDS = needsPermission('canManageIncidents');
                             [options]="typeOptions()"
                             formControlName="entityType"
                         ></inspecto-option-picker>
-                        <mat-form-field class="w-full" subscriptSizing="dynamic"><!-- form-allow: a many-line paste box, not one value -->
+                        <mat-form-field class="w-full" subscriptSizing="dynamic"
+                            ><!-- form-allow: a many-line paste box, not one value -->
                             <mat-label>Values, one per line</mat-label>
                             <textarea
                                 matInput
@@ -294,7 +300,13 @@ export const SAVE_NEEDS = needsPermission('canManageIncidents');
                 }
                 <p class="text-secondary m-0 text-xs" data-testid="start-what">{{ whatHappens() }}</p>
                 <div>
-                    <button mat-flat-button color="primary" type="submit" data-testid="start-submit" [disabled]="busy()">
+                    <button
+                        mat-flat-button
+                        color="primary"
+                        type="submit"
+                        data-testid="start-submit"
+                        [disabled]="busy()"
+                    >
                         {{ submitLabel() }}
                     </button>
                 </div>
@@ -306,7 +318,8 @@ export const SAVE_NEEDS = needsPermission('canManageIncidents');
             </form>
         } @else {
             <p class="m-0 text-sm" data-testid="start-no-dataset">
-                No Dataset in this Space has a link yet, so there is nothing to start from. Bring in a file of events with
+                No Dataset in this Space has a link yet, so there is nothing to start from. Bring in a file of events
+                with
                 <em>Add data</em>, or choose a Dataset's From and To columns yourself with File ▸ Explore Dataset.
             </p>
         }
@@ -507,13 +520,16 @@ export class LinkAnalysisStartBoxComponent {
     readonly fewestDegrees = DISABLED_REASON.fewestDegrees;
     /** The pack's limit only when the pack stops first; otherwise the form's own cap, said as the form's. */
     readonly degreeMaxReason = computed(() =>
-        this.maxDegree() > MOST_DEGREES_ON_START ? expandOnStartCap(MOST_DEGREES_ON_START) : mostDegrees(this.degreeMax()),
+        this.maxDegree() > MOST_DEGREES_ON_START
+            ? expandOnStartCap(MOST_DEGREES_ON_START)
+            : mostDegrees(this.degreeMax()),
     );
 
     constructor() {
         // The graph left the screen: *The graph on screen* is no longer a choice.
         effect(() => {
-            if (!this.graphOnScreen() && this.form.controls.kind.value === 'graph') this.form.controls.kind.setValue('entity');
+            if (!this.graphOnScreen() && this.form.controls.kind.value === 'graph')
+                this.form.controls.kind.setValue('entity');
         });
         // The Dataset: the page's preselect (`?dataset=`) when it can start a graph, else keep a valid pick, else the first.
         effect(() => {
@@ -653,8 +669,10 @@ export class LinkAnalysisStartBoxComponent {
         const kind = this.kind();
         if (this.adding()) return 'Records them as one Start step of this Investigation.';
         if (this.mode() === 'investigation') {
-            if (kind === 'graph') return 'Works on the graph on screen, with no start entities yet. Nothing is recorded until you Save.';
-            if (kind === 'dataset') return 'Draws the whole Dataset, with no start entities yet. Nothing is recorded until you Save.';
+            if (kind === 'graph')
+                return 'Works on the graph on screen, with no start entities yet. Nothing is recorded until you Save.';
+            if (kind === 'dataset')
+                return 'Draws the whole Dataset, with no start entities yet. Nothing is recorded until you Save.';
             return 'Draws the start and its links. Nothing is recorded until you Save.';
         }
         if (kind === 'dataset') return 'Draws the whole Dataset at once.';
@@ -672,7 +690,8 @@ export class LinkAnalysisStartBoxComponent {
      */
     prefillEntity(value: string, note = '', entityType = ''): void {
         this.resetNew();
-        if (entityType && this.catalogue().types.some((t) => t.id === entityType)) this.form.controls.entityType.setValue(entityType);
+        if (entityType && this.catalogue().types.some((t) => t.id === entityType))
+            this.form.controls.entityType.setValue(entityType);
         this.form.controls.value.setValue(value);
         this.prefillNote.set(note);
     }
@@ -714,7 +733,9 @@ export class LinkAnalysisStartBoxComponent {
     }
 
     /** The start the form names, or null (with the missing input marked). */
-    private request(v: ReturnType<LinkAnalysisStartBoxComponent['form']['getRawValue']>): Exclude<StartRequest, { kind: 'found' }> | null {
+    private request(
+        v: ReturnType<LinkAnalysisStartBoxComponent['form']['getRawValue']>,
+    ): Exclude<StartRequest, { kind: 'found' }> | null {
         switch (v.kind) {
             case 'entity': {
                 const value = v.value.trim();

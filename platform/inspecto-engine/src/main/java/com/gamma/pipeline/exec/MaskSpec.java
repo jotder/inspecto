@@ -3,6 +3,7 @@ package com.gamma.pipeline.exec;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.PipelineNode;
+import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.mask.EvidenceMasker;
 import com.gamma.util.ColumnClassification;
@@ -15,6 +16,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Predicate;
 
 /**
  * The {@code transform.mask} config (catalog {@code quality.pii.mask}, SEC-08 Advanced-only, operator 2026-10-06):
@@ -38,8 +40,21 @@ public record MaskSpec(String mode, int keepLast, List<String> classifications, 
     public static final int DEFAULT_KEEP_LAST = 4;
     private static final Set<String> KEYS = Set.of("columns", "classifications", "dataset", "mode", "keep_last");
 
-    /** Every shape problem in a raw {@code mask} config, worded for an author; empty = well-formed. Never a value. */
+    /**
+     * Every shape problem in a raw {@code mask} config, worded for an author; empty = well-formed. Never a value. A selected class
+     * must be one the current Space masks ({@link EvidenceMasker#maskedClasses} of {@link SpaceConfigRoot#current()}) - for the
+     * recipe compiler, which holds no Space root; the save gate and the run name theirs ({@link #problems(Map, Predicate)}).
+     */
     public static List<String> problems(Map<?, ?> cfg) {
+        return problems(cfg, EvidenceMasker.maskedClasses(SpaceConfigRoot.current()));
+    }
+
+    /**
+     * {@link #problems(Map)} against {@code masks}, the classes the Space masks (MASKING-UNION-RESIDUALS-1): a sensitive class, or a
+     * class or id of an Entity Type masked in force, so a Step can mask by {@code WALLET}. A class that masks nothing there is an
+     * author error and is refused.
+     */
+    public static List<String> problems(Map<?, ?> cfg, Predicate<String> masks) {
         List<String> out = new ArrayList<>();
         for (Object k : cfg.keySet())
             if (!KEYS.contains(String.valueOf(k)))
@@ -56,8 +71,9 @@ public record MaskSpec(String mode, int keepLast, List<String> classifications, 
         if (byClass) {
             for (Object o : (List<?>) cfg.get("classifications")) {
                 String cl = ColumnClassification.normalise(o);
-                if (cl == null || !ColumnClassification.SENSITIVE.contains(cl))
-                    out.add("mask classification '" + o + "' is not one of " + ColumnClassification.RESTRICTIVENESS);
+                if (cl == null || !masks.test(cl))
+                    out.add("mask classification '" + o + "' masks nothing in this Space: it is not one of "
+                            + ColumnClassification.RESTRICTIVENESS + " nor a class or id of an Entity Type the Space masks");
             }
             if (cfg.get("dataset") == null || String.valueOf(cfg.get("dataset")).isBlank())
                 out.add("mask classifications: need a dataset: - the registry Dataset whose column classifications choose the columns");
@@ -74,9 +90,12 @@ public record MaskSpec(String mode, int keepLast, List<String> classifications, 
         return out;
     }
 
-    /** The node's spec; a malformed config is refused with every {@link #problems problem} at once. */
-    public static MaskSpec of(PipelineNode node) {
-        List<String> p = problems(node.config());
+    /**
+     * The node's spec; a malformed config is refused with every {@link #problems problem} at once, its classes judged against
+     * the Space whose config root is {@code configRoot} ({@link EvidenceMasker#maskedClasses}).
+     */
+    public static MaskSpec of(PipelineNode node, Path configRoot) {
+        List<String> p = problems(node.config(), EvidenceMasker.maskedClasses(configRoot));
         if (!p.isEmpty())
             throw new IllegalArgumentException("transform.mask node '" + node.id() + "': " + String.join("; ", p));
         String mode = node.cfg("mode") == null ? "full" : String.valueOf(node.cfg("mode")).trim().toLowerCase(Locale.ROOT);
@@ -128,10 +147,10 @@ public record MaskSpec(String mode, int keepLast, List<String> classifications, 
                         out.merge(String.valueOf(c.get("name")).trim().toLowerCase(Locale.ROOT), cl,
                                 (a, b) -> ColumnClassification.stricter(a, b, selected));
                 }
-        // the author's list is drawn from SENSITIVE (problems), so the lineage keeps exactly those classes, as before
-        // MASKING-TWO-VOCABULARIES-1: a wider set would only add refusals for an untraceable class the author never chose
+        // the lineage keeps SENSITIVE (as before MASKING-TWO-VOCABULARIES-1) plus the author's selected classes, e.g. WALLET
+        // (MASKING-UNION-RESIDUALS-1): the Space's whole masked set would only add refusals for an untraceable class never chosen
         EvidenceMasker.lineageClassification(datasetId, ds, registry, new ViewStore(configRoot.resolve("views")),
-                        ColumnClassification.SENSITIVE::contains)
+                        c -> ColumnClassification.SENSITIVE.contains(c) || classifications.contains(c))
                 .forEach((col, cl) -> out.merge(col, cl, (a, b) -> ColumnClassification.stricter(a, b, selected)));
         return out;
     }

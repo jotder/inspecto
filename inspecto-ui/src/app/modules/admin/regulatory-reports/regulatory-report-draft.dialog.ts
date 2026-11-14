@@ -94,7 +94,8 @@ export interface RegulatoryReportDraftData {
                 </div>
 
                 @for (key of inputKeys(); track key) {
-                    <mat-form-field subscriptSizing="dynamic"><!-- form-allow: the report's own text written as prose (a message composer) -->
+                    <mat-form-field subscriptSizing="dynamic"
+                        ><!-- form-allow: the report's own text written as prose (a message composer) -->
                         <mat-label>{{ label(key) }}</mat-label>
                         <textarea matInput rows="3" [formControl]="inputControl(key)"></textarea>
                         @if (inputControl(key).hasError('required')) {

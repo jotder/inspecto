@@ -407,11 +407,14 @@ class ProcurementLinksJobGoldenTest {
         }
     }
 
+    /** The newest Run of {@code job} that ran. Not {@code lastRunOf}: the two derived Jobs each emit job.dataset.produced, which
+     *  records a SKIPPED ("when guard false") on the other one, and a trigger landing on a Run in flight records a SKIPPED too —
+     *  either can land after the real Run and would hide it for good. */
     private static JobRun awaitRun(JobService js, String job) throws InterruptedException {
         long deadline = System.nanoTime() + 120_000_000_000L;
         while (System.nanoTime() < deadline) {
-            JobRun r = js.lastRunOf(job).orElse(null);
-            if (r != null && !"SKIPPED".equals(r.status()) && !"RUNNING".equals(r.status())) return r;
+            for (JobRun r : js.runsFor(job))   // newest first
+                if (!"SKIPPED".equals(r.status()) && !"RUNNING".equals(r.status())) return r;
             Thread.sleep(50);
         }
         return null;

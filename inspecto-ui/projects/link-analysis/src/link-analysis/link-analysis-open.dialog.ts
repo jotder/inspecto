@@ -146,206 +146,282 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
             @if (tab() === 'investigations' && locked()) {
                 <p class="text-secondary m-0 text-sm" data-testid="la-open-inv-locked">{{ locked() }}</p>
             } @else {
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <mat-form-field class="min-w-48 flex-1" subscriptSizing="dynamic"><!-- form-allow: a search box over the list -->
-                    <mat-label>Search name or id</mat-label>
-                    <input matInput [formControl]="search" data-testid="la-open-search" />
-                </mat-form-field>
-                @if (tab() === 'views') {
-                    <mat-form-field class="w-40" subscriptSizing="dynamic"><!-- form-allow: a filter over the list -->
-                        <mat-label>Tag</mat-label>
-                        <input matInput [formControl]="tag" (keydown.enter)="applyTag()" (blur)="applyTag()" />
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <mat-form-field class="min-w-48 flex-1" subscriptSizing="dynamic"
+                        ><!-- form-allow: a search box over the list -->
+                        <mat-label>Search name or id</mat-label>
+                        <input matInput [formControl]="search" data-testid="la-open-search" />
                     </mat-form-field>
-                } @else {
-                    <inspecto-option-picker
-                        class="w-48"
-                        label="Owner"
-                        [formControl]="owner"
-                        [options]="ownerOptions()"
-                    ></inspecto-option-picker>
-                    <inspecto-option-picker
-                        class="w-48"
-                        label="Show"
-                        [formControl]="status"
-                        [options]="statusOptions"
-                    ></inspecto-option-picker>
-                }
-                <inspecto-option-picker
-                    class="w-48"
-                    label="Dataset"
-                    [formControl]="dataset"
-                    [options]="datasetOptions()"
-                ></inspecto-option-picker>
-                <inspecto-option-picker
-                    class="w-48"
-                    label="Sort by"
-                    data-testid="la-open-sort"
-                    [formControl]="sortBy"
-                    [options]="sortOptions"
-                ></inspecto-option-picker>
-                <inspecto-option-picker
-                    class="w-48"
-                    label="Changed"
-                    [formControl]="days"
-                    [options]="dayOptions"
-                ></inspecto-option-picker>
-            </div>
-
-            @if (error()) {
-                <inspecto-alert variant="error" title="Open">{{ error() }}</inspecto-alert>
-            }
-
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <ul class="m-0 flex max-h-96 list-none flex-col gap-0.5 overflow-auto p-0" aria-label="Results">
                     @if (tab() === 'views') {
-                        @for (r of viewRows(); track r.view.id) {
-                            <li>
-                                <button
-                                    type="button"
-                                    class="w-full rounded px-2 py-1 text-left text-sm"
-                                    [class.bg-hover]="selectedViewId() === r.view.id"
-                                    [attr.aria-pressed]="selectedViewId() === r.view.id"
-                                    [attr.data-testid]="'la-open-view-' + r.view.id"
-                                    (click)="selectView(r.view.id)"
-                                    (dblclick)="openView(r.view)"
-                                >
-                                    <span class="font-medium">{{ r.view.name }}</span>
-                                    <span class="text-secondary"> — {{ datasetOf(r.view) || 'no Dataset' }}</span>
-                                </button>
-                            </li>
-                        } @empty {
-                            <li class="text-secondary px-2 text-sm">
-                                {{ loading() ? 'Loading…' : allViews().length ? 'No saved view matches.' : 'No saved views yet. Draw a graph, then use File ▸ Save view.' }}
-                            </li>
-                        }
+                        <mat-form-field class="w-40" subscriptSizing="dynamic"
+                            ><!-- form-allow: a filter over the list -->
+                            <mat-label>Tag</mat-label>
+                            <input matInput [formControl]="tag" (keydown.enter)="applyTag()" (blur)="applyTag()" />
+                        </mat-form-field>
                     } @else {
-                        @for (r of investigationRows(); track r.id) {
-                            <li>
-                                <button
-                                type="button"
-                                class="w-full rounded px-2 py-1 text-left text-sm"
-                                [class.bg-hover]="selectedInvestigationId() === r.id"
-                                [attr.aria-pressed]="selectedInvestigationId() === r.id"
-                                [attr.data-testid]="'la-open-inv-' + r.id"
-                                (click)="selectInvestigation(r.id)"
-                                (dblclick)="openInvestigation(r)"
-                            >
-                                <span class="font-medium">{{ r.title || r.id }}</span>
-                                @if (r.title) {
-                                    <span class="text-secondary"> ({{ r.id }})</span>
-                                }
-                                @if (r.recent) {
-                                    <span class="text-secondary"> · recent</span>
-                                }
-                                </button>
-                            </li>
-                        } @empty {
-                            <li class="text-secondary px-2 text-sm">
-                                {{ loading() ? 'Loading…' : 'No Investigation matches.' }}
-                            </li>
-                        }
-                        @if (idCandidate(); as id) {
-                            <li class="px-2 text-sm">
-                                <button mat-button (click)="openInvestigation({ id, title: null })" data-testid="la-open-by-id">
-                                    Open by id “{{ id }}”
-                                </button>
-                            </li>
-                        }
-                        @if (truncated()) {
-                            <li class="text-secondary px-2 text-xs">Showing the first matches. Search to narrow.</li>
-                        }
+                        <inspecto-option-picker
+                            class="w-48"
+                            label="Owner"
+                            [formControl]="owner"
+                            [options]="ownerOptions()"
+                        ></inspecto-option-picker>
+                        <inspecto-option-picker
+                            class="w-48"
+                            label="Show"
+                            [formControl]="status"
+                            [options]="statusOptions"
+                        ></inspecto-option-picker>
                     }
-                </ul>
+                    <inspecto-option-picker
+                        class="w-48"
+                        label="Dataset"
+                        [formControl]="dataset"
+                        [options]="datasetOptions()"
+                    ></inspecto-option-picker>
+                    <inspecto-option-picker
+                        class="w-48"
+                        label="Sort by"
+                        data-testid="la-open-sort"
+                        [formControl]="sortBy"
+                        [options]="sortOptions"
+                    ></inspecto-option-picker>
+                    <inspecto-option-picker
+                        class="w-48"
+                        label="Changed"
+                        [formControl]="days"
+                        [options]="dayOptions"
+                    ></inspecto-option-picker>
+                </div>
 
-                <section class="flex flex-col gap-2 text-sm" aria-label="Preview" data-testid="la-open-preview">
-                    @if (tab() === 'views') {
-                        @if (selectedView(); as r) {
-                            @if (renaming()) {
-                                <form class="flex items-start gap-2" [formGroup]="renameForm" (ngSubmit)="rename(r.view)">
-                                    <inspecto-pen-field
-                                        class="flex-1"
-                                        label="Name"
-                                        [required]="true"
-                                        formControlName="name"
-                                        data-testid="la-open-rename-input"
-                                        [error]="renameTo.touched && renameTo.hasError('required') ? 'A name is required.' : ''"
-                                    ></inspecto-pen-field>
-                                    <button mat-stroked-button type="submit" [disabled]="busy()">Rename</button>
-                                    <button mat-button type="button" (click)="renaming.set(false)">Cancel</button>
-                                </form>
-                            } @else {
-                                <h3 class="m-0 text-sm font-semibold">{{ r.view.name }}</h3>
+                @if (error()) {
+                    <inspecto-alert variant="error" title="Open">{{ error() }}</inspecto-alert>
+                }
+
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <ul class="m-0 flex max-h-96 list-none flex-col gap-0.5 overflow-auto p-0" aria-label="Results">
+                        @if (tab() === 'views') {
+                            @for (r of viewRows(); track r.view.id) {
+                                <li>
+                                    <button
+                                        type="button"
+                                        class="w-full rounded px-2 py-1 text-left text-sm"
+                                        [class.bg-hover]="selectedViewId() === r.view.id"
+                                        [attr.aria-pressed]="selectedViewId() === r.view.id"
+                                        [attr.data-testid]="'la-open-view-' + r.view.id"
+                                        (click)="selectView(r.view.id)"
+                                        (dblclick)="openView(r.view)"
+                                    >
+                                        <span class="font-medium">{{ r.view.name }}</span>
+                                        <span class="text-secondary"> — {{ datasetOf(r.view) || 'no Dataset' }}</span>
+                                    </button>
+                                </li>
+                            } @empty {
+                                <li class="text-secondary px-2 text-sm">
+                                    {{
+                                        loading()
+                                            ? 'Loading…'
+                                            : allViews().length
+                                              ? 'No saved view matches.'
+                                              : 'No saved views yet. Draw a graph, then use File ▸ Save view.'
+                                    }}
+                                </li>
                             }
-                            <p class="m-0">{{ r.view.description || 'No description.' }}</p>
-                            <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
-                                <dt class="text-secondary">Dataset</dt><dd class="m-0">{{ datasetOf(r.view) || '—' }}</dd>
-                                <dt class="text-secondary">Counts</dt><dd class="m-0">Counted when opened</dd>
-                                <dt class="text-secondary">Owner</dt><dd class="m-0">Not recorded for a saved view</dd>
-                                <dt class="text-secondary">Last changed</dt><dd class="m-0">{{ when(r.modified) }}</dd>
-                                <dt class="text-secondary">Investigations</dt><dd class="m-0">{{ r.view.investigations?.length ?? 0 }}</dd>
-                                <dt class="text-secondary">Industry pack</dt><dd class="m-0">{{ r.view.profile || 'Generic' }}</dd>
-                            </dl>
-                            <p class="text-secondary m-0 text-xs leading-snug" data-testid="la-open-not-evidence">
-                                <span class="text-warn font-semibold">Not evidence:</span> {{ notEvidence }}
-                            </p>
-                            <div class="flex flex-wrap gap-1">
-                                <button mat-flat-button color="primary" (click)="openView(r.view)" data-testid="la-open-open">Open</button>
-                                <span class="inline-flex" [matTooltip]="editBlock(r.view)">
-                                    <button mat-button (click)="beginRename(r.view)" [disabled]="busy() || !!editBlock(r.view)" data-testid="la-open-rename">Rename</button>
-                                </span>
-                                <span class="inline-flex" [matTooltip]="data.viewSaveBlock || ''">
-                                    <button mat-button (click)="duplicate(r.view)" [disabled]="busy() || !!data.viewSaveBlock" data-testid="la-open-duplicate">Duplicate</button>
-                                </span>
-                                <span class="inline-flex" [matTooltip]="deleteBlock(r.view)">
-                                    <button mat-button (click)="deleteView(r.view)" [disabled]="busy() || !!deleteBlock(r.view)" data-testid="la-open-delete">Delete</button>
-                                </span>
-                                <button mat-button (click)="data.history(r.view)">Version history</button>
-                                @if (data.opsEnabled) {
-                                    <button mat-button (click)="data.comments(r.view)">Comments</button>
-                                    <button mat-button (click)="data.tags(r.view)">Tags</button>
-                                }
-                                @if (data.shareable(r.view)) {
-                                    <button mat-button (click)="data.offer(r.view)">Share…</button>
-                                }
-                            </div>
                         } @else {
-                            <p class="text-secondary m-0">Pick a view to see it here.</p>
+                            @for (r of investigationRows(); track r.id) {
+                                <li>
+                                    <button
+                                        type="button"
+                                        class="w-full rounded px-2 py-1 text-left text-sm"
+                                        [class.bg-hover]="selectedInvestigationId() === r.id"
+                                        [attr.aria-pressed]="selectedInvestigationId() === r.id"
+                                        [attr.data-testid]="'la-open-inv-' + r.id"
+                                        (click)="selectInvestigation(r.id)"
+                                        (dblclick)="openInvestigation(r)"
+                                    >
+                                        <span class="font-medium">{{ r.title || r.id }}</span>
+                                        @if (r.title) {
+                                            <span class="text-secondary"> ({{ r.id }})</span>
+                                        }
+                                        @if (r.recent) {
+                                            <span class="text-secondary"> · recent</span>
+                                        }
+                                    </button>
+                                </li>
+                            } @empty {
+                                <li class="text-secondary px-2 text-sm">
+                                    {{ loading() ? 'Loading…' : 'No Investigation matches.' }}
+                                </li>
+                            }
+                            @if (idCandidate(); as id) {
+                                <li class="px-2 text-sm">
+                                    <button
+                                        mat-button
+                                        (click)="openInvestigation({ id, title: null })"
+                                        data-testid="la-open-by-id"
+                                    >
+                                        Open by id “{{ id }}”
+                                    </button>
+                                </li>
+                            }
+                            @if (truncated()) {
+                                <li class="text-secondary px-2 text-xs">
+                                    Showing the first matches. Search to narrow.
+                                </li>
+                            }
                         }
-                    } @else {
-                        @if (selectedInvestigation(); as r) {
-                            <h3 class="m-0 text-sm font-semibold">{{ r.title || r.id }}</h3>
-                            <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
-                                <dt class="text-secondary">Id</dt><dd class="m-0">{{ r.id }}</dd>
-                                <dt class="text-secondary">Dataset</dt><dd class="m-0">{{ r.dataset || '—' }}</dd>
-                                <dt class="text-secondary">Steps</dt><dd class="m-0">{{ r.steps ?? '—' }}</dd>
-                                <dt class="text-secondary">Owner</dt><dd class="m-0" data-testid="la-open-inv-owner">{{ r.ownerName || r.owner || '—' }}</dd>
-                                <dt class="text-secondary">Created</dt><dd class="m-0">{{ when(r.changed) }}</dd>
-                                <dt class="text-secondary">Linked Case</dt><dd class="m-0">{{ r.caseRef || '—' }}{{ r.readOnly ? ' (read-only)' : '' }}</dd>
-                                <dt class="text-secondary">Industry pack</dt><dd class="m-0" data-testid="la-open-inv-pack">{{ investigationPack() }}</dd>
-                            </dl>
-                            <div class="flex flex-wrap gap-1">
-                                <button mat-flat-button color="primary" (click)="openInvestigation(r)" data-testid="la-open-open">Open</button>
-                                @if (r.listed) {
-                                    <!-- T-170: shown when it cannot act, disabled with the reason (the wrapper carries the tooltip) -->
-                                    <span class="inline-flex" [matTooltip]="investigationDeleteBlock(r)">
+                    </ul>
+
+                    <section class="flex flex-col gap-2 text-sm" aria-label="Preview" data-testid="la-open-preview">
+                        @if (tab() === 'views') {
+                            @if (selectedView(); as r) {
+                                @if (renaming()) {
+                                    <form
+                                        class="flex items-start gap-2"
+                                        [formGroup]="renameForm"
+                                        (ngSubmit)="rename(r.view)"
+                                    >
+                                        <inspecto-pen-field
+                                            class="flex-1"
+                                            label="Name"
+                                            [required]="true"
+                                            formControlName="name"
+                                            data-testid="la-open-rename-input"
+                                            [error]="
+                                                renameTo.touched && renameTo.hasError('required')
+                                                    ? 'A name is required.'
+                                                    : ''
+                                            "
+                                        ></inspecto-pen-field>
+                                        <button mat-stroked-button type="submit" [disabled]="busy()">Rename</button>
+                                        <button mat-button type="button" (click)="renaming.set(false)">Cancel</button>
+                                    </form>
+                                } @else {
+                                    <h3 class="m-0 text-sm font-semibold">{{ r.view.name }}</h3>
+                                }
+                                <p class="m-0">{{ r.view.description || 'No description.' }}</p>
+                                <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+                                    <dt class="text-secondary">Dataset</dt>
+                                    <dd class="m-0">{{ datasetOf(r.view) || '—' }}</dd>
+                                    <dt class="text-secondary">Counts</dt>
+                                    <dd class="m-0">Counted when opened</dd>
+                                    <dt class="text-secondary">Owner</dt>
+                                    <dd class="m-0">Not recorded for a saved view</dd>
+                                    <dt class="text-secondary">Last changed</dt>
+                                    <dd class="m-0">{{ when(r.modified) }}</dd>
+                                    <dt class="text-secondary">Investigations</dt>
+                                    <dd class="m-0">{{ r.view.investigations?.length ?? 0 }}</dd>
+                                    <dt class="text-secondary">Industry pack</dt>
+                                    <dd class="m-0">{{ r.view.profile || 'Generic' }}</dd>
+                                </dl>
+                                <p class="text-secondary m-0 text-xs leading-snug" data-testid="la-open-not-evidence">
+                                    <span class="text-warn font-semibold">Not evidence:</span> {{ notEvidence }}
+                                </p>
+                                <div class="flex flex-wrap gap-1">
+                                    <button
+                                        mat-flat-button
+                                        color="primary"
+                                        (click)="openView(r.view)"
+                                        data-testid="la-open-open"
+                                    >
+                                        Open
+                                    </button>
+                                    <span class="inline-flex" [matTooltip]="editBlock(r.view)">
                                         <button
                                             mat-button
-                                            (click)="deleteInvestigation(r)"
-                                            [disabled]="busy() || !!investigationDeleteBlock(r)"
-                                            [attr.aria-label]="investigationDeleteBlock(r) ? 'Delete: ' + investigationDeleteBlock(r) : null"
-                                            data-testid="la-open-inv-delete"
+                                            (click)="beginRename(r.view)"
+                                            [disabled]="busy() || !!editBlock(r.view)"
+                                            data-testid="la-open-rename"
+                                        >
+                                            Rename
+                                        </button>
+                                    </span>
+                                    <span class="inline-flex" [matTooltip]="data.viewSaveBlock || ''">
+                                        <button
+                                            mat-button
+                                            (click)="duplicate(r.view)"
+                                            [disabled]="busy() || !!data.viewSaveBlock"
+                                            data-testid="la-open-duplicate"
+                                        >
+                                            Duplicate
+                                        </button>
+                                    </span>
+                                    <span class="inline-flex" [matTooltip]="deleteBlock(r.view)">
+                                        <button
+                                            mat-button
+                                            (click)="deleteView(r.view)"
+                                            [disabled]="busy() || !!deleteBlock(r.view)"
+                                            data-testid="la-open-delete"
                                         >
                                             Delete
                                         </button>
                                     </span>
-                                }
-                            </div>
+                                    <button mat-button (click)="data.history(r.view)">Version history</button>
+                                    @if (data.opsEnabled) {
+                                        <button mat-button (click)="data.comments(r.view)">Comments</button>
+                                        <button mat-button (click)="data.tags(r.view)">Tags</button>
+                                    }
+                                    @if (data.shareable(r.view)) {
+                                        <button mat-button (click)="data.offer(r.view)">Share…</button>
+                                    }
+                                </div>
+                            } @else {
+                                <p class="text-secondary m-0">Pick a view to see it here.</p>
+                            }
                         } @else {
-                            <p class="text-secondary m-0">Pick an Investigation to see it here.</p>
+                            @if (selectedInvestigation(); as r) {
+                                <h3 class="m-0 text-sm font-semibold">{{ r.title || r.id }}</h3>
+                                <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+                                    <dt class="text-secondary">Id</dt>
+                                    <dd class="m-0">{{ r.id }}</dd>
+                                    <dt class="text-secondary">Dataset</dt>
+                                    <dd class="m-0">{{ r.dataset || '—' }}</dd>
+                                    <dt class="text-secondary">Steps</dt>
+                                    <dd class="m-0">{{ r.steps ?? '—' }}</dd>
+                                    <dt class="text-secondary">Owner</dt>
+                                    <dd class="m-0" data-testid="la-open-inv-owner">
+                                        {{ r.ownerName || r.owner || '—' }}
+                                    </dd>
+                                    <dt class="text-secondary">Created</dt>
+                                    <dd class="m-0">{{ when(r.changed) }}</dd>
+                                    <dt class="text-secondary">Linked Case</dt>
+                                    <dd class="m-0">{{ r.caseRef || '—' }}{{ r.readOnly ? ' (read-only)' : '' }}</dd>
+                                    <dt class="text-secondary">Industry pack</dt>
+                                    <dd class="m-0" data-testid="la-open-inv-pack">{{ investigationPack() }}</dd>
+                                </dl>
+                                <div class="flex flex-wrap gap-1">
+                                    <button
+                                        mat-flat-button
+                                        color="primary"
+                                        (click)="openInvestigation(r)"
+                                        data-testid="la-open-open"
+                                    >
+                                        Open
+                                    </button>
+                                    @if (r.listed) {
+                                        <!-- T-170: shown when it cannot act, disabled with the reason (the wrapper carries the tooltip) -->
+                                        <span class="inline-flex" [matTooltip]="investigationDeleteBlock(r)">
+                                            <button
+                                                mat-button
+                                                (click)="deleteInvestigation(r)"
+                                                [disabled]="busy() || !!investigationDeleteBlock(r)"
+                                                [attr.aria-label]="
+                                                    investigationDeleteBlock(r)
+                                                        ? 'Delete: ' + investigationDeleteBlock(r)
+                                                        : null
+                                                "
+                                                data-testid="la-open-inv-delete"
+                                            >
+                                                Delete
+                                            </button>
+                                        </span>
+                                    }
+                                </div>
+                            } @else {
+                                <p class="text-secondary m-0">Pick an Investigation to see it here.</p>
+                            }
                         }
-                    }
-                </section>
-            </div>
+                    </section>
+                </div>
             }
         </mat-dialog-content>
         <mat-dialog-actions align="end">
@@ -381,7 +457,9 @@ export class LinkAnalysisOpenDialog {
     private readonly sortValue = toSignal(this.sortBy.valueChanges, { initialValue: 'changed' as OpenSort });
     /** The selected Investigation's stored pack, read from its header (the listing does not carry it). */
     readonly investigationPack = signal('—');
-    readonly renameForm = new FormGroup({ name: new FormControl('', { nonNullable: true, validators: [Validators.required] }) });
+    readonly renameForm = new FormGroup({
+        name: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    });
     readonly renameTo = this.renameForm.controls.name;
     private readonly searchText = toSignal(this.search.valueChanges, { initialValue: '' });
     private readonly ownerValue = toSignal(this.owner.valueChanges, { initialValue: '' });
@@ -452,7 +530,18 @@ export class LinkAnalysisOpenDialog {
         const seen = new Set(rows.map((r) => r.id));
         for (const r of this.store.refs())
             if (!seen.has(r.id))
-                rows.push({ id: r.id, title: r.title ?? null, dataset: '', owner: null, ownerName: null, changed: null, steps: null, readOnly: false, recent: true, listed: false });
+                rows.push({
+                    id: r.id,
+                    title: r.title ?? null,
+                    dataset: '',
+                    owner: null,
+                    ownerName: null,
+                    changed: null,
+                    steps: null,
+                    readOnly: false,
+                    recent: true,
+                    listed: false,
+                });
         return rows;
     });
 
@@ -464,14 +553,14 @@ export class LinkAnalysisOpenDialog {
         const days = this.daysValue();
         return this.allInvestigations()
             .filter(
-            (r) =>
-                (!q || `${r.title ?? ''} ${r.id}`.toLowerCase().includes(q)) &&
-                (!owner || r.owner === owner) &&
-                (!ds || r.dataset === ds) &&
-                (status !== 'recent' || r.recent) &&
-                (status !== 'owner' || (!r.readOnly && r.owner !== null)) &&
-                (status !== 'case' || !!r.caseRef) &&
-                withinDays(r.changed, days),
+                (r) =>
+                    (!q || `${r.title ?? ''} ${r.id}`.toLowerCase().includes(q)) &&
+                    (!owner || r.owner === owner) &&
+                    (!ds || r.dataset === ds) &&
+                    (status !== 'recent' || r.recent) &&
+                    (status !== 'owner' || (!r.readOnly && r.owner !== null)) &&
+                    (status !== 'case' || !!r.caseRef) &&
+                    withinDays(r.changed, days),
             )
             .sort((a, b) =>
                 this.sortValue() === 'changed'
@@ -488,11 +577,22 @@ export class LinkAnalysisOpenDialog {
     });
 
     readonly owners = computed(() =>
-        [...new Set(this.allInvestigations().map((r) => r.owner).filter((o): o is string => !!o))].sort(),
+        [
+            ...new Set(
+                this.allInvestigations()
+                    .map((r) => r.owner)
+                    .filter((o): o is string => !!o),
+            ),
+        ].sort(),
     );
     /** T-186: login id → display name, for the owners the server named. */
     private readonly ownerNames = computed(
-        () => new Map(this.allInvestigations().filter((r) => r.owner && r.ownerName).map((r) => [r.owner!, r.ownerName!])),
+        () =>
+            new Map(
+                this.allInvestigations()
+                    .filter((r) => r.owner && r.ownerName)
+                    .map((r) => [r.owner!, r.ownerName!]),
+            ),
     );
 
     /** An owner as people call them: the display name when known, else the login id. */
@@ -560,7 +660,8 @@ export class LinkAnalysisOpenDialog {
         this.investigationPack.set('…');
         this.inv.investigationLog(id, 1).subscribe({
             next: (log) => {
-                if (this.selectedInvestigationId() === id) this.investigationPack.set(log.header.pack || 'Space default');
+                if (this.selectedInvestigationId() === id)
+                    this.investigationPack.set(log.header.pack || 'Space default');
             },
             error: () => {
                 if (this.selectedInvestigationId() === id) this.investigationPack.set('—');
@@ -578,7 +679,10 @@ export class LinkAnalysisOpenDialog {
         try {
             const defs = await firstValueFrom(this.components.list('link-analysis-view'));
             this.allViews.set(
-                defs.map((d) => ({ view: this.viewsService.fromContent(d.name, d.content), modified: d.modified ?? null })),
+                defs.map((d) => ({
+                    view: this.viewsService.fromContent(d.name, d.content),
+                    modified: d.modified ?? null,
+                })),
             );
         } catch (err) {
             this.fail('views', apiErrorMessage(err, 'Could not list the saved views.'));
@@ -610,7 +714,9 @@ export class LinkAnalysisOpenDialog {
         }
         try {
             const hits = await firstValueFrom(this.tagsService.targets(tag));
-            this.taggedIds.set(new Set(hits.filter((h) => h.targetKind === 'link-analysis-view').map((h) => h.targetId)));
+            this.taggedIds.set(
+                new Set(hits.filter((h) => h.targetKind === 'link-analysis-view').map((h) => h.targetId)),
+            );
         } catch {
             this.taggedIds.set(new Set()); // an unknown tag carries nothing
         }
@@ -689,7 +795,8 @@ export class LinkAnalysisOpenDialog {
         );
         if (!ok) return;
         await this.write(async () => {
-            if (!(await this.store.deleteInvestigation(r.id))) throw new Error(this.store.error() || 'Could not delete the Investigation.');
+            if (!(await this.store.deleteInvestigation(r.id)))
+                throw new Error(this.store.error() || 'Could not delete the Investigation.');
             this.listed.update((all) => (all ?? []).filter((i) => i.id !== r.id));
             this.selectedInvestigationId.set(null);
         }, 'Could not delete the Investigation.');

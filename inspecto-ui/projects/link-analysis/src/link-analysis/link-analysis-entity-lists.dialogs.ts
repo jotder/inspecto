@@ -80,9 +80,7 @@ export interface CreateEntityListData {
     template: `
         <h2 mat-dialog-title>New Entity List</h2>
         <mat-dialog-content class="flex flex-col gap-3 text-sm">
-            <p class="m-0 text-xs">
-                A named set of entities. Every change is logged with who, when and why.
-            </p>
+            <p class="m-0 text-xs">A named set of entities. Every change is logged with who, when and why.</p>
             @if (!typeOptions.length) {
                 <inspecto-alert variant="warning" title="No Entity Types">
                     No Entity Types are set up. Add one in Settings ▸ Entity Types.
@@ -155,7 +153,9 @@ export class CreateEntityListDialog {
             validators: [Validators.required],
         }),
         entityType: new FormControl<string | null>(
-            this.data.entityTypes.some((t) => t.id === this.data.initial?.entityType) ? this.data.initial!.entityType : null,
+            this.data.entityTypes.some((t) => t.id === this.data.initial?.entityType)
+                ? this.data.initial!.entityType
+                : null,
             { validators: [Validators.required] },
         ),
         reason: new FormControl(this.data.initial?.reason ?? '', {
@@ -334,7 +334,8 @@ export type EntityListEntriesResult = EntityListMembersResult | EntityListHeld;
                     <mat-button-toggle value="add">Add</mat-button-toggle>
                     <mat-button-toggle value="remove">Remove</mat-button-toggle>
                 </mat-button-toggle-group>
-                <mat-form-field subscriptSizing="dynamic"><!-- form-allow: a many-line paste box, not one value -->
+                <mat-form-field subscriptSizing="dynamic"
+                    ><!-- form-allow: a many-line paste box, not one value -->
                     <mat-label>Entries, one per line</mat-label>
                     <textarea matInput rows="6" formControlName="entries"></textarea>
                     <mat-hint>

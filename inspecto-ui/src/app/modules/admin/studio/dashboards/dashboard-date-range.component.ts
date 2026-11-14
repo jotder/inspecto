@@ -55,7 +55,8 @@ import {
                 >
                     <mat-icon svgIcon="heroicons_outline:chevron-left" />
                 </button>
-                <mat-form-field subscriptSizing="dynamic" class="w-40"><!-- form-allow: a live date filter with a calendar panel; its max day (the anchor) has no pen-field equivalent -->
+                <mat-form-field subscriptSizing="dynamic" class="w-40"
+                    ><!-- form-allow: a live date filter with a calendar panel; its max day (the anchor) has no pen-field equivalent -->
                     <mat-label>Day</mat-label>
                     <input
                         matInput
@@ -79,7 +80,8 @@ import {
                 </button>
             }
             @if (picked() === 'custom') {
-                <mat-form-field subscriptSizing="dynamic" class="w-40"><!-- form-allow: a live date filter with a calendar panel -->
+                <mat-form-field subscriptSizing="dynamic" class="w-40"
+                    ><!-- form-allow: a live date filter with a calendar panel -->
                     <mat-label>From</mat-label>
                     <input
                         matInput
@@ -90,7 +92,8 @@ import {
                     <mat-datepicker-toggle matIconSuffix [for]="fromPicker" />
                     <mat-datepicker #fromPicker />
                 </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic" class="w-40"><!-- form-allow: a live date filter with a calendar panel -->
+                <mat-form-field subscriptSizing="dynamic" class="w-40"
+                    ><!-- form-allow: a live date filter with a calendar panel -->
                     <mat-label>To</mat-label>
                     <input
                         matInput

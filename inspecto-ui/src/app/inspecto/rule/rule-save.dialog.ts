@@ -33,13 +33,7 @@ export interface RuleSaveData {
 @Component({
     selector: 'app-rule-save-dialog',
     standalone: true,
-    imports: [
-        ReactiveFormsModule,
-        MatDialogModule,
-        MatButtonModule,
-        PenFieldComponent,
-        MatProgressSpinnerModule,
-    ],
+    imports: [ReactiveFormsModule, MatDialogModule, MatButtonModule, PenFieldComponent, MatProgressSpinnerModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Save as rule</h2>

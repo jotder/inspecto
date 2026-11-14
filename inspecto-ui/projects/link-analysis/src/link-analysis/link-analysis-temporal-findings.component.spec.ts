@@ -217,7 +217,9 @@ describe('LinkAnalysisTemporalFindingsComponent', () => {
         // X6: disabled with its reason, still focusable and described by the visible line
         expect(button.getAttribute('aria-disabled')).toBe('true');
         expect(button.getAttribute('aria-describedby')).toContain('la-temporal-seal-note');
-        expect(el.querySelector('[data-test=temporal-seal-note]')!.textContent!.trim()).toBe('Open an Investigation first.');
+        expect(el.querySelector('[data-test=temporal-seal-note]')!.textContent!.trim()).toBe(
+            'Open an Investigation first.',
+        );
         button.click();
         expect(host.sealRequested).not.toHaveBeenCalled();
 
@@ -249,7 +251,9 @@ describe('LinkAnalysisTemporalFindingsComponent', () => {
         expect(el.textContent).toContain('this Investigation has no time column');
         host.sealBusy.set(true);
         fixture.detectChanges();
-        expect(el.querySelector<HTMLButtonElement>('[data-test=temporal-seal-button]')!.getAttribute('aria-disabled')).toBe('true');
+        expect(
+            el.querySelector<HTMLButtonElement>('[data-test=temporal-seal-button]')!.getAttribute('aria-disabled'),
+        ).toBe('true');
         await expectNoA11yViolations(el);
     });
 });

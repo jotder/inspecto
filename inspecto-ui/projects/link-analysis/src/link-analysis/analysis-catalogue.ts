@@ -130,7 +130,10 @@ export function catalogueSections<T extends { id: string }>(
 ): CatalogueSection<T>[] {
     return CATALOGUE_QUESTIONS.map((q) => ({
         ...q,
-        tools: tools.filter((t) => listedOnSide(t.id, where, handingOver(t.id)) && (CATALOGUE_TOOLS[t.id]?.question ?? 'unusual') === q.id),
+        tools: tools.filter(
+            (t) =>
+                listedOnSide(t.id, where, handingOver(t.id)) && (CATALOGUE_TOOLS[t.id]?.question ?? 'unusual') === q.id,
+        ),
         server:
             where === 'server'
                 ? algorithms

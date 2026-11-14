@@ -5,12 +5,7 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
-import {
-    describeSearchAround,
-    SearchAroundCondition,
-    SearchAroundSpec,
-    searchAroundIssues,
-} from './search-around';
+import { describeSearchAround, SearchAroundCondition, SearchAroundSpec, searchAroundIssues } from './search-around';
 
 /**
  * **Search around** - the plain-language view of the Pattern section's path motif: pick a start entity type,
@@ -49,7 +44,9 @@ import {
                     >
                         <mat-button-toggle value="out" aria-label="Outgoing" matTooltip="Outgoing">→</mat-button-toggle>
                         <mat-button-toggle value="in" aria-label="Incoming" matTooltip="Incoming">←</mat-button-toggle>
-                        <mat-button-toggle value="both" aria-label="Both ways" matTooltip="Both ways">↔</mat-button-toggle>
+                        <mat-button-toggle value="both" aria-label="Both ways" matTooltip="Both ways"
+                            >↔</mat-button-toggle
+                        >
                     </mat-button-toggle-group>
                     <inspecto-option-picker
                         class="w-40"
@@ -65,12 +62,21 @@ import {
                         [ngModel]="c.neighbourType ?? ''"
                         (ngModelChange)="edit(i, { neighbourType: $event || undefined })"
                     />
-                    <button mat-icon-button type="button" (click)="remove(i)" [attr.aria-label]="'Remove condition ' + (i + 1)">
+                    <button
+                        mat-icon-button
+                        type="button"
+                        (click)="remove(i)"
+                        [attr.aria-label]="'Remove condition ' + (i + 1)"
+                    >
                         <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
                     </button>
                 </div>
             }
-            <ol class="text-secondary m-0 list-none p-0 text-sm" aria-label="This search in words" data-testid="search-around-words">
+            <ol
+                class="text-secondary m-0 list-none p-0 text-sm"
+                aria-label="This search in words"
+                data-testid="search-around-words"
+            >
                 @for (line of words(); track $index) {
                     <li>{{ line }}</li>
                 }
@@ -94,7 +100,9 @@ import {
                 </button>
             </div>
             @if (issues().length) {
-                <p class="m-0 text-sm" role="status" id="search-around-why" data-testid="search-around-issues">{{ issues()[0] }}</p>
+                <p class="m-0 text-sm" role="status" id="search-around-why" data-testid="search-around-issues">
+                    {{ issues()[0] }}
+                </p>
             }
             <p class="text-secondary m-0 text-xs">
                 Searches the graph drawn here. To reach entities not loaded yet, use Expand.

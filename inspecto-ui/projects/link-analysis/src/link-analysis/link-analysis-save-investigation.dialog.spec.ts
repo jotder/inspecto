@@ -4,7 +4,10 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { penEdit, penError, penText } from '@inspecto/core/testing/pen-field';
-import { LinkAnalysisSaveInvestigationDialog, SaveInvestigationDialogData } from './link-analysis-save-investigation.dialog';
+import {
+    LinkAnalysisSaveInvestigationDialog,
+    SaveInvestigationDialogData,
+} from './link-analysis-save-investigation.dialog';
 
 function create(data: Partial<SaveInvestigationDialogData> = {}) {
     const close = vi.fn();

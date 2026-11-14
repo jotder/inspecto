@@ -112,7 +112,9 @@
                         Reveal subject (audited)
                     </button>
                     @if (revealError()) {
-                        <inspecto-alert class="mt-2" variant="error" title="Not revealed">{{ revealError() }}</inspecto-alert>
+                        <inspecto-alert class="mt-2" variant="error" title="Not revealed">{{
+                            revealError()
+                        }}</inspecto-alert>
                     }
                     @if (revealed(); as r) {
                         <dl class="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">

@@ -24,10 +24,16 @@ import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
         <div class="flex flex-col gap-3" data-testid="la-entity-types">
             <ul class="m-0 flex list-none flex-col gap-1 p-0" aria-label="Entity Types in force">
                 @for (t of types(); track t.id) {
-                    <li class="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm" style="border-color: var(--gamma-border)">
+                    <li
+                        class="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm"
+                        style="border-color: var(--gamma-border)"
+                    >
                         <span class="font-medium">{{ t.label || t.id }}</span>
                         <code class="text-secondary text-xs">{{ t.id }}</code>
-                        <span class="text-secondary text-xs">· {{ normaliserLabel(t.normaliser) }}{{ t.masked ? ' · masked' : '' }}</span>
+                        <span class="text-secondary text-xs"
+                            >· {{ normaliserLabel(t.normaliser)
+                            }}{{ (t.maskedInForce ?? t.masked) ? ' · masked' : '' }}</span
+                        >
                         @if (canEdit()) {
                             <button
                                 mat-button
@@ -52,7 +58,12 @@ import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
                 @if (adding()) {
                     <inspecto-la-new-entity-type (added)="adding.set(false)" (cancelled)="adding.set(false)" />
                 } @else {
-                    <button mat-stroked-button class="self-start" data-testid="la-entity-type-new" (click)="adding.set(true)">
+                    <button
+                        mat-stroked-button
+                        class="self-start"
+                        data-testid="la-entity-type-new"
+                        (click)="adding.set(true)"
+                    >
                         <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
                         New Entity Type
                     </button>

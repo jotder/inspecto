@@ -131,7 +131,12 @@ describe('SpaceTemplateGalleryDialog', () => {
      * a Basic Pipeline never polls on its own. A template that ships samples is created with them loaded and run.
      */
     it('creates a template that ships samples WITH them loaded, and says so', () => {
-        const sample: SpaceTemplateInfo = { ...TEMPLATES[1], id: 'la-sample', name: 'Link Analysis sample', samples: true };
+        const sample: SpaceTemplateInfo = {
+            ...TEMPLATES[1],
+            id: 'la-sample',
+            name: 'Link Analysis sample',
+            samples: true,
+        };
         const { fixture, created } = create(['default'], [sample]);
         const c = fixture.componentInstance;
         c.choose(sample);

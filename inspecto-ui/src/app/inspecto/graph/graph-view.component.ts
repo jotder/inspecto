@@ -160,7 +160,13 @@ export function buildBehaviors(
         ...(pan
             ? lasso
                 ? // Shift is the lasso's key: a drag holding it never also pans.
-                  [{ type: 'drag-canvas', enable: (e: { targetType?: string; shiftKey?: boolean }) => e.targetType === 'canvas' && !e.shiftKey }]
+                  [
+                      {
+                          type: 'drag-canvas',
+                          enable: (e: { targetType?: string; shiftKey?: boolean }) =>
+                              e.targetType === 'canvas' && !e.shiftKey,
+                      },
+                  ]
                 : ['drag-canvas']
             : []),
         { type: 'zoom-canvas', minZoom: 0.1, maxZoom: 4 },
@@ -1254,7 +1260,11 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         if (group) return this.groupSwatch.get(group)!; // analysis overlay wins over styling
         const kind = (d.data as { kind: NodeKind }).kind;
         const details = this.display?.referenceDetails;
-        const ruled = nodeRuleColor(this.display?.nodeRules, d.data as G6Node['data'], (ref) => details?.[ref]?.[d.id as string]);
+        const ruled = nodeRuleColor(
+            this.display?.nodeRules,
+            d.data as G6Node['data'],
+            (ref) => details?.[ref]?.[d.id as string],
+        );
         if (ruled) return ruled; // conditional formatting outranks the per-kind colour
         return this.display?.nodeColors[kind] ?? (d.data as { color?: string }).color ?? nodeColor(kind);
     }
@@ -1603,7 +1613,11 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         });
         graph.on(CanvasEvent.CLICK, () => {
             // The click that ends a box select must not clear what the box just selected.
-            if ((this.interaction?.boxSelect || this.interaction?.lasso) && Date.now() - this.brushedAt > 250 && this.selSet.size > 0) {
+            if (
+                (this.interaction?.boxSelect || this.interaction?.lasso) &&
+                Date.now() - this.brushedAt > 250 &&
+                this.selSet.size > 0
+            ) {
                 this.selectionChange.emit([]);
             }
         });

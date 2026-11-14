@@ -34,7 +34,11 @@ function answer(url: string): unknown {
 
 describe('LinkAnalysisComponent — load writes nothing (S6)', () => {
     it('sends no PUT/POST/DELETE while the page loads and its reads answer', async () => {
-        const source: GraphSource = { id: 'entity-projection', label: 'x', query: async () => ({ nodes: [], edges: [] }) };
+        const source: GraphSource = {
+            id: 'entity-projection',
+            label: 'x',
+            query: async () => ({ nodes: [], edges: [] }),
+        };
         TestBed.configureTestingModule({
             imports: [LinkAnalysisComponent],
             providers: [
@@ -45,10 +49,16 @@ describe('LinkAnalysisComponent — load writes nothing (S6)', () => {
                 provideHttpClientTesting(),
                 { provide: GraphSourcesService, useValue: { sources: [source], byId: () => source } },
                 { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
-                { provide: ToastrService, useValue: { warning: vi.fn(), success: vi.fn(), error: vi.fn(), info: vi.fn() } },
+                {
+                    provide: ToastrService,
+                    useValue: { warning: vi.fn(), success: vi.fn(), error: vi.fn(), info: vi.fn() },
+                },
                 {
                     provide: ActivatedRoute,
-                    useValue: { snapshot: { queryParamMap: convertToParamMap({}) }, queryParamMap: of(convertToParamMap({})) },
+                    useValue: {
+                        snapshot: { queryParamMap: convertToParamMap({}) },
+                        queryParamMap: of(convertToParamMap({})),
+                    },
                 },
             ],
         });

@@ -94,7 +94,8 @@
 
         <!-- UIE-5 (d): the viewer's date range — which column it filters, and the range a viewer starts from. -->
         <div class="flex flex-wrap items-center gap-4 border-t border-gray-200 pt-4 dark:border-gray-700">
-            <mat-form-field subscriptSizing="dynamic" class="w-56"><!-- form-allow: a typeahead with an autocomplete panel over the date columns -->
+            <mat-form-field subscriptSizing="dynamic" class="w-56"
+                ><!-- form-allow: a typeahead with an autocomplete panel over the date columns -->
                 <mat-label>Date field</mat-label>
                 <input
                     matInput
@@ -159,7 +160,8 @@
             </div>
             <div>
                 <div class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wider">Quick filters</div>
-                <mat-form-field subscriptSizing="dynamic" class="w-64"><!-- form-allow: a multiple choice, not one value -->
+                <mat-form-field subscriptSizing="dynamic" class="w-64"
+                    ><!-- form-allow: a multiple choice, not one value -->
                     <mat-label>Exposed fields</mat-label>
                     <!-- form-allow: a multiple choice, not one value --><mat-select
                         multiple
@@ -258,7 +260,12 @@
                             </app-dashboard-tile>
                         } @else if (isKpiBound(widget)) {
                             <!-- KPI-definition tile: the KPI reads its own value; no Dataset, no cross-filter. -->
-                            <app-dashboard-tile [widget]="widget" [stale]="staleOf(tile)" [asOf]="tileAsOf()" [range]="tileRange()">
+                            <app-dashboard-tile
+                                [widget]="widget"
+                                [stale]="staleOf(tile)"
+                                [asOf]="tileAsOf()"
+                                [range]="tileRange()"
+                            >
                                 <ng-container tileActions [ngTemplateOutlet]="tileControls" />
                             </app-dashboard-tile>
                         } @else if (datasetOf(tile); as dataset) {

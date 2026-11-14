@@ -68,7 +68,11 @@ function categoryOrderBy(groupBy: string[], co: VizRenderOptions['categoryOrder'
     const alphabetical = groupBy.map((f) => ({ field: f, dir: 'asc' as const, cosmetic: true }));
     if (!co?.field) return alphabetical;
     const hidden = !groupBy.includes(co.field);
-    const term = { field: co.field, dir: co.dir, ...(hidden ? { agg: co.agg ?? ('min' as const) } : { cosmetic: true }) };
+    const term = {
+        field: co.field,
+        dir: co.dir,
+        ...(hidden ? { agg: co.agg ?? ('min' as const) } : { cosmetic: true }),
+    };
     return [term, ...alphabetical.filter((t) => t.field !== co.field)];
 }
 

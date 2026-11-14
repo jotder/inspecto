@@ -29,7 +29,12 @@ const RESOLVED: DeepLinkResolution = {
 
 function make(
     params: Record<string, string>,
-    opts: { canReveal?: boolean; resolve?: ReturnType<typeof vi.fn>; investigations?: boolean; entityPages?: boolean } = {},
+    opts: {
+        canReveal?: boolean;
+        resolve?: ReturnType<typeof vi.fn>;
+        investigations?: boolean;
+        entityPages?: boolean;
+    } = {},
 ) {
     const resolve =
         opts.resolve ??

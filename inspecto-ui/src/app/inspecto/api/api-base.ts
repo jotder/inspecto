@@ -73,7 +73,10 @@ export function needsPermission(capabilityId: string): string {
 export function plainCapabilityRefusal(message: string): string {
     const m = /^missing capability '([A-Za-z]+)'(.*)$/.exec(message.trim());
     if (!m) return message;
-    const where = m[2].trim().replace(/\.$/, '').replace(/ space$/, ' Space');
+    const where = m[2]
+        .trim()
+        .replace(/\.$/, '')
+        .replace(/ space$/, ' Space');
     const base = needsPermission(m[1]);
     if (!where) return base;
     console.info(`Refused for a missing capability: ${m[1]} ${where}`);

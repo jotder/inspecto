@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { DatasetFilesPage } from '@inspecto/link-analysis/api/inv.service';
-import { buildStrip, dayCells, daysWindow, formatDay, formatDayStart, formatInstant, outcomeTone, splitMissing } from './data-trust';
+import {
+    buildStrip,
+    dayCells,
+    daysWindow,
+    formatDay,
+    formatDayStart,
+    formatInstant,
+    outcomeTone,
+    splitMissing,
+} from './data-trust';
 
 const files = (over: Partial<NonNullable<DatasetFilesPage['summary']>> = {}): DatasetFilesPage =>
     ({
@@ -111,7 +120,13 @@ describe('not delivered yet vs a real gap', () => {
             dataAsOf: '2026-09-05T00:00:00Z',
             days: { expected: 7, covered: 5, missing: ['2026-09-05', '2026-09-06'] },
             index: { version: 1, stale: false },
-            files: { ...files(), days: [{ day: '2026-09-01', files: 1, rows: 5 }, { day: '2026-09-04', files: 1, rows: 5 }] },
+            files: {
+                ...files(),
+                days: [
+                    { day: '2026-09-01', files: 1, rows: 5 },
+                    { day: '2026-09-04', files: 1, rows: 5 },
+                ],
+            },
         });
         expect(s.text).toContain('5 of 7 days · 2 not delivered yet');
         expect(s.text).not.toContain('gap');

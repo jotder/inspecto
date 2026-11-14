@@ -17,13 +17,7 @@ import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 @Component({
     selector: 'app-split-case-dialog',
     standalone: true,
-    imports: [
-        ReactiveFormsModule,
-        MatButtonModule,
-        MatCheckboxModule,
-        MatDialogModule,
-        PenFieldComponent,
-    ],
+    imports: [ReactiveFormsModule, MatButtonModule, MatCheckboxModule, MatDialogModule, PenFieldComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Split "{{ data.caseObj.title }}"</h2>

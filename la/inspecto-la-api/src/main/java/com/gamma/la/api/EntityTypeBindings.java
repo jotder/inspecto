@@ -18,8 +18,8 @@ import java.util.Optional;
 
 /**
  * The type-to-binding resolver (Entity profile plan §4.1, P1): where each Entity Type appears. An Entity Type binds to every
- * registered Dataset column whose {@code columns[].classification} it claims (trimmed, case-insensitive - the rule
- * {@link InvRoutes#columnTypes} and {@code EntityMasking} already apply). A binding's {@code role} is {@code source} /
+ * registered Dataset column whose {@code columns[].classification} names it ({@link EntityTypes#typeNamedBy}: claimed, else its
+ * id - the rule {@link InvRoutes#columnTypes} applies). A binding's {@code role} is {@code source} /
  * {@code target} when the column is a link end of a mapping the Space knows - a saved Link Analysis view
  * ({@code query.projection}, {@code query.projections[]}, {@code query.multi.edges[]}), a published index mapping or the
  * Dataset's own {@code defaultLinkMapping} (LA-ONBOARD-1 OB-8) - else
@@ -107,10 +107,10 @@ final class EntityTypeBindings {
             if (!(d.getValue().get("columns") instanceof List<?> cols)) continue;
             for (Object o : cols) {
                 if (!(o instanceof Map<?, ?> c) || c.get("name") == null || c.get("classification") == null) continue;
-                String col = String.valueOf(c.get("name")), cls = String.valueOf(c.get("classification")).trim();
-                types.stream().filter(t -> t.classifications().stream().anyMatch(x -> x.trim().equalsIgnoreCase(cls))).findFirst()
-                        .ifPresent(t -> byType.get(t.id()).add(new Binding(t.id(), d.getKey(), col,
-                                role(d.getKey(), col, mappings), timeColumn(d.getKey(), d.getValue(), mappings), party(c))));
+                String col = String.valueOf(c.get("name"));
+                EntityTypes.EntityType t = EntityTypes.typeNamedBy(types, c.get("classification"));
+                if (t != null) byType.get(t.id()).add(new Binding(t.id(), d.getKey(), col,
+                        role(d.getKey(), col, mappings), timeColumn(d.getKey(), d.getValue(), mappings), party(c)));
             }
         }
         for (List<Binding> l : byType.values())

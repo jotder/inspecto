@@ -30,13 +30,7 @@ export interface ResolveResult {
 @Component({
     selector: 'app-resolve-dialog',
     standalone: true,
-    imports: [
-        ReactiveFormsModule,
-        MatButtonModule,
-        MatDialogModule,
-        InspectoOptionPickerComponent,
-        PenFieldComponent,
-    ],
+    imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, InspectoOptionPickerComponent, PenFieldComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Resolve {{ data.count }} {{ data.label }}{{ data.count === 1 ? '' : 's' }}</h2>

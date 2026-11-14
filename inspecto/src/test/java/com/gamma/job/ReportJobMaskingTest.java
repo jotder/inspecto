@@ -35,6 +35,9 @@ class ReportJobMaskingTest {
     @org.junit.jupiter.api.BeforeEach
     void signIn() {
         System.setProperty("auth.mode", "oidc");
+        // these tests reach their registry through -Dassist.write.root, the fallback SpaceConfigRoot uses only while no
+        // Space has registered "default" - an earlier class that booted one (SpaceMigratorTest, on the Linux order) leaks it
+        com.gamma.pipeline.SpaceConfigRoot.clear();
     }
 
     @AfterEach

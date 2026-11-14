@@ -64,7 +64,10 @@ describe('limitRefusalMessage (DR-D6)', () => {
 
 describe('retryAfterMs (N13)', () => {
     const throttled = (retryAfter?: string) =>
-        new HttpErrorResponse({ status: 429, headers: retryAfter ? new HttpHeaders({ 'Retry-After': retryAfter }) : undefined });
+        new HttpErrorResponse({
+            status: 429,
+            headers: retryAfter ? new HttpHeaders({ 'Retry-After': retryAfter }) : undefined,
+        });
     it('reads a 429 Retry-After in seconds as milliseconds', () => expect(retryAfterMs(throttled('3'))).toBe(3000));
     it('is null without the header, past the auto-retry ceiling, or for another status', () => {
         expect(retryAfterMs(throttled())).toBeNull();

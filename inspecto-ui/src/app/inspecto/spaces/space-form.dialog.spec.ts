@@ -153,7 +153,7 @@ describe('SpaceFormDialog', () => {
             await expectNoA11yViolations(el);
         });
 
-        it('sets the chosen Industry pack as the new Space\'s Domain Profile, and writes no branding', () => {
+        it("sets the chosen Industry pack as the new Space's Domain Profile, and writes no branding", () => {
             const { fixture, spaceSave, domainSave, saveFor } = create({ dataKind: true });
             const c = fixture.componentInstance;
             c.form.patchValue({ display_name: 'Call records', dataKind: 'telecom' });
@@ -190,7 +190,7 @@ describe('SpaceFormDialog', () => {
         });
     });
 
-    it('shows the id pattern error only after submit — never before (the error lands in the row\'s alert line)', () => {
+    it("shows the id pattern error only after submit — never before (the error lands in the row's alert line)", () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
         c.form.patchValue({ display_name: 'Anything' });

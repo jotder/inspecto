@@ -46,7 +46,9 @@ export function idsInWorkingSet(node: G6Node, ws: WorkingSet | null): string[] {
     const members = new Set(ws.entities.map((e) => e.id));
     // DR-D2: the query graph shows the Space's alias, the Working Set this Investigation's own - `exploreAliases` pairs them.
     const viaExploration = new Map(Object.entries(ws.exploreAliases ?? {}).map(([inv, explore]) => [explore, inv]));
-    return rawIdsOf(node).map((id) => (members.has(id) ? id : (viaExploration.get(id) ?? id))).filter((id) => members.has(id));
+    return rawIdsOf(node)
+        .map((id) => (members.has(id) ? id : (viaExploration.get(id) ?? id)))
+        .filter((id) => members.has(id));
 }
 
 /**
@@ -218,7 +220,11 @@ export function stepName(op: string | null | undefined): string {
     if (!op) return 'Step';
     const known = STEP_NAMES[op];
     if (known) return known;
-    const words = op.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]+/g, ' ').toLowerCase().trim();
+    const words = op
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .replace(/[-_]+/g, ' ')
+        .toLowerCase()
+        .trim();
     return words ? words[0].toUpperCase() + words.slice(1) : 'Step';
 }
 
@@ -235,7 +241,10 @@ const REFUSALS_403: readonly [RegExp, string][] = [
     ],
     [/your role on investigation .* only a lead or reviewer decides/i, 'Only a lead or reviewer can decide this.'],
     [/your role on investigation .* only a lead changes it/i, 'Only a lead can change this Investigation.'],
-    [/your role on investigation .* does not (write|fork) a draft/i, 'Your role on this Investigation cannot change Drafts.'],
+    [
+        /your role on investigation .* does not (write|fork) a draft/i,
+        'Your role on this Investigation cannot change Drafts.',
+    ],
     [/only the actor or a lead/i, 'Only the Draft’s author or a lead can do that.'],
     [/only a lead of this investigation may grant or revoke/i, 'Only a lead can grant or revoke members.'],
     [/entity list .* is restricted/i, 'This Entity List is restricted.'],
@@ -369,7 +378,10 @@ export function mergePairOf(
     if (ids.length !== 2) return { pair: null, reason: 'Select exactly two entities to merge them.' };
     // A bare pseudonym `masked:<hex>` would split into type "masked" and slip past the value check below.
     if (ids.some((id) => id.startsWith(MASKED_PREFIX)))
-        return { pair: null, reason: 'A masked entity cannot be merged: only its alias is visible, and an identity needs the real value.' };
+        return {
+            pair: null,
+            reason: 'A masked entity cannot be merged: only its alias is visible, and an identity needs the real value.',
+        };
     const types = new Map((ws?.entities ?? []).filter((e) => e.type).map((e) => [e.id, e.type as string]));
     const split = ids.map((id) => {
         const type = types.get(id);
@@ -380,7 +392,10 @@ export function mergePairOf(
     const [a, b] = split;
     if (!a || !b || !a.value || !b.value) return { pair: null, reason: 'Both nodes must be typed entities.' };
     if (a.value.startsWith(MASKED_PREFIX) || b.value.startsWith(MASKED_PREFIX))
-        return { pair: null, reason: 'A masked entity cannot be merged: only its alias is visible, and an identity needs the real value.' };
+        return {
+            pair: null,
+            reason: 'A masked entity cannot be merged: only its alias is visible, and an identity needs the real value.',
+        };
     return { pair: { a, b }, reason: '' };
 }
 

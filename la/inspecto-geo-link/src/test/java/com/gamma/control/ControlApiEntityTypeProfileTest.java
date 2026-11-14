@@ -60,6 +60,35 @@ class ControlApiEntityTypeProfileTest {
         throw new AssertionError("no binding of " + column + " in " + bindings);
     }
 
+    /** MASKING-UNION-RESIDUALS-1: a column classed with a type's ID binds to that type, as a claimed class does. */
+    @Test
+    void aColumnClassedWithATypesIdBindsToThatType(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            settings(c, """
+                    entity_types[2]:
+                      - id: msisdn
+                        label: Phone number
+                        normaliser: e164
+                        masked: true
+                        classifications[1]: MSISDN
+                      - id: device
+                        label: Device
+                        normaliser: digits
+                        masked: false
+                        classifications[1]: DEVICE_REF
+                    """);
+            new ComponentStore(root.resolve("registry")).write("dataset", "calls_ds", Map.of("view", "calls_view",
+                    "owner", "analyst-1", "shares", List.of(), "columns", List.of(Map.of("name", "a_msisdn", "classification", "MSISDN"),
+                            Map.of("name", "imei", "classification", " Device "))));
+            JsonNode device = null;
+            for (JsonNode t : data(get(c, "/inv/entity-types", OWNER)).get("items"))
+                if ("device".equals(t.get("id").asText())) device = t;
+            assertNotNull(device);
+            assertEquals("attribute", binding(device.get("bindings"), "imei").get("role").asText(), device.toString());
+        }
+    }
+
     @Test
     void theListResolvesBindingsWithRolesAndAHeadlineOnlyOnceAProfileWasRead(@TempDir Path cfg, @TempDir Path root) throws Exception {
         subjects();

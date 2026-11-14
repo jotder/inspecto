@@ -86,7 +86,11 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                         </p>
                     }
                     @if (!configured() && !startupError()) {
-                        <inspecto-alert class="mt-4 block text-left" variant="error" title="Single sign-on isn't set up">
+                        <inspecto-alert
+                            class="mt-4 block text-left"
+                            variant="error"
+                            title="Single sign-on isn't set up"
+                        >
                             This workspace can't start sign-in because single sign-on hasn't been configured yet. Ask
                             your administrator to finish setting it up.
                         </inspecto-alert>
@@ -120,8 +124,8 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                                 title="No Space attached"
                                 data-testid="no-space"
                             >
-                                No Space is attached yet. Copy a Space folder (it needs
-                                config\\demo-users.toon) into the bundle's spaces\\ folder and restart.
+                                No Space is attached yet. Copy a Space folder (it needs config\\demo-users.toon) into
+                                the bundle's spaces\\ folder and restart.
                             </inspecto-alert>
                         }
                         @if (noUsers()) {
@@ -165,7 +169,12 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                         >
                             @if (busy()) {
                                 <!-- Decorative: a progressbar nested in the button is the axe rule nested-interactive; the button is named instead. -->
-                                <mat-progress-spinner diameter="20" mode="indeterminate" aria-hidden="true" [attr.tabindex]="null" />
+                                <mat-progress-spinner
+                                    diameter="20"
+                                    mode="indeterminate"
+                                    aria-hidden="true"
+                                    [attr.tabindex]="null"
+                                />
                                 <span class="sr-only">Signing in</span>
                             } @else {
                                 <ng-container>

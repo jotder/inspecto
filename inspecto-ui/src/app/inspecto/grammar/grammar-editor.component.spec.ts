@@ -314,7 +314,14 @@ describe('GrammarEditorComponent', () => {
             derived: {
                 kind: 'rows',
                 segments: [
-                    { segment: 'Record', child: false, columns: ['ID'], derivedColumns: [], rows: [{ ID: '5' }], rowCount: 1 },
+                    {
+                        segment: 'Record',
+                        child: false,
+                        columns: ['ID'],
+                        derivedColumns: [],
+                        rows: [{ ID: '5' }],
+                        rowCount: 1,
+                    },
                 ],
             },
         });

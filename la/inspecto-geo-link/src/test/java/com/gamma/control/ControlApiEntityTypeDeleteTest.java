@@ -120,6 +120,33 @@ class ControlApiEntityTypeDeleteTest {
         }
     }
 
+    /** MASKING-UNION-RESIDUALS-1: a column classed with a type's ID uses the type, as a claimed class does. */
+    @Test
+    void aTypeWhoseIdADatasetColumnIsClassedWithIsRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            settings(c, """
+                    entity_types[2]:
+                      - id: msisdn
+                        label: Phone number
+                        normaliser: e164
+                        masked: true
+                        classifications[1]: MSISDN
+                      - id: sweep_test
+                        label: sweep test
+                        normaliser: default
+                        masked: false
+                        classifications[1]: SWEEP
+                    """);
+            new com.gamma.pipeline.ComponentStore(root.resolve("registry")).write("dataset", "sweep_ds", java.util.Map.of(
+                    "owner", "analyst-1", "shares", List.of(),
+                    "columns", List.of(java.util.Map.of("name", "s", "classification", " Sweep_Test "))));
+            HttpResponse<String> r = delete(c, "/inv/entity-types/sweep_test", AUTHOR);
+            assertEquals(409, r.statusCode(), r.body());
+            assertTrue(r.body().contains("sweep_ds.s"), r.body());
+            assertTrue(typesInForce(c).contains("sweep_test"));
+        }
+    }
+
     @Test
     void aTypeALiveEntityListIsOfIsRefusedUntilTheListIsRetired(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (EntityProfileFixture.Ctx c = open(cfg, root)) {

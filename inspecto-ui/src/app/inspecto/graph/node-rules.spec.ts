@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { NodeRule, describeNodeRule, nodeRuleColor, nodeRuleMatches } from './node-rules';
 
 const node = (kind: string, attrs?: Record<string, string | null>) => ({ label: 'n', kind, attrs });
-const rule = (over: Partial<NodeRule>): NodeRule => ({ attr: 'risk', op: 'eq', value: '5', color: 'swatch-EF4444', ...over });
+const rule = (over: Partial<NodeRule>): NodeRule => ({
+    attr: 'risk',
+    op: 'eq',
+    value: '5',
+    color: 'swatch-EF4444',
+    ...over,
+});
 
 describe('node-rules', () => {
     it('compares text with equals / is not / contains (case-insensitive)', () => {
@@ -32,14 +38,20 @@ describe('node-rules', () => {
     });
 
     it('the first matching rule wins; none matching (or no rules) leaves the colour undefined', () => {
-        const rules = [rule({ value: '9', color: 'swatch-111111' }), rule({ value: '5', color: 'swatch-222222' }), rule({ color: 'swatch-333333' })];
+        const rules = [
+            rule({ value: '9', color: 'swatch-111111' }),
+            rule({ value: '5', color: 'swatch-222222' }),
+            rule({ color: 'swatch-333333' }),
+        ];
         expect(nodeRuleColor(rules, node('msisdn', { risk: '5' }))).toBe('swatch-222222');
         expect(nodeRuleColor(rules, node('msisdn', { risk: '1' }))).toBeUndefined();
         expect(nodeRuleColor(undefined, node('msisdn', { risk: '5' }))).toBeUndefined();
     });
 
     it('describes a rule in one line', () => {
-        expect(describeNodeRule(rule({ kind: 'msisdn', op: 'gt', value: '5' }))).toBe('msisdn · risk is greater than 5');
+        expect(describeNodeRule(rule({ kind: 'msisdn', op: 'gt', value: '5' }))).toBe(
+            'msisdn · risk is greater than 5',
+        );
         expect(describeNodeRule(rule({}))).toBe('risk equals 5');
         expect(describeNodeRule(rule({ reference: 'accounts', attr: 'segment', value: 'retail' }))).toBe(
             'segment (in accounts) equals retail',

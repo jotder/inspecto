@@ -160,6 +160,20 @@ public final class EntityTypes {
     }
 
     /**
+     * The Entity Type a column {@code classification} names (MASKING-UNION-RESIDUALS-1): the first of {@code types} that claims it,
+     * else the first whose id it is (trimmed, any case); {@code null} when blank or no type names it. The ONE rule every reader
+     * that types a column by its class applies: the save gate's vocabulary, onboarding, Link Analysis typing and the retire check.
+     */
+    public static EntityType typeNamedBy(List<EntityType> types, Object classification) {
+        String c = ColumnClassification.normalise(classification);
+        if (c == null) return null;
+        for (EntityType t : types)
+            for (String x : t.classifications()) if (x.trim().equalsIgnoreCase(c)) return t;
+        for (EntityType t : types) if (t.id().trim().equalsIgnoreCase(c)) return t;
+        return null;
+    }
+
+    /**
      * The first type of {@code types} masked in force ({@link #maskedInForce}) that claims {@code classification} or whose id it is
      * (trimmed, any case), else {@code null}. A type id counts because the save gate and onboarding read a column classed with it
      * as that type.

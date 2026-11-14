@@ -11,7 +11,8 @@ import type { LinkAnalysisView } from './link-analysis.service';
 export const VIEW_AUTHOR_REASON = 'Needs Workbench author.';
 export const VIEW_DELETE_AUTHOR_REASON = 'Needs Workbench author.';
 export const VIEW_DELETE_OWNER_REASON = 'Only its owner can delete a shared saved view.';
-export const VIEW_EDIT_SHARE_REASON = 'This saved view is shared with you to view only: use Save view as to keep a copy.';
+export const VIEW_EDIT_SHARE_REASON =
+    'This saved view is shared with you to view only: use Save view as to keep a copy.';
 
 export interface ViewAccessContext {
     /** `LensService.canAuthorWorkbench()`. */
@@ -39,7 +40,9 @@ export function viewEditBlock(
     if (!ctx.canAuthor) return VIEW_AUTHOR_REASON;
     if (!view.shared || !ctx.actor || ctx.canConfigureAccess || view.owner === ctx.actor) return '';
     const mayEdit = (view.shares ?? []).some(
-        (s) => s.access === 'edit' && (s.subjectType === 'role' || (s.subjectType === 'user' && s.subjectId === ctx.actor)),
+        (s) =>
+            s.access === 'edit' &&
+            (s.subjectType === 'role' || (s.subjectType === 'user' && s.subjectId === ctx.actor)),
     );
     return mayEdit ? '' : VIEW_EDIT_SHARE_REASON;
 }

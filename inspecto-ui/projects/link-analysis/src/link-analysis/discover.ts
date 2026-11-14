@@ -55,7 +55,11 @@ export function busiest(g: G6GraphData, t: PackTerms, limit = 5): FoundResult {
         .filter((s) => byId.has(s.id) && s.score > 0)
         .slice(0, limit);
     if (!ranked.length)
-        return { heading: `The busiest ${t.nodes}`, rows: [], empty: `No ${t.node} on this graph has a ${t.link} yet.` };
+        return {
+            heading: `The busiest ${t.nodes}`,
+            rows: [],
+            empty: `No ${t.node} on this graph has a ${t.link} yet.`,
+        };
     const rows = ranked.map((s, i): FoundRow => {
         const node = byId.get(s.id)!;
         const edgeIds = g.edges.filter((e) => e.source === s.id || e.target === s.id).map((e) => e.id);
@@ -85,9 +89,7 @@ export function busiest(g: G6GraphData, t: PackTerms, limit = 5): FoundResult {
 /** The days between the first and the last time a group's links carry, or null when they carry no readable time. */
 function daysSpanned(edges: G6GraphData['edges'], timeAttr: string): number | null {
     if (!timeAttr) return null;
-    const ms = edges
-        .map((e) => Date.parse(String(e.data.attrs?.[timeAttr] ?? '')))
-        .filter((v) => Number.isFinite(v));
+    const ms = edges.map((e) => Date.parse(String(e.data.attrs?.[timeAttr] ?? ''))).filter((v) => Number.isFinite(v));
     if (ms.length < 2) return null;
     return Math.max(1, Math.ceil((Math.max(...ms) - Math.min(...ms)) / 86_400_000));
 }
@@ -130,7 +132,10 @@ export function groups(g: G6GraphData, t: PackTerms, timeAttr = '', limit = 5): 
                 reading:
                     `Group ${i + 1}: ${count(m.length, t.node, t.nodes)}, ${count(edges.length, t.link, t.links)} among them` +
                     (days !== null ? ` within ${count(days, 'day', 'days')}` : '') +
-                    ` (${someValues(nodes.map((n) => n.data.label), 3)}).`,
+                    ` (${someValues(
+                        nodes.map((n) => n.data.label),
+                        3,
+                    )}).`,
                 nodeIds: m,
                 edgeIds: edges.map((e) => e.id),
                 values: valuesOf(nodes),

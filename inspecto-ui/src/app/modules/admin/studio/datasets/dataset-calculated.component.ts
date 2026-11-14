@@ -41,7 +41,8 @@ interface TestOutcome {
                         [error]="nameError(c.name) ?? ''"
                     ></inspecto-pen-field>
                     <div>
-                        <mat-form-field subscriptSizing="dynamic"><!-- form-allow: a SQL expression editor -->
+                        <mat-form-field subscriptSizing="dynamic"
+                            ><!-- form-allow: a SQL expression editor -->
                             <mat-label>Expression</mat-label>
                             <input
                                 matInput

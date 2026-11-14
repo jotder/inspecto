@@ -203,7 +203,7 @@ final class EntityShapes {
         String why;
         boolean agree;
         if (hint != null) {
-            type = typeClaiming(hint, types);
+            type = EntityTypes.typeNamedBy(types, hint);
             if (type == null)
                 return OnboardDraft.choice(null, "the name '" + c.name() + "' says " + hint.toLowerCase(Locale.ROOT)
                         + ", but no Entity Type in this Space holds " + hint.toLowerCase(Locale.ROOT) + " - it stays a detail", false);
@@ -236,13 +236,6 @@ final class EntityShapes {
     private static String firstClassification(EntityTypes.EntityType type, String detected) {
         for (String c : type.classifications()) if (c.equalsIgnoreCase(detected)) return c;
         return type.classifications().isEmpty() ? detected : type.classifications().get(0);
-    }
-
-    static EntityTypes.EntityType typeClaiming(String cls, List<EntityTypes.EntityType> types) {
-        if (cls == null) return null;
-        for (EntityTypes.EntityType t : types)
-            for (String c : t.classifications()) if (c.trim().equalsIgnoreCase(cls)) return t;
-        return null;
     }
 
     /** A classification named by the column's name tokens: a hint word, or a type's id or classification. */

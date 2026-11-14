@@ -999,7 +999,15 @@ export interface DatasetFilesPage {
     /** Per event day, over ALL Files. */
     days?: { day: string; files: number; rows: number }[];
     /** Over ALL Files, not the page. */
-    summary?: { files: number; rows: number; latestIngestedAt: string | null; indexed: number; waiting: number; unknown: number; problem: number };
+    summary?: {
+        files: number;
+        rows: number;
+        latestIngestedAt: string | null;
+        indexed: number;
+        waiting: number;
+        unknown: number;
+        problem: number;
+    };
     index?: { present: boolean; version: number | null; builtAt: string | null; inputsRecorded: number | null };
     readAt: string;
     note?: string;
@@ -1645,7 +1653,11 @@ export interface DiscoverResult {
     roles: { from: string | null; to: string | null; kind: string | null; time: string | null };
     entityTypes: DiscoverSection & { items: DiscoverEntityType[] };
     period: DiscoverSection & { column: string | null; from: string | null; to: string | null; days: number | null };
-    linkKinds: DiscoverSection & { column: string | null; items: { kind: string; links: number }[]; truncated: boolean };
+    linkKinds: DiscoverSection & {
+        column: string | null;
+        items: { kind: string; links: number }[];
+        truncated: boolean;
+    };
     busiest: DiscoverSection & {
         from: DiscoverBusy[];
         to: DiscoverBusy[];
@@ -2046,7 +2058,9 @@ export class InvService {
 
     /** LA-EXPAND-PICK-NEIGHBOURS-1: a window of the entity's neighbours with the real total; never held by the fan-out threshold. */
     neighbourList(req: NeighbourListRequest): Observable<NeighbourListResult> {
-        return this.noted(this.http.post<NeighbourListResult>(apiUrl('/inv/projection/neighbors'), { ...req, list: true }));
+        return this.noted(
+            this.http.post<NeighbourListResult>(apiUrl('/inv/projection/neighbors'), { ...req, list: true }),
+        );
     }
 
     /** LA-08: node + edge mappings over several Datasets in one call. One unviewable Dataset ⇒ the whole call 404s. */
@@ -2170,7 +2184,10 @@ export class InvService {
     }
 
     /** LA-DATA-TRUST-1 S1: one page of the Files recorded towards a Dataset, each with its index state. */
-    datasetFiles(dataset: string, q: { limit?: number; offset?: number; name?: string } = {}): Observable<DatasetFilesPage> {
+    datasetFiles(
+        dataset: string,
+        q: { limit?: number; offset?: number; name?: string } = {},
+    ): Observable<DatasetFilesPage> {
         return this.http.get<DatasetFilesPage>(apiUrl(`/inv/datasets/${encodeURIComponent(dataset)}/files`), {
             params: toParams({ limit: q.limit, offset: q.offset, name: q.name }),
         });
@@ -2212,7 +2229,10 @@ export class InvService {
     }
 
     /** Mint a read-only embed link - lead + `canShareInvestigation`; the token is in the answer once. */
-    mintInvestigationEmbed(id: string, body: { label?: string; ttl_hours?: number; scope?: EmbedScope; masking_mode?: string }): Observable<EmbedMinted> {
+    mintInvestigationEmbed(
+        id: string,
+        body: { label?: string; ttl_hours?: number; scope?: EmbedScope; masking_mode?: string },
+    ): Observable<EmbedMinted> {
         return this.http.post<EmbedMinted>(invPath(id, 'embeds'), body);
     }
 
@@ -2418,7 +2438,10 @@ export class InvService {
 
     /** LA-PRESET-QUERIES-1: run one preset. Read-only; 404 unknown Dataset or preset · 422 unmapped role or bad parameter. */
     runPreset(id: string, dataset: string, params: Record<string, string>): Observable<PresetRunResult> {
-        return this.http.post<PresetRunResult>(apiUrl(`/inv/presets/${encodeURIComponent(id)}/run`), { dataset, params });
+        return this.http.post<PresetRunResult>(apiUrl(`/inv/presets/${encodeURIComponent(id)}/run`), {
+            dataset,
+            params,
+        });
     }
 
     /** LA-BASIC-DISCOVER-1: what is in one Dataset. Read-only; 404 unknown Dataset · 422 unreadable link mapping. */
@@ -2436,7 +2459,9 @@ export class InvService {
 
     /** LA-QUERY-BUILDER-1: run one builder question (or a saved preset's). Read-only; 404 unknown Dataset · 422 unsupported. */
     runQuery(dataset: string, query: BuilderQuery): Observable<BuilderQueryResult> {
-        return this.http.post<BuilderQueryResult>(apiUrl(`/inv/datasets/${encodeURIComponent(dataset)}/query`), { query });
+        return this.http.post<BuilderQueryResult>(apiUrl(`/inv/datasets/${encodeURIComponent(dataset)}/query`), {
+            query,
+        });
     }
 
     // ── LA-17 Entity Lists. Writes need `canManageIncidents`; no write root → 503; unknown list → 404. ──

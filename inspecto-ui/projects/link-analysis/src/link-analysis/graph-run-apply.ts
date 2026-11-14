@@ -209,9 +209,7 @@ export function droppedNotice(c: DroppedCounts): string {
     const parts: string[] = [];
     if (c.nodes.dropped) parts.push(`${c.nodes.dropped} of ${c.nodes.total} result nodes`);
     if (c.edges.dropped) parts.push(`${c.edges.dropped} of ${c.edges.total} result links`);
-    return parts.length
-        ? `${parts.join(' and ')} are not on the canvas, so this result leaves them out.`
-        : '';
+    return parts.length ? `${parts.join(' and ')} are not on the canvas, so this result leaves them out.` : '';
 }
 
 /** What a list key of `GraphResultJson.lists` holds, in the analyst's words. */

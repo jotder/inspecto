@@ -17,7 +17,12 @@ const view = (id: string, title: string, datasetId: string) => ({
     name: id,
     ref: id,
     modified: '2026-10-20T10:00:00Z',
-    content: { title, description: `about ${title}`, sourceId: 'entity-projection', query: { projection: { datasetId } } },
+    content: {
+        title,
+        description: `about ${title}`,
+        sourceId: 'entity-projection',
+        query: { projection: { datasetId } },
+    },
 });
 
 function create(
@@ -35,21 +40,54 @@ function create(
         remove: vi.fn(() => of({})),
     };
     const inv = {
-        listInvestigations: vi.fn(opts.listInvestigations ?? (() =>
-            of({
-                items: [
-                    { id: 'inv-1', title: 'Mule ring', dataset: 'transfers', owner: 'ana', ownerName: 'Ana Analyst', createdAt: '2026-10-25T09:00:00Z', headStep: 4, access: 'owner', readOnly: false },
-                    { id: 'inv-2', title: null, dataset: 'calls', owner: 'bo', createdAt: '2026-10-01T09:00:00Z', headStep: 2, caseRef: 'case-9', access: 'case-member', readOnly: true },
-                ],
-                total: 2,
-                limit: 100,
-                offset: 0,
-                truncated: false,
-            })),
+        listInvestigations: vi.fn(
+            opts.listInvestigations ??
+                (() =>
+                    of({
+                        items: [
+                            {
+                                id: 'inv-1',
+                                title: 'Mule ring',
+                                dataset: 'transfers',
+                                owner: 'ana',
+                                ownerName: 'Ana Analyst',
+                                createdAt: '2026-10-25T09:00:00Z',
+                                headStep: 4,
+                                access: 'owner',
+                                readOnly: false,
+                            },
+                            {
+                                id: 'inv-2',
+                                title: null,
+                                dataset: 'calls',
+                                owner: 'bo',
+                                createdAt: '2026-10-01T09:00:00Z',
+                                headStep: 2,
+                                caseRef: 'case-9',
+                                access: 'case-member',
+                                readOnly: true,
+                            },
+                        ],
+                        total: 2,
+                        limit: 100,
+                        offset: 0,
+                        truncated: false,
+                    })),
         ),
-        investigationLog: vi.fn((id: string) => of({ header: { id, pack: id === 'inv-1' ? 'mobile-money' : null }, entries: [], total: 0, truncated: false })),
+        investigationLog: vi.fn((id: string) =>
+            of({
+                header: { id, pack: id === 'inv-1' ? 'mobile-money' : null },
+                entries: [],
+                total: 0,
+                truncated: false,
+            }),
+        ),
     };
-    const store = { refs: signal([{ id: 'inv-old', title: 'Remembered' }]), deleteInvestigation: vi.fn(async () => true), error: signal('') };
+    const store = {
+        refs: signal([{ id: 'inv-old', title: 'Remembered' }]),
+        deleteInvestigation: vi.fn(async () => true),
+        error: signal(''),
+    };
     const close = vi.fn();
     const data: LaOpenDialogData = {
         tab: opts.tab,
@@ -70,9 +108,19 @@ function create(
             { provide: MAT_DIALOG_DATA, useValue: data },
             { provide: MatDialogRef, useValue: { close } },
             { provide: ComponentsService, useValue: components },
-            { provide: TagsService, useValue: { targets: vi.fn(() => of([{ tag: 'aml', targetKind: 'link-analysis-view', targetId: 'transfers', createdAt: 0 }])) } },
+            {
+                provide: TagsService,
+                useValue: {
+                    targets: vi.fn(() =>
+                        of([{ tag: 'aml', targetKind: 'link-analysis-view', targetId: 'transfers', createdAt: 0 }]),
+                    ),
+                },
+            },
             { provide: InvService, useValue: inv },
-            { provide: InspectoConfirmService, useValue: { confirmDestructive: vi.fn(async () => opts.confirm ?? true) } },
+            {
+                provide: InspectoConfirmService,
+                useValue: { confirmDestructive: vi.fn(async () => opts.confirm ?? true) },
+            },
         ],
     });
     const fixture = TestBed.createComponent(LinkAnalysisOpenDialog);
@@ -112,9 +160,17 @@ describe('LinkAnalysisOpenDialog (§5.11)', () => {
     it('a 503 CAPABILITY_UNAVAILABLE reads as the same neutral line, never the server jargon in red', async () => {
         const unavailable = new HttpErrorResponse({
             status: 503,
-            error: { error: { errorCode: 'CAPABILITY_UNAVAILABLE', message: 'Link Analysis Investigations (Investigations, Drafts, Dossier ...' } },
+            error: {
+                error: {
+                    errorCode: 'CAPABILITY_UNAVAILABLE',
+                    message: 'Link Analysis Investigations (Investigations, Drafts, Dossier ...',
+                },
+            },
         });
-        const { el, settle } = create({ tab: 'investigations', listInvestigations: () => throwError(() => unavailable) });
+        const { el, settle } = create({
+            tab: 'investigations',
+            listInvestigations: () => throwError(() => unavailable),
+        });
         await settle();
         expect(el.querySelector('[data-testid="la-open-inv-locked"]')?.textContent).toContain('Standard and above');
         expect(el.querySelector('inspecto-alert')).toBeNull();
@@ -122,7 +178,10 @@ describe('LinkAnalysisOpenDialog (§5.11)', () => {
     });
 
     it('a failure on the Investigations tab stays on that tab', async () => {
-        const down = new HttpErrorResponse({ status: 500, error: { error: { errorCode: 'INTERNAL', message: 'disk full' } } });
+        const down = new HttpErrorResponse({
+            status: 500,
+            error: { error: { errorCode: 'INTERNAL', message: 'disk full' } },
+        });
         const { c, el, settle } = create({ tab: 'investigations', listInvestigations: () => throwError(() => down) });
         await settle();
         expect(el.querySelector('inspecto-alert')?.textContent).toContain('disk full');
@@ -180,11 +239,19 @@ describe('LinkAnalysisOpenDialog (§5.11)', () => {
         c.beginRename(hub);
         c.renameTo.setValue('Hub of calls');
         await c.rename(hub);
-        expect(components.update).toHaveBeenCalledWith('link-analysis-view', 'calls-hub', expect.objectContaining({ title: 'Hub of calls' }), undefined);
+        expect(components.update).toHaveBeenCalledWith(
+            'link-analysis-view',
+            'calls-hub',
+            expect.objectContaining({ title: 'Hub of calls' }),
+            undefined,
+        );
         expect(c.allViews().find((r) => r.view.id === 'calls-hub')?.view.name).toBe('Hub of calls');
 
         await c.duplicate(c.allViews()[0].view);
-        expect(components.create).toHaveBeenCalledWith('link-analysis-view', expect.objectContaining({ id: 'calls-hub-copy', title: 'Copy of Hub of calls' }));
+        expect(components.create).toHaveBeenCalledWith(
+            'link-analysis-view',
+            expect.objectContaining({ id: 'calls-hub-copy', title: 'Copy of Hub of calls' }),
+        );
         expect(c.selectedViewId()).toBe('calls-hub-copy');
 
         await c.deleteView(c.allViews().find((r) => r.view.id === 'transfers')!.view);

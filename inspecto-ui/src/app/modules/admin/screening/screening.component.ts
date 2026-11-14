@@ -118,8 +118,7 @@ export class ScreeningComponent implements OnInit {
 
     /** "100 of 100,000 hits loaded, newest first" while more pages remain. */
     readonly loadedCaption = computed(
-        () =>
-            `${formatNumber(this.hits().length)} of ${formatNumber(this.total() ?? 0)} hits loaded, newest first`,
+        () => `${formatNumber(this.hits().length)} of ${formatNumber(this.total() ?? 0)} hits loaded, newest first`,
     );
 
     readonly canReveal = computed(() => {
@@ -216,7 +215,7 @@ export class ScreeningComponent implements OnInit {
         const gen = this.generation;
         this.api.hits(f === 'all' ? undefined : f, cursor).subscribe({
             next: (r) => {
-                if (gen !== this.generation) return;   // a filter change or refresh replaced the list meanwhile
+                if (gen !== this.generation) return; // a filter change or refresh replaced the list meanwhile
                 this.hits.update((h) => [...h, ...r.hits]);
                 this.nextCursor.set(r.nextCursor);
                 this.total.set(r.total);

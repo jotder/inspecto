@@ -88,7 +88,11 @@ const COVERAGE = {
     standalone: true,
     imports: [LinkAnalysisDataStripComponent],
     changeDetection: ChangeDetectionStrategy.Eager,
-    template: `<la-data-strip investigationId="inv1" dataset="calls" [hasTimeColumn]="hasTimeColumn" (refreshed)="refreshed = refreshed + 1"
+    template: `<la-data-strip
+        investigationId="inv1"
+        dataset="calls"
+        [hasTimeColumn]="hasTimeColumn"
+        (refreshed)="refreshed = refreshed + 1"
         ><p la-data-alerts data-test="banner">corrected day</p></la-data-strip
     >`,
 })
@@ -133,7 +137,9 @@ function setup(
     spies = {
         changes: vi.fn(() => of({ ...CHANGES, changes: over.corrections ?? [] })),
         coverage: vi.fn((...a: unknown[]) =>
-            typeof over.coverage === 'function' ? (over.coverage as (...x: unknown[]) => unknown)(...a) : (over.coverage ?? of(COVERAGE)),
+            typeof over.coverage === 'function'
+                ? (over.coverage as (...x: unknown[]) => unknown)(...a)
+                : (over.coverage ?? of(COVERAGE)),
         ),
         files: vi.fn(() => over.files ?? of(FILES)),
         freshness: vi.fn(() =>
@@ -267,7 +273,9 @@ describe('LinkAnalysisDataStripComponent', () => {
         const f = setup({ coverage: throwError(() => new Error('boom')) });
         await settle(f);
         expect(q(f, '[data-test="drawer"]')).toBeNull();
-        expect(q(f, '[data-test="strip-days-reason"]')!.textContent).toContain('Days not assessed: the coverage read failed');
+        expect(q(f, '[data-test="strip-days-reason"]')!.textContent).toContain(
+            'Days not assessed: the coverage read failed',
+        );
     });
 
     it('S5: an Investigation with no time column sends no coverage read and says why', async () => {
@@ -295,7 +303,9 @@ describe('LinkAnalysisDataStripComponent', () => {
     });
 
     it('an Investigation whose log sets no window sends no bare coverage read (no 422): it goes straight to the Files span', async () => {
-        const f = setup({ session: { activeId: 'inv1', log: { truncated: false, entries: [{ op: 'seed' }, { op: 'expand' }] } } });
+        const f = setup({
+            session: { activeId: 'inv1', log: { truncated: false, entries: [{ op: 'seed' }, { op: 'expand' }] } },
+        });
         await settle(f);
         expect(spies.coverage).toHaveBeenCalledTimes(1);
         expect(spies.coverage.mock.calls[0][1]).toEqual({ from: '2026-09-01T00:00:00Z', to: '2026-09-04T00:00:00Z' });

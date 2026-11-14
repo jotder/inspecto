@@ -50,8 +50,7 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
                 return 'The link index version this Draft uses has expired. Rebase it, then promote.';
             if (/must rebase/.test(server) && /based on step/.test(server))
                 return 'The Investigation has moved on. Rebase this Draft, then promote.';
-            if (/must rebase/.test(server))
-                return 'Rebase this Draft before you promote it.';
+            if (/must rebase/.test(server)) return 'Rebase this Draft before you promote it.';
             return 'Refused: ' + server;
         case 422:
             return 'Refused: ' + server;

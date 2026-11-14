@@ -61,7 +61,16 @@ const NOT_BLANK = /\S/;
         ChipComponent,
     ],
     template: `
-        <h2 mat-dialog-title [matTooltip]="'Exclusion: the ' + data.terms.nodes + ' leave the graph and their ' + data.terms.links + ' go with them'">
+        <h2
+            mat-dialog-title
+            [matTooltip]="
+                'Exclusion: the ' +
+                data.terms.nodes +
+                ' leave the graph and their ' +
+                data.terms.links +
+                ' go with them'
+            "
+        >
             Exclude {{ data.count.toLocaleString('en') }} {{ data.count === 1 ? data.terms.node : data.terms.nodes }}
         </h2>
         <mat-dialog-content class="flex flex-col gap-3 text-sm">
@@ -106,7 +115,8 @@ const NOT_BLANK = /\S/;
                     }
                     @if (adminOnly(); as n) {
                         <p class="text-secondary m-0 text-xs" data-testid="la-exclude-admin-only">
-                            {{ n }} category {{ n === 1 ? 'list is' : 'lists are' }} kept by an administrator and not offered here.
+                            {{ n }} category {{ n === 1 ? 'list is' : 'lists are' }} kept by an administrator and not
+                            offered here.
                         </p>
                     }
                     @if (form.controls.listId.value === NEW_LIST) {
@@ -120,13 +130,32 @@ const NOT_BLANK = /\S/;
                     }
                 }
                 @if (needsReason()) {
-                    <inspecto-pen-field label="Reason" formControlName="reason" [maxlength]="200" [error]="reasonError()"></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="Reason"
+                        formControlName="reason"
+                        [maxlength]="200"
+                        [error]="reasonError()"
+                    ></inspecto-pen-field>
                     @if (data.recentReasons?.length) {
-                        <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Recent reasons" data-testid="la-exclude-recent">
+                        <div
+                            class="flex flex-wrap items-center gap-1"
+                            role="group"
+                            aria-label="Recent reasons"
+                            data-testid="la-exclude-recent"
+                        >
                             <span class="text-secondary text-xs">Recent:</span>
                             @for (r of data.recentReasons; track r) {
-                                <button type="button" class="la-reason" [attr.aria-pressed]="value().reason === r" (click)="useReason(r)">
-                                    <inspecto-chip [variant]="value().reason === r ? 'soft' : 'outline'" [tone]="value().reason === r ? 'primary' : 'neutral'">{{ r }}</inspecto-chip>
+                                <button
+                                    type="button"
+                                    class="la-reason"
+                                    [attr.aria-pressed]="value().reason === r"
+                                    (click)="useReason(r)"
+                                >
+                                    <inspecto-chip
+                                        [variant]="value().reason === r ? 'soft' : 'outline'"
+                                        [tone]="value().reason === r ? 'primary' : 'neutral'"
+                                        >{{ r }}</inspecto-chip
+                                    >
                                 </button>
                             }
                         </div>
@@ -136,7 +165,9 @@ const NOT_BLANK = /\S/;
         </mat-dialog-content>
         <mat-dialog-actions align="end">
             <button mat-button type="button" (click)="requestClose()">Cancel</button>
-            <button mat-flat-button color="primary" type="button" data-testid="la-exclude-go" (click)="submit()">Exclude</button>
+            <button mat-flat-button color="primary" type="button" data-testid="la-exclude-go" (click)="submit()">
+                Exclude
+            </button>
         </mat-dialog-actions>
     `,
     styles: `
@@ -178,7 +209,10 @@ export class LinkAnalysisExcludeDialog {
         newTitle: new FormControl('', { nonNullable: true }),
         reason: new FormControl(
             this.data.mode === 'investigation' ? 'Not relevant to this Investigation' : 'Not relevant to this analysis',
-            { nonNullable: true, validators: [Validators.required, Validators.pattern(NOT_BLANK), Validators.maxLength(200)] },
+            {
+                nonNullable: true,
+                validators: [Validators.required, Validators.pattern(NOT_BLANK), Validators.maxLength(200)],
+            },
         ),
     });
     readonly kind = toSignal(this.form.controls.kind.valueChanges, { initialValue: this.form.controls.kind.value });
@@ -195,7 +229,9 @@ export class LinkAnalysisExcludeDialog {
                 label: x.list.title,
                 hint: `${x.list.ownerKind === 'admin' ? 'Category list (administrator)' : 'Analyst list'} · ${x.list.size.toLocaleString('en')} members`,
             })),
-        ...(this.data.entityType ? [{ value: NEW_LIST, label: 'Create a new list…', hint: 'An analyst list you keep' }] : []),
+        ...(this.data.entityType
+            ? [{ value: NEW_LIST, label: 'Create a new list…', hint: 'An analyst list you keep' }]
+            : []),
     ]);
     readonly adminOnly = computed(() => this.targets.filter((x) => x.whyNot).length);
     readonly listMissing = computed(() => this.submitted() && this.value().kind === 'list' && !this.value().listId);

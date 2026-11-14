@@ -105,7 +105,11 @@ export interface ExpandDegreesChange {
     template: `
         <section
             class="flex min-h-0 flex-col gap-2"
-            [class]="embedded() ? '' : 'max-h-[75vh] w-[28rem] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border p-3 shadow-lg bg-card'"
+            [class]="
+                embedded()
+                    ? ''
+                    : 'max-h-[75vh] w-[28rem] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border p-3 shadow-lg bg-card'
+            "
             [style.border-color]="embedded() ? null : 'var(--gamma-border)'"
             [attr.role]="embedded() ? null : 'dialog'"
             [attr.aria-label]="embedded() ? 'Expand' : null"
@@ -116,27 +120,46 @@ export interface ExpandDegreesChange {
                 <div class="flex items-center gap-2">
                     <mat-icon svgIcon="heroicons_outline:arrows-pointing-out" aria-hidden="true"></mat-icon>
                     <h2 id="la-expand-title" class="m-0 text-sm font-semibold">Expand</h2>
-                    <span class="text-secondary text-xs">({{ ctx().mode === 'investigation' ? 'recorded' : 'not recorded' }})</span>
-                    <button mat-icon-button class="ml-auto" type="button" aria-label="Close Expand" (click)="closed.emit()">
+                    <span class="text-secondary text-xs"
+                        >({{ ctx().mode === 'investigation' ? 'recorded' : 'not recorded' }})</span
+                    >
+                    <button
+                        mat-icon-button
+                        class="ml-auto"
+                        type="button"
+                        aria-label="Close Expand"
+                        (click)="closed.emit()"
+                    >
                         <mat-icon svgIcon="heroicons_outline:x-mark" aria-hidden="true"></mat-icon>
                     </button>
                 </div>
             }
 
             @if (showHint()) {
-                <div class="rounded-md border p-2 text-xs" style="border-color: var(--gamma-border)" data-testid="la-expand-hint">
+                <div
+                    class="rounded-md border p-2 text-xs"
+                    style="border-color: var(--gamma-border)"
+                    data-testid="la-expand-hint"
+                >
                     <p class="m-0">
-                        Adds linked items one degree at a time, with the filter below. Double-click an entity on the canvas, or
-                        right-click it, to expand just that one the same way. One Undo (Ctrl+Z) reverses it.
+                        Adds linked items one degree at a time, with the filter below. Double-click an entity on the
+                        canvas, or right-click it, to expand just that one the same way. One Undo (Ctrl+Z) reverses it.
                     </p>
-                    <p class="text-secondary m-0" data-testid="la-hint-guide">More in the user guide: <cite>{{ guide.chapter }}</cite> ({{ guide.where }}).</p>
+                    <p class="text-secondary m-0" data-testid="la-hint-guide">
+                        More in the user guide: <cite>{{ guide.chapter }}</cite> ({{ guide.where }}).
+                    </p>
                     <button mat-button type="button" class="mt-1" (click)="dismissHint()">Got it</button>
                 </div>
             }
 
             <!-- 1. From: one press, no popup (LA-INVESTIGATE-UX-1) -->
             @if (fromOptions().length > 1) {
-                <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Expand from" data-testid="la-expand-from">
+                <div
+                    class="flex flex-wrap items-center gap-1"
+                    role="group"
+                    aria-label="Expand from"
+                    data-testid="la-expand-from"
+                >
                     <span class="text-secondary text-xs">From</span>
                     @for (o of fromOptions(); track o.value) {
                         <button
@@ -147,9 +170,11 @@ export interface ExpandDegreesChange {
                             [attr.data-testid]="'la-expand-from-' + o.value"
                             (click)="setFrom(o.value)"
                         >
-                            <inspecto-chip [variant]="formValue().from === o.value ? 'soft' : 'outline'" [tone]="formValue().from === o.value ? 'primary' : 'neutral'">{{
-                                o.label
-                            }}</inspecto-chip>
+                            <inspecto-chip
+                                [variant]="formValue().from === o.value ? 'soft' : 'outline'"
+                                [tone]="formValue().from === o.value ? 'primary' : 'neutral'"
+                                >{{ o.label }}</inspecto-chip
+                            >
                         </button>
                     }
                 </div>
@@ -169,7 +194,9 @@ export interface ExpandDegreesChange {
                     [disabled]="!!goWhyNot()"
                     [disabledInteractive]="true"
                     [matTooltip]="goWhyNot() || ''"
-                    [attr.aria-describedby]="goWhyNot() ? (active().blocked ? 'la-expand-blocked-why' : 'la-expand-why') : null"
+                    [attr.aria-describedby]="
+                        goWhyNot() ? (active().blocked ? 'la-expand-blocked-why' : 'la-expand-why') : null
+                    "
                     (click)="submit()"
                 >
                     Expand{{ formValue().degrees > 1 ? ' ' + formValue().degrees + ' degrees' : '' }}
@@ -178,7 +205,9 @@ export interface ExpandDegreesChange {
             <!-- T-193: a blocked start already says why in the alert below; the reason is never shown twice -->
             @if (goWhyNot(); as why) {
                 @if (!active().blocked) {
-                    <p id="la-expand-why" class="text-secondary m-0 text-xs" [class.text-right]="!embedded()">{{ why }}</p>
+                    <p id="la-expand-why" class="text-secondary m-0 text-xs" [class.text-right]="!embedded()">
+                        {{ why }}
+                    </p>
                 }
             }
 
@@ -190,10 +219,17 @@ export interface ExpandDegreesChange {
                     @case ('ready') {
                         <p class="m-0">{{ sentence() }}</p>
                         @if (pv().preview?.excludedByLists?.length) {
-                            <div class="mt-1 flex flex-wrap gap-1" aria-label="Exclusion lists in force" role="list" data-testid="la-expand-lists">
+                            <div
+                                class="mt-1 flex flex-wrap gap-1"
+                                aria-label="Exclusion lists in force"
+                                role="list"
+                                data-testid="la-expand-lists"
+                            >
                                 @for (l of pv().preview!.excludedByLists; track l.listId) {
                                     <span role="listitem">
-                                        <inspecto-chip variant="soft" [matTooltip]="'Exclusion list: removes ' + l.removed + ' from this step'"
+                                        <inspecto-chip
+                                            variant="soft"
+                                            [matTooltip]="'Exclusion list: removes ' + l.removed + ' from this step'"
                                             >{{ l.title }} · {{ l.removed.toLocaleString('en') }}</inspecto-chip
                                         >
                                     </span>
@@ -207,7 +243,9 @@ export interface ExpandDegreesChange {
                         >
                     }
                     @case ('error') {
-                        <inspecto-alert variant="warning" title="The preview was refused">{{ pv().message }}</inspecto-alert>
+                        <inspecto-alert variant="warning" title="The preview was refused">{{
+                            pv().message
+                        }}</inspecto-alert>
                     }
                 }
             </div>
@@ -215,22 +253,28 @@ export interface ExpandDegreesChange {
             @if (approval(); as a) {
                 @if (a.exceeded.length) {
                     <p class="text-warn m-0 text-xs" role="status" data-testid="la-expand-needs-approval">
-                        Each degree will need approval from a second person: {{ a.exceeded.join('; ') }}. The walk stops at
-                        the first degree held for approval.
+                        Each degree will need approval from a second person: {{ a.exceeded.join('; ') }}. The walk stops
+                        at the first degree held for approval.
                     </p>
                 }
             }
 
             @if (active().blocked; as why) {
-                <inspecto-alert id="la-expand-blocked-why" variant="info" data-testid="la-expand-blocked">{{ why }}</inspecto-alert>
+                <inspecto-alert id="la-expand-blocked-why" variant="info" data-testid="la-expand-blocked">{{
+                    why
+                }}</inspecto-alert>
             }
 
             <!-- 3. The Expand filter: foldable groups, each saying what is set, a dot when changed, its own reset -->
             <div class="flex flex-col" data-testid="la-expand-filters">
                 <div class="flex items-center gap-2 border-t pt-2" style="border-color: var(--gamma-border)">
-                    <h3 class="m-0 whitespace-nowrap text-sm font-semibold">{{ embedded() ? 'Expand filter' : 'Filter' }}</h3>
+                    <h3 class="m-0 whitespace-nowrap text-sm font-semibold">
+                        {{ embedded() ? 'Expand filter' : 'Filter' }}
+                    </h3>
                     @if (changed().length) {
-                        <span class="text-secondary whitespace-nowrap text-xs" data-testid="la-expand-changed">{{ changed().length }} changed</span>
+                        <span class="text-secondary whitespace-nowrap text-xs" data-testid="la-expand-changed"
+                            >{{ changed().length }} changed</span
+                        >
                         <button
                             type="button"
                             class="la-reset text-primary ml-auto whitespace-nowrap text-xs underline"
@@ -244,11 +288,26 @@ export interface ExpandDegreesChange {
                     }
                 </div>
                 @if (embedded()) {
-                    <p class="text-secondary m-0 mb-1 text-xs">Every expand uses it: this button, a double-click, the right-click menu and G.</p>
+                    <p class="text-secondary m-0 mb-1 text-xs">
+                        Every expand uses it: this button, a double-click, the right-click menu and G.
+                    </p>
                 }
 
-                <la-fold title="Direction" [dense]="true" [startOpen]="true" rememberKey="expand.direction" [hint]="directionSummary()" [changed]="isChanged('direction')" data-testid="la-expand-fold-direction">
-                    <div class="flex flex-wrap gap-1" role="group" aria-label="Direction" data-testid="la-expand-direction">
+                <la-fold
+                    title="Direction"
+                    [dense]="true"
+                    [startOpen]="true"
+                    rememberKey="expand.direction"
+                    [hint]="directionSummary()"
+                    [changed]="isChanged('direction')"
+                    data-testid="la-expand-fold-direction"
+                >
+                    <div
+                        class="flex flex-wrap gap-1"
+                        role="group"
+                        aria-label="Direction"
+                        data-testid="la-expand-direction"
+                    >
                         @for (d of directionOptions(); track d.value) {
                             <button
                                 type="button"
@@ -258,15 +317,25 @@ export interface ExpandDegreesChange {
                                 [attr.data-testid]="'la-expand-direction-' + d.value"
                                 (click)="setDirection(d.value)"
                             >
-                                <inspecto-chip [variant]="formValue().direction === d.value ? 'soft' : 'outline'" [tone]="formValue().direction === d.value ? 'primary' : 'neutral'">{{
-                                    d.label
-                                }}</inspecto-chip>
+                                <inspecto-chip
+                                    [variant]="formValue().direction === d.value ? 'soft' : 'outline'"
+                                    [tone]="formValue().direction === d.value ? 'primary' : 'neutral'"
+                                    >{{ d.label }}</inspecto-chip
+                                >
                             </button>
                         }
                     </div>
                 </la-fold>
 
-                <la-fold title="Depth" [dense]="true" [startOpen]="true" rememberKey="expand.depth" [hint]="depthSummary()" [changed]="isChanged('depth')" data-testid="la-expand-fold-depth">
+                <la-fold
+                    title="Depth"
+                    [dense]="true"
+                    [startOpen]="true"
+                    rememberKey="expand.depth"
+                    [hint]="depthSummary()"
+                    [changed]="isChanged('depth')"
+                    data-testid="la-expand-fold-depth"
+                >
                     <form [formGroup]="form" (ngSubmit)="submit()">
                         <inspecto-stepper-field
                             label="Degrees"
@@ -282,26 +351,51 @@ export interface ExpandDegreesChange {
                     </form>
                     @if (lastExpand() !== null) {
                         <p class="text-secondary m-0 text-xs" data-testid="la-expand-degrees-bound">
-                            Degrees follows the last Expand: fewer removes its outermost degrees from the Working Set, more expands further.
+                            Degrees follows the last Expand: fewer removes its outermost degrees from the Working Set,
+                            more expands further.
                         </p>
                     }
                     @if (formValue().degrees > 1) {
                         <p class="text-secondary m-0 text-xs">
-                            Stops early if a degree would expand from more than {{ ctx().frontierCap.toLocaleString('en-GB') }} {{ t().nodes }}.
+                            Stops early if a degree would expand from more than
+                            {{ ctx().frontierCap.toLocaleString('en-GB') }} {{ t().nodes }}.
                         </p>
                     }
                 </la-fold>
 
-                <la-fold title="Link kinds" [dense]="true" rememberKey="expand.kinds" [hint]="kindsSummary()" [changed]="isChanged('kinds')" [forceOpen]="tried() && kindsInvalid()" data-testid="la-expand-fold-links">
+                <la-fold
+                    title="Link kinds"
+                    [dense]="true"
+                    rememberKey="expand.kinds"
+                    [hint]="kindsSummary()"
+                    [changed]="isChanged('kinds')"
+                    [forceOpen]="tried() && kindsInvalid()"
+                    data-testid="la-expand-fold-links"
+                >
                     @if (isChanged('kinds')) {
-                        <button type="button" class="la-reset text-primary self-start text-xs underline" (click)="resetGroup('kinds')">Reset link kinds</button>
+                        <button
+                            type="button"
+                            class="la-reset text-primary self-start text-xs underline"
+                            (click)="resetGroup('kinds')"
+                        >
+                            Reset link kinds
+                        </button>
                     }
                     @if (ctx().linkKinds.length) {
                         <div class="flex flex-wrap gap-1" role="group" aria-labelledby="la-expand-kinds">
                             <span class="sr-only" id="la-expand-kinds">{{ linkKindsLabel }}</span>
                             @for (k of ctx().linkKinds; track k) {
-                                <button type="button" class="la-toggle" [attr.aria-pressed]="kindOn(k)" (click)="toggleKind(k, !kindOn(k))">
-                                    <inspecto-chip [variant]="kindOn(k) ? 'soft' : 'outline'" [tone]="kindOn(k) ? 'primary' : 'neutral'">{{ k }}</inspecto-chip>
+                                <button
+                                    type="button"
+                                    class="la-toggle"
+                                    [attr.aria-pressed]="kindOn(k)"
+                                    (click)="toggleKind(k, !kindOn(k))"
+                                >
+                                    <inspecto-chip
+                                        [variant]="kindOn(k) ? 'soft' : 'outline'"
+                                        [tone]="kindOn(k) ? 'primary' : 'neutral'"
+                                        >{{ k }}</inspecto-chip
+                                    >
                                 </button>
                             }
                         </div>
@@ -317,15 +411,32 @@ export interface ExpandDegreesChange {
                                 [error]="rung.controls.linkKinds.invalid ? 'At most ' + maxKinds() + ' kinds.' : ''"
                             />
                         </ng-container>
-                        <p class="text-secondary m-0 text-xs">Comma-separated; blank means all kinds. Needs the Investigation's link kind column.</p>
+                        <p class="text-secondary m-0 text-xs">
+                            Comma-separated; blank means all kinds. Needs the Investigation's link kind column.
+                        </p>
                     } @else {
-                        <p class="text-secondary m-0 text-xs">This graph has one kind of {{ t().link }}, so there is nothing to choose.</p>
+                        <p class="text-secondary m-0 text-xs">
+                            This graph has one kind of {{ t().link }}, so there is nothing to choose.
+                        </p>
                     }
                 </la-fold>
 
                 @if (ctx().mode === 'investigation' && ctx().hasWindow) {
-                    <la-fold title="Time" [dense]="true" rememberKey="expand.time" [hint]="timeSummary()" [changed]="isChanged('time')" [forceOpen]="tried() && timeInvalid()" data-testid="la-expand-fold-time">
-                        <div class="flex flex-wrap gap-1" role="group" aria-label="Time window" data-testid="la-expand-window">
+                    <la-fold
+                        title="Time"
+                        [dense]="true"
+                        rememberKey="expand.time"
+                        [hint]="timeSummary()"
+                        [changed]="isChanged('time')"
+                        [forceOpen]="tried() && timeInvalid()"
+                        data-testid="la-expand-fold-time"
+                    >
+                        <div
+                            class="flex flex-wrap gap-1"
+                            role="group"
+                            aria-label="Time window"
+                            data-testid="la-expand-window"
+                        >
                             @for (o of windowOptions; track o.value) {
                                 <button
                                     type="button"
@@ -335,22 +446,32 @@ export interface ExpandDegreesChange {
                                     [attr.data-testid]="'la-expand-window-' + o.value"
                                     (click)="setWindow(o.value)"
                                 >
-                                    <inspecto-chip [variant]="rungValue().window === o.value ? 'soft' : 'outline'" [tone]="rungValue().window === o.value ? 'primary' : 'neutral'">{{
-                                        o.label
-                                    }}</inspecto-chip>
+                                    <inspecto-chip
+                                        [variant]="rungValue().window === o.value ? 'soft' : 'outline'"
+                                        [tone]="rungValue().window === o.value ? 'primary' : 'neutral'"
+                                        >{{ o.label }}</inspecto-chip
+                                    >
                                 </button>
                             }
                         </div>
                         @if (quickDays() && !windowEnd()) {
                             <p class="text-secondary m-0 text-xs" role="status" data-testid="la-expand-window-no-end">
-                                {{ endLoading() ? 'Reading the latest event time…' : 'The latest event time is not known, so this Expand reads the Investigation window.' }}
+                                {{
+                                    endLoading()
+                                        ? 'Reading the latest event time…'
+                                        : 'The latest event time is not known, so this Expand reads the Investigation window.'
+                                }}
                             </p>
                         } @else if (quickDays(); as days) {
-                            <p class="text-secondary m-0 text-xs">The {{ days }} days up to the latest event ({{ windowEnd() }}). This Expand only.</p>
+                            <p class="text-secondary m-0 text-xs">
+                                The {{ days }} days up to the latest event ({{ windowEnd() }}). This Expand only.
+                            </p>
                         }
                         @if (rungValue().window === 'override') {
                             <div class="rounded-md border p-2" style="border-color: var(--gamma-border)">
-                                <p class="text-secondary m-0 mb-1 text-xs">This Expand only; the Investigation's own window is not changed.</p>
+                                <p class="text-secondary m-0 mb-1 text-xs">
+                                    This Expand only; the Investigation's own window is not changed.
+                                </p>
                                 <inspecto-la-window-fields [form]="override"></inspecto-la-window-fields>
                             </div>
                         }
@@ -358,9 +479,23 @@ export interface ExpandDegreesChange {
                 }
 
                 @if (ctx().mode === 'investigation') {
-                    <la-fold title="Strength" [dense]="true" rememberKey="expand.strength" [hint]="strengthSummary()" [changed]="isChanged('strength')" [forceOpen]="tried() && strengthInvalid()" data-testid="la-expand-fold-strength">
+                    <la-fold
+                        title="Strength"
+                        [dense]="true"
+                        rememberKey="expand.strength"
+                        [hint]="strengthSummary()"
+                        [changed]="isChanged('strength')"
+                        [forceOpen]="tried() && strengthInvalid()"
+                        data-testid="la-expand-fold-strength"
+                    >
                         @if (isChanged('strength')) {
-                            <button type="button" class="la-reset text-primary self-start text-xs underline" (click)="resetGroup('strength')">Reset strength</button>
+                            <button
+                                type="button"
+                                class="la-reset text-primary self-start text-xs underline"
+                                (click)="resetGroup('strength')"
+                            >
+                                Reset strength
+                            </button>
                         }
                         <div class="flex flex-col gap-2" [formGroup]="rung">
                             <inspecto-pen-field
@@ -376,19 +511,40 @@ export interface ExpandDegreesChange {
                                 type="number"
                                 [error]="rung.controls.minDistinctDays.invalid ? 'A whole number of at least 1.' : ''"
                             />
-                            <p class="text-secondary m-0 text-xs">Distinct days need the Investigation's time column. A blank field uses the Industry pack's setting.</p>
+                            <p class="text-secondary m-0 text-xs">
+                                Distinct days need the Investigation's time column. A blank field uses the Industry
+                                pack's setting.
+                            </p>
                         </div>
                     </la-fold>
                 }
 
-                <la-fold title="Fan-out and busy" [dense]="true" rememberKey="expand.limits" [hint]="limitsSummary()" [changed]="isChanged('limits')" [forceOpen]="tried() && limitsInvalid()" data-testid="la-expand-fold-limits">
+                <la-fold
+                    title="Fan-out and busy"
+                    [dense]="true"
+                    rememberKey="expand.limits"
+                    [hint]="limitsSummary()"
+                    [changed]="isChanged('limits')"
+                    [forceOpen]="tried() && limitsInvalid()"
+                    data-testid="la-expand-fold-limits"
+                >
                     @if (isChanged('limits')) {
-                        <button type="button" class="la-reset text-primary self-start text-xs underline" (click)="resetGroup('limits')">Reset fan-out and busy</button>
+                        <button
+                            type="button"
+                            class="la-reset text-primary self-start text-xs underline"
+                            (click)="resetGroup('limits')"
+                        >
+                            Reset fan-out and busy
+                        </button>
                     }
                     <div class="flex flex-col gap-1" [formGroup]="form">
                         <mat-checkbox
                             formControlName="hold"
-                            [matTooltip]="'Busy ' + t().nodes + ' stay on the graph and go to the Held tray; they are not expanded'"
+                            [matTooltip]="
+                                'Busy ' +
+                                t().nodes +
+                                ' stay on the graph and go to the Held tray; they are not expanded'
+                            "
                             data-testid="la-expand-hold"
                         >
                             <span class="text-xs">Hold busy entities (more than {{ thresholdLabel() }} linked)</span>
@@ -406,7 +562,8 @@ export interface ExpandDegreesChange {
                             ></inspecto-pen-field>
                         } @else {
                             <p class="text-secondary m-0 text-xs" data-testid="la-expand-no-hold">
-                                Busy {{ t().nodes }} will be expanded through too, recorded as an override in the step log.
+                                Busy {{ t().nodes }} will be expanded through too, recorded as an override in the step
+                                log.
                             </p>
                         }
                     </div>
@@ -424,29 +581,40 @@ export interface ExpandDegreesChange {
                                 label="Fewest links a neighbour may have"
                                 formControlName="candidateDegreeMin"
                                 type="number"
-                                [error]="rung.controls.candidateDegreeMin.invalid ? 'A whole number of at least 0.' : ''"
+                                [error]="
+                                    rung.controls.candidateDegreeMin.invalid ? 'A whole number of at least 0.' : ''
+                                "
                             />
                             <inspecto-pen-field
                                 label="Most links a neighbour may have"
                                 formControlName="candidateDegreeMax"
                                 type="number"
-                                [error]="rung.controls.candidateDegreeMax.invalid ? 'A whole number of at least 1.' : ''"
+                                [error]="
+                                    rung.controls.candidateDegreeMax.invalid ? 'A whole number of at least 1.' : ''
+                                "
                             />
                             @if (rung.hasError('degreeOrder')) {
-                                <p class="text-warn m-0 text-xs" role="alert">The minimum degree must not exceed the maximum.</p>
+                                <p class="text-warn m-0 text-xs" role="alert">
+                                    The minimum degree must not exceed the maximum.
+                                </p>
                             }
                             <inspecto-pen-field
                                 label="Row limit per degree"
                                 formControlName="budget"
                                 type="number"
                                 [placeholder]="(presets().budget ?? defaultBudget()).toString()"
-                                [error]="rung.controls.budget.invalid ? 'A whole number from 1 to ' + maxBudget() + '.' : ''"
+                                [error]="
+                                    rung.controls.budget.invalid ? 'A whole number from 1 to ' + maxBudget() + '.' : ''
+                                "
                             />
-                            <p class="text-secondary m-0 text-xs">Stops at this many rows; the step is marked incomplete.</p>
+                            <p class="text-secondary m-0 text-xs">
+                                Stops at this many rows; the step is marked incomplete.
+                            </p>
                         </div>
                         @if (approval(); as a) {
                             <p class="text-secondary m-0 text-xs" data-testid="la-expand-effective">
-                                Rows read per degree, at most {{ a.budget.toLocaleString('en-GB') }}. Neighbours per entity:
+                                Rows read per degree, at most {{ a.budget.toLocaleString('en-GB') }}. Neighbours per
+                                entity:
                                 {{ a.fanOut === null ? 'no limit' : 'at most ' + a.fanOut.toLocaleString('en-GB') }}.
                             </p>
                         }
@@ -596,7 +764,9 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
         const p = this.pv().preview;
         return p ? previewSentence(p, this.t(), this.formValue().degrees) : '';
     });
-    readonly thresholdLabel = computed(() => (this.formValue().threshold ?? this.ctx().hubThreshold).toLocaleString('en'));
+    readonly thresholdLabel = computed(() =>
+        (this.formValue().threshold ?? this.ctx().hubThreshold).toLocaleString('en'),
+    );
     readonly thresholdError = computed(() => {
         const v = this.formValue().threshold;
         return v != null && !(Number.isInteger(v) && v >= 1) ? 'A whole number of at least 1.' : '';
@@ -671,7 +841,11 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
         const all = this.ctx().linkKinds;
         const on = this.kinds();
         const typed = this.inv() && !all.length ? parseKinds(String(v.linkKinds ?? '')) : [];
-        return all.length && on !== null ? `${on.length} of ${all.length} link kinds` : typed.length ? typed.join(', ') : 'All link kinds';
+        return all.length && on !== null
+            ? `${on.length} of ${all.length} link kinds`
+            : typed.length
+              ? typed.join(', ')
+              : 'All link kinds';
     });
     /** "At least 3 events · on 2+ days", or what the pack sets. */
     readonly strengthSummary = computed(() => {
@@ -682,7 +856,9 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
         if (days !== null) parts.push(`on ${days}+ days`);
         return parts.join(' · ');
     });
-    readonly directionSummary = computed(() => GROW_DIRECTIONS.find((d) => d.value === this.formValue().direction)?.label ?? '');
+    readonly directionSummary = computed(
+        () => GROW_DIRECTIONS.find((d) => d.value === this.formValue().direction)?.label ?? '',
+    );
     readonly depthSummary = computed(() => {
         const d = this.formValue().degrees;
         return `${d} ${d === 1 ? 'degree' : 'degrees'}`;
@@ -724,7 +900,15 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
             Object.fromEntries(keys.filter((k) => fields.includes(k)).map((k) => [k, FILTER_DEFAULTS[k]]));
         this.form.patchValue(defaults(['direction', 'degrees', 'hold', 'threshold']));
         this.rung.patchValue({
-            ...defaults(['window', 'minEvents', 'minDistinctDays', 'candidateDegreeMin', 'candidateDegreeMax', 'maxFanOut', 'budget']),
+            ...defaults([
+                'window',
+                'minEvents',
+                'minDistinctDays',
+                'candidateDegreeMin',
+                'candidateDegreeMax',
+                'maxFanOut',
+                'budget',
+            ]),
             ...(fields.includes('typedKinds') ? { linkKinds: '' } : {}),
         });
         if (fields.includes('window')) this.override.reset();
@@ -831,19 +1015,28 @@ export class LinkAnalysisExpandComponent implements OnInit, OnChanges {
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe(() => this.publish());
         this.publish();
-        this.form.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.formValue.set(this.form.getRawValue()));
-        this.rung.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.rungValue.set(this.rung.getRawValue()));
-        this.override.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.rungValue.set(this.rung.getRawValue()));
+        this.form.valueChanges
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe(() => this.formValue.set(this.form.getRawValue()));
+        this.rung.valueChanges
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe(() => this.rungValue.set(this.rung.getRawValue()));
+        this.override.valueChanges
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe(() => this.rungValue.set(this.rung.getRawValue()));
         // The preview covers degree 1, so "Degrees" alone never re-reads it.
         merge(this.form.valueChanges, this.rung.valueChanges, this.override.valueChanges)
-            .pipe(debounceTime(300), takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+            .pipe(debounceTime(300), takeUntilDestroyed(this.destroyRef))
+            .subscribe(() => {
                 if (this.previewKey() !== this.previewedKey) this.refresh();
             });
         // the stepper settled (+/- clicks batch) on a size other than the last Expand's: the screen resizes that Expand
-        this.form.controls.degrees.valueChanges.pipe(debounceTime(300), takeUntilDestroyed(this.destroyRef)).subscribe((d) => {
-            const last = this.lastExpand();
-            if (last !== null && d !== last) this.degreesChange.emit({ degrees: d, req: this.request() });
-        });
+        this.form.controls.degrees.valueChanges
+            .pipe(debounceTime(300), takeUntilDestroyed(this.destroyRef))
+            .subscribe((d) => {
+                const last = this.lastExpand();
+                if (last !== null && d !== last) this.degreesChange.emit({ degrees: d, req: this.request() });
+            });
         // the popup takes focus when it opens; the tab section is focused by the screen, only when Expand is asked for
         if (!this.embedded()) queueMicrotask(() => this.focus());
     }

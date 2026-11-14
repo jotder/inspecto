@@ -31,7 +31,12 @@ import { NeighbourRow } from './neighbour-ranking';
 import { LA_DATASETS } from '@inspecto/link-analysis/la-host';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { QueuedSeed } from './la-starter';
-import { DegreePresets, DomainProfileId, domainProfile, domainProfiles } from '@inspecto/link-analysis/graph/domain-profile';
+import {
+    DegreePresets,
+    DomainProfileId,
+    domainProfile,
+    domainProfiles,
+} from '@inspecto/link-analysis/graph/domain-profile';
 import {
     DegreeOutcome,
     degreeOutcome,
@@ -162,7 +167,11 @@ export class InvestigationSessionStore {
     readonly addingStart = signal(false);
 
     /** Start working unsaved over this binding (any open Investigation is left first). */
-    beginUnsaved(binding: UnsavedBinding, defaults: { name: string; purpose: string }, steps: UnsavedStep[] = []): void {
+    beginUnsaved(
+        binding: UnsavedBinding,
+        defaults: { name: string; purpose: string },
+        steps: UnsavedStep[] = [],
+    ): void {
         this.close();
         this.unsaved.set({ binding, defaults, draft: null, steps: [...steps] });
     }
@@ -259,7 +268,9 @@ export class InvestigationSessionStore {
                 step.kind === 'seed'
                     ? await this.replaySeed(step)
                     : step.kind === 'hide' || step.kind === 'exclude' || step.kind === 'remove'
-                      ? await this.replayCleanUp(step.kind === 'remove' ? { ...step, ids: step.ids.filter((v) => !drawn.has(v)) } : step)
+                      ? await this.replayCleanUp(
+                            step.kind === 'remove' ? { ...step, ids: step.ids.filter((v) => !drawn.has(v)) } : step,
+                        )
                       : await this.replayExpand(step, b);
             recorded += r.recorded;
             if (this.activeId() !== id) return { created: true, recorded, message: '' };
@@ -278,7 +289,11 @@ export class InvestigationSessionStore {
     }
 
     private async replaySeed(step: Extract<UnsavedStep, { kind: 'seed' }>): Promise<{ ok: boolean; recorded: number }> {
-        const ok = await this.apply({ op: 'seed', ids: step.ids, ...(step.entityType ? { entityType: step.entityType } : {}) });
+        const ok = await this.apply({
+            op: 'seed',
+            ids: step.ids,
+            ...(step.entityType ? { entityType: step.entityType } : {}),
+        });
         if (ok) this.showWorkingSet.set(true);
         return { ok, recorded: ok ? 1 : 0 };
     }
@@ -308,7 +323,13 @@ export class InvestigationSessionStore {
 
     /** The server Working Set's outer ring, as "Expand next degree" reads it (held hubs only when Hold is off). */
     private outerFrontier(step: Extract<UnsavedStep, { kind: 'expand' }>, b: UnsavedBinding): string[] {
-        const d = degreeState(this.workingSet(), b.maxDegree, this.degreeOutcomes(), !step.req.hold, this.overrideSteps());
+        const d = degreeState(
+            this.workingSet(),
+            b.maxDegree,
+            this.degreeOutcomes(),
+            !step.req.hold,
+            this.overrideSteps(),
+        );
         return step.req.hold ? d.frontier : [...d.frontier, ...d.heldHubs];
     }
 
@@ -332,7 +353,8 @@ export class InvestigationSessionStore {
                 const named = [...new Set(values.map((v) => back.get(v) ?? v))].filter((id) => held.has(id));
                 const ids = named.length ? named : admitted;
                 if (!ids.length) break;
-                if (!(await this.apply(growExpandBody(ids, step.req, this.withPresets(b.presets, {}), group)))) return { ok: false, recorded };
+                if (!(await this.apply(growExpandBody(ids, step.req, this.withPresets(b.presets, {}), group))))
+                    return { ok: false, recorded };
                 recorded++;
                 const done = this.lastStep();
                 if (done?.status === 'pending') return { ok: 'held', recorded };
@@ -345,7 +367,8 @@ export class InvestigationSessionStore {
         let frontier = step.ids;
         if (step.from === 'outer') frontier = this.outerFrontier(step, b);
         for (let d = 1; d <= step.req.degrees && frontier.length; d++) {
-            if (!(await this.apply(growExpandBody(frontier, step.req, this.withPresets(b.presets, {}), group)))) return { ok: false, recorded };
+            if (!(await this.apply(growExpandBody(frontier, step.req, this.withPresets(b.presets, {}), group))))
+                return { ok: false, recorded };
             recorded++;
             const done = this.lastStep();
             if (done?.status === 'pending') return { ok: 'held', recorded };
@@ -412,7 +435,9 @@ export class InvestigationSessionStore {
         () =>
             this.activeRef()?.profileId ??
             // UIR-D9: an Investigation started from a template that named a pack reads under it
-            (domainProfiles().some((p) => p.id === this.header()?.pack) ? (this.header()!.pack as DomainProfileId) : null) ??
+            (domainProfiles().some((p) => p.id === this.header()?.pack)
+                ? (this.header()!.pack as DomainProfileId)
+                : null) ??
             profileForDataset(this.header()?.dataset),
     );
     /** The "Expand anyway" steps in effect — their hub's contacts are kept out of the next degree's frontier. */
@@ -431,7 +456,8 @@ export class InvestigationSessionStore {
      */
     hubBadge(id: string, contacts?: number | null, fallbackThreshold?: number | null): string {
         const sealed = this.lastStep()?.read?.rung?.['hubThreshold'];
-        const threshold = typeof sealed === 'number' ? sealed : (this.sealedHubThreshold() ?? fallbackThreshold ?? null);
+        const threshold =
+            typeof sealed === 'number' ? sealed : (this.sealedHubThreshold() ?? fallbackThreshold ?? null);
         const count =
             contacts ??
             this.hubContacts().get(id) ??
@@ -779,7 +805,9 @@ export class InvestigationSessionStore {
         const rest: ExpandRung = { ...rung };
         delete rest.includeHubs; // the override names this entity only
         delete rest.expandHubs;
-        if (!(await this.apply({ op: 'expand', ids: [id], ...rest, only, ...(throughHub ? { expandHubs: [id] } : {}) })))
+        if (
+            !(await this.apply({ op: 'expand', ids: [id], ...rest, only, ...(throughHub ? { expandHubs: [id] } : {}) }))
+        )
             return false;
         const step = this.lastStep();
         if (throughHub && step && step.status !== 'pending') this.lastOverride.set({ step: step.step, ids: [id] });
@@ -877,7 +905,8 @@ export class InvestigationSessionStore {
         const id = this.activeId();
         this.windowEnd.set(req.windowEnd ?? null);
         const entityType = req.projection.entityType;
-        if (!(await this.apply({ op: 'seed', ids: req.seeds ?? [req.seed], ...(entityType ? { entityType } : {}) }))) return false;
+        if (!(await this.apply({ op: 'seed', ids: req.seeds ?? [req.seed], ...(entityType ? { entityType } : {}) })))
+            return false;
         this.showWorkingSet.set(true);
         // A held (pending-approval) degree blocks the next one, so the loop stops there - no error, no retry.
         for (let i = 0; i < req.degrees; i++) {
@@ -1056,7 +1085,9 @@ export class InvestigationSessionStore {
     async undo(undoes?: number, change: 'newest' | 'one' | 'join' = 'newest'): Promise<boolean> {
         const redone = this.redone;
         this.redone = [];
-        const newest = this.effectiveSteps().slice(-redone.length).map((e) => e.step);
+        const newest = this.effectiveSteps()
+            .slice(-redone.length)
+            .map((e) => e.step);
         if (change === 'newest' && redone.length > 1 && undoes === redone.at(-1) && newest.join() === redone.join()) {
             for (const [i, step] of [...redone].reverse().entries())
                 if (!(await this.undo(step, i ? 'join' : 'one'))) return false;

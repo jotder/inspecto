@@ -46,7 +46,7 @@ class StepConfigSaveFindingsTest {
     }
 
     private static List<Finding> check(Path dir, Map<String, Object> draft) {
-        return ConfigRoutes.stepConfigFindings("pipeline", draft, dir);
+        return ConfigRoutes.stepConfigFindings("pipeline", draft, dir, null);
     }
 
     private static void assertOneRefusal(List<Finding> out, String field, String mustMention) {
@@ -125,6 +125,21 @@ class StepConfigSaveFindingsTest {
                 Map.of("classifications", List.of("PII")))))), "steps[0].mask", "dataset");
         assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("mask",
                 Map.of("classifications", List.of("SECRET"), "dataset", "d"))))), "steps[0].mask", "'SECRET'");
+    }
+
+    /**
+     * MASKING-UNION-RESIDUALS-1: a mask may select any class the Space MASKS - a sensitive class, or a class or id of an Entity
+     * Type masked in force (the built-in {@code wallet}: WALLET) - and still refuses one that masks nothing there (the built-in
+     * unmasked {@code handset}'s HANDSET, the not-masked INTERNAL).
+     */
+    @Test
+    void aMaskMaySelectAClassTheSpaceMasksAndNotOneThatMasksNothing(@TempDir Path dir) {
+        for (String cls : List.of("WALLET", "wallet", "MSISDN"))
+            assertEquals(List.of(), check(dir, pipeline(null, true, List.of(Map.of("mask",
+                    Map.of("classifications", List.of(cls), "dataset", "d"))))), cls);
+        for (String cls : List.of("HANDSET", "INTERNAL"))
+            assertOneRefusal(check(dir, pipeline(null, true, List.of(Map.of("mask",
+                    Map.of("classifications", List.of(cls), "dataset", "d"))))), "steps[0].mask", "masks nothing in this Space");
     }
 
     @Test

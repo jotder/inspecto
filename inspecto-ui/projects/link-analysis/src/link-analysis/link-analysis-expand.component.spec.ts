@@ -21,9 +21,30 @@ const CTX: GrowContext = {
     from: 'the outer ring (degree 1): 3 numbers',
     blocked: null,
     sources: [
-        { value: 'outer', label: 'The outer ring (next degree)', frontier: ['a', 'b'], heldFrontier: ['hub'], from: 'the outer ring (degree 1): 3 numbers', blocked: null },
-        { value: 'seeds', label: 'The seeds', frontier: ['s'], heldFrontier: [], from: 'the 1 number seeded', blocked: null },
-        { value: 'all', label: 'The whole Working Set', frontier: [], heldFrontier: [], from: 'the whole Working Set: 0 numbers', blocked: 'Too many.' },
+        {
+            value: 'outer',
+            label: 'The outer ring (next degree)',
+            frontier: ['a', 'b'],
+            heldFrontier: ['hub'],
+            from: 'the outer ring (degree 1): 3 numbers',
+            blocked: null,
+        },
+        {
+            value: 'seeds',
+            label: 'The seeds',
+            frontier: ['s'],
+            heldFrontier: [],
+            from: 'the 1 number seeded',
+            blocked: null,
+        },
+        {
+            value: 'all',
+            label: 'The whole Working Set',
+            frontier: [],
+            heldFrontier: [],
+            from: 'the whole Working Set: 0 numbers',
+            blocked: 'Too many.',
+        },
     ],
     linkKinds: ['voice', 'sms'],
     hubThreshold: 500,
@@ -78,7 +99,12 @@ const settle = async (fixture: { detectChanges(): void; whenStable(): Promise<un
 };
 
 function create(
-    opts: { preview?: () => Observable<GrowPreview>; ctx?: Partial<GrowContext>; basic?: GrowPreview | null; embedded?: boolean } = {},
+    opts: {
+        preview?: () => Observable<GrowPreview>;
+        ctx?: Partial<GrowContext>;
+        basic?: GrowPreview | null;
+        embedded?: boolean;
+    } = {},
 ) {
     const answer = opts.preview ?? (() => of(PREVIEW));
     const inv = { previewExpand: vi.fn((_id: string, _body: unknown) => answer()) };
@@ -118,7 +144,8 @@ function create(
     if (opts.embedded) fixture.componentInstance.embedded.set(true);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    const cmp = fixture.debugElement.query(By.directive(LinkAnalysisExpandComponent)).componentInstance as LinkAnalysisExpandComponent;
+    const cmp = fixture.debugElement.query(By.directive(LinkAnalysisExpandComponent))
+        .componentInstance as LinkAnalysisExpandComponent;
     return { fixture, el, inv, basic, host: fixture.componentInstance, cmp };
 }
 
@@ -149,19 +176,27 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
         // an Investigation also offers Reciprocal
         expect(cmp.directionOptions().map((o) => o.label)).toEqual(['Both ways', 'Outgoing', 'Incoming', 'Reciprocal']);
         // order of importance: From, the Expand button, then the filter: Direction, Depth, the other groups
-        const order = ['la-expand-from', 'la-expand-go', 'la-expand-filters', 'la-expand-direction', 'la-expand-degrees', 'la-expand-fold-links'].map(
-            (id) => q(el, id)!,
-        );
+        const order = [
+            'la-expand-from',
+            'la-expand-go',
+            'la-expand-filters',
+            'la-expand-direction',
+            'la-expand-degrees',
+            'la-expand-fold-links',
+        ].map((id) => q(el, id)!);
         for (let i = 1; i < order.length; i++)
-            expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING, order[i].dataset['testid']).toBeTruthy();
+            expect(
+                order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING,
+                order[i].dataset['testid'],
+            ).toBeTruthy();
         // Direction and Depth start open; the other groups are closed, each saying what is set; nothing is marked changed
         expect([fold(el, 'direction').open, fold(el, 'depth').open]).toEqual([true, true]);
-        expect([fold(el, 'links').open, fold(el, 'time').open, fold(el, 'strength').open, fold(el, 'limits').open]).toEqual([
-            false,
-            false,
-            false,
-            false,
-        ]);
+        expect([
+            fold(el, 'links').open,
+            fold(el, 'time').open,
+            fold(el, 'strength').open,
+            fold(el, 'limits').open,
+        ]).toEqual([false, false, false, false]);
         expect(q(el, 'la-expand-changed')).toBeNull();
         expect(el.querySelector('[data-testid="la-fold-changed"]')).toBeNull();
         expect(foldHint(el, 'links')).toContain('All link kinds');
@@ -183,7 +218,9 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
             direction: 'either',
             hubThreshold: 500,
         });
-        expect(q(el, 'la-expand-preview')?.textContent).toContain('This step adds about 42 numbers and 120 calls; 1 busy number will be held');
+        expect(q(el, 'la-expand-preview')?.textContent).toContain(
+            'This step adds about 42 numbers and 120 calls; 1 busy number will be held',
+        );
         degreesTo(el, 3);
         await settle(fixture, 350);
         expect(q(el, 'la-expand-preview')?.textContent).toContain(
@@ -212,7 +249,11 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
             rung: { minEvents: 2, window: 'full' },
         });
         expect(host.runs[0].ctx.frontier).toEqual(['a', 'b']);
-        (Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Cancel') as HTMLButtonElement).click();
+        (
+            Array.from(el.querySelectorAll('button')).find(
+                (b) => b.textContent?.trim() === 'Cancel',
+            ) as HTMLButtonElement
+        ).click();
         q(el, 'la-expand-dialog')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
         expect(host.closed).toBe(2);
     });
@@ -239,10 +280,15 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
         (q(el, 'la-expand-hold')!.querySelector('input') as HTMLInputElement).click();
         await settle(fixture, 350);
         expect(q(el, 'la-expand-no-hold')?.textContent).toContain('recorded as an override');
-        expect(inv.previewExpand).toHaveBeenLastCalledWith('inv-1', expect.objectContaining({ ids: ['a', 'b', 'hub'], includeHubs: true }));
+        expect(inv.previewExpand).toHaveBeenLastCalledWith(
+            'inv-1',
+            expect.objectContaining({ ids: ['a', 'b', 'hub'], includeHubs: true }),
+        );
         expect(foldHint(el, 'limits')).toContain('Busy expanded through');
         // a link kind is a chip: pressed = followed
-        const sms = Array.from(q(el, 'la-expand-fold-links')!.querySelectorAll('button[aria-pressed]')).find((c) => c.textContent?.includes('sms'));
+        const sms = Array.from(q(el, 'la-expand-fold-links')!.querySelectorAll('button[aria-pressed]')).find((c) =>
+            c.textContent?.includes('sms'),
+        );
         expect(sms!.getAttribute('aria-pressed')).toBe('true');
         (sms as HTMLButtonElement).click();
         await settle(fixture, 350);
@@ -257,7 +303,9 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
         const { fixture, el, host, cmp } = create();
         host.limits.set({ budgetAbove: 50, fanOutAbove: null });
         await settle(fixture);
-        expect(q(el, 'la-expand-needs-approval')?.textContent).toContain('The walk stops at the first degree held for approval');
+        expect(q(el, 'la-expand-needs-approval')?.textContent).toContain(
+            'The walk stops at the first degree held for approval',
+        );
         cmp.rung.controls.minEvents.setValue('0');
         await settle(fixture, 350);
         expect(el.querySelector('#la-expand-why')?.textContent).toContain('Fix the filters first.');
@@ -285,7 +333,9 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
         expect(foldHint(el, 'links')).toContain('All link kinds');
         expect(foldHint(el, 'strength')).toContain('At least 3 events · on 2+ days');
         expect(foldHint(el, 'time')).toContain('All data');
-        expect(foldHint(el, 'limits')).toContain('Busy over 50 links · 20 per entity · neighbours with 1–40 links · 5,000 rows');
+        expect(foldHint(el, 'limits')).toContain(
+            'Busy over 50 links · 20 per entity · neighbours with 1–40 links · 5,000 rows',
+        );
         // LA-INVESTIGATE-UX-1: each changed group has a dot; the header counts them and resets them all
         expect(q(el, 'la-expand-changed')?.textContent).toContain('3 changed');
         for (const id of ['time', 'strength', 'limits'] as const)
@@ -415,7 +465,14 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
         expect(inv.previewExpand).toHaveBeenCalledTimes(1);
         // three selections in quick succession: one read, for the last one
         for (const ids of [['x'], ['x', 'y'], ['y']]) {
-            const sel = { value: 'selection' as const, label: 'The selection', frontier: ids, heldFrontier: [], from: ids.join(','), blocked: null };
+            const sel = {
+                value: 'selection' as const,
+                label: 'The selection',
+                frontier: ids,
+                heldFrontier: [],
+                from: ids.join(','),
+                blocked: null,
+            };
             host.ctx.set({ ...CTX, sources: [sel, ...CTX.sources!] });
             await wait(50);
         }
@@ -438,7 +495,14 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
         const { fixture, cmp, host } = create({ embedded: true });
         await settle(fixture);
         cmp.form.controls.from.setValue('seeds');
-        const sel = { value: 'selection' as const, label: 'The selection', frontier: ['x'], heldFrontier: [], from: 'the 1 number you selected', blocked: null };
+        const sel = {
+            value: 'selection' as const,
+            label: 'The selection',
+            frontier: ['x'],
+            heldFrontier: [],
+            from: 'the 1 number you selected',
+            blocked: null,
+        };
         host.ctx.set({ ...CTX, sources: [sel, ...CTX.sources!] });
         await settle(fixture);
         expect(cmp.form.controls.from.value).toBe('selection');
@@ -446,7 +510,10 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
 
     it('a refused preview (422) says why, in place', async () => {
         const { fixture, el } = create({
-            preview: () => throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message: 'budget above the cap' } } })),
+            preview: () =>
+                throwError(
+                    () => new HttpErrorResponse({ status: 422, error: { error: { message: 'budget above the cap' } } }),
+                ),
         });
         await settle(fixture);
         expect(q(el, 'la-expand-preview')?.textContent).toContain('budget above the cap');
@@ -457,12 +524,16 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
         await settle(held.fixture);
         expect(held.el.querySelector('#la-expand-why')?.textContent).toContain('Untick “Hold busy entities”');
         TestBed.resetTestingModule();
-        const blocked = create({ ctx: { blocked: 'This changes the Investigation log and needs the Incident management capability.' } });
+        const blocked = create({
+            ctx: { blocked: 'This changes the Investigation log and needs the Incident management capability.' },
+        });
         await settle(blocked.fixture);
         expect(q(blocked.el, 'la-expand-blocked')?.textContent).toContain('Incident management');
         // T-193: shown once; the button points at the alert instead of repeating it in a second line
         expect(blocked.el.querySelector('#la-expand-why')).toBeNull();
-        expect(blocked.el.querySelector('[data-testid="la-expand-go"]')!.getAttribute('aria-describedby')).toContain('la-expand-blocked-why');
+        expect(blocked.el.querySelector('[data-testid="la-expand-go"]')!.getAttribute('aria-describedby')).toContain(
+            'la-expand-blocked-why',
+        );
         blocked.el.querySelector<HTMLButtonElement>('[data-testid="la-expand-go"]')!.click();
         expect(blocked.host.runs).toHaveLength(0);
     });
@@ -493,7 +564,9 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
             expect(q(el, 'la-expand-degrees-bound')?.textContent).toContain('fewer removes its outermost degrees');
             degreesTo(el, 1); // two clicks, one change
             await settle(fixture, 350);
-            expect(host.changes).toEqual([{ degrees: 1, req: expect.objectContaining({ degrees: 1, direction: 'either' }) }]);
+            expect(host.changes).toEqual([
+                { degrees: 1, req: expect.objectContaining({ degrees: 1, direction: 'either' }) },
+            ]);
             expect(host.runs).toHaveLength(0); // nothing expanded by the stepper itself
         });
 

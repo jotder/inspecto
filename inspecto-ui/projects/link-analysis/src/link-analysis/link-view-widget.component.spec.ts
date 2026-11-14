@@ -10,10 +10,7 @@ import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { ComponentsDataProvider } from 'app/modules/admin/catalog/components-data-provider';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
 import { G6GraphData, GraphSource } from '@inspecto/core/graph';
-import {
-    GraphDisplayOptions,
-    GraphViewComponent,
-} from '@inspecto/core/graph/graph-view.component';
+import { GraphDisplayOptions, GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { By } from '@angular/platform-browser';
 import { SUPER_NODE_KIND } from '@inspecto/link-analysis/graph/graph-analysis';
 import { nodeColor } from '@inspecto/core/graph/catalog-graph';
@@ -208,7 +205,8 @@ describe('LinkViewWidgetComponent — the read-only toolset', () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
         fixture.detectChanges();
         const stub = () =>
-            fixture.debugElement.query(By.directive(StubGraphViewComponent)).componentInstance as StubGraphViewComponent;
+            fixture.debugElement.query(By.directive(StubGraphViewComponent))
+                .componentInstance as StubGraphViewComponent;
         return { fixture, c: fixture.componentInstance, stub, http };
     }
 
@@ -240,7 +238,9 @@ describe('LinkViewWidgetComponent — the read-only toolset', () => {
         c.analyse('shortestPath');
         fixture.detectChanges();
         expect(stub().emphasis()).toEqual({ nodeIds: ['a', 'b', 'c'], edgeIds: ['ab', 'bc'] });
-        expect(el.querySelector('[data-testid="la-widget-result"]')?.textContent).toContain('Shortest path: 2 link(s).');
+        expect(el.querySelector('[data-testid="la-widget-result"]')?.textContent).toContain(
+            'Shortest path: 2 link(s).',
+        );
         http.verify(); // nothing beyond the limits read: no write, no server run
         await expectNoA11yViolations(el);
     });

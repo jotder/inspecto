@@ -98,7 +98,8 @@ export type FilterValues = Record<string, FilterValue>;
                 (submit)="$event.preventDefault(); apply.emit(value)"
             >
                 @for (f of fields; track f.key) {
-                    <mat-form-field class="gamma-mat-dense" [class]="f.width || 'w-44'" subscriptSizing="dynamic"><!-- form-allow: a grid-toolbar filter box over a list -->
+                    <mat-form-field class="gamma-mat-dense" [class]="f.width || 'w-44'" subscriptSizing="dynamic"
+                        ><!-- form-allow: a grid-toolbar filter box over a list -->
                         <mat-label>{{ f.label }}</mat-label>
                         @switch (f.type) {
                             @case ('select') {

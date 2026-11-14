@@ -188,6 +188,19 @@ class EntityShapesTest {
         assertEquals("sms", p.get("value"), "counted, the low 'bank' guess would make it a payment (1 of 1): " + p);
     }
 
+    /**
+     * MASKING-UNION-RESIDUALS-1: a name hint that is a type's ID the type does not claim (the hint word phone means MSISDN; this
+     * Space's msisdn type claims only PHONE_NO) proposes that type, as the save gate reads such a class, and writes a class it claims.
+     */
+    @Test
+    void aNameHintThatIsATypesUnclaimedIdProposesThatType() {
+        List<EntityType> types = List.of(new EntityType("msisdn", "Phone number", "e164", true, List.of("PHONE_NO")));
+        Map<String, Object> ch = EntityShapes.columnProposal(
+                new EntityShapes.Column("phone", "VARCHAR", values(i -> "+4477009" + String.format("%05d", i))), types);
+        assertEquals("msisdn", ch.get("value"), ch.toString());
+        assertEquals("PHONE_NO", ch.get("classification"), ch.toString());
+    }
+
     @Test
     void aNameThatIsATypesIdWinsOverItsLastToken() {
         assertEquals("IP_ADDRESS", EntityShapes.nameHint("ip_address", EntityTypes.DEFAULTS));

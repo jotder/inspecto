@@ -135,7 +135,14 @@ describe('Add data model (LA-ONBOARD-1 phase 4)', () => {
             expect(body.primaryEntityType).toBeNull();
             // ADD-DATA-STREAM-TIME-1: the confirmed Time is the Stream's own, link or not (what each arrival covers)
             expect(body.eventDate).toBe('ts');
-            const noTime = buildCommit(d, 'x', '', initialColumns(d), { ...roles, primaryTime: '' }, { withEntityTypes: true });
+            const noTime = buildCommit(
+                d,
+                'x',
+                '',
+                initialColumns(d),
+                { ...roles, primaryTime: '' },
+                { withEntityTypes: true },
+            );
             expect(noTime.eventDate).toBeNull();
             const linked = buildCommit(d, 'x', '', initialColumns(d), initialRoles(d), { withEntityTypes: true });
             expect(linked.link?.primaryTime).toBe('ts');

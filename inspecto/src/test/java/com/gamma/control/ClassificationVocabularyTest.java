@@ -208,6 +208,27 @@ class ClassificationVocabularyTest {
         assertTrue(ClassificationVocabulary.known("  ", DEFAULTS), "and the vocabulary allows it as 'none stated'");
     }
 
+    /**
+     * MASKING-UNION-RESIDUALS-1: a vocabulary entry names the type its class names by the one rule ({@link EntityTypes#typeNamedBy}),
+     * the type that CLAIMS it before an earlier type whose id it is, as onboarding reads it; masked by the one masking rule.
+     */
+    @Test
+    void anEntryNamesTheClaimingTypeBeforeAnEarlierTypeWhoseIdItIs() {
+        List<EntityType> types = List.of(new EntityType("wallet", "Wallet", "upper-trim", true, List.of("MOBILE_MONEY")),
+                new EntityType("account", "Account", "upper-trim", false, List.of("WALLET")));
+        ClassificationVocabulary.Entry wallet = ClassificationVocabulary.vocabulary(types).stream()
+                .filter(e -> e.cls().equals("WALLET")).findFirst().orElseThrow();
+        assertEquals("account", wallet.entityType());
+        assertEquals("account", OnboardMatches.typeOf("WALLET", types));
+        assertTrue(wallet.masked(), "still the id of a masked type: it masks");
+        assertEquals(ClassificationVocabulary.SOURCE_ENTITY_TYPE, wallet.source());
+        // with no claim, the type whose id it is
+        List<EntityType> alone = List.of(types.get(0));
+        assertEquals("wallet", ClassificationVocabulary.vocabulary(alone).stream()
+                .filter(e -> e.cls().equals("WALLET")).findFirst().orElseThrow().entityType());
+        assertEquals("wallet", OnboardMatches.typeOf(" Wallet ", alone));
+    }
+
     // ── findingsWritten: the files a bulk import landed (CLASSIFICATION-BULK-IMPORT-UNGATED-1) ──
 
     private static final String SCHEMA = """

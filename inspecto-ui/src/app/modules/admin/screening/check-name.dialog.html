@@ -6,7 +6,9 @@
     </inspecto-alert>
 
     <form [formGroup]="form" (ngSubmit)="run()" class="flex flex-col gap-4" id="check-name-form">
-        <!-- form-allow: a many-line paste box (one name per line, up to the check's limit; Enter must break a line) --><mat-form-field subscriptSizing="dynamic">
+        <!-- form-allow: a many-line paste box (one name per line, up to the check's limit; Enter must break a line) --><mat-form-field
+            subscriptSizing="dynamic"
+        >
             <mat-label>Names to check</mat-label>
             <textarea matInput formControlName="names" rows="3" aria-describedby="cn-names-hint"></textarea>
             <mat-hint id="cn-names-hint">One name per line, up to {{ limits.maxSubjects }}.</mat-hint>
@@ -81,9 +83,7 @@
                     <tr>
                         <td class="py-1 pr-3 break-all">{{ row.subject }}</td>
                         @if (row.clean) {
-                        <td class="text-secondary py-1" colspan="4">
-                            Checked: no match at or above {{ r.threshold }}
-                        </td>
+                        <td class="text-secondary py-1" colspan="4">Checked: no match at or above {{ r.threshold }}</td>
                         } @else {
                         <td class="py-1 pr-3">{{ row.listId }} ({{ row.purpose }})</td>
                         <td class="py-1 pr-3 font-mono break-all">{{ row.entry }}</td>

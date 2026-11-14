@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { HttpErrorResponse } from '@angular/common/http';
-import { STALE_WRITE_MESSAGE, apiErrorMessage, apiUrl, isStaleVersionError, needsPermission, plainCapabilityRefusal, toParams } from './api-base';
+import {
+    STALE_WRITE_MESSAGE,
+    apiErrorMessage,
+    apiUrl,
+    isStaleVersionError,
+    needsPermission,
+    plainCapabilityRefusal,
+    toParams,
+} from './api-base';
 import { environment } from '../../../environments/environment';
 
 describe('apiUrl', () => {
@@ -81,7 +89,12 @@ describe('apiErrorMessage — a capability refusal in plain words (LA-UI-TEXT-PA
     });
 
     it('names every Link Analysis capability without its id or the word capability', () => {
-        for (const id of ['canShareInvestigation', 'canRunLinkGraphAnalysis', 'canManageIncidents', 'canBuildLinkIndex']) {
+        for (const id of [
+            'canShareInvestigation',
+            'canRunLinkGraphAnalysis',
+            'canManageIncidents',
+            'canBuildLinkIndex',
+        ]) {
             const text = plainCapabilityRefusal(`missing capability '${id}'`);
             expect(text).toMatch(/^Needs [A-Z][a-z ]+[a-z]\.$/);
             expect(text).not.toContain(id);

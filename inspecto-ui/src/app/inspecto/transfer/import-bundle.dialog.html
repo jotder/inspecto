@@ -119,7 +119,10 @@
                     </td>
                     } @else {
                     <td class="py-1.5 pr-4">
-                        <!-- form-allow: a table-cell select (one action per bundle row) --><mat-form-field subscriptSizing="dynamic" class="w-36">
+                        <!-- form-allow: a table-cell select (one action per bundle row) --><mat-form-field
+                            subscriptSizing="dynamic"
+                            class="w-36"
+                        >
                             <!-- form-allow: a table-cell select (one action per bundle row) --><mat-select
                                 [value]="r.action"
                                 (selectionChange)="setAction(r, $event.value)"

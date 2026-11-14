@@ -24,7 +24,9 @@ describe('job-display', () => {
     });
 
     it('whatScheduled ignores a non-scalar param (no [object Object])', () => {
-        expect(whatScheduled({ type: 'pipeline', params: { source: { incremental: true }, pipeline: 'p1' } })).toBe('Pipeline · p1');
+        expect(whatScheduled({ type: 'pipeline', params: { source: { incremental: true }, pipeline: 'p1' } })).toBe(
+            'Pipeline · p1',
+        );
         expect(whatScheduled({ type: 'pipeline', params: { source: { incremental: true } } })).toBe('Pipeline');
     });
 

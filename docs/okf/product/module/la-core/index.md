@@ -34,7 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `MASKING-UNION-RESIDUALS-1` | P3 | defect | readers that still type or check a column without the one masking rule (filed 2026-11-14, left by MASKING-TWO-VOCABULARIES-1). | — |
 | `LA-EMPTY-DATASET-WORDING-1` | P3 | defect | an empty Pipeline-fed Dataset is reported in developer words, and the Data page does not say it is empty (filed 2026-11-14, left by LA-SA… | — |
 | `LA-RADIAL-LAYOUT-SQUASH-1` | P3 | defect | the Radial layout draws a two-component graph as a narrow, overlapping wedge. | — |
 | `LA-PHONE-OVERFLOW-1` | P3 | defect | at phone width the Link Analysis tool bar and the Add data page scroll sideways. | — |
@@ -53,3 +52,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-CONFIG-LIMITS-RESIDUALS-1` | P3 | feature | what LA-CONFIG-LIMITS-1 left after it shipped (2026-10-15; as-built in okf/product/module/la-core/architecture-backend.md §9-§10; plan ar… | — |
 | `LA-DAILY-INGEST-1` | P3 | feature | Daily scheduled ingestion of CSV, Hive and database feeds into Link Analysis (filed 2026-10-05; decisions answered, T1-T9 done or built;… | demand |
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | narrowed 2026-10-24: the assistant walked T1-T13 alone and the run of show moved into the demo runbook section 9 with the rehearsal recor… | external |
+| `UI-BUNDLE-SHAPE-RED-1` | P2 | defect | the nightly UI workflow stays red at check:bundle-shape: 26 violations, and the Link Analysis app loads 4,006 kB up front against a 3,130… | — |

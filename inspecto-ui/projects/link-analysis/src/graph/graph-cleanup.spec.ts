@@ -13,7 +13,10 @@ import {
 
 /** `'a-b b-c'` → nodes a, b, c and links a→b, b→c (ids `a-b`, `b-c`). Extra lone nodes via `alone`. */
 function graph(links: string, alone: string[] = []): G6GraphData {
-    const pairs = links.split(/\s+/).filter(Boolean).map((p) => p.split('-') as [string, string]);
+    const pairs = links
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((p) => p.split('-') as [string, string]);
     const ids = [...new Set([...pairs.flat(), ...alone])];
     return {
         nodes: ids.map((id) => ({ id, data: { label: id, kind: 'entity' } })),

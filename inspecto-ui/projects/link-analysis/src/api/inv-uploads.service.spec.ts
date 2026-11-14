@@ -22,7 +22,7 @@ describe('InvService analyst upload', () => {
 
     afterEach(() => httpMock.verify());
 
-    it('reads the targets and one Collector\'s uploads', () => {
+    it("reads the targets and one Collector's uploads", () => {
         svc.uploadTargets().subscribe();
         httpMock.expectOne(`${base}/inv/uploads`).flush({ collectors: [] });
         svc.listUploads('up feed').subscribe();

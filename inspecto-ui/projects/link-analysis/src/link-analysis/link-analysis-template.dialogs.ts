@@ -140,7 +140,11 @@ export interface SaveTemplateData {
                         placeholder="optional"
                         [maxlength]="200"
                         formControlName="title"
-                        [error]="form.controls.title.touched && form.controls.title.hasError('maxlength') ? 'At most 200 characters.' : ''"
+                        [error]="
+                            form.controls.title.touched && form.controls.title.hasError('maxlength')
+                                ? 'At most 200 characters.'
+                                : ''
+                        "
                     ></inspecto-pen-field>
                     <!-- UIR-D9: an optional pack, for a Space that mixes verticals; blank = the Space's own -->
                     <inspecto-option-picker
@@ -489,11 +493,7 @@ export class InstantiateTemplateDialog {
         } catch (err) {
             this.unavailable.set(isUnavailable(err));
             const status = (err as { status?: number })?.status;
-            this.error.set(
-                notFound && status === 404
-                    ? notFound
-                    : investigationErrorMessage(err, fallback),
-            );
+            this.error.set(notFound && status === 404 ? notFound : investigationErrorMessage(err, fallback));
         } finally {
             this.busy.set(false);
         }
@@ -525,10 +525,8 @@ export function alertRuleErrorMessage(err: unknown): string {
     const limit = limitRefusalMessage(err);
     if (limit) return limit;
     const status = (err as { status?: number })?.status;
-    if (status === 403)
-        return needsPermission('canAuthorAlertRules');
-    if (status === 503)
-        return 'Alert Rules cannot be armed here: the alert engine is not running.';
+    if (status === 403) return needsPermission('canAuthorAlertRules');
+    if (status === 503) return 'Alert Rules cannot be armed here: the alert engine is not running.';
     if (status === 409) return 'An Alert Rule with this name already exists. Pick another name.';
     return investigationErrorMessage(err, 'Could not create the Alert Rule.');
 }
@@ -581,7 +579,11 @@ export function alertRuleErrorMessage(err: unknown): string {
                         type="number"
                         [required]="true"
                         formControlName="threshold"
-                        [error]="form.controls.threshold.touched && form.controls.threshold.hasError('required') ? 'A threshold is required.' : ''"
+                        [error]="
+                            form.controls.threshold.touched && form.controls.threshold.hasError('required')
+                                ? 'A threshold is required.'
+                                : ''
+                        "
                     ></inspecto-pen-field>
                     <inspecto-option-picker
                         label="Severity"

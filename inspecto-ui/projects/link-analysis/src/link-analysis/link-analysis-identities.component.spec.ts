@@ -55,10 +55,17 @@ interface Options {
 }
 
 function create({ groups = [GROUP], canManage = true, listError, session = false }: Options = {}) {
-    const store = { mergeDraft: signal<unknown>(null), canvas: signal<unknown>({}), apply: vi.fn(async () => true), error: signal('') };
+    const store = {
+        mergeDraft: signal<unknown>(null),
+        canvas: signal<unknown>({}),
+        apply: vi.fn(async () => true),
+        error: signal(''),
+    };
     const inv = {
         listIdentityGroups: vi.fn(() =>
-            listError ? http(listError, "missing capability 'canManageIncidents'") : of({ groups, atSeq: 3, headSeq: 3, headHash: 'h' }),
+            listError
+                ? http(listError, "missing capability 'canManageIncidents'")
+                : of({ groups, atSeq: 3, headSeq: 3, headHash: 'h' }),
         ),
         identityGroup: vi.fn(() => of({ group: GROUP, atSeq: 3, headHash: 'h' })),
         assertIdentity: vi.fn(() => of({ assertion: GROUP.assertions[0], group: GROUP, atSeq: 3, headHash: 'h' })),
@@ -236,9 +243,17 @@ describe('LinkAnalysisIdentitiesComponent "Merge with..." hand-off', () => {
     it('prefills the form from the hand-off and clears it, writing nothing', async () => {
         const { cmp, inv, store, settle } = create({ session: true });
         await settle();
-        store.mergeDraft.set({ a: { type: 'msisdn', value: '+447700900123' }, b: { type: 'imsi', value: '234150000000001' } });
+        store.mergeDraft.set({
+            a: { type: 'msisdn', value: '+447700900123' },
+            b: { type: 'imsi', value: '234150000000001' },
+        });
         await settle();
-        expect(cmp.assertForm.getRawValue()).toMatchObject({ typeA: 'msisdn', valueA: '+447700900123', typeB: 'imsi', valueB: '234150000000001' });
+        expect(cmp.assertForm.getRawValue()).toMatchObject({
+            typeA: 'msisdn',
+            valueA: '+447700900123',
+            typeB: 'imsi',
+            valueB: '234150000000001',
+        });
         expect(store.mergeDraft()).toBeNull();
         expect(inv.assertIdentity).not.toHaveBeenCalled();
     });

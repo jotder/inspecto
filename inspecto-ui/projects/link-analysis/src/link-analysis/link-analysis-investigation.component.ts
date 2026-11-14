@@ -143,7 +143,11 @@ import { laLimit } from './la-limits';
     selector: 'inspecto-link-analysis-investigation',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [LaFoldComponent, PenFieldComponent, StepperFieldComponent, NgTemplateOutlet,
+    imports: [
+        LaFoldComponent,
+        PenFieldComponent,
+        StepperFieldComponent,
+        NgTemplateOutlet,
         FormsModule,
         ReactiveFormsModule,
         MatButtonModule,
@@ -269,8 +273,12 @@ export class LinkAnalysisInvestigationComponent {
     /** A Clean up while unsaved: the page hides these on the drawn Working Set and records the step. */
     readonly unsavedCleanUp = output<{ ids: string[]; reason: string; exclude: boolean }>();
 
-    readonly canUndoNow = computed(() => (this.isUnsaved() ? this.unsavedCanUndo() : this.canWrite() && this.store.canUndo()));
-    readonly canRedoNow = computed(() => (this.isUnsaved() ? this.unsavedCanRedo() : this.canWrite() && this.store.canRedo()));
+    readonly canUndoNow = computed(() =>
+        this.isUnsaved() ? this.unsavedCanUndo() : this.canWrite() && this.store.canUndo(),
+    );
+    readonly canRedoNow = computed(() =>
+        this.isUnsaved() ? this.unsavedCanRedo() : this.canWrite() && this.store.canRedo(),
+    );
     readonly undoTip = computed(() =>
         this.isUnsaved()
             ? this.unsavedCanUndo()
@@ -360,7 +368,12 @@ export class LinkAnalysisInvestigationComponent {
     });
     readonly outsideInvalid = computed(() => {
         const [from, to] = [this.outsideFromValue().trim(), this.outsideToValue().trim()];
-        return (!from && !to) || (!!from && !ISO_INSTANT.test(from)) || (!!to && !ISO_INSTANT.test(to)) || this.outsideInverted();
+        return (
+            (!from && !to) ||
+            (!!from && !ISO_INSTANT.test(from)) ||
+            (!!to && !ISO_INSTANT.test(to)) ||
+            this.outsideInverted()
+        );
     });
     /** The entities to take away, or null while there is no fresh read. */
     /** An error is about the window it was read over: a new window clears it. */
@@ -372,7 +385,13 @@ export class LinkAnalysisInvestigationComponent {
     readonly outsideIds = computed(() => {
         const r = this.outsideRead();
         const ws = this.store.workingSet();
-        if (!r || !ws || r.hash !== ws.hash || r.from !== this.outsideFromValue().trim() || r.to !== this.outsideToValue().trim())
+        if (
+            !r ||
+            !ws ||
+            r.hash !== ws.hash ||
+            r.from !== this.outsideFromValue().trim() ||
+            r.to !== this.outsideToValue().trim()
+        )
             return null;
         return outsideWindow(ws, r.ids);
     });
@@ -387,7 +406,11 @@ export class LinkAnalysisInvestigationComponent {
         this.outsideRead.set(null);
         try {
             const c = await firstValueFrom(
-                this.inv.compareInvestigationWindows(id, { aFrom: from || undefined, aTo: to || undefined, bTo: ALL_TIME_END }),
+                this.inv.compareInvestigationWindows(id, {
+                    aFrom: from || undefined,
+                    aTo: to || undefined,
+                    bTo: ALL_TIME_END,
+                }),
             );
             const read = c.entities.onlyB;
             if (read.truncated)
@@ -419,7 +442,9 @@ export class LinkAnalysisInvestigationComponent {
     async outsideChip(days: number): Promise<void> {
         const from = quickWindow(days, await this.store.loadLatestEvent())?.from;
         if (!from) {
-            this.outsideError.set('The latest event time is not known, so the last days cannot be counted. Type From instead.');
+            this.outsideError.set(
+                'The latest event time is not known, so the last days cannot be counted. Type From instead.',
+            );
             return;
         }
         this.outsideFrom.setValue(from);
@@ -525,7 +550,9 @@ export class LinkAnalysisInvestigationComponent {
             untracked(() => this.showDetails());
         });
         this.detailsTitle.valueChanges.pipe(takeUntilDestroyed()).subscribe((v) => void this.saveDetails('title', v));
-        this.detailsPurpose.valueChanges.pipe(takeUntilDestroyed()).subscribe((v) => void this.saveDetails('purpose', v));
+        this.detailsPurpose.valueChanges
+            .pipe(takeUntilDestroyed())
+            .subscribe((v) => void this.saveDetails('purpose', v));
         // Prefill the time column from the canvas / Dataset default; an analyst's own edit is never overwritten.
         effect(() => {
             const col = this.timeCol();
@@ -682,7 +709,11 @@ export class LinkAnalysisInvestigationComponent {
     readonly purpose = new FormControl('', {
         nonNullable: true,
         // the Space's limit at check time, never a number of our own (it may be raised above the shipped 1000)
-        validators: [Validators.required, Validators.pattern(/\S/), (c) => Validators.maxLength(laLimit('input.purpose_length'))(c)],
+        validators: [
+            Validators.required,
+            Validators.pattern(/\S/),
+            (c) => Validators.maxLength(laLimit('input.purpose_length'))(c),
+        ],
     });
     /** LA-19: `confidence` is deliberately NOT asked — its scale is undecided (D-U9) and the server refuses it. */
     readonly note = new FormControl('', {
@@ -723,7 +754,6 @@ export class LinkAnalysisInvestigationComponent {
     readonly pinError = signal('');
     /** Non-null while the analyst is re-ordering: the proposed order of effective step numbers. */
     readonly order = signal<number[] | null>(null);
-
 
     /** D-U9: the Working Set's links that carry a wire id — what a link note may name. */
     readonly linkOptions = computed<PickerOption[]>(() =>

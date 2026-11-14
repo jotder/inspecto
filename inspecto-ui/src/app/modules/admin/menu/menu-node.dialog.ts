@@ -82,7 +82,8 @@ export interface MenuNodeDialogResult {
 
                 <!-- Searchable icon picker over the full heroicons-outline set (menu-builder-plan O2).
                      Free text filters; only a real icon id is accepted (else the control errors). -->
-                <mat-form-field subscriptSizing="dynamic"><!-- form-allow: a typeahead with an autocomplete panel (the icon search) -->
+                <mat-form-field subscriptSizing="dynamic"
+                    ><!-- form-allow: a typeahead with an autocomplete panel (the icon search) -->
                     <mat-label>Icon (optional)</mat-label>
                     @if (selectedIcon()) {
                         <mat-icon matPrefix class="icon-size-5 ml-1 mr-2" [svgIcon]="selectedIcon()!"></mat-icon>

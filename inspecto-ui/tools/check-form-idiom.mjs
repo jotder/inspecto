@@ -8,7 +8,9 @@
 //   - a listed file that no longer holds either tag fails too ("remove it from the list"), so a converted screen
 //     cannot quietly go back.
 // Escape hatch, for what the plan keeps boxed on purpose (code / SQL / JSON editors, grid filters, search boxes):
-// `form-allow` in a comment on the tag's line, with the reason.
+// `form-allow` in a comment on the tag's line, with the reason. When the opening tag spans lines, the line that
+// closes it counts too: Prettier (the UI formatting gate) breaks a long `<mat-form-field a b><!-- form-allow -->`
+// into `<mat-form-field a b` + `    ><!-- form-allow -->`, and both gates must pass on the same source.
 //
 // Zero dependencies. Run from inspecto-ui/: node tools/check-form-idiom.mjs. FORM_IDIOM_ROOT aims it at a throwaway
 // tree (the test does), and FORM_IDIOM_ALLOWLIST at another list.
@@ -54,7 +56,15 @@ for (const root of ROOTS)
         const lines = readFileSync(f, 'utf8').split(/\r?\n/);
         // a tag named in a comment (a doc line, a removed-field note) is not a field
         const comment = (l) => /^\s*(\/\/|\/\*|\*|<!--)/.test(l);
-        if (lines.some((l) => TAG.test(l) && !comment(l) && !l.includes('form-allow')))
+        // the tag's line, plus - when the opening tag is not closed there - the lines up to the one that closes it
+        const tagLines = (i) => {
+            const at = lines[i].slice(lines[i].search(TAG));
+            if (at.includes('>')) return lines[i];
+            let j = i + 1;
+            while (j < lines.length && j < i + 30 && !/^\s*\/?>|>\s*$/.test(lines[j])) j++;
+            return lines.slice(i, j + 1).join('\n');
+        };
+        if (lines.some((l, i) => TAG.test(l) && !comment(l) && !tagLines(i).includes('form-allow')))
             holding.add(toPosix(relative(uiRoot, f)));
     }
 

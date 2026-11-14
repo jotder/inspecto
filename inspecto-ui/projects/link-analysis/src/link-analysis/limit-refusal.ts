@@ -27,7 +27,9 @@ export function limitRefusalMessage(err: unknown): string | null {
     if (status === 413) {
         // The server's tail ("Narrow the step, or raise the limit: set max_set_bytes in ...link-analysis.toon ...") is for an
         // administrator; the analyst's next step is the sentence below, so the file and the setting name stay out of it.
-        const said = server.replace(/\s*(Narrow the step, or raise|Fork a smaller Investigation, or raise)[^]*$/, '').replace(/;\s*nothing was stored\.?$/, '.');
+        const said = server
+            .replace(/\s*(Narrow the step, or raise|Fork a smaller Investigation, or raise)[^]*$/, '')
+            .replace(/;\s*nothing was stored\.?$/, '.');
         return (
             'That is over a size limit, so nothing was stored. ' +
             (said ? said + ' ' : '') +

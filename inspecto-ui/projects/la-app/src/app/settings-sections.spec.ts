@@ -118,7 +118,11 @@ describe('This Space → Add data in Settings (LA-ONBOARD-1 OB-7, phase 8)', () 
 
     it('offers Try again after a refused change, and reads the setting afresh', () => {
         const { f, el, dataSettings } = make(true, true, true);
-        (el.querySelector('[data-testid="la-self-import"] button, [data-testid="la-self-import"] input') as HTMLElement).click();
+        (
+            el.querySelector(
+                '[data-testid="la-self-import"] button, [data-testid="la-self-import"] input',
+            ) as HTMLElement
+        ).click();
         f.detectChanges();
         const retry = el.querySelector('[data-testid="la-self-import-retry"]') as HTMLButtonElement;
         expect(retry).not.toBeNull();

@@ -24,13 +24,7 @@ import { AiExplainDialog } from './ai-explain.dialog';
     imports: [MatButtonModule, MatIconModule, MatTooltipModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <button
-            mat-icon-button
-            type="button"
-            [attr.aria-label]="name()"
-            [matTooltip]="name()"
-            (click)="open()"
-        >
+        <button mat-icon-button type="button" [attr.aria-label]="name()" [matTooltip]="name()" (click)="open()">
             <mat-icon svgIcon="heroicons_outline:question-mark-circle" />
         </button>
     `,

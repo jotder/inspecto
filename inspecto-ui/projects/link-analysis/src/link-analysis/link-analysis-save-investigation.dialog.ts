@@ -37,8 +37,8 @@ const NOT_BLANK = /\S/;
         <form [formGroup]="form" (ngSubmit)="submit()">
             <mat-dialog-content class="flex flex-col gap-3 text-sm">
                 <p class="text-secondary m-0" data-testid="la-save-what">
-                    Creates the Investigation and records the {{ data.steps === 1 ? 'step' : data.steps + ' steps' }} taken
-                    so far, in order, with your name.
+                    Creates the Investigation and records the
+                    {{ data.steps === 1 ? 'step' : data.steps + ' steps' }} taken so far, in order, with your name.
                 </p>
                 <inspecto-pen-field
                     data-testid="la-save-name"
@@ -72,7 +72,8 @@ const NOT_BLANK = /\S/;
 })
 export class LinkAnalysisSaveInvestigationDialog {
     readonly data = inject<SaveInvestigationDialogData>(MAT_DIALOG_DATA);
-    readonly ref = inject<MatDialogRef<LinkAnalysisSaveInvestigationDialog, SaveInvestigationDialogResult>>(MatDialogRef);
+    readonly ref =
+        inject<MatDialogRef<LinkAnalysisSaveInvestigationDialog, SaveInvestigationDialogResult>>(MatDialogRef);
     /** The longest purpose the Space accepts (`input.purpose_length`, the server's own limit). */
     readonly purposeMax = laLimit('input.purpose_length');
     readonly form = new FormGroup({
@@ -107,6 +108,9 @@ export class LinkAnalysisSaveInvestigationDialog {
             this.form.markAllAsTouched();
             return;
         }
-        this.ref.close({ name: this.form.controls.name.value.trim(), purpose: this.form.controls.purpose.value.trim() });
+        this.ref.close({
+            name: this.form.controls.name.value.trim(),
+            purpose: this.form.controls.purpose.value.trim(),
+        });
     }
 }

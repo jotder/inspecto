@@ -84,7 +84,9 @@ import { parseSeedList } from './seed-list';
                     </inspecto-alert>
                 }
                 @if (r.noLinks.length) {
-                    <inspecto-alert variant="info" title="No links found for">{{ r.noLinks.join(', ') }}</inspecto-alert>
+                    <inspecto-alert variant="info" title="No links found for">{{
+                        r.noLinks.join(', ')
+                    }}</inspecto-alert>
                 }
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm" aria-label="Connection of every pair of seeds">
@@ -181,6 +183,7 @@ export class InvestigationConnectOpComponent {
     /** One `expand` step from the nodes on the connecting routes (they are all in the Working Set). */
     async expandFromRoutes(ids: string[]): Promise<void> {
         this.error.set('');
-        if (!(await this.store.apply({ op: 'expand', ids, ...this.store.withPresets(this.presets(), {}) }))) this.error.set(this.store.error());
+        if (!(await this.store.apply({ op: 'expand', ids, ...this.store.withPresets(this.presets(), {}) })))
+            this.error.set(this.store.error());
     }
 }

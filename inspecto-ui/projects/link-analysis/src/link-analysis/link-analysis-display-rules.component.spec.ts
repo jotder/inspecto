@@ -70,14 +70,23 @@ describe('LinkAnalysisDisplayRulesComponent', () => {
         const host = fixture.componentInstance;
         host.attributes.set([]); // the nodes carry nothing: the Reference's details alone make the form
         host.references.set([
-            { dataset: 'accounts', keyCol: 'account_id', name: 'Accounts', entityType: 'account', columns: ['segment', 'kyc'] },
+            {
+                dataset: 'accounts',
+                keyCol: 'account_id',
+                name: 'Accounts',
+                entityType: 'account',
+                columns: ['segment', 'kyc'],
+            },
         ]);
         host.note.set('kyc in Accounts is masked, so no node is coloured by it');
         fixture.detectChanges();
         const el: HTMLElement = fixture.nativeElement;
         const group = el.querySelector('optgroup')!;
         expect(group.label).toBe('Details in Accounts');
-        expect(Array.from(group.querySelectorAll('option')).map((o) => o.textContent?.trim())).toEqual(['segment', 'kyc']);
+        expect(Array.from(group.querySelectorAll('option')).map((o) => o.textContent?.trim())).toEqual([
+            'segment',
+            'kyc',
+        ]);
         expect(el.querySelector('[data-testid="la-rule-reference-note"]')!.textContent).toContain('is masked');
 
         const set = (id: string, value: string) => {
@@ -89,7 +98,9 @@ describe('LinkAnalysisDisplayRulesComponent', () => {
         set('la-rule-value', 'retail');
         el.querySelector<HTMLButtonElement>('button[aria-pressed]')!.click();
         fixture.detectChanges();
-        Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Add rule'))!.click();
+        Array.from(el.querySelectorAll('button'))
+            .find((b) => b.textContent?.includes('Add rule'))!
+            .click();
         fixture.detectChanges();
         expect(host.emitted).toEqual([
             { reference: 'accounts', attr: 'segment', op: 'eq', value: 'retail', color: 'swatch-EF4444' },

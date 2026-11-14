@@ -275,10 +275,9 @@ export class GeoMapComponent implements OnInit, OnDestroy {
     readonly radiusCenter = signal<{ lat: number; lon: number } | null>(null);
     /** The radius-search and note tools' inputs, as property rows. */
     readonly toolForm = this.fb.nonNullable.group({ searchRadiusM: 1000, noteText: '' });
-    readonly searchRadiusM = toSignal(
-        this.toolForm.controls.searchRadiusM.valueChanges.pipe(map((m) => m || 1000)),
-        { initialValue: 1000 },
-    );
+    readonly searchRadiusM = toSignal(this.toolForm.controls.searchRadiusM.valueChanges.pipe(map((m) => m || 1000)), {
+        initialValue: 1000,
+    });
     readonly polygonVertices = signal<{ lat: number; lon: number }[]>([]);
     /** A closed [lon, lat] ring filtering the displayed subset; `null` = no polygon filter. */
     readonly polygonFilter = signal<[number, number][] | null>(null);

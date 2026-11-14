@@ -70,7 +70,9 @@ let nextId = 0;
             </div>
         </div>
         @if (bounced(); as why) {
-            <p class="text-secondary m-0 text-right text-xs" role="status" [id]="hintId" data-testid="stepper-reason">{{ why }}</p>
+            <p class="text-secondary m-0 text-right text-xs" role="status" [id]="hintId" data-testid="stepper-reason">
+                {{ why }}
+            </p>
         }
     `,
 })

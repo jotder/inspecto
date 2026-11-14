@@ -8,7 +8,12 @@ import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.com
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { EmbedGrantList, EmbedGrantSummary, InvService } from '@inspecto/link-analysis/api/inv.service';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
-import { EMBED_SCOPES, EmbedMintData, LinkAnalysisEmbedMintDialog, embedErrorMessage } from './link-analysis-embed-mint.dialog';
+import {
+    EMBED_SCOPES,
+    EmbedMintData,
+    LinkAnalysisEmbedMintDialog,
+    embedErrorMessage,
+} from './link-analysis-embed-mint.dialog';
 
 const FLAG_HINT = 'Embed links are turned off. Ask an administrator.';
 
@@ -49,7 +54,9 @@ const FLAG_HINT = 'Embed links are turned off. Ask an administrator.';
                                 <inspecto-status-badge [value]="tone(g)" [label]="g.status"></inspecto-status-badge>
                                 <span class="text-secondary">expires {{ g.expiresAt }}</span>
                                 <span class="text-secondary">{{ g.viewCount }} views</span>
-                                <span class="text-secondary">{{ scopeLabel(g) }}, masking {{ g.maskingMode ?? 'as the Space' }}</span>
+                                <span class="text-secondary"
+                                    >{{ scopeLabel(g) }}, masking {{ g.maskingMode ?? 'as the Space' }}</span
+                                >
                                 @if (g.status === 'active' && canMint()) {
                                     <button
                                         mat-button
@@ -66,13 +73,9 @@ const FLAG_HINT = 'Embed links are turned off. Ask an administrator.';
                 }
             }
             @if (!lens.canShareInvestigation()) {
-                <p class="text-secondary m-0">
-                    Only a lead with Investigation sharing can create embed links.
-                </p>
+                <p class="text-secondary m-0">Only a lead with Investigation sharing can create embed links.</p>
             } @else if (!loading() && !isLead()) {
-                <p class="text-secondary m-0">
-                    Only a lead of this Investigation can create or revoke embed links.
-                </p>
+                <p class="text-secondary m-0">Only a lead of this Investigation can create or revoke embed links.</p>
             }
             @if (lens.canShareInvestigation() && isLead()) {
                 <div>
@@ -136,7 +139,8 @@ export class LinkAnalysisEmbedComponent {
             this.data.set(list);
             this.dark.set(!list.enabled);
         } catch (err) {
-            if (id === this.investigationId()) this.error.set(embedErrorMessage(err, 'Could not read the embed links.'));
+            if (id === this.investigationId())
+                this.error.set(embedErrorMessage(err, 'Could not read the embed links.'));
         } finally {
             if (id === this.investigationId()) this.loading.set(false);
         }

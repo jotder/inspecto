@@ -70,7 +70,8 @@ export class MenuAttachDialog {
      */
     private readonly kinds = KINDS.filter(
         (k) =>
-            (k.kind !== 'geo-map-view' || (this.session.geoLinkEnabled() && this.session.features()['geoMap'] === true)) &&
+            (k.kind !== 'geo-map-view' ||
+                (this.session.geoLinkEnabled() && this.session.features()['geoMap'] === true)) &&
             (k.kind !== 'link-analysis-view' || this.session.geoLinkEnabled()),
     );
 

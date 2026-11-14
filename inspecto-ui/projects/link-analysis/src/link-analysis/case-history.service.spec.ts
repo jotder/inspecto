@@ -57,7 +57,13 @@ describe('CaseHistoryService', () => {
         const req = http.expectOne((r) => r.url.endsWith('/inv/case-history'));
         expect(req.request.method).toBe('POST');
         expect(req.request.body).toEqual({ key: 'masked:00ff', status: 'open', investigationId: 'inv-1' });
-        req.flush({ entityType: 'msisdn', resolved: true, objects: [{ kind: 'case', id: 'c1' }], total: 3, truncated: true });
+        req.flush({
+            entityType: 'msisdn',
+            resolved: true,
+            objects: [{ kind: 'case', id: 'c1' }],
+            total: 3,
+            truncated: true,
+        });
         expect(await ok).toEqual({ items: [{ kind: 'case', id: 'c1' }], truncated: true, total: 3 });
 
         const gone = svc.byMaskedKey('masked:00ff', null, 'all');

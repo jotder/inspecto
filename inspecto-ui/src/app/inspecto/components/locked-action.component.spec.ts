@@ -33,11 +33,15 @@ describe('LockedActionComponent', () => {
         expect(button.textContent).toContain('Start an Investigation');
         expect(button.getAttribute('aria-disabled')).toBe('true');
         expect(button.disabled).toBe(false); // disabledInteractive: still reachable by keyboard
-        expect(reason.textContent?.trim()).toBe('Needs the Investigations add-on, which this installation does not hold.');
+        expect(reason.textContent?.trim()).toBe(
+            'Needs the Investigations add-on, which this installation does not hold.',
+        );
         expect(button.getAttribute('aria-describedby')).toBe(reason.id);
         expect(reason.id).not.toBe('');
 
-        fixture.componentInstance.reason.set('Investigations are in Standard and above, with the Investigations add-on.');
+        fixture.componentInstance.reason.set(
+            'Investigations are in Standard and above, with the Investigations add-on.',
+        );
         fixture.detectChanges();
         expect(reason.textContent).toContain('Standard and above');
         await expectNoA11yViolations(el);
@@ -50,6 +54,8 @@ describe('LockedActionComponent', () => {
         second.componentRef.setInput('label', 'Build index');
         second.componentRef.setInput('reason', 'r');
         second.detectChanges();
-        expect((second.nativeElement as HTMLElement).querySelector('[data-testid="locked-reason"]')!.id).not.toBe(first);
+        expect((second.nativeElement as HTMLElement).querySelector('[data-testid="locked-reason"]')!.id).not.toBe(
+            first,
+        );
     });
 });

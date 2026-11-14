@@ -1,11 +1,26 @@
 import { Location } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal, viewChild } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    DestroyRef,
+    computed,
+    effect,
+    inject,
+    input,
+    signal,
+    viewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
 import type { G6GraphData } from '@inspecto/core/graph';
 import { GraphDisplayOptions, GraphEmphasis, GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { searchNodes } from '@inspecto/link-analysis/graph/graph-analysis';
-import { CANVAS_MODES, CanvasMode, canvasInteractionFor, canvasModeForKey } from '@inspecto/link-analysis/link-analysis/canvas-mode';
+import {
+    CANVAS_MODES,
+    CanvasMode,
+    canvasInteractionFor,
+    canvasModeForKey,
+} from '@inspecto/link-analysis/link-analysis/canvas-mode';
 import { laLimit } from '@inspecto/link-analysis/link-analysis/la-limits';
 import {
     WIDGET_ANALYSES,
@@ -39,7 +54,10 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
     imports: [GraphViewComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     // The page sits outside the shell that paints the scheme background; without its own the text tokens were drawn on white (axe color-contrast 2.56:1 in dark).
-    host: { class: 'block min-h-screen', style: 'background: var(--gamma-bg-default); color: var(--gamma-text-default)' },
+    host: {
+        class: 'block min-h-screen',
+        style: 'background: var(--gamma-bg-default); color: var(--gamma-text-default)',
+    },
     template: `
         <main class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4" aria-live="polite">
             @switch (state()) {
@@ -50,8 +68,9 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
                     <section aria-labelledby="embed-na" class="flex flex-col gap-2">
                         <h1 id="embed-na" class="text-title m-0 font-semibold">This link is not available</h1>
                         <p class="text-secondary m-0">
-                            It may have expired, been withdrawn, or be mistyped. Ask the person who shared it for a new link. If you
-                            reloaded this page, open the original link again: the address bar no longer holds it.
+                            It may have expired, been withdrawn, or be mistyped. Ask the person who shared it for a new
+                            link. If you reloaded this page, open the original link again: the address bar no longer
+                            holds it.
                         </p>
                     </section>
                 }
@@ -69,18 +88,46 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
                                 <p class="text-secondary m-0">{{ v.investigation.purpose }}</p>
                             }
                             <p class="text-secondary m-0 text-sm">
-                                Read-only view at step {{ v.head.step }}. {{ maskNote() }} {{ scopeNote() }} This link expires
-                                {{ v.link.expiresAt }}.
+                                Read-only view at step {{ v.head.step }}. {{ maskNote() }} {{ scopeNote() }} This link
+                                expires {{ v.link.expiresAt }}.
                             </p>
                         </header>
 
                         <section aria-labelledby="embed-graph" class="flex flex-col gap-2">
                             <h2 id="embed-graph" class="m-0 text-lg font-semibold">Graph</h2>
                             @if (drawn(); as g) {
-                                <div class="flex flex-wrap items-center gap-1 text-sm" role="toolbar" aria-label="Graph tools" data-testid="embed-toolbar">
-                                    <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" (click)="graphView()?.zoomBy(1.4)" aria-label="Zoom in">+</button>
-                                    <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" (click)="graphView()?.zoomBy(1 / 1.4)" aria-label="Zoom out">-</button>
-                                    <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" (click)="graphView()?.fitView()">Fit</button>
+                                <div
+                                    class="flex flex-wrap items-center gap-1 text-sm"
+                                    role="toolbar"
+                                    aria-label="Graph tools"
+                                    data-testid="embed-toolbar"
+                                >
+                                    <button
+                                        type="button"
+                                        class="rounded border px-2 py-1"
+                                        style="border-color: var(--gamma-border)"
+                                        (click)="graphView()?.zoomBy(1.4)"
+                                        aria-label="Zoom in"
+                                    >
+                                        +
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="rounded border px-2 py-1"
+                                        style="border-color: var(--gamma-border)"
+                                        (click)="graphView()?.zoomBy(1 / 1.4)"
+                                        aria-label="Zoom out"
+                                    >
+                                        -
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="rounded border px-2 py-1"
+                                        style="border-color: var(--gamma-border)"
+                                        (click)="graphView()?.fitView()"
+                                    >
+                                        Fit
+                                    </button>
                                     <span class="mx-1 h-4 border-l" aria-hidden="true"></span>
                                     @for (m of canvasModes; track m.id) {
                                         <button
@@ -96,23 +143,50 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
                                         </button>
                                     }
                                     <span class="mx-1 h-4 border-l" aria-hidden="true"></span>
-                                    <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" [disabled]="!selection().length" (click)="hideSelected()">Hide selection</button>
+                                    <button
+                                        type="button"
+                                        class="rounded border px-2 py-1"
+                                        style="border-color: var(--gamma-border)"
+                                        [disabled]="!selection().length"
+                                        (click)="hideSelected()"
+                                    >
+                                        Hide selection
+                                    </button>
                                     @if (hiddenNodes().length) {
-                                        <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" (click)="hiddenNodes.set([])">Show hidden ({{ hiddenNodes().length }})</button>
+                                        <button
+                                            type="button"
+                                            class="rounded border px-2 py-1"
+                                            style="border-color: var(--gamma-border)"
+                                            (click)="hiddenNodes.set([])"
+                                        >
+                                            Show hidden ({{ hiddenNodes().length }})
+                                        </button>
                                     }
                                 </div>
                                 @if (nodeKinds().length > 1) {
-                                    <fieldset class="m-0 flex flex-wrap items-center gap-3 border-0 p-0 text-sm" data-testid="embed-kinds">
+                                    <fieldset
+                                        class="m-0 flex flex-wrap items-center gap-3 border-0 p-0 text-sm"
+                                        data-testid="embed-kinds"
+                                    >
                                         <legend class="float-left mr-2">Entity types</legend>
                                         @for (k of nodeKinds(); track k) {
                                             <label class="flex items-center gap-1">
-                                                <input type="checkbox" [checked]="!hiddenKinds().includes(k)" (change)="toggleKind(k)" />
+                                                <input
+                                                    type="checkbox"
+                                                    [checked]="!hiddenKinds().includes(k)"
+                                                    (change)="toggleKind(k)"
+                                                />
                                                 <span>{{ k }}</span>
                                             </label>
                                         }
                                     </fieldset>
                                 }
-                                <div class="flex flex-wrap items-center gap-1 text-sm" role="group" aria-label="Analyse" data-testid="embed-analyse">
+                                <div
+                                    class="flex flex-wrap items-center gap-1 text-sm"
+                                    role="group"
+                                    aria-label="Analyse"
+                                    data-testid="embed-analyse"
+                                >
                                     <span class="mr-1">Analyse:</span>
                                     @for (a of analyses; track a.id) {
                                         <button
@@ -128,9 +202,20 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
                                     }
                                 </div>
                                 @if (resultSummary(); as summary) {
-                                    <p class="text-secondary m-0 flex items-center gap-1 text-sm" role="status" data-testid="embed-result">
+                                    <p
+                                        class="text-secondary m-0 flex items-center gap-1 text-sm"
+                                        role="status"
+                                        data-testid="embed-result"
+                                    >
                                         <span>{{ summary }}</span>
-                                        <button type="button" class="rounded border px-2 py-0.5" style="border-color: var(--gamma-border)" (click)="clearResult()">Clear</button>
+                                        <button
+                                            type="button"
+                                            class="rounded border px-2 py-0.5"
+                                            style="border-color: var(--gamma-border)"
+                                            (click)="clearResult()"
+                                        >
+                                            Clear
+                                        </button>
                                     </p>
                                 }
                                 <div
@@ -220,9 +305,25 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
                             </table>
                             @if (pageCount() > 1) {
                                 <div class="flex items-center gap-2 text-sm">
-                                    <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" [disabled]="page() === 0" (click)="goto(page() - 1)">Previous</button>
+                                    <button
+                                        type="button"
+                                        class="rounded border px-2 py-1"
+                                        style="border-color: var(--gamma-border)"
+                                        [disabled]="page() === 0"
+                                        (click)="goto(page() - 1)"
+                                    >
+                                        Previous
+                                    </button>
                                     <span>Page {{ page() + 1 }} of {{ pageCount() }}</span>
-                                    <button type="button" class="rounded border px-2 py-1" style="border-color: var(--gamma-border)" [disabled]="page() >= pageCount() - 1" (click)="goto(page() + 1)">Next</button>
+                                    <button
+                                        type="button"
+                                        class="rounded border px-2 py-1"
+                                        style="border-color: var(--gamma-border)"
+                                        [disabled]="page() >= pageCount() - 1"
+                                        (click)="goto(page() + 1)"
+                                    >
+                                        Next
+                                    </button>
                                 </div>
                             }
                         </section>
@@ -245,7 +346,9 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
 
                         @if (v.link.scope !== 'working_set') {
                             <section aria-labelledby="embed-notes">
-                                <h2 id="embed-notes" class="m-0 text-lg font-semibold">Notes ({{ v.annotations.length }})</h2>
+                                <h2 id="embed-notes" class="m-0 text-lg font-semibold">
+                                    Notes ({{ v.annotations.length }})
+                                </h2>
                                 <ul class="m-0 list-none p-0">
                                     @for (n of v.annotations; track $index) {
                                         <li>{{ n.note }}</li>
@@ -255,7 +358,9 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
                         }
                         @if (v.link.scope === 'full' || v.link.scope === undefined) {
                             <section aria-labelledby="embed-refs">
-                                <h2 id="embed-refs" class="m-0 text-lg font-semibold">References ({{ v.references.length }})</h2>
+                                <h2 id="embed-refs" class="m-0 text-lg font-semibold">
+                                    References ({{ v.references.length }})
+                                </h2>
                                 <ul class="m-0 list-none p-0">
                                     @for (r of v.references; track $index) {
                                         <li>{{ refText(r) }}</li>
@@ -331,10 +436,14 @@ export class EmbedViewPageComponent {
     protected readonly matching = computed(() => {
         const q = this.filter().trim().toLowerCase();
         const rows = this.view()?.workingSet.entities ?? [];
-        return q ? rows.filter((e) => e.entityId.toLowerCase().includes(q) || (e.type ?? '').toLowerCase().includes(q)) : rows;
+        return q
+            ? rows.filter((e) => e.entityId.toLowerCase().includes(q) || (e.type ?? '').toLowerCase().includes(q))
+            : rows;
     });
     protected readonly pageCount = computed(() => Math.max(1, Math.ceil(this.matching().length / PAGE_SIZE)));
-    protected readonly pageRows = computed(() => this.matching().slice(this.page() * PAGE_SIZE, (this.page() + 1) * PAGE_SIZE));
+    protected readonly pageRows = computed(() =>
+        this.matching().slice(this.page() * PAGE_SIZE, (this.page() + 1) * PAGE_SIZE),
+    );
     private readonly degrees = computed(() => {
         const d = new Map<string, number>();
         for (const l of this.view()?.workingSet.links ?? []) {
@@ -344,10 +453,16 @@ export class EmbedViewPageComponent {
         return d;
     });
 
-    protected readonly maskNote = computed(() => (this.view()?.masking?.mode === 'none' ? '' : 'Entity ids may be masked.'));
+    protected readonly maskNote = computed(() =>
+        this.view()?.masking?.mode === 'none' ? '' : 'Entity ids may be masked.',
+    );
     protected readonly scopeNote = computed(() => {
         const s = this.view()?.link.scope;
-        return s === 'working_set' ? 'This link shows entities and links only.' : s === 'with_notes' ? 'This link omits references.' : '';
+        return s === 'working_set'
+            ? 'This link shows entities and links only.'
+            : s === 'with_notes'
+              ? 'This link omits references.'
+              : '';
     });
 
     private readonly svc = inject(EmbedViewService);
@@ -384,12 +499,18 @@ export class EmbedViewPageComponent {
     /** Replace the address-bar path with one that has no token (no navigation); the token stays only in this component's memory. */
     private scrub(token: string): void {
         const path = this.location.path();
-        if (path.includes(token) || path.includes(encodeURIComponent(token))) this.location.replaceState(EMBED_SCRUBBED_PATH);
+        if (path.includes(token) || path.includes(encodeURIComponent(token)))
+            this.location.replaceState(EMBED_SCRUBBED_PATH);
     }
 
     /** The keyboard equivalents of the pointer: arrows pan, + and - zoom, and the Canvas-mode keys (WCAG 2.1.1 / 2.5.7). */
     protected onKey(ev: KeyboardEvent): void {
-        const moves: Record<string, [number, number]> = { ArrowLeft: [40, 0], ArrowRight: [-40, 0], ArrowUp: [0, 40], ArrowDown: [0, -40] };
+        const moves: Record<string, [number, number]> = {
+            ArrowLeft: [40, 0],
+            ArrowRight: [-40, 0],
+            ArrowUp: [0, 40],
+            ArrowDown: [0, -40],
+        };
         const d = moves[ev.key];
         const g = this.graphView();
         if (d) g?.panBy(d[0], d[1]);

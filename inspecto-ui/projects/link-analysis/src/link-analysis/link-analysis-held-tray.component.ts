@@ -38,17 +38,29 @@ export interface HeldItem {
                     >
                         Held: busy {{ t().nodes }} ({{ held().length }})
                     </h2>
-                    <button mat-icon-button class="ml-auto" type="button" aria-label="Minimise the Held tray" (click)="open.set(false)">
+                    <button
+                        mat-icon-button
+                        class="ml-auto"
+                        type="button"
+                        aria-label="Minimise the Held tray"
+                        (click)="open.set(false)"
+                    >
                         <mat-icon svgIcon="heroicons_outline:minus"></mat-icon>
                     </button>
                 </div>
                 @if (showHint()) {
-                    <div class="rounded-md border p-2 text-xs" style="border-color: var(--gamma-border)" data-testid="la-held-hint">
+                    <div
+                        class="rounded-md border p-2 text-xs"
+                        style="border-color: var(--gamma-border)"
+                        data-testid="la-held-hint"
+                    >
                         <p class="m-0">
                             Some {{ t().nodes }} link to thousands of others and hide the real links. Expand holds them:
                             they stay on the graph, ringed, but are not expanded.
                         </p>
-                        <p class="text-secondary m-0" data-testid="la-hint-guide">More in the user guide: <cite>{{ guide.chapter }}</cite> ({{ guide.where }}).</p>
+                        <p class="text-secondary m-0" data-testid="la-hint-guide">
+                            More in the user guide: <cite>{{ guide.chapter }}</cite> ({{ guide.where }}).
+                        </p>
                         <button mat-button type="button" class="mt-1" (click)="dismissHint()">Got it</button>
                     </div>
                 }

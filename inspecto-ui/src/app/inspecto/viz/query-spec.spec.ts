@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { ColumnMeta, emptyGroup } from 'app/inspecto/query';
-import { aggExpression, buildMeasure, compileSpec, isoDaysBefore, measureId, ratioMeasure, recencyMeasure, windowTerms } from './query-spec';
+import {
+    aggExpression,
+    buildMeasure,
+    compileSpec,
+    isoDaysBefore,
+    measureId,
+    ratioMeasure,
+    recencyMeasure,
+    windowTerms,
+} from './query-spec';
 import { biQueryBody } from './dataset-result.service';
 import { Aggregation, QuerySpec } from './viz-types';
 import MEASURE_CONTRACT from 'app/inspecto/contracts/measure-grammar.contract.json';
@@ -196,7 +205,9 @@ describe('windowed and ratio measures', () => {
         const where = emptyGroup('AND');
         where.items.push({ kind: 'condition', field: 'tariff', operator: '=', value: 'premium' });
         const sql = compileSpec({ ...spec(7), filters: where }, COLS);
-        expect(sql).toContain(`WHERE ("tariff" = 'premium') AND SUBSTRING("day", 1, 10) <= '2026-06-30' AND SUBSTRING("day", 1, 10) > '2026-06-23'`);
+        expect(sql).toContain(
+            `WHERE ("tariff" = 'premium') AND SUBSTRING("day", 1, 10) <= '2026-06-30' AND SUBSTRING("day", 1, 10) > '2026-06-23'`,
+        );
     });
 
     it('sends ratios and the window on the wire, never an expression', () => {

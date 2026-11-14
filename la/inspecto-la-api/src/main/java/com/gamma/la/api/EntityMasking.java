@@ -162,9 +162,8 @@ final class EntityMasking {
                 Map<String, String> maskedCols = maskedColumns(inv, types);
                 if (!maskedCols.isEmpty()) {
                     masked = universe;
-                    basis = "typed: bound column(s) " + List.copyOf(maskedCols.keySet()) + " are classified as masked "
-                            + "Entity Type(s) " + maskedCols.values().stream().distinct().toList() + ", and an id does "
-                            + "not record which column it was read from, so every entity id is masked";
+                    basis = "typed: bound column(s) " + List.copyOf(maskedCols.keySet()) + " are " + classifiedAs(maskedCols, types)
+                            + ", and an id does not record which column it was read from, so every entity id is masked";
                 } else {
                     masked = typedSeeds;
                     basis = "typed: ids whose Entity Type is masked — seeded with a masked entityType (or one naming "
@@ -317,6 +316,19 @@ final class EntityMasking {
                     out.put(String.valueOf(name), maskedAs(types, String.valueOf(c.get("classification"))));
         }
         return out;
+    }
+
+    /**
+     * How {@link #maskedColumns}' columns read in a basis text (MASKING-UNION-RESIDUALS-1): "classified as masked Entity Type(s)
+     * [msisdn]" for a masked type's id, "classified PII" for a class no masked type names, joined by "or" when both occur.
+     */
+    static String classifiedAs(Map<String, String> maskedCols, List<EntityTypes.EntityType> types) {
+        List<String> typed = new ArrayList<>(), classes = new ArrayList<>();
+        for (String v : new java.util.LinkedHashSet<>(maskedCols.values()))
+            (types.stream().anyMatch(t -> t.id().equals(v)) ? typed : classes).add(v);
+        String t = typed.isEmpty() ? "" : "classified as masked Entity Type(s) " + typed;
+        String c = classes.isEmpty() ? "" : "classified " + String.join(", ", classes);
+        return t.isEmpty() ? c : c.isEmpty() ? t : t + " or " + c;
     }
 
     /** What a masked class is reported as: the id of the masked Entity Type that names it, else the class (upper-cased). */

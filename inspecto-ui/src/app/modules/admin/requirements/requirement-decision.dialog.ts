@@ -78,7 +78,8 @@ export type RequirementDetail = Requirement & { kpiPending?: boolean };
                 </div>
             }
             @if (lens.canTriageRequirements() && data.status === 'accepted') {
-                <mat-form-field class="w-full" subscriptSizing="dynamic"><!-- form-allow: a typeahead with an autocomplete panel (component suggestions) -->
+                <mat-form-field class="w-full" subscriptSizing="dynamic"
+                    ><!-- form-allow: a typeahead with an autocomplete panel (component suggestions) -->
                     <mat-label>Delivered via (optional)</mat-label>
                     <input
                         matInput

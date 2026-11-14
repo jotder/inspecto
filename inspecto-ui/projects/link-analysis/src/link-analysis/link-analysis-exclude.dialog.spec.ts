@@ -8,9 +8,33 @@ import { penByLabel, penEdit, penError, pickerSet } from '@inspecto/core/testing
 import { ExcludeDialogData, LinkAnalysisExcludeDialog } from './link-analysis-exclude.dialog';
 
 const LISTS: ExclusionListSummary[] = [
-    { id: 'cc', title: 'Call centres', entityType: 'msisdn', ownerKind: 'analyst', autoApply: false, visibility: 'open', size: 12 },
-    { id: 'vip', title: 'Marketing VIPs', entityType: 'msisdn', ownerKind: 'admin', autoApply: true, visibility: 'restricted', size: 40 },
-    { id: 'imei', title: 'Lab phones', entityType: 'imei', ownerKind: 'analyst', autoApply: false, visibility: 'open', size: 2 },
+    {
+        id: 'cc',
+        title: 'Call centres',
+        entityType: 'msisdn',
+        ownerKind: 'analyst',
+        autoApply: false,
+        visibility: 'open',
+        size: 12,
+    },
+    {
+        id: 'vip',
+        title: 'Marketing VIPs',
+        entityType: 'msisdn',
+        ownerKind: 'admin',
+        autoApply: true,
+        visibility: 'restricted',
+        size: 40,
+    },
+    {
+        id: 'imei',
+        title: 'Lab phones',
+        entityType: 'imei',
+        ownerKind: 'analyst',
+        autoApply: false,
+        visibility: 'open',
+        size: 2,
+    },
 ];
 const DATA: ExcludeDialogData = {
     count: 2,
@@ -30,7 +54,15 @@ function create(over: Partial<ExcludeDialogData> = {}) {
         providers: [
             provideNoopAnimations(),
             { provide: MAT_DIALOG_DATA, useValue: { ...DATA, ...over } },
-            { provide: MatDialogRef, useValue: { close, disableClose: false, backdropClick: () => ({ subscribe: () => undefined }), keydownEvents: () => ({ subscribe: () => undefined }) } },
+            {
+                provide: MatDialogRef,
+                useValue: {
+                    close,
+                    disableClose: false,
+                    backdropClick: () => ({ subscribe: () => undefined }),
+                    keydownEvents: () => ({ subscribe: () => undefined }),
+                },
+            },
         ],
     });
     const f = TestBed.createComponent(LinkAnalysisExcludeDialog);
@@ -47,7 +79,9 @@ describe('LinkAnalysisExcludeDialog (LA-GROW-EXCLUDE-1 §3.3)', () => {
         const { el } = create();
         expect(el.querySelector('h2')?.textContent).toContain('Exclude 2 numbers');
         expect(el.querySelector('[data-testid="la-exclude-what"]')?.textContent).toContain('+4477001, +4477002');
-        expect(el.querySelector('[data-testid="la-exclude-here"]')?.textContent).toContain('From this Investigation only');
+        expect(el.querySelector('[data-testid="la-exclude-here"]')?.textContent).toContain(
+            'From this Investigation only',
+        );
         expect(el.textContent).toContain('One recorded step (exclude), with your reason. Undo reverts it.');
         expect(el.querySelector('[data-testid="la-exclude-list"]')?.textContent).toContain('Add to a list…');
         await expectNoA11yViolations(el);
@@ -62,7 +96,9 @@ describe('LinkAnalysisExcludeDialog (LA-GROW-EXCLUDE-1 §3.3)', () => {
 
     it('LA-INVESTIGATE-UX-1: a recent reason is one press, and is what Exclude sends; axe-clean', async () => {
         const { f, el, close } = create({ recentReasons: ['Call centre', 'Not relevant'] });
-        const chips = Array.from(el.querySelectorAll('[data-testid="la-exclude-recent"] button')) as HTMLButtonElement[];
+        const chips = Array.from(
+            el.querySelectorAll('[data-testid="la-exclude-recent"] button'),
+        ) as HTMLButtonElement[];
         expect(chips.map((b) => b.textContent?.trim())).toEqual(['Call centre', 'Not relevant']);
         expect(chips[0].getAttribute('aria-pressed')).toBe('false');
         chips[0].click();
@@ -101,7 +137,11 @@ describe('LinkAnalysisExcludeDialog (LA-GROW-EXCLUDE-1 §3.3)', () => {
         expect(close).not.toHaveBeenCalled();
         pickerSet(f, '[data-testid="la-exclude-pick"]', 'cc');
         exclude(el);
-        expect(close).toHaveBeenCalledWith({ kind: 'list', listId: 'cc', reason: 'Not relevant to this Investigation' });
+        expect(close).toHaveBeenCalledWith({
+            kind: 'list',
+            listId: 'cc',
+            reason: 'Not relevant to this Investigation',
+        });
     });
 
     it('with the category capability an admin list is offered too', () => {
@@ -119,7 +159,11 @@ describe('LinkAnalysisExcludeDialog (LA-GROW-EXCLUDE-1 §3.3)', () => {
         expect(penError(penByLabel(el, 'New list name')!)).toContain('Name the new list.');
         penEdit(f, penByLabel(el, 'New list name')!, 'Call centres 2');
         exclude(el);
-        expect(close).toHaveBeenCalledWith({ kind: 'list', newTitle: 'Call centres 2', reason: 'Not relevant to this Investigation' });
+        expect(close).toHaveBeenCalledWith({
+            kind: 'list',
+            newTitle: 'Call centres 2',
+            reason: 'Not relevant to this Investigation',
+        });
     });
 
     it('says why "Add to a list…" is not possible: no capability, or no list route on this server', () => {
@@ -138,7 +182,9 @@ describe('LinkAnalysisExcludeDialog (LA-GROW-EXCLUDE-1 §3.3)', () => {
     });
 
     it('without the write capability "this Investigation only" says why, and the dialog starts on the list choice', () => {
-        const { el, c } = create({ hereWhyNot: 'This changes the Investigation log and needs the Incident management capability.' });
+        const { el, c } = create({
+            hereWhyNot: 'This changes the Investigation log and needs the Incident management capability.',
+        });
         expect(el.textContent).toContain('needs the Incident management capability');
         expect(c.kind()).toBe('list');
     });

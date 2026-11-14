@@ -176,7 +176,10 @@
                                 [entityKey]="obj().attributes!['key.entity_key']"
                             />
                             <!-- PREDICTIVE-SURFACE-1: the entity's Customer Segment / Churn Score; hides when none -->
-                            <inspecto-prediction-panel class="mt-6 block" [entityKey]="obj().attributes!['key.entity_key']" />
+                            <inspecto-prediction-panel
+                                class="mt-6 block"
+                                [entityKey]="obj().attributes!['key.entity_key']"
+                            />
                         }
                         @if (attributeRows.length) {
                             <div class="mt-6">
@@ -316,7 +319,8 @@
                 <mat-tab label="Comments">
                     <div class="flex flex-col gap-4 pt-6">
                         <form [formGroup]="commentForm" (ngSubmit)="addComment()" class="flex items-start gap-3">
-                            <mat-form-field class="flex-auto" subscriptSizing="dynamic"><!-- form-allow: a message composer -->
+                            <mat-form-field class="flex-auto" subscriptSizing="dynamic"
+                                ><!-- form-allow: a message composer -->
                                 <mat-label>Add a comment</mat-label>
                                 <textarea matInput rows="2" formControlName="body" required></textarea>
                                 @if (commentForm.get('body')?.hasError('required')) {

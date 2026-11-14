@@ -48,7 +48,13 @@ describe('Canvas modes (LA-STUDIO-UI-REORG-1 UIR-D3)', () => {
 
     it('Alt+Shift lasso removes: the selected state is dropped from every lassoed node', () => {
         const got: [string[], string][] = [];
-        const b = buildBehaviors(canvasInteractionFor('pan'), null, () => undefined, {}, (ids, mode) => got.push([ids, mode]));
+        const b = buildBehaviors(
+            canvasInteractionFor('pan'),
+            null,
+            () => undefined,
+            {},
+            (ids, mode) => got.push([ids, mode]),
+        );
         const remove = (b as Record<string, unknown>[]).find((x) => x['key'] === 'lasso-remove')!;
         const states: Record<string, string[]> = { a: ['active'], b: ['selected', 'active'] }; // G6 'diff' flipped a on
         (remove['onSelect'] as (s: Record<string, string[]>) => void)(states);
@@ -58,7 +64,11 @@ describe('Canvas modes (LA-STUDIO-UI-REORG-1 UIR-D3)', () => {
 
     it('a saved view: the brush and the old lasso toggle go, Fisheye wins over Link filter', () => {
         expect(
-            canvasModeOptions({ behaviors: ['brush-select', 'lasso-select', 'hover-activate'], fisheye: true, edgeFilterLens: true }),
+            canvasModeOptions({
+                behaviors: ['brush-select', 'lasso-select', 'hover-activate'],
+                fisheye: true,
+                edgeFilterLens: true,
+            }),
         ).toEqual({ behaviors: ['hover-activate'], fisheye: true, edgeFilterLens: false });
     });
 

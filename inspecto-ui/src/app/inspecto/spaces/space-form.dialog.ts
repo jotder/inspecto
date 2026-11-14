@@ -99,7 +99,12 @@ export interface DataKindOption {
 
 /** The three answers (UC-02 step 2); `pack` ids are the shipped Industry packs. */
 export const DATA_KIND_OPTIONS: readonly DataKindOption[] = [
-    { id: 'mobile-money', label: 'Mobile Money', pack: 'mobile-money', examples: 'sender_wallet, receiver_wallet, amount' },
+    {
+        id: 'mobile-money',
+        label: 'Mobile Money',
+        pack: 'mobile-money',
+        examples: 'sender_wallet, receiver_wallet, amount',
+    },
     { id: 'telecom', label: 'Telecom', pack: 'telecom', examples: 'calling_number, called_number, call_duration' },
     { id: 'generic', label: 'Generic', pack: null, examples: 'from_id, to_id, date' },
 ];
@@ -114,14 +119,7 @@ export const DATA_KIND_OPTIONS: readonly DataKindOption[] = [
 @Component({
     selector: 'app-space-form-dialog',
     standalone: true,
-    imports: [
-        ReactiveFormsModule,
-        MatDialogModule,
-        MatButtonModule,
-        MatIconModule,
-        MatRadioModule,
-        PenFieldComponent,
-    ],
+    imports: [ReactiveFormsModule, MatDialogModule, MatButtonModule, MatIconModule, MatRadioModule, PenFieldComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>{{ editMode ? 'Edit space' : dataKind ? 'Create a Space' : 'New space' }}</h2>
@@ -184,57 +182,57 @@ export const DATA_KIND_OPTIONS: readonly DataKindOption[] = [
                         <p class="text-secondary m-0 text-sm">It sets the words Link Analysis uses for your data.</p>
                     </div>
                 } @else {
-                <inspecto-pen-field label="Description" formControlName="description"></inspecto-pen-field>
+                    <inspecto-pen-field label="Description" formControlName="description"></inspecto-pen-field>
 
-                <!-- Branding -->
-                <div class="flex flex-col gap-2 border-t pt-3">
-                    <span id="space-logo-label" class="text-sm font-medium">Logo</span>
-                    <div class="flex items-center gap-4">
-                        <div class="bg-hover flex h-14 w-28 items-center justify-center rounded border p-2">
-                            <img
-                                class="max-h-full max-w-full"
-                                [src]="logoDataUrl() || defaultLogo"
-                                alt="Logo preview"
-                            />
+                    <!-- Branding -->
+                    <div class="flex flex-col gap-2 border-t pt-3">
+                        <span id="space-logo-label" class="text-sm font-medium">Logo</span>
+                        <div class="flex items-center gap-4">
+                            <div class="bg-hover flex h-14 w-28 items-center justify-center rounded border p-2">
+                                <img
+                                    class="max-h-full max-w-full"
+                                    [src]="logoDataUrl() || defaultLogo"
+                                    alt="Logo preview"
+                                />
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <input
+                                    #logoInput
+                                    type="file"
+                                    accept="image/*"
+                                    class="sr-only"
+                                    aria-labelledby="space-logo-label"
+                                    (change)="onLogoSelected(logoInput)"
+                                />
+                                <button mat-stroked-button type="button" (click)="logoInput.click()">
+                                    <mat-icon svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
+                                    <span class="ml-2">Upload</span>
+                                </button>
+                                @if (logoDataUrl()) {
+                                    <button mat-button type="button" (click)="removeLogo()">Remove custom logo</button>
+                                }
+                            </div>
                         </div>
-                        <div class="flex flex-col gap-1">
-                            <input
-                                #logoInput
-                                type="file"
-                                accept="image/*"
-                                class="sr-only"
-                                aria-labelledby="space-logo-label"
-                                (change)="onLogoSelected(logoInput)"
-                            />
-                            <button mat-stroked-button type="button" (click)="logoInput.click()">
-                                <mat-icon svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
-                                <span class="ml-2">Upload</span>
-                            </button>
-                            @if (logoDataUrl()) {
-                                <button mat-button type="button" (click)="removeLogo()">Remove custom logo</button>
-                            }
-                        </div>
+                        @if (logoError()) {
+                            <span class="text-warn text-xs" role="alert">{{ logoError() }}</span>
+                        }
                     </div>
-                    @if (logoError()) {
-                        <span class="text-warn text-xs" role="alert">{{ logoError() }}</span>
-                    }
-                </div>
 
-                <inspecto-pen-field
-                    label="Caption"
-                    formControlName="caption"
-                    placeholder="Unveil stories from your data"
-                    help="Shown beneath the logo in the sidebar."
-                ></inspecto-pen-field>
-                <inspecto-pen-field label="Footer text" formControlName="footerText"></inspecto-pen-field>
-                <inspecto-pen-field
-                    label="Default timezone"
-                    [mono]="true"
-                    formControlName="timezone"
-                    placeholder="UTC"
-                    help="An IANA zone such as Asia/Kolkata. KPIs without their own timezone use it."
-                    [error]="timezoneError()"
-                ></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="Caption"
+                        formControlName="caption"
+                        placeholder="Unveil stories from your data"
+                        help="Shown beneath the logo in the sidebar."
+                    ></inspecto-pen-field>
+                    <inspecto-pen-field label="Footer text" formControlName="footerText"></inspecto-pen-field>
+                    <inspecto-pen-field
+                        label="Default timezone"
+                        [mono]="true"
+                        formControlName="timezone"
+                        placeholder="UTC"
+                        help="An IANA zone such as Asia/Kolkata. KPIs without their own timezone use it."
+                        [error]="timezoneError()"
+                    ></inspecto-pen-field>
                 }
             </mat-dialog-content>
             <mat-dialog-actions align="end">

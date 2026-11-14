@@ -158,7 +158,8 @@ function requiredError(c: AbstractControl, message: string): string {
                             Entity from the same Dataset — is reused, not duplicated.
                         </p>
                         @if (candidates.length >= 8) {
-                            <mat-form-field subscriptSizing="dynamic" class="w-full"><!-- form-allow: a filter over the list below -->
+                            <mat-form-field subscriptSizing="dynamic" class="w-full"
+                                ><!-- form-allow: a filter over the list below -->
                                 <mat-label>Filter nodes</mat-label>
                                 <input matInput [value]="pickFilter()" (input)="onFilter($event)" />
                             </mat-form-field>
@@ -471,8 +472,8 @@ export interface AttachCaseResult {
         <form [formGroup]="form" (ngSubmit)="attach()">
             <mat-dialog-content class="flex flex-col gap-3">
                 <p class="text-secondary m-0 text-sm">
-                    Seals the analysis on screen ({{ frozenNodes }} nodes) as a snapshot with a fingerprint and attaches it
-                    to the Case — one step, no separate save.
+                    Seals the analysis on screen ({{ frozenNodes }} nodes) as a snapshot with a fingerprint and attaches
+                    it to the Case — one step, no separate save.
                 </p>
                 <inspecto-pen-field
                     label="Snapshot title"
@@ -561,7 +562,8 @@ export interface AttachCaseResult {
 export class LinkAnalysisAttachCaseDialog {
     protected readonly requiredError = requiredError;
     readonly data = inject<AttachCaseDialogData>(MAT_DIALOG_DATA);
-    private readonly ref = inject<MatDialogRef<LinkAnalysisAttachCaseDialog, AttachCaseResult | undefined>>(MatDialogRef);
+    private readonly ref =
+        inject<MatDialogRef<LinkAnalysisAttachCaseDialog, AttachCaseResult | undefined>>(MatDialogRef);
     private readonly confirm = inject(InspectoConfirmService);
     private readonly store = inject(LinkAnalysisSnapshotsService);
     private readonly caseMgmt = inject(LA_CASES);

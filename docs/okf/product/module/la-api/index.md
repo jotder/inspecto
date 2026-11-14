@@ -34,5 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `MASKING-UNION-RESIDUALS-1` | P3 | defect | readers that still type or check a column without the one masking rule (filed 2026-11-14, left by MASKING-TWO-VOCABULARIES-1). | — |
+| `MASKING-TYPE-ID-EDGES-1` | P3 | defect | two small edges of the one masking rule (filed 2026-11-15 by the review of MASKING-UNION-RESIDUALS-1). | — |
 | `LA-EMPTY-DATASET-WORDING-1` | P3 | defect | an empty Pipeline-fed Dataset is reported in developer words, and the Data page does not say it is empty (filed 2026-11-14, left by LA-SA… | — |

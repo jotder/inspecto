@@ -112,7 +112,11 @@ import {
                             >
                                 <mat-icon
                                     class="icon-size-4"
-                                    [svgIcon]="hiddenKinds().includes(k) ? 'heroicons_outline:eye-slash' : 'heroicons_outline:eye'"
+                                    [svgIcon]="
+                                        hiddenKinds().includes(k)
+                                            ? 'heroicons_outline:eye-slash'
+                                            : 'heroicons_outline:eye'
+                                    "
                                 ></mat-icon>
                                 <span>{{ k }}</span>
                             </button>
@@ -223,7 +227,12 @@ import {
                         <mat-icon class="icon-size-4" svgIcon="heroicons_outline:eye-slash"></mat-icon>
                     </button>
                     @if (hiddenNodes().length) {
-                        <button mat-button type="button" class="!h-7 !min-w-0 !px-1 text-xs" (click)="hiddenNodes.set([])">
+                        <button
+                            mat-button
+                            type="button"
+                            class="!h-7 !min-w-0 !px-1 text-xs"
+                            (click)="hiddenNodes.set([])"
+                        >
                             Show hidden ({{ hiddenNodes().length }})
                         </button>
                     }

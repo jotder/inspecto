@@ -45,8 +45,23 @@ const preview = (p: Partial<GrowPreview> = {}): GrowPreview => ({
     ...p,
 });
 
-const entry = (step: number, op: InvestigationLogEntry['op'], params: InvestigationLogEntry['params'] = {}, undoneBy: number | null = null) =>
-    ({ step, kind: 'op', op, params, undoneBy, author: null, at: '', workingSetHash: '', text: '' }) as InvestigationLogEntry;
+const entry = (
+    step: number,
+    op: InvestigationLogEntry['op'],
+    params: InvestigationLogEntry['params'] = {},
+    undoneBy: number | null = null,
+) =>
+    ({
+        step,
+        kind: 'op',
+        op,
+        params,
+        undoneBy,
+        author: null,
+        at: '',
+        workingSetHash: '',
+        text: '',
+    }) as InvestigationLogEntry;
 
 const list = (id: string, over: Partial<ExclusionListSummary> = {}): ExclusionListSummary => ({
     id,
@@ -72,13 +87,26 @@ describe('grow-exclude — wording', () => {
         expect(previewSentence(preview(), TELECOM)).toBe(
             'This step adds about 342 numbers and 1,210 calls; 3 busy numbers will be held; 41 numbers are removed by your exclusion lists.',
         );
-        expect(previewSentence(preview({ addsNodes: 0, addsLinks: 0, heldCount: 0, excludedByLists: [] }), GENERIC)).toBe(
-            'This step adds nothing new.',
+        expect(
+            previewSentence(preview({ addsNodes: 0, addsLinks: 0, heldCount: 0, excludedByLists: [] }), GENERIC),
+        ).toBe('This step adds nothing new.');
+        const flagged = previewSentence(
+            preview({ truncated: true, needsApproval: true, reason: 'budget 5000 > 1000' }),
+            GENERIC,
         );
-        const flagged = previewSentence(preview({ truncated: true, needsApproval: true, reason: 'budget 5000 > 1000' }), GENERIC);
         expect(flagged).toContain('incomplete');
         expect(flagged).toContain('A second person must approve this step before it runs (budget 5000 > 1000).');
-        expect(previewSentence(preview({ addsNodes: 1, addsLinks: 1, heldCount: 1, excludedByLists: [{ listId: 'x', title: 'X', removed: 1 }] }), TELECOM)).toBe(
+        expect(
+            previewSentence(
+                preview({
+                    addsNodes: 1,
+                    addsLinks: 1,
+                    heldCount: 1,
+                    excludedByLists: [{ listId: 'x', title: 'X', removed: 1 }],
+                }),
+                TELECOM,
+            ),
+        ).toBe(
             'This step adds about 1 number and 1 call; 1 busy number will be held; 1 number is removed by your exclusion lists.',
         );
     });
@@ -112,7 +140,9 @@ describe('grow-exclude — the N-degree walk and the preview failure', () => {
         for (const status of [0, 404, 405, 501, 503])
             expect(previewFailure(new HttpErrorResponse({ status })).unavailable).toBe(true);
         expect(previewFailure(new TypeError('x is not a function')).unavailable).toBe(true);
-        const refused = previewFailure(new HttpErrorResponse({ status: 422, error: { error: { message: 'frontier too large' } } }));
+        const refused = previewFailure(
+            new HttpErrorResponse({ status: 422, error: { error: { message: 'frontier too large' } } }),
+        );
         expect(refused).toEqual({ unavailable: false, absent: false, message: 'frontier too large' });
         expect(previewFailure(new HttpErrorResponse({ status: 404 })).absent).toBe(true);
         expect(previewFailure(new HttpErrorResponse({ status: 503 })).absent).toBe(false); // switched off now, maybe not later
@@ -136,7 +166,12 @@ describe('grow-exclude — the expand a Grow sends', () => {
     });
 
     it('grows through the held edge (a recorded includeHubs override) when Hold is off; the Advanced rung wins over the presets', () => {
-        const off = { ...req, hold: false, linkKinds: ['voice'], rung: { window: 'full' as const, minEvents: 2, budget: 50 } };
+        const off = {
+            ...req,
+            hold: false,
+            linkKinds: ['voice'],
+            rung: { window: 'full' as const, minEvents: 2, budget: 50 },
+        };
         expect(growExpandBody(growIds(ctx, off), off, { window: { from: 'x' }, budget: 2000 })).toEqual({
             op: 'expand',
             ids: ['a', 'b', 'hub'],
@@ -173,7 +208,10 @@ describe('grow-exclude — lists in force', () => {
         entry(5, 'exclude', { ids: ['h1'] }),
         entry(6, 'excludeBy', { listId: 'gone' }, 7),
     ];
-    const lists = [list('cc', { title: 'Call centres' }), list('vip', { title: 'VIPs', ownerKind: 'admin', visibility: 'restricted' })];
+    const lists = [
+        list('cc', { title: 'Call centres' }),
+        list('vip', { title: 'VIPs', ownerKind: 'admin', visibility: 'restricted' }),
+    ];
 
     it('lists every effective excludeBy with its removed count; only the latest step can be switched off', () => {
         const all = [...entries.slice(0, 4)];
@@ -191,7 +229,10 @@ describe('grow-exclude — lists in force', () => {
 
     it('a list applied twice: every application stays hidden when restricted, and Switch off says why it cannot', () => {
         const twice = [...entries.slice(0, 4), entry(5, 'excludeBy', { listId: 'vip' })];
-        const ws2: WorkingSet = { ...ws, excluded: [...ws.excluded.filter((x) => x.id !== 'h1'), { id: 'v2', step: 5, reason: 'vip' }] };
+        const ws2: WorkingSet = {
+            ...ws,
+            excluded: [...ws.excluded.filter((x) => x.id !== 'h1'), { id: 'v2', step: 5, reason: 'vip' }],
+        };
         const out = listsInForce(twice, ws2, lists, false);
         expect(out[1]).toMatchObject({ steps: [4, 5], step: 5 });
         expect(out[1].switchOffWhyNot).toContain('Applied in 2 steps (4, 5)');
@@ -247,7 +288,11 @@ describe('grow-exclude — the explorer (Basic)', () => {
             truncated: true,
         };
         const cut = filterExpansion(g, 'a', (x) => x.source === 'a');
-        expect(cut).toEqual({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ source: 'a', target: 'b' }], truncated: true });
+        expect(cut).toEqual({
+            nodes: [{ id: 'a' }, { id: 'b' }],
+            edges: [{ source: 'a', target: 'b' }],
+            truncated: true,
+        });
     });
 
     it('the explorer preview is ONE body over the whole frontier: ids, drawn, direction, hold threshold, kinds only with a kind column', () => {
@@ -277,7 +322,13 @@ describe('grow-exclude — the explorer (Basic)', () => {
     it('the explorer preview reads with the binding the Grow reads with: columns, attribute columns, the view filter', async () => {
         // The defect (LA-GROW-EXCLUDE-1): the preview counted the whole Dataset while the Grow read under the view's filter,
         // and folded one link per pair while the Grow draws one per attribute value. Same binding, same counts.
-        const p = { datasetId: 'pay', sourceCol: 'payer', targetCol: 'payee', linkKindCol: 'channel', attrCols: ['amount'] };
+        const p = {
+            datasetId: 'pay',
+            sourceCol: 'payer',
+            targetCol: 'payee',
+            linkKindCol: 'channel',
+            attrCols: ['amount'],
+        };
         const filter: ConditionGroup = {
             kind: 'group',
             op: 'AND',
@@ -299,7 +350,13 @@ describe('grow-exclude — the explorer (Basic)', () => {
     it('drawn: every node on the graph outside the frontier, by its spellings, the frontier neighbours first, capped', () => {
         const node = (id: string, label: string, spellings?: string[]) => ({ id, data: { label, spellings } });
         const g = {
-            nodes: [node('a', 'A'), node('far', 'FAR'), node('b', 'B', ['B', 'b ']), node('c', 'C'), node('blank', ' ')],
+            nodes: [
+                node('a', 'A'),
+                node('far', 'FAR'),
+                node('b', 'B', ['B', 'b ']),
+                node('c', 'C'),
+                node('blank', ' '),
+            ],
             edges: [
                 { source: 'a', target: 'b' },
                 { source: 'c', target: 'a' },

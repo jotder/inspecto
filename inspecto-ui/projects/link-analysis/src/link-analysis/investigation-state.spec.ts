@@ -62,14 +62,20 @@ describe('Working Set entity types on the canvas (ONB-LA-ENDPOINT-TYPE-1)', () =
     });
 
     it('builds the merge pair from the Working Set types for bare ids', () => {
-        const set = ws([entity('99979100001', { type: 'msisdn' }), entity('SHELL-A', { type: 'account' }), entity('plain')]);
+        const set = ws([
+            entity('99979100001', { type: 'msisdn' }),
+            entity('SHELL-A', { type: 'account' }),
+            entity('plain'),
+        ]);
         expect(mergePairOf(['99979100001', 'SHELL-A'], set)).toEqual({
             pair: { a: { type: 'msisdn', value: '99979100001' }, b: { type: 'account', value: 'SHELL-A' } },
             reason: '',
         });
         expect(mergePairOf(['99979100001', 'plain'], set).reason).toContain('typed entities');
         const masked = ws([entity('masked:0123456789abcdef', { type: 'msisdn' }), entity('1', { type: 'imsi' })]);
-        expect(mergePairOf(['masked:0123456789abcdef', '1'], masked).reason).toContain('masked entity cannot be merged');
+        expect(mergePairOf(['masked:0123456789abcdef', '1'], masked).reason).toContain(
+            'masked entity cannot be merged',
+        );
     });
 });
 
@@ -254,9 +260,14 @@ describe('LA-10 investigation-state', () => {
         expect(investigationErrorMessage(err(404, "no investigation 'x'"), 'f')).toContain('not yours');
         expect(investigationErrorMessage(err(404, "no investigation 'x'"), 'f')).not.toContain("no investigation 'x'");
         expect(investigationErrorMessage(err(404, "no investigation 'x'"), 'f')).not.toContain('Server:');
-        expect(investigationErrorMessage(err(403, "missing capability 'canManageIncidents'"), 'f')).toBe('Needs Incident management.');
+        expect(investigationErrorMessage(err(403, "missing capability 'canManageIncidents'"), 'f')).toBe(
+            'Needs Incident management.',
+        );
         const heldRead = investigationErrorMessage(
-            err(403, 'A neighbours read of one entity (degree 60) needs four-eyes approval (fan-out 60 > 1), and only an Investigation can hold the request. Make the step smaller, or take it as an Expand in an Investigation so a second person can approve it.'),
+            err(
+                403,
+                'A neighbours read of one entity (degree 60) needs four-eyes approval (fan-out 60 > 1), and only an Investigation can hold the request. Make the step smaller, or take it as an Expand in an Investigation so a second person can approve it.',
+            ),
             'f',
         );
         expect(heldRead).toBe(
@@ -311,15 +322,23 @@ describe('refusal403: a true plain reason for every 403 (LA-UI-TEXT-PASS-1 X5 re
     const e403 = (message: string) => new HttpErrorResponse({ status: 403, error: { error: { message } } });
 
     it('a member whose role is too low is told that, never that a permission is missing', () => {
-        const msg = investigationErrorMessage(e403("your role on investigation 'inv-1' is analyst — only a lead changes it"), 'f');
-        expect(msg).toBe('Only a lead can change this Investigation.');
-        expect(investigationErrorMessage(e403("your role on investigation 'inv-1' is analyst — only a lead or reviewer decides this"), 'f')).toBe(
-            'Only a lead or reviewer can decide this.',
+        const msg = investigationErrorMessage(
+            e403("your role on investigation 'inv-1' is analyst — only a lead changes it"),
+            'f',
         );
+        expect(msg).toBe('Only a lead can change this Investigation.');
+        expect(
+            investigationErrorMessage(
+                e403("your role on investigation 'inv-1' is analyst — only a lead or reviewer decides this"),
+                'f',
+            ),
+        ).toBe('Only a lead or reviewer can decide this.');
     });
 
     it('a restricted Entity List says so, on the Investigation route and the list routes', () => {
-        const restricted = e403("entity list 'l-1' is restricted: only a holder of canManageExclusionCategories or canRevealLinkEntities may seed from it");
+        const restricted = e403(
+            "entity list 'l-1' is restricted: only a holder of canManageExclusionCategories or canRevealLinkEntities may seed from it",
+        );
         expect(investigationErrorMessage(restricted, 'f')).toBe('This Entity List is restricted.');
         expect(entityListErrorMessage(restricted, 'f', true)).toBe('This Entity List is restricted.');
     });
@@ -329,12 +348,16 @@ describe('refusal403: a true plain reason for every 403 (LA-UI-TEXT-PASS-1 X5 re
     });
 
     it('a missing capability is the permission, worded by the screen where it knows better', () => {
-        expect(investigationErrorMessage(e403("missing capability 'canManageIncidents'"), 'f')).toBe('Needs Incident management.');
+        expect(investigationErrorMessage(e403("missing capability 'canManageIncidents'"), 'f')).toBe(
+            'Needs Incident management.',
+        );
         expect(identityErrorMessage(e403("missing capability 'canManageIncidents'"), 'f')).toBe(
             'Identities need Incident management, also to read.',
         );
         // a restricted list on the identity route is still a restricted list, not the identity wording
-        expect(identityErrorMessage(e403("entity list 'x' is restricted: …"), 'f')).toBe('This Entity List is restricted.');
+        expect(identityErrorMessage(e403("entity list 'x' is restricted: …"), 'f')).toBe(
+            'This Entity List is restricted.',
+        );
     });
 
     it('a four-eyes decision keeps the server sentence', () => {

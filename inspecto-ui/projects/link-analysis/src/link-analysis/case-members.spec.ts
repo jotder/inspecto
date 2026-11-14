@@ -28,7 +28,13 @@ describe('caseMemberCandidates - typed Investigation nodes (ONB-LA-ENDPOINT-TYPE
     const P: EntityProjection = { datasetId: 'calls', sourceCol: 'A', targetCol: 'B' };
 
     it('offers a typed Working Set entity (kind = its Entity Type) as a member', () => {
-        const g = workingSetToGraph(ws([{ id: '99979100001', type: 'msisdn' }, { id: 'x', type: null }]), P);
+        const g = workingSetToGraph(
+            ws([
+                { id: '99979100001', type: 'msisdn' },
+                { id: 'x', type: null },
+            ]),
+            P,
+        );
         expect(g.nodes.find((n) => n.data.label === '99979100001')!.data.kind).toBe('msisdn');
         const c = caseMemberCandidates(g, 'calls');
         expect(c.map((m) => m.label).sort()).toEqual(['99979100001', 'x']);

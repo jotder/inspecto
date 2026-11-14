@@ -21,6 +21,7 @@ describe('Link Analysis About terms (UI test 2026-10-29)', () => {
         expect(LA_ABOUT_TERMS).not.toContain('Link-Analysis View');
         expect(LA_ABOUT_TERMS).not.toContain('Widget');
         const text = Object.values(LA_ABOUT_DEFINITIONS).join(' ');
-        for (const banned of [/\bFlow\b/, /\bData Source\b/, /\bIssue\b/, /\bMetric\b/]) expect(text).not.toMatch(banned);
+        for (const banned of [/\bFlow\b/, /\bData Source\b/, /\bIssue\b/, /\bMetric\b/])
+            expect(text).not.toMatch(banned);
     });
 });

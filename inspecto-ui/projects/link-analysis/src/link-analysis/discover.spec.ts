@@ -6,7 +6,10 @@ import type { PackTerms } from './grow-exclude';
 
 const T: PackTerms = { node: 'account', nodes: 'accounts', link: 'transfer', links: 'transfers' };
 
-const node = (id: string, extra: Record<string, unknown> = {}) => ({ id, data: { label: id, kind: 'entity', ...extra } });
+const node = (id: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    data: { label: id, kind: 'entity', ...extra },
+});
 const edge = (s: string, t: string, at?: string) => ({
     id: `${s}->${t}`,
     source: s,
@@ -38,18 +41,28 @@ describe('Find something interesting - the readings (LA-ONBOARD-1 phase 7, UC-12
         expect(r.rows[0].edgeIds).toHaveLength(6);
         expect(r.rows[0].values).toEqual(['BIG']);
         // what a start from a row says it started from: that row, never the whole ranking
-        expect(r.rows.map((x) => x.what)).toEqual(['BIG, the busiest account', 'M1, one of the busiest accounts', 'M2, one of the busiest accounts']);
+        expect(r.rows.map((x) => x.what)).toEqual([
+            'BIG, the busiest account',
+            'M1, one of the busiest accounts',
+            'M2, one of the busiest accounts',
+        ]);
     });
 
     it('no hint when the top one is not far busier than the next', () => {
-        const flat: G6GraphData = { nodes: ['A', 'B', 'C'].map((id) => node(id)), edges: [edge('A', 'B'), edge('B', 'C'), edge('C', 'A')] };
+        const flat: G6GraphData = {
+            nodes: ['A', 'B', 'C'].map((id) => node(id)),
+            edges: [edge('A', 'B'), edge('B', 'C'), edge('C', 'A')],
+        };
         expect(busiest(flat, T).rows.every((x) => !x.hint)).toBe(true);
     });
 
     it('Who is busiest never ranks a super node, and says why when nothing has a link', () => {
         const g: G6GraphData = { nodes: [node('S', { kind: SUPER_NODE_KIND }), node('A')], edges: [edge('S', 'A')] };
         expect(busiest(g, T).rows.map((x) => x.title)).toEqual(['A']);
-        expect(busiest({ nodes: [node('A')], edges: [] }, T)).toMatchObject({ rows: [], empty: 'No account on this graph has a transfer yet.' });
+        expect(busiest({ nodes: [node('A')], edges: [] }, T)).toMatchObject({
+            rows: [],
+            empty: 'No account on this graph has a transfer yet.',
+        });
     });
 
     it('Which groups stick together: groups of three or more, with their links among them and the days they span', () => {
@@ -57,7 +70,9 @@ describe('Find something interesting - the readings (LA-ONBOARD-1 phase 7, UC-12
         const ring = r.rows.find((x) => x.nodeIds.includes('M2'))!;
         // the victim who paid into the ring belongs with it; the merchant and its other payers are a group of their own
         expect([...ring.nodeIds].sort()).toEqual(['M1', 'M2', 'M3', 'V1']);
-        expect(ring.reading).toMatch(/^Group \d: 4 accounts, 4 transfers among them within 2 days \(.+ and 1 more\)\.$/);
+        expect(ring.reading).toMatch(
+            /^Group \d: 4 accounts, 4 transfers among them within 2 days \(.+ and 1 more\)\.$/,
+        );
         expect([...ring.edgeIds].sort()).toEqual(['M1->M2', 'M2->M3', 'M3->M1', 'V1->M1']);
         expect(r.rows.find((x) => x.nodeIds.includes('BIG'))!.nodeIds).not.toContain('M1');
         // without a time attribute the reading says no days
@@ -66,7 +81,10 @@ describe('Find something interesting - the readings (LA-ONBOARD-1 phase 7, UC-12
 
     it('Which groups stick together says so when no group of three exists', () => {
         const g: G6GraphData = { nodes: [node('A'), node('B')], edges: [edge('A', 'B')] };
-        expect(groups(g, T)).toMatchObject({ rows: [], empty: 'No group of three or more accounts sticks together on this graph.' });
+        expect(groups(g, T)).toMatchObject({
+            rows: [],
+            empty: 'No group of three or more accounts sticks together on this graph.',
+        });
     });
 
     it('How does A reach B: following the links one way when it can, and saying so when it cannot', () => {
@@ -74,7 +92,9 @@ describe('Find something interesting - the readings (LA-ONBOARD-1 phase 7, UC-12
         expect(one.rows[0].reading).toBe('V1 reaches M3 in 3 transfers: V1 → M1 → M2 → M3.');
         expect(one.rows[0].nodeIds).toEqual(['V1', 'M1', 'M2', 'M3']);
         const both = route(G, 'V2', 'V3', T);
-        expect(both.rows[0].reading).toBe('V2 and V3 are linked through 2 transfers, not all in one direction: V2 – BIG – V3.');
+        expect(both.rows[0].reading).toBe(
+            'V2 and V3 are linked through 2 transfers, not all in one direction: V2 – BIG – V3.',
+        );
         const none = route({ nodes: [node('A'), node('B')], edges: [] }, 'A', 'B', T);
         expect(none.empty).toBe('A and B are not linked on this graph. Try Expand from one of them.');
         expect(route(G, 'V1', 'V1', T).empty).toBe('Choose two different accounts on the graph.');

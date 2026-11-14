@@ -27,13 +27,7 @@ const KINDS: { value: RequirementKind; label: string }[] = [
 @Component({
     selector: 'app-requirement-form-dialog',
     standalone: true,
-    imports: [
-        InspectoOptionPickerComponent,
-        ReactiveFormsModule,
-        MatDialogModule,
-        MatButtonModule,
-        PenFieldComponent,
-    ],
+    imports: [InspectoOptionPickerComponent, ReactiveFormsModule, MatDialogModule, MatButtonModule, PenFieldComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>New requirement</h2>
@@ -45,7 +39,11 @@ const KINDS: { value: RequirementKind; label: string }[] = [
                     [required]="true"
                     placeholder="e.g. daily churn KPI by region"
                     formControlName="title"
-                    [error]="form.controls.title.touched && form.controls.title.hasError('required') ? 'Title is required' : ''"
+                    [error]="
+                        form.controls.title.touched && form.controls.title.hasError('required')
+                            ? 'Title is required'
+                            : ''
+                    "
                 ></inspecto-pen-field>
                 <inspecto-option-picker class="w-full" label="Kind" [options]="kinds" formControlName="kind" />
                 <inspecto-pen-field

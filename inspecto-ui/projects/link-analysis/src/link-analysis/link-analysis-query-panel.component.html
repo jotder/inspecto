@@ -6,7 +6,8 @@
                 style="border-color: var(--gamma-border)"
                 data-testid="masking-badge"
                 [attr.title]="m.basis"
-                >{{ m.mode === 'none' ? 'Masking off' : 'Masking on' }}{{ m.masked === true ? ': ids shown as aliases' : '' }}</span
+                >{{ m.mode === 'none' ? 'Masking off' : 'Masking on'
+                }}{{ m.masked === true ? ': ids shown as aliases' : '' }}</span
             >
         }
         <inspecto-option-picker
@@ -298,8 +299,8 @@
                 [outputs]="aiAssistOutputs"
             />
             <p class="text-secondary w-full text-xs" data-testid="derive-mapping-help">
-                Derive mapping drafts the columns with the assistant. Needs Workbench author.
-                Without it, use the columns filled in above.
+                Derive mapping drafts the columns with the assistant. Needs Workbench author. Without it, use the
+                columns filled in above.
             </p>
         }
 
@@ -316,7 +317,8 @@
                 style="border-color: var(--gamma-border)"
                 data-testid="masking-badge"
                 [attr.title]="m.basis"
-                >{{ m.mode === 'none' ? 'Masking off' : 'Masking on' }}{{ m.masked === true ? ': ids shown as aliases' : '' }}</span
+                >{{ m.mode === 'none' ? 'Masking off' : 'Masking on'
+                }}{{ m.masked === true ? ': ids shown as aliases' : '' }}</span
             >
         }
         <div class="flex items-center gap-2 text-sm">

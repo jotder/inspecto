@@ -41,7 +41,12 @@ const ITEMS = [
 
 function chain(n: number): G6GraphData {
     const nodes = Array.from({ length: n }, (_, i) => ({ id: `c${i}`, data: { label: `c${i}`, kind: 'entity' } }));
-    const edges = Array.from({ length: n - 1 }, (_, i) => ({ id: `e${i}`, source: `c${i}`, target: `c${i + 1}`, data: { kind: 'link' } }));
+    const edges = Array.from({ length: n - 1 }, (_, i) => ({
+        id: `e${i}`,
+        source: `c${i}`,
+        target: `c${i + 1}`,
+        data: { kind: 'link' },
+    }));
     return { nodes, edges } as G6GraphData;
 }
 
@@ -65,7 +70,9 @@ describe('My browser: a personal value changes this browser and is clamped to th
         });
         svc = TestBed.inject(LaLimitsService);
         TestBed.tick();
-        TestBed.inject(HttpTestingController).expectOne(apiUrl('/settings/link-analysis/limits')).flush({ items: ITEMS });
+        TestBed.inject(HttpTestingController)
+            .expectOne(apiUrl('/settings/link-analysis/limits'))
+            .flush({ items: ITEMS });
     });
 
     afterEach(() => {

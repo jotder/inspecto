@@ -143,7 +143,9 @@
                                     >
                                         <option value="" [selected]="!segmentPicks()[s.column]">All</option>
                                         @for (v of s.values; track v) {
-                                            <option [value]="v" [selected]="segmentPicks()[s.column] === v">{{ v }}</option>
+                                            <option [value]="v" [selected]="segmentPicks()[s.column] === v">
+                                                {{ v }}
+                                            </option>
                                         }
                                     </select>
                                 </label>
@@ -151,7 +153,9 @@
                         </div>
                     }
                     @if (l.rows.length === 0) {
-                        <p class="text-secondary mt-2 text-sm">No scores match; the latest run may not have happened yet.</p>
+                        <p class="text-secondary mt-2 text-sm">
+                            No scores match; the latest run may not have happened yet.
+                        </p>
                     } @else {
                         <div class="mt-2 overflow-x-auto" [class.opacity-60]="listLoading()">
                             <table class="w-full text-left text-sm [&_td]:py-1 [&_td]:pr-4 [&_th]:pr-4" data-scores>
@@ -168,14 +172,21 @@
                                     @for (r of l.rows; track r.entityKey) {
                                         <tr class="border-b">
                                             <td>
-                                                <button type="button" class="text-primary underline" (click)="openRow(r.entityKey)">
+                                                <button
+                                                    type="button"
+                                                    class="text-primary underline"
+                                                    (click)="openRow(r.entityKey)"
+                                                >
                                                     {{ r.entityKey }}
                                                 </button>
                                             </td>
                                             <td class="tabular-nums">
                                                 {{ r.score }}
                                                 @if (r.high) {
-                                                    <inspecto-status-badge value="error" label="High"></inspecto-status-badge>
+                                                    <inspecto-status-badge
+                                                        value="error"
+                                                        label="High"
+                                                    ></inspecto-status-badge>
                                                 }
                                             </td>
                                             @for (s of l.segments; track s.column) {

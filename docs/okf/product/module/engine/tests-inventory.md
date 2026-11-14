@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-403 test class(es): 403 unit, 0 real-HTTP control-plane, 0 IT.
+404 test class(es): 404 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -360,6 +360,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `EgressAllowlistTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/EgressAllowlistTest.java` | {@link EgressAllowlist}'s one-time seeding (WEBHOOK-EGRESS-POLICY-1, operator 2026-09-27): a Space with no |
 | `ExcelSinkTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/ExcelSinkTest.java` | The {@code sink.excel} executor on the real engine path: a DuckDB relation in, a multi-sheet {@code .xlsx} |
 | `FileLanderTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/FileLanderTest.java` | T13 — {@link FileLander}: the adapter's land-then-ack. The file is durably present in the staging dir |
+| `MaskSpecTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/MaskSpecTest.java` | {@link MaskSpec#problems(Map, Predicate)}: the classes a mask may select are the ones the Space masks. |
 | `ModelEgressTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/ModelEgressTest.java` | Round-2 verification item 2 (2026-09-29): the model endpoint allowlist that stops SSRF through the model baseUrl. |
 | `PartitionSinkWriterBoundsTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/PartitionSinkWriterBoundsTest.java` | Event-time bounds and {@code producer} on the <b>Pipeline-sink</b> write path (consignment addressing §3.1, |
 | `PipelineDryRunTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/PipelineDryRunTest.java` | {@link PipelineDryRun} (T18): a bounded sample through a pipeline's transform→sink subgraph, scratch-only. |

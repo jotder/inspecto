@@ -22,7 +22,7 @@ describe('toCsv', () => {
 
     it('neutralises a formula-looking string cell by default, quoting a cell that then needs it', () => {
         expect(toCsv([{ k: '=A1', n: -4, s: '-3', r: '\rx' }], ['k', 'n', 's', 'r'])).toBe(
-            "k,n,s,r\n'=A1,-4,-3,\"'\rx\"",
+            'k,n,s,r\n\'=A1,-4,-3,"\'\rx"',
         );
     });
 

@@ -137,7 +137,9 @@ export class CheckNameDialog implements OnInit {
     /** The threshold row's error line: shown once the row was left or Run check was pressed. */
     thresholdError(): string {
         const c = this.form.controls.threshold;
-        return c.touched && (c.hasError('min') || c.hasError('max')) ? `A number from ${LIMITS.minThreshold} to 1.` : '';
+        return c.touched && (c.hasError('min') || c.hasError('max'))
+            ? `A number from ${LIMITS.minThreshold} to 1.`
+            : '';
     }
 
     /** The most-matches row's error line: shown once the row was left or Run check was pressed. */

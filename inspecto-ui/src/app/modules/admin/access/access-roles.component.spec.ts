@@ -53,7 +53,9 @@ function create(
             : of({ roles: authored.map((r) => ({ ...r, source: 'authored' as const })) }),
     );
     const api = {
-        roles: vi.fn(() => of({ roles: opts.roles ?? [SEED_OPS, AUTHORED], error: opts.error, identity: opts.identity })),
+        roles: vi.fn(() =>
+            of({ roles: opts.roles ?? [SEED_OPS, AUTHORED], error: opts.error, identity: opts.identity }),
+        ),
         profiles: vi.fn(() => of(opts.profiles ?? [])),
         saveRoles,
     };

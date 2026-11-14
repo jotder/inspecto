@@ -1155,7 +1155,12 @@ export function findCyclesShortestFirst(
     for (let len = 1; len <= maxLen; len++) {
         const res = findCycles(g, { limit: 2000, maxLen: len });
         // Parallel links give the same ring once per link combination: one row per node sequence.
-        out.push(...distinctPaths(g, res.filter((c) => c.nodeIds.length === len)).slice(0, limit));
+        out.push(
+            ...distinctPaths(
+                g,
+                res.filter((c) => c.nodeIds.length === len),
+            ).slice(0, limit),
+        );
         if (res.length >= 2000 || Date.now() - started > 1500) break;
     }
     return sortCyclesShortestFirst(out);

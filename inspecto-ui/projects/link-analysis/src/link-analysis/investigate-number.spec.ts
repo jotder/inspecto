@@ -53,7 +53,6 @@ const entity = (id: string, hop: number, hidden = false): WorkingSetEntity => ({
 });
 const ws = (...entities: WorkingSetEntity[]): WorkingSet => ({ entities, links: [], excluded: [], hash: '' });
 
-
 // The SPA holds no industry profile of its own (LA-EDITIONS-1): the telecom pack arrives from the server.
 installTelecomFixture();
 
@@ -189,11 +188,20 @@ describe('investigate-number - next degree', () => {
     });
 
     it('a degree held for its fan-out says what to do; one held for its budget does not offer a fan-out', () => {
-        const held = { degree: 1, admitted: 0, linksAdded: 0, truncated: false, fanOutCapped: 0, awaitingApproval: 'p1' };
+        const held = {
+            degree: 1,
+            admitted: 0,
+            linksAdded: 0,
+            truncated: false,
+            fanOutCapped: 0,
+            awaitingApproval: 'p1',
+        };
         const fan = degreeOutcomeMessage({ ...held, heldFor: ['maxFanOut unbounded (threshold 2000)'] });
         expect(fan).toContain('a second person approves request p1');
         expect(fan).toContain('four_eyes_fan_out_above');
-        expect(fan).toContain('Ask an approver, or use Expand with a fan-out at or below the threshold (Expand ▸ Limits).');
+        expect(fan).toContain(
+            'Ask an approver, or use Expand with a fan-out at or below the threshold (Expand ▸ Limits).',
+        );
         expect(degreeOutcomeMessage({ ...held, heldFor: ['budget 500 > 100'] })).not.toContain('Ask an approver');
     });
 
@@ -226,7 +234,9 @@ describe('investigate-number - next degree', () => {
 
     it('is blocked above the server frontier cap', () => {
         const many = Array.from({ length: laLimit('investigation.max_frontier') + 1 }, (_, i) => entity(`n${i}`, 2));
-        expect(degreeState(ws(entity('s', 0), ...many), 4).blocked).toContain(`one expand names at most ${laLimit('investigation.max_frontier').toLocaleString('en-US')}`);
+        expect(degreeState(ws(entity('s', 0), ...many), 4).blocked).toContain(
+            `one expand names at most ${laLimit('investigation.max_frontier').toLocaleString('en-US')}`,
+        );
     });
 
     it('follows the investigation.max_frontier / expand_budget_default limits in force (LA-CONFIG-LIMITS-1)', () => {
@@ -488,9 +498,7 @@ describe('investigate-number - fourth live run fixes', () => {
         expect([...overriddenHubs(entries, new Set(['h', 'g', 'k']))].sort()).toEqual(['h', 'k']);
         expect(sealedHubThreshold(entries)).toBe(500);
         expect(sealedHubThreshold([] as never)).toBeNull();
-        expect(hubBadgeText(500, 650, true)).toBe(
-            'Busy: 650 linked entities (limit 500), expanded through override',
-        );
+        expect(hubBadgeText(500, 650, true)).toBe('Busy: 650 linked entities (limit 500), expanded through override');
     });
 
     it('D3: reads a contact count served as a string', () => {
@@ -533,11 +541,7 @@ describe('investigate-number - walk-through 6 fixes', () => {
     it('D3: rebuilds the per-degree lines from the sealed log after a reopen', () => {
         const set: WorkingSet = {
             entities: [at('s', 0, 1), at('a', 1, 2), at('b', 1, 2), at('c', 2, 3)],
-            links: [
-                { admittedBy: 2 } as never,
-                { admittedBy: 2 } as never,
-                { admittedBy: 3 } as never,
-            ],
+            links: [{ admittedBy: 2 } as never, { admittedBy: 2 } as never, { admittedBy: 3 } as never],
             excluded: [],
             hash: '',
         };
@@ -545,7 +549,14 @@ describe('investigate-number - walk-through 6 fixes', () => {
         const entries = [
             { step: 1, kind: 'op', op: 'seed', undoneBy: null, params: { ids: ['s'] } },
             { step: 2, kind: 'op', op: 'expand', undoneBy: null, params: { ids: ['s'], window, budget: 5000 } },
-            { step: 3, kind: 'op', op: 'expand', undoneBy: null, params: { ids: ['a', 'b'], window: 'full' }, read: { truncated: true } },
+            {
+                step: 3,
+                kind: 'op',
+                op: 'expand',
+                undoneBy: null,
+                params: { ids: ['a', 'b'], window: 'full' },
+                read: { truncated: true },
+            },
             { step: 4, kind: 'op', op: 'expand', undoneBy: 5, params: { ids: ['c'] } },
         ] as never;
         const out = degreeOutcomesFromLog(entries, set);
@@ -594,7 +605,10 @@ describe('investigate-number - walk-through 6 fixes', () => {
                 read: {
                     truncated: false,
                     fanOutCapped: 4,
-                    hubs: [{ id: 'h', degree: 900 }, { id: 'gone', degree: 800 }],
+                    hubs: [
+                        { id: 'h', degree: 900 },
+                        { id: 'gone', degree: 800 },
+                    ],
                     hubDegreeSource: 'index',
                 },
             },
@@ -612,13 +626,33 @@ describe('investigate-number - walk-through 6 fixes', () => {
         const set: WorkingSet = { entities: [at('s', 0, 1), at('x', 1, 2)], links: [], excluded: [], hash: '' };
         const entries = [
             { step: 1, kind: 'op', op: 'seed', undoneBy: null, params: { ids: ['s'] } },
-            { step: 2, kind: 'op', op: 'expand', undoneBy: null, params: { ids: ['s'] }, read: { truncated: false, hubsHeld: 2 } },
+            {
+                step: 2,
+                kind: 'op',
+                op: 'expand',
+                undoneBy: null,
+                params: { ids: ['s'] },
+                read: { truncated: false, hubsHeld: 2 },
+            },
         ] as never;
         const [o] = degreeOutcomesFromLog(entries, set);
         expect(o.hubsHeld).toBe(2);
         expect(degreeOutcomeMessage(o)).toBe(degreeOutcomeMessage({ ...o, hubsHeld: 2 }));
         expect(degreeOutcomeMessage(o)).toContain('2 high-connectivity numbers of the frontier not expanded from.');
-        const [none] = degreeOutcomesFromLog([{ step: 1, kind: 'seed' }, { step: 2, kind: 'op', op: 'expand', undoneBy: null, params: { ids: ['s'] }, read: { truncated: false } }] as never, set);
+        const [none] = degreeOutcomesFromLog(
+            [
+                { step: 1, kind: 'seed' },
+                {
+                    step: 2,
+                    kind: 'op',
+                    op: 'expand',
+                    undoneBy: null,
+                    params: { ids: ['s'] },
+                    read: { truncated: false },
+                },
+            ] as never,
+            set,
+        );
         expect(none.hubsHeld).toBeUndefined();
     });
 
@@ -627,11 +661,7 @@ describe('investigate-number - walk-through 6 fixes', () => {
         expect(isOneHop(set, ['s'])).toBe(true);
         expect(isOneHop(set, ['b'])).toBe(false);
         expect(isOneHop(set, undefined)).toBe(true);
-        const r = reconcileApprovals(
-            [],
-            [{ id: 'r9', status: 'pending', params: { ids: ['s'] } }] as never,
-            set,
-        );
+        const r = reconcileApprovals([], [{ id: 'r9', status: 'pending', params: { ids: ['s'] } }] as never, set);
         expect(degreeOutcomeMessage(r[0])).toMatch(/^Expand one hop from s: waiting for approval/);
         const approved: DegreeOutcome = { ...r[0], decision: 'approved', admitted: 3 };
         expect(degreeOutcomeMessage(approved)).toMatch(/^Expand one hop from s: approved \(request r9\)/);
@@ -676,7 +706,14 @@ describe('investigate-number - four-eyes clarity (LA-EXPAND-FOUREYES-CLARITY-1)'
     it('the waiting text from a held request carries its reasons', () => {
         const r = reconcileApprovals(
             [],
-            [{ id: 'r1', status: 'pending', params: { ids: ['s'] }, sensitivity: { exceeded: ['budget 500 > 100'] } }] as never,
+            [
+                {
+                    id: 'r1',
+                    status: 'pending',
+                    params: { ids: ['s'] },
+                    sensitivity: { exceeded: ['budget 500 > 100'] },
+                },
+            ] as never,
             ws(entity('s', 0)),
         );
         const text = degreeOutcomeMessage(r[0]);

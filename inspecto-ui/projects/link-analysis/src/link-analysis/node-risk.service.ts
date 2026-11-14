@@ -90,7 +90,8 @@ export class NodeRiskService {
                 out.truncated ||= r.truncated;
                 out.unresolved += r.unresolved.length + r.rawKeysRefused;
                 out.masked ||= r.masking.masked;
-                for (const c of r.masking.maskedColumns ?? []) if (!out.maskedColumns.includes(c)) out.maskedColumns.push(c);
+                for (const c of r.masking.maskedColumns ?? [])
+                    if (!out.maskedColumns.includes(c)) out.maskedColumns.push(c);
             }
         } catch (e) {
             out.error = apiErrorMessage(e, 'the reference rows could not be read');
