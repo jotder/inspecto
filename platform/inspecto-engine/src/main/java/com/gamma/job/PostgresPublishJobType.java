@@ -57,8 +57,9 @@ import java.util.regex.Pattern;
  *   <li><b>Identifiers</b> are {@link PostgresPublishSql#SAFE_ID}s and always quoted; a Dataset or column name
  *       that is not one refuses the run.</li>
  *   <li><b>Runs as its author.</b> A Dataset the Job's last editor could not view (its sharing envelope) is refused.</li>
- *   <li><b>Data egress — refused by default.</b> A column classified {@link EvidenceMasker#SENSITIVE}
- *       (MSISDN / IMSI / ACCOUNT / PII) is published only when {@code include_sensitive} names it as
+ *   <li><b>Data egress — refused by default.</b> A column classified with a class the Space masks
+ *       ({@link EvidenceMasker#maskedClasses}: MSISDN / IMSI / ACCOUNT / PII, or a masked Entity Type's class or id)
+ *       is published only when {@code include_sensitive} names it as
  *       {@code dataset.column} AND the author holds {@code canAdminister} now. Otherwise it is dropped when no
  *       allowlist names it, and the run refuses when one does.</li>
  *   <li><b>Egress policy</b>: the JDBC host passes {@link EgressPolicy} with this Space's allowlist — the same one
@@ -423,8 +424,9 @@ public final class PostgresPublishJobType implements JobTypeProvider {
                         + "canAdminister — refused");
         }
         inherited.remove(UNKNOWN_LINEAGE);
-        // same-name columns inherit the classification, strictest wins (ColumnClassification)
-        inherited.forEach((col, cl) -> classification.merge(col, cl, ColumnClassification::stricter));
+        // same-name columns inherit the classification, strictest wins (ColumnClassification) under the classes the Space masks
+        java.util.function.Predicate<String> masked = EvidenceMasker.maskedClasses(store.root().getParent());
+        inherited.forEach((col, cl) -> classification.merge(col, cl, (a, b) -> ColumnClassification.stricter(a, b, masked)));
         List<Col> out = new ArrayList<>();
         Set<String> seenAllow = new HashSet<>();
         try (Statement st = duck.createStatement(); ResultSet rs = st.executeQuery("DESCRIBE SELECT * FROM (" + relation + ") t")) {
@@ -434,7 +436,7 @@ public final class PostgresPublishJobType implements JobTypeProvider {
                 if (!allow.isEmpty() && listed) seenAllow.add(name);
                 if (!listed) continue;
                 String lc = name.toLowerCase(Locale.ROOT);
-                boolean sensitive = EvidenceMasker.SENSITIVE.contains(classification.getOrDefault(lc, ""));
+                boolean sensitive = masked.test(classification.get(lc));
                 if (sensitive) {
                     boolean named = wholeDataset || sensitiveListed.contains(datasetId + "." + name);
                     if (!named) {

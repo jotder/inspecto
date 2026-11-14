@@ -3,6 +3,7 @@ package com.gamma.la.api;
 import com.gamma.access.RowScope;
 import com.gamma.audit.Event;
 import com.gamma.audit.EventSink;
+import com.gamma.entitystore.EntityTypes;
 import com.gamma.entitystore.LaLimit;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.la.core.DatasetProvider;
@@ -186,7 +187,8 @@ public final class InvestigationEmbedRoutes implements RouteModule {
     }
 
     /**
-     * The strictest classification (strictest-wins, {@link ColumnClassification}) of the Investigation's bound source and target
+     * The strictest classification (strictest-wins, {@link ColumnClassification}, under the classes the Space masks:
+     * {@link EntityTypes#maskedClasses}, MASKING-TWO-VOCABULARIES-1) of the Investigation's bound source and target
      * columns - the Dataset registry's {@code columns[].classification} and the pipeline schema's lineage - or null when none is
      * classified. {@link DatasetProvider#UNKNOWN_LINEAGE} when the lineage cannot be traced (fail closed).
      */
@@ -194,8 +196,9 @@ public final class InvestigationEmbedRoutes implements RouteModule {
     static String classification(InvestigationRoutes.Inv inv) {
         DatasetProvider provider = DatasetProviders.require();
         Map<String, Object> ds = provider.dataset(inv.writeRoot(), inv.dataset()).orElse(Map.of());
-        Map<String, String> lineage = provider.schemaClassification(inv.writeRoot(), ds,
-                cls -> ColumnClassification.SENSITIVE.contains(ColumnClassification.normalise(cls)));
+        java.util.function.Predicate<String> masked =
+                EntityTypes.maskedClasses(LinkAnalysisSettings.forRoot(inv.writeRoot()).effectiveEntityTypes());
+        Map<String, String> lineage = provider.schemaClassification(inv.writeRoot(), ds, masked);
         if (lineage.containsKey(DatasetProvider.UNKNOWN_LINEAGE)) return DatasetProvider.UNKNOWN_LINEAGE;
         List<String> classes = new ArrayList<>();
         for (String bound : List.of("sourceCol", "targetCol")) {
@@ -208,7 +211,7 @@ public final class InvestigationEmbedRoutes implements RouteModule {
                     if (o instanceof Map<?, ?> c && lower.equalsIgnoreCase(String.valueOf(c.get("name"))) && c.get("classification") != null)
                         classes.add(String.valueOf(c.get("classification")));
         }
-        return ColumnClassification.strictest(classes, ColumnClassification.SENSITIVE::contains);
+        return ColumnClassification.strictest(classes, masked);
     }
 
     /** Best-effort audit (LA-04 pattern), structured attributes only. */

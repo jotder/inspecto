@@ -54,9 +54,10 @@ import static com.gamma.la.core.InvestigationEvaluator.strings;
  *             ({@code MSISDN} is {@code msisdn}); an {@code entityType} naming NO in-force type is masked (fail
  *             closed) — per entity;</li>
  *         <li>the bound Dataset's registry {@code columns[]} {@code classification} of the Investigation's
- *             {@code sourceCol} / {@code targetCol} — the in-force type whose {@code classifications[]} contains it
- *             (case-insensitive, trimmed); when that type is masked, EVERY entity id is masked, because an id does
- *             not record which column it was read from. A classification no type claims leaves the column untyped.
+ *             {@code sourceCol} / {@code targetCol} — when the Space masks that class ({@link EntityTypes#maskedClasses}:
+ *             MSISDN / IMSI / ACCOUNT / PII, or a masked in-force type's class or id, case-insensitive, trimmed;
+ *             MASKING-TWO-VOCABULARIES-1), EVERY entity id is masked, because an id does not record which column it was
+ *             read from. Any other classification leaves the column unmasked.
  *             The column's class ALSO comes from schema lineage (ASSURE-CLASSIFICATION-PROPAGATION-1, operator
  *             2026-10-04): the pipeline schema's {@code raw.fields[].classification} followed through its mapping
  *             to the bound column, by the platform's one resolver ({@code DatasetProvider.schemaClassification},
@@ -283,8 +284,9 @@ final class EntityMasking {
         }
     }
 
-    /** The Investigation's bound source/target columns whose registry {@code columns[]} {@code classification} is
-     *  claimed by a MASKED in-force Entity Type — column name → type id. A classification no type claims is untyped. */
+    /** The Investigation's bound source/target columns whose registry {@code columns[]} {@code classification} the Space
+     *  masks ({@link EntityTypes#maskedClasses}, MASKING-TWO-VOCABULARIES-1) — column name → the masked type's id, else the
+     *  class itself (a SENSITIVE class no masked type names, such as {@code PII}). */
     static Map<String, String> maskedColumns(InvestigationRoutes.Inv inv, List<EntityTypes.EntityType> types) {
         return maskedColumns(inv.writeRoot(), inv.dataset(), inv.header(), types);
     }
@@ -295,37 +297,32 @@ final class EntityMasking {
         DatasetProvider provider = DatasetProviders.require();
         Map<String, Object> ds = provider.dataset(writeRoot, dataset).orElse(Map.of());
         Map<String, String> out = new LinkedHashMap<>();
-        // The pipeline-schema lineage (the platform's one resolver; a class is "masked" when a masked type claims it,
-        // so several classes on one column resolve strictest-wins = masked if any input is masked).
-        Map<String, String> lineage = provider.schemaClassification(writeRoot, ds,
-                cls -> typeOf(types, cls).map(EntityTypes.EntityType::masked).orElse(false));
+        // The pipeline-schema lineage (the platform's one resolver; a class is "masked" when the Space masks it, so several
+        // classes on one column resolve strictest-wins = masked if any input is masked).
+        java.util.function.Predicate<String> masked = EntityTypes.maskedClasses(types);
+        Map<String, String> lineage = provider.schemaClassification(writeRoot, ds, masked);
         if (lineage.containsKey(DatasetProvider.UNKNOWN_LINEAGE))
             out.put("(untraceable lineage)", "unknown");   // fail closed: mask every entity id
         for (String bound : List.of("sourceCol", "targetCol")) {
             Object name = roles.get(bound);
             String cls = name == null ? null : lineage.get(String.valueOf(name).trim().toLowerCase(Locale.ROOT));
-            if (cls != null) typeOf(types, cls).filter(EntityTypes.EntityType::masked)
-                    .ifPresent(t -> out.put(String.valueOf(name), t.id()));
+            if (cls != null && masked.test(cls)) out.put(String.valueOf(name), maskedAs(types, cls));
         }
         if (!(ds.get("columns") instanceof List<?> cols)) return out;
         for (String bound : List.of("sourceCol", "targetCol")) {
             Object name = roles.get(bound);
             for (Object o : cols)
                 if (o instanceof Map<?, ?> c && name != null && String.valueOf(name).equalsIgnoreCase(String.valueOf(c.get("name")))
-                        && c.get("classification") != null) {
-                    String cls = String.valueOf(c.get("classification")).trim();
-                    types.stream().filter(t -> t.classifications().stream().anyMatch(x -> x.trim().equalsIgnoreCase(cls)))
-                            .findFirst().filter(EntityTypes.EntityType::masked)
-                            .ifPresent(t -> out.put(String.valueOf(name), t.id()));
-                }
+                        && c.get("classification") != null && masked.test(String.valueOf(c.get("classification"))))
+                    out.put(String.valueOf(name), maskedAs(types, String.valueOf(c.get("classification"))));
         }
         return out;
     }
 
-    /** The in-force Entity Type whose {@code classifications[]} claims {@code cls} (case-insensitive, trimmed). */
-    private static java.util.Optional<EntityTypes.EntityType> typeOf(List<EntityTypes.EntityType> types, String cls) {
-        String c = cls.trim();
-        return types.stream().filter(t -> t.classifications().stream().anyMatch(x -> x.trim().equalsIgnoreCase(c))).findFirst();
+    /** What a masked class is reported as: the id of the masked Entity Type that names it, else the class (upper-cased). */
+    private static String maskedAs(List<EntityTypes.EntityType> types, String cls) {
+        EntityTypes.EntityType t = EntityTypes.maskedTypeOf(types, cls);
+        return t != null ? t.id() : cls.trim().toUpperCase(Locale.ROOT);
     }
 
     static String token(byte[] key, String id) {

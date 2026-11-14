@@ -251,8 +251,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/inv/investigations/([^/]+)/drafts/([^/]+)/promote` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:86` |
 | POST | `/inv/investigations/([^/]+)/drafts/([^/]+)/rebase` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:84` |
 | POST | `/inv/investigations/([^/]+)/drafts/([^/]+)/undo` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:79` |
-| POST | `/inv/investigations/([^/]+)/embeds` | gated | `canShareInvestigation` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationEmbedRoutes.java:57` |
-| POST | `/inv/investigations/([^/]+)/embeds/([^/]+)/revoke` | gated | `canShareInvestigation` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationEmbedRoutes.java:59` |
+| POST | `/inv/investigations/([^/]+)/embeds` | gated | `canShareInvestigation` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationEmbedRoutes.java:58` |
+| POST | `/inv/investigations/([^/]+)/embeds/([^/]+)/revoke` | gated | `canShareInvestigation` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationEmbedRoutes.java:60` |
 | POST | `/inv/investigations/([^/]+)/expand/preview` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java:158` |
 | POST | `/inv/investigations/([^/]+)/handoff` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/IntegrationRoutes.java:66` |
 | POST | `/inv/investigations/([^/]+)/members` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationMemberRoutes.java:56` |

@@ -388,6 +388,36 @@ class ControlApiRiskScoreTest {
         }
     }
 
+    /**
+     * MASKING-TWO-VOCABULARIES-1: evidence classified WALLET (a class the masked default Entity Type {@code wallet} claims, not
+     * one of the four SENSITIVE classes) is masked at write time too, so neither an analyst nor a revealer reads it raw.
+     */
+    @Test
+    void evidenceClassedWithAMaskedEntityTypesClassIsMaskedAtWriteTime(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            ComponentStore store = new ComponentStore(c.config.resolve("registry"));
+            store.write("dataset", "topups", Map.of("physicalRef", "topups",
+                    "columns", List.of(Map.of("name", "msisdn"), Map.of("name", "topup_id", "classification", "WALLET"),
+                            Map.of("name", "status"))));
+            Map<String, Object> m = model(null);
+            store.write("risk-score", "subs", m);
+            RiskScoreModel model = RiskScoreModel.fromMap("subs", m);
+            var run = com.gamma.risk.RiskScoreEvaluator.evaluate(model, id -> com.gamma.query.DatasetRelation.relationSql(
+                    store.get("dataset", id).orElseThrow().content(), c.data, null),
+                    com.gamma.mask.EvidenceMasker.of(store, c.config, model.datasetIds()));
+            RiskScoreEvaluator.write(c.data, model, "v", "r1", Instant.now(), run.scored());
+
+            String token = com.gamma.mask.EvidenceMasker.forSpace(c.config).tokenFor("t1");
+            for (String who : List.of("analyst", "revealer")) {
+                HttpResponse<String> r = send(c.port, "GET", "/spaces/s1/risk-scores/subs/m1", null, who);
+                assertEquals(200, r.statusCode(), r.body());
+                assertEquals(token, V1Body.of(r.body()).get("factors").get(0).get("evidence").get(0).get("topup_id").asText(),
+                        who + ": the WALLET evidence is the Space token: " + r.body());
+                assertFalse(r.body().contains("\"t1\""), who + ": the WALLET evidence value was never stored: " + r.body());
+            }
+        }
+    }
+
     @Test
     void aBundleCannotPlantAModelWhoseEvidenceColumnTheSchemaLacks(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {

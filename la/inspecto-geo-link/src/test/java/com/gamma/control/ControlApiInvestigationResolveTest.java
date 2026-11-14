@@ -338,7 +338,15 @@ class ControlApiInvestigationResolveTest {
     @Test
     void typedMaskingIsPerMemberKey(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            typed(c, false);
+            // MASKING-TWO-VOCABULARIES-1: the four sensitive classes (MSISDN, IMSI, ACCOUNT, PII) mask whatever an Entity Type's
+            // `masked` says - only maskingMode none turns masking off - so the UNMASKED msisdn type claims a non-sensitive class here
+            new ComponentStore(root.resolve("registry")).write("dataset", "calls_ds", Map.of("view", "calls_view",
+                    "columns", List.of(Map.of("name", "caller", "classification", "PHONE"),
+                            Map.of("name", "callee", "classification", "PHONE"))));
+            data(send(c, "PUT", "/settings/link-analysis", "{\"maskingMode\":\"typed\",\"entityTypes\":["
+                    + "{\"id\":\"msisdn\",\"label\":\"MSISDN\",\"normaliser\":\"e164\",\"masked\":false,\"classifications\":[\"PHONE\"]},"
+                    + "{\"id\":\"imsi\",\"label\":\"IMSI\",\"normaliser\":\"digits\",\"masked\":true,\"classifications\":[\"IMSI\"]}]}",
+                    null), 200);
             base(c);
             JsonNode r = op(c, "case-a", RESOLVE);
             JsonNode groups = r.at("/resolution/groups");

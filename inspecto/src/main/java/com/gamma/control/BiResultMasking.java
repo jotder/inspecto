@@ -16,7 +16,6 @@ import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.sql.SqlGuard;
-import com.gamma.util.ColumnClassification;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -41,9 +40,10 @@ import java.util.regex.Pattern;
  * ({@code /bi/query}, {@code /queries/{id}/run}, {@code /datasets/{id}/rows}, the public share query).
  *
  * <p><b>Which columns</b> - the Space's {@code maskingMode} ({@link LinkAnalysisSettings}), the same setting Link Analysis
- * reads. {@code none}: nothing. {@code typed} (default): a column whose classification a MASKED in-force Entity Type
- * claims (own {@code columns[].classification}, the pipeline-schema lineage, sibling Datasets over the same store).
- * {@code all}: every column classified MSISDN / IMSI / ACCOUNT / PII. A calculated column whose expression names a masked
+ * reads. {@code none}: nothing. {@code typed} (default) and {@code all} alike: a column whose classification the Space masks
+ * ({@link EntityTypes#maskedClasses}: MSISDN / IMSI / ACCOUNT / PII, or a MASKED in-force Entity Type's class or id;
+ * MASKING-TWO-VOCABULARIES-1), from its own {@code columns[].classification}, the pipeline-schema lineage or sibling Datasets
+ * over the same store. A calculated column whose expression names a masked
  * column is masked too. <b>Fail closed:</b> when the lineage cannot be traced (a view or virtual Dataset over a classified
  * store, an unreadable pipeline) every column the Dataset does not declare as unclassified is masked.
  *
@@ -141,9 +141,8 @@ final class BiResultMasking {
         if ("none".equals(mode))
             return new BiResultMasking(writeRoot, mode, reveal, Set.of(), false, Set.of(), "masking is off for this Space (maskingMode none)", Set.of());
         List<EntityTypes.EntityType> types = LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes();
-        Predicate<String> claim = "all".equals(mode)
-                ? cls -> cls != null && ColumnClassification.SENSITIVE.contains(cls.trim().toUpperCase(Locale.ROOT))
-                : cls -> cls != null && typeOf(types, cls).map(EntityTypes.EntityType::masked).orElse(false);
+        // MASKING-TWO-VOCABULARIES-1: typed and all mask the same classes, the ones the Space masks at every other egress
+        Predicate<String> claim = EntityTypes.maskedClasses(types);
 
         Set<String> masked = new LinkedHashSet<>();
         boolean unknown = false;
@@ -155,7 +154,7 @@ final class BiResultMasking {
                     declared.add(name);
                     if (c.get("classification") != null && claim.test(String.valueOf(c.get("classification")))) masked.add(name);
                 }
-        // The lineage (sibling Datasets + pipeline schema through the mapping): SENSITIVE classes, then judged by the claim.
+        // The lineage (sibling Datasets + pipeline schema through the mapping): the classes the Space masks, judged by the claim.
         Map<String, String> lineage = EvidenceMasker.lineageClassification(datasetId, dataset, store, views);
         for (Map.Entry<String, String> e : lineage.entrySet()) {
             if (EvidenceMasker.UNKNOWN_LINEAGE.equals(e.getKey())) unknown = true;
@@ -939,12 +938,6 @@ final class BiResultMasking {
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────────────
-
-    /** The first in-force Entity Type whose {@code classifications[]} claims {@code cls} (Link Analysis' rule). */
-    private static java.util.Optional<EntityTypes.EntityType> typeOf(List<EntityTypes.EntityType> types, String cls) {
-        String c = cls.trim();
-        return types.stream().filter(t -> t.classifications().stream().anyMatch(x -> x.trim().equalsIgnoreCase(c))).findFirst();
-    }
 
     /**
      * True when {@code text} contains any of {@code columns} as a whole identifier, case-insensitively. A masked column whose

@@ -62,7 +62,8 @@ public final class AnomalyKindValidator implements ComponentKindValidator {
     }
 
     /**
-     * Design §10, fail closed at save: no {@code peers.by} column may be classified ({@link EvidenceMasker#SENSITIVE}),
+     * Design §10, fail closed at save: no {@code peers.by} column may be classified with a class the Space masks
+     * ({@link EvidenceMasker#maskedClasses}),
      * because the cohort value is stored raw in every score's explanation ({@code peerBaseline.cohort}) and quoted in
      * its {@code reason}. The classification is the one Risk Score evidence masking reads
      * ({@link EvidenceMasker#sensitiveColumns}): the Dataset's own {@code columns[].classification} plus its lineage.
@@ -80,8 +81,9 @@ public final class AnomalyKindValidator implements ComponentKindValidator {
                 .filter(c -> sensitive.contains(c.toLowerCase(Locale.ROOT))).toList();
         if (!classified.isEmpty())
             throw new IllegalArgumentException("anomaly-model peers.by column(s) " + classified + " of dataset '"
-                    + dataset + "' are classified " + new java.util.TreeSet<>(EvidenceMasker.SENSITIVE)
-                    + "; a cohort value is stored raw in every score, so a classified column cannot be a cohort");
+                    + dataset + "' are classified with a class this Space masks ("
+                    + String.join(", ", new java.util.TreeSet<>(EvidenceMasker.SENSITIVE)) + " or one a masked Entity Type names);"
+                    + " a cohort value is stored raw in every score, so a classified column cannot be a cohort");
     }
 
     @Override public void requireNotReserved(Path writeRoot, String type, String id, Map<String, Object> content) {

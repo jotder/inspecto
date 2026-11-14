@@ -21,9 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * ({@link ColumnClassification#SENSITIVE}, or the classes a masked Entity Type claims), so a personal identifier
  * classed that way is masked nowhere (the defect {@code TelcoFraudTemplateGoldenTest} already pins for the
  * telco-fraud feeds). Pins the identifier columns of the shipped {@code aml}, {@code mobile-money} and
- * {@code telco-fraud} schemas to a {@code SENSITIVE} class. {@code ACCOUNT} and {@code MSISDN} mask everywhere;
- * {@code PII} ({@code id_doc}) masks Risk Score evidence but not a BI result in the default {@code typed} mode
- * (CLASSIFICATION-UNMASKED-CLASS-1).
+ * {@code telco-fraud} schemas to a {@code SENSITIVE} class, which masks at every egress, a BI result in the default
+ * {@code typed} mode included ({@code PII}, {@code id_doc}, since MASKING-TWO-VOCABULARIES-1).
  */
 class TemplateIdentifierClassificationTest {
 

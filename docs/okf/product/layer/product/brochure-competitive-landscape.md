@@ -122,7 +122,7 @@ target hardware with a CI floor is still the single highest-value piece of evide
 
 ### 1.4 The extension surface — what "plugins for the rest" rests on
 
-**47**<!--count:spi-extension-points--> extension-point interfaces, derived by `tools/check-doc-counts.mjs`
+**48**<!--count:spi-extension-points--> extension-point interfaces, derived by `tools/check-doc-counts.mjs`
 from every `ServiceLoader.load(X.class)`, `OptionalSpi.all(X.class)` and `SpiSlot(X.class)` call site in
 `inspecto*/src/main` (re-counted 2026-09-14: the 2026-09-10 grep counted call sites of ONE loader and landed on
 the same number by coincidence — three security seams go through `SpiSlot`, and `TransformFunctionProvider`
@@ -207,7 +207,7 @@ Two lanes, and we should say so rather than apologise for the rest:
 | "the assistant and the autonomy ladder ship in NO edition" — §1.2, §4.2 | `PKG-5` staged the assist agent into Professional and Enterprise on 2026-09-12; only `inspecto-intelligence` and `inspecto-agent-hosted` still ship in none (corrected 2026-09-23) | re-read `tools/bundle-modules.mjs` after any packaging change |
 | "Link Analysis backend projection pending" — §3, §6 A8 | `/inv/projection*` routes ship in `inspecto-geo-link`; the evidential controls (`LA-19`) were built 2026-09-24 (corrected 2026-10-06) | — |
 | "the audit trail is in memory on every stock bundle" — §4.1 | `EVENTS-DURABLE-1` closed 2026-09-11: the Professional/Enterprise launchers set `-Devents.backend=parquet`; only Personal stays in memory (corrected 2026-09-23) | a P1 cited by ID goes stale the day it closes |
-| "19 SPIs; one dead seam to fix or remove" — §6 A5, and "one dead SPI" in §4.2 | `SPEC-DEADSEAM-1` was refuted 2026-09-15 (`ExpressionProvider` is live, §1.4) and the count is guard-derived (**47**<!--count:spi-extension-points-->); both lines survived the 2026-09-23 pass (corrected 2026-11-12) | a correction in one section must be searched for in every other |
+| "19 SPIs; one dead seam to fix or remove" — §6 A5, and "one dead SPI" in §4.2 | `SPEC-DEADSEAM-1` was refuted 2026-09-15 (`ExpressionProvider` is live, §1.4) and the count is guard-derived (**48**<!--count:spi-extension-points-->); both lines survived the 2026-09-23 pass (corrected 2026-11-12) | a correction in one section must be searched for in every other |
 
 ---
 
@@ -253,7 +253,7 @@ at once. This is structural, not a failing — Palantir loses it too.
 | Native ASN.1 CDR ingestion (Standard and up) | 154-file decoder subsystem, vendor corpora; `inspecto-telecom-asn1` in `offerings/standard.toon` |
 | Reconciliation with a Breaks lifecycle (Standard and up) | `inspecto-reconciliation` in `offerings/standard.toon`. *Corrected 2026-11-12: this said "in the free tier", true of the Personal edition until 2026-10-07, `MODULE-REORG-1` P7* |
 | Fault-tolerant DR and Kubernetes scale-out as a **signed design** | signed 2026-09-10; DR phase A built but never validated on an HA deployment, T5 **not built** — say so, and name no edition (§1.2). The audit trail is kept on disk (Parquet) in every edition, Basic included (`offerings/*.toon` `eventsBackend: parquet`; `EDITIONS.md`) |
-| **47**<!--count:spi-extension-points--> extension points; the ASN.1 vendor functions ship through one | §1.4; guard-derived |
+| **48**<!--count:spi-extension-points--> extension points; the ASN.1 vendor functions ship through one | §1.4; guard-derived |
 | Three edition bundles (Basic, Standard, Advanced) from one build | `offerings/*.toon`, derived by `tools/bundle-modules.mjs`; `LA-EDITIONS-1` (2026-10-17) |
 | An Expectation (data-quality) engine with a builder UI — six check kinds, not a GX-sized library | `baseline` added 2026-09-24 (`ad1c0d9b6`, `BaselineEvaluator`); `ING-6` closed 2026-07-07 (`REQUIREMENTS.md` §5); `ExpectationEvaluator`; `inspecto-ui/src/app/modules/admin/expectations/`. A breach raises a deduplicated Incident only where `inspecto-ops` ships (Standard and up). *Moved here from §4.2 on 2026-09-23 — its unlock condition, "the UI ships", was met on 2026-07-04* |
 | Explainable anomaly scoring, statistical baselines **or** an isolation forest, with a per-feature explanation (Anomaly Detection add-on, Standard and up) | `ANOMALY-ML-SCORING-1` closed 2026-10-20: `AnomalyForestScorer`, `AnomalyForestScorerTest`, the `aml` pack model on `method: isolation_forest` (`PackFraudAmlAnomalyPropertyTest`) |
@@ -308,7 +308,7 @@ counts; SSO as a feature (table stakes).
 | **A2** | May we quote a capacity number? | only §1.3's derivation, with its caveats | a number is needed on the first slide | **Blocked on A3** |
 | **A3** | Sustained benchmark + CI floor | ~a day's work; `PipelineBenchmark -Dbench.cols=100` replaces the extrapolation | this is the evidence behind every capacity claim | **Open — highest-value unbuilt evidence** |
 | **A4** | Publish pricing? | three edition bundles exist (Basic, Standard, Advanced) | Definite shows $250/mo; a buyer who cannot self-serve a price assumes enterprise sales | Open |
-| **A5** | The plugin/services line | **47**<!--count:spi-extension-points--> SPIs, no dead seam (§1.4); Apps ship as signed packages *(facts corrected 2026-11-12, §2.4)* | "we build the rest for you" is a revenue line — price it | Open |
+| **A5** | The plugin/services line | **48**<!--count:spi-extension-points--> SPIs, no dead seam (§1.4); Apps ship as signed packages *(facts corrected 2026-11-12, §2.4)* | "we build the rest for you" is a revenue line — price it | Open |
 | **A6** | The Expectation engine | engine + builder UI shipped (`ING-6`, closed 2026-07-07), six check kinds *(corrected 2026-11-12: `baseline` added 2026-09-24)*; absorb GX suites rather than rival them | DQ buyers test this first | Open — product decision |
 | **A7** | Retire the stale stakeholder docs | brief + capabilities dated 2026-07-07 under- and over-sell | a sponsor reading them today gets the wrong product | Open — refresh from `EDITIONS.md` |
 | **A8** | Link Analysis backend | projection shipped; the Investigation layer (op log, multi-hop traversal, dossier) landed 2026-09-23; evidential controls (`LA-19`) built 2026-09-24; serves two verticals | the i2-shaped differentiator is worth zero half-built | Open |

@@ -49,6 +49,9 @@ export const OPEN = {
     'platform/inspecto-engine/src/main/java/com/gamma/job/ReportRowMasking.java': {
         sites: 1, why: 'masking of exported rows: without the provider rows would leave unmasked; an entitlement never reveals more',
     },
+    'platform/inspecto-engine/src/main/java/com/gamma/mask/MaskedClasses.java': {
+        sites: 1, why: 'the classes a Space masks: without the provider evidence and publication would mask fewer columns; an entitlement never reveals more',
+    },
     'platform/inspecto-entity-store/src/main/java/com/gamma/entitystore/MaskingDefault.java': {
         sites: 1, why: 'the Link Analysis masking default: without the provider a sign-in install would lose its masking default',
     },

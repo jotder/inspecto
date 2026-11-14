@@ -128,7 +128,10 @@ public record MaskSpec(String mode, int keepLast, List<String> classifications, 
                         out.merge(String.valueOf(c.get("name")).trim().toLowerCase(Locale.ROOT), cl,
                                 (a, b) -> ColumnClassification.stricter(a, b, selected));
                 }
-        EvidenceMasker.lineageClassification(datasetId, ds, registry, new ViewStore(configRoot.resolve("views")))
+        // the author's list is drawn from SENSITIVE (problems), so the lineage keeps exactly those classes, as before
+        // MASKING-TWO-VOCABULARIES-1: a wider set would only add refusals for an untraceable class the author never chose
+        EvidenceMasker.lineageClassification(datasetId, ds, registry, new ViewStore(configRoot.resolve("views")),
+                        ColumnClassification.SENSITIVE::contains)
                 .forEach((col, cl) -> out.merge(col, cl, (a, b) -> ColumnClassification.stricter(a, b, selected)));
         return out;
     }

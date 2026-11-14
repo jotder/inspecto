@@ -56,7 +56,7 @@ import java.util.TreeSet;
  * <p><b>Values out</b> — the Space's {@code maskingMode}, the {@link ExplorationMasking} rule: {@code none} shows raw. Else
  * the key column is masked whenever the exploration rule masks {@code keyCol} or any asked key was an alias/pseudonym (the
  * caller is not entitled to the raw value it stands for), and every other column is masked when its registry or lineage
- * classification is claimed by a masked Entity Type or is one of {@link ColumnClassification#SENSITIVE}, and under
+ * classification is claimed by a masked Entity Type, is the id of one, or is one of {@link ColumnClassification#SENSITIVE}, and under
  * {@code all} every value is masked too except fractional numbers and booleans (indicator scores) — an integral column
  * may be an unclassified id; an alias resolves only when the exploration rule covers {@code keyCol}, so it cannot be
  * matched against an arbitrary column as a membership oracle; an untraceable
@@ -280,15 +280,10 @@ final class ReferenceRows {
         return List.copyOf(out);
     }
 
-    /** Columns of {@code cols} whose classification is claimed by a masked Entity Type or is SENSITIVE; untraceable lineage -> all. */
+    /** Columns of {@code cols} whose classification the Space masks ({@link EntityTypes#maskedClasses}); untraceable lineage -> all. */
     private static Set<String> classifiedColumns(Path writeRoot, String datasetId, List<String> cols) {
         List<EntityTypes.EntityType> types = LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes();
-        java.util.function.Predicate<String> masked = cls -> {
-            String c = ColumnClassification.normalise(cls);
-            if (c == null) return false;
-            if (ColumnClassification.SENSITIVE.contains(c)) return true;
-            return types.stream().anyMatch(t -> t.masked() && t.classifications().stream().anyMatch(x -> x.trim().equalsIgnoreCase(c)));
-        };
+        java.util.function.Predicate<String> masked = EntityTypes.maskedClasses(types);
         DatasetProvider provider = DatasetProviders.require();
         Map<String, Object> ds = provider.dataset(writeRoot, datasetId).orElse(Map.of());
         Set<String> out = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);

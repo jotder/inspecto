@@ -40,7 +40,8 @@ import java.util.regex.Pattern;
  *
  * <p><b>What it masks</b> - the same {@code masked:<16 hex>} token as {@code /db/query}, {@code /bi/query} and the audit
  * read ({@link EvidenceMasker#tokenFor}: the Space identity key): a map value whose key names a column the Space's
- * Datasets classify {@link EvidenceMasker#SENSITIVE}, or a fixed key-like name ({@code msisdn}, {@code imsi},
+ * Datasets classify with a class the Space masks ({@link EvidenceMasker#maskedClasses}), or a fixed key-like name
+ * ({@code msisdn}, {@code imsi},
  * {@code imei}, {@code entityKey}, {@code key.*}); and inside free text, a {@code msisdn=<value>}-style pair. Free prose
  * is otherwise left alone. Where a Dataset's lineage cannot be traced only the key-like names apply (a blanket fail
  * closed would mask every number a metrics tool returns).

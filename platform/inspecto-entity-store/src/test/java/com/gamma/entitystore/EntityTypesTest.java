@@ -46,6 +46,25 @@ class EntityTypesTest {
         assertThrows(IllegalArgumentException.class, () -> EntityTypes.normalise("lower", "x"));
     }
 
+    /**
+     * MASKING-TWO-VOCABULARIES-1: the one masking rule is the union of both vocabularies - a SENSITIVE class, a class a
+     * MASKED type claims, or a masked type's id - trimmed and in any case; an unmasked type's class or id masks nothing.
+     */
+    @Test
+    void maskedClassesIsSensitiveOrAMaskedTypesClassOrId() {
+        List<EntityType> types = List.of(new EntityType("customer", "Customer", "upper-trim", true, List.of("CUSTOMER_REF")),
+                new EntityType("branch", "Branch", "upper-trim", false, List.of("BRANCH_REF")));
+        var masked = EntityTypes.maskedClasses(types);
+        for (String cls : List.of("PII", "msisdn", "CUSTOMER_REF", " customer_ref ", "customer", "Customer"))
+            assertTrue(masked.test(cls), cls);
+        for (String cls : List.of("BRANCH_REF", "branch", "INTERNAL", "WALLET", " ", ""))
+            assertFalse(masked.test(cls), cls);
+        assertFalse(masked.test(null));
+        assertEquals("customer", EntityTypes.maskedTypeOf(types, "customer_ref").id());
+        assertNull(EntityTypes.maskedTypeOf(types, "PII"), "a SENSITIVE class names no type");
+        assertNull(EntityTypes.maskedTypeOf(types, "branch"), "an unmasked type is never the masked type");
+    }
+
     @Test
     void theDefaultsAreTheSeededNineThenTheNeutralStarterTypesAndValidate() {
         // ENTITY-TYPE-CATALOG-1 P3: the nine original ids first (data contracts), then the neutral types every domain shares

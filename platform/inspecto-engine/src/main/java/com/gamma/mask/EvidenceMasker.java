@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
 /**
  * WRITE-time masking of Risk Score evidence (ASSURE-RISK-SCORE-1, operator decision 2026-09-27). The
  * {@code risk.score} Job stores the token, never the raw value, for any evidence column whose Dataset registry
- * {@code columns[].classification} is one of {@link #SENSITIVE}. So no reader sees it raw: not the read route,
+ * {@code columns[].classification} is a class the Space masks ({@link #maskedClasses}). So no reader sees it raw: not the read route,
  * not an Alert or Incident, not a Widget, and not the DB browser over the scores Dataset.
  *
  * <p>The ENTITY KEY is deliberately NOT masked — it stays raw like every per-entity Alert and Incident key in the
@@ -43,10 +43,23 @@ import java.util.regex.Pattern;
  */
 public final class EvidenceMasker {
 
-    /** Column classifications whose evidence values are masked. */
+    /** The platform's sensitive classes; every Space masks them, and the classes its masked Entity Types name ({@link #maskedClasses}). */
     public static final Set<String> SENSITIVE = ColumnClassification.SENSITIVE;
     public static final String TOKEN_PREFIX = "masked:";
     public static final String KEY_FILE = ".risk-score-mask.key";
+
+    private static final java.util.Optional<MaskedClasses> MASKED_CLASSES = MaskedClasses.provider();
+
+    /**
+     * The classes the Space whose config root is {@code configRoot} masks (MASKING-TWO-VOCABULARIES-1): {@link #SENSITIVE}, a
+     * class a masked Entity Type claims, or the id of one ({@link MaskedClasses}); {@link #SENSITIVE} alone without a provider.
+     */
+    public static Predicate<String> maskedClasses(Path configRoot) {
+        return MASKED_CLASSES.map(p -> p.of(configRoot)).orElse(cls -> {
+            String c = ColumnClassification.normalise(cls);
+            return c != null && SENSITIVE.contains(c);
+        });
+    }
 
     private final Path configRoot;
     private final Map<String, Set<String>> sensitiveByDataset;
@@ -93,12 +106,13 @@ public final class EvidenceMasker {
     public static Set<String> sensitiveColumns(ComponentStore registry, ViewStore views, String datasetId) {
         Set<String> out = new LinkedHashSet<>();
         Map<String, Object> ds = registry.get("dataset", datasetId).map(ComponentRegistry.Component::content).orElse(Map.of());
+        Predicate<String> masked = maskedClasses(registry.root().getParent());
         if (ds.get("columns") instanceof List<?> cols)
             for (Object o : cols)
                 if (o instanceof Map<?, ?> c && c.get("name") != null && c.get("classification") != null
-                        && SENSITIVE.contains(String.valueOf(c.get("classification")).trim().toUpperCase(Locale.ROOT)))
+                        && masked.test(String.valueOf(c.get("classification"))))
                     out.add(String.valueOf(c.get("name")).trim().toLowerCase(Locale.ROOT));
-        Map<String, String> inherited = lineageClassification(datasetId, ds, registry, views);
+        Map<String, String> inherited = lineageClassification(datasetId, ds, registry, views, masked);
         out.addAll(inherited.keySet());
         if (!inherited.isEmpty() && (str(ds.get("view")) != null || str(ds.get("sql")) != null)) out.add(UNKNOWN_LINEAGE);
         return out;
@@ -109,11 +123,12 @@ public final class EvidenceMasker {
      * {@code physicalRef}, a virtual Dataset's {@code sourceName}, or a view's store and its {@code source_store}
      * lineage, plus what the pipeline schemas behind them classify ({@link #schemaClassification}); several classes
      * on one column resolve strictest-wins ({@link ColumnClassification}). The ONE lineage resolver shared by
-     * {@code publish.postgres}, its four-eyes fingerprint, and evidence masking.
+     * {@code publish.postgres}, its four-eyes fingerprint, and evidence masking. Keeps the classes the Space masks
+     * ({@link #maskedClasses} of the registry's config root).
      */
     public static Map<String, String> lineageClassification(String datasetId, Map<String, ?> ds, ComponentStore store,
                                                             ViewStore views) {
-        return lineageClassification(datasetId, ds, store, views, SENSITIVE::contains);
+        return lineageClassification(datasetId, ds, store, views, maskedClasses(store.root().getParent()));
     }
 
     /**

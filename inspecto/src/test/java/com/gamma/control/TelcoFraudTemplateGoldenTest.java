@@ -524,7 +524,7 @@ class TelcoFraudTemplateGoldenTest {
                 // key under its masked alias (never the number), every other key raw.
                 String viewerBody = call(base + "/bi/query", body, "viewer");
                 Map<String, Double> viewerBars = bars(viewerBody, x, agg + "_" + field);
-                boolean subscriberKey = SUBSCRIBER_KEYS.contains(x);
+                boolean subscriberKey = MASKED_KEYS.contains(x);
                 for (String offender : corpus.offenders.get(dataset)) {
                     String shown = subscriberKey ? masker.tokenFor(offender) : offender;
                     assertEquals(bars.get(offender), viewerBars.get(shown), id + ": the viewer's bar for " + offender + ": " + viewerBars);
@@ -541,9 +541,9 @@ class TelcoFraudTemplateGoldenTest {
         }
     }
 
-    /** The sink group keys classified MSISDN, masked for a non-revealer. ({@code id_doc} is classified PII, which no
-     *  telecom Entity Type claims, so the default {@code typed} masking mode leaves it raw.) */
-    private static final Set<String> SUBSCRIBER_KEYS = Set.of("msisdn", "caller");
+    /** The sink group keys masked for a non-revealer: classified MSISDN ({@code msisdn}, {@code caller}) or PII
+     *  ({@code id_doc}, masked in the default {@code typed} mode too since MASKING-TWO-VOCABULARIES-1). */
+    private static final Set<String> MASKED_KEYS = Set.of("msisdn", "caller", "id_doc");
 
     private static Map<String, Double> bars(String body, String x, String measure) throws Exception {
         Map<String, Double> bars = new TreeMap<>();

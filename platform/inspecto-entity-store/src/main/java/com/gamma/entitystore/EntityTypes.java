@@ -1,5 +1,7 @@
 package com.gamma.entitystore;
 
+import com.gamma.util.ColumnClassification;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -8,6 +10,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 /**
@@ -138,6 +141,33 @@ public final class EntityTypes {
     public static EntityType coreDefault(String id) {
         for (EntityType t : DEFAULTS) if (t.id().equals(id)) return t;
         return null;
+    }
+
+    /**
+     * The first MASKED type of {@code types} that claims {@code classification} or whose id it is (trimmed, any case), else
+     * {@code null}. A type id counts because the save gate and onboarding read a column classed with it as that type.
+     */
+    public static EntityType maskedTypeOf(List<EntityType> types, String classification) {
+        String c = ColumnClassification.normalise(classification);
+        if (c == null) return null;
+        for (EntityType t : types) {
+            if (!t.masked()) continue;
+            if (t.id().equalsIgnoreCase(c)) return t;
+            for (String x : t.classifications()) if (x.trim().equalsIgnoreCase(c)) return t;
+        }
+        return null;
+    }
+
+    /**
+     * Whether a Space with {@code types} masks a column classified as the tested class (MASKING-TWO-VOCABULARIES-1, operator
+     * decision 2026-11-14): fail closed over both vocabularies, so a class in {@link ColumnClassification#SENSITIVE} OR one
+     * {@link #maskedTypeOf} finds. The ONE rule every reader that masks or refuses by classification applies; trimmed, any case.
+     */
+    public static Predicate<String> maskedClasses(List<EntityType> types) {
+        return cls -> {
+            String c = ColumnClassification.normalise(cls);
+            return c != null && (ColumnClassification.SENSITIVE.contains(c) || maskedTypeOf(types, c) != null);
+        };
     }
 
     /** The JavaScript {@code \s} set as an explicit class (see the class note — never Java's {@code \s}). */

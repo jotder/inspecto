@@ -12,8 +12,8 @@ import java.util.function.Predicate;
  * the column takes the most restrictive class, so it is masked if ANY input is masked. Used by every consumer of
  * column lineage: {@code publish.postgres}, Risk Score evidence masking and Link Analysis entity masking.
  *
- * <p>The order: a class the consumer MASKS outranks one it does not (for publication and evidence that is
- * {@link #SENSITIVE}; for Link Analysis, a class a masked Entity Type claims). Ties break by {@link #RESTRICTIVENESS}
+ * <p>The order: a class the consumer MASKS outranks one it does not (every masking reader passes the Space's masked classes:
+ * {@link #SENSITIVE}, or a masked Entity Type's class or id; MASKING-TWO-VOCABULARIES-1). Ties break by {@link #RESTRICTIVENESS}
  * ({@code MSISDN > IMSI > ACCOUNT > PII}, the platform's sensitive classes, subscriber identifiers first), then by
  * name. Within {@link #SENSITIVE} the tie-break only chooses the class a refusal or response NAMES: all four mask
  * the same way.

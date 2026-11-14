@@ -267,23 +267,60 @@ class ControlApiBiQueryMaskingTest {
         }
     }
 
+    /**
+     * MASKING-TWO-VOCABULARIES-1: a PII column, which no Entity Type claims, is masked in the default {@code typed} mode as in
+     * {@code all} (it used to reach a viewer raw in {@code typed}); a revealer reads it raw, and {@code none} opts BI out.
+     */
     @Test
-    void typedModeLeavesAnUnclaimedPiiColumnRawAndModeAllMasksIt(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void typedModeMasksAPiiColumnAsAllDoesAndNoneLeavesItRaw(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             seed(c, Map.of());
             String byEmail = "\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"email\"]";
-            JsonNode typed = V1Body.of(bi(c, "viewer", "calls_ds", byEmail).body());
-            assertTrue(column(typed.get("rows"), "email").contains("a@x.io"),
-                    "typed (default): PII is not claimed by a masked Entity Type, so it stays as Link Analysis leaves it");
+            HttpResponse<String> typed = bi(c, "viewer", "calls_ds", byEmail);
+            assertEquals(200, typed.statusCode(), typed.body());
+            assertFalse(typed.body().contains("a@x.io"), "typed (default) masks PII: " + typed.body());
+            assertTrue(column(V1Body.of(typed.body()).get("rows"), "email").stream().allMatch(s -> s.startsWith("masked:")));
+            assertEquals("typed", V1Body.of(typed.body()).get("masking").get("mode").asText());
+            JsonNode revealed = V1Body.of(bi(c, "revealer", "calls_ds", byEmail).body());
+            assertTrue(column(revealed.get("rows"), "email").contains("a@x.io"), "a revealer reads PII raw: " + revealed);
             writeMode(c, "all");
             HttpResponse<String> all = bi(c, "viewer", "calls_ds", byEmail);
             assertFalse(all.body().contains("a@x.io"), all.body());
             assertTrue(column(V1Body.of(all.body()).get("rows"), "email").stream().allMatch(s -> s.startsWith("masked:")));
             assertEquals("all", V1Body.of(all.body()).get("masking").get("mode").asText());
             writeMode(c, "none");
-            JsonNode none = V1Body.of(bi(c, "viewer", "calls_ds", BY_MSISDN).body());
+            JsonNode none = V1Body.of(bi(c, "viewer", "calls_ds", byEmail).body());
             assertFalse(none.has("masking"), "maskingMode none opts BI out");
-            assertEquals(Set.of(A, B, C), Set.copyOf(column(none.get("rows"), "msisdn")));
+            assertTrue(column(none.get("rows"), "email").contains("a@x.io"), "none leaves PII raw: " + none);
+            JsonNode noneKey = V1Body.of(bi(c, "viewer", "calls_ds", BY_MSISDN).body());
+            assertEquals(Set.of(A, B, C), Set.copyOf(column(noneKey.get("rows"), "msisdn")));
+        }
+    }
+
+    /**
+     * MASKING-TWO-VOCABULARIES-1: the save gate accepts an Entity Type's id as a class (onboarding reads a column by it), so a
+     * column classed with the id of a MASKED type is masked in {@code typed} mode though no type claims that word; the id of an
+     * unmasked type stays raw, and a revealer reads both raw.
+     */
+    @Test
+    void aColumnClassedWithAMaskedTypesIdIsMaskedInTypedMode(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            Files.writeString(c.root.resolve("link-analysis.toon"), "masking_mode: typed\nentity_types[2]:\n"
+                    + "  - id: customer\n    label: Customer\n    normaliser: upper-trim\n    masked: true\n    classifications[1]: CUSTOMER_REF\n"
+                    + "  - id: branch\n    label: Branch\n    normaliser: upper-trim\n    masked: false\n    classifications[1]: BRANCH_REF\n");
+            new ViewStore(c.root.resolve("views")).write(new ViewDefinition("cust_view", "flow-x", List.of(),
+                    "SELECT * FROM (VALUES ('C-1001','B-7'),('C-1002','B-7')) AS t(cust,branch)", "2026-07-08T00:00:00Z"));
+            new ComponentStore(c.root.resolve("registry")).write("dataset", "cust_ds", Map.of("view", "cust_view", "columns", List.of(
+                    Map.of("name", "cust", "classification", "customer"), Map.of("name", "branch", "classification", "branch"))));
+            String byBoth = "\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"cust\",\"branch\"]";
+            HttpResponse<String> viewer = bi(c, "viewer", "cust_ds", byBoth);
+            assertEquals(200, viewer.statusCode(), viewer.body());
+            assertFalse(viewer.body().contains("C-1001"), "the masked type's id masks: " + viewer.body());
+            JsonNode v = V1Body.of(viewer.body());
+            assertTrue(column(v.get("rows"), "cust").stream().allMatch(s -> s.startsWith("masked:")), v.toString());
+            assertEquals(List.of("B-7", "B-7"), column(v.get("rows"), "branch"), "an unmasked type's id stays raw");
+            JsonNode r = V1Body.of(bi(c, "revealer", "cust_ds", byBoth).body());
+            assertEquals(Set.of("C-1001", "C-1002"), Set.copyOf(column(r.get("rows"), "cust")), "a revealer reads it raw");
         }
     }
 

@@ -91,6 +91,15 @@ class EntityMaskingTest {
         assertTrue(String.valueOf(m.describe().get("basis")).contains("caller"), m.describe().toString());
     }
 
+    /** MASKING-TWO-VOCABULARIES-1: PII, which no Entity Type claims, masks a bound column as it does at every other egress. */
+    @Test
+    void aBoundColumnClassedPiiMasksEveryId(@TempDir Path root) throws Exception {
+        callsPipeline(root, "PII", "");
+        EntityMasking m = EntityMasking.of(inv(root), EXPAND_ONLY, List.of());
+        assertEquals(2, m.describe().get("masked"), m.describe().toString());
+        assertTrue(String.valueOf(m.describe().get("basis")).contains("caller"), m.describe().toString());
+    }
+
     @Test
     void anUnclassifiedPipelineColumnLeavesExpandedIdsRaw(@TempDir Path root) throws Exception {
         callsPipeline(root, "", "");

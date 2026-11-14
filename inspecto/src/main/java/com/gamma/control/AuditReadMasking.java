@@ -27,7 +27,7 @@ import java.util.function.UnaryOperator;
  * <p>An {@code AUDIT} / {@code ACCESS_DENIED} row served to a caller WITHOUT {@link #UNMASK_CAPABILITY} has every
  * classified value replaced by the Space's {@code masked:<16 hex>} token ({@link EvidenceMasker#tokenFor}, the same
  * key and token as Risk Score evidence). A value is classified when its attribute or payload key names a column
- * the Space's Dataset registry classifies {@link EvidenceMasker#SENSITIVE} — the one resolver
+ * the Space's Dataset registry classifies with a class the Space masks ({@link EvidenceMasker#maskedClasses}) — the one resolver
  * ({@link EvidenceMasker#sensitiveColumns}: registry {@code columns[].classification} plus schema lineage). A masked
  * value is also replaced where it stands in the row's {@code message}. Fail closed: when any Dataset's lineage
  * cannot be traced, every attribute outside the platform's own {@link AuditAttrs} keys, and every payload value,
