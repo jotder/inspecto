@@ -124,6 +124,19 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                                 config\\demo-users.toon) into the bundle's spaces\\ folder and restart.
                             </inspecto-alert>
                         }
+                        @if (noUsers()) {
+                            <!-- DEMO-AUTH-NO-ROSTER-1: Spaces are attached, none lists a Demo User; the file is re-read, so no restart. -->
+                            <inspecto-alert
+                                class="mt-4 block text-left"
+                                variant="info"
+                                title="No Demo Users"
+                                data-testid="no-demo-users"
+                            >
+                                No Demo Users are configured in this installation: no attached Space has
+                                config\\demo-users.toon. Add one to a Space, then try again (no restart needed).
+                                <button mat-button type="button" (click)="reload()">Try again</button>
+                            </inspecto-alert>
+                        }
                         <ul class="mt-4 flex flex-col gap-2 text-left" aria-label="Users">
                             @for (u of demoUsers(); track u.id) {
                                 <li>
@@ -195,9 +208,14 @@ export class SignInComponent implements OnInit {
     /** DEMO-AUTH-1: a demo build's Demo Users — non-empty replaces the SSO button with a picker. */
     readonly demoUsers = computed(() => this.session.demoUsers());
     /** R2-17: demo sign-in is on — the page must not claim security or SSO, nor pitch builder copy. */
-    readonly demo = computed(() => this.demoUsers().length > 0 || this.session.demoNoSpace());
+    readonly demo = computed(
+        () => this.demoUsers().length > 0 || this.session.demoNoSpace() || this.session.demoNoUsers(),
+    );
     /** A demo build started with zero Spaces: no Demo Users exist, so say how to get some. */
     readonly noSpace = computed(() => this.session.demoNoSpace() && this.demoUsers().length === 0);
+    /** DEMO-AUTH-NO-ROSTER-1: Spaces attached, none carries a roster — without this the page fell back to the SSO
+     *  button, whose mock code no demo server accepts ("Sign-in failed"). */
+    readonly noUsers = computed(() => this.session.demoNoUsers() && this.demoUsers().length === 0);
     /** LIVEFIX2 #3: the server's own message when `GET /bootstrap` answered an error. */
     readonly startupError = computed(() => this.session.bootstrapError());
 

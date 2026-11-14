@@ -28,7 +28,7 @@ Package `com.gamma.demoauth`, registered in
 * `exchangeCode(code, …)`: accepts only `code = "demo:<id>"` for a known Demo User; PKCE verifier and redirect
   are ignored. Returns an access and a refresh token.
 * `refresh`: a valid `r` token for a still-known user mints a fresh pair. `revoke` is the interface default (no-op).
-* `bootstrapAuth`: `{mock: true, demoUsers: [{id, displayName, title, landing?}], spacesAttached}` — never roles
+* `bootstrapAuth`: `{mock: true, demoUsers: [{id, displayName, title, landing?}], spacesAttached}` — `spacesAttached` counts folders under `spaces.root` that hold `config/` and whose names do not start with `_` or `.` (`DEMO-AUTH-NO-ROSTER-1`, 2026-11-14); never roles
   or capabilities, since it is served before sign-in.
 * Known users: every Space under `-Dspaces.root`, or the single `-Dassist.write.root` in legacy mode.
 

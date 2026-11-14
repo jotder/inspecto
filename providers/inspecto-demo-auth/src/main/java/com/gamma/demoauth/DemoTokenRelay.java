@@ -42,6 +42,34 @@ public final class DemoTokenRelay implements TokenRelay {
         }
     }
 
+    /**
+     * DEMO-AUTH-NO-ROSTER-1: the startup block for a demo that nobody can sign into, or {@code null} when some Demo User
+     * exists (or a roster conflict, already logged, is the reason). The server keeps serving: the sign-in page says
+     * the same, and a roster added to an attached Space is read on the next call.
+     */
+    static String noDemoUsersWarning() {
+        try {
+            if (!known().isEmpty()) return null;
+        } catch (com.gamma.spi.auth.ApiException conflict) {
+            return null;
+        }
+        String spaces = System.getProperty("spaces.root"), wr = System.getProperty("assist.write.root");
+        String why = spaces == null || spaces.isBlank()
+                ? wr == null || wr.isBlank()
+                        ? "Neither -Dspaces.root nor -Dassist.write.root is set, so there is no roster to read. Start with serve-demo."
+                        : "No Demo User is defined in " + wr.trim() + "/demo-users.toon. Add one there; it is read on every"
+                                + " sign-in, no restart is needed."
+                : DemoUsers.spacesAttached() == 0
+                ? "No Space is attached under " + spaces.trim() + " (_templates holds templates, not Spaces). Copy a Space"
+                        + " folder carrying config/demo-users.toon into it, then restart."
+                : "No attached Space carries config/demo-users.toon under " + spaces.trim() + ". Add one to a Space,"
+                        + " e.g.\n  users[1]{id,displayName,title,roles,landing}:\n    analyst,Demo Analyst,Analyst,operations,\n"
+                        + "It is read on every sign-in: no restart is needed.";
+        return "\n==================== DEMO SIGN-IN HAS NO USERS ====================\n" + why
+                + "\nUntil then nobody can sign in. The server is still running.\n"
+                + "=================================================================";
+    }
+
     @Override
     public Optional<Tokens> exchangeCode(String code, String codeVerifier, String redirectUri) {
         if (code == null || !code.startsWith(CODE_PREFIX)) return Optional.empty();

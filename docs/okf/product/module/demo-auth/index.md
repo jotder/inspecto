@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `DEMO-AUTH-NO-ROSTER-1` | P2 | defect | a demo build with no Space carrying a roster cannot be signed into, and does not say so. | — |
+| `DEMO-AUTH-STALE-ROSTER-1` | P2 | defect | a roster in a folder that is not a Space can still sign a user in (filed 2026-11-14, found while fixing DEMO-AUTH-NO-ROSTER-1; not reprod… | — |

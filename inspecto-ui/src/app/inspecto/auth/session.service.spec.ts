@@ -468,6 +468,33 @@ describe('SessionService (W6d edition switch)', () => {
         httpMock.expectOne(`${base}/auth/refresh`).flush({ error: 'no session' }, { status: 401, statusText: 'x' });
         await done;
         expect(svc.demoNoSpace()).toBe(true);
+        expect(svc.demoNoUsers(), 'no Space is its own message').toBe(false);
+    });
+
+    // DEMO-AUTH-NO-ROSTER-1: Spaces attached, none lists a Demo User.
+    it('flags a demo with Spaces attached and no Demo User', async () => {
+        const done = svc.init();
+        httpMock.expectOne(`${base}/bootstrap`).flush({
+            features: { authMode: 'demo' },
+            auth: { mock: true, demoUsers: [], spacesAttached: 1 },
+        });
+        await tick();
+        httpMock.expectOne(`${base}/auth/refresh`).flush({ error: 'no session' }, { status: 401, statusText: 'x' });
+        await done;
+        expect(svc.demoNoUsers()).toBe(true);
+        expect(svc.demoNoSpace()).toBe(false);
+    });
+
+    it('does not flag a demo whose Spaces list Demo Users', async () => {
+        const done = svc.init();
+        httpMock.expectOne(`${base}/bootstrap`).flush({
+            features: { authMode: 'demo' },
+            auth: { mock: true, demoUsers: [{ id: 'a', displayName: 'A', title: 'T' }], spacesAttached: 1 },
+        });
+        await tick();
+        httpMock.expectOne(`${base}/auth/refresh`).flush({ error: 'no session' }, { status: 401, statusText: 'x' });
+        await done;
+        expect(svc.demoNoUsers()).toBe(false);
     });
 
     // DEMO-AUTH-1: a demo build reports authMode 'demo' and a Demo User list; it signs in through the same backend

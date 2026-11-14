@@ -107,14 +107,19 @@ final class DemoUsers {
         return v == null ? d : v;
     }
 
-    /** How many Spaces are attached (directories under {@code -Dspaces.root}; 1 for a legacy write root, else 0). */
+    /**
+     * How many Spaces are attached (folders under {@code -Dspaces.root} that hold {@code config/} and are not hidden
+     * {@code .} or reserved {@code _}, as {@code SpaceManager.notASpaceReason} rules; 1 for a legacy write root, else
+     * 0). DEMO-AUTH-NO-ROSTER-1: counting {@code _templates} made a bundle with no Space say it had one.
+     */
     static int spacesAttached() {
         String spaces = System.getProperty("spaces.root");
         if (spaces != null && !spaces.isBlank()) {
             Path root = Path.of(spaces.trim());
             if (!Files.isDirectory(root)) return 0;
             try (var dirs = Files.list(root)) {
-                return (int) dirs.filter(Files::isDirectory).count();
+                return (int) dirs.filter(d -> !d.getFileName().toString().startsWith("_")
+                        && !d.getFileName().toString().startsWith(".") && Files.isDirectory(d.resolve("config"))).count();
             } catch (java.io.IOException e) {
                 return 0;
             }
