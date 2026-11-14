@@ -1,6 +1,6 @@
 # DuckDB loop queries — C3 temporal scan in DuckDB, C1 `USING KEY` traversal (plan, 2026-11-14)
 
-> 🟡 **IN PROGRESS.** Board row `DUCKDB-2-LOOP-QUERIES-1`. Candidates and their gates come from
+> 🟢 **DONE 2026-11-14** - C3 shipped, C1 measured and refused (§3). Board row `DUCKDB-2-LOOP-QUERIES-1`. Candidates and their gates come from
 > [`duckdb-2-plan.md`](../archived-documents/plans-archive/duckdb-2-plan.md) §7. The operator chose **C3, then C1**
 > on 2026-11-14; C2, C4, C5 and C8 stay on the row.
 
@@ -62,11 +62,37 @@ timeout, since one partition gets no parallelism. The cut now asks `lead(ts, min
 detector's own condition exactly and an offset window, not a frame; that test now answers in about 8 s of test time and
 the parity test still holds. The burst rows above were not re-measured with the new form.
 
-## 3. C1 — `USING KEY` traversal behind `SqlGraphEngine`
+## 3. C1 — `USING KEY` traversal behind `SqlGraphEngine`: measured, NO-GO
 
-Not started. Gate as in §7 of the DuckDB 2 plan: `InvTraversalBench` G-R4 vs `IndexedTraversal` / `SqlGraphEngine`,
-parity against `graph-paths-parity.fixture.json`, the `SqlGuard` allow-list for the `USING KEY` node, the visited-node
-cap and 5 s timeout in place of the 2-hop / 20-key caps. Scale per D-LQ2.
+**Bench (2026-11-14, `UsingKeyTraversalBench`, opt-in).** A real link index built at 10^6 and 10^7 edges (the D-S5 skew of
+`IndexScaleBench`), 15 random start nodes, undirected k-hop reachability two ways: **levels** - one `IndexReader.edges`
+round trip per level, an equality statement per frontier key on its bucket, which is what `IndexedTraversal` and
+`SqlGraphEngine` do today (run here without the 20-key cap; a level wider than 2 000 keys, or a statement past the index
+sandbox's timeout, counts as not answered) - and **using-key**, one `WITH RECURSIVE ... USING KEY (node)` statement over the
+index's `out` copy in both directions, visited nodes read through `recurring`. Reached node sets were equal in every sample
+both answered (0 mismatches at every size and depth).
+
+| Edges | Depth | Levels (answered) | Using key | Nodes reached (avg) |
+|---|---|---|---|---|
+| 10^6 | 2 | p50 133 ms, p95 367 ms (15 of 15) | p50 737 ms, p95 952 ms | 337 |
+| 10^6 | 3 | p50 5.2 s, p95 27.8 s (14 of 15) | p50 1.0 s, p95 1.2 s | 28 640 |
+| 10^6 | 5 | none of 15 | p50 1.6 s, p95 3.2 s | 197 623 |
+| 10^7 | 2 | p50 172 ms, p95 761 ms (15 of 15) | p50 7.0 s, p95 10.1 s | 7 783 |
+| 10^7 | 3 | 9 of 15 | p50 9.1 s, p95 26.2 s | 195 257 |
+| 10^7 | 5 | 7 of 15 | p50 14.4 s, p95 17.6 s | 631 570 |
+
+**Reading.** A recursive CTE cannot use the index's bucket layout: every iteration joins against the whole `out` copy, so
+its cost grows with the graph, roughly 10x from 10^6 to 10^7 at every depth. The level read touches only the keys' own
+buckets and barely moves with size. At depth 2 - the walk the index serves - `USING KEY` is 5x slower at 10^6 and 40x
+slower at 10^7. It does answer depths 3 and 5, which the level read cannot, but at 1 to 14 s and over hundreds of
+thousands of nodes; G-R4 (5 hops over 10^6 edges under 350 ms) is missed by 5x.
+
+**D-LQ6 (assistant, under D-LQ2): C1 is NOT adopted.** The gate was "adopt only if it beats `IndexedTraversal` at 10^8";
+it already loses 40x at 10^7 and the gap widens with size, so the 10^8 run is not needed. `SqlGraphEngine` and
+`IndexedTraversal` stay as they are, with their 2-hop / 20-key caps. Nothing was built besides the bench. Revisit only if
+a DuckDB release can prune a recursive join by the key's bucket (or a native graph syntax, §7 C9, ships), and re-run this
+bench first. Not checked: shortest path and the temporal walk forms of the candidate (reachability alone already decides
+it), and the `SqlGuard` question is moot.
 
 ## 4. Status
 
@@ -74,7 +100,7 @@ cap and 5 s timeout in place of the 2-hop / 20-key caps. Scale per D-LQ2.
 |---|---|
 | C3 statement + parity test | **built 2026-11-14**: `TemporalCut` (la-core) behind both the flat read and `IndexReader.scanTemporalCut`; `TemporalCutParityTest` (192 combinations, findings / `skippedNoTime` / `rowCapped` equal to the haul-everything read); the temporal route tests green (flat, index-served, Investigation op) |
 | C3 10^7 bench, new cap default | **done 2026-11-14**: default `pattern.temporal_max_rows` 400 000 → 2 000 000 (§2a) |
-| C1 engine, parity, bench | — |
+| C1 engine, parity, bench | **measured 2026-11-14, NO-GO** (§3, D-LQ6); only the bench was built |
 
 ## References
 

@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `DUCKDB-2-LOOP-QUERIES-1` | P3 | feature | the looping / graph-style query candidates now that 2.0.0.0 is pinned: C1 / C2 USING KEY recursion behind SqlGraphEngine (Analytics C7, o… | — |
+| `DUCKDB-2-LOOP-QUERIES-1` | P3 | feature | the looping / graph-style query candidates still open now that 2.0.0.0 is pinned: C2 components by USING KEY label propagation, C4 branch… | — |
