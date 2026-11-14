@@ -47,5 +47,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
 | `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` | P3 | defect | a multi-file Consignment re-planned after a failover can write a second, differently named output, even on a shared output tree. | operator |
 | — | P2 | feature | Postgres multi-user | operator |
+| `MASKING-TYPE-ID-EDGES-1` | P3 | defect | two small edges of the one masking rule (filed 2026-11-15 by the review of MASKING-UNION-RESIDUALS-1). | — |
 | `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` | P3 | chore | report DuckDB 2.0.0's window_self_join hive-pruning defect upstream, then drop the workaround when it is fixed. | external |
 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | NARROWED 2026-11-01 (twice): the ingest lane WRITES an allow-listed s3:// dirs.database and REGISTERS that output in DuckLake; what is le… | — |
