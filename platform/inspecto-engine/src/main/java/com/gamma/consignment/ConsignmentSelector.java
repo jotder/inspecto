@@ -1,6 +1,7 @@
 package com.gamma.consignment;
 
 import com.gamma.api.PublicApi;
+import com.gamma.job.SnapshotSwapLock;
 import com.gamma.sql.SqlViews;
 import com.gamma.util.SqlIdent;
 import org.slf4j.Logger;
@@ -92,8 +93,21 @@ public final class ConsignmentSelector {
      * mapped back through the output registry, not "every Consignment under the store".
      */
     public static Resolution resolveWithFiles(Connection conn, String format, String glob, boolean hive) {
-        List<String> kept = select(conn, glob);
-        return new Resolution(kept == null ? SqlViews.reader(format, glob, hive) : SqlViews.reader(format, kept, hive), kept);
+        // Enumerated under the store's swap lock: a pin never sees a snapshot half hidden (SnapshotSwapLock).
+        try (SnapshotSwapLock.Held pinning = SnapshotSwapLock.pin(globRoot(glob))) {
+            List<String> kept = select(conn, glob);
+            return new Resolution(kept == null ? SqlViews.reader(format, glob, hive) : SqlViews.reader(format, kept, hive), kept);
+        }
+    }
+
+    /** The directory {@code glob} enumerates: everything before its first wildcard segment ({@code null} when none). */
+    static String globRoot(String glob) {
+        String g = glob.replace("\\", "/");
+        int cut = g.length();
+        for (int i = 0; i < g.length(); i++)
+            if ("*?[{".indexOf(g.charAt(i)) >= 0) { cut = i; break; }
+        int slash = g.lastIndexOf('/', cut - 1);
+        return slash <= 0 ? null : g.substring(0, slash);
     }
 
     /**
@@ -108,8 +122,10 @@ public final class ConsignmentSelector {
      */
     public static String sourceLiteral(String root, String ext) {
         String glob = root.replace("\\", "/") + "/**/*." + ext;
-        List<String> kept = select(root, ext);
-        return kept == null ? "'" + glob + "'" : SqlViews.pathList(kept);
+        try (SnapshotSwapLock.Held pinning = SnapshotSwapLock.pin(root)) {   // see resolveWithFiles
+            List<String> kept = select(root, ext);
+            return kept == null ? "'" + glob + "'" : SqlViews.pathList(kept);
+        }
     }
 
     /**

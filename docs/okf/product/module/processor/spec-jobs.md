@@ -313,9 +313,24 @@ them until its `CREATE TABLE … AS` has finished, and releases it before its ow
 store it writes never waits on itself). Every swap holds the write lock only around hide and reveal. Read locks
 are taken in path order, and a writer holds no other SnapshotSwapLock while it waits (`IncrementalSink` waits holding its own
 sink monitor and file lock, which no reader takes), so there is no deadlock.
-Limits: only `sql.template` sources take the read lock today (`SNAPSHOT-SWAP-UNLOCKED-READERS-1`); a publish
-waits for the slowest locked reader of its store, and an interrupt does not stop a running DuckDB statement,
-so the wait is bounded only by the writer's deadline (24 h by default), and the fair lock queues new readers behind it; one JVM only. Hidden files
+**Every reader and writer, since 2026-11-15** (`SNAPSHOT-SWAP-UNLOCKED-READERS-1`). Three ways to take the lock:
+- **Pin:** `ConsignmentSelector` lists and pins a store's files under the read lock, waiting only while a swap is
+  under way (a pin overtakes a writer that is merely queued, so pins cannot deadlock).
+- **Interactive readers** (BI, Alert Rule measures, Link Analysis, the DB browser — everything that runs through
+  `QueryExecutor`): pin under the lock, then scan **unlocked**; if the scan fails because a pinned file is gone,
+  re-render the relation (`DatasetRelation` registers how) and run it once more inside `SnapshotSwapLock.hold()`.
+  Measured on a 40M-row store with a 19.7 s query: holding the lock through the scan made a publish wait 18.5-21.2 s
+  and queued a 1 s-later COUNT behind it for ~20 s; not holding it, a publish took 10-26 ms.
+- **Job readers** (`sql.template`, `materialize`, a Pipeline's `source_store`, `expectation.evaluate`): hold
+  the store from the pin until the scan ends; a publish waits for them.
+Every writer that hides, replaces or deletes a live `*.parquet` holds the write lock: the snapshot swaps,
+`ReferenceCompactor`, `PartitionCompactor`, `DatasetPeriod` replace and restore, `IncrementalSink` prune and
+rollback, `ScoreOutputWriter` prune; `ScoreOutputWriter` also sweeps a crashed run's `.tmp` / `.stale`. A swap
+refuses a thread that already holds a read lock on the same store instead of waiting forever. `<store>/database`
+keys as `<store>`.
+Limits: a publish waits for the slowest Job reader of its store (bounded by the writer's deadline, 24 h by default);
+one JVM only; readers that run a relation on their own connection, and glob reads with the registry off, are not
+covered (`SNAPSHOT-SWAP-READER-RESIDUALS-1`). Hidden files
 never match the readers' `**/*.parquet` glob and are not counted as storage.
 
 ## The parameter contract & runtime Expressions (shipped 2026-08-07/10)

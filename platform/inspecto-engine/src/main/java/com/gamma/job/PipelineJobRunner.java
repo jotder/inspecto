@@ -112,6 +112,10 @@ public final class PipelineJobRunner implements Job {
     private static final Logger log = LoggerFactory.getLogger(PipelineJobRunner.class);
     private static final String SEED_VIEW_PREFIX = "pipeline_src";
 
+    /** Test seam: runs once the seed views have pinned their stores' files and before the run scans them; production
+     *  never reassigns it (SNAPSHOT-SWAP-UNLOCKED-READERS-1). */
+    static volatile Runnable afterPin = () -> { };
+
     private final JobConfig cfg;
     private final ConsignmentEventBus bus;
     private final PipelineStore pipelineStore;
@@ -330,6 +334,7 @@ public final class PipelineJobRunner implements Job {
             throw e;
         }
         File dryRunBranchLog = null;
+        SnapshotSwapLock.Held seedsPinned = null;
         final List<Path> storeDirs;
         try {
             storeDirs = storeDirs(g, seeds, dir);
@@ -343,6 +348,9 @@ public final class PipelineJobRunner implements Job {
             // scratch connection isn't uncapped (defaults ≈ 80% RAM) while the batch path is capped.
             DuckDbUtil.applyGlobalDuckDbSettings(conn);
             Map<String, String> seedViews = new LinkedHashMap<>();
+            // Each seed view pins its store's files, which DuckDB opens when the run scans them: the source stores stay
+            // held against a snapshot swap until the last scan of a seed view (SNAPSHOT-SWAP-UNLOCKED-READERS-1).
+            seedsPinned = SnapshotSwapLock.hold();
             for (Seed seed : seeds) {                              // one view per source_store (multi-source, Phase C)
                 String view = SEED_VIEW_PREFIX + "_" + safe(seed.node());
                 String predicate = incremental
@@ -353,6 +361,7 @@ public final class PipelineJobRunner implements Job {
                 reportSources(ctx, seed.store(), read);
                 seedViews.put(seed.node(), view);
             }
+            afterPin.run();
             RowShaper.ReferenceResolver refs = references();
             seal(conn, g, storeDirs, refs, scratch);
 
@@ -426,6 +435,7 @@ public final class PipelineJobRunner implements Job {
             fence(ctx);   // LEASE-TAKEOVER-JOB-RUNS-1: no watermark/supersede/view/artifact write once taken over
             if (incremental) advanceWatermarks(conn, watermarks, pipelineId, seeds, seedViews, incCol);
             else supersedeEarlierRevisions(g, batchId);
+            seedsPinned.close();   // the seeds are scanned: release them before anything below publishes
 
             List<String> parts = realWriter.outputs().stream().map(PartitionOutput::partition).distinct().toList();
             registerViews(g, pipelineId, srcStores, dir);              // T32 Phase C — sink.view → durable definition
@@ -439,6 +449,7 @@ public final class PipelineJobRunner implements Job {
             return JobResult.ok(realWriter.outputs().size() + " file(s), " + realWriter.totalRows()
                     + " row(s) → store(s) " + PipelineStores.produced(g), ms);
         } finally {
+            if (seedsPinned != null) seedsPinned.close();   // a dry run or a failure ends the run early
             if (dryRunBranchLog != null) DuckDbUtil.deleteTempDb(dryRunBranchLog);
             DuckDbUtil.deleteTempDb(db);
             PipelineDryRun.removeScratch(scratch);

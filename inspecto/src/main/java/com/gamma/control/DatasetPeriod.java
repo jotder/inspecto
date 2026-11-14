@@ -1,6 +1,7 @@
 package com.gamma.control;
 
 import com.gamma.config.safety.PathJail;
+import com.gamma.job.SnapshotSwapLock;
 import com.gamma.sql.SqlViews;
 import com.gamma.util.DuckDbUtil;
 import com.gamma.util.SqlIdent;
@@ -93,9 +94,13 @@ final class DatasetPeriod {
                                     + ") TO " + SqlIdent.pathStr(tmp) + " (FORMAT PARQUET)");
                         Path kept = aside.resolve(database.relativize(f));
                         Files.createDirectories(kept.getParent());
-                        Files.move(f, kept, StandardCopyOption.ATOMIC_MOVE);
-                        moved.add(new Path[] {f, kept});
-                        if (!empties) Files.move(tmp, f, StandardCopyOption.ATOMIC_MOVE);
+                        // f's path is gone between the two moves, for good when it empties: wait for the readers that
+                        // pinned it (SnapshotSwapLock)
+                        try (SnapshotSwapLock.Held swap = SnapshotSwapLock.write(database)) {
+                            Files.move(f, kept, StandardCopyOption.ATOMIC_MOVE);
+                            moved.add(new Path[] {f, kept});
+                            if (!empties) Files.move(tmp, f, StandardCopyOption.ATOMIC_MOVE);
+                        }
                     } finally {
                         Files.deleteIfExists(tmp);
                     }
@@ -110,10 +115,14 @@ final class DatasetPeriod {
 
     /** Put every original back (the import failed after {@link #replace}), and the merge map with them. */
     void restore() throws IOException {
-        for (int i = moved.size() - 1; i >= 0; i--) {
-            Path[] m = moved.get(i);
-            Files.deleteIfExists(m[0]);
-            Files.move(m[1], m[0], StandardCopyOption.ATOMIC_MOVE);
+        if (!moved.isEmpty()) {
+            try (SnapshotSwapLock.Held swap = SnapshotSwapLock.write(database)) {   // deletes the rewritten files a reader may hold
+                for (int i = moved.size() - 1; i >= 0; i--) {
+                    Path[] m = moved.get(i);
+                    Files.deleteIfExists(m[0]);
+                    Files.move(m[1], m[0], StandardCopyOption.ATOMIC_MOVE);
+                }
+            }
         }
         moved.clear();
         if (mapBefore != null) DatasetCompaction.restoreMap(base, mapBefore);

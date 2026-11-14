@@ -1,6 +1,7 @@
 package com.gamma.expectation;
 
 import com.gamma.config.safety.DataRef;
+import com.gamma.job.SnapshotSwapLock;
 import com.gamma.query.ConditionSql;
 import com.gamma.sql.SqlSandbox;
 import com.gamma.sql.SqlSandboxPolicy;
@@ -36,6 +37,10 @@ public final class ExpectationEvaluator {
     /** The outcome of one evaluation. {@code status} is {@code PASSED} or {@code FAILED}. */
     public record Result(String status, long violations, long checkedAt) {}
 
+    /** Test seam: runs once the count has pinned its files and before it scans them; production never reassigns it
+     *  (SNAPSHOT-SWAP-UNLOCKED-READERS-1). */
+    static volatile Runnable afterPin = () -> { };
+
     /**
      * Run {@code exp} against {@code dataRoot} and return the count of violating records.
      *
@@ -47,14 +52,19 @@ public final class ExpectationEvaluator {
      */
     public static Result evaluate(Expectation exp, Path dataRoot) throws SQLException, IOException {
         long now = System.currentTimeMillis();
-        ConditionSql.Bound count = countSql(exp, dataRoot);
-        try (SqlSandbox sandbox = SqlSandbox.open(SqlSandboxPolicy.defaultPolicy());
-             PreparedStatement ps = sandbox.preparedStatement(count.sql())) {
-            int i = 1;
-            for (Object v : count.params()) ps.setObject(i++, v);
-            try (ResultSet rs = ps.executeQuery()) {
-                long violations = rs.next() ? rs.getLong(1) : 0L;
-                return new Result(violations > 0 ? "FAILED" : "PASSED", violations, now);
+        // The count pins the target's (and a referential ref's) files, which DuckDB opens when it scans them: the
+        // stores stay held against a snapshot swap until the count is done (SNAPSHOT-SWAP-UNLOCKED-READERS-1).
+        try (SnapshotSwapLock.Held pinned = SnapshotSwapLock.hold()) {
+            ConditionSql.Bound count = countSql(exp, dataRoot);
+            afterPin.run();
+            try (SqlSandbox sandbox = SqlSandbox.open(SqlSandboxPolicy.defaultPolicy());
+                 PreparedStatement ps = sandbox.preparedStatement(count.sql())) {
+                int i = 1;
+                for (Object v : count.params()) ps.setObject(i++, v);
+                try (ResultSet rs = ps.executeQuery()) {
+                    long violations = rs.next() ? rs.getLong(1) : 0L;
+                    return new Result(violations > 0 ? "FAILED" : "PASSED", violations, now);
+                }
             }
         }
     }

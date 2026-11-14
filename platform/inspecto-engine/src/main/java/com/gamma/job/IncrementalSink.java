@@ -38,9 +38,9 @@ import static com.gamma.util.SqlIdent.sqlStr;
  * (4) the stale files are deleted. Recovery (start of every replace) reads each day folder: a {@code .tmp}
  * means step 3 never ran, so the stale files are restored (the OLD partition); no {@code .tmp} but
  * {@code .stale} means step 3 ran, so the stale files are dropped (the NEW partition). A crash therefore
- * leaves the old or the new partition, never a mix. Steps 2-4 wait for the Jobs reading the sink
- * ({@link SnapshotSwapLock}) — the same discipline as the full-snapshot swap. The sink's ownership marker is a
- * dot-file at its root and a replace never touches it.
+ * leaves the old or the new partition, never a mix. Steps 2-4, that recovery and the retention prune wait for the
+ * readers holding the sink ({@link SnapshotSwapLock}) — the same discipline as the full-snapshot swap. The sink's
+ * ownership marker is a dot-file at its root and a replace never touches it.
  */
 final class IncrementalSink {
 
@@ -75,7 +75,7 @@ final class IncrementalSink {
             LocalDate day;
             try { day = LocalDate.parse(d); } catch (java.time.format.DateTimeParseException e) { continue; }
             if (!day.isBefore(keepFrom) || Files.exists(dir.resolve(SEED_FILE))) continue;
-            try {
+            try (SnapshotSwapLock.Held swap = SnapshotSwapLock.write(sink)) {   // a reader may hold the files deleted here
                 beforePrune.before(dir);
                 if (deleteContained(dir, dir.toRealPath())) deleted++;
                 else log.warn("sql.template incremental: expired partition {} only partly pruned; kept", dir);
@@ -225,18 +225,21 @@ final class IncrementalSink {
             List<Path> tmps = list(dir, "*.tmp");
             List<Path> stale = list(dir, "*.stale");
             if (tmps.isEmpty() && stale.isEmpty()) continue;
-            if (!tmps.isEmpty()) {
-                for (Path t : tmps) Files.delete(t);
-                for (Path s : stale) {
-                    String n = s.getFileName().toString();
-                    Files.move(s, s.resolveSibling(n.substring(0, n.length() - ".stale".length())), StandardCopyOption.ATOMIC_MOVE);
+            // Under the swap lock, like the replace it finishes: a reader sees the day's old or new files whole.
+            try (SnapshotSwapLock.Held swap = SnapshotSwapLock.write(sink)) {
+                if (!tmps.isEmpty()) {
+                    for (Path t : tmps) Files.delete(t);
+                    for (Path s : stale) {
+                        String n = s.getFileName().toString();
+                        Files.move(s, s.resolveSibling(n.substring(0, n.length() - ".stale".length())), StandardCopyOption.ATOMIC_MOVE);
+                    }
+                    log.warn("sql.template incremental: rolled back an interrupted replace of {}", dir);
+                } else {
+                    for (Path s : stale) Files.delete(s);
+                    log.warn("sql.template incremental: completed an interrupted replace of {}", dir);
                 }
-                log.warn("sql.template incremental: rolled back an interrupted replace of {}", dir);
-            } else {
-                for (Path s : stale) Files.delete(s);
-                log.warn("sql.template incremental: completed an interrupted replace of {}", dir);
+                deleteIfEmpty(dir);
             }
-            deleteIfEmpty(dir);
         }
     }
 

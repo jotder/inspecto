@@ -8,6 +8,7 @@ import com.gamma.analytics.score.ScoreColumns;
 import com.gamma.analytics.score.ScoreKind;
 import com.gamma.analytics.score.ScoreRunFiles;
 import com.gamma.job.ResultSetMeta;
+import com.gamma.job.SnapshotSwapLock;
 import com.gamma.util.DuckDbUtil;
 import com.gamma.util.SqlIdent;
 
@@ -42,6 +43,8 @@ import java.util.TreeMap;
 public final class ScoreOutputWriter {
     private ScoreOutputWriter() {}
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ScoreOutputWriter.class);
+
     private static final ObjectMapper SORTED = new ObjectMapper().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
 
     /** One entity's row: its key and the values of the kind's own columns, in their order. */
@@ -50,8 +53,9 @@ public final class ScoreOutputWriter {
     /**
      * Append this run to the history Dataset {@code kind.scores(modelId)} and swap {@code kind.latest(modelId)} to it.
      * Both directories must be this model's (created with its marker, or already carrying it); both files land as
-     * {@code *.tmp} and are revealed by an atomic move, so a reader never sees a half-written file. Retention then
-     * prunes older history runs, never {@code _latest} or this run.
+     * {@code *.tmp} and are revealed by an atomic move, so a reader never sees a half-written file; the {@code *.tmp} /
+     * {@code *.stale} a crashed run left are swept first. Retention then prunes older history runs, never
+     * {@code _latest} or this run, waiting for the readers holding the history ({@link SnapshotSwapLock}).
      *
      * <p>Kind column values bind by type: {@code VARCHAR} a String, {@code DOUBLE} / {@code INTEGER} a Number,
      * {@code BOOLEAN} a Boolean, {@code TIMESTAMP} a {@link LocalDateTime}; {@code null} binds SQL NULL.
@@ -67,6 +71,8 @@ public final class ScoreOutputWriter {
             throw new IllegalArgumentException("scores Dataset escapes the data root");
         ScoreOutputDirs.claim(history, kind.ownerMarker(), kind.kind(), modelId);
         ScoreOutputDirs.claim(latest, kind.ownerMarker(), kind.kind(), modelId);
+        cleanLeftovers(history);   // a crashed prior run leaves only invisible .tmp/.stale files
+        cleanLeftovers(latest);
         String name = ScoreRunFiles.name(scoredAt, runId);
         Path histTmp = history.resolve(name + ".tmp");
         Path latestTmp = latest.resolve(name + ".tmp");
@@ -123,7 +129,20 @@ public final class ScoreOutputWriter {
         try (DirectoryStream<Path> ds = Files.newDirectoryStream(history, ScoreRunFiles.GLOB)) {
             for (Path p : ds) runs.add(p.getFileName().toString());
         }
-        for (String f : retention.expired(runs, now, keep)) Files.deleteIfExists(history.resolve(f));
+        List<String> expired = retention.expired(runs, now, keep);
+        if (expired.isEmpty()) return;
+        try (SnapshotSwapLock.Held swap = SnapshotSwapLock.write(history)) {   // a reader may have pinned an expired run
+            for (String f : expired) Files.deleteIfExists(history.resolve(f));
+        }
+    }
+
+    /** Clear the invisible {@code .tmp}/{@code .stale} files a crashed run left in {@code dir}; never a live run file. */
+    private static void cleanLeftovers(Path dir) throws IOException {
+        try (DirectoryStream<Path> junk = Files.newDirectoryStream(dir, "*.{tmp,stale}")) {
+            for (Path p : junk) {
+                try { Files.delete(p); } catch (IOException e) { log.warn("score output: stray {} not deletable: {}", p, e.getMessage()); }
+            }
+        }
     }
 
     private static String parquetPath(Path p) {

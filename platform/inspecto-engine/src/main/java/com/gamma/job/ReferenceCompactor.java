@@ -209,12 +209,21 @@ public final class ReferenceCompactor {
                 }
             }
 
-            // 3. Hide the originals (atomic per file; readers' *.parquet globs no longer see them) …
-            for (Path p : candidates)
-                Files.move(p, sibling(p, HIDDEN_SUFFIX), StandardCopyOption.ATOMIC_MOVE);
-            // 4. … reveal the compacted slice in one atomic rename (nothing to reveal when it is empty) …
-            if (rows > 0) Files.move(tmp, dir.resolve(target), StandardCopyOption.ATOMIC_MOVE);
-            else Files.deleteIfExists(tmp);
+            // 3-4 hold the store's swap lock: the hide removes paths a reader pinned (SnapshotSwapLock), and a failure is
+            //     healed before the lock is released, so no reader sees the originals half hidden.
+            try (SnapshotSwapLock.Held swap = SnapshotSwapLock.write(root)) {
+                try {
+                    // 3. Hide the originals (atomic per file; readers' *.parquet globs no longer see them) …
+                    for (Path p : candidates)
+                        Files.move(p, sibling(p, HIDDEN_SUFFIX), StandardCopyOption.ATOMIC_MOVE);
+                    // 4. … reveal the compacted slice in one atomic rename (nothing to reveal when it is empty) …
+                    if (rows > 0) Files.move(tmp, dir.resolve(target), StandardCopyOption.ATOMIC_MOVE);
+                    else Files.deleteIfExists(tmp);
+                } catch (IOException | RuntimeException e) {
+                    heal(dir);
+                    throw e;
+                }
+            }
             // 5. … then the hidden originals and the journal can go.
             for (Path p : candidates) Files.deleteIfExists(sibling(p, HIDDEN_SUFFIX));
             Files.deleteIfExists(journal);

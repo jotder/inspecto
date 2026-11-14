@@ -61,7 +61,9 @@ public final class DatasetRelation {
      * @throws IllegalArgumentException on an unusable dataset config (→ 422 at the route)
      */
     public static String relationSql(Map<String, Object> datasetConfig, Path dataRoot, ViewStore views) {
-        return withCalculated(baseRelationSql(datasetConfig, dataRoot, views), datasetConfig);
+        // The relation pins its store's files: QueryExecutor renders it again if a snapshot swap removes one before
+        // the scan (SNAPSHOT-SWAP-UNLOCKED-READERS-1).
+        return QueryExecutor.repinnable(() -> withCalculated(baseRelationSql(datasetConfig, dataRoot, views), datasetConfig));
     }
 
     /**

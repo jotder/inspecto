@@ -1,5 +1,6 @@
 package com.gamma.query;
 
+import com.gamma.job.SnapshotSwapLock;
 import com.gamma.util.SqlIdent;
 import com.gamma.etl.DuckDbExtension;
 import com.gamma.sql.SqlSandbox;
@@ -205,7 +206,52 @@ public final class QueryExecutor {
         return run(new Request(datasetName, relationSql, null, 0, 0, List.of(), List.of()), planner, policy, null);
     }
 
+    /** How to render each relation {@link #repinnable} returned, for as long as its caller holds the string. */
+    private static final Map<String, java.util.function.Supplier<String>> RENDERERS =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
+    /** Test seam: runs in every attempt once the relation is registered and before the statement scans it. */
+    static volatile Runnable beforeScan = () -> { };
+
+    /**
+     * {@code render}'s relation, remembered so that {@link #run} can render it again when a snapshot swap removed a file
+     * it pinned (SNAPSHOT-SWAP-UNLOCKED-READERS-1). For the builders of a relation over pinned store files
+     * ({@code DatasetRelation}); a relation from anywhere else, or one a caller has wrapped in more SQL, is not
+     * re-rendered and fails across a swap as before.
+     */
+    public static String repinnable(java.util.function.Supplier<String> render) {
+        String sql = render.get();
+        if (sql != null) RENDERERS.put(sql, render);
+        return sql;
+    }
+
+    /**
+     * Runs the request; when a snapshot swap removed a file the relation had pinned, renders the relation again and runs
+     * once more inside {@link SnapshotSwapLock#hold()}, so the new pin holds the stores until the scan ends. The
+     * first attempt holds nothing: a publish never waits for a user's query, only for this rare second attempt.
+     */
     private static Result run(Request req, Planner planner, SqlSandboxPolicy policy, java.time.ZoneId timeZone)
+            throws SQLException, IOException {
+        try {
+            return attempt(req, planner, policy, timeZone);
+        } catch (SQLException lost) {
+            java.util.function.Supplier<String> render = req.relationSql() == null ? null : RENDERERS.get(req.relationSql());
+            if (render == null || !SnapshotSwapLock.lostPin(lost)) throw lost;
+            try (SnapshotSwapLock.Held held = SnapshotSwapLock.hold()) {
+                String again;
+                try {
+                    again = render.get();
+                } catch (RuntimeException unusable) {
+                    lost.addSuppressed(unusable);
+                    throw lost;
+                }
+                return attempt(new Request(req.datasetName(), again, req.sql(), req.limit(), req.offset(),
+                        req.projection(), req.sort(), req.binds()), planner, policy, timeZone);
+            }
+        }
+    }
+
+    private static Result attempt(Request req, Planner planner, SqlSandboxPolicy policy, java.time.ZoneId timeZone)
             throws SQLException, IOException {
         long t0 = System.nanoTime();
         try (SqlSandbox sandbox = SqlSandbox.open(policy)) {
@@ -234,6 +280,7 @@ public final class QueryExecutor {
                 req = new Request(req.datasetName(), req.relationSql(), planned.sql(), planned.limit(), planned.offset(),
                         planned.projection(), planned.sort(), planned.binds());
             }
+            beforeScan.run();
             String wrapped = wrap(req);
             // A Rule Template's `:name` holes arrive here already rewritten to positional `?` with their
             // values in `binds` (RuleTemplate.compile). They are bound, never interpolated — so a bind

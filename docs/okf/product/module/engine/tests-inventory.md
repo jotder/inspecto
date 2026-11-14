@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-401 test class(es): 401 unit, 0 real-HTTP control-plane, 0 IT.
+403 test class(es): 403 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -47,6 +47,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `PerEntityAlertTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/PerEntityAlertTest.java` | ASSURE-PER-ENTITY-ALERTS-1 — a Dataset measure Alert Rule with {@code by} evaluates the Measure per key over |
 | `PollRelativeFreshnessTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/PollRelativeFreshnessTest.java` | LA-DATA-TRUST-1 S3: a freshness Alert Rule whose {@code maximumAge} is a MULTIPLE of the feeding Collector's poll interval |
 | `RunbookTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/RunbookTest.java` | The {@code runbook} kind's structural validator, and the Alert Rule's {@code runbook:} link. |
+| `ScoreOutputWriterSwapTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/ScoreOutputWriterSwapTest.java` | SNAPSHOT-SWAP-UNLOCKED-READERS-1, the score output writer: its retention prune deletes history runs a reader may have |
 | `WindowedPatternEvaluatorTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/WindowedPatternEvaluatorTest.java` | PA-9c: {@link WindowedRuleEvaluator} running the {@code sequence} and {@code absence} Patterns over committed |
 | `WindowedRuleEvaluatorTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/WindowedRuleEvaluatorTest.java` | PA-9b: {@link WindowedRuleEvaluator} over committed Parquet files — the window buffer, effectively-once Alerts |
 | `WindowSqlOracleTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/WindowSqlOracleTest.java` | PA-9b: the window SQL compiler ({@link WindowSql}) against an independent oracle — a plain-Java evaluation of the |
@@ -417,6 +418,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `QueryExecutorBindsTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/QueryExecutorBindsTest.java` | The bound-parameter path through {@link QueryExecutor} — the half of Rule Template execution that |
 | `QueryExecutorRecursiveCteTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/QueryExecutorRecursiveCteTest.java` | The empirical check decision <b>D-S2</b> (Link Analysis, {@code docs/archived-documents/plans-archive/link-analysis-backlog-plan.md}) |
 | `QueryExecutorSharedCatalogTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/QueryExecutorSharedCatalogTest.java` | The read side of the shared lakehouse (scale-out phase C, §5.4 bullet 5, D4/D4a). |
+| `QueryExecutorSwapRetryTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/QueryExecutorSwapRetryTest.java` | SNAPSHOT-SWAP-UNLOCKED-READERS-1, the interactive readers' seam: a Dataset relation pins its store's files when it is |
 | `ResultSetDescriptorTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/ResultSetDescriptorTest.java` | Parity guard for {@link ResultSetDescriptor} (W4) — the Java mirror of the UI |
 | `RuleTemplateTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/RuleTemplateTest.java` | Rule Template compilation — the {@code :name} → positional-{@code ?} rewrite that makes a stored |
 | `ViewReaderSqlTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/ViewReaderSqlTest.java` | {@link ViewReaderSql} (consignment addressing §7-A, the {@code deriveViewSql} residual): a view's derived SQL |

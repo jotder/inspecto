@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-437 test class(es): 178 unit, 259 real-HTTP control-plane, 0 IT.
+440 test class(es): 180 unit, 260 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -124,6 +124,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiDatasetRowsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDatasetRowsTest.java` | Real-HTTP + real-DuckDB tests for {@code GET /datasets/{id}/rows} — one page of a Dataset's RELATION |
 | `ControlApiDataSourceExportTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDataSourceExportTest.java` | The Stage-6 per-space data-source export endpoints over real HTTP: list data sources, download one <!-- vocab-allow: quoted Javadoc --> |
 | `ControlApiDbBrowserMaskingTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDbBrowserMaskingTest.java` | BI-QUERY-MASKING-1, the {@code /db} routes: a business-data STORE (not a Dataset) carries the classification of the <!-- vocab-allow: quoted Javadoc --> |
+| `ControlApiDbBrowserSwapTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDbBrowserSwapTest.java` | SNAPSHOT-SWAP-UNLOCKED-READERS-1, the store browser: {@code GET /db/table} pins the store's files when it renders the |
 | `ControlApiDbBrowserTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDbBrowserTest.java` | Real-HTTP + real-DuckDB tests for the raw table browser (design {@code docs/superpower/db-browser-design.md}): |
 | `ControlApiDbQueryTypedOutputTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDbQueryTypedOutputTest.java` | Found driving the UI 2026-09-25: the {@code web_orders} Pipeline (types in a sibling Structure CSV, a |
 | `ControlApiDeadPropertyTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDeadPropertyTest.java` | `DUCKLE-C3-DEAD-PROPERTY-1` at the STRICT seam, over real HTTP: a config block no component reads |
@@ -285,6 +286,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `DashboardDateRangeTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DashboardDateRangeTest.java` | UIE-5 (d): the server's copy of the SPA's date-range maths ({@code dashboard-date-range.spec.ts} pins the same cases). |
 | `DatasetEntryRulesRolesTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DatasetEntryRulesRolesTest.java` | {@code columns[].role} on a Dataset entry (LA-COLUMN-ROLES-1 P0, operator decision B 2026-11-04): one vocabulary, |
 | `DatasetNewColumnsLocalDayTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DatasetNewColumnsLocalDayTest.java` | DATES-ONE-ZONE-1 (Basic live check 2026-11-06): the arrivals list showed a file received at {@code 2026-11-06 |
+| `DatasetPeriodSwapLockTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DatasetPeriodSwapLockTest.java` | SNAPSHOT-SWAP-UNLOCKED-READERS-1: replacing an upload's period moves each touched Parquet file aside and puts its |
 | `DecisionRuleWritersTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DecisionRuleWritersTest.java` | {@code ASSURE-ACTION-REQUESTS-1} round-2 finding 1c — <b>every writer that can write a {@code decision-rule} runs |
 | `EditionFeatureGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/EditionFeatureGateTest.java` | The BASIC half of `PROCESSOR-RELEASE-READINESS-1` G9 (operator decision 2026-09-24, "gate the code"): |
 | `EntitledLoaderFamiliesTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/EntitledLoaderFamiliesTest.java` | ENTITLEMENT-SPI-NARROWING-1: each extension-point family skips a provider whose module the signed entitlement leaves out. |
@@ -380,6 +382,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `BaselineProfileStoreStateZoneTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/BaselineProfileStoreStateZoneTest.java` | SE-4 step 1: a baseline history under {@code state/expectation-baselines} is read before {@code config/}'s; writes stay in config. |
 | `BaselineProfileStoreTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/BaselineProfileStoreTest.java` | DUCKLE-C8 — the durable profile history + accepted-profile store behind the {@code baseline} kind. |
 | `ExpectationEvaluatorParityTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/ExpectationEvaluatorParityTest.java` | Golden corpus for the {@code non_null} / {@code range} / {@code regex} shorthand kinds: the failing-row |
+| `ExpectationEvaluatorSwapLockTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/ExpectationEvaluatorSwapLockTest.java` | SNAPSHOT-SWAP-UNLOCKED-READERS-1: an Expectation's count pins the target's files and scans them afterwards; a snapshot |
 | `LaDailyFeedTemplateRulesTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/LaDailyFeedTemplateRulesTest.java` | LA-DATA-TRUST-1 S3, S4, S7 / S8: the rules the shipped {@code spaces/_templates/la-daily-feed} template carries load through |
 | `DryRunCoverageTest` | `com.gamma.job` | unit | `inspecto/src/test/java/com/gamma/job/DryRunCoverageTest.java` | Recurrence guard for {@code PLATFORM-SERVICES-DRYRUN-GAP-1}: every built-in Platform Service the host binds |
 | `ReportJobMaskingTest` | `com.gamma.job` | unit | `inspecto/src/test/java/com/gamma/job/ReportJobMaskingTest.java` | BI-QUERY-MASKING-1: a scheduled Dataset export has no viewer, so the file it writes always carries aliased entity keys |

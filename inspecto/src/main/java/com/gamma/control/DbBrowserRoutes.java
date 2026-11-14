@@ -268,9 +268,10 @@ final class DbBrowserRoutes implements RouteModule {
         // is the Consignment catalog's PINNED file list (addressing §7-A), not a live glob: a browse over a
         // pipeline sink during a full recompute otherwise re-expands the glob at scan time and shows a
         // revision the catalog has already superseded (2026-09-06; the same fix DatasetRelation carries).
-        String source = com.gamma.consignment.ConsignmentSelector.sourceLiteral(
-                browseDir.toString().replace('\\', '/'), SqlViews.ext(format));
-        String relationSql = "SELECT * FROM " + SqlViews.readerOverLiteral(format, source, true);
+        // Repinnable: QueryExecutor renders it again if a snapshot swap removes a pinned file before the scan.
+        String relationSql = QueryExecutor.repinnable(() -> "SELECT * FROM " + SqlViews.readerOverLiteral(format,
+                com.gamma.consignment.ConsignmentSelector.sourceLiteral(browseDir.toString().replace('\\', '/'),
+                        SqlViews.ext(format)), true));
         String sql = userSql != null ? userSql : "SELECT * FROM " + q(storeName);
 
         // BI-QUERY-MASKING-1: a store's classified entity keys are masked unless the caller may reveal them; a caller who may

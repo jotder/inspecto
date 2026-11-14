@@ -87,7 +87,7 @@ final class PartitionCompactor {
                 heal(dir);
                 List<Path> candidates = candidates(dir, cutoff);
                 if (candidates.size() < minFiles) continue;
-                filesMerged += compactDir(conn, dir, candidates);
+                filesMerged += compactDir(conn, root, dir, candidates);
                 dirsCompacted++;
             }
         }
@@ -110,8 +110,9 @@ final class PartitionCompactor {
         return out;
     }
 
-    /** Merge {@code candidates} into one file and swap it in (journal → merge → hide → reveal → clean). */
-    private static int compactDir(Connection conn, Path dir, List<Path> candidates) throws Exception {
+    /** Merge {@code candidates} into one file and swap it in (journal → merge → hide → reveal → clean); {@code root} is
+     *  the store whose readers the swap waits for. */
+    private static int compactDir(Connection conn, Path root, Path dir, List<Path> candidates) throws Exception {
         String target = "compacted_" + System.currentTimeMillis() + "_out.parquet";
         Path tmp = dir.resolve(target + TMP_SUFFIX);
         Path journal = dir.resolve(JOURNAL);
@@ -132,11 +133,20 @@ final class PartitionCompactor {
                         + SqlIdent.pathStr(tmp) + " (FORMAT PARQUET)");
             }
 
-            // 3. Hide the originals (atomic per file; readers' *.parquet globs no longer see them) …
-            for (Path p : candidates)
-                Files.move(p, sibling(p, HIDDEN_SUFFIX), StandardCopyOption.ATOMIC_MOVE);
-            // 4. … reveal the merged file in one atomic rename …
-            Files.move(tmp, dir.resolve(target), StandardCopyOption.ATOMIC_MOVE);
+            // 3-4 hold the store's swap lock: the hide removes paths a reader pinned (SnapshotSwapLock), and a failure is
+            //     healed before the lock is released, so no reader sees the originals half hidden.
+            try (SnapshotSwapLock.Held swap = SnapshotSwapLock.write(root)) {
+                try {
+                    // 3. Hide the originals (atomic per file; readers' *.parquet globs no longer see them) …
+                    for (Path p : candidates)
+                        Files.move(p, sibling(p, HIDDEN_SUFFIX), StandardCopyOption.ATOMIC_MOVE);
+                    // 4. … reveal the merged file in one atomic rename …
+                    Files.move(tmp, dir.resolve(target), StandardCopyOption.ATOMIC_MOVE);
+                } catch (IOException | RuntimeException e) {
+                    heal(dir);
+                    throw e;
+                }
+            }
             // 5. … then the hidden originals and the journal can go.
             for (Path p : candidates) Files.deleteIfExists(sibling(p, HIDDEN_SUFFIX));
             Files.deleteIfExists(journal);

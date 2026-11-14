@@ -46,8 +46,9 @@ import static com.gamma.util.SqlIdent.q;
  * The new snapshot lands invisibly ({@code *.parquet.tmp} — readers glob {@code *.parquet}); prior
  * snapshots are hidden ({@code → *.stale}) before the reveal (ATOMIC_MOVE), then deleted — never doubled
  * rows. The hide removes the path a reader pinned, so the swap waits for the Jobs reading the target
- * ({@link SnapshotSwapLock}); a reader that does not take the lock can fail across a swap. A crash leaves only
- * invisible {@code .tmp}/{@code .stale} files; the next run cleans them.
+ * ({@link SnapshotSwapLock}); a reader that does not take the lock can fail across a swap. This task's own read of its
+ * source holds the source the same way, from pin to COPY. A crash leaves only invisible {@code .tmp}/{@code .stale}
+ * files; the next run cleans them.
  */
 final class MaterializeTask {
 
@@ -56,6 +57,10 @@ final class MaterializeTask {
 
     /** The ceiling a {@code limit:} is clamped to (unchanged: it was the literal passed to the spec parser). */
     private static final int MAX_ROWS = 100_000_000;
+
+    /** Test seam: runs once the source's files are pinned and before the statement opens them; production never
+     *  reassigns it (SNAPSHOT-SWAP-UNLOCKED-READERS-1). */
+    static volatile Runnable afterPin = () -> { };
 
     private MaterializeTask() {}
 
@@ -80,41 +85,46 @@ final class MaterializeTask {
         Map<String, Object> dataset = store.get("dataset", source)
                 .map(ComponentRegistry.Component::content)
                 .orElseThrow(() -> new IllegalArgumentException("unknown dataset '" + source + "'"));
-        String relationSql = DatasetRelation.relationSql(dataset, dataRoot, new ViewStore(writeRoot.resolve("views")));
-        int cap = Math.max(1, Math.min(Integer.parseInt(cfg.opt("limit", "1000000")), MAX_ROWS));   // >= 1, as the spec parser clamps
-        // One row PAST the cap: the compiled statement ends in its own LIMIT, so asking for exactly the cap
-        // could never show that rows were dropped (BI-QUERY-TRUNCATION-1).
-        String sql = compileSpec(cfg, source, cap + 1);
-
         Path outDir = dataRoot.resolve(target);
-        Files.createDirectories(outDir);
-        cleanLeftovers(outDir);   // a crashed prior run leaves only invisible .tmp/.stale files
         String snapshot = "matrix-" + System.currentTimeMillis() + ".parquet";
         Path tmp = outDir.resolve(snapshot + ".tmp");
-
         long rows;
         List<ResultSetDescriptor.Column> derived;
-        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(dataRoot),
-                     DatasetRelation.readRoots(dataset, dataRoot));
-             Statement st = conn.createStatement()) {
-            st.execute("CREATE VIEW " + q(source) + " AS " + relationSql);
-            st.execute("COPY (" + sql + ") TO " + SqlIdent.pathStr(tmp) + " (FORMAT PARQUET)");
-            try (ResultSet rs = st.executeQuery(
-                    "SELECT count(*) FROM " + SqlViews.parquetFile(tmp))) {
-                rs.next();
-                rows = rs.getLong(1);
+        // The relation pins the source's files, which DuckDB opens when COPY scans them: the source stays held against
+        // a snapshot swap until then, and is released before this task's own swap below (SNAPSHOT-SWAP-UNLOCKED-READERS-1).
+        try (SnapshotSwapLock.Held reading = SnapshotSwapLock.hold()) {
+            String relationSql = DatasetRelation.relationSql(dataset, dataRoot, new ViewStore(writeRoot.resolve("views")));
+            int cap = Math.max(1, Math.min(Integer.parseInt(cfg.opt("limit", "1000000")), MAX_ROWS));   // >= 1, as the spec parser clamps
+            // One row PAST the cap: the compiled statement ends in its own LIMIT, so asking for exactly the cap
+            // could never show that rows were dropped (BI-QUERY-TRUNCATION-1).
+            String sql = compileSpec(cfg, source, cap + 1);
+
+            Files.createDirectories(outDir);
+            cleanLeftovers(outDir);   // a crashed prior run leaves only invisible .tmp/.stale files
+            afterPin.run();
+
+            try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(dataRoot),
+                         DatasetRelation.readRoots(dataset, dataRoot));
+                 Statement st = conn.createStatement()) {
+                st.execute("CREATE VIEW " + q(source) + " AS " + relationSql);
+                st.execute("COPY (" + sql + ") TO " + SqlIdent.pathStr(tmp) + " (FORMAT PARQUET)");
+                try (ResultSet rs = st.executeQuery(
+                        "SELECT count(*) FROM " + SqlViews.parquetFile(tmp))) {
+                    rs.next();
+                    rows = rs.getLong(1);
+                }
+                if (rows > cap) {
+                    Files.deleteIfExists(tmp);   // the prior snapshot stays visible: a failed refresh changes nothing
+                    throw new IllegalStateException("materialize '" + cfg.name() + "': the result has more than " + cap
+                            + " rows - refusing to write a snapshot that silently drops groups (every downstream aggregate would "
+                            + "be wrong); raise this job's `limit:` (ceiling " + MAX_ROWS + ") or narrow the spec");
+                }
+                // `TYPEFLOW-DATASET-COLUMNS-1` step 4. DESCRIBE the Parquet that was just written, not the
+                // pipeline's static shape: this task HAS the real relation in hand, so describing it is both
+                // simpler and more truthful than deriving a shape statically — and needs no TypeFlow at all,
+                // despite the row's title (design §4, option A).
+                derived = describeWritten(st, tmp);
             }
-            if (rows > cap) {
-                Files.deleteIfExists(tmp);   // the prior snapshot stays visible: a failed refresh changes nothing
-                throw new IllegalStateException("materialize '" + cfg.name() + "': the result has more than " + cap
-                        + " rows - refusing to write a snapshot that silently drops groups (every downstream aggregate would "
-                        + "be wrong); raise this job's `limit:` (ceiling " + MAX_ROWS + ") or narrow the spec");
-            }
-            // `TYPEFLOW-DATASET-COLUMNS-1` step 4. DESCRIBE the Parquet that was just written, not the
-            // pipeline's static shape: this task HAS the real relation in hand, so describing it is both
-            // simpler and more truthful than deriving a shape statically — and needs no TypeFlow at all,
-            // despite the row's title (design §4, option A).
-            derived = describeWritten(st, tmp);
         }
 
         // Swap: hide prior snapshots, reveal the new one, drop the hidden ones (see class doc).
