@@ -46,7 +46,8 @@ The rest of this page takes them in that order.
 
 Example from `la-utility`: eight feeds (`premise`, `customer_account`, `meter_read`, `transformer_read`,
 `field_visit`, `service_order`, `prepaid_vend`, `payment`) land through eight Pipelines. The `utility_links` Job then
-writes one link Dataset, `utility_links_dataset`. Two more Jobs write `transformer_loss` and `utility_bank_links`.
+writes one link Dataset, `utility_links_dataset`. Two more Jobs write `transformer_loss` and `utility_bank_links`, and a
+fourth, `utility_loss_alerts`, serves the Alert Rule.
 
 `la-sample` is the exception: one Pipeline (`mule_transfers`), one Dataset (`mule_transfers_dataset`), no Jobs.
 
@@ -58,7 +59,7 @@ nothing to add by hand.
 
 Open a Dataset to see:
 
-- **Entities**: what each column holds (an Entity Type, or *Nothing: a detail*);
+- **Columns**: what each column holds and its role (an Entity Type, or *Nothing: a detail*);
 - **Mappings**: how its rows are read as links;
 - **Discover** ▸ *Show what is in it*: its link rows, the period its Time covers, about how many entities of each
   Entity Type, its kinds of link with their counts, and the ten busiest entities at each end.
@@ -71,12 +72,13 @@ When the product starts, the Pipelines land everything in `data/inbox`, and each
 minute or two. Each Space's install guide lists what to check: the Parquet folders, nothing in `quarantine` or
 `errors`, the link Dataset, and the saved views in **File ▸ Open… ▸ Saved views**.
 
-For `la-utility` the install guide expects 30 files and 0 rejected rows, and a link Dataset of about 4 300 rows in
+For `la-utility` the install guide expects 30 files and 0 rejected rows, and a link Dataset of about 4,300 rows in
 six kinds.
 
 ### The staged month
 
-Most showcases also ship one more month of data in `data/staged/<feed>/`. It is not loaded at start. Copy those files
+Most of the new showcases also ship one more month of data in `data/staged/<feed>/` (`la-showcase` stages a next-day
+file and a gap-day file instead; the four older showcases describe theirs in their runbooks). It is not loaded at start. Copy those files
 into `data/inbox/<feed>/` to show new data arriving: the Pipelines land them, the Jobs rebuild the links, and a saved
 view you reopen draws the new rows. The install guides describe it under *New data arrives* (for example October 2026
 for `la-utility`, November 2026 for `la-police`).
@@ -107,7 +109,7 @@ Two patterns you will meet:
 ### Link Datasets and their Mapping
 
 A **Mapping** says how a Dataset's rows are read as links: which column is **From**, which is **To**, and optionally
-the **Kind of link**, **When** and **Amount**. A showcase Dataset carries its own Mapping. For
+the **Kind of link**, **When** and **Measure**. A showcase Dataset carries its own Mapping. For
 `utility_links_dataset` it is From `src`, To `dst`, kind `kind`, time `ts`, amount `amount`.
 
 On the Data page, **Mappings** shows it. **New mapping** saves another reading of the same rows under its own name,
@@ -119,7 +121,7 @@ The Data page shows each column's role: **Entity**, **Time**, **Measure**, **Cat
 states no role, the page works it out:
 
 - it holds an Entity Type → **Entity**;
-- it is the Mapping's time or the Dataset's event date → **Time**;
+- it is a date or timestamp, the Mapping's time or the Dataset's event date → **Time**;
 - it is the Mapping's amount → **Measure**;
 - it is the Mapping's kind → **Category**;
 - anything else → **Detail**: carried along, not filtered on.
@@ -161,7 +163,7 @@ re-reads the data each time it opens. It is not evidence.
 ### The 1,000-node cap
 
 The canvas admits at most **1,000 nodes**, and a server read returns at most 4,000 links by default. When a cap cuts
-the data, the screen says **Result cut short** and names the cap. A view that draws a whole Dataset through its filter
+the data, the screen says **Result cut short**. A view that draws a whole Dataset through its filter
 is cut to the busiest 1,000 nodes: a picture of the data, not yet of a story. To find the story, start small: one
 entity, then expand.
 
@@ -191,7 +193,7 @@ Selecting an area on the map highlights the matching entities on the graph, and 
 
 ### How a look-alike sits apart
 
-The testers' checklists state the rule: a story's members form one connected group, and a look-alike does not link
+The testers' checklists state the test: a story's members form one connected group, and a look-alike does not link
 to them. That is the test: draw the story,
 then find the look-alike. It will be busy, or odd in the same way, but it is in another group, or it has no link to
 the story's key node.
@@ -317,7 +319,7 @@ two industries and is listed under both.
       guide lists what.
    3. Sign in as the Space's lead persona (each user guide has the table of personas).
    4. Open **Alerts**. Where the Space has an Alert Rule, its Alert is listed; the user guide gives the expected
-      value. On Basic the same rule is loaded but not armed, so there is no Alert.
+      value. On Basic the same Alert Rule is loaded but not armed, so there is no Alert.
    5. Open the seeded Investigation. A large expand is held for a second person: sign in as the manager persona and
       approve or refuse it in the approval inbox. Nobody can approve their own request.
 
@@ -331,7 +333,7 @@ two industries and is listed under both.
    `PAYEE_ACCOUNT`, time `BOOKED_DATE`. Masking is off: `la-sample` has no sign-in.
 4. **Observation.** The view is `mule_layering_ring`. Links are folded per payer, payee, channel and payee country;
    width is the number of transfers.
-5. **Intention.** Twelve `SMURF` accounts each place cash deposits just under 1 000 into `MULE-HUB-01`
+5. **Intention.** Twelve `SMURF` accounts each place cash deposits just under 1,000 into `MULE-HUB-01`
    (structuring). The hub passes the money on within hours to `RELAY-01` and `RELAY-02`, which move it to
    `OFFSHORE-77` (pass-through). Separately, `SHELL-A` → `SHELL-B` → `SHELL-C` → `SHELL-D` → `SHELL-A` circulate
    money in a loop.
@@ -355,7 +357,7 @@ Electricity revenue protection: energy leaves a transformer but is not paid for.
 1. **Install** the three `la-utility` downloads and start the product
    ([install guide](../la-utility/admin-guide-install.md)). It runs on Basic.
 2. **Data.** Open **Data**. The eight feed Datasets are there, plus `utility_links_dataset`,
-   `transformer_loss_dataset` and `utility_bank_links_dataset`. In Discover, `utility_links_dataset` has about 4 300 links in six kinds: `supplied_by`,
+   `transformer_loss_dataset` and `utility_bank_links_dataset`. In Discover, `utility_links_dataset` has about 4,300 links in six kinds: `supplied_by`,
    `account_at`, `paid_from`, `visited_by`, `order_closed_by`, `vended_by`.
 3. **Mapping.** `src` and `dst` hold **Utility entity**; read the id prefix (`PRM-`, `TX-`, `C-`, …). `kwh` and `via`
    read *Detail*.
@@ -364,12 +366,11 @@ Electricity revenue protection: energy leaves a transformer but is not paid for.
    contractors (`C-27`, `C-21`) are not the story. Volume alone says nothing here.
 5. **Intention.** Which contractor's visits are followed by meters reading less, and where does the energy go?
 6. **How-to.**
-   1. Open `transformer_loss_dataset` (Discover) and sort by `loss_pct`: two transformers stand out, `TX-007` and
-      `TX-019`.
-   2. Back in the view, seed `C-14` and **Expand** once. Most of its premises sit under those two transformers.
-   3. Open a `visited_by` link and read `via`: the visit day. Compare the premise's `meter_read` before and after.
-   4. Answer: `C-14` visited 32 premises; 22 of them register 40–70 % less within two weeks of its visit. Loss on
-      `TX-007` rises from 6.2 % to 17.9 %, on `TX-019` from 5.1 % to 24.7 %.
+   1. In the view, start from contractor `C-14` alone (**One entity**) and **Expand** once: its premises appear.
+   2. Open a `visited_by` link: `ts` is the first visit day, and `via` lists the visits (`visit:<id>:<type>`).
+   3. Answer, from the Space's ground truth (Basic has no screen that compares meter reads or shows transformer
+      loss): `C-14` visited 32 premises; 22 of them register 40–70 % less within two weeks of its visit. All 22 sit
+      under `TX-007` or `TX-019`, whose loss rises from 6.2 % to 17.9 % and from 5.1 % to 24.7 %.
    5. **Look-alike:** `PRM-0773`, the holiday home. It has no link to `C-14`.
    6. **New data:** copy `data/staged/<feed>/` into `data/inbox/<feed>/`. October 2026 lands and the Jobs rebuild
       the links and the loss. Reopen the view.
