@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **106<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 93<!--count:backlog-p3--> × P3** —
+> **105<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 92<!--count:backlog-p3--> × P3** —
+> ⬇ **106 → 105 (P3 93 → 92) on 2026-11-15**: closed P3 defect `DEMO-AUTH-ROSTER-REACH-1` [items: module.demo-auth · kind: defect] — demo sign-in reads its users from the Spaces the server actually booted (published by `SpaceManager` through `SpaceFolders`), so a `.ref` Space's roster signs in and a folder refused for overlap, pod ownership or a failed boot is neither read nor counted; in legacy write-root mode the sign-in page names the write root.
 > ⬇ **107 → 106 (P3 94 → 93) on 2026-11-15**: closed P3 defect `SQL-STEP-METADATA-ROUNDTRIP-1` [items: layer.product, module.etl · kind: defect] — switching a `sql` Step's pane from Fields to SQL and back now keeps each column's description, unit, classification and synonym, matched by output name (a column renamed in SQL comes back undescribed); with no edit, Apply stays off.
 > ⬇ **108 → 107 (P3 95 → 94) on 2026-11-15**: closed P3 defect `UI-BRANDING-SPEC-ORDER-1` [items: layer.product · kind: defect] — it failed the UI workflow on Linux once the format check stopped hiding the test step. The spec now clears the stored current Space first; a planted leftover reproduces the CI failure without the fix, and the full suite passes (7,596 tests).
 > ↔ **108 (no count change, P2 13, P3 95) on 2026-11-15**: closed P3 defect `SNAPSHOT-SWAP-UNLOCKED-READERS-1` [items: module.engine, module.processor · kind: defect] — every listed reader and writer now takes the snapshot lock: interactive reads pin under it and retry once under a hold if a swap removed their file (measured: holding through a slow BI scan would stall a publish ~20 s), Job reads hold pin → scan, and the compactions, period replace, incremental prune and score prune take the write side. Filed in its place P3 defect `SNAPSHOT-SWAP-READER-RESIDUALS-1` [items: module.engine, module.processor · kind: defect].
@@ -566,10 +567,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 93<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 92<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 93<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 106<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 92<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 105<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -823,7 +824,6 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
   - **ASSISTANT-DECIDED under operator delegation 2026-10-18 — PENDING OPERATOR CONFIRMATION.** **D1:** move `business-assurance` to `offerings/standard.toon` `contentPacks` and set `minEdition: standard` in its `template.toon` (verified: all five of its pack Alert Rules need the dispatcher, and `docs/EDITIONS.md` SP-CTL-07 says Basic refuses every authoring door and arms no rule copied onto disk, so on Basic the pack's headline is inert). **`la-daily-feed` stays in Basic** — but note the row's recommendation understated it: its two Alert Rules (`daily_xdr_freshness`, `daily_xdr_index_lag`) are equally inert on Basic; they ship as examples a Standard upgrade arms, and the pack's value on Basic is the feed Datasets. **D2:** list `la-audit`, `la-claims`, `la-mobile-money`, `la-showcase` in `offerings/preview.toon` `contentPacks` (they need Demo Auth, which only the demo/Preview edition has); `la-showcase-off` stays unlisted. **Not yet applied** — this was a docs-only lane; the follow-up is two `.toon` edits plus `node tools/check-offerings.mjs`. **Reverse:** revert those edits (an Offering lists packs; no stored Space data changes). No sign-off needed.
 
 
-- **P3** · `DEMO-AUTH-ROSTER-REACH-1` — **three places demo sign-in still disagrees with the Spaces the server boots (filed 2026-11-14, left by `DEMO-AUTH-STALE-ROSTER-1`).** (1) A Space attached through `spaces/<id>.ref` (its folder outside the spaces root) boots, but `DemoUsers.all` and `spacesAttached` never follow refs, so its roster is ignored. (2) Spaces refused for a reason other than the name (overlap with another Space, owned by another pod, failed boot) are still read and counted: only the name rule is shared. (3) In legacy `-Dassist.write.root` mode the sign-in page says the file belongs in an attached Space while it sits at `<write root>/demo-users.toon`; `/bootstrap` must not send a path, so this needs a flag from `DemoTokenRelay.bootstrapAuth`, a session signal and a second message. Cleanest for (1) and (2): have the core hand demo-auth the Spaces it actually booted. [items: module.demo-auth · kind: defect]
 
 - **P3** · `SPACE-CREATE-PARTIAL-1` — **creating a Space half-succeeds when the caller lacks `canAuthorWorkbench`.** [items: module.config, module.access · kind: defect]
   `POST /spaces` succeeds, the branding `PUT` that follows is refused, and the UI shows only

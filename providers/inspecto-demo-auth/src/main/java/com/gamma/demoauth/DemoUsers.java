@@ -73,33 +73,52 @@ final class DemoUsers {
     }
 
     /**
-     * Every Space's Demo Users under {@code -Dspaces.root}, keyed by id — what the sign-in picker lists.
-     * A duplicate id across Spaces that differs is refused with a typed 409 {@link #ROSTER_CONFLICT}: one id must
-     * mean one person on the picker. The message names the user and both Space ids, never a path.
-     * Only folders the core boots as Spaces are read ({@link SpaceFolders#notASpaceReason}): a hidden, reserved or
-     * backup-named copy's stale roster neither signs anyone in nor conflicts (DEMO-AUTH-STALE-ROSTER-1).
+     * Every attached Space's Demo Users ({@code spaces}: Space id to folder, {@link #attached}), keyed by id — what
+     * the sign-in picker lists. A duplicate id across Spaces that differs is refused with a typed 409
+     * {@link #ROSTER_CONFLICT}: one id must mean one person on the picker. The message names the user and both Space
+     * ids, never a path.
      */
-    static Map<String, User> all(Path spacesRoot) {
+    static Map<String, User> all(Map<String, Path> spaces) {
         Map<String, User> byId = new LinkedHashMap<>();
         Map<String, String> spaceOf = new LinkedHashMap<>();
-        if (spacesRoot == null || !Files.isDirectory(spacesRoot)) return byId;
-        try (var dirs = Files.list(spacesRoot)) {
-            for (Path space : dirs.filter(d -> SpaceFolders.notASpaceReason(d) == null).sorted().toList()) {
-                String name = space.getFileName().toString();
-                for (User u : load(space.resolve("config"))) {
-                    User prior = byId.putIfAbsent(u.id(), u);
-                    spaceOf.putIfAbsent(u.id(), name);
-                    if (prior != null && !prior.equals(u))
-                        throw new ApiException(409, ROSTER_CONFLICT, "Demo User '" + u.id()
-                                + "' is defined differently in Spaces '" + spaceOf.get(u.id()) + "' and '" + name
-                                + "'. Make that user's row in config/demo-users.toon identical in both Spaces, "
-                                + "or attach only one of them to this demo, then restart.");
-                }
+        for (Map.Entry<String, Path> space : new java.util.TreeMap<>(spaces).entrySet()) {
+            String name = space.getKey();
+            for (User u : load(space.getValue().resolve("config"))) {
+                User prior = byId.putIfAbsent(u.id(), u);
+                spaceOf.putIfAbsent(u.id(), name);
+                if (prior != null && !prior.equals(u))
+                    throw new ApiException(409, ROSTER_CONFLICT, "Demo User '" + u.id()
+                            + "' is defined differently in Spaces '" + spaceOf.get(u.id()) + "' and '" + name
+                            + "'. Make that user's row in config/demo-users.toon identical in both Spaces, "
+                            + "or attach only one of them to this demo, then restart.");
             }
-        } catch (java.io.IOException e) {
-            throw new IllegalStateException("cannot list " + spacesRoot + ": " + e.getMessage(), e);
         }
         return byId;
+    }
+
+    /**
+     * The attached Spaces, id to folder, or {@code null} when Demo Users come from the legacy {@code -Dassist.write.root}
+     * (or nowhere). With a core running, exactly the Spaces it booted ({@link SpaceFolders#hosted}): a {@code <id>.ref}
+     * Space kept outside the Spaces root is read, and a folder refused for overlap, another pod's or one that failed to
+     * boot is not (DEMO-AUTH-ROSTER-REACH-1). Without one (a unit test), the folders under {@code -Dspaces.root} that
+     * {@link SpaceFolders#notASpaceReason} accepts: a hidden, reserved or backup-named copy's stale roster neither
+     * signs anyone in nor conflicts (DEMO-AUTH-STALE-ROSTER-1).
+     */
+    static Map<String, Path> attached() {
+        var booted = SpaceFolders.hosted();
+        if (booted.isPresent()) return booted.get();
+        String spaces = System.getProperty("spaces.root");
+        if (spaces == null || spaces.isBlank()) return null;
+        Path root = Path.of(spaces.trim());
+        Map<String, Path> out = new LinkedHashMap<>();
+        if (!Files.isDirectory(root)) return out;
+        try (var dirs = Files.list(root)) {
+            dirs.filter(d -> SpaceFolders.notASpaceReason(d) == null).sorted()
+                    .forEach(d -> out.put(d.getFileName().toString(), d));
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("cannot list " + root + ": " + e.getMessage(), e);
+        }
+        return out;
     }
 
     private static String str(Object o) {
@@ -111,22 +130,24 @@ final class DemoUsers {
     }
 
     /**
-     * How many Spaces are attached (folders under {@code -Dspaces.root} the core boots as Spaces,
-     * {@link SpaceFolders#notASpaceReason}; 1 for a legacy write root, else 0). DEMO-AUTH-NO-ROSTER-1: counting
-     * {@code _templates} made a bundle with no Space say it had one; DEMO-AUTH-STALE-ROSTER-1: so did a backup copy.
+     * How many Spaces are attached ({@link #attached}; 1 for a legacy write root, else 0). DEMO-AUTH-NO-ROSTER-1:
+     * counting {@code _templates} made a bundle with no Space say it had one; DEMO-AUTH-STALE-ROSTER-1: so did a
+     * backup copy; DEMO-AUTH-ROSTER-REACH-1: so did a folder refused for overlap, and a {@code .ref} Space did not count.
      */
     static int spacesAttached() {
-        String spaces = System.getProperty("spaces.root");
-        if (spaces != null && !spaces.isBlank()) {
-            Path root = Path.of(spaces.trim());
-            if (!Files.isDirectory(root)) return 0;
-            try (var dirs = Files.list(root)) {
-                return (int) dirs.filter(d -> SpaceFolders.notASpaceReason(d) == null).count();
-            } catch (java.io.IOException e) {
-                return 0;
-            }
+        Map<String, Path> spaces;
+        try {
+            spaces = attached();
+        } catch (IllegalStateException unlistable) {
+            return 0;
         }
+        if (spaces != null) return spaces.size();
+        return legacyRoot() != null ? 1 : 0;
+    }
+
+    /** The legacy single-Space roster folder ({@code -Dassist.write.root}), or {@code null}. */
+    static Path legacyRoot() {
         String wr = System.getProperty("assist.write.root");
-        return wr != null && !wr.isBlank() ? 1 : 0;
+        return wr == null || wr.isBlank() ? null : Path.of(wr.trim());
     }
 }

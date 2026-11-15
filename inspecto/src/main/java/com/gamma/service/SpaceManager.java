@@ -151,6 +151,7 @@ public final class SpaceManager implements AutoCloseable {
         m.notificationOverrides = NotificationPreferenceOverrides.open(notificationOverridesFile(m.spacesRoot));
         if (!Files.isDirectory(spacesRoot)) {
             log.warn("Spaces root {} does not exist — no spaces booted", spacesRoot.toAbsolutePath());
+            m.publishHosted();
             return m;
         }
         // §5.3: which Spaces are THIS pod's. Absent a partition.toon this hosts everything, so the
@@ -183,8 +184,22 @@ public final class SpaceManager implements AutoCloseable {
         // a server started from the wrong directory boots, so the one-line check must be visible (SPACE-RELOCATABLE-ROOTS-1).
         log.info("SpaceManager: {} space(s) booted from {} (app root {})",
                 m.spaces.size(), spacesRoot.toAbsolutePath(), AppRoot.current());
+        m.publishHosted();
         m.auditInboxOwnership();   // §5.3: two Spaces on one inbox = silent double-ingestion
         return m;
+    }
+
+    /**
+     * Publish the Spaces this manager hosts ({@link com.gamma.util.SpaceFolders#hosted}) for a reader that may not
+     * depend on this module - the demo sign-in reads its rosters from exactly these folders, a {@code <id>.ref}'s
+     * included, and never from one discovery refused (DEMO-AUTH-ROSTER-REACH-1). Discover mode only: single-tenant
+     * hosts the legacy write root, which those readers resolve themselves.
+     */
+    private void publishHosted() {
+        if (spacesRoot == null) return;
+        Map<String, Path> folders = new LinkedHashMap<>();
+        spaces.forEach((id, ctx) -> folders.put(id.value(), ctx.root().base()));
+        com.gamma.util.SpaceFolders.publishHosted(this, folders);
     }
 
     /** A Space reference: {@code <spaces root>/<id>.ref} holds the path of a Space folder kept elsewhere —
@@ -481,6 +496,7 @@ public final class SpaceManager implements AutoCloseable {
             SpaceContext ctx = bootStarted(base);
             spaces.put(id, ctx);
             wire(ctx);
+            publishHosted();
             log.info("Created space '{}' at {}", id.value(), base);
             return ctx;
         }
@@ -540,6 +556,7 @@ public final class SpaceManager implements AutoCloseable {
             SpaceContext ctx = bootStarted(base);
             spaces.put(id, ctx);
             wire(ctx);
+            publishHosted();
             log.info("Created space '{}' from bundle at {} ({} config file(s))",
                     id.value(), base, bundle.configEntries().size());
             return ctx;
@@ -785,6 +802,7 @@ public final class SpaceManager implements AutoCloseable {
             SpaceContext ctx = bootStarted(base);
             spaces.put(id, ctx);
             wire(ctx);
+            publishHosted();
             log.info("Created space '{}' from template '{}' at {}", id.value(), templateId, base);
             return ctx;
         }
@@ -896,6 +914,7 @@ public final class SpaceManager implements AutoCloseable {
         SpaceContext ctx;
         synchronized (lifecycleLock) {
             ctx = spaces.remove(id);
+            if (ctx != null) publishHosted();
         }
         if (ctx == null) return false;
         // S7: the space is already deregistered — a hung or failing drain-and-close must not abort the
@@ -1032,6 +1051,7 @@ public final class SpaceManager implements AutoCloseable {
             closeWithDeadline(c);   // S7: bound each drain so one hung space can't stall JVM shutdown
         }
         spaces.clear();
+        com.gamma.util.SpaceFolders.withdrawHosted(this);
     }
 
     /**

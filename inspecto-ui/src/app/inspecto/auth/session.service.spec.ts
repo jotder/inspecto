@@ -483,6 +483,21 @@ describe('SessionService (W6d edition switch)', () => {
         await done;
         expect(svc.demoNoUsers()).toBe(true);
         expect(svc.demoNoSpace()).toBe(false);
+        expect(svc.demoRosterInWriteRoot(), 'no rosterLocation means a Space').toBe(false);
+    });
+
+    // DEMO-AUTH-ROSTER-REACH-1: legacy -Dassist.write.root mode keeps the roster in the write root, never a path.
+    it('flags a legacy demo whose roster belongs in the write root', async () => {
+        const done = svc.init();
+        httpMock.expectOne(`${base}/bootstrap`).flush({
+            features: { authMode: 'demo' },
+            auth: { mock: true, demoUsers: [], spacesAttached: 1, rosterLocation: 'write-root' },
+        });
+        await tick();
+        httpMock.expectOne(`${base}/auth/refresh`).flush({ error: 'no session' }, { status: 401, statusText: 'x' });
+        await done;
+        expect(svc.demoNoUsers()).toBe(true);
+        expect(svc.demoRosterInWriteRoot()).toBe(true);
     });
 
     it('does not flag a demo whose Spaces list Demo Users', async () => {

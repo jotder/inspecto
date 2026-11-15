@@ -62,6 +62,35 @@ class SpaceManagerTest {
     }
 
     /**
+     * DEMO-AUTH-ROSTER-REACH-1: the hosted list a module that may not depend on this one reads
+     * ({@link com.gamma.util.SpaceFolders#hosted}) is exactly what the manager booted — a {@code .ref} Space outside
+     * the root in, a name-valid folder refused for overlap out — follows runtime create and delete, and leaves with
+     * {@link SpaceManager#close()}.
+     */
+    @Test
+    void theHostedListIsWhatTheManagerBootedAndLeavesWithIt(@TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("spaces"));
+        Path acme = Files.createDirectories(root.resolve("acme").resolve("config")).getParent();
+        Path ext = Files.createDirectories(tmp.resolve("elsewhere").resolve("far").resolve("config")).getParent();
+        Files.writeString(root.resolve("far.ref"), ext.toAbsolutePath().toString());
+        Path beta = Files.createDirectories(root.resolve("beta").resolve("config")).getParent();   // its data root reaches into acme
+        Files.writeString(beta.resolve("space.toon"), "data_root: " + acme.resolve("config").resolve("x").toString().replace('\\', '/') + "\n");
+        try {
+            try (SpaceManager mgr = SpaceManager.discover(root)) {
+                assertEquals(Map.of("acme", acme.toAbsolutePath().normalize(), "far", ext.toAbsolutePath().normalize()),
+                        com.gamma.util.SpaceFolders.hosted().orElseThrow());
+                mgr.create(SpaceId.of("gamma"), null, null);
+                assertTrue(com.gamma.util.SpaceFolders.hosted().orElseThrow().containsKey("gamma"), "a runtime create joins");
+                assertTrue(mgr.delete(SpaceId.of("gamma"), true));
+                assertFalse(com.gamma.util.SpaceFolders.hosted().orElseThrow().containsKey("gamma"), "a delete leaves");
+            }
+            assertTrue(com.gamma.util.SpaceFolders.hosted().isEmpty(), "a closed manager hosts nothing");
+        } finally {
+            com.gamma.config.safety.DiscoveredRoots.clear();
+        }
+    }
+
+    /**
      * {@code CROSS-SPACE-JAIL-1}: once a Space's roots are its own base (not the union), loading a named
      * Space must run AS that Space — its pipelines' {@code schema_file} refs meet the jail at boot, and an
      * unbound boot thread is the {@code default} Space, whose roots do not include {@code acme}. The
