@@ -146,6 +146,15 @@ final class SpacePromotionRoutes implements RouteModule {
         return ApiContext.respondJson(e, 422, refusal);
     }
 
+    private static Object collided(HttpExchange e, SpacePromotion.CaseCollisions c) throws IOException {
+        Map<String, Object> refusal = new LinkedHashMap<>();
+        refusal.put("error", "a bundle path names, in another case, a file this Space has or another bundle path ("
+                + c.byPath + "): a case-insensitive filesystem holds them as one file, so they cannot be promoted as "
+                + "two; spell both the same, by renaming one; nothing was written");
+        refusal.put("caseCollisions", c.byPath);
+        return ApiContext.respondJson(e, 422, refusal);
+    }
+
     private Object preview(ApiContext api, HttpExchange e) throws IOException {
         Path root = configRoot(api);
         Request r = request(api, e, false);
@@ -159,6 +168,8 @@ final class SpacePromotionRoutes implements RouteModule {
             return broken(e, b);
         } catch (SpacePromotion.ReshapedByBinding s) {
             return reshaped(e, s);
+        } catch (SpacePromotion.CaseCollisions c) {
+            return collided(e, c);
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("space", space);
@@ -195,6 +206,8 @@ final class SpacePromotionRoutes implements RouteModule {
             return broken(e, b);
         } catch (SpacePromotion.ReshapedByBinding s) {
             return reshaped(e, s);
+        } catch (SpacePromotion.CaseCollisions c) {
+            return collided(e, c);
         }
         List<SpacePromotion.Change> applied = new ArrayList<>(cs.of("add"));
         applied.addAll(cs.of("change"));
@@ -310,13 +323,14 @@ final class SpacePromotionRoutes implements RouteModule {
         for (String p : written) {
             Path f = root.resolve(p);
             if (p.endsWith("_pipeline.toon")) PipelineHistory.record(root, f);   // as every Pipeline save
-            if (SpacePromotion.isConnection(p)) service.registerConnection(ConnectionProfile.load(f));
+            // only what a loader reads goes live: a file named in another case is judged as its kind, never registered
+            if (SpacePromotion.liveConnection(p)) service.registerConnection(ConnectionProfile.load(f));
         }
         for (Map.Entry<Path, byte[]> gone : removed.entrySet()) {
             String p = root.relativize(gone.getKey()).toString().replace('\\', '/');
             if (p.endsWith("_pipeline.toon")) service.unregisterPipeline(gone.getKey());
-            if ("job".equals(SpacePromotion.kindOf(p))) removeJob(root, service, gone.getValue());
-            if (SpacePromotion.isConnection(p)) {
+            if (SpacePromotion.liveJob(p)) removeJob(root, service, gone.getValue());
+            if (SpacePromotion.liveConnection(p)) {
                 try {
                     Map<String, Object> doc = ConfigCodec.toMap(new String(gone.getValue(), StandardCharsets.UTF_8));
                     Object block = doc.get("connection") instanceof Map<?, ?> c ? c : doc;
