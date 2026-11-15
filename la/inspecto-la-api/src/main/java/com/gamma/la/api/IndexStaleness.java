@@ -38,7 +38,9 @@ public final class IndexStaleness {
     /**
      * @param stale            any reason applies
      * @param reasons          codes, precedence order
-     * @param details          human text, parallel to {@code reasons}
+     * @param details          plain words, parallel to {@code reasons}: what {@code GET /inv/index}'s {@code reason}, a read's
+     *                         refusal and every screen say about an out-of-date index (LA-FULL-CYCLE-TEST-1 phase 4) - no
+     *                         SQL or engine term, since the analyst reads them as they are
      * @param removedInput     see the class doc
      * @param fingerprintKnown whether the input files could be compared at all
      */
@@ -62,23 +64,23 @@ public final class IndexStaleness {
         boolean removed = false;
         if (known && !input.value().equals(m.baseFingerprint())) {
             codes.add(INPUT_FILES_CHANGED);
-            text.add("the Dataset's input files changed since the index was built (added, removed or replaced)");
+            text.add("the Dataset's files changed after the index was built (added, removed or replaced)");
             removed = removedSince(m.inputFiles(), input.files());
         }
         if (relationSqlHash == null) {
             codes.add(RELATION_UNRESOLVABLE);
-            text.add("the Dataset's relation cannot be resolved now");
+            text.add("the Dataset cannot be read now");
         } else if (!relationSqlHash.equals(m.relationSqlHash())) {
             codes.add(RELATION_SQL_CHANGED);
-            text.add("the Dataset's relation SQL changed since the index was built");
+            text.add("the Dataset's definition changed after the index was built");
         }
         if (!bucketFn.equals(m.bucketFn())) {
             codes.add(BUCKET_FUNCTION_CHANGED);
-            text.add("the bucket function differs (index: " + m.bucketFn() + ", server: " + bucketFn + ")");
+            text.add("the index was built by another version of Inspecto (layout " + m.bucketFn() + ", this server reads " + bucketFn + ")");
         }
         if (duckdbVersion != null && !duckdbVersion.equals(m.duckdbVersion())) {
             codes.add(DUCKDB_VERSION_CHANGED);
-            text.add("built with DuckDB " + m.duckdbVersion() + ", this server runs " + duckdbVersion);
+            text.add("the index was built with DuckDB " + m.duckdbVersion() + " and this server runs " + duckdbVersion);
         }
         return new Result(!codes.isEmpty(), List.copyOf(codes), List.copyOf(text), removed, known);
     }

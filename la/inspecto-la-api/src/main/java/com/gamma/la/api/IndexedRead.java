@@ -215,8 +215,10 @@ final class IndexedRead {
         for (int i = 0; i < st.reasons().size(); i++) {
             String code = st.reasons().get(i);
             if (code.equals(IndexStaleness.INPUT_FILES_CHANGED)) {
+                // plain words, as GET /inv/index's reason (LA-FULL-CYCLE-TEST-1 phase 4): a served index only ever misses ADDED files
                 int recorded = manifest.inputFiles() == null ? 0 : manifest.inputFiles().size();
-                reasonText.add(code + ": " + Math.max(0, input.files().size() - recorded) + " files added since the build");
+                int added = Math.max(0, input.files().size() - recorded);
+                reasonText.add(added + (added == 1 ? " file was" : " files were") + " added to the Dataset after the index was built");
             } else {
                 reasonText.add(st.details().get(i));
             }

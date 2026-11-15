@@ -56,6 +56,13 @@ import java.util.function.Supplier;
  * idle, is cancellable while it waits, and ends {@code FAILED} ({@link IngestStillActiveException}) if ingest is still running
  * after {@link #MAX_INGEST_WAIT_MS}. A manual and a scheduled build wait alike - neither is refused for it. The gate is
  * one-way: ingest that starts after a build has started is not held back.
+ *
+ * <p><b>A build runs in the Space that submitted it</b> ({@code LA-FULL-CYCLE-TEST-1} phase 4, finding 21). The worker
+ * takes the submitting thread's logging context (its Space id, {@code MDC}) for the build and drops it after. The builder
+ * renders the relation again on the worker, and that render asks the Space's Consignment registry which files to read:
+ * with no Space on the worker it read the store as a glob while every reader in the Space read a pinned file list, so the
+ * index recorded another relation hash and read as stale ({@code relation_sql_changed}) the moment it was published, in
+ * every Space but the default one. The terminal audit row lands in that Space too.
  */
 public final class IndexBuildService implements AutoCloseable {
 
@@ -420,11 +427,12 @@ public final class IndexBuildService implements AutoCloseable {
             if (dup != null) throw duplicate(dup, req.owner());
             runs.put(run.id, run);
         }
+        Map<String, String> context = org.slf4j.MDC.getCopyOfContextMap();   // the submitter's Space: see the class doc
         synchronized (pool) {                                           // the waiting-line check and the hand-off are one step
             Limits l = limits;
             try {
                 if (pool.getQueue().size() >= l.queue()) throw new RejectedExecutionException("the waiting line is full");
-                pool.execute(() -> execute(run));
+                pool.execute(() -> inContext(context, () -> execute(run)));
             } catch (RejectedExecutionException e) {
                 synchronized (runs) {
                     runs.remove(run.id);
@@ -541,6 +549,19 @@ public final class IndexBuildService implements AutoCloseable {
     }
 
     // -- execution ------------------------------------------------------------------------------------------------
+
+    /** Runs {@code work} under the submitter's logging {@code context} (null = none), then restores the worker's own. */
+    private static void inContext(Map<String, String> context, Runnable work) {
+        Map<String, String> before = org.slf4j.MDC.getCopyOfContextMap();
+        if (context != null) org.slf4j.MDC.setContextMap(context);
+        else org.slf4j.MDC.clear();
+        try {
+            work.run();
+        } finally {
+            if (before != null) org.slf4j.MDC.setContextMap(before);
+            else org.slf4j.MDC.clear();
+        }
+    }
 
     private void execute(Run r) {
         if (!awaitIngest(r)) return;                                  // ended while waiting for ingest

@@ -550,8 +550,8 @@ class ControlApiInvIndexedTraversalTest {
             JsonNode added = traverse(c, FILES_REQ);
             assertEquals("index", added.at("/source/kind").asText(), "only additions: served, not refused: " + added.get("source"));
             assertTrue(added.at("/source/stale").asBoolean());
-            assertTrue(added.at("/source/staleReason").asText().contains("input_files_changed: 1 files added since the build"),
-                    added.at("/source/staleReason").asText());
+            assertEquals("1 file was added to the Dataset after the index was built", added.at("/source/staleReason").asText(),
+                    "plain words, one number agreeing");
             assertEquals("known", added.at("/source/fingerprint").asText());
             // the documented difference: the index misses the new rows, so the flag is honest
             settings(c, DISABLED);
@@ -573,7 +573,8 @@ class ControlApiInvIndexedTraversalTest {
             JsonNode touched = traverse(c, FILES_REQ);
             assertEquals("dataset", touched.at("/source/kind").asText());
             assertEquals("index_stale_refused", touched.at("/source/reason").asText());
-            assertTrue(touched.at("/source/details").asText().contains("input files changed"), touched.get("source").toString());
+            assertEquals("the Dataset's files changed after the index was built (added, removed or replaced)",
+                    touched.at("/source/details").asText(), "plain words: " + touched.get("source"));
             assertEquals(built, normalised(touched), "the flat answer is complete");
 
             touch(p1, T0);                                                                            // the twin: restored, served again

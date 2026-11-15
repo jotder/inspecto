@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.geo-link`](../../../../../product-map/module/geo-link.toon).
 
-132 test class(es): 19 unit, 113 real-HTTP control-plane, 0 IT.
+133 test class(es): 19 unit, 114 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -51,6 +51,7 @@ mvn -o test -pl la/inspecto-geo-link -Dtest=ControlApiAnalystUploadTest,ControlA
 | `ControlApiEntityTypeDeleteTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiEntityTypeDeleteTest.java` | {@code DELETE /inv/entity-types/{id}} over REAL HTTP (LA-ENTITY-TYPE-RETIRE-1, delete if unused): every gate in order - 401, 403 |
 | `ControlApiEntityTypeProfileTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiEntityTypeProfileTest.java` | {@code GET /inv/entity-types} and {@code GET /inv/entity-types/{id}/profile} over REAL HTTP (la-entity-profile-plan §4.5): |
 | `ControlApiExplorationMaskingTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiExplorationMaskingTest.java` | DR-D2 / DR-T4 (operator 2026-10-10: <i>mask the same way everywhere</i>) over real HTTP. A Space that masks shows an |
+| `ControlApiFullCycleIndexStatusTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiFullCycleIndexStatusTest.java` | {@code LA-FULL-CYCLE-TEST-1} phase 4 (finding 21) over real HTTP: a healthy fresh import leaves the link index current, and |
 | `ControlApiGeoDatasetViewGateTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiGeoDatasetViewGateTest.java` | R3 on the Geo routes — a Dataset shared away from the caller is indistinguishable from an absent one on |
 | `ControlApiGeoLinkModuleGateTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiGeoLinkModuleGateTest.java` | LA-MODULE-GATE: on a Space whose {@code modules.toon} disables {@code geoLink}, EVERY LA route module answers 404 |
 | `ControlApiGeoProjectionTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiGeoProjectionTest.java` |  |

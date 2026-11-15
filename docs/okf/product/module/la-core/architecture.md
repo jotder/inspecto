@@ -796,7 +796,20 @@ optional pack field; no route was added.
   `index.loops_max_degree` (`derived_tables_outdated`).
 * **Staleness** (`IndexStaleness`, la-api) compares input-file fingerprints from `DatasetRelation.inputFiles`
   (platform engine); a view-backed Dataset has no file list (`fingerprintKnown=false`) and is never called stale —
-  hence D-ING6: dimension data is joined at read time, never baked into the index.
+  hence D-ING6: dimension data is joined at read time, never baked into the index. It is the ONE answer every surface
+  reads (`GET /inv/index` for the Data page and the Investigation's data strip, `IndexedRead` for the Expand), and its
+  `details` are the plain words those surfaces show — no SQL or engine term (`LA-FULL-CYCLE-TEST-1` phase 4,
+  2026-11-16; the screen side is [spec.md § Link index status](spec.md#link-index-status-one-answer-and-rebuild)).
+* **A build runs in the Space that submitted it** (phase 4, finding 21). `IndexBuildService.submit` hands the
+  submitter's `MDC` (its Space id) to the worker for the build and clears it after. 🔴 Gotcha, now pinned: the builder
+  renders the relation AGAIN on its worker (`held()` → `QueryExecutor.rerendered`), and `ConsignmentSelector` asks the
+  Consignment registry of the THREAD's Space which files to read. With no Space on the worker it read the store as a
+  glob, every reader in the Space read a pinned file list, the manifest recorded another `relationSqlHash`, and the
+  index read `relation_sql_changed` the moment it was published — in every Space but the default one, which is why no
+  single-Space test saw it (the test drive blamed the details import; that import is SKIPPED by the index follow-on).
+  Any other pool that renders a Dataset's relation must carry the Space the same way. An index built before the fix
+  stays out of date (an APPEND keeps its parent's hash) until a FULL build: the next import, the Space's
+  `la.index.build` Job (`allow_full`) or **Rebuild** runs one, since `IndexPlan` advises `full` for a changed definition.
 * **Build service** (`IndexBuildService`, one per write root via `IndexBuildServices`): 1 thread, queue 4; one live
   build per (Dataset, mapping) → 409; disk estimate `rows × 34 B` vs `max_disk_bytes` → 422 (estimate bounded at
   10 s); queue full → 503. The builder uses its own **non-sandboxed** in-memory DuckDB (COPY TO is forbidden in the

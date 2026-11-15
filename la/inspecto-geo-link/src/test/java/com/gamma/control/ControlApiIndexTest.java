@@ -330,7 +330,7 @@ class ControlApiIndexTest {
             writeView(root, VIEW_SQL + " WHERE who <> 'bob'");                                     // re-point the Dataset's view
             JsonNode ix = ok(c, "GET", "/inv/index", null, OWNER).get("indexes").get(0);
             assertTrue(ix.get("stale").asBoolean(), "the Dataset's relation changed");
-            assertTrue(ix.get("reason").asText().contains("relation SQL changed"), ix.get("reason").asText());
+            assertEquals("the Dataset's definition changed after the index was built", ix.get("reason").asText(), "plain words");
             assertEquals(1, ix.get("version").asInt(), "stale but present: the index is still listed");
 
             writeView(root, VIEW_SQL);                                                              // put it back: fresh again

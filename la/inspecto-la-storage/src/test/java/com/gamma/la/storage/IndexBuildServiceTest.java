@@ -143,6 +143,32 @@ class IndexBuildServiceTest {
         assertTrue(new IndexStore(tmp, "empty", M1.hash()).current().isEmpty());
     }
 
+    /**
+     * LA-FULL-CYCLE-TEST-1 phase 4 (finding 21): the build runs under the Space of the thread that submitted it, because the
+     * relation it renders again asks that Space's Consignment registry which files to read; and the worker keeps no Space
+     * once the build is done, so the next build, submitted from no Space, sees none.
+     */
+    @Test
+    void aBuildRunsInTheSpaceThatSubmittedItAndTheWorkerKeepsNoneAfter(@TempDir Path tmp) throws Exception {
+        String key = com.gamma.util.CurrentSpace.SPACE_MDC_KEY;
+        List<String> seen = new CopyOnWriteArrayList<>();
+        IndexBuildService s = new IndexBuildService(tmp, limits(1, 4), System::currentTimeMillis, null, 1_000L, r -> {
+            seen.add(String.valueOf(org.slf4j.MDC.get(key)));
+            return new IndexBuilder.Result(1, r.store().directory(), null, 2, 2, 0, 3, 16, Map.of(), 5);
+        });
+        open.add(s);
+        org.slf4j.MDC.put(key, "bank");
+        String first;
+        try {
+            first = s.submit(req("ana", "d1", M1)).id();
+        } finally {
+            org.slf4j.MDC.remove(key);
+        }
+        assertEquals(Status.COMPLETED, s.await(first, 30_000).status());
+        assertEquals(Status.COMPLETED, s.await(s.submit(req("ana", "d2", M1)).id(), 30_000).status());
+        assertEquals(List.of("bank", "null"), seen, "the submitter's Space, then none: the one worker kept nothing between builds");
+    }
+
     // -- the state machine -----------------------------------------------------------------------------------------------
 
     @Test
