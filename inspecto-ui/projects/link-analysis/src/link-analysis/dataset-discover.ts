@@ -19,7 +19,7 @@ export function discoverPeriod(r: DiscoverResult | null): string {
     if (!p?.assessed || !p.from || !p.to) return '';
     const days =
         p.days === null || p.days === undefined ? '' : `${p.days.toLocaleString('en')} day${p.days === 1 ? '' : 's'}, `;
-    return `${p.from.slice(0, 10)} to ${p.to.slice(0, 10)} (${days}by ${p.column})`;
+    return `${p.from.slice(0, 10)} to ${p.to.slice(0, 10)} (${days}dated by the ${p.column} column)`;
 }
 
 /** The busiest table's columns: the entity, its links, its distinct counterparts. */

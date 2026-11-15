@@ -372,7 +372,7 @@ import {
                                                         >
                                                             From
                                                             {{ dr.mappings.length === 1 ? 'Mapping' : 'Mappings' }}
-                                                            {{ dr.mappings.join(', ') }} - not set on this Dataset.
+                                                            {{ dr.mappings.join(', ') }}: not set on this Dataset.
                                                         </p>
                                                     }
                                                 }

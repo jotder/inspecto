@@ -1,6 +1,6 @@
 ---
 id: la-core
-title: Link analysis core and ports
+title: Link Analysis core and ports
 buildRole: platform
 offeringRole: optional
 bindingTime: boot

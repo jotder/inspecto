@@ -93,7 +93,7 @@ export function embedAbsoluteLink(token: string): string {
                         [value]="l"
                         (focus)="$any($event.target).select()"
                     />
-                    <p class="m-0 font-semibold">Copy now - it is not shown again.</p>
+                    <p class="m-0 font-semibold">Copy now: it is not shown again.</p>
                     <div class="flex items-center gap-2">
                         <button mat-flat-button color="primary" type="button" (click)="copy()">Copy</button>
                         <span role="status" aria-live="polite" class="text-secondary">{{ copied() }}</span>
@@ -241,7 +241,7 @@ export class LinkAnalysisEmbedMintDialog implements OnDestroy {
             } catch {
                 ok = false;
             }
-            this.copied.set(ok ? 'Copied to the clipboard.' : 'Copy failed - select the link and copy it by hand.');
+            this.copied.set(ok ? 'Copied to the clipboard.' : 'Copy failed; select the link and copy it by hand.');
         }
     }
 

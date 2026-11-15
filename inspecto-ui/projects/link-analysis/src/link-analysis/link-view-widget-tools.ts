@@ -95,7 +95,10 @@ export function runWidgetAnalysis(id: WidgetAnalysisId, g: G6GraphData, selectio
         case 'shortestPath': {
             const path = shortestPath(g, selection[0], selection[1]);
             return path
-                ? { emphasis: path, summary: `Shortest path: ${path.edgeIds.length} link(s).` }
+                ? {
+                      emphasis: path,
+                      summary: `Shortest path: ${path.edgeIds.length} ${path.edgeIds.length === 1 ? 'link' : 'links'}.`,
+                  }
                 : { emphasis: null, summary: 'No path joins the two entities.' };
         }
         case 'centrality': {
@@ -124,7 +127,7 @@ export function runWidgetAnalysis(id: WidgetAnalysisId, g: G6GraphData, selectio
                       }
                     : null,
                 summary: cycles.length
-                    ? `${cycles.length}${cycles.length === WIDGET_CYCLE_LIMIT ? '+' : ''} cycle(s).`
+                    ? `${cycles.length}${cycles.length === WIDGET_CYCLE_LIMIT ? '+' : ''} ${cycles.length === 1 ? 'cycle' : 'cycles'}.`
                     : 'No cycles.',
             };
         }
@@ -132,7 +135,9 @@ export function runWidgetAnalysis(id: WidgetAnalysisId, g: G6GraphData, selectio
             const cut = articulationPoints(g);
             return {
                 emphasis: cut.length ? { nodeIds: cut } : null,
-                summary: cut.length ? `${cut.length} cut point(s): removing one splits the graph.` : 'No cut points.',
+                summary: cut.length
+                    ? `${cut.length} ${cut.length === 1 ? 'cut point' : 'cut points'}: removing one splits the graph.`
+                    : 'No cut points.',
             };
         }
     }

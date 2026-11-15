@@ -238,9 +238,7 @@ describe('LinkViewWidgetComponent — the read-only toolset', () => {
         c.analyse('shortestPath');
         fixture.detectChanges();
         expect(stub().emphasis()).toEqual({ nodeIds: ['a', 'b', 'c'], edgeIds: ['ab', 'bc'] });
-        expect(el.querySelector('[data-testid="la-widget-result"]')?.textContent).toContain(
-            'Shortest path: 2 link(s).',
-        );
+        expect(el.querySelector('[data-testid="la-widget-result"]')?.textContent).toContain('Shortest path: 2 links.');
         http.verify(); // nothing beyond the limits read: no write, no server run
         await expectNoA11yViolations(el);
     });

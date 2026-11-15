@@ -1,12 +1,12 @@
 ---
 type: TestsInventory
-title: Link analysis PostgreSQL store — tests inventory
+title: Link Analysis PostgreSQL store — tests inventory
 item: module.la-store-pg
 description: Generated list of the test classes for module.la-store-pg, with how to run them.
 tags: [tests, module]
 ---
 
-# Link analysis PostgreSQL store — tests inventory (`module.la-store-pg`)
+# Link Analysis PostgreSQL store — tests inventory (`module.la-store-pg`)
 
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked test sources under `la/inspecto-la-store-pg/src/test/` — never edit this table; add or
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item

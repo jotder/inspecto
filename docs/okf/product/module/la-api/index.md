@@ -1,12 +1,12 @@
 ---
 type: ProductItem
-title: Link analysis and geo routes
+title: Link Analysis and geo routes
 item: module.la-api
 description: Documentation hub for module.la-api — every document about it, by slot.
 tags: [product-item, module]
 ---
 
-# Link analysis and geo routes (`module.la-api`)
+# Link Analysis and geo routes (`module.la-api`)
 
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.la-api`](../../../../../product-map/module/la-api.toon). Editions, add-ons, order codes and dependencies are read
@@ -19,11 +19,11 @@ tags: [product-item, module]
 | spec | current | [LA server profile — N7 / N8 / N9 (LA-PERF-SERVER-1, 2026-11-12)](spec-server-profile.md) · [Link analysis and geo routes - spec](spec.md) |
 | architecture | current | [Link analysis and geo routes - architecture](architecture.md) |
 | features | current | [Link analysis and geo routes — features](features.md) |
-| feature-db | current | [Link analysis and geo routes — feature database](feature-db.md) |
+| feature-db | current | [Link Analysis and geo routes — feature database](feature-db.md) |
 | user-guide | n/a | no screens of its own - the Link Analysis screens these routes serve are documented in the la-core hub (la-core/user-guide.md) |
 | admin-guide | current | [Link analysis and geo routes - admin guide](admin-guide.md) |
 | api | current | [HTTP routes — module.la-api](api-routes.md) |
-| tests | current | [Link analysis and geo routes — tests inventory](tests-inventory.md) |
+| tests | current | [Link Analysis and geo routes — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).

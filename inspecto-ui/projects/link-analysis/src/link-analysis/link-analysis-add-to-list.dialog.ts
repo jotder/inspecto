@@ -201,8 +201,8 @@ export class LinkAnalysisAddToListDialog {
             const message = isHeldListChange(r)
                 ? `Waiting for approval: adding to “${list.title}” needs a second person to approve it.`
                 : r.changed
-                  ? `${r.changed.toLocaleString('en')} added to “${list.title}” - it now has ${r.size.toLocaleString('en')}.`
-                  : `Nothing changed - “${list.title}” already holds ${this.data.values.length === 1 ? 'it' : 'them'}.`;
+                  ? `${r.changed.toLocaleString('en')} added to “${list.title}” — it now has ${r.size.toLocaleString('en')}.`
+                  : `Nothing changed: “${list.title}” already holds ${this.data.values.length === 1 ? 'it' : 'them'}.`;
             this.ref.close({ listId: list.id, title: list.title, purpose: list.purpose, message });
         } catch (err) {
             this.error.set(entityListErrorMessage(err, 'The list could not be changed.'));

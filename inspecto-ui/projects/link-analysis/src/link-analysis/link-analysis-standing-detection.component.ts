@@ -39,7 +39,7 @@ import { standingDetectionErrorMessage } from './standing-detection';
                 </p>
                 <p class="text-secondary m-0">
                     Only the Investigation's owner can enable this (the server refuses anyone else). Enabling lets a
-                    scheduled sweep read Dataset "{{ investigation().dataset }}" with your access, checked again before
+                    scheduled sweep read Dataset “{{ investigation().dataset }}” with your access, checked again before
                     every read. It computes and discloses counts only, and stops (recorded) if your access, your lead
                     role, an access policy or the masking changes.
                 </p>
@@ -79,9 +79,9 @@ import { standingDetectionErrorMessage } from './standing-detection';
             }
             @if (!enabled() && isEnabled()) {
                 <p class="text-secondary m-0" data-test="standing-readback">
-                    Enabled {{ initial()?.enabledAt }} — sweep principal {{ initial()?.principal }}, reading Dataset "{{
+                    Enabled {{ initial()?.enabledAt }} — sweep principal {{ initial()?.principal }}, reading Dataset “{{
                         initial()?.dataset
-                    }}".
+                    }}”.
                 </p>
             }
             @if (enabled(); as e) {
@@ -91,7 +91,9 @@ import { standingDetectionErrorMessage } from './standing-detection';
                         Masking recorded: mode {{ e.masking.mode }},
                         {{
                             e.masking.columns.length
-                                ? e.masking.columns.length + ' masked column(s): ' + e.masking.columns.join(', ')
+                                ? e.masking.columns.length +
+                                  (e.masking.columns.length === 1 ? ' masked column: ' : ' masked columns: ') +
+                                  e.masking.columns.join(', ')
                                 : 'no masked columns'
                         }}.
                     </span>

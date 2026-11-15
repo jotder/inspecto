@@ -1,12 +1,12 @@
 ---
 type: ProductItem
-title: Link analysis PostgreSQL store
+title: Link Analysis PostgreSQL store
 item: module.la-store-pg
 description: Documentation hub for module.la-store-pg — every document about it, by slot.
 tags: [product-item, module]
 ---
 
-# Link analysis PostgreSQL store (`module.la-store-pg`)
+# Link Analysis PostgreSQL store (`module.la-store-pg`)
 
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.la-store-pg`](../../../../../product-map/module/la-store-pg.toon). Editions, add-ons, order codes and dependencies are read
@@ -23,7 +23,7 @@ tags: [product-item, module]
 | user-guide | n/a | no screens - a storage backend chosen by JVM properties, invisible to end users |
 | admin-guide | current | [Link analysis PostgreSQL store - admin guide](admin-guide.md) |
 | api | n/a | implements la-core's InvestigationStoreProvider SPI and adds no contract of its own; the SPI is specified in la-core/spec.md |
-| tests | current | [Link analysis PostgreSQL store — tests inventory](tests-inventory.md) |
+| tests | current | [Link Analysis PostgreSQL store — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).

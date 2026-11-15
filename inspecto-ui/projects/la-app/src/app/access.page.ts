@@ -40,5 +40,6 @@ export class AccessPageComponent {
         canAuthorWorkbench: 'Set up Datasets, Entity Types and saved views',
         canAdminister: 'Administer Spaces and their settings',
         canConfigureAccess: 'Edit roles and access',
+        canOpenInboundInvestigation: 'Open Investigations from another system',
     };
 }

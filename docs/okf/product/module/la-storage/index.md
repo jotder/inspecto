@@ -1,12 +1,12 @@
 ---
 type: ProductItem
-title: Link analysis storage
+title: Link Analysis storage
 item: module.la-storage
 description: Documentation hub for module.la-storage — every document about it, by slot.
 tags: [product-item, module]
 ---
 
-# Link analysis storage (`module.la-storage`)
+# Link Analysis storage (`module.la-storage`)
 
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.la-storage`](../../../../../product-map/module/la-storage.toon). Editions, add-ons, order codes and dependencies are read
@@ -23,7 +23,7 @@ tags: [product-item, module]
 | user-guide | n/a | no screens of its own - the index tool and staleness badges are documented in the la-core user guide (la-core/user-guide.md) |
 | admin-guide | current | [Link analysis storage - admin guide](admin-guide.md) |
 | api | n/a | no HTTP routes and no SPI - an internal library called only by la-api, whose index routes are in la-api/api-routes.md |
-| tests | current | [Link Analysis edge index — 10^9 scale run plan (clause 3 of `LA-INDEX-SCALE-MEASURE-1`)](tests-index-scale-run.md) · [Link analysis storage — tests inventory](tests-inventory.md) |
+| tests | current | [Link Analysis edge index — 10^9 scale run plan (clause 3 of `LA-INDEX-SCALE-MEASURE-1`)](tests-index-scale-run.md) · [Link Analysis storage — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).

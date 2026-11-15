@@ -69,8 +69,10 @@ export class LinkAnalysisModulesComponent implements OnInit {
 
     /** A server reason with each module id it names replaced by that module's title ("requires la-core" → "requires Link analysis core and ports"). */
     reason(text: string): string {
-        // module ids are word characters and hyphens; split on everything else and swap whole ids only
+        // module ids are word characters and hyphens; split on everything else and swap whole ids only. The server's
+        // "not on the class path" (a known module missing from this build) is "not installed" to a user.
         return text
+            .replaceAll('not on the class path', 'not installed')
             .split(/([^\w-]+)/)
             .map((part) => this.titles().get(part) ?? part)
             .join('');

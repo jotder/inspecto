@@ -90,7 +90,7 @@ describe('PostgresTableComponent - Choose a table (BASIC-ONBOARD-1 P3)', () => {
         });
         test.flush(TESTED);
         fixture.detectChanges();
-        expect(q(el, 'pg-connected')!.textContent).toContain('Connected as reader, read-only - 2');
+        expect(q(el, 'pg-connected')!.textContent).toContain('Connected as reader, read-only: 2');
 
         // reading without a table names what is missing
         q(el, 'pg-read')!.click();

@@ -97,7 +97,7 @@ export function waitingWords(n: number, alreadyImported = 0): string {
 
 /** One waiting file: its name, and why Run now would skip it. */
 export function waitingFileLine(f: WaitingFile): string {
-    return f.alreadyImported ? `${f.name} - already imported under this name` : f.name;
+    return f.alreadyImported ? `${f.name} (already imported under this name)` : f.name;
 }
 
 /** Where the files come from, in words: `a watched folder`, `SFTP (Connection partner_box)`. */

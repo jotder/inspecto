@@ -36,7 +36,9 @@ the dialog was opened with a synthetic key event and works).
 > tracked templates `la-sample` and `la-mobile-money`; the phone switcher still shows no name and a two-line name is
 > squeezed in its list item: `LA-SPACE-SWITCHER-NAMES-1`. In D-10 node labels still start off, by the operator's
 > 2026-10-15 decision). D-5 was fixed and its row closed on 2026-11-15 (Radial is now one radial per component round
-> its best-connected node; the picked layout still stays chosen for the next graph, by design). D-14 stays open on the board.
+> its best-connected node; the picked layout still stays chosen for the next graph, by design). D-14 was fixed on
+> 2026-11-15 except five wording calls left for the operator on the narrowed row `LA-UI-TEXT-PASS-2` (the embed
+> host-flag hint, *Onboard a file*, *capabilities*, the link index version, the showcase Dataset descriptions).
 
 Severity: **P1** blocks a user's task · **P2** misleads or breaks a main path · **P3** friction, layout or
 wording. Each defect has a row in `docs/BACKLOG.md` (id in brackets).

@@ -41,7 +41,7 @@
                             >{{ label(card.role.name) }}</span
                         >
                         <inspecto-chip variant="soft" [tone]="card.role.source === 'authored' ? 'primary' : 'neutral'">
-                            {{ card.role.source === 'authored' ? 'Authored' : 'Seed default' }}
+                            {{ card.role.source === 'authored' ? 'Authored' : 'Built-in' }}
                         </inspecto-chip>
                         <span class="flex-1"></span>
                         @if (canEdit()) {
@@ -60,7 +60,9 @@
                                     mat-icon-button
                                     type="button"
                                     [attr.aria-label]="
-                                        'Revert role ' + label(card.role.name) + ' to its seed defaults or remove it'
+                                        'Revert role ' +
+                                        label(card.role.name) +
+                                        ' to its built-in defaults or remove it'
                                     "
                                     matTooltip="Revert to seed / remove"
                                     [disabled]="saving()"

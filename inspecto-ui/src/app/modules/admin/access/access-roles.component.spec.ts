@@ -93,7 +93,7 @@ describe('AccessRolesComponent', () => {
         const { fixture, c } = create();
         expect(c.cards().map((card) => card.role.name)).toEqual(['operations', 'fraud-analyst']);
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-        expect(text).toContain('Seed default');
+        expect(text).toContain('Built-in');
         expect(text).toContain('Authored');
         expect(text).toContain('canOperateRuns');
         expect(text).toContain('Data scopes: fraud');

@@ -149,7 +149,7 @@ export function summarizeGraphRun(r: GraphRunResult, map: ServerIdMap | null): G
             const l = r.links ?? [];
             return out(
                 `${plural(l.length, 'predicted link')}.`,
-                l.slice(0, TOP).map((x) => scored(`${x.sourceLabel} - ${x.targetLabel}`, x.score)),
+                l.slice(0, TOP).map((x) => scored(`${x.sourceLabel} — ${x.targetLabel}`, x.score)),
                 nodeOf(l.flatMap((x) => [x.source, x.target])),
             );
         }

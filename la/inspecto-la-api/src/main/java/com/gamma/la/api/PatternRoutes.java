@@ -448,7 +448,7 @@ public final class PatternRoutes implements RouteModule {
                         + " cannot be evaluated — add " + th.attr() + " as a link attribute in the Query panel.";
             if (((Number) row.get("passing_" + i)).longValue() == 0)
                 return "No link in this graph passes " + label(th) + ". If the view filters " + th.attr()
-                        + " (for example to ≥ 5 000), the legs this pattern looks for were removed before it ran — clear that filter rather than read this as \"none found\".";
+                        + " (for example to ≥ 5,000), the legs this pattern looks for were removed before it ran — clear that filter rather than read this as “none found”.";
         }
         return null;
     }

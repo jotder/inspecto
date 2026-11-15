@@ -333,7 +333,7 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
                                 <h2 id="embed-sel" class="m-0 text-lg font-semibold">{{ sel }}</h2>
                                 <ul class="m-0 list-none p-0">
                                     @for (l of linksOf(sel); track $index) {
-                                        <li>{{ l.source }} - {{ l.kind }} - {{ l.target }} ({{ l.count ?? 1 }})</li>
+                                        <li>{{ l.source }} — {{ l.kind }} — {{ l.target }} ({{ l.count ?? 1 }})</li>
                                     } @empty {
                                         <li class="text-secondary">No links.</li>
                                     }
@@ -483,7 +483,7 @@ export class EmbedViewPageComponent {
                     next: (v) => {
                         this.view.set(v);
                         this.state.set('ready');
-                        this.title.setTitle((v.investigation.title || 'Investigation') + ' - shared view');
+                        this.title.setTitle((v.investigation.title || 'Investigation') + ' — shared view');
                         this.scrub(t);
                     },
                     error: (e: { status?: number } | null) => {

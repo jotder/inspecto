@@ -33,8 +33,8 @@ describe('ShortcutsHelpDialog', () => {
         const fixture = await create({ shortcuts: LA_APP_SHORTCUTS });
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
         expect(text).not.toContain('command palette');
-        expect(text).toContain('Grow the graph');
-        expect(text).toContain('Undo the last Grow or Exclude');
+        expect(text).toContain('Expand the graph');
+        expect(text).toContain('Undo the last Expand or Exclude');
         await expectNoA11yViolations(fixture.nativeElement);
     });
 

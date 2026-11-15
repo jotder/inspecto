@@ -1,6 +1,6 @@
 ---
 id: la-api
-title: Link analysis and geo routes
+title: Link Analysis and geo routes
 buildRole: implementation
 offeringRole: optional
 bindingTime: boot

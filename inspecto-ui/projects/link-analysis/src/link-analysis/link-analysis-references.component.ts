@@ -98,8 +98,7 @@ import { investigationErrorMessage } from './investigation-state';
                     </p>
                 } @else if (reviewer()) {
                     <p id="refs-read-only" class="text-secondary m-0" data-testid="references-read-only">
-                        Read-only: you are a reviewer of this Investigation - only a lead or an analyst adds a
-                        reference.
+                        Read-only: you are a reviewer of this Investigation; only a lead or an analyst adds a reference.
                     </p>
                 }
             }

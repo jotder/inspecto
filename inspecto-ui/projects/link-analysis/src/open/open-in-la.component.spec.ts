@@ -128,7 +128,7 @@ describe('OpenInLaComponent (Open in Inspecto LA)', () => {
     it('refuses an invalid link with a readable reason and never calls the server', () => {
         const { el, resolve } = make({ entity: 'no-colon' });
         expect(resolve).not.toHaveBeenCalled();
-        expect(q(el, 'open-error')!.textContent).toContain('"<type>:<key>"');
+        expect(q(el, 'open-error')!.textContent).toContain('“<type>:<key>”');
         expect(q(el, 'open-entity')).toBeNull();
     });
 

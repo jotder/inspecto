@@ -236,7 +236,7 @@ describe('LinkAnalysisEmbedComponent (LA-EMBED-SPA-1)', () => {
         const field = d.querySelector('#embed-link-field') as HTMLInputElement;
         expect(field.value).toBe(location.origin + '/embed/inv/' + encodeURIComponent(TOKEN));
         expect(field.value).not.toContain('/public/investigations');
-        expect(d.textContent).toContain('Copy now - it is not shown again');
+        expect(d.textContent).toContain('Copy now: it is not shown again');
         await expectNoA11yViolations(d);
 
         button(d, 'Copy')!.click();

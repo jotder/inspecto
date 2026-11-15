@@ -48,7 +48,7 @@ type State = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 
                                     <span class="font-mono">{{ e.type }}: {{ revealed() ?? e.key }}</span>
                                     @if (e.masked && !revealed()) {
                                         <span class="text-secondary ml-2 text-xs" data-testid="masked"
-                                            >masked - shown by its alias</span
+                                            >masked, shown by its alias</span
                                         >
                                     }
                                 </dd>

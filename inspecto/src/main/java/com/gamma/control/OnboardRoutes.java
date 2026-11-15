@@ -124,7 +124,7 @@ final class OnboardRoutes implements RouteModule {
         Path root = WriteGates.requireWriteRoot(api, what);
         if (!DataSettings.forRoot(root).selfImportInForce())
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED,
-                    "Add data is turned off in this Space: its data comes from Pipelines - ask an administrator to turn it on");
+                    "Add data is turned off in this Space: its data comes from Pipelines; ask an administrator to turn it on");
         return root;
     }
 

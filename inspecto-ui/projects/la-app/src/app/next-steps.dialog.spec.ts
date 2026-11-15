@@ -51,7 +51,7 @@ describe('NextStepsDialog - What can I do next? (LA-ONBOARD-1 phase 8)', () => {
     });
 
     it('a step this person may not take is shown locked with the reason, never a button that fails', async () => {
-        const lock = 'Data in this Space comes from Pipelines - ask an administrator.';
+        const lock = 'Data in this Space comes from Pipelines; ask an administrator.';
         const { el } = create(
             { hasSpace: true, datasets: 0, columnsDescribed: false, views: 0, lists: 0 },
             lock,

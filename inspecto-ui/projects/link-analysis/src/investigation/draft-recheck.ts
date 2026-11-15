@@ -25,5 +25,5 @@ export function draftSavedWarning(name: string, integrity: string[] | null): str
     if (integrity === null)
         return `Saved “${name}” — the reference check could not run, so broken references are unknown.`;
     if (!integrity.length) return null;
-    return `Saved “${name}” with ${integrity.length} broken reference(s): ${integrity.join('; ')}`;
+    return `Saved “${name}” with ${integrity.length} broken ${integrity.length === 1 ? 'reference' : 'references'}: ${integrity.join('; ')}`;
 }

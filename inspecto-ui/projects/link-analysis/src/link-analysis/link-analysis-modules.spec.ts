@@ -66,14 +66,32 @@ describe('LinkAnalysisModulesComponent (DR-U12)', () => {
             of({
                 hostBuildId: 'h',
                 modules: [
-                    m('la-core', { title: 'Link analysis core and ports' }),
+                    m('la-core', { title: 'Link Analysis core and ports' }),
                     m('la-graph', { state: 'INERT', reasons: ['requires la-core (and la-core-x, not-listed)'] }),
                 ],
             }),
         );
         open();
         expect(el.querySelector('[data-testid=module-reason]')!.textContent!.trim()).toBe(
-            'requires Link analysis core and ports (and la-core-x, not-listed)',
+            'requires Link Analysis core and ports (and la-core-x, not-listed)',
+        );
+    });
+
+    it('LA-UI-TEXT-PASS-2: a module missing from this build is "not installed", never "not on the class path"', () => {
+        const { el, open } = make(() =>
+            of({
+                hostBuildId: 'h',
+                modules: [
+                    m('la-graph', {
+                        state: 'INERT',
+                        reasons: ["requires module 'entity-list', which is not on the class path"],
+                    }),
+                ],
+            }),
+        );
+        open();
+        expect(el.querySelector('[data-testid=module-reason]')!.textContent!.trim()).toBe(
+            "requires module 'entity-list', which is not installed",
         );
     });
 

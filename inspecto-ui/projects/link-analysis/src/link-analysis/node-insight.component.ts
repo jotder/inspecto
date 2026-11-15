@@ -417,7 +417,7 @@ interface Membership {
                     </p>
                 } @else if (memberships() && !eligibleLists().length) {
                     <p class="text-secondary mt-1 text-xs" data-testid="lists-none">
-                        No watch or block list can take this entity - create one in Entity Lists.
+                        No watch or block list can take this entity; create one in Entity Lists.
                     </p>
                 }
                 @if (actionNote(); as n) {

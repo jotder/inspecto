@@ -1,6 +1,6 @@
 ---
 id: la-storage
-title: Link analysis storage
+title: Link Analysis storage
 buildRole: implementation
 offeringRole: optional
 bindingTime: boot

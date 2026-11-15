@@ -206,10 +206,10 @@ source for them yet (see `docs/okf/product/layer/platform/spec-module-reorg-deci
 | `scoring` - Scoring | features | optional | `entity-list` | — | ✅ | ✅ | ✅ |
 | `screening` - Screening | features | optional | `entity-list`, `ops` | — | ✅ | ✅ | ✅ |
 | `geo-link` - Geo and link adapters over platform data | la | optional | `la-api`, `la-core` | ✅ | ✅ | ✅ | ✅ |
-| `la-api` - Link analysis and geo routes | la | optional | `la-core`, `la-storage` | ✅ | ✅ | ✅ | ✅ |
-| `la-core` - Link analysis core and ports | la | optional | `graph` | ✅ | ✅ | ✅ | ✅ |
-| `la-storage` - Link analysis storage | la | optional | `la-core` | ✅ | ✅ | ✅ | ✅ |
-| `la-store-pg` - Link analysis PostgreSQL store | la | provider | `la-core` | — | — | ✅ | ✅ |
+| `la-api` - Link Analysis and geo routes | la | optional | `la-core`, `la-storage` | ✅ | ✅ | ✅ | ✅ |
+| `la-core` - Link Analysis core and ports | la | optional | `graph` | ✅ | ✅ | ✅ | ✅ |
+| `la-storage` - Link Analysis storage | la | optional | `la-core` | ✅ | ✅ | ✅ | ✅ |
+| `la-store-pg` - Link Analysis PostgreSQL store | la | provider | `la-core` | — | — | ✅ | ✅ |
 | `agent-hosted` - Hosted model providers for the assistant | providers | provider | `agent` | — | — | — | — |
 | `asn-decoders` - ASN.1 decoders | providers | provider | — | — | — | — | — |
 | `connectors` - Collector and export connectors | providers | provider | — | ✅ | ✅ | ✅ | ✅ |

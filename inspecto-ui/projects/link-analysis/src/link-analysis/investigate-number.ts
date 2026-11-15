@@ -408,7 +408,7 @@ export function thresholdWords(heldFor: readonly string[]): string {
         const key = r.startsWith('budget') ? BUDGET_KEY : r.startsWith('maxFanOut') ? FAN_OUT_KEY : null;
         return key ? `${r}, set by ${key}` : r;
     });
-    return `${named.join('; ')} - Settings > Link Analysis`;
+    return `${named.join('; ')} (Settings ▸ Link Analysis)`;
 }
 
 /** What a non-ladder expand named, in words: the one entity, a count, or every entity (no ids). */

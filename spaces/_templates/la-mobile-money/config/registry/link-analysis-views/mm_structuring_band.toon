@@ -1,5 +1,5 @@
 name: mm_structuring_band
-description: "The structuring band: only transactions of 4 750 or more (the top 5 percent under the Tier-1 limit 5 000). Ordinary traffic stays under 4 400, so what survives is agent AG-18 cashing in for 25 wallets and those wallets paying HUB-01, the 98 percent forward to the relays and the cash-out at AG-39."
+description: "The structuring band: only transactions of 4,750 or more (the top 5 percent under the Tier-1 limit 5,000). Ordinary traffic stays under 4,400, so what survives is agent AG-18 cashing in for 25 wallets and those wallets paying HUB-01, the 98 percent forward to the relays and the cash-out at AG-39."
 sourceId: entity-projection
 layout: dagre
 profile: finance

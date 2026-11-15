@@ -30,9 +30,9 @@ describe('parseOpenLink (the Open in Inspecto LA contract)', () => {
         const error = (p: Record<string, string>) => (parse(p) as { error: string }).error;
         expect(error({ entity: 'cell:x', seed: '1' })).toContain('does not know: seed');
         expect(error({})).toContain('names no entity and no Investigation');
-        expect(error({ entity: 'no-colon' })).toContain('"<type>:<key>"');
-        expect(error({ entity: ':key' })).toContain('"<type>:<key>"');
-        expect(error({ entity: 'msisdn:' })).toContain('"<type>:<key>"');
+        expect(error({ entity: 'no-colon' })).toContain('“<type>:<key>”');
+        expect(error({ entity: ':key' })).toContain('“<type>:<key>”');
+        expect(error({ entity: 'msisdn:' })).toContain('“<type>:<key>”');
         expect(error({ investigation: '../x' })).toContain('not a valid id');
         expect(error({ entity: 'cell:x', from: '2026-10-01' })).toContain('"from"');
         expect(error({ entity: 'cell:x', to: 'yesterday' })).toContain('"to"');

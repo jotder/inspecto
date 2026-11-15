@@ -4549,7 +4549,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         await settle(fixture); // the panel's preview starts on its first render
         const panel = el.querySelector('[data-testid="la-expand-dialog"]') as HTMLElement;
         expect(panel.closest('[data-testid="la-graph-region"]')).toBeTruthy(); // an overlay on the canvas
-        expect(panel.textContent).toContain('(not recorded)');
+        expect(panel.textContent).toContain('(this graph only)');
         expect(el.querySelector('[data-testid="la-expand-no-preview"]')).not.toBeNull();
         expect(grow.getAttribute('aria-expanded')).toBe('true');
         await expectNoA11yViolations(panel);

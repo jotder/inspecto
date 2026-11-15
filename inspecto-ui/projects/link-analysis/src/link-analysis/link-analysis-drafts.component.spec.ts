@@ -112,7 +112,7 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         const { el } = await create({}, [{ ...DRAFT, state: 'hibernated', behind: 2, stale: true }]);
         expect(el.textContent).toContain('ana-1');
         expect(el.textContent).toContain('hibernated');
-        expect(el.textContent).toContain('main moved 2 step(s)');
+        expect(el.textContent).toContain('main moved 2 steps');
         await expectNoA11yViolations(el);
     });
 
@@ -153,13 +153,13 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         const list = (steps: number) => of({ investigationId: 'inv-1', items: [{ ...DRAFT, steps }], total: 1 });
         const investigationDrafts = vi.fn(() => list(3)).mockReturnValueOnce(list(2));
         const { f, el, inv } = await create({ investigationDrafts });
-        expect(el.textContent).toContain('2 own step(s)');
+        expect(el.textContent).toContain('2 own steps');
         f.componentInstance.tick = { step: 6 };
         f.detectChanges();
         await f.whenStable();
         f.detectChanges();
         expect(inv.investigationDrafts).toHaveBeenCalledTimes(2);
-        expect(el.textContent).toContain('3 own step(s)');
+        expect(el.textContent).toContain('3 own steps');
     });
 
     it('LA-UI-DRAFT-POLISH-1: counts EFFECTIVE own steps (an undo and the op it undid fold away)', async () => {
@@ -171,12 +171,12 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         const draftLog = vi.fn(() => of({ entries, total: 3, truncated: false }));
         const { el, inv } = await create({ draftLog });
         expect(inv.draftLog).toHaveBeenCalledWith('inv-1', 'd-1');
-        expect(el.textContent).toContain('0 own step(s)');
+        expect(el.textContent).toContain('0 own steps');
     });
 
     it('LA-UI-DRAFT-POLISH-1: keeps the raw count when the Draft log cannot be read', async () => {
         const { el } = await create();
-        expect(el.textContent).toContain('2 own step(s)');
+        expect(el.textContent).toContain('2 own steps');
     });
 
     it('forks a Draft', async () => {
@@ -262,7 +262,7 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         const { f, el, inv } = await create();
         await click(f, button(el, 'Rebase'));
         expect(inv.rebaseDraft).toHaveBeenCalledWith('inv-1', 'd-1', [4], 5);
-        expect(el.textContent).toContain('Rebased onto step 5; 1 conflicting step(s) were dropped');
+        expect(el.textContent).toContain('Rebased onto step 5; 1 conflicting step was dropped');
     });
 
     it('promotes at the main head and tells the host', async () => {

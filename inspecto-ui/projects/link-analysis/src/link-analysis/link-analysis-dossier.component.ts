@@ -257,8 +257,9 @@ function saveBlob(blob: Blob, name: string): void {
                     <inspecto-alert variant="success" title="Bundle verified">
                         The seal matches the file and the store still agrees with the Dossier.
                         @if (b.referencesAddedSince) {
-                            {{ b.referencesAddedSince }} reference(s) were added after export; appending never breaks a
-                            bundle.
+                            {{ b.referencesAddedSince }}
+                            {{ b.referencesAddedSince === 1 ? 'reference was' : 'references were' }} added after export;
+                            appending never breaks a bundle.
                         }
                     </inspecto-alert>
                 } @else {

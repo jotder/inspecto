@@ -77,11 +77,11 @@ import { OnboardService } from './onboard.service';
                     [mono]="true"
                     [required]="true"
                     placeholder="\${ENV:INSPECTO_PG_SALES}"
-                    help="The name of an environment variable on the server, starting INSPECTO_PG_, that holds it - never the password itself."
+                    help="The name of an environment variable on the server, starting INSPECTO_PG_, that holds it, never the password itself."
                     [error]="
                         errorOf(
                             'password',
-                            'Write it as \${ENV:INSPECTO_PG_…} - the variable on the server holding the password.'
+                            'Write it as \${ENV:INSPECTO_PG_…}: the variable on the server holding the password.'
                         )
                     "
                 ></inspecto-pen-field>
@@ -92,7 +92,7 @@ import { OnboardService } from './onboard.service';
                 </button>
                 @if (tested(); as t) {
                     <span class="text-sm" role="status" data-testid="pg-connected"
-                        >Connected as {{ t.user }}, read-only - {{ t.tables.length }}{{ t.truncated ? '+' : '' }}
+                        >Connected as {{ t.user }}, read-only: {{ t.tables.length }}{{ t.truncated ? '+' : '' }}
                         {{ t.tables.length === 1 ? 'table' : 'tables' }}</span
                     >
                 }

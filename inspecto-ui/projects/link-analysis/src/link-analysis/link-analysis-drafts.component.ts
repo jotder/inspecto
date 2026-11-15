@@ -121,12 +121,13 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
                         <code>{{ d.draftId }}</code>
                         <inspecto-status-badge [value]="tone(d.state)" [label]="d.state"></inspecto-status-badge>
                         <span class="text-secondary">
-                            forked at step {{ d.baseStep }} · {{ ownSteps(d) }} own step(s)
+                            forked at step {{ d.baseStep }} · {{ ownSteps(d) }} own
+                            {{ ownSteps(d) === 1 ? 'step' : 'steps' }}
                         </span>
                         @if (d.behind > 0) {
                             <inspecto-status-badge
                                 value="warning"
-                                [label]="'main moved ' + d.behind + ' step(s)'"
+                                [label]="'main moved ' + d.behind + (d.behind === 1 ? ' step' : ' steps')"
                             ></inspecto-status-badge>
                         }
                         @if (d.expiryWarning) {
@@ -210,7 +211,7 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
                         <div class="flex flex-col gap-1">
                             <span>
                                 Based on step {{ r.baseStep }}; main is at step {{ r.mainHead }} ({{ r.behind }} behind)
-                                · {{ r.carried }} step(s) would carry over.
+                                · {{ r.carried }} {{ r.carried === 1 ? 'step' : 'steps' }} would carry over.
                             </span>
                             @if (r.conflicts.length === 0) {
                                 <span class="text-secondary">No conflicts — a rebase would carry every step.</span>
@@ -416,7 +417,7 @@ export class LinkAnalysisDraftsComponent {
             });
             this.notice.set(
                 confirm.length
-                    ? `Rebased onto step ${report.mainHead}; ${confirm.length} conflicting step(s) were dropped.`
+                    ? `Rebased onto step ${report.mainHead}; ${confirm.length} conflicting ${confirm.length === 1 ? 'step was' : 'steps were'} dropped.`
                     : `Rebased onto step ${report.mainHead}.`,
             );
         }

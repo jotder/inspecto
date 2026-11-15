@@ -19,9 +19,9 @@ const SHORTCUTS: Shortcut[] = [
     { keys: ['J', 'K'], description: 'Move down / up a list that supports keyboard nav (e.g. incidents)' },
     { keys: ['Enter'], description: 'Open the focused list row' },
     { keys: ['X'], description: 'Select / deselect the focused list row' },
-    { keys: ['G'], description: 'Link Analysis: Grow the graph (opens the Grow panel)' },
+    { keys: ['G'], description: 'Link Analysis: Expand the graph (opens the Expand panel)' },
     { keys: ['X'], description: 'Link Analysis: Exclude the selected nodes (outside a list)' },
-    { keys: ['Ctrl', 'Z'], description: 'Link Analysis: Undo the last Grow or Exclude' },
+    { keys: ['Ctrl', 'Z'], description: 'Link Analysis: Undo the last Expand or Exclude' },
 ];
 
 /**
@@ -33,9 +33,9 @@ export const LA_APP_SHORTCUTS: Shortcut[] = [
     { keys: ['Esc'], description: 'Close a dialog, or this help' },
     { keys: ['→'], description: 'Fill sample value into an empty edit box' },
     { keys: ['/'], description: "Search the page's table (opens and focuses its quick filter)" },
-    { keys: ['G'], description: 'Link Analysis: Grow the graph (opens the Grow panel)' },
+    { keys: ['G'], description: 'Link Analysis: Expand the graph (opens the Expand panel)' },
     { keys: ['X'], description: 'Link Analysis: Exclude the selected nodes (outside a list)' },
-    { keys: ['Ctrl', 'Z'], description: 'Link Analysis: Undo the last Grow or Exclude' },
+    { keys: ['Ctrl', 'Z'], description: 'Link Analysis: Undo the last Expand or Exclude' },
 ];
 
 /** True when a key event comes from a text-editing control, where a bare `?` is typed text, not a shortcut. */

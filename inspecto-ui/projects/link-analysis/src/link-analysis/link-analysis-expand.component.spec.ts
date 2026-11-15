@@ -546,7 +546,7 @@ describe('LinkAnalysisExpandComponent (LA-STUDIO-UI-REORG-1 §5.4)', () => {
         await settle(fixture);
         expect(basic).toHaveBeenCalledWith(['a', 'b'], expect.objectContaining({ direction: 'either', hold: true }));
         expect(inv.previewExpand).not.toHaveBeenCalled();
-        expect(el.textContent).toContain('(not recorded)');
+        expect(el.textContent).toContain('(this graph only)');
         expect(cmp.directionOptions().map((o) => o.value)).not.toContain('reciprocal');
         expect(q(el, 'la-expand-fold-time')).toBeNull();
         expect(q(el, 'la-expand-rung')).toBeNull();

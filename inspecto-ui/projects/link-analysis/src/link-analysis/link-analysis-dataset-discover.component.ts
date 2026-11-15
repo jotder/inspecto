@@ -84,7 +84,10 @@ import type { PresetDraw } from './link-analysis-presets.component';
                                 <span class="font-medium">{{ t.label }}</span
                                 >:
                                 {{ t.distinct === null ? 'not counted' : count(t.distinct, t.approximate) }}
-                                <span class="text-secondary text-xs">(in {{ t.columns.join(', ') }})</span>
+                                <span class="text-secondary text-xs"
+                                    >(in the {{ t.columns.length === 1 ? 'column' : 'columns' }}
+                                    {{ t.columns.join(', ') }})</span
+                                >
                             </li>
                         } @empty {
                             <li class="text-secondary">No column of this Dataset holds an Entity Type.</li>

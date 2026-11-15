@@ -428,7 +428,7 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
                 { status: 202, statusText: 'Accepted' },
             );
             fixture.detectChanges();
-            expect(el.textContent).toContain('runs on the server - following it');
+            expect(el.textContent).toContain('runs on the server; following it');
             vi.advanceTimersByTime(1500);
             http.expectOne(apiUrl('/onboard/runs/r5')).flush({
                 runId: 'r5',

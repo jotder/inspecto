@@ -82,8 +82,9 @@ export interface SaveTemplateData {
         <mat-dialog-content class="flex flex-col gap-3 text-sm">
             @if (saved(); as t) {
                 <inspecto-alert variant="success" title="Template saved">
-                    <code>{{ t.id }}</code> — {{ t.parameters.length }} parameter(s), {{ t.ops.length }} step(s).
-                    Instantiate it from this panel with that id.
+                    <code>{{ t.id }}</code> — {{ t.parameters.length }}
+                    {{ t.parameters.length === 1 ? 'parameter' : 'parameters' }}, {{ t.ops.length }}
+                    {{ t.ops.length === 1 ? 'step' : 'steps' }}. Instantiate it from this panel with that id.
                 </inspecto-alert>
                 <ul class="m-0 pl-4 text-xs" aria-label="What the server dropped and generalised">
                     @for (d of t.dropped; track d.step) {
@@ -370,8 +371,9 @@ export function instantiateSpecs(t: InvestigationTemplate): AttributeSpec[] {
             }
             @if (template(); as t) {
                 <p class="text-secondary m-0 text-xs">
-                    <strong>{{ t.title || t.id }}</strong> — {{ t.ops.length }} step(s) from Investigation
-                    {{ t.derivedFrom.investigation }}, originally over {{ t.roles.dataset }}.
+                    <strong>{{ t.title || t.id }}</strong> — {{ t.ops.length }}
+                    {{ t.ops.length === 1 ? 'step' : 'steps' }} from Investigation {{ t.derivedFrom.investigation }},
+                    originally over {{ t.roles.dataset }}.
                 </p>
                 <inspecto-schema-form
                     [specs]="specs()"
@@ -406,7 +408,7 @@ export class InstantiateTemplateDialog {
         (this.templates() ?? []).map((t) => ({
             value: t.id,
             label: t.title || t.id,
-            hint: `${t.id} · ${t.ops} step(s) · over ${t.dataset ?? 'unknown Dataset'}`,
+            hint: `${t.id} · ${t.ops} ${t.ops === 1 ? 'step' : 'steps'} · over ${t.dataset ?? 'unknown Dataset'}`,
         })),
     );
     readonly templateId = new FormControl('', { nonNullable: true, validators: [Validators.required] });

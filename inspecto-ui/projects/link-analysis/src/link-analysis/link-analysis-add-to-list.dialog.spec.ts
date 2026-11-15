@@ -111,7 +111,7 @@ describe('LinkAnalysisAddToListDialog - Add to a list (LA-ONBOARD-1 phase 7, UC-
             listId: 'suspects',
             title: 'Suspects',
             purpose: 'watch',
-            message: '1 added to “Suspects” - it now has 4.',
+            message: '1 added to “Suspects” — it now has 4.',
         });
     });
 

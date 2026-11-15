@@ -1,12 +1,12 @@
 ---
 type: TestsInventory
-title: Link analysis core and ports — tests inventory
+title: Link Analysis core and ports — tests inventory
 item: module.la-core
 description: Generated list of the test classes for module.la-core, with how to run them.
 tags: [tests, module]
 ---
 
-# Link analysis core and ports — tests inventory (`module.la-core`)
+# Link Analysis core and ports — tests inventory (`module.la-core`)
 
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked test sources under `la/inspecto-la-core/src/test/` — never edit this table; add or
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item

@@ -991,11 +991,11 @@ function indexAndExpectations(s: ImportSummary): SummaryLine[] {
 
 /** Why Add data is locked in this Space, in the server's words (`OnboardRoutes.requireSelfImport`). */
 export const SELF_IMPORT_OFF =
-    'Add data is turned off in this Space: its data comes from Pipelines - ask an administrator to turn it on';
-export const NO_UPLOAD_RIGHT = 'Adding data needs the right to upload data in this Space - ask an administrator';
+    'Add data is turned off in this Space: its data comes from Pipelines; ask an administrator to turn it on';
+export const NO_UPLOAD_RIGHT = 'Adding data needs the right to upload data in this Space; ask an administrator';
 /** Fallbacks until `DATA-TIERS-1` phase 2 serves `featureReasons.remoteSystems` / `pipelineAutomation`. */
 export const REMOTE_FALLBACK =
-    'Reading from another database or a remote system is available in Standard and above - this build (Basic) adds files and copies Postgres tables';
+    'Reading from another database or a remote system is available in Standard and above; this build (Basic) adds files and copies Postgres tables';
 export const AUTOMATION_FALLBACK =
     'Keeping a Dataset up to date on a schedule you set, or from a remote system, is available in Standard and above';
 

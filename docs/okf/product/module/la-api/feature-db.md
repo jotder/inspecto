@@ -1,12 +1,12 @@
 ---
 type: FeatureDb
-title: Link analysis and geo routes — feature database
+title: Link Analysis and geo routes — feature database
 item: module.la-api
 description: Generated feature list for module.la-api — features, routes, config kinds and processors, with Editions and add-ons.
 tags: [feature-db, module]
 ---
 
-# Link analysis and geo routes — feature database (`module.la-api`)
+# Link Analysis and geo routes — feature database (`module.la-api`)
 
 > **Generated** by `tools/render-feature-db.mjs` from the module manifests, `offerings/*.toon`, the processor catalog
 > contract and `docs/FEATURE_INVENTORY.md` — never edit this table; change its sources and re-run the tool. The whole

@@ -415,7 +415,7 @@ export class LinkAnalysisSnapshotDialog {
                         this.form.controls.caseId.setValue(made.caseId);
                         this.caseForm.controls.mode.setValue('existing');
                         this.caseError.set(
-                            `Case ${made.caseId} was created with ${made.memberCount} member(s), but the ` +
+                            `Case ${made.caseId} was created with ${made.memberCount} ${made.memberCount === 1 ? 'member' : 'members'}, but the ` +
                                 `analysis could not be attached to it: ${apiErrorMessage(e, 'the attachment failed')}. ` +
                                 'Save again to attach it — the Case will not be created twice.',
                         );

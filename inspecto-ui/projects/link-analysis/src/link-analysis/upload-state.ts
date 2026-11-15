@@ -57,12 +57,12 @@ export function uploadErrorMessage(
                 : 'You can only delete your own uploads, unless you administer the Space. ' + server;
         case 404:
             return action === 'delete'
-                ? 'That upload is no longer listed - it may already have been deleted. Refresh the list.'
+                ? 'That upload is no longer listed; it may already have been deleted. Refresh the list.'
                 : 'That Collector does not accept uploads here. Choose another, or ask a Space administrator to enable uploads on it.';
         case 409:
             if (action !== 'delete' && isBusyRefusal(err)) return server;
             return action === 'delete'
-                ? 'The Collector has already picked this file up, so it cannot be withdrawn - its rows are in the Dataset.'
+                ? 'The Collector has already picked this file up, so it cannot be withdrawn: its rows are in the Dataset.'
                 : "A file with this name is still waiting in the Collector's inbox. If it is your upload, delete or replace it below; otherwise rename your file.";
         case 413:
             return (

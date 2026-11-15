@@ -151,7 +151,7 @@ describe('LinkAnalysisIdentityComponent (DR-U8)', () => {
             reason: 'SIM swap file',
         });
         expect(inv.listIdentityGroups).toHaveBeenCalledTimes(2);
-        expect(el.textContent).toContain('3 assertion(s) added from 6 row(s)');
+        expect(el.textContent).toContain('3 assertions added from 6 rows');
         expect(el.textContent).toContain('1 already asserted');
     });
 

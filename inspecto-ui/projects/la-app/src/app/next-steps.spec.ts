@@ -24,7 +24,7 @@ describe('nextSteps - What can I do next? (LA-ONBOARD-1 phase 8, UC-15 rule 4)',
         const [first] = nextSteps(space({}), OPEN);
         expect(first).toEqual(expect.objectContaining({ id: 'add-data', to: '/add-data' }));
         expect(first.why).toContain('no Dataset');
-        const lock = 'Data in this Space comes from Pipelines - ask an administrator.';
+        const lock = 'Data in this Space comes from Pipelines; ask an administrator.';
         expect(nextSteps(space({}), { canCreateSpace: false, addDataLock: lock })[0].locked).toBe(lock);
     });
 

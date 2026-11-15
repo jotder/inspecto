@@ -1,5 +1,5 @@
 name: mfs_split_deposits
-description: "Split deposits - every cash-in at an agent that handled 1 000 or more cash-ins averaging under 25 (via on cashed_in_at = cash-ins, days, per day, average), with the agent's own registration of those wallets (via on registered_by = what else each wallet does). Small cash-ins are normal at a market, where traders deposit a day's takings; an agent who splits one deposit into many earns a commission on each."
+description: "Split deposits - every cash-in at an agent that handled 1,000 or more cash-ins averaging under 25 (via on cashed_in_at = cash-ins, days, per day, average), with the agent's own registration of those wallets (via on registered_by = what else each wallet does). Small cash-ins are normal at a market, where traders deposit a day's takings; an agent who splits one deposit into many earns a commission on each."
 sourceId: entity-projection
 layout: force
 query:

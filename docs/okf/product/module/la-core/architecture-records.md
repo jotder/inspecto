@@ -892,7 +892,7 @@ where a later bullet supersedes them.
   nodes · M links on screen* (`onScreenCounts()` over `canvasData`, so the Working Set while one is open) above *Totals for
   the full graph, before grouping*. **Limits** = `inspecto-link-analysis-caps` on that card (icon button
   `heroicons_outline:scale`, popover `top-full right-0`, Escape returns focus). **Installed modules** is the ⚙ Settings
-  section `modules` (*This Studio*; `GET /modules` read when first shown, filtered to `geo-link` + `la-*`). The canvas
+  section `modules` (*This server*; `GET /modules` read when first shown, filtered to `geo-link` + `la-*`). The canvas
   render strip keeps only what the render left out (`role="group"`: axe refuses an `aria-label` on a role-less empty div).
 * **Expand in the Investigation tab** (`LA-INV-EXPAND-1`, 2026-10-29): `LinkAnalysisExpandComponent` `embedded` is
   projected into the tab (`<ng-content select="[laExpand]">`, writers only; a reader sees *Needs Incident management.*);

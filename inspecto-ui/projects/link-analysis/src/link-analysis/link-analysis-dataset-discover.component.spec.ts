@@ -122,7 +122,7 @@ describe('dataset discover helpers', () => {
     });
 
     it('reads the period in one line, and nothing when it was not measured', () => {
-        expect(discoverPeriod(ANSWER)).toBe('2026-10-01 to 2026-10-09 (9 days, by ts)');
+        expect(discoverPeriod(ANSWER)).toBe('2026-10-01 to 2026-10-09 (9 days, dated by the ts column)');
         expect(
             discoverPeriod({ ...ANSWER, period: { ...ANSWER.period, assessed: false, reason: 'no Time column' } }),
         ).toBe('');

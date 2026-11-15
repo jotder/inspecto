@@ -258,7 +258,7 @@ describe('embed view page', () => {
         c.analyse('shortestPath');
         f.detectChanges();
         expect(g.emphasis()).toEqual({ nodeIds: ['a', 'b', 'c'], edgeIds: ['l0', 'l1'] });
-        expect(el.querySelector('[data-testid="embed-result"]')?.textContent).toContain('Shortest path: 2 link(s).');
+        expect(el.querySelector('[data-testid="embed-result"]')?.textContent).toContain('Shortest path: 2 links.');
 
         c.hideSelected();
         f.detectChanges();

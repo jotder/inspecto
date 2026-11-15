@@ -73,9 +73,10 @@ export function importFieldNames(message: string): string {
             }
             @if (head(); as h) {
                 <inspecto-alert variant="success" title="Chain verified">
-                    The server re-checked every link of the chain on this read: {{ h.headSeq }} fact(s), none altered or
-                    missing in between. Cutting the END of a chain leaves a shorter valid chain, so note the head hash
-                    and compare it later.
+                    The server re-checked every link of the chain on this read: {{ h.headSeq }}
+                    {{ h.headSeq === 1 ? 'fact' : 'facts' }}, none altered or missing in between. Removing the newest
+                    facts would leave a shorter chain that still checks out, so keep a copy of the Head hash below and
+                    compare it later.
                 </inspecto-alert>
                 <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-2" aria-label="Identity Fact log head">
                     <dt class="text-secondary">Head</dt>
@@ -113,11 +114,12 @@ export function importFieldNames(message: string): string {
                 </form>
                 <p class="text-secondary m-0">
                     Each row of the two columns asserts that the two values are one identity. Types default to the
-                    columns' classified Entity Types; at most 1 000 rows by default.
+                    columns' classified Entity Types; at most 1,000 rows by default.
                 </p>
                 @if (imported(); as r) {
                     <inspecto-alert [variant]="r.imported ? 'success' : 'info'" title="Import result">
-                        {{ r.imported }} assertion(s) added from {{ r.rowsRead }} row(s) read{{
+                        {{ r.imported }} {{ r.imported === 1 ? 'assertion' : 'assertions' }} added from
+                        {{ r.rowsRead }} {{ r.rowsRead === 1 ? 'row' : 'rows' }} read{{
                             r.truncated ? ' (read truncated)' : ''
                         }}. Skipped: {{ r.skipped.alreadyAsserted }} already asserted,
                         {{ r.skipped.duplicate }} duplicate, {{ r.skipped.empty }} empty,

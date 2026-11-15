@@ -1,6 +1,6 @@
 id: module.la-store-pg
 kind: module
-title: Link analysis PostgreSQL store
+title: Link Analysis PostgreSQL store
 parent: layer.la
 module: la-store-pg
 billable: false

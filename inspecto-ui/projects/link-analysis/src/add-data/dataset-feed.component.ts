@@ -140,7 +140,7 @@ import { OnboardService } from './onboard.service';
                                 [disabled]="saving() || !!locked()"
                                 (click)="stop()"
                             >
-                                Stop - import only when asked
+                                Stop: import only when asked
                             </button>
                         } @else {
                             <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">

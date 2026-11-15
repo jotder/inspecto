@@ -91,7 +91,7 @@ const NAV: NavGroup[] = [
         ],
     },
     {
-        title: 'This Studio',
+        title: 'This server',
         items: [
             {
                 id: 'modules',
@@ -116,7 +116,7 @@ function storedSection(): LaSettingsSection | null {
 
 /**
  * **⚙ Settings** (LA-STUDIO-UI-REORG-1 §5.10, UIR-D16 + UIR-A1): one modal with a left nav in four groups — This
- * graph, Data, This Investigation, This Studio (Installed modules) — for configuration changed rarely. The sections are PROJECTED by the host
+ * graph, Data, This Investigation, This server (Installed modules) — for configuration changed rarely. The sections are PROJECTED by the host
  * (`<div laSection="graph-model">…</div>`) and only hidden, never destroyed, so the host keeps its ViewChild on the
  * query panel and a half-edited form survives closing. It is an in-page overlay, not a MatDialog, for that reason.
  * The last section is remembered per browser; closing with unsaved changes asks first.

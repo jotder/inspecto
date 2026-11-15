@@ -41,7 +41,7 @@ const REASON = 'changed in Settings > Link Analysis';
             <h2 id="exclusion-categories-heading" class="text-lg font-semibold">Category exclusion lists</h2>
             <p class="text-secondary m-0 text-sm">
                 Lists of numbers no Investigation should follow, kept by an administrator. An auto-applied list is the
-                first step of every new Investigation in this space. A restricted list shows analysts its name and how
+                first step of every new Investigation in this Space. A restricted list shows analysts its name and how
                 many nodes it removed, never its members. Add members on the Entity Lists page.
             </p>
             @if (loading()) {
@@ -51,8 +51,8 @@ const REASON = 'changed in Settings > Link Analysis';
             } @else {
                 @for (l of broken(); track l.id) {
                     <inspecto-alert variant="warning" title="New Investigations are refused">
-                        "{{ l.title }}" is applied to every new Investigation, but {{ l.problem }}. Until it is fixed or
-                        switched off, no Investigation can be created in this space.
+                        “{{ l.title }}” is applied to every new Investigation, but {{ l.problem }}. Until it is fixed or
+                        switched off, no Investigation can be created in this Space.
                     </inspecto-alert>
                 }
                 @if (categories().length) {
@@ -61,7 +61,10 @@ const REASON = 'changed in Settings > Link Analysis';
                             <li class="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
                                 <span class="text-sm">
                                     <strong>{{ l.title }}</strong>
-                                    <span class="text-secondary"> - {{ l.entityType }}, {{ l.size }} members</span>
+                                    <span class="text-secondary">
+                                        · {{ l.entityType }}, {{ l.size }}
+                                        {{ l.size === 1 ? 'member' : 'members' }}</span
+                                    >
                                 </span>
                                 <span class="flex flex-wrap items-center gap-4">
                                     <mat-checkbox

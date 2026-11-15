@@ -65,14 +65,14 @@ describe('LinkAnalysisSettingsComponent (⚙ Settings, §5.10)', () => {
         await expectNoA11yViolations(el);
     });
 
-    it('operator 2026-10-29: Installed modules is a section under This Studio, last in the nav, always listed', async () => {
+    it('operator 2026-10-29: Installed modules is a section under This server, last in the nav, always listed', async () => {
         const { fixture, el, host } = make();
         const nav = el.querySelector('[data-testid="la-settings-nav-modules"]') as HTMLButtonElement;
         expect(nav.textContent!.trim()).toBe('Installed modules');
         const groups = Array.from(el.querySelectorAll('nav[aria-label="Settings sections"] h3')).map((h) =>
             h.textContent!.trim(),
         );
-        expect(groups.at(-1)).toBe('This Studio');
+        expect(groups.at(-1)).toBe('This server');
         nav.click();
         fixture.detectChanges();
         expect(host.section()).toBe('modules');

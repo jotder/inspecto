@@ -321,7 +321,9 @@ import {
                                     <mat-icon class="icon-size-3" svgIcon="heroicons_outline:x-mark"></mat-icon>
                                 </button>
                             </div>
-                            <div class="text-secondary">{{ d.kind }} · {{ d.links }} link(s)</div>
+                            <div class="text-secondary">
+                                {{ d.kind }} · {{ d.links }} {{ d.links === 1 ? 'link' : 'links' }}
+                            </div>
                             @if (d.id !== d.label) {
                                 <div class="text-secondary break-all">{{ d.id }}</div>
                             }

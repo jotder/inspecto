@@ -116,7 +116,7 @@ describe('DatasetFeedComponent - the inbox and Keep this up to date (LA-ARRIVAL-
         const items = Array.from(el.querySelectorAll('[data-testid="waiting-files"] li')).map((li) =>
             li.textContent!.trim(),
         );
-        expect(items[0]).toContain('oct.csv - already imported under this name');
+        expect(items[0]).toContain('oct.csv (already imported under this name)');
         expect(items[1]).toBe('nov.csv');
     });
 

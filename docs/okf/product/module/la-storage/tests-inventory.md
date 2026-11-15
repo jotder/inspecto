@@ -1,12 +1,12 @@
 ---
 type: TestsInventory
-title: Link analysis storage — tests inventory
+title: Link Analysis storage — tests inventory
 item: module.la-storage
 description: Generated list of the test classes for module.la-storage, with how to run them.
 tags: [tests, module]
 ---
 
-# Link analysis storage — tests inventory (`module.la-storage`)
+# Link Analysis storage — tests inventory (`module.la-storage`)
 
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked test sources under `la/inspecto-la-storage/src/test/` — never edit this table; add or
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item

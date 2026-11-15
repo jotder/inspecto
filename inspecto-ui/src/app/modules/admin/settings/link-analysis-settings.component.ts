@@ -15,6 +15,7 @@ import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { LinkAnalysisLimitsComponent } from './link-analysis-limits.component';
 import { LinkAnalysisDomainProfileComponent } from '@inspecto/link-analysis/link-analysis/link-analysis-domain-profile.component';
+import { NORMALISER_OPTIONS } from '@inspecto/link-analysis/entities/entity-columns';
 import { ExclusionCategoriesComponent } from './exclusion-categories.component';
 
 /** `ConfigSpecs.LINK_ANALYSIS_MASKING_MODES`; blank = inherit the edition's default (`typed`; `none` in Basic), read back as `maskingModeInForce`. */
@@ -103,7 +104,7 @@ function embedClassesValid(c: AbstractControl): ValidationErrors | null {
         <div class="flex flex-col gap-6 p-6">
             <inspecto-page-header
                 title="Link Analysis"
-                subtitle="Masking, Entity Types, the link index, propagated-risk weights and embed-link sharing for Investigations in this space. Every numeric limit is set in the sections below."
+                subtitle="Masking, Entity Types, the link index, propagated-risk weights and embed-link sharing for Investigations in this Space. Every numeric limit is set in the sections below."
                 [inset]="false"
             />
             @if (loading()) {
@@ -135,7 +136,8 @@ function embedClassesValid(c: AbstractControl): ValidationErrors | null {
                                 <ul class="text-secondary list-disc pl-5 text-sm">
                                     @for (m of maskingModes; track m.value) {
                                         <li>
-                                            <strong>{{ m.label }}</strong> - {{ m.hint }}
+                                            <strong>{{ m.label }}</strong
+                                            >: {{ m.hint }}
                                         </li>
                                     }
                                 </ul>
@@ -150,12 +152,12 @@ function embedClassesValid(c: AbstractControl): ValidationErrors | null {
                                     <ul class="text-sm" aria-label="Entity Types in force">
                                         @for (t of entityTypes(); track t.id) {
                                             <li>
-                                                <strong>{{ t.label }}</strong> ({{ t.id }}) -
-                                                {{ t.normaliser }} normaliser, {{ t.masked ? 'masked' : 'not masked' }};
-                                                claims
+                                                <strong>{{ t.label }}</strong> ({{ t.id }}):
+                                                {{ normaliserWords(t.normaliser) }},
+                                                {{ t.masked ? 'masked' : 'not masked' }};
                                                 {{
                                                     t.classifications.length
-                                                        ? t.classifications.join(', ')
+                                                        ? 'classified as ' + t.classifications.join(', ')
                                                         : 'no classification'
                                                 }}
                                             </li>
@@ -302,6 +304,10 @@ export class LinkAnalysisSettingsComponent implements OnInit {
     private toastr = inject(ToastrService);
 
     readonly maskingModes = MASKING_MODES;
+    /** How an Entity Type compares values, in the words the Entity Type form uses; an unknown normaliser shows its id. */
+    normaliserWords(normaliser: string): string {
+        return NORMALISER_OPTIONS.find((o) => o.value === normaliser)?.label ?? normaliser;
+    }
     readonly maskingOptions: PickerOption[] = [
         { value: '', label: 'Inherit the default' },
         ...MASKING_MODES.map((m) => ({ value: m.value, label: m.label })),

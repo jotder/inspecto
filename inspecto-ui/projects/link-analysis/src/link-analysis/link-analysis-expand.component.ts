@@ -121,7 +121,7 @@ export interface ExpandDegreesChange {
                     <mat-icon svgIcon="heroicons_outline:arrows-pointing-out" aria-hidden="true"></mat-icon>
                     <h2 id="la-expand-title" class="m-0 text-sm font-semibold">Expand</h2>
                     <span class="text-secondary text-xs"
-                        >({{ ctx().mode === 'investigation' ? 'recorded' : 'not recorded' }})</span
+                        >({{ ctx().mode === 'investigation' ? 'recorded' : 'this graph only' }})</span
                     >
                     <button
                         mat-icon-button

@@ -277,8 +277,8 @@ class ControlApiInvPatternTest {
             filtered.set("filter", JSON.readTree("{\"kind\":\"group\",\"op\":\"AND\",\"items\":[{\"kind\":\"condition\","
                     + "\"field\":\"AMOUNT\",\"operator\":\">=\",\"value\":\"5000\"}]}"));
             JsonNode refused = ok(c, filtered.toString());
-            assertEquals("No link in this graph passes 900 ≤ AMOUNT < 1000. If the view filters AMOUNT (for example to ≥ 5 000), "
-                    + "the legs this pattern looks for were removed before it ran — clear that filter rather than read this as \"none found\".",
+            assertEquals("No link in this graph passes 900 ≤ AMOUNT < 1000. If the view filters AMOUNT (for example to ≥ 5,000), "
+                    + "the legs this pattern looks for were removed before it ran — clear that filter rather than read this as “none found”.",
                     refused.get("refusal").asText());
             assertEquals(0, refused.get("matches").size());
 

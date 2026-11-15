@@ -699,7 +699,7 @@ describe('investigate-number - four-eyes clarity (LA-EXPAND-FOUREYES-CLARITY-1)'
 
     it('a held expand names the threshold crossed and the Settings key', () => {
         expect(thresholdWords(['budget 500 > 100', 'maxFanOut unbounded (threshold 2000)'])).toBe(
-            'budget 500 > 100, set by four_eyes_budget_above; maxFanOut unbounded (threshold 2000), set by four_eyes_fan_out_above - Settings > Link Analysis',
+            'budget 500 > 100, set by four_eyes_budget_above; maxFanOut unbounded (threshold 2000), set by four_eyes_fan_out_above (Settings ▸ Link Analysis)',
         );
     });
 
@@ -718,6 +718,6 @@ describe('investigate-number - four-eyes clarity (LA-EXPAND-FOUREYES-CLARITY-1)'
         );
         const text = degreeOutcomeMessage(r[0]);
         expect(text).toContain('budget 500 > 100, set by four_eyes_budget_above');
-        expect(text).toContain('Settings > Link Analysis');
+        expect(text).toContain('Settings ▸ Link Analysis');
     });
 });

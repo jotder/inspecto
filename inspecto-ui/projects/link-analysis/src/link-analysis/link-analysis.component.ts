@@ -4169,7 +4169,7 @@ Its prior copies stay in its version history.`,
         // LA-I2-GAPS-RESIDUALS-1 (5): open what holds the prefilled merge, so the next step is on screen. Identities moved
         // to ⚙ Settings ▸ Data (§5.10).
         this.openSettings('identities');
-        this.toastr.info('Prefilled in the Identities section - add a reason and confirm there.');
+        this.toastr.info('Prefilled in the Identities section; add a reason and confirm there.');
     }
 
     /** One step: seal what is on screen and attach it to a Case (optionally linking the open Investigation too). */

@@ -1,12 +1,12 @@
 ---
 type: TestsInventory
-title: Link analysis and geo routes — tests inventory
+title: Link Analysis and geo routes — tests inventory
 item: module.la-api
 description: Generated list of the test classes for module.la-api, with how to run them.
 tags: [tests, module]
 ---
 
-# Link analysis and geo routes — tests inventory (`module.la-api`)
+# Link Analysis and geo routes — tests inventory (`module.la-api`)
 
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked test sources under `la/inspecto-la-api/src/test/` — never edit this table; add or
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item

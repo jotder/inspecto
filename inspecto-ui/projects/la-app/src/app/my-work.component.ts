@@ -94,7 +94,7 @@ import { PRODUCT } from './product.generated';
                                 </ul>
                             } @else {
                                 <p class="m-0 text-sm" role="status" data-testid="la-cases-no-match">
-                                    No saved view matches "{{ query() }}".
+                                    No saved view matches “{{ query() }}”.
                                 </p>
                             }
                             <div class="flex flex-wrap items-center gap-3 text-xs" data-testid="la-cases-pager">
@@ -235,7 +235,8 @@ export class MyWorkComponent implements OnInit {
     /** The open Incidents and Cases (assigned to the caller when signed in), most recently changed first; null while they load. */
     readonly work = signal<WorkRow[] | null>(null);
 
-    protected readonly notEvidence = SAVED_VIEW_NOT_EVIDENCE;
+    /** The shared notice starts lower case (it follows "Not evidence:" elsewhere); here it opens a sentence. */
+    protected readonly notEvidence = SAVED_VIEW_NOT_EVIDENCE.charAt(0).toUpperCase() + SAVED_VIEW_NOT_EVIDENCE.slice(1);
     protected readonly addData = ADD_DATA_ROUTE;
     protected readonly nonBlank = (s: string): boolean => !!s;
     /** The cases, most recent first; null while they load. */

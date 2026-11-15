@@ -1,6 +1,6 @@
 id: module.la-storage
 kind: module
-title: Link analysis storage
+title: Link Analysis storage
 parent: layer.la
 module: la-storage
 billable: false

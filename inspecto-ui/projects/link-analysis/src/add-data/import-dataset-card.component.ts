@@ -203,7 +203,7 @@ import { ImportRunFailed, OnboardService } from './onboard.service';
                 <p class="m-0 text-sm" role="status">
                     {{
                         following()
-                            ? 'The file is large, so it runs on the server - following it…'
+                            ? 'The file is large, so it runs on the server; following it…'
                             : 'Running the import…'
                     }}
                 </p>

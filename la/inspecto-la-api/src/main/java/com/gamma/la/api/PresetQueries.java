@@ -124,13 +124,13 @@ final class PresetQueries {
     private static final Param KINDS = new Param("kinds", "Only these kinds of link (comma list, empty = all)", "kinds", "");
 
     private static final Preset FAN_IN = new Preset("fan_in", "Reached by many",
-            "Entities that many different others link to - a collector, a mule, a popular shop.",
+            "Entities that many different others link to, such as a collection account, a mule or a popular shop.",
             List.of("from", "to"),
             List.of(new Param("min", "At least this many distinct senders", "number", "5"), KINDS, TOP),
             new Aggregate("to", List.of("counterparts", "links"), null, "kinds", "min"), null);
 
     private static final Preset FAN_OUT = new Preset("fan_out", "Reaching many",
-            "Entities that link to many different others - a distributor, a spammer, a layering hub.",
+            "Entities that link to many different others, such as a distributor, a spammer or a layering hub.",
             List.of("from", "to"),
             List.of(new Param("min", "At least this many distinct receivers", "number", "5"), KINDS, TOP),
             new Aggregate("from", List.of("counterparts", "links"), null, "kinds", "min"), null);
@@ -149,7 +149,7 @@ final class PresetQueries {
 
     /** Mobile money pack: money in, then out again within hours (the Value Measure timeToCashOut). */
     private static final Preset QUICK_CASH_OUT = new Preset("quick_cash_out", "Money in, then out again within hours",
-            "Entities whose money leaves again soon after it arrives - the median hours from money in to the next link of the chosen kinds out.",
+            "Entities whose money leaves again soon after it arrives: the median hours from money in to the next link of the chosen kinds out.",
             List.of("from", "to", "kind", "time", "amount"),
             List.of(new Param("maxHours", "Within this many hours", "number", "24"),
                     new Param("minInbound", "At least this much received", "number", "1000"),
@@ -159,7 +159,7 @@ final class PresetQueries {
 
     /** Telecom pack: entities linked to many others through one shared item (the pack's shared_device link kind). */
     private static final Preset SHARED_DEVICE = new Preset("shared_device", "Linked through one shared item",
-            "Entities linked to many others by a kind of link that means sharing one item - many identities on one thing.",
+            "Entities linked to many others by a kind of link that means sharing one item: many identities on one thing.",
             List.of("from", "to", "kind"),
             List.of(new Param("min", "At least this many entities linked this way", "number", "2"),
                     new Param("kinds", "The kind of link that means sharing one item", "kinds", "shared_device"), TOP),
@@ -167,21 +167,21 @@ final class PresetQueries {
 
     /** Pairs that link both ways: A to B and B to A. */
     private static final Preset TWO_WAY = new Preset("two_way", "Two-way pairs",
-            "Pairs of entities that link to each other in both directions - something going back and forth between them.",
+            "Pairs of entities that link to each other in both directions: something going back and forth between them.",
             List.of("from", "to"),
             List.of(new Param("min", "At least this many links each way", "number", "1"), TOP),
             null, null, "two_way");
 
     /** Loops of three: A to B, B to C, C back to A. */
     private static final Preset SHORT_LOOPS = new Preset("short_loops", "Short loops",
-            "Three entities linked in a circle (A to B to C and back to A) - round-tripping, layering. Very busy entities are left out so it stays quick.",
+            "Three entities linked in a circle (A to B to C and back to A): round-tripping, layering. Very busy entities are left out so it stays quick.",
             List.of("from", "to"),
             List.of(new Param("maxLinks", "Leave out entities with more than this many links in and out", "number", "50"), TOP),
             null, null, "short_loops");
 
     /** Entities first seen lately that already have many links. */
     private static final Preset NEWCOMERS = new Preset("newcomers", "Newcomers",
-            "Entities first seen in the last days of the data that already link to many others - fresh accounts ramping up.",
+            "Entities first seen in the last days of the data that already link to many others: fresh accounts ramping up.",
             List.of("from", "to", "time"),
             List.of(new Param("days", "First seen in the last this many days of the data", "number", "7"),
                     new Param("min", "At least this many links", "number", "5"), TOP),
@@ -189,7 +189,7 @@ final class PresetQueries {
 
     /** Everyone within two steps of one entity, either direction. */
     private static final Preset TWO_STEPS = new Preset("two_steps", "Two steps from one entity",
-            "Who is around one entity: its direct counterparts, then theirs - and through how many of them.",
+            "Who is around one entity: its direct counterparts, then theirs, and through how many of them.",
             List.of("from", "to"),
             List.of(new Param("entity", "The entity", "entity", ""), TOP),
             null, null, "two_steps");
@@ -427,7 +427,7 @@ final class PresetQueries {
                         + ": preset questions read only columns named with letters, digits and _");
             if (!gone.isEmpty())
                 throw new IllegalArgumentException("its link mapping reads " + String.join(", ", gone)
-                        + ", which its data does not have (any more) - edit the Mapping or the Dataset's link mapping");
+                        + ", which its data does not have (any more); edit the Mapping or the Dataset's link mapping");
             from = col(real, m.get("from"));
             to = col(real, m.get("to"));
             kind = col(real, m.get("kind"));

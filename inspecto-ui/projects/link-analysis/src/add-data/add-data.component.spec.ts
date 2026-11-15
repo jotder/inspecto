@@ -689,7 +689,7 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
                 { status: 202, statusText: 'Accepted' },
             );
             fixture.detectChanges();
-            expect(q(el, 'running')!.textContent).toContain('runs on the server - following it');
+            expect(q(el, 'running')!.textContent).toContain('runs on the server; following it');
             vi.advanceTimersByTime(1500);
             http.expectOne(apiUrl('/onboard/runs/r1')).flush({
                 runId: 'r1',

@@ -547,10 +547,10 @@ naming rule is held by `node tools/check-product-docs.mjs`.
 | Graph algorithms (`module.graph`) | [architecture](../../module/graph/architecture.md) |  |
 | Route module contract (`module.http-spi`) | [architecture](../../module/http-spi/architecture.md) |  |
 | AI assist and intelligence (`module.intelligence`) | [architecture](../../module/intelligence/architecture.md) | [Embedded intelligence (AGT-5)](../../module/intelligence/architecture-embedded-intelligence.md) |
-| Link analysis and geo routes (`module.la-api`) | [architecture](../../module/la-api/architecture.md) |  |
-| Link analysis core and ports (`module.la-core`) | [architecture](../../module/la-core/architecture.md) | [Link Analysis — data onboarding](../../module/la-core/architecture-data-onboarding.md) · [Link Analysis — HTTP surface and Investigation UI](../../module/la-core/architecture-http-and-ui.md) · [Link Analysis — as-built reference and design records](../../module/la-core/architecture-records.md) |
-| Link analysis storage (`module.la-storage`) | [architecture](../../module/la-storage/architecture.md) |  |
-| Link analysis PostgreSQL store (`module.la-store-pg`) | [architecture](../../module/la-store-pg/architecture.md) |  |
+| Link Analysis and geo routes (`module.la-api`) | [architecture](../../module/la-api/architecture.md) |  |
+| Link Analysis core and ports (`module.la-core`) | [architecture](../../module/la-core/architecture.md) | [Link Analysis — data onboarding](../../module/la-core/architecture-data-onboarding.md) · [Link Analysis — HTTP surface and Investigation UI](../../module/la-core/architecture-http-and-ui.md) · [Link Analysis — as-built reference and design records](../../module/la-core/architecture-records.md) |
+| Link Analysis storage (`module.la-storage`) | [architecture](../../module/la-storage/architecture.md) |  |
+| Link Analysis PostgreSQL store (`module.la-store-pg`) | [architecture](../../module/la-store-pg/architecture.md) |  |
 | Notification channels (`module.notify-channels`) | [architecture](../../module/notify-channels/architecture.md) |  |
 | Observability (metrics endpoint + events feed API) (`module.observability`) | [architecture](../../module/observability/architecture.md) |  |
 | OIDC authenticator and token relay (`module.oidc`) | [architecture](../../module/oidc/architecture.md) |  |

@@ -23,7 +23,7 @@ import { GENERIC_PROFILE } from '@inspecto/link-analysis/graph/domain-profile';
         <section class="flex max-w-4xl flex-col gap-3" aria-labelledby="la-domain-profile-title">
             <h2 id="la-domain-profile-title" class="m-0 text-lg font-semibold">Domain Profile</h2>
             <p class="text-secondary m-0 text-sm">
-                The Industry pack whose vocabulary Link Analysis uses in this space. A pack renames concepts and Entity
+                The Industry pack whose vocabulary Link Analysis uses in this Space. A pack renames concepts and Entity
                 Types and explains its terms; it never adds a concept. Generic keeps the neutral words.
             </p>
             @if (state(); as s) {

@@ -109,7 +109,7 @@ const DAY_OR_INSTANT = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?Z)?$/;
                         <inspecto-pen-field
                             label="From day"
                             formControlName="after"
-                            help="2026-10-01, or an instant ending in Z"
+                            help="A day like 2026-10-01, or a UTC time like 2026-10-01T09:30:00Z"
                             [error]="fieldError('after')"
                             data-testid="la-builder-after"
                         />
@@ -294,7 +294,8 @@ export class LinkAnalysisQueryBuilderComponent {
     protected fieldError(name: 'after' | 'before' | 'measureMin' | 'measureMax' | 'min' | 'top'): string {
         const c = this.form.controls[name];
         if (!c.touched || !c.hasError('pattern')) return '';
-        if (name === 'after' || name === 'before') return 'A day like 2026-10-01, or an instant ending in Z.';
+        if (name === 'after' || name === 'before')
+            return 'A day like 2026-10-01, or a UTC time like 2026-10-01T09:30:00Z.';
         if (name === 'top') return 'A whole number, 1 to 500.';
         return 'A number.';
     }

@@ -45,7 +45,9 @@ export function parseOpenLink(params: {
     if (!entity && !investigation)
         return { error: 'This link names no entity and no Investigation, so there is nothing to open.' };
     if (entity && (!ENTITY.test(entity) || entity.length > MAX_KEY + 65))
-        return { error: 'The entity in this link is not "<type>:<key>" - an Entity Type, a colon and the key.' };
+        return {
+            error: 'The entity in this link is not in the form “<type>:<key>” (an Entity Type, a colon and the key).',
+        };
     if (investigation && !INVESTIGATION.test(investigation))
         return { error: 'The Investigation id in this link is not a valid id.' };
     for (const [name, v] of [
