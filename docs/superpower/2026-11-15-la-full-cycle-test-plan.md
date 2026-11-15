@@ -7,10 +7,11 @@
 
 # Inspecto LA full-cycle user test — findings and fix plan (2026-11-15)
 
-> **Status: findings stand; the plan waits on five operator decisions (§4.1).** Phases 1 and 2 must not start before
-> them. The findings were re-checked against `origin/master` `c8d94b4bd` by reading the code (§3.6): 27 commits landed
-> after the tested build, four related board rows shipped, and four of the proposed fixes turned out to reverse
-> recorded decisions.
+> **Status: in build since 2026-11-15.** The five decisions of §4.1 were taken that day under the operator's
+> delegation ("take decisions with justification"), each recorded with its reason in §4.3, and the phases run as
+> parallel lanes. The findings were re-checked against `origin/master` `c8d94b4bd` by reading the code (§3.6): 27
+> commits landed after the tested build, four related board rows shipped, and four of the proposed fixes turned out
+> to reverse recorded decisions.
 
 ## 1. What was tested, and how
 
@@ -142,10 +143,10 @@ Board rows this plan named that have **shipped** since the tested build: `LA-OVE
 
 Each phase is one lane from a fresh `origin/master`, with its own tests; phases 1 and 2 are the ones a first-time user hits.
 
-### 4.1 Decisions the operator owes first
+### 4.1 The five decisions
 
-Four proposed fixes reverse a recorded decision, and one finding asks for a decision without offering one. Nothing in
-phases 1 and 2 starts before these are answered; each answer is recorded here and in the hub it changes.
+Four proposed fixes reverse a recorded decision, and one finding asks for a decision without offering one. The
+questions and options are below; the answers taken are in §4.3, and each is also recorded in the hub it changes.
 
 | # | Question | Today | Options |
 |---|---|---|---|
@@ -154,6 +155,16 @@ phases 1 and 2 starts before these are answered; each answer is recorded here an
 | D3 (findings 11, 12) | What does a holder of *See unmasked ids* see by default? | Aliases, with reveal one entity at a time inside an Investigation (A-16, LA-19) | (a) one audited *Reveal* for the nodes on screen, with a reason; (b) raw by default for a holder, each read audited; (c) keep, and say on the start form and the node dialog where reveal is |
 | D4 (finding 14) | One alias per entity across exploration and every Investigation? | The Space has one key; each Investigation has its own | (a) keep (an alias cannot be matched across Investigations) and say so on screen; (b) one key everywhere, accepting that it can |
 | D5 (finding 32) | Who sees a Space the moment it is created? | Any signed-in user of the install who lands in it reads its Datasets, arrivals and inbox path | (a) the creator only, others by grant; (b) the roster of the Space it was created from; (c) keep, and state it in the admin guide |
+
+### 4.3 Decisions taken (2026-11-15, under the operator's delegation; the operator may reverse any of them)
+
+| # | Decision | Why | What it does not change |
+|---|---|---|---|
+| D1 | **(a)** The seeded `admin` role holds `canAuthorWorkbench`. | `admin` already holds `canConfigureAccess`, so it can give itself the capability: withholding it protects nothing, and it stops the role named "administrator" from finishing the quick start (save a view, change a Link Analysis setting). The lane checks that premise in the code first and does not grant if it is false. | The gate on every `PUT /settings/*` stays; `business`, `operations` and `support` gain nothing. |
+| D2 | **(a) and (b)** *Use my own data* turns Add data on for a creator who holds `canAdminister`; the locked panel carries a **Turn on Add data** button for that same caller. | Choosing *Use my own data* is an explicit statement of intent, and the switch still goes through the existing administrator gate, so no gate is loosened. The text link that was there was missed by a careful tester. | Add data stays off by default wherever people sign in; an import still cannot switch it on. |
+| D3 | **(a)** Masked stays the default; a holder of *See unmasked ids* gets one audited **Reveal** for the nodes on screen, with a reason. | It keeps the privacy default (A-16) and one audit row per entity (LA-19), and turns nine clicks into one. Raw-by-default for a holder (b) would make every read a disclosure nobody chose. | Reviewers and outsiders still see aliases; nothing is revealed without a recorded reason. |
+| D4 | **(a)** Aliases stay per Investigation. Inside an Investigation every surface shows that Investigation's alias. | An alias that cannot be matched across Investigations is a privacy property, and one key everywhere would change every alias already minted, sealed Dossiers included. The defect seen was two aliases for one entity on one screen, and that is what gets fixed. | Exploration outside an Investigation keeps the Space's one key. |
+| D5 | **(a)** A new Space is readable by its creator and by install administrators only; everyone else is admitted. | It is the only finding about who can read data, so it fails closed. The lane first reproduces the observation in a test and decides, with its reason, what happens to Spaces that exist today. | Basic, where nobody signs in, is unchanged. |
 
 ### 4.2 Phases
 
