@@ -2575,8 +2575,9 @@ public final class JobService implements AutoCloseable {
                 .toList();
     }
 
-    /** Immutable snapshot of every configured job, for the scheduler_audit task. */
-    List<JobConfig> configSnapshot() {
+    /** Immutable snapshot of every configured job, for the scheduler_audit task and the Pipeline save gate's
+     *  "chain with no type: pipeline Job" warning ({@code PIPELINE-CHAIN-NO-JOB-1}). */
+    public List<JobConfig> configSnapshot() {
         return List.copyOf(configs);
     }
 

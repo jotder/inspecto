@@ -990,7 +990,8 @@ is the instance `PipelineLift` names **"Shape &lt;table&gt;"**, or **"Shape reco
 A Record Transformer added from the palette is a chain Step (`steps: - sql:`) that runs after load, at rest
 (`PipelineLift.stageTwo`, from a `type: pipeline` Job), writing the top-level `output_store:`. A chain with no
 `output_store:` is refused at save, one finding per Step: `ERR_CHAIN_WITHOUT_OUTPUT_STORE` on an active
-Pipeline (422), `WARN_CHAIN_WITHOUT_OUTPUT_STORE` on an inactive draft
+Pipeline (422), `WARN_CHAIN_WITHOUT_OUTPUT_STORE` on an inactive draft; a chain with a store that no
+enabled `type: pipeline` Job runs saves with `WARN_CHAIN_WITHOUT_PIPELINE_JOB`
 ([config safety](../config/spec-config-safety.md), "A chain with no output store").
 
 **Behaviour.** A node carrying `fields[]` / `columns` / `rules` is a **projection** and compiles

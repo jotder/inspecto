@@ -57,6 +57,11 @@ public final class FindingCodes {
     /** The same chain-without-store refusal on an INACTIVE draft — it bites only at activation. */
     public static final String WARN_CHAIN_WITHOUT_OUTPUT_STORE = "WARN_CHAIN_WITHOUT_OUTPUT_STORE";
 
+    /** A pipeline with a Stage-2 chain and a top-level {@code output_store:} that no enabled {@code type: pipeline}
+     *  Job runs ({@code pipeline_config:} naming its file) — the chain never runs. Always a WARNING: the Job is a
+     *  separate config, and refusing would make the order of authoring matter (PIPELINE-CHAIN-NO-JOB-1). */
+    public static final String WARN_CHAIN_WITHOUT_PIPELINE_JOB = "WARN_CHAIN_WITHOUT_PIPELINE_JOB";
+
     /** An ACTIVE pipeline whose {@code lookup} / {@code profile} / {@code dedup} / {@code filter} step config
      *  the run would refuse — a missing or malformed required key, or a column the declared schema does not
      *  carry ({@code PROCESSOR-RELEASE-READINESS-1} G4). */
