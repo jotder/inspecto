@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.exchange`](../../../../../product-map/module/exchange.toon).
 
-17 test class(es): 8 unit, 9 real-HTTP control-plane, 0 IT.
+18 test class(es): 9 unit, 9 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -39,6 +39,7 @@ mvn -o test -pl features/inspecto-exchange -Dtest=ControlApiDecisionRuleSignalOf
 | `ExchangeRoutesContractTest` | `com.gamma.exchange` | unit | `features/inspecto-exchange/src/test/java/com/gamma/exchange/ExchangeRoutesContractTest.java` | {@link ExchangeRoutes} against the platform test kit's RouteModule TCK (MODULE-REORG-P5-TCKS): no host, no processor |
 | `ExchangeRoutesManifestParityTest` | `com.gamma.exchange` | unit | `features/inspecto-exchange/src/test/java/com/gamma/exchange/ExchangeRoutesManifestParityTest.java` | The module's {@code module.toon} {@code provides.routes} must list EXACTLY the routes {@code ExchangeRoutes} |
 | `ExchangeSnapshotMultiPodTest` | `com.gamma.exchange` | unit | `features/inspecto-exchange/src/test/java/com/gamma/exchange/ExchangeSnapshotMultiPodTest.java` | EXCHANGE-SNAPSHOT-MULTIPOD-1: two JVMs sharing a store may publish the same due snapshot at once. Neither |
+| `ExchangeSnapshotSwapLockTest` | `com.gamma.exchange` | unit | `features/inspecto-exchange/src/test/java/com/gamma/exchange/ExchangeSnapshotSwapLockTest.java` | SNAPSHOT-SWAP-READER-RESIDUALS-1: an Exchange publish renders the owner's Dataset relation, which pins the store's |
 | `ExchangeSnapshotSweepTest` | `com.gamma.exchange` | unit | `features/inspecto-exchange/src/test/java/com/gamma/exchange/ExchangeSnapshotSweepTest.java` | The scheduled snapshot refresh's due rule and outcome recording (SHARE-SNAPSHOT-ON-APPROVE-1). |
 | `ExchangeSnapshotTest` | `com.gamma.exchange` | unit | `features/inspecto-exchange/src/test/java/com/gamma/exchange/ExchangeSnapshotTest.java` | S2 end-to-end at the unit level: an owner publishes a versioned snapshot, and a consumer resolves |
 | `ExchangeTest` | `com.gamma.exchange` | unit | `features/inspecto-exchange/src/test/java/com/gamma/exchange/ExchangeTest.java` | The Exchange ledger + Share Grant lifecycle: offer → request → approve/deny/revoke, all fail-closed. |

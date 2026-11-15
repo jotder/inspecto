@@ -244,6 +244,129 @@ class ReconRunJobTest {
                 Map.of("reconciliation", "x"), null, null)).type());
     }
 
+    /**
+     * SNAPSHOT-SWAP-READER-RESIDUALS-1: each side's relation pins its store's files when the run resolves the day, and
+     * the grain scans them afterwards. A snapshot swap in between renamed a pinned file away and the run failed with "No
+     * files found"; the run now holds its sides from the pin until the grain has scanned them.
+     */
+    @Test
+    void aRunHoldsItsSidesFromThePinUntilTheGrainHasScannedThem(@TempDir Path dir) throws Exception {
+        com.gamma.consignment.DbConsignmentOutputStore registry = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:");
+        com.gamma.consignment.ConsignmentOutputStores.use(registry);   // as in production: a relation pins an explicit file list
+        try {
+            Path writeRoot = dir.resolve("cfg");
+            Path dataDir = dir.resolve("data");
+            Path a = dataDir.resolve("orders_a");
+            writeSide(a.resolve("snap-1.parquet"), "VALUES ('EU','voice',100.0),('EU','data',118.0),('MEA','voice',10.0)");
+            seedStore(dataDir, "orders_b", "VALUES ('EU','voice',100.0),('EU','data',114.0),('APAC','sms',7.0)");
+            ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+            store.write("dataset", "a_ds", Map.of("dateField", "event_date", "physicalRef", "orders_a"));
+            store.write("dataset", "b_ds", Map.of("dateField", "event_date", "physicalRef", "orders_b"));
+            store.write("reconciliation", "orders_recon", Map.of(
+                    "datasets", List.of("a_ds", "b_ds"),
+                    "keyColumns", List.of("region", "product"),
+                    "compareColumns", List.of(Map.of("column", "amount", "toleranceType", "percent", "tolerance", 0.5))));
+            System.setProperty("assist.write.root", writeRoot.toString());
+            AtomicReference<Throwable> writerFailed = new AtomicReference<>();
+            Thread writer = new Thread(() -> {   // publishes side a equal to side b: no breaks once it lands
+                try {
+                    Path tmp = a.resolve("snap-2.parquet.tmp");
+                    writeSide(tmp, "VALUES ('EU','voice',100.0),('EU','data',114.0),('APAC','sms',7.0)");
+                    com.gamma.alert.ScoreOutputDirs.swapIn(a, tmp, "snap-2.parquet", "*.parquet");
+                } catch (Throwable t) {
+                    writerFailed.set(t);
+                }
+            });
+            ReconRunJob.afterPin = () -> {
+                writer.start();
+                long deadline = System.nanoTime() + 30_000_000_000L;
+                while (writer.getState() != Thread.State.TERMINATED && !SnapshotSwapLock.hasQueuedThreads(a)) {
+                    if (System.nanoTime() > deadline) fail("the writer neither finished nor waited for the run");
+                    try { Thread.sleep(5); } catch (InterruptedException e) { throw new IllegalStateException(e); }
+                }
+            };
+            JobConfig cfg = new JobConfig("nightly_recon", "recon.run", null, null, true, false,
+                    Map.of("reconciliation", "orders_recon"), null, null);
+            JobResult result;
+            try {
+                result = new ReconRunJob(cfg, dataDir.toString(), () -> null).run(new CapturingContext(Map.of()));
+            } finally {
+                ReconRunJob.afterPin = () -> { };
+            }
+            writer.join(30_000);
+
+            assertEquals("SUCCESS", result.status(), result.message());
+            assertTrue(result.message().contains("3 break(s)"), "the run compared the snapshot it pinned: " + result.message());
+            assertNull(writerFailed.get(), "the swap landed once the run was done: " + writerFailed.get());
+            assertTrue(Files.exists(a.resolve("snap-2.parquet")) && !Files.exists(a.resolve("snap-1.parquet")));
+        } finally {
+            com.gamma.consignment.ConsignmentOutputStores.use(null);
+            registry.close();
+        }
+    }
+
+    /**
+     * The Job reads no relation a page request pinned before a swap: a Board request seconds earlier leaves its spec
+     * memoised (RECON-CACHE-1), and a run served from it would scan a file the swap renamed away - and hold nothing,
+     * since nothing was pinned inside its block.
+     */
+    @Test
+    void aRunDoesNotReuseARelationAPageRequestPinnedBeforeASwap(@TempDir Path dir) throws Exception {
+        com.gamma.consignment.DbConsignmentOutputStore registry = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:");
+        com.gamma.consignment.ConsignmentOutputStores.use(registry);
+        long ttl = ReconDay.FINGERPRINT_TTL_MS;
+        ReconDay.FINGERPRINT_TTL_MS = 600_000;   // the page request's memo is still fresh when the run starts
+        try {
+            Path writeRoot = dir.resolve("cfg");
+            Path dataDir = dir.resolve("data");
+            Path a = dataDir.resolve("orders_a");
+            writeSide(a.resolve("snap-1.parquet"), "VALUES ('EU','voice',100.0),('EU','data',118.0),('MEA','voice',10.0)");
+            seedStore(dataDir, "orders_b", "VALUES ('EU','voice',100.0),('EU','data',114.0),('APAC','sms',7.0)");
+            ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+            store.write("dataset", "a_ds", Map.of("dateField", "event_date", "physicalRef", "orders_a"));
+            store.write("dataset", "b_ds", Map.of("dateField", "event_date", "physicalRef", "orders_b"));
+            store.write("reconciliation", "orders_recon", Map.of(
+                    "datasets", List.of("a_ds", "b_ds"),
+                    "keyColumns", List.of("region", "product"),
+                    "compareColumns", List.of(Map.of("column", "amount", "toleranceType", "percent", "tolerance", 0.5))));
+            System.setProperty("assist.write.root", writeRoot.toString());
+            // The Board's resolve, as POST /recon/run makes it.
+            Map<String, Object> config = store.get("reconciliation", "orders_recon").orElseThrow().content();
+            java.util.function.Function<String, Map<String, Object>> datasetFor =
+                    id -> store.get("dataset", id).orElseThrow().content();
+            com.gamma.pipeline.ViewStore views = new com.gamma.pipeline.ViewStore(writeRoot.resolve("views"));
+            ReconDay.resolve(config, datasetFor,
+                    id -> com.gamma.query.DatasetRelation.relationSql(datasetFor.apply(id), dataDir, views), dataDir, null);
+            Path tmp = a.resolve("snap-2.parquet.tmp");   // side a is republished equal to side b
+            writeSide(tmp, "VALUES ('EU','voice',100.0),('EU','data',114.0),('APAC','sms',7.0)");
+            com.gamma.alert.ScoreOutputDirs.swapIn(a, tmp, "snap-2.parquet", "*.parquet");
+
+            JobConfig cfg = new JobConfig("nightly_recon", "recon.run", null, null, true, false,
+                    Map.of("reconciliation", "orders_recon"), null, null);
+            JobResult result = new ReconRunJob(cfg, dataDir.toString(), () -> null).run(new CapturingContext(Map.of()));
+
+            assertEquals("SUCCESS", result.status(), result.message());
+            assertTrue(result.message().contains(": 0 break(s)"), "the run read the published snapshot: " + result.message());
+        } finally {
+            ReconDay.FINGERPRINT_TTL_MS = ttl;
+            com.gamma.consignment.ConsignmentOutputStores.use(null);
+            registry.close();
+        }
+    }
+
+    /** One flat snapshot file of a side, dated as {@link #seedStore} dates it. */
+    private static void writeSide(Path file, String values) throws Exception {
+        Files.createDirectories(file.getParent());
+        DuckDbUtil.loadDriver();
+        File db = DuckDbUtil.tempDbFile("recon_job_side_");
+        try (Connection conn = DuckDbUtil.openConnection(db); Statement st = conn.createStatement()) {
+            st.execute("COPY (SELECT *, DATE '2026-09-26' AS event_date FROM (" + values + ") t(region, product, amount)) TO '"
+                    + file.toString().replace("\\", "/") + "' (FORMAT PARQUET)");
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
     private static void seedStore(Path dataDir, String name, String values) throws Exception {
         Path partition = dataDir.resolve(name).resolve("dt=2026");
         Files.createDirectories(partition);

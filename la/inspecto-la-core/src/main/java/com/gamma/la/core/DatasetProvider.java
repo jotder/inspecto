@@ -140,6 +140,17 @@ public interface DatasetProvider {
         return null;
     }
 
+    /**
+     * Runs {@code read} over {@code relationSql} rendered again on this thread, with every store the new render pins held
+     * against a snapshot swap until {@code read} returns (SNAPSHOT-SWAP-READER-RESIDUALS-1). For a background reader of a
+     * relation rendered earlier, on another thread: an index build, whose relation was rendered when it was submitted. A
+     * relation this provider did not render passes unchanged. The default (a provider whose stores are never swapped)
+     * holds nothing.
+     */
+    default <T> T readHeld(String relationSql, java.util.function.Function<String, T> read) {
+        return read.apply(relationSql);
+    }
+
     /** Reserved {@link #schemaClassification} key: the Dataset's column lineage cannot be traced (fail closed). */
     String UNKNOWN_LINEAGE = "*";
 

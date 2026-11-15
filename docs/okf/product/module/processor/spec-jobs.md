@@ -325,6 +325,15 @@ sink monitor and file lock, which no reader takes), so there is no deadlock.
   and queued a 1 s-later COUNT behind it for ~20 s; not holding it, a publish took 10-26 ms.
 - **Job readers** (`sql.template`, `materialize`, a Pipeline's `source_store`, `expectation.evaluate`): hold
   the store from the pin until the scan ends; a publish waits for them.
+- **Readers on their own connection** (since 2026-11-15, `SNAPSHOT-SWAP-READER-RESIDUALS-1`): `exchange` snapshot
+  publish, `recon.run` (renders its sides afresh inside the hold, never a cached spec), `postgres.publish`, and an
+  enrichment's reference and Stage-1 input globs (a glob read pins the store, so it waits for a compaction under way)
+  hold from pin to scan like a Job. A Link Analysis index build re-renders its relation on the build thread
+  (`DatasetProvider.readHeld`) and holds it until the build has read it. A caller that wraps a registered relation in
+  more SQL still gets the retry: every relation the wrapper embeds is re-rendered in place. Two renders of an
+  identical relation share one registration (the second caller gets the first string, so it keeps the retry).
+  `retire_superseded` deletes a file under `SnapshotSwapLock.writeAbove`, waiting for a reader that pinned it
+  before it was superseded.
 Every writer that hides, replaces or deletes a live `*.parquet` holds the write lock: the snapshot swaps,
 `ReferenceCompactor`, `PartitionCompactor`, `DatasetPeriod` replace and restore, `IncrementalSink` prune and
 rollback, `ScoreOutputWriter` prune; `ScoreOutputWriter` also sweeps a crashed run's `.tmp` / `.stale`. A swap
@@ -333,8 +342,7 @@ keys as `<store>`.
 Limits: a publish waits for the readers in flight when it queued, plus any reader that overtook it while holding
 another store (bounded by the writer's deadline, 24 h by default); runs of one score model take turns (a monitor per
 history directory), so the leftover sweep never meets another run's file;
-one JVM only; readers that run a relation on their own connection, and glob reads with the registry off, are not
-covered (`SNAPSHOT-SWAP-READER-RESIDUALS-1`). Hidden files
+one JVM only. Hidden files
 never match the readers' `**/*.parquet` glob and are not counted as storage.
 
 ## The parameter contract & runtime Expressions (shipped 2026-08-07/10)

@@ -126,6 +126,34 @@ class QueryExecutorSwapRetryTest {
         assertEquals(List.of(3), gens(links));
     }
 
+    // ── SNAPSHOT-SWAP-READER-RESIDUALS-1 ──────────────────────────────────────────
+
+    @Test
+    void aRelationACallerWrappedInMoreSqlRendersTheRelationItEmbedsAgain(@TempDir Path data) throws Exception {
+        Path links = data.resolve("links");
+        publish(links, 1);
+        String relation = DatasetRelation.relationSql(Map.of("physicalRef", "links"), data, null);
+        // What Link Analysis does with two relations (a UNION) or one (a filtered sub-select) before the executor.
+        String wrapped = "SELECT gen * 10 AS gen FROM (" + relation + ") AS w WHERE gen > 0";
+        publish(links, 2);   // the embedded relation's pinned file is gone before the scan
+
+        QueryExecutor.Result r = QueryExecutor.run(read(wrapped));
+
+        assertEquals(List.of(20), column(r), "the wrapper ran again over the embedded relation rendered afresh");
+    }
+
+    @Test
+    void twoRendersOfAnIdenticalRelationShareTheRegisteredString(@TempDir Path data) throws Exception {
+        publish(data.resolve("links"), 1);
+        String first = DatasetRelation.relationSql(Map.of("physicalRef", "links"), data, null);
+        String second = DatasetRelation.relationSql(Map.of("physicalRef", "links"), data, null);
+
+        assertEquals(first, second);
+        // The registry holds its key weakly: an equal copy of its own would leave the second caller without a retry once
+        // the first dropped the registered string.
+        assertSame(first, second, "the second render hands back the registered string, so the entry lives while either holds it");
+    }
+
     @Test
     void anAlertRuleMeasureReadsThePublishedSnapshotWhenASwapLandsBeforeItsScan(@TempDir Path writeRoot, @TempDir Path data)
             throws Exception {

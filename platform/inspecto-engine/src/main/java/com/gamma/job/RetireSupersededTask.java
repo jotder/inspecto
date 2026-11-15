@@ -58,7 +58,10 @@ final class RetireSupersededTask {
                     continue;
                 }
                 if (dryRun) retired++;
-                else if (java.nio.file.Files.deleteIfExists(file)) retired++;
+                else try (SnapshotSwapLock.Held removing = SnapshotSwapLock.writeAbove(file)) {
+                    // A reader that pinned the file before it was superseded may still hold its store: wait for it.
+                    if (java.nio.file.Files.deleteIfExists(file)) retired++;
+                }
             } catch (IOException e) {
                 // An open reader (on Windows, any open handle) fails the delete. Never fatal: the row keeps the
                 // file out of every read, and the next pass retries it.

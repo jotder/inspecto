@@ -268,7 +268,10 @@ public final class PostgresPublishJobType implements JobTypeProvider {
                 Map<String, Object> ds = store.get("dataset", id).map(ComponentRegistry.Component::content).orElse(null);
                 if (ds != null && canRead(author, store, ds)) readRoots.addAll(DatasetRelation.readRoots(ds, Path.of(dataDir)));
             }
-            try (Connection duck = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(Path.of(dataDir)), readRoots)) {
+            // Each relation pins its store's files, which the publication scans below (again on a retry): the stores stay
+            // held against a snapshot swap until the last scan, as a Job reader's must (SNAPSHOT-SWAP-READER-RESIDUALS-1).
+            try (SnapshotSwapLock.Held reading = SnapshotSwapLock.hold();
+                 Connection duck = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(Path.of(dataDir)), readRoots)) {
                 for (String id : datasets) {
                     Map<String, Object> ds = store.get("dataset", id).map(ComponentRegistry.Component::content)
                             .orElse(null);

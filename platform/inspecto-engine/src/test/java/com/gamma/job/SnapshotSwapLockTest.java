@@ -565,6 +565,37 @@ class SnapshotSwapLockTest {
     }
 
     @Test
+    void retireSupersededWaitsForAReaderHoldingTheStoreBeforeItDeletesAFile(@TempDir Path dir) throws Exception {
+        // SNAPSHOT-SWAP-READER-RESIDUALS-1: a reader that pinned the file while it was still live may still hold the store.
+        Path store = dir.resolve("data").resolve("cdr");
+        Path old = store.resolve("ingest_date=2026-08-01").resolve("c1_out.parquet");
+        Files.createDirectories(old.getParent());
+        writeParquet(1, old);
+        Files.setLastModifiedTime(old, FileTime.from(Instant.now().minus(9, ChronoUnit.DAYS)));
+        registry.record(List.of(new com.gamma.consignment.ConsignmentOutput("c1", "run-1", "cdr", "", null,
+                old.toString(), 1, 1, "2026-08-01T10:00:00Z", com.gamma.consignment.ConsignmentOutput.State.SUPERSEDED)));
+        JobConfig cfg = new JobConfig("retire", "maintenance", null, null, true, false,
+                Map.of("task", "retire_superseded", "retention_days", "7"), null, null);
+        AtomicReference<JobResult> result = new AtomicReference<>();
+        AtomicReference<Throwable> failed = new AtomicReference<>();
+        Thread retire = new Thread(() -> {
+            try { result.set(new MaintenanceJob(cfg, dir.resolve("data").toString()).run()); } catch (Throwable t) { failed.set(t); }
+        });
+
+        try (SnapshotSwapLock.Held reading = SnapshotSwapLock.read(List.of(store))) {
+            retire.start();
+            awaitQueuedOrDone(store, retire);
+            assertTrue(retire.isAlive(), "the delete waits for the reader (result: " + result.get() + ", failure: " + failed.get() + ")");
+            assertTrue(Files.exists(old), "the file the reader may have pinned is still there");
+        }
+        retire.join(30_000);
+
+        assertNull(failed.get(), String.valueOf(failed.get()));
+        assertTrue(result.get().message().contains("retired 1"), result.get().message());
+        assertFalse(Files.exists(old), "deleted once the reader was done");
+    }
+
+    @Test
     void theIncrementalDaySwapWaitsForAReader(@TempDir Path dir) throws Exception {
         Path data = dir.resolve("data");
         Files.createDirectories(data.resolve("events"));

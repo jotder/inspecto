@@ -43,7 +43,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LEGAL-HOLD-SCOPE-1` | P3 | feature | a legal hold protects the Incident row but not its evidence (filed 2026-11-15, verified from ARCH-MOSCOW-UNTRACKED-1 item 7). | demand |
 | `ALERT-EVALUATE-NO-BREACH-WORDING-1` | P3 | defect | an alert.evaluate Job logs "no rule breached" on every run while an Alert it raised stays OPEN. | — |
 | `REPORT-PDF-CHARTS-1` | P3 | feature | a report Job's PDF is a table snapshot, never a chart. | — |
-| `SNAPSHOT-SWAP-READER-RESIDUALS-1` | P3 | defect | the snapshot lock still misses readers that run a relation on their own connection (filed 2026-11-15, left by SNAPSHOT-SWAP-UNLOCKED-READ… | — |
 | `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
 | `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` | P3 | defect | a multi-file Consignment re-planned after a failover can write a second, differently named output, even on a shared output tree. | operator |
 | — | P2 | feature | Postgres multi-user | operator |

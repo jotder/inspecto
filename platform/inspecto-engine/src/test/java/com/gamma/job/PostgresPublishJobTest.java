@@ -181,6 +181,53 @@ class PostgresPublishJobTest {
         assertTrue(columnsOf("subs__inspecto_stage").isEmpty(), "the stage was renamed away");
     }
 
+    /**
+     * SNAPSHOT-SWAP-READER-RESIDUALS-1: each Dataset's relation pins its store's files when the plan is built, and the
+     * publication scans them only after it has dialled the target. A snapshot swap in between renamed the pinned file
+     * away and the run failed with "No files found"; the run now holds the stores until its last scan.
+     */
+    @Test
+    void thePublicationHoldsItsDatasetsFromThePinUntilItHasScannedThem() throws Exception {
+        com.gamma.consignment.DbConsignmentOutputStore registry = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:");
+        com.gamma.consignment.ConsignmentOutputStores.use(registry);   // as in production: the relation pins an explicit file list
+        Path subs = data.resolve("subs");
+        AtomicReference<Throwable> writerFailed = new AtomicReference<>();
+        Thread writer = new Thread(() -> {   // what every snapshot writer does: write invisibly, hide the old, reveal the new
+            try {
+                Path tmp = subs.resolve("data-2.parquet.tmp");
+                try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+                    st.execute("COPY (SELECT 'm9' AS msisdn, 'gold' AS plan, 1.0 AS amount, DATE '2026-09-03' AS day) TO '"
+                            + tmp.toString().replace('\\', '/') + "' (FORMAT PARQUET)");
+                }
+                com.gamma.alert.ScoreOutputDirs.swapIn(subs, tmp, "data-2.parquet", "*.parquet");
+            } catch (Throwable t) {
+                writerFailed.set(t);
+            }
+        });
+        PostgresPublishJobType.opener = (url, props) -> {   // dialled after the plans pinned the files, before the scans
+            writer.start();
+            long deadline = System.nanoTime() + 30_000_000_000L;
+            while (writer.getState() != Thread.State.TERMINATED && !SnapshotSwapLock.hasQueuedThreads(subs)) {
+                if (System.nanoTime() > deadline) throw new IllegalStateException("the writer neither finished nor waited");
+                try { Thread.sleep(5); } catch (InterruptedException e) { throw new IllegalStateException(e); }
+            }
+            return target.duplicate();
+        };
+        try {
+            JobRun r = run(Map.of());
+            writer.join(30_000);
+
+            assertEquals("SUCCESS", r.status(), r.message());
+            assertEquals(3L, ((Number) query("SELECT count(*) FROM bi.subs").get(0).get(0)).longValue(),
+                    "the publication read the snapshot it pinned");
+            assertNull(writerFailed.get(), "the swap landed once the publication was done: " + writerFailed.get());
+            assertTrue(Files.exists(subs.resolve("data-2.parquet")) && !Files.exists(subs.resolve("data.parquet")));
+        } finally {
+            com.gamma.consignment.ConsignmentOutputStores.use(null);
+            registry.close();
+        }
+    }
+
     @Test
     void aListedSensitiveColumnIsRefusedUnlessTheAuthorHoldsCanAdminister() throws Exception {
         PostgresPublishJobType.installAuthority(c -> author("bob"));
