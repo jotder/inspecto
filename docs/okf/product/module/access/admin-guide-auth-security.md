@@ -289,10 +289,20 @@ via `META-INF/services`. Basic/Standard never bundle it and behave byte-identica
   the build-time capabilities granted to `pipeline-developer`/`app-developer`/`developer`/`power`. It left the
   `builder` set and `power`, and joined `admin` (`super` holds the whole vocabulary via `KNOWN_CAPABILITIES`).
   ⚠ **`Roles.SEED` is asserted by an *equality* check** in `OidcAuthenticatorTest`
-  (`adminRoleGrantsOnboardConnectionsAndNotWorkbench`) — every future grant addition must update that test, and
+  (`adminRoleGrantsExactlyItsSeededSet`, named `adminRoleGrantsOnboardConnectionsAndNotWorkbench` until 2026-11-15) —
+  every future grant addition must update that test, and
   it must be run under **`-Pedition-advanced`**: the default reactor omits `inspecto-oidc` entirely, so a
   plain `mvn -o clean test` cannot see a failure there. That gap had already left this assertion red on
   `master` since `63a556f8`; see `.claude/skills/build-verify/SKILL.md`.
+- **The seeded `admin` role holds `canAuthorWorkbench` (operator, 2026-11-15; `LA-FULL-CYCLE-TEST-1` D1).** It
+  reverses the 2026-07-22 sign-off that kept the capability Builder-only. Reason: `admin` holds `canConfigureAccess`,
+  and `PUT /access/roles` lets a holder rewrite any role's capability list (`Roles.validate` checks only that each
+  capability is known), so an administrator could already grant itself the capability; withholding it protected
+  nothing and left the person who creates a Space unable to save a view or change a Link Analysis setting. ⚠ Where the
+  approval policy governs `access-roles`, that self-grant needs a second person, and this seed grant does not: an
+  install that wants administrators who do not author states it in `roles.toon` (an authored `admin` row replaces the
+  seeded one). Maker-checker is unchanged: nobody approves their own change. Pinned by `ControlApiFirstRunTest` and
+  `OidcAuthenticatorTest.adminRoleGrantsExactlyItsSeededSet`.
 - **D4 — `canCurateMenus`, split out of `canAuthorWorkbench`. SHIPPED end-to-end 2026-07-25**
   (`fc637b1b` server, `0c375ff5` UI). Rationale: the `pipeline-developer`/`app-developer`/`developer`/`power`
   seeds got menu curation free, conflating "may edit a pipeline" with "may change what this space's business
@@ -834,7 +844,8 @@ approving or declining. `canApproveChanges` is seeded to `admin` only (`super` h
   (`ApiContext.replay`) with a Subject for the author: their recognised roles, recorded at propose time, are
   re-resolved against the Space's role table and Access Profiles as they stand NOW
   (`PendingChanges.authorNow`), exactly as `OidcAuthenticator` resolves them. The approver needs only the
-  approver capability, so the seeded `admin` (no `canAuthorWorkbench`) approves a builder's change. An author
+  approver capability, so a checker who is no builder approves a builder's change (the seeded `admin` also authors
+  since 2026-11-15, but never approves its own change). An author
   who has since lost the grant gets 403 with that reason, and the change stays pending. ⚠ Role MEMBERSHIP is
   the IdP's view as of the proposal — a server cannot re-ask the IdP about a user who is not in the request.
   🔴 With an Authenticator that stamps no roles the apply FAILS CLOSED (403, "the author's roles are

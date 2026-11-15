@@ -36,7 +36,7 @@ class ControlApiDomainProfileTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String ROUTE = "/settings/link-analysis/domain-profile";
-    private static final String AUTHOR = "Bearer author", ADMIN = "Bearer admin";
+    private static final String AUTHOR = "Bearer author", OPS = "Bearer ops";
     private final HttpClient client = HttpClient.newHttpClient();
 
     private record Ctx(CollectorService svc, ControlApi api, int port, Path root) implements AutoCloseable {
@@ -52,7 +52,7 @@ class ControlApiDomainProfileTest {
             String h = String.valueOf(ex.getRequestHeaders().getFirst("Authorization"));
             String[] who = switch (h) {
                 case AUTHOR -> new String[] {"dev-1", "developer"};   // canAuthorWorkbench
-                case ADMIN -> new String[] {"admin-1", "admin"};      // canAdminister, not canAuthorWorkbench
+                case OPS -> new String[] {"ops-1", "operations"};     // no canAuthorWorkbench (the seeded admin holds it)
                 default -> null;
             };
             if (who == null) return Optional.empty();
@@ -168,7 +168,7 @@ class ControlApiDomainProfileTest {
     void thePutNeedsCanAuthorWorkbench(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
         try (Ctx c = open(cfg, Files.createDirectories(tmp.resolve("config")))) {
             assertEquals(401, send(c, "PUT", ROUTE, "{\"domainProfile\":\"telecom\"}", "Bearer nobody").statusCode());
-            assertEquals(403, send(c, "PUT", ROUTE, "{\"domainProfile\":\"telecom\"}", ADMIN).statusCode());
+            assertEquals(403, send(c, "PUT", ROUTE, "{\"domainProfile\":\"telecom\"}", OPS).statusCode());
             assertFalse(Files.exists(c.root().resolve(LinkAnalysisSettings.FILE)), "a refused write writes nothing");
         }
     }

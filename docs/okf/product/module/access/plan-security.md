@@ -296,7 +296,9 @@ must validate on Personal — a per-edition validator was refused, `EDITIONS.md`
 
 **Seed roles** (`Roles.java:121-131`): `pipeline-developer`, `app-developer`, `developer` (the builder set),
 `operations`, `power`, `admin` (`canOnboardConnections`, `canConfigureAccess`, `canApproveShares`,
-`canOfferDatasets`, `canCurateMenus`, `canTriageRequirements`, `canAdminister`), `super` (the whole vocabulary via
+`canOfferDatasets`, `canCurateMenus`, `canTriageRequirements`, `canAdminister`, and since 2026-11-15
+`canAuthorWorkbench`: `LA-FULL-CYCLE-TEST-1` D1, reason in `admin-guide-auth-security.md`; the list here is not
+exhaustive, `Roles.SEED` is), `super` (the whole vocabulary via
 `KNOWN_CAPABILITIES`), `business` (**only** `canTriageRequirements`). ⚠ `Roles.SEED` is asserted by an
 *equality* test in `OidcAuthenticatorTest` — every grant change must update it, and that test runs **only**
 under `-Pedition-standard|enterprise` (§8).

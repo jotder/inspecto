@@ -179,11 +179,13 @@ class OidcAuthenticatorTest {
     }
 
     @Test
-    void adminRoleGrantsOnboardConnectionsAndNotWorkbench() throws Exception {
+    void adminRoleGrantsExactlyItsSeededSet() throws Exception {
         // rbac-groundwork §3/§4.1 Q1 (product sign-off 2026-07-22): Connection onboarding is its own
-        // Admin-owned grant — Admin gets canOnboardConnections and NOT canAuthorWorkbench (Builder-only).
-        // Admin's set has since grown twice, and this assertion tracks Roles.SEED exactly (it is an
-        // equality check, so every addition must land here too):
+        // Admin-owned grant. That sign-off also kept canAuthorWorkbench Builder-only; LA-FULL-CYCLE-TEST-1 D1
+        // (operator, 2026-11-15) reversed that half: Admin holds canConfigureAccess, so it could already grant
+        // itself the capability through PUT /access/roles, and without it the creator of a Space could not save
+        // a view or change a Link Analysis setting.
+        // This assertion tracks Roles.SEED exactly (it is an equality check, so every addition must land here too):
         //   canTriageRequirements — Q3 seed, 2026-07-24 (7e90f53d)
         //   canOfferDatasets      — BACKLOG D14, 2026-07-25 (offering exposes data cross-space with no
         //                           second gate, so it left Builder/Power for Admin)
@@ -209,10 +211,9 @@ class OidcAuthenticatorTest {
                 Roles.CAN_BUILD_LINK_INDEX,   // LA separation D-3 step 4, 2026-10-02
                 Roles.CAN_UPLOAD_DATA,   // analyst upload, D-UP3
                 Roles.CAN_SHARE_INVESTIGATION,   // LA-EMBED-VIEW-1, 2026-10-12
-                Roles.CAN_MANAGE_EXCLUSION_CATEGORIES),   // LA-GROW-EXCLUDE-1 phase 4, 2026-10-22
+                Roles.CAN_MANAGE_EXCLUSION_CATEGORIES,   // LA-GROW-EXCLUDE-1 phase 4, 2026-10-22
+                Roles.CAN_AUTHOR_WORKBENCH),   // LA-FULL-CYCLE-TEST-1 D1, 2026-11-15
                 admin.capabilities());
-        assertFalse(admin.capabilities().contains(Roles.CAN_AUTHOR_WORKBENCH),
-                "canAuthorWorkbench stays Builder-only");
     }
 
     @Test

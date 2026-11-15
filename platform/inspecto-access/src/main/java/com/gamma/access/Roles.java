@@ -276,7 +276,10 @@ public final class Roles {
         m.put("support", new Def(ops, null));
         // LA-19: revealing a masked entity and approving a sensitive expand are oversight acts, so they sit with
         // Admin (and Super, which holds everything) — NOT with the analyst roles that own Investigations.
-        m.put("admin", new Def(Set.of(CAN_ONBOARD_CONNECTIONS, CAN_CONFIGURE_ACCESS, CAN_APPROVE_SHARES,
+        // LA-FULL-CYCLE-TEST-1 D1 (operator, 2026-11-15): Admin also authors (canAuthorWorkbench). Admin holds
+        // canConfigureAccess, so PUT /access/roles already let it grant itself the capability; withholding it
+        // protected nothing and left the creator of a Space unable to save a view or change its settings.
+        m.put("admin", new Def(Set.of(CAN_AUTHOR_WORKBENCH, CAN_ONBOARD_CONNECTIONS, CAN_CONFIGURE_ACCESS, CAN_APPROVE_SHARES,
                 CAN_OFFER_DATASETS, CAN_OFFER_SIGNALS, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_ADMINISTER,
                 CAN_MANAGE_INCIDENTS, CAN_WORK_INCIDENTS, CAN_REVEAL_LINK_ENTITIES, CAN_APPROVE_LINK_EXPANSIONS,
                 CAN_APPROVE_CHANGES, CAN_RUN_LINK_GRAPH_ANALYSIS, CAN_BUILD_LINK_INDEX, CAN_UPLOAD_DATA, CAN_SHARE_INVESTIGATION,

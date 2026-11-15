@@ -500,7 +500,7 @@ class ControlApiPendingChangesTest {
         }
     }
 
-    // ── D-P13 with the SEEDED role table: an admin (canApproveChanges, no canAuthorWorkbench) approves a builder ──
+    // ── D-P13 with the SEEDED role table: an admin (canApproveChanges) approves a builder's change ──
 
     /** An Authenticator shaped like the OIDC one: `Bearer <user>:<role>` → the role's grants in THIS Space's table. */
     private static void armWithSeededRoles() {
@@ -523,7 +523,8 @@ class ControlApiPendingChangesTest {
         armWithSeededRoles();
         String builder = "Bearer dana:pipeline-developer", admin = "Bearer ada:admin";
         try (Ctx c = open(cfg, root)) {
-            assertFalse(Roles.SEED.get("admin").capabilities().contains("canAuthorWorkbench"), "premise: admin is no builder");
+            // The seeded admin also authors since LA-FULL-CYCLE-TEST-1 D1; that a checker need not be a builder is
+            // pinned by theDecideGates above, with a Subject that only approves (PLAIN).
             assertTrue(Roles.SEED.get("admin").capabilities().contains("canApproveChanges"));
             data(send(c, "PUT", "/settings/approval", PACK_POLICY, admin.replace("ada", "ops-admin")), 200);
 

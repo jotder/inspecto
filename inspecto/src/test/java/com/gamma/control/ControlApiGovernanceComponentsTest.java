@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p>⚠ A REAL Subject is attached on every request ({@link Authenticators#forTest}); with none, {@code withCapability}
  * is a no-op and every 403 below would be a 200 against an ungated route. Roles come from {@link Roles#SEED}:
- * {@code admin} holds canAdminister (and not canAuthorWorkbench); {@code developer} holds canAuthorWorkbench;
+ * {@code admin} holds canAdminister (and canAuthorWorkbench); {@code developer} holds canAuthorWorkbench only;
  * {@code operations} holds canManageIncidents.
  */
 class ControlApiGovernanceComponentsTest {

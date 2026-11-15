@@ -54,16 +54,15 @@ class ControlApiLinkAnalysisLimitsTest {
 
     @BeforeEach
     void arm() {
-        Authenticators.forTest(ex -> {
-            String h = String.valueOf(ex.getRequestHeaders().getFirst("Authorization"));
-            String[] who = switch (h) {
-                case AUTHOR -> new String[] {"dev-1", "developer"};   // canAuthorWorkbench, not canAdminister
-                case ADMIN -> new String[] {"admin-1", "admin"};      // canAdminister, not canAuthorWorkbench
-                default -> null;
-            };
-            if (who == null) return Optional.empty();
-            Roles.Def def = Roles.effective(ex).get(who[1]);
-            return Optional.of(new Subject(who[0], def.capabilities(), def.dataScopes()));
+        Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
+            case AUTHOR -> {   // the seeded developer: canAuthorWorkbench, not canAdminister
+                Roles.Def def = Roles.effective(ex).get("developer");
+                yield Optional.of(new Subject("dev-1", def.capabilities(), def.dataScopes()));
+            }
+            // canAdminister, not canAuthorWorkbench. Stated here: no seeded role is that any more (the seeded admin
+            // also authors, LA-FULL-CYCLE-TEST-1 D1), and the Space gate and the install gate must still be told apart.
+            case ADMIN -> Optional.of(new Subject("admin-1", Set.of(Roles.CAN_ADMINISTER)));
+            default -> Optional.empty();
         });
     }
 

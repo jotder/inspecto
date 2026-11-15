@@ -36,7 +36,7 @@ Edits in `platform/inspecto-access` or `spi/inspecto-auth-spi` are exercised thr
 | [ ] | EMB-3 | 6 | Every mutating route is classified (fail closed) | `CapabilityManifest.java` ~61: delete the `new Entry("POST", "/inv/investigations/([^/]+)/embeds", Roles.CAN_SHARE_INVESTIGATION),` row | `inspecto -Dtest=CapabilityManifestTest` | red naming the undeclared `POST /inv/investigations/{id}/embeds`; a host boot refuses too |
 | [ ] | EMB-4 | 4 | `embed` is an authorable access-policy action | `spi/inspecto-auth-spi/.../auth/AccessPolicies.java` line 33: drop `, "embed"` from `ACTIONS` | `inspecto -Dtest=ControlApiAccessPoliciesTest` | `embedIsAnAuthorableActionAndAnUnknownVerbIsStillRefused` red |
 | [ ] | EMB-5 | 4 | The anonymous embed view is throttled (EXPENSIVE rate class) | `inspecto/.../control/LinkAnalysisRateClasses.java` ~39: delete `{"GET", "/public/investigations/([^/]+)"},` | `inspecto -Dtest=LinkAnalysisRateClassCoverageTest` | red: the route is in no rate class |
-| [ ] | EMB-6 | 3 | Admin holds the share-an-Investigation capability | `platform/inspecto-access/.../access/Roles.java` ~247 (the `"admin"` Def): delete `, CAN_SHARE_INVESTIGATION` | `providers/inspecto-oidc -Dtest=OidcAuthenticatorTest` | `adminRoleGrantsOnboardConnectionsAndNotWorkbench` red (set equality, `canShareInvestigation` missing) |
+| [ ] | EMB-6 | 3 | Admin holds the share-an-Investigation capability | `platform/inspecto-access/.../access/Roles.java` ~247 (the `"admin"` Def): delete `, CAN_SHARE_INVESTIGATION` | `providers/inspecto-oidc -Dtest=OidcAuthenticatorTest` | `adminRoleGrantsExactlyItsSeededSet` red (set equality, `canShareInvestigation` missing) |
 
 ## B. Store and concurrency guards (assurance, 2026-10-04)
 
