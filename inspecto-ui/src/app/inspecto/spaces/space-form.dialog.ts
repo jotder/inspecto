@@ -5,13 +5,14 @@ import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatRadioModule } from '@angular/material/radio';
-import { catchError, forkJoin, map, Observable, of, switchMap } from 'rxjs';
+import { catchError, concat, map, Observable, of, switchMap, toArray } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { environment } from 'environments/environment';
 import {
     apiErrorMessage,
     Branding,
     BrandingService,
+    LensService,
     Space,
     SpacesService,
     TimezoneSettingsService,
@@ -114,7 +115,9 @@ export const DATA_KIND_OPTIONS: readonly DataKindOption[] = [
  * the user names the space (the SpaceId folder is auto-derived from the name, editable under "Edit id"),
  * fixing the old "type a name → Create stays disabled" trap. The id is immutable on edit. Persists via
  * POST/PUT /spaces and, for branding, PUT /spaces/{id}/settings/branding. Closes with the resulting
- * {@link Space}. The `default` space is not editable and is never opened here in edit mode.
+ * {@link Space}; a setting saved after it that is refused is named in a warning, never left as an open dialog.
+ * Branding and timezone are offered only to a caller who may save them ({@link LensService.canSaveSpaceSettings}).
+ * The `default` space is not editable and is never opened here in edit mode.
  */
 @Component({
     selector: 'app-space-form-dialog',
@@ -184,55 +187,64 @@ export const DATA_KIND_OPTIONS: readonly DataKindOption[] = [
                 } @else {
                     <inspecto-pen-field label="Description" formControlName="description"></inspecto-pen-field>
 
-                    <!-- Branding -->
-                    <div class="flex flex-col gap-2 border-t pt-3">
-                        <span id="space-logo-label" class="text-sm font-medium">Logo</span>
-                        <div class="flex items-center gap-4">
-                            <div class="bg-hover flex h-14 w-28 items-center justify-center rounded border p-2">
-                                <img
-                                    class="max-h-full max-w-full"
-                                    [src]="logoDataUrl() || defaultLogo"
-                                    alt="Logo preview"
-                                />
+                    @if (!canSaveSettings()) {
+                        <p class="text-secondary m-0 border-t pt-3 text-sm">
+                            Logo, caption, footer and default timezone are not offered: saving them needs the
+                            <span class="font-mono">canAuthorWorkbench</span> capability.
+                        </p>
+                    } @else {
+                        <!-- Branding -->
+                        <div class="flex flex-col gap-2 border-t pt-3">
+                            <span id="space-logo-label" class="text-sm font-medium">Logo</span>
+                            <div class="flex items-center gap-4">
+                                <div class="bg-hover flex h-14 w-28 items-center justify-center rounded border p-2">
+                                    <img
+                                        class="max-h-full max-w-full"
+                                        [src]="logoDataUrl() || defaultLogo"
+                                        alt="Logo preview"
+                                    />
+                                </div>
+                                <div class="flex flex-col gap-1">
+                                    <input
+                                        #logoInput
+                                        type="file"
+                                        accept="image/*"
+                                        class="sr-only"
+                                        aria-labelledby="space-logo-label"
+                                        (change)="onLogoSelected(logoInput)"
+                                    />
+                                    <button mat-stroked-button type="button" (click)="logoInput.click()">
+                                        <mat-icon svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
+                                        <span class="ml-2">Upload</span>
+                                    </button>
+                                    @if (logoDataUrl()) {
+                                        <button mat-button type="button" (click)="removeLogo()">
+                                            Remove custom logo
+                                        </button>
+                                    }
+                                </div>
                             </div>
-                            <div class="flex flex-col gap-1">
-                                <input
-                                    #logoInput
-                                    type="file"
-                                    accept="image/*"
-                                    class="sr-only"
-                                    aria-labelledby="space-logo-label"
-                                    (change)="onLogoSelected(logoInput)"
-                                />
-                                <button mat-stroked-button type="button" (click)="logoInput.click()">
-                                    <mat-icon svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
-                                    <span class="ml-2">Upload</span>
-                                </button>
-                                @if (logoDataUrl()) {
-                                    <button mat-button type="button" (click)="removeLogo()">Remove custom logo</button>
-                                }
-                            </div>
+                            @if (logoError()) {
+                                <span class="text-warn text-xs" role="alert">{{ logoError() }}</span>
+                            }
                         </div>
-                        @if (logoError()) {
-                            <span class="text-warn text-xs" role="alert">{{ logoError() }}</span>
-                        }
-                    </div>
 
-                    <inspecto-pen-field
-                        label="Caption"
-                        formControlName="caption"
-                        placeholder="Unveil stories from your data"
-                        help="Shown beneath the logo in the sidebar."
-                    ></inspecto-pen-field>
-                    <inspecto-pen-field label="Footer text" formControlName="footerText"></inspecto-pen-field>
-                    <inspecto-pen-field
-                        label="Default timezone"
-                        [mono]="true"
-                        formControlName="timezone"
-                        placeholder="UTC"
-                        help="An IANA zone such as Asia/Kolkata. KPIs without their own timezone use it."
-                        [error]="timezoneError()"
-                    ></inspecto-pen-field>
+                        <inspecto-pen-field
+                            label="Caption"
+                            formControlName="caption"
+                            placeholder="Unveil stories from your data"
+                            help="Shown beneath the logo in the sidebar."
+                        ></inspecto-pen-field>
+                        <inspecto-pen-field label="Footer text" formControlName="footerText"></inspecto-pen-field>
+                        <inspecto-pen-field
+                            label="Default timezone"
+                            [mono]="true"
+                            formControlName="timezone"
+                            placeholder="UTC"
+                            help="An IANA zone such as Asia/Kolkata. KPIs without their own timezone use it."
+                            [error]="timezoneError()"
+                        ></inspecto-pen-field>
+                    }
                 }
             </mat-dialog-content>
             <mat-dialog-actions align="end">
@@ -252,6 +264,8 @@ export class SpaceFormDialog {
     private toastr = inject(ToastrService);
     private ref = inject(MatDialogRef<SpaceFormDialog, Space>);
     private confirm = inject(InspectoConfirmService);
+    /** Branding and timezone are offered (and sent) only to a caller the server lets save them. */
+    readonly canSaveSettings = inject(LensService).canSaveSpaceSettings;
 
     /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
@@ -399,41 +413,58 @@ export class SpaceFormDialog {
         // UC-02: the chosen kind of data selects the new Space's Domain Profile; generic leaves it unset.
         const pack = this.dataKind ? (DATA_KIND_OPTIONS.find((k) => k.id === v.dataKind)?.pack ?? null) : null;
 
-        // The timezone is saved only when it was touched (never a null PUT on create), and AFTER the Space: a
-        // refusal there must not read as the whole save failing — the Space is already saved.
+        // The timezone is saved only when it was touched (never a null PUT on create). The data-kind create asks
+        // no branding, and a caller who may not save settings is not offered it, so neither writes any.
         const tz = String(v.timezone ?? '').trim() || null;
         const saveTz = this.form.controls['timezone'].dirty && !(!existing && tz === null);
+        const saveBranding = !this.dataKind && this.canSaveSettings();
         save$
             .pipe(
-                switchMap((space) =>
-                    forkJoin({
-                        space: of(space),
-                        // The data-kind create asks no branding, so it writes none.
-                        _: this.dataKind ? of(null) : this.brandingApi.saveFor(space.id, branding),
-                    }),
-                ),
-                switchMap(({ space }) => {
-                    const done: Observable<unknown> = saveTz
-                        ? this.timezoneApi.saveFor(space.id, tz)
-                        : pack
-                          ? this.api.setDomainProfile(space.id, pack)
-                          : of(null);
-                    return done.pipe(
-                        map(() => ({ space, tzError: null as unknown })),
-                        catchError((e: unknown) => of({ space, tzError: e })),
+                // Each setting is its own step AFTER the Space (SPACE-CREATE-PARTIAL-1): a refused step is named
+                // and the dialog still closes on the Space it saved — never an open dialog over a Space that exists.
+                switchMap((space) => {
+                    const step = (step$: Observable<unknown>, refused: string, fallback: string) =>
+                        step$.pipe(
+                            map(() => null),
+                            catchError((e: unknown) => of(`${refused}: ${apiErrorMessage(e, fallback)}`)),
+                        );
+                    const steps: Observable<string | null>[] = [];
+                    if (saveBranding)
+                        steps.push(
+                            step(
+                                this.brandingApi.saveFor(space.id, branding),
+                                'its branding was not saved',
+                                'the branding was refused.',
+                            ),
+                        );
+                    if (saveTz)
+                        steps.push(
+                            step(
+                                this.timezoneApi.saveFor(space.id, tz),
+                                'its default timezone was not saved',
+                                'the timezone was refused.',
+                            ),
+                        );
+                    else if (pack)
+                        steps.push(
+                            step(
+                                this.api.setDomainProfile(space.id, pack),
+                                'its kind of data was not set',
+                                'the Domain Profile was refused.',
+                            ),
+                        );
+                    return concat(...steps).pipe(
+                        toArray(),
+                        map((done) => ({ space, refused: done.filter((r): r is string => r !== null) })),
                     );
                 }),
             )
             .subscribe({
-                next: ({ space, tzError }) => {
+                next: ({ space, refused }) => {
                     this.saving.set(false);
-                    if (tzError) {
+                    if (refused.length) {
                         this.toastr.warning(
-                            pack
-                                ? `Space "${space.id}" was created, but its kind of data was not set: ` +
-                                      apiErrorMessage(tzError, 'the Domain Profile was refused.')
-                                : `Space "${space.id}" was saved, but its default timezone was not: ` +
-                                      apiErrorMessage(tzError, 'the timezone was refused.'),
+                            `Space "${space.id}" was ${existing ? 'saved' : 'created'}, but ${refused.join('; ')}`,
                         );
                     } else {
                         this.toastr.success(`Space "${space.id}" ${existing ? 'updated' : 'created'}`);

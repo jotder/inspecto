@@ -18,6 +18,13 @@ active space reloads the app.
   edit including logo (≤200 KB upload) / caption / footer, persisted via `GET|PUT /settings/branding`
   (per-space doc; empty → shipped default). The signal-backed `BrandingService`
   (`inspecto/api/branding.service.ts`) reloads on active-space change so the layout header stays live.
+* **Branding and the default timezone need `canAuthorWorkbench`** (every `PUT /settings/*` is gated on it, while creating,
+  renaming or removing a Space is gated on `canAdminister`). The dialog offers those fields only when `LensService.canSaveSpaceSettings`
+  holds — the server's own question, identity not lens: a seeded `admin`, who lacks it, sees a one-line note instead
+  and its create or edit sends no settings. Every setting is its own step after the Space: a refused one is named
+  (`Space "x" was created, but its branding was not saved: …`) and the dialog still closes on the saved Space —
+  never an open dialog over a Space that exists (`SPACE-CREATE-PARTIAL-1`, 2026-11-15;
+  `space-form.dialog.spec.ts`).
 * Create asks a **Display name** and auto-derives the SpaceId slug (editable); the space id is immutable
   on edit. Each card gets **Activate** (single-select, hard-reloads to re-scope); the `default` space is
   not editable.

@@ -225,6 +225,14 @@ export class LensService {
      *  {@link canWorkIncidents} (operator, 2026-09-26). Do not widen this one to cover it. */
     readonly canAdminister = computed(() => this.identityCapability('canAdminister', 'space.administer'));
 
+    /** May save a Space's settings — branding and default timezone (`PUT /spaces/{id}/settings/*`, which the
+     *  backend gates on `canAuthorWorkbench`). The Space form offers those fields only when this holds, so a
+     *  create never ends with the Space saved and its branding refused (SPACE-CREATE-PARTIAL-1).
+     *
+     *  {@link identityCapability}, not {@link canAuthorWorkbench}: the server asks only who the subject is, and a
+     *  `super` viewing as Business may still save them. No Access-Catalog node carries it (a backend-only gate). */
+    readonly canSaveSpaceSettings = computed(() => this.identityCapability('canAuthorWorkbench', 'space.settings'));
+
     /** May manage Incidents and Cases — the grant the backend puts on opening an Incident/Case, promoting a
      *  Break, Investigation writes, and (D1, operator 2026-09-25) the Case desk's Findings fields
      *  (`/components/findings-spec…`). RBAC: Operations, Support, Admin, Power, Super.

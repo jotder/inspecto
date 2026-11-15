@@ -101,6 +101,20 @@ describe('LensService', () => {
         expect(service.canAdminister()).toBe(true);
     });
 
+    // SPACE-CREATE-PARTIAL-1: the server gates PUT /settings/* on canAuthorWorkbench and asks nothing about lenses.
+    it('canSaveSpaceSettings follows the canAuthorWorkbench grant, and survives the business lens', () => {
+        const session = TestBed.inject(SessionService);
+        const service = TestBed.inject(LensService);
+        session.authMode.set('oidc');
+        service.selectLens('business');
+
+        session.capabilities.set(['canAdminister', 'canManageIncidents']); // the seeded admin
+        expect(service.canSaveSpaceSettings()).toBe(false);
+
+        session.capabilities.set(['canAuthorWorkbench']);
+        expect(service.canSaveSpaceSettings()).toBe(true);
+    });
+
     // D1 (findings-spec authoring, 2026-09-25): the Case desk's grant. Identity, because the admin seed holds
     // it and qualifies for no non-Business lens — lens-scoping would hide the editor from a subject who may save.
     it('canManageIncidents is granted only to a subject holding it, and survives the business lens', () => {

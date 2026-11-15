@@ -2,10 +2,11 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of, throwError } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it, vi } from 'vitest';
 import { BrandingService, Space, SpacesService, TimezoneSettingsService } from 'app/inspecto/api';
+import { SessionService } from 'app/inspecto/auth/session.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { penByLabel, penEdit, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { SpaceFormData, SpaceFormDialog } from './space-form.dialog';
@@ -16,9 +17,12 @@ const NO_BRANDING = { logoDataUrl: null, caption: null, footerText: null };
 function create(
     data: SpaceFormData | null = null,
     tzSave = vi.fn(() => of({ timezone: null, effectiveTimezone: 'UTC' })),
+    /** Under OIDC, the subject's effective capabilities; omitted = no sign-in (every capability). */
+    capabilities?: string[],
 ) {
+    const close = vi.fn();
     const getFor = vi.fn(() => of(NO_BRANDING));
-    const saveFor = vi.fn(() => of(NO_BRANDING));
+    const saveFor = vi.fn((): Observable<unknown> => of(NO_BRANDING));
     const spaceSave = vi.fn(() => of({ id: 'beta', displayName: 'Beta', description: '', createdAt: '' }));
     const tzGetFor = vi.fn(() => of({ timezone: 'Asia/Kolkata', effectiveTimezone: 'Asia/Kolkata' }));
     const domainSave = vi.fn(() => of({}));
@@ -26,12 +30,13 @@ function create(
         imports: [SpaceFormDialog],
         providers: [
             provideNoopAnimations(),
-            { provide: MatDialogRef, useValue: { close: () => {} } },
+            { provide: MatDialogRef, useValue: { close } },
             { provide: MAT_DIALOG_DATA, useValue: data },
             {
                 provide: SpacesService,
                 useValue: {
                     availableSpaces: signal([{ id: 'taken' }]),
+                    currentSpaceId: signal<string | null>(null), // read by SessionService, behind LensService
                     create: spaceSave,
                     update: spaceSave,
                     setDomainProfile: domainSave,
@@ -42,9 +47,14 @@ function create(
             { provide: ToastrService, useValue: toastr },
         ],
     });
+    if (capabilities) {
+        const session = TestBed.inject(SessionService);
+        session.authMode.set('oidc');
+        session.capabilities.set(capabilities);
+    }
     const fixture = TestBed.createComponent(SpaceFormDialog);
     fixture.detectChanges();
-    return { fixture, getFor, saveFor, spaceSave, tzSave, domainSave };
+    return { fixture, close, getFor, saveFor, spaceSave, tzSave, domainSave };
 }
 
 /** The `<inspecto-pen-field>` row bound to `control` inside `scope`, so an error assertion is scoped to that one row. */
@@ -127,6 +137,44 @@ describe('SpaceFormDialog', () => {
             expect.stringContaining('was saved, but its default timezone was not'),
         );
         expect(toastr.error).not.toHaveBeenCalled();
+    });
+
+    // SPACE-CREATE-PARTIAL-1: POST /spaces succeeded, the branding PUT was refused, and the dialog stayed open on
+    // only the refusal — so the operator believed the create had failed while the Space existed.
+    it('a refused branding names that step and still closes on the created Space', () => {
+        toastr.error.mockClear();
+        toastr.warning.mockClear();
+        const { fixture, close, saveFor } = create();
+        saveFor.mockReturnValue(
+            throwError(() => ({ status: 403, error: { error: "missing capability 'canAuthorWorkbench'" } })),
+        );
+        const c = fixture.componentInstance;
+        c.form.patchValue({ display_name: 'Beta', caption: 'Our data' });
+        c.submit();
+        expect(saveFor).toHaveBeenCalledWith('beta', expect.objectContaining({ caption: 'Our data' }));
+        expect(toastr.warning).toHaveBeenCalledWith(
+            expect.stringContaining('Space "beta" was created, but its branding was not saved'),
+        );
+        expect(toastr.error).not.toHaveBeenCalled();
+        expect(close).toHaveBeenCalledWith(expect.objectContaining({ id: 'beta' }));
+    });
+
+    it('a caller without canAuthorWorkbench is not offered branding or timezone, and the create sends none', async () => {
+        toastr.success.mockClear();
+        const { fixture, close, saveFor, tzSave } = create(null, undefined, ['canAdminister']); // the seeded admin
+        const el = fixture.nativeElement as HTMLElement;
+        for (const gone of ['caption', 'footerText', 'timezone'])
+            expect(el.querySelector(`[formControlName="${gone}"]`)).toBeNull();
+        expect(el.textContent).not.toContain('Upload');
+        expect(el.textContent).toContain('canAuthorWorkbench');
+        await expectNoA11yViolations(el);
+        const c = fixture.componentInstance;
+        c.form.patchValue({ display_name: 'Beta' });
+        c.submit();
+        expect(saveFor).not.toHaveBeenCalled();
+        expect(tzSave).not.toHaveBeenCalled();
+        expect(toastr.success).toHaveBeenCalledWith('Space "beta" created');
+        expect(close).toHaveBeenCalledWith(expect.objectContaining({ id: 'beta' }));
     });
 
     it('has no a11y violations', async () => {
