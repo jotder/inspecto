@@ -44,7 +44,7 @@ export function buildPlan() {
   ];
   return [
     { id: 'investigation', as: 'rp.analyst', method: 'POST', path: '/inv/investigations', body: {
-      id: INV, title: `Meter tampering (${CONTRACTOR})`, purpose: `Showcase: loss on ${TRANSFORMERS.join(' and ')} after one contractor's visits`, dataset: DATASET,
+      id: INV, title: 'Meter tampering after one contractor\'s visits', purpose: `Showcase: loss on ${TRANSFORMERS.length} transformers after one contractor's visits`, dataset: DATASET,
       sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts', entityType: ENTITY_TYPE } },
     ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'rp.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
     ...[['rp.reviewer', 'reviewer'], ['rp.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
@@ -74,7 +74,7 @@ async function prime(call, log, sleep, tries) {
 }
 
 export const PENDING_EXPAND = { op: 'expand', direction: 'either' };   // no maxFanOut = unbounded: always above four_eyes_fan_out_above, so held
-export const DRAFT_STEP = { op: 'annotate', ids: [CONTRACTOR], note: `widen the case: ${COLLEAGUE} joined three of these visits and closed 15 reconnect orders without payment` };   // annotates a Working Set node: ${COLLEAGUE} is two hops out
+export const DRAFT_STEP = { op: 'annotate', ids: [CONTRACTOR], note: 'widen the case: a colleague joined three of these visits and closed 15 reconnect orders without payment' };   // annotates a Working Set node: COLLEAGUE is two hops out
 
 /** Runs (or, with apply=false, only prints) the plan. Returns { done, skipped, failed, warnings, summary }. */
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = SPACE, apply = false, log = () => {},

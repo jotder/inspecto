@@ -52,6 +52,11 @@ redeploys: `.claude/memory/preview-la-demo.md`.
   not have at `POST /spaces`). It names a running-total count, never an entity, so one Alert stays open and is
   refreshed in place. Narrow the rule until the look-alike is out, and pin it in the golden test.
 - **A Draft may only annotate an entity in the Working Set** (two hops out → 422); seeds annotate the story's seed.
+- **Investigation text names roles, never an entity id** (LA-FULL-CYCLE-TEST-1 finding 13): the title, purpose, an
+  exclude's reason, an annotation, a reference label and the Draft step say "the hub", "this dealer", "one
+  contractor", never `MULE-HUB-01`. Masked is the default, and the server masks every id inside Investigation text,
+  so "Mule hub MULE-HUB-01" reached the demo as "Mule hub masked:6021…". `tools/seed-la-investigation-text.test.mjs`
+  checks every seed against the ids its plan sends and its exported constants hold.
 - **Names:** Space name = the use case alone ("Crypto laundering"), never "Link Analysis … showcase"; the seed
   script's `display_name` must match `template.toon`.
 

@@ -40,7 +40,7 @@ export function buildPlan() {
     // bounded, under four_eyes_fan_out_above (2000): runs now and brings in the carrier's 5 loads and the driver whose phone it
     // shares; an UNBOUNDED expand always goes pending
     { op: 'expand', direction: 'either', linkKinds: ['carried_by', 'same_phone'], maxFanOut: 20 },
-    { op: 'annotate', ids: [CARRIER], note: `registered ${fc.registered_at.slice(0, 10)}, not insured; ${TRIPS.length} high-value loads in its first month, none arrived; its phone is ${THIEF}'s, who drove the theft ${fc.thief_loss} for ${fc.thief_carrier}` },
+    { op: 'annotate', ids: [CARRIER], note: `registered ${fc.registered_at.slice(0, 10)}, not insured; ${TRIPS.length} high-value loads in its first month, none arrived; its phone is a dismissed driver's, who drove an earlier theft for another carrier` },
     { op: 'threshold', min: 1 },
     { op: 'window', window: { from: '2025-10-01T00:00:00Z', to: '2026-10-01T00:00:00Z' } },
     { op: 'resolve' },
@@ -48,7 +48,7 @@ export function buildPlan() {
   ];
   return [
     { id: 'investigation', as: 'logistics.analyst', method: 'POST', path: '/inv/investigations', body: {
-      id: INV, title: `Fictitious carrier (${CARRIER})`, purpose: `Showcase: a carrier under 60 days old and not insured, sharing a dismissed driver's phone, whose ${TRIPS.length} high-value loads never arrived`, dataset: DATASET,
+      id: INV, title: 'Fictitious carrier', purpose: `Showcase: a carrier under 60 days old and not insured, sharing a dismissed driver's phone, whose ${TRIPS.length} high-value loads never arrived`, dataset: DATASET,
       sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts', entityType: ENTITY_TYPE } },
     ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'logistics.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
     ...[['logistics.reviewer', 'reviewer'], ['logistics.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
@@ -77,7 +77,7 @@ async function prime(call, log, sleep, tries) {
 export const PENDING_EXPAND = { op: 'expand', direction: 'either' };   // no maxFanOut = unbounded: always above four_eyes_fan_out_above, so held
 // annotates the driver, whose same_phone link the bounded expand brought into the Working Set; his old trips are two hops out
 // (carrier -> driver -> trip), and annotating one of them is refused
-export const DRAFT_STEP = { op: 'annotate', ids: [THIEF], note: `widen the case: ${CARRIER} gives ${THIEF}'s phone as its own; check his old trips, ${THIEF_TRIP} among them, and the carriers he drove for` };
+export const DRAFT_STEP = { op: 'annotate', ids: [THIEF], note: 'widen the case: the carrier gives this driver\'s phone as its own; check his old trips, the earlier theft among them, and the carriers he drove for' };
 
 /** Runs (or, with apply=false, only prints) the plan. Returns { done, skipped, failed, warnings, summary }. */
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = SPACE, apply = false, log = () => {},

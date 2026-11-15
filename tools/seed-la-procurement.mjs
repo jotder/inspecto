@@ -39,7 +39,7 @@ export function buildPlan() {
     // bounded, under four_eyes_fan_out_above (2000): runs now and brings in the four bidders that sent bids from the address;
     // an UNBOUNDED expand always goes pending
     { op: 'expand', direction: 'either', linkKinds: ['same_ip'], maxFanOut: 20 },
-    { op: 'annotate', ids: [OFFICE_IP], note: `${FROM_OFFICE} bids by ${COVERS.length} competitors came from ${WINNER}'s office address minutes after its own bid on the same tender` },
+    { op: 'annotate', ids: [OFFICE_IP], note: `${FROM_OFFICE} bids by ${COVERS.length} competitors came from the winner's office address minutes after its own bid on the same tender` },
     { op: 'threshold', min: 1 },
     { op: 'window', window: { from: '2025-10-01T00:00:00Z', to: '2026-10-01T00:00:00Z' } },
     { op: 'resolve' },
@@ -47,7 +47,7 @@ export function buildPlan() {
   ];
   return [
     { id: 'investigation', as: 'procurement.analyst', method: 'POST', path: '/inv/investigations', body: {
-      id: INV, title: `Cover bids from ${OFFICE_IP}`, purpose: `Showcase: ${COVERS.length} competitors bid from ${WINNER}'s office address on the same tenders`, dataset: DATASET,
+      id: INV, title: 'Cover bids from one office', purpose: `Showcase: ${COVERS.length} competitors bid from the winner's office address on the same tenders`, dataset: DATASET,
       sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts', entityType: ENTITY_TYPE } },
     ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'procurement.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
     ...[['procurement.reviewer', 'reviewer'], ['procurement.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
@@ -76,7 +76,7 @@ async function prime(call, log, sleep, tries) {
 export const PENDING_EXPAND = { op: 'expand', direction: 'either' };   // no maxFanOut = unbounded: always above four_eyes_fan_out_above, so held
 // annotates the winner, which the bounded expand brought into the Working Set; its estimator is two hops out (IP -> CO-0074 -> author),
 // and annotating the author is refused
-export const DRAFT_STEP = { op: 'annotate', ids: [WINNER], note: `widen the case: ${AUTHOR}, ${WINNER}'s estimator, is the author of most of the cover bids' documents` };
+export const DRAFT_STEP = { op: 'annotate', ids: [WINNER], note: 'widen the case: this company\'s estimator is the author of most of the cover bids\' documents' };
 
 /** Runs (or, with apply=false, only prints) the plan. Returns { done, skipped, failed, warnings, summary }. */
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = SPACE, apply = false, log = () => {},

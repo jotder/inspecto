@@ -128,6 +128,41 @@ const step = (n: number, op: string) => ({
 // The SPA holds no industry profile of its own (LA-EDITIONS-1): the telecom pack arrives from the server.
 installTelecomFixture();
 
+describe('InvestigationSessionStore - the one Reveal (LA-FULL-CYCLE-TEST-1 D3)', () => {
+    it('reveals the aliases on screen in chunks of input.reveal_ids with one reason, keeps them for this screen only', async () => {
+        const { store, inv } = setup();
+        const revealEntities = vi.fn((id: string, tokens: string[], reason: string) =>
+            of({ id, reason, revealed: tokens.map((t) => ({ token: t, id: 'raw-' + t })), unknown: [], masking: {} }),
+        );
+        Object.assign(inv, { revealEntities });
+        store.activeId.set('inv-1');
+        const tokens = Array.from({ length: 250 }, (_, i) => `masked:${String(i).padStart(16, '0')}`);
+
+        expect(await store.reveal(tokens, 'warrant 7')).toBe(250);
+        expect(revealEntities).toHaveBeenCalledTimes(3); // 100 + 100 + 50: the server's per-call cap
+        expect(revealEntities.mock.calls.every((c) => c[0] === 'inv-1' && c[2] === 'warrant 7')).toBe(true);
+        expect(store.revealed()[tokens[0]]).toBe('raw-' + tokens[0]);
+        expect(store.revealReason()).toBe('warrant 7');
+
+        expect(await store.reveal(tokens.slice(0, 5), 'again')).toBe(0); // already revealed: nothing is asked twice
+        expect(revealEntities).toHaveBeenCalledTimes(3);
+
+        store.close(); // closing (or switching) forgets them: masked stays the default
+        expect(store.revealed()).toEqual({});
+        expect(store.revealReason()).toBeNull();
+    });
+
+    it('a refusal reveals nothing and reaches the caller', async () => {
+        const { store, inv } = setup();
+        Object.assign(inv, {
+            revealEntities: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 403, error: {} }))),
+        });
+        store.activeId.set('inv-1');
+        await expect(store.reveal(['masked:0000000000000001'], 'r')).rejects.toBeInstanceOf(HttpErrorResponse);
+        expect(store.revealed()).toEqual({});
+    });
+});
+
 describe('InvestigationSessionStore (LA-10)', () => {
     it('start sends the time column, so the coverage read has one (LA-SPA-OWED-SURFACES-1 defect)', async () => {
         const { store, inv } = setup();

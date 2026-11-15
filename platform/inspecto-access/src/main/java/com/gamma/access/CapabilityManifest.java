@@ -616,7 +616,7 @@ public final class CapabilityManifest {
             new Exemption("POST", "/inv/expand/preview", "read-shaped", "evaluates an unsaved Investigation's seed / expand steps (LA-UNSAVED-INVESTIGATION-1); persists nothing"),
             new Exemption("POST", "/inv/projection/multi", "read-shaped", "computes a multi-dataset projection from the body; persists nothing"),
             new Exemption("POST", "/inv/schema/overlap-profile", "read-shaped", "profiles column cardinality/overlap; persists nothing"),
-            new Exemption("POST", "/inv/reference-rows", "read-shaped", "looks up reference rows for at most 500 entity keys; persists nothing"),
+            new Exemption("POST", "/inv/reference-rows", "read-shaped", "looks up reference rows for at most 500 entity keys; persists nothing; reveal:true demands canRevealLinkEntities and the Investigation's lead in the handler"),
             new Exemption("POST", "/inv/case-history", "read-shaped", "reads one Entity's Incident / Case history, resolving a masked key server-side; persists nothing"),
             new Exemption("POST", "/inv/entities/([^/]+)/resolve", "read-shaped", "resolves one Entity key (raw value in the body) to the alias its Entity page takes; reads no Dataset, persists nothing"),
             new Exemption("POST", "/inv/entities/([^/]+)/suggest", "read-shaped", "lists the values of an Entity Type that start a graph, by a prefix sent in the body (the Start box's type-ahead); reads the caller's viewable Datasets, persists nothing"),

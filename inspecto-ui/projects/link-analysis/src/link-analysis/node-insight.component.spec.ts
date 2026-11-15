@@ -235,9 +235,55 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         await expectNoA11yViolations(el);
     });
 
+    it('D3 (LA-FULL-CYCLE-TEST-1): a masked node offers the one Reveal; its details are read again raw with the reason', async () => {
+        const ref = {
+            dataset: 'crm_kyc_dataset',
+            keyCol: 'msisdn',
+            name: 'subscribers',
+            entityType: 'msisdn',
+            columns: ['subscriber_type'],
+        };
+        const alias = 'masked:0123456789abcdef';
+        const reveal = vi.fn(() => Promise.resolve({ id: '27820000001', reason: 'MR-3 warrant' }));
+        const { fixture, el, svc } = make({ label: alias, key: alias, references: [ref], reveal, revealWhyNot: '' });
+        await settle(fixture);
+        expect(el.querySelector('[data-testid="ni-masked"]')?.textContent).toContain('is an alias');
+        expect(el.querySelector('[data-testid="ni-revealed"]')).toBeNull();
+        expect(svc.lookup).toHaveBeenCalledWith(ref, [alias], 'inv'); // masked: read as the alias, no reveal
+
+        (el.querySelector('[data-testid="ni-reveal"]') as HTMLButtonElement).click();
+        await settle(fixture);
+        expect(reveal).toHaveBeenCalledTimes(1);
+        expect(el.querySelector('[data-testid="ni-revealed"]')?.textContent).toContain('27820000001');
+        expect(svc.lookup).toHaveBeenCalledWith(ref, [alias], 'inv', 'MR-3 warrant');
+        await expectNoA11yViolations(el);
+    });
+
+    it('D3: a masked node says why it cannot be revealed here', async () => {
+        const masked = make({
+            label: 'masked:0123456789abcdef',
+            key: 'masked:0123456789abcdef',
+            revealWhyNot: 'Needs See unmasked ids.',
+        });
+        await settle(masked.fixture);
+        expect(masked.el.querySelector('[data-testid="ni-reveal"]')).toBeNull();
+        expect(masked.el.querySelector('[data-testid="ni-reveal-why"]')?.textContent).toContain('See unmasked ids');
+    });
+
+    it('D3: a node this screen already revealed opens showing its real id', async () => {
+        const { fixture, el } = make({
+            label: 'masked:0123456789abcdef',
+            key: 'masked:0123456789abcdef',
+            revealed: { id: '27820000001', reason: 'r' },
+        });
+        await settle(fixture);
+        expect(el.querySelector('[data-testid="ni-revealed"]')?.textContent).toContain('27820000001');
+    });
+
     it('Details (C6a): no Reference describes the type, no Details section', () => {
         const { el } = make({ references: [] });
         expect(el.querySelector('[data-testid="node-details"]')).toBeNull();
+        expect(el.querySelector('[data-testid="ni-masked"]')).toBeNull(); // D3: an id in the clear has nothing to reveal
     });
 
     it('shows the own indicator score + factors, CRM/KYC enrichment and list membership; computes propagated risk on demand', async () => {

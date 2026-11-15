@@ -42,7 +42,7 @@ export function buildPlan() {
   ];
   return [
     { id: 'investigation', as: 'siu.analyst', method: 'POST', path: '/inv/investigations', body: {
-      id: INV, title: 'Staged-accident ring (LAW-02)', purpose: 'Showcase: one garage, one clinic, one lawyer, twelve strangers', dataset: DATASET,
+      id: INV, title: 'Staged-accident ring', purpose: 'Showcase: one garage, one clinic, one lawyer, twelve strangers', dataset: DATASET,
       sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts', entityType: 'party' } },
     ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'siu.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
     ...[['partner.reviewer', 'reviewer'], ['siu.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
@@ -50,7 +50,7 @@ export function buildPlan() {
     // police-report PDFs (invented URLs on the reserved example domain) as EXTERNAL REFERENCES: never fetched, never trusted, never in the Dossier manifest
     ...[['PR-REQ-0001', 'Request to the police records office: reports for the nine ring accidents (none on file, by design)'],
         ['PR-REQ-0002', 'Request: reports for the eleven accidents at the Derby junction, 02:00-03:59'],
-        ['PR-NOTE-0003', 'Identity note: CL-0332 and CL-0141 share a date of birth and phone (E.164 versus national spelling)']].map(([id, label]) => (
+        ['PR-NOTE-0003', 'Identity note: two claimants share a date of birth and phone (E.164 versus national spelling)']].map(([id, label]) => (
       { id: `reference-${id}`, as: 'siu.analyst', method: 'POST', path: `${base}/references`, body: {
         system: 'police-records', type: id.startsWith('PR-REQ') ? 'report-request' : 'note', id, url: `https://records.example/la-claims/${id}.pdf`, label } })),
     { id: 'list-ring', as: 'siu.analyst', method: 'POST', path: '/entity-lists', body: {
@@ -80,7 +80,7 @@ async function prime(call, log, sleep, tries) {
 }
 
 export const PENDING_EXPAND = { op: 'expand', direction: 'either' };   // no maxFanOut = unbounded: always above four_eyes_fan_out_above, so held
-export const DRAFT_STEP = { op: 'annotate', ids: ['CLI-04'], note: 'widen the ring: who else does LAW-02 refer to this clinic?' };
+export const DRAFT_STEP = { op: 'annotate', ids: ['CLI-04'], note: 'widen the ring: who else does the ring\'s lawyer refer to this clinic?' };
 
 /** Runs (or, with apply=false, only prints) the plan. Returns { done, skipped, failed, warnings, summary }. */
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = SPACE, apply = false, log = () => {},

@@ -17,7 +17,7 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { InspectoSkeletonComponent } from '@inspecto/core/components/skeleton.component';
 import { DataTableComponent } from '@inspecto/core/data-table';
 import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
-import { EntitySummaryResult, InvService } from '@inspecto/link-analysis/api/inv.service';
+import { EntitySummaryCounterpart, EntitySummaryResult, InvService } from '@inspecto/link-analysis/api/inv.service';
 import {
     activityBars,
     activityLine,
@@ -89,7 +89,7 @@ import { NodeRiskService } from './node-risk.service';
                         <p role="heading" [attr.aria-level]="level()" class="m-0 font-semibold">Most links with</p>
                         <inspecto-data-table
                             tier="mini"
-                            [rows]="s.counterpartsByLinks!"
+                            [rows]="byLinks()"
                             [columns]="columns()"
                             noRowsTitle="No counterparts"
                             data-testid="la-summary-by-links"
@@ -99,7 +99,7 @@ import { NodeRiskService } from './node-risk.service';
                         <p role="heading" [attr.aria-level]="level()" class="m-0 font-semibold">Most money with</p>
                         <inspecto-data-table
                             tier="mini"
-                            [rows]="s.counterpartsByAmount!"
+                            [rows]="byAmount()"
                             [columns]="columns()"
                             noRowsTitle="No counterparts"
                             data-testid="la-summary-by-amount"
@@ -151,6 +151,11 @@ export class LinkAnalysisEntitySummaryComponent {
     readonly showLists = input(false);
     /** The level of its sub-headings. */
     readonly level = input<3 | 4>(3);
+    /**
+     * D4 (LA-FULL-CYCLE-TEST-1 phase 2): how a counterpart's alias reads where this is shown - inside an Investigation, its
+     * own alias for an entity of its Working Set, so one entity never shows two aliases on one screen; null = as read.
+     */
+    readonly aliasOf = input<((alias: string) => string) | null>(null);
     /** Why *Draw it* cannot run here; '' = it can. */
     readonly drawWhyNot = input('');
 
@@ -168,6 +173,13 @@ export class LinkAnalysisEntitySummaryComponent {
     readonly bars = computed(() => activityBars(this.result()));
     readonly activity = computed(() => activityLine(this.result()));
     readonly columns = computed(() => summaryCounterpartColumns(!!this.result()?.measure));
+    readonly byLinks = computed(() => this.shown(this.result()?.counterpartsByLinks));
+    readonly byAmount = computed(() => this.shown(this.result()?.counterpartsByAmount));
+
+    private shown(rows: EntitySummaryCounterpart[] | undefined): EntitySummaryCounterpart[] {
+        const alias = this.aliasOf();
+        return !rows ? [] : alias ? rows.map((r) => ({ ...r, entity: alias(r.entity) })) : rows;
+    }
 
     private loading?: Subscription;
 

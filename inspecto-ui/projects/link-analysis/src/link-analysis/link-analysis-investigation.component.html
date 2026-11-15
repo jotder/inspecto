@@ -225,6 +225,8 @@
                             [investigationId]="activeId"
                             [log]="store.log()"
                             [workingSet]="store.workingSet()"
+                            [revealed]="store.revealed()"
+                            [reveal]="revealAliases"
                             (decided)="store.open(activeId)"
                         ></inspecto-link-analysis-oversight>
                     </la-fold>
@@ -280,7 +282,7 @@
                                             }}</span>
                                         </div>
                                         <div class="text-sm" [class.line-through]="e.undoneBy != null">
-                                            {{ e.text }}
+                                            {{ shown(e.text) }}
                                         </div>
                                         @if (readSuffix(e); as how) {
                                             <div class="text-secondary text-[0.6875rem]" data-testid="step-read-source">
@@ -288,7 +290,9 @@
                                             </div>
                                         }
                                         @if (e.params?.reason) {
-                                            <div class="text-secondary text-sm">Reason: {{ e.params!.reason }}</div>
+                                            <div class="text-secondary text-sm">
+                                                Reason: {{ shown(e.params!.reason) }}
+                                            </div>
                                         }
                                         @if (e.author) {
                                             <div class="text-secondary text-[0.6875rem]">by {{ e.author }}</div>

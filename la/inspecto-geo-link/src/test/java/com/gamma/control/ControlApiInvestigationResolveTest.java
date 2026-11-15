@@ -372,7 +372,7 @@ class ControlApiInvestigationResolveTest {
             assertTrue(d.at("/manifest/content").has("resolution"), d.at("/manifest").toString());
 
             JsonNode revealed = data(post(c, "/inv/investigations/case-a/reveal",
-                    "{\"tokens\":[\"" + members.get(0) + "\"]}"), 200);
+                    "{\"tokens\":[\"" + members.get(0) + "\"],\"reason\":\"confirm the merged member\"}"), 200);
             assertTrue(revealed.toString().contains(IMSI), "a masked member reveals to its key: " + revealed);
         }
     }

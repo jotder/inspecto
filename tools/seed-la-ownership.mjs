@@ -41,14 +41,14 @@ export function buildPlan() {
     // bounded, under four_eyes_fan_out_above (2000): runs now and brings in the matched person and the customer's company; an
     // UNBOUNDED expand always goes pending. The 50 % owner between them is two hops from either seed, so it is not in yet.
     { op: 'expand', direction: 'either', linkKinds: ['name_match', 'owns', 'customer_is'], maxFanOut: 50 },
-    { op: 'annotate', ids: [LISTED], note: `${MATCHED} (${f.matched_person_name}) matches ${f.listed_name} at ${f.match_score} with the same birth year and nationality, and holds ${f.listed_share_of_owner} % of the ${f.owner_share} % owner of ${CUSTOMER}'s company` },
+    { op: 'annotate', ids: [LISTED], note: `a person matched to this entry at ${f.match_score} with the same birth year and nationality holds ${f.listed_share_of_owner} % of the ${f.owner_share} % owner of the customer's company` },
     // from the first stake on the path (2016) to the end of the landed year
     { op: 'window', window: { from: '2016-01-01T00:00:00Z', to: '2026-10-01T00:00:00Z' } },
     { op: 'snapshot', label: 'showcase baseline' },
   ];
   return [
     { id: 'investigation', as: 'ownership.analyst', method: 'POST', path: '/inv/investigations', body: {
-      id: INV, title: `Sanctions exposure (${CUSTOMER})`, purpose: `Showcase: a customer two ownership hops below a person matched to the sanctions list (${LISTED})`, dataset: DATASET,
+      id: INV, title: 'Sanctions exposure two ownership hops down', purpose: 'Showcase: a customer two ownership hops below a person matched to the sanctions list', dataset: DATASET,
       sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts', entityType: ENTITY_TYPE } },
     ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'ownership.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
     ...[['ownership.reviewer', 'reviewer'], ['ownership.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
@@ -76,7 +76,7 @@ async function prime(call, log, sleep, tries) {
 
 export const PENDING_EXPAND = { op: 'expand', direction: 'either' };   // no maxFanOut = unbounded: always above four_eyes_fan_out_above, so held
 // annotates the matched person, who is in the Working Set; the 50 % owner is two hops from either seed and annotating it is refused
-export const DRAFT_STEP = { op: 'annotate', ids: [MATCHED], note: `widen the case: ${MATCHED} holds ${f.listed_share_of_owner} % of the ${f.owner_share} % owner of ${CUSTOMER}'s company - bring the owner in and screen its other holdings` };
+export const DRAFT_STEP = { op: 'annotate', ids: [MATCHED], note: `widen the case: this person holds ${f.listed_share_of_owner} % of the ${f.owner_share} % owner of the customer's company - bring the owner in and screen its other holdings` };
 
 /** Runs (or, with apply=false, only prints) the plan. Returns { done, skipped, failed, warnings, summary }. */
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = SPACE, apply = false, log = () => {},

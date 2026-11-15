@@ -340,7 +340,7 @@ class ControlApiInvestigationOversightTest {
             assertEquals(200, send(c.port, "POST", OPS, "{\"op\":\"seed\",\"ids\":[\"" + A + "\"]}", "Bearer owner").statusCode());
             assertEquals(200, send(c.port, "POST", OPS, "{\"op\":\"expand\"}", "Bearer owner").statusCode());
             List<String> tokens = List.copyOf(entityIds(c, "Bearer owner"));
-            String body = "{\"tokens\":[\"" + tokens.get(0) + "\",\"masked:0000000000000000\"]}";
+            String body = "{\"tokens\":[\"" + tokens.get(0) + "\",\"masked:0000000000000000\"],\"reason\":\"FR-7 warrant\"}";
             String reveal = "/inv/investigations/case-a/reveal";
 
             assertEquals(401, send(c.port, "POST", reveal, body, null).statusCode());

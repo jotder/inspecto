@@ -40,7 +40,7 @@ export function buildPlan() {
     // bounded, under four_eyes_fan_out_above (2000): runs now and brings in the exporter's buyers (the importer among them) and its
     // directors (the shared one among them); an UNBOUNDED expand always goes pending
     { op: 'expand', direction: 'either', linkKinds: ['traded_with', 'directed_by'], maxFanOut: 20 },
-    { op: 'annotate', ids: [EXPORTER], note: `${TRADES.length} shipments of HS ${oi.hs_code} to ${IMPORTER} at ${oi.price_x_reference[0]} to ${oi.price_x_reference[1]} times the reference price; both companies are directed by ${DIRECTOR}` },
+    { op: 'annotate', ids: [EXPORTER], note: `${TRADES.length} shipments of HS ${oi.hs_code} to the importer at ${oi.price_x_reference[0]} to ${oi.price_x_reference[1]} times the reference price; both companies are directed by one person` },
     { op: 'threshold', min: 1 },
     { op: 'window', window: { from: '2025-10-01T00:00:00Z', to: '2026-10-01T00:00:00Z' } },
     { op: 'resolve' },
@@ -48,7 +48,7 @@ export function buildPlan() {
   ];
   return [
     { id: 'investigation', as: 'trade.analyst', method: 'POST', path: '/inv/investigations', body: {
-      id: INV, title: `Over-invoicing (${EXPORTER} to ${IMPORTER})`, purpose: `Showcase: ${TRADES.length} trades over 3 times the reference price between two companies that share a director`, dataset: DATASET,
+      id: INV, title: 'Over-invoicing between two related companies', purpose: `Showcase: ${TRADES.length} trades over 3 times the reference price between two companies that share a director`, dataset: DATASET,
       sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts', entityType: ENTITY_TYPE } },
     ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'trade.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
     ...[['trade.reviewer', 'reviewer'], ['trade.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
@@ -77,7 +77,7 @@ async function prime(call, log, sleep, tries) {
 export const PENDING_EXPAND = { op: 'expand', direction: 'either' };   // no maxFanOut = unbounded: always above four_eyes_fan_out_above, so held
 // annotates the importer, which the bounded expand brought into the Working Set; its other sellers are two hops out
 // (seller -> importer -> exporter), and annotating one of them is refused
-export const DRAFT_STEP = { op: 'annotate', ids: [IMPORTER], note: `widen the case: ${IMPORTER} shares director ${DIRECTOR} with ${EXPORTER}; check its other suppliers' prices against the reference` };
+export const DRAFT_STEP = { op: 'annotate', ids: [IMPORTER], note: `widen the case: this importer shares a director with the exporter; check its other suppliers' prices against the reference` };
 
 /** Runs (or, with apply=false, only prints) the plan. Returns { done, skipped, failed, warnings, summary }. */
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = SPACE, apply = false, log = () => {},

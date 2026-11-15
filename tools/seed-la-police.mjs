@@ -40,7 +40,7 @@ export function buildPlan() {
   ];
   return [
     { id: 'investigation', as: 'police.analyst', method: 'POST', path: '/inv/investigations', body: {
-      id: INV, title: 'Burglary series (ZX 9117 X)', purpose: 'Showcase: stolen serials at two dealers and one vehicle near the scenes', dataset: DATASET,
+      id: INV, title: 'Burglary series and the vehicle near the scenes', purpose: 'Showcase: stolen serials at two dealers and one vehicle near the scenes', dataset: DATASET,
       sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts', entityType: TYPE } },
     ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'police.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
     ...[['police.reviewer', 'reviewer'], ['police.sio', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
@@ -56,7 +56,7 @@ export function buildPlan() {
 }
 
 export const PENDING_EXPAND = { op: 'expand', direction: 'either' };   // no maxFanOut = unbounded: always above four_eyes_fan_out_above, so held
-export const DRAFT_STEP = { op: 'annotate', ids: ['DLR-09'], note: 'widen the series: who else sells stolen items to DLR-09?' };   // in the Working Set after the first expand
+export const DRAFT_STEP = { op: 'annotate', ids: ['DLR-09'], note: 'widen the series: who else sells stolen items to this dealer?' };   // in the Working Set after the first expand
 
 /** The link Dataset is a Job output, so a fresh Space has none until the 5-minute cron and the Investigation create is refused: press Run on
  *  the link Job (as police.sio, who holds canOperateRuns) and wait for police_links_dataset to have rows. */

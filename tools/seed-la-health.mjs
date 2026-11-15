@@ -46,7 +46,7 @@ export function buildPlan() {
   ];
   return [
     { id: 'investigation', as: 'health.analyst', method: 'POST', path: '/inv/investigations', body: {
-      id: INV, title: `Billed in hospital or after death (${CLINIC})`, purpose: `Showcase: phantom billing for ${BILLED.length} members`, dataset: DATASET,
+      id: INV, title: 'Billed in hospital or after death', purpose: `Showcase: phantom billing for ${BILLED.length} members`, dataset: DATASET,
       sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts', entityType: ENTITY_TYPE } },
     ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'health.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
     ...[['health.reviewer', 'reviewer'], ['health.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (

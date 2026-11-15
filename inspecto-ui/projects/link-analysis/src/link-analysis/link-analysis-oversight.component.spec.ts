@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
+import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
@@ -41,6 +42,8 @@ const WS = {
         investigationId="inv-1"
         [log]="log"
         [workingSet]="ws"
+        [revealed]="revealed"
+        [reveal]="reveal"
         (decided)="decided = decided + 1"
     ></inspecto-link-analysis-oversight>`,
 })
@@ -48,6 +51,12 @@ class Host {
     log: InvestigationLog | null = LOG;
     ws: WorkingSet | null = WS;
     decided = 0;
+    revealed: Record<string, string> = {};
+    /** The host store's reveal: it records what the server revealed, which flows back in as `revealed`. */
+    reveal = vi.fn(async (tokens: string[]): Promise<number> => {
+        this.revealed = { ...this.revealed, ...Object.fromEntries(tokens.map((t) => [t, '27820000001'])) };
+        return tokens.length;
+    });
 }
 
 function create(opts: { approve: boolean; reveal: boolean; approveError?: unknown }) {
@@ -59,18 +68,20 @@ function create(opts: { approve: boolean; reveal: boolean; approveError?: unknow
         ),
     };
     const lens = { canApproveLinkExpansions: signal(opts.approve), canRevealLinkEntities: signal(opts.reveal) };
+    const dialog = { open: vi.fn(() => ({ afterClosed: () => of('FR-7 warrant') })) };
     TestBed.configureTestingModule({
         imports: [Host],
         providers: [
             provideNoopAnimations(),
             { provide: InvService, useValue: inv },
             { provide: LensService, useValue: lens },
+            { provide: MatDialog, useValue: dialog },
         ],
     });
     const f = TestBed.createComponent(Host);
     f.detectChanges();
     const c = f.debugElement.children[0].componentInstance as LinkAnalysisOversightComponent;
-    return { f, c, el: f.nativeElement as HTMLElement, inv };
+    return { f, c, el: f.nativeElement as HTMLElement, inv, dialog, host: f.componentInstance };
 }
 
 function button(el: HTMLElement, text: string): HTMLButtonElement | undefined {
@@ -141,18 +152,28 @@ describe('LinkAnalysisOversightComponent (D-U6 / D-U7)', () => {
         expect(button(el, 'Deny')).toBeTruthy();
     });
 
-    it('without approve capability shows the waiting line, and reveals a masked entity as audited', async () => {
-        const { f, el, inv } = create({ approve: false, reveal: true });
+    it('without approve capability shows the waiting line, and reveals every masked entity in one action with a reason', async () => {
+        const { f, el, dialog, host } = create({ approve: false, reveal: true });
         expect(button(el, 'Approve')).toBeUndefined();
         expect(el.textContent).toContain('Waiting for a different person');
         expect(el.textContent).toContain('masked:abc');
-        expect(el.textContent).not.toContain('Reveal 27820000002');
-        (el.querySelector('button[aria-label="Reveal masked:abc"]') as HTMLButtonElement).click();
+        expect(el.textContent).not.toContain('27820000002 →');
+        (el.querySelector('[data-testid="oversight-reveal"]') as HTMLButtonElement).click();
         await f.whenStable();
         f.detectChanges();
-        expect(inv.revealEntities).toHaveBeenCalledWith('inv-1', ['masked:abc']);
+        expect(dialog.open).toHaveBeenCalledTimes(1);
+        expect(host.reveal).toHaveBeenCalledWith(['masked:abc'], 'FR-7 warrant');
         expect(el.textContent).toContain('27820000001');
         expect(el.textContent).toContain('reveal audited');
+        expect(el.querySelector('[data-testid="oversight-reveal"]')).toBeNull();
         await expectNoA11yViolations(el);
+    });
+
+    it('a cancelled reason prompt reveals nothing', async () => {
+        const { f, el, dialog, host } = create({ approve: false, reveal: true });
+        dialog.open.mockReturnValueOnce({ afterClosed: () => of(undefined as unknown as string) });
+        (el.querySelector('[data-testid="oversight-reveal"]') as HTMLButtonElement).click();
+        await f.whenStable();
+        expect(host.reveal).not.toHaveBeenCalled();
     });
 });

@@ -2292,6 +2292,76 @@ describe('LinkAnalysisComponent', () => {
         expect(dataAt(2).graph).toBe(c.canvasData());
         expect(dataAt(2).graph.nodes).toHaveLength(5);
     });
+    it('D3 (LA-FULL-CYCLE-TEST-1): one Reveal for the masked nodes on screen, from the canvas, in a saved Investigation', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        expect(c.revealOffer()).toBeNull(); // the query graph here is in the clear: nothing to reveal
+        const lens = TestBed.inject(LensService);
+        Object.defineProperty(lens, 'canRevealLinkEntities', { value: () => false, configurable: true });
+        const a = 'masked:0123456789abcdef';
+        const b = 'masked:fedcba9876543210';
+        c.investigation.activeId.set('inv-9');
+        c.investigation.log.set({
+            header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
+            entries: [],
+        } as never);
+        c.investigation.workingSet.set({
+            entities: [{ id: a }, { id: b }],
+            links: [{ source: a, target: b, kind: 'k', count: 1 }],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        expect(c.revealOffer()).toEqual({ count: 2, why: 'Needs See unmasked ids.' });
+
+        Object.defineProperty(lens, 'canRevealLinkEntities', { value: () => true, configurable: true });
+        c.investigation.revealed.set({}); // re-reads the offer
+        expect(c.revealOffer()).toEqual({ count: 2, why: '' });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="la-reveal-offer"]')?.textContent).toContain('2 ids masked');
+        expect((el.querySelector('[data-testid="la-reveal"]') as HTMLButtonElement).disabled).toBe(false);
+
+        const open = vi
+            .spyOn(fixture.debugElement.injector.get(MatDialog), 'open')
+            .mockReturnValue({ afterClosed: () => of('MR-3 warrant') } as never);
+        const reveal = vi.spyOn(c.investigation, 'reveal').mockImplementation(async (tokens) => {
+            c.investigation.revealed.set(Object.fromEntries(tokens.map((t) => [t, 'real-' + t.slice(-4)])));
+            return tokens.length;
+        });
+        expect(await c.revealOnScreen()).toBe('MR-3 warrant');
+        expect(open).toHaveBeenCalledTimes(1);
+        expect(reveal).toHaveBeenCalledTimes(1); // ONE action for every masked node drawn
+        expect([...reveal.mock.calls[0][0]].sort()).toEqual([a, b].sort());
+        expect(reveal.mock.calls[0][1]).toBe('MR-3 warrant');
+        expect(c.revealOffer()).toBeNull();
+        expect(
+            c
+                .canvasData()!
+                .nodes.map((n) => n.data.canvasLabel)
+                .sort(),
+        ).toEqual(['real-3210', 'real-cdef']);
+        expect(
+            c
+                .canvasData()!
+                .nodes.map((n) => n.data.label)
+                .sort(),
+        ).toEqual([a, b].sort()); // ops keep the alias
+    });
+
+    it('D3: outside a saved Investigation the canvas says where Reveal works', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        c.graph.set({
+            nodes: [{ id: 'masked:0123456789abcdef', data: { label: 'masked:0123456789abcdef', kind: 'entity' } }],
+            edges: [],
+        });
+        expect(c.revealOffer()?.why).toContain('saved Investigation');
+    });
+
     it('Graph counts states what the canvas draws, open and minimised: the query graph, then the Working Set', async () => {
         const { fixture } = create();
         fixture.detectChanges();

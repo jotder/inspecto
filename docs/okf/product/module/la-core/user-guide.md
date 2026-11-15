@@ -453,7 +453,9 @@ from a type no installed pack investigates waits for the packs before it binds.
 
 **Masked ids.** Names such as `masked:1d4d76be…` mean your Space hides sensitive ids. The same alias always stands for
 the same account, so you can still group, count, search, seed and follow it. Graph model says **Masking on: ids
-shown as aliases**. Someone with Reveal rights can turn an alias back into the real id.
+shown as aliases**. Details beside a masked id (a holder's name, a city) are masked with it. Inside a saved
+Investigation, someone with *See unmasked ids* who leads it turns every alias on screen back into its real id in one
+step: **Reveal…** under the canvas or in a node's details (see [Masked ids in an Investigation](#masked-ids-in-an-investigation)).
 
 ---
 
@@ -467,7 +469,9 @@ shown as aliases**. Someone with Reveal rights can turn an alias back into the r
 On an edition with Investigations the empty canvas reads **Start from the Investigation tab →** and this form is in
 the toolbox's **Investigation** tab. When the Entity Type is masked (in Standard and up, *Account*, *Phone number* and
 other identifying types are masked unless the Space says otherwise) nothing is suggested: type the whole value, or turn
-on **Show values (this is logged)** if you may reveal them.
+on **Show values (this is logged)** if you may reveal them. The line under the field says where the real ids are: if
+you have *See unmasked ids*, the graph shows aliases until you save it and press **Reveal…** on the canvas or in a
+node's details; otherwise it says that seeing them needs *See unmasked ids*.
 
 ![A first graph: one account in the middle with fourteen linked accounts](../../assets/la-guide-07-first-graph.png)
 *The first graph: the start entity and everything it is linked to. Dotted outlines are entities not expanded yet.*
@@ -654,6 +658,10 @@ Click a node for its rows (id, links, neighbours, Datasets, attributes), **Expla
 its canvas actions. On an Investigation's canvas, click once to select, then click the selected node again to open the
 dialog. Three sections look up only the entities they need on the server, so they work in a masked Space too
 (identifying values show as aliases and the section says *Entity masking is on*; numeric scores stay readable):
+
+* **Masked id** — only for a masked node: it says the name is an alias and offers **Reveal the ids on screen…** (the
+  one Reveal, see [Masked ids in an Investigation](#masked-ids-in-an-investigation)), or why you cannot. Once revealed it
+  shows the real id, and the node's details and enrichment are read again in the clear, each recorded with your reason.
 
 * **Risk** — on a pack that maps an indicators Dataset (Telecom: `telecom_msisdn_indicators` by `msisdn`), the node's
   **indicator score** and factor columns. **Compute risk** runs propagated risk on the server over the Investigation's
@@ -1104,7 +1112,8 @@ approval from a second person, so it cannot run unsaved. Save first, then Expand
 **Save…** asks for the **Name** and the **Purpose** (why you are investigating: the stated reason or legal basis, shown
 in the Dossier), both pre-filled from the start: *Account MULE-HUB-01* / *Review of an Account and its links*,
 *Members of “Suspects”* / *Review of the members of “Suspects” and their links*, *Transfers* / *Review of the links in
-Transfers*. In a Space that masks values the default Name leaves the value out (*Phone number*). Your edits are kept if
+Transfers*. In a Space that masks values the default Name leaves the value out and says when you started instead
+(*Phone number, 2026-11-16 14:05*), so two Investigations are not saved under one Name. Your edits are kept if
 you cancel. Save then creates the Investigation and records the steps in order, each with your name. While unsaved,
 every degree is already read by the server with the Industry pack's settings (time window, minimum events, row limit,
 neighbours per entity, busy limit) and your Links, Time and Limits choices, so what you see is what Save records. If the
@@ -1136,10 +1145,16 @@ binds `events` for you.
 ![The Investigation settings dialog with its sections](../../assets/la-guide-09-investigation-settings.png)
 ***Investigation settings…** (bottom of the Investigation tab): General, Case, Members, Share and embed, Drafts, Replay and drift, Oversight and approvals, Measures and templates, Dossier, References.*
 
-Masked ids show as aliases (`masked:…`) on the canvas, in the step log and in the Dossier. To read one, open
-**Investigation settings… ▸ Oversight and approvals ▸ Masked entities** and press **Reveal** beside it (one entity per
-press, each recorded in the audit trail; you need the right to see unmasked ids). A second person approves or denies a
-held expand in the same section.
+<a id="masked-ids-in-an-investigation"></a>Masked ids show as aliases (`masked:…`) on the canvas, in the step log
+and in the Dossier, and one entity reads as the same alias everywhere in the Investigation. When ids on the canvas are
+masked, the line under it says *N ids masked* with **Reveal…**; the node details dialog has the same button under
+**Masked id**. Reveal asks for a reason, then shows the real ids of every masked node on screen, to you and on this
+screen only: the canvas labels, the node's title and details, and the step log read the real ids. Each entity revealed
+is recorded in the audit trail with your reason. You need *See unmasked ids* and to lead the Investigation; reviewers
+and everyone else keep the aliases, the Dossier stays masked, and closing the Investigation forgets what you revealed.
+On a graph that is not saved yet the button says to save it first: a reveal is recorded against an Investigation and
+its purpose. **Investigation settings… ▸ Oversight and approvals ▸ Masked entities** lists the aliases with the same
+one **Reveal all…**. A second person approves or denies a held expand in the same section.
 
 Top to bottom, most important first:
 

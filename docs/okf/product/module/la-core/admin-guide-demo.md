@@ -157,10 +157,13 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
 * **If it goes wrong:** a changed mode needs `admin` (`canAuthorWorkbench`); `fm.analyst` sees the fields read-only.
 
 ### S4. Reveal is audited (1 min) [admin]
-* **Click:** as `admin`, Investigation tab > **Oversight** > **Masked entities** > **Reveal** on one token.
-* **Expect:** the raw id and the note "(reveal audited)". The Oversight section appears only when there is a request or masked entities and
-  needs the reveal capability (`canRevealLinkEntities`, which `admin` holds; `fm.analyst` does not).
-* **Proves:** Reveal is one entity at a time and recorded in the audit trail (arch §3.4, §6.1 step 7: `LINK_*` audit events).
+* **Click:** as `admin` (a lead of `mule-hub-case`), open the Investigation, then **Reveal…** on the line under the canvas (*N ids
+  masked*), or in a masked node's details under **Masked id**; type a reason and press **Reveal**.
+* **Expect:** every masked node on screen now reads its real id (canvas, node title, step log); the toast says each was recorded
+  with your reason. As `ra.analyst` (reviewer) the same canvas still shows aliases and offers no working Reveal.
+* **Proves:** one Reveal for the nodes on screen, a reason required, one `LINK_ENTITY_REVEALED` audit row per entity
+  (LA-FULL-CYCLE-TEST-1 D3; arch §3.4, §6.1 step 7: `LINK_*` audit events). The showcase names no entity in its
+  Investigation's name, reasons or notes, so the story reads before and after the reveal.
 
 ### S5. Graph Run on the server (2 min) [fm.analyst]
 * **Click:** Toolbox > **Analysis** > a group offering **Run on server** (for example Pattern match > **Structuring (smurfing)** > **Run on server**,
@@ -557,9 +560,11 @@ Confidence: PROVEN for the routes the tests cover. A new route must be added to 
 future routes.
 
 **Q3. Can anyone ever see the real value? Who, and is it recorded?**
-Yes, per entity, through *Reveal*. It needs its own capability (`canRevealLinkEntities`), is a separate action from
-approving, and every reveal writes an audit event. In the shipped demo the `admin` persona holds it.
-Evidence: [architecture](architecture.md#34-masking) §3.4 and backend §6 (Four-eyes / reveal row); `ControlApiInvestigationOversightTest
+Yes, through *Reveal*: a lead of the Investigation holding its own capability (`canRevealLinkEntities`, a separate
+action from approving) reveals the nodes on screen in one step with a reason, and every entity revealed writes one
+audit row with that reason. Reviewers and non-members keep the aliases. In the shipped demo the `admin` persona holds it.
+Evidence: [architecture](architecture.md#34-masking) §3.4 and backend §6 (Four-eyes / reveal row);
+`ControlApiInvestigationRevealOnScreenTest`, `ControlApiInvestigationOversightTest
 .revealIsPerEntityGatedOnItsOwnCapabilityAndAudited`.
 Confidence: PROVEN.
 

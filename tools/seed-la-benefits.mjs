@@ -75,7 +75,7 @@ async function prime(call, log, sleep, tries) {
 export const PENDING_EXPAND = { op: 'expand', direction: 'either' };   // no maxFanOut = unbounded: always above four_eyes_fan_out_above, so held
 // annotates the living claimant, who is in the Working Set after the second expand. The expands follow paid_into and claims only,
 // so the claimant's address (a lives_at link further out) is not in it, and annotating an entity outside the Working Set is refused
-export const DRAFT_STEP = { op: 'annotate', ids: [CONTROLLER], note: `widen the case: who else lives at ${CONTROLLER}'s address, and is any of them on the death register?` };
+export const DRAFT_STEP = { op: 'annotate', ids: [CONTROLLER], note: 'widen the case: who else lives at this person\'s address, and is any of them on the death register?' };
 
 /** Runs (or, with apply=false, only prints) the plan. Returns { done, skipped, failed, warnings, summary }. */
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = SPACE, apply = false, log = () => {},

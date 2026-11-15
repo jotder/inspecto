@@ -1,12 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { InvService, InvestigationLog, PendingExpansion, WorkingSet } from '@inspecto/link-analysis/api/inv.service';
 import { LensService, apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
-import { refusal403 } from './investigation-state';
+import { RevealedIds, refusal403 } from './investigation-state';
+import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
 
 /** A readable message for a four-eyes / reveal refusal; the server's own reason is always kept. */
 export function oversightErrorMessage(err: unknown, fallback: string): string {
@@ -30,8 +32,9 @@ export function oversightErrorMessage(err: unknown, fallback: string): string {
  * **Oversight** (D-U6 / D-U7) — the Investigation tab's four-eyes and reveal surfaces. Lists every held sensitive
  * expand (who requested it, the thresholds it crossed, its status); a holder of `canApproveLinkExpansions` may
  * approve or deny a pending one — the SERVER refuses the requester deciding their own request, and that refusal is
- * shown here verbatim. A holder of `canRevealLinkEntities` may reveal one masked entity at a time; each reveal is
- * audited server-side. Emits `(decided)` so the host re-reads the log and Working Set.
+ * shown here verbatim. A holder of `canRevealLinkEntities` reveals the masked entities in ONE action with a reason
+ * (LA-FULL-CYCLE-TEST-1 D3, the same Reveal as the canvas's): the server records one audit row per entity, and the host
+ * keeps the real ids for this screen only (`revealed`). Emits `(decided)` so the host re-reads the log and Working Set.
  */
 @Component({
     selector: 'inspecto-link-analysis-oversight',
@@ -100,9 +103,28 @@ export function oversightErrorMessage(err: unknown, fallback: string): string {
                 }
                 @if (canReveal() && masked().length) {
                     <div class="flex flex-col gap-1 border-t pt-1" style="border-color: var(--gamma-border)">
-                        <strong>Masked entities</strong>
+                        <div class="flex items-center gap-2">
+                            <strong>Masked entities</strong>
+                            @if (unrevealed().length && reveal()) {
+                                <button
+                                    mat-stroked-button
+                                    type="button"
+                                    class="ml-auto"
+                                    data-testid="oversight-reveal"
+                                    [disabled]="busy()"
+                                    (click)="revealAll()"
+                                >
+                                    {{
+                                        unrevealed().length === 1
+                                            ? 'Reveal it…'
+                                            : 'Reveal all ' + unrevealed().length + '…'
+                                    }}
+                                </button>
+                            }
+                        </div>
                         <span class="text-secondary"
-                            >Each reveal is one entity and is recorded in the audit trail.</span
+                            >One reveal shows them all, to you on this screen only; each entity is recorded in the audit
+                            trail with your reason.</span
                         >
                         @for (t of masked(); track t) {
                             <div class="flex items-center gap-2">
@@ -112,15 +134,6 @@ export function oversightErrorMessage(err: unknown, fallback: string): string {
                                         >→ <code>{{ v }}</code>
                                         <span class="text-secondary">(reveal audited)</span></span
                                     >
-                                } @else {
-                                    <button
-                                        mat-button
-                                        [disabled]="busy()"
-                                        [attr.aria-label]="'Reveal ' + t"
-                                        (click)="reveal(t)"
-                                    >
-                                        Reveal
-                                    </button>
                                 }
                             </div>
                         }
@@ -139,10 +152,15 @@ export class LinkAnalysisOversightComponent {
     readonly investigationId = input.required<string>();
     readonly log = input<InvestigationLog | null>(null);
     readonly workingSet = input<WorkingSet | null>(null);
+    /** The aliases this screen already revealed (the host's, shared with the canvas and the node dialog). */
+    readonly revealed = input<RevealedIds>({});
+    /** Reveal these aliases with a reason (the host's store); null = no reveal from here. */
+    readonly reveal = input<((tokens: string[], reason: string) => Promise<number>) | null>(null);
     readonly decided = output<void>();
 
     private readonly inv = inject(InvService);
     private readonly lens = inject(LensService);
+    private readonly dialog = inject(MatDialog);
     readonly canApprove = computed(() => this.lens.canApproveLinkExpansions());
     readonly canReveal = computed(() => this.lens.canRevealLinkEntities());
 
@@ -150,7 +168,7 @@ export class LinkAnalysisOversightComponent {
     readonly masked = computed(() =>
         (this.workingSet()?.entities ?? []).map((e) => e.id).filter((id) => id.startsWith('masked:')),
     );
-    readonly revealed = signal<Record<string, string>>({});
+    readonly unrevealed = computed(() => this.masked().filter((t) => !Object.hasOwn(this.revealed(), t)));
     readonly reason = signal('');
     readonly busy = signal(false);
     readonly error = signal('');
@@ -191,14 +209,30 @@ export class LinkAnalysisOversightComponent {
         }
     }
 
-    async reveal(token: string): Promise<void> {
+    /** D3: one Reveal for every masked entity listed, after asking the reason (the server audits each entity). */
+    async revealAll(): Promise<void> {
+        const reveal = this.reveal();
+        const tokens = this.unrevealed();
+        if (!reveal || !tokens.length) return;
+        const what = tokens.length === 1 ? 'the masked entity' : `the ${tokens.length} masked entities`;
+        const reason = await firstValueFrom(
+            this.dialog
+                .open<EntityListReasonDialog, EntityListReasonData, string | undefined>(EntityListReasonDialog, {
+                    width: '32rem',
+                    data: {
+                        title: 'Reveal the masked entities',
+                        message: `Shows the real ids of ${what}, to you and on this screen only. Each one is recorded in the audit trail with your reason.`,
+                        confirmLabel: 'Reveal',
+                        maxLength: 200,
+                    },
+                })
+                .afterClosed(),
+        );
+        if (!reason) return;
         this.busy.set(true);
         this.error.set('');
         try {
-            const res = await firstValueFrom(this.inv.revealEntities(this.investigationId(), [token]));
-            const hit = res.revealed.find((r) => r.token === token);
-            if (hit) this.revealed.update((m) => ({ ...m, [token]: hit.id }));
-            else this.error.set('The server did not recognise ' + token + ' as a pseudonym of this Investigation.');
+            await reveal(tokens, reason);
         } catch (err) {
             this.error.set(oversightErrorMessage(err, 'Reveal failed.'));
         } finally {

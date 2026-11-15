@@ -41,7 +41,7 @@ export function buildPlan() {
     // bounded, under four_eyes_fan_out_above (2000): runs now and brings in the hacked wallet's other payees and senders, the
     // second hop and the first deposit address; an UNBOUNDED expand always goes pending
     { op: 'expand', direction: 'either', linkKinds: ['sent_to'], maxFanOut: 20 },
-    { op: 'annotate', ids: [HACKED], note: `labelled hacked: ${pc.stolen} SYC left it on ${pc.hacked_at} for ${FIRST_HOP}, the first of ${HOPS.length} hops that peel ${pc.peeled} SYC into ${ACCOUNTS.length} exchange accounts` },
+    { op: 'annotate', ids: [HACKED], note: `labelled hacked: ${pc.stolen} SYC left it on ${pc.hacked_at} for the first of ${HOPS.length} hops that peel ${pc.peeled} SYC into ${ACCOUNTS.length} exchange accounts` },
     { op: 'threshold', min: 1 },
     { op: 'window', window: { from: '2026-03-14T00:00:00Z', to: '2026-03-19T00:00:00Z' } },
     { op: 'resolve' },
@@ -78,7 +78,7 @@ async function prime(call, log, sleep, tries) {
 export const PENDING_EXPAND = { op: 'expand', direction: 'either' };   // no maxFanOut = unbounded: always above four_eyes_fan_out_above, so held
 // annotates the first deposit address, which the bounded expand brought into the Working Set (the first hop paid it); its exchange
 // account is two hops out (first hop -> deposit address -> account), and annotating the account is refused
-export const DRAFT_STEP = { op: 'annotate', ids: [FIRST_DEPOSIT], note: `widen the case: the first peel landed at this deposit address of ${ACCOUNTS[0]}; ask the exchange to freeze it and trace the other ${ACCOUNTS.length - 1} accounts` };
+export const DRAFT_STEP = { op: 'annotate', ids: [FIRST_DEPOSIT], note: `widen the case: the first peel landed at this deposit address of an exchange account; ask the exchange to freeze it and trace the other ${ACCOUNTS.length - 1} accounts` };
 
 /** Runs (or, with apply=false, only prints) the plan. Returns { done, skipped, failed, warnings, summary }. */
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = SPACE, apply = false, log = () => {},

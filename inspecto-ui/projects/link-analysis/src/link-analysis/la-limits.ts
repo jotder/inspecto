@@ -68,6 +68,7 @@ export const LA_LIMIT_FALLBACKS = {
     'input.recurring_excludes': 32,
     'input.note_length': 2000,
     'input.purpose_length': 1000,
+    'input.reveal_ids': 100,
 } as const satisfies Record<string, number>;
 
 /** A limit the SPA itself reads. */

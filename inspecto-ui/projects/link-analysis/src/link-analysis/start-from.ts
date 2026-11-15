@@ -7,6 +7,7 @@ import {
     domainProfiles,
 } from '@inspecto/link-analysis/graph/domain-profile';
 import type { LaDataset } from '@inspecto/link-analysis/la-host';
+import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import { PendingInvestigation, dayLabel } from './investigate-number';
 import type { LinkAnalysisView } from './link-analysis.service';
 
@@ -60,6 +61,8 @@ export interface NewInvestigationInput {
     datasetName: string;
     /** The Space's masking mode: a title is stored and shown like a value, so a value enters it only when this is `none`. */
     maskingMode?: string | null;
+    /** When the form was filled (default now): a masked Name carries it so two starts are not saved under one Name. */
+    now?: Date;
 }
 
 /** "a Party", "an Account": the article for a label (blank = "an entity"). */
@@ -77,22 +80,26 @@ function aOrAn(label: string): string {
  * - The Purpose never holds a raw identifier: a value enters only the Name, and only where the Space is known not to
  *   mask (the same rule as `suspectTitle`).
  * - Blank inputs never leave a gap: a blank Entity Type is "entity", a blank Dataset name is "the Dataset".
+ * - LA-FULL-CYCLE-TEST-1 finding 24: where the value cannot enter the Name (masked, D3 keeps masked the default), the
+ *   Name carries the time the form was filled, in the one app clock (`ledgerTime`), so two starts from one Entity Type
+ *   are not saved as two Investigations both called "Account". Never the alias: it reads as nothing to anyone (finding 13).
  *
- * | Start from    | Name                              | Purpose                                                   |
- * |---------------|-----------------------------------|-----------------------------------------------------------|
- * | one entity    | "<Type> <value>" (masked: "<Type>")| "Review of a <Type> and its links"                       |
- * | Entity List   | "Members of “<title>”"            | "Review of the members of “<title>” and their links"      |
- * | pasted values | "N pasted <Type> values"          | "Review of N pasted values and their links"               |
- * | whole Dataset | "<Dataset>"                       | "Review of the links in <Dataset>"                        |
- * | graph         | "<graph name>" (masked: "Graph on screen") | "Review of the graph on screen"                  |
+ * | Start from    | Name                                            | Purpose                                         |
+ * |---------------|-------------------------------------------------|-------------------------------------------------|
+ * | one entity    | "<Type> <value>" (masked: "<Type>, <time>")     | "Review of a <Type> and its links"              |
+ * | Entity List   | "Members of “<title>”"                          | "Review of the members of “<title>” and their links" |
+ * | pasted values | "N pasted <Type> values"                        | "Review of N pasted values and their links"     |
+ * | whole Dataset | "<Dataset>"                                     | "Review of the links in <Dataset>"              |
+ * | graph         | "<graph name>" (masked: "Graph on screen, <time>") | "Review of the graph on screen"              |
  */
 export function newInvestigationDefaults(i: NewInvestigationInput): { name: string; purpose: string } {
     const type = (i.typeLabel ?? '').trim();
+    const stamped = (name: string): string => `${name}, ${ledgerTime((i.now ?? new Date()).toISOString())}`;
     switch (i.kind) {
         case 'graph': {
             const graph = (i.graphName ?? '').trim();
             return {
-                name: i.maskingMode === 'none' && graph ? graph : 'Graph on screen',
+                name: i.maskingMode === 'none' && graph ? graph : stamped('Graph on screen'),
                 purpose: 'Review of the graph on screen',
             };
         }
@@ -122,9 +129,8 @@ export function newInvestigationDefaults(i: NewInvestigationInput): { name: stri
             const value = (i.value ?? '').trim();
             const purpose = `Review of ${aOrAn(type)} and its links`;
             if (!value) return { name: '', purpose };
-            const shown = i.maskingMode === 'none' ? value : '';
-            const name = [type, shown].filter(Boolean).join(' ') || 'Entity';
-            return { name, purpose };
+            if (i.maskingMode !== 'none') return { name: stamped(type || 'Entity'), purpose };
+            return { name: [type, value].filter(Boolean).join(' '), purpose };
         }
     }
 }

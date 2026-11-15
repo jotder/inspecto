@@ -364,7 +364,16 @@ import { foldBranches, foldableOf } from '@inspecto/link-analysis/graph/graph-cl
 import { autoStyle } from './auto-style';
 import { LinkAnalysisModulesComponent } from './link-analysis-modules.component';
 import { buildServerIdMap } from './graph-run-apply';
-import { idsInWorkingSet, mergePairOf, rawIdsOf, workingSetToGraph } from './investigation-state';
+import {
+    idsInWorkingSet,
+    maskedOnScreen,
+    mergePairOf,
+    rawIdsOf,
+    revealedIdOf,
+    workingSetToGraph,
+} from './investigation-state';
+import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
+import { oversightErrorMessage } from './link-analysis-oversight.component';
 import type { ColDef } from 'ag-grid-community';
 import { NodeInsightComponent, NodeInsightContext } from './node-insight.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
@@ -4983,6 +4992,99 @@ Its prior copies stay in its version history.`,
         return this.router.createUrlTree(['/', ...segs.slice(0, -1), 'entities', type, key]);
     }
 
+    /**
+     * D3 (LA-FULL-CYCLE-TEST-1 phase 2): the one Reveal for the nodes on screen. `count` = the masked aliases drawn and not
+     * revealed yet; `why` = why it cannot run here ('' = it can). Null when nothing drawn is masked.
+     */
+    readonly revealOffer = computed<{ count: number; why: string } | null>(() => {
+        const left = this.unrevealedOnScreen();
+        return left.length ? { count: left.length, why: this.revealWhyNot() } : null;
+    });
+
+    private unrevealedOnScreen(): string[] {
+        const revealed = this.investigation.revealed();
+        return maskedOnScreen(this.canvasData()?.nodes ?? []).filter((a) => !Object.hasOwn(revealed, a));
+    }
+
+    /** Why Reveal cannot run on what is drawn ('' = it can): only inside a saved Investigation, by a holder of the right. */
+    private revealWhyNot(): string {
+        if (!this.investigation.canvas())
+            return 'Reveal works in a saved Investigation: each reveal is recorded against it and its purpose.';
+        return this.lens.canRevealLinkEntities() ? '' : 'Needs See unmasked ids.';
+    }
+
+    /**
+     * D3: ask the reason, then reveal every masked node on screen in one action (the server records one audit row per
+     * entity). Resolves with the reason, or null when cancelled; throws a readable refusal.
+     */
+    async revealOnScreen(): Promise<string | null> {
+        const aliases = this.unrevealedOnScreen();
+        if (!aliases.length || this.revealWhyNot()) return null;
+        const what =
+            aliases.length === 1
+                ? 'the masked entity'
+                : `the ${aliases.length.toLocaleString('en-GB')} masked entities`;
+        const reason = await firstValueFrom(
+            this.dialog
+                .open<EntityListReasonDialog, EntityListReasonData, string | undefined>(EntityListReasonDialog, {
+                    width: '32rem',
+                    data: {
+                        title: 'Reveal the ids on screen',
+                        message:
+                            `Shows the real ids of ${what} on screen, to you and on this screen only. Each one is ` +
+                            'recorded in the audit trail with your reason. Everyone else, and the Dossier, keep the aliases.',
+                        confirmLabel: 'Reveal',
+                        maxLength: 200,
+                    },
+                })
+                .afterClosed(),
+        );
+        if (!reason) return null;
+        try {
+            const got = await this.investigation.reveal(aliases, reason);
+            this.toastr.success(
+                `Revealed ${got === 1 ? '1 id' : got.toLocaleString('en-GB') + ' ids'}, each recorded with your reason.`,
+                'Reveal',
+            );
+            return reason;
+        } catch (err) {
+            throw new Error(oversightErrorMessage(err, 'Reveal failed.'), { cause: err });
+        }
+    }
+
+    /** The canvas's Reveal button: a refusal is a toast there. */
+    async revealFromCanvas(): Promise<void> {
+        try {
+            await this.revealOnScreen();
+        } catch (err) {
+            this.toastr.error((err as Error).message, 'Reveal');
+        }
+    }
+
+    /** The node dialog's D4 alias mapping and D3 Reveal for one node. */
+    private revealContext(
+        node: G6GraphData['nodes'][number],
+    ): Pick<NodeInsightContext, 'aliasOf' | 'revealed' | 'reveal' | 'revealWhyNot'> {
+        const back = new Map(
+            Object.entries(this.investigation.workingSet()?.exploreAliases ?? {}).map(([inv, explore]) => [
+                explore,
+                inv,
+            ]),
+        );
+        const real = revealedIdOf(node, this.investigation.revealed());
+        const reason = this.investigation.revealReason();
+        return {
+            ...(this.investigation.active() && back.size ? { aliasOf: (a: string) => back.get(a) ?? a } : {}),
+            revealed: real !== null && reason ? { id: real, reason } : null,
+            revealWhyNot: this.revealWhyNot(),
+            reveal: async () => {
+                const r = await this.revealOnScreen();
+                const id = revealedIdOf(node, this.investigation.revealed());
+                return r && id !== null ? { id, reason: r } : null;
+            },
+        };
+    }
+
     private openNodeDetail(id: string): void {
         const onInvestigation = this.investigation.canvas() !== null;
         const g = onInvestigation ? this.canvasData() : this.baseGraph();
@@ -5030,12 +5132,14 @@ Its prior copies stay in its version history.`,
             summaryDataset: this.traversalTargets()[0]?.dataset ?? null,
             // ONBOARDING-FIRST-RUN-1 C6a: the node's details from every Reference describing its Entity Type
             references: referencesFor(this.references(), entityType),
+            // LA-FULL-CYCLE-TEST-1 phase 2: D4 one alias per entity in the Investigation, D3 the one Reveal from here
+            ...this.revealContext(node),
         };
         this.dialog
             .open(ElementDetailDialog, {
                 width: '36rem',
                 data: {
-                    title: node.data.label,
+                    title: revealedIdOf(node, this.investigation.revealed()) ?? node.data.label,
                     subtitle: this.kindLabel(node.data.kind),
                     rows: [
                         {

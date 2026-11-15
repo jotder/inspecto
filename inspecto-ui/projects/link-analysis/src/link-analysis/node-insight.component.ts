@@ -17,7 +17,7 @@ import {
 import { EntityListSummary, isHeldListChange } from '@inspecto/link-analysis/api/inv.service';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
-import { factorLine, nodeScoresFor, numberOf, riskMappingFor, riskOf, round1 } from './node-risk';
+import { KeyedDataset, factorLine, nodeScoresFor, numberOf, riskMappingFor, riskOf, round1 } from './node-risk';
 import { NodeRiskService, ReferenceTable } from './node-risk.service';
 import { NodeReference, detailLines } from './reference-details';
 import { CaseHistoryService, EntityHistory, EntityHistoryStatus } from './case-history.service';
@@ -59,6 +59,17 @@ export interface NodeInsightContext {
     summaryDataset?: string | null;
     /** ONBOARDING-FIRST-RUN-1 C6a: the References that describe this node's Entity Type; its row of each is shown. */
     references?: NodeReference[];
+    /**
+     * D4 (LA-FULL-CYCLE-TEST-1 phase 2): inside an Investigation, the alias it shows for an entity an exploration read named
+     * by the Space's alias (the Summary's counterparts), so one entity reads as one alias on every surface; absent = as read.
+     */
+    aliasOf?: (alias: string) => string;
+    /** D3: the real id when this screen already revealed the node's alias, with the reason it was revealed with. */
+    revealed?: { id: string; reason: string } | null;
+    /** D3: reveal the masked nodes on screen (the host asks the reason); resolves with this node's real id, or null. */
+    reveal?: () => Promise<{ id: string; reason: string } | null>;
+    /** D3: why Reveal cannot run for this masked node ('' or absent = it can, when `reveal` is given). */
+    revealWhyNot?: string;
 }
 
 interface Membership {
@@ -88,6 +99,42 @@ interface Membership {
         LinkAnalysisEntitySummaryComponent,
     ],
     template: `
+        @if (maskedId()) {
+            <!-- D3: the node dialog's way to the one Reveal for the nodes on screen -->
+            <section class="mt-2" aria-labelledby="ni-masked" data-testid="ni-masked">
+                <h3 id="ni-masked" class="text-base font-semibold">Masked id</h3>
+                @if (revealed(); as r) {
+                    <p class="m-0 text-sm" data-testid="ni-revealed">
+                        Real id: <strong class="font-mono">{{ r.id }}</strong>
+                    </p>
+                    <p class="text-secondary m-0 text-xs">
+                        Shown to you on this screen only, and recorded with your reason. Everyone else still sees the
+                        alias.
+                    </p>
+                } @else {
+                    <p class="text-secondary m-0 text-sm">
+                        {{ ctx().label }} is an alias: this Space masks entities of this type.
+                    </p>
+                    @if (ctx().reveal && !ctx().revealWhyNot) {
+                        <button
+                            mat-stroked-button
+                            type="button"
+                            class="mt-1"
+                            data-testid="ni-reveal"
+                            [disabled]="revealing()"
+                            (click)="revealNow()"
+                        >
+                            Reveal the ids on screen…
+                        </button>
+                    } @else if (ctx().revealWhyNot) {
+                        <p class="text-secondary m-0 text-xs" data-testid="ni-reveal-why">{{ ctx().revealWhyNot }}</p>
+                    }
+                    @if (revealError()) {
+                        <p class="text-warn m-0 text-xs" role="alert">{{ revealError() }}</p>
+                    }
+                }
+            </section>
+        }
         @if (ctx().entityPage; as page) {
             <p class="mt-2 text-sm">
                 <a [routerLink]="page" data-testid="entity-page-link">Open the Entity page</a>
@@ -100,6 +147,7 @@ interface Membership {
                     <inspecto-link-analysis-entity-summary
                         [type]="ctx().entityType!"
                         [key]="ctx().listKey ?? ctx().key"
+                        [aliasOf]="ctx().aliasOf ?? null"
                         [dataset]="ctx().summaryDataset!"
                         [level]="4"
                         drawWhyNot="It is on the graph already."
@@ -565,23 +613,61 @@ export class NodeInsightComponent implements OnInit {
         if (status === this.historyStatus()) this.history.set(h);
     }
 
+    /** D3: the node's id is an alias (its own Investigation's, or the Space's in exploration). */
+    readonly maskedId = computed(() => this.ctx().key.startsWith('masked:'));
+    /** D3: the real id and the reason, once this screen revealed it (set from the host, or by Reveal here). */
+    readonly revealed = signal<{ id: string; reason: string } | null>(null);
+    readonly revealing = signal(false);
+    readonly revealError = signal('');
+
     ngOnInit(): void {
         const c = this.ctx();
+        this.revealed.set(c.revealed ?? null);
         const m = this.mapping();
-        if (m) {
-            void this.svc.lookup(m.indicators, [c.key], c.investigationId).then((t) => this.indicators.set(t));
-            if (m.enrichment)
-                void this.svc.lookup(m.enrichment, [c.key], c.investigationId).then((t) => this.enrichment.set(t));
-        }
-        // C6a: the node's row of every Reference describing its Entity Type (masked by the server like every LA read)
+        if (m) void this.svc.lookup(m.indicators, [c.key], c.investigationId).then((t) => this.indicators.set(t));
+        this.readDetails();
+        if (c.graphKey) this.riskResult.set(this.svc.cachedRisk(this.cacheKey(c.graphKey)));
+        void this.loadMemberships();
+    }
+
+    /**
+     * The node's personal details: its Enrichment row and its row of every Reference describing its Entity Type (C6a),
+     * masked by the server with the node's id - and, once this screen revealed the id (D3), read raw with the reason
+     * given, which the server re-checks and records per entity.
+     */
+    private readDetails(): void {
+        const c = this.ctx();
+        const reason = this.revealed()?.reason;
+        const read = (ref: KeyedDataset): Promise<ReferenceTable> =>
+            reason
+                ? this.svc.lookup(ref, [c.key], c.investigationId, reason)
+                : this.svc.lookup(ref, [c.key], c.investigationId);
+        const enrichment = this.mapping()?.enrichment;
+        if (enrichment) void read(enrichment).then((t) => this.enrichment.set(t));
         const refs = c.references ?? [];
         this.details.set(refs.map((ref) => ({ ref, table: null })));
         for (const ref of refs)
-            void this.svc
-                .lookup(ref, [c.key], c.investigationId)
-                .then((table) => this.details.update((all) => all.map((d) => (d.ref === ref ? { ref, table } : d))));
-        if (c.graphKey) this.riskResult.set(this.svc.cachedRisk(this.cacheKey(c.graphKey)));
-        void this.loadMemberships();
+            void read(ref).then((table) =>
+                this.details.update((all) => all.map((d) => (d.ref === ref ? { ref, table } : d))),
+            );
+    }
+
+    /** D3: the one Reveal for the nodes on screen, from this node's dialog; the details are then read again, raw. */
+    async revealNow(): Promise<void> {
+        const reveal = this.ctx().reveal;
+        if (!reveal || this.revealing()) return;
+        this.revealing.set(true);
+        this.revealError.set('');
+        try {
+            const r = await reveal();
+            if (!r) return; // the reason prompt was cancelled
+            this.revealed.set(r);
+            this.readDetails();
+        } catch (e) {
+            this.revealError.set(e instanceof Error ? e.message : apiErrorMessage(e, 'Reveal failed.'));
+        } finally {
+            this.revealing.set(false);
+        }
     }
 
     async computeRisk(): Promise<void> {

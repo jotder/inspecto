@@ -67,7 +67,11 @@ const weightOf = (e: { data: object }): number => (e.data as { count?: number })
  * listed by the panel). Every entity and every link is drawn up to {@link WORKING_SET_LINK_RENDER_CEILING}
  * links (heaviest first, then by id); `omittedLinks` says how many the ceiling left out.
  */
-export function workingSetToGraph(ws: WorkingSet, projection: EntityProjection): ProjectedGraph {
+export function workingSetToGraph(
+    ws: WorkingSet,
+    projection: EntityProjection,
+    revealed: RevealedIds = {},
+): ProjectedGraph {
     const g = projectTriples(
         ws.links.map((l) => ({ source: l.source, target: l.target, kind: l.kind, count: l.count })),
         false,
@@ -125,9 +129,12 @@ export function workingSetToGraph(ws: WorkingSet, projection: EntityProjection):
     }
     // F-11: a `masked:<16 hex>` alias is drawn short so labels stop overlapping; the label itself stays the full alias
     // (the hover text, the Selected line, search and every op still read it). Nothing the alias hides is shown.
+    // D3: an alias the lead revealed is drawn as its real id - drawn only, so every op still speaks the alias.
     for (const n of g.nodes) {
-        const short = shortMaskedLabel(n.data.label);
-        if (short) n.data.canvasLabel = short;
+        const real = revealedIdOf(n, revealed);
+        const short = real === null ? shortMaskedLabel(n.data.label) : null;
+        if (real !== null) n.data.canvasLabel = real;
+        else if (short) n.data.canvasLabel = short;
     }
     const hidden = new Set(ws.entities.filter((e) => e.hidden).map((e) => e.id));
     const done = (out: ProjectedGraph): ProjectedGraph => {
@@ -403,6 +410,33 @@ export function mergePairOf(
 const MASKED_PREFIX = 'masked:';
 /** How many characters of a pseudonym's hash the canvas draws (F-11). */
 const MASKED_LABEL_CHARS = 4;
+
+/**
+ * D3 (LA-FULL-CYCLE-TEST-1 phase 2): the aliases this screen revealed, alias → real id. Held in the browser for the open
+ * Investigation only and never stored: the canvas, the node dialog and the step log draw the real id, while every op,
+ * selection and search keeps speaking the alias. Each entry was audited server-side with the reason given.
+ */
+export type RevealedIds = Readonly<Record<string, string>>;
+
+const MASKED_TOKEN = /masked:[0-9a-f]{16}/g;
+
+/** The real id a reveal gave for one of the node's aliases, else null. */
+export function revealedIdOf(node: G6Node, revealed: RevealedIds): string | null {
+    for (const id of rawIdsOf(node)) if (Object.hasOwn(revealed, id)) return revealed[id];
+    return null;
+}
+
+/** Server text (a step line, a reason) with each revealed alias written as its real id; other aliases stay as they are. */
+export function revealText(text: string, revealed: RevealedIds): string {
+    return text.replace(MASKED_TOKEN, (alias) => (Object.hasOwn(revealed, alias) ? revealed[alias] : alias));
+}
+
+/** The masked aliases of the nodes drawn (in canvas order, each once): what one Reveal asks for. */
+export function maskedOnScreen(nodes: readonly G6Node[]): string[] {
+    const out = new Set<string>();
+    for (const n of nodes) for (const id of rawIdsOf(n)) if (id.startsWith(MASKED_PREFIX)) out.add(id);
+    return [...out];
+}
 
 /** The canvas text for a masked alias (`masked:6065…`); null when `label` is not one or is already that short. */
 export function shortMaskedLabel(label: string): string | null {

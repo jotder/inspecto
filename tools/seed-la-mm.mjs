@@ -32,7 +32,7 @@ export function buildPlan() {
   const ops = [
     { op: 'seed', ids: ['HUB-01', 'RELAY-1', 'RELAY-2', 'STRUCT-01'], entityType: 'wallet' },
     { op: 'expand', direction: 'either', maxFanOut: 5 },   // bounded, under four_eyes_fan_out_above (100): runs now; an UNBOUNDED expand always goes pending
-    { op: 'exclude', ids: ['RELAY-2'], reason: 'second relay repeats the RELAY-1 route' },
+    { op: 'exclude', ids: ['RELAY-2'], reason: 'the second relay repeats the route of the first' },
     { op: 'annotate', ids: ['HUB-01'], note: 'hub: 25 wallets just under the 5 000 tier limit in, 98% out within minutes' },
     { op: 'threshold', min: 1 },
     { op: 'window', window: WINDOW },
@@ -41,7 +41,7 @@ export function buildPlan() {
   ];
   return [
     { id: 'investigation', as: 'mm.analyst', method: 'POST', path: '/inv/investigations', body: {
-      id: INV, title: 'Mule hub HUB-01', purpose: 'Showcase: agent-assisted structuring and the mule chain', dataset: DATASET,
+      id: INV, title: 'Mule hub and its chain', purpose: 'Showcase: agent-assisted structuring and the mule chain', dataset: DATASET,
       sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts' } },
     ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'mm.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
     ...[['mm.reviewer', 'reviewer'], ['mm.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (

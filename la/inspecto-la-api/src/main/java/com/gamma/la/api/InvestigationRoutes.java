@@ -83,7 +83,8 @@ import static com.gamma.la.core.InvestigationEvaluator.strings;
  *       current data.</li>
  *   <li>{@code GET /inv/investigations/{id}/log} — the ordered log, each step rendered as a plain-language line, and
  *       the pending sensitive expands (D-U7).</li>
- *   <li>{@code POST /inv/investigations/{id}/reveal} — reveal masked entity ids, per entity (D-U6).</li>
+ *   <li>{@code POST /inv/investigations/{id}/reveal} — reveal masked entity ids with a reason, one audit row per
+ *       entity (D-U6; D3 of LA-FULL-CYCLE-TEST-1: the nodes on screen in one call).</li>
  *   <li>{@code POST /inv/investigations/{id}/pending/{rid}/approve} · {@code .../deny} — four-eyes (D-U7).</li>
  *   <li>{@code GET /inv/pending?status} — the approver's inbox: the requests across the Space the caller may decide;
  *       see {@link #approvalInbox}.</li>
@@ -92,8 +93,8 @@ import static com.gamma.la.core.InvestigationEvaluator.strings;
  * <p><b>LA-19 controls (operator decisions 2026-09-24).</b> <i>Purpose</i> (D-U5): every Investigation states a
  * {@code purpose} — its legal basis — at create; it is sealed in the write-once header and shown in the Dossier, and
  * NOT enforced. <i>Masking</i> (D-U6): every response carrying entity ids is masked per the Space's
- * {@code maskingMode} ({@link EntityMasking}); a holder of {@code canRevealLinkEntities} reveals one entity at a time,
- * audited. <i>Four-eyes</i> (D-U7): an {@code expand} whose budget or fan-out exceeds the Space's threshold does not
+ * {@code maskingMode} ({@link EntityMasking}); a lead holding {@code canRevealLinkEntities} reveals the entities on screen
+ * in one call with a reason, audited per entity. <i>Four-eyes</i> (D-U7): an {@code expand} whose budget or fan-out exceeds the Space's threshold does not
  * run — it becomes a PENDING request that runs only when a DIFFERENT Subject holding
  * {@code canApproveLinkExpansions} approves it.
  *
@@ -3218,17 +3219,20 @@ public final class InvestigationRoutes implements RouteModule {
     }
 
     /**
-     * {@code POST /inv/investigations/{id}/reveal} — body {@code {tokens: ["masked:…", …]}} (D-U6). Per entity: each
-     * pseudonym this Investigation issued is answered with the entity id behind it; anything else is listed under
-     * {@code unknown}, never guessed. Gates: {@code canRevealLinkEntities} (the route) → the Investigation, owner-only /
-     * R3 / PDP ({@link #open}) → a missing, empty or over-long token list 422. Audited as
-     * {@code LINK_ENTITY_REVEALED} with the TOKENS revealed — never the raw ids, so the trail does not re-leak them.
+     * {@code POST /inv/investigations/{id}/reveal} — body {@code {tokens: ["masked:…", …], reason}} (D-U6; LA-FULL-CYCLE-TEST-1
+     * D3: one Reveal for the nodes on screen). Each pseudonym this Investigation issued is answered with the entity id behind
+     * it; anything else is listed under {@code unknown}, never guessed. Gates: {@code canRevealLinkEntities} (the route) →
+     * the Investigation, a lead only / R3 / PDP ({@link #open}: a reviewer or analyst 403, anyone else 404) → a missing,
+     * empty or over-long token list, or a missing / blank / over-200-character {@code reason}, 422. Audited as ONE
+     * {@code LINK_ENTITY_REVEALED} row per entity revealed (LA-19), each with the reason and the TOKEN it revealed — never
+     * the raw id, so the trail does not re-leak it. A reveal changes no later response: masked stays the default.
      */
     private Object reveal(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
         Inv inv = open(api, ex, id);
         int maxReveal = SpaceLimits.get(inv.writeRoot(), LaLimit.INPUT_REVEAL_IDS);
         if (!(body.get("tokens") instanceof List<?> raw) || raw.isEmpty() || raw.size() > maxReveal)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'tokens', a list of 1.." + maxReveal + " masked ids to reveal");
+        String reason = revealReason(body);
         EntityMasking mask = EntityMasking.of(inv, List.of());
         List<Map<String, Object>> revealed = new ArrayList<>();
         List<String> unknown = new ArrayList<>();
@@ -3237,16 +3241,37 @@ public final class InvestigationRoutes implements RouteModule {
             if (value == null) unknown.add(token);
             else revealed.add(Map.of("token", token, "id", value));
         }
-        List<Object> tokens = revealed.stream().map(r -> r.get("token")).toList();
-        emit(ex, LinkEventTypes.LINK_ENTITY_REVEALED, "link.entity.revealed",
-                "link.entity.revealed — " + id + " " + revealed.size() + " entit" + (revealed.size() == 1 ? "y" : "ies"),
-                b -> b.attr("investigationId", id).attr("tokens", tokens).attr("count", revealed.size()));
+        for (Map<String, Object> r : revealed) auditReveal(ex, id, String.valueOf(r.get("token")), reason, "investigation");
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", id);
         out.put("revealed", revealed);
         out.put("unknown", unknown);
+        out.put("reason", reason);
         out.put("masking", mask.describe());
         return out;
+    }
+
+    /** A reveal's required reason (D3): non-blank, at most 200 characters, as every other reason an analyst gives. */
+    static String revealReason(Map<String, Object> body) {
+        String reason = ApiContext.str(body, "reason");
+        if (reason == null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "a reveal requires a 'reason': each entity revealed is "
+                    + "recorded with it");
+        reason = reason.trim();
+        if (reason.length() > 200) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'reason' is at most 200 chars");
+        return reason;
+    }
+
+    /**
+     * One {@code LINK_ENTITY_REVEALED} row for one entity (LA-19): the alias and the reason, never the raw id. ⚠ The alias
+     * rides as {@code alias} and the target, never as {@code tokens}: the event sink redacts every attribute whose key names
+     * a secret ({@code SecretScrubber}), so a {@code tokens} attribute reached the trail as {@code ***redacted***}.
+     */
+    static void auditReveal(HttpExchange ex, String investigationId, String alias, String reason, String via) {
+        emit(ex, LinkEventTypes.LINK_ENTITY_REVEALED, "link.entity.revealed",
+                "link.entity.revealed — " + investigationId + " 1 entity (" + via + ")",
+                b -> b.target("entity", alias).attr("investigationId", investigationId).attr("alias", alias)
+                        .attr("count", 1).attr("reason", reason).attr("via", via));
     }
 
     @SuppressWarnings("unchecked")

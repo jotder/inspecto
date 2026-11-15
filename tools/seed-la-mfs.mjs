@@ -45,7 +45,7 @@ export function buildPlan() {
   ];
   return [
     { id: 'investigation', as: 'mfs.analyst', method: 'POST', path: '/inv/investigations', body: {
-      id: INV, title: `SIM-swap wallet takeover (${LOGIN})`, purpose: `Showcase: ${VICTIMS.length} wallets drained within 2 hours of a SIM swap through one call-centre login`, dataset: DATASET,
+      id: INV, title: 'SIM-swap wallet takeover', purpose: `Showcase: ${VICTIMS.length} wallets drained within 2 hours of a SIM swap through one call-centre login`, dataset: DATASET,
       sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts', entityType: ENTITY_TYPE } },
     ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'mfs.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
     ...[['mfs.reviewer', 'reviewer'], ['mfs.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (

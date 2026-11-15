@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-104 test file(s). Run one, or all:
+105 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -107,6 +107,7 @@ node --test tools/
 | `tools/seed-la-crypto.test.mjs` | node --test tools/seed-la-crypto.test.mjs  -  request building of the crypto laundering seed script against a MOCKED fetch (no server). |
 | `tools/seed-la-health.test.mjs` | node --test tools/seed-la-health.test.mjs  -  request building of the provider billing fraud seed script against a MOCKED fetch (no server). |
 | `tools/seed-la-insider.test.mjs` | node --test tools/seed-la-insider.test.mjs  -  request building of the insider-threat seed script against a MOCKED fetch (no server). |
+| `tools/seed-la-investigation-text.test.mjs` | LA-FULL-CYCLE-TEST-1 finding 13: a showcase Investigation's name, purpose, reasons, annotations and Draft step name roles, |
 | `tools/seed-la-logistics.test.mjs` | node --test tools/seed-la-logistics.test.mjs  -  request building of the cargo-theft seed script against a MOCKED fetch (no server). |
 | `tools/seed-la-mfs.test.mjs` | node --test tools/seed-la-mfs.test.mjs  -  request building of the MFS fraud seed script against a MOCKED fetch (no server). |
 | `tools/seed-la-mm.test.mjs` | node --test tools/seed-la-mm.test.mjs  -  request building of the mobile-money seed script against a MOCKED fetch (no server). |

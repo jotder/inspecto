@@ -62,18 +62,32 @@ export class NodeRiskService {
 
     private readonly risk = new Map<string, GraphRunResult>();
 
-    /** One reference-rows call (at most the key cap). */
-    referenceRows(ref: KeyedDataset, keys: string[], investigationId?: string | null): Observable<ReferenceRowsResult> {
+    /**
+     * One reference-rows call (at most the key cap). `revealReason` (D3): the keys are aliases this screen revealed, so the
+     * rows are asked raw with that reason - the server re-checks the caller may reveal and audits each entity read.
+     */
+    referenceRows(
+        ref: KeyedDataset,
+        keys: string[],
+        investigationId?: string | null,
+        revealReason?: string | null,
+    ): Observable<ReferenceRowsResult> {
         return this.http.post<ReferenceRowsResult>(apiUrl('/inv/reference-rows'), {
             dataset: ref.dataset,
             keyCol: ref.keyCol,
             keys,
             ...(investigationId ? { investigationId } : {}),
+            ...(investigationId && revealReason ? { reveal: true, reason: revealReason } : {}),
         });
     }
 
     /** The rows of `keys` in a reference Dataset, chunk by chunk; any failed chunk makes the whole lookup an error. */
-    async lookup(ref: KeyedDataset, keys: string[], investigationId?: string | null): Promise<ReferenceTable> {
+    async lookup(
+        ref: KeyedDataset,
+        keys: string[],
+        investigationId?: string | null,
+        revealReason?: string | null,
+    ): Promise<ReferenceTable> {
         const out: ReferenceTable = {
             byKey: new Map(),
             columns: [],
@@ -84,7 +98,7 @@ export class NodeRiskService {
         };
         try {
             for (const chunk of keyChunks(keys)) {
-                const r = await firstValueFrom(this.referenceRows(ref, chunk, investigationId));
+                const r = await firstValueFrom(this.referenceRows(ref, chunk, investigationId, revealReason));
                 for (const [k, row] of indexByKey(r.rows)) if (!out.byKey.has(k)) out.byKey.set(k, row);
                 out.columns = r.columns;
                 out.truncated ||= r.truncated;

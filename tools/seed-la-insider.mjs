@@ -41,7 +41,7 @@ export function buildPlan() {
     // bounded, under four_eyes_fan_out_above (2000): runs now and brings in everyone whose grants the manager approved (its 11
     // reports, the 4 among them) and the manager's own approver; an UNBOUNDED expand always goes pending
     { op: 'expand', direction: 'either', linkKinds: ['granted_by'], maxFanOut: 20 },
-    { op: 'annotate', ids: [MANAGER], note: `granted ${ac.systems.join(' and ')} to ${REPORTS.length} reports in operations roles with no ticket: the only ${GRANTS.length} finance grants without one` },
+    { op: 'annotate', ids: [MANAGER], note: `granted finance system access to ${REPORTS.length} reports in operations roles with no ticket: the only ${GRANTS.length} finance grants without one` },
     { op: 'threshold', min: 1 },
     { op: 'window', window: { from: '2025-10-01T00:00:00Z', to: '2026-10-01T00:00:00Z' } },
     { op: 'resolve' },
@@ -49,7 +49,7 @@ export function buildPlan() {
   ];
   return [
     { id: 'investigation', as: 'insider.analyst', method: 'POST', path: '/inv/investigations', body: {
-      id: INV, title: `Access creep (${MANAGER})`, purpose: `Showcase: ${GRANTS.length} grants to a finance system without a ticket, approved by one manager for ${REPORTS.length} reports`, dataset: DATASET,
+      id: INV, title: 'Access creep by one manager', purpose: `Showcase: ${GRANTS.length} grants to a finance system without a ticket, approved by one manager for ${REPORTS.length} reports`, dataset: DATASET,
       sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts', entityType: ENTITY_TYPE } },
     ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'insider.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
     ...[['insider.reviewer', 'reviewer'], ['insider.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
@@ -78,7 +78,7 @@ async function prime(call, log, sleep, tries) {
 export const PENDING_EXPAND = { op: 'expand', direction: 'either' };   // no maxFanOut = unbounded: always above four_eyes_fan_out_above, so held
 // annotates the report who later changed a vendor's bank details, which the bounded expand brought into the Working Set; the vendor
 // itself is two hops out (manager -> report -> vendor), and annotating it is refused
-export const DRAFT_STEP = { op: 'annotate', ids: [VENDOR_EDITOR], note: `widen the case: ${VENDOR_EDITOR} changed the bank account of ${VENDOR} on ${ac.vendor_changed_at.slice(0, 10)}, the only person ever to touch that vendor; check the payments to it` };
+export const DRAFT_STEP = { op: 'annotate', ids: [VENDOR_EDITOR], note: `widen the case: this employee changed a vendor's bank account on ${ac.vendor_changed_at.slice(0, 10)}, the only person ever to touch that vendor; check the payments to it` };
 
 /** Runs (or, with apply=false, only prints) the plan. Returns { done, skipped, failed, warnings, summary }. */
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = SPACE, apply = false, log = () => {},

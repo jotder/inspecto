@@ -58,7 +58,7 @@ import { timeZoneOptions } from '@inspecto/core/schema/time-zones';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { LinkAnalysisDataStripComponent } from './link-analysis-data-strip.component';
 import { stepReadSuffix } from './index-source';
-import { expandSourceNote, idsInWorkingSet, moveStep, rawIdsOf, stepName } from './investigation-state';
+import { expandSourceNote, idsInWorkingSet, moveStep, rawIdsOf, revealText, stepName } from './investigation-state';
 import { RELATION_NOUN, pinBinding } from './working-set-widget';
 import { LA_WIDGETS } from '@inspecto/link-analysis/la-host';
 import {
@@ -781,6 +781,14 @@ export class LinkAnalysisInvestigationComponent {
     readSuffix(e: InvestigationLogEntry): string | null {
         return stepReadSuffix(e.read);
     }
+
+    /** D3 (LA-FULL-CYCLE-TEST-1 phase 2): server text with each alias this screen revealed written as its real id. */
+    shown(text: string): string {
+        return revealText(text, this.store.revealed());
+    }
+
+    /** D3: the Oversight panel's Reveal goes through the store, so the canvas and the node dialog show what it revealed. */
+    readonly revealAliases = (tokens: string[], reason: string): Promise<number> => this.store.reveal(tokens, reason);
 
     readonly counts = computed(() => {
         const ws = this.store.workingSet();

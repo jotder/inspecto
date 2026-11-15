@@ -1876,6 +1876,40 @@
                                 @if (investigation.canvas()) {
                                     <span>Investigation Working Set</span>
                                 }
+                                @if (revealOffer(); as offer) {
+                                    <!-- LA-FULL-CYCLE-TEST-1 D3: the canvas's way to the one Reveal for the nodes on screen -->
+                                    <span class="flex items-center gap-1" data-testid="la-reveal-offer">
+                                        {{
+                                            offer.count === 1
+                                                ? '1 id masked'
+                                                : offer.count.toLocaleString('en-GB') + ' ids masked'
+                                        }}
+                                        <button
+                                            mat-stroked-button
+                                            type="button"
+                                            class="!h-6 !min-h-0 !px-2 !text-[0.6875rem]"
+                                            data-testid="la-reveal"
+                                            [disabled]="!!offer.why"
+                                            [disabledInteractive]="true"
+                                            [matTooltip]="
+                                                offer.why || 'Show the real ids of the nodes on screen, to you only'
+                                            "
+                                            [attr.aria-label]="
+                                                offer.why
+                                                    ? 'Reveal the ids on screen: ' + offer.why
+                                                    : 'Reveal the ids on screen'
+                                            "
+                                            (click)="revealFromCanvas()"
+                                        >
+                                            <mat-icon
+                                                class="icon-size-3"
+                                                svgIcon="heroicons_outline:eye"
+                                                aria-hidden="true"
+                                            ></mat-icon>
+                                            Reveal…
+                                        </button>
+                                    </span>
+                                }
                                 @if (detailDense()) {
                                     <span data-testid="la-detail-dense"
                                         >arrows and node labels on hover above {{ denseDetailCap }} links</span

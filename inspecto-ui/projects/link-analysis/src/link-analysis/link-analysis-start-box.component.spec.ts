@@ -10,6 +10,7 @@ import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { penByLabel, pickerSet } from '@inspecto/core/testing/pen-field';
 import { EntityProfileService, EntitySuggestions } from '@inspecto/link-analysis/api/entity-profile.service';
 import type { EntityListSummary } from '@inspecto/link-analysis/api/inv.service';
+import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import { LinkAnalysisStartBoxComponent, StartNotice } from './link-analysis-start-box.component';
 import {
     NewInvestigationInput,
@@ -228,11 +229,24 @@ describe('LinkAnalysisStartBoxComponent (LA-ONBOARD-1 phase 6, OB-9)', () => {
         expect(fixture.componentInstance.starts[0]).toMatchObject({ kind: 'entity', value: 'MULE-HUB-01' });
     });
 
-    it('a masked type says nothing is suggested', async () => {
+    it('a masked type says nothing is suggested, and that the real ids need See unmasked ids', async () => {
         const { fixture, el } = create(vi.fn(() => of(answer({ masked: true, items: [], assessed: false }))));
         await settle();
         fixture.detectChanges();
         expect(q(el, 'start-suggest-note')?.textContent).toContain('masked: type the whole value');
+        expect(q(el, 'start-suggest-note')?.textContent).toContain('needs See unmasked ids');
+    });
+
+    it('LA-FULL-CYCLE-TEST-1 finding 11: a masked type tells someone who may reveal where Reveal is', async () => {
+        const { fixture, el } = create(
+            vi.fn(() => of(answer({ masked: true, items: [], assessed: false }))),
+            true,
+        );
+        await settle();
+        fixture.detectChanges();
+        expect(q(el, 'start-suggest-note')?.textContent).toContain(
+            'press Reveal… on the canvas or in a node’s details',
+        );
     });
 
     it('a masked type offers no reveal to someone who may not reveal', async () => {
@@ -514,10 +528,10 @@ describe('LinkAnalysisStartBoxComponent - the Investigation tab start form (LA-U
         await settle();
         fixture.detectChanges();
         submit(fixture);
-        expect(fixture.componentInstance.creates[0].defaults).toEqual({
-            name: 'Account',
-            purpose: 'Review of an Account and its links',
-        });
+        const { name, purpose } = fixture.componentInstance.creates[0].defaults;
+        // LA-FULL-CYCLE-TEST-1 finding 24: the Type and when it was started, never the value
+        expect(name).toMatch(/^Account, \d{4}-\d\d-\d\d \d\d:\d\d$/);
+        expect(purpose).toBe('Review of an Account and its links');
     });
 
     it('with a graph drawn, Start from offers "Graph on screen": a seedless start over its mapping', () => {
@@ -579,6 +593,9 @@ describe('LinkAnalysisStartBoxComponent - the Investigation tab start form (LA-U
 });
 
 describe('newInvestigationDefaults: the full matrix (LA-UI-TEXT-PASS-1 X7)', () => {
+    // LA-FULL-CYCLE-TEST-1 finding 24: a masked Name carries when the form was filled, in the app's one clock
+    const NOW = new Date('2026-11-16T12:05:00Z');
+    const AT = ledgerTime(NOW.toISOString());
     const base = {
         typeLabel: 'Account',
         value: '',
@@ -586,6 +603,7 @@ describe('newInvestigationDefaults: the full matrix (LA-UI-TEXT-PASS-1 X7)', () 
         pasted: 0,
         datasetName: 'Calls',
         maskingMode: 'none',
+        now: NOW,
     };
     const d = (over: Partial<NewInvestigationInput>) => newInvestigationDefaults({ ...base, kind: 'entity', ...over });
     const NO_GAPS = /\s{2}|^\s|\s$|Investigation —|whole the|list an Entity List|\bundefined\b|\bnull\b/;
@@ -597,20 +615,20 @@ describe('newInvestigationDefaults: the full matrix (LA-UI-TEXT-PASS-1 X7)', () 
         [
             'entity, a value, Space masked',
             { value: 'AC-1', maskingMode: 'partial' },
-            'Account',
+            `Account, ${AT}`,
             'Review of an Account and its links',
         ],
         [
             'entity, a value, masking unknown',
             { value: 'AC-1', maskingMode: null },
-            'Account',
+            `Account, ${AT}`,
             'Review of an Account and its links',
         ],
         ['entity, type not picked', { typeLabel: '', value: 'AC-1' }, 'AC-1', 'Review of an entity and its links'],
         [
             'entity, type not picked and masked',
             { typeLabel: '', value: 'AC-1', maskingMode: 'full' },
-            'Entity',
+            `Entity, ${AT}`,
             'Review of an entity and its links',
         ],
         [
@@ -661,10 +679,10 @@ describe('newInvestigationDefaults: the full matrix (LA-UI-TEXT-PASS-1 X7)', () 
         [
             'graph, masked',
             { kind: 'graph', graphName: 'ring', maskingMode: 'partial' },
-            'Graph on screen',
+            `Graph on screen, ${AT}`,
             'Review of the graph on screen',
         ],
-        ['graph, no name', { kind: 'graph', graphName: '' }, 'Graph on screen', 'Review of the graph on screen'],
+        ['graph, no name', { kind: 'graph', graphName: '' }, `Graph on screen, ${AT}`, 'Review of the graph on screen'],
     ])('%s', (_case, over, name, purpose) => {
         const out = d(over);
         expect(out).toEqual({ name, purpose });
@@ -673,6 +691,13 @@ describe('newInvestigationDefaults: the full matrix (LA-UI-TEXT-PASS-1 X7)', () 
 
     it('never puts a raw identifier in the Purpose', () => {
         expect(d({ value: 'AC-1' }).purpose).not.toContain('AC-1');
+    });
+
+    it('finding 24: two masked starts a minute apart default to two Names, neither carrying the value', () => {
+        const a = d({ value: 'AC-1', maskingMode: 'typed' }).name;
+        const b = d({ value: 'AC-1', maskingMode: 'typed', now: new Date(NOW.getTime() + 60_000) }).name;
+        expect(a).not.toBe(b);
+        for (const n of [a, b]) expect(n).not.toContain('AC-1');
     });
 });
 

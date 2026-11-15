@@ -278,9 +278,12 @@ public final class LinkEventTypes {
      *  {@code investigationId} and the former {@code caseId}. */
     public static final String LINK_INVESTIGATION_CASE_UNLINKED = "LINK_INVESTIGATION_CASE_UNLINKED";
 
-    /** Masked entity ids of an Investigation were revealed ({@code POST /inv/investigations/{id}/reveal}, LA-19 /
-     *  D-U6) — per entity, by a holder of {@code canRevealLinkEntities}. {@code investigationId}, {@code tokens}
-     *  (the pseudonyms revealed — never the raw values, so the trail does not re-leak them) and {@code count}. */
+    /** A masked entity id of an Investigation was revealed ({@code POST /inv/investigations/{id}/reveal}, or its details
+     *  read raw through {@code POST /inv/reference-rows} {@code reveal: true}; LA-19 / D-U6, LA-FULL-CYCLE-TEST-1 D3) —
+     *  ONE row per entity, by a lead holding {@code canRevealLinkEntities}. {@code investigationId}, {@code alias} and the
+     *  target (the pseudonym revealed — never the raw value, so the trail does not re-leak it), {@code reason}, {@code via}
+     *  ({@code investigation} / {@code details}) and {@code count} 1. The deep-link reveal still writes {@code tokens},
+     *  which the event sink's secret scrubber redacts. */
     public static final String LINK_ENTITY_REVEALED = "LINK_ENTITY_REVEALED";
 
     /** A sensitive expand was held for four-eyes approval instead of running (LA-19 / D-U7). {@code investigationId},

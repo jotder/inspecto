@@ -62,6 +62,7 @@ const SUMMARY: EntitySummaryResult = {
             dataset="pays"
             [showLists]="lists()"
             [drawWhyNot]="why()"
+            [aliasOf]="aliasOf()"
             (draw)="drawn.push($event)"
         ></inspecto-link-analysis-entity-summary>
     </main>`,
@@ -70,6 +71,7 @@ class HostComponent {
     readonly key = signal('masked:aaaa');
     readonly lists = signal(true);
     readonly why = signal('');
+    readonly aliasOf = signal<((alias: string) => string) | null>(null);
     readonly drawn: PresetDraw[] = [];
 }
 
@@ -155,6 +157,16 @@ describe('LinkAnalysisEntitySummaryComponent', () => {
             { datasetId: 'pays', values: ['masked:aaaa'], what: 'masked:aaaa (from its summary)' },
         ]);
         await expectNoA11yViolations(el);
+    });
+
+    it('D4 (LA-FULL-CYCLE-TEST-1): inside an Investigation a counterpart reads as its own alias, never a second one', () => {
+        const { fixture, c, host } = setup();
+        fixture.detectChanges();
+        expect(c.byLinks().map((r) => r.entity)).toEqual(['masked:bbbb', 'masked:dddd']); // as read: no mapping
+        host.aliasOf.set((a) => (a === 'masked:bbbb' ? 'masked:inv-bbbb' : a));
+        fixture.detectChanges();
+        expect(c.byLinks().map((r) => r.entity)).toEqual(['masked:inv-bbbb', 'masked:dddd']);
+        expect(c.byAmount().map((r) => r.entity)).toEqual(['masked:dddd']);
     });
 
     it('says why it was not summarised, and never draws then', () => {

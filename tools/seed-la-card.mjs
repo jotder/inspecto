@@ -46,7 +46,7 @@ export function buildPlan() {
   ];
   return [
     { id: 'investigation', as: 'card.analyst', method: 'POST', path: '/inv/investigations', body: {
-      id: INV, title: `Compromised terminal (${TERMINAL})`, purpose: `Showcase: common point of purchase behind ${DEFRAUDED.length} defrauded cards`, dataset: DATASET,
+      id: INV, title: 'Compromised terminal', purpose: `Showcase: common point of purchase behind ${DEFRAUDED.length} defrauded cards`, dataset: DATASET,
       sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts', entityType: ENTITY_TYPE } },
     ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'card.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
     ...[['card.reviewer', 'reviewer'], ['card.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (

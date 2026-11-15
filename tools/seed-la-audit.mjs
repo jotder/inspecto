@@ -25,7 +25,7 @@ export const REVIEW_DATASET = 'ap_approval_links_dataset';
 const CASE_TITLE = 'Vendor V-117 conflict of interest';
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const PENDING_EXPAND = { op: 'expand', direction: 'either' };   // no maxFanOut = unbounded: always above four_eyes_fan_out_above, so held
-export const DRAFT_STEP = { op: 'annotate', ids: ['V-117'], note: 'what-if: an approval limit of 9 000 and a second approver outside the reporting line of E-31' };
+export const DRAFT_STEP = { op: 'annotate', ids: ['V-117'], note: 'what-if: an approval limit of 9 000 and a second approver outside this employee\'s reporting line' };
 
 /** The seeded state as an ordered list of steps. */
 export function buildPlan() {
@@ -33,14 +33,14 @@ export function buildPlan() {
   const ops = [
     { op: 'seed', ids: ['V-117', 'E-31'], entityType: 'party' },
     { op: 'expand', direction: 'either', maxFanOut: 20 },   // bounded, under four_eyes_fan_out_above (2000): runs now
-    { op: 'annotate', ids: ['E-31'], note: 'shares bank account BA-9031 and address AD-9031 with V-117; manager E-15 approved all 14 invoices' },
+    { op: 'annotate', ids: ['E-31'], note: 'shares a bank account and an address with the vendor; one manager approved all 14 invoices' },
     { op: 'window', window: { from: '2025-10-01T00:00:00Z', to: '2026-11-01T00:00:00Z' } },
     { op: 'resolve' },
     { op: 'snapshot', label: 'workpaper baseline' },
   ];
   return [
     { id: 'investigation', as: 'audit.lead', method: 'POST', path: '/inv/investigations', body: {
-      id: INV, title: 'Vendor V-117 workpaper', purpose: 'Showcase: audit workpaper for the conflict-of-interest vendor', dataset: DATASET,
+      id: INV, title: 'Conflict-of-interest vendor workpaper', purpose: 'Showcase: audit workpaper for the conflict-of-interest vendor', dataset: DATASET,
       sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts' } },
     ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'audit.lead', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
     ...[['audit.committee', 'reviewer'], ['audit.manager', 'reviewer'], ['audit.admin', 'lead']].map(([subject, role]) => (

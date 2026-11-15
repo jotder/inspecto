@@ -89,7 +89,8 @@ test('the pending expand is unbounded and the Draft step annotates C-14 about C-
   assert.equal(r.summary.pendingRequestId, 'P-1');
   const step = m.calls.find((c) => c.u.endsWith('/drafts/D-1/ops')).body;
   assert.deepEqual(step.ids, ['C-14'], 'a Working Set node (C-22 is two hops out)');
-  assert.match(step.note, /C-22/);
+  assert.match(step.note, /a colleague joined/);
+  assert.doesNotMatch(step.note, /C-22/, 'Investigation text names roles, never an entity id (LA-FULL-CYCLE-TEST-1 finding 13)');
 });
 
 test('every plan step names a persona the template defines, and the outsider is on the roster', () => {

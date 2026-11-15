@@ -611,7 +611,13 @@ export class LinkAnalysisStartBoxComponent {
         if (!s) return '';
         if (s.masked && s.revealed)
             return 'This Entity Type is masked: its values are shown because you may reveal them, and each look-up is recorded.';
-        if (s.masked) return 'This Entity Type is masked: type the whole value. Nothing is suggested.';
+        // LA-FULL-CYCLE-TEST-1 finding 11: say where the real ids are, not only that they are hidden
+        if (s.masked)
+            return this.lens.canRevealLinkEntities()
+                ? 'This Entity Type is masked: type the whole value, or Show values. The graph shows aliases until you ' +
+                      'save it and press Reveal… on the canvas or in a node’s details (recorded with your reason).'
+                : 'This Entity Type is masked: type the whole value. The graph shows aliases; seeing the real ids ' +
+                      'needs See unmasked ids.';
         if (s.assessed && !s.items.length) return `No ${this.typeLabel()} in ${this.datasetName()} starts like this.`;
         return '';
     });

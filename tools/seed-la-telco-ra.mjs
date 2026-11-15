@@ -48,7 +48,7 @@ export function buildPlan() {
   ];
   return [
     { id: 'investigation', as: 'telcora.analyst', method: 'POST', path: '/inv/investigations', body: {
-      id: INV, title: `Unbilled usage (${DEALER})`, purpose: `Showcase: ${UNBILLED.length} SIMs on the network with no billing record, all from one dealer`, dataset: DATASET,
+      id: INV, title: 'Unbilled usage at one dealer', purpose: `Showcase: ${UNBILLED.length} SIMs on the network with no billing record, all from one dealer`, dataset: DATASET,
       sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts', entityType: ENTITY_TYPE } },
     ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'telcora.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
     ...[['telcora.reviewer', 'reviewer'], ['telcora.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
@@ -77,7 +77,7 @@ async function prime(call, log, sleep, tries) {
 export const PENDING_EXPAND = { op: 'expand', direction: 'either' };   // no maxFanOut = unbounded: always above four_eyes_fan_out_above, so held
 // annotates the seed, which is in the Working Set; the activation device is two hops out (DL-047 -> SIM -> DEV-00086: the bounded
 // expand followed activated_by only), and annotating it is refused
-export const DRAFT_STEP = { op: 'annotate', ids: [DEALER], note: `widen the case: every unbilled SIM was activated on ${DEVICE} - bar it and check its other activations` };
+export const DRAFT_STEP = { op: 'annotate', ids: [DEALER], note: 'widen the case: every unbilled SIM was activated on one device - bar it and check its other activations' };
 
 /** Runs (or, with apply=false, only prints) the plan. Returns { done, skipped, failed, warnings, summary }. */
 export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', space = SPACE, apply = false, log = () => {},

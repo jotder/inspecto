@@ -14,7 +14,8 @@ timestamp: 2026-11-15T00:00:00Z
 Design: [architecture](architecture.md) §3 and §5. Layer overview: [layer/la architecture](../../layer/la/architecture.md).
 
 - [Required](#required) · [Built](#built) · [Left](#left) · [Refused](#refused) ·
-  [Decided design: LA-COLUMN-ROLES-2](#decided-design-la-column-roles-2-2026-11-05)
+  [Decided design: LA-COLUMN-ROLES-2](#decided-design-la-column-roles-2-2026-11-05) ·
+  [Decided design: LA-FULL-CYCLE-TEST-1 phase 2](#decided-design-la-full-cycle-test-1-phase-2-2026-11-16)
 
 ## Required
 
@@ -45,6 +46,7 @@ Design: [architecture](architecture.md) §3 and §5. Layer overview: [layer/la a
 | Inspecto LA onboarding, blank install to a first finding (`LA-ONBOARD-1`, phases 0-8, closed 2026-10-22): Investigations add-on at runtime, masking by sign-in, locked-with-reason, `/onboard/files`, Getting started and the Space guide, Add data, Entity Types per column, Start from..., My work, help on every screen, onboarding counters | `EditionFeatures.holdsInvestigationsAddon`, `OnboardRoutes`, `OnboardImport`, `OnboardingRoutes`, `OnboardingCounters`; SPA `la-app`, `inspecto-add-data`, `start-from.ts`, `next-steps.ts`, `term-help.ts` | [architecture](architecture.md) §3.4, §8, [architecture-data-onboarding](architecture-data-onboarding.md) §6.10, §6.11; archived [plan](../../../../archived-documents/plans-archive/la-onboarding-plan.md); acceptance [tests-live-drives](tests-live-drives.md) |
 | Column roles, second part (`LA-COLUMN-ROLES-2`, shipped 2026-11-05): Mapping-level `carried` override, Entity Type profile Measures, edge width by the primary Measure, per-Dataset Filter by role | see [below](#decided-design-la-column-roles-2-2026-11-05) | [architecture-data-onboarding](architecture-data-onboarding.md) §6.15 |
 | Performance work (`LA-PERF-*`, closed 2026-11-13) | browser seams and caps | [spec](spec.md) § Performance |
+| Masking a user can live with (`LA-FULL-CYCLE-TEST-1` phase 2, findings 11-14 and 24, 2026-11-16): one audited Reveal for the nodes on screen with a reason, one alias per entity inside an Investigation, details masked with their id, showcase Investigation text without entity ids, Save defaults that do not repeat | see [below](#decided-design-la-full-cycle-test-1-phase-2-2026-11-16) | [architecture](architecture.md) §3.4; `ControlApiInvestigationRevealOnScreenTest`, `tools/seed-la-investigation-text.test.mjs` |
 
 ## Left
 
@@ -79,3 +81,24 @@ when edited). The other three were put to the operator; **answers D-1 b, D-2 a, 
 | **D-1** Entity *Type* profile Measures (the one-Entity profile already had `EntityProfiles.measures`; `typeProfile` had none) | **b**: count / sum / min / max per binding × Measure, plus the per-Entity distribution (p50 / p90 / top) of each Measure's total, GROUP BY per Entity, sampled by key hash as `relationships` does. Sample size and cap live in the limits config (`entity_profile.*`); a test proves the sample stays bounded on a large synthetic Dataset | Each binding is its own row, so one Dataset's rows are never summed twice; the distribution is the cost class of `relationships` (the union read took 112 s on a 39 M-row Dataset), hence the sample | (a) aggregates only; (c) one pooled row per Measure name: a transfer naming two wallets counts twice |
 | **D-2** Edge width from the link mapping's primary Measure | **a**: the server sums it. `edgeSql` adds `SUM(TRY_CAST(m AS DOUBLE)) AS total` beside `cnt` (no grouping change, links do not unfold), the link-index read sums the carried column the same way (`IndexedRead`), the edge gains `total`, the client fold adds totals; Display menu *Width: Count / <Measure>*, default Count. A link with no number has total null and is drawn thinnest | Nothing changes until asked | (b) width by the Measure always: changes every existing picture; (c) client-only, see Refused |
 | **D-3** Category values for a read over several Datasets (Filter by role was empty there) | **b**: per-Dataset sections in Filter by role, each writing a per-Dataset filter on the server's multi-Dataset read; a test proves one Dataset's filter does not narrow the others | Needed a filter per Dataset on the multi-Dataset projection (one `filter` per read before) | (a) only Categories shared by name; (c) leave multi-Dataset reads without the panel |
+
+## Decided design: LA-FULL-CYCLE-TEST-1 phase 2 (2026-11-16)
+
+The two large calls were taken with the plan (`docs/superpower/2026-11-15-la-full-cycle-test-plan.md` §4.3): **D3** masked
+stays the default and a holder of *See unmasked ids* gets one audited Reveal for the nodes on screen, with a reason;
+**D4** aliases stay per Investigation and every surface inside one shows its alias. The smaller calls were taken in the
+lane, each with its reason (as built: [architecture](architecture.md) §3.4).
+
+| Decision | Chosen | Why | Rejected |
+|---|---|---|---|
+| Where Reveal lives | The line under the canvas (*N ids masked · Reveal…*), the node dialog's **Masked id** section and Oversight's **Reveal all…**, all one store action | Finding 12: nothing on the canvas or in the node dialog pointed to Reveal. The render-status line already says what the canvas draws, and a toolbar button would have to be mirrored in the folded overflow menu | A toolbar icon; a per-node button (nine clicks again) |
+| What a reveal changes | Browser memory for the open Investigation only; the canvas draws the real id as `canvasLabel`, `label` stays the alias | Nothing raw is stored and no later response changes (D3: no read becomes a disclosure nobody chose); every op, search and selection keeps working because it still speaks the alias | A server-side per-actor reveal set: it would make every later read a silent disclosure |
+| Audit row | One `LINK_ENTITY_REVEALED` per entity, the alias as `alias` and as target, the reason, `via` | LA-19 asks one row per entity; the old `tokens` attribute was redacted by the event sink's secret scrubber, so the trail never named the entity | One row naming many tokens |
+| Where Reveal is offered | Only in a saved Investigation; an unsaved or exploration canvas says so | A reveal is recorded against an Investigation and its stated purpose (D-U5); exploration has neither | An exploration reveal under the Space key |
+| Personal details | Masked with their id, as `all` masks (text and integral values; fractional numbers and flags pass); read raw with the reason once the screen revealed the id, audited per entity (`via: details`); under `all` a reveal lifts the key alone | Finding 14: a name or city beside a masked id identifies it. Reusing `all`'s rule keeps one definition of "may be an id". Under `all` the Space masks those values whatever the key, and a revealed row may hold another entity's id, so it fails closed | A blank "hidden" value: it loses equality (two accounts with one holder), which an alias keeps |
+| One alias per entity | Reference rows' key column reads the alias asked with; the Summary maps counterparts through `exploreAliases` | D4: the defect was two aliases on one screen, so the Investigation's surfaces translate; the Space key is untouched | One key everywhere (re-mints every sealed alias) |
+| Save defaults under masking | `"<Type>, <time>"` / `"Graph on screen, <time>"` in the one app clock (`ledgerTime`) | Finding 24: every masked start defaulted to "Account". The value cannot enter (a raw id is visible to reviewers, an alias reads as nothing); the time makes two starts differ | A blank required Name: one more field to type |
+| Showcase text | Roles, never ids, in every Investigation name, purpose, reason, annotation, reference label and Draft step; guarded by `tools/seed-la-investigation-text.test.mjs` | Finding 13: the server masks every id inside Investigation text, so "Mule hub MULE-HUB-01" read "Mule hub masked:6021…" | Unmasking titles: a title is visible to reviewers |
+
+Left on purpose: the deep-link reveal still audits a redacted `tokens` attribute; seeded Case titles (Case Management,
+not an Investigation) still name the story's entity; quick-question answers and the Dossier keep aliases after a reveal.

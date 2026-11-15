@@ -355,7 +355,7 @@ jobs:
 
       # Engine-names-no-LA guard (LA-DEMO-GUARDS-1 / DR-T3): inspecto/src/main must not name com.gamma.la.* / com.gamma.geolink.*.
       - name: Guard - the engine names no Link Analysis class
-        run: node tools/check-engine-names-no-la.mjs && node --test tools/check-engine-names-no-la.test.mjs tools/la-demo-smoke.test.mjs tools/seed-la-showcase.test.mjs tools/la-demo-burst.test.mjs tools/la-demo-figures.test.mjs tools/gen-la-showcase-data.test.mjs tools/la_gen_io.test.mjs
+        run: node tools/check-engine-names-no-la.mjs && node --test tools/check-engine-names-no-la.test.mjs tools/la-demo-smoke.test.mjs tools/seed-la-showcase.test.mjs tools/seed-la-investigation-text.test.mjs tools/la-demo-burst.test.mjs tools/la-demo-figures.test.mjs tools/gen-la-showcase-data.test.mjs tools/la_gen_io.test.mjs
 
       # Public API guard (PUBLIC-API-SURFACE-1, 2026-11-12): every @PublicApi signature in every tracked .java file
       # must match the committed baseline platform/inspecto-api/public-api.txt, so a changed signature lands only

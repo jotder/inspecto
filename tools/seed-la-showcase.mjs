@@ -37,7 +37,7 @@ export function buildPlan() {
   const ops = [
     { op: 'seed', ids: ['MULE-HUB-01', 'RELAY-01', 'RELAY-02', 'SMURF-01'], entityType: 'account' },
     { op: 'expand', direction: 'either', maxFanOut: 5 },   // bounded, under four_eyes_fan_out_above (2000): runs now; an UNBOUNDED expand (no maxFanOut) always goes pending
-    { op: 'exclude', ids: ['RELAY-02'], reason: 'second relay repeats the RELAY-01 route' },
+    { op: 'exclude', ids: ['RELAY-02'], reason: 'the second relay repeats the route of the first' },
     { op: 'annotate', ids: ['MULE-HUB-01'], note: 'hub: 12 sub-1000 cash deposits in, 98% out within hours' },
     { op: 'threshold', min: 1 },
     { op: 'window', window: { from: '2026-09-01T00:00:00Z', to: '2026-09-04T00:00:00Z' } },
@@ -46,7 +46,7 @@ export function buildPlan() {
   ];
   const plan = [
     { id: 'investigation', as: 'fm.analyst', method: 'POST', path: '/inv/investigations', body: {
-      id: INV, title: 'Mule hub MULE-HUB-01', purpose: 'Showcase: layering ring around MULE-HUB-01', dataset: DATASET,
+      id: INV, title: 'Mule hub and its relays', purpose: 'Showcase: layering ring around one mule hub', dataset: DATASET,
       sourceCol: 'PAYER_ACCOUNT', targetCol: 'PAYEE_ACCOUNT', linkKindCol: 'CHANNEL', timeCol: 'BOOKED_AT' } },
     ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'fm.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
     ...[['ra.analyst', 'reviewer'], ['fm.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
@@ -80,7 +80,7 @@ export function buildPlan() {
 }
 
 export const PENDING_EXPAND = { op: 'expand', direction: 'either' };   // no maxFanOut = unbounded: always above four_eyes_fan_out_above, so held
-export const DRAFT_STEP = { op: 'annotate', ids: ['RELAY-01'], note: 'widen the ring: check what RELAY-01 pays on to' };
+export const DRAFT_STEP = { op: 'annotate', ids: ['RELAY-01'], note: 'widen the ring: check what this relay pays on to' };
 const RULE = 'mule-pass-through';
 const unwrap = (r) => (r && typeof r === 'object' && 'data' in r ? r.data : r);
 

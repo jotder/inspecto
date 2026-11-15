@@ -818,7 +818,9 @@ public final class InvRoutes implements RouteModule {
      *
      * <p><b>Values stay raw</b> (operator decision D-S4, 2026-09-23: value-projected, the SPA normalises and
      * warns). An entity appearing in two Datasets is two entries here, one per provenance; joining them is
-     * id equality on the client. Ids are cast to VARCHAR, so an INTEGER key still meets its VARCHAR twin.
+     * id equality on the client. Ids are cast to VARCHAR, so an INTEGER key still meets its VARCHAR twin. Under the
+     * Space's masking a mapping's ids are aliases (DR-D2), and a node mapping's {@code attrs} are masked with its id
+     * (LA-FULL-CYCLE-TEST-1 finding 14: a name or city beside a masked id identifies it).
      *
      * <p><b>Fail closed, whole call.</b> Every mapping is resolved through {@link #relationFor} — unknown or
      * not viewable → 404, the same answer as absence — and every identifier and {@code filter} validated
@@ -895,8 +897,10 @@ public final class InvRoutes implements RouteModule {
                     out.put("label", mp.mask().active() && row.get("label") != null ? mp.mask().out(row.get("id")) : row.get("label"));
                     out.put("category", mp.category());
                     if (!mp.attrs().isEmpty()) {
+                        // LA-FULL-CYCLE-TEST-1 finding 14: a node's attributes (a holder's name, a city) go with its id -
+                        // masked when it is masked, as /inv/reference-rows masks a masked key's details
                         Map<String, Object> attrs = new LinkedHashMap<>();
-                        for (int i = 0; i < mp.attrs().size(); i++) attrs.put(mp.attrs().get(i), row.get("attr_" + i));
+                        for (int i = 0; i < mp.attrs().size(); i++) attrs.put(mp.attrs().get(i), mp.mask().out(row.get("attr_" + i)));
                         out.put("attrs", attrs);
                     }
                     if (mp.idType() != null) out.put("entityType", mp.idType());

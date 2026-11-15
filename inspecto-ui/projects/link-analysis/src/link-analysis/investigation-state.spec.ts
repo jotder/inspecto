@@ -11,9 +11,12 @@ import {
     effectiveOpSteps,
     idsInWorkingSet,
     investigationErrorMessage,
+    maskedOnScreen,
     mergePairOf,
     moveStep,
     rawIdsOf,
+    revealText,
+    revealedIdOf,
     truncatedSteps,
     WORKING_SET_LINK_RENDER_CEILING,
     workingSetToGraph,
@@ -59,6 +62,31 @@ describe('Working Set entity types on the canvas (ONB-LA-ENDPOINT-TYPE-1)', () =
         expect(node('masked:6065a1b2c3d4e5f6').data.label).toBe('masked:6065a1b2c3d4e5f6');
         expect(rawIdsOf(node('masked:6065a1b2c3d4e5f6'))).toEqual(['masked:6065a1b2c3d4e5f6']);
         expect(node('99979100001').data.canvasLabel).toBeUndefined(); // a clear id is drawn as it is
+    });
+
+    it('D3: draws a revealed alias as its real id and keeps the alias for every op (LA-FULL-CYCLE-TEST-1)', () => {
+        const alias = 'masked:6065a1b2c3d4e5f6';
+        const g = workingSetToGraph(
+            ws([entity(alias, { type: 'msisdn' }), entity('masked:aaaabbbbccccdddd', { type: 'msisdn' })]),
+            P,
+            { [alias]: '27820000001' },
+        );
+        const node = (raw: string) => g.nodes.find((n) => rawIdsOf(n).includes(raw))!;
+        expect(node(alias).data.canvasLabel).toBe('27820000001');
+        expect(node(alias).data.label).toBe(alias);
+        expect(rawIdsOf(node(alias))).toEqual([alias]);
+        expect(revealedIdOf(node(alias), { [alias]: '27820000001' })).toBe('27820000001');
+        expect(node('masked:aaaabbbbccccdddd').data.canvasLabel).toBe('masked:aaaa…'); // not revealed: drawn short
+        expect(revealedIdOf(node('masked:aaaabbbbccccdddd'), { [alias]: '27820000001' })).toBeNull();
+    });
+
+    it('D3: maskedOnScreen lists the drawn aliases once, and revealText rewrites only revealed ones', () => {
+        const a = 'masked:6065a1b2c3d4e5f6';
+        const b = 'masked:aaaabbbbccccdddd';
+        const g = workingSetToGraph(ws([entity(a), entity(b), entity('27820000009')]), P);
+        expect(maskedOnScreen(g.nodes).sort()).toEqual([a, b].sort());
+        expect(revealText(`1. Seeded ${a} and ${b}.`, { [a]: '27820000001' })).toBe(`1. Seeded 27820000001 and ${b}.`);
+        expect(revealText('no alias here', { [a]: 'x' })).toBe('no alias here');
     });
 
     it('builds the merge pair from the Working Set types for bare ids', () => {

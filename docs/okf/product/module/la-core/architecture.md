@@ -403,6 +403,35 @@ Anomaly Scores. A list member's token therefore differs from an Investigation's 
 to `typed` (fail closed). `EntityMasking` (la-api) masks on the way **out**: engine results and caches stay raw; a
 raw id that masking hides is answered as a nonexistent node; `reveal` needs `canRevealLinkEntities`.
 
+**One Reveal for the nodes on screen, one alias per entity (LA-FULL-CYCLE-TEST-1 phase 2, decisions D3 and D4,
+2026-11-16).** Masked stays the default. `POST /inv/investigations/{id}/reveal` takes every masked alias on screen in
+one call (up to `input.reveal_ids`; the SPA chunks a larger screen) with a required `reason` (non-blank, at most 200
+characters, 422 otherwise) and writes **one** `LINK_ENTITY_REVEALED` row per entity revealed (LA-19), naming the alias
+as `alias` and as the row's target, with the reason and `via`, never the raw id. ⚠ Gotcha: the old single row carried
+the aliases as a `tokens` attribute, and `SecretScrubber` redacts every attribute whose key names a secret, so the trail
+read `tokens=***redacted***`; never name an audit attribute `*token*`. The deep-link reveal
+(`InvestigationInboundRoutes`) still writes `tokens` and was left as it was. The gate is unchanged: a lead of the
+Investigation holding the capability; a reviewer or analyst 403, anyone else 404. Nothing is stored: a reveal changes
+no later response, and the SPA keeps the real ids in browser memory for the open Investigation only
+(`InvestigationSessionStore.revealed`), drawn as the node's `canvasLabel` while `label` (what every op, search and
+selection sends) stays the alias. The step log rewrites revealed aliases on screen (`revealText`); the Dossier keeps
+them masked (its own hand-off reveal is unchanged). Reveal is offered only in a saved Investigation: an unsaved or
+exploration canvas has no Investigation and purpose to record it against, and says so.
+*Details go with their id:* `/inv/reference-rows` masks every other value of a row whose key is masked as `all` masks
+(text and integral values become aliases; fractional numbers and flags pass), because a holder's name or city beside a
+masked id identifies it; `/inv/projection/multi` masks a node mapping's `attrs` with its id. With `reveal: true`, a
+`reason` and an `investigationId`, reference rows read that Investigation's pseudonyms raw (the key and the details
+masked only because of it; a column masked by its own classification names another entity and stays masked, and under
+`all`, where the Space masks every value that may be an id whatever the key, a reveal lifts the key alone), under the
+same gate as the reveal route, one audit row per entity read (`via: details`); the node dialog's Details and Enrichment
+ask this once the screen revealed the node. *One alias per entity (D4):* aliases stay per Investigation (an alias that
+cannot be matched across Investigations is a privacy property, and one key would re-mint every sealed Dossier's
+aliases). Inside an Investigation every surface shows its alias: reference rows' key column reads the alias the
+caller ASKED with (it read the Space's alias beside the Investigation's before), and the node dialog's Summary maps
+its counterparts through the Working Set's `exploreAliases`. Exploration outside an Investigation keeps the Space key.
+Tests: `ControlApiInvestigationRevealOnScreenTest` (written failing first against master); the SPA's
+`investigation-state`, store, oversight, node-insight, entity-summary and component specs.
+
 **A reader outside Link Analysis resolves an Investigation's alias through a port** (`LA-SUSPICION-FACTORS-INVESTIGATION-1`,
 2026-10-31). `InvestigationAliases` (entity-store, ServiceLoader) is provided by la-api's `InvestigationAliasResolver`:
 `InvestigationRoutes.openForRead` first (its 404 / 422 propagate), then `EntityMasking.of(inv, []).reveal(alias)`, so only a

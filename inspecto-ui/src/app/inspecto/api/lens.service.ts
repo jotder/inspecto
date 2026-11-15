@@ -279,8 +279,9 @@ export class LensService {
         this.identityCapability('canApproveLinkExpansions', 'linkgraph.approve'),
     );
 
-    /** May reveal a masked entity of an Investigation, one at a time (D-U6, `POST /inv/investigations/{id}/reveal`).
-     *  {@link identityCapability}; the server gates the route and audits each reveal. Its Access-Catalog node is
+    /** May reveal the masked entities of an Investigation on screen, with a reason (D-U6 and LA-FULL-CYCLE-TEST-1 D3,
+     *  `POST /inv/investigations/{id}/reveal`; a lead only). {@link identityCapability}; the server gates the route and
+     *  audits each entity revealed. Its Access-Catalog node is
      *  `linkgraph.reveal` (LA-ACCESS-NODE-IDS-1, as {@link canApproveLinkExpansions}). */
     readonly canRevealLinkEntities = computed(() =>
         this.identityCapability('canRevealLinkEntities', 'linkgraph.reveal'),

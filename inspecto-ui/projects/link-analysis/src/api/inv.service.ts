@@ -885,10 +885,12 @@ export interface DenyExpansionResult {
     pending: PendingExpansion;
 }
 
-/** `POST …/reveal` (D-U6) — per entity; the server audits `LINK_ENTITY_REVEALED` with the tokens only. */
+/** `POST …/reveal` (D-U6, D3) — the server audits one `LINK_ENTITY_REVEALED` row per entity, with the alias and the reason. */
 export interface RevealResult {
     id: string;
     revealed: { token: string; id: string }[];
+    /** The reason recorded with each revealed entity. */
+    reason?: string;
     /** Tokens this Investigation never issued — never guessed. */
     unknown: string[];
     masking: Record<string, unknown>;
@@ -2148,9 +2150,13 @@ export class InvService {
         );
     }
 
-    /** D-U6: `canRevealLinkEntities` (403), owner-only (404), 1..N tokens (422). */
-    revealEntities(id: string, tokens: string[]): Observable<RevealResult> {
-        return this.http.post<RevealResult>(invPath(id, 'reveal'), { tokens });
+    /**
+     * D-U6 / D3: reveal the aliases of the nodes on screen - `canRevealLinkEntities` (403), a lead of the Investigation (403
+     * for another member, 404 for anyone else), 1..`input.reveal_ids` tokens and a reason of at most 200 characters (422).
+     * Audited server-side as one row per entity, with the reason.
+     */
+    revealEntities(id: string, tokens: string[], reason: string): Observable<RevealResult> {
+        return this.http.post<RevealResult>(invPath(id, 'reveal'), { tokens, reason });
     }
 
     /** LA-20/21: the Working Set as a relation. Owner-only (a 404 for anyone else — indistinguishable from absence). */

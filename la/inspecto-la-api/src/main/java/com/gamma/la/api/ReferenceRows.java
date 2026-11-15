@@ -34,7 +34,8 @@ import java.util.TreeSet;
  * node dialog's Risk / Enrichment sections and the server-algorithms panel's "Fill nodeScores from indicators" never read
  * a whole Dataset over {@code /db/query} (which masks nothing) and look entities up in the browser.
  *
- * <p><b>Body</b> {@code {dataset, keyCol, keys: string[] (1..the Space's reference.max_keys), columns?: string[], investigationId?}}.
+ * <p><b>Body</b> {@code {dataset, keyCol, keys: string[] (1..the Space's reference.max_keys), columns?: string[], investigationId?,
+ * reveal?: boolean, reason?: string}} (see <b>Reveal</b> below).
  * <b>Response</b> {@code {dataset, keyCol, columns, rows:[{key, row}], matchedKeys, unresolved, truncated, masking}}: each
  * row is tagged with the key AS ASKED (so a caller holding aliases maps rows back without ever seeing a raw id), at most
  * the Space's {@code reference.max_rows} rows with {@code truncated} saying the cap bit; {@code unresolved} lists the asked ALIASES the server
@@ -62,6 +63,20 @@ import java.util.TreeSet;
  * matched against an arbitrary column as a membership oracle; an untraceable
  * lineage masks every column (fail closed). A masked value is the Space's exploration alias, the same one every other
  * exploration read shows for that id.
+ *
+ * <p><b>Details go with their id</b> (LA-FULL-CYCLE-TEST-1 phase 2, finding 14 and D4): when the key is masked, every
+ * other value of its row is masked as {@code all} masks (a holder's name or city beside a masked id identifies it);
+ * fractional numbers and flags still pass. The key column reads the alias the caller ASKED with, so inside an
+ * Investigation it is that Investigation's pseudonym, never the Space's second alias for the same entity.
+ *
+ * <p><b>Reveal</b> (D3): {@code reveal: true} with a {@code reason} reads the named Investigation's entities raw - the key
+ * and the details masked only because of it (a column masked by its own classification names another entity and stays
+ * masked; under {@code all} every other value that may be an id stays masked too, since the Space masks those whatever the
+ * key, and a revealed row may hold another entity's id: a reveal there lifts the key alone). Extra gates, in order: no {@code investigationId} or a missing / blank / over-200-character reason 422 →
+ * without {@code canRevealLinkEntities} 403 → not a lead of that Investigation 403 (a member) / 404 (anyone else), as
+ * {@code POST /inv/investigations/{id}/reveal}. Only that Investigation's pseudonyms are keys here (a raw key or a Space
+ * alias names nothing), and each entity whose row is read is audited as one {@code LINK_ENTITY_REVEALED} row with the
+ * reason ({@code via: details}), never the raw id.
  */
 final class ReferenceRows {
 
@@ -78,10 +93,21 @@ final class ReferenceRows {
         List<String> wanted = identList(body.get("columns"));
         List<String> keys = keyList(body.get("keys"), SpaceLimits.get(writeRoot, LaLimit.REFERENCE_MAX_KEYS));   // 422 · 413
         String invId = ApiContext.str(body, "investigationId");
+        boolean reveal = Boolean.TRUE.equals(body.get("reveal"));
+        String reason = null;
+        if (reveal) {
+            if (invId == null)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'reveal' reads an Investigation's entities raw: "
+                        + "it needs that 'investigationId'");
+            reason = InvestigationRoutes.revealReason(body);                                             // 422
+            ApiContext.requireCapability(ex, "canRevealLinkEntities");                                   // 403
+        }
 
         EntityMasking invMask = null;
         if (invId != null) {
-            InvestigationRoutes.Inv inv = InvestigationRoutes.openForRead(api, ex, invId);             // 404 · 403
+            // a reveal is the Investigation's lead's act, as POST .../reveal is (a reviewer 403, anyone else 404)
+            InvestigationRoutes.Inv inv = reveal ? InvestigationRoutes.open(api, ex, invId)
+                    : InvestigationRoutes.openForRead(api, ex, invId);                                   // 404 · 403
             invMask = EntityMasking.of(inv, List.of());
         }
         String relationSql = InvRoutes.relationFor(api, ex, writeRoot, datasetId);                     // 404 · 422
@@ -111,7 +137,10 @@ final class ReferenceRows {
         boolean aliasAsked = false;
         for (String k : keys) {
             String raw = null;
-            if (k.startsWith(MaskTokens.TOKEN_PREFIX)) {
+            if (reveal) {
+                // a reveal names only this Investigation's own pseudonyms: never a raw key (no oracle) nor a Space alias
+                if (k.startsWith(MaskTokens.TOKEN_PREFIX)) raw = invMask.reveal(k);
+            } else if (k.startsWith(MaskTokens.TOKEN_PREFIX)) {
                 aliasAsked = true;
                 // an alias resolves only against a key column the masking rule covers: matched against any other column,
                 // the raw value behind it would answer "is this entity in that column?" without ever being shown
@@ -127,12 +156,19 @@ final class ReferenceRows {
             else askedByRaw.computeIfAbsent(raw, r -> new ArrayList<>()).add(k);
         }
 
-        boolean maskKey = masking && (explore.active() || aliasAsked);
+        // a reveal reads its entities raw: the key, and the details masked only because of it. A column masked by its OWN
+        // classification names some other entity and stays masked.
+        boolean maskKey = !reveal && masking && (explore.active() || aliasAsked);
         ExplorationMasking out = maskKey && !explore.active() ? ExplorationMasking.forced(writeRoot, mode,
                 "an aliased key was asked, so its entity id is shown as an alias") : explore;
         Set<String> maskedCols = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         if (masking) maskedCols.addAll(classifiedColumns(writeRoot, datasetId, cols));
         if (maskKey) maskedCols.add(keyName);
+        else if (reveal) maskedCols.remove(keyName);
+        // `all`'s rule masks every value that may be an id. It applies with a masked key, and under `all` itself even to a
+        // revealed row: there the Space chose to mask every possible id, and a revealed row may hold ANOTHER entity's, so a
+        // reveal lifts the key alone (fail closed). Under `typed` the details were masked only because of the key.
+        boolean allRule = maskKey || reveal && "all".equals(mode);
         ExplorationMasking colMask = maskedCols.isEmpty() ? out : ExplorationMasking.forced(writeRoot, mode, "classified column");
 
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -159,25 +195,36 @@ final class ReferenceRows {
                 Map<String, Object> shown = new LinkedHashMap<>();
                 for (String c : cols) {
                     Object v = row.get(c);
-                    // `all` masks every id: text and integral values (an unclassified BIGINT msisdn / imsi) are ids until
-                    // proven otherwise; only fractional numbers and flags - indicator scores - pass
-                    boolean hide = maskedCols.contains(c) || "all".equals(mode) && v != null && !passesUnderAll(v);
+                    // A masked key masks its row's details with it (LA-FULL-CYCLE-TEST-1 finding 14: a holder's name or city
+                    // beside a masked id identifies it), as `all` masks every id: text and integral values (an unclassified
+                    // BIGINT msisdn / imsi) are ids until proven otherwise; only fractional numbers and flags - indicator
+                    // scores - pass. (Under `all` the key is always masked, so this is `all`'s rule too.)
+                    boolean hide = maskedCols.contains(c)
+                            || allRule && !(reveal && c.equals(keyName)) && v != null && !passesUnderAll(v);
                     shown.put(c, hide ? colMask.out(v) : v);
                 }
                 for (String asked : askedByRaw.getOrDefault(raw, List.of())) {
                     Map<String, Object> o = new LinkedHashMap<>();
                     o.put("key", asked);
-                    o.put("row", shown);
+                    // D4: the key column reads the alias the caller asked with - inside an Investigation its own pseudonym,
+                    // never a second (Space) alias for the same entity on the same screen
+                    Map<String, Object> mine = shown;
+                    if (maskKey && asked.startsWith(MaskTokens.TOKEN_PREFIX)) {
+                        mine = new LinkedHashMap<>(shown);
+                        mine.put(keyName, asked);
+                    }
+                    o.put("row", mine);
                     rows.add(o);
-                    matched.add(asked);
+                    if (matched.add(asked) && reveal) InvestigationRoutes.auditReveal(ex, invId, asked, reason, "details");
                 }
             }
         }
 
         audit(ex, datasetId, keys.size(), matched.size(), rows.size(), truncated);
         Map<String, Object> describe = out.describe();
-        describe.put("masked", maskKey || !maskedCols.isEmpty());
+        describe.put("masked", allRule || !maskedCols.isEmpty());
         describe.put("maskedColumns", List.copyOf(maskedCols));
+        if (reveal) describe.put("revealed", true);
         Map<String, Object> res = new LinkedHashMap<>();
         res.put("dataset", datasetId);
         res.put("keyCol", keyName);
