@@ -835,7 +835,8 @@ control plane; with no provider, the engine's own tests, the four sensitive clas
   Analysis they still differ: `all` masks every entity id and every non-fractional reference-row value.
 - `quality.pii.mask`: its `classifications:` list is the author's, and since 2026-11-15
   (`MASKING-UNION-RESIDUALS-1`) may name any class the Space masks under this rule (e.g. `WALLET` where a masked
-  type claims it); a class that would mask nothing is refused at save and at run.
+  type claims it); a class that would mask nothing is refused at save and at run. Naming an Entity Type's id selects
+  every class that type claims (`EntityTypes.classesSelectedBy`, 2026-11-15); naming a claimed class selects only itself.
 - **Which Entity Type a class names** is one helper, `EntityTypes.typeNamedBy` (a type that claims it, else a type
   whose id it is): the save gate, onboarding proposals, Link Analysis typing, discovery, presets, the index and the
   "type still in use" check on retiring a type all use it. `GET /settings/link-analysis` reports each type in force

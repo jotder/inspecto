@@ -106,6 +106,34 @@ class ControlApiEntityTypeDeleteTest {
         }
     }
 
+    /**
+     * MASKING-TYPE-ID-EDGES-1: the answer's {@code entityTypesInForce} is the shape {@code GET /settings/link-analysis} gives,
+     * {@code maskedInForce} included: true for a {@code masked: false} type whose class is sensitive.
+     */
+    @Test
+    void theRemainingTypesCarryMaskedInForceAsTheSettingsDo(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            settings(c, """
+                    entity_types[2]:
+                      - id: msisdn
+                        label: Phone number
+                        normaliser: e164
+                        masked: false
+                        classifications[1]: MSISDN
+                      - id: sweep_test
+                        label: sweep test
+                        normaliser: default
+                        masked: false
+                        classifications[1]: SWEEP
+                    """);
+            JsonNode kept = data(delete(c, "/inv/entity-types/sweep_test", AUTHOR)).get("entityTypesInForce");
+            assertEquals(1, kept.size(), kept.toString());
+            assertFalse(kept.get(0).get("masked").asBoolean(), kept.toString());
+            assertTrue(kept.get(0).path("maskedInForce").asBoolean(),"MSISDN is sensitive whatever the type says: " + kept);
+            assertEquals(data(get(c, "/settings/link-analysis", AUTHOR)).get("entityTypesInForce"), kept, "one shape");
+        }
+    }
+
     @Test
     void aTypeADatasetColumnClaimsIsRefusedNamingTheColumn(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (EntityProfileFixture.Ctx c = open(cfg, root)) {

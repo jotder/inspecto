@@ -61,6 +61,22 @@ public final class EvidenceMasker {
         });
     }
 
+    /**
+     * The classes an author's {@code selected} classes stand for in the Space whose config root is {@code configRoot}
+     * (MASKING-TYPE-ID-EDGES-1, {@link MaskedClasses#selected}): an Entity Type's id stands for every class the type claims too;
+     * each class itself, normalised, without a provider.
+     */
+    public static Set<String> selectedClasses(Path configRoot, java.util.Collection<String> selected) {
+        return MASKED_CLASSES.map(p -> p.selected(configRoot, selected)).orElseGet(() -> {
+            Set<String> out = new LinkedHashSet<>();
+            for (String s : selected) {
+                String c = ColumnClassification.normalise(s);
+                if (c != null) out.add(c);
+            }
+            return out;
+        });
+    }
+
     private final Path configRoot;
     private final Map<String, Set<String>> sensitiveByDataset;
     private byte[] key;

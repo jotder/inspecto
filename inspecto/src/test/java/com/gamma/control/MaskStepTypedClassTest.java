@@ -81,6 +81,52 @@ class MaskStepTypedClassTest {
         }
     }
 
+    /**
+     * The Space's {@code wallet} type claims {@code WALLET} and {@code MOBILE_MONEY}; Dataset {@code mm} (its own store, no
+     * sibling) classes column {@code wallet} WALLET and {@code purse} MOBILE_MONEY.
+     */
+    private void walletClaimsMobileMoney() throws Exception {
+        Path root = Path.of(System.getProperty("assist.write.root"));
+        Files.writeString(root.resolve("link-analysis.toon"), """
+                entity_types[1]:
+                  - id: wallet
+                    label: Stored-value account
+                    normaliser: upper-trim
+                    masked: true
+                    classifications[2]: WALLET,MOBILE_MONEY
+                """);
+        Files.writeString(root.resolve("registry").resolve("datasets").resolve("mm.toon"), ConfigCodec.toToon(Map.of("name", "mm",
+                "physicalRef", "mm_store", "columns", List.of(Map.of("name", "wallet", "classification", "WALLET"),
+                        Map.of("name", "purse", "classification", "MOBILE_MONEY"), Map.of("name", "id")))));
+    }
+
+    /** MASKING-TYPE-ID-EDGES-1 (decided 2026-11-15): naming a type's id masks every class the type claims, not only the id. */
+    @Test
+    void aTypesIdMasksEveryClassTheTypeClaims() throws Exception {
+        walletClaimsMobileMoney();
+        String out = run(Map.of("classifications", List.of("WALLET"), "dataset", "mm"));
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT id, wallet, purse FROM \"" + out + "\"")) {
+            assertTrue(rs.next());
+            assertEquals("1", rs.getString(1));
+            assertEquals("****", rs.getString(2), "classed WALLET, the type's id");
+            assertEquals("****", rs.getString(3), "classed MOBILE_MONEY, a class the wallet type claims");
+        }
+    }
+
+    /** MASKING-TYPE-ID-EDGES-1: a selected class that is not a type's id still masks only itself. */
+    @Test
+    void aClaimedClassMasksOnlyItself() throws Exception {
+        walletClaimsMobileMoney();
+        String out = run(Map.of("classifications", List.of("MOBILE_MONEY"), "dataset", "mm"));
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT wallet, purse FROM \"" + out + "\"")) {
+            assertTrue(rs.next());
+            assertEquals(WALLET, rs.getString(1), "classed WALLET: not selected, so left as it is");
+            assertEquals("****", rs.getString(2), "classed MOBILE_MONEY, the selected class");
+        }
+    }
+
     @Test
     void aClassThatMasksNothingInTheSpaceIsRefusedAtRun() {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,

@@ -1,8 +1,10 @@
 package com.gamma.mask;
 
 import java.nio.file.Path;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.function.Predicate;
 
 /**
@@ -17,6 +19,12 @@ public interface MaskedClasses {
 
     /** The classes the Space whose config root is {@code configRoot} masks, as a test of a raw classification (trimmed, any case). */
     Predicate<String> of(Path configRoot);
+
+    /**
+     * The classes an author's {@code selected} classes stand for in that Space (MASKING-TYPE-ID-EDGES-1): an Entity Type's id
+     * stands for every class the type claims as well; any other class for itself. Normalised (trimmed, upper case).
+     */
+    Set<String> selected(Path configRoot, Collection<String> selected);
 
     static Optional<MaskedClasses> provider() {
         return ServiceLoader.load(MaskedClasses.class).findFirst();

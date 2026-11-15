@@ -5,7 +5,9 @@
 > Items marked *(no row)* were found in the docs and are **not verified in the code**; the board row
 > `ARCH-MOSCOW-UNTRACKED-1` owns checking each one and either filing or refusing it.
 > Re-rank when the next MAJOR is tagged or a first customer deployment is scheduled.
-> **Refreshed 2026-11-14:** M1, M3, M6 and M8 are closed, as are S5, S13 and the layout half of S14; the
+> **Refreshed 2026-11-15:** the nightly CI and UI workflows are green on Linux again (CI at `47c5dc33f`, UI at
+> `16d259204`; red since 2026-11-11 and at least 2026-10-10), and every snapshot reader and writer now takes the swap
+> lock (M8 follow-up). **Refreshed 2026-11-14:** M1, M3, M6 and M8 are closed, as are S5, S13 and the layout half of S14; the
 > tables mark each with the date. The ranking itself was not redone.
 
 ## 1. What is ranked, and against what
@@ -110,9 +112,9 @@ M8 (2026-11-14). Left: M4 (release notes, kept current as changes land), M5 and 
 
 ## 6. What this ranking says
 
-1. **The tests that were red are fixed.** The full gate of 2026-11-12 on `f0aa137da` (M2) showed three red
-   tests (M1); they and the two found red on 2026-11-13 are closed. No full gate has run since 2026-11-12, so
-   "master is green" is again a claim until the next one.
+1. **Master is green on CI again.** The tests red on 2026-11-12 (M1) and on 2026-11-13 are fixed, and on 2026-11-15
+   both GitHub workflows passed every job on Linux, including the 31 modules that a failed module had kept from
+   running for two weeks. No full reactor gate ran on this host since 2026-11-12; the nightly CI is the daily gate.
 2. **The release path is the largest unproven piece.** M4, M5 and M7 are all "it exists and has never
    run": the release workflow, the recovery drill, the service wrapper acceptance. None needs design; each
    needs an operator input and one execution.
