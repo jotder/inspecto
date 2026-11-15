@@ -24,6 +24,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HexFormat;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,7 +56,8 @@ import java.util.regex.Pattern;
  * <p><b>Parameters</b> — every {@code ${NAME}} ({@code NAME} upper snake case) in a promoted file is a placeholder;
  * {@code SPACE} is always the target Space's id. A connection's secret reference (the whole value of a secret field,
  * resolved at run time by {@link SecretResolver}) is not a placeholder. A placeholder with no value refuses the
- * whole change set ({@link MissingParameters}).
+ * whole change set ({@link MissingParameters}), as does a value that makes a {@code .toon} file unreadable
+ * ({@link BrokenByBinding}) or changes its shape ({@link ReshapedByBinding}).
  */
 public final class SpacePromotion {
 
@@ -115,6 +117,18 @@ public final class SpacePromotion {
         }
     }
 
+    /** {@code .toon} files whose bound values change the kind of a value the source states (text into a list or an
+     *  object, a list item into an object) or rename a key it names, with the parameters that do it (SPACE-PROMOTION-
+     *  PARAM-TYPES-1): a value fills a value, it never adds structure. */
+    static final class ReshapedByBinding extends RuntimeException {
+        final Map<String, List<String>> byPath;
+
+        ReshapedByBinding(Map<String, List<String>> byPath) {
+            super("binding the parameters changes the shape of " + byPath.keySet(), null, false, false);
+            this.byPath = byPath;
+        }
+    }
+
     /**
      * The change set of promoting {@code bundle} (a whole-Space bundle) into the Space whose config root is
      * {@code configRoot}, with {@code params} bound and {@code SPACE} = {@code spaceId}. Writes nothing.
@@ -144,6 +158,7 @@ public final class SpacePromotion {
         List<Change> changes = new ArrayList<>();
         List<Excluded> excluded = new ArrayList<>();
         Set<String> missing = new TreeSet<>(), used = new TreeSet<>(), broken = new TreeSet<>();
+        Map<String, List<String>> reshaped = new TreeMap<>();
         for (Map.Entry<String, byte[]> e : incoming.entrySet()) {
             String path = e.getKey();
             String why = refusal(root, path, referenced);
@@ -155,6 +170,10 @@ public final class SpacePromotion {
             used.addAll(usedBy.get(path));
             if (missingBy.get(path).isEmpty() && brokenByBinding(path, bundle.configEntries(), e.getValue()))
                 broken.add(path);
+            else if (missingBy.get(path).isEmpty()) {
+                List<String> by = reshapedBy(path, bundle.configEntries().get(path), e.getValue(), values, usedBy.get(path));
+                if (!by.isEmpty()) reshaped.put(path, by);
+            }
             if (isConnection(path) && holdsLiteralSecret(e.getValue())) {
                 excluded.add(new Excluded(path, "the bundle's connection carries a literal secret (or does not parse), "
                         + "which a promotion never writes — export it with secrets as references"));
@@ -193,6 +212,7 @@ public final class SpacePromotion {
         }
         if (!missing.isEmpty()) throw new MissingParameters(List.copyOf(missing));
         if (!broken.isEmpty()) throw new BrokenByBinding(List.copyOf(broken));
+        if (!reshaped.isEmpty()) throw new ReshapedByBinding(reshaped);
         changes.sort((a, b) -> a.path().compareTo(b.path()));
         return new ChangeSet(List.copyOf(changes), List.copyOf(excluded), List.copyOf(used), hash(changes));
     }
@@ -273,12 +293,58 @@ public final class SpacePromotion {
     }
 
     private static boolean parses(byte[] toon) {
+        return decoded(toon) != null;
+    }
+
+    private static Map<String, Object> decoded(byte[] toon) {
         try {
-            ConfigCodec.toMap(new String(toon, StandardCharsets.UTF_8));
-            return true;
+            return ConfigCodec.toMap(new String(toon, StandardCharsets.UTF_8));
         } catch (RuntimeException unparseable) {
-            return false;
+            return null;
         }
+    }
+
+    /**
+     * The parameters whose values change the shape of {@code path} (a {@code .toon} file that parses before and after
+     * binding): each is bound alone to find it, and when only their combination does it, every parameter it binds.
+     * Empty when the shape is kept.
+     */
+    private static List<String> reshapedBy(String path, byte[] before, byte[] bound, Map<String, String> values,
+                                           Set<String> used) {
+        if (!path.endsWith(".toon") || before == null || Arrays.equals(before, bound)) return List.of();
+        Map<String, Object> source = decoded(before), result = decoded(bound);
+        if (source == null || result == null || sameShape(source, result)) return List.of();
+        List<String> by = new ArrayList<>();
+        for (String name : used) {
+            Map<String, Object> one = decoded(bind(path, before, Map.of(name, values.get(name)), new TreeSet<>(), new TreeSet<>()));
+            if (one != null && !sameShape(source, one)) by.add(name);
+        }
+        return by.isEmpty() ? List.copyOf(used) : by;
+    }
+
+    /**
+     * Whether {@code bound} keeps the shape of {@code source}: an object where it has an object, with the same keys
+     * (a key holding a placeholder may be named by its value), a list where it has a list, as long, and a scalar where it
+     * has a scalar — of any type, so {@code 30} fills text as a number.
+     */
+    static boolean sameShape(Object source, Object bound) {
+        if (source instanceof Map<?, ?> s) {
+            if (!(bound instanceof Map<?, ?> b) || s.size() != b.size()) return false;
+            Iterator<? extends Map.Entry<?, ?>> bi = b.entrySet().iterator();
+            for (Map.Entry<?, ?> se : s.entrySet()) {
+                Map.Entry<?, ?> be = bi.next();
+                String key = String.valueOf(se.getKey());
+                if (!key.contains("${") && !key.equals(String.valueOf(be.getKey()))) return false;
+                if (!sameShape(se.getValue(), be.getValue())) return false;
+            }
+            return true;
+        }
+        if (source instanceof List<?> s) {
+            if (!(bound instanceof List<?> b) || s.size() != b.size()) return false;
+            for (int i = 0; i < s.size(); i++) if (!sameShape(s.get(i), b.get(i))) return false;
+            return true;
+        }
+        return !(bound instanceof Map<?, ?>) && !(bound instanceof List<?>);
     }
 
     /** {@code bytes} as strict UTF-8, or {@code null} when they are not text. */
@@ -324,6 +390,17 @@ public final class SpacePromotion {
         if (p.options() != null)
             p.options().forEach((k, v) -> { if (ConnectionProfile.isSecretKey(k)) out.add(v); });
         out.removeIf(s -> s == null || s.isEmpty());
+        return out;
+    }
+
+    /** The bundle's connection files that carry a literal secret (or do not parse), wherever they sit: never written,
+     *  but a held apply would store them in its Pending Change's recorded request. */
+    static List<String> literalSecretConnections(BundleImporter.Bundle bundle) {
+        List<String> out = new ArrayList<>();
+        bundle.configEntries().forEach((p, bytes) -> {
+            String path = p.replace('\\', '/');
+            if (isConnection(path) && holdsLiteralSecret(bytes)) out.add(path);
+        });
         return out;
     }
 

@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -79,6 +80,7 @@ class ControlApiSpacePromotionTest {
         DiscoveredRoots.clear();
         MetricRegistry.global().reset();
         System.clearProperty(SpacePromotion.PROPERTY);
+        System.clearProperty("jobs.audit.dir");
     }
 
     // ── fixtures ──
@@ -109,9 +111,16 @@ class ControlApiSpacePromotionTest {
     }
 
     private static String body(byte[] zip, Map<String, Object> extra) throws Exception {
+        return body(zip, Map.of(), extra);
+    }
+
+    /** As {@link #body(byte[], Map)}, with {@code params} bound beside {@code REGION}. */
+    private static String body(byte[] zip, Map<String, String> params, Map<String, Object> extra) throws Exception {
+        Map<String, String> all = new java.util.TreeMap<>(params);
+        all.put("REGION", "eu");
         ObjectNode n = JSON.createObjectNode();
         n.put("bundle", Base64.getEncoder().encodeToString(zip));
-        n.set("parameters", JSON.valueToTree(Map.of("REGION", "eu")));
+        n.set("parameters", JSON.valueToTree(all));
         extra.forEach((k, v) -> n.set(k, JSON.valueToTree(v)));
         return JSON.writeValueAsString(n);
     }
@@ -208,6 +217,23 @@ class ControlApiSpacePromotionTest {
         }
     }
 
+    /** {@code zip} with one more entry: a hand-made bundle (an export never carries a literal secret). */
+    private static byte[] withEntry(byte[] zip, String path, String text) throws Exception {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        try (ZipInputStream in = new ZipInputStream(new java.io.ByteArrayInputStream(zip));
+             ZipOutputStream out = new ZipOutputStream(bos)) {
+            for (ZipEntry e = in.getNextEntry(); e != null; e = in.getNextEntry()) {
+                out.putNextEntry(new ZipEntry(e.getName()));
+                out.write(in.readAllBytes());
+                out.closeEntry();
+            }
+            out.putNextEntry(new ZipEntry(path));
+            out.write(text.getBytes(StandardCharsets.UTF_8));
+            out.closeEntry();
+        }
+        return bos.toByteArray();
+    }
+
     private static byte[] dataSourceBundle() throws Exception {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         try (ZipOutputStream z = new ZipOutputStream(bos)) {
@@ -229,6 +255,65 @@ class ControlApiSpacePromotionTest {
                 assertTrue(r.body().contains("REGION") && !r.body().contains("\"SPACE\""), r.body());
             }
             assertTrue(Files.readString(c.config.resolve(ORDERS)).contains("v1"));
+        }
+    }
+
+    private static final String SHAPE = "registry/datasets/shape.toon";
+
+    /**
+     * SPACE-PROMOTION-PARAM-TYPES-1: a parameter value fills a value; one that makes it another kind of value (a list item
+     * an object, text a list or {@code {}}) while the file still parses refuses the change set, naming the parameter and
+     * the file. Nothing is written.
+     */
+    @Test
+    void aParameterValueThatChangesTheKindOfTheValueItFillsIs422NamingItAndTheFile(@TempDir Path root, @TempDir Path tmp)
+            throws Exception {
+        List<List<String>> cases = List.of(   // the file's text, the value of P
+                List.of("physicalRef: s/database\nlabels[1]:\n  - ${P}\n", "k: v"),
+                List.of("physicalRef: s/database\ndescription: ${P}\n", "[2]: a,b"),
+                List.of("physicalRef: s/database\ndescription: ${P}\n", ""),
+                List.of("physicalRef: s/database\ndescription: \"${P}\"\n", "[2]: a,b"));   // [N]: makes a key even in quotes
+        try (Ctx c = open(root)) {
+            for (int i = 0; i < cases.size(); i++) {
+                Path dir = tmp.resolve("case" + i);
+                write(dir.resolve("src-config"), SHAPE, cases.get(i).get(0));
+                byte[] zip = sourceBundle(dir);
+                for (String route : List.of("preview", "apply")) {
+                    HttpResponse<String> r = post(c.port, "/spaces/alpha/promotion/" + route, "admin",
+                            body(zip, Map.of("P", cases.get(i).get(1)), Map.of("previewHash", "x")));
+                    assertEquals(422, r.statusCode(), "case " + i + ", " + route + ": " + r.body());
+                    assertTrue(r.body().contains("reshapedByParameters") && r.body().contains(SHAPE)
+                            && r.body().contains("[\"P\"]"), "case " + i + ", " + route + ": " + r.body());
+                }
+            }
+            assertFalse(Files.exists(c.config.resolve(SHAPE)), "nothing was written");
+            assertTrue(Files.readString(c.config.resolve(ORDERS)).contains("v1"));
+        }
+    }
+
+    /**
+     * No false refusal: a scalar stays a scalar whatever its type ({@code 30} fills text as a number), a colon in text
+     * is text, and a quoted placeholder keeps a list item or an empty value text.
+     */
+    @Test
+    void aValueThatKeepsTheKindOfWhatItFillsPromotesAndAQuotedPlaceholderStaysText(@TempDir Path root, @TempDir Path tmp)
+            throws Exception {
+        write(tmp.resolve("src-config"), SHAPE, "physicalRef: s/database\ndescription: ${P}\nretentionDays: ${DAYS}\n"
+                + "labels[1]:\n  - \"${L}\"\nnote: \"${E}\"\n");
+        byte[] zip = sourceBundle(tmp);
+        Map<String, String> params = Map.of("P", "EU: west", "DAYS", "30", "L", "k: v", "E", "");
+        try (Ctx c = open(root)) {
+            HttpResponse<String> pr = post(c.port, "/spaces/alpha/promotion/preview", "admin", body(zip, params, Map.of()));
+            assertEquals(200, pr.statusCode(), pr.body());
+            HttpResponse<String> r = post(c.port, "/spaces/alpha/promotion/apply", "admin", body(zip, params,
+                    Map.of("previewHash", V1Body.of(pr.body()).get("changeSetHash").asText())));
+            assertEquals(200, r.statusCode(), r.body());
+            String text = Files.readString(c.config.resolve(SHAPE));
+            Map<String, Object> landed = com.gamma.config.io.ConfigCodec.toMap(text);
+            assertEquals("EU: west", landed.get("description"), text);
+            assertInstanceOf(Number.class, landed.get("retentionDays"), text);
+            assertEquals(List.of("k: v"), landed.get("labels"), text);
+            assertEquals("", landed.get("note"), text);
         }
     }
 
@@ -415,7 +500,7 @@ class ControlApiSpacePromotionTest {
     static Path auditDir;
 
     @Test
-    void underAnApprovalPolicyApplyIsOnePendingChangeAndLandsOnlyOnApproval(@TempDir Path cfg, @TempDir Path writeRoot,
+    void underAnApprovalPolicyApplyIsOnePendingChangeLandsOnlyOnApprovalAndNeverHoldsALiteralSecret(@TempDir Path cfg, @TempDir Path writeRoot,
                                                                            @TempDir Path tmp) throws Exception {
         System.setProperty("jobs.audit.dir", auditDir.resolve("jobs_audit").toString());
         byte[] zip = sourceBundle(tmp);
@@ -437,6 +522,20 @@ class ControlApiSpacePromotionTest {
             assertEquals(200, pr.statusCode(), pr.body());
             JsonNode p = V1Body.of(pr.body());
             assertEquals("pending-change", p.get("approval").asText());
+
+            // SPACE-PROMOTION-PARAM-TYPES-1 (2): a held apply records its request, bundle included, so a hand-made bundle
+            // whose connection carries a literal secret is refused before it is held - nothing is stored
+            byte[] secret = withEntry(zip, "connections/db_connection.toon",
+                    "connection:\n  id: db\n  connector: postgres\n  host: h\n  password: hunter2\n");
+            JsonNode sp = V1Body.of(post(port, "/promotion/preview", ADMIN, body(secret, Map.of())).body());
+            HttpResponse<String> refused = post(port, "/promotion/apply", ADMIN,
+                    body(secret, Map.of("previewHash", sp.get("changeSetHash").asText())));
+            assertEquals(422, refused.statusCode(), refused.body());
+            assertTrue(refused.body().contains("connections/db_connection.toon"), refused.body());
+            Path pending = writeRoot.resolve("pending-changes");
+            if (Files.isDirectory(pending)) try (var files = Files.list(pending)) {
+                assertEquals(List.of(), files.toList(), "nothing was held");
+            }
 
             HttpResponse<String> held = post(port, "/promotion/apply", ADMIN,
                     body(zip, Map.of("previewHash", p.get("changeSetHash").asText(), "removals", true)));

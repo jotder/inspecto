@@ -42,8 +42,9 @@ import java.util.Map;
  *       policy ONE Pending Change for the whole set (202), else writes it at once.</li>
  * </ul>
  * Both {@code canAdminister}. Gate order: kill switch / no config root 503 → body 400 (413 over
- * {@link #MAX_BODY}) → not a whole-Space bundle or a placeholder without a value 422 → a promoted Pipeline escaping
- * the allowed roots 422 → a kind the caller may not write 403 → stale 409 → hold 202 → write 200.
+ * {@link #MAX_BODY}) → not a whole-Space bundle, a placeholder without a value, or a value that makes a file unreadable
+ * or changes its shape 422 → a promoted Pipeline escaping the allowed roots 422 → a kind the caller may not write 403 →
+ * stale 409 → under a policy, a bundle connection carrying a literal secret 422 → hold 202 → write 200.
  */
 final class SpacePromotionRoutes implements RouteModule {
 
@@ -136,6 +137,15 @@ final class SpacePromotionRoutes implements RouteModule {
         return ApiContext.respondJson(e, 422, refusal);
     }
 
+    private static Object reshaped(HttpExchange e, SpacePromotion.ReshapedByBinding reshaped) throws IOException {
+        Map<String, Object> refusal = new LinkedHashMap<>();
+        refusal.put("error", "a parameter value changes the shape of the file it fills (" + reshaped.byPath + "): it makes "
+                + "text or a list item a list or an object, or renames a key; a value fills a value and never adds structure "
+                + "(quote the placeholder, \"${NAME}\", to keep a value with ': ' or an empty value text); nothing was written");
+        refusal.put("reshapedByParameters", reshaped.byPath);
+        return ApiContext.respondJson(e, 422, refusal);
+    }
+
     private Object preview(ApiContext api, HttpExchange e) throws IOException {
         Path root = configRoot(api);
         Request r = request(api, e, false);
@@ -147,6 +157,8 @@ final class SpacePromotionRoutes implements RouteModule {
             return missing(e, m);
         } catch (SpacePromotion.BrokenByBinding b) {
             return broken(e, b);
+        } catch (SpacePromotion.ReshapedByBinding s) {
+            return reshaped(e, s);
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("space", space);
@@ -181,6 +193,8 @@ final class SpacePromotionRoutes implements RouteModule {
             return missing(e, m);
         } catch (SpacePromotion.BrokenByBinding b) {
             return broken(e, b);
+        } catch (SpacePromotion.ReshapedByBinding s) {
+            return reshaped(e, s);
         }
         List<SpacePromotion.Change> applied = new ArrayList<>(cs.of("add"));
         applied.addAll(cs.of("change"));
@@ -202,6 +216,15 @@ final class SpacePromotionRoutes implements RouteModule {
 
         if (!cs.hash().equals(r.previewHash())) throw stale();
         if (applied.isEmpty()) return result(space, cs, List.of(), List.of(), r.removals());
+
+        // A held apply records this request, bundle included, for the replay: a literal secret it carries (a hand-made
+        // bundle; never written) would be stored there, so under a policy it is refused before the hold
+        List<String> secrets = SpacePromotion.literalSecretConnections(r.bundle());
+        if (!secrets.isEmpty() && ApprovalPolicy.forRoot(root).forWholeSet() != null)
+            return ApiContext.respondJson(e, 422, Map.of("error", "the bundle's connection(s) " + secrets + " carry a literal "
+                    + "secret (or do not parse); a held promotion stores its request, so it never takes one - export the "
+                    + "Space with secrets as references, or leave those files out; nothing was written or held",
+                    "literalSecrets", secrets));
 
         // D-SE7: under any approval policy the whole set is ONE Pending Change (202); approval replays this request
         PendingChanges.hold(api, e, SpacePromotion.KIND, space, SpacePromotion.proposed(space, cs, applied),

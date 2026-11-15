@@ -348,8 +348,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/pipelines/authored/([^/]+)/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java:78` |
 | POST | `/pipelines/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineBundleRoutes.java:100` |
 | POST | `/pipelines/rename/resume` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineRenameRoutes.java:57` |
-| POST | `/promotion/apply` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpacePromotionRoutes.java:57` |
-| POST | `/promotion/preview` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpacePromotionRoutes.java:56` |
+| POST | `/promotion/apply` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpacePromotionRoutes.java:58` |
+| POST | `/promotion/preview` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpacePromotionRoutes.java:57` |
 | POST | `/public/dashboards/([^/]+)/query` | exempt | self-verifying-public | `inspecto/src/main/java/com/gamma/control/ShareRoutes.java:58` |
 | POST | `/public/delivery-status/([^/]+)` | exempt | self-verifying-public | `inspecto/src/main/java/com/gamma/control/DeliveryStatusRoutes.java:70` |
 | POST | `/queries/([^/]+)/run` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/QueryRoutes.java:49` |
