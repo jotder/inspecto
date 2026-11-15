@@ -9,7 +9,7 @@ timestamp: 2026-11-08T00:00:00Z
 # Link Analysis logistics cargo theft showcase — user guide
 
 Screens and controls are the shared Link Analysis ones: see the
-[Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md). Installing the Space is in the
+[Link Analysis user guide](../../module/la-core/user-guide.md). Installing the Space is in the
 [admin guide](admin-guide-install.md). Everything here is synthetic. Carriers, drivers, warehouses, places,
 shippers and consignees are invented. Cities are real only as city names. Phone numbers are in the UK's reserved
 drama ranges (`07700 900…`, `0113 496 0…` and so on).

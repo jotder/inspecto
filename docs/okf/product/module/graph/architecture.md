@@ -13,7 +13,7 @@ It is plain JDK with no dependency on any other Inspecto module.
 It began as a port of the Link Analysis SPA's algorithms and was moved into the platform by the
 analytics core plan (decision D-AN2) so Fraud, AML and Case Management can use it without depending
 on Link Analysis. The backend description of Link Analysis, which is its main caller, is
-[link-analysis (backend)](../la-core/architecture-backend.md).
+[link-analysis (backend)](../la-core/architecture.md).
 
 ## 2. Who uses it
 

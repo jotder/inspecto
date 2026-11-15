@@ -9,7 +9,7 @@ timestamp: 2026-11-08T00:00:00Z
 # Link Analysis provider billing fraud showcase — user guide
 
 Screens and controls are the shared Link Analysis ones: see the
-[Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md). Installing the Space is in the
+[Link Analysis user guide](../../module/la-core/user-guide.md). Installing the Space is in the
 [admin guide](admin-guide-install.md). Everything here is synthetic: names, practice names, streets and bank
 accounts (`SYN-…`) are invented, the procedure codes are this showcase's own (not any real code set), map positions
 are random points around a city centre, and only city names are real.

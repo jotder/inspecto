@@ -1,14 +1,20 @@
 ---
 type: Reference
-title: "Link Analysis — API"
-description: "Control-plane routes for Link Analysis, with their gates."
-tags: [la-core, link-analysis, api]
-timestamp: 2026-10-19T00:00:00Z
+title: Link Analysis — API
+description: Control-plane routes for Link Analysis, grouped, with the request gate order; the full route table with write capabilities is architecture.md section 6.
+tags: [module, la-core, link-analysis, api]
+timestamp: 2026-11-15T00:00:00Z
 ---
 
 # Link Analysis — API
 
-Routes for Link Analysis. Design and internals: [Link Analysis architecture](architecture.md).
+- [Routes by group](#routes-by-group) · [Gate order](#gate-order)
+
+Routes for Link Analysis. Design and internals: [Link Analysis architecture](architecture.md); the full route table
+with the write capability of each area is [architecture §6](architecture.md#6-http-surface-la-api-geo-link), and the
+gate order in detail is [§6.1](architecture-http-and-ui.md#61-gate-order-for-an-inv-request).
+
+## Routes by group
 
 Grouped; the authoritative list is each module's `META-INF/inspecto/module.toon`.
 
@@ -22,5 +28,7 @@ Grouped; the authoritative list is each module's `META-INF/inspecto/module.toon`
 | Graph, index | `GET /inv/graph/algorithms`, `POST /inv/graph/runs`, `GET /inv/index`, `POST /inv/index/builds` |
 | Entities | `/inv/entity-types`, `DELETE /inv/entity-types/{id}` (an unused Entity Type; `canAuthorWorkbench`; 409 names the Dataset columns, live Entity Lists or Investigations that still use it, or refuses the last type), `/inv/entity-identities`, `/inv/entities/{type}/{key}/profile` |
 | geo-link | `.../measures`, `/data-changes`, `/alert-rules`, `/standing-detection` |
+
+## Gate order
 
 Request gate order: authenticate -> rate limit -> ABAC -> module enabled -> capability -> open gate (member, policy).

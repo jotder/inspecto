@@ -9,7 +9,7 @@ timestamp: 2026-11-08T00:00:00Z
 # Link Analysis police showcase — user guide
 
 Screens and controls are the shared Link Analysis ones: see the
-[Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md). Installing the Space is in the
+[Link Analysis user guide](../../module/la-core/user-guide.md). Installing the Space is in the
 [admin guide](admin-guide-install.md). Everything here is synthetic: names, streets, plates (`ZX …`), serials,
 handset IMEIs and phone numbers (Ofcom drama ranges `07700 900xxx` and `0113`, `0114`, `0115`, `0116`, `0161`
 `496 0xxx`) are invented; only the cities are real, and only at city level.

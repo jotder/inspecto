@@ -20,7 +20,7 @@ tags: [product-item, module]
 | architecture | current | [Link analysis storage - architecture](architecture.md) |
 | features | current | [Link analysis storage — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | n/a | no screens of its own - the index tool and staleness badges are documented in the la-core user guide (la-core/user-guide-link-analysis.md) |
+| user-guide | n/a | no screens of its own - the index tool and staleness badges are documented in the la-core user guide (la-core/user-guide.md) |
 | admin-guide | current | [Link analysis storage - admin guide](admin-guide.md) |
 | api | n/a | no HTTP routes and no SPI - an internal library called only by la-api, whose index routes are in la-api/api-routes.md |
 | tests | current | [Link Analysis edge index — 10^9 scale run plan (clause 3 of `LA-INDEX-SCALE-MEASURE-1`)](tests-index-scale-run.md) · [Link analysis storage — tests inventory](tests-inventory.md) |

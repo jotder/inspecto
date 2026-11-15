@@ -21,7 +21,7 @@ Fraud, AML and claims investigators.
 ## Key capabilities
 
 - 94 routes across investigations and geo — [feature-db](feature-db.md)
-- Studio features — [Link Analysis features](../../module/la-core/features-link-analysis.md)
+- Studio features — [Link Analysis features](../../module/la-core/features.md)
 - Offline geo map — [geo-link](../../module/geo-link/index.md)
 
 ## Related hubs

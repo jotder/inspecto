@@ -69,7 +69,7 @@ BACKLOG". The coordinator re-checked it and found `LA-19` in `docs/BACKLOG.md`, 
 | `module/screening/user-guide-screening.md` | user-guide | 5 | 0 |
 | `module/telecom-asn1/architecture.md` | architecture | 24 | 0 |
 | `module/entity-list/architecture.md` | architecture | 16 | 0 |
-| `module/la-core/features-link-analysis.md` | features | 22 | 0 |
+| `module/la-core/features.md` | features | 22 | 0 |
 
 ## Wrong claims and corrections (all fixed in place)
 

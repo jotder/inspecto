@@ -9,7 +9,7 @@ timestamp: 2026-11-08T00:00:00Z
 # Link Analysis mobile financial services fraud showcase — user guide
 
 Screens and controls are the shared Link Analysis ones: see the
-[Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md). Installing the Space is in the
+[Link Analysis user guide](../../module/la-core/user-guide.md). Installing the Space is in the
 [admin guide](admin-guide-install.md). Everything here is synthetic. Wallet numbers (MSISDNs) are in the unassigned `+999`
 range. Agent, merchant and area names are invented, and so are the bank accounts. No real operator, agent, merchant or bank
 appears. Amounts have no currency. Wallet anti-money-laundering (structuring, mule chains, a device farm) is in the

@@ -13,7 +13,7 @@ for trade-based money laundering. This Space holds a synthetic company register 
 and their bills of lading (B/L), where each of 300 vessels was every day, a monthly reference price per HS code and the
 payments between the companies' accounts. Four stories are planted in it; each has a benign look-alike that must not
 be mistaken for it. Screens and controls are the shared Link Analysis ones: see the
-[Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md). Install: [admin guide](admin-guide-install.md).
+[Link Analysis user guide](../../module/la-core/user-guide.md). Install: [admin guide](admin-guide-install.md).
 
 Everything is synthetic. No company, person, vessel, port, street or container is real. Countries are real (the
 two-letter code after each port name), and HS codes are real codes of the public Harmonized System with invented prices.
@@ -170,4 +170,4 @@ its buyers have their own directors, so the rule does not count them; without `C
 
 ## References
 
-[Brochure](brochure.md) · [Install](admin-guide-install.md) · [Architecture](architecture.md) · [Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md)
+[Brochure](brochure.md) · [Install](admin-guide-install.md) · [Architecture](architecture.md) · [Link Analysis user guide](../../module/la-core/user-guide.md)

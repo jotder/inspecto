@@ -28,7 +28,7 @@ the design history is `docs/archived-documents/plans-archive/rbac-abac-plan.md`.
 Proven live against WSO2 Identity Server 7.3.0 and Keycloak
 (`providers/inspecto-oidc/src/test/java/com/gamma/oidc/OidcAgainstRealProviderTest.java`,
 `providers/inspecto-oidc/src/test/java/com/gamma/oidc/OidcKeycloakAgainstRealProviderTest.java`; runbook
-[admin-guide-real-signin](../la-core/admin-guide-real-signin.md)).
+[admin-guide](../la-core/admin-guide.md#2-real-oidc-sign-in-runbook-la-app-local-wso2-identity-server)).
 
 ## Decided
 

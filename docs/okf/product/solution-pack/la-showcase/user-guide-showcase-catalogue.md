@@ -15,7 +15,7 @@ truth. Every story has a benign look-alike that must not join it; the user guide
 real people, businesses or plates.
 
 This page helps you pick one. The screens are the shared studio ones, described in the
-[Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md). How the catalogue is built and shipped:
+[Link Analysis user guide](../../module/la-core/user-guide.md). How the catalogue is built and shipped:
 [catalogue architecture](architecture.md); building and boot-testing a release:
 [release guide](admin-guide-showcase-release.md).
 
@@ -169,4 +169,4 @@ the industry Spaces land.
 ## References
 
 [la-showcase hub](index.md) · [Distribution and install layout](architecture.md#distribution-and-install-layout) ·
-[Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md)
+[Link Analysis user guide](../../module/la-core/user-guide.md)

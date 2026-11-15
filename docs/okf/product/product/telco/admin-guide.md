@@ -38,8 +38,7 @@
 
 - [Geo and link adapters — admin guide](../../module/geo-link/admin-guide.md)
 - [Link analysis and geo routes - admin guide](../../module/la-api/admin-guide.md)
-- [Inspecto LA (Link Analysis) demo runbook (rehearsable, stakeholder presentation)](../../module/la-core/admin-guide-demo.md)
-- [Inspecto LA - the Link Analysis level, the Investigations add-on and the masking default](../../module/la-core/admin-guide-la-level.md)
-- [Inspecto LA (Link Analysis) real OIDC sign-in runbook (`la-app`, local WSO2 Identity Server)](../../module/la-core/admin-guide-real-signin.md)
+- [Inspecto LA demo kit - runbook and stakeholder Q&A](../../module/la-core/admin-guide-demo.md)
+- [Inspecto LA - administration (LA level, Investigations add-on, masking default, real OIDC sign-in)](../../module/la-core/admin-guide.md)
 - [Link analysis storage - admin guide](../../module/la-storage/admin-guide.md)
 - [Link analysis PostgreSQL store - admin guide](../../module/la-store-pg/admin-guide.md)

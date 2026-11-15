@@ -10,7 +10,7 @@ timestamp: 2026-10-19T00:00:00Z
 # Link analysis and geo routes - admin guide
 
 Deployment walkthroughs for the whole product: [la-core demo admin guide](../la-core/admin-guide-demo.md) and
-[real sign-in](../la-core/admin-guide-real-signin.md). This page covers what la-api itself reads.
+[real sign-in](../la-core/admin-guide.md#2-real-oidc-sign-in-runbook-la-app-local-wso2-identity-server). This page covers what la-api itself reads.
 
 ## Install and enable
 
@@ -34,7 +34,7 @@ sign-in, so masking there is display-only.
 
 Every limit key with its default and range: `GET /settings/link-analysis/limits`, catalogue
 `platform/inspecto-entity-store/src/main/java/com/gamma/entitystore/LaLimit.java`, table in
-[la-core architecture-backend](../la-core/architecture-backend.md) §9. Values outside a key's range are refused 422 on write and read as
+[la-core architecture](../la-core/architecture.md) §9. Values outside a key's range are refused 422 on write and read as
 the default if hand-edited.
 
 Most-used SPACE keys: `index.max_age_hours` (24), `index.traversal_depth` (2), `index.frontier_cap` (20),
@@ -46,7 +46,7 @@ INSTALL keys: `graph_run.threads` (2) / `queue` (16), `index.threads` (1) / `que
 ## Secure
 
 - Embed links are bearer tokens: keep `-Dla.embed.enabled` off unless a portal needs them; the per-Space frame
-  allow-list and TTLs bound them ([la-core architecture-http-surface](../la-core/architecture-http-surface.md) §6.2).
+  allow-list and TTLs bound them ([la-core architecture-http-and-ui](../la-core/architecture-http-and-ui.md) §6.2).
 - Investigation access is membership-based; non-members see 404. The Advanced PDP (`providers/inspecto-policy`) can only
   narrow.
 - Audit rows use the `LINK_*` event types; tokens are redacted.

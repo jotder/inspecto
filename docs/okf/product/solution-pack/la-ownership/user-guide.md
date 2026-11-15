@@ -11,7 +11,7 @@ timestamp: 2026-11-07T00:00:00Z
 A KYC and sanctions-compliance team at a bank checks who really owns and runs its corporate customers. This Space
 holds a synthetic company register, the bank's customers and their payments, and an **invented** sanctions list. Four
 stories are planted in it; each has a benign look-alike that must not be mistaken for it. Screens and controls are
-the shared Link Analysis ones: see the [Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md).
+the shared Link Analysis ones: see the [Link Analysis user guide](../../module/la-core/user-guide.md).
 Install: [admin guide](admin-guide-install.md).
 
 Everything is synthetic. No company, person, address or sanctions-list name is real.
@@ -151,4 +151,4 @@ him. Without `PER-03904` the rule would not fire at all.
 
 ## References
 
-[Brochure](brochure.md) · [Install](admin-guide-install.md) · [Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md)
+[Brochure](brochure.md) · [Install](admin-guide-install.md) · [Link Analysis user guide](../../module/la-core/user-guide.md)

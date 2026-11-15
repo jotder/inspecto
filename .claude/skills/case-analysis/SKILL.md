@@ -19,7 +19,7 @@ check `docs/GLOSSARY.md` before naming anything (Entity List, Expectation, Decis
 |---|---|
 | Case model, routes, permissions | `module/case-management/architecture.md` (add-on index: `addon/caseManagement/index.md`) |
 | Case Rules within Incidents | `addon/incidents/plan-incidents.md` (Case Rules section) |
-| Link analysis (investigations, graph) | `module/la-core/architecture.md`, `module/la-core/user-guide-link-analysis.md`, `module/la-core/user-guide-investigation-pivot.md` |
+| Link analysis (investigations, graph) | `module/la-core/architecture.md`, `module/la-core/user-guide.md` (§6.3 pivot between graph and map), `module/la-core/architecture-records.md` |
 | Scoring + Decision kernel | `module/scoring/architecture.md`, `module/scoring/spec-risk-scores.md`, `module/scoring/architecture.md` |
 | Entity Lists | `module/entity-list/spec.md` |
 | Screening | `module/screening/architecture.md`, `module/screening/spec.md` |
@@ -50,7 +50,7 @@ request. Handlers: `features/inspecto-case-management/src/main/java/com/gamma/op
    threshold) or by `POST /cases/from-entities`?
 2. **What is in it?** List member Incidents and linked objects (`/objects/{id}/graph`).
 3. **Who is connected?** Open or attach an LA investigation; pivot per
-   `user-guide-investigation-pivot.md`; run a graph algorithm only when asked (it is a Run).
+   `user-guide.md`; run a graph algorithm only when asked (it is a Run).
 4. **How risky?** Read risk / anomaly scores for the key entities; explain them via the Decision kernel spec.
 5. **Listed / sanctioned?** Entity List match and screening hits; deciding a hit is a mutating action —
    never decide without the operator's go-ahead.

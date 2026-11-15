@@ -12,7 +12,7 @@
   run on `127.0.0.1:8111` with Demo Users. Spaces: `la-showcase` and `la-claims` (scaffolded, then seeded with
   `tools/seed-la-showcase.mjs --apply` and `tools/seed-la-claims.mjs --apply`), plus one Space created in the test.
 - **Method:** a headless Chrome driven step by step (click, type, read the page text, screenshot at 1440 × 900), acting as
-  an end user with only the screens and the [user guide](../okf/product/module/la-core/user-guide-link-analysis.md).
+  an end user with only the screens and the [user guide](../okf/product/module/la-core/user-guide.md).
 - **The full cycle (Demo Admin):** Create a Space *Bank transfers* (Generic) → Add data `transfers.csv` (461 invented
   rows: a mule chain, one busy merchant, four dirty rows) → say what the columns hold → Add details `accounts.csv`
   (138 rows) → Start a graph from `MULE-HUB-01` → Expand → quick questions → Save the Investigation → step log →

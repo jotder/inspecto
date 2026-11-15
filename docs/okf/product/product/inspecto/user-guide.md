@@ -19,8 +19,7 @@
 ## Link Analysis
 
 - [Geo Map Analysis](../../module/geo-link/user-guide-geo-map.md)
-- [Investigation Pivot](../../module/la-core/user-guide-investigation-pivot.md)
-- [Link Analysis — User Guide](../../module/la-core/user-guide-link-analysis.md)
+- [Link Analysis — User Guide](../../module/la-core/user-guide.md)
 
 ## The Space Templates it ships
 

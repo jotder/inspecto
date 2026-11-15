@@ -20,7 +20,7 @@ tags: [product-item, module]
 | architecture | current | [Link analysis and geo routes - architecture](architecture.md) |
 | features | current | [Link analysis and geo routes — features](features.md) |
 | feature-db | current | [Link analysis and geo routes — feature database](feature-db.md) |
-| user-guide | n/a | no screens of its own - the Link Analysis screens these routes serve are documented in the la-core hub (la-core/user-guide-link-analysis.md) |
+| user-guide | n/a | no screens of its own - the Link Analysis screens these routes serve are documented in the la-core hub (la-core/user-guide.md) |
 | admin-guide | current | [Link analysis and geo routes - admin guide](admin-guide.md) |
 | api | current | [HTTP routes — module.la-api](api-routes.md) |
 | tests | current | [Link analysis and geo routes — tests inventory](tests-inventory.md) |

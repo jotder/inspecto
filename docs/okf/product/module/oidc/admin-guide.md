@@ -68,7 +68,7 @@ INSPECTO_JAVA_OPTS=-Dauth.oidc.rolesClaim=groups
 
 The WSO2 application must issue JWT access tokens (`ext_token_type: JWT`) and list roles under
 `accessTokenAttributes`; display names need a `name` or `preferred_username` claim. Full walk-through:
-[admin-guide-real-signin](../la-core/admin-guide-real-signin.md) and `docs/api/deployment/README.md`.
+[admin-guide](../la-core/admin-guide.md#2-real-oidc-sign-in-runbook-la-app-local-wso2-identity-server) and `docs/api/deployment/README.md`.
 
 ## 3. Certificates and truststore
 

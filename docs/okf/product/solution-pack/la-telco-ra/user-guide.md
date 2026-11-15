@@ -9,7 +9,7 @@ timestamp: 2026-11-08T00:00:00Z
 # Link Analysis telecom revenue assurance showcase — user guide
 
 Screens and controls are the shared Link Analysis ones: see the
-[Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md). Installing the Space is in the
+[Link Analysis user guide](../../module/la-core/user-guide.md). Installing the Space is in the
 [admin guide](admin-guide-install.md). Everything here is synthetic. Subscriber numbers (MSISDNs) are in the unassigned
 `+999` range, IMSIs use the `001-01` test network, and dealer and firm names are invented. Cities are real only as city
 names, and countries appear only as call destinations. Premium-rate ranges exist in every country: the three in the

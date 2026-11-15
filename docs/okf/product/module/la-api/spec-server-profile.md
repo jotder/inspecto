@@ -102,4 +102,4 @@ Verdict: **the tail goes with the first job burst after boot.** N10 did not remo
 - **N9 decision:** audit append stays per-event durable; the Parquet flush moved off the lock as journal segments
   ([`../event/architecture.md`](../event/architecture.md)). The first-job-burst-after-boot tail is accepted as a cold-start cost.
 - History and every run: `archived-documents/plans-archive/la-performance-plan.md`. Browser side and the measured
-  no-gos: [`../la-core/spec-performance.md`](../la-core/spec-performance.md).
+  no-gos: [`../la-core/spec.md#performance`](../la-core/spec.md#performance).

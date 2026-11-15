@@ -9,7 +9,7 @@ timestamp: 2026-11-08T00:00:00Z
 # Link Analysis benefits and tax fraud showcase — user guide
 
 Screens and controls are the shared Link Analysis ones: see the
-[Link Analysis user guide](../../module/la-core/user-guide-link-analysis.md). Installing the Space is in the
+[Link Analysis user guide](../../module/la-core/user-guide.md). Installing the Space is in the
 [admin guide](admin-guide-install.md). Everything here is synthetic: names, streets, phones (Ofcom drama ranges)
 and bank accounts (`SYN-…`) are invented, map positions are random points around a city centre, and only city names
 are real. The 200-a-month limit on permitted earnings is this showcase's own figure, not any country's.

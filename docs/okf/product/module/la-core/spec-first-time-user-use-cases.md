@@ -14,8 +14,8 @@ timestamp: 2026-10-24T00:00:00Z
 `LA-ONBOARD-RESIDUALS-1` (open for its demand-gated items).** Each use case below carries an **As built** line
 (checked against `inspecto-ui/projects/la-app` and `projects/link-analysis` on 2026-10-24) with the on-screen
 names; **Today** keeps the 2026-10-22 walkthrough state the work started from. The acceptance drive is
-[`tests-onboarding-live-drive.md`](tests-onboarding-live-drive.md) (Basic: first graph 2 min 40 s after first
-launch); the as-built design is [architecture-masking](architecture-masking.md) §3.4, [architecture-data-onboarding](architecture-data-onboarding.md) §6.10-§6.13.
+[`tests-live-drives.md#onboarding-acceptance-drive-la-onboard-1-2026-10-22`](tests-live-drives.md#onboarding-acceptance-drive-la-onboard-1-2026-10-22) (Basic: first graph 2 min 40 s after first
+launch); the as-built design is [architecture](architecture.md#34-masking) §3.4, [architecture-data-onboarding](architecture-data-onboarding.md) §6.10-§6.13.
 
 **Evidence.** On 2026-10-22 a fresh Basic bundle (`la-app` UI, master `cb4feedd9`) was started on an empty Spaces
 root and driven as a first-time user with a synthetic mobile-money file pair (`transfers.csv` 2,215 rows,
@@ -31,8 +31,8 @@ the one verb for creating a data origin (GLOSSARY).
 
 Related: [DATA-TIERS-1 plan](../../../../superpower/data-tier-editions-plan.md) ·
 [LA-ONBOARD-1 plan](../../../../archived-documents/plans-archive/la-onboarding-plan.md) ·
-[ONBOARDING-FIRST-RUN-1 console plan](../../../../archived-documents/plans-archive/first-run-onboarding-plan.md) · [user guide](user-guide-link-analysis.md) ·
-[Space guide steps](user-guide-link-analysis.md#31-the-getting-started-page) · [GLOSSARY](../../../../GLOSSARY.md).
+[ONBOARDING-FIRST-RUN-1 console plan](../../../../archived-documents/plans-archive/first-run-onboarding-plan.md) · [user guide](user-guide.md) ·
+[Space guide steps](user-guide.md#31-the-getting-started-page) · [GLOSSARY](../../../../GLOSSARY.md).
 
 ---
 
@@ -237,7 +237,7 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   no row for (a local hide: undoable; *Show all* brings back only what the filter hid; nothing recorded; the explorer only - an Investigation hides by its
   own recorded ops). Verified by specs (`reference-details.spec`, the node dialog, the filter, the Link Analysis
   component over a drawn graph), each mutation-checked; not driven live (the lane's backend had no Link Analysis
-  module). Detail: `la-core/architecture-masking.md` (*Reference details on nodes*).
+  module). Detail: `la-core/architecture.md#34-masking` (*Reference details on nodes*).
 - **As built: colour and coverage (`LA-REFERENCE-DETAILS-MORE-1`, 2026-11-06; every edition) - UC-04 verified.**
   **⚙ Settings ▸ Display rules** offers a Reference's detail columns (*Details in accounts*) for the nodes of its Entity
   Type. The values are read through the masked `POST /inv/reference-rows`, batched over the drawn nodes. A masked value is
@@ -246,7 +246,7 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   not." These counts come from `GET /datasets/{id}/coverage`, which is bounded, returns counts only and never counts over a column masked for the viewer. Verified by
   `ControlApiDatasetCoverageTest` over a synthetic pair and by specs (masking, a node without a row, the counts), each
   mutation-checked.
-  Detail: `la-core/architecture-masking.md` (*Colour by a Reference detail, and the coverage line*).
+  Detail: `la-core/architecture.md#34-masking` (*Colour by a Reference detail, and the coverage line*).
 
 ### UC-05 Use a Dataset that a Pipeline already builds
 

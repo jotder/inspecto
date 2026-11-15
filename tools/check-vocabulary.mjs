@@ -167,8 +167,8 @@ const DOC_ALLOW = {
     // and moved to docs/archived-documents/plans-archive/ (a permanently unscanned tier). The
     // stale-allowlist rule named both the moment the file left this scope — the self-retirement working as
     // designed, rather than two exemptions quietly outliving the debt they described.
-    'docs/okf/product/module/la-core/user-guide-link-analysis.md::source-acquisition-entity':
-        'Different concept: link-analysis "Sources" are `GraphSource` renderer feeds, not acquisition entities.',
+    'docs/okf/product/module/la-core/architecture-records.md::source-acquisition-entity':
+        'Different concept: the link Mapping form\'s Source/Target endpoint fields (a link\'s two ends), not acquisition entities.',
     // A `grammar-config.md::source-acquisition-entity` entry lived here for one commit (2026-08-26). It is
     // gone because the OPERATOR TOOK THE RENAME instead of the exemption: the schema-fields editor's column
     // is headed **Selector** now — exactly the `raw.fields[].selector` it renders — so the doc describing it

@@ -1,17 +1,29 @@
-# Inspecto LA (Link Analysis) demo runbook (rehearsable, stakeholder presentation)
+---
+type: Guide
+title: Inspecto LA demo kit - runbook and stakeholder Q&A
+description: The rehearsable stakeholder demo of the standalone Inspecto LA app (pre-flight, scenes S1-S15, short version, rehearsal records, real-feed lessons, the technical review cut) and the presenter Q&A leave-behind with evidence and confidence per answer.
+tags: [module, la-core, link-analysis, demo, presales, admin-guide]
+timestamp: 2026-11-15T00:00:00Z
+---
 
-*Status: written 2026-10-12 from the code, the seed script and the tests on `origin/master`; §0 (package flags,
-Spaces, Space Templates, Demo Users) re-checked against `package.ps1`, the seed scripts and `spaces/_templates` on 2026-10-24. A scene marked
-**UNVERIFIED (rehearse first)** has no test or smoke probe behind one of its claims. Rehearse the whole script once
-on the exact bundle you will present, then again the evening before.*
+# Inspecto LA demo kit - runbook and stakeholder Q&A
+
+*Runbook written 2026-10-12 from the code, the seed script and the tests on `origin/master`; §0 (package flags,
+Spaces, Space Templates, Demo Users) re-checked against `package.ps1`, the seed scripts and `spaces/_templates` on
+2026-10-24. Q&A (§10) written 2026-10-12 against `22ccbe952`. A scene marked **UNVERIFIED (rehearse first)** has no
+test or smoke probe behind one of its claims. Rehearse the whole script once on the exact bundle you will present,
+then again the evening before.*
+
+- §0-§3 pre-flight, day-of checklist, the script (S1-S15), ten-minute version · §4 claims we do not make ·
+  §5 contradictions between sources · §6-§7 rehearsal records · §8 a private showcase on a real feed ·
+  §9 technical / security review cut (T1-T13) · [§10 stakeholder Q&A](#10-stakeholder-qa)
 
 What this is: the step-by-step script for presenting the Inspecto LA demo on the **standalone Inspecto LA app
-bundle**. It defends the architecture page ([`okf/product/module/la-core/architecture-backend.md`](architecture-backend.md),
-cited below as "arch §n") with the running application. The claim-to-evidence map and the requirement ids (DR-*) are in
+bundle**. It defends the architecture page ([`architecture.md`](architecture.md), cited below as "arch §n") with the running application. The claim-to-evidence map and the requirement ids (DR-*) are in
 the archived [demo readiness plan](../../../../archived-documents/plans-archive/la-demo-readiness-plan.md) (all built by 2026-10-13; history only). The
 technical / security review cut of this script (T1-T13) is section 9 below: rehearsed by the
 assistant alone on 2026-10-24, the sceptical-reviewer rehearsal is still owed. Every control label below is the
-one on screen (see the [user manual](user-guide-link-analysis.md)). The variants (Personal bundle, Postgres
+one on screen (see the [user guide](user-guide.md)). The variants (Personal bundle, Postgres
 store) are in the [showcase variants runbook](../../solution-pack/la-showcase/admin-guide-variants-runbook.md).
 
 ---
@@ -262,7 +274,7 @@ unless you tell it not to.** Anyone who reads that log can open the link until i
 * give that log the retention you would give a credential, and do not ship it to a third-party log service unmasked;
 * a leaked link is revoked at once from the Share panel (or `POST .../embeds/<grantId>/revoke`); links default to 72 h and a Space can lower `embed.max_ttl_hours`.
 Not built: token delivery by a header, a fragment or a POST exchange. A fragment would hide the token from every server log but the page could then not tell the token's Space to
-send the right `frame-ancestors` (see `okf/product/module/la-core/architecture-http-surface.md` §6.2); a POST exchange is a new route and a new client flow. Both are a larger change than the redaction rule above, so this stays a documented operator duty.
+send the right `frame-ancestors` (see `okf/product/module/la-core/architecture-http-and-ui.md` §6.2); a POST exchange is a new route and a new client flow. Both are a larger change than the redaction rule above, so this stays a documented operator duty.
 
 ### S14. Embed API aside, API only (2 min) [admin by curl]
 No SPA exists for embed links (the SPA shell is deferred). Start the server with `-Dla.embed.enabled=true` (§0 step 8). Mint needs `canShareInvestigation` AND a lead
@@ -307,7 +319,9 @@ Not live. Link index: full build **852 s**, append **31 s** on a synthetic **10^
 | 8-9 | S7 the 401/404/403/422 `curl` block | terminal |
 | 9-10 | S15 evidence slide; take questions; S14 only if asked | slides |
 
-## 4. Claims we do NOT make
+## 4. Claims we do NOT make, and what is not yet
+
+Say these before anyone asks. Confidence tags as in [§10](#10-stakeholder-qa).
 
 * **Scale:** proven to 10^8 edges (measured, synthetic corpus), **10^9 is an extrapolation**. The live demo corpus is small (about 1,800 ordinary
   transfers plus the planted ring); it demonstrates behaviour, not scale.
@@ -318,8 +332,27 @@ Not live. Link index: full build **852 s**, append **31 s** on a synthetic **10^
 * **Postgres store, Personal 503, 429/503 bursts:** other variants (see the variants runbook) or `--burst`, not part of this script.
 * **A fired Alert names entities:** it does not, by design (aggregate only).
 * **Alerts inside the standalone app:** the Alerts page is in the full SPA, not the la-app.
+* **Real-IAM sign-in** was proven once, end to end, against a local WSO2 Identity Server on 2026-10-13
+  ([admin guide §2](admin-guide.md#2-real-oidc-sign-in-runbook-la-app-local-wso2-identity-server)); the demo bundle
+  itself never shows it. Confidence: PROVEN on that run, not on the demo bundle.
+* **Embed links** are built and driven live on both the file and the Postgres store (viewer page, frame headers,
+  revoke); a few edge paths are unit-tested only (`LA-EMBED-VIEW-1` remainder). OFF unless the host runs with
+  `-Dla.embed.enabled=true`.
+* **No Hive or Kerberos connector;** feeds go in as files or database queries. Confidence: NOT YET.
+* **Slowly changing dimensions (SCD2) are deferred.** The setting is accepted but never honoured (decision D-ING4).
+  Confidence: NOT YET.
+* **Multi-pod operation is not complete** (Q26); a two-host drill has not been run. Confidence: NOT YET.
+* **Measurements are from a laptop on a synthetic corpus.** Confidence: NOT YET for production hardware.
+* **The general audit ledger is not hash-chained** (Q4), and the Investigation seal is not a signature (Q14).
+* **No retention or purge for Investigations** (Q11).
+* **Accessibility:** the WCAG 2.2 AA audit is at specification and automated-scan level; the Link Analysis items
+  were checked with axe in a browser with two vendor grid findings left, and a full assistive-technology audit is
+  not done (`LA-A11Y-AUDIT-1`). Confidence: NOT YET.
+* **No published precision or false-positive rate** for any score (Q19).
 
-## 5. Contradictions found between sources (as of 2026-10-12)
+## 5. Contradictions found between sources (2026-10-12)
+
+This kit follows the figure named; the others should be corrected at source.
 
 1. **`TILL-06` share:** readiness plan DR-T6 says 82 %; `ControlApiLaShowcaseFiguresTest` and the manual say 97 % (8 payers). The test wins.
 2. **Step 1 figures:** the plan's "170 nodes, 1,803 links, centrality `ACC-1008`" belong to the `demo` Space; the plan's own seed note says on the
@@ -328,6 +361,11 @@ Not live. Link index: full build **852 s**, append **31 s** on a synthetic **10^
    expand (`maxFanOut` 5) so none is pending after seeding. The scene S8 therefore creates the request live.
 4. **Smoke wording:** the task brief expects "N/N pass"; the runner prints `N/N probes passed`.
 5. **Alert -> Open Investigation** is described by the plan and manual as part of the product but is rendered by the gamma host SPA only, not the la-app.
+6. **Algorithms:** 29 in code and in [architecture](architecture.md) §5; the readiness plan's defence matrix says 28.
+7. **Routes:** the readiness plan says 75; the route count today is in [architecture](architecture.md) §6.
+8. **10^8 build:** the first spike says 368 s (17.9 GB peak), the later table 447 s (8 GB cap), the roadmap "24 min
+   under an 8 GB cap"; index size 3.43 GB versus 2.23 GB across the two measurements. Quote the later table.
+9. **Accessibility:** the stakeholder framing "spec-level" versus the board, which records axe runs in a browser.
 
 ## 6. Rehearsal record: fresh full bake, 2026-10-13
 
@@ -447,7 +485,7 @@ For a CISO, lead architect and forensic reviewer: every PROVEN row of the [white
 | T9 | SHA-256 Dossier, tamper-evident (§2.3) | S11 | `ControlApiDossierTest` | PASS: untouched manifest Verified; one flipped digit uploaded: NOT verified, Changed `log.jsonl#2` (B) and `mm-structuring-case` (A) |
 | T10 | Drafts, atomic promotion (§2.4) | S9 | Draft tests | PASS: Conflicts "No conflicts", Rebase, Promote (step 7), Discard; Discard takes no confirmation |
 | T11 | Ephemeral embed, revoke (§5.5) | S14 | `ControlApiInvestigationEmbedTest` | PASS: link shown once, viewer masked and read-only at `/embed/inv/shared`, revoke asks to confirm, public read 404; smoke headers `frame-ancestors 'none'`, DENY, no-store; the claims partner portal frames the view |
-| T12 | Data trust strip (§4.6) | - | [`tests-data-trust-live-drive.md`](tests-data-trust-live-drive.md) | PASS: "Data as of … · 3 of 3 days · index v3" on `mule-hub-case`; on a Space whose index is still building: "days not assessed · no index" |
+| T12 | Data trust strip (§4.6) | - | [`tests-live-drives.md#data-trust-drive-la-data-trust-1-s10-2026-10-14`](tests-live-drives.md#data-trust-drive-la-data-trust-1-s10-2026-10-14) | PASS: "Data as of … · 3 of 3 days · index v3" on `mule-hub-case`; on a Space whose index is still building: "days not assessed · no index" |
 | T13 | Scale and limits (§6) | S15 | `InvTraversalBench`; [`tests-index-scale-run.md`](../la-storage/tests-index-scale-run.md) | evidence only (a slide): the bench class and the scale-run page exist; nothing driven live |
 
 Say out loud: 10^9 edges, retention purge (D-U8), precision rates, multi-pod HA, native Hive / Kerberos (NOT YET); the demo build signs in Demo Users, so it is no SSO demonstration; a full-disk consistent rewrite (anchor the Dossier root externally). Prepare a tampered manifest (T9), a late file (T8), an admin token (T6, T11), two browser profiles (T7) and a recorded fallback for T8, T9, T11.
@@ -478,5 +516,322 @@ Say out loud: 10^9 edges, retention purge (D-U8), precision rates, multi-pod HA,
 
 **Calls decided by the assistant, pending operator confirmation (2026-10-24):**
 
-* **IdP or Demo Users: Demo Users for a rehearsal.** It is the safest reading: no credential is typed and no external identity provider has to be reachable in the room. Say out loud that this build is no SSO demonstration. For the real review the operator may choose a real IdP sign-in instead (verified on la-app 2026-10-13, `LA-APP-REAL-SIGNIN-1`; [`admin-guide-real-signin.md`](admin-guide-real-signin.md)).
+* **IdP or Demo Users: Demo Users for a rehearsal.** It is the safest reading: no credential is typed and no external identity provider has to be reachable in the room. Say out loud that this build is no SSO demonstration. For the real review the operator may choose a real IdP sign-in instead (verified on la-app 2026-10-13, `LA-APP-REAL-SIGNIN-1`; [`admin-guide.md#2-real-oidc-sign-in-runbook-la-app-local-wso2-identity-server`](admin-guide.md#2-real-oidc-sign-in-runbook-la-app-local-wso2-identity-server)).
 * **T12 stays in the technical cut** (it is dropped only in the 35-minute cut, with T10).
+
+## 10. Stakeholder Q&A
+
+Audience: bank and telecom risk, security, IT and compliance reviewers of the LA demo. Every figure was checked
+against the repo on 2026-10-12. Terms follow [`GLOSSARY.md`](../../../../GLOSSARY.md). "backend §n" below means
+[architecture](architecture.md) §n (§6.1-§6.9 in [architecture-http-and-ui](architecture-http-and-ui.md)); "user
+manual §n" means [user-guide](user-guide.md) §n; "Part II reference" means [architecture-records](architecture-records.md).
+
+How to read an answer: two to five plain sentences you can repeat, then **Evidence** (where to look), then a
+**Confidence** tag.
+
+* **PROVEN** - a test or a measurement exists for it.
+* **DOCUMENTED** - the design says so; it has not been shown live or by a test.
+* **NOT YET** - an honest gap. Say so out loud; do not soften it.
+
+### 10.1 Security and access
+
+**Q1. Who can see what? Can an analyst see an Investigation they were not invited to?**
+No. An Investigation is visible only to its members (and to the owner or assignee of its linked Case, read only). To
+everyone else the answer is "not found", the same answer as for one that does not exist, so nobody can even confirm
+it is there. A member who lacks a role gets a refusal only after the Dataset-visibility and policy checks have
+passed. Visibility of the underlying Dataset is checked on every request, so losing access to a Dataset also closes
+the Investigation built on it.
+Evidence: [architecture-http-and-ui](architecture-http-and-ui.md) §6.1 (gate order, step 6); `ControlApiInvestigationMembersTest`; user manual §12.
+Confidence: PROVEN (the gate order and members behaviour have tests); the Postgres-store variant is DOCUMENTED.
+
+**Q2. How does masking work, and can it be bypassed by a clever query?**
+Identifiers are replaced on the way out of the server by a stable alias of the form `masked:` plus 16 hex
+characters (a keyed hash), so an analyst can still group, count and follow an entity without seeing the value. The
+default mode is `typed`: only columns whose classification an Entity Type claims (MSISDN, IMSI, account and similar)
+are masked; `all` masks every id; `none` shows raw. The same rule applies on the canvas, node lists, paths,
+patterns, Value Measures and the Working Set, and a raw id typed into an alias field is refused, so the route is not
+an oracle for guessing.
+Evidence: [architecture](architecture.md#34-masking) §3.4; `ControlApiExplorationMaskingTest` (the `everyInvReadOnAMaskedSpaceIsScannedForRawIds`
+case scans every Investigation read for raw ids); `ControlApiInvestigationOversightTest` (typed by default).
+Confidence: PROVEN for the routes the tests cover. A new route must be added to that scan; say so if asked about
+future routes.
+
+**Q3. Can anyone ever see the real value? Who, and is it recorded?**
+Yes, per entity, through *Reveal*. It needs its own capability (`canRevealLinkEntities`), is a separate action from
+approving, and every reveal writes an audit event. In the shipped demo the `admin` persona holds it.
+Evidence: [architecture](architecture.md#34-masking) §3.4 and backend §6 (Four-eyes / reveal row); `ControlApiInvestigationOversightTest
+.revealIsPerEntityGatedOnItsOwnCapabilityAndAudited`.
+Confidence: PROVEN.
+
+**Q4. What is audited, and is the audit trail itself protected from edits?**
+Link Analysis writes `LINK_*` audit events (reveal, embed minted, viewed or denied, four-eyes inbox reads, reference
+reads, and so on), and the host records every 401, 403 and 5xx. The platform audit ledger is append-only, but it is
+NOT hash-chained: the security spec states that `AuditTrail` contains no hash, chain or signature. Our tamper-evidence
+claim is about the Investigation record (Q13), not about the general audit ledger.
+Evidence: [architecture-http-and-ui](architecture-http-and-ui.md) §6.1 step 7, §6.2 (audit events); [`security.md`](../access/plan-security.md) row
+"Tamper-evidence of the audit log" (checked against `platform/inspecto-access` `AuditTrail.java`).
+Confidence: DOCUMENTED for the events; the absence of a chain on the ledger is a stated gap (see Section 8).
+
+**Q5. How do people sign in? What does the demo use versus production?**
+The demo uses Demo User authentication: a picker of seeded personas (analyst, manager, admin) on a local server.
+That is a token relay, not a real identity provider. Production uses OIDC against the customer's IAM; the host-side
+OIDC authenticator exists and is specified, but the Link Analysis standalone app's OIDC sign-in has never been run
+against a real IAM.
+Evidence: feature page "la-app signs in over Demo User auth"; [`security.md`](../access/plan-security.md)
+section 3.4; `docs/BACKLOG.md` `LA-APP-REAL-SIGNIN-1`.
+Confidence: DOCUMENTED for OIDC; real-IAM sign-in is NOT YET verified (Section 8).
+
+**Q6. Can the analyst approve their own large expansion? Who holds the second key?**
+No. A large expansion (above the Space's thresholds) is held as a pending request, the requester cannot decide it,
+and the approver inbox never lists the caller's own requests. Self-approval is refused with 403 even for someone
+holding the approve capability, and when several approvers decide at once exactly one decision lands. In the
+shipped demo `fm.manager` holds the approve capability and `admin` holds reveal.
+Evidence: feature page "Oversight surface" and "Approver inbox"; `ControlApiInvestigationOversightTest
+.aSensitiveExpandWaitsForADifferentPersonsApproval`; `ControlApiInvestigationFourEyesRaceTest`; demo readiness plan
+section 0.
+Confidence: PROVEN.
+
+**Q7. What are the "embed links", and could one leak an Investigation?**
+A lead can mint a read-only link to ONE Investigation for a person with no login. The token is 256 random bits,
+shown once, and only its hash is stored; it follows the Space's masking, shows no reveal, drafts, Case, Dataset names
+or SQL, expires (default 72 hours, a Space may allow up to 30 days by default and up to 8760 hours at most) and dies
+automatically if the minter loses the lead role, the Case closes or masking is loosened. Every bad, expired or
+revoked token gets the same "not found". The feature is OFF by default (`-Dla.embed.enabled`) and the answer is
+GET-only with no cookie and no framing.
+Evidence: [architecture-http-and-ui](architecture-http-and-ui.md) §6.2; `ControlApiInvestigationEmbedTest` (expiry, kill switch, same-404, auto-revoke, token in no
+log or audit row).
+Confidence: PROVEN for the API. There is no viewer page yet (Section 8).
+
+### 10.2 Data handling
+
+**Q8. Where does the data live? Does it leave the server?**
+Source data stays in the customer's own Datasets on the host; Link Analysis reads it in place or from a derived
+Parquet link index on the same disk. The Investigation record (op log, sealed Working Sets, Dossier inputs) is kept in
+the Space's write root on the filesystem, or in the customer's PostgreSQL in Preview and Enterprise. The
+standalone app is a second UI served by the same host process, not a separate service, and nothing is sent to an
+external service.
+Evidence: backend §1, §3.2, §4 (index under `<writeRoot>/la-index/`), §8.
+Confidence: DOCUMENTED (the architecture; no external-egress test is cited here).
+
+**Q9. What does "never store values" mean for ingest?**
+When data is ingested, error and failure text must not carry the offending cell. The engine's messages quote the bad
+value, so the platform replaces every quoted literal and "original line" tail with a salted fingerprint, and
+file-name handling avoids raw paths. The aim is that a rejected record leaves a reason, not a copy of the personal
+data.
+Evidence: [`ingestion.md`](../etl/plan-ingestion.md) "Failure text never stores a value"
+(`FailureText.scrub`); [`spaces.md`](../config/plan-spaces.md) (malformed-row rejects).
+Confidence: DOCUMENTED (shipped 2026-10-03; this pass did not re-run it). Scope is ingest failure text, not a claim
+that no personal data exists anywhere.
+
+**Q10. How is data classified, and does classification drive masking?**
+Columns carry a classification from the Dataset registry and lineage. In `typed` mode a column is masked when an
+Entity Type claims its classification; untraceable lineage fails closed (masked). A Space can also refuse to mint an
+embed link when the strictest classification of the Investigation's columns is on its refusal list.
+Evidence: [architecture](architecture.md#34-masking) §3.4 and [architecture-http-and-ui](architecture-http-and-ui.md) §6.2; `ControlApiInvestigationOversightTest
+.aColumnClassificationIsTypedByTheEntityTypeClaimingIt`; `ControlApiInvestigationEmbedTest
+.aSpaceCanRefuseToShareInvestigationsOfAClassificationAndAPolicyCanForbidTheActionEmbed`.
+Confidence: PROVEN.
+
+**Q11. How long is data kept, and how is it deleted?**
+There is deliberately no purge today: the Investigation store is append-only evidence, with no retention period,
+purge task or legal-hold record (operator decision D-U8, 2026-09-24). Drafts are different: they hibernate after
+60 minutes and expire after 30 days by default, as a discard, with at most 50 open per Space. If a regulator
+requires deletion, that decision is to be reopened, copying the existing incident purge pattern. A lead can delete
+one Investigation by hand (`DELETE /inv/investigations/{id}`, `LA-INVESTIGATION-DELETE-1`; refused while it is linked
+to an open Case or holds a pending approval, and audited).
+Evidence: feature page D-U8; backend §3.3 (Draft defaults) and §6 (the Investigations row).
+Confidence: DOCUMENTED. A retention period or scheduled purge for Investigations is NOT YET built.
+
+**Q12. What copies of the data can leave the system, and are they masked?**
+Exports a person can make are the Dossier (JSON or self-contained HTML), the sealed Dossier bundle with references, and
+snapshots attached to a Case. Ids in them are masked as the Space masks them; the manifest hashes the raw store, so
+the root is identical masked or not and a masked bundle still verifies. A Working Set is capped at 64 MiB per set
+and 4 GiB per Investigation by default (413 above, audited).
+Evidence: feature page (Dossier bundle: "Masking, R3, four-eyes"); `ControlApiDossierTest
+.theHtmlDossierIsMaskedLikeTheJson`; `ControlApiDossierBundleTest`; settings in
+[`configuration.md`](../config/admin-guide-configuration-reference.md) (the Link Analysis Investigations row).
+Confidence: PROVEN for masked output; DOCUMENTED for the size caps.
+
+### 10.3 Integrity and evidence
+
+**Q13. What is "sealed", and what does "tamper-evident" actually mean here?**
+Each analyst step is appended to an op log and the resulting Working Set is sealed with a SHA-256 hash; the log is
+folded deterministically, so replay reproduces the same set. The Dossier adds a manifest hashed over every stored
+artefact, and Verify rebuilds it from the store and names anything changed, missing or added. "Tamper-evident"
+means an edit made inside the store after the fact is detected when someone verifies; it does not mean the store
+cannot be edited.
+Evidence: backend §3.1; feature page Dossier section; `ControlApiDossierTest
+.anUntouchedStoreVerifiesAndATamperedStepIsReported`, `.theManifestCatchesWhatTheRecordedHashesCannotAndCannotBeEdited`.
+Confidence: PROVEN.
+
+**Q14. What does tamper-evident NOT mean? Could an administrator with full disk access rewrite history?**
+Correct: it is not a signature and not a write-once store. Our reading of the design is that someone who can rewrite
+every file AND recompute every hash consistently would produce a store that verifies against itself; the defence is
+to keep the Dossier root (or a sealed bundle) outside the store, for example attached to a Case, and verify
+against that. The identity fact log is a hash chain, and a truncated tail is caught only if a head hash was cited
+elsewhere. We have not run a test of the "rewrite everything consistently" attack.
+Evidence: backend §3.5 (fact log), feature page Dossier ("the manifest remains the custody root"). The
+full-rewrite reasoning is ours and is UNVERIFIED by a test.
+Confidence: DOCUMENTED, with the attacker-model limit above stated openly.
+
+**Q15. If the data changes afterwards, does an old Investigation change?**
+No. Expands store the rows they read, and compare and temporal steps store their findings with a fingerprint, so a
+replay needs no Dataset and a Dataset change cannot rewrite history. *Re-read (drift check)* compares against the
+current Dataset and reports drift, for example when a file lands in the bound Dataset. A stored Alert watches the
+sealed Working Set, not live data.
+Evidence: backend §3.1 (sealed reads, D-E3); `ControlApiReplayDriftOnFileAppendTest`; user manual §12.
+Confidence: PROVEN.
+
+**Q16. How are a team's parallel experiments kept from corrupting the record?**
+An analyst works in a private Draft forked from the Investigation. Promotion rebases onto the current head, reports
+conflicts, and appends to the main log under a lock, all or nothing; if the Draft carries a sensitive expansion it
+becomes a four-eyes request instead. The main log is never rewritten by a Draft.
+Evidence: backend §3.3; feature page (Drafts, rebase and promote).
+Confidence: DOCUMENTED (Draft behaviour is covered by tests in the module; the browser UI for Drafts was driven
+once, per the readiness plan).
+
+### 10.4 Analytics
+
+**Q17. What algorithms are there, and where do they run?**
+The catalogue holds 29 graph algorithms (communities, centrality, paths, similarity, a suspicion score and a
+propagated-risk score among them). Over a Working Set they run in-process on the server in a bounded pool; over a
+link index only a few (neighbourhood, ego network, seeds-only degree) run, as SQL. The server routes by input type,
+never by size, and says when a budget is exceeded rather than returning a partial answer.
+Evidence: backend §5; `ControlApiGraphRunTest.theCatalogueListsAll29WithCeilingsAndTheSpacesDefaultsClampedAndEchoed`.
+Confidence: PROVEN.
+
+**Q18. Is a result the same every time? Does the screen agree with the server?**
+Results are deterministic: ties break by a fixed canonical order, and the Java and TypeScript implementations
+assert the same hand-derived fixtures. The result cache is keyed on the relation, row scope, algorithm and
+parameters, and only completed results are cached.
+Evidence: backend §5 (Parity); `GraphAlgorithmsParityTest`, `GraphSuspicionParityTest`, `ControlApiGraphRunParityTest`.
+Confidence: PROVEN for the fixtures; a statement about every input is not claimed.
+
+**Q19. Can you explain why an entity scored high? What about false positives?**
+The suspicion score is an explainable 0 to 100 composite with a per-node breakdown, and the top decile is
+highlighted. Propagated risk returns each node's top five contributing factors (origin, distance, weight,
+contribution). The scores are triage aids: a high score means "look here first", not "guilty", and we publish no
+false-positive or precision rate, because that depends on the customer's data and thresholds.
+Evidence: user manual section 6 (Suspicion score row); backend §5 (`propagatedRisk`);
+`ControlApiGraphRunTest.propagatedRiskAnswersWithScoresAndFactorsAndRefusesBadWeights422`.
+Confidence: PROVEN for explainability. Precision on real data: NOT YET measured.
+
+**Q20. What does the demo corpus show, and is it realistic?**
+It is synthetic. The shipped mule-ring corpus has 112 accounts over three landed days; the pass-through Measure
+flags 13 of them, and a cash-out concentration Measure shows the till `TILL-06` receiving 97 percent of cash-out
+value from 8 payers. A test reproduces those figures.
+Evidence: user manual section 10; `ControlApiLaShowcaseFiguresTest` (asserts `TILL-06`, share 0.97).
+Confidence: PROVEN for the synthetic figures; they say nothing about real-data accuracy.
+
+### 10.5 Scale and performance
+
+**Q21. How big a graph can it handle?**
+The server-side path search over a Dataset is certified at about one million links. Above that a Space can switch
+on the link index, a versioned Parquet layout, measured on one laptop up to 10^8 edges: a one-key lookup stays near
+20 ms at 10^8 (it is flat in size) and a depth-2 walk of a small frontier is about 22 ms median. 10^9 edges is an
+extrapolation (an index of about 34 GB and a build of roughly 2.5 hours) and has NOT been run.
+Evidence: feature page measurement table (10^6, 10^7, 10^8 rows) and "Extrapolating to 10^9 edges ... NOT measured";
+backend §10; `docs/superpower/link-analysis-roadmap.md` (`LA-INDEX-SCALE-MEASURE-1`, 10^9 open).
+Confidence: PROVEN to 10^8 on a synthetic corpus; 10^9 is NOT YET.
+
+**Q22. What happens when someone asks for too much?**
+It is refused or limited out loud, never silently trimmed. A Graph Run has a size and time budget (shipped default
+50,000 nodes, 500,000 edges, 30 seconds; Space ceiling 500,000 nodes, 5,000,000 edges, 300 seconds) and ends
+`BUDGET_EXCEEDED` with no result when exceeded. The Run pool is 2 running plus 16 waiting; the next request beyond
+that is refused with 503. Expensive exploration calls share a per-person bucket of 30, refilling one per 2
+seconds (429). Large expansions go to four-eyes.
+Evidence: backend §5 (Budgets, Pool), [architecture-http-and-ui](architecture-http-and-ui.md) §6.1 step 2, backend §9; `ControlApiGraphRunTest
+.aBudgetExceededRunIs200WithTheNumbersAndNeverAResultKey`; `LinkAnalysisRateClassCoverageTest`.
+Confidence: PROVEN for the budget refusal; DOCUMENTED for the exact pool and queue figures.
+
+**Q23. How does the link index work, and does it go stale?**
+It stores each edge twice (by source and by target), in Parquet partitioned by a hash bucket, so a one-entity lookup
+reads a small slice. Reads fall back to the plain Dataset read, with a stated reason, when no fresh index exists. For
+a Dataset whose input files can be fingerprinted, a stale index is served and flagged. For one that cannot (a view),
+the index serves only while younger than 24 hours by default (`index.max_age_hours`, 1 to 8760). The index serves
+only shallow lookups (depth 2, at most 20 keys per level); deep or global algorithms use the other paths.
+Evidence: backend §4, §9; feature page scope note (Path A, the 5-level walk FAILED its 1.5 s criterion).
+Confidence: PROVEN for the measured cases; the age gate is DOCUMENTED.
+
+**Q24. What are the known performance weak spots?**
+At about 10^6 edges the index is not faster than the flat read, because each request pays a fresh sealed
+connection of roughly 100 to 200 ms; it wins from about 10^7. Lookup cost grows with the degree of a hub entity
+(the frontier cap bounds how many keys, not how heavy one key is). A 10^8 build took 447 seconds in the later
+measurement under an 8 GB cap. Index build memory and time are laptop numbers, not a sizing guide.
+Evidence: feature page "Where the index loses" and measurement table; backend §10.
+Confidence: PROVEN as measured; sizing for a customer environment is NOT YET done.
+
+### 10.6 Deployment and operations
+
+**Q25. Which editions include it, and what is installed?**
+Link Analysis is optional jars discovered at startup, not a separate server. It is present from Standard upward
+(Standard is a Professional alias in the bundler), absent in Personal (the routes answer 503), and the PostgreSQL
+Investigation store and the Enterprise policy engine are Preview and Enterprise only. Per Space it needs the
+`geoLink` module enabled in `modules.toon`.
+Evidence: backend §8 and [architecture-http-and-ui](architecture-http-and-ui.md) §6.1 step 4; `ControlApiGeoLinkModuleGateTest`.
+Confidence: PROVEN for the module gate; DOCUMENTED for packaging.
+
+**Q26. Can it run on several servers for scale or high availability? Be honest.**
+Not yet as a finished capability. A shared run lease exists and was proven against a real PostgreSQL, including a
+handover between two processes on one laptop; a handover between two hosts, a standby promotion and a network
+partition are NOT proven. The Kubernetes scale-out plan's own status line is stale: it says nothing is built, but the
+lease is, and the extent of its Phases A and B has not been audited (row `SCALEOUT-PLAN-AUDIT-1`). For Link
+Analysis specifically, the Postgres Investigation store is built, but embed links are filesystem-only (a Postgres
+store answers 503 for them).
+Evidence: [`../../layer/platform/admin-guide-ha-dr-drill.md`](../../layer/platform/admin-guide-ha-dr-drill.md) "What has actually been proven" and the laptop-scale
+drill; [`enterprise-scale-out-plan.md`](../../../../superpower/enterprise-scale-out-plan.md) status header;
+`docs/BACKLOG.md` `SCALEOUT-PLAN-AUDIT-1`; [architecture-http-and-ui](architecture-http-and-ui.md) §6.2.
+Confidence: NOT YET for multi-pod; PROVEN only for the single-database lease at laptop scale.
+
+**Q27. How do we back up, restore and upgrade? Can it run air-gapped?**
+Backup and restore are covered by a runbook (Standard and above), including restoring into a new Space. Investigation
+data on the filesystem store is ordinary files under the write root; on Postgres it is one schema per Space. The
+product is self-contained and the bundle's install checks are specified to run offline. We have not run a
+documented upgrade rehearsal for Link Analysis specifically.
+Evidence: [`../backup/admin-guide-backup-restore.md`](../backup/admin-guide-backup-restore.md); `docs/okf/product/module/config/admin-guide-configuration-reference.md`
+(Investigation store row); the preflight row in `docs/BACKLOG.md` (`SCR-1`, offline).
+Confidence: DOCUMENTED. A Link Analysis upgrade and restore rehearsal: NOT YET (UNVERIFIED).
+
+### 10.7 Integration
+
+**Q28. What data can it read today?**
+Files and CSV through the file Collectors, relational databases through the `db` Collector (a query with a
+`:watermark`), and Parquet landing. Hive is not supported directly: the agreed route is to extract to Parquet files
+and land them through a Collector, and there is no Hive or Kerberos connector. Dimension data (names, risk
+indicators) is joined at read time and kept out of the index.
+Evidence: `docs/BACKLOG.md` `LA-DAILY-INGEST-1` ("Confirmed today ... no Hive/Kerberos support"; decisions D-ING5,
+D-ING6).
+Confidence: DOCUMENTED; Hive is NOT YET.
+
+**Q29. How do findings reach our case and alerting tools?**
+An Investigation can be linked to a Case (the Case's owner or assignee then gets read-only access), a graph or
+snapshot can be attached to a Case, and a standing detection watches a Measure and fires an Alert. A fired Alert is
+aggregate only (Measure, threshold, breach count, worst value); entities are named only inside the Investigation
+under its own gates. External references to other systems are stored as text and never opened.
+Evidence: backend §7 (live detection); user manual §9.7, §9.12; `la.detect` Job in backend §7.
+Confidence: DOCUMENTED (driven live in the 2026-10-12 telecom demo runs per the backlog; no single test cited).
+
+**Q30. Is there an API, and is it controlled?**
+Yes: 82 Link Analysis routes (76 in `la-api`, 6 in `geo-link`), all in the OpenAPI contract, each behind the same
+gate order (authenticate, rate limit, authorize, module enabled, capability, Investigation access). A guard test
+keeps the route modules behind the module gate.
+Evidence: backend §6 and [architecture-http-and-ui](architecture-http-and-ui.md) §6.1; `LaApiRoutesManifestParityTest`; `ControlApiGeoLinkModuleGateTest`.
+Confidence: PROVEN. (The readiness plan still says 75 routes and 28 algorithms; those figures are stale.)
+
+### 10.8 What we do NOT claim
+
+Moved into [§4](#4-claims-we-do-not-make-and-what-is-not-yet), one list for the whole kit.
+
+### 10.9 Presenter notes
+
+* Never promise a number that is not in this page; point to the Evidence line instead.
+* If asked about a claim marked NOT YET, answer with the row id and say it is on the board.
+* Run the pre-demo checks in the demo runbook first; this page does not replace them.
+
+### 10.10 Claims not verified (UNVERIFIED)
+
+* The 19th concurrent Graph Run being refused 503: stated by backend §5; no test method was located by name.
+* Q14's "rewrite everything consistently" reasoning is ours; no test.
+* Q16, Q29: no single test class was identified for Drafts end to end or for the standing-detection Alert path.
+* Q8: that nothing leaves the host: design statement; no egress test.
+* Q27: a Link Analysis upgrade or restore rehearsal.

@@ -11,7 +11,7 @@ timestamp: 2026-10-19T00:00:00Z
 Module: `platform/inspecto-entity-store`, package `com.gamma.entitystore`, `buildRole: platform`,
 `offeringRole: base`, `bindingTime: build` ([module.toon](../../../../../platform/inspecto-entity-store/src/main/resources/META-INF/inspecto/module.toon)).
 It holds no HTTP routes: the Entity List routes live in [entity-list](../entity-list/api-routes.md) and Link
-Analysis in [la-core](../la-core/api-link-analysis.md); both read this module.
+Analysis in [la-core](../la-core/api.md); both read this module.
 
 ## Classes
 

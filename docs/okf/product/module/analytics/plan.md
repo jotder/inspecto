@@ -51,7 +51,7 @@ ratcheting duplication guard (Must items M1–M10).
 
 - C7 graph traversal in SQL — **measured and refused 2026-11-14** (`DUCKDB-2-LOOP-QUERIES-1` C1, now closed): a
   `USING KEY` reachability over the link index lost to the per-key index read 5x at 10^6 edges and 40x at 10^7
-  ([la-core architecture](../la-core/architecture-backend.md)). Nothing of the Analytics Kernel is left open.
+  ([la-core architecture](../la-core/architecture.md)). Nothing of the Analytics Kernel is left open.
 
 ## Refused (Won't, this horizon)
 

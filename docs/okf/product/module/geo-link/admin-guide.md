@@ -59,4 +59,4 @@ Outbound delivery needs the `WebhookSinkTransport` from `inspecto-notify-channel
 ## References
 
 - [architecture](architecture.md) · [spec](spec.md) · [api-routes](api-routes.md)
-- [la-core admin-guide-real-signin](../la-core/admin-guide-real-signin.md) · [la-core admin-guide-demo](../la-core/admin-guide-demo.md)
+- [la-core admin-guide](../la-core/admin-guide.md#2-real-oidc-sign-in-runbook-la-app-local-wso2-identity-server) · [la-core admin-guide-demo](../la-core/admin-guide-demo.md)

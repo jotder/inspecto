@@ -12,7 +12,7 @@ timestamp: 2026-11-12T00:00:00Z
 How data reaches Link Analysis and what a first-time user meets: Add data and the shared import route, help on every
 screen and the onboarding counters, the explorer defects and onboarding residuals, column roles, discovery in Basic,
 arrivals, arrival feeds, Dataset storage and the watched folder.
-Section numbers continue those of [architecture-backend.md](architecture-backend.md), from which this page was split on 2026-11-12.
+Section numbers continue those of [architecture.md](architecture.md), from which this page was split on 2026-11-12.
 
 ## 6.10 Add data: the shared import route (LA-ONBOARD-1 phase 2, as built 2026-10-22)
 
@@ -108,9 +108,9 @@ limits and the commit's write order are in
 ## 6.11 Help on every screen and the onboarding counters (LA-ONBOARD-1 phase 8, as built 2026-10-22; UC-15, A-9, A-10, OB-13)
 
 `LA-ONBOARD-1` closed with this phase; the plan is archived
-(`docs/archived-documents/plans-archive/la-onboarding-plan.md`). What phases 1-7 built is in [architecture-masking.md](architecture-masking.md) §3.4 (*Start from...*,
-*My work*), §6.10 and [architecture-backend.md](architecture-backend.md) §8 (*Trust vs level*); the acceptance drive is
-[`tests-onboarding-live-drive.md`](tests-onboarding-live-drive.md).
+(`docs/archived-documents/plans-archive/la-onboarding-plan.md`). What phases 1-7 built is in [architecture.md#34-masking](architecture.md#34-masking) §3.4 (*Start from...*,
+*My work*), §6.10 and [architecture.md](architecture.md) §8 (*Trust vs level*); the acceptance drive is
+[`tests-live-drives.md#onboarding-acceptance-drive-la-onboard-1-2026-10-22`](tests-live-drives.md#onboarding-acceptance-drive-la-onboard-1-2026-10-22).
 
 * **Onboarding counters (OB-13).** `com.gamma.util.OnboardingCounters` (inspecto-util, below both the host and la-api,
   like `IngestActivity`): a process-wide static holder of ONE append-only file per installation,
@@ -163,7 +163,7 @@ limits and the commit's write order are in
     data*, Entity Lists → *New list* (for someone who may write lists; otherwise the existing line says why not), the
     Start box's no-Dataset line points at the *Add data* / *Explore a Dataset* cards under it, the saved-views menu
     says how to fill it, and My work says when the cases could not be read (*Try again*) instead of "No case yet".
-* **Found by the acceptance drive and fixed here** ([`tests-onboarding-live-drive.md`](tests-onboarding-live-drive.md)):
+* **Found by the acceptance drive and fixed here** ([`tests-live-drives.md#onboarding-acceptance-drive-la-onboard-1-2026-10-22`](tests-live-drives.md#onboarding-acceptance-drive-la-onboard-1-2026-10-22)):
   * **Add to a list was a dead end on the explorer.** `growEntityType` (used by *Add to a list* from Find something
     interesting and by Exclude → Add to a list) knew only the Investigation binding, the Domain Profile's `investigate`
     type and typed canvas nodes; a graph drawn by a Start box start has none, so the dialog offered no list and no *Create
@@ -231,7 +231,7 @@ Each fix carries a test that fails on the code before it (falsified).
   start from it, and changing it still needs the route's capability (`canAuthorWorkbench` for its columns,
   `canUploadData` for *Add a file*). A Dataset made private through the component routes stays private. Imports
   committed before this change keep `shares: []`; nothing migrates them. A person who wants a file to themselves uses
-  the analyst upload ([architecture-http-surface.md](architecture-http-surface.md) §6.6) into their own Collector. Test: `ControlApiOnboardFilesTest`
+  the analyst upload ([architecture-http-and-ui.md](architecture-http-and-ui.md) §6.6) into their own Collector. Test: `ControlApiOnboardFilesTest`
   "withSignInSelfImportIsOffByDefault...".
 
 ## 6.13 Onboarding residuals (LA-ONBOARD-RESIDUALS-1, as built 2026-10-24)

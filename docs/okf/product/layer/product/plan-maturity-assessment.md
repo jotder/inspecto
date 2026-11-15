@@ -941,13 +941,13 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **Evidence:**
   - Basic ships `la-storage`, `la-core`, `la-api` and `geo-link`; Advanced adds `la-store-pg` (`offerings/basic.toon`, `offerings/advanced.toon`). Basic is the explorer and the Investigation surface needs Standard (`ControlApiBasicEditionLinkAnalysisTest`, cited in `module/la-core/brochure-inspecto-la-whitepaper.md` §7). `la/inspecto-la-graph/` is untracked work in flight and not in any offering.
   - There are 29 algorithms, verified in code: 29 enum constants in `la/inspecto-la-core/src/main/java/com/gamma/la/core/Algorithm.java`, including PageRank, betweenness, Louvain, max-flow, link prediction and `PROPAGATED_RISK`.
-  - Routes: `la-api` 90 and `geo-link` 7, so 97 registered, all in the OpenAPI contract (generated `api-routes.md`). Docs drift: the whitepaper says 93 (86+7), `features-link-analysis.md` says 87 and the add-on features say 94. 101 feature-db rows.
+  - Routes: `la-api` 90 and `geo-link` 7, so 97 registered, all in the OpenAPI contract (generated `api-routes.md`). Docs drift: the whitepaper says 93 (86+7), `features.md` says 87 and the add-on features say 94. 101 feature-db rows.
   - Tests: 186 classes across la-core (23), la-api (40), la-storage (12), la-store-pg (3) and geo-link (108). 90 are real-HTTP control-plane tests, held in `la/inspecto-geo-link/src/test`. Golden showcase tests (`ControlApiLaShowcaseFiguresTest`, `LaShowcaseGoldenTest`) and the acceptance test `LaDailyIngestAcceptanceTest` are among them.
   - Live and measured evidence (`brochure-inspecto-la-whitepaper.md` §6–§7):
     - `IndexScaleBench`: about 21 ms one-key p50 from 10^6 to 10^8 edges.
     - Daily append at 10^8 takes 30.6 s against 929 s for a full rebuild.
     - A production-scale day (132M records, 39.4M links) was indexed in 5.3 min. This is a single run on private data.
-    - Live axe passes, real WSO2 OIDC sign-in, a Data Trust live drive, a think-aloud script and a stakeholder Q&A are recorded in `module/la-core/tests-*.md` and `admin-guide-real-signin.md`.
+    - Live axe passes, real WSO2 OIDC sign-in, a Data Trust live drive, a think-aloud script and a stakeholder Q&A are recorded in `module/la-core/tests-*.md` and `admin-guide.md`.
   - Governance proven by named tests: seven-gate order, strict 404 for non-members, keyed masking with anti-oracle, four-eyes on sensitive expansion, per-entity audited reveal, Dossier tamper detection (`ControlApiDossierTest`) and replay determinism.
   - Open work: P2 `LA-DAILY-INGEST-1` follow-ups (Hive/Kerberos deferred by D-ING5, SCD2 deferred by D-ING4), six P3 rows, and the P3 defect row `LA-CASE-HISTORY-UPLOAD-FOLLOWUPS-1`. Items (1)–(6) of that defect row are done; only the alias-book scan check remains.
   - Stated NOT YET items (whitepaper §7): retention purge and legal hold (declined, D-U8), the multi-host HA two-host drill (`ASSURE-OPERABILITY-1`), 5×10^8 and 10^9 edge builds (`LA-INDEX-SCALE-MEASURE-1`), machine-to-machine trust, and full WCAG 2.2 AA (`LA-A11Y-AUDIT-1`). The Postgres store tests do not run on the shared profile (`TEST-ENV-PG-ASN-UNRUN-1`).
@@ -956,7 +956,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - It runs in-process over Parquet, with no separate graph database or cluster, and the standard build provably cannot call hosted AI (`EgressGuardTest`). This is a strong sovereignty and air-gap story against Palantir/Quantexa-class SaaS or cluster deployments (general market).
   - The disclosure discipline is unusually honest: a claims register marking each claim PROVEN, MEASURED or NOT YET makes RFP answers defensible line by line.
 - **Gaps vs market / RFP risk:**
-  - Entity resolution is analyst-asserted or imported identity pairs plus merged traversal (`user-guide.md` §11.7 and Part II *Identity resolution routes*). There is no probabilistic or ML entity resolution at scale, which is Quantexa's core (general market). **No row.**
+  - Entity resolution is analyst-asserted or imported identity pairs plus merged traversal (`user-guide.md` §11.7 and [architecture-records](../../module/la-core/architecture-records.md)). There is no probabilistic or ML entity resolution at scale, which is Quantexa's core (general market). **No row.**
   - It runs on a single host: measured to 10^8 edges, with 5×10^8 and 10^9 unmeasured (`LA-INDEX-SCALE-MEASURE-1`, P3). The two-host HA drill has not run (`ASSURE-OPERABILITY-1`, P2, platform). Embed links are not supported on the Postgres store.
   - Retention purge and legal hold were declined (D-U8; BACKLOG §6 standing refusal). Regulated buyers who need retention schedules or right-to-erasure will flag this.
   - Daily-feed completeness is open under `LA-DAILY-INGEST-1` (P2): no native Hive/Kerberos and no SCD2 as-of join. The whitepaper's "All read surfaces masked — NOT YET" row is partly stale: `OBJECT-READ-MASKING-RESIDUALS-1` closed 2026-10-18, and `BI-QUERY-MASKING-1` closed 2026-10-23, but free SQL can still test a key (P1 `BI-MASKING-FREE-SQL-ORACLES-1`).
@@ -1353,7 +1353,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - It ships as a turnkey demo bundle. `-Edition Advanced -Product la -Distribution demo` bakes `la-showcase` pre-seeded into `inspecto-demo-<platform>.zip`: unzip, `serve-demo`, pick a persona (`solution-pack/la-showcase/admin-guide-variants-runbook.md` §0).
   - Tests: `LaShowcaseTemplateTest` 6 @Test, `LaShowcaseGoldenTest` 3, `ControlApiLaShowcaseFiguresTest` 1, `ControlApiLaShowcaseGeoSceneTest` 3. Runners: `tools/la-demo-smoke.mjs`, `seed-la-showcase.mjs`, `gen-la-showcase-data.py`, `gen-la-telecom-data.py`.
   - Live, Postgres variant (2026-10-13): `la-demo-smoke` 17/17, also after a restart, and `PgInvestigationStoreContractTest` 45/0/0 (variants runbook, "Not verified" section).
-  - Live, browser, 2026-10-15: analyst coverage (`module/la-core/tests-analyst-coverage.md`) on this Space. 11 use cases: 6 PASS, 4 PARTIAL, 1 with axe 0 violations. 16 findings: 5 fixed, 11 open, all P3 except fixed P2s.
+  - Live, browser, 2026-10-15: analyst coverage (`module/la-core/tests-live-drives.md#analyst-coverage-test-ui-only-impersonated-analyst-2026-10-15`) on this Space. 11 use cases: 6 PASS, 4 PARTIAL, 1 with axe 0 violations. 16 findings: 5 fixed, 11 open, all P3 except fixed P2s.
   - The stakeholder demo runbook `module/la-core/admin-guide-demo.md` (371 lines) still flags several beats "UNVERIFIED (rehearse first)": compare-and-seal, the masked-id set, and the la-app approve-then-step text.
 - **Strengths vs market:**
   - A pre-seeded, one-click demo with governance on screen: masking, four-eyes on fan-out, Drafts, a sealed Dossier. i2 and Linkurious demos typically show charting, not evidential custody (general market).
@@ -1361,7 +1361,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
 - **Gaps vs market / RFP risk:**
   - It is not in any Offering although brochures sell it with Advanced/Preview (`OFFERING-DECLARATION-DRIFT-1` D2).
   - Synthetic data only. "Recorded precision claims: none" (la-audit runbook §6 states the same policy). Buyers comparing with Quantexa or Featurespace-style references will ask for detection rates on real data: no row.
-  - Some walk-through beats are still unrehearsed, and 11 analyst-coverage findings are open (F-7, F-10, F-11, F-2, F-3 and others). They are tracked only in `tests-analyst-coverage.md`: no BACKLOG row.
+  - Some walk-through beats are still unrehearsed, and 11 analyst-coverage findings are open (F-7, F-10, F-11, F-2, F-3 and others). They are tracked only in `tests-live-drives.md`: no BACKLOG row.
   - It needs Demo Auth (Advanced/Preview). A Standard customer with real OIDC cannot use the seeded personas. The default runbook says the "Advanced or Standard bundle" works, but `minEdition: advanced` refuses Standard: no row.
 - **RFP stance on the 5 most-asked requirements (LA proof-of-value / demo content):**
 
@@ -1484,7 +1484,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Product map: `billable: true, orderCode INS-SP-LA-DAILY-FEED, billing flat, status ga` (`product-map/solution-pack/la-daily-feed.toon`). Listed in `offerings/basic.toon` `contentPacks`.
   - Template: 12 files. Pipeline plus schema; poll Collector (`XDR_{yyyyMMdd}.csv`); freshness and index-lag Alert Rules; row-band Expectation; `la_index_build` and `la_rows_band_evaluate` Jobs. Only **2 sample days of a few rows each** (`data/samples/daily_xdr/`).
   - Tests: `LaDailyFeedTemplateRulesTest` 6. `LaDailyIngestAcceptanceTest` covers 7 days, a late day, a re-run, a correction, a part-count change, a missing day and a dimension change. `ScheduledDailyChainTest` (geo-link) runs on the scheduler alone. Benches `LaDailyIngestScaleBench` / `DailyIndexScaleBench`: 10^7 rows a day ingest in 35–40 s, 10^8 in 489 s, APPEND 31 s onto 10^8 (BACKLOG `LA-DAILY-INGEST-1`).
-  - Live drive on 2026-10-14 (`module/la-core/tests-data-trust-live-drive.md`): 8 steps, 1 FAIL (corrected day, since fixed by `f3a90e6a3`). At that time the template shipped no index Job; the Jobs were added later and are pinned by `theTemplateShipsTheJobsThatIndexAndEvaluateOnEveryCommit`.
+  - Live drive on 2026-10-14 (`module/la-core/tests-live-drives.md#data-trust-drive-la-data-trust-1-s10-2026-10-14`): 8 steps, 1 FAIL (corrected day, since fixed by `f3a90e6a3`). At that time the template shipped no index Job; the Jobs were added later and are pinned by `theTemplateShipsTheJobsThatIndexAndEvaluateOnEveryCommit`.
   - **Edition mismatch.** The pack ships Alert Rules, but the Alert Rule dispatcher (`alert.dispatch`, declared by `inspecto-ops`) is Standard and up (`layer/platform/architecture-editions.md` §28; `OFFERING-DECLARATION-DRIFT-1` D1, closed 2026-10-20). The template has no `minEdition`, so the `tools/check-offerings.mjs` check 5 guard cannot catch it.
   - The index Job runs as `owner: admin` (`config/jobs/la_index_build_job.toon`), but Basic ships no Authenticator. By code read (2026-10-23, `LA-DAILY-INGEST-1`): on an open server the run authority is skipped (`JobAuthority.runAuthority`) and the template's Dataset has no `shares`, so `ComponentAccess.canViewAs` allows `admin`; with an Authenticator, `TemplateSeedGate.stampJobs` re-stamps the owner to the applier unless the applier holds `canConfigureAccess`. `LaIndexBuildJob` and `ScheduledLinkIndexBuilder` consult no edition feature (`platform/inspecto-engine/.../LaIndexBuildJob.java:59`, `la/inspecto-geo-link/.../ScheduledLinkIndexBuilder.java`), so the index probably builds on Basic while every index-consuming Investigation route is 503 there (unverified live).
   - The row-band Expectation "does not judge a day until 3 prior days exist" (`admin-guide.md`), and only 2 sample days ship. The out-of-box verify cannot show the band working.
@@ -1514,11 +1514,11 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Modules: `la-core`, `la-storage`, `la-api`, `geo-link`, `la-store-pg` (`la/`). Routes: `la-api` 90 (90 in OpenAPI), `geo-link` 7 (`module/la-api/api-routes.md`, `module/geo-link/api-routes.md`).
   - Test classes: geo-link 108 (90 real-HTTP), la-api 40, la-core 23, la-storage 12, entity-list 5 (generated `tests-inventory.md` per hub). Plus 4 golden corpora tests in `platform/inspecto-graph`. UI: `projects/link-analysis` 130 specs, `projects/la-app` 9 specs (15 non-spec files: a thin shell).
   - Live evidence:
-    - analyst coverage on 2026-10-15: 11 use cases, axe 0 violations (`tests-analyst-coverage.md`);
+    - analyst coverage on 2026-10-15: 11 use cases, axe 0 violations (`tests-live-drives.md`);
     - data trust drive on 2026-10-14;
-    - real OIDC sign-in against WSO2 IS 7.3.0 on 2026-10-13 (`admin-guide-real-signin.md`);
+    - real OIDC sign-in against WSO2 IS 7.3.0 on 2026-10-13 (`admin-guide.md`);
     - Postgres store on 2026-10-13;
-    - stakeholder Q&A with 22 PROVEN-tagged answers and 16 NOT YET mentions (`tests-stakeholder-qa.md`).
+    - stakeholder Q&A with 22 PROVEN-tagged answers and 16 NOT YET mentions (`admin-guide-demo.md`).
   - Edition placement is gated in code: Basic is the explorer; the Investigation surface answers 503 via `EditionFeatures.INVESTIGATIONS` (`ControlApiBasicEditionLinkAnalysisTest`, 2 tests, real HTTP).
   - Open work: P2 `LA-DAILY-INGEST-1` (owner calls only). P3s: `LA-I2-GAPS-RESIDUALS-1`, `LA-CASE-HISTORY-UPLOAD-FOLLOWUPS-1` (defect, mostly done), `LA-ENTITY-PROFILE-RESIDUALS-1`, `LA-CONFIG-LIMITS-RESIDUALS-1`, `LA-A11Y-AUDIT-1` (screen-reader reading still person-only), `LA-INVESTIGATION-STORE-DESIGN-1`, `LA-INVESTIGATION-OPS-DEFERRED-1`, `LA-EDITIONS-RESIDUALS-1` (`module/la-core/index.md`).
   - Deliberately declined (BACKLOG §6 line 774): retention/purge of Investigation evidence (`D-U8`), a G6 `timebar`, and a server-rendered Dossier PDF.
@@ -1530,7 +1530,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Entity resolution is assertion-based. Fuzzy merge suggestions were retired (`LA-I2-GAPS-RESIDUALS-1`, D-M1). Quantexa's core value is probabilistic entity resolution at billions of records (general market). This is the largest functional gap: no row beyond the §6 retirement.
   - Scale and topology: 10^9 is not measured, and multi-pod is not complete. The Helm chart is `replicas: 1` (`SCALEOUT-HELM-NPOD-1` P2, `LA-INVESTIGATION-STORE-DESIGN-1` P3). The stakeholder Q&A says NOT YET for multi-pod and for a two-host drill.
   - Retention / legal hold of Investigation evidence is declined (`D-U8`), yet `docs/EDITIONS.md` and the Advanced brochure list "retention, legal hold, residency" as Advanced roadmap. That is a contradiction, and legal hold and residency have no row.
-  - Analyst ergonomics vs i2: no timeline / time-bar view (the G6 `timebar` was declined; only a timeline filter exists, `la-core/user-guide-link-analysis.md` §6), no i2 ANX import/export, no unstructured/document ingestion: no rows. Precision on real data is not measured (stakeholder Q&A line 201).
+  - Analyst ergonomics vs i2: no timeline / time-bar view (the G6 `timebar` was declined; only a timeline filter exists, `la-core/user-guide.md` §6), no i2 ANX import/export, no unstructured/document ingestion: no rows. Precision on real data is not measured (stakeholder Q&A line 201).
 - **RFP stance on the 5 most-asked requirements (link analysis / investigation):**
 
 | Requirement | Stance | Evidence or caveat |
@@ -1581,7 +1581,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Staged jars: 41 first-party, 42 total (`docs/EDITIONS.md`). `release.yml` builds a signed Standard bundle without the policy jar (lines 238–244).
   - Absent-surface parity tests per module: `AnomalyAbsentSurfaceParityTest`, `ReconAbsentSurfaceParityTest`, `ScoringAbsentSurfaceParityTest`, `ScreeningAbsentSurfaceParityTest`, `EntityListAbsentSurfaceParityTest`, `GeoLinkAbsentSurfaceParityTest`, plus `OpsEditionFeaturesTest`.
   - The `tools/check-offerings.mjs` guard (CI `guards`) asserts Offering == bundle == pom profile and checks `minEdition` against each pack (check 5).
-  - Real IdP sign-in proven once against WSO2 IS 7.3.0 (`module/la-core/admin-guide-real-signin.md`, 2026-10-13).
+  - Real IdP sign-in proven once against WSO2 IS 7.3.0 (`module/la-core/admin-guide.md#2-real-oidc-sign-in-runbook-la-app-local-wso2-identity-server`, 2026-10-13).
   - ~~Open: `OFFERING-DECLARATION-DRIFT-1`~~ closed 2026-10-20 (`78fc6e583`).
 - **Strengths vs market:**
   - One SKU spans assurance, case and investigation, where competitors sell separate products. Examples: Linkurious + a case tool; i2 ANB + EIA; Subex or Mobileum modules priced per function (general market, and `layer/product/brochure-competitive-landscape.md`).
