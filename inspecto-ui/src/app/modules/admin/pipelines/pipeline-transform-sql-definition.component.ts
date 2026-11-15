@@ -24,6 +24,7 @@ import {
     FieldMetadataKey,
     SqlField,
     applyFunction,
+    carryMetadata,
     compileFields,
     generateSql,
     newFieldId,
@@ -484,12 +485,16 @@ export class PipelineTransformSqlDefinitionComponent {
     /**
      * SQL → Fields through the reconciler. Refused (the tab is disabled) when the SQL is not a
      * projection. An empty projection (`SELECT *`) seeds one passthrough row per incoming column.
+     * The rows still held from before the switch hand their column metadata to the rebuilt rows by
+     * output name ({@link carryMetadata}), so a round-trip with no edit loses nothing and arms nothing;
+     * a column renamed in the SQL comes back undescribed.
      */
     showFieldsView(): void {
         if (this.view() === 'fields') return;
         const r = this.reconciled();
         if (!r || r.unsupported) return;
-        this.fields.set(r.fields.length ? r.fields : seedFields(this.upstreamColumns()));
+        const rows = r.fields.length ? r.fields : seedFields(this.upstreamColumns());
+        this.fields.set(carryMetadata(rows, this.fields()));
         this.leftOut.set([]);
         this.view.set('fields');
         this.filter.set(this.allRows().some((row) => row.changed) ? 'changed' : 'all');

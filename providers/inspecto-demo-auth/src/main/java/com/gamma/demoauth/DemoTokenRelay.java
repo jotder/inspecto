@@ -85,7 +85,9 @@ public final class DemoTokenRelay implements TokenRelay {
     }
 
     /** The picker: every Demo User's id, name, title and optional landing menu item (UIE-7) — never roles or
-     *  capabilities (pre-sign-in). */
+     *  capabilities (pre-sign-in). {@code rosterLocation} says where the roster file belongs — {@code space} (each
+     *  attached Space's {@code config/}) or {@code write-root} (legacy {@code -Dassist.write.root}) — never a path
+     *  (DEMO-AUTH-ROSTER-REACH-1). */
     @Override
     public Map<String, Object> bootstrapAuth() {
         List<Map<String, Object>> users = new ArrayList<>();
@@ -99,6 +101,7 @@ public final class DemoTokenRelay implements TokenRelay {
         auth.put("demoUsers", users);
         // An empty picker with zero Spaces attached is a dead end the sign-in page must explain.
         auth.put("spacesAttached", DemoUsers.spacesAttached());
+        auth.put("rosterLocation", DemoUsers.attached() == null && DemoUsers.legacyRoot() != null ? "write-root" : "space");
         return auth;
     }
 
@@ -108,14 +111,12 @@ public final class DemoTokenRelay implements TokenRelay {
                 DemoTokens.mint('r', id, now), DemoTokens.REFRESH_SECONDS);
     }
 
-    /** Every hosted Space's Demo Users (multi-Space mode), or the single write root's (legacy mode). */
+    /** Every attached Space's Demo Users ({@link DemoUsers#attached}), or the single write root's (legacy mode). */
     static Map<String, DemoUsers.User> known() {
-        String spaces = System.getProperty("spaces.root");
-        if (spaces != null && !spaces.isBlank()) return DemoUsers.all(Path.of(spaces.trim()));
-        String wr = System.getProperty("assist.write.root");
+        Map<String, Path> spaces = DemoUsers.attached();
+        if (spaces != null) return DemoUsers.all(spaces);
         Map<String, DemoUsers.User> byId = new LinkedHashMap<>();
-        if (wr != null && !wr.isBlank())
-            for (DemoUsers.User u : DemoUsers.load(Path.of(wr.trim()))) byId.put(u.id(), u);
+        for (DemoUsers.User u : DemoUsers.load(DemoUsers.legacyRoot())) byId.put(u.id(), u);
         return byId;
     }
 }

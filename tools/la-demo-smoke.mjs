@@ -7,7 +7,7 @@
 //                                [--staged <dir with TRANSFERS_20260904.csv> --inbox <Space inbox/mule_transfers dir>]
 //                                [--burst] [--embed] [--telecom [--presenter fm.manager] [--four-eyes 2000] [--telecom-timeout 180]] [--dry-run]
 //
-// Newer behaviour, always run (each prints PASS/FAIL/SKIPPED): empty-dataset (409 'has no data yet', no engine/path leak; SKIPPED when
+// Newer behaviour, always run (each prints PASS/FAIL/SKIPPED): empty-dataset (409 'has no rows yet', no engine/path leak; SKIPPED when
 // the telecom Dataset already has rows), read-only-persona (ra.analyst 403 missing capability, read 200), settings-roundtrip (PUT the same
 // document back; maxAgeHours 0/8761 = 422 1..8760), signin-picker (/bootstrap auth.mock). --embed (host runs -Dla.embed.enabled=true; admin
 // must lead the Investigation): mint + public GET headers + mangled/revoked uniform 404 + revoke; without it only the dark answers (503/404).
@@ -294,11 +294,11 @@ export async function runTelecom({ call, record, skip = () => {}, presenter = 'f
 export const EMPTY_DATASET = 'telecom_links_dataset';
 const LEAK = /IO Error|read_parquet|[A-Za-z]:[\\/]|\/tmp\b|\/home\/|\/var\//;
 
-/** A never-ingested Dataset answers a calm 409 naming "has no data yet", never an engine/path leak. */
+/** A never-ingested Dataset answers a calm 409 naming "has no rows yet", never an engine/path leak. */
 export function emptyDatasetVerdict(res) {
   if (res.status !== 409) return `expected HTTP 409, got ${excerpt(res)}`;
   const text = JSON.stringify(res.body ?? null);
-  if (!/has no data yet/.test(text)) return `message lacks "has no data yet": ${excerpt(res)}`;
+  if (!/has no rows yet/.test(text)) return `message lacks "has no rows yet": ${excerpt(res)}`;
   const leak = text.match(LEAK);
   return leak ? `message leaks "${leak[0]}": ${excerpt(res)}` : null;
 }
@@ -457,7 +457,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
     log(`  admin         GET /spaces/${space}/audit/route-inventory  -> ${EXPECTED_LA_ROUTES} Link Analysis routes`);
     log(`  fm.analyst    GET dossier, tamper the manifest, POST dossier/verify  -> verified:false`);
     log(`  fm.analyst    replay hash before/after copying a staged file  ${inbox && staged ? '' : '(SKIPPED: no --staged/--inbox)'}`);
-    log(`  fm.analyst    GET ${EMPTY_DATASET} rows (empty) then POST /inv/projection  -> 409 'has no data yet', no IO Error/read_parquet/path  (SKIPPED if it has rows)`);
+    log(`  fm.analyst    GET ${EMPTY_DATASET} rows (empty) then POST /inv/projection  -> 409 'has no rows yet', no IO Error/read_parquet/path  (SKIPPED if it has rows)`);
     log(`  ra.analyst    POST ops expand -> 403 missing capability; GET log -> 200`);
     log(`  admin         GET /settings/link-analysis, PUT it back unchanged, GET equal; PUT index.maxAgeHours 0 and 8761 -> 422 (1..8760)`);
     log(`  admin         embed link ${embed ? 'mint, public GET (CSP frame-ancestors none, DENY, no-store), mangled vs revoked = same 404, revoke' : '(feature dark) mint -> 503 CAPABILITY_UNAVAILABLE, public GET -> 404  (pass --embed when the host runs -Dla.embed.enabled=true)'}`);

@@ -447,9 +447,7 @@ describe('projection limit is configurable (D-S3)', () => {
 });
 
 describe('invErrorMessage - an empty Dataset store', () => {
-    const noData =
-        "Dataset 'mule_transfers_dataset' has no data yet: nothing has been ingested into its store (mule_transfers). " +
-        "Run the Pipeline that fills it, or check the Dataset's physicalRef.";
+    const noData = "Dataset 'mule_transfers_dataset' has no rows yet: its Pipeline 'mule_transfers' has not run.";
     const http = (status: number, message: string) => new HttpErrorResponse({ status, error: { error: { message } } });
 
     it('shows the server words plus a hint, with no DuckDB text', () => {
@@ -458,6 +456,9 @@ describe('invErrorMessage - an empty Dataset store', () => {
         expect(out).toContain('Nothing is wrong with your query');
         expect(out).not.toContain('projection failed');
         expect(out).not.toContain('IO Error');
+        // LA-EMPTY-DATASET-WORDING-1: an analyst's words, not the developer's
+        expect(out).not.toContain('physicalRef');
+        expect(out).not.toContain('store');
     });
 
     it('leaves any other 409 as the server says it', () => {

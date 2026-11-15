@@ -60,6 +60,8 @@ export interface DataEntry {
     primaryEntityType: string | null;
     /** What one row is: a record type id of the Space's packs (ENTITY-TYPE-CATALOG-1 P2); null when not said. */
     recordType: string | null;
+    /** LA-EMPTY-DATASET-WORDING-1: the server found no data file in its store yet (false when it found one or cannot tell). */
+    empty: boolean;
 }
 
 /**
@@ -141,6 +143,7 @@ export function dataEntry(def: ComponentDef): DataEntry {
         eventDate: str(c['eventDate']),
         primaryEntityType: str(c['primaryEntityType']),
         recordType: str(c['recordType']),
+        empty: def.empty === true,
     };
 }
 

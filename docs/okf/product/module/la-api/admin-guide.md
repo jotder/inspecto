@@ -59,4 +59,4 @@ INSTALL keys: `graph_run.threads` (2) / `queue` (16), `index.threads` (1) / `que
 | Reads slow, response says `source: flat` with a `Reason` | no published index, stale index, or caps exceeded; see [la-storage admin guide](../la-storage/admin-guide.md) |
 | 429 on exploration | raise `rate.link_analysis_*` via `PUT /system/link-analysis/limits` |
 | Graph Run `REJECTED` / `BUDGET_EXCEEDED` | pool full, or the run exceeds `graph_run.max_*` |
-| 409 "Dataset has no data yet" | the Dataset's store is empty: run the Pipeline that fills it |
+| 409 "Dataset … has no rows yet: its Pipeline has not run" | the Dataset's store is empty: run the Pipeline that fills it |

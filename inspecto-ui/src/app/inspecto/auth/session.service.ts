@@ -76,7 +76,12 @@ interface Bootstrap {
     branding?: Partial<BootstrapBranding>;
     /** PRODUCT-ASSEMBLY-1 PA-3: the Product this server was built as; null from a server without a descriptor. */
     product?: BootstrapProduct | null;
-    auth?: Partial<OidcConfig> & { demoUsers?: DemoUser[]; spacesAttached?: number };
+    auth?: Partial<OidcConfig> & {
+        demoUsers?: DemoUser[];
+        spacesAttached?: number;
+        /** DEMO-AUTH-ROSTER-REACH-1: where demo-users.toon belongs - each attached Space, or the legacy write root. */
+        rosterLocation?: 'space' | 'write-root';
+    };
     /** PRODUCT-ASSEMBLY-1 PA-7a/7b: the install's entitlement (every signed-in caller sees the state; an administrator more). */
     entitlement?: EntitlementSummary;
 }
@@ -240,6 +245,8 @@ export class SessionService {
     readonly demoNoSpace = signal(false);
     /** DEMO-AUTH-NO-ROSTER-1: a demo build with Spaces attached but no Demo User in any of them — the page says why. */
     readonly demoNoUsers = signal(false);
+    /** DEMO-AUTH-ROSTER-REACH-1: the roster sits in the legacy write root (`auth.rosterLocation`), not in a Space. */
+    readonly demoRosterInWriteRoot = signal(false);
 
     private readonly accessToken = signal<string | null>(null);
     private oidc: OidcConfig | null = null;
@@ -353,6 +360,7 @@ export class SessionService {
         this.demoNoUsers.set(
             boot.auth?.mock === true && boot.auth?.demoUsers?.length === 0 && boot.auth?.spacesAttached !== 0,
         );
+        this.demoRosterInWriteRoot.set(boot.auth?.mock === true && boot.auth?.rosterLocation === 'write-root');
         // A returning user still holds the httpOnly refresh cookie — mint an access token from it. A 401
         // just means "not signed in yet"; the guard will route to sign-in.
         if (!readResumable()) return; // never signed in here, or signed out: nothing to resume, no 401

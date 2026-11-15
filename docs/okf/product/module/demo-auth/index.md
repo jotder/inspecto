@@ -32,6 +32,4 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.demo-auth` — the board is the only list; change the row there.
 
-| Row | Priority | Kind | Title | Hold |
-|---|---|---|---|---|
-| `DEMO-AUTH-ROSTER-REACH-1` | P3 | defect | three places demo sign-in still disagrees with the Spaces the server boots (filed 2026-11-14, left by DEMO-AUTH-STALE-ROSTER-1). | — |
+_No open rows._

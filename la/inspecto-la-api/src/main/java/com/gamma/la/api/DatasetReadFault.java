@@ -15,7 +15,8 @@ import java.util.regex.Pattern;
  *
  * <ul>
  *   <li>A file-backed Dataset whose store holds no files yet (DuckDB: "No files found that match the pattern")
- *       answers a closed 409 naming the Dataset and its store - never DuckDB's text, never a server path.</li>
+ *       answers a closed 409 naming the Dataset and the Pipeline that fills it - never DuckDB's text, never a server
+ *       path.</li>
  *   <li>Any other driver message keeps its useful text but loses the JDBC preamble and every absolute filesystem
  *       path (a Windows drive path or a POSIX path of two or more segments reads as {@code <path>}).</li>
  * </ul>
@@ -35,7 +36,7 @@ public final class DatasetReadFault {
     /**
      * @param what      the route's own phrase ("projection failed", "traversal failed"...)
      * @param datasetId the Dataset the read ran over
-     * @param writeRoot the Space's config root, to name the Dataset's store; may be {@code null}
+     * @param writeRoot the Space's config root, to name the Pipeline that fills the Dataset; may be {@code null}
      */
     public static ApiException of(String what, String datasetId, Path writeRoot, Exception e) {
         String raw = DuckDbUtil.withoutPendingQueryPreamble(e.getMessage());
@@ -45,7 +46,7 @@ public final class DatasetReadFault {
 
     /** The closed 409: the Dataset exists and is well-formed, its store simply holds nothing yet. */
     public static ApiException noData(String datasetId, Path writeRoot) {
-        return new ApiException(409, ErrorCodes.CONFLICT, DatasetNoData.message(datasetId, storeOf(datasetId, writeRoot)));
+        return new ApiException(409, ErrorCodes.CONFLICT, DatasetNoData.message(datasetId, pipelineOf(datasetId, writeRoot)));
     }
 
     /** {@code message} with every absolute path replaced; {@code null} stays {@code null}. */
@@ -56,13 +57,11 @@ public final class DatasetReadFault {
         return QUOTED_PATH.matcher(m).replaceAll("'<path>'");
     }
 
-    private static String storeOf(String datasetId, Path writeRoot) {
+    private static String pipelineOf(String datasetId, Path writeRoot) {
         if (writeRoot == null) return null;
         try {
             Map<String, Object> ds = DatasetProviders.require().dataset(writeRoot, datasetId).orElse(null);
-            Object ref = ds == null ? null : ds.get("physicalRef");
-            String s = ref == null ? null : String.valueOf(ref).trim();
-            return s == null || s.isEmpty() ? null : s;
+            return DatasetNoData.pipelineOf(ds);
         } catch (RuntimeException ignore) {
             return null;
         }

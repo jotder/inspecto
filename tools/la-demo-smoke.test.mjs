@@ -371,7 +371,7 @@ function withNewer(inner, f = {}) {
     if (p === '/bootstrap') return res(200, { data: { auth: f.noMock ? {} : { mock: true, ...(f.attached0 && { spacesAttached: 0 }) } } });
     if (p.startsWith('/datasets/telecom_links_dataset/rows')) return res(f.rowsMissing ? 404 : 200, { data: { rows: f.rowsExist ? [{ a: 1 }] : [] } });
     if (p === '/inv/projection' && init.method === 'POST' && body.dataset === 'telecom_links_dataset')
-      return res(f.wrong409 ? 500 : 409, { error: { message: f.leak ? 'has no data yet: IO Error: read_parquet C:/data/x' : 'telecom_links_dataset has no data yet' } });
+      return res(f.wrong409 ? 500 : 409, { error: { message: f.leak ? 'has no rows yet: IO Error: read_parquet C:/data/x' : 'telecom_links_dataset has no rows yet' } });
     if (p.endsWith('/ops') && who === 'Bearer demo:ra.analyst') return res(f.writeAllowed ? 200 : 403, { error: { message: 'missing capability canInvestigate' } });
     if (p.endsWith('/log') && who === 'Bearer demo:ra.analyst') return res(200, { data: {} });
     if (p === '/settings/link-analysis') {
@@ -420,7 +420,7 @@ test('empty-dataset: FAILs a leak or a wrong status; SKIPs when the Dataset has 
     assert.equal(failsOf(rs), '');
     assert.ok(rs.some((r) => r.skipped && /empty-dataset/.test(r.id)));
   }
-  assert.match(emptyDatasetVerdict({ status: 409, body: { error: { message: 'has no data yet at /tmp/x' } } }), /\/tmp/);
+  assert.match(emptyDatasetVerdict({ status: 409, body: { error: { message: 'has no rows yet at /tmp/x' } } }), /\/tmp/);
 });
 
 test('read-only-persona FAILs a persona that can write', async () => {
@@ -461,5 +461,5 @@ test('signin-picker FAILs a non-demo build or spacesAttached 0', async () => {
 
 test('the dry run lists the newer probes', async () => {
   const lines = []; await run({ dryRun: true, embed: true, log: (l) => lines.push(l) });
-  for (const w of [/has no data yet/, /ra\.analyst/, /maxAgeHours/, /public GET/, /\/bootstrap/]) assert.ok(lines.some((l) => w.test(l)), String(w));
+  for (const w of [/has no rows yet/, /ra\.analyst/, /maxAgeHours/, /public GET/, /\/bootstrap/]) assert.ok(lines.some((l) => w.test(l)), String(w));
 });

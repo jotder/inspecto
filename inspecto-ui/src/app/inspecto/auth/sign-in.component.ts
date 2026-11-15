@@ -136,8 +136,14 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                                 title="No Demo Users"
                                 data-testid="no-demo-users"
                             >
-                                No Demo Users are configured in this installation: no attached Space has
-                                config\\demo-users.toon. Add one to a Space, then try again (no restart needed).
+                                @if (rosterInWriteRoot()) {
+                                    <!-- DEMO-AUTH-ROSTER-REACH-1: legacy mode reads <write root>/demo-users.toon, no config folder. -->
+                                    No Demo Users are configured in this installation: the server's write root has no
+                                    demo-users.toon. Add one there, then try again (no restart needed).
+                                } @else {
+                                    No Demo Users are configured in this installation: no attached Space has
+                                    config\\demo-users.toon. Add one to a Space, then try again (no restart needed).
+                                }
                                 <button mat-button type="button" (click)="reload()">Try again</button>
                             </inspecto-alert>
                         }
@@ -225,6 +231,8 @@ export class SignInComponent implements OnInit {
     /** DEMO-AUTH-NO-ROSTER-1: Spaces attached, none carries a roster — without this the page fell back to the SSO
      *  button, whose mock code no demo server accepts ("Sign-in failed"). */
     readonly noUsers = computed(() => this.session.demoNoUsers() && this.demoUsers().length === 0);
+    /** DEMO-AUTH-ROSTER-REACH-1: legacy mode keeps the roster in the write root, so the hint must not point at a Space. */
+    readonly rosterInWriteRoot = computed(() => this.session.demoRosterInWriteRoot());
     /** LIVEFIX2 #3: the server's own message when `GET /bootstrap` answered an error. */
     readonly startupError = computed(() => this.session.bootstrapError());
 

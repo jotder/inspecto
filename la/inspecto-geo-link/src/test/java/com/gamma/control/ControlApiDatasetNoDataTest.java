@@ -79,10 +79,12 @@ class ControlApiDatasetNoDataTest {
 
     private static void assertClosed(HttpResponse<String> r, String dataset, String store, String route) throws Exception {
         assertEquals(409, r.statusCode(), r.body());
+        assertEquals("CONFLICT", new ObjectMapper().readTree(r.body()).at("/error/errorCode").asText(), r.body());
         String message = new ObjectMapper().readTree(r.body()).at("/error/message").asText();
-        assertTrue(message.contains("Dataset '" + dataset + "' has no data yet"), message);
-        if (route == null) assertTrue(message.contains(store), "names the store: " + message);
-        assertTrue(message.contains("Run the Pipeline"), message);
+        // LA-EMPTY-DATASET-WORDING-1: an analyst's words - a bare store name is not proof of a Pipeline, so none is named
+        assertEquals("Dataset '" + dataset + "' has no rows yet: its Pipeline has not run.", message, route);
+        for (String dev : List.of(store, "physicalRef", "its store"))
+            assertFalse(message.contains(dev), "no '" + dev + "' in: " + message);
         for (String leak : List.of("IO Error", "read_parquet", "CREATE VIEW", "LINE 1", "projection failed", ":/", ":\\", "**", System.getProperty("java.io.tmpdir").replace('\\', '/'), "/tmp"))
             assertFalse(r.body().replace('\\', '/').contains(leak), "no '" + leak + "' in: " + r.body());
     }
@@ -98,6 +100,37 @@ class ControlApiDatasetNoDataTest {
                     "empty_store_ds", store);
             assertClosed(post(c, "/inv/projection/multi", "{\"edges\":[{\"dataset\":\"empty_store_ds\",\"sourceColumn\":\"who\",\"targetColumn\":\"other\"}]}"),
                     "empty_store_ds", store);
+        }
+    }
+
+    /**
+     * LA-EMPTY-DATASET-WORDING-1: a Dataset that records its Pipeline ({@code importPipeline}) names that Pipeline on
+     * every refusal the Data page and Explore meet - the projection, a preset, the shape marks and Discover - with the same
+     * status and machine code as before.
+     */
+    @Test
+    void aPipelineFedEmptyDatasetNamesItsPipelineInAnalystWords(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        String pipeline = "never_run_" + System.nanoTime();
+        try (Ctx c = open(cfg, root)) {
+            new ComponentStore(root.resolve("registry")).write("dataset", "fed_ds", Map.of("physicalRef", pipeline + "/database", "importPipeline", pipeline));
+            Map<String, HttpResponse<String>> answers = new java.util.LinkedHashMap<>();
+            answers.put("projection", post(c, "/inv/projection", "{\"dataset\":\"fed_ds\",\"sourceCol\":\"who\",\"targetCol\":\"other\"}"));
+            answers.put("preset", post(c, "/inv/presets/any/run", "{\"dataset\":\"fed_ds\"}"));
+            answers.put("shapes", get(c, "/inv/datasets/fed_ds/shapes"));
+            answers.put("discover", get(c, "/inv/datasets/fed_ds/discover"));
+            answers.forEach((route, r) -> {
+                try {
+                    assertEquals(409, r.statusCode(), route + ": " + r.body());
+                    JsonNode error = new ObjectMapper().readTree(r.body()).at("/error");
+                    assertEquals("CONFLICT", error.get("errorCode").asText(), route + ": " + r.body());
+                    assertEquals("Dataset 'fed_ds' has no rows yet: its Pipeline '" + pipeline + "' has not run.",
+                            error.get("message").asText(), route);
+                    for (String dev : List.of("physicalRef", "store", "/database", "IO Error", "read_parquet"))
+                        assertFalse(r.body().contains(dev), route + ": no '" + dev + "' in " + r.body());
+                } catch (Exception e) {
+                    throw new AssertionError(route + ": " + e.getMessage(), e);
+                }
+            });
         }
     }
 

@@ -184,6 +184,14 @@ import {
                                             <span class="text-secondary truncate text-xs">{{
                                                 d.name !== d.id ? d.id + ' · ' + summary(d) : summary(d)
                                             }}</span>
+                                            <!-- LA-EMPTY-DATASET-WORDING-1: a Pipeline-fed Dataset whose store holds nothing yet -->
+                                            @if (d.origin === 'other' && d.empty) {
+                                                <span
+                                                    class="text-warn truncate text-xs"
+                                                    [attr.data-testid]="'data-empty-' + d.id"
+                                                    >{{ noRowsYet }}</span
+                                                >
+                                            }
                                         </span>
                                     </button>
                                 }
@@ -299,6 +307,11 @@ import {
                                             Its data is written there, not added here. What its columns hold and its
                                             Mappings are set here.
                                         </p>
+                                        @if (d.empty) {
+                                            <p class="text-warn m-0 text-sm" data-testid="pipeline-card-empty">
+                                                {{ noRowsYet }}: there is nothing to explore until it writes some.
+                                            </p>
+                                        }
                                     </div>
                                 }
 
@@ -629,6 +642,8 @@ export class DataPageComponent implements OnInit {
     private readonly dialog = inject(MatDialog);
 
     protected readonly addData = ADD_DATA_ROUTE;
+    /** LA-EMPTY-DATASET-WORDING-1: what a Pipeline-fed Dataset whose store holds nothing yet says. */
+    protected readonly noRowsYet = 'No rows yet — its Pipeline has not run';
     protected readonly line = mappingLine;
     protected readonly optional = [
         { key: 'kind', label: 'Kind of link', help: 'A column naming the kind of each link', role: null },

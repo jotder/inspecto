@@ -29,6 +29,7 @@ function create(
         configured?: boolean;
         noSpace?: boolean;
         noUsers?: boolean;
+        rosterInWriteRoot?: boolean;
         productName?: string;
         signInPitch?: { title: string; body: string };
     } = {},
@@ -43,6 +44,7 @@ function create(
         demoUsers: signal<DemoUser[]>(opts.demoUsers ?? []),
         demoNoSpace: signal(opts.noSpace ?? false),
         demoNoUsers: signal(opts.noUsers ?? false),
+        demoRosterInWriteRoot: signal(opts.rosterInWriteRoot ?? false),
         bootstrapError: signal<string | null>(opts.bootstrapError ?? null),
     };
     const router = { navigate: vi.fn() };
@@ -195,6 +197,18 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
         expect(el.querySelector('[data-demo-user]')).toBeNull();
         expect(el.querySelector('[data-testid="no-space"]')).toBeNull();
         await expectNoA11yViolations(el);
+    });
+
+    // DEMO-AUTH-ROSTER-REACH-1: legacy -Dassist.write.root mode reads <write root>/demo-users.toon — sending the
+    // operator to "an attached Space's config\demo-users.toon" pointed at a file the server never reads.
+    it('a legacy demo with no roster points at the write root, not at a Space', () => {
+        const { el } = create({ noUsers: true, rosterInWriteRoot: true });
+        const note = el.querySelector('[data-testid="no-demo-users"]')?.textContent?.replace(/\s+/g, ' ');
+        expect(note).toContain(
+            "No Demo Users are configured in this installation: the server's write root has no demo-users.toon. Add one there, then try again (no restart needed).",
+        );
+        expect(note).not.toContain('Space');
+        expect(note).toContain('Try again');
     });
 
     it('a roster conflict is shown with the server message, and the generic text stays for unknown errors', () => {

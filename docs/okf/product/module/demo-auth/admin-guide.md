@@ -59,6 +59,7 @@ users[2]{id,displayName,title,roles,landing}:
 |---|---|
 | Boot fails: "inspecto-demo-auth refuses to load: set -Dcontrol.bind=127.0.0.1" | Started without the loopback bind; use `serve-demo`. |
 | Log block "DEMO SIGN-IN IS DISABLED"; sign-in answers 409 `DEMO_ROSTER_CONFLICT` | The same Demo User is defined differently in two Spaces. Align or remove one `demo-users.toon`; no restart needed. |
+| Legacy write-root mode (`-Dassist.write.root`): sign-in page says "the server's write root has no demo-users.toon" | Put `demo-users.toon` directly in the write root; no restart needed. |
 | Sign-in page says "No Space attached"; log "DEMO SIGN-IN HAS NO USERS … No Space is attached" | No Space folder under `spaces.root` that the server accepts as a Space; `_templates`, hidden folders and backup, snapshot or scratch copies (e.g. `backup-acme`, `acme.bak`) do not count, and a roster inside one is ignored. Copy in a Space that carries `config/demo-users.toon`, then restart. |
 | Sign-in page says "No Demo Users"; log "DEMO SIGN-IN HAS NO USERS … No attached Space carries config/demo-users.toon" | Spaces are attached but none defines Demo Users. Add `config/demo-users.toon` to one; no restart needed, the page's *Try again* reads it. Nobody can sign in until then: there is no built-in roster. |
 | 401 right after sign-in | The bundle is not a `-Distribution demo` build, or the user was removed from the roster. |
