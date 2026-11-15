@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **103<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 90<!--count:backlog-p3--> × P3** —
+> **102<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 89<!--count:backlog-p3--> × P3** —
+> ⬇ **103 → 102 (P3 90 → 89) on 2026-11-15**: closed P3 defect `ALERT-EVALUATE-NO-BREACH-WORDING-1` [items: addon.incidents, module.engine · kind: defect] — an `alert.evaluate` Run with nothing fired now says "no new breach (an Alert still open is refreshed, not raised again)" instead of "no rule breached".
 > ⬇ **104 → 103 (P3 91 → 90) on 2026-11-15**: closed P3 defect `LA-EMPTY-DATASET-WORDING-1` [items: module.la-core, module.la-api · kind: defect] — an empty Pipeline-fed Dataset is refused in user words ("has no rows yet: its Pipeline 'x' has not run"), and `GET /components/dataset` gives each Dataset `empty` (a cheap first-file check) so the Data page says so. `UI-TS-STRICT-1` re-measured and put on hold for an operator decision: the vendored `@gamma` code cannot be left out of a strict build.
 > ⬇ **105 → 104 (P3 92 → 91) on 2026-11-15**: closed P3 defect `DEMO-AUTH-ROSTER-REACH-1` [items: module.demo-auth · kind: defect] — demo sign-in reads its users from the Spaces the server actually booted (published by `SpaceManager` through `SpaceFolders`), so a `.ref` Space's roster signs in and a folder refused for overlap, pod ownership or a failed boot is neither read nor counted; in legacy write-root mode the sign-in page names the write root.
 > ⬇ **106 → 105 (P3 93 → 92) on 2026-11-15**: closed P3 defect `MASKING-TYPE-ID-EDGES-1` [items: module.la-api, module.engine · kind: defect] — decided: a `quality.pii.mask` Step naming an Entity Type's id masks every class that type claims (a claimed class still selects only itself); `DELETE /inv/entity-types/{id}` answers `entityTypesInForce` with `maskedInForce`, the same shape as `GET /settings/link-analysis` (`EntityTypes.inForceShape`).
@@ -569,10 +570,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 90<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 89<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 90<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 103<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 89<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 102<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -789,7 +790,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Alerting & freshness
 
-- **P3** · `ALERT-EVALUATE-NO-BREACH-WORDING-1` — **an `alert.evaluate` Job logs "no rule breached" on every run while an Alert it raised stays OPEN.** An Alert Rule is edge-triggered (an open Alert is refreshed in place, not raised again: `ALERT-VALUE-REFRESH-1`), so on a build with armed Alert Rules the line does not mean "no breach". Say "no new breach", or name the open Alerts. Seen in every Preview showcase of the release proof 2026-11-09. → `okf/product/solution-pack/la-showcase/admin-guide-showcase-release.md` [items: addon.incidents, module.engine · kind: defect]
 
 #### Signals, decisions & notifications
 

@@ -87,7 +87,7 @@ is untouched.
 
 The same Space download carries an Advanced tier. On Basic it is **inert**: `demo-users.toon` and `roles.toon` are
 ignored (there is no sign-in), the Alert Rule `utility_transformer_loss` is loaded but not armed (a WARN, "Not arming
-alert rule"), and the `utility_loss_alerts` Job runs and reports no rule breached. On a build with sign-in it comes to
+alert rule"), and the `utility_loss_alerts` Job runs and reports no new breach. On a build with sign-in it comes to
 life. To show it, use the demo build, which signs people in by name with no password (Preview, Demo Auth, loopback
 only), and the same Space and data downloads:
 

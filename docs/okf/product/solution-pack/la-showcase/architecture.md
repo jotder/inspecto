@@ -253,7 +253,7 @@ What "inert" means, as seen live on Basic:
 | Part | On Basic |
 |---|---|
 | `config/demo-users.toon`, `config/roles.toon` | ignored (no sign-in; only the demo-auth module reads the roster). The gallery no longer refuses a `minEdition: basic` template for its roster (operator 2026-11-08, "A: allow on Basic") |
-| Alert Rules (`config/registry/alert-rules/`, or deferred `config/pending/alert-rules/`) | loaded, **not armed**: a WARN "Not arming alert rule '<rule>'" at boot; the `alert.evaluate` Job runs and logs "no rule breached"; 0 Alerts. The gallery and `POST /spaces` do not refuse them for a `minEdition: basic` template (operator 2026-11-08, "A: allow, unarmed"; each rule's content is still judged). Rules: [Spaces user guide](../../layer/product/user-guide-spaces.md), edition fit |
+| Alert Rules (`config/registry/alert-rules/`, or deferred `config/pending/alert-rules/`) | loaded, **not armed**: a WARN "Not arming alert rule '<rule>'" at boot; the `alert.evaluate` Job runs and logs "no new breach"; 0 Alerts. The gallery and `POST /spaces` do not refuse them for a `minEdition: basic` template (operator 2026-11-08, "A: allow, unarmed"; each rule's content is still judged). Rules: [Spaces user guide](../../layer/product/user-guide-spaces.md), edition fit |
 | `masking_mode` in `link-analysis.toon` | **left unset** in every showcase: the edition default (`EditionMaskingDefault`) is `none` where nobody signs in and `typed` with sign-in. A stated `typed` masked every id on Basic, where nobody can reveal it (found on `la-claims`) |
 | `la.index.build`, `la.detect` Jobs | run and succeed (built in on every edition) |
 | a Job whose type's module is not installed (for example `risk.score`) | listed `hosted: false`, never fires |
@@ -325,5 +325,5 @@ What "inert" means, as seen live on Basic:
 - Two views of the older showcases are cut at the 4 000-row default projection limit on every edition,
   `mm_money_trail` (`la-mobile-money`) and `telecom_fraud_network` (`la-showcase`); left as found.
 - A product zip attaches no Space, but its template gallery still carries every template's data.
-- On a Preview log, the `alert.evaluate` Job's "no rule breached" line also appears while an Alert stays open (the rule
-  is edge-triggered), so it does not mean "no breach" there (`ALERT-EVALUATE-NO-BREACH-WORDING-1`).
+- On a Preview log, the `alert.evaluate` Job says "no new breach" while an Alert stays open: the rule is edge-triggered,
+  so the open Alert is refreshed, not raised again (worded so since 2026-11-15, `ALERT-EVALUATE-NO-BREACH-WORDING-1`).
