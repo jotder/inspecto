@@ -101,7 +101,7 @@ was refused) and `okf/product/module/processor/spec-queries.md` §3.3–§3.5. *
   stale — see [`db-layer.md`](../../module/engine/spec-db-layer.md) §*Proving the JDBC stores on real
   PostgreSQL (DAT-6)* for how the probe that "confirmed" the gap was itself blind). ⛔ All of them SKIP without a configured server, so this is coverage, not evidence. The page
   is corrected to those numbers.
-- **`status.backend` defaults to `db`**, not `file` (`OperationalDb.java:132`, flipped 2026-08-31); `db-layer.md`
+- **`status.backend` defaults to `db`**, not `file` (`OperationalDb.java`, flipped 2026-08-31); `db-layer.md`
   §2 still said `file` and its "exactly one store defaults on" paragraph predates two more defaults.
 - **`structured` queries: "no server compiler" is half true.** The R6 sign-off says a server-side structured
   compiler would duplicate the builder "for no functional gain", and `/queries/{id}/run` answers `422` on a
@@ -209,7 +209,7 @@ authored in the Studio **Query Library** (`/studio/queries`), which since 2026-0
 and Expectations) — and declares `$`-parameters for **SQL only** (a structured query has no text to scan;
 deliberate cut).
 
-**`POST /queries/{id}/run`** (`QueryRoutes.java:43`): `422` unless `type: sql`; **`Parameters.resolve`**
+**`POST /queries/{id}/run`** (`QueryRoutes.java`): `422` unless `type: sql`; **`Parameters.resolve`**
 (`platform/inspecto-engine/src/main/java/com/gamma/query/Parameters.java`) substitutes the built-ins `$today`, `$now`, `$day(n)`,
 `$current_user`, `$role` and user-declared `$name` (+ offset), leaves `:name` and `${ENV:KEY}` untouched, and
 **leaves an unknown token verbatim** (the save-time rejection of unknown tokens is the *job* parameter
@@ -349,7 +349,7 @@ precedence = per-config → the served `scheduler.toon` value → `-Dprocessing.
 code default `defaultMemoryLimit()`** (40 % RAM ÷ 4, ≥ 1 GiB — GAP-4, 2026-09-26; until then DuckDB's own
 ≈80 %), `effectiveWorkerThreads` (cores ÷ batch
 concurrency, against oversubscription), `buildCopyOptions` (PARQUET → SNAPPY). The D11 pair (2026-08-26):
-`maxConcurrentRuns` **defaults to 4** (`JobService.java:184`); `memory_limit` is **served, not mirrored** —
+`maxConcurrentRuns` **defaults to 4** (`JobService.java`); `memory_limit` is **served, not mirrored** —
 `GET|PUT /system/scheduler` owns it with `file > property > default` provenance and a portable, anchored
 grammar (`duckdbMemoryLimitPattern`, DuckDB's `80%` form accepted). **Measured, not reasoned** (2026-07-27):
 peak memory does **not** scale with input on the ingest path, and blocking operators **hard-fail instead of
@@ -374,7 +374,7 @@ decided representation for non-additive measures. ⛔ Do not re-litigate from Du
 
 ### 3.8 The operational stores and Postgres
 
-**`OperationalDb.Family`** (`inspecto/src/main/java/com/gamma/service/OperationalDb.java:77-135`) is **the
+**`OperationalDb.Family`** (`inspecto/src/main/java/com/gamma/service/OperationalDb.java`) is **the
 roster — sixteen families**, each with its own `-D<family>.backend` toggle and default:
 
 | Family | Default | Family | Default |
@@ -561,6 +561,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 > `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
 > starting point and read the row before acting on it:
 > `CONSUMER-PAIRS-1`, `SPEC-STALEREF-1`, `SPEC-NOPROOF-1`, `SPEC-DEADSEAM-1`.
+> ⚠ **None of these ids is an open board row today** (re-checked 2026-11-15, `DOCS-AGENT-WRITTEN-REVIEW-1`): `SPEC-STALEREF-1` closed 2026-09-09 when `tools/check-doc-citations.mjs` became a guard, `SPEC-NOPROOF-1` closed 2026-09-09 when all six Musts had tests, and the rest were closed, refuted or split into their own rows by the 2026-09-24 board consolidation. Their history: `docs/archived-documents/backlog-snapshot-2026-09-24.md` and `docs/archived-documents/plans-archive/post-consolidation-sprints.md`.
 > ✅ **`CONSUMER-PAIRS-1` decided 2026-09-10 (operator, per row):** `POST /queries/{id}/run` **ADOPT** (a Run action per saved query); materialization **ADOPT** (a Materialize action + one committed example job) → `BACKLOG.md` §3 `STUDIO-HALVES-1`.
 >
 > ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
@@ -640,7 +641,7 @@ A whole Space on S3 (no atomic rename); `hadoop-client` for HDFS (⛔ never — 
 |---|---|---|
 | "D11 — NOT implemented; no default `memory_limit`" (2026-07-25) → "both on by default" (2026-08-26) | **the concurrency half defaults on; `memory_limit` is served with no code default** — corrected with this spec | `duckdb.md`, `api-stability.md`, GAP-4 |
 | "`DuckDB` defaults to UTC" | the host zone, probed 2026-08-15 | `duckdb.md` |
-| `status.backend` default `file` | `db` (2026-08-31) — corrected in `db-layer.md` §2 with this spec | `OperationalDb.java:132` |
+| `status.backend` default `file` | `db` (2026-08-31) — corrected in `db-layer.md` §2 with this spec | `OperationalDb.java` |
 | "exactly one store defaults on" (2026-08-10) | three do — `consignment_outputs`, the dedup ledger (D-9), status | `db-layer.md` |
 | Postgres coverage "6 of 9" / "all seven" / "all ten"; roster "ten" / "eleven" families | **9 of 12**, roster **12** — corrected with this spec | `db-layer.md` |
 | `Cube` as the asset noun | **Matrix**, a label over `DERIVED_TABLE` (2026-08-04); §6-B's "not yet surfaced as of 2026-07-20" corrected with this spec | `GLOSSARY.md` |
@@ -671,14 +672,18 @@ A whole Space on S3 (no atomic rename); `hadoop-client` for HDFS (⛔ never — 
 ## 8. Verification
 
 > 🔴 **One promise here is not provable in this reactor, and it is worth knowing before trying.**
-> `DuckLakeRegistrar`'s class javadoc promises that "any connectivity or SQL failure is caught … without
-> aborting ETL success for the file" — load-bearing, because its one caller (`ConsignmentIngestor:288`)
-> runs it inside the batch's **durable finalisation**, where a throw would demote a batch whose data is
-> already written. Measured 2026-09-09: the reachability and guard tests cost **0.4 s**, while two tests
+> `DuckLakeRegistrar`'s class javadoc promises that, in a `single` topology, "any connectivity or SQL
+> failure is caught and logged without aborting ETL success for the file" — load-bearing, because the
+> ingest lane (`ConsignmentIngestor`, through `DuckLakeRegistrar.register`) runs it inside the batch's
+> **durable finalisation**, where a throw would demote a batch whose data is already written (the
+> pipeline-job lane, `PipelineJobRunner`, calls `registerInto`). Measured 2026-09-09: the reachability and guard tests cost **0.4 s**, while two tests
 > that drove an *enabled* block cost **262 s**, because `INSTALL ducklake FROM core` is a **network**
 > fetch that runs before any failure the promise covers, and `DuckDbUtil.jdbcUrl` exposes no settings
-> hook to make it fail fast. ⛔ So it needs a reachable catalog — a live deployment, not the reactor — and
-> it stays open under `SPEC-NOPROOF-1`. Adding 4.4 minutes to an offline build would be a defect, and a
+> hook to make it fail fast. ⛔ So it needs a reachable catalog — a live deployment, not the reactor.
+> `SPEC-NOPROOF-1` closed on 2026-09-09 counting the reachability and guard tests, and since D10
+> (2026-09-14) `DuckLakeRegistrarTest` also tests the per-topology decision (`onRegistrationFailure`)
+> directly; the real driver's failure stays unproven, and no board row tracks it (re-checked
+> 2026-11-15). Adding 4.4 minutes to an offline build would be a defect, and a
 > `@Tag`-excluded test that never runs is not a guard.
 
 ### 8.1 Relations, guards, compiler — `inspecto-engine` · `inspecto-sql` (default reactor)

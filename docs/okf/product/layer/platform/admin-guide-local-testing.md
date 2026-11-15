@@ -94,7 +94,9 @@ users[2]{id,displayName,title,roles}:
   no picker and a *Try again* button. A 401 the SPA did not expect (`authMode` none) routes to sign-in the same
   way. An unreachable backend (status 0) still degrades to Basic — the connectivity banner owns that. Roles still resolve per request against the bound Space,
   so one Demo User can hold different capabilities in different Spaces.
-- No committed Space ships a `demo-users.toon`; a Space intended for a demo must author one.
+- No committed Space under `spaces/` ships a `demo-users.toon`, but the Link Analysis Space Templates do
+  (`spaces/_templates/la-*/config/demo-users.toon`, e.g. `spaces/_templates/la-showcase/config/demo-users.toon`),
+  so a Space created from one of them has Demo Users; any other Space intended for a demo must author one.
 
 ### Guardrails
 
@@ -172,10 +174,12 @@ The already-running `CollectorService` polls every 60s and ingests automatically
 
 ### Verify
 
-The boot log names the active authenticator: `ControlApi started on port 8080 (Standard edition —
-authentication enforced via com.gamma.demoauth.DemoAuthenticator)`. `/bootstrap` carries
-`auth.mock: true` and the Demo User list. `/bootstrap` also reports `edition: standard` — its
-edition label is "anything but `auth.mode=none`", not the jar set.
+The boot log names the active authenticator: `ControlApi started on port 8080 (authentication enforced
+via com.gamma.demoauth.DemoAuthenticator)`. `/bootstrap` carries `auth.mock: true` and the Demo User list.
+`/bootstrap` also reports `edition: advanced` — `BootstrapRoutes.edition()` derives it from what registered,
+not from `lib/edition.properties`: `basic` when nobody signs in (`auth.mode=none` and no Authenticator),
+`advanced` when an `AccessDecider` is registered (`inspecto-policy.jar`, which the demo build keeps), else
+`standard`.
 
 ## Path B — The real release: Standard/Advanced with a genuine IAM and Postgres
 
@@ -189,9 +193,10 @@ mvn -o clean package -DskipTests -Pedition-advanced -B   # superset: builds secu
 pwsh -File inspecto/package.ps1 -Edition Advanced        # or -Edition Standard (no policy engine)
 ```
 
-`serve.bat`/`serve.sh` auto-detect the edition from which jars are in the bundle
-(`inspecto-oidc.jar` present ⇒ Standard; `+ inspecto-policy.jar` ⇒ Advanced) — no separate
-runtime flag exists for this.
+`serve.bat`/`serve.sh` read the edition from `lib/edition.properties` (`edition=Basic|Standard|Advanced|Preview`),
+which `package.ps1` writes beside `modules.list` (`tools/offering-classpath.mjs`). Only a hand-assembled
+directory without that file falls back to sniffing jars (`inspecto-oidc.jar` present ⇒ Standard;
+`+ inspecto-policy.jar` ⇒ Advanced). No separate runtime flag exists for this.
 
 ### 2. Point it at a real OIDC provider
 
@@ -232,7 +237,7 @@ inspecto-deploy\runtime\bin\keytool.exe -importcert -alias wso2is -file wso2is.c
     -keystore inspecto-deploy\runtime\lib\security\cacerts -storepass changeit -noprompt
 ```
 
-### 3. Point it at real Postgres (optional — only for `OPS-02` operational stores)
+### 3. Point it at real Postgres (required on Advanced; optional on Standard)
 
 ```powershell
 $env:INSPECTO_DB_URL = "jdbc:postgresql://<host>:5432/<db>"
@@ -240,9 +245,12 @@ $env:INSPECTO_DB_USER = "<user>"
 $env:INSPECTO_DB_PASSWORD = "<password>"
 ```
 
-`serve.bat` only turns on `-Dinspecto.db=postgres` when `INSPECTO_DB_URL` is set — the URL is the
-switch, never the driver jar's mere presence. Leaving these three unset keeps DuckDB/local disk, same
-as Path A, with zero other change.
+`serve.bat` only turns on `-Dinspecto.db=postgres` (the operational stores) when `INSPECTO_DB_URL` is set
+and `postgresql.jar` is in `lib/` — the URL is the switch, never the driver jar's mere presence. On
+**Advanced** the launcher also sets `-Dobjects.backend=postgres` (Incidents, Cases, notes, links, tags;
+`OBJECTS-BACKEND-DEFAULT-MEMORY-1`), and `OperationalDb.verifyObjectsBackend` refuses to boot until
+`INSPECTO_DB_URL` points them at PostgreSQL — there is no fallback to DuckDB. On **Standard** (and
+Preview), leaving these three unset keeps DuckDB/local disk, same as Path A, with zero other change.
 
 ### 4. Verify
 
@@ -258,7 +266,7 @@ tell for "is this actually a real deployment or did Path A's demo jar end up on 
 | | Path A (Demo User, local) | Path B (real release) |
 |---|---|---|
 | Authenticator | `com.gamma.demoauth.DemoAuthenticator` (Demo Users with real roles, `inspecto-demo-auth`) | `com.gamma.oidc.OidcAuthenticator` (real IdP) |
-| Operational DB | DuckDB (default, unset `-Dinspecto.db`) | DuckDB or Postgres (`INSPECTO_DB_URL` set) |
+| Operational DB | DuckDB (default, unset `-Dinspecto.db`; `serve-demo.*` passes `-Dobjects.backend=db`) | Standard: DuckDB or Postgres (`INSPECTO_DB_URL` set); Advanced: Postgres required |
 | Needs a running IdP? | No | Yes |
 | Safe to expose beyond localhost? | **Never** (refuses to load unless bound to loopback) | Yes, per the edition's transport/TLS story |
 | Classpath includes `inspecto-oidc.jar`? | No (deliberately) | Yes |

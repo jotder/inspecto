@@ -143,7 +143,8 @@ Group letters match §6. Scores are the assessor's; levels are calibrated (§2).
 - `linkAnalysis` is billable yet built into Basic; `entity-list` is both a Basic module and part of the billable
   `scoringLists` add-on; Integration & Delivery, Premium Connectors and Telecom industry pack each hold one module —
   narrower than their names suggest.
-- Per-node billing with no licence engine or meter (D-MR3); Preview carries a GA order code; Advanced's brochure
+- Per-node billing with no licence engine or meter (D-MR3; since 2026-11-11 an offline signed entitlement file
+  narrows which modules run — D-PA22, `Entitlements` — but its `nodes` count is recorded, not enforced); Preview carries a GA order code; Advanced's brochure
   promises HA, legal hold and residency that are unbuilt. Nothing has yet been released under the new edition names.
 - Retention / legal hold covers Incidents only — Cases, anomaly scores and action-request history have none.
 
@@ -189,7 +190,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - Connector factories in code: Sftp, Ftp, Ftps, DbExport (JDBC), S3, GCS, AzureBlob, Kafka (`providers/inspecto-connectors/src/main/java/com/gamma/connect/`), plus the local file system and a Dataset-entry collector.
   - Step Processor board, ACQ family: 4 delivered on every edition (SP-ACQ-01..04). 4 are partial: S3/GCS have no proven end-to-end acquisition-node run, ADLS Gen2 is unproven, Kafka is unproven against a real broker, Excel is one sheet per file. 11 are planned: Pulsar, Kinesis, SQS, RabbitMQ, MQTT, Debezium CDC, Delta, Iceberg, Snowflake/BigQuery readers, a REST poller and a webhook receiver/gRPC (`docs/EDITIONS.md` SP-ACQ-*; plan §5).
   - Tests: 26 + 36 + 6 = **68 unit test classes**, 0 real-HTTP in these hubs (the HTTP routes are tested under module.processor). `KafkaRealBrokerTest` is opt-in and skips unless a broker is supplied; CI has none (`module/connectors-kafka/plan.md`).
-  - The acquisition ledger defaults to **memory** (`AcquisitionLedgers.java:199`, `acquire.ledger.backend` defaults to `memory`). No launcher, offering or script sets `db`. Plan §5 flags that the completeness KPI cannot be computed on a fresh install.
+  - The acquisition ledger defaults to **memory** (`AcquisitionLedgers.java`, `acquire.ledger.backend` defaults to `memory`). No launcher, offering or script sets `db`. Plan §5 flags that the completeness KPI cannot be computed on a fresh install.
   - Open rows: P3 `SCALEOUT-U1-REMOTE-ACQUIRE-1` (two pods would both fetch the same remote file) and the untagged P3 "Unpack (11) absent codecs" (no xz/zstd; multi-part archives). No open defects.
   - Security: SFTP host-key pinning and bastion tunnel. Secret references `${ENV}`/`${SYS}` on every edition and `${FILE}`/`${KEYSTORE}` on Standard and up (EDITIONS SEC-07). The Safety Policy checks Kafka partition-leader egress (connectors-kafka plan, 2026-10-06).
 - **Strengths vs market:**
@@ -223,7 +224,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - Measured throughput: native DuckDB ingest of 2M rows × 12 columns in about 3.5 s, and 1.0–1.4M rows/s for transform and write (`layer/platform/tests-performance.md`).
   - Config safety: `ConfigSafetyValidator`, path jail, fail-closed schema types (`module/config/spec-config-safety.md`). Config writes can be held for maker-checker (item 6).
   - Open rows: P2 `AUTHORING-REDESIGN-1` (remaining letters parked on demand), P2 "Postgres multi-user", P2 `SCALEOUT-OBJSTORE-DATABASE-DIR-1` (operator hold), P3 defect `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` (a duplicate output after failover re-plan; operator hold).
-  - Replay is bounded. `JobService` resolves runs from an in-memory map capped at `LIVE_RUN_CAP = 1000` (`JobService.java:327`), so replay after a restart or eviction returns 404 (`module/engine/plan-pipeline-execution.md` §2.3).
+  - Replay is bounded. `JobService` resolves runs from an in-memory map capped at `LIVE_RUN_CAP = 1000` (`JobService.java`), so replay after a restart or eviction returns 404 (`module/engine/plan-pipeline-execution.md` §2.3).
 - **Strengths vs market:**
   - A full ingest → Pipeline → data-quality → lineage platform under the assurance controls. The competitive matrix (§3) names this as something none of the six vendors shows publicly.
   - The authoring loop (validate → dry-run → test-run to a node → arm) is fail-closed, and save-time safety checks are pinned by tests.
@@ -742,8 +743,8 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **Evidence:**
   - The add-on holds one module, `reconciliation` (`offerings/standard.toon`); it ships in Standard and above (`docs/EDITIONS.md` l.178).
   - Built per `docs/okf/product/module/reconciliation/plan.md`: the Board, 2-way and 3-way compare, Break lifecycle `open | assigned | resolved | auto_closed`, the `recon.run` Job, `POST /recon/promote` to Incident, cardinality tier 1, 90-day state retention and the uplift slices. The only open row is P3 `PACK-PARTNER-SETTLEMENT-1`, a content pack. No defects.
-  - Code confirms per-Measure tolerances (`exact`, `absolute`, percent) in `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconBreaks.java:414-419`, and cardinality assertion in `ReconService.Cardinality`.
-  - 10 routes (`api-routes.md`). Writes are gated in `ReconRoutes.java:80-90`: `canOperateRuns` for record and breaks/status, `canManageIncidents` for promote. Read-shaped POSTs are recorded in `CapabilityManifest.EXEMPTIONS`.
+  - Code confirms per-Measure tolerances (`exact`, `absolute`, percent) in `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconBreaks.java`, and cardinality assertion in `ReconService.Cardinality`.
+  - 10 routes (`api-routes.md`). Writes are gated in `ReconRoutes.java`: `canOperateRuns` for record and breaks/status, `canManageIncidents` for promote. Read-shaped POSTs are recorded in `CapabilityManifest.EXEMPTIONS`.
   - 21 test classes: 16 unit and 5 real-HTTP (`ControlApiReconTest`, `ControlApiReconDayTest`, `ControlApiReconStateTest`, `ControlApiReconPromoteTest`, `MobileMoneyPackGoldenTest`), plus `TelcoRaGoldenTest` and an oracle parity corpus (`tests-inventory.md`).
   - Scale was measured with `ReconPerfTest` (`RECON_PERF=1`) up to 10M key groups. A live pass over 1,020,000 key groups and 60,000 Breaks loaded the Board in 1.3 s (`user-guide-reconciliation.md` l.151-218). This is one laptop run.
   - Audit happens at platform route level. `platform/inspecto-access/.../AuditTrail.java` records every successful mutating POST, so a break-status change is audited. There is no masking code in the module (grep `mask` hits only the filter bitmask).
@@ -779,7 +780,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - 11 routes (`api-routes.md`). Draft and request-approval need `canWorkIncidents`. Approve, decline, retry and template PUT/DELETE need `canApproveChanges`.
   - XSD validation at draft time is real code (`features/inspecto-regulatory-reporting/src/main/java/com/gamma/regreporting/SchemaCheck.java`). There is a `.sha256` sidecar plus `GET /regulatory-reports/{id}/verify`, and `FileDrop.java` does the atomic file drop.
   - 6 test classes: 4 unit and 2 real-HTTP (`ControlApiRegulatoryReportsTest`, `ControlApiRegulatoryTemplatesTest`) (`tests-inventory.md`). That is thin for a filing engine.
-  - The demo rehearsal on 2026-10-14 was GO and re-driven on an Enterprise bundle (`spec.md` l.134-161). It showed XML, CSV and JSON drafted, maker self-approval refused with 403, the viewer refused with 403, `sourceChanged` detection, and `GET /audit/verify ok`.
+  - The demo rehearsal on 2026-10-14 was GO and re-driven on an Enterprise (today Advanced) bundle (`spec.md` § *Demo rehearsal 2026-10-14*). It showed XML, CSV and JSON drafted, maker self-approval refused with 403, the viewer refused with 403, `sourceChanged` detection, and `GET /audit/verify ok`.
   - Masking of report content is "declared unmasked by design" (`spec.md` l.179). The only real-shaped template is the AML pack's `aml-str`. `sample-sar` claims no real regulator schema.
   - Open row: P3 `REGULATORY-SAR-STR-TEMPLATES-1` (hold: demand). Acknowledgement ingest, live delivery through a Connection and XMLDSig/CMS signing are BACKLOG §6 demand-gated. The competitive matrix rates row T as **P** for Inspecto (only LATRO has Y).
 - **Strengths vs market:**
@@ -810,7 +811,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **Evidence:**
   - The add-on holds `entity-list` and `scoring` (`offerings/standard.toon`). `entity-list` also ships as a Basic module (`offerings/basic.toon` `modules[6]`), so part of this billable add-on is already in Basic (packaging finding).
   - Scoring `plan.md` says "Nothing open on a BACKLOG row". It covers `ASSURE-RISK-SCORE-1`, the residuals (watch-list feed, opt-in history retention, entity-key masking on read, authoring pane with preview) and `TEMPLATE-RISK-SCORE-ALERT-RULE-1`.
-  - Entity Lists `plan.md` lists ranges, CIDR, expiry, the Parquet sidecar, `/match`, four-eyes on held changes, the hash-chained fact log and `ENTITY_LIST_CHANGED` audit (counts, never keys). Left: a head-hash cache and `LA17-NORMALISER-CHANGE-1` (a normaliser change strands members).
+  - Entity Lists `plan.md` lists ranges, CIDR, expiry, the Parquet sidecar, `/match`, four-eyes on held changes, the hash-chained fact log and `ENTITY_LIST_CHANGED` audit (counts, never keys). Left: a head-hash cache. (`LA17-NORMALISER-CHANGE-1`, a normaliser change stranding members, closed 2026-09-27: a list seals its normaliser at `list.created`, D-M9, `EntityListRoutes`.)
   - Routes: scoring 2, both `canWorkIncidents`. Entity Lists 7: writes `canManageIncidents`, register-dataset `canAuthorWorkbench`, GET and `/match` ungated with members masked.
   - Tests: scoring 24 classes (21 unit, 3 real-HTTP), including golden runs of the AML, mobile-money and payment-fraud packs (`AmlPackGoldenTest`, `MobileMoneyRiskScoreGoldenTest`, `PaymentFraudTemplateGoldenTest`) and `RiskScoreOutputGoldenTest`. Entity Lists 5 classes (2 unit, 3 real-HTTP).
   - 13 feature-db rows. The competitive matrix rates rows J (entity risk scoring) and K (watch/deny lists) as **Y**.
@@ -822,7 +823,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - Scoring is batch only, with no real-time or in-transaction score. Row: `REALTIME-DECISIONING-1` (P3). Feedzai/FICO-class buyers expect real-time (general market).
   - There is no ML model scoring and no model governance (champion/challenger, back-testing, drift). The Anomaly add-on is separate. **No row** for model governance.
   - Named score bands are deferred (D-RP3) and indicators allow no arithmetic (refused). The Entity List fact log has no retention (append-only), which gives no GDPR erasure path. **No row.**
-  - `LA17-NORMALISER-CHANGE-1` strands list members when an Entity Type's normaliser changes, a latent defect cited in the plan. No ranked row was found on the board (unverified).
+  - ~~`LA17-NORMALISER-CHANGE-1` strands list members when an Entity Type's normaliser changes.~~ Closed 2026-09-27 (D-M9): a list seals its normaliser at `list.created` and member writes use the sealed one (`EntityListRoutes`); re-checked 2026-11-15.
 - **RFP stance on the 5 most-asked requirements for this category:**
 
 | Requirement | Stance | Evidence or caveat |
@@ -842,10 +843,10 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **Scores:** F 2 · B 4 · Q 4 · E 3 · R 3 → **Level L3 (Pilot-ready)**
 - **Evidence:**
   - The add-on holds one module, `screening` (`offerings/standard.toon`). It requires `ops` (`SCREENING-1` row, BACKLOG l.596).
-  - Matching is real code: token Jaro-Winkler from the analytics similarity kit (`features/inspecto-screening/src/main/java/com/gamma/screening/NameMatcher.java:3`), phonetic skeletons, Cyrillic transliteration by sound, and blocking keys (`spec.md` l.34-51).
+  - Matching is real code: token Jaro-Winkler from the analytics similarity kit (`features/inspecto-screening/src/main/java/com/gamma/screening/NameMatcher.java`), phonetic skeletons, Cyrillic transliteration by sound, and blocking keys (`spec.md` l.34-51).
   - 5 routes. `decide` needs `canWorkIncidents` and `reveal` needs `canRevealLinkEntities`. `POST /screening/check` and the hits GET routes are ungated ("—").
   - 12 test classes: 11 unit and 1 real-HTTP (`ControlApiScreeningTest`), plus `NameMatcherGoldenTest` and `ScreeningRevealTest`.
-  - The 2026-10-14 demo rehearsal was re-driven on an Enterprise Demo Auth bundle (`spec.md` l.140-161). It covered exact, fuzzy, transliterated and identifier matches, 1,000 subjects in 94 ms, self-confirm refused with 409 four-eyes, and an audited reveal. Verdict: GO.
+  - The 2026-10-14 demo rehearsal was re-driven on an Enterprise (today Advanced) Demo Auth bundle (`spec.md` § *Demo script and rehearsal*). It covered exact, fuzzy, transliterated and identifier matches, 1,000 subjects in 94 ms, self-confirm refused with 409 four-eyes, and an audited reveal. Verdict: GO.
   - P2 `SCREENING-1` is still open even though the row says "No operator decision is open (D1-D3 built; D4-D7 taken)". The remaining items are decided deferrals: dedupe index D6, Space threshold default D5 and initial-letter typo D7.
   - Scale limits: `maxRows` defaults to 100,000 with a ceiling of 1,000,000. A run lists every hit document to dedupe, with no index, which is "fine for thousands of hits, not for millions" (`spec.md` l.139).
   - No sanctions-list feed or loader exists. There is no `ofac` hit in `features/`, `platform/` main code, `spaces/_templates` or the screening hub. The only hits are test fixtures.
@@ -910,7 +911,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - The add-on holds one module, `connectors-kafka` (`offerings/standard.toon`). `docs/EDITIONS.md` row SP-ACQ-09 marks it 🟡 (partial) in Standard and Advanced: "proven against MockConsumer and a fake connector only, never a real broker".
   - `plan.md` Built: the workbench probe/explore/sample, `STREAM-CONSUMER-1` (ledger-watermark frontier durable across restart, lag gauge), the `trigger: stream` lane, the partition-leader egress check and `StreamLane.Backoff`.
   - 6 test classes, all unit. `KafkaRealBrokerTest` skips unless `-Dkafka.it.bootstrap` answers, and no broker ships with the build or CI (`plan.md` Left open).
-  - Security: SASL is supported (`KafkaConnector.java:383`). The default `security.protocol` is `SASL_PLAINTEXT` when credentials are set; `SASL_SSL` is reachable only through a pass-through option. There is no truststore handling in the module (grep), so TLS to the broker is unverified.
+  - Security: SASL is supported (`KafkaConnector.java`). The default `security.protocol` is `SASL_PLAINTEXT` when credentials are set; `SASL_SSL` is reachable only through a pass-through option. There is no truststore handling in the module (grep), so TLS to the broker is unverified.
   - No Avro or schema-registry support (grep of `providers/inspecto-connectors-kafka/src/main`: none). Outbound Kafka (Dataset to topic) is a proposal only.
   - No feature-db row; no open BACKLOG row.
 - **Strengths vs market:**
@@ -990,7 +991,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **Gaps vs market / RFP risk:**
   - The add-on is thin against LATRO/Subex/Mobileum-class telecom offerings, which bundle mediation, RA/FM controls and bypass detection (competitive matrix). Bypass/SIM-box detection: `TELCO-BYPASS-SIMBOX-1` (plan only). Re-rating and settlement: `PACK-RERATING-1` and `PACK-PARTNER-SETTLEMENT-1`.
   - Vendor coverage is partly unproven: 30 grammars, 9 proven cases, and tag-map formats with no converter. **No row** for the `asn migrate` converter.
-  - There is no decoder throughput figure: the only mention is a to-do in `providers/asn-parser/docs/REDESIGN.md:225`. Mediation-grade volume claims are unverified. **No row.**
+  - There is no decoder throughput figure: the only mention is a to-do in `providers/asn-parser/docs/REDESIGN.md`. Mediation-grade volume claims are unverified. **No row.**
   - Parser trust is limited: the decoder runs in-process (out-of-process host D8 deferred) and plugin signatures are not anchored (T2).
 - **RFP stance on the 5 most-asked requirements for this category:**
 
@@ -1019,7 +1020,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - Masking of classified keys on `/recon/rows`.
   - Whether notification webhooks are HMAC-signed.
   - Kafka TLS.
-  - Whether `LA17-NORMALISER-CHANGE-1` has a board row.
+  - ~~Whether `LA17-NORMALISER-CHANGE-1` has a board row.~~ It has none: it closed 2026-09-27 (D-M9; re-checked 2026-11-15).
   - All performance figures, which are single laptop runs as the docs themselves state.
 - No reference-customer evidence is recorded anywhere, so nothing qualifies for L5.
 
@@ -1072,7 +1073,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - Template `spaces/_templates/telco-fraud/`: 3 Pipelines, **14 detection Jobs** (`config/jobs/fraud_*_job.toon`), 14 per-entity Alert Rules, 14 runbook records (`registry/runbooks/`), 7 Expectations, 2 Decision Rules, 1 Case Rule (`config/ops/fraud_critical_burst_caserule.toon`, `groupBy` msisdn), 4 KPIs, 19 Widgets, 1 Anomaly Model, a nightly `report` export, and an `expectation.evaluate` Job.
   - **Typology count: 14**: IRSF, Wangiri, SIM-box, premium rate, roaming, SIM swap, identity/subscription, dealer, voucher/EVD, reversal, recharge, data bypass, internal, manual adjustment. The thresholds are generic defaults tuned to the corpus (`ASSURE-PACK-TELCO-FRAUD-RESIDUALS-1` (g)).
   - `inspecto/src/test/java/com/gamma/control/TelcoFraudTemplateGoldenTest.java` (12 tests, 866 lines) checks: exact planted offenders with no look-alike, every tile rendered, 16 retained days with no storm, an Expectation Incident from a bad row, runbook linkage, and MSISDN classification. Also `TelcoFraudFeedGapTest` (2), `TelcoFraudPackAnomalyPropertyTest` (2) and `AnomalyTemplateModelsTest`.
-  - Live evidence: a demo rehearsal on an Enterprise Demo Auth bundle on 2026-10-14 (`docs/BACKLOG.md` line 76). The live bundle run on the same day exercised the Expectation Job and the offender export (row `TELCO-FRAUD-STORY-GAPS-1`).
+  - Live evidence: a demo rehearsal on an Enterprise (today Advanced) Demo Auth bundle on 2026-10-14 (the 2026-10-14 ⬆ count note in `docs/BACKLOG.md`'s header). The live bundle run on the same day exercised the Expectation Job and the offender export (row `TELCO-FRAUD-STORY-GAPS-1`).
   - Masking: `TELCO-FRAUD-MASKED-DASHBOARD-1` was closed 2026-10-18. 10 of the 14 sink Datasets classify `msisdn`/`caller` `MSISDN` and `id_doc` `PII`, and a viewer without `canRevealLinkEntities` gets masked bars over real HTTP (BACKLOG line 54).
   - Open rows (hub `index.md`): defect `ANOMALY-TF-STORE-CLASH-1` (P3: `AnomalyTemplateModelsTest...[1]` ERRORS on clean master; the pack's `tf_subscriber_anomaly_latest` Dataset clashes with the model's store), `TELCO-FRAUD-STORY-GAPS-1` (P3 remainder), `ASSURE-PACK-TELCO-FRAUD-RESIDUALS-1` (P3, demand), `PACK-IRSF-WANGIRI-1` (P3, plan only), `TELCO-BYPASS-SIMBOX-1` (P3, B0 measurement done 2026-10-20, nothing built).
   - The SIM-box check is a single heuristic (`fraud_simbox_job.toon`: no MT calls, no SMS, ≤ 1 cell, ≥ 10 distinct targets). The IRSF check is a static prefix list (`irsf_prefixes: "882,883,8818"`). Detection is daily batch at 02:00; only the Decision Rules act at ingest (`architecture.md` "Limits").
@@ -1201,7 +1202,7 @@ Not verified: vendor control and typology counts (general-market). Also not veri
   - Screening: `aml_screening` Job (`screening.run`, threshold 0.85, lists `aml_sanctions,aml_pep`) ships `enabled: false`; Entity Lists are not shipped (`config/jobs/aml_screening_job.toon`; architecture.md "Limits"). No vendor list-feed loader (OFAC / UN / World-Check) found — grep of `module/screening` docs and `features/inspecto-screening/src/main` returns nothing.
   - SAR/STR: `regulatory-report-templates/aml-str.toon` — 17-field XML, file-drop delivery, explicitly "follows no real regulator's schema"; engine is four-eyes (`docs/okf/product/module/regulatory-reporting/spec.md`); regulator formats are open P3 `REGULATORY-SAR-STR-TEMPLATES-1` (hold: demand).
   - Tests: `AmlPackGoldenTest` 4 (committed corpus = seeded generator output; golden corpus raises exactly the planted accounts per typology), `AmlScreeningGoldenTest` 2 (hits exactly the planted parties, no look-alike; STR template loads), `PackFraudAmlAnomalyPropertyTest` 3 of 5 on AML (forest ranks and explains the planted account), plus `ControlApiSpaceTemplateSeedGateTest` 12 (real-HTTP apply of every shipped template, capability refusal, pending-rule gating).
-  - Live evidence: screening demo rehearsal 2026-10-14 recorded with 11 beats PASS, re-driven on an Enterprise Demo Auth bundle (`docs/BACKLOG.md` row `SCREENING-1`; `docs/okf/product/module/screening/spec.md` lines 150-166; `tools/seed-screening-demo.mjs` builds the Space from the `aml` template).
+  - Live evidence: screening demo rehearsal 2026-10-14 recorded with 11 beats PASS, re-driven on an Enterprise (today Advanced) Demo Auth bundle (`docs/BACKLOG.md` row `SCREENING-1`; `docs/okf/product/module/screening/spec.md` § *Demo script and rehearsal*; `tools/seed-screening-demo.mjs` builds the Space from the `aml` template).
   - Enterprise hooks the pack uses: party `full_name` / `national_id` classified `PII` (masked) after the rehearsal; confirmed screening hit opens an Incident + Case; audited privileged reveal; four-eyes on `confirmed` (`SCREENING-1` D1-D3).
   - Corpus: ~1,200 ledger rows over 10 days + 127 parties (`data/samples/`); 3 KPIs, 7-tile dashboard, runbooks (57 lines). Closed P2 `PACK-AML-1` (2026-10-10).
 - **Strengths vs market:**
@@ -1265,7 +1266,7 @@ Not verified: vendor control and typology counts (general-market). Also not veri
   - Agent Risk Score `mm_agent` (3 factors) and wallet Anomaly Model `mm_wallet_activity` with **KYC-tier peer groups** (`peers.by: kyc_tier`, `minGroupSize: 30`), both with pending Alert Rules.
   - Tests: `MobileMoneyPackGoldenTest` 5 (corpus = generator; every control flags exactly its planted cases and no look-alike; every dashboard tile renders the planted offenders), `MobileMoneyRiskScoreGoldenTest` 2, `PackFraudAmlAnomalyPropertyTest` 2 of 5 (planted wallet top, look-alikes normal), `ControlApiAnomalyTemplateApplyTest` 1 (peer model applies under the deployed safety policy, real HTTP), plus the shared seed-gate test.
   - Five feeds, ~725 wallet txns / 359 wallets / 359 subscribers / 56 settlement / 38 bank lines (`data/samples/`); 4 KPIs, 11-tile dashboard, runbooks (95 lines). Closed `PACK-MOBILE-MONEY-1` (2026-10-09).
-  - Masking (fixed: reclassified 2026-11-14 (`TEMPLATE-CONFIDENTIAL-UNMASKED-1`, pinned by `TemplateIdentifierClassificationTest`)): `wallet_id` and `msisdn` were classified `CONFIDENTIAL` in `config/wallets/wallets_schema.toon` and `config/core_subscribers/core_subscribers_schema.toon`, which `ColumnClassification.SENSITIVE` (`platform/inspecto-util/.../ColumnClassification.java:26`) does not mask — while the industry pack marks `wallet` / `msisdn` Entity Types `masked: true`.
+  - Masking (fixed: reclassified 2026-11-14 (`TEMPLATE-CONFIDENTIAL-UNMASKED-1`, pinned by `TemplateIdentifierClassificationTest`)): `wallet_id` and `msisdn` were classified `CONFIDENTIAL` in `config/wallets/wallets_schema.toon` and `config/core_subscribers/core_subscribers_schema.toon`, which `ColumnClassification.SENSITIVE` (`platform/inspecto-util/.../ColumnClassification.java`) does not mask — while the industry pack marks `wallet` / `msisdn` Entity Types `masked: true`.
   - Matrix row R: Y vs LATRO Assure Fintech, Subex FraudZap, Mobileum RAID mobile-money risk (matrix l.18-20, 50).
 - **Strengths vs market:**
   - RA (float, settlement, fee, commission) and fraud/AML-lite (split, round-trip, dormant, KYC) in one pack — LATRO's Assure Fintech is the closest peer and is largely managed-service; this is self-run configuration.
@@ -1486,7 +1487,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Tests: `LaDailyFeedTemplateRulesTest` 6. `LaDailyIngestAcceptanceTest` covers 7 days, a late day, a re-run, a correction, a part-count change, a missing day and a dimension change. `ScheduledDailyChainTest` (geo-link) runs on the scheduler alone. Benches `LaDailyIngestScaleBench` / `DailyIndexScaleBench`: 10^7 rows a day ingest in 35–40 s, 10^8 in 489 s, APPEND 31 s onto 10^8 (BACKLOG `LA-DAILY-INGEST-1`).
   - Live drive on 2026-10-14 (`module/la-core/tests-live-drives.md#data-trust-drive-la-data-trust-1-s10-2026-10-14`): 8 steps, 1 FAIL (corrected day, since fixed by `f3a90e6a3`). At that time the template shipped no index Job; the Jobs were added later and are pinned by `theTemplateShipsTheJobsThatIndexAndEvaluateOnEveryCommit`.
   - **Edition mismatch.** The pack ships Alert Rules, but the Alert Rule dispatcher (`alert.dispatch`, declared by `inspecto-ops`) is Standard and up (`layer/platform/architecture-editions.md` §28; `OFFERING-DECLARATION-DRIFT-1` D1, closed 2026-10-20). The template has no `minEdition`, so the `tools/check-offerings.mjs` check 5 guard cannot catch it.
-  - The index Job runs as `owner: admin` (`config/jobs/la_index_build_job.toon`), but Basic ships no Authenticator. By code read (2026-10-23, `LA-DAILY-INGEST-1`): on an open server the run authority is skipped (`JobAuthority.runAuthority`) and the template's Dataset has no `shares`, so `ComponentAccess.canViewAs` allows `admin`; with an Authenticator, `TemplateSeedGate.stampJobs` re-stamps the owner to the applier unless the applier holds `canConfigureAccess`. `LaIndexBuildJob` and `ScheduledLinkIndexBuilder` consult no edition feature (`platform/inspecto-engine/.../LaIndexBuildJob.java:59`, `la/inspecto-geo-link/.../ScheduledLinkIndexBuilder.java`), so the index probably builds on Basic while every index-consuming Investigation route is 503 there (unverified live).
+  - The index Job runs as `owner: admin` (`config/jobs/la_index_build_job.toon`), but Basic ships no Authenticator. By code read (2026-10-23, `LA-DAILY-INGEST-1`): on an open server the run authority is skipped (`JobAuthority.runAuthority`) and the template's Dataset has no `shares`, so `ComponentAccess.canViewAs` allows `admin`; with an Authenticator, `TemplateSeedGate.stampJobs` re-stamps the owner to the applier unless the applier holds `canConfigureAccess`. `LaIndexBuildJob` and `ScheduledLinkIndexBuilder` consult no edition feature (`platform/inspecto-engine/.../LaIndexBuildJob.java`, `la/inspecto-geo-link/.../ScheduledLinkIndexBuilder.java`), so the index probably builds on Basic while every index-consuming Investigation route is 503 there (unverified live).
   - The row-band Expectation "does not judge a day until 3 prior days exist" (`admin-guide.md`), and only 2 sample days ship. The out-of-box verify cannot show the band working.
 - **Strengths vs market:**
   - The ingestion is measured to 10^8 rows a day with append-only index refresh and data-trust signals (freshness, gaps, quarantine, index lag). Neo4j Bloom and Linkurious leave this to customer ETL (general market).
@@ -1549,7 +1550,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
 - **Scores:** F 2 · B 4 · Q 3 · E 2 · R 2 → **Level L2 (Prototype)** for enterprise RFP fitness. By design it is a single-analyst desk.
 - **Evidence:**
   - Offering: `offerings/basic.toon`, with modules `connectors, entity-list, la-storage, la-core, la-api, geo-link` and contentPacks `business-assurance, la-daily-feed, orders-starter`. Posture: `authMode none`, no Postgres.
-  - Product map: `INS-ED-BASIC`, `billing per-node`, `enforcement: build`, `ga` (`product-map/edition/basic.toon`). No licence engine exists: `ModuleManifest.entitlementKey` is "reserved (D-MR3: no licence engine)… never consulted" (`platform/inspecto-util/.../ModuleManifest.java:10`; `layer/platform/spec-module-reorg-decisions.md` D-MR3).
+  - Product map: `INS-ED-BASIC`, `billing per-node`, `enforcement: build`, `ga` (`product-map/edition/basic.toon`). `ModuleManifest.entitlementKey` is still "reserved (D-MR3: no licence engine)… never consulted" (`platform/inspecto-util/.../ModuleManifest.java`), but D-MR3 was superseded 2026-11-11 by D-PA22 (`layer/platform/spec-module-reorg-decisions.md`): `Entitlements` verifies an offline signed `conf/entitlement.toon`, which narrows the Installed gate; with no file every installed module is entitled.
   - Gating is tested by falsification: 9 `No*ShipsInThePersonalBuildTest` classes in `inspecto/src/test/java/com/gamma/control/`, plus `NoBackupTaskShips…` and `NoChannelShips…` (engine), `AbsentModuleRoutesTest`, `BootstrapEditionTest`, `EditionFeatureGateTest`, `ControlApiBasicEditionLinkAnalysisTest`.
   - Packaging: `release.yml` builds and signs a Basic bundle (`package.ps1 -Edition Basic`, line 189). Staged jars: 23 (`docs/EDITIONS.md` "Staged jars"). The Basic 503 has "not been re-probed on a built Basic bundle" (la-showcase variants runbook).
   - Masking on Basic is display only: "anyone may reveal" (`docs/EDITIONS.md` "Basic — the Link Analysis explorer").
@@ -1661,7 +1662,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
 - **Evidence:**
   - Mechanism: build flavors with no branches. Absent modules answer 503 with an explanation (never 404), `/bootstrap` flags derive from registered routes, and each gated cell has a falsification test (`layer/platform/architecture-editions.md` recipe items 1–7, 28; 20+ edition test classes listed above).
   - Offering == bundle == pom profile is enforced in CI (`tools/check-offerings.mjs`, `tools/offering-classpath.mjs`, `tools/bundle-modules.mjs`). Customer trimming is available via `tools/customer-build.mjs` (`product-map/README.md`).
-  - Enforcement is `build` only, with no licence engine (D-MR3) and no node metering, although every edition is billed `per-node`.
+  - Enforcement is `build` only, with no licence engine (D-MR3) and no node metering, although every edition is billed `per-node`. *(Since 2026-11-11, D-PA22: a signed entitlement file narrows the Installed gate; `nodes` is recorded, not enforced, and the product map still says `enforcement: build`.)*
   - The ladder is clean on modules: Basic ⊂ Standard ⊂ Advanced ⊂ Preview through `includes:` in `offerings/*.toon`.
 - **Strengths vs market:**
   - The ladder follows a recognised model: features are equal across tiers, and scale and governance differ. Neo4j Community/Enterprise and Linkurious tiers work the same way (general market). Keeping full evidential Link Analysis in Standard is a sales argument against i2's split of ANB desktop and EIA server (general market).
@@ -1677,7 +1678,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
 |---|---|---|
 | Clear tier matrix | Comply | `docs/EDITIONS.md` matrix, generated offerings matrix |
 | Upgrade without migration | Comply | same Spaces/config across builds (brochures; build-flavor model) |
-| Licence enforcement / usage metering | Not offered | D-MR3: no licence engine; per-node is honour-system |
+| Licence enforcement / usage metering | Partial (was Not offered) | Since 2026-11-11 (D-PA22) a signed entitlement file gates modules (`Entitlements`); no usage metering, per-node is honour-system |
 | Enterprise tier with HA/DR | Partial | Advanced HA not built (`SCALEOUT-HELM-NPOD-1`) |
 | On-prem / air-gapped install | Comply | self-contained bundles with embedded runtime (`release.yml` OPS-07 comment) |
 - **To reach the next level:** remove Preview from the price book; decide metering (or move to flat or site pricing that needs none); deliver or descope the Advanced HA/retention promise; release 4.0.0.
@@ -1689,7 +1690,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
 The Link Analysis showcase packs are well-built demo assets. Three are live-rehearsed with smoke runners (30/30, 29/29, 17/17), and the planted outcomes are pinned by golden tests, so they reliably support a proof-of-value conversation. None is sellable: all are `billable: false`, and none is listed in any Offering although two edition brochures sell them (`OFFERING-DECLARATION-DRIFT-1` D2). The one priced Link Analysis pack, `la-daily-feed`, is tiered into Basic, where its Alert Rules cannot dispatch (D1). Inspecto LA's real differentiator against i2, Linkurious and Bloom is evidential custody: sealed log, verifiable Dossier, four-eyes, audited reveal. Its largest gaps against Quantexa and Palantir-class products are probabilistic entity resolution, scale beyond 10^8 and multi-node HA.
 
 Across editions the build-flavor mechanism is strong and well tested. The commercial layer is weaker:
-- per-node billing with no licence engine or meter (D-MR3);
+- per-node billing with no meter (D-MR3; since 2026-11-11 a signed entitlement file gates modules, D-PA22);
 - Preview carries a GA order code that the platform doc forbids shipping;
 - Advanced promises HA, retention, legal hold and residency, which are unbuilt or, for retention, declined;
 - nothing has been released under the new edition names.

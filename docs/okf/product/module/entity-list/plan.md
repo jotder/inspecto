@@ -24,6 +24,7 @@ timestamp: 2026-10-19T00:00:00Z
 | Item | Shipped | Where |
 |---|---|---|
 | Store, five routes, fold, masking, `excludeBy` / `seedBy` (`LA-17`) | 2026-09-26 | [design §4.3.2, §4.4.2](../../../../archived-documents/plans-archive/link-analysis-entity-model-design.md) |
+| A list seals its Entity Type's normaliser at `list.created`, so a later normaliser change never strands members (D-M9, closes `LA17-NORMALISER-CHANGE-1`; `EntityListRoutes`) | 2026-09-27 | [spec](spec.md) |
 | Ranges, CIDR, expiry, sidecar, `/match`, four-eyes, watch-list feed (`ASSURE-ENTITY-LISTS-1`) | 2026-09-28 | [spec](spec.md); [BACKLOG](../../../../BACKLOG.md) change log |
 | Own module `inspecto-entity-list`; routes renamed `/inv/entity-lists…` to `/entity-lists…` (SEP-08) | 2026-10-01 | [spec](spec.md) |
 | `POST /entity-lists/{id}/register-dataset` (manual) and `approverCheck` on held changes | 2026-10-04 | [spec](spec.md) |
@@ -37,7 +38,6 @@ timestamp: 2026-10-19T00:00:00Z
 - Range / CIDR entries in `excludeBy` / `seedBy` — retired to [BACKLOG](../../../../BACKLOG.md) §6 *Link Analysis & Geo*
   (DEFER; trigger: a customer asks). It changes the sealed-log format and the replay hash.
 - A head-hash cache for `EntityFactLog.read()` — recommended by the SP4 measurement, not built ([spec](spec.md), Scale facts).
-- Changing an Entity Type's normaliser strands existing members (`LA17-NORMALISER-CHANGE-1`, design §4.3.2).
 
 ## Refused / decided against
 

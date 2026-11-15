@@ -79,7 +79,7 @@ both design refusals rather than gaps (§6).
 | **PIP-4** | Scheduler + Jobs (atomic Executables; **Run ⊇ Batch ⊇ File** status hierarchy) — `SHIPPED`, all | 🔴 **The hierarchy was renamed on 2026-08-03 to Run ⊇ Consignment ⊇ File**, and identity is the run-and-consignment pair, because a reprocess is a *new Run over the same Consignment*. This register is what the board, the backlog and commit messages cite, and it is still stale — as are three other current files, one of which contradicts itself twelve lines apart. |
 | **PIP-5** | Async run triggers: 202 + runId + poll, idempotent replay — jobs **and** pipelines — `SHIPPED`, all | ⚠ Accurate for the contract. **But replay's backing store is in-memory** (§2.3), so the *replay* half is bounded in a way no register or board row states. |
 | **PIP-6** | Job templates — `SHIPPED` | ✅ Accurate, and the design detail is worth keeping: templates resolve **once, at load**, so the scheduler and the job service only ever see plain, fully-resolved configs. ⚠ **Named for grep (2026-09-09):** the file suffix is `*_job_template.toon`, substitution is `${param}`, and a job references a template with the `template:` and `params:` keys. The mechanism was described here; the four literals a reader would search for lived only in `REQUIREMENTS.md`. |
-| **PIP-7** | Maintenance job library (retention, compaction, housekeeping) — `SHIPPED` | 🔴 **Understated by a factor of five, and nothing is armed.** The row names four tasks. The engine handles **19** built-in ids, and four more arrive from optional modules. The "curated library" it points at is **five example job files** an operator must copy; no scheduler config ships, and the shipped default space contains no maintenance job at all. The whole housekeeping posture is opt-in — which is correct by decision, but "SHIPPED" without that word misreads. ⚠ **Named for grep (2026-09-09):** the contributed backup-verification task id is `backup_verify`, and the retention tasks take `min_age_days` — ⛔ keep it beyond the reprocess horizon, because reprocessing a compacted-away consignment is unsupported. |
+| **PIP-7** | Maintenance job library (retention, compaction, housekeeping) — `SHIPPED` | 🔴 **Understated by a factor of five, and nothing is armed.** The row names four tasks. The engine handles **23** built-in ids, and five more arrive from providers (§2.2). The "curated library" it points at is **five example job files** an operator must copy; no scheduler config ships, and the shipped default space contains no maintenance job at all. The whole housekeeping posture is opt-in — which is correct by decision, but "SHIPPED" without that word misreads. ⚠ **Named for grep (2026-09-09):** the contributed backup-verification task id is `backup_verify`, and the retention tasks take `min_age_days` — ⛔ keep it beyond the reprocess horizon, because reprocessing a compacted-away consignment is unsupported. |
 
 ### 2.2 One number per fact
 
@@ -89,8 +89,8 @@ Every count in this area is stated two or more ways, and the pattern from the au
 | Fact | Measured | What the documents say |
 |---|---|---|
 | Job types | **10 core + 2 from the operations module = 12** | the glossary says 4 in its binding entry and 9 in its own rename table; the jobs concept page says 4, naming a deprecated enum; the board lists 10 — but a *different* 10, omitting alert evaluation and the sample, and including the two module ones |
-| Maintenance tasks | **19 built-in + 4 contributed = 23** | the requirement says 4; the board says 16; the jobs page says 13 + 3; **the served descriptor says 16** |
-| Trigger vocabulary | **two models** — pipeline: interval, cron, event (`commit`/`dataset`), manual, default-poll, with coalescing and no catch-up; job: cron, on-pipeline, on-signal + guard, manual, with catch-up | the binding glossary entry lists 4 and **omits on-signal entirely** while counting one mechanism twice; the active plan says 3; the jobs page says 4; the board and the boundary page say 5 |
+| Maintenance tasks | **23 built-in + 5 contributed = 28** (re-counted 2026-11-15: `MaintenanceJob.BUILT_IN_TASKS`, counting `heartbeat` and `noop` apart; contributed `backup`, `backup_verify`, `restore`, `incident_purge`, `audit_anchor_export`) | the requirement says 4; the board says 16; the jobs page says 13 + 3; **the served descriptor says 16** |
+| Trigger vocabulary | **two models** — pipeline: interval, cron, event (`commit`/`dataset`), manual, default-poll, and since the push-ingest lane stream (six `PipelineTrigger.Kind`s, re-counted 2026-11-15), with coalescing and no catch-up; job: cron, on-pipeline, on-signal + guard, manual, with catch-up | the binding glossary entry lists 4 and **omits on-signal entirely** while counting one mechanism twice; the active plan says 3; the jobs page says 4; the board and the boundary page say 5 |
 | Built-in node types | **49**<!--count:node-types--> | an execution page says 29 — a *fifth* wrong count of this one, which the authoring spec did not catch |
 | Lanes | the declared owner says **five**; three other pages say **two**, three different ways | and the owner's own table **omits the post-sync lane** that another page calls one of two |
 
@@ -172,8 +172,9 @@ as a Job, because a Job is the only thing that reads data already written.
 
 ### 3.2 Two trigger models
 
-**Pipeline triggers** are declared on the entry node: an interval, a cron expression, an event, manual, or
-the default poll. The event kind carries what it listens for — a **commit** from an upstream pipeline, or a
+**Pipeline triggers** are declared on the entry node — six kinds (`PipelineTrigger.Kind`): an interval, a
+cron expression, an event, manual, the default poll, or a **stream** (`{type: stream, records, max_wait}`, the
+continuous lane, still on the loop scheduler; `ASSURE-PUSH-INGEST-1`). The event kind carries what it listens for — a **commit** from an upstream pipeline, or a
 **dataset** write — and the two namespaces are explicitly fenced from each other so they cannot collide.
 There is a coalescing window. **There is no catch-up.**
 
@@ -254,7 +255,10 @@ Two properties make this trustworthy rather than hopeful:
 lane** and throws, naming the specific reason the write could not be carried. `flat` is a permanent kill
 switch. Anything else throws. This flag is Row 15's **precondition, not its trigger**.
 
-🔴 **The §6 step-2 parity gate was RUN for the first time on 2026-09-16 and is NOT met.** The root pom now
+✅ **The §6 step-2 parity gate is MET (2026-09-16, `GRAPH-LANE-RULE-ROUTED-1`, `b6b90fa2c`):** the whole suite
+under `-Dingest.lane=graph` passed with zero "cannot carry pipeline" refusals, once rule-routed writes rode the
+graph lane (`DecisionRuleApplier` runs above the lane fork, so both lanes see the same remainder). What
+follows is the history of the first run that day. **First run, 2026-09-16 — NOT met.** The root pom now
 carries `<ingest.lane>auto</ingest.lane>` and hands it to surefire, so `mvn -Dingest.lane=graph test` runs the
 WHOLE suite with the flat lane disabled — the gate as D-2 wrote it. Result: **13 tests in `inspecto-engine`
 refuse** (`DecisionRuleWiringTest`, `ConsignmentIngestorPluginTest`, `ConsignmentIngestorPluginDeepTest`,
@@ -264,10 +268,10 @@ to more sinks than the compiled recipe declares — and `test_etl` because *a De
 graph lane does not implement*. Those are the two features the compiled-recipe path cannot carry today, stated
 by the code itself; until both are implemented on the graph lane the flat lane cannot be deleted. Running the
 gate is now one flag, so re-run it after each of those lands rather than reading a projection round-trip test
-as parity. **The multi-schema gap SHIPPED 2026-09-16 (see below); `GRAPH-LANE-RULE-ROUTED-1` (BACKLOG §3) is
-the one that remains.** And the rule-routed gap is
-representational: `PipelineLift` never sees a Decision Rule (they are a space-registry fact), so the routed
-destinations cannot appear in a lifted graph at all.
+as parity. **The multi-schema gap SHIPPED 2026-09-16 (see below), and `GRAPH-LANE-RULE-ROUTED-1` shipped the same
+day.** The rule-routed gap looked representational (`PipelineLift` never sees a Decision Rule), but no graph
+node was needed: the routed outputs only had to be merged into the graph lane's written list. Routing combined
+with route branches or a multi-destination `sinks[]` stays refused on both lanes.
 
 #### A multi-schema write is admitted PER SEGMENT (2026-09-16)
 
@@ -355,14 +359,15 @@ lane table — the declared owner of this fact — names only the projection, wh
 
 ### 3.7 Caps and the bounded retry
 
-**The resource-cap pair ships half-on by design.** The Run bound is on by default in code; the memory limit
-is served by configuration with **no code default** (§2.4). Total exposure is the limit times the concurrent
+**The resource-cap pair ships on.** The Run bound is on by default in code; the memory limit has a **code
+default** since 2026-09-26 (GAP-4, §2.4: 40 % of JVM-visible RAM ÷ a fixed 4, floored at 1 GiB —
+`DuckDbUtil.defaultMemoryLimit`). Total exposure is the limit times the concurrent
 Run count, which is exactly why an unbounded Run count would make any per-instance cap meaningless.
-Precedence for the limit is per-pipeline, then server-installed, then a bootstrap flag, then the database's
-own default. Preview and dry-run connections are **deliberately exempt** — they run over bounded samples.
+Precedence for the limit is per-pipeline, then server-installed, then a bootstrap flag, then that code
+default (`DuckDbUtil.memoryLimit` never returns null; configure `80%` to get the database's own behaviour back). Preview and dry-run connections are **deliberately exempt** — they run over bounded samples.
 
-⛔ **Two standing refusals here, both measured:** a cap computed as memory ÷ concurrency was rejected
-because the divisor is routinely unknown and the ingest path has its own limiter — so any formula is wrong
+⛔ **Two standing refusals here, both measured:** a cap computed as memory ÷ the *live* concurrency was
+rejected (the GAP-4 default divides by a fixed 4 instead) because the divisor is routinely unknown and the ingest path has its own limiter — so any formula is wrong
 *in exactly the overcommit case it was meant to prevent*; and no temporary-directory-size default is
 defensible without knowing the volume.
 
@@ -409,7 +414,7 @@ Housekeeping is **tasks on one job type**, never shell scripts or host cron, so 
 Alert Rule can consume. **A task with no preview does nothing on a dry run** — fail-closed, never falling
 through to the real action.
 
-**Nineteen built-in tasks, four contributed** (§2.2), and the contribution seam matters: the built-in
+**Twenty-three built-in tasks, five contributed** (§2.2), and the contribution seam matters: the built-in
 dispatch always wins first, so the incident purge had to be **removed** from it rather than merely also
 provided — otherwise the built-in would silently persist on every edition. A task claimed by two providers
 is refused fail-closed, and on Personal a contributed task is an unknown task **refused loudly**, never a
@@ -437,8 +442,10 @@ also *retracts that Consignment's dedup-ledger claims*, or re-ingested rows woul
 suppressed; a parked Consignment has **drain**, which does not re-walk but registers the park tables and
 runs the real finalisation; the at-rest lane has **replay** (§2.3).
 
-⚠ **Reprocess is whole-batch only**, stated verbatim in the source. Record-level replay from quarantine is
-tracked and explicitly has no driver.
+⚠ **Reprocess is whole-batch only**, stated verbatim in the source. Record-level replay of one file's
+rejected rows is a separate route since the X4 deferral shipped (2026-09-28): `POST /runs/{name}/replay-rejects`
+(`RecordReplay`; CSV frontends only, once per reject sidecar), with `processing.reject_mode: eject |
+all_or_nothing` as the per-pipeline choice.
 
 **Park is a durable pause, not a bypass** — and disabling a Step means two different things per lane: on
 the scratch lane an in-memory bypass, on the ingest lanes a durable pause, because a bypass there would
@@ -450,8 +457,11 @@ dies at the park with a null message, **one batch every cycle**.
 kill switch. That was a fail-open fix: it previously fired only from a maintenance job, and no shipped
 space but the demo had one — so a stock space had no orphan detection at all.
 
-⚠ **There is no timeout or cancellation on either engine.** Cancelling a cron handle un-arms only *future*
-fires. A hanging Job is a recorded gap, and the watchdog that exists covers only contributed Steps.
+⚠ **Cancelling a cron handle un-arms only *future* fires.** A hanging Job is bounded since 2026-10-06 by
+**`JobDeadline`** (platform-services R1): every Run gets its Job Type's deadline (default 30 min, the
+long-running types the ceiling), overridable by `deadline_seconds:`, capped by `-Djob.deadlineCeilingSeconds`
+(default 24 h); on expiry the Run's thread is interrupted and the Run is recorded `FAILED`. Contributed Steps
+keep their own watchdog.
 
 ### 3.11 Whole-pipeline dry run (`PIPELINE-DRYRUN-1`, shipped 2026-09-20)
 
@@ -659,8 +669,8 @@ and `ControlApiAsyncV1Test.pipelineTriggerDryRunImpliesSkipPostAction`.
 * **Row 15 — the deletion half of the legacy flat read path.** Gate: a minor release on the trunk after the
   newest ancestor tag, shipping the converter and the lane flag. ⛔ Not closable by code, and ⛔ not to be
   started on momentum. 🔴 The earlier gate was **unfalsifiable by construction** — it named a tag on a
-  retired line that can never be a trunk ancestor. Of its four steps, one is shipped, one is **unverified**
-  (the parity gate through the compiled path), one shipped 2026-09-02, and the deletion awaits a release.
+  retired line that can never be a trunk ancestor. Of its four steps, one is shipped, the parity gate through
+  the compiled path is **met** (2026-09-16, §3), one shipped 2026-09-02, and the deletion awaits a release.
   ⚠ Its stated parity blocker is the phantom-class row in §2.3.
 * **Cross-lane drill-down and the step-info envelope**, and **the batch-id rename trio** — both ride the
   next major tag. ⚠ The rename trio is **not enumerated in the drafted release notes**.
@@ -669,10 +679,12 @@ and `ControlApiAsyncV1Test.pipelineTriggerDryRunImpliesSkipPostAction`.
 
 ### 5.2 Tracked and actionable
 
-* **Record-level replay from quarantine**, with error manifests and an all-or-nothing versus
-  eject-and-continue choice as per-pipeline config — ⛔ explicitly no build without a driver.
-* **The retry deferrals** — a per-pipeline retry block, and an operator cancel or retry-now affordance
-  (today: delete the sidecar, or reprocess).
+* ✅ ~~**Record-level replay from quarantine**~~ **SHIPPED 2026-09-28 (X4):** `POST /runs/{name}/replay-rejects`
+  and `processing.reject_mode: eject | all_or_nothing` (§3).
+* ✅ ~~**The retry deferrals**~~ **SHIPPED:** the per-pipeline `processing.retry {max_attempts, initial_backoff,
+  max_backoff}` block (2026-09-25, `PipelineConfigParser`, absent keys inherit `-Dingest.retry.*`) and
+  `POST /runs/{name}/retries/retry-now|cancel {file}` (`RunRoutes`; retry-now clears the backoff, keeps the
+  attempt count).
 * A pre-materialise cap to save fetch bandwidth —
   ⚠ the latter is **design-first** (checked 2026-09-16): no unit, config key or enforcement point exists
   anywhere. `IntakeGovernor` caps FILES per cycle after listing; a pre-materialise cap would have to cap BYTES
@@ -681,8 +693,10 @@ and `ControlApiAsyncV1Test.pipelineTriggerDryRunImpliesSkipPostAction`.
 * **Branch-aware residuals** — ~~multi-schema with route~~ (segment-scoped lift shipped 2026-09-24); mid-branch
   transforms in the route verb; three node kinds still unimplemented anywhere; the destination-list
   follow-ups.
-* **Platform services stage two and three** — the open Step-kind registry, gated on the decision to execute
-  an intervening node at rest and on a throughput spike. ⚠ **No job-side watchdog.**
+* ✅ ~~**Platform services stage two and three**~~ **SHIPPED 2026-09-28 → 2026-10-04** (S2-1…S2-3: node types
+  declare an execution mode, the pack Step seam `StepExecutor` / `StepContext` with grants and watchdog; S3-1…S3-3:
+  packs contribute Platform Services, provider pinning, disable/enable, read-only `DatasetAccess`); the
+  job-side watchdog is `JobDeadline` (2026-10-06, §3). Design archived 2026-10-04.
 * **Consignment addressing residuals** — a dead field that is always zero and never read; a task that must
   be configured or every full recompute leaves a complete extra copy on disk.
 * **The consignment-ELT residual** — the batch table is **structurally singular**, one schema per row while
@@ -690,8 +704,7 @@ and `ControlApiAsyncV1Test.pipelineTriggerDryRunImpliesSkipPostAction`.
 * **The completeness measure** — wiring, and a job type that must **refuse loudly** when the registry
   backend is off. ⚠ Two of its components have **no production caller today**. 🔴 Its hold is neither
   carrier- nor query-gated: its first action is *engineering*.
-* **The memory-cap default and surge admission** — ⚠ verified still open; ⛔ do not close the first off the
-  resource-pair decision.
+* **Surge admission** — open. *(The memory-cap default that shared this row shipped 2026-09-26, GAP-4, §2.4.)*
 
 ### 5.3 `UNTRACKED` — found writing this spec, no board row exists
 
@@ -700,6 +713,7 @@ and `ControlApiAsyncV1Test.pipelineTriggerDryRunImpliesSkipPostAction`.
 > `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
 > starting point and read the row before acting on it:
 > `SPEC-STALEREF-1`, `SPEC-GREENCELL-1`, `SPEC-GLOSSARY-1`, `SPEC-PLANSTALE-1`.
+> ⚠ **None of these ids is an open board row today** (re-checked 2026-11-15, `DOCS-AGENT-WRITTEN-REVIEW-1`): `SPEC-STALEREF-1` closed 2026-09-09 when `tools/check-doc-citations.mjs` became a guard, `SPEC-NOPROOF-1` closed 2026-09-09 when all six Musts had tests, and the rest were closed, refuted or split into their own rows by the 2026-09-24 board consolidation. Their history: `docs/archived-documents/backlog-snapshot-2026-09-24.md` and `docs/archived-documents/plans-archive/post-consolidation-sprints.md`.
 >
 > ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
 > area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —
@@ -713,16 +727,16 @@ Ranked. The first three are visible to an operator.
    does** (§2.3). Fix the row's name and its claim before anyone reasons about Row 15's readiness again.
 2. ✅ ~~**The served maintenance descriptor advertises four tasks Personal refuses and hides seven
    shipped ones**~~ **FIXED 2026-09-09.** `MaintenanceJob.BUILT_IN_TASKS` is now the one declaration of
-   the switch's 20 ids, `availableTasks()` adds whatever a provider on **this** classpath contributed,
+   the switch's ids (20 then, 23 on 2026-11-15), `availableTasks()` adds whatever a provider on **this** classpath contributed,
    and the descriptor is built from that — so the form offers exactly what will not throw, per edition.
    Pinned by `MaintenanceTaskContractTest`, which **re-parses the switch's own `case` labels**; proven by
    mutation (removing one id failed three of its five tests, naming the id).
 3. 🔴 **Replay is backed by an in-memory capped map, lost on restart**, while a board row marks it ✅ in all
    three editions and another spec misattributes its 404 to the wrong flag (§2.3). Either persist the
    lookup or caveat the row.
-4. 🔴 **The 2 GB memory default is asserted in six more current locations**, one of them in the same file
-   whose own gap row refutes it, and two others give two further framings (§2.4). Five framings of one
-   absent default.
+4. ✅ ~~**The 2 GB memory default is asserted in six more current locations**~~ — moot since 2026-09-26: a code
+   default exists (GAP-4, `DuckDbUtil.defaultMemoryLimit`, §2.4), so the documents now owe *that* number,
+   not "none".
 5. 🔴 **"The only bound" is stale in three documents and in the class's own javadoc**, which says the
    default is unbounded directly above the constant that sets it to four (§2.5).
 6. 🔴 **The status hierarchy is still stated with the retired word** in the register and three more current
@@ -764,7 +778,7 @@ Ranked. The first three are visible to an operator.
 | **Nested semaphores per tier** | ⛔ **REFUSED** | No global view for the fairness decision, and cross-tier ordering is a deadlock hazard |
 | **A separate consignment-generation service** | ⛔ **REFUSED** | Planning stays in the poll cycle; only *admission to execution* is shared |
 | **Retiring the ingest run budget** | ⛔ **REFUSED — the plan claimed it, the code refuted it** | It bounds a different *phase*, not the same fact twice |
-| **A cap computed from memory ÷ concurrency** | ⛔ **REJECTED** | The divisor is routinely unknown and the ingest path has its own limiter, so any formula is wrong *in exactly the overcommit case it was meant to prevent* |
+| **A cap computed from memory ÷ the live concurrency** | ⛔ **REJECTED** (the GAP-4 default divides by a fixed 4) | The divisor is routinely unknown and the ingest path has its own limiter, so any formula is wrong *in exactly the overcommit case it was meant to prevent* |
 | **A temporary-directory-size default** | ⛔ **NONE, permanently** | None is defensible without knowing the volume |
 | **Capping preview and dry-run connections** | ⛔ **REFUSED, and must stay so** | They run over bounded samples |
 | **Read-path connection reuse** | ⛔ **NOT the lever** | Measured: a warm open is 24 ms; no contradicting measurement exists |
@@ -794,7 +808,7 @@ Ranked. The first three are visible to an operator.
 | **Multi-user relational deployment** | ⛔ **PARKED** 2026-09-06 | Until a multi-operator install exists |
 | **Mail delivery reporting success with no channel** | **DELIBERATE** | ⛔ Do not "fix" without an operator call — but know that a scheduled mail job **reads green while delivering nothing** |
 | **A built-in with an unsatisfiable grant** | **ACCEPTED** asymmetry | Only the pack and classpath paths refuse; recorded deliberately |
-| **The step-scaffold generator for a new kind** | ⛔ **GATED** | A classpath type gets no hot deploy, no isolated loader and no watchdog |
+| **The step-scaffold generator for a new kind** | ✅ **BUILT** for pack-hosted Steps — `node tools/scaffold.mjs new step` (isolated classloader, `StepContext`, watchdog; platform-services S2-3) | The original gate stands for a *classpath* node type: it gets no hot deploy, no isolated loader and no watchdog |
 | **Third-party lowerable Step kinds** | ⛔ **CLOSED** | Until a fragment guard exists |
 | **Reusing the flow-job sink writer for ingest destinations** | ⛔ **NEVER** | It is shaped for one root, with no lineage, and self-registers |
 
@@ -813,7 +827,7 @@ current citations name classes the 2026-08-31 rename removed (§5.3 item 7).
 | Per-job non-overlap | `LockingRunner` | — |
 | The ingest engine | `PipelineScheduler`, `CollectorService` | 🔴 **No test class exists at all** |
 | Per-pipeline exclusion | `PipelineRunGuard` | Non-reentrant on purpose (§3.3) |
-| Pipeline triggers | `PipelineTrigger` (5 kinds + a scheduler enum) | ⚠ The glossary's trigger entry omits a shipped kind |
+| Pipeline triggers | `PipelineTrigger` (6 kinds + a scheduler enum) | ⚠ The glossary's trigger entry omits a shipped kind |
 | The commit bus | `ConsignmentEventBus` | ⚠ Cited under its **old** name in a concept page |
 | The lane fork | `ConsignmentIngestStrategy.admittedLift` / `flatReason` | — |
 | The whole-pipeline dry run | `RunRoutes.triggerPipeline`, `CollectorProcessor.run`/`ingest`, `ConsignmentIngestor.process`, `PipelineTestRun.dryIngest`, `EventLog.CONTAINED`, `ConsignmentAuditWriter` | §3.11 — `strategy.ingest` runs contained (member copies, scratch root, throwaway event log), so parsing IS re-validated and reported per member |
@@ -825,7 +839,7 @@ current citations name classes the 2026-08-31 rename removed (§5.3 item 7).
 | Contributed tasks | `MaintenanceTaskProvider` + the backup and operations modules | — |
 | Compaction | `PartitionCompactor` | — |
 | The bounded retry | `CommitRetry` | 🔴 No transient/fatal classifier; ⚠ escape hatch undocumented |
-| The memory resolver | `DuckDbUtil.memoryLimit` | 🔴 Six docs assert a default it does not return (§2.4) |
+| The memory resolver | `DuckDbUtil.memoryLimit` | ✅ Falls back to `DuckDbUtil.defaultMemoryLimit` since 2026-09-26 (§2.4) |
 | Quarantine | `QuarantineManager` | — |
 | Reprocess and drain | `ReprocessCommand`, `DrainCommand` | Whole-batch only, verbatim |
 | The commit log | `CommitLog` | No day column, by design |

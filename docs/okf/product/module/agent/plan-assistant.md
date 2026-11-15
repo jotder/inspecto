@@ -168,19 +168,19 @@ aggregate "AI is up". ⚠ On Basic, which bundles no agent, the pane's own route
 #### 3.4a How a tier resolves to a concrete model — and why it is NOT hardware-detected
 
 Two paths, in precedence order, both in `ModelProviderFactory.fromPersisted()`
-(`features/inspecto-agent/.../model/ModelProviderFactory.java:30-34`):
+(`features/inspecto-agent/.../model/ModelProviderFactory.java`):
 
 1. **Persisted settings win.** `AssistModelSettings.load()` reads `config/assist-settings.properties`
-   (core-side twin: `inspecto/.../model/ModelSettingsStore.java:28-74`) — an operator-entered provider
+   (core-side twin: `inspecto/.../model/ModelSettingsStore.java`) — an operator-entered provider
    id, base URL and per-tier model names. This is the production path.
 2. **Legacy environment fallback**, only when no settings file exists: `OllamaModelProvider.fromEnvironment()`
-   (`OllamaModelProvider.java:55-56`) → `ModelProfile.fromEnvironment()`
-   (`ModelProfile.java:68-74`).
+   (`OllamaModelProvider.java`) → `ModelProfile.fromEnvironment()`
+   (`ModelProfile.java`).
 
 The fallback resolves one of **three built-in bundles** — `CPU_ONLY`, `DEV_LAPTOP`, `PRODUCTION`
-(`ModelProfile.java:39-48`), each a fixed `ModelTier → Ollama model name` map. Which bundle applies is a
+(`ModelProfile.java`), each a fixed `ModelTier → Ollama model name` map. Which bundle applies is a
 **plain case-insensitive string match** on `-Dagentkernel.profile` (env fallback `AGENTKERNEL_PROFILE`),
-defaulting to `cpu-only`, in `ModelProfile.byName()` (`ModelProfile.java:58-66`). The tier itself is
+defaulting to `cpu-only`, in `ModelProfile.byName()` (`ModelProfile.java`). The tier itself is
 chosen by capability code, not by the machine (e.g. `ModelDiagnoser.TIER = ModelTier.MEDIUM`).
 
 ⚠ **Checked 2026-09-17 and found ABSENT: no hardware signal participates anywhere on this chain.**
@@ -188,7 +188,7 @@ No `availableProcessors`, `maxMemory`, `os.arch`, GPU/CUDA probe or equivalent i
 `OllamaModelProvider`, `ModelRouter`, `ModelProviderFactory` or `ModelSettingsStore`. The repo's
 `availableProcessors`/`maxMemory` call sites all size ETL thread pools and partition workers; none is
 reachable from model selection. The hardware sizes in `ModelProfile`'s javadoc ("~4GB GPU", "16GB+ GPU",
-`ModelProfile.java:38-48`) are **guidance to the operator for picking a bundle**, not detection.
+`ModelProfile.java`) are **guidance to the operator for picking a bundle**, not detection.
 **Do not re-derive an auto-detection behaviour from those comments or from the bundle names.**
 
 ### 3.5 Embedded intelligence (AGT-5)
@@ -453,6 +453,7 @@ So the honest reading of §2 is: `AGT-1`, `AGT-2` and `AGT-4` (the assist agent)
 > `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
 > starting point and read the row before acting on it:
 > `CONSUMER-PAIRS-1`, `SPEC-STALEREF-1`, `SPEC-COUNTS-1`, `SPEC-DEADSEAM-1`, `SPEC-GLOSSARY-1`, `SPEC-MOCKRESIDUE-1`, `SPEC-PLANSTALE-1`, `SPEC-ORPHANPAGE-1`, `SPEC-AGT-EDITIONS-1`.
+> ⚠ **None of these ids is an open board row today** (re-checked 2026-11-15, `DOCS-AGENT-WRITTEN-REVIEW-1`): `SPEC-STALEREF-1` closed 2026-09-09 when `tools/check-doc-citations.mjs` became a guard, `SPEC-NOPROOF-1` closed 2026-09-09 when all six Musts had tests, and the rest were closed, refuted or split into their own rows by the 2026-09-24 board consolidation. Their history: `docs/archived-documents/backlog-snapshot-2026-09-24.md` and `docs/archived-documents/plans-archive/post-consolidation-sprints.md`.
 > ✅ **`CONSUMER-PAIRS-1` decided 2026-09-10 (operator, per row):** `AgentAskResult.artifact` — the inverse pair — **BUILD the producer**: the draft skills return their draft as the artifact the UI already renders → `BACKLOG.md` §3 `AGT-ARTIFACT-1`.
 >
 > ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
@@ -617,7 +618,7 @@ One archived plan also cites a reflex-layer history file that **does not exist**
 
 - **`README-HARDWARE-PROFILE-CLAIM-1`** — ✅ **ANSWERED 2026-09-17 from the code** (`58739575`). The row
   offered two outcomes; the truth was a third. The three profiles are **not stale** — `cpu-only`,
-  `dev-laptop` and `production` are live code with exactly those names (`ModelProfile.java:39-48`), so the
+  `dev-laptop` and `production` are live code with exactly those names (`ModelProfile.java`), so the
   archived `v3-agent-mvp.md` was never their only home. What was wrong is the **one word "auto"**: the
   bundle is declared by the operator via `-Dagentkernel.profile`, and **no hardware signal participates**
   (evidence in §3.4a). The README was corrected to say "declare", and §3.4a records the absence so nobody

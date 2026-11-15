@@ -542,6 +542,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 > `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
 > starting point and read the row before acting on it:
 > `CONSUMER-PAIRS-1`, `SPEC-NOPROOF-1`.
+> ⚠ **None of these ids is an open board row today** (re-checked 2026-11-15, `DOCS-AGENT-WRITTEN-REVIEW-1`): `SPEC-STALEREF-1` closed 2026-09-09 when `tools/check-doc-citations.mjs` became a guard, `SPEC-NOPROOF-1` closed 2026-09-09 when all six Musts had tests, and the rest were closed, refuted or split into their own rows by the 2026-09-24 board consolidation. Their history: `docs/archived-documents/backlog-snapshot-2026-09-24.md` and `docs/archived-documents/plans-archive/post-consolidation-sprints.md`.
 > ✅ **`CONSUMER-PAIRS-1` decided 2026-09-10 (operator, per row):** `permissions[]` in the v1 envelope **ADOPT** — the shell interceptor stops discarding the envelope FIRST, then affordances gate on it → `BACKLOG.md` §3 `CLIENT-HALVES-1`.
 >
 > ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is

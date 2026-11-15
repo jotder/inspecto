@@ -9,10 +9,12 @@ timestamp: 2026-07-16T00:00:00Z
 
 # Cross-Cutting Gotchas
 
-* **TOON schema serialization** — `ConfigCodec.toToon(map)` does **not** emit tabular-array format. A schema
-  whose `fields`/`rules` are Java-constructed `List<Map>` round-trips as nested maps and the parser throws
-  *"Array length mismatch: declared N, found 0"*. In tests, write the schema as an inline TOON string
-  (`fields[N]{name,selector,type}: …`), not via `toToon(schemaMap)`. See [TOON config](../../module/config/spec-toon-config.md).
+* **TOON schema serialization** — `ConfigCodec.toToon(map)` round-trips a Java-constructed `List<Map>`
+  (`fields`/`rules`) back through the strict `ConfigCodec.toMap` (`ComponentStoreTest.tabularFieldsRoundTripThroughToon`;
+  every shipped example in `ShippedExamplesRoundTripTest`). The old warning — that it emits no tabular form and
+  the re-read throws *"Array length mismatch"* — no longer holds; a few test comments still repeat it. The live
+  trap is the strict decode: a tabular row whose width disagrees with its header (an unquoted
+  `DECIMAL(18,2)`) is refused, naming the line and the quoted fix. See [TOON config](../../module/config/spec-toon-config.md).
 * **DuckDB reserved words** — `day` is a keyword: alias it (`run_day`) in SQL; quote `"trigger"` too. Watch
   this whenever generating SQL with date/trigger columns. See [DuckDB](../../module/engine/spec-duckdb.md).
 * **`ConsignmentEvent.pipeline()` is the LOWERCASED pipeline name** (`cfg.identity().pipelineName()`). Any name
@@ -34,15 +36,18 @@ timestamp: 2026-07-16T00:00:00Z
   `clear()` in `finally` — `MultiCollectorProcessor.runAll`/`runConfigs` **and** `CollectorProcessor`'s per-batch
   executor. Miss one and that space's metrics/events silently fall back to `"default"`. See
   [multi-space](../../module/processor/architecture.md).
-* **Pipeline-internal paths resolve against the JVM CWD, not the space root — `schema_file` excepted since
-  2026-07-31.** `grammar` and `dirs.*` are still bare `Paths.get(...)` in `PipelineConfigParser` with no
-  rebasing to `spaces/<id>/`, and only the *space discovery* layer (`-Dspaces.root`) is space-relative — so
-  those must stay repo/bundle-root-relative, and `SpaceMigrator` cannot auto-fix absolute/author-relative ones.
-  **Schema references (`schema_file`, `schemas[].schema_file`, `segments`, `grammar`, `mapping_file`) now go
-  through `PipelineConfigParser.resolveSchemaRef` → `PathJail.resolveConfigRef`: beside the config, never the
-  CWD** (W1b made it config-relative first; `SCHEMA-FILE-RESOLVES-AGAINST-CWD-1` removed the CWD second on
-  2026-09-23), so a bare basename beside the pipeline is portable and loads from any launch directory. ⚠ The mixed model is the trap — in one config file a bare
-  `orders_schema.toon` resolves while a bare `dirs.poll: inbox` still means `<CWD>/inbox`.
+* **Pipeline-internal paths have two bases, neither of them the JVM CWD (inside a Space).** Until 2026-09-23
+  `grammar` and `dirs.*` were bare `Paths.get(...)` against the CWD (history). Today:
+  **schema references (`schema_file`, `schemas[].schema_file`, `segments`, `grammar`, `mapping_file`) go
+  through `PipelineConfigParser.resolveSchemaRef` → `PathJail.resolveConfigRef`: beside the config file**
+  (W1b made it config-relative first; `SCHEMA-FILE-RESOLVES-AGAINST-CWD-1` removed the CWD second on
+  2026-09-23), and **data paths (`dirs.*` and the other data paths `PathJail.resolveDataPath` lists) resolve
+  under the Space directory** `spaces/<id>/` (`DATA-DIRS-RESOLVE-AGAINST-CWD-1`, via
+  `PipelineConfigParser.dataPaths` → `PathJail.dataPath`). ⚠ The two bases are the trap — in one config under
+  `spaces/demo/config/orders/` a bare `orders_schema.toon` means the file beside the pipeline while
+  `dirs.poll: inbox` means `spaces/demo/inbox`; a data path that repeats the Space's own path
+  (`spaces/demo/data/…`) is refused. With **no Space** (`PathJail.spaceDirOf` is null: a single-tenant example
+  or an in-memory draft) data paths keep the CWD reading.
   ⚠ ⚠ Anything that *validates* a schema reference must mirror `resolveSchemaRef` or it will reject configs
   the engine runs. `ConfigRoutes.schemaFileFindings` is an **ERROR** gate at registration and takes a
   `configDir` for exactly this reason. **W3 (2026-08-17) closed the spurious-warning half**: `POST /config/write`
@@ -56,13 +61,14 @@ timestamp: 2026-07-16T00:00:00Z
 * **Pipeline seed must be ≥ 1 `source_store`** — `PipelineJobRunner.seedsOf` throws on zero; multi-source merge is the
   `transform.merge` path (the Phase-A "exactly one" rule was relaxed in Phase C). See
   [Pipeline live execution](../../module/engine/spec-live-execution.md).
-* **Source→Collector rename (2026-07-14) residuals — three tokens that deliberately did NOT move.** <!-- vocab-allow: names the rename itself -->
+* **Source→Collector rename (2026-07-14) residuals — what deliberately did NOT move.** <!-- vocab-allow: names the rename itself -->
   The acquisition entity is **Collector** (`CollectorConnector` SPI, `CollectorService`, routes
   `/collectors`) and the Catalog origin node is **Stream** (`NodeKind.STREAM`, id `stream:<pipeline>`,
-  ex `source:`), but: the pipeline **TOON config key `source:`** block is kept (renaming breaks
-  authored TOON — a separate migration if ever wanted); the `'SOURCE'` pipeline **stage category** is
-  unchanged; `collector.*` pipeline node types were already correct. Don't "fix" these to match the
-  glossary.
+  ex `source:`). The pipeline **TOON config key is `collector:`** — `PipelineConfigParser` reads only
+  `collector:`, so a legacy `source:` block is silently ignored (no alias; zero committed `.toon` files
+  carry one; `PipelineEditable.collectorKey` still writes back to whichever key a file uses). What stayed:
+  the `'SOURCE'` pipeline **stage category** (`NodeCategory.SOURCE`, the `acquisition` node type's
+  category). Don't "fix" that to match the glossary.
 * **KPI is deliberately NOT renamed to Measure** (Flow→Pipeline backend rename, 2026-06-30). <!-- vocab-allow: names the rename itself --> The
   backend has no BI "Metric" concept — its semantic construct is **KPI** (`kpis:` in `*_meta.toon`,
   `KpiMeta`, `NodeKind.KPI`), a *distinct* canonical term ("a single-number Measure with a

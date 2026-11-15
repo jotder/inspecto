@@ -26,12 +26,16 @@ A **Case** groups related Incidents for one business investigation; the chain is
   (Postgres multi-user row, [BACKLOG](../../../../BACKLOG.md)). A Case is an `ObjectType.CASE` row behind
   `ObjectStore`; there is no separate Case store.
 - The Case-specific surface is the optional module `inspecto-case-management` ([features](features-case-management.md)).
+- Incident resolution gate (design §4 item 5), all three stages: resolving an Incident needs a timeline, cause
+  analysis, corrective actions, an SLA (`dueAt`) and a Disposition. The backend guard
+  (`ObjectService.incidentResolutionGaps`, enforced in `ObjectService.commit` since 2026-07-24) answers 422
+  naming what is missing; the UI hard-gates too — the mail view leaves such Incidents out and names the gaps,
+  the detail view refuses up front (`postmortemGaps` in `mail-model.ts`).
 
 ## Left
 
 - P3 `D6-REAL-USER-SESSION-1`: the *Findings fields* think-aloud with a real Case-desk lead is unrun
   ([BACKLOG](../../../../BACKLOG.md)).
-- Incident resolution gate: the UI hard-gate and the backend workflow guard are not started (design §4 item 5).
 - A deployment-configurable disposition list (TOON override) is unscheduled (design §4 item 3).
 - Case analytics as a Studio Dataset:
   [plan](../../../../archived-documents/plans-archive/case-analytics-dataset-plan.md) (draft 2026-07-24).

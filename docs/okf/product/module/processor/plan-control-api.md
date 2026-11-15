@@ -74,7 +74,7 @@ column**; this table mirrors it.
 **Corrections this table makes to its predecessor**, each verified against source:
 
 - **`API-3`** read a flat `SHIPPED`; the concept page said "writes require `If-Match`". `ETags.requireMatch`
-  (`inspecto/src/main/java/com/gamma/control/ETags.java:33-39`) rejects **a present, non-matching**
+  (`inspecto/src/main/java/com/gamma/control/ETags.java`) rejects **a present, non-matching**
   precondition with `409`; an absent header passes. No file under `inspecto-ui/src/app` sends `If-Match`
   or `If-None-Match`, and `V1EnvelopeMetadata.etag` is declared and read nowhere. The concept page is
   corrected with this spec; the requirement stays a Must whose client half is unbuilt (§5).
@@ -89,7 +89,7 @@ column**; this table mirrors it.
   file, so editing the file is safe).
 - **The route count has four incompatible published values** — 121 (the archived design's inventory),
   ~80 (`ADVANCED_GUIDE.md` §10), ~30 (`STAKEHOLDER_OVERVIEW.md`), 19 documented paths (the OpenAPI doc) —
-  against **~332 built-in registrations** the code's own census records (`ControlApi.java:1086`), plus
+  against **~332 built-in registrations** the code's own census records (`ControlApi.java`), plus
   `ServiceLoader`-discovered module routes. The first two are dated snapshots; the stakeholder figure also
   names retired route vocabulary (`sources`, `flows`, `issues`) and is plan §8's cluster, reconciled at step 6.
 
@@ -158,7 +158,7 @@ version belongs to the client, exactly as the SPA composes `apiBaseUrl + /v1 + p
 
 ### 3.3 The envelope and the error catalog
 
-Every `/api/v1` response is enveloped (`Envelope.java:30-79`):
+Every `/api/v1` response is enveloped (`Envelope.java`):
 
 ```
 success  {data, metadata:{timestamp, durationMs, apiVersion:"v1", pagination?}, links:{self}?, permissions?, diagnostics:{correlationId}}
@@ -225,7 +225,7 @@ three *mutating* routes, and `GET /requirements` — the sole read, with no sing
 carries no per-resource set, so it can never gate a list's affordances; **(ii)** the client already holds
 the input the server derives from (`view()` puts `status` on every list row and the server's rule is
 literally `switch (status)`); **(iii)** the pane already implements that exact rule locally and correctly
-(`requirement-decision.dialog.ts:59,69`). ⇒ Adopting it would duplicate a correct local derivation over
+(`requirement-decision.dialog.ts`). ⇒ Adopting it would duplicate a correct local derivation over
 the network and change no behaviour. ⚠ A structural limit worth knowing first: the envelope carries **ONE**
 `permissions` array per response, so it cannot express per-row permissions for a collection — "per-resource"
 only ever works for a single-resource response. Every affordance gate in the SPA today is a
@@ -270,7 +270,7 @@ is bounded with a `truncated` flag that reports the *true* total.
   precondition with `409 CONFLICT_STALE_VERSION`; no header ⇒ the write proceeds. There is no `412` and no
   `428` anywhere. ⚠ The SPA never sends it (§3.15).
   🔴 **And it is honoured on ONE route only — re-measured 2026-09-11.** `ETags.requireMatch` has exactly
-  **one** production call site in the tree: `ComponentRoutes.java:263` (`PUT /components/{type}/{id}`).
+  **one** production call site in the tree: `ComponentRoutes.java` (`PUT /components/{type}/{id}`).
   ⛔ **The config write family does not participate**: `ConfigWriteRoutes.java` (`POST /config/write`,
   `POST /config/patch`) contains no `ETags`, no `If-Match` and no `ContentHash`. Its concurrency story is a
   different one by design — `write` gates on an existence check plus an `overwrite` flag, and `patch`
@@ -310,7 +310,7 @@ is bounded with a `truncated` flag that reports the *true* total.
   `ComponentsService` (the registry), not `/config/write`. Recorded so a later sweep of this shape does
   not re-investigate it.
   ⚠ Also: `Envelope.java` **never sets an `etag` key in `metadata`** for any route, so the SPA's
-  `V1EnvelopeMetadata.etag` (`v1.ts:27`) is a field the server has never populated. The ETag travels only
+  `V1EnvelopeMetadata.etag` (`v1.ts`) is a field the server has never populated. The ETag travels only
   as an HTTP header — which means `v1.interceptor.ts` is **not** what withholds it: that interceptor clones
   the **body** only and leaves headers intact.
 - **`Idempotency-Key`** (`Idempotency.java`): on any `POST`/`PUT`/`DELETE`, the first JSON response is cached
@@ -473,8 +473,8 @@ it does it is the dependency-injection framework this codebase deliberately does
 
 ### 3.15 The SPA client
 
-`apiUrl(path)` = `environment.apiBaseUrl + "/v1" + path` (`inspecto-ui/src/app/inspecto/api/api-base.ts:9-11`;
-`/api` in dev behind the proxy, `''` in the built bundle). Interceptor order (`app.config.ts:28-31`):
+`apiUrl(path)` = `environment.apiBaseUrl + "/v1" + path` (`inspecto-ui/src/app/inspecto/api/api-base.ts`;
+`/api` in dev behind the proxy, `''` in the built bundle). Interceptor order (`app.config.ts`):
 **`v1Interceptor`** (unwraps `{data, metadata, diagnostics}` → `data` at the one seam; warns on
 `apiVersion` skew) → `spaceInterceptor` → `authInterceptor` (Bearer + 401 → silent refresh → retry) →
 `inspectoErrorInterceptor` (connectivity only). `apiErrorMessage` reads the v1 error object with a legacy
@@ -486,7 +486,7 @@ contract features still have **zero client consumers**: `metadata.pagination` (n
 table's "Load more" is not cursor-driven) and `Idempotency-Key` (never sent). `If-None-Match` is also
 never sent. ⚠ **`If-Match` no longer belongs on this list** — as of 2026-09-11 two panes send it
 (`/config/write`, `CLIENT-HALVES-1` (a)) and the Schema editor sends it on `PUT /components/schema/{id}`
-(`SCHEMA-DIALOG-IFMATCH-1`). ⚠ `error.interceptor.ts:14-16` still says "the backend is fully open, no 401
+(`SCHEMA-DIALOG-IFMATCH-1`). ⚠ `error.interceptor.ts` still says "the backend is fully open, no 401
 handling" — stale since W6d; the handling lives in `auth.interceptor.ts`.
 
 ## 4. Decisions
@@ -572,6 +572,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 > `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
 > starting point and read the row before acting on it:
 > `SPEC-STALEREF-1`, `SPEC-NOPROOF-1`.
+> ⚠ **None of these ids is an open board row today** (re-checked 2026-11-15, `DOCS-AGENT-WRITTEN-REVIEW-1`): `SPEC-STALEREF-1` closed 2026-09-09 when `tools/check-doc-citations.mjs` became a guard, `SPEC-NOPROOF-1` closed 2026-09-09 when all six Musts had tests, and the rest were closed, refuted or split into their own rows by the 2026-09-24 board consolidation. Their history: `docs/archived-documents/backlog-snapshot-2026-09-24.md` and `docs/archived-documents/plans-archive/post-consolidation-sprints.md`.
 >
 > ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
 > area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —
@@ -586,7 +587,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | **The SPA reads no `metadata.pagination`** | zero consumers of `nextCursor` | Four paginated endpoints page for `curl` only; the data table's "Load more" is not cursor-driven |
 | **No `@PublicApi` surface guard** | no japicmp, no scanning test | `API-7` is policy in prose; a MINOR that removes a marked member passes the build |
 | **The gateway blueprints are untested documentation** | no reference in `src/`; README's own caveat | `API-6` is a Must (S); the WSO2 definition also omits the `503` stubs and the optional-module paths |
-| **Idempotency replay is per instance** | `Idempotency.java:32` | A second instance behind a gateway replays nothing; fine today (single instance), a trap for E1 |
+| **Idempotency replay is per instance** | `Idempotency.java` | A second instance behind a gateway replays nothing; fine today (single instance), a trap for E1 |
 | **`error.interceptor.ts` comment is stale** | `:14-16` "fully open, no 401 handling" | A reader editing the chain would place 401 handling in the wrong file |
 
 ## 6. Refused & superseded

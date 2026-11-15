@@ -170,8 +170,16 @@ describe a state that has since shipped.
    `plan-editions` Java floor (compile target 27 — the table and two "stays 24" statements, the stale "two
    documents claim 26"), profile count (three edition profiles + `coverage`, ×2), example count (49 examples,
    144 `.toon`); `plan-surfaces` `/bootstrap` edition derivation (`basic | standard | advanced` from
-   `BootstrapRoutes.edition()`). Module and jar counts were already guarded (21 / 28). ⏸ Still open:
-   `layer/product/plan-maturity-assessment`, where "Enterprise" is often the market word — fix by hand.
+   `BootstrapRoutes.edition()`). Module and jar counts were already guarded (21 / 28). ✅ **FIXED 2026-11-15
+   (batch 3)** in `layer/product/plan-maturity-assessment`, by hand: the four 2026-10-14 rehearsals ran on an
+   "Enterprise" bundle, now "Enterprise (today Advanced)" (the rename landed 2026-10-17, `LA-EDITIONS-1`); "no
+   licence engine" (×5) now records D-PA22 — since 2026-11-11 `Entitlements` verifies a signed entitlement file
+   that narrows the Installed gate, and its `nodes` is recorded, not enforced; `LA17-NORMALISER-CHANGE-1` (×3)
+   closed 2026-09-27 (D-M9, `EntityListRoutes` seals the normaliser); four line pointers (`spec.md l.…`,
+   "`docs/BACKLOG.md` line 76") now name a section — 16 claims. Already right: "Enterprise grade", "Enterprise
+   hooks" and the market comparisons (the market word), the nine `No*ShipsInThePersonalBuildTest` classes, and the
+   seven code facts behind its `file:line` citations (ledger default `memory`, `LIVE_RUN_CAP = 1000`, Recon
+   tolerances and gates, Jaro-Winkler, Kafka SASL default, `ColumnClassification.SENSITIVE`) — 14.
 4. **Counts that drifted**: ✅ **FIXED 2026-11-01 (batch 2), re-measured that day:** `plan-control-api`
    (OpenAPI 487 paths / 581 operations, 147 hand-written + 434 generated of which 186 optional-module;
    `@PublicApi` 244 files, 256 of 286 `since` values `4.0.0`; `WriteGates` 71 main files / 253 call lines);
@@ -181,16 +189,63 @@ describe a state that has since shipped.
    Not changed: ETag call sites and the `WriteGates` importer count (no such count left in the docs),
    `plan-compliance`'s 89 locked dependencies (guarded, correct).
 5. **Stale `file:line` citations**, everywhere. Cite the symbol, not the line; drop the numbers on the next touch.
+   ✅ **Done 2026-11-15 (batch 3) in every doc this batch touched:** about 100 line numbers dropped (all of
+   `acquire/plan-acquisition`, and `plan-control-api`, `plan-metamodel`, `plan-maturity-assessment`,
+   `plan-assistant`, `plan-ingestion`, `plan-spaces`, `plan-data-plane`, `plan-api-stability`,
+   `user-guide-inline-ai-authoring`), each cited file checked to exist first; the one that did not
+   (`onboarding.md`) is marked retired. Line numbers were wrong where sampled (`AgentRoutes`, `JobService`,
+   `ConsignmentIngestor`). ⏸ Still open: `access/plan-security` (23, with the access lane) and about 150 in
+   docs not touched yet — the same rule, on their next touch.
 6. **Dangling BACKLOG pointers**: ✅ **FIXED 2026-11-01 (batch 2):** `CLIENT-HALVES-1` (×4 — row closed),
    `OPENAPI-GEN-1` (shipped 2026-09-15), `SEC-INCIDENT-1` (`plan-compliance` §5.2 said the carry-forwards were
    not done; the controls matrix CC6.1 records both done), `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` in
-   `plan-editions` (×2 → the *Deployment topology live validation* row) — 8 claims. ⏸ Still open:
-   `SPEC-STALEREF-1` / `SPEC-NOPROOF-1` in the "filed as cross-cutting rows" blockquotes of ~12 plans.
+   `plan-editions` (×2 → the *Deployment topology live validation* row) — 8 claims. ✅ **FIXED 2026-11-15
+   (batch 3):** the "filed as cross-cutting rows" blockquotes of 14 plans (`plan-metamodel`,
+   `plan-pipeline-authoring`, `plan-ingestion`, `plan-pipeline-execution`, `plan-control-api`, `plan-assistant`,
+   `plan-security`, `plan-surfaces`, `plan-studio`, `plan-observability`, `plan-editions`, `plan-data-plane`,
+   `plan-tooling`, `plan-compliance`) each gained a dated line: none of the ids is an open board row —
+   `SPEC-STALEREF-1` and `SPEC-NOPROOF-1` closed 2026-09-09, the rest closed, were refuted or were split by the
+   2026-09-24 consolidation (verified with `git log -S` on `docs/BACKLOG.md`). Two pages said work "stays open
+   under" / "belongs to" `SPEC-NOPROOF-1`: `plan-data-plane` §8 (the DuckLake real-driver failure; it also named
+   one registrar caller where there are two lanes, `ConsignmentIngestor` and `PipelineJobRunner`) and
+   `intelligence/user-guide-inline-ai-authoring` (the UI's 403/404/422 renderings) — both now say no board row
+   tracks it — 17 claims. Already right: the three "closing part of `SPEC-NOPROOF-1`" history notes
+   (`plan-control-api` §8, `plan-pipeline-execution`, `plan-editions`).
 7. **Batch 2 (config, connectors, engine, etl)**: `plan-metamodel` (30 writable kinds not 24; delete protection also owner-only, stranded-objects and runbook-link 409s; schemas already use `mapping.fields[]`; the Components pane does send `If-Match`; `transform.mask` enforces classification; `findings-spec` editor and Entity Projection are built); `plan-spaces` (13 templates not 2 or 5; telco-fraud is `minEdition: standard`; test counts; zero Spaces is a clean state); `plan-pipeline-execution` (23 built-in maintenance tasks + 5 contributed; six trigger kinds; DuckDB memory default exists; `JobDeadline`, replay-rejects, retry block, scaffold-step and Platform Services stages 2/3 all shipped; parity gate met); `plan-pipeline-authoring` (SQL is guarded on save; 46 node types; Step-kind registry seam is live); `plan-warehouse-targets` (`sinks:` fan-out, `objectstore.export` and `publish.postgres` are built); `plan-ingestion` (Expectations UI exists; 144 example `.toon`); `connectors` runbook (seven schemes, secrets from `inspecto-secrets`); `entity-store/admin-guide` (`masking_mode`); `entity-list/plan` (`LA17-NORMALISER-CHANGE-1` closed).
+   ✅ **FIXED 2026-11-15 (batch 3), re-verified against code first — 28 of 30 claims; two of the work list's own
+   numbers were stale too:** writable kinds are **34** (`ComponentStore.WRITABLE_TYPES`), not 30, and only 4 have
+   a `ConfigSpec`; delete refusals listed (owner-only 403, `use:` / grant / stranded-objects / runbook-link /
+   Mapping 409s, census links refused only under `refuse`); 201 `*_schema.toon` use `fields[]`; `If-Match` is sent
+   by the schema editor only in the Components pane (`component-form` and `mapping-editor` send none — partly
+   true); the `findings-spec` editor and Entity Projection (`InvRoutes`) exist; **30** Space templates (10 + 20
+   `la-*`), telco-fraud `minEdition: standard`, Space test counts re-counted (130); maintenance tasks 23 + 5,
+   six trigger kinds (`STREAM`), DuckDB memory default (`DuckDbUtil.defaultMemoryLimit`), `JobDeadline`,
+   replay-rejects, the retry block, `tools/scaffold.mjs new step`, Platform Services S2/S3 and the parity gate
+   (met 2026-09-16); SQL guarded on save (`PipelineEditable.refuseUnsafeSql`), **49** node types (now
+   count-guarded), the Step-kind registry live; `sinks:` fan-out, `objectstore.export`, `publish.postgres`; the
+   Expectations UI (since 2026-07-04), 144 example `.toon`; seven connector schemes plus `kafka` in its own
+   module, `${FILE}` / `${KEYSTORE}` from `inspecto-secrets`; `masking_mode`; `LA17-NORMALISER-CHANGE-1` moved to
+   Built. Already right: zero Spaces is a clean state; classification as a closed vocabulary.
 8. **Minor**: `admin-guide-gotchas` (JToon tabular round-trip, `dirs.*` jail, `source:` vs `collector:`),
    `admin-guide-local-testing` (demo-users template, Postgres default on Advanced, edition detection),
    `acquire/plan-acquisition` (about a dozen), `la-core/admin-guide-demo` (Alerts page and embed SPA exist,
    `fm.analyst` can Reveal, smoke count), `case-management/plan` (resolution gate), `api/plan-api-stability`.
+   ✅ **FIXED 2026-11-15 (batch 3), re-verified against code first — about 65 claims checked, 36 fixed, 28
+   already right:** `admin-guide-gotchas` (a Java-built `List<Map>` now round-trips `ConfigCodec`; `grammar`
+   resolves beside the config and `dirs.*` under the Space through `PathJail.dataPath`; the parser reads only
+   `collector:` — 3); `admin-guide-local-testing` (18 `la-*` templates ship `demo-users.toon`; Advanced boots on
+   Postgres and refuses without `INSPECTO_DB_URL`; launchers read `lib/edition.properties`, and `/bootstrap` says
+   `advanced` for the demo build — 3; the note on the demo switch removed 2026-11-10 was already right); `acquire/plan-acquisition`
+   (about 24: the acquire tick lives in `PipelineScheduler`, the intake cap is read in `CollectorProcessor.collect`
+   with default 500, seven schemes, twelve acquisition metrics, connection test/probe gated by
+   `canOnboardConnections`, an unknown connection is a save-time ERROR, the Completeness-KPI hold lifted, test and
+   example counts, retired-doc pointers); `case-management/plan` (the resolution gate is built:
+   `ObjectService.incidentResolutionGaps` answers 422, the UI hard-gates — 1); `api/plan-api-stability` (three
+   `since` values that never existed — `"5.0.0"` ×2, `"5.2.0"` — `EnrichmentAuditReader` / `JobConfig` are
+   `4.0.0`, `ConsignmentEvent` has 12 components, `ConsignmentPlanner` / `Consignment` — 5). Also fixed: the
+   *Collector rename residual* decided note in `docs/BACKLOG.md`, which still said the `source:` block stays.
+   ⏸ Skipped: `la-core/admin-guide-demo` (a peer owns the `la-*` hubs). Found in code, not docs: the three
+   `since = "5.x"` annotations, and a `PipelineExecutionParityTest` comment repeating the old `toToon` warning.
 
 ### Verified correct — do not "fix"
 

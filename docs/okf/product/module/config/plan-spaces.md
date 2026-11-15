@@ -59,7 +59,7 @@ matrix is authoritative for the Edition column**; this table mirrors it.
 |---|---|---|---|---|
 | `SPC-1` | Isolated **Spaces** (config / data / audit / duckdb per Space), CRUD without restart, one-time migrator | Must | ✅ SHIPPED — ⚠ "isolated" is a **layout** on Basic/Standard and an **enforced boundary** only on Advanced (CP-07, SEC-06; §3.9) | All |
 | `SPC-2` | Whole-Space zip export / import with dry-run preview | Must | ✅ SHIPPED | All |
-| `SPC-3` | **Space Templates** (vertical blueprints: Telecom RA, Fraud, Financial Audit, Link Analysis) | Should | 🟡 **MECHANISM SHIPPED, CONTENT PARTIAL** — the server-side catalog exists; **five** templates ship (`orders-starter`; since 2026-09-30 the `business-assurance`, `telco-fraud` and `telco-ra` content packs — `telco-ra` is the generic half of Telecom RA, §3.5 — and `payment-fraud` slice 1, §3.5.1); Financial Audit and Link Analysis do not exist in any shipped artifact (§2 corrections) | All |
+| `SPC-3` | **Space Templates** (vertical blueprints: Telecom RA, Fraud, Financial Audit, Link Analysis) | Should | 🟡 **MECHANISM SHIPPED, CONTENT PARTIAL** — the server-side catalog exists; **30** templates ship under `spaces/_templates/` (counted 2026-11-15): ten packs (`orders-starter`, `business-assurance`, `telco-fraud`, `telco-ra` — the generic half of Telecom RA, §3.5 — `payment-fraud`, `mobile-money`, `aml`, `partner-settlement`, `telco-bypass`, `telco-rerating`) and twenty `la-*` Link Analysis templates (`la-showcase` and its companions, §3.5.6, and the per-industry showcases, among them `la-audit`); a Financial Audit pack in the original sense still does not exist | All |
 | `SPC-4` | **Metadata Bundle v2**: selective config-only transfer with refs, provenance / `contentHash`, `requires`, drift fit-check | Should | ✅ SHIPPED 2026-07-07 (+ `authored-pipeline`, `job`, `saved-view` 2026-07-18; `connection` 2026-07-25; `enrichment` 2026-08-31) | All |
 | `SPC-5` | Per-tenant ABAC | Could | ✅ SHIPPED 2026-07-24 (two seeded policies; engage only when a `space` claim is mapped) ⚠ **Named for grep:** the decision seam those policies enforce through is `AccessDecider` (`providers/inspecto-policy/.../PolicyEngine.java`, exercised by `ControlApiAccessDeciderTest`) — until 2026-09-09 that name appeared only in `REQUIREMENTS.md`. | E |
 
@@ -68,8 +68,9 @@ matrix is authoritative for the Edition column**; this table mirrors it.
 - **`SPC-3` read `SHIPPED (UI seed packs)`.** The four vertical seed packs were **mock-only TypeScript seed
   functions** in the offline mock backend, and the mock backend was **deleted on 2026-08-31**
   (`f1553136`). Nothing replaced them: the real catalog is `<spacesRoot>/_templates/<id>/template.toon`
-  (`SpaceManager.templates()`, `inspecto/src/main/java/com/gamma/service/SpaceManager.java:221-257`) and
-  the tree ships exactly one entry, `spaces/_templates/orders-starter/` ("a tiny retail-orders feed").
+  (`SpaceManager.templates()`, `inspecto/src/main/java/com/gamma/service/SpaceManager.java`) and
+  the tree then shipped exactly one entry, `spaces/_templates/orders-starter/` ("a tiny retail-orders feed")
+  — 30 since (SPC-3 row).
   The gallery has no client-side fallback and renders "This server publishes no space templates" when the
   catalog is empty. The names survive only in a UI code comment. A Should recorded green over content that
   no longer exists — and the **binding glossary** (`GLOSSARY.md` §1 "Shipped verticals: …"),
@@ -87,7 +88,7 @@ matrix is authoritative for the Edition column**; this table mirrors it.
 
 **Two more corrections in sibling docs, made with this spec:** `api-stability.md`'s release notes stated
 the `DELETE /spaces/{id}` rule **backwards** ("409 unless `?purge=true`") — the code refuses **only with**
-`?purge=true` and only for the last Space on disk (`SpaceRoutes.java:120-127`); and `multi-space.md` said
+`?purge=true` and only for the last Space on disk (`SpaceRoutes.java`); and `multi-space.md` said
 `SpaceMigrator` runs "on boot" — nothing but its own CLI invokes it (§3.2).
 
 **One standing note no status token can carry:** ⚠ **`-Dspaces.root` unset is not "one Space", it is the
@@ -103,7 +104,7 @@ side in the root `pom.xml` surefire properties (§3.8).
 `SpaceManager` (`inspecto/src/main/java/com/gamma/service/SpaceManager.java`) hosts N `SpaceContext`s, each
 a thin holder of `id` + `SpaceRoot` + manifest + **its own unchanged `CollectorService`** (the ~40-method
 facade is `@PublicApi`; wrapping it kept the embedding API intact and avoided re-auditing every per-Space
-lock). Two boot modes (`ControlApi.main`, `ControlApi.java:379-397`):
+lock). Two boot modes (`ControlApi.main`, `ControlApi.java`):
 
 | Mode | When | Layout |
 |---|---|---|
@@ -130,7 +131,7 @@ directories and tolerates both `flows/` and `pipelines/` (Tier 3, 2026-08-04 —
 
 ### 3.3 The `/spaces` seam and what is bound per request
 
-`ControlApi.dispatch` matches `SPACE_PREFIX` `^/spaces/([a-z0-9][a-z0-9-]{0,62})(/.*)$` (`ControlApi.java:189`)
+`ControlApi.dispatch` matches `SPACE_PREFIX` `^/spaces/([a-z0-9][a-z0-9-]{0,62})(/.*)$` (`ControlApi.java`)
 **after** stripping `/api/v1` — the Space segment sits after the version: `/api/v1/spaces/<id>/…`. The id is
 validated, the path rewritten, and the `space` **SLF4J MDC** key bound for the request and cleared in
 `finally` (`:665-688`); an un-prefixed path binds `spaces.current()` (`boundSpace`, `:1038-1043`). Five
@@ -160,7 +161,7 @@ Space stays allowed. The eight paths the SPA never prefixes are `SERVER_GLOBAL`:
 existing Space; import data sources one at a time, or create a new Space from it*. It seeds a NEW Space through
 Space creation. See [auth-security.md](../access/admin-guide-auth-security.md) (import section).
 
-`DataSourceRoutes` (`inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:38-41`): `GET
+`DataSourceRoutes` (`inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java`): `GET
 /spaces/{id}/export` (the whole config tree + `space.toon`, manifest `bundle.toon` — `BundleExporter`),
 `POST /spaces/{id}/import/preview` (the **dry run**: contents, `hasSpaceToon`, per-item conflicts, findings,
 `valid` — writes nothing) and `POST /spaces/{id}/import[?on_conflict=overwrite]` (`BundleImporter`); a
@@ -186,14 +187,16 @@ seven CRUD routes and omits the export routes; corrected with this spec.
 A template is a **server-global catalog entry**, deliberately **not a Component kind** (product owner,
 2026-07-03): `<spacesRoot>/_templates/<id>/template.toon` (`{id, name, tagline, description, icon,
 contents[]}` — the UI's `SpaceTemplateInfo`) beside a `config/` tree and an optional `data/`.
-`createFromTemplate` (`SpaceManager.java:269-318`) mints the convention directories, copies `config/`
+`createFromTemplate` (`SpaceManager.java`) mints the convention directories, copies `config/`
 **rewriting `${SPACE}` tokens** in every `.toon` (template configs address their own Space as
 `spaces/${SPACE}/…` — the portable bare-form the product writes, W3) and copies `data/` verbatim. An
 unreadable template is warned and skipped, never fatal. The SPA's gallery (`SpaceTemplateGalleryDialog`) is
-two-step ask-the-minimum and renders whatever the server publishes. **What is published: five templates** —
-`orders-starter` (a pipeline, a quality rule, a dataset and a live dashboard), and, since 2026-09-30,
-`business-assurance`, `telco-fraud` and `telco-ra` (below) and `payment-fraud` slice 1 (§3.5.1), and since 2026-10-09 the `mobile-money` industry pack (§3.5.3). Nothing named Financial Audit or Link Analysis
-exists (§2, §5).
+two-step ask-the-minimum and renders whatever the server publishes. **What is published: 30 templates**
+(counted 2026-11-15) — `orders-starter` (a pipeline, an Expectation, a dataset and a live dashboard), and, since 2026-09-30,
+`business-assurance`, `telco-fraud` and `telco-ra` (below) and `payment-fraud` slice 1 (§3.5.1), since 2026-10-09 the `mobile-money` industry pack (§3.5.3),
+then `aml`, `partner-settlement`, `telco-bypass` and `telco-rerating`; and twenty `la-*` Link Analysis templates
+(`la-showcase`, §3.5.6, and its siblings). A template's `minEdition:` (`standard` on the packs except `orders-starter`, `basic` on the
+`la-*` templates except `la-sample` and `la-showcase-off`, which declare none) is checked by `tools/check-offerings.mjs`.
 
 **`telco-ra` — the telecom revenue-assurance pack** (`ASSURE-PACK-TELCO-RA-1`, wave 5.2 of the assurance plan,
 2026-09-30). ✅ **SHIPPED — row closed 2026-10-04**: items (1)-(6) done or decided; the vendor-specific half is
@@ -420,7 +423,7 @@ counts (`irsf_prefixes`, `premium_prefixes`, `home_cc`, `max_ring_seconds`, `cal
 `day`) and the Alert Rule's `threshold` (`gt`) says how much is too much. **Schedule:** every detection Job carries `cron: "0 2 * * *"` and the rolling window `window_start: "$yesterday"` / `window_end: "$today"` (job-parameter Expressions, resolved at fire time in the Job's zone), so a created Space detects the previous day each night; a manual run (and the golden test) overrides both with literal timestamps, plus `day` (the partition the run replaces, below). Also: four KPIs + tiles, one
 dashboard (`telco_fraud_overview`: the four KPI tiles plus one bar Widget per typology over its sink Dataset,
 keyed on the offender — the golden test renders every tile through `/kpis/{id}/value` and `/bi/query`), and `config/runbooks/telco-fraud-runbooks.md` (plain Markdown, kept for the shared guidance; since 2026-10-10 each typology's steps are ALSO a
-`runbook` component linked from its Alert Rule and shown on the Incident/Case page, operator 2026-10-10, superseding the 2026-10-04 park), which names the known false-positive sources that have no defence. **Edition gating (decided 2026-10-04): none** — the template ships to all editions (editions are build flavours, the template is plain config; anyone holding the needed capabilities can create it). **Two product gaps decided DEFER 2026-10-04, no build until a customer asks:** a Dataset whose Schema comes from its producing Job (the pack ships zero-row `data/fraud_*/seed.parquet` Schema seeds instead) and an incremental Job Type mode — the latter since BUILT (operator, 2026-10-10) and enabled in this pack 2026-10-11 (below). Known limits (not product gaps): thresholds are generic defaults (the vendor-specific half
+`runbook` component linked from its Alert Rule and shown on the Incident/Case page, operator 2026-10-10, superseding the 2026-10-04 park), which names the known false-positive sources that have no defence. **Edition gating:** since 2026-10-18 the template declares `minEdition: standard` (its Alert Rules are Standard+, below), which `tools/check-offerings.mjs` holds against every Offering that lists the pack. *(History: the 2026-10-04 decision was "none — the template ships to all editions".)* **Two product gaps decided DEFER 2026-10-04, no build until a customer asks:** a Dataset whose Schema comes from its producing Job (the pack ships zero-row `data/fraud_*/seed.parquet` Schema seeds instead) and an incremental Job Type mode — the latter since BUILT (operator, 2026-10-10) and enabled in this pack 2026-10-11 (below). Known limits (not product gaps): thresholds are generic defaults (the vendor-specific half
 stays parked); each run writes one day partition, and the identity / dealer / voucher / reversal
 sinks keep every entity, so they grow with the subscriber base and with every retained day — **sizing documented (operator, 2026-10-06)**:
 size by subscriber count x `retain` (pack runbook § *Sizing and retention*).
@@ -1127,12 +1130,12 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 
 | Item | Evidence | Why it matters |
 |---|---|---|
-| **The four vertical Space Templates** (Telecom RA, Fraud, Financial Audit, Link Analysis) | `ls spaces/_templates` → `orders-starter` + `telco-fraud` (Fraud rebuilt 2026-09-30, §3.5; the other three still absent); the packs died with the mock backend `f1553136` | A Should the register, the binding glossary, the user guide and the stakeholder capabilities page all call shipped. Product call: rebuild as `_templates/` entries or drop the promise |
+| **The four vertical Space Templates** (Telecom RA, Fraud, Financial Audit, Link Analysis) | `ls spaces/_templates` → 30 templates (2026-11-15): Fraud (`telco-fraud`, `payment-fraud`), Telecom RA (`telco-ra`, `la-telco-ra`) and Link Analysis (`la-showcase` and nineteen `la-*` siblings) were rebuilt; only Financial Audit is still absent (`la-audit` is a Link Analysis showcase, not that pack); the packs died with the mock backend `f1553136` | A Should the register, the binding glossary, the user guide and the stakeholder capabilities page all call shipped. Product call for the last one: rebuild as a `_templates/` entry or drop the promise |
 | **Nothing validates a bundle against `metadata-bundle.schema.json`** | zero Java references to the schema file | The documented contract for the promotion artifact is unenforced; the two samples can drift silently |
 | **Ingested-data cloning between Spaces** | the design lock said "roadmap (future)"; no row | The zip and the bundle move config only; a Space clone with data is manual |
 | **A multi-tenant user-visibility model** ("users see only the Spaces they may access") + a superuser console | the design lock's open item; nearest live surface is SEC-06 | On Standard every authenticated subject can address every Space |
 | **`uat` is a half Space** — `data/` with no `config/` or `space.toon`, not bootable, not mirrored | `spaces/uat/` | Either finish it or delete it; a discover boot ignores it silently |
-| **`multi-space.md` omits the export routes** and says the migrator runs on boot | `DataSourceRoutes.java:38-41`; `SpaceMigrator` has no non-CLI caller | Corrected with this spec |
+| **`multi-space.md` omits the export routes** and says the migrator runs on boot | `DataSourceRoutes.java`; `SpaceMigrator` has no non-CLI caller | Corrected with this spec |
 
 ## 6. Refused & superseded
 
@@ -1197,7 +1200,7 @@ import was refused too: the bundle covers component kinds, the zip covers the wh
 
 | Superseded | By | Where recorded |
 |---|---|---|
-| The four mock-only vertical seed packs (`telecom-ra`, `fraud-mgmt`, `financial-audit`, `link-analysis`, registered in the mock's `_server` pseudo-Space) | the server catalog `_templates/<id>/template.toon`, shipping `orders-starter` only (mock deleted 2026-08-31) | this spec §2; `REQUIREMENTS.md` UI-4 |
+| The four mock-only vertical seed packs (`telecom-ra`, `fraud-mgmt`, `financial-audit`, `link-analysis`, registered in the mock's `_server` pseudo-Space) | the server catalog `_templates/<id>/template.toon`, shipping `orders-starter` only at first (mock deleted 2026-08-31; 30 templates by 2026-11-15) | this spec §2; `REQUIREMENTS.md` UI-4 |
 | Mock-first UI operation | a real `ControlApi` is required (2026-08-31) | `REQUIREMENTS.md` UI-4 |
 | Bundle v1 `{kind, id, content}` with both-side ref re-derivation | v2 self-describing subgraph | `metadata-bundle.md` |
 | `schema` as a bundle kind | retired 2026-07-31 (unification W1); kept in the TS type so old bundles parse | `metadata-bundle.md` |
@@ -1208,7 +1211,7 @@ import was refused too: the bundle covers component kinds, the zip covers the wh
 | Ten string literals for DB-family property names | the `OperationalDb.Family` roster | `db-layer.md` |
 | `api-stability.md`'s "`DELETE /spaces/{id}` answers 409 unless `?purge=true`" | the rule is the reverse — corrected with this spec | `api-stability.md` |
 | `multi-space.md`'s "`SpaceMigrator` migrates on boot" | a one-time CLI — corrected with this spec | `multi-space.md` |
-| `GLOSSARY.md` §1's "Shipped verticals: …" and its three `docs/superpower/…` design pointers | the one shipped template; provenance paths in `plans-archive/` — corrected with this spec | `GLOSSARY.md` §1 |
+| `GLOSSARY.md` §1's "Shipped verticals: …" and its three `docs/superpower/…` design pointers | the shipped templates (one at the time, 30 by 2026-11-15); provenance paths in `plans-archive/` — corrected with this spec | `GLOSSARY.md` §1 |
 | `STAKEHOLDER_OVERVIEW.md` — never mentions Spaces, defers per-tenant ABAC to "future" | shipped Must and shipped Could; plan §8 cluster, reconciled at step 6 | — |
 
 ## 7. As-built mechanism (pointers only)
@@ -1235,29 +1238,29 @@ import was refused too: the bundle covers component kinds, the zip covers the wh
 
 | Class | Proves |
 |---|---|
-| `SpaceManagerTest` (12) | create / update / delete / discover, CRUD lifecycle, close-with-deadline |
+| `SpaceManagerTest` (21) | create / update / delete / discover, CRUD lifecycle, close-with-deadline |
 | `SpaceManagerTemplateGateTest` (1) | a refused template whose cleanup fails keeps the refusal and never blocks the id |
 | `SpaceBootstrapTest` (3) | booting a `SpaceContext` from disk |
 | `SpaceLayoutContractTest` (5) | the convention directories; `flows/` and `pipelines/` both tolerated |
 | `SpaceIdTest` (2) | the id charset and length |
 | `SpaceRootTest` (1) | legacy vs directory-rooted paths |
-| `SpaceMigratorTest` (2) | plan / apply / idempotence of the one-time migration |
-| `BundleExporterTest` (8) · `BundleImporterTest` (9) | the zip manifest and contents; **the zip-slip jail** and source-prefix rebasing |
+| `SpaceMigratorTest` (7) | plan / apply / idempotence of the one-time migration |
+| `BundleExporterTest` (9) · `BundleImporterTest` (8) | the zip manifest and contents; **the zip-slip jail** and source-prefix rebasing |
 | `DataSourceBundleResolverTest` (3) | per-data-source bundle resolution, incl. the forward Reference closure |
 
 ### 8.2 Routes — `inspecto/src/test/java/com/gamma/control/` (real HTTP)
 
 | Class | Proves |
 |---|---|
-| `ControlApiSpacesTest` (4) | `/spaces` CRUD; `authenticatedCreateSucceedsWhenNoSpaceIsHostedYet`; `purgingTheLastSpaceOnDiskIsRefused` |
-| `ControlApiSpaceTemplatesTest` (2) | the gallery and `createFromTemplate` |
+| `ControlApiSpacesTest` (5) | `/spaces` CRUD; `authenticatedCreateSucceedsWhenNoSpaceIsHostedYet`; `purgingTheLastSpaceOnDiskIsRefused` |
+| `ControlApiSpaceTemplatesTest` (7) | the gallery and `createFromTemplate` |
 | `ControlApiSpaceTemplateKpiTest` (4) | a template's KPI pack meets the `/components/kpi` save gate and capability; a refusal creates no Space |
 | `ControlApiMultiSpaceTest` (1) | a multi-Space server smoke |
-| `ControlApiBundleTest` (11) · `ControlApiBundleImportTest` (11) · `ControlApiBundleNewKindsTest` (10) · `ControlApiPipelineBundleTest` (7) | export / preview / import contract, ordering, the newer kinds, the `authored-pipeline` round trip |
+| `ControlApiBundleTest` (16) · `ControlApiBundleImportTest` (13) · `ControlApiBundleNewKindsTest` (12) · `ControlApiPipelineBundleTest` (12) | export / preview / import contract, ordering, the newer kinds, the `authored-pipeline` round trip |
 | `ExchangeAttributeScopeTest` · `NoExchangeShipsInThePersonalBuildTest` | exchange attributes private by default; Basic carries no exchange module |
 | `PostgresStateStoreTest` (opt-in, `-Dinspecto.test.pg.url`; 11 skipped otherwise) | the DB-backed stores against a real Postgres |
 
-About 92 `@Test` methods across the eighteen Space and bundle classes, all in the default reactor.
+130 `@Test` methods across the eighteen counted Space and bundle classes (recounted 2026-11-15), all in the default reactor.
 
 ### 8.3 UI specs — vitest
 
@@ -1270,7 +1273,7 @@ Fifteen: `space.interceptor.spec.ts`, `spaces.service.spec.ts`, `space-switcher.
 ### 8.4 Committed artifacts
 
 `spaces/default`, `spaces/demo`, `spaces/ucc` (complete; not bundled);
-`spaces/_templates/orders-starter/` and `spaces/_templates/telco-fraud/` (the two templates — the only part of `spaces/`
+the 30 templates under `spaces/_templates/` (counted 2026-11-15; §3.5 — the only part of `spaces/`
 a bundle ships, via `inspecto/package-spaces.ps1`); `spaces/uat/` (a `data/` stub).
 `docs/api/schemas/metadata-bundle.schema.json` + `docs/api/schemas/samples/{dashboard-closure,single-widget}.bundle.json`.
 
@@ -1286,7 +1289,7 @@ on every path a Space's config declares.
 | Gap | Evidence |
 |---|---|
 | **No test validates a bundle against `metadata-bundle.schema.json`** | zero Java references to the file |
-| **No test that the four verticals exist** — because they do not | `ls spaces/_templates` |
+| **No test that the four verticals exist** — Financial Audit still does not; the shipped templates are applied by `ControlApiSpaceTemplateSeedGateTest.everyShippedTemplateApplies` | `ls spaces/_templates` |
 | **No test of the MDC-copy invariant across every executor** | pinned by convention and the gotcha page, not by a sweep |
 | **Postgres path runs only opt-in** | `PostgresStateStoreTest` skips 11 without `-Dinspecto.test.pg.url` |
 | **No Exchange UI spec** | §8.3 |

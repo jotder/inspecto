@@ -43,10 +43,11 @@ Three things make Inspecto a good feeder rather than one more connector:
 | Partitioned Parquet / CSV write to a local write-root, atomic reveal | ✅ built | `PartitionWriter`, `output:` block |
 | Partitioned Parquet write to an **object store (`s3://`)**, no staging, MinIO-tested | ✅ built 2026-09-14 | `PartitionWriter` object-store lane (`d87b7890`) |
 | DuckLake catalog on PostgreSQL — cross-node visibility of committed files | ✅ built | `DuckLakeRegistrar`, scale-out phases A/B |
-| Several destinations per pipeline (`sinks:`) | 🟡 config authorable, **executor not wired** | archived `sinks-config-format-plan.md`; `PipelineConfig.Sink` javadoc |
-| Outbound object-storage export as a scheduled job | 🟡 intent; sequence of record is an operator `aws s3 sync` | `EXPORT-1` (BACKLOG §3, P3), `object-storage-export.md` |
+| Several destinations per pipeline (`sinks:`) | ✅ built (re-checked 2026-11-15) — the main write fans out to every destination; Decision Rule routed rows are replicated to each (2026-10-06) | `ConsignmentIngestStrategy.writeAndTrace`, `IngestSinkWriter` |
+| Outbound object-storage export as a scheduled job | ✅ built 2026-09-24 — Job type `objectstore.export` (upload-then-manifest, path-jailed, S3-compatible; no multipart) | `ObjectStoreExportJobType`, `EXPORT-1`, `object-storage-export.md` |
 | JDBC **read** from any database | ✅ built | JDBC Collector |
-| JDBC / SQL **write** to a database | ⛔ not built | no `JdbcSink` exists |
+| Publish curated Datasets into **PostgreSQL** | ✅ built 2026-09-29 — Job type `publish.postgres` (full refresh or partition-incremental, egress-checked, classified columns refused by default) | `PostgresPublishJobType` (ASSURE-BI-PUBLICATION-1) |
+| JDBC / SQL **write** to any other database | ⛔ not built | no `JdbcSink` exists |
 | Iceberg / Delta table **write** through a catalog | ⛔ not built; DuckDB supports both (§4) | extension staging: `tools/fetch-duckdb-extensions.mjs` |
 | Streaming or NoSQL outbound | ⛔ not built | would be a `CollectorConnectorFactory`-style plugin |
 | PostgreSQL as a query surface **over** Inspecto's lake (`pg_duckdb`) | 📐 signed design D13, no code | the reverse direction — the warehouse reads us |
@@ -57,9 +58,9 @@ Everything in §5 resolves to one of these. Build the mechanism once; a target i
 
 | # | Mechanism | How the target receives data | What Inspecto needs | Status |
 |---|---|---|---|---|
-| **M1** | **Parquet drop + target-side load** | Inspecto writes Hive-partitioned Parquet to the target's object store; the target loads it with its own bulk primitive (`COPY INTO`, `LOAD DATA`, external/foreign table, `s3()` function) or reads it in place | object-store write ✅ · scheduled outbound job (`EXPORT-1`) 🟡 · a post-write hook that issues the load statement ⛔ | **nearest** — works today by runbook |
+| **M1** | **Parquet drop + target-side load** | Inspecto writes Hive-partitioned Parquet to the target's object store; the target loads it with its own bulk primitive (`COPY INTO`, `LOAD DATA`, external/foreign table, `s3()` function) or reads it in place | object-store write ✅ · scheduled outbound job (`objectstore.export`) ✅ · a post-write hook that issues the load statement ⛔ | **nearest** — works today by runbook |
 | **M2** | **Open table-format write through a catalog** | Inspecto commits new **Iceberg** or **Delta** snapshots via DuckDB's extensions (Iceberg REST catalog; Delta incl. Unity Catalog), or registers in **DuckLake** | stage `iceberg`/`delta`/`httpfs` extensions for air-gap · a `sinks:` kind per format · credentials via `SecretsProvider` | ⛔ build; DuckDB side is ready |
-| **M3** | **Direct SQL sink** | Inspecto inserts into the target over JDBC, or uses DuckDB's `postgres`/`mysql` extensions to write natively | a `JdbcSink` (batched `INSERT`/`MERGE`, idempotent by run id) · the `sinks:` executor | ⛔ build |
+| **M3** | **Direct SQL sink** | Inspecto inserts into the target over JDBC, or uses DuckDB's `postgres`/`mysql` extensions to write natively | a `JdbcSink` (batched `INSERT`/`MERGE`, idempotent by run id) · the `sinks:` executor ✅ | ✅ PostgreSQL via `publish.postgres` · ⛔ build for the rest |
 | **M4** | **Connector plugin** | A jar implementing an outbound connector pages Datasets into a stream or document store | plugin lane (`CollectorConnectorFactory` shape, outbound) | 🔧 per target |
 
 **Idempotency is the design constraint that crosses all four.** Locally a re-run overwrites; on an object
@@ -126,7 +127,7 @@ M2/M3 built (configuration once built) · 🧩 plugin (M4). "Edition" is where t
 
 | Target | Mechanism | Status | Notes |
 |---|---|---|---|
-| **PostgreSQL** (incl. Citus, Timescale) | M3 via DuckDB `postgres` extension (native `INSERT`), or JDBC | 🔧 | DuckDB writes Postgres natively — fastest M3 |
+| **PostgreSQL** (incl. Citus, Timescale) | M3 — the `publish.postgres` Job | ✅ | publishes curated Datasets into a schema a BI tool reads (§2) |
 | **MySQL / MariaDB** | M3 via DuckDB `mysql` extension, or JDBC | 🔧 | |
 | **Oracle · SQL Server · IBM Db2** | M3 JDBC; or M1 → external tables over object store (Oracle `DBMS_CLOUD`, SQL Server PolyBase) | 🔧 / ✅ | |
 | **Teradata · Vertica · Greenplum · Exasol · SAP HANA** | M3 JDBC bulk; M1 external tables where offered | 🔧 / ✅ | Vertica and Greenplum read Parquet external tables directly |
@@ -142,15 +143,15 @@ M2/M3 built (configuration once built) · 🧩 plugin (M4). "Edition" is where t
 
 ## 6. What to build, in order
 
-1. **`EXPORT-1` as a real job** — scheduled outbound export with its own Signals, run-keyed object names, and
-   a post-write **load hook** that issues the target's statement (`COPY INTO`, `MSCK REPAIR`, ClickHouse
+1. **`EXPORT-1` as a real job** — ✅ the export half shipped 2026-09-24 as `objectstore.export`; still owed: a
+   post-write **load hook** that issues the target's statement (`COPY INTO`, `MSCK REPAIR`, ClickHouse
    `INSERT … s3()`). Turns every ✅ M1 row from runbook into feature. Effort **S–M**.
 2. **Stage `iceberg`, `delta`, `httpfs` extensions** into the air-gap set and prove loadable (the same shape as
    `AIRGAP-EXTENSIONS-1`; ⚠ staged ≠ loadable). Effort **S**.
-3. **`sinks:` executor** — the archived plan's Stage A step 3; unblocks more than one destination per pipeline.
-   Effort **M**.
+3. ✅ ~~**`sinks:` executor**~~ — built (the multi-destination fan-out in `ConsignmentIngestStrategy.writeAndTrace`).
 4. **Iceberg sink kind** (M2) — one build, every catalog in §5.2. Effort **M**. Then Delta.
-5. **`JdbcSink`** (M3) — batched, run-keyed `MERGE`; DuckDB-native for Postgres/MySQL. Effort **M**.
+5. **`JdbcSink`** (M3) — batched, run-keyed `MERGE`; DuckDB-native for MySQL (PostgreSQL is served by
+   `publish.postgres`). Effort **M**.
 6. **Outbound connector SPI** (M4) — Kafka first. Effort **M**, plugin lane thereafter.
 
 None of this changes the edge story: Basic and Standard keep zero external runtime services; the warehouse
@@ -161,7 +162,7 @@ is the *customer's* system, reached only by the outbound job.
 * "Inspecto loads into Snowflake / BigQuery / Redshift" — true only as *Parquet drop plus your load statement*
   until step 1 ships. Say "lands Parquet your warehouse loads natively".
 * "Iceberg / Delta writer" — DuckDB has it; Inspecto has not staged or wired it (steps 2 and 4).
-* "JDBC sink" — read is built, write is not.
+* "JDBC sink" — read is built; write is built for PostgreSQL only (`publish.postgres`).
 * Any row here as a product feature in [`../../layer/product/brochure-enterprise-whitepaper.md`](../../layer/product/brochure-enterprise-whitepaper.md)
   without the matching §4.1 row in the landscape register.
 

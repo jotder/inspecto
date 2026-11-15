@@ -113,8 +113,8 @@ backend was **deleted 2026-08-31**: `mock/handlers/agent.handler.ts`, `mock-api.
 real `ControlApi`. The page had kept describing the mock's gate-reproduction in the present tense, which
 is why the citation guard flags a doc that talks about a file as if it were there.
 
-**The gates themselves are real and are the server's.** `AgentRoutes.java:68` states them and
-`:96-104` implement them — module absent → **503**, unknown tool → **404**, a MUTATING tool → **403**, and
+**The gates themselves are real and are the server's.** `AgentRoutes.java` states them in a comment on
+its tool route and implements them in the same handler — module absent → **503**, unknown tool → **404**, a MUTATING tool → **403**, and
 a refused argument → **422** carrying its message. Result shapes come from `InspectoTools`
 (`features/inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/InspectoTools.java`), pinned by
 `InspectoToolsTest`; the route surface is pinned by `AgentRoutesTest`.
@@ -122,7 +122,8 @@ a refused argument → **422** carrying its message. Result shapes come from `In
 ⚠ **What the deletion cost is the offline exercise of the degrade paths**, which is what this section
 said most needed it — three shipped bugs had hidden behind a mock more lenient than the server. Those
 paths are now covered only where `AgentRoutesTest` reaches them; whether the front end has its own
-proof of the 403/404/422 renderings is untracked, and belongs to `SPEC-NOPROOF-1` rather than here.
+proof of the 403/404/422 renderings is untracked: `SPEC-NOPROOF-1`, which this page once pointed to,
+closed 2026-09-09 without it, and no board row holds it (re-checked 2026-11-15).
 
 ## Why is this red (`<inspecto-ai-status>`, A4-status — shipped 2026-07-26)
 
@@ -570,7 +571,7 @@ by design here. Runtime validation is revisitable, but only after all 23 schemas
   **one** widget, and `studio/dashboards/dashboard-editor` builds a dashboard but has no measures.
   ✅ **The resolution: the tool builds the measures, so the pane only has to supply a dataset.**
   `dashboard-editor` gained a *Report dataset* select and hosts it
-  (`dashboard-editor.component.ts:260-289`, `.html:75-99`).
+  (`dashboard-editor.component.ts`, `.html:75-99`).
   Three as-built gotchas that until now existed **only in code comments**:
   - ⚠ **`[args]` is identity-only.** Pass anything else and the tool's derived measures are silently
     overwritten (`.html:77-78`, `.ts:270-274`).

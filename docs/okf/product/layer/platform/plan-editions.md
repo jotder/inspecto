@@ -753,6 +753,7 @@ definition of "done" for every unbuilt script. Board row: *Deployment topology l
 > `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
 > starting point and read the row before acting on it:
 > `SPEC-STALEREF-1`, `SPEC-COUNTS-1`, `SPEC-NOPROOF-1`, `SPEC-GREENCELL-1`, `SPEC-DEADSEAM-1`, `SPEC-PLANSTALE-1`, `SPEC-DEPLOY-ROWS-1`.
+> ⚠ **None of these ids is an open board row today** (re-checked 2026-11-15, `DOCS-AGENT-WRITTEN-REVIEW-1`): `SPEC-STALEREF-1` closed 2026-09-09 when `tools/check-doc-citations.mjs` became a guard, `SPEC-NOPROOF-1` closed 2026-09-09 when all six Musts had tests, and the rest were closed, refuted or split into their own rows by the 2026-09-24 board consolidation. Their history: `docs/archived-documents/backlog-snapshot-2026-09-24.md` and `docs/archived-documents/plans-archive/post-consolidation-sprints.md`.
 >
 > ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
 > area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —

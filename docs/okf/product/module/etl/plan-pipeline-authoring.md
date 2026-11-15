@@ -2,7 +2,7 @@
 type: Capability
 area: PIP
 title: Pipeline authoring (PIP) — capability spec
-description: The requirement-of-record and as-built specification for authoring a Pipeline — the derived graph and the token it passes, the round-trip seam, the five registration points a Step kind needs, the validation ladder and the one guard missing from it, the transform surface, the Step catalog and the editor's own shape. The first of the two PIP specs; execution is the sibling.
+description: The requirement-of-record and as-built specification for authoring a Pipeline — the derived graph and the token it passes, the round-trip seam, the five registration points a Step kind needs, the validation ladder and the SQL guard that joined it, the transform surface, the Step catalog and the editor's own shape. The first of the two PIP specs; execution is the sibling.
 status: current
 written: 2026-09-09
 supersedes-rows: REQUIREMENTS §3.3 PIP-1 (this file corrects it, see §2); PIP-2..PIP-7 belong to the execution spec
@@ -25,8 +25,9 @@ supersedes-rows: REQUIREMENTS §3.3 PIP-1 (this file corrects it, see §2); PIP-
 > is that a capability doc which restates mechanism becomes a fourth copy of the truth. What it adds is
 > the thing none of them has: **one number per fact, and the disagreements named** (§2).
 >
-> 🔴 **The single most important finding: author SQL is guarded when you preview it and when it runs, and
-> unguarded when you save it** (§3.5). Nothing refuses it at save, and no test covers the gap.
+> ✅ **The single most important finding — author SQL was guarded at preview and at run but not at save — is
+> FIXED (2026-09-09):** `PipelineEditable.refuseUnsafeSql` now runs the guard on the graph save and the
+> Recipe compile, pinned by `SqlSavePathGuardTest` (§3.5, §5.2 item 1).
 
 ## 1. Purpose & scope
 
@@ -46,7 +47,7 @@ Two facts organise everything else, and both are decisions rather than consequen
 
 * **The config contract** — the flat file's blocks, who declares each, and which keys are executable.
 * **The derived graph** — lift, lower, and the verbatim round trip that protects unmodelled keys.
-* **The Step catalog** — the thirty built-in node types, the processor taxonomy, and the difference
+* **The Step catalog** — the **49**<!--count:node-types--> built-in node types, the processor taxonomy, and the difference
   between a type being *authorable*, *lowerable* and *executable*.
 * **The registration points** a new Step kind must reach, and what fails at which layer when one is
   missed.
@@ -69,7 +70,7 @@ Two facts organise everything else, and both are decisions rather than consequen
 
 | Row | Register says | Correction of record |
 |---|---|---|
-| **PIP-1** | Authored Pipeline DAGs, Steps = the **closed** `BuiltinNodeType` set, with **author-time validation** and a visual editor — `SHIPPED`, all editions | ⚠ **Three corrections.** (a) **"Closed" is superseded doctrine that happens to be true today.** `GLOSSARY.md` D0-B (2026-08-09) retired the closure: the real guarantee is compiler *totality* — a pipeline that parses is a pipeline that runs — which survives an **open** Step-kind registry. But that registry is unbuilt (no provider interface exists in any module), so the set is still closed in fact. Say "closed today, by an unbuilt registry rather than by design". (b) 🔴 **"Author-time validation" does not hold for an unknown node type** — the validator flags it as a **WARNING**, the codec stores `config` as an unchecked map, and the compiler silently drops an unknown-typed node. An invented vocabulary survives unnoticed. (c) 🔴 **Author SQL is not guarded at save** (§3.5). The row's own cell also reads `SHIPPED` and "is **not** shipped" in one sentence — the 2026-08-02 scope correction about sub-Pipeline nesting, which is right but reads as self-contradiction. ⚠ **Named for grep:** the store that keeps an unknown node's `config` as an unchecked map is `PipelineCodec` — until 2026-09-09 that name appeared only in `REQUIREMENTS.md`, so the class a next shift must open to fix (b) was unsearchable from here. |
+| **PIP-1** | Authored Pipeline DAGs, Steps = the **closed** `BuiltinNodeType` set, with **author-time validation** and a visual editor — `SHIPPED`, all editions | ⚠ **Three corrections.** (a) **"Closed" is superseded doctrine that happens to be true today.** `GLOSSARY.md` D0-B (2026-08-09) retired the closure: the real guarantee is compiler *totality* — a pipeline that parses is a pipeline that runs — which survives an **open** Step-kind registry. That registry is now live: `PipelineNodeTypes` loads every `PipelineNodeType` provider on the classpath (and `JobPackManager` from a pack's loader), and the `StepKindRegistry` SPI (`inspecto-etl`, answered by `NodeTypeStepKinds`) lets a `steps:` kind name a registered plugin type — so the set is open, and `BuiltinNodeType` is only its built-in part. (b) 🔴 **"Author-time validation" does not hold for an unknown node type** — the validator flags it as a **WARNING**, the codec stores `config` as an unchecked map, and the compiler silently drops an unknown-typed node. An invented vocabulary survives unnoticed. (c) ✅ **Author SQL is guarded at save** since 2026-09-09 (§3.5). The row's own cell also reads `SHIPPED` and "is **not** shipped" in one sentence — the 2026-08-02 scope correction about sub-Pipeline nesting, which is right but reads as self-contradiction. ⚠ **Named for grep:** the store that keeps an unknown node's `config` as an unchecked map is `PipelineCodec` — until 2026-09-09 that name appeared only in `REQUIREMENTS.md`, so the class a next shift must open to fix (b) was unsearchable from here. |
 
 The board rows are accurate and this spec keeps them: **CP-02** (graph editor + Recipe view, insert-between,
 insert-into-branch, undo/redo, snapshots, save-as-template), **CP-03** (validate → save → arm → test-run →
@@ -231,9 +232,9 @@ Three round-trip tests exist and each guards a different failure:
 * a **reachable-path** test that drives the editor's actual write route to an engine field, because a key
   can be read by the executor while being unreachable from the file the editor writes.
 
-### 3.2 Thirty node types, and three different kinds of "supported"
+### 3.2 The built-in node types, and three different kinds of "supported"
 
-The built-in vocabulary is thirty types across source and parse, transform, sink and control. Each carries
+The built-in vocabulary is **49**<!--count:node-types--> types across source and parse, transform, sink and control (thirty when this was written). Each carries
 its category, label, what it accepts and what it emits — and the accepts/emits pair is explicitly
 **token vocabulary, not a record-flow contract**.
 
@@ -250,8 +251,8 @@ worth keeping: filtering the palette on lowerability *"would force the choice be
 nothing should create and refusing to save a graph that legitimately still carries one"* — an editor
 opened before a fold still holds the old graph.
 
-**Config shapes are published for a subset only.** Eleven of the thirty have a server-published attribute
-table; the other nineteen get the typed free-form editor **by documented design**, not by omission.
+**Config shapes are published for a subset only.** **34**<!--count:node-types-with-attributes--> of the **49**<!--count:node-types--> have a server-published attribute
+table; the rest get the typed free-form editor **by documented design**, not by omission.
 
 ### 3.3 Five registration points, not four
 
@@ -296,7 +297,7 @@ while its input follows the ordinary one-edge pattern.
 That distinction is why the step workbench's input picker was refused on grounding: there are no input keys
 to write, so a picker would have written a key nothing reads. **Edges stay authored on the canvas.**
 
-### 3.5 The validation ladder, and the guard missing from it
+### 3.5 The validation ladder, and the guard that joined it
 
 A save climbs five gates in order:
 
@@ -308,17 +309,14 @@ A save climbs five gates in order:
    `refusals[]`** with a 422.
 5. **Specs and safety** on the lowered map — a 422 on any ERROR.
 
-🔴 **The transform guard is not in that ladder.** The allow-list that refuses data-definition statements,
-multiple statements and file-reading functions runs at the **describe preview** and at **execution** — ten
-call sites across the engine, the query surfaces and the intelligence tools — and **zero times on any save
-path**. The graph-save route does not reference it; neither does the lowering code, nor the Recipe
-compiler, nor the spec validator.
-
-So a hand-written SQL string that reads a file from disk, or issues a data-definition statement, **saves
-cleanly** and only fails later. The honest characterisation matters: because the guard *is* enforced at
-execution, this is **fail-late, not fail-open** — such a pipeline cannot run. But it can be authored,
-saved and armed, and its refusal arrives at the worst moment. Blank-only is the sole SQL check at save.
-**No test blocks this anywhere.**
+✅ **The transform guard is on the save path since 2026-09-09.** The allow-list that refuses data-definition
+statements, multiple statements and file-reading functions (`SqlGuard`) runs at the **describe preview**, at
+**execution**, and on **save**: `PipelineEditable.refuseUnsafeSql` checks every `transform.sql` node on the
+graph save (before classification, so the chain and the projection slot are both covered) and
+`RecipeCompiler` calls the same helper; both refuse with `SQL_STEP_REFUSED` carrying the guard's message,
+while blankness stays `SQL_STEP_EMPTY`. Pinned by `SqlSavePathGuardTest`. *(History: before that fix a
+hand-written `read_csv(...)` or data-definition statement saved and armed cleanly and failed only at run —
+fail-late, never fail-open.)*
 
 Three other things can be saved and only fail at run: a destination list naming more than one target
 (refused when loaded for execution), a route with no default branch (refused at arming), and a join whose
@@ -481,7 +479,9 @@ migration to reach semantics that composition already provides.
   source of truth and `MapNodeKeyContractTest` parses the TypeScript to keep it there (§2.3).
 * **Two author-facing messages name things that do not exist** — one warns that only three Step kinds may
   run inside a branch when the code's own set also contains the transform-SQL kind.
-* **The open Step-kind registry** — gated, and it is what the retired closure was superseded *by* (§2.1).
+* ✅ ~~**The open Step-kind registry**~~ — **live** (`PipelineNodeTypes` provider loading, the `StepKindRegistry`
+  SPI and `NodeTypeStepKinds`; pack-hosted Steps since platform-services S2-3, 2026-09-28) — what the retired
+  closure was superseded *by* (§2.1).
 
 ### 5.2 `UNTRACKED` — found writing this spec, no board row exists
 
@@ -490,6 +490,7 @@ migration to reach semantics that composition already provides.
 > `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
 > starting point and read the row before acting on it:
 > `SPEC-STALEREF-1`, `SPEC-COUNTS-1`, `SPEC-GREENCELL-1`, `SPEC-GLOSSARY-1`, `SPEC-PLANSTALE-1`, `SPEC-ORPHANPAGE-1`.
+> ⚠ **None of these ids is an open board row today** (re-checked 2026-11-15, `DOCS-AGENT-WRITTEN-REVIEW-1`): `SPEC-STALEREF-1` closed 2026-09-09 when `tools/check-doc-citations.mjs` became a guard, `SPEC-NOPROOF-1` closed 2026-09-09 when all six Musts had tests, and the rest were closed, refuted or split into their own rows by the 2026-09-24 board consolidation. Their history: `docs/archived-documents/backlog-snapshot-2026-09-24.md` and `docs/archived-documents/plans-archive/post-consolidation-sprints.md`.
 >
 > ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
 > area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —
@@ -564,7 +565,7 @@ and the requirement row whose status hierarchy still uses a word the glossary re
 | Item | Verdict | Why |
 |---|---|---|
 | **Sub-Pipeline / embedded-Job nesting** | ⛔ **REFUSED by design** 2026-08-02 | In-motion and at-rest are a binding line; they compose as producer and consumer over a shared store |
-| **The closed type vocabulary** | **SUPERSEDED** 2026-08-09 (D0-B) | Totality, not closure, was the real guarantee — and it survives an open registry. ⚠ That registry is unbuilt, so the set is closed in fact today |
+| **The closed type vocabulary** | **SUPERSEDED** 2026-08-09 (D0-B) | Totality, not closure, was the real guarantee — and it survives an open registry — which is now live (§5.1), so the set is open in fact too |
 | **The simple five-verb grid, and its editing lock** | **SUPERSEDED + DELETED** 2026-09-04, the day it was reviewed live | A raw SQL box is not an authoring surface for a non-technical user; a verb enum is not a mapping model either. Replaced by a typed function catalogue |
 | **The SQL-only middle state** | ⚠ **NOT CURRENT** — the surface flipped twice on 2026-09-04 | Recorded because a reader landing on the middle state would build the wrong thing |
 | **The map type** | ⛔ **DELETED** 2026-09-05 | Replaced by the Record Transformer; map is a slot identified by id grammar, not a type |
@@ -593,8 +594,8 @@ of those citations is wrong (§5.2 item 9).
 
 | Concern | Where it lives | Gap |
 |---|---|---|
-| The type vocabulary | `BuiltinNodeType` (30 constants) | ⚠ Counted 20/28/20 in three docs |
-| Published config shapes | `NodeAttributes` + its committed contract | 11 of 30 by design |
+| The type vocabulary | `BuiltinNodeType` (**49**<!--count:node-types--> constants) | ⚠ Counted 20/28/20 in three docs |
+| Published config shapes | `NodeAttributes` + its committed contract | **34**<!--count:node-types-with-attributes--> of the built-ins, by design |
 | The authoring round trip | `PipelineEditable.toMap` / `.lower` | — |
 | The read-only projection | `PipelineLift.lift` | ⚠ Documented as *internal only, never a file rewrite*; do not cite it as the round trip. ✅ **D9 (2026-09-22): not renamed** — its `GET …/graph` response carries `links.roundTrip` to `…/graph/raw` and a `readOnlyProjection` flag, so the pairing is discoverable at the route (`WB-18`) |
 | The at-rest projection | `PipelineLift.stageTwo` | Execution spec's |
@@ -603,8 +604,8 @@ of those citations is wrong (§5.2 item 9).
 | The authored map keys | `PipelineEditable.MAP_AUTHORED` (3 keys) | ✅ No client mirror since 2026-09-24 (deleted as dead code); `MapNodeKeyContractTest` holds it to `RowShaper` |
 | Live refusal codes | `PipelineEditable` constants | ⚠ Two docs cite two that do not exist |
 | Graph validation | `PipelineValidator` | 🔴 Unknown type is a WARNING (§2.1) |
-| The Recipe layer | `RecipeCompiler` (11 verbs) / `RecipeConverter` | 🔴 The fifth registration point (§3.3); no guard call (§3.5) |
-| The transform guard | `SqlGuard` — 10 call sites | 🔴 **Zero on any save path** |
+| The Recipe layer | `RecipeCompiler` (11 verbs) / `RecipeConverter` | 🔴 The fifth registration point (§3.3); ✅ calls `refuseUnsafeSql` since 2026-09-09 (§3.5) |
+| The transform guard | `SqlGuard` | ✅ On the save path since 2026-09-09 (`PipelineEditable.refuseUnsafeSql`, §3.5) |
 | The legacy read bridge | `DataTransformer.recordFields` | — |
 | The function catalogue | `sql-functions.ts` (23 in 7 categories) | ⚠ Counted 24 and ~20 in docs |
 | The processor catalogue | `processor-catalog.contract.json` (122<!--count:processors--> = 34/18/67) | ✅ The two docs that counted 121 were corrected 2026-09-09; every statement of this number is now derived from the contract by `tools/check-doc-counts.mjs` |

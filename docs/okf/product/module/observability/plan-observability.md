@@ -740,6 +740,7 @@ the form authors the kind), and per-measure limits.
 > `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
 > starting point and read the row before acting on it:
 > `CONSUMER-PAIRS-1`, `SPEC-STALEREF-1`, `SPEC-GLOSSARY-1`, `SPEC-ORPHANPAGE-1`.
+> ⚠ **None of these ids is an open board row today** (re-checked 2026-11-15, `DOCS-AGENT-WRITTEN-REVIEW-1`): `SPEC-STALEREF-1` closed 2026-09-09 when `tools/check-doc-citations.mjs` became a guard, `SPEC-NOPROOF-1` closed 2026-09-09 when all six Musts had tests, and the rest were closed, refuted or split into their own rows by the 2026-09-24 board consolidation. Their history: `docs/archived-documents/backlog-snapshot-2026-09-24.md` and `docs/archived-documents/plans-archive/post-consolidation-sprints.md`.
 > ✅ **`CONSUMER-PAIRS-1` decided 2026-09-10 (operator, per row):** `GET /signals/stream` **ADOPT** — the Events pane subscribes, polling stays as the fallback → `CLIENT-HALVES-1` (row closed; the Events pane subscribes to `/signals/stream`).
 >
 > ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is

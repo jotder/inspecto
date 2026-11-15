@@ -48,7 +48,8 @@ Multi-location ingest is composition of existing pieces — see
 
 ## 2. Requirements of record
 
-Seven requirements, all shipped. ⚠ **`EDITIONS.md`'s feature × edition matrix is authoritative for the
+Seven requirements, all shipped. ⚠ **The feature × edition matrix in
+[`spec-editions.md`](../../layer/platform/spec-editions.md) (the `SP-ACQ-*` rows) is authoritative for the
 Edition column**; this table mirrors it.
 
 | ID | Requirement | MoSCoW | Status | Edition |
@@ -69,9 +70,9 @@ against source:
   recorded as shipped while half its scope was refused is the shape that makes a requirement register
   untrustworthy — the refusal now has a home in §6.1 instead of being absorbed into a green tick.
 - **`ACQ-6`'s route was wrong.** It documented `POST /sources/{id}/notify`; the route is
-  **`POST /collectors/{id}/notify`** (`AcquisitionRoutes.java:27`), audited as `collector.notified`.
+  **`POST /collectors/{id}/notify`** (`AcquisitionRoutes`), audited as `collector.notified`.
 - **`ACQ-7`'s config key was wrong.** It documented `source.duplicate.mode`; the block is
-  **`collector.duplicate`** (`PipelineConfigParser.java:376,409` — `duplicate` is read from the
+  **`collector.duplicate`** (`PipelineConfigParser.parseCollector` — `duplicate` is read from the
   `collector` map).
 
 ⚠ **`ACQ-1` carries an edition nuance the matrix column cannot express.** Connections are `All`, but two
@@ -84,7 +85,8 @@ connectors were **build-available and deploy-absent**. `inspecto-connectors` was
 no bundle shipped, so `connector: s3` and its siblings could be authored, compiled and tested and then
 did nothing in a deployment. Fixed 2026-09-07 (CONNECTORS-BUNDLE-1) — it now rides every bundle as the
 shaded `inspecto-connectors.jar` sidecar. A requirement is not delivered until it is *reachable*;
-"SHIPPED" against a module no bundle carries is the most expensive kind of true statement.
+"SHIPPED" against a module no bundle carries is the most expensive kind of true statement. *(Since
+MODULE-REORG-1 P7, 2026-10-07, `kafka` rides its own premium `inspecto-connectors-kafka` jar, Standard and above.)*
 
 ## 3. Specification
 
@@ -96,29 +98,31 @@ sitting under `dirs.poll` (the **inbox**), landed atomically. Everything after t
 transform, sink — is the ingest lane's problem and does not special-case a remotely-collected file. This
 seam is the whole design: `CollectorConnectors.localForConfig` exists precisely so the ingest walk uses a
 **local** connector even for a pipeline whose `collector.connector` names a remote scheme, because by then
-the bytes are already local (`CollectorConnectors.java:47-60`).
+the bytes are already local (`CollectorConnectors.localForConfig`).
 
 The authored config block is **`collector:`**. ⛔ There is no `source:` block and no alias: the parser reads
-`collector` only (`PipelineConfigParser.java:218`, `:376`), and zero committed `*_pipeline.toon` carries a
-top-level `source:`. ⚠ `data-acquisition-framework.md` (§13 and passim) still spells
-it `source.*`; both are stale, and the reason they are stale is that **`inspecto-acquire`'s own javadocs
-still say `source.*`** (`CollectorConnectors.java:11`, `RateLimiter.java:3`, `CircuitBreaker.java:12`,
-`AcquisitionLedger.java:16`, `StabilityGate` and others) — the prose inherited the drift from the code
-comments, not the reverse. ⚠ `inspecto/examples/README.md:56-59,107,130` has the same stale prefix while the
-example files it describes use `collector:`.
+`collector` only (`PipelineConfigParser.parseCollector`), zero committed `*_pipeline.toon` carries a
+top-level `source:`, and since `2c310d1c` a `source:` key is refused at `/config/write` as a key nothing reads.
+The retired `data-acquisition-framework.md` spelled it `source.*` (its successor
+[`spec-framework-design.md`](spec-framework-design.md) does not); the reason it drifted is that
+**`inspecto-acquire`'s own javadocs still say `source.*`** (`CollectorConnectors`, `RateLimiter`,
+`CircuitBreaker`, `AcquisitionLedger`, `DuplicatePolicy`, `RetryPolicy` and others) — the prose inherited the
+drift from the code comments, not the reverse. ⚠ `inspecto/examples/README.md` has the same stale prefix (the
+`gap-detection`, `checksum-change` and `incremental-watermark` rows) while the example files it describes use
+`collector:`.
 
 ### 3.2 The poll cycle and its two timers
 
 `CollectorProcessor` (`platform/inspecto-engine/src/main/java/com/gamma/inspector/CollectorProcessor.java`) is the
-entry point, in three public shapes: `run(cfg)` (`:70`) = `acquire` then `ingest` in one cycle — the
-one-shot CLI / `reprocess` / manual path; `acquire(cfg)` (`:257`) = phases A–F, fetch-and-land only;
-`ingest(cfg, onCommit)` (`:95`) = the inbox walk. `acquire` is a **no-op for a `local` collector**.
+entry point, in three public shapes: `run(cfg)` = `acquire` then `ingest` in one cycle — the
+one-shot CLI / `reprocess` / manual path; `acquire(cfg)` = phases A–F, fetch-and-land only;
+`ingest(cfg, onCommit)` = the inbox walk. `acquire` is a **no-op for a `local` collector**.
 
 In the always-on service the two halves run on **separate timers with separate guards** (B3b): the
-acquisition tick is `CollectorService.dispatchAcquireCycle`, cadenced by `-Dacquire.pollSeconds` (defaults
-to the ingest poll interval — `CollectorService.java:1010-1012`) with an allowance of
-`-Dacquire.maxConcurrent` (defaults to the ingest budget, `:574-575`), and each pipeline is serialised by a
-dedicated `acquireGuard`. So a slow fetch neither blocks nor is blocked by ingest, and two acquisitions of
+acquisition tick is `PipelineScheduler.dispatchAcquireCycle` (scheduled by `CollectorService`), cadenced by
+`-Dacquire.pollSeconds` (defaults to the ingest poll interval) with an allowance of
+`-Dacquire.maxConcurrent` (defaults to the ingest budget, both read in `CollectorService`), and each pipeline is
+serialised by a dedicated `acquireGuard`. So a slow fetch neither blocks nor is blocked by ingest, and two acquisitions of
 one pipeline never overlap.
 
 ⚠ **Gotcha — the two guards are deliberately not one.** A manual "run now" acquires inline under the
@@ -126,10 +130,10 @@ one pipeline never overlap.
 is benign and self-correcting: landing is atomic (§3.7) and duplicates are caught by markers/fingerprint
 dedup. Do not "fix" it by merging the guards — that would serialise ingest behind fetch again.
 
-**Back-pressure (B4) throttles the producer.** If a pipeline's inbox backlog (`CollectorProcessor.countPending`,
-`:611` — the exact landed count) has reached `-Dacquire.backpressure.highWater`
-(`CollectorService.java:579`), `selectDueForAcquire` skips that pipeline this tick and bumps
-`inspecto_acquire_backpressure_skips_total` (`PipelineScheduler.java:522`). The already-landed files wait in
+**Back-pressure (B4) throttles the producer.** If a pipeline's inbox backlog (`CollectorProcessor.countPending`
+— the exact landed count) has reached `-Dacquire.backpressure.highWater` (read in `CollectorService`),
+`PipelineScheduler.selectDueForAcquire` skips that pipeline this tick and bumps
+`inspecto_acquire_backpressure_skips_total`. The already-landed files wait in
 the durable inbox — which *is* the spill-to-disk hand-off queue of the design's escalation ladder — until
 ingest drains them below the mark. The mark is **0 = off by default**; a failed pending scan returns `-1`
 and so fails open (never pauses). This is *negative* feedback on the producer, and is therefore the exact
@@ -138,7 +142,8 @@ the ingest *consumer* on backlog would be positive feedback.
 
 ⚠ The gate bounds backlog **across** ticks, not within one: a single acquire cycle still fetches the whole
 discovered listing, so one tick can overshoot the mark. A per-cycle intake cap is **live** under another
-name — files via `-Dingest.maxFilesPerCycle` (`IntakeGovernor.capFor` → `CollectorProcessor.admit`, per
+name — files via `-Dingest.maxFilesPerCycle` (default `IntakeGovernor.DEFAULT_MAX_FILES_PER_CYCLE` = 500
+since 2026-10-06, `0` disables; `IntakeGovernor.capFor` read in `CollectorProcessor.collect`, per
 Pipeline `processing.intake.max_files_per_cycle`) and bytes via `-Dingest.maxBytesPerCycle` (2026-09-16,
 `20ff050d`) — but both run after listing, on local files, so they bound materialisation, not remote fetch
 bandwidth. Bounding the *fetch* would need a listing-with-sizes seam that does not exist (branch-aware
@@ -150,29 +155,29 @@ residual (f) in `BACKLOG.md`).
 `collector.connector`, which defaults to `local`) → the built-in `LocalFileSystemConnector`, constructed
 from `dirs.poll`/`errors`/`quarantine`; any other scheme → a `ServiceLoader<CollectorConnectorFactory>`
 lookup, matched case-insensitively on `scheme()`. An unknown scheme **fails fast** with a message naming
-`local` as the only built-in (`CollectorConnectors.java:33-35`) — not a silent fall-back to local.
+`local` as the only built-in (`CollectorConnectors.forConfig`) — not a silent fall-back to local.
 
 `CollectorConnector.discover(ctx)` lists candidates and **never dedups** — dedup is an engine concern, so a
 connector stays a protocol adapter. Discovery is shaped by four keys, all under `collector:`:
 
 | Key | Default | Meaning |
 |---|---|---|
-| `include[]` | `[processing.file_pattern]` | glob list; a non-empty `include` **replaces** the pattern rather than adding to it (`PipelineConfigParser.java:383-385`) |
+| `include[]` | `[processing.file_pattern]` | glob list; a non-empty `include` **replaces** the pattern rather than adding to it (`PipelineConfigParser.parseCollector`) |
 | `exclude[]` | `[]` | exclusion globs |
 | `recursive_depth` | `-1` | unbounded |
 | `discovery` | `poll` | `poll` \| `watch` |
 
 `discovery: watch` (ACQ-6) puts a JDK `WatchService` on a local/mounted poll root, debounced ~1 s via
-`-Dservice.watch.quiet.millis` (`CollectorWatcher.java:43`, default `1000`). 🔴 The interval poll loop stays
+`-Dservice.watch.quiet.millis` (`CollectorWatcher.QUIET_MS`, default `1000`). 🔴 The interval poll loop stays
 on as the backstop: **watch narrows latency, it never carries correctness.**
 
-The push half of ACQ-6 is `POST /collectors/{id}/notify` (`AcquisitionRoutes.java:27`) — an S3 event
+The push half of ACQ-6 is `POST /collectors/{id}/notify` (`AcquisitionRoutes`) — an S3 event
 notification, upload script or upstream job asks for an immediate scan instead of waiting out the interval.
 Gated on `canOperateRuns`; `?v1` answers `202 {runId, source, pipeline, status}` plus a `Location` to poll,
 legacy answers a synchronous run result off the trigger pool; `404` for an unknown source id. The request
 **body is ignored** — a notify is a hint that something arrived and the triggered cycle re-discovers
 authoritatively, so a spurious notify is harmless. Audited as **`collector.notified`**
-(`AuditTrail.java:151` maps the verb `notify` → `notified`).
+(`AuditTrail` maps the verb `notify` → `notified`).
 
 ### 3.4 Phase B — the readiness / stability gate
 
@@ -180,15 +185,15 @@ authoritatively, so a spurious notify is harmless. Audited as **`collector.notif
 half-written files — the requirement's stated "biggest production problem". Order of decision:
 
 1. Ask `connector.readiness(file)` → `READY` / `NOT_READY` / `UNKNOWN`
-   (`CollectorConnector.java:79`). A connector that knows natively short-circuits: an object store's listed
+   (`CollectorConnector.readiness`). A connector that knows natively short-circuits: an object store's listed
    object is atomic ⇒ always `READY`; a local connector with a `ready_marker` answers `READY` iff the
    sibling marker exists.
 2. Only on `UNKNOWN` does the gate apply size/mtime **quiescence**: released once the file has been
    unmodified for at least `window` **and** observed at the same size on at least `size_checks`
    consecutive cycles.
 
-⚠ The stability key is **`size_checks`** (`PipelineConfigParser.java:422`; `sizeChecks()` is merely the
-record accessor) — `framework.md:48` gives `stability.sizeChecks`, which is wrong.
+⚠ The stability key is **`size_checks`** (`PipelineConfigParser.parseCollector`; `sizeChecks()` is merely the
+record accessor) — the retired `framework.md` gave `stability.sizeChecks`, which was wrong.
 
 | `collector.stability` key | Default when the block is present |
 |---|---|
@@ -196,7 +201,7 @@ record accessor) — `framework.md:48` gives `stability.sizeChecks`, which is wr
 | `size_checks` | `2` (floored at 1) |
 | `ready_marker` | *none* — template with `{name}`; a template without `{name}` is treated as a suffix (`ReadyMarker.java`) |
 | `exclude_temp_files` | `true` |
-| `exclude_temp_patterns[]` | `*.tmp`, `*.partial`, `*.filepart`, `.~lock.*` (`PipelineConfig.java:769-770`) |
+| `exclude_temp_patterns[]` | `*.tmp`, `*.partial`, `*.filepart`, `.~lock.*` (`PipelineConfig`) |
 
 An **absent** `stability:` block is `Stability.DISABLED` — the legacy "a matched file is a candidate at
 once" behaviour, nothing stat'd.
@@ -216,16 +221,16 @@ The fingerprint repository is the `AcquisitionLedger` SPI
 relativePath)`. Unlike the append-only OI stores it **upserts** — a file's latest fingerprint replaces the
 prior one for its key. Four operations: `find`, `record`, `highWatermark(sourceId)` (file-level, Phase C4),
 `dbWatermark`/advance (row-level, DB export). `LedgerEntry` carries `sourceId, relativePath, name, size,
-checksum, etag, version, lastModified, processedAt, status` (`LedgerEntry.java:16-18`).
+checksum, etag, version, lastModified, processedAt, status` (`LedgerEntry`).
 
 Implementations: `InMemoryAcquisitionLedger` (**default — lost on restart**) and `DbAcquisitionLedger`
 (durable JDBC over its own DuckDB file, single-writer, or a Postgres URL), selected once from
-`-Dacquire.ledger.backend` (`memory` default | `db`, `AcquisitionLedgers.java:142`). Tables:
+`-Dacquire.ledger.backend` (`memory` default | `db`, `AcquisitionLedgers`). Tables:
 `inspecto_acquisition_ledger` and `inspecto_acquisition_db_watermark`
-(`DbAcquisitionLedger.java:33,36`). `AcquisitionLedgers` is the per-space `shared()` accessor + lifecycle
+(`DbAcquisitionLedger.TABLE`, `.WM_TABLE`). `AcquisitionLedgers` is the per-space `shared()` accessor + lifecycle
 manager — one of the five MDC-routed singletons.
 
-🔴 **`DuplicatePolicy` is TWO orthogonal enums, not one list.** `framework.md:53` states the modes as
+🔴 **`DuplicatePolicy` is TWO orthogonal enums, not one list.** The retired `framework.md` stated the modes as
 "PATH / METADATA / CHECKSUM / SKIP / REPROCESS / VERSION / FAIL", which conflates the detection axis with
 the change axis and imports four tokens from the requirement doc's §4 wish-list that the code never
 adopted. The code (`DuplicatePolicy.java`) has:
@@ -244,22 +249,22 @@ it is unit-tested directly. In `ETAG` mode the strongest dimension both sides ca
 differs is `CHANGED` even when size+mtime happen to match.
 
 Config: `collector.duplicate: { mode: path, algorithm: SHA256, on_change: reprocess }` — those are the
-defaults when the block is present (`PipelineConfigParser.java:411-414`). `algorithm` feeds `Checksums`,
+defaults when the block is present (`PipelineConfigParser.parseCollector`). `algorithm` feeds `Checksums`,
 which is JDK-only (`MessageDigest`/`CRC32`), streams in 64 KB chunks, returns lowercase hex, and accepts
 `MD5`, `SHA1`, `SHA256` (default), `SHA512`, `CRC32` with or without the dash.
 
 **Collection guarantee.** `collector.guarantee` → `BEST_EFFORT` (default) | `AT_LEAST_ONCE` |
-`EXACTLY_ONCE` (`PipelineConfig.java:662-677`; both dash and underscore spellings parse). `requiresLedger()`
+`EXACTLY_ONCE` (`PipelineConfig.Guarantee`; both dash and underscore spellings parse). `requiresLedger()`
 is true for anything but best-effort. ⚠ **The parser refuses to over-promise silently:** a
 ledger-requiring guarantee combined with `duplicate.mode: path` (marker-only, which never populates the
 ledger) logs a `[CONFIG]` warning saying it will behave as best-effort + commit-log replay and naming the
-three modes that would enforce it (`PipelineConfigParser.java:445-448`).
+three modes that would enforce it (`PipelineConfigParser.parseCollector`).
 
 **File-level watermark (C4).** `collector.incremental.watermark: last_modified` makes each scan skip files
 modified strictly before the source's high-watermark — the greatest `lastModified` the ledger holds for that
 source. It is **derived from the ledger, with no separate watermark column**, hence only meaningful in a
 content-based mode; the parser warns on `incremental` + `mode: path` for exactly that reason
-(`:500-504`). Metric: `inspecto_watermark_skipped_total`.
+(`PipelineConfigParser.parseCollector`). Metric: `inspecto_watermark_skipped_total`.
 
 **Row-level DB watermark.** Distinct machinery: an opaque max of a monotonic result column, persisted per
 **connection-profile id**, bound as a JDBC parameter into `… WHERE col > :watermark` and advanced **only
@@ -272,8 +277,8 @@ an event-time column.
 **Consignment cutting** is a Collector concern because the planner runs in the poll cycle:
 `collector.consignment: { max_files, max_bytes, order }`, canonical since CONSIGNMENT-HOME-1 (2026-09-02).
 `order` is `mtime` (arrival — the default) or `name`, and **garbage refuses at parse time** rather than being
-silently ignored (`PipelineConfigParser.java:233-237`). The pre-move `processing.batch:` spelling is
-dual-read, canonical-first, and nothing writes it any more (`:213-224`).
+silently ignored (`PipelineConfigParser`, the consignment-caps block). The pre-move `processing.batch:`
+spelling is dual-read, canonical-first, and nothing writes it any more (same block).
 
 ### 3.6 Phase D — gap detection
 
@@ -388,7 +393,7 @@ forces a wasted read. Pure verification: no events, no metrics; the caller decid
 
 **Fetch tuning.** `collector.fetch: { mode: STAGE, staging_dir: …, parallel_fetch: 1, rate_limit: … }`.
 `parallel_fetch` is floored at 1. `rate_limit` parses to **bytes per second** via `parseRate`
-(`PipelineConfigParser.java:1438-1456`): a size with an optional `/s`, `ps` or `/sec` suffix — `50MBps`,
+(`PipelineConfigParser.parseRate`): a size with an optional `/s`, `ps` or `/sec` suffix — `50MBps`,
 `50MB/s`, `1GBps`, `512KBps`, or a bare number; KB/MB/GB are **binary (1024-based)**; null/blank ⇒ 0 =
 unlimited. `RateLimiter` is a token bucket holding at most one second's burst, shared across all parallel
 fetch workers so the *whole source* is bounded; an `acquire` larger than the burst waits proportionally
@@ -425,7 +430,7 @@ archive_path: …, tags: {…}, on_unsupported: WARN_AND_CONTINUE }` — `on_uns
 
 ### 3.9 The connector SPI, and the ten resolvable schemes
 
-⚠ **"Eight connectors" is the count of the optional module, not of the registry.** Verified from `META-INF/services/com.gamma.acquire.CollectorConnectorFactory`: **seven** factories ship in `inspecto-connectors` (`sftp`, `ftp`, `ftps`, `db`, `s3`, `azure`, `gcs`), **one** (`kafka`) in the premium module `inspecto-connectors-kafka` (MODULE-REORG-1 P7, 2026-10-07; Standard and above — Basic has no Kafka), **one** more in `inspecto-engine` (`DatasetCollectorConnectorFactory` → `connector: dataset`, UI-S7), and `local` is the built-in default that needs no jar. So ten values resolve, and a bundle without the sidecar resolves only `local` and `dataset`. *(A ninth entry exists under `inspecto/src/test/resources` — `FakeRemoteConnectorFactory` — and is test-only; do not count it.)*
+⚠ **"Eight connectors" is the count of the optional module, not of the registry.** Verified from `META-INF/services/com.gamma.acquire.CollectorConnectorFactory`: **seven** factories ship in `inspecto-connectors` (`sftp`, `ftp`, `ftps`, `db`, `s3`, `azure`, `gcs`), **one** (`kafka`) in the premium module `inspecto-connectors-kafka` (MODULE-REORG-1 P7, 2026-10-07; Standard and above — Basic has no Kafka), **one** more in `inspecto-engine` (`DatasetCollectorConnectorFactory` → `connector: dataset`, UI-S7), and `local` is the built-in default that needs no jar. So ten values resolve, and a bundle without the sidecar resolves only `local` and `dataset`. *(Two more entries exist under `inspecto/src/test/resources` — `FakeRemoteConnectorFactory` and `FakeOffsetTailConnectorFactory` — and are test-only; do not count them.)*
 
 ⚠ **`https` is a Connection scheme, not a Collector scheme** (2026-09-23). No `CollectorConnectorFactory` serves it: an `https` Connection is the target of the outbound **Webhook sink** (`sink.webhook`, [step-catalog](../etl/spec-step-catalog.md#webhook--sinkwebhook--the-outbound-webhook)), onboarded under the same `canOnboardConnections` grant as every other Connection. That grant is what makes a Connection the egress gate. `host`/`port`/`base_path` build the URL, `password` is the bearer-token reference, and the option `timeout_seconds` sets the request timeout. The sink refuses a tunnel or proxy. A Collector bound to an `https` Connection fails as an unknown scheme.
 
@@ -435,7 +440,7 @@ optional `inspecto-connectors` jar:
 - **`CollectorConnector`** — `discover`, `readiness`, `open` (stream bytes), `fetchTo` (materialise at the
   destination it is *given*), `post` (RETAIN/DELETE/MOVE/RENAME/TAG), plus a `Capability` enum:
   `STREAM, RANDOM_ACCESS, RESUMABLE, DELETE, MOVE, RENAME, TAG, ETAG, VERSIONING`
-  (`CollectorConnector.java:82-92`). *(Renamed from `SourceConnector` per the Source→Collector glossary <!-- vocab-allow: names the SourceConnector rename itself -->
+  (`CollectorConnector.Capability`). *(Renamed from `SourceConnector` per the Source→Collector glossary <!-- vocab-allow: names the SourceConnector rename itself -->
   flip.)*
 - **`CollectorConnectorFactory`** — `scheme()` + `create(cfg, profile)` + the optional `workbench(profile)`
   hook, registered via `META-INF/services`.
@@ -455,20 +460,20 @@ Seven schemes are registered by `inspecto-connectors`
 | `GcsConnector` + `GcpServiceAccountToken` | `gcs` | **SDK-free** (gson for JSON) |
 | `KafkaConnector` (module `inspecto-connectors-kafka`, package `com.gamma.acquire.kafka`; Standard and above) | `kafka` | kafka-clients |
 
-⚠ Two precisions the sources get wrong in opposite directions. (a) `connectors-runbook.md` (its opening paragraph) and
-`modules/connectors.md:16` once called S3/GCS/Azure "future"; they ship — the current text of both files is
-now correct, and **NFS/SMB is a *declined* design, not a pending one** (no in-process client by intent; the
-config safety validator rejects UNC paths at the path jail — that is the security boundary). (b) "Eight
-schemes" is exactly right *for `inspecto-connectors`*, but the SPI has a **ninth registrant elsewhere**:
-`inspecto-engine` registers `com.gamma.inspector.DatasetCollectorConnectorFactory`, `scheme() == "dataset"`
-(`DatasetCollectorConnectorFactory.java:91`), which consumes another store's parquet snapshots. It is
-parsed with two fail-closed refusals: `connector: dataset` without `collector.dataset` is refused, and
-`collector.dataset` without `connector: dataset` is refused rather than silently ignored
-(`PipelineConfigParser.java:397-403`); a `datasets/<id>` ref is normalised to the bare id.
+⚠ Two precisions the sources get wrong in opposite directions. (a) `connectors-runbook.md` (its opening
+paragraph) and the old connectors module page once called S3/GCS/Azure "future"; they ship — the current
+runbook text is correct, and **NFS/SMB is a *declined* design, not a pending one** (no in-process client by
+intent; the config safety validator rejects UNC paths at the path jail — that is the security boundary).
+(b) "Eight schemes" was the count of `inspecto-connectors` until `kafka` moved to its own module (seven
+now), and the SPI has a further registrant elsewhere: `inspecto-engine` registers
+`com.gamma.inspector.DatasetCollectorConnectorFactory`, `scheme() == "dataset"`, which consumes another
+store's parquet snapshots. It is parsed with two fail-closed refusals: `connector: dataset` without
+`collector.dataset` is refused, and `collector.dataset` without `connector: dataset` is refused rather than
+silently ignored (`PipelineConfigParser.parseCollector`); a `datasets/<id>` ref is normalised to the bare id.
 
 🔴 **Its `post` action is FORCED to `RETAIN`, whatever the config says** — `post()` passes
 `PostAction.RETAIN` to the delegate unconditionally
-(`DatasetCollectorConnectorFactory.java:105-108`, whose own comment reads *"Retain is the only honest
+(`DatasetCollectorConnectorFactory`, whose own comment reads *"Retain is the only honest
 post-action here, whatever the config says"*). ⛔ **A consumer can never delete, move or rename a
 producer's snapshots.** A safety property that overrides authored config must be documented, or an operator
 authoring `post: delete` will believe it took effect. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
@@ -612,19 +617,20 @@ missing profile yields `null` and the factory decides.
 ### 3.11 Host-key policy
 
 `HostKeyPolicy` (`providers/inspecto-connectors/src/main/java/com/gamma/acquire/connectors/HostKeyPolicy.java`) is
-derived from the profile's `options` (`:45-51`). Three knobs, purely additive — with none of them set the
-legacy accept-on-connect behaviour is unchanged (and logged at debug, `:79`):
+derived from the profile's `options` (`HostKeyPolicy.from`). Three knobs, purely additive — with none of them
+set the legacy accept-on-connect behaviour is unchanged (and logged at debug):
 
 | Option | Effect |
 |---|---|
-| `host_key` | 🔴 a key **FINGERPRINT** — `SHA256:<base64>` or OpenSSH MD5 colon-hex. The field is literally named `fingerprint` (`:35`) and is handed to sshj's `client.addHostKeyVerifier(fingerprint)` (`:70-71`), so a **raw `ssh-rsa AAAA…` key line cannot work**. `connectors-runbook.md`'s host-key table is right and any doc showing a raw key line is wrong — `docs/FEATURE_INVENTORY.md:147` is one such. |
+| `host_key` | 🔴 a key **FINGERPRINT** — `SHA256:<base64>` or OpenSSH MD5 colon-hex. The field is literally named `fingerprint` and is handed to sshj's `client.addHostKeyVerifier(fingerprint)`, so a **raw `ssh-rsa AAAA…` key line cannot work**. `connectors-runbook.md`'s host-key table is right and any doc showing a raw key line is wrong. (`docs/FEATURE_INVENTORY.md` once showed one; its host-key row now says a raw key line is rejected.) |
 | `known_hosts` | path to an OpenSSH `known_hosts` file; the host must have an entry. Works across hops. |
-| `strict_host_key: true` | when set and neither of the above is configured, **refuse to connect** (`:75`) rather than silently accept any key. |
+| `strict_host_key: true` | when set and neither of the above is configured, **refuse to connect** rather than silently accept any key. |
 
-Over a bastion, `HostKeyPolicy.bastionView` (`:60-61`) encodes the asymmetry: a single `host_key`
+Over a bastion, `HostKeyPolicy.bastionView` encodes the asymmetry: a single `host_key`
 fingerprint matches **one** host, so it pins the *target* and does not apply to the bastion; `known_hosts`
 can verify both hops. For a `db`/`ftp`/`ftps` profile reached through a tunnel the bastion is the only SSH
-hop, so `host_key`/`known_hosts` pin **it** (`DbConnections.java:51`, `FtpConnector.java:256`).
+hop, so `host_key`/`known_hosts` pin **it** (`DbConnections.open`, `FtpConnector` — both pass
+`HostKeyPolicy.from(profile)` to `SshTunnel.open`).
 
 ### 3.12 Tunnels and proxy dial-through
 
@@ -671,15 +677,15 @@ tunnel's local endpoint, which a proxy must not carry, and the SSH hop itself is
 
 | Route | Notes |
 |---|---|
-| `GET /collectors` | flat view of every pipeline's acquisition config (`AcquisitionRoutes.java:23`); since 2026-09-15 each row also carries the pipeline's **polling session** — `lastPollAt`, `pollCount`, `lastPollError`, `lastPollErrorAt` (`PipelineScheduler.pollStates`, `DUCKLE-C9-WATCHER-NOT-A-RUN-1`). ⚠ IN-MEMORY and lossy across restart by design: this is liveness ("is this collector alive, when did it last look, what did it last say?"), not an audit trail — the durable record of work is the Run/Consignment ledger. ⛔ It corrects no miscount: a quiet poll never minted a Run (`CollectorProcessor.ingest` returns before `RunIds.next()`, fixed `1fda46d5`), which is why the row was rescoped to observability before it was built. `lastError` is a message, not a metric, because a Prometheus gauge cannot say *what* failed. 🔴 Since `POLL-STATE-BLIND-TO-CONNECTOR-FAILURE-1` (closed 2026-09-15) an **acquisition that throws before landing anything** — a connector that cannot be built (unknown dataset, unreachable host) — is recorded as a poll that happened and failed (`lastPollError: "acquisition failed: …"`); before that the row stayed all-null while the log carried the ERROR. ⚠ Still NOT a poll: an event-triggered run (`on: dataset` / `on: commit`) — those are Runs, and `pollCount` counts scheduler polls only, by design. |
+| `GET /collectors` | flat view of every pipeline's acquisition config (`AcquisitionRoutes`); since 2026-09-15 each row also carries the pipeline's **polling session** — `lastPollAt`, `pollCount`, `lastPollError`, `lastPollErrorAt` (`PipelineScheduler.pollStates`, `DUCKLE-C9-WATCHER-NOT-A-RUN-1`). ⚠ IN-MEMORY and lossy across restart by design: this is liveness ("is this collector alive, when did it last look, what did it last say?"), not an audit trail — the durable record of work is the Run/Consignment ledger. ⛔ It corrects no miscount: a quiet poll never minted a Run (`CollectorProcessor.ingest` returns before `RunIds.next()`, fixed `1fda46d5`), which is why the row was rescoped to observability before it was built. `lastError` is a message, not a metric, because a Prometheus gauge cannot say *what* failed. 🔴 Since `POLL-STATE-BLIND-TO-CONNECTOR-FAILURE-1` (closed 2026-09-15) an **acquisition that throws before landing anything** — a connector that cannot be built (unknown dataset, unreachable host) — is recorded as a poll that happened and failed (`lastPollError: "acquisition failed: …"`); before that the row stayed all-null while the log carried the ERROR. ⚠ Still NOT a poll: an event-triggered run (`on: dataset` / `on: commit`) — those are Runs, and `pollCount` counts scheduler polls only, by design. |
 | `POST /collectors/{id}/notify` | ACQ-6 push discovery; `canOperateRuns`; `202`+`Location` under v1; audited `collector.notified` |
 | `POST /streams/{id}/records` | **push ingest** (ASSURE-PUSH-INGEST-1). `{id}` is the Collector id (`GET /catalog/streams`). NDJSON (`application/x-ndjson`) or CSV (`text/csv`), validated WHOLE before anything lands; one server-named file `push-<utc>-<8 hex>.<ext>` moved atomically into `dirs.poll`, so the ordinary Collector path ingests it. Gates: `canOperateRuns` · `429` per-caller push bucket (burst 60, 10/s) · `404` unknown Stream · `501` Dataset-fed · `409` template, `pipeline paused` (paused or not active — refused rather than stranded in an unwatched inbox), or the same caller's `Idempotency-Key` still in flight · `415` other types · `413` over `-Dstreams.push.max_bytes` (8 MiB) or `-Dstreams.push.max_records` (100 000) · `413` also for a KEYED push over the W5 hash window (`Idempotency.MAX_REQUEST_BYTES`, 1 MiB), which the stage would run un-keyed · `422` not UTF-8, a malformed line (named), no records, or a `file_pattern` that would never pick the file up. A leading UTF-8 BOM is stripped for both formats, before validation and before the write. A keyed replay returns the first `{file}` to the same caller only — the key is the W5 one (Space + principal + path + body hash, SEC-IDEMPOTENCY-REPLAY-1), and the in-flight reservation reuses it, so two callers' equal keys never collide. One AUDIT row `stream.records_pushed` with `records`, `bytes`, `file` — never the payload. ⛔ **Not a config write**: data arriving at a Stream is what a Collector landing a fetched file does, so no write-root gate and no approval hold. ⚠ The idempotency store is in-memory per process (10 min): a replay after a restart lands the batch again; row-level dedup is downstream, as for Kafka. |
-| `GET /metrics/acquisition` | JSON snapshot of the nine acquisition metrics, complementing the text-only Prometheus `/metrics` |
+| `GET /metrics/acquisition` | JSON snapshot of the twelve acquisition metrics (`AcquisitionRoutes.ACQ_METRICS`), complementing the text-only Prometheus `/metrics` |
 | `GET /connections`, `GET /connections/{id}` | profiles, **secret-masked** |
-| `POST`/`PUT`/`DELETE /connections[/{id}]` | ⚠ writes require **`canOnboardConnections`** — its own Admin-only grant, deliberately *not* `canAuthorWorkbench`, because Connections are the credential/egress surface (`ConnectionRoutes.java:35-55`). None of the six sources documents these three write routes. |
-| `POST /connections/{id}/test` | TCP reachability + latency + secret **resolvability**; `404` unknown id; `422` on `?target=tunnel\|proxy` with none configured, or an unsupported target |
-| `POST /connections/test` | probes an **unsaved** profile from the create/edit form; `?target=connection\|tunnel\|proxy` picks the hop |
-| `POST /connections/{id}/probe` · `GET …/explore?path=` · `GET …/sample?path=&limit=` | the graded workbench. Gates: `404` unknown id · `422` unknown check name · `400` missing sample path · **`403` path escape (jail)** · `404` unknown path · `501` connector without workbench support · `502` protocol failure. Read-only, no capability gate — same as `/test`. |
+| `POST`/`PUT`/`DELETE /connections[/{id}]` | ⚠ writes require **`canOnboardConnections`** — its own Admin-only grant, deliberately *not* `canAuthorWorkbench`, because Connections are the credential/egress surface (`ConnectionRoutes.register`). None of the six sources documents these three write routes. |
+| `POST /connections/{id}/test` | TCP reachability + latency + secret **resolvability**; `canOnboardConnections` since 2026-09-17 (it dials from the server's network position); `404` unknown id; `422` on `?target=tunnel\|proxy` with none configured, or an unsupported target |
+| `POST /connections/test` | probes an **unsaved** profile from the create/edit form; `?target=connection\|tunnel\|proxy` picks the hop; `canOnboardConnections` since 2026-09-17 |
+| `POST /connections/{id}/probe` · `GET …/explore?path=` · `GET …/sample?path=&limit=` | the graded workbench. Gates: `404` unknown id · `422` unknown check name · `400` missing sample path · **`403` path escape (jail)** · `404` unknown path · `501` connector without workbench support · `502` protocol failure. `probe` needs `canOnboardConnections` (since 2026-09-17: it reads through the saved credential); `explore` and `sample` are reads with no capability gate. |
 
 **Probe orchestration** (`ConnectionProber`): reachability and `secretsResolved` are answered generically by
 `ConnectionTester`; the graded checks (authenticate / read / write / list) go to the profile's
@@ -706,7 +712,7 @@ jailed segment-wise (no absolute paths, no `..` above the base) by the shared `A
 
 ### 3.14 Observability
 
-Events (`platform/inspecto-event/.../EventType.java:61-83`), all emitted through `AcquisitionTelemetry` with
+Events (`spi/inspecto-audit-spi/src/main/java/com/gamma/audit/EventType.java`), all emitted through `AcquisitionTelemetry` with
 `CollectorProcessor`'s FQN as the event `source` so the stream stayed byte-identical when the emitters moved
 out: `FILE_DISCOVERED` · `FILE_STABLE` · `FILE_FETCHED` (carries `bytes`) · `FILE_VALIDATED` ·
 `FILE_FETCH_FAILED` · `FILE_QUARANTINED` · `FILE_CHANGED` · `FILE_ARCHIVED` (carries `action`) ·
@@ -750,7 +756,7 @@ a cap on what one cycle *fetches* remains). The SPI makes each non-disruptive.
 
 ⚠ Do not restore a **`4.x`** attribution for phases A–F. That branch and its `v4.0.0`/`v4.0.0-RC1` tags were
 deleted 2026-08-17 (`docs/BRANCHING.md` §0-A); the phases shipped on `master`. Both
-`data-acquisition-framework.md:13` and `acquisition/index.md` carried the wrong attribution.
+the retired `data-acquisition-framework.md` and `acquisition/index.md` carried the wrong attribution.
 
 ---
 
@@ -829,12 +835,12 @@ so they are not re-proposed as new ideas; none is scheduled.
 
 | Item | Board id | What remains |
 |---|---|---|
-| Vault / KMS secret provider | `GAP-6` | Deferred by the SEC-07 decision, not blocked |
-| "Listed-not-yet-fetched" gauge | branch-aware residual **(e)** | Observability gap: the queue between list and fetch is invisible |
-| Remote-fetch bandwidth cap (was `acquire.maxFilesPerCycle`) | branch-aware residual **(f)** | The per-cycle intake caps SHIPPED (`-Dingest.maxFilesPerCycle`, `-Dingest.maxBytesPerCycle`); both run after listing on local files, so a cap on what a cycle *fetches* needs a listing-with-sizes seam that does not exist |
-| Multi-part archives | Unpack (11) | `depth: 1` is deliberate (§6.9); *multi-part* (`.z01`, split RAR) is simply unbuilt |
-| Missing connection not caught until first poll | W5 | A Collector referencing an absent Connection saves cleanly and fails at runtime |
-| Acquisition ledger defaults to `memory` | Completeness-KPI hold | 🔴 The default loses the ledger on restart, which is also why the completeness KPI cannot be computed on a fresh install |
+| Vault / KMS secret provider | `BACKLOG.md` §6 "Decided 2026-09-06" note (`GAP-6` in older docs; no open row) | Deferred by the SEC-07 decision, not blocked: only when a client policy requires it |
+| ~~"Listed-not-yet-fetched" gauge~~ | branch-aware residual **(e)** | **DROPPED (operator, 2026-10-06)** — recorded on the *Branch-aware executor residuals* row |
+| Remote-fetch bandwidth cap (was `acquire.maxFilesPerCycle`) | branch-aware residual **(f)** (P3, `hold: demand`) | The per-cycle intake caps SHIPPED (`-Dingest.maxFilesPerCycle`, `-Dingest.maxBytesPerCycle`); both run after listing on local files, so a cap on what a cycle *fetches* needs a listing-with-sizes seam that does not exist |
+| Multi-part archives | Unpack (11) | `depth: 1` is deliberate (§6.8); *multi-part* (`.z01`, split RAR) is simply unbuilt |
+| ~~Missing connection not caught until first poll~~ | — (closed) | **Now caught at save**: a remote Collector whose `collector.connection` names no profile in the Space is an ERROR finding at `/config/write` (`ConfigRoutes.unknownConnectionFindings`); a Space import with a missing connection is a WARNING that writes the dependents switched off (2026-09-25) |
+| Acquisition ledger defaults to `memory` | — (the *Completeness KPI hold* that carried it was lifted 2026-10-06) | 🔴 The default loses the ledger on restart (§3.5, §3.7). The completeness KPI no longer depends on it: `kpi.completeness` reads the consignment-output store and refuses unless that store is durable (`KpiCompletenessJob`) |
 
 ### 🔴 UNTRACKED — no board row exists; file before scheduling
 
@@ -856,7 +862,7 @@ so they are not re-proposed as new ideas; none is scheduled.
 | Controller-service **VALID/INVALID lifecycle + run-gating** | same, §3 | Verified absent: validation gates *save* and *compile*, never *run*. A Collector whose Connection has gone bad still starts a run and fails inside it |
 | `acquisition.list` / `acquisition.fetch` node split | same, §4 | Verified: `BuiltinNodeType.ACQUISITION` is the only acquisition node. ⚠ The SPI seam for the split already exists, so this is smaller than it reads |
 | A "referencing components" read view | same | "What breaks if I change this Connection?" has no answer today |
-| Presigned-URL / STS credentials for `s3` | `AwsSigV4.java:26` states the scope reason in-code | Long-lived keys are the only option today |
+| Presigned-URL / STS credentials for `s3` | `AwsSigV4`'s class javadoc states the scope reason in-code | Long-lived keys are the only option today |
 
 ## 6. Refused & superseded
 
@@ -868,22 +874,21 @@ reason — the reason is the load-bearing half.
 
 `ACQ-4` asked for "network-share (NFS/SMB) connectors on the connector SPI". **There is no share
 connector and there will not be one.** The path validator **rejects UNC outright**
-(`ConfigSafetyValidator.java:438` — "reject UNC/network paths"; `DataRef.java:40` bans the `\` separator
-that `\\host\share` needs). That rejection is not a gap someone forgot to close: it is the boundary that
+(`PathJail` refuses a value that "is a UNC/network path", the rule `ConfigSafetyValidator` documents as
+"reject UNC/network paths"; `DataRef` bans the `\` separator that `\\host\share` needs). That rejection is not a gap someone forgot to close: it is the boundary that
 keeps an authored config from reaching an arbitrary host on the network.
 
 **What serves the need instead:** mount the share at the OS level and point the built-in `local`
 connector at it. Credential handling, caching and reconnection stay the operating system's job, where
-they are already solved. `EDITIONS.md`'s `SP-ACQ-01` is titled "**Local/NFS** directory watcher —
-`LocalFileSystemConnector`, the default collector" and reads `✅✅✅` — so NFS **is** served; what is
-refused is an in-process protocol client.
+they are already solved. The editions matrix's `SP-ACQ-01` (`spec-editions.md`) is titled "**Local / NFS**
+directory watcher" — `LocalFileSystemConnector`, the default collector — and reads `✅✅✅`, so NFS **is**
+served; what is refused is an in-process protocol client.
 
-⚠ **This is filed in two tiers and they disagree.** `ROADMAP.md` §3.2 still carries an explicit
-"**Not delivered:** the NFS/SMB-CIFS half … there is no share connector", and §6 keeps the half open,
-while `REQUIREMENTS.md` closes the tier as the mounted-share pattern. **The refusal wins, because the
-code enforces it** — and retiring the ROADMAP wording is part of this spec's job, not a separate debate.
-*(⚠ ROADMAP `T2` is flagged stale in its own §9, and ROADMAP entered the vocabulary guard's scope only
-2026-09-08.)*
+✅ **The two tiers now agree.** The old root `ROADMAP.md` §3.2 carried "**Not delivered:** the NFS/SMB-CIFS
+half … there is no share connector" and kept the half open, while `REQUIREMENTS.md` closed it as the
+mounted-share pattern. Its successor, [`plan-roadmap.md`](../../layer/platform/plan-roadmap.md) §3.2, records
+the half as "Not delivered, and not pending — REFUSED by decision" (framing corrected 2026-09-09). **The
+refusal wins, because the code enforces it.**
 
 ### 6.2 A standalone `inspecto-connect` repo with a cross-repo `@PublicApi` — REVERSED IN FACT, recorded nowhere until now
 
@@ -897,8 +902,11 @@ The half that was **kept** is worth naming, because it is why the reversal was c
 contract freeze. The connection contract was frozen from the consumer's side first, so moving the
 implementation was a packaging decision rather than an interface renegotiation.
 
-⚠ Residue: `@PublicApi(since = "4.0.0")` survives on two acquisition types and is now a **stale marker**
-— `4.x` was deleted 2026-08-17.
+⚠ Residue: `@PublicApi(since = "4.0.0")` marks eight `inspecto-acquire` SPI types (`CollectorConnector`,
+`CollectorConnectorFactory`, `ExportConnector`, `ExportConnectorFactory`, `DiscoveryContext`, `RemoteFile`,
+`PostAction`, `AcquisitionException`). It is **not** a stale marker: trunk is `4.0.0-SNAPSHOT`, and per the
+[API stability policy](../api/plan-api-stability.md) `since = "4.0.0"` means "will become public API in 4.0.0"
+(the deleted `4.x` branch never shipped), so these types may still change before that release.
 
 ### 6.3 NiFi's FlowFile session/queue runtime — REFUSED
 
@@ -929,8 +937,8 @@ a demo rather than a product (2026-09-07).
 `SP-ACQ-06` / `SP-ACQ-08` read 🟡 "no proven end-to-end acquisition-node run" while `ACQ-4` reads
 FULLY CLOSED. Both are true and neither is stale: a **Connection kind** existing (tested connector,
 real credentials, real listing) is a different claim from an **acquisition node** having been proven end
-to end in a pipeline run. `BACKLOG.md` §5 already names this distinction; it is recorded here so the
-pair is not "reconciled" by flattening one of them.
+to end in a pipeline run. It is recorded here so the pair is not "reconciled" by flattening one of
+them.
 
 ### 6.8 Other standing refusals, with their reasons
 
@@ -947,7 +955,7 @@ pair is not "reconciled" by flattening one of them.
 | Bounds-based window pruning | Measured 1.3–2.6× faster for 29–88× fewer rows — the win did not survive contact with real cardinality |
 
 ⚠ **Do not carry forward** `BACKLOG.md` §6's "the TOON `source:` block stays". It is refuted:
-`PipelineConfigParser.java:218,376` read only `collector`, and no committed TOON carries a top-level
+`PipelineConfigParser` reads only `collector` (`parseCollector`), and no committed TOON carries a top-level
 `source:`. Only `NodeCategory.SOURCE` survives, and that is an enum constant, not authored config.
 
 ## 7. As-built mechanism (pointers only)
@@ -955,7 +963,7 @@ pair is not "reconciled" by flattening one of them.
 | Mechanism | Owning file | `resource:` | Read it for |
 |---|---|---|---|
 | Poll cycle, phases A–F, back-pressure | `docs/okf/product/module/acquire/architecture.md` (`Concept`) | `platform/inspecto-acquire/src/main/java/com/gamma/acquire` | the two-timer / two-guard split, the manual-run overlap gotcha, B4 vs `IntakeGovernor` |
-| Connector SPI, 8 schemes, profiles, secrets, workbench, proxy chain | `docs/okf/product/module/connectors/spec-connectors.md` (`Concept`) | `providers/inspecto-connectors/src/main/java/com/gamma/acquire/connectors` | stage-then-land, SDK-free auth per store, the four dial-through ships, workbench disciplines |
+| Connector SPI, the remote schemes (seven in `inspecto-connectors` + `kafka`), profiles, secrets, workbench, proxy chain | `docs/okf/product/module/connectors/spec-connectors.md` (`Concept`) | `providers/inspecto-connectors/src/main/java/com/gamma/acquire/connectors` | stage-then-land, SDK-free auth per store, the four dial-through ships, workbench disciplines |
 | The 14 numbered requirement areas | `docs/okf/product/module/acquire/spec-framework-design.md` (`Reference`) | `platform/inspecto-acquire/src/main/java/com/gamma/acquire` | requirement-of-record wording + the mounted-share security note |
 | Operator runbook: profile YAML, host-key table, FTPS, bastion, db-export | `docs/okf/product/module/connectors/admin-guide-connectors-runbook.md` (`Reference`) | `providers/inspecto-connectors/src/main/java/com/gamma/acquire/connectors` | the copy-pasteable profile shapes and the `curl` verification sequence |
 | Module boundary + dependency confinement | `docs/okf/product/module/connectors/architecture.md` (`Module`) | `providers/inspecto-connectors/` | why the jar is optional and what `ServiceLoader` gives you |
@@ -967,13 +975,16 @@ pair is not "reconciled" by flattening one of them.
 
 ### 8.1 Decision-logic and ledger unit tests — `platform/inspecto-acquire/src/test/java/com/gamma/acquire/`
 
-22 classes. The acquisition core is deliberately built as pure, injectable-clock decision logic, so almost
-every invariant in §3 is provable without a network or a sleep.
+25 test classes (24 here + `retry/RetryPolicyTest`) plus the `testkit/` connector-factory TCK. The table
+lists the core ones; not listed: `AcquisitionLedgerPruneTest`, `DayManifestTest`,
+`FileSequenceGapsBucketStartGoldenTest`, `StreamLaneTest`. `SecretResolverTest` is listed with them but lives
+in `spi/inspecto-auth-spi`. The acquisition core is deliberately built as pure, injectable-clock decision
+logic, so almost every invariant in §3 is provable without a network or a sleep.
 
 | Class | Proves |
 |---|---|
 | `StabilityGateTest` | growing-file hold, release on quiescence, the `size_checks` gate, per-source isolation, gate shared **per space** |
-| `DuplicatePolicyTest` | `Decision{NEW,DUPLICATE,CHANGED}` across `Mode{PATH,METADATA,CHECKSUM,ETAG}` incl. the etag→version→metadata fallback; `OnChange` reprocess/alert flags; `configStringsMapToEnums()` (`:82`) pins the config-string→enum mapping and the null/unknown defaults |
+| `DuplicatePolicyTest` | `Decision{NEW,DUPLICATE,CHANGED}` across `Mode{PATH,METADATA,CHECKSUM,ETAG}` incl. the etag→version→metadata fallback; `OnChange` reprocess/alert flags; `configStringsMapToEnums()` pins the config-string→enum mapping and the null/unknown defaults |
 | `AcquisitionLedgerTest` | the ledger contract across in-memory **and** DuckDB backends, pre-etag schema migration, and a failed replace rolling back to the prior fingerprint |
 | `AcquisitionLedgerWatermarkTest` | `highWatermark` = max(`lastModified`) per source, in-memory + DB, and the safe no-op default |
 | `AcquisitionLedgersTest` | ledgers isolated per space (MDC routing) |
@@ -990,22 +1001,28 @@ every invariant in §3 is provable without a network or a sleep.
 | `PostActionTest` | `archive_path` date-token resolution |
 | `ConnectionProfileTest` | field/tunnel/options load, secret masking in `toMap`, proxy-block parse+mask, **`everyFieldSurvivesAMapRoundTrip`** (the `base_path`/`basePath` data-loss guard, §3.10) |
 | `ConnectionTesterTest` | reachable/unreachable probe, local-profile no-network shortcut, missing host/port failure |
-| `SecretResolverTest` | all five forms — `recognisesReferences` (`:16`), `resolvesSystemPropertyScope` (`:25`, incl. bare-scope fallback), `missingEnvReferenceResolvesToNull` (`:40`), `literalIsPassedThrough` (`:45`), **`fileAndKeystoreSchemesAreRefusedNamingTheEditionWhenNoProviderIsBundled`** (`:54` — the SEC-07 gate), `aBundledProviderServesTheSchemesItSupports` (`:73`) |
+| `SecretResolverTest` (`spi/inspecto-auth-spi`) | all five forms — `recognisesReferences`, `resolvesSystemPropertyScope` (incl. bare-scope fallback), `missingEnvReferenceResolvesToNull`, `literalIsPassedThrough`, **`fileAndKeystoreSchemesAreRefusedNamingTheEditionWhenNoProviderIsBundled`** (the SEC-07 gate), `aBundledProviderServesTheSchemesItSupports` |
 | `ConnectionRegistryTest` | register/find/remove by id, null-registration ignored, per-space isolation |
 | `LocalConnectionWorkbenchTest` | probe/explore/sample, **path jailing**, CSV vs. raw-line fallback |
 | `LocalFileSystemConnectorTest` | discover/open/fetchTo/post-action + ready-marker readiness |
 
 ### 8.2 Connector, workbench and proxy tests — `providers/inspecto-connectors/src/test/java/com/gamma/acquire/connectors/`
 
-17 acquisition test classes plus 2 relay fixtures. ⚠ The two `com/gamma/connect/notify/*DeliveryStatusAdapterTest`
-classes also live in this module but are a **notification** subject, not ACQ.
+30 test classes — the per-scheme and workbench tests below, a `*FactoryTckTest` per factory (the
+`testkit` contract of §8.1), `DbExportConnectorFactoryValidateTest`, `CollectorProcessorRemoteCycleTest` and
+the export/egress tests (`ObjectStoreEgressTest`, `ObjectStoreExportJobTest`, `PinnedObjectStoreHttpTest`,
+`SafetyPolicyEgressTest`) — plus 4 helpers (the 2 relay fixtures, `ObjectStoreEgressFixture`, `OutputRows`).
+⚠ The `com/gamma/connect/notify/*` tests (six classes, two helpers) also live in this module but are a
+**notification** subject, not ACQ. The Kafka tests (`KafkaConnectorTest`, `KafkaConnectionWorkbenchTest`,
+`KafkaConnectorFactoryTckTest`, `KafkaStreamLaneTest`, `KafkaEgressTest`, `KafkaRealBrokerTest`) moved with the
+connector to `providers/inspecto-connectors-kafka/src/test/java/com/gamma/acquire/kafka/`.
 
 - Per-scheme: `SftpConnectorTest` (host-key pinning, discover/fetch/resume, dedup-on-rerun, parallel fetch,
   workbench, SOCKS5 + HTTP-CONNECT tunnelling) · `FtpConnectorTest` (+ proxy, unknown-proxy fail-closed) ·
-  `FtpsConnectorTest` (TLS mode parsing, `scheme()=="ftps"` at `:98`) · `FtpTunnelConnectorTest` (bastion +
+  `FtpsConnectorTest` (TLS mode parsing, asserts `scheme()=="ftps"`) · `FtpTunnelConnectorTest` (bastion +
   passive-port-range parsing) · `S3ConnectorTest` · `AzureBlobConnectorTest` · `GcsConnectorTest` (each:
   discover w/ pagination + etag, depth bound, fetch, move+delete post-actions) · `KafkaConnectorTest`
-  (offset-range discover, **ledger-watermark resume**, NDJSON envelope drain, raw-payload mode,
+  (Kafka module; offset-range discover, **ledger-watermark resume**, NDJSON envelope drain, raw-payload mode,
   non-RETAIN post-action rejection, the **in-flight fence** and its self-release, the lag gauge) ·
   `DbExportWatermarkCycleTest` (real poll cycles: frontier advances, **restart between land and commit**,
   fence across a restart) · `DbExportConnectorTest` (query→CSV, `:watermark` placeholder rewrite,
@@ -1015,7 +1032,7 @@ classes also live in this module but are a **notification** subject, not ACQ.
 - Workbenches: `S3ConnectionWorkbenchTest` · `AzureBlobConnectionWorkbenchTest` ·
   `GcsConnectionWorkbenchTest` (each an in-process JDK `HttpServer` stub per store) ·
   `DbConnectionWorkbenchTest` (schema/table/column explore, bounded sample + truncation flag) ·
-  `KafkaConnectionWorkbenchTest` (topic→partition explore; **sample without touching the ledger
+  `KafkaConnectionWorkbenchTest` (Kafka module; topic→partition explore; **sample without touching the ledger
   watermark**).
 - Proxy: `DbConnectionsProxyTest` — the JDBC half dialled through both relays at a bare listener, asserting
   the relay was asked for the database; unroutable shapes refused.
@@ -1025,7 +1042,8 @@ classes also live in this module but are a **notification** subject, not ACQ.
   `createSocket()`-vs-`connect()` bypass of §3.12: the happy path still returned the right file.
 - Test infrastructure declared in `providers/inspecto-connectors/pom.xml`: Apache MINA `sshd-core` + `sshd-sftp` and
   Apache `ftpserver-core` (all `<scope>test</scope>`) give **real in-process SSH/SFTP and FTP servers**;
-  kafka-clients' in-jar `MockConsumer` means the suite needs no broker; the one committed test resource is
+  in the Kafka module, kafka-clients' in-jar `MockConsumer` means the suite needs no broker (only
+  `KafkaRealBrokerTest` wants one, and skips without it); the ACQ test resource committed here is
   `providers/inspecto-connectors/src/test/resources/ftps-test-keystore.jks`.
 
 ### 8.3 Control-plane real-HTTP route tests — `inspecto/src/test/java/com/gamma/control/`
@@ -1050,12 +1068,13 @@ Incidental (the route string is an example for another concern, but they do exer
 | File | Providers |
 |---|---|
 | `providers/inspecto-connectors/src/main/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | the **seven**: `SftpConnectorFactory`, `FtpConnectorFactory`, `FtpsConnectorFactory`, `DbExportConnectorFactory`, `S3ConnectorFactory`, `AzureBlobConnectorFactory`, `GcsConnectorFactory` (`KafkaConnectorFactory` is in `providers/inspecto-connectors-kafka/src/main/resources/META-INF/services/...`) |
-| `platform/inspecto-engine/src/main/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | `com.gamma.inspector.DatasetCollectorConnectorFactory` — the ninth scheme, `dataset`, from a different module |
+| `platform/inspecto-engine/src/main/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | `com.gamma.inspector.DatasetCollectorConnectorFactory` — the `dataset` scheme, from a different module |
 | `providers/inspecto-secrets/src/main/resources/META-INF/services/com.gamma.auth.secrets.SecretsProvider` | `com.gamma.secrets.FileKeystoreSecretsProvider` — the SEC-07 edition seam |
-| `inspecto/src/test/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | `com.gamma.service.FakeRemoteConnectorFactory` (test-only remote scheme) |
+| `inspecto/src/test/resources/META-INF/services/com.gamma.acquire.CollectorConnectorFactory` | `com.gamma.service.FakeRemoteConnectorFactory`, `com.gamma.service.FakeOffsetTailConnectorFactory` (test-only remote schemes) |
 
 `platform/inspecto-engine/src/test/java/com/gamma/inspector/DatasetCollectorConnectorFactoryTest.theFactoryIsServiceLoaderDiscoverable()`
-(`:97`) is the only test that loads the SPI through `ServiceLoader`.
+loads the SPI through `ServiceLoader`; so does the factory TCK (`testkit/CollectorConnectorFactoryContract`,
+`schemeIsServedByExactlyOneFactory`), which every `*FactoryTckTest` runs.
 
 ### 8.5 Runnable examples
 
@@ -1069,34 +1088,42 @@ the classpath) `POST /spaces/demo/jobs/orders_by_region_materialize/trigger` →
 found that no test had: (a) the committed materialize job was **broken** — `measures: "gross,sum"` is not the
 measure grammar (`sum(gross)`), so the demo's own materialize had never run; (b) the demo space **does not boot on
 the core jar at all** — `ops_analytics_sample_job.toon` declares `type: objects.analytics` (an `inspecto-ops` job
-type) and `SpaceManager` SKIPS the whole space with a WARN (filed `DEMO-SPACE-PERSONAL-UNBOOTABLE-1`). ⚠ Before
+type) and `SpaceManager` SKIPPED the whole space with a WARN (`DEMO-SPACE-PERSONAL-UNBOOTABLE-1`, fixed
+2026-09-15: a job of an unregistered type is now skipped at boot, not the Space — see
+[jobs](../processor/spec-jobs.md)). ⚠ Before
 the Dataset exists the feed's first poll fails loudly (`unknown dataset 'orders_by_region'`) — fail-fast, by
 design; the registry component `orders_by_region.toon` is committed so a fresh checkout resolves it at boot.
-⚠ Otherwise every `collector.connector` in every committed `*_pipeline.toon` is `local` (20 occurrences), and `collector.fetch`, `post_action`, `rate_limit` and
-`retry` appear in **zero** committed config. What is runnable is the acquisition *semantics* layer over the
-local connector:
+⚠ Otherwise every runnable committed `*_pipeline.toon` uses `connector: local` (153 occurrences). The two
+remote ones are the **`_reference/`** templates, which need external infrastructure and are not runnable
+offline: `inspecto/examples/_reference/sftp-collector/orders_pipeline.toon` (`connector: sftp` with
+`fetch` + `rate_limit`, `retry`, `stability`, `post_action`) and
+`inspecto/examples/_reference/db-export/orders_pipeline.toon` (`connector: db` with `fetch`, `retry`). What is
+runnable is the acquisition *semantics* layer over the local connector:
 
 | Example | Exercises |
 |---|---|
 | `inspecto/examples/05-acquisition/gap-detection/pipeline.toon` | `collector.gap_detection` |
 | `inspecto/examples/05-acquisition/dedup-rerun/pipeline.toon` | ⚠ **not** an acquisition key — its dedup is `processing.duplicate_check` |
+| `inspecto/examples/05-acquisition/intake-throttle/pipeline.toon` | the per-cycle intake cap, `processing.intake { max_files_per_cycle }` (§3.2) |
 | `inspecto/examples/06-serve/sequence-gap/feed_pipeline.toon` | `collector.gap_detection` under the serve runner |
 | `inspecto/examples/06-serve/checksum-change/orders_pipeline.toon` | `collector.duplicate { mode: checksum, algorithm: SHA256, on_change: alert }` |
 | `inspecto/examples/06-serve/incremental-watermark/feed_pipeline.toon` | `collector.duplicate { mode: metadata }` + `collector.incremental { watermark: last_modified }` |
 | `inspecto/examples/07-steps/collect/pipeline.toon` | `connector`, `discovery: poll`, `include[]`, `exclude[]`, `recursive_depth`, `gap_detection` (mirrored at `spaces/default/config/collect_step/collect_step_pipeline.toon`) |
-| `spaces/ucc/config/voucher/voucher_pipeline.toon` | the only committed **`collector.stability`** — `window: 10s`, `size_checks: 2` — and `collector.consignment { max_files, max_bytes }` |
+| `spaces/ucc/config/voucher/voucher_pipeline.toon` | the only runnable **`collector.stability`** (the other is in `_reference/sftp-collector`) — `window: 10s`, `size_checks: 2` — and `collector.consignment { max_files, max_bytes }` |
 
 Runners: `inspecto/examples/run-example.ps1` / `.sh` (batch) and `serve-example.ps1` / `.sh` (serve mode —
 required for gap/fingerprint/watermark/stability, which need more than one cycle; the `phase2/` two-cycle
 protocol and `mtimes.txt`). Self-checking `probes.txt` assertions exist for the three `06-serve/*` examples
-above and **not** for either `05-acquisition/*`.
+above and **not** for any of the three `05-acquisition/*`.
 
-Connection profiles — three committed, all exercising the Connections API surface rather than collection
-(no pipeline references any of them): `spaces/default/config/connections/local_demo_connection.toon`
+Connection profiles — six committed. Three sit beside the `_reference/` pipelines that bind them
+(`_reference/sftp-collector/warehouse_sftp_connection.toon`, `_reference/db-export/orders_db_connection.toon`,
+`_reference/webhook-sink/orders_hook_connection.toon`). The other three exercise the Connections API surface
+rather than collection (no pipeline references any of them): `spaces/default/config/connections/local_demo_connection.toon`
 (`sftp`, `${ENV:DEMO_SFTP_PASSWORD}`; ⚠ `host: 127.0.0.1 port: 8080` reads as a probe fixture aimed at the
 control-plane port, not a working SFTP endpoint) · `spaces/demo/config/connections/demo_local_connection.toon`
 (`local`, the only one that resolves offline) · `spaces/demo/config/connections/warehouse_sftp_connection.toon`
-(`sftp`, `${ENV:WAREHOUSE_SFTP_PASSWORD}`; `spaces/demo/config/README.md:52` labels it "reference shape").
+(`sftp`, `${ENV:WAREHOUSE_SFTP_PASSWORD}`; `spaces/demo/config/README.md` labels it "reference shape").
 **No committed `.toon` anywhere contains a `tunnel:` or `proxy:` block** — those shapes live only in
 `connectors-runbook.md`, `ConnectionProfileTest`'s inline TOON, and the UI's `connection-form.dialog.ts`.
 
@@ -1106,7 +1133,7 @@ control-plane port, not a working SFTP endpoint) · `spaces/demo/config/connecti
   literal, and it explicitly blesses `${ENV:…}` as *the* sanctioned way not to hold a secret. Two modes,
   because tree-scan alone hands out a false green when a secret is committed and moved one commit later;
   `.githooks/pre-push` runs both. Wired into `ci.yml`.
-- `tools/check-vocabulary.mjs` — rule `source-acquisition-entity` (`:228`) enforces Collector over Source. <!-- vocab-allow: names the guard rule by id -->
+- `tools/check-vocabulary.mjs` — rule `source-acquisition-entity` enforces Collector over Source. <!-- vocab-allow: names the guard rule by id -->
   ✅ **The merge hazard this note used to describe is discharged (2026-09-08).** `DOC_ALLOW` held a
   *path-keyed* waiver for `integrations.md` whose only suppressed hit was that file's H1 ("Remote Sources"); <!-- vocab-allow: quotes the retired heading the waiver covered -->
   the connector runbook was split out to `acquisition/connectors-runbook.md`, the H1 went with the retitle,
@@ -1116,24 +1143,27 @@ control-plane port, not a working SFTP endpoint) · `spaces/demo/config/connecti
   documented `GET /sources` that is really `GET /collectors`.
 - `tools/check-doc-links.mjs` — new 2026-09-08, wired into `.githooks/pre-push` + `ci.yml`; any ACQ file
   move must keep its 1,378-link baseline at zero dangling.
-- `tools/check-coverage.mjs` — ⚠ the floors are **repo-wide, not per-module** (`:2-6`), so there is no
+- `tools/check-coverage.mjs` — ⚠ the floors are **repo-wide, not per-module** (its header comment), so there is no
   `inspecto-acquire` floor to cite; do not claim one.
 
 ### 8.7 Named coverage gaps (verified absent, not assumed)
 
-1. 🔴 **No test asserts the registered-scheme set.** The number eight is only the line count of the
-   services file; `FtpsConnectorTest:98` and `DatasetCollectorConnectorFactoryTest:97` each assert a single
-   scheme. Nothing counts or lists them together, so a dropped `META-INF/services` line would ship silently
-   — the exact failure mode of the palette-fallback incident.
+1. 🔴 **No test asserts the registered-scheme set.** The number seven is only the line count of the
+   `inspecto-connectors` services file; `FtpsConnectorTest` and
+   `DatasetCollectorConnectorFactoryTest.theFactoryIsServiceLoaderDiscoverable` each assert a single scheme,
+   and the factory TCK checks that a scheme has *at most* one factory, not that it is registered. Nothing
+   counts or lists them together, so a dropped `META-INF/services` line would ship silently — the exact
+   failure mode of the palette-fallback incident.
 2. 🔴 **No test feeds a raw `ssh-rsa AAAA…` line into `host_key`.** `SftpConnectorTest` covers
-   `wrongHostKeyFingerprintRejectsConnect()` (`:109`, a bogus colon-hex fingerprint) and
-   `strictHostKeyWithoutAnyPinRefusesConnect()` (`:120`). The rejection of a raw key line follows from
-   `HostKeyPolicy:70-71` handing the string to sshj's fingerprint verifier — it is code-supported by
+   `wrongHostKeyFingerprintRejectsConnect()` (a bogus colon-hex fingerprint) and
+   `strictHostKeyWithoutAnyPinRefusesConnect()`. The rejection of a raw key line follows from
+   `HostKeyPolicy` handing the string to sshj's fingerprint verifier — it is code-supported by
    construction, but **not covered by a test with that input**, so state it as a design property, never as
    a tested one.
-3. `05-acquisition/gap-detection` and `05-acquisition/dedup-rerun` have no `probes.txt`, so they are
-   demonstrable but not self-checking.
-4. `inspecto/examples/README.md:11` itself records that templates for features needing external infra
-   (SFTP/FTP/DB connections) are still to come — the honest statement of gap 8.5.
+3. The three `05-acquisition/*` examples (`gap-detection`, `dedup-rerun`, `intake-throttle`) have no
+   `probes.txt`, so they are demonstrable but not self-checking.
+4. Features needing external infra (SFTP, a database, an https receiver, a DuckLake catalog) now ship as
+   `inspecto/examples/_reference/` templates (`inspecto/examples/README.md`, *Reference templates*); they are
+   reference shapes, not runnable offline, so no committed example *drives* a remote fetch (§8.5).
 
 ---

@@ -41,7 +41,9 @@ Two consequences, and they govern every relocation and rename question on this c
 1. **`since()` is informational, and a value above 3.x means "will become public API in 4.0.0" —
    not "has been public API since".** Every `@PublicApi` element introduced after 3.x therefore
    carries `since = "4.0.0"`. Values of 4.1.0 … 5.8.0 were previously written against versions that
-   never existed; they were corrected to `4.0.0` in one sweep (200 sites).
+   never existed; they were corrected to `4.0.0` in one sweep (200 sites). ⚠ Three written since then
+   still carry a version that never existed — `MailAttachment` and `DbEventStore` (`"5.0.0"`) and
+   `AcceptedConfigKeys` (`"5.2.0"`); read them as `4.0.0` (checked 2026-11-15).
 2. **An element whose `since` is `4.0.0` has never been published in any release, so it may still be
    moved, renamed, or changed freely** — the stability promise binds *within a released major*, and
    4.0.0 is not released. ⛔ **`@PublicApi` alone does not make a change breaking.** Check whether the
@@ -261,7 +263,8 @@ Most of these commits are not marked `!`, so a commit-type scan misses them.*
   mutation as `dry run: would …`. It **implies** `?skipPostAction=true`, which remains the separate,
   narrower capability (fetch without acking; the ingest write still happens for real). The v1 response
   body gains a `dryRun` field alongside `skipPostAction`.
-- `com.gamma.etl.ConsignmentEvent` gains a **`boolean dryRun`** component (11 in total). Additive, on a
+- `com.gamma.etl.ConsignmentEvent` gains a **`boolean dryRun`** component (11 in total then; 12 since
+  `outputFiles` was added). Additive, on a
   type whose `since = "4.0.0"` has never shipped (absent from `v3.11.0`), so no bump of its own. A
   published event that carries it MUST be honoured or refused by every consumer; `JobService`'s
   `on_pipeline` and `on_signal` firings now inherit it instead of hardcoding `false`, which narrowly
@@ -545,7 +548,7 @@ Most of these commits are not marked `!`, so a commit-type scan misses them.*
   (`valid` stays `true`) and the same `connectionWarnings` is returned. A client that treated the 422 as
   "nothing imported" must now read `connectionWarnings` instead.
   [editable round-trip §22](../engine/spec-editable-round-trip.md)
-- `DELETE /spaces/{id}?purge=true` answers **409** when it would remove the **last Space directory on disk** (D4); deregister-only on the last Space stays allowed. *(This line stated the rule backwards — "409 unless `?purge=true`" — until 2026-09-08; `SpaceRoutes.java:120-127`.)*
+- `DELETE /spaces/{id}?purge=true` answers **409** when it would remove the **last Space directory on disk** (D4); deregister-only on the last Space stays allowed. *(This line stated the rule backwards — "409 unless `?purge=true`" — until 2026-09-08; `SpaceRoutes.java`.)*
 - Full recomputes write a sibling `<pipeline>_<batchId>` table and supersede the old revision in the
   catalog; **nothing deletes the bytes** until a `retire_superseded` maintenance job is configured.
 - Run artifacts carry `event_time_min` / `event_time_max` instead of `timeRange`.
@@ -629,13 +632,13 @@ Two audiences depend on the framework from outside:
 |---|---|---|
 | `com.gamma.service.CollectorService` | 2.2.0 | Always-on host: registry, poll schedule, event bus, control surface (`fromArgs`, `runAllOnce`, `runPipeline`, `pause`/`resume`, `pipelines`, `statusStore`) |
 | `com.gamma.service.EnrichmentService` | 2.3.0 | Orchestrates Stage-2 enrichment against batch-commit events + schedules; exposes the run-audit read surface (`configs`, `views`, `runs`, `lineage`) backing `GET /enrichment[...]` (v2.9.0) |
-| `com.gamma.enrich.EnrichmentAuditReader` | 2.9.0 | Read side of the Stage-2 audit — reads back the `<job>_enrich_runs.csv` / `_enrich_lineage.csv` ledgers as JSON-ready rows |
+| `com.gamma.enrich.EnrichmentAuditReader` | 4.0.0 (the type since 2.9.0; unmarked in `v3.11.0`, marked by the M3 freeze below) | Read side of the Stage-2 audit — reads back the `<job>_enrich_runs.csv` / `_enrich_lineage.csv` ledgers as JSON-ready rows |
 | `com.gamma.control.ControlApi` | 2.4.0 | Embedded REST control plane over a running `CollectorService`. History: v3.0 added scoped token auth; the **editions realignment (2026-06-16) removed token auth from the core** — the common core is auth-free (Personal), and Standard re-adds OIDC via the `Authenticator`/`Subject`/`TokenRelay` SPIs. 2026-07-06: versioned `/api/v1` envelope (W1); 2026-07-25: the unversioned business surface retired (API-5). *(This cell said "v4.8 … alongside byte-for-byte legacy routes" until 2026-09-08 — no v4.8 ever existed and the legacy routes are gone.)* |
 | `com.gamma.assist.spi.AssistAgent` | 3.0.0 | SPI for the optional embedded assist agent; discovered via `ServiceLoader` (or `CollectorService.registerAgent`) and wired in-process before `start()`. Implemented in the optional `inspecto-agent` module (M0) |
 | `com.gamma.service.DbStatusStore` | 2.6.0 | Database-backed `StatusStore` (engine-neutral JDBC; DuckDB by default — zero extra dep; Postgres for a future distributed deployment, bring-your-own driver) — selected via `-Dstatus.backend=db` |
 | `com.gamma.report.ReportService` | 2.8.0 | Rolls `StatusStore` audit into a live status snapshot + a historical batch-audit report (backs `GET /status`, `/report`, `/pipelines/{name}/report`); rolls the Stage-2 run audit into `enrichmentReport` (backs `GET /enrichment/{job}/report`, v2.9.0); reports accept a `Window` date range + report duration percentiles p50/p95/p99 (v2.10.0) |
 | `com.gamma.job.JobService` | 2.8.0 | Registry + scheduler for config-driven jobs (cron / event / manual) hosting ingest, enrichment, report and maintenance work uniformly (backs `GET /jobs`, `/jobs/{name}/runs`, `POST /jobs/{name}/trigger`) |
-| `com.gamma.job.JobConfig` | 2.8.0 | A `*_job.toon` definition: name, `type`, `cron`, `on_pipeline`, `enabled`, type-specific params |
+| `com.gamma.job.JobConfig` | 4.0.0 (the type since 2.8.0; unmarked in `v3.11.0`, marked by the M3 freeze below) | A `*_job.toon` definition: name, `type`, `cron`, `on_pipeline`, `enabled`, type-specific params |
 
 ### Agent-consumed core surface (frozen for the pending 4.0.0, M3)
 
@@ -661,10 +664,10 @@ build against an API jar), so wrapping would duplicate data shapes for no payoff
 
 `CsvIngester`, `DuckDbCsvIngester`, `DataTransformer`, `TransformCompiler`,
 `PartitionWriter`, `OutputFormat`, `LineageCollector`, `SchemaSelector`,
-`ConsignmentIngestor`, `BatchPlanner`, `MarkerManager`, `QuarantineManager`,
+`ConsignmentIngestor`, `ConsignmentPlanner` (was `BatchPlanner`), `MarkerManager`, `QuarantineManager`,
 `DuckLakeRegistrar`, `CommitLog`, `ConsignmentAuditWriter`, the `com.gamma.util.*` CLI
 tools, and all of
-`ManifestStore`/`Batch`/`PartitionDef`/`PartitionOutput`/`LineageRow` are
+`ManifestStore`/`Consignment` (was `Batch`)/`PartitionDef`/`PartitionOutput`/`LineageRow` are
 implementation detail. (The `com.gamma.inspector` batch-ingest strategy seam —
 `ConsignmentIngestStrategy`, `CsvIngestStrategy`, `StreamingPluginIngestStrategy`, `DuckDbRecordSink`,
 `IngestOutcome`, `MemberAudit`, all package-private — is likewise internal.) They are stable enough for the framework's own use but

@@ -57,7 +57,7 @@ reject rows; Expectations; the source time zone at parse; the Parse pane, gramma
 ## 2. Requirements of record
 
 Six requirements from `REQUIREMENTS.md` §3.2 (that section was stripped to an index on 2026-09-09 — this file is their only home now), all recorded shipped. **Two describe a narrower build than
-exists, one describes a broader one, and one has no UI at all.** ⚠ **`EDITIONS.md`'s feature × edition
+exists, and one describes a broader one.** *(A fourth, "one has no UI at all" about `ING-6`, was a false negative — corrected 2026-11-15.)* ⚠ **`EDITIONS.md`'s feature × edition
 matrix is authoritative for the Edition column**; this table mirrors it.
 
 | ID | Requirement | MoSCoW | Status | Edition |
@@ -67,7 +67,7 @@ matrix is authoritative for the Edition column**; this table mirrors it.
 | `ING-3` | Compressed input streaming (gzip / bz2 / zip) | Must | ✅ SHIPPED — **superseded in shape** by the Unpack stage (2026-08-23): streams *and* Archives, at the Collector, with caps and a verdict (§3.5) | All |
 | `ING-4` | Schema casting + reject routing (quarantine: unreadable / mismatch / sink-flush fail) | Must | ✅ SHIPPED | All |
 | `ING-5` | Unified `parsing:` block + JSON/NDJSON + text/regex frontends | Must | ✅ SHIPPED 2026-07-07 — ⚠ "LDIF block-records stay PROPOSED" is stale: blank-line record splitting is **live** via `text_regex.record_split` (2026-08-28) | All |
-| `ING-6` | **Expectation** engine: data-quality rules against a Schema | Must | ✅ **server SHIPPED — no UI.** `/expectations*` CRUD + evaluate exist; **no file in the SPA mentions Expectations**; evaluation is a COUNT over **at-rest Parquet**, not at ingest (§3.7) | All |
+| `ING-6` | **Expectation** engine: data-quality rules against a Schema | Must | ✅ **SHIPPED, server and UI.** `/expectations*` CRUD + evaluate; the SPA's Expectations pane (`/admin/expectations`, `inspecto-ui/src/app/modules/admin/expectations/`, `ExpectationsService`); evaluation is a COUNT over **at-rest Parquet**, not at ingest (§3.7) | All |
 
 **Corrections this table makes to its predecessor and the concept pages**, each verified against source:
 
@@ -77,11 +77,12 @@ matrix is authoritative for the Edition column**; this table mirrors it.
   which appears on **no** board row, no `step-catalog.md` row and no `EDITIONS.md` `SP-PRS-*` row. The
   documentation states the count as three, five, six, seven and ten in six places; the code says ten tokens,
   eight formats, six built-ins.
-- **`ING-6` is a Must with no product surface.** `ExpectationRoutes` (`inspecto/src/main/java/com/gamma/control/ExpectationRoutes.java:47-54`)
-  serves list / evaluate / evaluate-one / create / update / delete; a case-insensitive search of every `.ts`
-  under `inspecto-ui/src/app` finds **zero** occurrences of "expectation". The `<inspecto-query-panel>`
-  condition builder that `queries.md` says Expectations reuse exists — for Queries and Datasets. Same shape as
-  the `API`, `DAT` and `MET` client-half findings.
+- ✅ ~~**`ING-6` is a Must with no product surface.**~~ **Corrected 2026-11-15: the surface exists.**
+  `ExpectationRoutes` (`inspecto/src/main/java/com/gamma/control/ExpectationRoutes.java`) serves list /
+  evaluate / evaluate-one / create / update / delete, and the SPA's Expectations pane
+  (`inspecto-ui/src/app/modules/admin/expectations/` — list, `expectation-form.dialog`, routed at
+  `/admin/expectations`) calls it through `ExpectationsService`; it dates from 2026-07-04 (C2), so the
+  2026-09 "zero occurrences" search was a false negative.
 - **`ING-5`'s LDIF note is stale**, and `parsing-options-reference.md` contradicts itself on it: §6.6 says
   `[LIVE via text_regex]` with `record_split: blank_line`, its decision matrix still says `[PROPOSED]`.
   Corrected in both places with this spec.
@@ -89,7 +90,7 @@ matrix is authoritative for the Edition column**; this table mirrors it.
   value is **refused by name** — a `.tar.gz` inside a `.zip` is extracted as an opaque Entry and quarantines.
   Corrected with this spec.
 - **`ingest-wrap-spi.md` names the mode selector `processing.streaming.generation_threshold_bytes`**; the
-  parser reads **`large_file_bytes`** (`PipelineConfigParser.java:243`) and no other page or code uses the
+  parser reads **`large_file_bytes`** (`PipelineConfigParser.java`) and no other page or code uses the
   first name. Corrected with this spec.
 - **`transforms-seams.md` still describes `ConsignmentIngestStrategy` / `CsvIngestStrategy` and a `DATA_RULES`
   registry**; the types are `ConsignmentIngestStrategy` / `CsvIngestStrategy` / `StreamingPluginIngestStrategy`
@@ -107,7 +108,7 @@ file inside a `FAILED` Consignment is normal), and collapsing them loses the que
 
 ### 3.1 The Consignment: from inbox to a unit of work
 
-`CollectorProcessor.ingest(cfg, onCommit)` (`platform/inspecto-engine/src/main/java/com/gamma/inspector/CollectorProcessor.java:95`)
+`CollectorProcessor.ingest(cfg, onCommit)` (`platform/inspecto-engine/src/main/java/com/gamma/inspector/CollectorProcessor.java`)
 scans the local inbox — a remote-fetched file, once landed, is discovered exactly like a locally-pushed one —
 expands Archives through **Unpack** (§3.5, at `:117`, *before* planning), then **`ConsignmentPlanner`**
 (`platform/inspecto-etl/src/main/java/com/gamma/etl/ConsignmentPlanner.java`) cuts the candidate list into Consignments
@@ -123,7 +124,7 @@ pipeline could plan a Consignment through the poll cycle).
 
 ### 3.2 The ingest strategies, the two modes, and the commit
 
-**`ConsignmentIngestor`** (`…/inspector/ConsignmentIngestor.java:43`, ex `BatchProcessor` — ⛔ not
+**`ConsignmentIngestor`** (`…/inspector/ConsignmentIngestor.java`, ex `BatchProcessor` — ⛔ not
 `ConsignmentProcessor`, which is the post-sync SPI) is a stateless coordinator: pick a
 **`ConsignmentIngestStrategy`** — `CsvIngestStrategy` for DuckDB-native frontends, `StreamingPluginIngestStrategy`
 for the wrap-SPI — run `ingest()` → `IngestOutcome`, then the path-agnostic **`commit()`** in crash-safe order:
@@ -137,7 +138,7 @@ The plugin strategy picks a **mode per Consignment by member size, with no extra
 generations of **`flush_records`** rows (default 5 000 000), each generation transformed, written and dropped,
 so peak heap stays one generation regardless of file size (`<stem>_gNNNNN_out.*`, a valid Hive layout).
 
-**The write is staged and revealed.** `PartitionWriter` (`platform/inspecto-etl/src/main/java/com/gamma/etl/PartitionWriter.java:158-208`)
+**The write is staged and revealed.** `PartitionWriter` (`platform/inspecto-etl/src/main/java/com/gamma/etl/PartitionWriter.java`)
 `COPY`s into a staging directory, then reveals by atomic rename — `COPY … PARTITION_BY` for a keyed schema,
 a single-file `COPY` for an **unkeyed** one (E1: the `year=1900/month=01/day=01` sentinel bucket is retired; an
 unkeyed segment writes a **flat** store). `CommitLog` records committed ids (read back by streaming, since the log only grows); `MarkerManager` writes the
@@ -202,7 +203,7 @@ can outlive one Consignment (500 Entries at `max_files: 100` plan five). Kinds: 
 `.Z`) and 1→N Archives (`.zip`, `.tar`, `.tar.gz`); **xz and zstd have no plugin** (a dependency sign-off).
 **Caps, fail-closed** (`ConfigSpecs`): `processing.unpack.max_entries` (10 000), `max_entry_bytes`,
 `max_total_bytes`, `max_ratio` (the bomb cap), `depth` **= 1, refused otherwise**; the zip-slip jail
-(`ArchiveDecompressorPlugin.java:157-158`, tested with a re-packed archive); `data_extensions` published, an
+(`ArchiveDecompressorPlugin.java`, tested with a re-packed archive); `data_extensions` published, an
 empty list honoured as a choice. Identity is **extension-insensitive** (a collision is not a bug — the allow-list
 is the remedy). **The archive verdict is a Run-level fact**, one row per Archive per Run in the `unpack` ledger
 (`UnpackLedger.COLUMNS`, declared once): `UNPACKED · UNPACKED_PARTIAL · UNREADABLE · EMPTY`; 🔴
@@ -361,7 +362,7 @@ default (added 2026-09-30, `RefusalQuarantine`). With it on, a file can be refus
 grammar) targets a pipeline or job output; **`ExpectationEvaluator`** counts violating records with a
 server-built `COUNT` over the target's **at-rest Parquet** in a DuckDB sandbox (unsealed — it reads Parquet by
 absolute path); a FAILED check opens a deduped `expectation:<name>` Incident through `IncidentAccess` and emits
-`EXPECTATION_FAILED` → notifications. Routes (`ExpectationRoutes.java:47-54`): `GET /expectations`,
+`EXPECTATION_FAILED` → notifications. Routes (`ExpectationRoutes.java`): `GET /expectations`,
 `POST /expectations/evaluate`, `POST /expectations/{name}/evaluate`, `POST | PUT | DELETE` gated
 `canAuthorWorkbench`. ⚠ **This is not ingest-time validation** — `REQUIREMENTS.md` homes it under ING and
 words it "validating records against a Schema"; the glossary homes it under Rules; the build is an at-rest
@@ -578,6 +579,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 > `docs/BACKLOG.md` rows. ⚠ The list below is matched **by family, not per item**, so treat it as a
 > starting point and read the row before acting on it:
 > `CONSUMER-PAIRS-1`, `SPEC-STALEREF-1`, `SPEC-COUNTS-1`, `SPEC-NOPROOF-1`, `SPEC-GLOSSARY-1`.
+> ⚠ **None of these ids is an open board row today** (re-checked 2026-11-15, `DOCS-AGENT-WRITTEN-REVIEW-1`): `SPEC-STALEREF-1` closed 2026-09-09 when `tools/check-doc-citations.mjs` became a guard, `SPEC-NOPROOF-1` closed 2026-09-09 when all six Musts had tests, and the rest were closed, refuted or split into their own rows by the 2026-09-24 board consolidation. Their history: `docs/archived-documents/backlog-snapshot-2026-09-24.md` and `docs/archived-documents/plans-archive/post-consolidation-sprints.md`.
 > ✅ **`CONSUMER-PAIRS-1` decided 2026-09-10 (operator, per row):** Expectations (`ING-6`, a Must) **ADOPT — build the UI**; the Must stands as written → `BACKLOG.md` §3 `EXPECTATIONS-UI-1`.
 >
 > ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
@@ -588,11 +590,11 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 
 | Item | Evidence | Why it matters |
 |---|---|---|
-| **Expectations have no UI** | zero "expectation" hits under `inspecto-ui/src/app`; routes exist | `ING-6` is a Must reachable only by `curl`; the `<inspecto-query-panel>` it was meant to reuse exists |
+| ✅ ~~**Expectations have no UI**~~ — wrong when written: `inspecto-ui/src/app/modules/admin/expectations/` exists (2026-07-04) | §2 corrections | — |
 | **`parquet` is a built-in frontend on no board** | `BuiltinParsers.IDS`; `FRONTENDS` | shipped, untested-as-a-row, invisible to `EDITIONS.md` and `step-catalog.md` |
 | **The frontend count is stated six ways** (3 / 5 / 6 / 7 / 9 / 10) across five pages and the user guide | §2 | FOUR sets share one noun: **10**<!--count:parsing-frontend-tokens--> `parsing.frontend` tokens (eight formats once the two aliases fold), **6**<!--count:builtin-parsers--> DuckDB-native built-ins, **7**<!--count:parser-node-types--> `parser.*` node types, and three byte→row *mechanisms* (a prose taxonomy, not a count in code). The three derivable sets are marked and derived by `tools/check-doc-counts.mjs` (2026-09-09); the mechanism sense is written as *mechanisms*, never *frontends* |
 | **`Segment` has no glossary entry** | `GLOSSARY.md` | the load-bearing plugin-ingest word is undefined in the binding vocabulary |
-| **`ingestable` is a display flag with a stale reading in `onboarding.md`** ("XML today") | `parser-plugins.md` vs `onboarding.md:210-212` | corrected with this spec |
+| **`ingestable` is a display flag with a stale reading in `onboarding.md`** ("XML today") | `parser-plugins.md` vs `onboarding.md` (a page since retired into the onboarding user guide) | corrected with this spec |
 | **The "Batch" names survive in `transforms-seams.md`, `duckdb.md`, `FEATURE_INVENTORY.md`** | `ConsignmentIngestStrategy`, `CsvIngestStrategy` | 8 days after the rename; corrected in the seams page with this spec, the rest are a sweep |
 
 ## 6. Refused & superseded
@@ -734,7 +736,7 @@ rule), `Asn1ParserPlugin` tests, `RealGrammarsTest` · `ParityCheckTest` (`asn-p
 
 `inspecto/examples/02-parsing/` — nine format-lane examples (`fixedwidth`, `json-frontend`, `text-regex-frontend`,
 `xlsx-frontend`, `xml-plugin-frontend`, `pipe-delimited`, `no-header`, `compressed-gzip`, `asn1-frontend`), each a
-`pipeline.toon` (+ `grammar.toon` for fixed-width); `07-steps`; 76 `.toon` files under `examples/` in all.
+`pipeline.toon` (+ `grammar.toon` for fixed-width); `07-steps`; 144 `.toon` files under `inspecto/examples/` in all (counted 2026-11-15).
 ⚠ **No committed `parquet` example** and no committed `expectation` component.
 
 ### 8.7 Guards
@@ -748,7 +750,7 @@ rule), `Asn1ParserPlugin` tests, `RealGrammarsTest` · `ParityCheckTest` (`asn-p
 | Gap | Evidence |
 |---|---|
 | **Five reactor tests skip by default** — `RealGrammarsTest` ×2, `ParityCheckTest` (corpus-gated), `DelimitedGrammarTest`, `FixedWidthTest` (fixture-gated) | `assumeTrue` in each; no current page names all five |
-| **No UI test of Expectations** — no UI | §2 |
+| ~~**No UI test of Expectations**~~ — `expectations.component.spec.ts` and `expectation-form.dialog.spec.ts` exist | §2 |
 | **`.Z` has no round-trip test**; xz / zstd have no codec to test | `BACKLOG.md` §3 |
 | **No `parquet` frontend example or board row** | §8.6 |
 | **The `tier: 'required'` fields ship `required: false`** — the D13 observation is un-run | `BACKLOG.md` §2 |
