@@ -136,4 +136,16 @@ class SpacePromotionTest {
         write(target, "registry/datasets/d.toon", "physicalRef: e/database\n");
         assertNotEquals(h1, SpacePromotion.compute(target, b, Map.of(), "p").hash());
     }
+
+    /** SPACE-PROMOTION-EXT-CASE-1: a kind is read from the name as the filesystem resolves it, as the import reads it. */
+    @Test
+    void aKindIsReadWhateverTheCaseOfTheName() {
+        for (String p : List.of("connections/x_connection.TOON", "x_CONNECTION.toon",
+                "Registry/connections/x.toon", "connections/x_connection.toon."))
+            assertTrue(SpacePromotion.isConnection(p) && "connection".equals(SpacePromotion.kindOf(p)), p);
+        assertTrue(SpacePromotion.isPipelineFile("x_PIPELINE.TOON"));
+        assertEquals("pipeline", SpacePromotion.kindOf("x_pipeline.TOON"));
+        assertEquals("dataset", SpacePromotion.kindOf("Registry/Datasets/d.toon"));
+        assertFalse(SpacePromotion.isConnection("registry/datasets/connections.toon"));
+    }
 }

@@ -221,7 +221,7 @@ public final class SpacePromotion {
     private static String refusal(Path root, String path, Set<String> referenced) {
         String why = ImportPaths.refusal(root, path, referenced);
         if (why != null) return why;
-        String kind = PendingChanges.kindOfConfigPath(path);
+        String kind = PendingChanges.kindOfConfigPath(resolved(path));
         if (kind != null && (ImportCapabilityGuard.DEDICATED_ONLY.containsKey(kind)
                 || ImportCapabilityGuard.GOVERNANCE_ONLY.containsKey(kind)))
             return "a '" + kind + "' is written through its own route only";
@@ -286,7 +286,7 @@ public final class SpacePromotion {
 
     /** Whether binding turned a parseable {@code .toon} entry into one that no longer parses. */
     private static boolean brokenByBinding(String path, Map<String, byte[]> raw, byte[] bound) {
-        if (!path.endsWith(".toon")) return false;
+        if (!isToon(path)) return false;
         byte[] before = raw.get(path);
         if (before == null || Arrays.equals(before, bound) || !parses(before)) return false;
         return !parses(bound);
@@ -311,7 +311,7 @@ public final class SpacePromotion {
      */
     private static List<String> reshapedBy(String path, byte[] before, byte[] bound, Map<String, String> values,
                                            Set<String> used) {
-        if (!path.endsWith(".toon") || before == null || Arrays.equals(before, bound)) return List.of();
+        if (!isToon(path) || before == null || Arrays.equals(before, bound)) return List.of();
         Map<String, Object> source = decoded(before), result = decoded(bound);
         if (source == null || result == null || sameShape(source, result)) return List.of();
         List<String> by = new ArrayList<>();
@@ -357,8 +357,28 @@ public final class SpacePromotion {
         }
     }
 
+    /**
+     * {@code path} as the filesystem resolves it ({@link ImportCapabilityGuard#normalizedPath}: lower case, no trailing
+     * dots or spaces), which is how the import judges a file's shape and kind — so every kind test here reads
+     * {@code connections/x_connection.TOON} or {@code Registry/connections/x.toon} as the connection it is
+     * (SPACE-PROMOTION-EXT-CASE-1). The path itself is kept as written.
+     */
+    private static String resolved(String path) {
+        return ImportCapabilityGuard.normalizedPath(path);
+    }
+
+    private static boolean isToon(String path) {
+        return resolved(path).endsWith(".toon");
+    }
+
     static boolean isConnection(String path) {
-        return path.endsWith("_connection.toon") || path.startsWith("registry/connections/");
+        String p = resolved(path);
+        return p.endsWith("_connection.toon") || p.startsWith("registry/connections/");
+    }
+
+    /** Whether {@code path} is a {@code *_pipeline.toon}, read as {@link #resolved} reads it. */
+    static boolean isPipelineFile(String path) {
+        return resolved(path).endsWith("_pipeline.toon");
     }
 
     /** The decoded profile of a connection file (wrapped in {@code connection:} or flat), or {@code null}. */
@@ -421,9 +441,9 @@ public final class SpacePromotion {
     /** Equal bytes, or for {@code .toon} equal decoded content less the server's stamps. */
     static boolean equivalent(String path, byte[] a, byte[] b) {
         if (Arrays.equals(a, b)) return true;
-        if (!path.endsWith(".toon")) return false;
+        if (!isToon(path)) return false;
         try {
-            String kind = PendingChanges.kindOfConfigPath(path);
+            String kind = PendingChanges.kindOfConfigPath(resolved(path));
             return unstamped(ConfigCodec.toMap(new String(a, StandardCharsets.UTF_8)), kind)
                     .equals(unstamped(ConfigCodec.toMap(new String(b, StandardCharsets.UTF_8)), kind));
         } catch (RuntimeException unparseable) {
@@ -450,10 +470,11 @@ public final class SpacePromotion {
     /** The kind a promoted path is, for the report. */
     static String kindOf(String path) {
         if (isConnection(path)) return "connection";
-        String k = PendingChanges.kindOfConfigPath(path);
+        String p = resolved(path);
+        String k = PendingChanges.kindOfConfigPath(p);
         if (k != null) return k;
-        if (path.endsWith("_schema.toon")) return "schema";
-        if (path.endsWith("_view.toon")) return "view";
+        if (p.endsWith("_schema.toon")) return "schema";
+        if (p.endsWith("_view.toon")) return "view";
         return "config";
     }
 

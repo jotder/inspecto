@@ -244,6 +244,39 @@ class ControlApiSpacePromotionTest {
         return bos.toByteArray();
     }
 
+    /**
+     * SPACE-PROMOTION-EXT-CASE-1: a file's kind is read from its name as the filesystem resolves it, as the import
+     * reads it ({@link ImportCapabilityGuard#normalizedPath}), so a connection spelled in another case is still a
+     * connection: one carrying a literal secret is excluded, never proposed as an {@code add} or written.
+     */
+    @Test
+    void aConnectionNamedInAnotherCaseIsStillAConnectionAndItsLiteralSecretIsNeverWritten(@TempDir Path root,
+                                                                                         @TempDir Path tmp) throws Exception {
+        List<String> names = List.of("connections/db_connection.TOON", "connections/dc_CONNECTION.toon",
+                "Registry/connections/dd.toon");
+        byte[] zip = sourceBundle(tmp);
+        for (String n : names)
+            zip = withEntry(zip, n, "connection:\n  id: db\n  connector: postgres\n  host: h\n  password: hunter2\n");
+        try (Ctx c = open(root)) {
+            JsonNode p = preview(c, zip);
+            Map<String, String> excluded = new java.util.TreeMap<>();
+            p.get("excluded").forEach(x -> excluded.put(x.get("path").asText(), x.get("reason").asText()));
+            for (String n : names) {
+                assertFalse(actions(p, "add").contains(n), n + " is not proposed: " + p);
+                assertTrue(String.valueOf(excluded.get(n)).contains("literal secret"), n + ": " + excluded);
+            }
+            HttpResponse<String> r = post(c.port, "/spaces/alpha/promotion/apply", "admin",
+                    body(zip, Map.of("previewHash", p.get("changeSetHash").asText())));
+            assertEquals(200, r.statusCode(), r.body());
+            assertEquals(List.of(ORDERS), JSON.convertValue(V1Body.of(r.body()).get("written"), List.class));
+            try (var walk = Files.walk(c.config)) {
+                assertEquals(List.of(), walk.filter(Files::isRegularFile)
+                        .filter(f -> f.toString().toLowerCase(java.util.Locale.ROOT).contains("connection"))
+                        .map(Path::toString).toList(), "no connection file was written");
+            }
+        }
+    }
+
     @Test
     void aPlaceholderWithNoValueIs422NamingIt(@TempDir Path root, @TempDir Path tmp) throws Exception {
         byte[] zip = sourceBundle(tmp);
@@ -525,13 +558,16 @@ class ControlApiSpacePromotionTest {
 
             // SPACE-PROMOTION-PARAM-TYPES-1 (2): a held apply records its request, bundle included, so a hand-made bundle
             // whose connection carries a literal secret is refused before it is held - nothing is stored
-            byte[] secret = withEntry(zip, "connections/db_connection.toon",
-                    "connection:\n  id: db\n  connector: postgres\n  host: h\n  password: hunter2\n");
-            JsonNode sp = V1Body.of(post(port, "/promotion/preview", ADMIN, body(secret, Map.of())).body());
-            HttpResponse<String> refused = post(port, "/promotion/apply", ADMIN,
-                    body(secret, Map.of("previewHash", sp.get("changeSetHash").asText())));
-            assertEquals(422, refused.statusCode(), refused.body());
-            assertTrue(refused.body().contains("connections/db_connection.toon"), refused.body());
+            // (SPACE-PROMOTION-EXT-CASE-1: whatever the case of its name)
+            for (String name : List.of("connections/db_connection.toon", "connections/db_connection.TOON")) {
+                byte[] secret = withEntry(zip, name,
+                        "connection:\n  id: db\n  connector: postgres\n  host: h\n  password: hunter2\n");
+                JsonNode sp = V1Body.of(post(port, "/promotion/preview", ADMIN, body(secret, Map.of())).body());
+                HttpResponse<String> refused = post(port, "/promotion/apply", ADMIN,
+                        body(secret, Map.of("previewHash", sp.get("changeSetHash").asText())));
+                assertEquals(422, refused.statusCode(), name + ": " + refused.body());
+                assertTrue(refused.body().contains(name), refused.body());
+            }
             Path pending = writeRoot.resolve("pending-changes");
             if (Files.isDirectory(pending)) try (var files = Files.list(pending)) {
                 assertEquals(List.of(), files.toList(), "nothing was held");

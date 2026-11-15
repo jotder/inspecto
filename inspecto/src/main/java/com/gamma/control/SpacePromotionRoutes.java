@@ -251,7 +251,7 @@ final class SpacePromotionRoutes implements RouteModule {
     private static Map<String, List<Finding>> escaping(Path root, Map<String, byte[]> toWrite) {
         Map<String, List<Finding>> out = new LinkedHashMap<>();
         for (Map.Entry<String, byte[]> en : toWrite.entrySet()) {
-            if (!en.getKey().endsWith("_pipeline.toon")) continue;
+            if (!SpacePromotion.isPipelineFile(en.getKey())) continue;
             List<Finding> fs;
             try {
                 fs = ConfigSafetyValidator.check("pipeline", ConfigCodec.toMap(new String(en.getValue(), StandardCharsets.UTF_8)),
