@@ -38,8 +38,8 @@ import java.util.regex.Pattern;
  *       files (default all of them; never a conflict), {@code canAdminister}. Never automatic. Gates in order: no Space
  *       folder 503 → body 400 / 422 → a named path that is not a plain relative path 403 → no origin 409 → template gone
  *       404 → already at the template's version, {@code toVersion} not the installed one, or {@code proposalId} not the
- *       current proposal's 409 → a named file no import may write 403 → a named file that is not an update or add, or
- *       nothing to apply 409 → the import gates (kind capability 403, Decision Rule gate) → the maker-checker hold (ONE
+ *       current proposal's 409 → a named file no import may write 403 → a named file that is not an update or add 409 →
+ *       nothing applicable left: record the new version only, no file written → the import gates (kind capability 403, Decision Rule gate) → the maker-checker hold (ONE
  *       Pending Change for the set, 202) → write through the import journal (all or nothing), then rewrite the origin
  *       record.</li>
  * </ul>
@@ -196,8 +196,20 @@ final class SpaceOriginRoutes implements RouteModule {
                                 : "'" + e.change() + "' in the proposal") + " — only an update or add is applied; a conflict is resolved by hand");
                 }
             }
-            if (chosen.isEmpty())
-                throw new ApiException(409, ErrorCodes.CONFLICT, "the proposal has no update or add to apply");
+            // SPACE-UPGRADE-STUCK-VERSION-1: no update or add is left (only conflicts, kept, template-removed or refused
+            // files - e.g. the files a group left became conflicts the operator resolved by hand), so nothing is written and
+            // this apply only records the new version, as the apply that writes the last update would. Every hash is kept,
+            // so a conflict still reads against the old baseline. Only reachable without `files` (a named file must apply).
+            if (chosen.isEmpty()) {
+                // A replay of an approved upgrade always had files to write: if none is an update or add any more, the
+                // Space moved after the approval was asked for, so the change is stale and nothing - not even the
+                // version - is recorded. (The stale-version code marks the Pending Change stale.)
+                if (ApiContext.attr(ex, ApiContext.ATTR_APPROVED_CHANGE) != null)
+                    throw new ApiException(409, ErrorCodes.CONFLICT_STALE_VERSION, "the files this approved upgrade "
+                            + "writes are no longer an update or add — not applied; read the proposal again");
+                SpaceOrigin.recordUpgrade(base, now, Map.of());
+                return answer(o, now, p, Map.of(), List.of(), now);
+            }
 
             // The import gates, as a Space bundle import runs them over raw config files: a template is never a way
             // around a kind's own route (capability per kind, administer-only Jobs, attaching Job templates), every
@@ -265,18 +277,24 @@ final class SpaceOriginRoutes implements RouteModule {
                     RefusalConfigAudit.audit(target, priorPipelines.get(w.getKey()), w.getValue());
                     PipelineHistory.record(config, target);   // PIPELINE-CONFIG-HISTORY-1
                 }
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("template", o.template());
-            out.put("fromVersion", o.templateVersion());
-            out.put("toVersion", now);
-            out.put("applied", new ArrayList<>(written.keySet()));
-            out.put("recordedVersion", recordedVersion);
-            out.put("remaining", remaining);
-            List<Map<String, Object>> left = new ArrayList<>();
-            for (SpaceTemplateUpgrade.Entry e : p.files())
-                if (!written.containsKey(e.path())) left.add(Map.of("path", e.path(), "change", e.change()));
-            out.put("notApplied", left);
-            return out;
+            return answer(o, now, p, written, remaining, recordedVersion);
         }
+    }
+
+    /** The apply's answer: {@code notApplied} is every proposal entry not in {@code written}. */
+    private static Map<String, Object> answer(SpaceOrigin.Origin o, String now, SpaceTemplateUpgrade.Proposal p,
+                                              Map<String, String> written, List<String> remaining, String recordedVersion) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("template", o.template());
+        out.put("fromVersion", o.templateVersion());
+        out.put("toVersion", now);
+        out.put("applied", new ArrayList<>(written.keySet()));
+        out.put("recordedVersion", recordedVersion);
+        out.put("remaining", remaining);
+        List<Map<String, Object>> left = new ArrayList<>();
+        for (SpaceTemplateUpgrade.Entry e : p.files())
+            if (!written.containsKey(e.path())) left.add(Map.of("path", e.path(), "change", e.change()));
+        out.put("notApplied", left);
+        return out;
     }
 }

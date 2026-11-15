@@ -36,7 +36,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | — | P2 | feature | SPACE-LINK-CENSUS-1 one declared census of the links between a Space's config files | — |
 | — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
-| `SPACE-UPGRADE-STUCK-VERSION-1` | P3 | defect | a Space Template upgrade whose last remaining files are conflicts never records the new version | — |
 | `SPACE-PROMOTION-PARAM-TYPES-1` | P3 | defect | a promotion parameter value can change the type of the value it fills | — |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
 | `SPACE-ROOTED-DATA-ROOT-MIGRATION-1` | P3 | feature | an install whose data_root is rooted (or absent, i.e. -Dspaces.data.root) is still not relocatable, and there is no route that migrates it. | demand |

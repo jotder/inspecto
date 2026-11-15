@@ -371,6 +371,26 @@ class ControlApiSpaceOriginUpgradeTest {
         }
     }
 
+    /** SPACE-UPGRADE-STUCK-VERSION-1: an approved upgrade whose files all became conflicts records nothing on replay. */
+    @Test
+    void anApprovedUpgradeWhoseFilesBecameConflictsIsStaleAndRecordsNoVersion(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            Path config = c.shop().resolve("config");
+            Files.writeString(config.resolve("approval.toon"), "approval:\n  widget:\n    required: true\n");
+            bump(c);
+            String id = V1Body.of(apply(c, "admin", "{\"toVersion\":\"2\"}").body()).at("/pendingChange/id").asText();
+            // the Space edits the one file the held set writes, so the replay finds no update or add left
+            Files.writeString(config.resolve(REVENUE), Files.readString(config.resolve(REVENUE)) + "subtitle: edited meanwhile\n");
+            String revenue = Files.readString(config.resolve(REVENUE));
+            HttpResponse<String> r = send(c, "POST", "/spaces/shop/pending-changes/" + id + "/approve", "checker", "{}");
+            assertEquals(409, r.statusCode(), r.body());
+            JsonNode pc = V1Body.of(send(c, "GET", "/spaces/shop/pending-changes/" + id, "checker", null).body());
+            assertEquals("stale", pc.get("status").asText(), pc.toString());
+            assertEquals(revenue, Files.readString(config.resolve(REVENUE)), "nothing applied");
+            assertEquals("unversioned", SpaceOrigin.read(c.shop()).orElseThrow().templateVersion(), "no version recorded");
+        }
+    }
+
     @Test
     void filesAppliedInGroupsStayProposedUntilTheLastGroupRecordsTheVersion(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
@@ -404,6 +424,47 @@ class ControlApiSpaceOriginUpgradeTest {
             assertEquals("same-version", V1Body.of(read(c, "shop").body()).get("status").asText());
             for (String f : new String[] {KPI, REVENUE})
                 assertArrayEquals(Files.readAllBytes(c.template().resolve("config").resolve(f)), Files.readAllBytes(config.resolve(f)), f);
+        }
+    }
+
+    /**
+     * SPACE-UPGRADE-STUCK-VERSION-1: the file a group left becomes a conflict (the Space edits it between groups) and the
+     * operator resolves it by hand. With no update or add left, an apply writes nothing and records the new version; a
+     * stale or unknown proposal is still refused first.
+     */
+    @Test
+    void anApplyWithOnlyConflictsLeftRecordsTheVersionAndWritesNothing(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            Path config = c.shop().resolve("config");
+            Files.copy(c.template().resolve("config").resolve(KPI), config.resolve(KPI),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);   // undo the Space's edit: both widgets are updates
+            bump(c);
+            assertEquals(200, apply(c, "ops", "{\"toVersion\":\"2\",\"files\":[\"" + REVENUE + "\"]}").statusCode());
+            String recordedKpi = SpaceOrigin.read(c.shop()).orElseThrow().hashes().get(KPI);
+            Files.writeString(config.resolve(KPI), Files.readString(config.resolve(KPI)) + "title: Resolved by hand\n");
+            String resolved = Files.readString(config.resolve(KPI));
+
+            JsonNode p = V1Body.of(read(c, "shop").body());
+            assertEquals("proposal", p.get("status").asText(), p.toString());
+            assertEquals("conflict", entry(p, KPI).get("change").asText(), p.toString());
+            assertEquals(0, p.get("applicable").size(), p.toString());
+            assertEquals(409, apply(c, "ops", "{\"toVersion\":\"2\",\"proposalId\":\"not-the-proposal\"}").statusCode(),
+                    "an unknown proposal is still refused");
+            assertEquals(409, apply(c, "ops", "{\"toVersion\":\"2\",\"files\":[\"" + KPI + "\"]}").statusCode(), "a conflict is never applied");
+            assertEquals("unversioned", SpaceOrigin.read(c.shop()).orElseThrow().templateVersion(), "no refusal recorded the version");
+
+            HttpResponse<String> ok = apply(c, "ops", "{\"toVersion\":\"2\",\"proposalId\":\"" + p.get("proposalId").asText() + "\"}");
+            assertEquals(200, ok.statusCode(), ok.body());
+            JsonNode done = V1Body.of(ok.body());
+            assertEquals(0, done.get("applied").size(), done.toString());
+            assertEquals("2", done.get("recordedVersion").asText(), done.toString());
+            assertEquals(0, done.get("remaining").size());
+            assertTrue(done.get("notApplied").toString().contains(KPI), done.toString());
+            assertEquals(resolved, Files.readString(config.resolve(KPI)), "the operator's resolution is never overwritten");
+            SpaceOrigin.Origin after = SpaceOrigin.read(c.shop()).orElseThrow();
+            assertEquals("2", after.templateVersion());
+            assertEquals(recordedKpi, after.hashes().get(KPI), "the conflict keeps its old recorded hash");
+            assertEquals("same-version", V1Body.of(read(c, "shop").body()).get("status").asText());
         }
     }
 

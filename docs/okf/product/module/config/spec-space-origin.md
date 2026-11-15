@@ -122,7 +122,9 @@ apply takes without `files`. `proposalId` is a SHA-256 over every entry and both
 4. no origin recorded 409 (adopt first); the template no longer installed 404;
 5. already at the template's version 409; `toVersion` not the installed version, or `proposalId` not the current
    proposal's, 409 `CONFLICT_STALE_VERSION` (the template or the Space moved since the caller read it);
-6. a named file no import may write 403; a named file that is not an `update` or `add`, or nothing to apply, 409;
+6. a named file no import may write 403; a named file that is not an `update` or `add` 409. With no `files` and nothing
+   applicable left (only conflicts, `kept`, `template-removed` or refused files), the apply writes no file, skips 7 and 8,
+   and only records the new version (step 9's record rewrite, every hash kept) — §5.4;
 7. the gates a Space bundle import runs over raw config files: a kind whose own route needs more
    (`ImportCapabilityGuard`: a Connection needs `canOnboardConnections`, …) 403, every Decision Rule through
    `DecisionRuleGuard`, every Job server-stamped (`JobAuthority`);
@@ -157,9 +159,18 @@ Deliberately not done: a registry component written by the upgrade gets no MET-5
 writes raw files, as a Space bundle import does); nothing is deleted; a Pipeline the upgrade writes takes effect as after
 any config write. Rollback: none needed for the record (ignore it); a written file is restored from its history or by hand.
 
-Known gap, open on the board as `SPACE-UPGRADE-STUCK-VERSION-1`: when every file still left is a conflict, and the operator
-resolves it by hand, no apply can record the new version (409 "nothing to apply"); the next template version re-reads
-every file.
+**Nothing applicable left** (`SPACE-UPGRADE-STUCK-VERSION-1`, 2026-11-15): when the files a group left become conflicts
+(the Space edited them between groups) and the operator resolves them by hand, or a proposal holds only conflicts, an
+apply without `files` writes nothing and records the new version (answer: `applied` and `remaining` empty, the conflicts
+under `notApplied`). Until 2026-11-15 it answered 409 "the proposal has no update or add to apply", so `GET` kept
+proposing and the record stayed at the old version for good. Decision: record the version from that apply rather than
+close the proposal on `GET` — a read never writes, and the operator's explicit apply is the acknowledgement. Every gate
+before it still holds: a stale `toVersion` or `proposalId` 409, a named conflict 409. Every hash is kept, so a file the
+operator resolved by hand reads as a conflict again at the next template version, even one that leaves that file
+unchanged: the safe side, since the Space's file still differs from the baseline it was made from. No Pending Change: no
+config file is written, only the origin record. A replay of an approved upgrade never takes this path: the files it was
+approved to write are no longer an update or add, so it answers 409 with the stale-version code, the Pending Change
+turns `stale` and no version is recorded.
 
 ## 6. Tests
 
@@ -167,4 +178,5 @@ every file.
 template sections) and `ControlApiSpaceOriginTest` (real HTTP, armed: 401, 403 for each route, every adopt gate, the
 read). SE-5b: `SpaceTemplateUpgradeTest` (each classification, the stamped Job left out, the proposal id moving with the
 Space) and `ControlApiSpaceOriginUpgradeTest` (real HTTP, armed: the plan's proof on `orders-starter`, 401, 403 per route,
-every apply gate, the capability gate, 202 + approval applying the set, a stale approval). `ImportLoaderInventoryTest.ALLOWED` names `created-from.toon` (outside `config/`, where an import writes).
+every apply gate, the capability gate, 202 + approval applying the set, a stale approval, groups, and an apply with only a
+conflict left recording the version without writing). `ImportLoaderInventoryTest.ALLOWED` names `created-from.toon` (outside `config/`, where an import writes).
