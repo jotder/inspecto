@@ -18,10 +18,12 @@ active space reloads the app.
   edit including logo (≤200 KB upload) / caption / footer, persisted via `GET|PUT /settings/branding`
   (per-space doc; empty → shipped default). The signal-backed `BrandingService`
   (`inspecto/api/branding.service.ts`) reloads on active-space change so the layout header stays live.
-* **Branding and the default timezone need `canAuthorWorkbench`** (every `PUT /settings/*` is gated on it, while creating,
-  renaming or removing a Space is gated on `canAdminister`). The dialog offers those fields only when `LensService.canSaveSpaceSettings`
-  holds — the server's own question, identity not lens: a seeded `admin`, who lacks it, sees a one-line note instead
-  and its create or edit sends no settings. Every setting is its own step after the Space: a refused one is named
+* **With sign-in, branding and the default timezone need `canAuthorWorkbench`** (their `PUT /spaces/{id}/settings/…` routes
+  are gated on it, as is the Link Analysis kind of data; creating, renaming or removing a Space is gated on
+  `canAdminister`; without sign-in no gate applies). The dialog offers those fields only when `LensService.canSaveSpaceSettings`
+  holds — identity, not lens, and asked of the current Space (the server asks of the target Space; a difference shows
+  as the named warning below): a seeded `admin`, who lacks it, sees a one-line note instead and sends no branding or
+  timezone. The Link Analysis create's kind of data is still offered. Every setting is its own step after the Space: a refused one is named
   (`Space "x" was created, but its branding was not saved: …`) and the dialog still closes on the saved Space —
   never an open dialog over a Space that exists (`SPACE-CREATE-PARTIAL-1`, 2026-11-15;
   `space-form.dialog.spec.ts`).

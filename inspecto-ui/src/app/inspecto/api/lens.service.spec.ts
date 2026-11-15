@@ -115,6 +115,17 @@ describe('LensService', () => {
         expect(service.canSaveSpaceSettings()).toBe(true);
     });
 
+    // Without sign-in the server attaches no Subject and the gate is a no-op: branding stays offered in every lens.
+    it('canSaveSpaceSettings always holds without sign-in, even in the business lens', () => {
+        const session = TestBed.inject(SessionService);
+        const service = TestBed.inject(LensService);
+        session.authMode.set('none');
+        session.capabilities.set([]);
+        service.selectLens('business');
+
+        expect(service.canSaveSpaceSettings()).toBe(true);
+    });
+
     // D1 (findings-spec authoring, 2026-09-25): the Case desk's grant. Identity, because the admin seed holds
     // it and qualifies for no non-Business lens — lens-scoping would hide the editor from a subject who may save.
     it('canManageIncidents is granted only to a subject holding it, and survives the business lens', () => {
