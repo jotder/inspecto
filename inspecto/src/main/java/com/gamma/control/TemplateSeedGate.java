@@ -146,11 +146,13 @@ final class TemplateSeedGate {
         }
     }
 
-    /** Each {@code *_connection.toon} meets what a Connection save runs ({@link ConnectionRoutes#validateProfile}). */
+    /** Each {@code *_connection.toon} meets what a Connection save runs ({@link ConnectionRoutes#validateProfile}); the
+     *  name is read as the import reads it ({@link ImportCapabilityGuard#normalizedPath}), so {@code x_connection.TOON}
+     *  is judged too (IMPORT-CONNECTION-CASE-1). */
     private static void requireConnections(Path config) {
         for (Path file : configFiles(config)) {
             String name = file.getFileName().toString();
-            if (!name.endsWith("_connection.toon")) continue;
+            if (!ImportCapabilityGuard.normalizedPath(name).endsWith("_connection.toon")) continue;
             try {
                 Object block = com.gamma.util.ToonHelper.load(file.toString()).get("connection");
                 @SuppressWarnings("unchecked")

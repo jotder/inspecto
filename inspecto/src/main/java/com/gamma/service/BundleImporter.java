@@ -129,6 +129,8 @@ public final class BundleImporter {
     public static MissingConnections disableForMissingConnections(Bundle bundle, Set<String> registered) {
         Set<String> known = new HashSet<>(registered);
         for (Map.Entry<String, byte[]> e : bundle.configEntries().entrySet()) {
+            // as spelled, as the loader reads it: an x_connection.TOON never goes live, so it supplies no connection
+            // (IMPORT-CONNECTION-CASE-1)
             if (!e.getKey().endsWith("_connection.toon")) continue;
             Map<String, Object> doc = parseOrNull(e.getValue());
             Object id = doc == null ? null

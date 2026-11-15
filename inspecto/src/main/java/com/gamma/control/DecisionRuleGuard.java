@@ -195,6 +195,8 @@ public final class DecisionRuleGuard {
     static Map<String, String> carriedConnections(Map<String, byte[]> configEntries) {
         Map<String, String> carried = new LinkedHashMap<>();
         for (Map.Entry<String, byte[]> e : configEntries.entrySet()) {
+            // as spelled, as the loader reads it: an x_connection.TOON never goes live, so a rule may not name it
+            // (IMPORT-CONNECTION-CASE-1)
             if (!e.getKey().endsWith("_connection.toon")) continue;
             try {
                 if (ConfigCodec.toMap(new String(e.getValue(), StandardCharsets.UTF_8)).get("connection") instanceof Map<?, ?> c
