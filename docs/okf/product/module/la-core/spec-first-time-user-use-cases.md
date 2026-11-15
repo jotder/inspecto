@@ -216,8 +216,13 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
 - **As built: done, except row filtering.** The button is **Add data**, the screen **Onboard a file** (route
   `/add-data`; API `POST /onboard/files`; every edition). Step 1 asks *Events between entities* or *Details about entities*, then **Choose a
   file**; *Read from a database or a remote system* is locked on Basic. Step 2 marks a low-confidence choice **A
-  guess** with **Confirm**; columns can be renamed, retyped or **Leave out**. Step 4 is **Create and run**. The result
-  offers **Explore in Link Analysis**, **Add details about these entities** and **Add another file**. With sign-in
+  guess** with **Confirm**, and a step with several guesses offers **Confirm all N guesses**; columns can be renamed,
+  retyped or **Leave out**. A column that is almost all dates or numbers is proposed as that at low confidence with
+  the odd value named, and a Type or Role picked on screen is answered again by the server, so the role and the
+  link's When and Weighed by follow in one edit (`LA-FULL-CYCLE-TEST-1` phase 3, 2026-11-15; contract in
+  `module/processor/api-onboarding-authoring.md`). Step 4 is **Create and run**. The result names every value left
+  blank, every row that draws no link and every second spelling of an entity, and offers **Explore in Link
+  Analysis** (after details about entities too), **Add details about these entities** and **Add another file**. With sign-in
   the per-Space switch is **Settings → Add data** (off by default). Not built: no-code row filtering
   (`LA-ONBOARD-RESIDUALS-1` item 6). An Add data import is shared with its Space (`LA-ONBOARD-DEFECTS-1`).
 

@@ -34,8 +34,15 @@ final class EntityShapes {
 
     private EntityShapes() {}
 
-    /** One sampled column: its name, its proposed type and its non-blank sampled values. */
-    record Column(String name, String type, List<String> values) {}
+    /**
+     * One sampled column: its name, its proposed type, its non-blank sampled values, and how many of them read as that
+     * type ({@code fits}: fewer than all when the type is an "almost all" guess or the person's own choice).
+     */
+    record Column(String name, String type, List<String> values, int fits) {
+        Column(String name, String type, List<String> values) {
+            this(name, type, values, values.size());
+        }
+    }
 
     private static final Pattern ID_LIKE = Pattern.compile("\\S{1,128}");
     private static final Pattern TOKEN_SPLIT = Pattern.compile("[^a-z0-9]+");
@@ -61,13 +68,31 @@ final class EntityShapes {
     private static final Set<String> AMOUNT_WORDS = Set.of("amount", "amt", "value", "sum", "total", "price", "duration", "cost",
             "volume", "fee", "qty", "quantity", "seconds", "bytes");
 
+    /** The roles a person may state for a column that holds no Entity Type, with the names the screen gives them. */
+    static final Map<String, String> STATED_ROLES = Map.of("temporal", "Time", "measure", "Measure", "dimension", "Category", "detail", "Detail");
+
     /** The full {@code entityTypes} block of a draft. */
     static Map<String, Object> propose(List<Column> columns, List<EntityTypes.EntityType> types, String kind) {
+        return propose(columns, types, kind, Map.of());
+    }
+
+    /**
+     * {@link #propose(List, List, String)} with the roles the person stated on screen ({@code stated}: column → one of
+     * {@link #STATED_ROLES}; {@code LA-FULL-CYCLE-TEST-1} finding 4). A stated role is taken as given, and the link's
+     * kind, time and measure are chosen among the columns that may still hold them: a column stated as a Detail is no
+     * longer the link's kind, one stated as a Measure can be what the link is weighed by.
+     */
+    static Map<String, Object> propose(List<Column> columns, List<EntityTypes.EntityType> types, String kind, Map<String, String> stated) {
         Map<String, Map<String, Object>> perColumn = new LinkedHashMap<>();
         Map<String, String> typeOf = new LinkedHashMap<>();           // column -> Entity Type id (proposed)
         Map<String, Boolean> highOf = new LinkedHashMap<>();
+        Map<String, String> labels = new LinkedHashMap<>();           // Entity Type id -> the label a person reads
+        for (EntityTypes.EntityType t : types) labels.put(t.id(), label(t));
         for (Column c : columns) {
-            Map<String, Object> p = columnProposal(c, types);
+            // a role is stated for a column that holds no Entity Type (an Entity is stated by its Entity Type)
+            Map<String, Object> p = stated.containsKey(c.name())
+                    ? OnboardDraft.choice(null, "you chose " + STATED_ROLES.get(stated.get(c.name())) + " for " + c.name(), true)
+                    : columnProposal(c, types);
             perColumn.put(c.name(), p);
             if (p.get("value") != null) {
                 typeOf.put(c.name(), String.valueOf(p.get("value")));
@@ -75,16 +100,18 @@ final class EntityShapes {
             }
         }
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("primary", primary(typeOf, highOf));
+        out.put("primary", primary(typeOf, highOf, labels));
         Map<String, Object> link = null;
-        if ("reference".equals(kind)) out.put("identifying", identifying(columns, typeOf, highOf));
-        else out.put("link", link = link(columns, typeOf, highOf));
+        if ("reference".equals(kind)) out.put("identifying", identifying(columns, typeOf, highOf, labels));
+        else out.put("link", link = link(columns, typeOf, highOf, labels, stated));
         List<Map<String, Object>> cols = new ArrayList<>();
         for (Column c : columns) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("column", c.name());
             row.put("entityType", perColumn.get(c.name()));
-            row.put("role", roleProposal(c, perColumn.get(c.name()), link));
+            row.put("role", stated.containsKey(c.name())
+                    ? OnboardDraft.choice(stated.get(c.name()), "you chose " + STATED_ROLES.get(stated.get(c.name())) + " for " + c.name(), true)
+                    : roleProposal(c, perColumn.get(c.name()), link));
             if (TEXT.contains(c.type())) row.put("distinct", new LinkedHashSet<>(c.values()).size());
             cols.add(row);
         }
@@ -109,23 +136,24 @@ final class EntityShapes {
         int n = c.values().size();
         String t = c.type() == null ? "VARCHAR" : c.type().toUpperCase(Locale.ROOT);
         if (entity != null && entity.get("value") != null)
-            return OnboardDraft.choice("entity", c.name() + " holds " + entity.get("value"), "high".equals(entity.get("confidence")));
+            return OnboardDraft.choice("entity", c.name() + " holds " + entity.getOrDefault("label", entity.get("value")),
+                    "high".equals(entity.get("confidence")));
         if (link != null) {
             for (var e : Map.of("kind", "dimension", "primaryTime", "temporal", "primaryMeasure", "measure").entrySet())
                 if (link.get(e.getKey()) instanceof Map<?, ?> ch && c.name().equals(ch.get("value")))
                     return OnboardDraft.choice(e.getValue(), "the link's " + ROLE_WORDS.get(e.getValue()), "high".equals(ch.get("confidence")));
         }
         if (t.equals("DATE") || t.equals("TIMESTAMP"))
-            return OnboardDraft.choice("temporal", c.name() + " holds " + t.toLowerCase(Locale.ROOT) + " values", true);
+            return OnboardDraft.choice("temporal", c.name() + " holds " + Words.plural(t), true);
         if (t.equals("DOUBLE") || (t.equals("BIGINT") && hasAny(c.name(), AMOUNT_WORDS)))
             return OnboardDraft.choice("measure", c.name() + (t.equals("DOUBLE") ? " holds decimal numbers" : " is named as an amount and holds numbers"),
                     n >= OnboardDraft.MIN_SAMPLE);
         if (TEXT.contains(t) && n > 0) {
             int distinct = new LinkedHashSet<>(c.values()).size();
             if (distinct <= CATEGORY_MAX && distinct < n)
-                return OnboardDraft.choice("dimension", c.name() + " has " + distinct + " distinct values in " + n + " sampled rows",
-                        t.equals("BOOLEAN") || (distinct <= 20 && n >= OnboardDraft.MIN_SAMPLE));
-            if (distinct == n)
+                return OnboardDraft.choice("dimension", c.name() + " has " + Words.count(distinct, "distinct value", "distinct values") + " in "
+                        + Words.count(n, "sampled row", "sampled rows"), t.equals("BOOLEAN") || (distinct <= 20 && n >= OnboardDraft.MIN_SAMPLE));
+            if (distinct == n && n > 1)
                 return OnboardDraft.choice("detail", "every one of the " + n + " sampled values of " + c.name() + " is different", true);
         }
         return OnboardDraft.choice("detail", c.name() + " is shown on the link", true);
@@ -159,8 +187,14 @@ final class EntityShapes {
      * and remembers the role proposed without it ({@code base}, with its {@code baseConfidence}) so the screen can undo it when another record type is
      * picked. {@code entityTypes} is the block {@link #propose} answered, with its {@code recordType} set.
      */
-    @SuppressWarnings("unchecked")
     static void recordTypeRoles(Map<String, Object> entityTypes, List<Column> columns, List<IndustryPack.RecordType> recordTypes) {
+        recordTypeRoles(entityTypes, columns, recordTypes, Set.of());
+    }
+
+    /** {@link #recordTypeRoles(Map, List, List)}, leaving alone the columns whose role the person stated ({@code fixed}). */
+    @SuppressWarnings("unchecked")
+    static void recordTypeRoles(Map<String, Object> entityTypes, List<Column> columns, List<IndustryPack.RecordType> recordTypes,
+                                Set<String> fixed) {
         if (!(entityTypes.get("recordType") instanceof Map<?, ?> rtChoice) || rtChoice.get("value") == null) return;
         IndustryPack.RecordType rt = recordTypes.stream().filter(r -> r.id().equals(rtChoice.get("value"))).findFirst().orElse(null);
         if (rt == null) return;
@@ -176,7 +210,7 @@ final class EntityShapes {
             Map<String, Object> row = (Map<String, Object>) raw;
             Column c = byName.get(String.valueOf(row.get("column")));
             Object current = row.get("role") instanceof Map<?, ?> r ? r.get("value") : null;
-            if (c == null || "entity".equals(current) || linkCols.contains(c.name())) continue;
+            if (c == null || "entity".equals(current) || linkCols.contains(c.name()) || fixed.contains(c.name())) continue;
             String[] hinted = hintedRole(c.name(), c.type(), rt.roleHints());
             if (hinted == null || hinted[0].equals(current)) continue;
             String label = rt.label().toLowerCase(Locale.ROOT);
@@ -194,7 +228,7 @@ final class EntityShapes {
         String t = c.type() == null ? "VARCHAR" : c.type().toUpperCase(Locale.ROOT);
         int n = c.values().size();
         if (!t.equals("VARCHAR") && !t.equals("BIGINT"))
-            return OnboardDraft.choice(null, "holds " + t.toLowerCase(Locale.ROOT) + " values, not identifiers", n >= OnboardDraft.MIN_SAMPLE);
+            return OnboardDraft.choice(null, "holds " + Words.plural(t) + ", not identifiers", n >= OnboardDraft.MIN_SAMPLE);
         if (n == 0) return OnboardDraft.choice(null, "no value in the sample", false);
 
         String hint = nameHint(c.name(), types);
@@ -205,20 +239,23 @@ final class EntityShapes {
         if (hint != null) {
             type = EntityTypes.typeNamedBy(types, hint);
             if (type == null)
-                return OnboardDraft.choice(null, "the name '" + c.name() + "' says " + hint.toLowerCase(Locale.ROOT)
-                        + ", but no Entity Type in this Space holds " + hint.toLowerCase(Locale.ROOT) + " - it stays a detail", false);
+                return OnboardDraft.choice(null, "the name '" + c.name() + "' says " + hintWords(hint)
+                        + ", but no Entity Type in this Space holds that - it stays a detail", false);
             int fit = fitting(type, c.values());
             if (fit == 0 && shape.type != null && shape.type != type && shape.count == n) {
-                why = "the name says " + hint + " but " + shape.describe(n);
+                why = "the name says " + label(type) + " but " + shape.describe(n);
                 agree = false;
             } else {
                 agree = fit == n;
-                why = "the name '" + c.name() + "' says " + hint.toLowerCase(Locale.ROOT)
-                        + (agree ? "; all " + n + " sampled values look like identifiers of it"
-                                : "; " + (n - fit) + " of " + n + " sampled values do not look like one");
+                // finding 10: the Entity Type's label, never its id or a classification code
+                why = "the name '" + c.name() + "' says " + label(type)
+                        + (agree ? "; " + (n == 1 ? "the sampled value looks like an identifier of it" : "all " + n + " sampled values look like identifiers of it")
+                                : "; " + (n - fit) + " of " + Words.count(n, "sampled value", "sampled values") + " " + Words.pick(n - fit, "does", "do")
+                                        + " not look like one");
             }
             Map<String, Object> ch = OnboardDraft.choice(type.id(), why, agree && n >= OnboardDraft.MIN_SAMPLE);
             ch.put("classification", firstClassification(type, hint));
+            ch.put("label", label(type));
             return ch;
         }
         if (shape.type == null)
@@ -229,7 +266,24 @@ final class EntityShapes {
         why = shape.describe(n) + (shape.strong ? "" : " (digits alone could also be account numbers)");
         Map<String, Object> ch = OnboardDraft.choice(type.id(), why, shape.strong && n >= OnboardDraft.MIN_SAMPLE);
         ch.put("classification", type.classifications().isEmpty() ? type.id().toUpperCase(Locale.ROOT) : type.classifications().get(0));
+        ch.put("label", label(type));
         return ch;
+    }
+
+    /** The name a person reads for an Entity Type: its label, else its id. */
+    static String label(EntityTypes.EntityType type) {
+        return type.label() == null || type.label().isBlank() ? type.id() : type.label();
+    }
+
+    /** A classification a column's name hints at, in words: the label of the product's own type for it, else the word. */
+    private static String hintWords(String hint) {
+        EntityTypes.EntityType known = EntityTypes.typeNamedBy(EntityTypes.DEFAULTS, hint);
+        return known == null ? hint.toLowerCase(Locale.ROOT) : label(known);
+    }
+
+    /** Whether a column's name says it is an amount ({@code amount}, {@code total}, {@code fee}, …). */
+    static boolean namedAsAmount(String column) {
+        return hasAny(column, AMOUNT_WORDS);
     }
 
     /** The classification to write for {@code type}: the detected one when the type claims it, else the type's first. */
@@ -317,11 +371,14 @@ final class EntityShapes {
     @SuppressWarnings("unchecked")
     static Map<String, Object> recordType(Map<String, Object> entityTypes, List<IndustryPack.RecordType> recordTypes) {
         Set<String> held = new LinkedHashSet<>();
+        Map<String, String> labels = new LinkedHashMap<>();
         for (Object o : (List<Object>) entityTypes.getOrDefault("columns", List.of()))
             // only a sure proposal is evidence: a low guess (a number column that merely fits a digits shape) would steer it
             if (o instanceof Map<?, ?> row && row.get("entityType") instanceof Map<?, ?> ch && ch.get("value") != null
-                    && "high".equals(ch.get("confidence")))
+                    && "high".equals(ch.get("confidence"))) {
                 held.add(String.valueOf(ch.get("value")));
+                if (ch.get("label") != null) labels.put(String.valueOf(ch.get("value")), String.valueOf(ch.get("label")));
+            }
         IndustryPack.RecordType best = null;
         List<String> bestHeld = List.of();
         boolean tie = false;
@@ -339,14 +396,15 @@ final class EntityShapes {
         }
         if (best == null)
             return OnboardDraft.choice(null, "no column holds an Entity Type a record type of this Space usually holds", false);
-        String why = (bestHeld.size() == 1 ? "a column holds " : "the columns hold ") + String.join(", ", bestHeld)
+        String why = (bestHeld.size() == 1 ? "a column holds " : "the columns hold ")
+                + String.join(", ", bestHeld.stream().map(id -> labels.getOrDefault(id, id)).toList())
                 + ", which a " + best.label().toLowerCase(Locale.ROOT) + " usually holds" + (tie ? " - a tie, the first is proposed" : "");
         return OnboardDraft.choice(best.id(), why, bestHeld.size() >= 2 && !tie);
     }
 
     // ── the Dataset level ────────────────────────────────────────────────────────────────────────────────────
 
-    private static Map<String, Object> primary(Map<String, String> typeOf, Map<String, Boolean> highOf) {
+    private static Map<String, Object> primary(Map<String, String> typeOf, Map<String, Boolean> highOf, Map<String, String> labels) {
         if (typeOf.isEmpty()) return OnboardDraft.choice(null, "no column holds an Entity Type", false);
         Map<String, List<String>> byType = new LinkedHashMap<>();
         for (var e : typeOf.entrySet()) byType.computeIfAbsent(e.getValue(), k -> new ArrayList<>()).add(e.getKey());
@@ -363,7 +421,8 @@ final class EntityShapes {
         StringBuilder why = new StringBuilder();
         for (var e : byType.entrySet()) {
             if (!why.isEmpty()) why.append("; ");
-            why.append(e.getValue().size()).append(e.getValue().size() == 1 ? " column holds " : " columns hold ").append(e.getKey())
+            why.append(e.getValue().size()).append(e.getValue().size() == 1 ? " column holds " : " columns hold ")
+                    .append(labels.getOrDefault(e.getKey(), e.getKey()))
                     .append(" (").append(String.join(", ", e.getValue())).append(")");
         }
         boolean allHigh = byType.get(best).stream().allMatch(c -> highOf.getOrDefault(c, false));
@@ -371,7 +430,8 @@ final class EntityShapes {
         return OnboardDraft.choice(best, why.toString(), !tie && allHigh);
     }
 
-    private static Map<String, Object> identifying(List<Column> columns, Map<String, String> typeOf, Map<String, Boolean> highOf) {
+    private static Map<String, Object> identifying(List<Column> columns, Map<String, String> typeOf, Map<String, Boolean> highOf,
+                                                   Map<String, String> labels) {
         Column best = null;
         for (Column c : columns) {
             if (!typeOf.containsKey(c.name())) continue;
@@ -383,20 +443,23 @@ final class EntityShapes {
         if (best == null) {
             for (Column c : columns)
                 if (typeOf.containsKey(c.name()))
-                    return OnboardDraft.choice(c.name(), c.name() + " holds " + typeOf.get(c.name())
+                    return OnboardDraft.choice(c.name(), c.name() + " holds " + labels.getOrDefault(typeOf.get(c.name()), typeOf.get(c.name()))
                             + " but repeats values in the sample, so it may not identify one entity per row", false);
             return OnboardDraft.choice(null, "no column holds an Entity Type with one value per row", false);
         }
         boolean high = highOf.getOrDefault(best.name(), false) && best.values().size() >= OnboardDraft.MIN_SAMPLE;
-        Map<String, Object> ch = OnboardDraft.choice(best.name(), best.name() + " holds " + typeOf.get(best.name()) + " and every one of its "
-                + best.values().size() + " sampled values is different", high);
+        String held = labels.getOrDefault(typeOf.get(best.name()), typeOf.get(best.name()));
+        Map<String, Object> ch = OnboardDraft.choice(best.name(), best.name() + " holds " + held + (best.values().size() == 1
+                ? "; the sample has one value" : " and every one of its " + best.values().size() + " sampled values is different"), high);
         ch.put("entityType", typeOf.get(best.name()));
         return ch;
     }
 
-    private static Map<String, Object> link(List<Column> columns, Map<String, String> typeOf, Map<String, Boolean> highOf) {
+    private static Map<String, Object> link(List<Column> columns, Map<String, String> typeOf, Map<String, Boolean> highOf,
+                                            Map<String, String> labels, Map<String, String> stated) {
         Map<String, Object> out = new LinkedHashMap<>();
         List<String> entityCols = new ArrayList<>(typeOf.keySet());
+        java.util.function.Function<String, String> held = col -> labels.getOrDefault(typeOf.get(col), typeOf.get(col));
         String from = null, to = null, why = null;
         boolean high = false;
         // 1. two columns of one Entity Type whose names say direction
@@ -407,7 +470,7 @@ final class EntityShapes {
                 if (hasAny(a, FROM_WORDS) && hasAny(b, TO_WORDS)) {
                     from = a;
                     to = b;
-                    why = a + " and " + b + " both hold " + typeOf.get(a) + "; the names say " + a + " → " + b;
+                    why = a + " and " + b + " both hold " + held.apply(a) + "; the names say " + a + " → " + b;
                     high = highOf.getOrDefault(a, false) && highOf.getOrDefault(b, false);
                     break outer;
                 }
@@ -420,14 +483,14 @@ final class EntityShapes {
                     if (typeOf.get(entityCols.get(i)).equals(typeOf.get(entityCols.get(j)))) {
                         from = entityCols.get(i);
                         to = entityCols.get(j);
-                        why = from + " and " + to + " both hold " + typeOf.get(from) + "; the names do not say which way, so column order";
+                        why = from + " and " + to + " both hold " + held.apply(from) + "; the names do not say which way, so column order";
                         break outer2;
                     }
         // 3. two columns of different Entity Types (which device a number used)
         if (from == null && entityCols.size() >= 2) {
             from = entityCols.get(0);
             to = entityCols.get(1);
-            why = from + " holds " + typeOf.get(from) + " and " + to + " holds " + typeOf.get(to) + "; a link between two kinds of thing";
+            why = from + " holds " + held.apply(from) + " and " + to + " holds " + held.apply(to) + "; a link between two kinds of thing";
         }
         if (from == null) {
             out.put("from", OnboardDraft.choice(null, "fewer than two columns hold an Entity Type, so no link is proposed", false));
@@ -441,9 +504,9 @@ final class EntityShapes {
             used.add(from);
             used.add(to);
         }
-        out.put("kind", pick(columns, used, typeOf, KIND_WORDS, Set.of("VARCHAR"), "kind"));
-        out.put("primaryTime", pickTime(columns, used));
-        out.put("primaryMeasure", pick(columns, used, typeOf, AMOUNT_WORDS, Set.of("DOUBLE", "BIGINT"), "amount"));
+        out.put("kind", pick(columns, used, typeOf, KIND_WORDS, Set.of("VARCHAR"), "kind", stated));
+        out.put("primaryTime", pickTime(columns, used, stated));
+        out.put("primaryMeasure", pick(columns, used, typeOf, AMOUNT_WORDS, Set.of("DOUBLE", "BIGINT"), "amount", stated));
         List<String> details = new ArrayList<>();
         for (Column c : columns) if (!used.contains(c.name())) details.add(c.name());
         out.put("details", OnboardDraft.choice(details, details.isEmpty() ? "every column has a role" : "every other column is shown on the link",
@@ -451,29 +514,44 @@ final class EntityShapes {
         return out;
     }
 
+    /**
+     * The link's kind (a text column named as one) or its measure (a number column named as an amount, or one the person
+     * stated as a Measure). A column the person gave another role is never picked.
+     */
     private static Map<String, Object> pick(List<Column> columns, Set<String> used, Map<String, String> typeOf, Set<String> words,
-                                            Set<String> types, String role) {
+                                            Set<String> types, String role, Map<String, String> stated) {
+        String wanted = "kind".equals(role) ? "dimension" : "measure";
         for (Column c : columns) {
-            if (used.contains(c.name()) || typeOf.containsKey(c.name()) || !types.contains(c.type()) || !hasAny(c.name(), words)) continue;
+            String said = stated.get(c.name());
+            boolean chosen = "measure".equals(wanted) && wanted.equals(said);
+            if (used.contains(c.name()) || typeOf.containsKey(c.name()) || !types.contains(c.type()) || (said != null && !wanted.equals(said))
+                    || !(chosen || hasAny(c.name(), words))) continue;
             int n = c.values().size();
             if ("kind".equals(role)) {
                 int distinct = new LinkedHashSet<>(c.values()).size();
                 if (distinct > 50) continue;
                 used.add(c.name());
-                return OnboardDraft.choice(c.name(), "the name '" + c.name() + "' says a kind, and it has " + distinct + " distinct values in "
-                        + n + " sampled rows", distinct <= 20 && n >= OnboardDraft.MIN_SAMPLE);
+                return OnboardDraft.choice(c.name(), "the name '" + c.name() + "' says a kind, and it has "
+                        + Words.count(distinct, "distinct value", "distinct values") + " in " + Words.count(n, "sampled row", "sampled rows"),
+                        distinct <= 20 && n >= OnboardDraft.MIN_SAMPLE);
             }
             used.add(c.name());
-            return OnboardDraft.choice(c.name(), "the name '" + c.name() + "' says an amount and all " + n + " sampled values are numbers",
-                    n >= OnboardDraft.MIN_SAMPLE);
+            // never "all" when a value is not a number: the count that fit the type is said (finding 3). The confidence
+            // does not drop for it: whether the column IS a number is the type's own guess, with its own confirm, and
+            // asking twice for one doubt is a click that decides nothing (finding 6)
+            String numbers = c.fits() < n ? c.fits() + " of " + n + " sampled values are numbers"
+                    : n == 1 ? "the sampled value is a number" : "all " + n + " sampled values are numbers";
+            return OnboardDraft.choice(c.name(), (chosen ? "you chose Measure for " + c.name() : "the name '" + c.name() + "' says an amount")
+                    + " and " + numbers, chosen || n >= OnboardDraft.MIN_SAMPLE);
         }
         return OnboardDraft.choice(null, "no column's name and values say " + ("kind".equals(role) ? "a kind of link" : "an amount"), false);
     }
 
-    private static Map<String, Object> pickTime(List<Column> columns, Set<String> used) {
+    private static Map<String, Object> pickTime(List<Column> columns, Set<String> used, Map<String, String> stated) {
         List<Column> candidates = new ArrayList<>();
         for (Column c : columns)
-            if (!used.contains(c.name()) && ("TIMESTAMP".equals(c.type()) || "DATE".equals(c.type()))) candidates.add(c);
+            if (!used.contains(c.name()) && ("TIMESTAMP".equals(c.type()) || "DATE".equals(c.type()))
+                    && (stated.get(c.name()) == null || "temporal".equals(stated.get(c.name())))) candidates.add(c);
         if (candidates.isEmpty()) return OnboardDraft.choice(null, "no column holds dates or times", false);
         Column best = candidates.stream().filter(c -> "TIMESTAMP".equals(c.type())).findFirst().orElse(candidates.get(0));
         for (Column c : candidates) if (c.type().equals(best.type()) && hasAny(c.name(), TIME_WORDS)) {
@@ -482,7 +560,7 @@ final class EntityShapes {
         }
         used.add(best.name());
         boolean high = candidates.size() == 1 && best.values().size() >= OnboardDraft.MIN_SAMPLE;
-        return OnboardDraft.choice(best.name(), best.name() + " holds " + best.type().toLowerCase(Locale.ROOT) + " values"
+        return OnboardDraft.choice(best.name(), best.name() + " holds " + Words.plural(best.type())
                 + (candidates.size() == 1 ? ", the only date or time column" : "; " + candidates.size() + " columns hold dates or times"), high);
     }
 

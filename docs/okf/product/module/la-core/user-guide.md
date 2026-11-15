@@ -70,10 +70,11 @@ that would otherwise hide everything.
    **Create a Space**: name it after the data (*Mobile money*) and choose what kind of data it is.
 2. **Add data.** You land on **Onboard a file**. Choose *Events between entities* and drop `transfers.csv`. The
    screen applies what it detected and says why; a choice that was only a guess is marked **A guess** — press
-   **Confirm** or change it.
+   **Confirm**, or **Confirm all** for every guess of the step, or change it.
 3. **Say what the columns hold.** `from_account` and `to_account` hold an **Account**; a link goes **From**
    `from_account` **To** `to_account`; pick the time and amount columns if the screen did not. Press **Create and
-   run**. The result says how many transfers between how many accounts were kept, and anything set aside.
+   run**. The result says how many rows were read and kept, any value left blank or row that draws no link, and how
+   many links between how many accounts the graph has.
 4. **Add details (optional).** **Add details about these entities** brings in `accounts.csv`; say which column
    identifies each account (`account_id`). Names and segments then show on the graph.
 5. **Start from one account.** **Explore in Link Analysis** opens **Start a graph** with your Dataset picked. Keep
@@ -168,15 +169,24 @@ is sent anywhere. Administrators see it, read-only, in **Settings → Getting st
    (every edition; see *Data* below). *Read from another database or a remote system* is locked on Basic, with the
    reason.
 2. **Check the columns.** What was detected is applied, with the reason beside it. A guess is highlighted and marked
-   **A guess**: **Confirm** it or change it. Rename a column, change its type or **Leave out** a column; a table shows
-   the first rows as they will be kept.
+   **A guess**: **Confirm** it or change it. When a step holds several guesses, **Confirm all N guesses** at its top
+   confirms them together, after you have read their reasons. Rename a column, change its type or **Leave out** a
+   column; a table shows the first rows as they will be kept.
 
 ![Step 2 of Onboard a file: the detected separator, header line and column types](../../assets/la-guide-03-check-columns.png)
 *Check the columns: each detected choice gives its reason; a guess is highlighted with **Confirm**.*
 
-   A column with even one value that does not fit (a broken date, a letter in an amount) is read as *Text*. Change its
-   **Type** yourself (*Date and time*, *Decimal number*), then set its **Role** in step 3 (*Time*, *Measure*) so that
-   **When** and **Weighed by** can offer it.
+   A column that is *almost all* dates, dates with a time or numbers — at least nine values in ten, and at least ten
+   of them — is proposed as that type, marked **A guess**, and its reason names a value that does not fit (*460 of 461
+   sampled values are dates with a time, but 1 is not (e.g. 'not-a-date'); it will be left blank*). The import leaves
+   such a value blank, keeps its row and counts it in the result. A whole-number column is proposed this way only
+   when its name says an amount (`amount`, `total`, `fee`…); digits with a few letters among them are more often
+   identifiers, so any other such column stays *Text*. Below nine in ten the column stays *Text* too.
+
+   When you change a column's **Type** or **Role** yourself, the screen asks the server again and everything that
+   depends on it follows in that one edit: the reason beside the type (how many values it reads, and one it does
+   not), the column's role, and **When** and **Weighed by** in step 3. What you picked yourself is never proposed
+   over.
 3. **What does each column hold?** An *Entity Type* (Account, Phone number…) or *Nothing: a detail*. For events:
    which column a link goes **From** and **To**, and optionally its kind, time and amount. For details: **Which
    column identifies each entity?** Without a From and a To the screen warns that the Dataset cannot be drawn as a
@@ -188,9 +198,24 @@ is sent anywhere. Administrators see it, read-only, in **Settings → Getting st
    run** waits until every guess is confirmed or changed; a very large file runs on the server and the screen
    follows it.
 
-The result says how many rows were read and kept, rows set aside and why, whether the link index was built, and each
-Expectation on the data. Then **Explore in Link Analysis** (opens **Start a graph** with the Dataset picked), **Add
-details about these entities**, or **Add another file**.
+The result accounts for every row and value, one line each:
+
+- how many rows were read and how many were kept, and, when there are any, the rows set aside because the line itself
+  could not be read (too few columns, a broken quote);
+- each column where a value did not fit its type and was **left blank** (*1 value in booked_at was not a date with a
+  time and was left blank (e.g. 'not-a-date')*) — the row is kept;
+- rows that **draw no link** because their From or To is empty (*1 row has no From (from_account), so it draws no
+  link*) — which is why the graph can have fewer links than the Dataset has rows;
+- values of an entity column that are **a second spelling** of an entity already there, differing only by spaces or
+  letter case (*' acc-1003 ' is ACC-1003*) — worth correcting in the file: an Entity profile counts both as one
+  entity, but the graph draws each spelling as its own node;
+- whether the link index was built, with its links and entities, and each Expectation on the data when the Dataset
+  has any (a first import has none).
+
+The last two kinds of line are counted over the rows this import added. Then **Explore in Link Analysis** (for events
+it opens **Start a graph** with the Dataset picked; after details about entities it opens the events those entities
+are in, where the details now show on each entity), **Add details about these entities** (after events), or **Add
+another file**.
 
 ![The result of an import: rows read and kept, the link index, and the Arrivals list](../../assets/la-guide-05-import-result.png)
 *The result and the Dataset card after **Create and run**.*
@@ -265,7 +290,9 @@ shows it open. Opened, each one shows:
   last arrived), **Covers** (the period it covers), **Graph** (whether the graph has it), **Inbox** or **Kept up to date**,
   **Storage** and **Compacted**, each only when known - then the **Arrivals** table (every file it took, uploaded or put
   in its inbox by another system: File, Arrived, How, Result, Rows, Left out, Covers, Columns; newest first, ten to a
-  page; a file a later replace set aside reads muted and its Result says so), *Add a file* and
+  page; **Left out** counts the file's rows that are not in the Dataset — set aside, or left out by the row filter —
+  and says 0 when there are none; **Covers** is the period of its Time column; a file a later replace set aside reads
+  muted and its Result says so), *Add a file* and
   *Run now*; under **Inbox**, *Watch this folder* imports what another system writes there on its own, checked every
   30 seconds, once the files have stopped changing (every edition); a Postgres table snapshot shows *Refresh now*
   instead, and is copied again only when you press it; for one a Pipeline or a Job keeps up to date, *Kept up to date by a Pipeline or a Job* - its data is

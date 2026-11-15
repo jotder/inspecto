@@ -429,6 +429,10 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         (el.querySelector('[data-testid="confirm"][data-key="format.header"]') as HTMLButtonElement).click();
         fixture.detectChanges();
         pickerSet(fixture, '[data-testid="type-amount"]', 'VARCHAR');
+        // the stated type is answered by the server (finding 4); here it cannot be reached, so the choice stays the
+        // person's own and the commit states it
+        http.expectOne((r) => r.url.endsWith('/redraft')).flush({}, { status: 500, statusText: 'Server Error' });
+        fixture.detectChanges();
         expect(q(el, 'pending')!.textContent).not.toContain('The header line');
         expect(q(el, 'pending')!.textContent).not.toContain('Type of amount');
         expect(createBtn.disabled).toBe(true);
@@ -441,6 +445,195 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         const body = bodyOf(req);
         expect(body.columns.find((c) => c.name === 'amount')!.type).toBe('VARCHAR');
         req.flush(summary());
+    });
+
+    // ── LA-FULL-CYCLE-TEST-1 phase 3: the honest, forgiving import ──────────────────────────────────────────────────
+
+    /** `ts` read as text: no Time column, so the link has no When and its reason says so. */
+    const textTimeDraft = (): OnboardDraft => {
+        const d = transfersDraft();
+        d.columns[5] = {
+            ...d.columns[5],
+            type: {
+                value: 'VARCHAR',
+                evidence: "the values are text (e.g. '2026-09-21T03:58:24')",
+                confidence: 'high',
+            },
+        };
+        d.entityTypes.columns[5] = {
+            column: 'ts',
+            entityType: { value: null, evidence: 'neither the name nor the values point to one', confidence: 'high' },
+            role: { value: 'detail', evidence: 'ts is shown on the link', confidence: 'high' },
+        };
+        d.entityTypes.link!.primaryTime = {
+            value: null,
+            evidence: 'no column holds dates or times',
+            confidence: 'low',
+        };
+        return d;
+    };
+    /** What the server answers once `ts` is stated a Date and time: the type, its reason, the role and the link's time. */
+    const restatedDraft = (): OnboardDraft => {
+        const d = transfersDraft();
+        d.columns[5] = {
+            ...d.columns[5],
+            type: {
+                value: 'TIMESTAMP',
+                evidence: 'you chose Date and time; all 1000 sampled values are dates with a time',
+                confidence: 'high',
+                format: '%Y-%m-%dT%H:%M:%S',
+            },
+        };
+        d.entityTypes.link!.primaryTime = {
+            value: 'ts',
+            evidence: 'ts holds dates with a time, the only date or time column',
+            confidence: 'high',
+        };
+        return d;
+    };
+
+    it('finding 4: one Type edit asks the server again; the role, When and every reason follow (no violations)', async () => {
+        const { fixture, el } = create();
+        upload(fixture, el, textTimeDraft());
+        expect(q(el, 'link-primaryTime')!.closest('div')!.textContent).toContain('no column holds dates or times');
+        expect(q(el, 'guesses-columns')).toBeNull();
+
+        pickerSet(fixture, '[data-testid="type-ts"]', 'TIMESTAMP');
+        const again = http.expectOne((r) => r.url.endsWith('/onboard/files/' + textTimeDraft().draftId + '/redraft'));
+        expect(again.request.method).toBe('POST');
+        expect(again.request.body).toEqual({ columns: [{ name: 'ts', type: 'TIMESTAMP' }] });
+        // while the server answers, the screen says so and Create waits
+        expect(q(el, 'reproposing')!.textContent).toContain('Checking the columns again');
+        expect((q(el, 'create') as HTMLButtonElement).disabled).toBe(true);
+        again.flush(restatedDraft());
+        fixture.detectChanges();
+
+        expect(q(el, 'reproposing')).toBeNull();
+        const text = el.textContent ?? '';
+        expect(text).toContain('you chose Date and time; all 1000 sampled values are dates with a time');
+        expect(text).not.toContain('the values are text');
+        expect(text).not.toContain('no column holds dates or times');
+        expect(q(el, 'role-ts')!.textContent).toContain('Time');
+        expect(q(el, 'link-primaryTime')!.textContent).toContain('ts');
+        expect((q(el, 'create') as HTMLButtonElement).disabled).toBe(false);
+        await expectNoA11yViolations(el);
+
+        // the commit starts from the draft as last answered: the type is the draft's now, and ts is the link's time
+        const req = commit(fixture, el);
+        expect(bodyOf(req).columns.find((c) => c.name === 'ts')!.type).toBeUndefined();
+        expect(bodyOf(req).link).toMatchObject({ primaryTime: 'ts' });
+        req.flush(summary());
+    });
+
+    it('finding 4: a stated role is sent with every stated type, and what the person picked is not proposed over', () => {
+        const { fixture, el } = create();
+        upload(fixture, el, textTimeDraft());
+        pickerSet(fixture, '[data-testid="type-ts"]', 'TIMESTAMP');
+        http.expectOne((r) => r.url.endsWith('/redraft')).flush(restatedDraft());
+        fixture.detectChanges();
+
+        pickerSet(fixture, '[data-testid="role-channel"]', 'detail');
+        const again = http.expectOne((r) => r.url.endsWith('/redraft'));
+        expect(again.request.body).toEqual({
+            columns: [
+                { name: 'ts', type: 'TIMESTAMP' },
+                { name: 'channel', role: 'detail' },
+            ],
+        });
+        const next = restatedDraft();
+        next.entityTypes.columns[4] = {
+            column: 'channel',
+            entityType: { value: null, evidence: 'you chose Detail for channel', confidence: 'high' },
+            role: { value: 'detail', evidence: 'you chose Detail for channel', confidence: 'high' },
+        };
+        next.entityTypes.link!.kind = {
+            value: null,
+            evidence: "no column's name and values say a kind of link",
+            confidence: 'low',
+        };
+        again.flush(next);
+        fixture.detectChanges();
+        expect(q(el, 'role-channel')!.textContent).toContain('Detail');
+        expect(el.textContent).toContain('you chose Detail for channel');
+        const req = commit(fixture, el);
+        expect(bodyOf(req).columns.find((c) => c.name === 'channel')).toMatchObject({ role: 'detail' });
+        expect(bodyOf(req).link!.kind).toBeUndefined();
+        req.flush(summary());
+    });
+
+    it('finding 6: Confirm all confirms every guess of its step and says how many; one guess keeps its own Confirm', async () => {
+        const { fixture, el } = create();
+        const d = transfersDraft();
+        // what the server answers for the 138-row details-like file: every format choice and every type a guess
+        for (const k of ['type', 'delimiter', 'header', 'quote']) d.format[k]!.confidence = 'low';
+        for (const c of d.columns) c.type.confidence = 'low';
+        d.entityTypes.link!.from.confidence = 'low';
+        upload(fixture, el, d);
+        const createBtn = q(el, 'create') as HTMLButtonElement;
+        expect(createBtn.disabled).toBe(true);
+        expect(q(el, 'guesses-columns')!.textContent).toContain('10 choices in this step are guesses');
+        const all = q(el, 'confirm-all-columns') as HTMLButtonElement;
+        expect(all.textContent!.trim()).toBe('Confirm all 10 guesses');
+        // the other step has one guess: no Confirm all for it, its own Confirm stays
+        expect(q(el, 'confirm-all-hold')).toBeNull();
+        await expectNoA11yViolations(el);
+
+        all.click();
+        fixture.detectChanges();
+        expect(q(el, 'guesses-columns')).toBeNull();
+        expect(q(el, 'pending')!.textContent).toContain('Which way the link goes');
+        expect(q(el, 'pending')!.textContent).not.toContain('Type of');
+        expect(createBtn.disabled).toBe(true);
+        (el.querySelector('[data-testid="confirm"][data-key="link.from"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        // two clicks after the drop, then Create and run: three
+        expect(createBtn.disabled).toBe(false);
+    });
+
+    it('finding 7: after details about entities, Explore in Link Analysis opens the events they describe', () => {
+        const { fixture, el } = create();
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        const kind = q(el, 'import-kind')!.querySelectorAll<HTMLInputElement>('input[type="radio"]')[1];
+        kind.click();
+        fixture.detectChanges();
+        const d = accountsDraft();
+        d.matches = [
+            {
+                column: 'account_id',
+                dataset: 'accounts_old',
+                datasetColumn: 'account_id',
+                share: 1,
+                keys: 312,
+                found: 312,
+                by: 'name',
+                datasetKind: 'reference',
+            },
+            {
+                column: 'account_id',
+                dataset: 'transfers',
+                datasetColumn: 'from_account',
+                share: 0.99,
+                keys: 137,
+                found: 136,
+                by: 'entityType',
+                entityType: 'account',
+                datasetKind: 'stream',
+            },
+        ];
+        upload(fixture, el, d);
+        commit(fixture, el).flush(
+            summary({ dataset: 'accounts', pipeline: 'accounts', kind: 'reference', index: undefined }),
+        );
+        fixture.detectChanges();
+        // the Reference's card asks how much of it the other data uses; not what this test looks at
+        http.match((r) => r.url.endsWith('/coverage')).forEach((r) =>
+            r.flush({}, { status: 404, statusText: 'Not Found' }),
+        );
+        const explore = q(el, 'explore') as HTMLButtonElement;
+        expect(explore.textContent).toContain('Explore in Link Analysis');
+        expect(q(el, 'add-details')).toBeNull(); // details of details are not offered
+        explore.click();
+        expect(navigate).toHaveBeenCalledWith(['/link-analysis'], { queryParams: { dataset: 'transfers' } });
     });
 
     it('a small CSV (under 50 lines): its file type is a guess too, shown with a Confirm, and Create follows', () => {

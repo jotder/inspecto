@@ -19,7 +19,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatRadioModule } from '@angular/material/radio';
 import { Router } from '@angular/router';
 import type { ColDef } from 'ag-grid-community';
-import { Subscription } from 'rxjs';
+import { EMPTY, Subject, Subscription, catchError, map, switchMap } from 'rxjs';
 import { apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
@@ -43,6 +43,11 @@ import {
     ACCEPTED_EXTENSIONS,
     COLUMN_NAME,
     Choice,
+    ChoiceStep,
+    RedraftBody,
+    adoptRedraft,
+    choiceStep,
+    confirmAllLabel,
     ColumnState,
     ColumnType,
     DATASET_NAME,
@@ -69,7 +74,7 @@ import {
     DraftMatch,
     matchLine,
     keptFormat,
-    count,
+    rowsWords,
     followOnClause,
     delimiterLabel,
     excelLine,
@@ -195,6 +200,13 @@ export class AddDataComponent implements OnInit {
     protected readonly excel = signal<boolean | null>(null);
     /** The low-confidence choices the person confirmed with a click (OF-2). */
     protected readonly confirmed = signal<ReadonlySet<string>>(new Set());
+    /** The server is proposing the draft again after a stated type or role (finding 4); Create waits for it. */
+    protected readonly reproposing = signal(false);
+    /** The column types and roles the person picked on screen, by draft column: sent whole with every redraft. */
+    private readonly statedTypes = new Map<string, string>();
+    private readonly statedRoles = new Map<string, ColumnRole>();
+    private readonly redrafts = new Subject<void>();
+    private columnSubs: Subscription | null = null;
     /** Step 3 opened (always, when `whatColumnsHold` is `ask`). */
     protected readonly whatOpen = signal(false);
     /** Bumped on every form change, so the computed views below re-read the form. */
@@ -389,6 +401,15 @@ export class AddDataComponent implements OnInit {
         );
     });
     protected readonly pendingKeys = computed(() => new Set(this.pending().map((p) => p.key)));
+    /** The pending guesses of each step, for its *Confirm all* (finding 6). */
+    protected readonly pendingByStep = computed<Record<ChoiceStep, PendingChoice[]>>(() => {
+        const p = this.pending();
+        return {
+            columns: p.filter((x) => choiceStep(x.key) === 'columns'),
+            hold: p.filter((x) => choiceStep(x.key) === 'hold'),
+        };
+    });
+    protected readonly confirmAllLabel = confirmAllLabel;
 
     /** The preview of the first rows as they will be kept (renamed, left-out columns gone). */
     protected readonly previewColumns = computed<ColDef[]>(() =>
@@ -458,6 +479,7 @@ export class AddDataComponent implements OnInit {
             !!this.draft() &&
             !this.running() &&
             !this.reading() &&
+            !this.reproposing() &&
             this.pending().length === 0 &&
             this.renameErrors().size === 0 &&
             this.conditionProblems().every((p) => !p) &&
@@ -471,7 +493,7 @@ export class AddDataComponent implements OnInit {
         const name = this.form.controls.name.value || '…';
         const what = d.kind === 'reference' ? 'details about entities' : 'events between entities';
         const followOn = followOnClause(d.followOns, d.kind === 'stream' && !this.linkMissing());
-        return `Creates the Dataset ${name} (${what}) from ${d.file.name}, ${count(d.file.rows)} rows; runs it once${followOn}.`;
+        return `Creates the Dataset ${name} (${what}) from ${d.file.name}, ${rowsWords(d.file.rows)}; runs it once${followOn}.`;
     });
     protected readonly resultDataset = computed<ImportDataset | null>(() => {
         const s = this.summary();
@@ -516,7 +538,34 @@ export class AddDataComponent implements OnInit {
         // A different separator, header line or quote re-reads the file (the draft's columns were read with the old one).
         for (const c of [this.form.controls.delimiter, this.form.controls.header, this.form.controls.quote])
             this.formSub.add(c.valueChanges.subscribe(() => this.reformat()));
-        this.destroyRef.onDestroy(() => this.formSub?.unsubscribe());
+        this.destroyRef.onDestroy(() => {
+            this.formSub?.unsubscribe();
+            this.columnSubs?.unsubscribe();
+        });
+        // Finding 4: a stated type or role is answered by the server - the latest set of stated choices wins.
+        this.redrafts
+            .pipe(
+                switchMap(() => {
+                    const old = this.draft();
+                    if (!old) return EMPTY;
+                    this.reproposing.set(true);
+                    this.error.set('');
+                    return this.onboard.redraft(old.draftId, this.redraftBody()).pipe(
+                        map((next) => ({ old, next })),
+                        catchError((err: unknown) => {
+                            // the person's choice stays on screen and the commit states it; the reasons are as they were
+                            this.reproposing.set(false);
+                            this.refused(err, 'The columns could not be checked again.');
+                            return EMPTY;
+                        }),
+                    );
+                }),
+                takeUntilDestroyed(this.destroyRef),
+            )
+            .subscribe(({ old, next }) => {
+                this.reproposing.set(false);
+                if (this.draft()?.draftId === next.draftId) this.applyRedraft(old, next);
+            });
     }
 
     // ── 1. the file ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -593,6 +642,7 @@ export class AddDataComponent implements OnInit {
         this.draft.set(d);
         this.excel.set(d.limits.excel);
         this.confirmed.set(new Set());
+        this.forgetStated();
         const fmt = d.format;
         this.form.controls.columns.clear({ emitEvent: false });
         this.form.controls.filter.clear({ emitEvent: false });
@@ -616,7 +666,7 @@ export class AddDataComponent implements OnInit {
     }
 
     private columnGroup(c: ColumnState): ColumnGroup {
-        return this.fb.nonNullable.group({
+        const g: ColumnGroup = this.fb.nonNullable.group({
             name: [c.name],
             rename: [c.rename],
             type: [c.type],
@@ -624,6 +674,93 @@ export class AddDataComponent implements OnInit {
             entityType: [c.entityType],
             role: [c.role],
         });
+        // A type or role the person picks is stated to the server, which proposes the rest again (finding 4). What the
+        // screen sets itself is set without an event, so only a person's pick lands here.
+        this.columnSubs ??= new Subscription();
+        this.columnSubs.add(
+            g.controls.type.valueChanges.subscribe((type) => {
+                this.statedTypes.set(c.name, type);
+                this.redrafts.next();
+            }),
+        );
+        this.columnSubs.add(
+            g.controls.role.valueChanges.subscribe((role) => {
+                this.statedRoles.set(c.name, role);
+                this.redrafts.next();
+            }),
+        );
+        return g;
+    }
+
+    /** A new draft (another file, a re-read, a start over): nothing is stated yet. */
+    private forgetStated(): void {
+        this.columnSubs?.unsubscribe();
+        this.columnSubs = null;
+        this.statedTypes.clear();
+        this.statedRoles.clear();
+        this.reproposing.set(false);
+    }
+
+    /** Every type and role the person stated; a role only while its column holds no Entity Type (then it is an Entity). */
+    private redraftBody(): RedraftBody {
+        const holds = new Set(
+            this.columnStates()
+                .filter((c) => c.entityType)
+                .map((c) => c.name),
+        );
+        const names = new Set([...this.statedTypes.keys(), ...this.statedRoles.keys()]);
+        return {
+            columns: [...names].map((name) => ({
+                name,
+                ...(this.statedTypes.has(name) ? { type: this.statedTypes.get(name) } : {}),
+                ...(this.statedRoles.has(name) && !holds.has(name) ? { role: this.statedRoles.get(name) } : {}),
+            })),
+        };
+    }
+
+    /**
+     * The server answered the draft again: what the person changed stays, everything else takes the new proposal and its
+     * reason ({@link adoptRedraft}). Nothing here emits, so it never asks the server a second time.
+     */
+    private applyRedraft(old: OnboardDraft, next: OnboardDraft): void {
+        const v = this.form.getRawValue();
+        const recordType =
+            v.recordType === (old.entityTypes.recordType?.value ?? NONE)
+                ? (next.entityTypes.recordType?.value ?? NONE)
+                : v.recordType;
+        const merged = adoptRedraft(
+            old,
+            next,
+            v.columns,
+            {
+                primary: v.primary,
+                from: v.from,
+                to: v.to,
+                kind: v.kind,
+                primaryTime: v.primaryTime,
+                primaryMeasure: v.primaryMeasure,
+                identifying: v.identifying,
+                recordType: v.recordType,
+            },
+            new Set(this.statedRoles.keys()),
+            this.confirmed(),
+            (d, column) => roleUnder(d, column, recordType, this.recordTypes())?.value,
+        );
+        this.draft.set(next);
+        this.form.controls.columns.controls.forEach((g, i) =>
+            g.patchValue(
+                {
+                    type: merged.columns[i].type,
+                    entityType: merged.columns[i].entityType,
+                    role: merged.columns[i].role,
+                },
+                { emitEvent: false },
+            ),
+        );
+        this.form.patchValue({ ...merged.roles }, { emitEvent: false });
+        this.rolesUnder = merged.roles.recordType ?? NONE;
+        this.confirmed.set(merged.confirmed);
+        this.formTick.update((n) => n + 1);
     }
 
     /** Choose another file: back to step 1 with nothing kept. */
@@ -634,6 +771,7 @@ export class AddDataComponent implements OnInit {
         this.error.set('');
         this.unavailable.set('');
         this.confirmed.set(new Set());
+        this.forgetStated();
         this.form.controls.columns.clear({ emitEvent: false });
         this.form.controls.filter.clear({ emitEvent: false });
         this.form.reset(undefined, { emitEvent: false });
@@ -694,6 +832,11 @@ export class AddDataComponent implements OnInit {
         this.confirmed.update((s) => new Set(s).add(key));
     }
 
+    /** Confirm every guess still pending in one step (finding 6); the button says how many. */
+    protected confirmAll(step: ChoiceStep): void {
+        this.confirmed.update((s) => new Set([...s, ...this.pendingByStep()[step].map((p) => p.key)]));
+    }
+
     protected isPending(key: string): boolean {
         return this.pendingKeys().has(key);
     }
@@ -729,9 +872,11 @@ export class AddDataComponent implements OnInit {
             const n = g.controls.name.value;
             const before = roleUnder(d, n, was, this.recordTypes())?.value;
             const after = roleUnder(d, n, recordType, this.recordTypes())?.value;
+            // set without an event: a role the screen re-proposes is not one the person stated
             if (before && after && after !== before && g.controls.role.value === before)
-                g.controls.role.setValue(after);
+                g.controls.role.setValue(after, { emitEvent: false });
         }
+        this.formTick.update((n) => n + 1);
     }
 
     protected typeChoice(column: string): Choice<string> | undefined {
@@ -752,7 +897,7 @@ export class AddDataComponent implements OnInit {
         { id: 'primaryMeasure', label: 'Weighed by (a Measure column)' },
     ] as const;
     protected readonly formatSize = formatSize;
-    protected readonly count = count;
+    protected readonly rowsWords = rowsWords;
 
     // ── 4. create and run ────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -797,9 +942,19 @@ export class AddDataComponent implements OnInit {
 
     // ── 5. next ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
+    /**
+     * *Explore in Link Analysis*. Events open as their own graph. Details about entities draw no graph of their own
+     * (finding 7): they open the events those entities are in - the best match the draft found - where the details now
+     * show on each entity; with no such Dataset yet, Link Analysis opens for the person to choose.
+     */
     protected explore(): void {
         const s = this.summary();
-        if (s) void this.router.navigate([this.exploreRoute()], { queryParams: { dataset: s.dataset } });
+        if (!s) return;
+        const dataset =
+            s.kind === 'stream'
+                ? s.dataset
+                : ((this.draft()?.matches ?? []).find((m) => m.datasetKind === 'stream')?.dataset ?? null);
+        void this.router.navigate([this.exploreRoute()], dataset ? { queryParams: { dataset } } : {});
     }
 
     // ── C6a: lookups ─────────────────────────────────────────────────────────────────────────────────────────────────

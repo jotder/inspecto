@@ -1,5 +1,6 @@
 import type { PickerOption } from '@inspecto/core/components/option-picker.component';
 import { formatSize, ledgerTime } from './add-data.model';
+import { plural } from './words';
 
 /**
  * An import Dataset's storage (`LA-DATASET-COMPACT-1`, `GET /datasets/{id}/storage`): its Parquet files, the last
@@ -39,10 +40,6 @@ export const RETENTION_OPTIONS: PickerOption[] = [
     },
     { value: 'arrivals', label: 'The last N arrivals', hint: 'The oldest files are removed first.' },
 ];
-
-function plural(n: number, one: string, many: string): string {
-    return `${n} ${n === 1 ? one : many}`;
-}
 
 /** `keeps the last 90 days` / `keeps the last 12 arrivals` / `keeps every arrival`. */
 export function retentionWords(r: Retention | null): string {

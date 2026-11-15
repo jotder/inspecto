@@ -16,6 +16,7 @@ import type {
     PostgresConnection,
     PostgresPick,
     PostgresTest,
+    RedraftBody,
 } from './add-data.model';
 import type { ReferenceCoverage } from './reference-coverage.component';
 import type { DatasetFeedState, IndexJob, KeepUpToDate } from './dataset-feed.model';
@@ -55,6 +56,14 @@ export class OnboardService {
             params,
             headers: { 'Content-Type': 'application/octet-stream' },
         });
+    }
+
+    /**
+     * The person stated a column's type or role (LA-FULL-CYCLE-TEST-1 finding 4): the same draft, answered again with
+     * every proposal and reason that depends on it worked out by the server. `body` carries every stated choice.
+     */
+    redraft(draftId: string, body: RedraftBody): Observable<OnboardDraft> {
+        return this.http.post<OnboardDraft>(apiUrl(`/onboard/files/${encodeURIComponent(draftId)}/redraft`), body);
     }
 
     /** **Choose a table** (BASIC-ONBOARD-1 P3): connect read-only and list the tables; a login that could write is refused. */

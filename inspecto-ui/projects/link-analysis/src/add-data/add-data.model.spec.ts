@@ -256,7 +256,7 @@ describe('Add data model (LA-ONBOARD-1 phase 4)', () => {
             );
             expect(lines.map((l) => l.text)).toEqual([
                 '2,215 rows were read from transfers.csv; 2,203 rows were kept.',
-                '12 rows were set aside because they did not match the column types.',
+                "12 rows were set aside because their lines could not be read as the file's columns.",
                 'b.csv was set aside: wrong column count.',
                 'This replaced the previous data: 2,000 rows before, 2,203 rows now.',
                 'The link index was not built: over the memory budget.',

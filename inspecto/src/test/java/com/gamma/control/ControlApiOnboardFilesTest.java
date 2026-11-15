@@ -181,7 +181,7 @@ class ControlApiOnboardFilesTest {
             assertChoice(amount);
             assertEquals("DOUBLE", amount.get("value").asText());
             assertEquals("high", amount.get("confidence").asText());
-            assertTrue(amount.get("evidence").asText().contains("all 240 sampled values parse as double"), amount.toString());
+            assertTrue(amount.get("evidence").asText().contains("all 240 sampled values are decimal numbers"), amount.toString());
             JsonNode booked = column(d, "booked_at").get("type");
             assertEquals("TIMESTAMP", booked.get("value").asText());
             assertEquals("%Y-%m-%d %H:%M:%S", booked.get("format").asText(), "the proven strptime format rides the choice");
@@ -191,13 +191,13 @@ class ControlApiOnboardFilesTest {
             assertEquals("account", from.get("value").asText());
             assertEquals("ACCOUNT", from.get("classification").asText());
             assertEquals("high", from.get("confidence").asText(), from.toString());
-            assertTrue(from.get("evidence").asText().contains("the name 'from_account' says account"), from.toString());
+            assertTrue(from.get("evidence").asText().contains("the name 'from_account' says Account"), from.toString());
             assertTrue(entityOf(d, "amount").get("value").isNull(), "an amount is not an identifier");
             assertTrue(entityOf(d, "transfer_id").get("value").isNull());
 
             JsonNode et = d.get("entityTypes");
             assertEquals("account", et.get("primary").get("value").asText());
-            assertTrue(et.get("primary").get("evidence").asText().contains("2 columns hold account (from_account, to_account)"), et.toString());
+            assertTrue(et.get("primary").get("evidence").asText().contains("2 columns hold Account (from_account, to_account)"), et.toString());
             JsonNode link = et.get("link");
             for (String k : List.of("from", "to", "kind", "primaryTime", "primaryMeasure", "details")) assertChoice(link.get(k));
             assertEquals("from_account", link.get("from").get("value").asText());
@@ -371,7 +371,7 @@ class ControlApiOnboardFilesTest {
             assertEquals("dimension", roleOf(d, "channel").get("value").asText(), "the link's kind is a Category");
             JsonNode currency = roleOf(d, "currency");
             assertEquals("dimension", currency.get("value").asText(), "a few repeating values: " + currency);
-            assertTrue(currency.get("evidence").asText().contains("distinct values in 120 sampled rows"), currency.toString());
+            assertTrue(currency.get("evidence").asText().contains("1 distinct value in 120 sampled rows"), currency.toString());
             JsonNode id = roleOf(d, "transfer_id");
             assertEquals("detail", id.get("value").asText(), "every value different: not a Category");
             assertEquals("high", id.get("confidence").asText());

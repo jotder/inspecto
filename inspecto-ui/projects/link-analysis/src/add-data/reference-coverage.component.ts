@@ -12,6 +12,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subscription } from 'rxjs';
 import { OnboardService } from './onboard.service';
+import { plural } from './words';
 
 /** `GET /datasets/{id}/coverage` (LA-REFERENCE-DETAILS-MORE-1): counts only, never a key or a value. */
 export interface ReferenceCoverage {
@@ -30,16 +31,20 @@ export interface ReferenceCoverage {
 
 /**
  * The coverage in plain words (UC-04 H9): "40 Account entities described." then, per Dataset holding that Entity Type,
- * "20 appear in transfers; 20 do not." Nothing when there are no counts. Pure.
+ * "20 appear in transfers; 20 do not." - in the singular for one ("137 appear in transfers; 1 does not."). Nothing when
+ * there are no counts. Pure.
  */
 export function coverageLines(c: ReferenceCoverage | null): string[] {
     if (!c || c.described === null) return [];
-    const what = `${c.entityTypeLabel || c.entityType} entities`;
+    const type = c.entityTypeLabel || c.entityType;
+    const described = `${plural(c.described, `${type} entity`, `${type} entities`)} described`;
     const cut = c.truncated ? ' (counted over part of the rows)' : '';
-    if (!c.datasets.length) return [`${c.described} ${what} described; no other Dataset holds ${what} yet${cut}.`];
+    if (!c.datasets.length) return [`${described}; no other Dataset holds ${type} entities yet${cut}.`];
     return [
-        `${c.described} ${what} described${cut}.`,
-        ...c.datasets.map((d) => `${d.appear} appear in ${d.dataset}; ${d.absent} do not.`),
+        `${described}${cut}.`,
+        ...c.datasets.map(
+            (d) => `${plural(d.appear, 'appears', 'appear')} in ${d.dataset}; ${plural(d.absent, 'does', 'do')} not.`,
+        ),
     ];
 }
 

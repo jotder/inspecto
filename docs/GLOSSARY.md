@@ -221,7 +221,8 @@ seams: `docs/okf/product/module/processor/api-onboarding-authoring.md`.)*
 **Add data** — The Inspecto LA entry point to **Onboard a file** as a Stream or a Reference (`LA-ONBOARD-1`
 OB-14): the button says *Add data*, the screen title says *Onboard a file*, so "Onboard" stays the one verb. One
 server route family, every edition (`POST /onboard/files` → a draft whose every choice carries evidence and a
-confidence; `…/{draftId}/commit` → an ordinary Pipeline marked `origin: import`, run once, and the Dataset). On a
+confidence; `…/{draftId}/redraft` → the same draft answered again around the column types and roles the person
+stated; `…/{draftId}/commit` → an ordinary Pipeline marked `origin: import`, run once, and the Dataset). On a
 Dataset made this way: **Add a file** and **Run now**. Who may use it is
 the Space setting `data.self_import` (on with no sign-in, off with sign-in until an administrator turns it on).
 ⛔ never "upload wizard" or "import wizard"; ⛔ not the Investigation tab's analyst upload (`/inv/uploads`, which

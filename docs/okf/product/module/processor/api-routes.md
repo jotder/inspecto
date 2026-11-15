@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-386 route(s) registered; 386 in the OpenAPI contract, 0 not.
+387 route(s) registered; 387 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -256,6 +256,7 @@ tags: [api, routes, generated]
 | GET | `/notifications/unread-count` | GET /notifications/unread-count (generated skeleton) | notifications | — | `inspecto/src/main/java/com/gamma/control/NotificationRoutes.java` |
 | POST | `/onboard/files` | Add data: upload a file and get a draft of how to import it | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |
 | POST | `/onboard/files/{fileId}/commit` | Add data: one confirm - write the import Pipeline, run it once, register the Dataset | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |
+| POST | `/onboard/files/{fileId}/redraft` | Add data: answer a draft again around the column types and roles the person stated | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |
 | POST | `/onboard/postgres` | Add data, Choose a table: copy a Postgres table or query into a draft | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/PostgresSnapshot.java` |
 | POST | `/onboard/postgres/test` | Add data, Choose a table: test a Postgres connection and list its tables | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/PostgresSnapshot.java` |
 | GET | `/onboard/runs/{runId}` | Follow an import run answered with 202 | datasets | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |

@@ -198,40 +198,15 @@ public final class DataTransformer {
 
     /** {@link #countCastFailures(Connection, Map, PipelineConfig, String)} for a caller holding only the
      *  {@code csv} settings — the graph executor's map node, whose dry-run has no {@link PipelineConfig}. */
-    @SuppressWarnings("unchecked")
     public static long countCastFailures(Connection conn, Map<String, Object> schemaConfig,
                                         PipelineConfig.CsvSettings csv, String sourceTable) {
-        Map<String, String> fieldTypes = rawFieldTypes(schemaConfig);
-        SourceZones zones = SourceZones.of(schemaConfig, csv.sourceTimezone());
-        Map<String, String> fieldFormats = SchemaFieldTypes.formatsOf(schemaConfig);
-
-        // 🔴 This method reads the mapping DIRECTLY — it does not go through selectFor — so it must
-        // read the same fields[] the SELECT was compiled from. A mapping with no fields (nor rules to
-        // convert) has nothing to audit.
-        List<Map<String, Object>> fieldRows = recordFields(schemaConfig);
-
+        List<CastCheck> checks = castChecks(schemaConfig, csv, sourceTable);
         List<String> targets = new ArrayList<>();
         StringBuilder select = new StringBuilder("SELECT ");
-        if (fieldRows != null) {
-            for (Map<String, Object> field : fieldRows) {
-                List<String> inputs = RecordTransform.auditedSourceColumns(field, fieldTypes);
-                if (inputs.isEmpty()) continue;   // custom / no source / VARCHAR pass-through — see that method
-                String expr = RecordTransform.compile(List.of(field), fieldTypes, fieldFormats, csv, zones,
-                        sourceTable, false).get(0).get("expr").toString();
-                if (!targets.isEmpty()) select.append(", ");
-                // every column input non-blank AND the expression NULL — a blank second input is not a
-                // coercion failure of the first (RECORD-TRANSFORMER-1 (c))
-                select.append("SUM(CASE WHEN ");
-                for (String raw : inputs) {
-                    String col = q(sourceTable) + "." + q(raw);
-                    select.append("NULLIF(TRIM(CAST(").append(col).append(" AS VARCHAR)), '') IS NOT NULL AND ");
-                    // an epoch column's `0` means "none" and lands NULL on purpose — not a failure
-                    if (SchemaFieldTypes.isEpochFormat(fieldFormats.get(raw)))
-                        select.append("NOT ").append(SchemaFieldTypes.epochNoneSql(col)).append(" AND ");
-                }
-                select.append("(").append(expr).append(") IS NULL THEN 1 ELSE 0 END)");
-                targets.add(String.valueOf(field.get("name")));
-            }
+        for (CastCheck check : checks) {
+            if (!targets.isEmpty()) select.append(", ");
+            select.append("SUM(CASE WHEN ").append(check.failed()).append(" THEN 1 ELSE 0 END)");
+            targets.add(check.column());
         }
         if (targets.isEmpty()) return 0;   // nothing coercing — no failure is possible
         select.append(" FROM ").append(q(sourceTable));
@@ -255,6 +230,53 @@ public final class DataTransformer {
             log.warn("Could not count cast failures on {}: {}", sourceTable, e.toString());
             return -1;   // not measured — never fails the batch
         }
+    }
+
+    /**
+     * One audited mapping field of {@link #castChecks}: {@code column} is the target column, {@code source} the
+     * (unquoted) raw column it reads, {@code type} that raw column's declared type, and {@code failed} a SQL predicate
+     * over {@code sourceTable} that is true for a row whose source value was present and came out NULL.
+     */
+    public record CastCheck(String column, String source, String type, String failed) {}
+
+    /**
+     * The per-column predicates behind {@link #countCastFailures}: one per mapping field whose declared type coerces
+     * (the same fields, the same compiled expressions, the same exclusions — see that method). Public so a caller that
+     * must say <em>which</em> column lost values and show one of them (Add data's import result) asks the same question
+     * the batch audit asks, instead of writing a second cast rule that could drift from the engine's.
+     */
+    @SuppressWarnings("unchecked")
+    public static List<CastCheck> castChecks(Map<String, Object> schemaConfig, PipelineConfig.CsvSettings csv, String sourceTable) {
+        Map<String, String> fieldTypes = rawFieldTypes(schemaConfig);
+        SourceZones zones = SourceZones.of(schemaConfig, csv.sourceTimezone());
+        Map<String, String> fieldFormats = SchemaFieldTypes.formatsOf(schemaConfig);
+
+        // 🔴 This method reads the mapping DIRECTLY — it does not go through selectFor — so it must
+        // read the same fields[] the SELECT was compiled from. A mapping with no fields (nor rules to
+        // convert) has nothing to audit.
+        List<Map<String, Object>> fieldRows = recordFields(schemaConfig);
+        List<CastCheck> checks = new ArrayList<>();
+        if (fieldRows == null) return checks;
+        for (Map<String, Object> field : fieldRows) {
+            List<String> inputs = RecordTransform.auditedSourceColumns(field, fieldTypes);
+            if (inputs.isEmpty()) continue;   // custom / no source / VARCHAR pass-through — see that method
+            String expr = RecordTransform.compile(List.of(field), fieldTypes, fieldFormats, csv, zones,
+                    sourceTable, false).get(0).get("expr").toString();
+            // every column input non-blank AND the expression NULL — a blank second input is not a
+            // coercion failure of the first (RECORD-TRANSFORMER-1 (c))
+            StringBuilder failed = new StringBuilder();
+            for (String raw : inputs) {
+                String col = q(sourceTable) + "." + q(raw);
+                failed.append("NULLIF(TRIM(CAST(").append(col).append(" AS VARCHAR)), '') IS NOT NULL AND ");
+                // an epoch column's `0` means "none" and lands NULL on purpose — not a failure
+                if (SchemaFieldTypes.isEpochFormat(fieldFormats.get(raw)))
+                    failed.append("NOT ").append(SchemaFieldTypes.epochNoneSql(col)).append(" AND ");
+            }
+            failed.append("(").append(expr).append(") IS NULL");
+            checks.add(new CastCheck(String.valueOf(field.get("name")), inputs.get(0),
+                    fieldTypes.getOrDefault(inputs.get(0), SchemaFieldTypes.VARCHAR), failed.toString()));
+        }
+        return checks;
     }
 
     /**

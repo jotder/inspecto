@@ -41,6 +41,10 @@ import java.util.stream.Stream;
  *   <li>{@code POST /onboard/files?name=&kind=stream|reference[&delimiter=&header=&quote=&encoding=&decimal=&recordPath=]} - raw file body; stores it in
  *       the Space's draft area and answers the DRAFT ({@link OnboardDraft}, {@link EntityShapes}): every proposed choice is
  *       {@code {value, evidence, confidence}}. Nothing is written to config.</li>
+ *   <li>{@code POST /onboard/files/{draftId}/redraft} - the column types and roles the person stated on screen
+ *       ({@code {columns: [{name, type?, role?}]}}, the whole set each time); answers the same DRAFT again with those taken
+ *       as given and every proposal and reason that depends on them worked out again ({@code LA-FULL-CYCLE-TEST-1}
+ *       finding 4). The stored draft is replaced, so the commit starts from what was last answered. Writes no config.</li>
  *   <li>{@code POST /onboard/files/{draftId}/commit} - the confirmed choices; writes the schema and an ordinary Pipeline
  *       marked {@code origin: import}, registers it, lands the file, runs it once, registers the Dataset and answers the
  *       run summary ({@link OnboardImport}). A failed commit leaves nothing behind. Above
@@ -73,6 +77,8 @@ final class OnboardRoutes implements RouteModule {
         api.post("/onboard/files", ApiContext.withCapability("canUploadData", (e, m) -> fixable(e, () -> draft(api, e))));
         api.post("/onboard/files/([^/]+)/commit", ApiContext.withCapability("canUploadData",
                 (e, m) -> fixable(e, () -> OnboardImport.commit(api, e, ApiContext.name(m), api.body(e)))));
+        api.post("/onboard/files/([^/]+)/redraft", ApiContext.withCapability("canUploadData",
+                (e, m) -> fixable(e, () -> redraft(api, e, ApiContext.name(m), api.body(e)))));
         api.get("/onboard/runs/([^/]+)", ApiContext.withCapability("canUploadData",
                 (e, m) -> OnboardImport.run(e, ApiContext.name(m))));
         api.post("/datasets/([^/]+)/files", ApiContext.withCapability("canUploadData",
@@ -237,6 +243,73 @@ final class OnboardRoutes implements RouteModule {
         }
     }
 
+    /** The column types and roles a person stated on screen, by draft column name (finding 4). */
+    record Stated(Map<String, String> types, Map<String, String> roles) {
+        static final Stated NONE = new Stated(Map.of(), Map.of());
+
+        /** From a redraft body: {@code {columns: [{name, type?, role?}]}}; 422 on anything else. */
+        static Stated of(Map<String, Object> body, Map<String, Object> draft) {
+            Object raw = body.get("columns");
+            if (!(raw instanceof List<?> list))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "columns must be a list of {name, type?, role?}");
+            java.util.Set<String> known = new java.util.HashSet<>();
+            if (draft.get("plan") instanceof List<?> plan)
+                for (Object p : plan) if (p instanceof Map<?, ?> m) known.add(String.valueOf(m.get("name")));
+            Map<String, String> types = new LinkedHashMap<>(), roles = new LinkedHashMap<>();
+            for (Object o : list) {
+                if (!(o instanceof Map<?, ?> m) || !(m.get("name") instanceof String n))
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every columns[] entry needs the draft column's name");
+                if (!known.contains(n)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the draft has no column '" + n + "'");
+                if (m.get("type") != null) {
+                    String t = String.valueOf(m.get("type")).trim().toUpperCase(Locale.ROOT);
+                    if (!OnboardDraft.COLUMN_TYPES.contains(t))
+                        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "type of '" + n + "' must be one of "
+                                + new java.util.TreeSet<>(OnboardDraft.COLUMN_TYPES));
+                    types.put(n, t);
+                }
+                if (m.get("role") != null) {
+                    String r = String.valueOf(m.get("role")).trim().toLowerCase(Locale.ROOT);
+                    if (!EntityShapes.STATED_ROLES.containsKey(r))
+                        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "role of '" + n + "' must be one of "
+                                + new java.util.TreeSet<>(EntityShapes.STATED_ROLES.keySet()) + "; a column is an Entity by the Entity Type it holds");
+                    roles.put(n, r);
+                }
+            }
+            return new Stated(types, roles);
+        }
+    }
+
+    // ── POST /onboard/files/{draftId}/redraft ───────────────────────────────────────────────────────────────
+
+    /**
+     * Finding 4: answer the draft again with the types and roles the person stated. The file is read again with the format
+     * choices the draft was made with, so only what follows from the stated choices changes; the uploader and the
+     * draft's age stay. Gates: capability → write root 503 → {@code data.self_import} 403 → the draft 404 → the body 422.
+     */
+    @SuppressWarnings("unchecked")
+    private Object redraft(ApiContext api, HttpExchange ex, String draftId, Map<String, Object> body) throws IOException {
+        Path writeRoot = requireSelfImport(api, "Add data");
+        Path dataRoot = requireDataRoot(api);
+        Map<String, Object> draft = readDraft(dataRoot, draftId, ex);
+        Path dir = dataRoot.resolve(DRAFTS).resolve(draftId);
+        Path file = dir.resolve(String.valueOf(draft.get("stored")));
+        if (!Files.isRegularFile(file))
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "the draft's file is gone; add the file again");
+        Stated stated = Stated.of(body, draft);
+        String name = String.valueOf(((Map<String, Object>) draft.get("file")).get("name"));
+        Map<String, Object> snapshot = draft.get("snapshot") instanceof Map<?, ?> s ? (Map<String, Object>) s : null;
+        return answerDraft(writeRoot, ex, draftId, dir, file, name, String.valueOf(draft.get("kind")), limits(writeRoot),
+                formatOverrides(draft), snapshot, stated, draft);
+    }
+
+    /** The format choices a draft was made with ({@code ?delimiter=} …), so a later read of its file reads it the same way. */
+    static Map<String, String> formatOverrides(Map<String, Object> draft) {
+        Map<String, String> out = new LinkedHashMap<>();
+        if (draft.get("overrides") instanceof Map<?, ?> m)
+            for (var e : m.entrySet()) if (e.getValue() != null) out.put(String.valueOf(e.getKey()), String.valueOf(e.getValue()));
+        return out;
+    }
+
     /**
      * Analyse the draft's {@code file} (already in {@code dir}), write {@code draft.json} and answer the DRAFT. Shared by an
      * uploaded file and a Postgres snapshot ({@link PostgresSnapshot}), whose {@code snapshot} settings ride in the record
@@ -245,20 +318,31 @@ final class OnboardRoutes implements RouteModule {
     static Map<String, Object> answerDraft(Path writeRoot, HttpExchange ex, String draftId, Path dir, Path file, String name,
                                            String kind, LaLimitValues lim, Map<String, String> overrides,
                                            Map<String, Object> snapshot) throws IOException {
+        return answerDraft(writeRoot, ex, draftId, dir, file, name, kind, lim, overrides, snapshot, Stated.NONE, null);
+    }
+
+    /**
+     * {@link #answerDraft(Path, HttpExchange, String, Path, Path, String, String, LaLimitValues, Map, Map)} with the
+     * person's {@code stated} types and roles; {@code previous} is the draft record being answered again (a redraft keeps
+     * its uploader and its age), else {@code null}.
+     */
+    static Map<String, Object> answerDraft(Path writeRoot, HttpExchange ex, String draftId, Path dir, Path file, String name,
+                                           String kind, LaLimitValues lim, Map<String, String> overrides,
+                                           Map<String, Object> snapshot, Stated stated, Map<String, Object> previous) throws IOException {
         long bytes = Files.size(file);
         String type = OnboardDraft.fileType(file, name);
-        OnboardDraft.Analysis a = OnboardDraft.analyse(dir, file, name, type, overrides);
+        OnboardDraft.Analysis a = OnboardDraft.analyse(dir, file, name, type, overrides, stated.types());
         long maxRows = lim.get(LaLimit.IMPORT_MAX_ROWS);
         if (a.rows() > maxRows)
             throw new ApiException(413, ErrorCodes.PAYLOAD_TOO_LARGE, "'" + name + "' holds " + a.rows()
                     + " rows; this Space's import.max_rows is " + maxRows);
         LinkAnalysisSettings laSettings = LinkAnalysisSettings.forRoot(writeRoot);
-        Map<String, Object> entity = OnboardDraft.entityTypes(a, laSettings.effectiveEntityTypes(), kind);
+        Map<String, Object> entity = EntityShapes.propose(a.sampled(), laSettings.effectiveEntityTypes(), kind, stated.roles());
         // ENTITY-TYPE-CATALOG-1 P2: what a row is, when the Space's packs define record types
         if (!laSettings.effectiveRecordTypes().isEmpty()) {
             entity.put("recordType", EntityShapes.recordType(entity, laSettings.effectiveRecordTypes()));
-            // ENTITY-TYPE-RECORD-ROLES-1: and the roles such a record usually gives its columns
-            EntityShapes.recordTypeRoles(entity, a.sampled(), laSettings.effectiveRecordTypes());
+            // ENTITY-TYPE-RECORD-ROLES-1: and the roles such a record usually gives its columns (never over a stated role)
+            EntityShapes.recordTypeRoles(entity, a.sampled(), laSettings.effectiveRecordTypes(), stated.roles().keySet());
         }
 
         Map<String, Object> out = new LinkedHashMap<>();
@@ -281,8 +365,10 @@ final class OnboardRoutes implements RouteModule {
         record.remove("rows");
         record.put("type", type);
         record.put("stored", file.getFileName().toString());
-        record.put("uploader", ApiContext.actor(ex));
-        record.put("createdAt", Instant.now().toString());
+        record.put("uploader", previous != null && previous.get("uploader") != null ? previous.get("uploader") : ApiContext.actor(ex));
+        record.put("createdAt", previous != null && previous.get("createdAt") != null ? previous.get("createdAt") : Instant.now().toString());
+        record.put("overrides", overrides);   // what the file was read with, so a redraft or a commit reads it the same way
+        record.put("stated", Map.of("types", stated.types(), "roles", stated.roles()));
         record.put("plan", a.cols().stream().map(c -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("name", c.name());

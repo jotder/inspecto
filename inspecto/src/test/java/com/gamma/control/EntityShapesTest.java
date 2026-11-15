@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.function.IntFunction;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -137,6 +138,59 @@ class EntityShapesTest {
         none.put("recordType", OnboardDraft.choice(null, "", false));
         EntityShapes.recordTypeRoles(none, cols, List.of(CALL_WITH_ROLES));
         assertEquals("detail", roleOf(none, "release_cause").get("value"));
+    }
+
+    // ── LA-FULL-CYCLE-TEST-1 phase 3: stated roles, counts that are true, labels not ids ───────────────────────
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void aStatedRoleIsTakenAsGivenAndTheLinkIsChosenAmongTheColumnsThatMayStillHoldIt() {
+        List<EntityShapes.Column> cols = List.of(
+                col("from_account", "VARCHAR", "A1", "A2", "A3"), col("to_account", "VARCHAR", "A2", "A3", "A1"),
+                col("channel", "VARCHAR", "app", "app", "branch"), col("points", "BIGINT", "1", "2", "3"),
+                col("booked_at", "TIMESTAMP", "2026-01-01 10:00:00", "2026-01-02 10:00:00", "2026-01-03 10:00:00"));
+        List<EntityType> types = List.of(EntityTypes.coreDefault("account"));
+        Map<String, Object> plain = EntityShapes.propose(cols, types, "stream");
+        Map<String, Object> link = (Map<String, Object>) plain.get("link");
+        assertEquals("channel", ((Map<String, Object>) link.get("kind")).get("value"));
+        assertNull(((Map<String, Object>) link.get("primaryMeasure")).get("value"), "'points' says no amount, so nothing is weighed by it");
+
+        Map<String, Object> said = EntityShapes.propose(cols, types, "stream", Map.of("channel", "detail", "points", "measure", "booked_at", "detail"));
+        Map<String, Object> saidLink = (Map<String, Object>) said.get("link");
+        assertEquals("detail", roleOf(said, "channel").get("value"));
+        assertEquals("high", roleOf(said, "channel").get("confidence"), "the person's own choice is never a guess");
+        assertEquals("you chose Detail for channel", roleOf(said, "channel").get("evidence"));
+        assertNull(((Map<String, Object>) saidLink.get("kind")).get("value"), "a Detail is no longer the link's kind");
+        Map<String, Object> measure = (Map<String, Object>) saidLink.get("primaryMeasure");
+        assertEquals("points", measure.get("value"), "a column stated a Measure can be what the link is weighed by");
+        assertEquals("you chose Measure for points and all 3 sampled values are numbers", measure.get("evidence"));
+        Map<String, Object> time = (Map<String, Object>) saidLink.get("primaryTime");
+        assertNull(time.get("value"), "the only date column was stated a Detail");
+        assertEquals("no column holds dates or times", time.get("evidence"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void aReasonNamesTheEntityTypeByItsLabelAndNeverSaysAllWhenAValueDoesNotFit() {
+        List<EntityShapes.Column> cols = List.of(
+                col("from_account", "VARCHAR", "A1", "A2", "A3"), col("to_account", "VARCHAR", "A2", "A3", "A1"),
+                // 2 of the 3 sampled values are numbers: the type is an "almost all" guess, and the count says so
+                new EntityShapes.Column("amount", "DOUBLE", List.of("1.5", "2.5", "abc"), 2),
+                col("phone", "VARCHAR", "+447700900001", "+447700900002", "+447700900003"));
+        List<EntityType> types = List.of(EntityTypes.coreDefault("account"), EntityTypes.coreDefault("msisdn"));
+        Map<String, Object> et = EntityShapes.propose(cols, types, "stream");
+        Map<String, Object> link = (Map<String, Object>) et.get("link");
+        assertTrue(String.valueOf(((Map<String, Object>) link.get("from")).get("evidence")).startsWith("from_account and to_account both hold Account"),
+                link.toString());
+        assertEquals("the name 'amount' says an amount and 2 of 3 sampled values are numbers", ((Map<String, Object>) link.get("primaryMeasure")).get("evidence"));
+        String phone = String.valueOf(roleOf(et, "phone").get("evidence"));
+        assertEquals("phone holds Phone number", phone, "the Entity Type's label, never its id");
+        String all = et.toString();
+        assertFalse(all.contains("says msisdn") || all.contains("holds msisdn") || all.contains("hold account"), all);
+        assertTrue(all.contains("the name 'phone' says Phone number"), all);
+        // one distinct value is singular
+        Map<String, Object> one = EntityShapes.propose(List.of(col("currency", "VARCHAR", "EUR", "EUR", "EUR")), types, "stream");
+        assertEquals("currency has 1 distinct value in 3 sampled rows", roleOf(one, "currency").get("evidence"));
     }
 
     @Test

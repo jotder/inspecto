@@ -1,6 +1,5 @@
 package com.gamma.control;
 
-import com.gamma.entitystore.EntityTypes;
 import com.gamma.etl.ExcelExtension;
 import com.gamma.pipeline.exec.SchemaSuggest;
 import com.gamma.spi.auth.ApiException;
@@ -64,6 +63,35 @@ final class OnboardDraft {
             "%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M",
             "%d/%m/%Y %H:%M:%S", "%m/%d/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d.%m.%Y %H:%M:%S");
     private static final Pattern NUMBER = Pattern.compile("[+-]?(\\d+\\.?\\d*|\\.\\d+)([eE][+-]?\\d+)?");
+
+    /**
+     * {@code LA-FULL-CYCLE-TEST-1} finding 3: a column whose sampled values are <i>almost all</i> numbers, dates or dates
+     * with a time is proposed as that type at {@code low} confidence, and the values that do not fit are left blank by the
+     * import (and counted in its result). "Almost all" is at least nine in ten, and at least this many fitting values.
+     * <b>Why nine in ten, not the four in five that marks a number column as a guess:</b> this proposal blanks every value
+     * that does not fit, so it may cost at most one value in ten; between four in five and nine in ten a number column
+     * stays text (as before) and a date column is offered through the fix catalogue. <b>Why ten:</b> below ten agreeing
+     * values one stray value is already a tenth of the column, so the share says nothing.
+     */
+    static final int MOSTLY_MIN = 10;
+
+    static boolean mostly(long fits, long of) {
+        return fits >= MOSTLY_MIN && fits * 10 >= of * 9;
+    }
+
+    private static final Set<String> NUMBERS = Set.of("BIGINT", "DOUBLE");
+    /** The column types a person may state ({@code OnboardImport.TYPES}). */
+    static final Set<String> COLUMN_TYPES = Set.of("VARCHAR", "BIGINT", "DOUBLE", "DATE", "TIMESTAMP", "BOOLEAN");
+
+    /**
+     * How the sampled values of one column read as {@code type}: how many of the {@code of} non-blank values fit, the
+     * strptime {@code format} the most date values are written in (else {@code null}), and one value that does not fit.
+     */
+    record Fit(String type, String format, long fits, long of, String odd) {
+        long misfits() {
+            return of - fits;
+        }
+    }
 
     /** One proposed choice. */
     static Map<String, Object> choice(Object value, String evidence, boolean high) {
@@ -166,6 +194,17 @@ final class OnboardDraft {
 
     /** Read {@code file} (in {@code dir}) and propose. */
     static Analysis analyse(Path dir, Path file, String name, String type, Map<String, String> overrides) throws IOException {
+        return analyse(dir, file, name, type, overrides, Map.of());
+    }
+
+    /**
+     * {@link #analyse(Path, Path, String, String, Map)} with the column types the person stated on screen ({@code stated}:
+     * draft column name → type, {@code LA-FULL-CYCLE-TEST-1} finding 4). A stated type is taken as given at {@code high}
+     * confidence; its evidence says how many sampled values it reads, and a date type carries the format most of them are
+     * written in, so the import reads them rather than blanking the whole column.
+     */
+    static Analysis analyse(Path dir, Path file, String name, String type, Map<String, String> overrides, Map<String, String> stated)
+            throws IOException {
         if ("excel".equals(type) && !excelAvailable())
             throw new ApiException(422, ErrorCodes.NOT_SUPPORTED, "this installation cannot read Excel workbooks (the DuckDB excel "
                     + "extension is not in the bundle); save '" + name + "' as CSV and add that");
@@ -177,12 +216,12 @@ final class OnboardDraft {
         String decimal = overrides.get("decimal");
         try (Connection conn = DuckDbUtil.openInMemory(null, List.of(dir), "excel".equals(type) ? ExcelExtension::ensureLoaded : null)) {
             Analysis a = switch (type) {
-                case "csv", "tsv" -> delimited(conn, file, name, type, overrides);
+                case "csv", "tsv" -> delimited(conn, file, name, type, overrides, stated);
                 case "parquet" -> typed(conn, file, com.gamma.sql.SqlViews.parquetFile(file),
-                        choice("parquet", "the file starts with the Parquet magic bytes", true), true, null, null);
-                case "json", "ndjson" -> json(conn, file, name, type, overrides.get("recordPath"), decimal);
+                        choice("parquet", "the file starts with the Parquet magic bytes", true), true, null, null, stated, false);
+                case "json", "ndjson" -> json(conn, file, name, type, overrides.get("recordPath"), decimal, stated);
                 case "excel" -> typed(conn, file, "read_xlsx(" + SqlIdent.pathStr(file) + ", header = true, all_varchar = true)",
-                        choice("excel", "the file is an .xlsx workbook; its first sheet is read", true), false, null, decimal);
+                        choice("excel", "the file is an .xlsx workbook; its first sheet is read", true), false, null, decimal, stated, false);
                 default -> throw new IllegalStateException(type);
             };
             a.format().put("fileDate", fileDate(name));
@@ -203,8 +242,8 @@ final class OnboardDraft {
 
     // ── delimited text ───────────────────────────────────────────────────────────────────────────────────────
 
-    private static Analysis delimited(Connection conn, Path file, String name, String type, Map<String, String> overrides)
-            throws SQLException, IOException {
+    private static Analysis delimited(Connection conn, Path file, String name, String type, Map<String, String> overrides,
+                                      Map<String, String> stated) throws SQLException, IOException {
         String delim = ",", quote = "\"";
         boolean header = true, sniffed = true;
         // C2: the encoding entry - UTF-8 unless the user chose Latin-1 (a fix the catalogue offers when a file is not UTF-8)
@@ -273,7 +312,8 @@ final class OnboardDraft {
 
         String relation = "read_csv(" + SqlIdent.pathStr(file) + ", delim = " + SqlIdent.sqlStr(delim) + ", quote = " + SqlIdent.sqlStr(quote)
                 + ", header = " + header + encodingArg + ", all_varchar = true, null_padding = true, ignore_errors = true)";
-        Analysis base = typed(conn, file, relation, null, false, null, overrides.get("decimal"));
+        // a file with no header line numbers its columns (col_1 …): a stated type names them that way
+        Analysis base = typed(conn, file, relation, null, false, null, overrides.get("decimal"), stated, !header);
 
         Map<String, Object> format = new LinkedHashMap<>();
         boolean extMatches = name.toLowerCase(Locale.ROOT).endsWith(finalType.equals("tsv") ? ".tsv" : ".csv")
@@ -497,7 +537,8 @@ final class OnboardDraft {
 
     private static List<EntityShapes.Column> renameSampled(List<EntityShapes.Column> s, List<Col> cols) {
         List<EntityShapes.Column> out = new ArrayList<>();
-        for (int i = 0; i < s.size(); i++) out.add(new EntityShapes.Column(cols.get(i).name(), s.get(i).type(), s.get(i).values()));
+        for (int i = 0; i < s.size(); i++)
+            out.add(new EntityShapes.Column(cols.get(i).name(), s.get(i).type(), s.get(i).values(), s.get(i).fits()));
         return out;
     }
 
@@ -553,8 +594,8 @@ final class OnboardDraft {
      * are spread into dotted columns ({@code format.flatten}), a list stays one column of JSON text. The same records
      * relation the engine reads ({@code json.records_path} and dotted selectors in {@code DuckDbCsvIngester}).
      */
-    private static Analysis json(Connection conn, Path file, String name, String type, String wantedPath, String decimal)
-            throws SQLException, IOException {
+    private static Analysis json(Connection conn, Path file, String name, String type, String wantedPath, String decimal,
+                                 Map<String, String> stated) throws SQLException, IOException {
         String p = SqlIdent.pathStr(file);
         String records;
         Map<String, Object> typeCh, pathCh;
@@ -606,7 +647,7 @@ final class OnboardDraft {
                     .append(SqlIdent.q(String.join(".", seg)));
             selectors.add(OnboardJson.selector(seg));
         }
-        Analysis a = typed(conn, file, "(SELECT " + proj + " FROM " + records + ")", typeCh, false, selectors, decimal);
+        Analysis a = typed(conn, file, "(SELECT " + proj + " FROM " + records + ")", typeCh, false, selectors, decimal, stated, false);
         a.format().put("recordPath", pathCh);
         a.format().put("flatten", flattenChoice(flat, sampleJson.size()));
         return a;
@@ -691,10 +732,12 @@ final class OnboardDraft {
      * Columns, types, rows and sample of {@code relation}. {@code declaredTypes}: the file carries its own types
      * (Parquet), so they are taken, not voted. {@code selectors}: what the schema reads each column by, when that is not
      * its header (a flattened JSON field's dotted path); {@code null} = the header. {@code decimal}: the decimal mark the
-     * user stated, or {@code null} to detect it (never for declared types).
+     * user stated, or {@code null} to detect it (never for declared types). {@code stated}: the types the person stated,
+     * by column name ({@code positional}: by {@code col_<n>}, the name a file with no header line gives column n).
      */
     private static Analysis typed(Connection conn, Path file, String relation, Map<String, Object> typeChoice, boolean declaredTypes,
-                                  List<String> selectors, String decimal) throws SQLException, IOException {
+                                  List<String> selectors, String decimal, Map<String, String> stated, boolean positional)
+            throws SQLException, IOException {
         List<String> headers = new ArrayList<>();
         List<String> declared = new ArrayList<>();
         try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("DESCRIBE SELECT * FROM " + relation)) {
@@ -766,27 +809,52 @@ final class OnboardDraft {
             SchemaSuggest.Field f = voted.get(i);
             List<String> values = valuesOf.get(i);
             String type = f.type(), fmt = f.format(), colMark = null;
+            long fits = values.size();
             Map<String, Object> typeCh;
             String numeric = mark == null ? null : DecimalMark.numberType(values, mark);
-            if (numeric != null) {
+            String said = stated.get(positional ? "col_" + (i + 1) : n);
+            if (said != null && !(numeric != null && NUMBERS.contains(said))) {
+                // finding 4: the person's own choice, never a guess - how many sampled values it reads, and their format
+                Fit fit = fit(conn, n, said, values.size());
+                type = said;
+                fmt = fit.format();
+                fits = fit.fits();
+                typeCh = choice(type, statedEvidence(fit), true);
+                typeCh.put("format", fmt);
+            } else if (numeric != null) {
                 // C1: numbers written with grouping or a ',' decimal mark: read through the mark, never left as text
-                type = numeric;
+                type = said != null ? said : numeric;
                 fmt = null;
                 colMark = mark;
                 int k = values.size();
-                typeCh = choice(type, (k >= MIN_SAMPLE ? "all " : "only ") + k + " sampled values are numbers written with '" + mark
+                typeCh = choice(type, (said != null ? "you chose " + Words.label(said) + "; " : "") + (k >= MIN_SAMPLE ? "all " + k + " sampled values are numbers"
+                        : "only " + Words.count(k, "sampled value, a number", "sampled values, all numbers")) + " written with '" + mark
                         + "' as the decimal mark (e.g. '" + clip(DecimalMark.example(values, mark)) + "')",
-                        k >= MIN_SAMPLE && "high".equals(markChoice.get("confidence")));
+                        said != null || (k >= MIN_SAMPLE && "high".equals(markChoice.get("confidence"))));
                 typeCh.put("format", null);
             } else if ("BIGINT".equals(type) && !declaredTypes && fractions.get(i) != null) {
                 // DECIMAL-TEXT-NOT-BIGINT-1: the sample is whole numbers but a later row is not; a BIGINT would cut it
                 type = "DOUBLE";
-                typeCh = choice(type, "the " + values.size() + " sampled values are whole numbers, but the file also has '"
-                        + clip(fractions.get(i)) + "', so a decimal number", true);
+                typeCh = choice(type, (values.size() == 1 ? "the sampled value is a whole number" : "the " + values.size() + " sampled values are whole numbers")
+                        + ", but the file also has '" + clip(fractions.get(i)) + "', so a decimal number", true);
                 typeCh.put("format", null);
             } else {
                 if ("TIMESTAMP".equals(type) && !declaredTypes) fmt = timestampFormat(conn, n);
-                typeCh = typeChoice(type, fmt, values, declaredTypes ? declared.get(i) : null);
+                // finding 3: almost all numbers, dates or dates with a time - proposed as that, the odd values left blank
+                Fit almost = "VARCHAR".equals(type) && !declaredTypes ? almost(conn, n, values.size(), fractions.get(i)) : null;
+                if (almost != null && almost.misfits() > 0) {
+                    type = almost.type();
+                    fmt = almost.format();
+                    fits = almost.fits();
+                    typeCh = choice(type, oddOnes(almost) + "; " + Words.pick(almost.misfits(), "it", "they") + " will be left blank", false);
+                    typeCh.put("format", fmt);
+                } else {
+                    if (almost != null) {   // every value is a date with a time in a format a plain cast does not read
+                        type = almost.type();
+                        fmt = almost.format();
+                    }
+                    typeCh = typeChoice(type, fmt, values, declaredTypes ? declared.get(i) : null);
+                }
             }
             Map<String, Object> col = new LinkedHashMap<>();
             col.put("name", n);
@@ -795,7 +863,7 @@ final class OnboardDraft {
             col.put("sample", values.stream().distinct().limit(3).toList());
             columns.add(col);
             cols.add(new Col(n, headers.get(i), selectors == null ? headers.get(i) : selectors.get(i), type, fmt, colMark, fractions.get(i)));
-            sampled.add(new EntityShapes.Column(n, type, values));
+            sampled.add(new EntityShapes.Column(n, type, values, (int) fits));
         }
         List<Map<String, Object>> findings = new ArrayList<>();
         if (!declaredTypes)
@@ -895,8 +963,10 @@ final class OnboardDraft {
         } else if (n == 0) {
             ch = choice(type, "no value in the sample; kept as text", false);
         } else if (!"VARCHAR".equals(type)) {
-            ch = choice(type, (n >= MIN_SAMPLE ? "all " : "only ") + n + " sampled values parse as " + type.toLowerCase(Locale.ROOT)
-                    + (fmt == null ? "" : " written " + fmt), n >= MIN_SAMPLE);
+            // plain words, never the engine's type name or a strptime pattern (finding 10): a format is shown by a value
+            ch = choice(type, (n >= MIN_SAMPLE ? "all " + n + " sampled values are " + Words.plural(type)
+                    : "only " + Words.count(n, "sampled value", "sampled values") + ", " + (n == 1 ? Words.singular(type) : "all " + Words.plural(type)))
+                    + (fmt == null ? "" : " (like '" + clip(values.get(0)) + "')"), n >= MIN_SAMPLE);
         } else {
             int numbers = 0;
             String odd = null;
@@ -905,13 +975,126 @@ final class OnboardDraft {
                 else if (odd == null) odd = v;
             }
             if (numbers > 0 && numbers * 5 >= n * 4)
-                ch = choice(type, numbers + " of " + n + " sampled values are numbers but " + (n - numbers) + " are not (e.g. '"
-                        + clip(odd) + "'), so text", false);
+                ch = choice(type, oddOnes(new Fit("DOUBLE", null, numbers, n, odd)) + ", so it is kept as text", false);
             else
                 ch = choice(type, "the values are text (e.g. '" + clip(values.get(0)) + "')", n >= MIN_SAMPLE);
         }
         ch.put("format", fmt);
         return ch;
+    }
+
+    /**
+     * Finding 3: the type a text column almost is ({@link #mostly}), else {@code null}. Numbers first (a decimal number,
+     * or a whole number under a name that says an amount - digits with a few letters among them are more often
+     * identifiers, so any other whole-number column stays text), then dates with a time, then dates. Two formats that
+     * read the values equally well (day first or month first) are never guessed between: the column stays text.
+     */
+    private static Fit almost(Connection conn, String column, long n, String fraction) throws SQLException {
+        if (n < MOSTLY_MIN) return null;
+        String c = SqlIdent.q(column), nonBlank = c + " IS NOT NULL AND trim(" + c + ") <> ''";
+        String d = "TRY_CAST(" + c + " AS DOUBLE)", whole = d + " = TRY_CAST(" + c + " AS BIGINT) AND NOT regexp_matches(" + c + ", '[.eE]')";
+        long numbers, wholes;
+        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT count(*) FILTER (WHERE " + d + " IS NOT NULL), "
+                + "count(*) FILTER (WHERE " + d + " IS NOT NULL AND " + whole + ") FROM onboard_sample WHERE " + nonBlank)) {
+            rs.next();
+            numbers = rs.getLong(1);
+            wholes = rs.getLong(2);
+        }
+        if (numbers * 5 >= n * 4) {   // a number column: a number when almost all are, else text (the caller says why)
+            boolean isWhole = wholes == numbers && fraction == null;
+            if (numbers == n || !mostly(numbers, n) || (isWhole && !EntityShapes.namedAsAmount(column))) return null;
+            return new Fit(isWhole ? "BIGINT" : "DOUBLE", null, numbers, n, odd(conn, c, nonBlank, d + " IS NULL"));
+        }
+        Fit time = bestFormat(conn, c, nonBlank, "TIMESTAMP", TIMESTAMP_FORMATS, n);
+        if (time != null && mostly(time.fits(), n)) return time;
+        Fit date = bestFormat(conn, c, nonBlank, "DATE", DATE_FORMATS, n);
+        return date != null && date.misfits() > 0 && mostly(date.fits(), n) ? date : null;
+    }
+
+    /** The one format of {@code formats} that reads the most values; {@code null} when none reads any or two tie. */
+    private static Fit bestFormat(Connection conn, String c, String nonBlank, String type, List<String> formats, long n) throws SQLException {
+        StringBuilder sql = new StringBuilder("SELECT ");
+        for (int k = 0; k < formats.size(); k++)
+            sql.append(k == 0 ? "" : ", ").append("count(*) FILTER (WHERE TRY_STRPTIME(").append(c).append(", ").append(SqlIdent.sqlStr(formats.get(k)))
+                    .append(") IS NOT NULL)");
+        int best = -1;
+        long bestCount = 0;
+        boolean tie = false;
+        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql + " FROM onboard_sample WHERE " + nonBlank)) {
+            rs.next();
+            for (int k = 0; k < formats.size(); k++) {
+                long count = rs.getLong(k + 1);
+                if (count > bestCount) {
+                    best = k;
+                    bestCount = count;
+                    tie = false;
+                } else if (count == bestCount && count > 0) tie = true;
+            }
+        }
+        if (best < 0 || tie) return null;
+        String f = formats.get(best);
+        return new Fit(type, f, bestCount, n, odd(conn, c, nonBlank, "TRY_STRPTIME(" + c + ", " + SqlIdent.sqlStr(f) + ") IS NULL"));
+    }
+
+    /** One non-blank sampled value that meets {@code misfit}, else {@code null}. */
+    private static String odd(Connection conn, String c, String nonBlank, String misfit) throws SQLException {
+        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT " + c + " FROM onboard_sample WHERE " + nonBlank
+                + " AND " + misfit + " LIMIT 1")) {
+            return rs.next() ? rs.getString(1) : null;
+        }
+    }
+
+    /**
+     * How the sampled values read as a type the person stated (finding 4), tested as the import will read them: a number
+     * or a yes / no by a plain cast, a date by the one format that reads the most values (a date's own formats first,
+     * then the other kind's, so a date and time column may be read as dates and the other way round).
+     */
+    private static Fit fit(Connection conn, String column, String type, long n) throws SQLException {
+        String c = SqlIdent.q(column), nonBlank = c + " IS NOT NULL AND trim(" + c + ") <> ''";
+        if ("VARCHAR".equals(type) || n == 0) return new Fit(type, null, n, n, null);
+        if ("DATE".equals(type) || "TIMESTAMP".equals(type)) {
+            List<String> formats = new ArrayList<>("DATE".equals(type) ? DATE_FORMATS : TIMESTAMP_FORMATS);
+            formats.addAll("DATE".equals(type) ? TIMESTAMP_FORMATS : DATE_FORMATS);
+            Fit best = null;
+            for (String f : formats) {   // the first format that reads the most values: a tie goes to the earlier one
+                long fits;
+                try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT count(*) FROM onboard_sample WHERE " + nonBlank
+                        + " AND TRY_STRPTIME(" + c + ", " + SqlIdent.sqlStr(f) + ") IS NOT NULL")) {
+                    rs.next();
+                    fits = rs.getLong(1);
+                }
+                if (fits > 0 && (best == null || fits > best.fits())) best = new Fit(type, f, fits, n, null);
+            }
+            if (best == null) return new Fit(type, null, 0, n, odd(conn, c, nonBlank, "TRUE"));
+            return new Fit(type, best.format(), best.fits(), n,
+                    odd(conn, c, nonBlank, "TRY_STRPTIME(" + c + ", " + SqlIdent.sqlStr(best.format()) + ") IS NULL"));
+        }
+        String cast = "TRY_CAST(" + c + " AS " + type + ")";
+        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT count(*) FROM onboard_sample WHERE " + nonBlank
+                + " AND " + cast + " IS NOT NULL")) {
+            rs.next();
+            return new Fit(type, null, rs.getLong(1), n, odd(conn, c, nonBlank, cast + " IS NULL"));
+        }
+    }
+
+    /** "460 of 461 sampled values are dates with a time, but 1 is not (e.g. 'not-a-date')". */
+    private static String oddOnes(Fit f) {
+        return f.fits() + " of " + f.of() + " sampled values are " + noun(f.type()) + ", but " + f.misfits() + " " + Words.pick(f.misfits(), "is", "are")
+                + " not (e.g. '" + clip(f.odd()) + "')";
+    }
+
+    private static String noun(String type) {
+        return NUMBERS.contains(type) ? "numbers" : Words.plural(type);
+    }
+
+    private static String statedEvidence(Fit f) {
+        String chose = "you chose " + Words.label(f.type());
+        if ("VARCHAR".equals(f.type()) || f.of() == 0) return chose;
+        if (f.misfits() == 0) return chose + "; " + (f.of() == 1 ? "the sampled value is " + Words.singular(f.type()) : "all " + f.of() + " sampled values are " + noun(f.type()));
+        if (f.fits() == 0)
+            return chose + ", but none of the " + Words.count(f.of(), "sampled value", "sampled values") + " is " + Words.singular(f.type())
+                    + ": every value would be left blank";
+        return chose + ": " + oddOnes(f) + "; " + Words.pick(f.misfits(), "it", "they") + " will be left blank";
     }
 
     private static String clip(String s) {
@@ -951,8 +1134,4 @@ final class OnboardDraft {
         return v.length() == 1 ? v : dflt;
     }
 
-    /** The Entity Type block for an analysis. */
-    static Map<String, Object> entityTypes(Analysis a, List<EntityTypes.EntityType> types, String kind) {
-        return EntityShapes.propose(a.sampled(), types, kind);
-    }
 }

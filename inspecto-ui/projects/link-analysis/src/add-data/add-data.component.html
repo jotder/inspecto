@@ -8,11 +8,12 @@
     <section class="flex flex-col gap-4" aria-labelledby="add-data-done-title" data-testid="add-data-result">
         <h2 id="add-data-done-title" class="m-0 text-lg font-semibold">{{ s.dataset }} is ready</h2>
         <div class="flex flex-wrap gap-2" data-testid="next-actions">
+            <!-- After details about entities too (finding 7): the graph of the events those entities are in -->
+            <button mat-flat-button color="primary" type="button" data-testid="explore" (click)="explore()">
+                <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
+                Explore in Link Analysis
+            </button>
             @if (s.kind === 'stream') {
-                <button mat-flat-button color="primary" type="button" data-testid="explore" (click)="explore()">
-                    <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
-                    Explore in Link Analysis
-                </button>
                 <button mat-stroked-button type="button" data-testid="add-details" (click)="addDetails()">
                     <mat-icon svgIcon="heroicons_outline:identification"></mat-icon>
                     Add details about these entities
@@ -70,7 +71,7 @@
                         aria-hidden="true"
                     ></mat-icon>
                     <span class="font-semibold">{{ d.snapshot ? snapshotName(d.snapshot) : d.file.name }}</span>
-                    <span class="text-secondary">{{ count(d.file.rows) }} rows, {{ formatSize(d.file.bytes) }}</span>
+                    <span class="text-secondary">{{ rowsWords(d.file.rows) }}, {{ formatSize(d.file.bytes) }}</span>
                     <button mat-button type="button" data-testid="choose-another" (click)="startOver()">
                         {{ d.snapshot ? 'Choose another table' : 'Choose another file' }}
                     </button>
@@ -221,6 +222,15 @@
                         What was detected is already applied, with the reason beside it. A highlighted choice was a
                         guess: confirm it or change it.
                     </p>
+                    <ng-container
+                        *ngTemplateOutlet="
+                            confirmAllBar;
+                            context: { step: 'columns', n: pendingByStep().columns.length }
+                        "
+                    ></ng-container>
+                    @if (reproposing()) {
+                        <p class="m-0 text-sm" role="status" data-testid="reproposing">Checking the columns again…</p>
+                    }
 
                     <!-- The file type, for every format: a CSV of fewer than 50 lines reads as a guess too (OF-2). -->
                     <div
@@ -456,6 +466,9 @@
                             An Entity Type is a kind of thing, like an account. Columns that hold one become the dots of
                             the graph; every other column is a Time, a Measure, a Category or a Detail.
                         </p>
+                        <ng-container
+                            *ngTemplateOutlet="confirmAllBar; context: { step: 'hold', n: pendingByStep().hold.length }"
+                        ></ng-container>
                         <ul class="m-0 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2" formArrayName="columns">
                             @for (g of columnGroups(); track g.controls.name.value; let i = $index) {
                                 @if (!g.controls.drop.value) {
@@ -677,6 +690,26 @@
         }
     </div>
 }
+
+<!-- Several guesses in one step: confirm them together, the count said (finding 6). One guess has its own Confirm. -->
+<ng-template #confirmAllBar let-step="step" let-n="n">
+    @if (n > 1) {
+        <div class="flex flex-wrap items-center gap-2 text-sm" [attr.data-testid]="'guesses-' + step">
+            <span
+                >{{ n }} choices in this step are guesses. Check each reason, then confirm them one by one or
+                together.</span
+            >
+            <button
+                mat-stroked-button
+                type="button"
+                [attr.data-testid]="'confirm-all-' + step"
+                (click)="confirmAll(step)"
+            >
+                {{ confirmAllLabel(n) }}
+            </button>
+        </div>
+    }
+</ng-template>
 
 <!-- One choice's evidence, and its confirm while it is a guess (OF-2). -->
 <ng-template #evidence let-c="c" let-k="k">

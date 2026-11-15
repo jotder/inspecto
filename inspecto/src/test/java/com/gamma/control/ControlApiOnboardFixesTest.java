@@ -198,8 +198,10 @@ class ControlApiOnboardFixesTest {
     @Test
     void dateFormat(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            // day-first dates; one is not a real date
-            byte[] file = rows(240, i -> "O" + i + "," + (i == 7 ? "31/02/2026" : String.format("%02d/%02d/2026", 13 + i % 15, 1 + i % 12)),
+            // day-first dates; one in eight is not a real date. (When at least nine in ten are, the draft proposes the
+            // column as a date itself, as a guess: LA-FULL-CYCLE-TEST-1, ControlApiOnboardFullCycleTest. Between four in
+            // five and nine in ten it stays text and this entry offers the fix.)
+            byte[] file = rows(240, i -> "O" + i + "," + (i % 8 == 7 ? "31/02/2026" : String.format("%02d/%02d/2026", 13 + i % 15, 1 + i % 12)),
                     "order_id,ordered").getBytes(StandardCharsets.UTF_8);
             JsonNode d = draft(c, "orders.csv", file, "");
             JsonNode f = finding(d.get("findings"), "date_format");
@@ -209,7 +211,7 @@ class ControlApiOnboardFixesTest {
 
             String id = id("orders");
             data(commit(c, d, id, ",\"columns\":" + f.at("/fix/columns")), 200);
-            assertEquals(239, parquet(id, "SELECT count(ordered) FROM t"), "the one unreal date stays empty");
+            assertEquals(210, parquet(id, "SELECT count(ordered) FROM t"), "the 30 unreal dates stay empty");
             assertEquals(4, parquet(id, "SELECT count(*) FROM t WHERE ordered = DATE '2026-02-14'"), "read day first (rows 1, 61, 121, 181)");
 
             // both parts at most 12 (03/04/2026): day first and month first read alike - the finding says so and the

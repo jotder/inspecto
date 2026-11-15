@@ -4,6 +4,7 @@ import { formatNumber } from '@inspecto/core/viz/number-format';
 import type { ColDef } from 'ag-grid-community';
 import { type ColumnRole, ROLE_LABELS, hintedRole, recordPhrase } from '@inspecto/link-analysis/api/column-roles';
 import type { RecordTypeGuide } from '@inspecto/link-analysis/api/entity-type-options';
+import { pick, plural } from './words';
 
 /**
  * **Add data** - the contract of `POST /onboard/files` and its commit (LA-ONBOARD-1 OB-2, phase 2), and the pure rules the
@@ -35,6 +36,8 @@ export interface DraftColumn {
 
 export interface DraftEntityTypeChoice extends Choice<string | null> {
     classification?: string | null;
+    /** The Entity Type's label, as its reason names it. */
+    label?: string | null;
 }
 
 /** The link a draft proposes: its ends, its kind, and the primary Time and Measure (LA-COLUMN-ROLES-1 P1). */
@@ -204,6 +207,14 @@ export interface FormatOverrides {
     quote?: string;
 }
 
+/**
+ * The body of `POST /onboard/files/{draftId}/redraft` (LA-FULL-CYCLE-TEST-1 finding 4): every column type and role the
+ * person stated on screen - the whole set each time. The answer is the same draft, proposed again around them.
+ */
+export interface RedraftBody {
+    columns: { name: string; type?: string; role?: ColumnRole }[];
+}
+
 export interface CommitColumn {
     name: string;
     type?: string;
@@ -296,6 +307,8 @@ export interface Arrival {
     keptColumns?: string[] | null;
     /** ADD-DATA-ROW-FILTER-1: rows of this file the import's row filter left out; null = no filter, or not counted. */
     rowsFilteredOut?: number | null;
+    /** Rows of this file that are not in the Dataset (set aside, or left out by the row filter); null = not known. */
+    rowsLeftOut?: number | null;
     /** A `REFUSED` arrival: why, and where the file was set aside (relative to the Dataset's folder). */
     reason?: string | null;
     setAside?: string | null;
@@ -346,6 +359,18 @@ export interface ImportSummary {
     newColumnsReason?: string;
     /** Waiting files refused by the columns rule and set aside (`setAside` is relative to the Dataset's folder). */
     refused?: { file: string; reason: string; setAside: string }[];
+    /**
+     * LA-FULL-CYCLE-TEST-1 finding 5: values present in the file that the column's type could not read. Each was left
+     * blank and its row kept. `type` is the Dataset's column type (`number`, `date`, `timestamp`, `boolean`).
+     */
+    blanked?: { column: string; type: string; values: number; example?: string | null }[];
+    /** Rows kept that cannot be a link because an end is blank (a Dataset with a link only). */
+    unlinked?: { rows: number; noFrom: number; noTo: number; from: string; to: string };
+    /**
+     * Per Entity column: values that are a second spelling of an entity already there (they differ only by spaces or
+     * letter case); `readAs` is the key the Entity Type's normaliser gives the example.
+     */
+    respelled?: { column: string; values: number; example?: string | null; readAs?: string | null }[];
 }
 
 /** A followed (202) run: `GET /onboard/runs/{runId}`. */
@@ -548,14 +573,15 @@ export function count(n: number | null | undefined): string {
     return typeof n === 'number' && Number.isFinite(n) ? formatNumber(n, { decimals: 0 }) : '-';
 }
 
-function plural(n: number, one: string, many: string): string {
-    return `${count(n)} ${n === 1 ? one : many}`;
+/** "1 row", "461 rows": a file's or a Dataset's size in rows; '-' when not known. */
+export function rowsWords(n: number | null | undefined): string {
+    return typeof n === 'number' && Number.isFinite(n) ? plural(n, 'row', 'rows') : '-';
 }
 
 /** The limits as one line, before or after an upload (`limits` of a draft, or the Space's `import.*` limits). */
 export function limitsLine(l: Pick<DraftLimits, 'maxBytes' | 'maxRows' | 'maxImports'> & { imports?: number }): string {
     const used = typeof l.imports === 'number' ? ` (${count(l.imports)} so far)` : '';
-    return `Up to ${formatSize(l.maxBytes)} and ${count(l.maxRows)} rows per file; ${count(l.maxImports)} imports per Space${used}.`;
+    return `Up to ${formatSize(l.maxBytes)} and ${plural(l.maxRows, 'row', 'rows')} per file; ${plural(l.maxImports, 'import', 'imports')} per Space${used}.`;
 }
 
 /** What the chooser says about Excel: read when the bundle can, otherwise "save as CSV". Null = not known yet. */
@@ -603,6 +629,77 @@ export function fileProblem(file: { name: string; size: number } | null, maxByte
 export interface PendingChoice {
     key: string;
     label: string;
+}
+
+/** The step of the screen a choice sits in: *Check the columns* (the format and the types) or *What does each column hold?*. */
+export type ChoiceStep = 'columns' | 'hold';
+
+export function choiceStep(key: string): ChoiceStep {
+    return key.startsWith('format.') || key.startsWith('type.') ? 'columns' : 'hold';
+}
+
+/** "Confirm all 5 guesses" - the count is always said (finding 6). */
+export function confirmAllLabel(n: number): string {
+    return `Confirm all ${plural(n, 'guess', 'guesses')}`;
+}
+
+/** What a draft proposes for one choice key, to tell whether a new answer changed it. */
+export function proposalValue(d: OnboardDraft, key: string): unknown {
+    const [kind, ...rest] = key.split('.');
+    const name = rest.join('.');
+    const col = d.entityTypes.columns.find((c) => c.column === name);
+    if (kind === 'format') return d.format[name]?.value;
+    if (kind === 'type') return d.columns.find((c) => c.name === name)?.type.value;
+    if (kind === 'entity') return col?.entityType.value;
+    if (kind === 'role') return col?.role?.value;
+    if (kind === 'link')
+        return name === 'from'
+            ? `${d.entityTypes.link?.from.value}>${d.entityTypes.link?.to.value}`
+            : d.entityTypes.link?.[name as LinkPrimary]?.value;
+    if (key === choiceKey.primary) return d.entityTypes.primary.value;
+    if (key === choiceKey.identifying) return d.entityTypes.identifying?.value;
+    return undefined;
+}
+
+/**
+ * LA-FULL-CYCLE-TEST-1 finding 4: what the screen holds once the server answered a draft again (`next`) after a stated
+ * type or role. A control still showing what the old draft proposed takes the new proposal; one the person changed keeps
+ * their value (`statedRoles`: the columns whose role they picked). A confirmation stands only while the proposal it
+ * confirmed is unchanged. `roleOf` is the role proposed for a column under the record type on screen.
+ */
+export function adoptRedraft(
+    old: OnboardDraft,
+    next: OnboardDraft,
+    columns: readonly ColumnState[],
+    roles: RolesState,
+    statedRoles: ReadonlySet<string>,
+    confirmed: ReadonlySet<string>,
+    roleOf: (d: OnboardDraft, column: string) => ColumnRole | undefined = (d, c) =>
+        d.entityTypes.columns.find((x) => x.column === c)?.role?.value,
+): { columns: ColumnState[]; roles: RolesState; confirmed: Set<string> } {
+    const was = new Map(initialColumns(old).map((c) => [c.name, c]));
+    const now = new Map(initialColumns(next).map((c) => [c.name, c]));
+    const outColumns = columns.map((c) => {
+        const before = was.get(c.name);
+        const after = now.get(c.name);
+        if (!after) return c;
+        return {
+            ...c,
+            type: after.type,
+            entityType: !before || c.entityType === before.entityType ? after.entityType : c.entityType,
+            role: statedRoles.has(c.name) ? c.role : (roleOf(next, c.name) ?? after.role),
+        };
+    });
+    const oldRoles = initialRoles(old);
+    const newRoles = initialRoles(next);
+    const outRoles = { ...roles };
+    for (const k of Object.keys(newRoles) as (keyof RolesState)[])
+        if (roles[k] !== undefined && roles[k] === oldRoles[k]) outRoles[k] = newRoles[k] as string;
+    return {
+        columns: outColumns,
+        roles: outRoles,
+        confirmed: new Set([...confirmed].filter((k) => proposalValue(old, k) === proposalValue(next, k))),
+    };
 }
 
 /** The keys of the choices on screen, so a confirmation names the same thing in the template and here. */
@@ -905,12 +1002,34 @@ export function summaryLines(s: ImportSummary): SummaryLine[] {
     if (s.rowsRejected > 0)
         out.push({
             tone: 'warning',
-            text: `${plural(s.rowsRejected, 'row was', 'rows were')} set aside because ${s.rowsRejected === 1 ? 'it' : 'they'} did not match the column types.`,
+            // a value that does not fit its column's type is left blank, never a reason to set a row aside (see blanked)
+            text: `${plural(s.rowsRejected, 'row was', 'rows were')} set aside because ${pick(s.rowsRejected, 'its line', 'their lines')} could not be read as the file's columns.`,
         });
     if (s.rowsFilteredOut)
         out.push({
             tone: 'info',
             text: `${plural(s.rowsFilteredOut, 'row was', 'rows were')} left out by the row filter.`,
+        });
+    // finding 5: every value a type could not read, every row that draws no link, every spelling read as another
+    for (const b of s.blanked ?? [])
+        out.push({
+            tone: 'warning',
+            text: `${plural(b.values, 'value', 'values')} in ${b.column} ${pick(b.values, 'was', 'were')} not ${typeWords(b.type, b.values)} and ${pick(b.values, 'was', 'were')} left blank${b.example ? ` (e.g. '${b.example}')` : ''}.`,
+        });
+    if (s.unlinked?.rows) {
+        const u = s.unlinked;
+        const ends = [u.noFrom ? `no From (${u.from})` : '', u.noTo ? `no To (${u.to})` : '']
+            .filter(Boolean)
+            .join(' or ');
+        out.push({
+            tone: 'warning',
+            text: `${plural(u.rows, 'row has', 'rows have')} ${ends}, so ${pick(u.rows, 'it draws', 'they draw')} no link.`,
+        });
+    }
+    for (const r of s.respelled ?? [])
+        out.push({
+            tone: 'info',
+            text: `${plural(r.values, 'value', 'values')} in ${r.column} ${pick(r.values, 'is a second spelling', 'are second spellings')} of ${pick(r.values, 'an entity', 'entities')} already there, differing only by spaces or letter case${r.example ? ` (e.g. '${r.example}'${r.readAs ? ` is ${r.readAs}` : ''})` : ''}.`,
         });
     for (const q of s.quarantined ?? []) out.push({ tone: 'warning', text: `${q.file} was set aside: ${q.reason}.` });
     out.push(...refused);
@@ -940,6 +1059,18 @@ export function summaryLines(s: ImportSummary): SummaryLine[] {
             text: `${plural(s.rowsChanged, 'row was', 'rows were')} added: ${plural(s.rowsAfter, 'row', 'rows')} now.`,
         });
     return [...out, ...indexAndExpectations(s)];
+}
+
+/** A Dataset column type in the words of a sentence: "a date with a time" for one value, "dates with a time" for more. */
+function typeWords(type: string, n: number): string {
+    const words: Record<string, [string, string]> = {
+        number: ['a number', 'numbers'],
+        date: ['a date', 'dates'],
+        timestamp: ['a date with a time', 'dates with a time'],
+        boolean: ['a yes / no value', 'yes / no values'],
+    };
+    const w = words[type] ?? ['of its type', 'of its type'];
+    return pick(n, w[0], w[1]);
 }
 
 /** The follow-on work of the run (DT-16): the link index and the Expectations. */
@@ -1153,7 +1284,7 @@ export interface ArrivalRow {
     /** What it did to the data (or why it was refused), and whether its rows are still kept. */
     result: string;
     rows: number | null;
-    /** Rows the import's row filter left out; null = no filter, or not counted. */
+    /** Rows of the file that are not in the Dataset (set aside, or left out by the row filter); null = not known. */
     leftOut: number | null;
     covers: string;
     /** New columns it carried: kept as details, or not kept. */
@@ -1165,17 +1296,22 @@ export interface ArrivalRow {
 export function arrivalColumns(): ColDef<ArrivalRow>[] {
     const count = (p: { value: unknown }) =>
         typeof p.value === 'number' ? formatNumber(p.value, { decimals: 0 }) : '';
+    // The widths add up to ARRIVALS_MIN_WIDTH: the grid sits in the Dataset card of a page 896 px wide (about 810 px for
+    // the grid), so wider minimums made it scroll sideways at 1440 px (LA-FULL-CYCLE-TEST-1 finding 5). Long values wrap.
     return [
-        { field: 'file', headerName: 'File', minWidth: 140 },
-        { field: 'arrived', headerName: 'Arrived', sort: 'desc', minWidth: 160 },
-        { field: 'how', headerName: 'How', minWidth: 110 },
-        { field: 'result', headerName: 'Result', minWidth: 160, wrapText: true, autoHeight: true },
-        { field: 'rows', headerName: 'Rows', type: 'rightAligned', minWidth: 80, valueFormatter: count },
-        { field: 'leftOut', headerName: 'Left out', type: 'rightAligned', minWidth: 90, valueFormatter: count },
-        { field: 'covers', headerName: 'Covers', minWidth: 130 },
-        { field: 'columns', headerName: 'Columns', minWidth: 130, wrapText: true, autoHeight: true },
+        { field: 'file', headerName: 'File', minWidth: 110, wrapText: true, autoHeight: true },
+        { field: 'arrived', headerName: 'Arrived', sort: 'desc', minWidth: 100, wrapText: true, autoHeight: true },
+        { field: 'how', headerName: 'How', minWidth: 88, wrapText: true, autoHeight: true },
+        { field: 'result', headerName: 'Result', minWidth: 132, wrapText: true, autoHeight: true },
+        { field: 'rows', headerName: 'Rows', type: 'rightAligned', minWidth: 72, valueFormatter: count },
+        { field: 'leftOut', headerName: 'Left out', type: 'rightAligned', minWidth: 72, valueFormatter: count },
+        { field: 'covers', headerName: 'Covers', minWidth: 100, wrapText: true, autoHeight: true },
+        { field: 'columns', headerName: 'Columns', minWidth: 96, wrapText: true, autoHeight: true },
     ];
 }
+
+/** The width the Arrivals grid needs before it scrolls sideways: the sum of its columns' minimum widths. */
+export const ARRIVALS_MIN_WIDTH = 770;
 
 /** One arrival as an {@link ArrivalRow}: who sent it, what it did, its rows, period and new columns. */
 export function arrivalRow(a: Arrival): ArrivalRow {
@@ -1199,7 +1335,7 @@ export function arrivalRow(a: Arrival): ArrivalRow {
         how: a.sender === 'upload' ? 'uploaded' : 'from a system',
         result: result.join(' · '),
         rows: typeof a.rowsRead === 'number' ? a.rowsRead : null,
-        leftOut: a.rowsFilteredOut ?? null,
+        leftOut: a.rowsLeftOut ?? a.rowsFilteredOut ?? null,
         covers: coversText(a.coversFrom, a.coversTo),
         columns: columns.join(' · '),
         kept: a.kept,

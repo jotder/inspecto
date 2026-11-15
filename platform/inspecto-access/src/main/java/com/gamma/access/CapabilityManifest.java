@@ -217,6 +217,8 @@ public final class CapabilityManifest {
             // holds is a Dataset authoring write.
             new Entry("POST", "/onboard/files", Roles.CAN_UPLOAD_DATA),
             new Entry("POST", "/onboard/files/([^/]+)/commit", Roles.CAN_UPLOAD_DATA),
+            // LA-FULL-CYCLE-TEST-1: the same draft answered again around the types and roles the person stated
+            new Entry("POST", "/onboard/files/([^/]+)/redraft", Roles.CAN_UPLOAD_DATA),
             new Entry("GET", "/onboard/runs/([^/]+)", Roles.CAN_UPLOAD_DATA),
             new Entry("POST", "/datasets/([^/]+)/files", Roles.CAN_UPLOAD_DATA),
             new Entry("POST", "/datasets/([^/]+)/run", Roles.CAN_UPLOAD_DATA),

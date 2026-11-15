@@ -331,6 +331,7 @@ the nine-call walkthrough (parse preview → suggest → two `/config/write` →
 | Route | Capability | What it does |
 |---|---|---|
 | `POST /onboard/files?name=&kind=stream\|reference[&delimiter=&header=&quote=&encoding=&decimal=&recordPath=]` | `canUploadData` | raw body, streamed to `<data root>/_onboard/<draftId>/`; answers the draft |
+| `POST /onboard/files/{draftId}/redraft` | `canUploadData` | the column types and roles the person stated on screen: answers the same draft again around them (below); writes no config |
 | `POST /onboard/files/{draftId}/commit` | `canUploadData` | one confirm: writes, registers, lands, runs once, registers the Dataset; 200 run summary, or 202 above `import.inline_max_bytes` |
 | `GET /onboard/runs/{runId}` | `canUploadData` | follows a 202 run (`running` / `succeeded` / `failed`): the caller's own, or any with `canAdminister` |
 | `POST /datasets/{id}/files?name=[&mode=replace\|append]` | `canUploadData` | **Add a file** to an imported Dataset and run it (replace is the default; append for a Stream only) |
@@ -354,7 +355,7 @@ with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carr
          fileDate:{value, format, name, evidence, confidence}},
  columns:[{name, header, type:{value, format, evidence, confidence}, sample:[up to 3]}],
  rows:[up to 20 preview rows],
- entityTypes:{columns:[{column, entityType:{value, classification?, evidence, confidence},
+ entityTypes:{columns:[{column, entityType:{value, classification?, label?, evidence, confidence},
                         role:{value, evidence, confidence}, distinct? (text columns)}],
               primary, link:{from, to, kind, primaryTime, primaryMeasure, details} (stream) | identifying (reference)},
  limits:{maxBytes, maxRows, maxImports, imports, inlineMaxBytes, excel},
@@ -385,6 +386,31 @@ with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carr
   `?recordPath=` on a re-draft) is `high` by definition. The sample is the first 1,000 rows. A column's date or time
   format rides its `type` choice (`format`, the strptime pattern every sampled value parsed with: DATE through
   `SchemaSuggest`, TIMESTAMP from a fixed candidate list).
+* **A column that is almost all one type (`LA-FULL-CYCLE-TEST-1` phase 3, 2026-11-15; `OnboardDraft.almost`).** The
+  type vote needs every sampled value to agree, so one `not-a-date` made a column of 460 timestamps *Text* at `high`
+  confidence, and the link then had no time. Now a text column whose non-blank sampled values are **at least nine in
+  ten, and at least ten,** dates with a time (one of the TIMESTAMP candidate formats), dates (`DATE_FORMATS`) or
+  numbers is proposed as TIMESTAMP, DATE, DOUBLE or BIGINT at `low` confidence, with the format the fitting values are
+  written in and evidence that names a value that does not fit: `460 of 461 sampled values are dates with a time, but
+  1 is not (e.g. 'not-a-date'); it will be left blank`. **Why nine in ten, not the four in five that marks a number
+  column a guess:** this proposal blanks every value that does not fit, so it may cost at most one value in ten;
+  between four in five and nine in ten a number column stays text (`…, so it is kept as text`, `low`) and a date
+  column is offered through the fix catalogue's `date_format` entry. **Why ten:** below ten agreeing values one stray
+  value is already a tenth of the column. **A whole-number column is proposed this way only when its name says an
+  amount** (`EntityShapes.namedAsAmount`: amount, total, fee, …): digits with a few letters among them are more often
+  identifiers, and a number type would blank them. Two formats that read the values equally well (day first or month
+  first) are never guessed between: the column stays text. A column where **every** value is a date with a time in a
+  candidate format a plain cast does not read (`21/09/2026 03:58:24`) is TIMESTAMP with that format too. The roles
+  that follow see the column: the link's `primaryTime` and `primaryMeasure` are proposed, and a measure's evidence
+  says `460 of 461 sampled values are numbers`, never "all". The values that do not fit are **left blank by the import,
+  their rows kept, and counted** in the run summary's `blanked` (below). Tests:
+  `ControlApiOnboardFullCycleTest` on the committed fixture `inspecto/src/test/resources/onboard/full-cycle/`
+  (`tools/gen-la-import-fixture.mjs`).
+* **Reasons in plain words (finding 10; `Words`).** One helper agrees in number (`1 is not`, `3 are not`; `1 distinct
+  value`), and a reason never carries an engine type or an Entity Type id: `all 240 sampled values are decimal
+  numbers` (it was `parse as double`), `booked_at holds dates with a time`, `the name 'phone' says Phone number` (the
+  Entity Type's label, also answered as `entityType.label`). A date format is shown by a value (`like '2026-09-01
+  00:05:00'`), not by its strptime pattern; the pattern stays in `type.format`.
 * **A whole number is only text with no decimal point** (`DECIMAL-TEXT-NOT-BIGINT-1`, 2026-11-06). The type vote
   (`SchemaSuggest`) gives BIGINT only to digits with no `.` and no exponent: `47.00`, `370.00` are DOUBLE (the text
   says decimal even when every fraction is zero), so a later `12.25` is kept, not cut to 12. A column whose sample is
@@ -399,8 +425,9 @@ with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carr
   whose numbers need the mark (a `,` mark, or grouping) is typed DOUBLE (never BIGINT: a later `7.500,25` keeps its
   fraction) and carries it in
   the draft's `plan` (`decimal`); the commit writes that raw field as VARCHAR and maps it with `fn: custom`,
-  `TRY_CAST(REPLACE(…) AS DOUBLE)` (the engine's cast has no decimal-mark option; ⚠ a `custom` field is outside the
-  cast-failure audit, so an unreadable value becomes empty without being counted). Not on Parquet (`?decimal=` 422).
+  `TRY_CAST(REPLACE(…) AS DOUBLE)` (the engine's cast has no decimal-mark option; a `custom` field is outside the
+  engine's cast-failure audit, so the import result counts this one expression itself: `blanked`, below). Not on
+  Parquet (`?decimal=` 422).
 * **JSON records (`format.recordPath`, `format.flatten`, C1; `OnboardJson`).** A `.json` file starting with `{` that
   holds ONE document is walked with Jackson's streaming parser; its records are the first list of objects in document
   order (a list inside a record is a field). `recordPath` is that list's dotted path (`response.transfers`; `$` for a
@@ -490,6 +517,38 @@ own Dataset) - and the user re-runs it; nothing is applied silently.
   (`country,2022,2023`) sniffed as no header, get no finding; a quoted multi-line field is a 422 from DuckDB's parallel
   reader with `null_padding` (outside the catalogue).
 
+### The redraft: `POST /onboard/files/{draftId}/redraft` (`LA-FULL-CYCLE-TEST-1` phase 3, 2026-11-15)
+
+The reasons of a draft are written once, on the server. A type changed on screen used to leave them standing ("the
+values are text", "no column holds dates or times") and the screen had to be corrected in three places per column. Now
+a stated type or role is one call: body `{columns:[{name, type?, role?}]}` - **every** type and role the person has
+stated, the whole set each time (`[]` states nothing) - and the answer is the same draft, same `draftId`, proposed
+again (`OnboardRoutes.redraft`):
+
+* The file is read again with the format choices the draft was made with (`draft.json` keeps them as `overrides`), so
+  nothing but what follows from the stated choices changes; the draft's uploader and age stay.
+* A stated **type** (`VARCHAR|BIGINT|DOUBLE|DATE|TIMESTAMP|BOOLEAN`) is `high` by definition. Its evidence says how many
+  sampled values it reads, tested as the import will read them (a number or a yes / no by a plain cast, a date by the
+  one candidate format that reads the most values): `you chose Date and time: 460 of 461 sampled values are dates with
+  a time, but 1 is not (e.g. 'not-a-date'); it will be left blank`, or `…, but none of the 461 sampled values is a
+  date with a time: every value would be left blank`. A date type carries that format in `type.format` and in the
+  draft's `plan`, so the commit reads the values (see the commit, below, for why that matters).
+* A stated **role** (`temporal|measure|dimension|detail`; `entity` is 422 - a column is an Entity by the Entity Type it
+  holds) is `high` (`you chose Detail for channel`), and the column then holds no Entity Type.
+* Everything that depends on them is worked out again (`EntityShapes.propose` with the stated roles): each column's
+  role, and the link's kind, `primaryTime` and `primaryMeasure` among the columns that may still hold them - a column
+  stated a Detail is no longer the link's kind; one stated a Measure can be what the link is weighed by even when its
+  name says no amount; a record type's usual roles never replace a stated one.
+* The stored draft is replaced, so a commit that states nothing starts from what was last answered. No config is written.
+
+Gates: capability 401/403 → no write root 503 → `data.self_import` off 403 → unknown, expired or another person's
+draft (or a draft whose file is gone) 404 → 422 `columns` is not a list, an entry names no draft column, or states a
+type or role outside the lists. Rate class: the standard bucket. The screen (`AddDataComponent`) sends it on every
+Type or Role pick, keeps what the person changed and takes every other proposal from the answer (`adoptRedraft` in
+`add-data.model.ts`); a failed call leaves the person's choice on screen and the commit states it. Tests:
+`ControlApiOnboardFullCycleTest` (`aStatedTypeOrRoleIsProposedAgainByTheServerInOneCall`, `redraftIsGatedLikeTheDraft`),
+`EntityShapesTest` (stated roles).
+
 ### The commit
 
 Body (every key optional; absent = the draft's proposal): `{name, description, columns:[{name, type?, format?,
@@ -501,7 +560,11 @@ type (else Detail); the link's kind / primaryTime / primaryMeasure columns take 
 role is stated. A stated role that contradicts the Entity Type, the link's primaries, or a Measure on a non-number
 column is 422. The Dataset is written with `columns[].role` and `defaultLinkMapping.primaryTime / primaryMeasure`
 (`time` / `amount` are their old names, still read for entries written before). `format.*` cannot change at commit (422:
-re-draft with `?delimiter=…`), because the columns were read with it. Order:
+re-draft with `?delimiter=…`), because the columns were read with it. **A DATE or TIMESTAMP type stated only here,
+with no `format`, gets the format most of the column's values are written in** (`OnboardImport.withFoundFormats`: the
+draft's file is read once more, as a redraft reads it). Before, such a column was read with the Pipeline's one default
+format (`%Y-%m-%d %H:%M:%S`) and every other value - a whole column of `2026-03-01T10:15:00` - was imported blank with
+nothing said (seen in the 2026-11-15 drive: *Covers* stayed empty). Order:
 
 1. Decide everything first: 422 for a choice naming nothing real; 409 for a taken name (Dataset, Pipeline, config
    files or `<data root>/<id>`), an approval policy over Datasets, Pipelines or schemas, an import of that id in
@@ -520,6 +583,30 @@ re-draft with `?delimiter=…`), because the columns were read with it. Order:
    `rowsIn` (`total_input_rows`, rejected rows included), `rowsRejected`, `quarantined:[{file, reason}]`,
    `rowsBefore`, `rowsAfter`, `rowsChanged`, `replaced`. A run that quarantined the file or loaded no row **fails**
    (422 "nothing was imported … nothing was kept").
+
+   **The summary accounts for every row and value** (`LA-FULL-CYCLE-TEST-1` finding 5; commit, Add a file and Run now):
+   * `blanked:[{column, type, values, example}]` - per column, the values present in the file that its type could not
+     read. The engine blanks such a value and **keeps the row** (`TRY_CAST` / `TRY_STRPTIME`), and its own audit keeps
+     only a batch total, so the import counts them per column **before** the run, in one pass over each waiting file
+     through the engine's reader view with the engine's own cast expressions (`OnboardImport.Job.prescan` over
+     `DataTransformer.castChecks`, the predicates `countCastFailures` sums) - what the run does, not a second opinion.
+     `type` is the Dataset column type (`number|date|timestamp|boolean`), `example` one such value. A number read
+     through a decimal mark is counted with this import's own expression. `[]` when nothing was blanked.
+   * `unlinked:{rows, noFrom, noTo, from, to}` - for a Dataset with a link: the rows this run wrote whose From or To is
+     blank. They are kept in the Dataset and draw no link, which is why an index can hold fewer links than the Dataset
+     has rows.
+   * `respelled:[{column, values, example, readAs}]` - per Entity column, over the rows this run wrote: how many
+     distinct values differ from another only by leading or trailing spaces or letter case (distinct values less
+     distinct `upper(trim())` values), one of them, and the key the Entity Type's normaliser reads it as
+     (`EntityTypes.normalise`; every normaliser folds case and outer spaces). `' acc-1003 '` is `ACC-1003`. ⚠ The
+     claim is only that: Entity profiles, entity counts and lookups read the normalised key, while the link index keeps
+     each spelling as its own node id (on the fixture `index.nodes` is 138 for 137 accounts), so the screen says "a
+     second spelling of an entity already there", not "merged".
+   Both are read from the Parquet the run wrote, before any compaction; unreadable output leaves them unsaid.
+   An arrival (`GET /datasets/{id}/arrivals`) carries `rowsLeftOut`: the rows of the file that are not in the Dataset
+   (rejected plus left out by the row filter); `0` says none, `null` that it is not known (a filter whose rows were not
+   counted). `coversFrom` / `coversTo` are filled whenever the Time column holds real dates - which the format rule
+   above now ensures.
 4. The Dataset entry: `{physicalRef: <id>/database, description, origin: import, kind, importPipeline, importFormat,
    eventDate (a Stream's Time: the link's time, else the body's `eventDate`, else - body silent on both - the draft's
    proposed Time; kept with no link, since it is what each arrival covers and how fresh the Dataset is -

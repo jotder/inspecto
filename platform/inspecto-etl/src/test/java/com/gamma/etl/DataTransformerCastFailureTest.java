@@ -65,6 +65,41 @@ class DataTransformerCastFailureTest {
         }
     }
 
+    /**
+     * {@link DataTransformer#castChecks}: the same audit, one predicate per column, so a caller can say WHICH column
+     * lost values and show one (Add data's import result). The checks must add up to the batch count they are cut from.
+     */
+    @Test
+    void theChecksNameEachColumnAndAddUpToTheBatchCount(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = config(dir);
+        File db = DuckDbUtil.tempDbFile("cast_checks_");
+        try (Connection conn = DuckDbUtil.openConnection(db);
+             Statement st = conn.createStatement()) {
+            st.execute("CREATE TABLE raw_input AS SELECT * FROM (VALUES " +
+                    "('a', '1.5',  '2020-04-03', 0)," +
+                    "('b', 'abc',  '2020-04-03', 0)," +
+                    "('c', '',     '31/31/2020', 0)," +
+                    "('d', 'n/a',  '2020-04-04', 0)) t(ID, AMT, EVENT_DATE, __src_id)");
+            List<DataTransformer.CastCheck> checks = DataTransformer.castChecks(schema(), cfg.csv(), "raw_input");
+            // ID is VARCHAR: a pass-through cannot lose a value, so it is not audited
+            assertEquals(List.of("AMT", "EVENT_DATE"), checks.stream().map(DataTransformer.CastCheck::column).toList());
+            assertEquals("DOUBLE", checks.get(0).type());
+            long total = 0;
+            for (DataTransformer.CastCheck c : checks)
+                try (ResultSet rs = st.executeQuery("SELECT count(*) FILTER (WHERE " + c.failed() + "), first(\"" + c.source()
+                        + "\") FILTER (WHERE " + c.failed() + ") FROM raw_input")) {
+                    rs.next();
+                    total += rs.getLong(1);
+                    // a blank AMT is not a failed coercion: 2 for AMT ('abc', 'n/a'), 1 for EVENT_DATE
+                    assertEquals("AMT".equals(c.column()) ? 2 : 1, rs.getLong(1), c.column());
+                    assertEquals("AMT".equals(c.column()) ? "abc" : "31/31/2020", rs.getString(2), "one value that was lost");
+                }
+            assertEquals(total, DataTransformer.countCastFailures(conn, schema(), cfg, "raw_input"), "the per-column counts are the batch count");
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
     /** A clean batch reports 0 — distinguishable from "not measured" (-1), which is the whole point. */
     @Test
     void aCleanBatchCountsZeroNotUnknown(@TempDir Path dir) throws Exception {

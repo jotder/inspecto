@@ -249,10 +249,11 @@ final class DatasetArrivals {
         List<Map<String, Object>> arrivals = new ArrayList<>();
         // LA-DATASET-COMPACT-1 (D-8): arrivals a compaction merged keep their period through the merge map
         Map<String, DatasetCompaction.Segment> merged = DatasetCompaction.merged(dataRoot, pipeline);
+        boolean filters = dataset.get(OnboardImport.IMPORT_FILTER) instanceof List<?> conditions && !conditions.isEmpty();
         try (Connection duck = periodReader(dataRoot, pipeline, eventDate)) {
             for (Map<String, String> r : rows) {
                 if (arrivals.size() == MAX_LISTED) break;
-                arrivals.add(arrival(r, extras, dataRoot, pipeline, eventDate, duck, merged));
+                arrivals.add(arrival(r, extras, dataRoot, pipeline, eventDate, duck, merged, filters));
             }
         } catch (java.sql.SQLException noReader) {
             // closing failed: the list is already built
@@ -286,7 +287,7 @@ final class DatasetArrivals {
 
     private static Map<String, Object> arrival(Map<String, String> r, Map<String, Map<String, Object>> extras, Path dataRoot,
                                                String pipeline, String eventDate, Connection duck,
-                                               Map<String, DatasetCompaction.Segment> merged) {
+                                               Map<String, DatasetCompaction.Segment> merged, boolean filters) {
         String landed = r.getOrDefault("filename", "");
         String batch = r.getOrDefault("consignment_id", "");
         Map<String, Object> extra = extras.get(landed + "|" + batch);
@@ -335,6 +336,12 @@ final class DatasetArrivals {
         a.put("newColumns", extra == null ? null : extra.get("newColumns"));
         a.put("keptColumns", extra == null ? null : extra.get("keptColumns"));
         a.put("rowsFilteredOut", extra == null ? null : extra.get("rowsFilteredOut"));
+        // LA-FULL-CYCLE-TEST-1 finding 5: the rows of the file that are not in the Dataset - set aside, or left out by the row
+        // filter. 0 says "none"; null says it is not known (no count in the ledger, or a filter whose rows were not counted)
+        Long rejected = number(r.get("error_rows"));
+        Object filtered = extra == null ? null : extra.get("rowsFilteredOut");
+        a.put("rowsLeftOut", rejected == null || (filters && !(filtered instanceof Number)) ? null
+                : Long.valueOf(rejected + (filtered instanceof Number n ? n.longValue() : 0)));
         a.put("reason", null);
         if (extra != null && extra.get("at") != null) a.put(AT, extra.get("at"));   // a sort key only, never answered
         return a;
@@ -362,6 +369,7 @@ final class DatasetArrivals {
         a.put("coversTo", null);
         a.put("newColumns", null);
         a.put("keptColumns", null);
+        a.put("rowsLeftOut", null);
         a.put("reason", m.get("reason"));
         a.put("setAside", m.get("setAside"));
         if (m.get("at") != null) a.put(AT, m.get("at"));

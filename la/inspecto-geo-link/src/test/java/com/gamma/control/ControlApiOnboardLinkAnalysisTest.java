@@ -171,6 +171,29 @@ class ControlApiOnboardLinkAnalysisTest {
      * LA-COLUMN-ROLES-1 P3: a role filter (a Measure range, a Category list, a Time window) on a link read is answered from the link index's
      * attribute columns - which Add data's first build carries - with exactly the rows the Dataset read gives, and narrows them.
      */
+    /**
+     * LA-FULL-CYCLE-TEST-1 phase 3 (finding 5), on the committed full-cycle fixture ({@code inspecto/src/test/resources/
+     * onboard/full-cycle/}, read by path): the import's counts and the index's add up - 461 rows kept, 1 of them with no
+     * From, so 460 links - and the spelling {@code ' acc-1003 '} is named as the account ACC-1003.
+     */
+    @Test
+    void onTheFullCycleFixtureTheRowsTheLinksAndTheRowsThatDrawNoLinkAddUp(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        byte[] fixture = Files.readAllBytes(Path.of("..", "..", "inspecto", "src", "test", "resources", "onboard", "full-cycle", "transfers.csv"));
+        try (Ctx c = open(cfg, root)) {
+            JsonNode d = data(send(c, "POST", "/onboard/files?name=transfers.csv&kind=stream", fixture), 200);
+            JsonNode s = data(send(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit",
+                    ("{\"name\":\"" + id + "\"}").getBytes(StandardCharsets.UTF_8)), 200);
+            assertEquals(461, s.get("rowsAfter").asLong(), s.toString());
+            assertEquals("BUILT", s.at("/index/result").asText(), s.get("index").toString());
+            assertEquals(1, s.at("/unlinked/rows").asLong(), s.toString());
+            assertEquals(s.get("rowsAfter").asLong() - s.at("/unlinked/rows").asLong(), s.at("/index/edges").asLong(),
+                    "every kept row is a link, or is named as drawing none: " + s);
+            // ' acc-1003 ' is named as a second spelling of ACC-1003. (The index itself keeps each spelling as a node id:
+            // index.nodes is 138 here for 137 accounts - not this lane's to change, so it is not pinned.)
+            assertEquals("ACC-1003", s.at("/respelled/0/readAs").asText(), s.toString());
+        }
+    }
+
     @Test
     void aRoleFilterIsServedFromTheIndexAndAgreesWithTheDataset(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

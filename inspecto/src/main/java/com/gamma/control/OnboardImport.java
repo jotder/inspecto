@@ -141,6 +141,7 @@ final class OnboardImport {
         try {
             // ── decide everything before writing anything ─────────────────────────────────────────────────────
             List<EntityTypes.EntityType> types = LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes();
+            body = withFoundFormats(draft, body, draftDir, draftFile, fileName);
             Plan plan = Plan.of(draft, body, types, kind);
             PendingChanges.holdRefusing(api, List.of("dataset", "pipeline", "schema"), "Add data writes a Pipeline, its schema and a Dataset");
             ComponentStore registry = new ComponentStore(writeRoot.resolve("registry"));
@@ -231,6 +232,44 @@ final class OnboardImport {
         } finally {
             if (!handedOff) IN_FLIGHT.remove(key);
         }
+    }
+
+    /**
+     * {@code LA-FULL-CYCLE-TEST-1} finding 5: a date type stated only here, with no format, gets the format most of the
+     * column's values are written in (the draft's file is read once more, as a redraft reads it). Without it the import
+     * reads such a column with the Pipeline's one default format and leaves every other value blank - a whole column of
+     * ISO date-times imported as nothing. The screen states types through a redraft, so this is for every other caller.
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> withFoundFormats(Map<String, Object> draft, Map<String, Object> body, Path dir, Path file,
+                                                        String fileName) throws IOException {
+        if (!(body.get("columns") instanceof List<?> columns) || !(draft.get("plan") instanceof List<?> plan)) return body;
+        Map<String, Object> planned = new LinkedHashMap<>();
+        for (Object p : plan) if (p instanceof Map<?, ?> m) planned.put(String.valueOf(m.get("name")), m.get("type"));
+        Map<String, String> stated = new LinkedHashMap<>();
+        for (Object o : columns) {
+            if (!(o instanceof Map<?, ?> m) || !(m.get("name") instanceof String n) || !(m.get("type") instanceof String t)
+                    || m.containsKey("format") || Boolean.TRUE.equals(m.get("drop")) || !planned.containsKey(n)) continue;
+            String type = t.trim().toUpperCase(Locale.ROOT);
+            if ((type.equals("DATE") || type.equals("TIMESTAMP")) && !type.equals(planned.get(n))) stated.put(n, type);
+        }
+        if (stated.isEmpty()) return body;
+        Map<String, String> found = new LinkedHashMap<>();
+        for (OnboardDraft.Col c : OnboardDraft.analyse(dir, file, fileName, String.valueOf(draft.get("type")),
+                OnboardRoutes.formatOverrides(draft), stated).cols())
+            if (stated.containsKey(c.name()) && c.format() != null) found.put(c.name(), c.format());
+        if (found.isEmpty()) return body;
+        List<Object> withFormats = new ArrayList<>();
+        for (Object o : columns) {
+            if (o instanceof Map<?, ?> m && found.containsKey(m.get("name"))) {
+                Map<String, Object> c = new LinkedHashMap<>((Map<String, Object>) m);
+                c.put("format", found.get(m.get("name")));
+                withFormats.add(c);
+            } else withFormats.add(o);
+        }
+        Map<String, Object> out = new LinkedHashMap<>(body);
+        out.put("columns", withFormats);
+        return out;
     }
 
     private static void refuseFindings(String what, List<Finding> findings) {
@@ -848,7 +887,9 @@ final class OnboardImport {
             // the rows its reader yields are counted here, before the run, with the engine's own reader view
             boolean filters = cfg.csv().hasRowPredicate();
             String format = String.valueOf(dataset.get("importFormat"));
-            Map<String, Long> read = filters && COUNTED_FORMATS.contains(format) ? rowsRead(cfg, format) : null;
+            Map<String, Long> read = filters && COUNTED_FORMATS.contains(format) ? new LinkedHashMap<>() : null;
+            // finding 5: in the same pass, the values each typed column cannot read (blank in the Dataset, the row kept)
+            List<Map<String, Object>> blanked = prescan(cfg, format, read);
             try {
                 space.service().runPipeline(id).orElseThrow(() -> new ApiException(409, ErrorCodes.CONFLICT, "the import's Pipeline '" + id + "' is not registered"));
             } catch (IllegalStateException notRunnable) {
@@ -898,6 +939,7 @@ final class OnboardImport {
                 for (Map<String, Object> m : quarantined) m.put("findings", findings);
             s.put("rowsIn", parsed);
             s.put("rowsRejected", rejected);
+            s.put("blanked", blanked);
             if (filters) {
                 s.put("rowsFilteredOut", read == null ? null : filtered);   // null: this format's rows are not counted apart
                 if (dataset.get(IMPORT_FILTER) instanceof List<?> conditions) s.put("filter", conditions);
@@ -919,6 +961,7 @@ final class OnboardImport {
                 if (!findings.isEmpty()) throw new OnboardFixes.Refusal(422, msg, findings);
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, msg);
             }
+            describeOutput(s);
             return s;
         }
 
@@ -948,48 +991,186 @@ final class OnboardImport {
             }
         }
 
+        /** The reader view {@link #prescan} reads each waiting file through. */
+        private static final String PRESCAN_VIEW = "import_prescan";
+
+        /** One typed column of {@link #prescan}: the SQL of its raw value, and the predicate "present, but blank once typed". */
+        private record Check(String column, String source, String failed) {}
+
         /**
-         * Rows each file waiting in the import's inbox yields, by the name the run ledger gives it: delimited text through the
-         * engine's own reader view ({@code DuckDbCsvIngester.createRawInputView}: the same {@code read_csv}, rejected rows
-         * excluded), Parquet by its row count. A file it cannot read is left out (the run judges it). An extra read of each
-         * file, paid only by an import that filters rows.
+         * One pass over each file waiting in the import's inbox, before the run, with the engine's own reader view
+         * ({@code DuckDbCsvIngester.createRawInputView}: the same read, rejected rows excluded).
+         * <ul>
+         *   <li>{@code rows} (non-null for an import that filters rows): the rows each file yields, by the name the run ledger
+         *       gives it - delimited text through the view, Parquet by its row count.</li>
+         *   <li>Answered ({@code LA-FULL-CYCLE-TEST-1} finding 5): the values each typed column cannot read - present in the
+         *       file, left blank in the Dataset, the row kept - as {@code [{column, type, values, example}]}, counted with the
+         *       engine's own cast expressions ({@link com.gamma.etl.DataTransformer#castChecks}), so the count is what the
+         *       run does, not a second opinion.</li>
+         * </ul>
+         * A file it cannot read is left out (the run judges it). One extra read of each file.
          */
-        private Map<String, Long> rowsRead(PipelineConfig cfg, String format) {
-            Map<String, Long> out = new LinkedHashMap<>();
+        private List<Map<String, Object>> prescan(PipelineConfig cfg, String format, Map<String, Long> rows) {
             Path in = inbox(space.dataRoot(), id);
             Map<String, Object> schema = cfg.schemas().single();
-            if (schema == null || !Files.isDirectory(in)) return out;
+            if (schema == null || !Files.isDirectory(in)) return List.of();
             List<Path> files;
             try (java.util.stream.Stream<Path> w = Files.list(in)) {
                 files = w.filter(Files::isRegularFile).filter(p -> !p.getFileName().toString().startsWith(".")).toList();
             } catch (IOException unreadable) {
-                return out;
+                return List.of();
             }
-            if (files.isEmpty()) return out;
+            List<Check> checks = checks(schema, cfg);
+            if (files.isEmpty() || (rows == null && checks.isEmpty())) return List.of();
+            long[] values = new long[checks.size()];
+            String[] examples = new String[checks.size()];
+            StringBuilder select = new StringBuilder("SELECT count(*)");
+            for (Check c : checks)
+                select.append(", count(*) FILTER (WHERE ").append(c.failed()).append("), first(CAST(").append(c.source())
+                        .append(" AS VARCHAR)) FILTER (WHERE ").append(c.failed()).append(")");
+            boolean parquet = "parquet".equals(format);
             try {
                 DuckDbUtil.loadDriver();
                 try (Connection conn = DuckDbUtil.openInMemory(null, List.of(in.toAbsolutePath().normalize()), null)) {
-                    for (Path f : files)
+                    for (Path f : files) {
+                        String name = com.gamma.etl.FileNames.safe(cfg, f.getFileName().toString());
+                        if (rows != null && parquet)
+                            try (Statement st = conn.createStatement();
+                                 ResultSet rs = st.executeQuery("SELECT count(*) FROM " + com.gamma.sql.SqlViews.parquetFile(f))) {
+                                if (rs.next()) rows.put(name, rs.getLong(1));
+                            } catch (Exception unreadable) {
+                                // left out: the run quarantines or rejects it and the ledger says so
+                            }
+                        if (checks.isEmpty() && (rows == null || parquet)) continue;
                         try (Statement st = conn.createStatement()) {
-                            String relation;
-                            if ("parquet".equals(format)) {
-                                relation = com.gamma.sql.SqlViews.parquetFile(f);
-                            } else {
-                                com.gamma.etl.DuckDbCsvIngester.createRawInputView(f.toFile(), conn, schema, cfg, "row_filter_read", 0);
-                                relation = "row_filter_read";
+                            com.gamma.etl.DuckDbCsvIngester.createRawInputView(f.toFile(), conn, schema, cfg, PRESCAN_VIEW, 0);
+                            try (ResultSet rs = st.executeQuery(select + " FROM " + PRESCAN_VIEW)) {
+                                if (rs.next()) {
+                                    if (rows != null && !parquet) rows.put(name, rs.getLong(1));
+                                    for (int i = 0; i < checks.size(); i++) {
+                                        values[i] += rs.getLong(2 + 2 * i);
+                                        if (examples[i] == null) examples[i] = rs.getString(3 + 2 * i);
+                                    }
+                                }
                             }
-                            try (ResultSet rs = st.executeQuery("SELECT count(*) FROM " + relation)) {
-                                if (rs.next()) out.put(com.gamma.etl.FileNames.safe(cfg, f.getFileName().toString()), rs.getLong(1));
-                            }
-                            st.execute("DROP VIEW IF EXISTS row_filter_read");
+                            st.execute("DROP VIEW IF EXISTS " + PRESCAN_VIEW);
                         } catch (Exception unreadable) {
                             // left out: the run quarantines or rejects it and the ledger says so
                         }
+                    }
                 }
             } catch (Exception noDuckDb) {
                 // no count: the ledger's own figures are used
             }
+            Map<String, String> types = new LinkedHashMap<>();
+            if (dataset.get("columns") instanceof List<?> cols)
+                for (Object o : cols) if (o instanceof Map<?, ?> m) types.put(String.valueOf(m.get("name")), String.valueOf(m.get("type")));
+            List<Map<String, Object>> blanked = new ArrayList<>();
+            for (int i = 0; i < checks.size(); i++) {
+                if (values[i] == 0) continue;
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("column", checks.get(i).column());
+                m.put("type", types.getOrDefault(checks.get(i).column(), "string"));
+                m.put("values", values[i]);
+                m.put("example", examples[i]);
+                blanked.add(m);
+            }
+            return blanked;
+        }
+
+        /**
+         * The typed columns {@link #prescan} audits: every mapping field the engine's own cast audit covers, and the numbers
+         * this import reads through a decimal mark (C1) - its own expression, which the engine's audit leaves out as
+         * author-owned SQL. Empty when the schema does not compile (the run then says so).
+         */
+        private static List<Check> checks(Map<String, Object> schema, PipelineConfig cfg) {
+            List<Check> out = new ArrayList<>();
+            String view = SqlIdent.q(PRESCAN_VIEW);
+            try {
+                for (com.gamma.etl.DataTransformer.CastCheck c : com.gamma.etl.DataTransformer.castChecks(schema, cfg.csv(), PRESCAN_VIEW))
+                    out.add(new Check(c.column(), view + "." + SqlIdent.q(c.source()), c.failed()));
+            } catch (RuntimeException uncompilable) {
+                return List.of();
+            }
+            if (schema.get("mapping") instanceof Map<?, ?> mapping && mapping.get("fields") instanceof List<?> fields)
+                for (Object o : fields) {
+                    if (!(o instanceof Map<?, ?> f) || !"custom".equals(f.get("fn")) || !(f.get("from") instanceof String from)
+                            || !(f.get("args") instanceof Map<?, ?> args) || !(args.get("expression") instanceof String expr)) continue;
+                    boolean ours = false;
+                    for (String type : List.of("DOUBLE", "BIGINT"))
+                        for (String mark : List.of(".", ",")) ours |= expr.equals(DecimalMark.sql(SqlIdent.q(from), type, mark));
+                    if (!ours) continue;
+                    String source = view + "." + SqlIdent.q(from);
+                    out.add(new Check(String.valueOf(f.get("name")), source,
+                            "NULLIF(TRIM(CAST(" + source + " AS VARCHAR)), '') IS NOT NULL AND (" + expr + ") IS NULL"));
+                }
             return out;
+        }
+
+        /**
+         * Finding 5, over the Parquet this run wrote (before any compaction): the rows that cannot be a link because an end
+         * is blank ({@code unlinked}, only for a Dataset with a link), and for each column holding an Entity Type the
+         * spellings that differ from another only by spaces or letter case ({@code respelled}, with the key the type's
+         * normaliser gives one of them: Entity profiles, entity counts and lookups read that key, while the link index keeps
+         * each spelling as its own node id). Best effort: unreadable output leaves both unsaid.
+         */
+        private void describeOutput(Map<String, Object> s) {
+            Path base = space.dataRoot().resolve(id).toAbsolutePath().normalize();
+            List<Path> outputs = new ArrayList<>();
+            for (Map<String, String> r : taken)
+                for (Path p : DatasetPeriod.outputs(r)) {
+                    Path abs = p.toAbsolutePath().normalize();
+                    if (com.gamma.config.safety.PathJail.contains(base, abs) && Files.isRegularFile(abs)) outputs.add(abs);
+                }
+            if (outputs.isEmpty()) return;
+            String relation = com.gamma.sql.SqlViews.parquet(com.gamma.sql.SqlViews.pathList(outputs.stream().map(Path::toString).toList()),
+                    true, com.gamma.sql.SqlViews.Hive.OFF);
+            try {
+                DuckDbUtil.loadDriver();
+                try (Connection conn = DuckDbUtil.openInMemory(null, List.of(base)); Statement st = conn.createStatement()) {
+                    if (dataset.get(DatasetEntryRules.DEFAULT_LINK_MAPPING) instanceof Map<?, ?> link && link.get("from") instanceof String from
+                            && link.get("to") instanceof String to) {
+                        String noFrom = "NULLIF(trim(CAST(" + SqlIdent.q(from) + " AS VARCHAR)), '') IS NULL";
+                        String noTo = "NULLIF(trim(CAST(" + SqlIdent.q(to) + " AS VARCHAR)), '') IS NULL";
+                        try (ResultSet rs = st.executeQuery("SELECT count(*) FILTER (WHERE " + noFrom + " OR " + noTo + "), count(*) FILTER (WHERE "
+                                + noFrom + "), count(*) FILTER (WHERE " + noTo + ") FROM " + relation)) {
+                            if (rs.next()) {
+                                Map<String, Object> u = new LinkedHashMap<>();
+                                u.put("rows", rs.getLong(1));
+                                u.put("noFrom", rs.getLong(2));
+                                u.put("noTo", rs.getLong(3));
+                                u.put("from", from);
+                                u.put("to", to);
+                                s.put("unlinked", u);
+                            }
+                        }
+                    }
+                    List<Map<String, Object>> respelled = new ArrayList<>();
+                    List<EntityTypes.EntityType> types = LinkAnalysisSettings.forRoot(space.writeRoot()).effectiveEntityTypes();
+                    if (dataset.get("columns") instanceof List<?> cols)
+                        for (Object o : cols) {
+                            if (!(o instanceof Map<?, ?> col) || !"entity".equals(col.get("role")) || col.get("classification") == null) continue;
+                            String c = "CAST(" + SqlIdent.q(String.valueOf(col.get("name"))) + " AS VARCHAR)";
+                            String spellings = "(SELECT v, upper(trim(v)) AS folded FROM (SELECT DISTINCT " + c + " AS v FROM " + relation
+                                    + " WHERE trim(" + c + ") <> ''))";
+                            try (ResultSet rs = st.executeQuery("SELECT (SELECT count(*) - count(DISTINCT folded) FROM " + spellings + "), (SELECT v FROM "
+                                    + spellings + " WHERE folded IN (SELECT folded FROM " + spellings + " GROUP BY folded HAVING count(*) > 1)"
+                                    + " ORDER BY (v = folded), v LIMIT 1)")) {
+                                if (!rs.next() || rs.getLong(1) == 0) continue;
+                                Map<String, Object> m = new LinkedHashMap<>();
+                                m.put("column", col.get("name"));
+                                m.put("values", rs.getLong(1));
+                                m.put("example", rs.getString(2));
+                                EntityTypes.EntityType type = EntityTypes.typeNamedBy(types, col.get("classification"));
+                                m.put("readAs", type == null || rs.getString(2) == null ? null : EntityTypes.normalise(type.normaliser(), rs.getString(2)));
+                                respelled.add(m);
+                            }
+                        }
+                    s.put("respelled", respelled);
+                }
+            } catch (Exception unreadable) {
+                // left unsaid: the import itself succeeded
+            }
         }
 
         /**
