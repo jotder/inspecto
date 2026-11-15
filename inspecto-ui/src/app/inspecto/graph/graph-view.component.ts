@@ -631,6 +631,21 @@ export function baseEdgeKind(kind: unknown): string {
 const esc = (s: unknown): string => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /**
+ * The hover card in the theme's tokens (LA-CLIPPED-CONTROLS-1): the plugin's own card is a white box set in
+ * 'Roboto-Regular', a font this app never loads, so it read as white serif text on the dark scheme. The plugin writes
+ * these as inline styles, so `var(--gamma-*)` follows the colour scheme. `visibility` keeps the plugin's own default.
+ */
+export const TOOLTIP_STYLE = {
+    '.tooltip': {
+        visibility: 'hidden',
+        'background-color': 'var(--gamma-bg-card)',
+        color: 'var(--gamma-text-default)',
+        border: '1px solid var(--gamma-border)',
+        'font-family': 'inherit',
+    },
+};
+
+/**
  * Value signature used by the change classifier (LA-05). The Studio binds `[data]`, `[display]`,
  * `[emphasis]` and `[plugins]` from `computed()`s that yield a FRESH object on every evaluation, so
  * an identity check would classify every cosmetic toggle as a structural change. `Map` and `Set` are
@@ -1567,6 +1582,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                               type: 'tooltip',
                               trigger: 'hover',
                               getContent: async (_e: unknown, items: ElementDatum[]) => this.tooltipHtml(items),
+                              style: TOOLTIP_STYLE,
                           },
                       ]
                     : []),

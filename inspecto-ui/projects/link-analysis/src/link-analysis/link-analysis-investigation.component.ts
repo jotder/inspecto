@@ -40,6 +40,7 @@ import { apiErrorMessage, needsPermission } from '@inspecto/core/api';
 import { WORKING_SET_PLUGIN } from '@inspecto/core/viz/plugins/view.plugins';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
+import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import { DEFAULT_MAX_DEGREE, DegreePresets } from '@inspecto/link-analysis/graph/domain-profile';
 import {
     PendingInvestigation,
@@ -1073,9 +1074,8 @@ export class LinkAnalysisInvestigationComponent {
         return stepName(e.kind === 'undo' ? 'undo' : e.op);
     }
 
-    /** One format and one zone, labelled, as in File ▸ Open… (T-186). */
+    /** A server-recorded time in local time, as File ▸ Open… (T-186) and every other one (`DATES-ONE-ZONE-1`). */
     time(at: string): string {
-        const d = new Date(at);
-        return isNaN(d.getTime()) ? at : `${d.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+        return ledgerTime(at);
     }
 }

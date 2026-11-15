@@ -142,6 +142,31 @@ describe('LinkAnalysisOpenDialog (§5.11)', () => {
         expect(withinDays('2026-10-26T00:00:00Z', 7, Date.parse('2026-10-27T00:00:00Z'))).toBe(true);
     });
 
+    /** LA-OPEN-DIALOG-ACTIONS-1 (D-11): the actions sat below the fold of the scroll area, and the width changed by tab. */
+    it('puts the selection actions outside the scroll area, and keeps one width for both tabs', async () => {
+        const { c, el, settle } = create();
+        await settle();
+        const actions = () => el.querySelector('[data-testid="la-open-actions"]');
+        expect(el.getAttribute('style')).toContain('width: min(56rem, 90vw)');
+        expect(actions()?.querySelector('[data-testid="la-open-open"]')).toBeNull(); // nothing picked yet: only Close
+
+        (el.querySelector('[data-testid="la-open-view-calls-hub"]') as HTMLButtonElement).click();
+        await settle();
+        for (const id of ['la-open-open', 'la-open-rename', 'la-open-duplicate', 'la-open-delete']) {
+            const b = el.querySelector(`[data-testid="${id}"]`);
+            expect(b?.closest('mat-dialog-actions, [mat-dialog-actions]')).toBe(actions());
+            expect(b?.closest('mat-dialog-content')).toBeNull();
+        }
+
+        c.setTab('investigations');
+        await settle();
+        (el.querySelector('[data-testid="la-open-inv-inv-1"]') as HTMLButtonElement).click();
+        await settle();
+        expect(actions()?.querySelector('[data-testid="la-open-open"]')).not.toBeNull();
+        expect(el.getAttribute('style')).toContain('width: min(56rem, 90vw)');
+        await expectNoA11yViolations(el);
+    });
+
     /** LA-BASIC-503-EXPLAINED-1 (D-4): Basic showed a red error with a jargon list under live filters. */
     it('without Investigations (Basic): one neutral line from the edition reason, no filters, no call', async () => {
         const reason = 'Investigations are in Standard and above, with the Investigations add-on.';
@@ -326,8 +351,13 @@ describe('LinkAnalysisOpenDialog (§5.11)', () => {
         expect(el.querySelector('[data-testid="la-open-inv-pack"]')?.textContent?.trim()).toBe('Space default');
         // the list carries only createdAt (set once at create, fork or instantiate): the label says so (T-161 review)
         expect(Array.from(el.querySelectorAll('dt')).map((d) => d.textContent?.trim())).toContain('Created');
-        // T-186: one labelled zone and format, the same as the step log
-        expect(el.querySelector('[data-testid="la-open-preview"]')?.textContent).toContain('2026-10-01 09:00 UTC');
+        // T-186 + DATES-ONE-ZONE-1 (LA-OPEN-DIALOG-ACTIONS-1): one format, in local time like every other recorded time
+        const at = new Date('2026-10-01T09:00:00Z');
+        const p = (n: number): string => String(n).padStart(2, '0');
+        const local = `${at.getFullYear()}-${p(at.getMonth() + 1)}-${p(at.getDate())} ${p(at.getHours())}:${p(at.getMinutes())}`;
+        const preview = el.querySelector('[data-testid="la-open-preview"]')?.textContent ?? '';
+        expect(preview).toContain(local);
+        expect(preview).not.toContain('UTC');
 
         c.setTab('views');
         await settle();

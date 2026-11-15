@@ -20,6 +20,7 @@ import {
     GraphViewComponent,
     NODE_DBLCLICK_DELAY_MS,
     SELECTED_STATE,
+    TOOLTIP_STYLE,
     buildBehaviors,
     buildPluginList,
     lassoSelection,
@@ -935,6 +936,15 @@ describe('dense-graph link labels (telco demo ring, 2026-09-27)', () => {
         expect(bare).toContain('High connectivity');
         expect(bare).not.toContain('contact');
         expect(comp.tooltipHtml(node({}))).not.toContain('High connectivity');
+    });
+
+    it('draws the hover card in theme tokens and the page font, starting hidden (LA-CLIPPED-CONTROLS-1)', () => {
+        const card = TOOLTIP_STYLE['.tooltip'];
+        expect(card['background-color']).toBe('var(--gamma-bg-card)');
+        expect(card.color).toBe('var(--gamma-text-default)');
+        expect(card['font-family']).toBe('inherit'); // the plugin's 'Roboto-Regular' is never loaded: serif
+        expect(card.visibility).toBe('hidden');
+        expect(Object.values(card).join(' ')).not.toMatch(/#|rgb/);
     });
 });
 

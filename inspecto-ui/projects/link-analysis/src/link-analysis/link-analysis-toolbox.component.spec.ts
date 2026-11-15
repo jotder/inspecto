@@ -185,6 +185,20 @@ describe('LinkAnalysisToolboxComponent', () => {
         expect(c.toolBadge('communities')).toBe('2 groups');
     });
 
+    it('the two-choice toggles of Shortest path and Communities wrap to a new row, never clip (LA-CLIPPED-CONTROLS-1)', async () => {
+        const { c, fixture } = make();
+        const group = (label: string) =>
+            (fixture.nativeElement as HTMLElement).querySelector(`mat-button-toggle-group[aria-label="${label}"]`);
+        c.tab.set('path');
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(group('Path type')?.classList).toContain('inspecto-wrap-toggle');
+        c.tab.set('communities');
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(group('Community detection method')?.classList).toContain('inspecto-wrap-toggle');
+    });
+
     it('pattern: builds a motif, matches it, gates on node kind, and focuses a match', () => {
         const { c, last } = make();
 

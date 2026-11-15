@@ -1,4 +1,4 @@
-import { Injectable, effect, inject, signal } from '@angular/core';
+import { Injectable, effect, inject, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, firstValueFrom, tap } from 'rxjs';
 import { SpacesService, apiUrl } from '@inspecto/core/api';
@@ -24,6 +24,8 @@ export interface DomainProfileState {
     refused: { id: string; reason: string }[];
 }
 
+const NOT_READ = Symbol('not read');
+
 /**
  * Loads the Space's Domain Profile and installs the server's Industry packs into the `domain-profile.ts` registry, once
  * per Space (and again after a save). Until the answer arrives, and when it fails, every reader sees `generic` — the
@@ -39,16 +41,31 @@ export class DomainProfileService {
     /** The current Space's read failed; false while it is in flight (LA-SETTINGS-PROFILE-FLASH-1). */
     readonly failed = signal(false);
     private loaded: Promise<void> = Promise.resolve();
+    /** The Space the last read was started for; `NOT_READ` before the first read. */
+    private loadedFor: unknown = NOT_READ;
 
     constructor() {
         effect(() => {
             this.spaces.currentSpaceId(); // track: another Space has another profile
-            this.loaded = this.load();
+            untracked(() => this.ensureLoad());
         });
     }
 
-    /** Resolves once the current Space's packs are installed (or the read failed and `generic` stays in force). */
+    /**
+     * Resolves once the current Space's packs are installed (or the read failed and `generic` stays in force). Called
+     * before the Space effect first runs (a `?seed=` link on a cold load), it starts that read itself rather than
+     * resolving at once; the effect then finds it started and sends no second GET (LA-DOMAIN-PROFILE-READY-RACE-1).
+     */
     ready(): Promise<void> {
+        return this.ensureLoad();
+    }
+
+    private ensureLoad(): Promise<void> {
+        const space = this.spaces.currentSpaceId();
+        if (space !== this.loadedFor) {
+            this.loadedFor = space;
+            this.loaded = this.load();
+        }
         return this.loaded;
     }
 

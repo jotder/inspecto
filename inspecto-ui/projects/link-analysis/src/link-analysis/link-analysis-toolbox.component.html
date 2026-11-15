@@ -130,6 +130,7 @@
                                         (ngModelChange)="pathTo.set($any($event))"
                                     />
                                     <mat-button-toggle-group
+                                        class="inspecto-wrap-toggle"
                                         [value]="pathMetric()"
                                         (change)="pathMetric.set($event.value)"
                                         aria-label="Path type"
@@ -607,6 +608,7 @@
                             @case ('communities') {
                                 <div class="flex flex-wrap items-center gap-2">
                                     <mat-button-toggle-group
+                                        class="inspecto-wrap-toggle"
                                         [value]="communityMethod()"
                                         (change)="communityMethod.set($event.value)"
                                         aria-label="Community detection method"

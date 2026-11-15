@@ -13,6 +13,7 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
+import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import { InvService, InvestigationListItem } from '@inspecto/link-analysis/api/inv.service';
 import { LA_LOCKED_REASON_FALLBACK, isCapabilityUnavailable } from '@inspecto/link-analysis/la-host';
 import { needsPermission } from './disabled-reasons';
@@ -113,6 +114,8 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
     selector: 'la-open-dialog',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
+    // LA-OPEN-DIALOG-ACTIONS-1: one width for both tabs (it used to grow to the wider tab's filter row)
+    host: { class: 'block', style: 'width: min(56rem, 90vw)' },
     imports: [
         ReactiveFormsModule,
         MatDialogModule,
@@ -127,7 +130,7 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
     ],
     template: `
         <h2 mat-dialog-title>Open</h2>
-        <mat-dialog-content class="flex flex-col gap-3" style="min-width: min(56rem, 90vw)">
+        <mat-dialog-content class="flex flex-col gap-3">
             <div class="flex gap-1" role="tablist" aria-label="What to open">
                 @for (t of tabs; track t.id) {
                     <button
@@ -271,7 +274,11 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                         }
                     </ul>
 
-                    <section class="flex flex-col gap-2 text-sm" aria-label="Preview" data-testid="la-open-preview">
+                    <section
+                        class="flex min-w-0 flex-col gap-2 text-sm break-words"
+                        aria-label="Preview"
+                        data-testid="la-open-preview"
+                    >
                         @if (tab() === 'views') {
                             @if (selectedView(); as r) {
                                 @if (renaming()) {
@@ -316,54 +323,6 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                                 <p class="text-secondary m-0 text-xs leading-snug" data-testid="la-open-not-evidence">
                                     <span class="text-warn font-semibold">Not evidence:</span> {{ notEvidence }}
                                 </p>
-                                <div class="flex flex-wrap gap-1">
-                                    <button
-                                        mat-flat-button
-                                        color="primary"
-                                        (click)="openView(r.view)"
-                                        data-testid="la-open-open"
-                                    >
-                                        Open
-                                    </button>
-                                    <span class="inline-flex" [matTooltip]="editBlock(r.view)">
-                                        <button
-                                            mat-button
-                                            (click)="beginRename(r.view)"
-                                            [disabled]="busy() || !!editBlock(r.view)"
-                                            data-testid="la-open-rename"
-                                        >
-                                            Rename
-                                        </button>
-                                    </span>
-                                    <span class="inline-flex" [matTooltip]="data.viewSaveBlock || ''">
-                                        <button
-                                            mat-button
-                                            (click)="duplicate(r.view)"
-                                            [disabled]="busy() || !!data.viewSaveBlock"
-                                            data-testid="la-open-duplicate"
-                                        >
-                                            Duplicate
-                                        </button>
-                                    </span>
-                                    <span class="inline-flex" [matTooltip]="deleteBlock(r.view)">
-                                        <button
-                                            mat-button
-                                            (click)="deleteView(r.view)"
-                                            [disabled]="busy() || !!deleteBlock(r.view)"
-                                            data-testid="la-open-delete"
-                                        >
-                                            Delete
-                                        </button>
-                                    </span>
-                                    <button mat-button (click)="data.history(r.view)">Version history</button>
-                                    @if (data.opsEnabled) {
-                                        <button mat-button (click)="data.comments(r.view)">Comments</button>
-                                        <button mat-button (click)="data.tags(r.view)">Tags</button>
-                                    }
-                                    @if (data.shareable(r.view)) {
-                                        <button mat-button (click)="data.offer(r.view)">Share…</button>
-                                    }
-                                </div>
                             } @else {
                                 <p class="text-secondary m-0">Pick a view to see it here.</p>
                             }
@@ -388,34 +347,6 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                                     <dt class="text-secondary">Industry pack</dt>
                                     <dd class="m-0" data-testid="la-open-inv-pack">{{ investigationPack() }}</dd>
                                 </dl>
-                                <div class="flex flex-wrap gap-1">
-                                    <button
-                                        mat-flat-button
-                                        color="primary"
-                                        (click)="openInvestigation(r)"
-                                        data-testid="la-open-open"
-                                    >
-                                        Open
-                                    </button>
-                                    @if (r.listed) {
-                                        <!-- T-170: shown when it cannot act, disabled with the reason (the wrapper carries the tooltip) -->
-                                        <span class="inline-flex" [matTooltip]="investigationDeleteBlock(r)">
-                                            <button
-                                                mat-button
-                                                (click)="deleteInvestigation(r)"
-                                                [disabled]="busy() || !!investigationDeleteBlock(r)"
-                                                [attr.aria-label]="
-                                                    investigationDeleteBlock(r)
-                                                        ? 'Delete: ' + investigationDeleteBlock(r)
-                                                        : null
-                                                "
-                                                data-testid="la-open-inv-delete"
-                                            >
-                                                Delete
-                                            </button>
-                                        </span>
-                                    }
-                                </div>
                             } @else {
                                 <p class="text-secondary m-0">Pick an Investigation to see it here.</p>
                             }
@@ -424,7 +355,76 @@ export function withinDays(iso: string | null, days: number, now = Date.now()): 
                 </div>
             }
         </mat-dialog-content>
-        <mat-dialog-actions align="end">
+        <!-- LA-OPEN-DIALOG-ACTIONS-1: the selection's actions sit outside the scroll area, so they never fall below the fold -->
+        <mat-dialog-actions class="gap-1" data-testid="la-open-actions">
+            @if (tab() === 'views') {
+                @if (selectedView(); as r) {
+                    <button mat-flat-button color="primary" (click)="openView(r.view)" data-testid="la-open-open">
+                        Open
+                    </button>
+                    <span class="inline-flex" [matTooltip]="editBlock(r.view)">
+                        <button
+                            mat-button
+                            (click)="beginRename(r.view)"
+                            [disabled]="busy() || !!editBlock(r.view)"
+                            data-testid="la-open-rename"
+                        >
+                            Rename
+                        </button>
+                    </span>
+                    <span class="inline-flex" [matTooltip]="data.viewSaveBlock || ''">
+                        <button
+                            mat-button
+                            (click)="duplicate(r.view)"
+                            [disabled]="busy() || !!data.viewSaveBlock"
+                            data-testid="la-open-duplicate"
+                        >
+                            Duplicate
+                        </button>
+                    </span>
+                    <span class="inline-flex" [matTooltip]="deleteBlock(r.view)">
+                        <button
+                            mat-button
+                            (click)="deleteView(r.view)"
+                            [disabled]="busy() || !!deleteBlock(r.view)"
+                            data-testid="la-open-delete"
+                        >
+                            Delete
+                        </button>
+                    </span>
+                    <button mat-button (click)="data.history(r.view)">Version history</button>
+                    @if (data.opsEnabled) {
+                        <button mat-button (click)="data.comments(r.view)">Comments</button>
+                        <button mat-button (click)="data.tags(r.view)">Tags</button>
+                    }
+                    @if (data.shareable(r.view)) {
+                        <button mat-button (click)="data.offer(r.view)">Share…</button>
+                    }
+                }
+            } @else if (!locked()) {
+                @if (selectedInvestigation(); as r) {
+                    <button mat-flat-button color="primary" (click)="openInvestigation(r)" data-testid="la-open-open">
+                        Open
+                    </button>
+                    @if (r.listed) {
+                        <!-- T-170: shown when it cannot act, disabled with the reason (the wrapper carries the tooltip) -->
+                        <span class="inline-flex" [matTooltip]="investigationDeleteBlock(r)">
+                            <button
+                                mat-button
+                                (click)="deleteInvestigation(r)"
+                                [disabled]="busy() || !!investigationDeleteBlock(r)"
+                                [attr.aria-label]="
+                                    investigationDeleteBlock(r) ? 'Delete: ' + investigationDeleteBlock(r) : null
+                                "
+                                data-testid="la-open-inv-delete"
+                            >
+                                Delete
+                            </button>
+                        </span>
+                    }
+                }
+            }
+            <span class="flex-1"></span>
             <button mat-button mat-dialog-close>Close</button>
         </mat-dialog-actions>
     `,
@@ -484,11 +484,9 @@ export class LinkAnalysisOpenDialog {
     readonly selectedInvestigationId = signal<string | null>(null);
 
     readonly datasetOf = viewDataset;
-    /** One format and one zone, labelled, as in the step log (T-186). */
+    /** A server-recorded time in local time, as every other one (`DATES-ONE-ZONE-1`) and the step log (T-186). */
     when(iso: string | null): string {
-        if (!iso) return '—';
-        const d = new Date(iso);
-        return isNaN(d.getTime()) ? iso : `${d.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+        return ledgerTime(iso) || '—';
     }
 
     readonly viewRows = computed(() => {

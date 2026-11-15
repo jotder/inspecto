@@ -207,7 +207,7 @@
                     >
                         <mat-icon svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
                     </button>
-                    <mat-menu #searchMenu="matMenu">
+                    <mat-menu #searchMenu="matMenu" class="inspecto-form-menu">
                         <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
                         <div class="p-3" (click)="$event.stopPropagation()">
                             <mat-form-field subscriptSizing="dynamic" class="w-64"
@@ -327,7 +327,7 @@
                                 <mat-icon svgIcon="heroicons_outline:clock"></mat-icon>
                             </button>
                         </span>
-                        <mat-menu #timelineMenu="matMenu">
+                        <mat-menu #timelineMenu="matMenu" class="inspecto-form-menu">
                             <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
                             <div
                                 class="flex w-80 max-w-full flex-col gap-2 px-4 py-2"
@@ -385,12 +385,12 @@
                     </button>
                 }
 
-                <mat-menu #saveMenu="matMenu">
+                <mat-menu #saveMenu="matMenu" class="inspecto-form-menu">
                     <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events -- (click) only stops propagation so the mat-menu stays open; the form is not a control -->
                     <form
                         [formGroup]="saveForm"
                         (ngSubmit)="saveView()"
-                        class="flex w-72 max-w-full flex-col p-3"
+                        class="flex w-[22rem] max-w-full flex-col p-3"
                         (click)="$event.stopPropagation()"
                         aria-label="Save view as"
                     >
@@ -436,10 +436,11 @@
                     >
                         <mat-icon svgIcon="heroicons_outline:paint-brush"></mat-icon>
                     </button>
-                    <mat-menu #displayMenu="matMenu">
+                    <mat-menu #displayMenu="matMenu" class="inspecto-form-menu">
                         <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- (click) only stops propagation so the mat-menu stays open; not a control, focus lives on the inner fields -->
                         <div
-                            class="flex max-h-96 flex-col gap-2 overflow-y-auto px-4 py-2"
+                            class="flex w-80 max-w-full flex-col gap-2 px-4 py-2"
+                            data-testid="la-display-options"
                             (click)="$event.stopPropagation()"
                             aria-label="Display options"
                         >
@@ -532,7 +533,7 @@
                                     </button></span
                                 >
                             }
-                            <div class="mt-1 flex items-center gap-2">
+                            <div class="mt-1 flex flex-wrap items-center gap-2">
                                 <mat-checkbox
                                     [checked]="superNodeThreshold() > 0"
                                     [disabled]="workingSetCanvas()"

@@ -291,6 +291,23 @@ body.dark {
     min-height: 0;
     max-height: none;
 }
+/* A `mat-menu` that holds a FORM rather than menu items (Link Analysis: Search nodes, the timeline filter, Save view
+ * as, Display options; LA-CLIPPED-CONTROLS-1). Material caps a menu panel at 280 px and the border above takes 2 px
+ * of it, so a 256 px field with its padding, or a locked "Start an Investigation from this" button, overflowed and the
+ * panel scrolled sideways. The form sets its own width; the panel only keeps it inside the viewport. */
+.inspecto-form-menu.mat-mdc-menu-panel {
+    max-width: min(24rem, calc(100vw - 2rem));
+}
+
+/* A choice toggle in a narrow panel (the Link Analysis toolbox; LA-CLIPPED-CONTROLS-1). The theme draws each choice
+ * as its own one-line pill and the group never wraps, so once the panel is narrower than the pills the group clips
+ * them ("Label spread (fast)" in 159 px). Here a pill that does not fit moves to the next row instead. */
+.mat-button-toggle-group.inspecto-wrap-toggle {
+    flex-wrap: wrap;
+    row-gap: 0.25rem;
+    max-width: 100%;
+}
+
 /* The whole-value token picker's menu (`inspecto/components/token-picker.component.ts`). Each item is a
  * token, its resolved preview and a one-line description; Material's menu item is a fixed-height nowrap
  * single line, which squeezes all three into a column of fragments. Widen it and let items wrap. */
