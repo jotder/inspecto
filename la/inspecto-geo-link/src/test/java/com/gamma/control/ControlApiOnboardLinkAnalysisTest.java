@@ -168,10 +168,6 @@ class ControlApiOnboardLinkAnalysisTest {
     }
 
     /**
-     * LA-COLUMN-ROLES-1 P3: a role filter (a Measure range, a Category list, a Time window) on a link read is answered from the link index's
-     * attribute columns - which Add data's first build carries - with exactly the rows the Dataset read gives, and narrows them.
-     */
-    /**
      * LA-FULL-CYCLE-TEST-1 phase 3 (finding 5), on the committed full-cycle fixture ({@code inspecto/src/test/resources/
      * onboard/full-cycle/}, read by path): the import's counts and the index's add up - 461 rows kept, 1 of them with no
      * From, so 460 links - and the spelling {@code ' acc-1003 '} is named as the account ACC-1003.
@@ -194,6 +190,10 @@ class ControlApiOnboardLinkAnalysisTest {
         }
     }
 
+    /**
+     * LA-COLUMN-ROLES-1 P3: a role filter (a Measure range, a Category list, a Time window) on a link read is answered from the link index's
+     * attribute columns - which Add data's first build carries - with exactly the rows the Dataset read gives, and narrows them.
+     */
     @Test
     void aRoleFilterIsServedFromTheIndexAndAgreesWithTheDataset(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

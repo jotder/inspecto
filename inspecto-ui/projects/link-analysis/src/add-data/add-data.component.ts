@@ -701,20 +701,25 @@ export class AddDataComponent implements OnInit {
         this.reproposing.set(false);
     }
 
-    /** Every type and role the person stated; a role only while its column holds no Entity Type (then it is an Entity). */
+    /**
+     * Every type and role the person stated. A role is sent as the column can hold it now ({@link columnRole}): not at
+     * all while the column holds an Entity Type (it is an Entity), and a Measure whose column is no longer a number as
+     * a Detail - what the commit will send for it.
+     */
     private redraftBody(): RedraftBody {
-        const holds = new Set(
-            this.columnStates()
-                .filter((c) => c.entityType)
-                .map((c) => c.name),
-        );
+        // read from the form itself: this runs inside a control's own change, before the screen's computed views catch up
+        const states = new Map(this.form.controls.columns.getRawValue().map((c) => [c.name, c]));
         const names = new Set([...this.statedTypes.keys(), ...this.statedRoles.keys()]);
         return {
-            columns: [...names].map((name) => ({
-                name,
-                ...(this.statedTypes.has(name) ? { type: this.statedTypes.get(name) } : {}),
-                ...(this.statedRoles.has(name) && !holds.has(name) ? { role: this.statedRoles.get(name) } : {}),
-            })),
+            columns: [...names].map((name) => {
+                const state = states.get(name);
+                const role = state && this.statedRoles.has(name) ? columnRole(state) : 'entity';
+                return {
+                    name,
+                    ...(this.statedTypes.has(name) ? { type: this.statedTypes.get(name) } : {}),
+                    ...(role !== 'entity' ? { role } : {}),
+                };
+            }),
         };
     }
 

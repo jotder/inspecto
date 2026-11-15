@@ -212,7 +212,7 @@ The result accounts for every row and value, one line each:
 - whether the link index was built, with its links and entities, and each Expectation on the data when the Dataset
   has any (a first import has none).
 
-The last two kinds of line are counted over the rows this import added. Then **Explore in Link Analysis** (for events
+The rows that draw no link and the second spellings are counted over the rows this import added. Then **Explore in Link Analysis** (for events
 it opens **Start a graph** with the Dataset picked; after details about entities it opens the events those entities
 are in, where the details now show on each entity), **Add details about these entities** (after events), or **Add
 another file**.

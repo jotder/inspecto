@@ -1092,7 +1092,7 @@ final class OnboardDraft {
         if ("VARCHAR".equals(f.type()) || f.of() == 0) return chose;
         if (f.misfits() == 0) return chose + "; " + (f.of() == 1 ? "the sampled value is " + Words.singular(f.type()) : "all " + f.of() + " sampled values are " + noun(f.type()));
         if (f.fits() == 0)
-            return chose + ", but none of the " + Words.count(f.of(), "sampled value", "sampled values") + " is " + Words.singular(f.type())
+            return chose + ", but " + (f.of() == 1 ? "the sampled value is not " : "none of the " + f.of() + " sampled values is ") + Words.singular(f.type())
                     + ": every value would be left blank";
         return chose + ": " + oddOnes(f) + "; " + Words.pick(f.misfits(), "it", "they") + " will be left blank";
     }
