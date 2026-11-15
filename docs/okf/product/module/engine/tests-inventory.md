@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-405 test class(es): 405 unit, 0 real-HTTP control-plane, 0 IT.
+406 test class(es): 406 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -95,6 +95,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `CollectorProcessorArchiveEditionTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/CollectorProcessorArchiveEditionTest.java` | The run-time backstop of `PROCESSOR-RELEASE-READINESS-1` G9 for the CLI entry points the pipeline registry |
 | `CollectorProcessorByteCapTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/CollectorProcessorByteCapTest.java` | The pre-materialise <b>byte</b> cap, driven through the real processor (operator 2026-09-16). |
 | `CollectorProcessorDatasetFeedTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/CollectorProcessorDatasetFeedTest.java` | {@code PROCESSOR-RELEASE-READINESS-1} gap G6 — a {@code connector: dataset} feed driven through real poll |
+| `CollectorProcessorEpochFieldTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/CollectorProcessorEpochFieldTest.java` | MAPPING-EPOCH-TIMESTAMP-1, end to end: a CSV feed carrying a 10-digit epoch (with {@code 0} for none — the |
 | `CollectorProcessorIngestActivityTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/CollectorProcessorIngestActivityTest.java` | {@code LA-CONFIG-LIMITS-1} CL-12 on the REAL dispatcher: every Consignment of a cycle counts in {@link IngestActivity} |
 | `CollectorProcessorPollTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/CollectorProcessorPollTest.java` |  |
 | `CollectorProcessorPoolTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/CollectorProcessorPoolTest.java` | The supervisor-takes-no-slot rule ({@code DUCKLE-C10-ADMISSION-POOLS-1}) on the REAL dispatcher: |

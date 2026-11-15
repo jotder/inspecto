@@ -112,7 +112,9 @@ public final class Identifiers {
      *   <li>with no {@code %} directive, or with a single quote — the format is inlined into a SQL
      *       string literal;</li>
      *   <li>with a zone directive — the same refusal {@code date_formats} gets
-     *       ({@link SourceZones#assertNoZoneDirective}).</li>
+     *       ({@link SourceZones#assertNoZoneDirective});</li>
+     *   <li>a reserved epoch format ({@link SchemaFieldTypes#isEpochFormat}) on any type but
+     *       {@code TIMESTAMP}, or beside a {@code timezone}/{@code timezone_column} it would ignore.</li>
      * </ul>
      */
     private static void validateFieldFormat(Map<?, ?> field, String origin) {
@@ -126,9 +128,25 @@ public final class Identifiers {
                     + fmt + "' but its type is " + (type == null ? "absent (VARCHAR)" : "'" + type + "'")
                     + ". A format is honoured only on DATE, TIMESTAMP or TIMESTAMPTZ — set the type or "
                     + "drop the format.");
+        if (SchemaFieldTypes.isEpochFormat(fmt)) {
+            // An epoch count is an instant and lands as its UTC wall clock in a TIMESTAMP. A DATE would
+            // need a zone to pick the calendar day, and a TIMESTAMPTZ demands a source zone it would not
+            // use — so both are refused rather than given a guessed meaning.
+            if (!"TIMESTAMP".equals(SchemaFieldTypes.normalize(t)))
+                throw new IllegalArgumentException("Schema field '" + name + "' at " + origin + " sets format '"
+                        + fmt + "' on type '" + t + "'. An epoch format is honoured only on TIMESTAMP (the "
+                        + "value lands as its UTC time) — declare the field TIMESTAMP.");
+            // A source zone says how a wall clock was written; an epoch has none, so it would never apply.
+            if (blankToNull(field.get("timezone")) != null || blankToNull(field.get("timezone_column")) != null)
+                throw new IllegalArgumentException("Schema field '" + name + "' at " + origin + " sets format '"
+                        + fmt + "' and a timezone. An epoch count is already UTC, so the zone would never "
+                        + "apply — drop timezone / timezone_column.");
+            return;
+        }
         if (fmt.indexOf('%') < 0 || fmt.indexOf('\'') >= 0)
             throw new IllegalArgumentException("Schema field format at " + where + " is invalid: '" + fmt
-                    + "'. It must be a strptime pattern such as %B %d,%Y, with no single quote.");
+                    + "'. It must be a strptime pattern such as %B %d,%Y (or epoch / epoch_ms for a "
+                    + "TIMESTAMP held as a count since 1970), with no single quote.");
         SourceZones.assertNoZoneDirective(List.of(fmt), where);
     }
 

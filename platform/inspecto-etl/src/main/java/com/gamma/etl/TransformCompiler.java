@@ -115,6 +115,10 @@ public final class TransformCompiler {
         String castType    = ("TIMESTAMP".equals(srcType) || "TIMESTAMPTZ".equals(srcType)) ? "TIMESTAMP" : "DATE";
         String varcharExpr = "CAST(" + col + " AS VARCHAR)";
         String fmt         = fieldFormats.get(pd.source());
+        // An epoch-count TIMESTAMP source: the same UTC instant the stored column holds, and no zone shift
+        // (SchemaFieldTypes.castSql's rule, so the partition cannot disagree with the column).
+        String epoch       = SchemaFieldTypes.epochFormatOf(SchemaFieldTypes.formatsFor(fmt, csv.tsFormats()));
+        if (epoch != null && "TIMESTAMP".equals(srcType)) return SchemaFieldTypes.epochSql(col, epoch);
         String parsed      = SqlBuilder.buildCastExpr(varcharExpr, castType,
                 SchemaFieldTypes.formatsFor(fmt, csv.dateFormats()), SchemaFieldTypes.formatsFor(fmt, csv.tsFormats()));
         // A DATE partition source has no instant to shift; only the timestamp branch takes a zone.

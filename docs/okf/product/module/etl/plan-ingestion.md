@@ -389,6 +389,10 @@ into a SQL literal), and a zone directive. `POST /config/suggest/schema` emits i
 under which two formats give different dates (`03/04/2025`) gets **no** format and stays VARCHAR. ⚠ DuckDB
 strptime matches whitespace exactly, so a column mixing `March 22,2025` and `March 22, 2025` fits no single
 format and is suggested VARCHAR. `SchemaExtractor` regeneration does not preserve `format` (it re-infers).
+**Epoch counts (2026-11-15, `MAPPING-EPOCH-TIMESTAMP-1`):** the reserved values `epoch` / `epoch_ms` on a
+`TIMESTAMP` field read a count of seconds / milliseconds since 1970 as its UTC wall clock — no source zone
+applies, `0` is NULL and not a counted failure, a non-integer is a counted NULL; rules and reasons in
+[engine parsing options §2.2](../engine/spec-parsing-options.md).
 
 ### 3.9 Authoring: the Parse pane, the grammar drawer, Grammar Templates
 

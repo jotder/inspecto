@@ -37,7 +37,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `TRANSFORMER-TWO-NODES-1` | P3 | defect | two different Steps are both called "Record Transformer". | — |
 | — | P3 | feature | Branch-aware executor residuals | demand |
 | — | P3 | feature | Consignment addressing | demand |
-| `MAPPING-EPOCH-TIMESTAMP-1` | P3 | feature | a field mapping cannot type an epoch-seconds string as a TIMESTAMP. | — |
 | — | P2 | feature | SPACE-LINK-CENSUS-1 one declared census of the links between a Space's config files | — |
 | — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
 | `LEGAL-HOLD-SCOPE-1` | P3 | feature | a legal hold protects the Incident row but not its evidence (filed 2026-11-15, verified from ARCH-MOSCOW-UNTRACKED-1 item 7). | demand |

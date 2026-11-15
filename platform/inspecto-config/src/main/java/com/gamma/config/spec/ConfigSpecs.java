@@ -1236,7 +1236,9 @@ public final class ConfigSpecs {
                 FieldSpec.of("raw.fields", "Field definitions", FieldType.LIST,
                         "Tabular array of {name,selector,type[,format,description,unit,classification]}. "
                                 + "format is a strptime pattern (e.g. %B %d,%Y) for a DATE/TIMESTAMP field "
-                                + "and replaces the pipeline's date/timestamp format list for it."),
+                                + "and replaces the pipeline's date/timestamp format list for it; "
+                                + "epoch / epoch_ms read a TIMESTAMP from a count of seconds / milliseconds "
+                                + "since 1970 (UTC; 0 = none)."),
                 FieldSpec.of("mapping.canonicalName", "Canonical name", FieldType.STRING,
                         "Canonical table name the raw source maps to.")
         );

@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **98<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 85<!--count:backlog-p3--> × P3** —
+> **97<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 84<!--count:backlog-p3--> × P3** —
+> ⬇ **98 → 97 (P3 85 → 84) on 2026-11-15** — `MAPPING-EPOCH-TIMESTAMP-1` shipped (closed P3 feature [items: module.engine · kind: feature]): a `TIMESTAMP` field's `format` may be `epoch` (seconds) or `epoch_ms` (milliseconds) — the count since 1970 lands as its UTC time whatever the host or source zone, `0` lands NULL without counting as a failure, and a non-integer is a counted NULL; `DATE`/`TIMESTAMPTZ` or a field zone beside it is refused at load. The MFS feed's `sql`-step workaround is no longer needed ([engine parsing options §2.2](okf/product/module/engine/spec-parsing-options.md)).
 > ⬆ **96 → 98 (P3 83 → 85) on 2026-11-15**: filed P3 defects `SPACE-PROMOTION-CASE-PAIRING-1` and `IMPORT-CONNECTION-CASE-1` [items: module.config · kind: defect] — a path spelled in another case is paired by spelling in promotion, and the regular import and export still match `_connection.toon` case-sensitively (found by the review of `SPACE-PROMOTION-EXT-CASE-1`).
 > ⬇ **97 → 96 (P3 84 → 83) on 2026-11-15** — closed P3 defect `SPACE-PROMOTION-EXT-CASE-1` [items: module.config · kind: defect]: promotion reads a file's kind from its name as the filesystem resolves it (`ImportCapabilityGuard.normalizedPath`, lower case, no trailing dots), as the import does, for every kind test (connection, `.toon` equality / binding / shape, the Pipeline safety check at apply, the reported kind), so `connections/db_connection.TOON`, `db_CONNECTION.toon` and `Registry/connections/db.toon` carrying `password: hunter2` are excluded, and refused 422 `literalSecrets` before an approval hold. Reading kinds the import's way was chosen over refusing names not in lower case: one rule shared with the import, no list of which part of a name must be lower case.
 > ⬆ **96 → 97 (P3 83 → 84) on 2026-11-15**: filed P3 defect `LA-DOMAIN-PROFILE-READY-RACE-1` [items: module.la-core · kind: defect] — `DomainProfileService.ready()` can resolve before the first read, so a `?seed=` Link Analysis link on a cold load may bind through the generic vocabulary (found by the review of `LA-SETTINGS-PROFILE-FLASH-1`).
@@ -579,10 +580,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 85<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 84<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 85<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 98<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 84<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 97<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -747,7 +748,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 #### Parsing
 
 - **P3** · `PARSING-DERIVE-EDITOR-1` — **slice 4 of Parsing D9: an optional profile editor for ASN.1 `derive` / `children`.** The drawer lists derived columns read-only today; `ASN1-DERIVE-NOT-IN-GRAMMAR` and the counters channel stay in §6 *Parsing (Stage-1) residual deferrals*. → `okf/product/module/engine/spec-parser-plugins.md` (D9) [items: module.telecom-asn1, module.etl · kind: feature · hold: operator]
-- **P3** · `MAPPING-EPOCH-TIMESTAMP-1` — **a field mapping cannot type an epoch-seconds string as a TIMESTAMP.** The mapping's date and time formats are strptime patterns, and an epoch count is not one, so a feed that carries a 10-digit epoch (with `0` for none) needs a `sql` step with `to_timestamp(x::BIGINT)` and a `0` → NULL guard. Found in the MFS demo onboarding (2026-10-26, `last_date_balance`; review item 26), where that workaround is in force. The other half of item 26 is not a gap: Hive partition columns are reachable through the Parquet parser's `parquet.hive_partitioning` option (since 2026-08-28). [items: module.engine · kind: feature]
 
 
 ### 3.4 Catalog, Onboarding, Datasets & Lineage
