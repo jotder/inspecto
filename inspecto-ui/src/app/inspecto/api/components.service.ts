@@ -78,6 +78,11 @@ export interface ComponentDef {
     contentHash?: string;
     /** ISO-8601 time the stored file last changed (the server's file attribute); absent on a local copy, null when unknown. */
     modified?: string | null;
+    /**
+     * A Dataset in the LIST only (LA-EMPTY-DATASET-WORDING-1): true when its store holds no data file yet (its Pipeline
+     * has not run), false when it holds one, null when the server cannot tell cheaply; absent on every other read.
+     */
+    empty?: boolean | null;
 }
 
 /** One archived prior copy of a component (MET-5): `GET /components/{type}/{id}/versions`. */

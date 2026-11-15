@@ -772,4 +772,28 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         expect(q(el, 'data-transfers')).toBeNull();
         expect(q(q(el, 'data-wallet_txn')!, 'mapping-form')).not.toBeNull();
     });
+
+    it('LA-EMPTY-DATASET-WORDING-1: a Pipeline-fed Dataset whose store holds nothing yet says so on its row and card (no violations)', async () => {
+        const said = 'No rows yet — its Pipeline has not run';
+        // the server's `empty` rides beside the content on the list; an import's own card says how its files arrive
+        const datasets = DATASETS.map((d) =>
+            d.name === 'wallet_txn' || d.name === 'transfers' ? { ...d, empty: true } : { ...d, empty: false },
+        );
+        const { fixture, el } = create(datasets);
+        expect(q(el, 'data-empty-wallet_txn')!.textContent!.trim()).toBe(said);
+        expect(q(el, 'data-empty-transfers')).toBeNull();
+        show(fixture, 'wallet_txn');
+        expect(q(el, 'pipeline-card-empty')!.textContent).toContain(said);
+        await expectNoA11yViolations(el);
+    });
+
+    it('LA-EMPTY-DATASET-WORDING-1: a Dataset with rows, or one the server cannot tell, carries no such line', () => {
+        const datasets = DATASETS.map((d) =>
+            d.name === 'wallet_txn' ? { ...d, empty: null } : { ...d, empty: false },
+        );
+        const { fixture, el } = create(datasets);
+        expect(el.querySelector('[data-testid^="data-empty-"]')).toBeNull();
+        show(fixture, 'wallet_txn');
+        expect(q(el, 'pipeline-card-empty')).toBeNull();
+    });
 });

@@ -34,7 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-EMPTY-DATASET-WORDING-1` | P3 | defect | an empty Pipeline-fed Dataset is reported in developer words, and the Data page does not say it is empty (filed 2026-11-14, left by LA-SA… | — |
 | `LA-RADIAL-LAYOUT-SQUASH-1` | P3 | defect | the Radial layout draws a two-component graph as a narrow, overlapping wedge. | — |
 | `LA-PHONE-OVERFLOW-1` | P3 | defect | at phone width the Link Analysis tool bar and the Add data page scroll sideways. | — |
 | `LA-CLIPPED-CONTROLS-1` | P3 | defect | Link Analysis controls clipped by their panels. | — |

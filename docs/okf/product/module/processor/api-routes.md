@@ -93,7 +93,7 @@ tags: [api, routes, generated]
 | GET | `/classifications` | The Space's column classification vocabulary | Metadata & Catalog | — | `inspecto/src/main/java/com/gamma/control/ClassificationRoutes.java` |
 | GET | `/collectors` | GET /collectors (generated skeleton) | collectors | — | `inspecto/src/main/java/com/gamma/control/AcquisitionRoutes.java` |
 | POST | `/collectors/{collectorId}/notify` | POST /collectors/{collectorId}/notify (generated skeleton) | collectors | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/AcquisitionRoutes.java` |
-| GET | `/components/{componentId}` | GET /components/{componentId} (generated skeleton) | components | — | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java` |
+| GET | `/components/{componentId}` | Registry components of one kind | components | — | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java` |
 | POST | `/components/{componentId}` | POST /components/{componentId} (generated skeleton) | components | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java` |
 | DELETE | `/components/{type}/{id}` | DELETE /components/{type}/{id} (generated skeleton) | components | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java` |
 | GET | `/components/{type}/{id}` | One registry component | Metadata & Catalog | — | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java` |

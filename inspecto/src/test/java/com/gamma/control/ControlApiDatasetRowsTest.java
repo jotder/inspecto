@@ -133,7 +133,8 @@ class ControlApiDatasetRowsTest {
             for (HttpResponse<String> r : List.of(rows, bi)) {
                 assertEquals(409, r.statusCode(), r.body());
                 String message = V1Body.envelope(r.body()).get("error").get("message").asText();
-                assertTrue(message.contains("Dataset 'empty_ds' has no data yet") && message.contains(store), message);
+                // LA-EMPTY-DATASET-WORDING-1: an analyst's words - no store, no physicalRef
+                assertEquals("Dataset 'empty_ds' has no rows yet: its Pipeline has not run.", message);
                 for (String leak : List.of("IO Error", "CREATE VIEW", "LINE 1", "read_parquet", "__no_readable_files__", "**", ":\\", ":/"))
                     assertFalse(r.body().replace('\\', '/').contains(leak), "no '" + leak + "' in: " + r.body());
             }

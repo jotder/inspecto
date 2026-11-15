@@ -3414,9 +3414,9 @@
     "/components/{componentId}" : {
       "get" : {
         "tags" : [ "components" ],
-        "summary" : "GET /components/{componentId} (generated skeleton)",
+        "summary" : "Registry components of one kind",
         "operationId" : "getComponentsByComponentId",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Every component of the kind the caller may view (empty when no write root is configured). A Dataset in this list also carries `empty` (LA-EMPTY-DATASET-WORDING-1): true when its store holds no data file yet (its Pipeline has not run, so a read answers 409), false when it holds one, null when that cannot be told cheaply (a view-backed Dataset, no data root, an unavailable ref). A directory check stopped at the first file, never a scan of rows; the one-component read does not carry it.",
         "parameters" : [ {
           "name" : "componentId",
           "in" : "path",
@@ -3426,11 +3426,40 @@
           }
         } ],
         "responses" : {
+          "200" : {
+            "description" : "The components, each with identity, version metadata and content; a Dataset also with `empty`.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "type" : "array",
+                        "items" : {
+                          "allOf" : [ {
+                            "$ref" : "#/components/schemas/Component"
+                          }, {
+                            "properties" : {
+                              "empty" : {
+                                "type" : [ "boolean", "null" ],
+                                "description" : "Dataset components only: whether its store holds no data file yet; null when that cannot be told."
+                              }
+                            }
+                          } ]
+                        }
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
           }
-        },
-        "x-generated" : true
+        }
       },
       "post" : {
         "tags" : [ "components" ],

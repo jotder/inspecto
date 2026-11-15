@@ -86,16 +86,14 @@ public final class ServerFaults {
      * Dataset's real errors still reach the caller.
      *
      * @param what    the route's own phrase ("dataset read failed", "BI query failed"...)
-     * @param dataset the Dataset's stored content, to name its store; may be {@code null}
+     * @param dataset the Dataset's stored content, to name the Pipeline that fills it; may be {@code null}
      */
     public static ApiException datasetRead(String what, String datasetId, java.util.Map<String, Object> dataset,
                                            java.sql.SQLException e, com.gamma.spi.http.ApiContext api) {
         String raw = com.gamma.util.DuckDbUtil.withoutPendingQueryPreamble(e.getMessage());
-        if (com.gamma.util.DatasetNoData.matches(raw)) {
-            Object ref = dataset == null ? null : dataset.get("physicalRef");
-            String store = ref == null || String.valueOf(ref).isBlank() ? null : String.valueOf(ref).trim();
-            return new ApiException(409, ErrorCodes.CONFLICT, com.gamma.util.DatasetNoData.message(datasetId, store));
-        }
+        if (com.gamma.util.DatasetNoData.matches(raw))
+            return new ApiException(409, ErrorCodes.CONFLICT,
+                    com.gamma.util.DatasetNoData.message(datasetId, com.gamma.util.DatasetNoData.pipelineOf(dataset)));
         return new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, what + ": " + sqlMessage(e.getMessage(), api));
     }
 

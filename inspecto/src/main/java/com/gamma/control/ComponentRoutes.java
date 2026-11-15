@@ -315,12 +315,41 @@ final class ComponentRoutes implements RouteModule {
     private Object componentList(ApiContext api, com.sun.net.httpserver.HttpExchange ex, String type) {
         Path root = componentRootOrNull(api);
         if (root == null) return List.of();
+        List<ComponentRegistry.Component> list;
         try {
-            return new ComponentStore(root).list(type).stream()
-                    .filter(c -> ComponentAccess.canView(ex, c.content()))
-                    .map(ComponentRoutes::componentDoc).toList();
+            list = new ComponentStore(root).list(type).stream()
+                    .filter(c -> ComponentAccess.canView(ex, c.content())).toList();
         } catch (IllegalArgumentException e) {
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
+        }
+        if (!"dataset".equals(type)) return list.stream().map(ComponentRoutes::componentDoc).toList();
+        Path dataRoot = api.dataRoot();
+        long deadline = System.nanoTime() + EMPTY_CHECK_BUDGET_NANOS;
+        java.util.function.BooleanSupplier expired = () -> System.nanoTime() > deadline;
+        return list.stream().map(c -> {
+            Map<String, Object> doc = componentDoc(c);
+            doc.put("empty", emptyStore(c.content(), dataRoot, expired));
+            return doc;
+        }).toList();
+    }
+
+    /** The whole list's budget for {@link #emptyStore}: a Dataset still unchecked when it runs out answers "cannot tell". */
+    private static final long EMPTY_CHECK_BUDGET_NANOS = 500_000_000L;
+
+    /**
+     * LA-EMPTY-DATASET-WORDING-1: whether a Dataset's store holds no data file yet - {@code true} (its Pipeline has not
+     * written any rows, so every read of it answers the closed 409), {@code false} (it holds at least one), {@code null}
+     * when that cannot be told cheaply (a view-backed Dataset, no data root, an unusable or unavailable ref, the budget
+     * spent). The SAME file resolution the read uses ({@link com.gamma.query.DatasetRelation#inputFiles}), stopped at
+     * the first file: a directory walk, never a scan of rows. Served on the LIST only: the one-component read is cached
+     * by its content hash ({@code ETag}), which this does not change.
+     */
+    static Boolean emptyStore(Map<String, Object> dataset, Path dataRoot, java.util.function.BooleanSupplier expired) {
+        try {
+            return com.gamma.query.DatasetRelation.inputFiles(dataset, dataRoot, 1, expired)
+                    .map(f -> !f.overLimit() && f.files().isEmpty()).orElse(null);
+        } catch (RuntimeException cannotTell) {
+            return null;
         }
     }
 
