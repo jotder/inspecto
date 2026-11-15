@@ -67,6 +67,10 @@ still take. Marking it would promise a type that is on its way out.
 pre-commit. An intended change is recorded by `node tools/check-public-api.mjs --update` in the same commit,
 where the reviewer sees the changed lines. The guard does not judge whether a change is allowed: under the
 rule above, a line whose type was not in `v3.11.0` may still change before 4.0.0 ships.
+`since` is not part of a line; the same guard fails a `since` that is not `X.Y.Z` or is above the pending
+version (the root `pom.xml` version without `-SNAPSHOT`), so a version that never existed cannot be written
+(`PUBLICAPI-SINCE-VERSIONS-1`, 2026-11-16: three marks said `5.0.0` / `5.2.0`). It does not check that the value
+is a released tag: `1.0.0`, `2.2.0` and `2.4.0` are in use and have none.
 
 ## Release notes — the pending MAJOR (draft, kept current until the tag is cut)
 

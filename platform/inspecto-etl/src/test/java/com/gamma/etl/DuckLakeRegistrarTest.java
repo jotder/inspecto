@@ -37,8 +37,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>⛔ Deliberately NOT tested here: a successful registration, and the NON-FATAL promise. Both need
  * {@code INSTALL ducklake FROM core}, a network fetch this offline reactor cannot make — measured, it
- * costs ~131 s per attempt before failing. See the note at the foot of this class; the non-fatal half is
- * still owed under {@code SPEC-NOPROOF-1}.
+ * costs ~131 s per attempt before failing. See the note at the foot of this class; the real-driver
+ * failure proof is still owed — {@code SPEC-NOPROOF-1} closed on 2026-09-09 without it, and it was
+ * untracked until {@code DUCKLAKE-REAL-DRIVER-FAILURE-PROOF-1} (2026-11-16).
  */
 class DuckLakeRegistrarTest {
 
@@ -145,8 +146,9 @@ class DuckLakeRegistrarTest {
      * never runs is not a guard either (this repo has already recorded that a guard nobody runs proves
      * nothing). `DuckDbUtil.jdbcUrl` offers no settings hook, so the fetch cannot be made to fail fast.
      *
-     * ⚠ So this class proves the REACHABILITY half and the GUARDS, and the non-fatal half stays owed —
-     * filed under `SPEC-NOPROOF-1`. It needs a reachable DuckLake catalog, which means a live deployment,
+     * ⚠ So this class proves the REACHABILITY half and the GUARDS, and the real-driver failure proof stays
+     * owed. `SPEC-NOPROOF-1` closed on 2026-09-09 without it and left it untracked; it is now the board row
+     * `DUCKLAKE-REAL-DRIVER-FAILURE-PROOF-1`. It needs a reachable DuckLake catalog, which means a live deployment,
      * which puts it in the same bucket as the SCR-4/5/7 deployment scripts rather than the reactor.
      * ⛔ Do not "fix" this by asserting it with a mock: the promise is about a real driver's real failure.
      *

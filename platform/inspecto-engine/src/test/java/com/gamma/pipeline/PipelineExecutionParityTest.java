@@ -323,8 +323,8 @@ class PipelineExecutionParityTest {
     @Test
     @SuppressWarnings("unchecked")
     void segmentsToConfigMapWritesSchemaFilesAndBuildSegmentsMap(@TempDir Path dir) throws Exception {
-        // Two segment schema files — written as inline TOON (ConfigCodec.toToon doesn't emit
-        // tabular-array format so the TOON parser would fail to re-read the serialized arrays)
+        // Two segment schema files — written as inline TOON, as an author would. ConfigCodec.toToon
+        // would round-trip them too: it emits tabular arrays (ComponentStoreTest.tabularFieldsRoundTripThroughToon).
         String segSchema = """
                 partitionKey: ID
                 raw:
@@ -384,8 +384,8 @@ class PipelineExecutionParityTest {
     private static Path writeRowFilterPipeline(Path dir) throws Exception {
         Files.createDirectories(dir);
         Path sf = dir.resolve("schema.toon");
-        // Write inline TOON — ConfigCodec.toToon doesn't emit tabular-array format and the
-        // TOON parser would reject it with "Array length mismatch" when re-reading fields/rules.
+        // Inline TOON, as an author would write it. ConfigCodec.toToon would round-trip fields/rules too:
+        // it emits tabular arrays (ComponentStoreTest.tabularFieldsRoundTripThroughToon).
         Files.writeString(sf, """
                 partitionKey: EVENT_DATE
                 raw:

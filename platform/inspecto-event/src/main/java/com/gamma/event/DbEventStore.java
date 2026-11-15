@@ -51,9 +51,9 @@ import com.gamma.audit.EventType;
  * reading one backend's raw table reads the other's unchanged, and so the row→{@link Event} mapping is the
  * same code shape in both.
  *
- * @since 5.x
+ * @since 4.0.0
  */
-@com.gamma.api.PublicApi(since = "5.0.0")
+@com.gamma.api.PublicApi(since = "4.0.0")
 public final class DbEventStore extends AbstractJdbcStore implements EventStore {
 
     private static final Logger log = LoggerFactory.getLogger(DbEventStore.class);

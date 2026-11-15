@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **87<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 73<!--count:backlog-p3--> × P3** —
+> **88<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 74<!--count:backlog-p3--> × P3** —
+> ⬆ **87 → 88 (P3 73 → 74) on 2026-11-16** — from the doc-claim audit: filed and closed P3 defect `PUBLICAPI-SINCE-VERSIONS-1` [items: module.api · kind: defect] (⬆ 87 → 88, then ⬇ 88 → 87, net zero): three `@PublicApi` marks named versions that never existed — `MailAttachment` and `DbEventStore` `since = "5.0.0"`, `AcceptedConfigKeys` `since = "5.2.0"`. Each type was added after `v3.12.0` (2026-09-11, 2026-09-16, 2026-09-29) and no tag contains it, so each is now `4.0.0`, the pending major (trunk `4.0.0-SNAPSHOT`); `since` is not in `public-api.txt`, so the baseline is unchanged. `tools/check-public-api.mjs` now also fails a `since` that is not X.Y.Z or is above the root pom's pending version (fixture test in `check-public-api.test.mjs`); a "must be a released tag" check was left out because `1.0.0`, `2.2.0` and `2.4.0` are used and have no tag. Also corrected the stale `toToon` warning in `PipelineExecutionParityTest` and `spec-toon-config.md` (`toToon` emits tabular arrays). Then filed P3 chore `DUCKLAKE-REAL-DRIVER-FAILURE-PROOF-1` [items: module.etl · kind: chore] (⬆ 87 → 88): the real-driver failure proof `DuckLakeRegistrarTest` cites, untracked since `SPEC-NOPROOF-1` closed on 2026-09-09.
 > ⬇ **88 → 87 (P3 74 → 73) on 2026-11-15** — closed P3 defect `JOB-OUTLIVES-CLOSE-1` [items: module.engine · kind: defect]: closing the server did wait for Job Runs, but only cooperatively and only for `SpaceManager`'s 10 s budget; a drain still busy then was abandoned at once and its Run went on writing after `close()` returned (the test's log showed 2–3 Spaces abandoned per run even when it passed; under a second Maven run `t-la-utility` was one, mid-`transformer_loss`). And `sql.template`, which wrote that Dataset, never read the cooperative cancel. Now an overrun drain is escalated before it is abandoned: `CollectorService.interruptRuns()` → `JobService.interruptRuns()` interrupts the in-flight Runs (recorded `CANCELLED`), and the drain gets up to 5 s more, taken from the store flush's budget, so a Space still closes within two budgets; `sql.template` checks the cancel before each write and reveals no snapshot once cancelled. A Run inside a native DuckDB statement still stops only when the statement returns, and is abandoned as before. Tests `SpaceCloseStopsRunsTest`, `JobCloseStopTest`; as-built in the engine hub's architecture (*Stopping a Space*).
 > ↔ **88 (no count change, P2 14, P3 74) on 2026-11-15**: narrowed P3 chore `DOCS-AGENT-WRITTEN-REVIEW-1` [items: layer.platform, layer.product · kind: chore] — batch 3 of the doc-claim audit, every claim re-verified against code first: about 98 fixed, 48 already right (`tests-doc-claim-audit-2026-10-19.md` § *Second pass*, items 3, 5, 6, 7, 8). The "filed as cross-cutting rows" blockquotes of 14 plans now say none of their `SPEC-*` ids is a board row; the work list's own counts were stale too (34 writable kinds, 30 Space templates, 49 node types). Left: the `access/` claims with the access lane, `la-core/admin-guide-demo` with the `la-*` peer, and the ~70 unsampled `spec*` / `user-guide*` / `architecture*` docs.
 > ↔ **88 (no count change, P2 14, P3 74) on 2026-11-15**: narrowed P3 `ANOMALY-UI-FINDINGS-1` [items: module.anomaly · kind: chore · hold: operator] and held it on the operator: (a)–(j) re-checked against current master, including the UI-FORM-ROWS-1 rework of the Feature editor, and none reproduces. The one nit left on 2026-11-01 is fixed: the draft preview's column headers ("Self z", "Peer z", "Cohort shift") stay on one line and the table scrolls sideways (CSS; spec only, not driven in a browser). What remains is the live (h) token-lapse check, which needs a person to sign in to the IdP; no defect is known, so the row is now a chore.
@@ -601,10 +602,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 73<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 74<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 73<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 87<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 74<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 88<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -962,6 +963,7 @@ What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 
 #### Test infrastructure
 
+- **P3** · `DUCKLAKE-REAL-DRIVER-FAILURE-PROOF-1` — **no test proves that a real DuckLake driver's registration failure is non-fatal (filed 2026-11-16; untracked since `SPEC-NOPROOF-1` closed on 2026-09-09).** `DuckLakeRegistrarTest` proves the reachability, the guards and the per-topology decision (`onRegistrationFailure`), not a real driver failing: every route to "enabled, then broken" first runs `INSTALL ducklake FROM core`, a network fetch (~131 s per attempt offline, 262 s for two tests, measured 2026-09-09), and `DuckDbUtil.jdbcUrl` has no settings hook to make it fail fast. Needs a reachable DuckLake catalog — a live deployment, not the reactor; never a mock. → `okf/product/layer/platform/plan-data-plane.md` §8 [items: module.etl · kind: chore · hold: external]
 
 
 #### Developer tooling

@@ -12,7 +12,7 @@ timestamp: 2026-07-16T00:00:00Z
 * **TOON schema serialization** — `ConfigCodec.toToon(map)` round-trips a Java-constructed `List<Map>`
   (`fields`/`rules`) back through the strict `ConfigCodec.toMap` (`ComponentStoreTest.tabularFieldsRoundTripThroughToon`;
   every shipped example in `ShippedExamplesRoundTripTest`). The old warning — that it emits no tabular form and
-  the re-read throws *"Array length mismatch"* — no longer holds; a few test comments still repeat it. The live
+  the re-read throws *"Array length mismatch"* — no longer holds. The live
   trap is the strict decode: a tabular row whose width disagrees with its header (an unquoted
   `DECIMAL(18,2)`) is refused, naming the line and the quoted fix. See [TOON config](../../module/config/spec-toon-config.md).
 * **DuckDB reserved words** — `day` is a keyword: alias it (`run_day`) in SQL; quote `"trigger"` too. Watch

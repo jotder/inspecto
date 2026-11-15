@@ -78,7 +78,7 @@ import java.util.TreeSet;
  * is accepted unconditionally, never suggested against, and round-trips through {@code ConfigCodec}
  * untouched.
  */
-@PublicApi(since = "5.2.0")
+@PublicApi(since = "4.0.0")
 public final class AcceptedConfigKeys {
 
     private AcceptedConfigKeys() {}

@@ -15,9 +15,9 @@ import java.util.Objects;
  * @param filename    the name the recipient sees — sanitised here (no CR/LF, quotes, path separators)
  * @param contentType a MIME type from {@link MailAttachments#CONTENT_TYPES}
  * @param content     the bytes; not copied, so the caller must not mutate them after handing them over
- * @since 5.0.0
+ * @since 4.0.0
  */
-@PublicApi(since = "5.0.0")
+@PublicApi(since = "4.0.0")
 public record MailAttachment(String filename, String contentType, byte[] content) {
 
     public MailAttachment {

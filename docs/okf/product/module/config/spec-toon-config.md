@@ -33,10 +33,10 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   load accepts the truncated map with no error and no warning — every key after the comment is silently
   gone. Never author `#` comments in a live config; if you inherit one, decode the file and compare its
   top-level key list.
-  **Gotcha**: `toToon` does **not** emit tabular-array format — a Java-constructed schema whose `fields`/
-  `rules` are `List<Map>` round-trips as nested maps and the parser then throws *"Array length mismatch:
-  declared N, found 0"*. Write test schemas as inline TOON strings, not via `toToon(schemaMap)`; round-trip is
-  only safe when the map was originally `JToon.decode`-d. See [gotchas](../../layer/platform/admin-guide-gotchas.md).
+  `toToon` emits tabular arrays: a Java-constructed schema whose `fields`/`rules` are `List<Map>` round-trips
+  through the strict `toMap` (`ComponentStoreTest.tabularFieldsRoundTripThroughToon`). The old warning that it
+  does not, and that the re-read throws *"Array length mismatch"*, no longer holds. See
+  [gotchas](../../layer/platform/admin-guide-gotchas.md).
   ⚠ **An unquoted comma-bearing value in a table row is REFUSED, by line** (`TOON-UNQUOTED-DECIMAL-SKIPS-PIPELINE-1`,
   fixed 2026-09-23). The comma is also the row delimiter, so `AMT,"1",DECIMAL(18,2)` under
   `fields[3]{name,selector,type}` is **four** values — genuinely ambiguous, so it is never guessed at.

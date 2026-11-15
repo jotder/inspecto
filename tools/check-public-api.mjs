@@ -8,6 +8,8 @@
 // so renaming a parameter or changing an implementation is not a change. The lines are compared with the committed
 // baseline platform/inspecto-api/public-api.txt: any difference fails, so a changed signature can only land in the
 // same change that updates the baseline (`--update`), where a reviewer sees it.
+// PUBLICAPI-SINCE-VERSIONS-1 (2026-11-16): it also fails a `@PublicApi(since = ...)` that is not X.Y.Z or is above the
+// pending version (root pom.xml, -SNAPSHOT dropped): such a version does not exist. `since` is not in the baseline.
 // Usage: node tools/check-public-api.mjs            check against the baseline
 //        node tools/check-public-api.mjs --update   rewrite the baseline from the source
 // Doc: docs/okf/product/layer/platform/user-guide-builder-kit.md section 4.
@@ -230,6 +232,29 @@ export function surface(root, files = javaFiles(root)) {
     return [...lines].sort();
 }
 
+const SINCE = /@(?:com\.gamma\.api\.)?PublicApi\s*\(\s*since\s*=\s*"([^"]*)"/g;
+const semver = v => v.split('.').map(Number);
+
+/** The pending release: the root pom's version without -SNAPSHOT. */
+export function pendingVersion(root) {
+    const m = readFileSync(join(root, 'pom.xml'), 'utf8').match(/<artifactId>inspecto-parent<\/artifactId>\s*<version>([^<]+)<\/version>/);
+    if (!m) throw new Error('pom.xml: no inspecto-parent <version>');
+    return m[1].replace(/-SNAPSHOT$/, '');
+}
+
+/** One message per `@PublicApi(since = ...)` in `src` that is not X.Y.Z or is above `pending`. */
+export function badSince(src, pending, file = '?') {
+    const top = semver(pending);
+    const out = [];
+    for (const [, v] of src.matchAll(SINCE)) {
+        if (!/^\d+\.\d+\.\d+$/.test(v)) { out.push(`${file}: since = "${v}" is not X.Y.Z`); continue; }
+        const s = semver(v);
+        const cmp = s[0] - top[0] || s[1] - top[1] || s[2] - top[2];
+        if (cmp > 0) out.push(`${file}: since = "${v}" is above the pending version ${pending}`);
+    }
+    return out;
+}
+
 export function readBaseline(root) {
     const p = join(root, BASELINE);
     if (!existsSync(p)) return null;
@@ -255,6 +280,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         writeFileSync(join(root, BASELINE), render(current));
         console.log(`Public API guard: wrote ${BASELINE} (${current.length} lines).`);
         process.exit(0);
+    }
+    const pending = pendingVersion(root);
+    const wrongSince = javaFiles(root).filter(f => existsSync(join(root, f)))
+        .flatMap(f => badSince(readFileSync(join(root, f), 'utf8'), pending, f));
+    if (wrongSince.length) {
+        console.error('Public API guard FAILED: a @PublicApi since names a version that does not exist:');
+        for (const l of wrongSince) console.error('  ' + l);
+        console.error(`Use the release that first shipped the element, or ${pending} if it has not shipped yet.`);
+        process.exit(1);
     }
     const baseline = readBaseline(root);
     if (!baseline) { console.error(`Public API guard FAILED: ${BASELINE} is missing; run with --update.`); process.exit(1); }

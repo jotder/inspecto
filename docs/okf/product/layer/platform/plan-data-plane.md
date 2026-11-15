@@ -682,8 +682,8 @@ A whole Space on S3 (no atomic rename); `hadoop-client` for HDFS (⛔ never — 
 > hook to make it fail fast. ⛔ So it needs a reachable catalog — a live deployment, not the reactor.
 > `SPEC-NOPROOF-1` closed on 2026-09-09 counting the reachability and guard tests, and since D10
 > (2026-09-14) `DuckLakeRegistrarTest` also tests the per-topology decision (`onRegistrationFailure`)
-> directly; the real driver's failure stays unproven, and no board row tracks it (re-checked
-> 2026-11-15). Adding 4.4 minutes to an offline build would be a defect, and a
+> directly; the real driver's failure stays unproven, untracked until 2026-11-16, now the P3 board row
+> `DUCKLAKE-REAL-DRIVER-FAILURE-PROOF-1`. Adding 4.4 minutes to an offline build would be a defect, and a
 > `@Tag`-excluded test that never runs is not a guard.
 
 ### 8.1 Relations, guards, compiler — `inspecto-engine` · `inspecto-sql` (default reactor)

@@ -2,11 +2,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { diff, readBaseline, surface, surfaceOf } from './check-public-api.mjs';
+import { badSince, diff, javaFiles, pendingVersion, readBaseline, surface, surfaceOf } from './check-public-api.mjs';
 
 const BASE = `package x;
 
@@ -104,6 +104,26 @@ test('scope: every tracked .java file is read, whatever module or directory hold
         const got = surface(root);
         assert.ok(got.includes('x.Hook | String id()') && got.includes('x.Internal | public Internal(int)'), got.join('\n'));
     } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('since above the pending version is RED; a released or the pending version is GREEN', () => {
+    const at = v => badSince(`@PublicApi(since = "${v}")\npublic interface A {}`, '4.0.0', 'A.java');
+    assert.equal(at('5.0.0').length, 1);
+    assert.equal(at('4.1.0').length, 1);
+    assert.equal(at('4.0.1').length, 1);
+    assert.equal(at('5.x').length, 1, 'not X.Y.Z');
+    assert.equal(badSince('@com.gamma.api.PublicApi( since="5.2.0" ) class B {}', '4.0.0').length, 1);
+    for (const v of ['4.0.0', '3.12.0', '3.10.0', '1.0.0']) assert.deepEqual(at(v), [], v);
+    assert.deepEqual(badSince('@PublicApi class C {}', '4.0.0'), []);
+});
+
+test('no @PublicApi since in the repo names a version above the pending one', () => {
+    const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+    const pending = pendingVersion(root);
+    assert.match(pending, /^\d+\.\d+\.\d+$/);
+    const bad = javaFiles(root).filter(f => existsSync(join(root, f)))
+        .flatMap(f => badSince(readFileSync(join(root, f), 'utf8'), pending, f));
+    assert.deepEqual(bad, []);
 });
 
 test('the committed baseline matches the repo source', () => {
