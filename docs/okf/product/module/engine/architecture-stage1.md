@@ -370,7 +370,10 @@ Two things close that gap, both as of 2026-09-01:
   `scheduler_audit` maintenance job remains the richer on-demand audit
   (`spaces/demo/config/jobs/scheduler_audit_job.toon`). ⚠ History: until 2026-09-01 the check fired
   ONLY from that job and no shipped space but `demo` had one — a fail-open gate; a stock space had
-  no orphan detection at all ("the one failure this split makes possible").
+  no orphan detection at all ("the one failure this split makes possible"). A Job covers a Pipeline when
+  its `pipeline_config:`, resolved as the runner resolves it, names a file whose registered id is that
+  Pipeline's (`PipelineConfigIds.registeredIdOf`, the save gate's rule too); until 2026-11-15 it was the
+  file name less `_pipeline.toon`, which flagged every `07-steps` sample (`SCHEDULER-AUDIT-PIPELINE-NAME-1`).
 
 **`output_store:` is the arming condition.** `prepare()` refuses to arm a pipeline carrying
 `summarize`/`dedup`/`join`/`steps:` *unless* `output_store:` is authored — with it, the file itself

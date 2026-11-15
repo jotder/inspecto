@@ -275,7 +275,7 @@ class ControlApiChainWithoutJobTest {
                 Path pipelineFile = base.resolve(pc);
                 String expected = ConfigReadRoutes.pipelineIdOf(ToonHelper.decode(Files.readString(pipelineFile)), null);
                 assertNotNull(expected, pipelineFile.toString());
-                assertEquals(expected, ConfigRoutes.chainPipelineOf(pc, base), jobFile.toString());
+                assertEquals(expected, com.gamma.job.PipelineConfigIds.registeredIdOf(pc, base), jobFile.toString());
                 if (!pipelineFile.getFileName().toString().equalsIgnoreCase(expected + "_pipeline.toon"))
                     nameDiffersFromFile = true;
                 checked++;

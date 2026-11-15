@@ -36,7 +36,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | — | P2 | feature | SPACE-LINK-CENSUS-1 one declared census of the links between a Space's config files | — |
 | — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
-| `SCHEDULER-AUDIT-PIPELINE-NAME-1` | P3 | defect | the default-on orphan output_store: signal matches a Job to its Pipeline by file name, so it flags the 07-steps samples as having no Job… | — |
 | `DEFAULT-SPACE-LOOKUP-STEP-NO-JOB-1` | P3 | defect | the default Space's lookup_step Pipeline has a chain and an output_store: but no type: pipeline Job, so its chain never runs, and it now… | — |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
 | `SPACE-ROOTED-DATA-ROOT-MIGRATION-1` | P3 | feature | an install whose data_root is rooted (or absent, i.e. -Dspaces.data.root) is still not relocatable, and there is no route that migrates it. | demand |

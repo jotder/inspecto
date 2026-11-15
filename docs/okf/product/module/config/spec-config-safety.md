@@ -651,7 +651,8 @@ finding per Step, anchored at `steps[i].<kind>` or `processing.<kind>`, naming t
     resolves exactly as `PipelineJobRunner` resolves it: from the run's own base (`SpaceConfigRoot.jobPathBase`,
     the config read root) through `PathJail.requireJobPathUnderAny` over `PathJail.allowedRoots()`, which also
     refuses a path outside the jail and a `*.secrets` directory. The file's registered id (`id:`, else `name:`
-    lower-cased, `ConfigReadRoutes.pipelineIdOf`) must be this Pipeline's. The shipped samples name
+    lower-cased) must be this Pipeline's. One helper holds this rule, `PipelineConfigIds.registeredIdOf`
+    in the engine, so the save gate and the run-time audit below cannot drift. The shipped samples name
     `orders_pipeline.toon` for `STEP_DEDUP`, so a file-name rule would warn on every one of them. A Job's
     `pipeline:` names an authored Pipeline and never lifts this chain, so it does not count; neither does a
     disabled Job, nor one whose path the runner would refuse (that file is never read) or whose file is missing.
@@ -667,9 +668,14 @@ finding per Step, anchored at `steps[i].<kind>` or `processing.<kind>`, naming t
     run-time side already exists: `JobService.auditOrphanOutputStores` (default on, run on a Job upsert or
     delete and on a registry rebuild) signals `maintenance.scheduler.findings` for an active store with no
     enabled `pipeline_config:` Job.
-  - ⚠ That run-time audit matches by **file name** (`SchedulerAuditTask.pipelineNameOf`: the
-    `pipeline_config:` basename less `_pipeline.toon`), not by identity, so it reports the shipped
-    `07-steps` samples as orphans although each has its Job. Open as `SCHEDULER-AUDIT-PIPELINE-NAME-1`.
+  - That run-time audit (`SchedulerAuditTask.orphanOutputStoreFindings`, shared with the on-demand
+    `scheduler_audit` task) matches a Job by the **same identity rule** (2026-11-15,
+    `SCHEDULER-AUDIT-PIPELINE-NAME-1`; it took the `pipeline_config:` basename less `_pipeline.toon` until
+    then, and so reported every `07-steps` sample as an orphan). It resolves from the Space's own base:
+    `JobService.auditOrphanOutputStores` binds the service's Space for the scan, as a Job run does, because a
+    registry rebuild calls it from a thread bound to no Space. A Job whose file is missing, unreadable or
+    outside the jail runs nothing, so it covers nothing. Pinned by `JobServiceOrphanAuditTest` and
+    `MaintenanceLibraryTest.schedulerAuditFlagsAnOutputStoreNoPipelineConfigJobRuns`.
   - ⚠ The `webhook:` / `excel:` blocks also run only at rest but are not judged by this warning (only the
     chain is, as for the store-less finding above).
   - The default Space's `lookup_step` Pipeline (`spaces/default/config/lookup_step/`) has a chain and a

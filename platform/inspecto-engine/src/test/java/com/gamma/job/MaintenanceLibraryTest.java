@@ -858,14 +858,20 @@ class MaintenanceLibraryTest {
     }
 
     @Test
-    void schedulerAuditFlagsAnOutputStoreNoPipelineConfigJobRuns(@TempDir Path audit) throws Exception {
-        // 'covered' has an enabled pipeline_config job (basename match); 'orphaned' has none;
-        // 'disabled_shaper' has a job, but it is disabled — the chain still never runs.
+    void schedulerAuditFlagsAnOutputStoreNoPipelineConfigJobRuns(@TempDir Path audit, @TempDir Path configs)
+            throws Exception {
+        // 'covered' has an enabled pipeline_config job (its file's registered id, not its file name:
+        // SCHEDULER-AUDIT-PIPELINE-NAME-1); 'orphaned' has none; 'disabled_shaper' has a job, but it is
+        // disabled — the chain still never runs.
+        Path coveredFile = Files.writeString(configs.resolve("orders_pipeline.toon"), "name: covered\n");
+        Path shaperFile = Files.writeString(configs.resolve("shaper_pipeline.toon"), "name: disabled_shaper\n");
         JobConfig covered  = new JobConfig("rollup", JobType.PIPELINE, null, null, true, false,
-                Map.of("pipeline_config", "config/covered_pipeline.toon"));
+                Map.of("pipeline_config", coveredFile.toString()));
         JobConfig offShaper = new JobConfig("dormant", JobType.PIPELINE, null, null, false, false,
-                Map.of("pipeline_config", "config/disabled_shaper_pipeline.toon"));
+                Map.of("pipeline_config", shaperFile.toString()));
         JobConfig auditJob = new JobConfig("hygiene", JobType.MAINTENANCE, null, null, true, false, Map.of("task", "scheduler_audit"));
+        String priorRoots = System.getProperty("assist.safety.roots");
+        System.setProperty("assist.safety.roots", configs.toString());   // the runner's jail
         try (com.gamma.util.Scheduler s = new com.gamma.util.Scheduler();
              JobService js = new JobService(List.of(covered, offShaper, auditJob),
                      new com.gamma.etl.ConsignmentEventBus(), s, null, audit.toString())) {
@@ -884,6 +890,9 @@ class MaintenanceLibraryTest {
                     && m.contains("dormant_out")), logged.toString());
             assertTrue(logged.stream().noneMatch(m -> m.contains("output_store") && m.contains("'covered'")),
                     logged.toString());
+        } finally {
+            if (priorRoots != null) System.setProperty("assist.safety.roots", priorRoots);
+            else System.clearProperty("assist.safety.roots");
         }
     }
 

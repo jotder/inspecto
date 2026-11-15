@@ -405,7 +405,7 @@ final class ConfigRoutes {
      * (PIPELINE-CHAIN-NO-JOB-1): the chain runs only at rest, from a Job whose {@code pipeline_config:} names this
      * Pipeline's file ({@code PipelineJobRunner} → {@code PipelineLift.stageTwo}), so with none it never runs. A Job
      * runs this Pipeline when its {@code pipeline_config:} resolves as the runner resolves it (its base,
-     * {@code SpaceConfigRoot.jobPathBase}, and its jail, {@link #chainPipelineOf}) to a file whose registered id ({@link ConfigReadRoutes#pipelineIdOf})
+     * {@code SpaceConfigRoot.jobPathBase}, and its jail, {@code PipelineConfigIds.registeredIdOf}) to a file whose registered id
      * is this draft's id — the file's own identity, not its file name, because the shipped samples name
      * {@code orders_pipeline.toon} for a Pipeline called {@code STEP_DEDUP}. A Job's {@code pipeline:} names an
      * authored ({@code *_flow.toon}) Pipeline and never lifts this file's chain, so it does not count.
@@ -426,7 +426,8 @@ final class ConfigRoutes {
         Path base = com.gamma.pipeline.SpaceConfigRoot.jobPathBase("pipeline_config", writeRoot);
         for (com.gamma.job.JobConfig j : jobs)
             if (j.enabled() && "pipeline".equals(j.type())
-                    && pipeline.equalsIgnoreCase(chainPipelineOf(j.params().get("pipeline_config"), base)))
+                    && pipeline.equalsIgnoreCase(com.gamma.job.PipelineConfigIds.registeredIdOf(
+                            j.params().get("pipeline_config"), base)))
                 return List.of();
         return List.of(new Finding(Severity.WARNING, "output_store",
                 "Pipeline '" + pipeline + "' has a chain writing output_store '" + draft.get("output_store")
@@ -436,23 +437,6 @@ final class ConfigRoutes {
                 FindingCodes.WARN_CHAIN_WITHOUT_PIPELINE_JOB,
                 "add a type: pipeline Job that runs '" + pipeline + "' (pipeline_config: this Pipeline's "
                         + "*_pipeline.toon file, on_pipeline: " + pipeline + "), or enable the one you have"));
-    }
-
-    /** The registered id of the Pipeline file a Job's {@code pipeline_config:} value names, resolved exactly as
-     *  {@code PipelineJobRunner} resolves it ({@code PathJail.requireJobPathUnderAny} over
-     *  {@code PathJail.allowedRoots()} from {@code base}, the run's own {@code SpaceConfigRoot.jobPathBase}), so a path
-     *  the runner refuses (outside the jail, or a secrets directory) is "no Job" and is never read; {@code null}
-     *  when it is blank, refused, missing or unreadable. */
-    static String chainPipelineOf(String pipelineConfig, Path base) {
-        if (pipelineConfig == null || pipelineConfig.isBlank()) return null;
-        try {
-            Path file = PathJail.requireJobPathUnderAny(PathJail.allowedRoots(), base, pipelineConfig.trim(),
-                    "job.pipeline_config");
-            if (!Files.isRegularFile(file)) return null;
-            return ConfigReadRoutes.pipelineIdOf(com.gamma.util.ToonHelper.decode(Files.readString(file)), null);
-        } catch (Exception unreadable) {   // a Job the runner could not run either: it runs nothing
-            return null;
-        }
     }
 
     static List<Finding> dedupWindowFindings(String type, Map<String, Object> draft) {
