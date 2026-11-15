@@ -157,7 +157,7 @@ public final class EntityProfileRoutes implements RouteModule {
         if (kept.isEmpty()) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no entity type '" + id + "'");
         audit(ex, LinkEventTypes.LINK_ENTITY_TYPE_DELETED, "link.entity_type.deleted", "link.entity_type.deleted " + id,
                 b -> b.target("entity_type", id).attr("entityType", id).attr("remaining", kept.get().size()));
-        return Map.of("deleted", id, "entityTypesInForce", EntityTypes.shape(kept.get()));
+        return Map.of("deleted", id, "entityTypesInForce", EntityTypes.inForceShape(kept.get()));
     }
 
     /**

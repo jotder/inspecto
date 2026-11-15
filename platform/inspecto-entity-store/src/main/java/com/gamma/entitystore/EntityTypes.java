@@ -174,6 +174,25 @@ public final class EntityTypes {
     }
 
     /**
+     * The classes an author's selected {@code classification} stands for (MASKING-TYPE-ID-EDGES-1, operator decision 2026-11-15):
+     * when it names an Entity Type by its id ({@link #typeNamedBy}), that id and every class the type claims; any other class
+     * stands for itself. Normalised ({@link ColumnClassification#normalise}); empty when blank.
+     */
+    public static Set<String> classesSelectedBy(List<EntityType> types, Object classification) {
+        String c = ColumnClassification.normalise(classification);
+        if (c == null) return Set.of();
+        Set<String> out = new java.util.LinkedHashSet<>();
+        out.add(c);
+        EntityType named = typeNamedBy(types, c);
+        if (named != null && named.id().trim().equalsIgnoreCase(c))
+            for (String x : named.classifications()) {
+                String n = ColumnClassification.normalise(x);
+                if (n != null) out.add(n);
+            }
+        return out;
+    }
+
+    /**
      * The first type of {@code types} masked in force ({@link #maskedInForce}) that claims {@code classification} or whose id it is
      * (trimmed, any case), else {@code null}. A type id counts because the save gate and onboarding read a column classed with it
      * as that type.
@@ -358,6 +377,17 @@ public final class EntityTypes {
             putGuidance(m, t);
             out.add(m);
         }
+        return out;
+    }
+
+    /**
+     * The wire shape of the types in force: {@link #shape} plus each type's {@code maskedInForce} ({@link #maskedInForce}):
+     * whether its ids mask, which a {@code masked: false} type with a sensitive id or class does. The ONE shape every answer
+     * naming {@code entityTypesInForce} gives (MASKING-TYPE-ID-EDGES-1). Read-only: a PUT ignores it.
+     */
+    public static List<Map<String, Object>> inForceShape(List<EntityType> types) {
+        List<Map<String, Object>> out = shape(types);
+        for (int i = 0; i < types.size(); i++) out.get(i).put("maskedInForce", maskedInForce(types.get(i)));
         return out;
     }
 

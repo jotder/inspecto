@@ -24,7 +24,8 @@ import java.util.function.Predicate;
  * cannot disagree.
  *
  * <p><b>By classification.</b> {@code classifications: [PII, MSISDN]} plus {@code dataset: <registry id>} masks every
- * inbound column whose class is selected. A column's class is the Dataset's own {@code columns[].classification}
+ * inbound column whose class is selected; a selected Entity Type id stands for every class the type claims as well
+ * ({@link EvidenceMasker#selectedClasses}, MASKING-TYPE-ID-EDGES-1). A column's class is the Dataset's own {@code columns[].classification}
  * merged with {@link EvidenceMasker#lineageClassification} (sibling Datasets over the same store and the pipeline
  * schemas behind it), several classes on one column resolving <b>strictest-wins</b>
  * ({@link ColumnClassification#stricter} with the selected set as the masked predicate — a selected class
@@ -117,13 +118,15 @@ public record MaskSpec(String mode, int keepLast, List<String> classifications, 
             if (configRoot == null)
                 throw new IllegalStateException("transform.mask node '" + node.id()
                         + "': no Space config root is bound to this run, so the Dataset's classifications cannot be read");
-            Map<String, String> classes = classesOf(configRoot, dataset);
+            // a selected Entity Type id stands for every class the type claims (MASKING-TYPE-ID-EDGES-1)
+            Set<String> selected = EvidenceMasker.selectedClasses(configRoot, classifications);
+            Map<String, String> classes = classesOf(configRoot, dataset, selected);
             if (classes.containsKey(EvidenceMasker.UNKNOWN_LINEAGE))
                 throw new IllegalStateException("transform.mask node '" + node.id() + "': the column lineage of Dataset '"
                         + dataset + "' cannot be traced, so which columns are classified is unknown - mask them by name");
             for (String c : available) {
                 String cl = classes.get(c.toLowerCase(Locale.ROOT));
-                if (cl != null && classifications.contains(cl)) out.add(c);
+                if (cl != null && selected.contains(cl)) out.add(c);
             }
         }
         if (out.isEmpty())
@@ -132,13 +135,13 @@ public record MaskSpec(String mode, int keepLast, List<String> classifications, 
         return List.copyOf(out);
     }
 
-    /** Lower-cased column → class for {@code datasetId}: its own classes and its lineage, strictest-wins (selected first). */
-    private Map<String, String> classesOf(Path configRoot, String datasetId) {
+    /** Lower-cased column → class for {@code datasetId}: its own classes and its lineage, strictest-wins ({@code chosen} first). */
+    private static Map<String, String> classesOf(Path configRoot, String datasetId, Set<String> chosen) {
         ComponentStore registry = new ComponentStore(configRoot.resolve("registry"));
         Map<String, Object> ds = registry.get("dataset", datasetId).map(ComponentRegistry.Component::content)
                 .orElseThrow(() -> new IllegalArgumentException("transform.mask: no registry Dataset '" + datasetId + "'"));
         Map<String, String> out = new TreeMap<>();
-        java.util.function.Predicate<String> selected = classifications::contains;
+        java.util.function.Predicate<String> selected = chosen::contains;
         if (ds.get("columns") instanceof List<?> cols)
             for (Object o : cols)
                 if (o instanceof Map<?, ?> c && c.get("name") != null) {
@@ -150,7 +153,7 @@ public record MaskSpec(String mode, int keepLast, List<String> classifications, 
         // the lineage keeps SENSITIVE (as before MASKING-TWO-VOCABULARIES-1) plus the author's selected classes, e.g. WALLET
         // (MASKING-UNION-RESIDUALS-1): the Space's whole masked set would only add refusals for an untraceable class never chosen
         EvidenceMasker.lineageClassification(datasetId, ds, registry, new ViewStore(configRoot.resolve("views")),
-                        c -> ColumnClassification.SENSITIVE.contains(c) || classifications.contains(c))
+                        c -> ColumnClassification.SENSITIVE.contains(c) || chosen.contains(c))
                 .forEach((col, cl) -> out.merge(col, cl, (a, b) -> ColumnClassification.stricter(a, b, selected)));
         return out;
     }
