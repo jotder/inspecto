@@ -163,7 +163,7 @@ test('commercial load on a residential tariff: six flat loads at 3-5x the street
   assert.ok(mean(window(hp, '2026-01-01', '2026-01-31')) > 2 * mean(window(hp, '2026-07-01', '2026-07-31')), 'winter heating');
 });
 
-test('prepaid token fraud: V-08 credits 40 premises 2.5-4x their money, mostly at night; V-01 sells at the list price by day', () => {
+test('prepaid token fraud: V-08 credits 40 premises 2.5-4x their money, mostly at night; V-01, in the same city, sells at the list price by day', () => {
   const s = story('prepaid_token_fraud');
   const prem = new Set(s.entities.filter((e) => e.startsWith('PRM-')));
   assert.equal(prem.size, 40);
@@ -172,8 +172,13 @@ test('prepaid token fraud: V-08 credits 40 premises 2.5-4x their money, mostly a
   assert.ok(fraud.every((v) => v.vendor_id === 'V-08' && Number(v.kwh) / Number(v.amount) >= 10), 'over-credited by V-08');
   assert.ok(fraud.filter(night).length / fraud.length > 0.6, 'mostly at night');
   const v01 = vends.filter((v) => v.vendor_id === 'V-01');
-  const busiest = Math.max(...['V-02', 'V-03', 'V-04', 'V-05', 'V-06', 'V-07', 'V-08'].map((id) => vends.filter((v) => v.vendor_id === id).length));
+  const busiest = Math.max(...[...new Set(vends.map((v) => v.vendor_id))].filter((id) => id !== 'V-01').map((id) => vends.filter((v) => v.vendor_id === id).length));
   assert.ok(v01.length > busiest, 'the supermarket sells the most');
   assert.ok(v01.every((v) => Number(v.kwh) === Number(v.amount) * 4 && !night(v)), 'list price, daytime');
+  // the look-alike sells in the fraud's city (LA-UTILITY-LOOKALIKE-CHECKS-1): its customers could have been the 40, so
+  // "no fraud premise buys from V-01" here and "no look-alike link" in UtilityLinksJobGoldenTest pin a real choice
+  const cities = (ids) => new Set([...ids].map((p) => premise[p].city));
+  assert.deepEqual([...cities(prem)], ['Coventry']);
+  assert.deepEqual([...cities(new Set(v01.map((v) => v.premise_id)))], ['Coventry'], 'V-01 sells in Coventry');
   assert.ok(!v01.some((v) => prem.has(v.premise_id)), 'no fraud premise buys from V-01');
 });

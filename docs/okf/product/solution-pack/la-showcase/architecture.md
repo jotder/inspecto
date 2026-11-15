@@ -309,7 +309,11 @@ What "inert" means, as seen live on Basic:
   the real Pipelines and Jobs (every story one connected piece of the link Dataset, no look-alike linked to a story
   entity, every saved view under 4 000 rows and 1 000 nodes, the Alert Rule's own measure and threshold).
 - **Realism first:** a background population with heavy-tailed degrees, daily and weekly cycles and 3–8 % blank
-  optional fields, then each story planted by rewiring a few records; every story has a benign look-alike.
+  optional fields, then each story planted by rewiring a few records; every story has a benign look-alike. Put the
+  look-alike where the story could reach it (the same city, the same contractors), or the "no link" check cannot
+  fail: `la-utility`'s supermarket vendor sold in another city until `LA-UTILITY-LOOKALIKE-CHECKS-1` (2026-11-15).
+  Two hops through an ordinary entity (a busy contractor, a transformer, a shared customer) is expected, not a
+  failure: a story is its hub's links, and a realistic background puts most entities two hops from most others.
   Synthetic identity only (invented names, a reserved phone range, invented streets, real cities at city level).
   Several Spaces are smaller than first specified to keep the committed corpus small (for example `la-utility`: 1 000
   premises, not 8 000); each hub says so.

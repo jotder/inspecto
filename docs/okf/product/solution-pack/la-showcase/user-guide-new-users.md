@@ -370,7 +370,7 @@ Electricity revenue protection: energy leaves a transformer but is not paid for.
    2. Open a `visited_by` link: `ts` is the first visit day, and `via` lists the visits (`visit:<id>:<type>`).
    3. Answer, from the Space's ground truth (Basic has no screen that compares meter reads or shows transformer
       loss): `C-14` visited 32 premises; 22 of them register 40–70 % less within two weeks of its visit. All 22 sit
-      under `TX-007` or `TX-019`, whose loss rises from 6.2 % to 17.9 % and from 5.1 % to 24.7 %.
+      under `TX-007` or `TX-019`, whose loss rises from 6.0 % to 17.8 % and from 4.6 % to 24.7 %.
    5. **Look-alike:** `PRM-0773`, the holiday home. It has no link to `C-14`.
    6. **New data:** copy `data/staged/<feed>/` into `data/inbox/<feed>/`. October 2026 lands and the Jobs rebuild
       the links and the loss. Reopen the view.

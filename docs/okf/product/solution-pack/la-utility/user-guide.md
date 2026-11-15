@@ -22,9 +22,9 @@ ids (`BA-…`) are invented, and coordinates are city centres (Leicester, Covent
 | `meter_read` | 365 000 (one file a month) | a premise's registered kWh for one day, and a tamper flag (`0`, `1`, blank) |
 | `transformer_read` | 4 380 (one file a month) | the kWh one of the 12 metered transformers supplied that day (40 transformers in all) |
 | `field_visit` | 551 | a visit to a premise by a contractor (`C-…`): when and why |
-| `service_order` | 473 | a `connect`, `disconnect`, `reconnect` or `meter_swap` order and the contractor who closed it |
-| `prepaid_vend` | 10 577 | a prepaid token sale at a vending point (`V-…`): money received, kWh credited |
-| `payment` | 7 368 | a bill payment by a credit account, and the bank account it came from |
+| `service_order` | 474 | a `connect`, `disconnect`, `reconnect` or `meter_swap` order and the contractor who closed it |
+| `prepaid_vend` | 11 006 | a prepaid token sale at a vending point (`V-…`): money received, kWh credited |
+| `payment` | 7 374 | a bill payment by a credit account, and the bank account it came from |
 
 The `utility_links` Job runs after every load and writes **one link Dataset**, `utility_links_dataset`
 (`src`, `dst`, `kind`, `ts`, `amount`, `kwh`, `event_date`, `via`), about 4 300 rows, one per pair. An id says
@@ -75,7 +75,7 @@ premise's reads in the weeks before and after that contractor's first visit day 
 **Answer:** contractor **`C-14`** visited **32 premises**; **22** of them register **40–70 % less** within two weeks
 of its visit (visits between 2025-12-06 and 2026-06-28; six meters flag `tamper_flag = 1` on the visit day). All 22
 are supplied by **`TX-007`** (Leicester) or **`TX-019`** (Coventry), both metered: the transformers send out as much
-as before, so their loss rises from 6.2 % to **17.9 %** and from 5.1 % to **24.7 %**. The other ten metered transformers stay
+as before, so their loss rises from 6.0 % to **17.8 %** and from 4.6 % to **24.7 %**. The other ten metered transformers stay
 under 7 %. **Not the story:** the holiday home **`PRM-0773`** (38 Rowan Close, Nottingham) uses almost nothing from
 November to February every year, but no contractor has ever visited it and its transformer is not `TX-007` or
 `TX-019`; it has no link to `C-14`.
@@ -123,11 +123,12 @@ rises at weekends, and it pays from its own bank account (`BA-40040149`), so it 
 *Steps:* in `prepaid_token_fraud_vendor`, compare the two busiest vending points. Read `via` on their `vended_by` links:
 `kwh_per_money` and `night`.
 
-**Answer:** **`V-08`** (Coventry) sells to 53 premises; **40** of them, from 2026-01-05, got tokens crediting about
-**13 kWh per unit of money** where the price gives 4, in **718 sales**, **73 %** of them between 22:00 and 05:00.
-Those 40 buy from `V-08` only. **Not the story:** **`V-01`**, a supermarket in Leicester, makes the most sales
-(2 518, to 76 premises) but always at the list price (4 kWh per unit of money) and in the daytime; it shares no
-premise with `V-08`.
+**Answer:** **`V-08`** (Coventry) sells to 44 premises; **40** of them, from 2026-01-05, got tokens crediting about
+**13 kWh per unit of money** where the price gives 4, in **732 sales**, **71 %** of them between 22:00 and 05:00.
+Those 40 buy from `V-08` only. **Not the story:** **`V-01`**, a supermarket in the same city, makes the most sales
+(1 797, to 38 premises) but always at the list price (4 kWh per unit of money) and in the daytime. It shares one
+ordinary customer with `V-08` (`PRM-0182`, which buys at both at the list price) and none of the 40: it is two hops
+from `V-08`, never linked to the story.
 
 ## Tester's checklist
 
@@ -140,8 +141,11 @@ golden tests are `tools/gen-la-utility-data.test.mjs` and `UtilityLinksJobGolden
 - [ ] Each story's members form one connected group: the 22 premises with `C-14`, `TX-007` and `TX-019`; the 15
       premises with `C-22`; the 18 accounts and 6 premises with `BA-40000032`; the 6 premises and their accounts
       with `BA-40000075`; the 40 premises with `V-08`.
-- [ ] No look-alike links to its story: `PRM-0773`; the ten genuine reconnections; the five genuine tenant
-      changes and their bank accounts; `PRM-0682`, its account and `BA-40040149`; `V-01`.
+- [ ] No look-alike links to any story: `PRM-0773`; the ten genuine reconnections; the five genuine tenant
+      changes and their bank accounts; `PRM-0682`, its account and `BA-40040149`; `V-01`. Two hops is expected,
+      not a failure: a genuine reconnection or tenant change shares a busy contractor (`C-27`, `C-18`) or a
+      transformer with story premises, and `V-01` shares an ordinary customer with `V-08`. A story is its hub's
+      links; no grid keeps every innocent premise further than two hops from every story.
 - [ ] Each saved view draws without "Result cut short" (under 1 000 nodes and 4 000 rows) and shows its stories.
 - [ ] Only `TX-007` and `TX-019` leave the normal loss band in `transformer_loss`.
 

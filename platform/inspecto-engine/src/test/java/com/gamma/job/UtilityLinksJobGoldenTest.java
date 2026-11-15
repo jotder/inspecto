@@ -36,7 +36,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * The {@code la-utility} Space Template (Basic tier) RUN end to end from a verbatim copy: the eight Pipelines land the shipped
  * extracts with nothing quarantined, then the {@code utility_links} and {@code transformer_loss} {@code sql.template} Jobs fold
  * them. Over the REAL link Dataset it pins the generator's ground truth ({@code tools/gen-la-utility-data.ground-truth.json}):
- * every story's entities form one connected group, and no benign look-alike has a link to any of them. The facts behind
+ * every story's entities form one connected group, and no benign look-alike has a link to any story's entity (it may stand
+ * two hops away, through an ordinary contractor, transformer or customer). The facts behind
  * each story in the files themselves (drops, arrears, flat loads, token prices) are pinned by
  * {@code tools/gen-la-utility-data.test.mjs}.
  */
@@ -173,9 +174,13 @@ class UtilityLinksJobGoldenTest {
     }
 
     @Test
-    void noLookAlikeJoinsItsStory() {
+    void noLookAlikeLinksToAnyStory() {
+        // every story's entities, not only the look-alike's own: a genuine reconnection visited by C-14 would join meter
+        // tampering. So every neighbour of a look-alike is an ordinary entity, and a look-alike two hops from a story reaches
+        // it only through one (see aLookAlikeStandsBesideItsStoryTwoHopsAwayThroughAnOrdinaryEntity)
+        Set<String> members = new TreeSet<>();
+        truth.get("stories").forEach(s -> members.addAll(ids(s.get("entities"))));
         truth.get("stories").fields().forEachRemaining(e -> {
-            Set<String> members = ids(e.getValue().get("entities"));
             Set<String> lookalikes = ids(e.getValue().get("lookalikes"));
             assertFalse(lookalikes.isEmpty(), e.getKey());
             for (String a : lookalikes) {
@@ -184,8 +189,34 @@ class UtilityLinksJobGoldenTest {
             }
             for (String[] l : links)
                 assertFalse(lookalikes.contains(l[0]) && members.contains(l[1]) || lookalikes.contains(l[1]) && members.contains(l[0]),
-                        e.getKey() + ": the look-alike link " + String.join(" ", l) + " joins the story");
+                        e.getKey() + ": the look-alike link " + String.join(" ", l) + " joins a story");
         });
+    }
+
+    @Test
+    void aLookAlikeStandsBesideItsStoryTwoHopsAwayThroughAnOrdinaryEntity() {
+        // LA-UTILITY-LOOKALIKE-CHECKS-1, decided: two hops is acceptable. A story is its hub's links (C-14, C-22, the two
+        // bank accounts, V-08), and a busy contractor, a transformer or a shared customer puts most premises two hops from
+        // most others; keeping look-alikes further out would plant an emptiness no real grid has. What this pins: three
+        // look-alikes do stand that close, so noLookAlikeLinksToAnyStory has a real choice to check - above all V-01, which
+        // sells in the fraud's city and shares an ordinary customer with V-08 (in another city it could never link).
+        Map<String, Set<String>> next = new HashMap<>();
+        for (String[] l : links) {
+            next.computeIfAbsent(l[0], k -> new TreeSet<>()).add(l[1]);
+            next.computeIfAbsent(l[1], k -> new TreeSet<>()).add(l[0]);
+        }
+        Set<String> beside = new TreeSet<>();
+        truth.get("stories").fields().forEachRemaining(e -> {
+            Set<String> members = ids(e.getValue().get("entities"));
+            for (String a : ids(e.getValue().get("lookalikes")))
+                for (String via : next.getOrDefault(a, Set.of()))
+                    if (next.get(via).stream().anyMatch(members::contains)) beside.add(e.getKey());
+        });
+        assertEquals(Set.of("account_churn", "illegal_reconnection", "prepaid_token_fraud"), beside,
+                "the stories with a look-alike two hops away (the holiday home and the heat-pump home have no shared neighbour)");
+        String hub = truth.get("stories").get("prepaid_token_fraud").get("hub").asText();
+        String vendor = truth.get("stories").get("prepaid_token_fraud").get("lookalikes").get(0).asText();
+        assertTrue(next.get(vendor).stream().anyMatch(p -> next.get(p).contains(hub)), vendor + " shares a customer with " + hub);
     }
 
     @Test

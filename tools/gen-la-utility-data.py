@@ -20,7 +20,8 @@ tools/gen-la-utility-data.test.mjs over the files and UtilityLinksJobGoldenTest 
   4 COMMERCIAL LOAD        6 residential premises with a flat 24/7 load at 3-5x their street median, all paid from one bank account
                            look-alike: a home with a heat pump and an electric car (high but seasonal and weekly load)
   5 PREPAID TOKEN FRAUD    vendor V-08 sells 40 prepaid premises tokens whose kWh credited is 2.5-4x the money received, mostly at night
-                           look-alike: the supermarket vendor V-01 with high but consistently priced daytime sales
+                           look-alike: the supermarket vendor V-01 in the same city, Coventry, with high but consistently priced
+                           daytime sales; it shares ordinary customers with V-08 (two hops), none of the 40
 Scale: 1 000 premises (the plan's 8 000 scaled down so the committed corpus stays near 12 MB); 40 transformers, 12 of them metered.
 Every name, id, bank account and coordinate is invented; cities are city centroids plus jitter. Nothing derives from a real source.
 """
@@ -328,6 +329,7 @@ for pid in pids:
 # ---- prepaid vends -------------------------------------------------------------------------------------------------------------
 VENDORS = [f"V-{i:02d}" for i in range(1, 13)]
 VENDOR_CITY = {v: CITIES[i // 4] for i, v in enumerate(VENDORS)}
+VENDOR_CITY[V01], VENDOR_CITY["V-05"] = "Coventry", "Leicester"   # the supermarket look-alike sells where the fraud does
 vends = []                                          # [premise, vendor, amount, kwh, datetime]
 V08_LEGIT = []
 for pid in pids:
@@ -338,9 +340,7 @@ for pid in pids:
     if pid in FRAUD:
         mine = [V08]
     else:
-        w = [6 if v == V01 else 1 for v in local]
-        if p["city"] == "Coventry":
-            local, w = [v for v in local if v != V08] + [V08], [1, 1, 1, 0.6]
+        w = [6 if v == V01 else 0.6 if v == V08 else 1 for v in local]
         mine = [rng.choices(local, w)[0]]
         if rng.random() < 0.2:
             mine.append(pick([v for v in local if v not in mine]))
@@ -360,7 +360,7 @@ for pid in pids:
                 kwh = round(amount / PREPAID_PRICE * rng.uniform(2.5, 4.0), 1)
                 t = at(d, 22, 28) if rng.random() < 0.75 else at(d, 9, 21)
             else:
-                amount = float(pick([10, 20, 20, 30, 50] if v != V01 else [20, 20, 30]))
+                amount = float(pick([10, 20, 20, 30, 50] if v != V01 else [10, 20, 20]))   # small top-ups with the shopping
                 kwh = round(amount / PREPAID_PRICE, 1)
                 t = at(d, 8, 21)
             vends.append([pid, v, amount, kwh, t])
