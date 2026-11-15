@@ -218,7 +218,7 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                                     @case ('list') {
                                         @if (isEditing(spec)) {
                                             <div class="flex min-w-0 flex-1 flex-col gap-1">
-                                                <mat-form-field
+                                                <!-- form-allow: the in-row list editor of an .sf-row - a typeahead with an autocomplete panel, a draft that adds entry after entry and a token menu, which pen-field cannot host (spec-forms-state "Deliberate boxes", UI-SCHEMA-FORM-EDITOR-1) --><mat-form-field
                                                     class="sf-dense w-full"
                                                     appearance="outline"
                                                     subscriptSizing="dynamic"
@@ -326,7 +326,7 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                                     }
                                     @default {
                                         @if (isEditing(spec)) {
-                                            <mat-form-field
+                                            <!-- form-allow: the in-row editor of an .sf-row - a secret (masked), a typeahead with an autocomplete panel, a many-line note or a value whose whitespace is meaningful (a delimiter; a pen-field row trims), with a token menu (spec-forms-state "Deliberate boxes", UI-SCHEMA-FORM-EDITOR-1) --><mat-form-field
                                                 class="sf-dense w-full"
                                                 appearance="outline"
                                                 subscriptSizing="dynamic"

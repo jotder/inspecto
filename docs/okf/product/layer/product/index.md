@@ -41,7 +41,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `UI-TS-STRICT-1` | P3 | chore | TypeScript strict is off in the UI, and turning it on needs a decision about the vendored src/@gamma code (filed 2026-11-15; measured the… | operator |
 | `UI-ZONELESS-1` | P3 | chore | the app runs Zone.js on purpose; going zoneless needs a component-by-component audit first (filed 2026-11-15, so the code's pointer has a… | demand |
 | `UI-PICKER-OPTIONS-1` | P3 | feature | <inspecto-option-picker> gains nested options (a parent that opens to its children), a disabled option with its reason, and a per-picker… | demand |
-| `UI-SCHEMA-FORM-EDITOR-1` | P3 | feature | <inspecto-schema-form>'s in-row editor is still a dense boxed Material field, the last file on the lint:forms allow-list. | — |
+| `UI-SCHEMA-FORM-EDITOR-1` | P3 | feature | <inspecto-schema-form>'s in-row editor is still a dense boxed Material field, kept with form-allow (the lint:forms allow-list is empty si… | demand |
 | `PACK-SALES-MARKETING-1` | P3 | feature | Sales & Marketing BI pack: sales, commissions, marketing and churn analytics | operator |
 | `DOCS-AGENT-WRITTEN-REVIEW-1` | P3 | chore | ~200 hub docs were written by agents on 2026-10-19 (PRODUCT-DOCS-HUB-1) | — |
 | `DOCS-FUNCTIONALITY-HUBS-1` | P3 | chore | decide whether functionality/ Product Map Items get their own hubs or stay sections of their module's features slot (none exist yet, so n… | operator |

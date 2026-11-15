@@ -1,4 +1,4 @@
 # Files that may still hold a boxed <mat-form-field> / <mat-select> (UI-FORM-ROWS-1, tools/check-form-idiom.mjs).
 # This list only shrinks: convert a screen to pen-field / option-picker rows, then delete its line here.
-# Seeded 2026-11-03 with every file that held one (127).
-src/app/inspecto/components/schema-form.component.ts
+# Seeded 2026-11-03 with every file that held one (127). Empty since 2026-11-15 (UI-SCHEMA-FORM-EDITOR-1): a boxed
+# field now stays only with `form-allow` and its reason on the tag's line. Do not add lines.

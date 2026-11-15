@@ -49,7 +49,11 @@ draws the same rows, its optional / advanced tiers as named folds that say how m
   whose whitespace is meaningful (a delimiter; a row trims). `grep -rn form-allow` lists them all.
 * **Guard**: `lint:forms` (`inspecto-ui/tools/check-form-idiom.mjs`, in CI and the pre-commit hook) refuses an
   unmarked `<mat-form-field>` / `<mat-select>` outside `tools/form-idiom-allowlist.txt`, and a listed file that no
-  longer holds one, so the list only shrinks. It holds one file: `schema-form`, for its dense in-row editor.
+  longer holds one, so the list only shrinks. It is empty since 2026-11-15: the last file, `schema-form`, keeps its
+  dense in-row editor boxed with `form-allow` (a secret, a typeahead, a many-line note, a whitespace-sensitive value,
+  the list entry), as the Pipeline extra-config editor already did. Moving them onto `pen-field` waits on what it
+  lacks: suggestions, a suffix slot and the focus model a token menu needs, a trim opt-out, masking, display labels
+  and a list mode (`UI-SCHEMA-FORM-EDITOR-1`).
 * **Specs**: `inspecto/testing/pen-field.ts` (`penByLabel`, `penEdit`, `penOpen`, `penText`, `penError`,
   `pickerSet`, `refresh`) and `inspecto/testing/schema-form.ts` (`sfOpen`, `sfRow`, `sfHelp`); read errors from
   `inspecto-pen-field p[role="alert"]`, never `mat-error`.
