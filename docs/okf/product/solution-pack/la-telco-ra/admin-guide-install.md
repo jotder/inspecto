@@ -125,7 +125,11 @@ lands first is not read as unbilled). The rule fires when a subscriber not on th
 2 or more such months and is still unbilled in the latest one. On the shipped data the Alert carries **300**: the SIMs
 of `DL-047`. The 40 test SIMs of `DL-000` are counted apart as `known_list_subscribers` and never raise it, and the 62
 ordinary subscribers with one dropped month or two late-billed months (`other_unbilled_subscribers`) do not either.
-October changes none of the three figures. The count is a running total, so the rule stays met after every build. It
+October changes none of the three figures. The count is a running total, so the rule stays met after every build.
+On a first boot each feed lands its months one at a time and the counts Job runs between them, so the Alert fires on a
+partial count and is refreshed in place up to 300 (it reads 300 to 306 along the way). It never heals in between: a
+late-billed subscriber meets the rule until its third month lands billed, and the generator starts every such lag in
+or after the story's first month (2026-03), so the story is counted before any lag is billed. It
 names no subscriber or dealer; the `unbilled_usage` view shows them. The rule is not grouped by subscriber, because
 `telco_ra_unbilled_counts` is a Job output: a `by` column cannot be checked against its Schema when the Space is
 created.
@@ -134,7 +138,9 @@ created.
 the 51 files landed with 0 rejected, the Alert Rule raised one OPEN Alert at **300 (WARNING)**,
 `seed-la-telco-ra.mjs --apply` created 19 steps with none failed, and every persona got the answers in the table above
 (the held expand ran once the manager approved it). On that first boot the rule fired at 4, cleared and fired again, so
-a RESOLVED Alert at 4 sits beside the OPEN one; the cause is not known yet (`LA-TELCO-RA-FIRST-BOOT-RESOLVED-ALERT-1`).
+a RESOLVED Alert at 4 sat beside the OPEN one (`LA-TELCO-RA-FIRST-BOOT-RESOLVED-ALERT-1`, fixed 2026-11-15 in the data:
+some late-billed subscribers' lags ended before the story's months, so the replayed months read 4, then 0, then 1,
+then 302 down to 300; the boot-test is not repeated yet).
 On Basic the rule stayed unarmed and the Space had no Alert. Method and record:
 [showcase release, record](../la-showcase/admin-guide-showcase-release.md#record-the-2026-11-09-release).
 

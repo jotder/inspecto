@@ -65,7 +65,8 @@ Prove every Space on both products before handing the release over:
    `SPACES_ROOT` still overrides it on either, and Git Bash mangles the `..\` in that value.
 3. Wait for every inbox file to land and for at least one `*/5` cron run after the last landing; trigger no Job by hand.
 4. **Preview:** per Space, read `GET /api/v1/spaces/<id>/alerts` (one OPEN Alert at the value its install guide
-   names), run `node tools/seed-la-<id>.mjs --base http://127.0.0.1:<PORT> --space <id> --apply` (every step created,
+   names, and no RESOLVED Alert: a first boot lands each feed's months one at a time, so a look-alike that meets the
+   rule only until a later month lands raises and heals it before the story arrives), run `node tools/seed-la-<id>.mjs --base http://127.0.0.1:<PORT> --space <id> --apply` (every step created,
    none failed; a second run creates nothing), then probe the personas with Demo Auth tokens
    (`POST /api/v1/auth/exchange`): analyst, reviewer and manager read the Working Set and the outsider gets 404; the
    reviewer cannot add a step (403); the analyst has no approval inbox (403); analyst and reviewer cannot approve
@@ -110,7 +111,10 @@ Basic (port 8190): every Space as in step 5, 0 ERROR lines. Before this full boo
 and `la-crypto` on Preview (one OPEN Alert at 2, refreshed in place from 1, no RESOLVED Alert).
 
 Found by this boot-test and filed in `docs/BACKLOG.md`: `LA-TELCO-RA-FIRST-BOOT-RESOLVED-ALERT-1` (the stray RESOLVED
-Alert above), `JOB-LOADER-SAVED-VIEW-SUFFIX-1` (`la-logistics`' saved view `driver_team_inside_job.toon` is read by the
+Alert above; closed 2026-11-15: the generator had put some late-billed look-alikes' two unbilled months before the
+story's, so the month-by-month landing counted them, then 0 once their third month landed billed, then the story; their
+lags now start in the story's first month, and `TelcoRaLinksJobGoldenTest` checks every landing order of the usage and
+billing months), `JOB-LOADER-SAVED-VIEW-SUFFIX-1` (`la-logistics`' saved view `driver_team_inside_job.toon` is read by the
 Job loader, a WARN at every boot), `LA-OWNERSHIP-NO-CRON-FALLBACK-1` (`ownership_links` had no `*/5` cron fallback; closed 2026-11-14),
 `ALERT-EVALUATE-NO-BREACH-WORDING-1`. Not covered by it: `LA-SHOWCASE-RELEASE-RESIDUALS-1` (the Linux product, the
 Link Analysis UI on these tiers, an OIDC sign-in build, the Geo Views on Standard).

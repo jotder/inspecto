@@ -214,10 +214,13 @@ for s in subs:
             s["billing"][m] = (mins, mb + (rng.choice([-1, 1]) if rng.random() < 0.03 and mb > 1 else 0))
 
 # background leakage: 50 single subscriber-months that never reached billing (a dropped batch), and a dozen subscribers whose first
-# two months reached billing late (a provisioning lag) - the reconciliation's ordinary noise
+# two months reached billing late (a provisioning lag) - the reconciliation's ordinary noise. The lags start in or after the story's
+# first month (2026-03): while the months land one by one on a first boot, a lag looks exactly like the story until its third month
+# lands billed, so a lag that ended before the story's months had the Alert Rule fire on it, heal, then fire again on the story
+# (LA-TELCO-RA-FIRST-BOOT-RESOLVED-ALERT-1)
 special = {DL_TEST, DL_UNBILLED, DL_FRAUD, DL_UNI}
 bg_used = [s for s in subs if s["kind"] == "background" and s["dealer"] not in special and len(s["usage"]) >= 3]
-late = [s for s in bg_used if date(2025, 11, 1) <= s["act"].date() <= date(2026, 6, 30)]
+late = [s for s in bg_used if date(2026, 3, 1) <= s["act"].date() <= date(2026, 6, 30)]
 late = rng.sample(late, 12)
 for s in late:
     s["kind_note"] = "late"

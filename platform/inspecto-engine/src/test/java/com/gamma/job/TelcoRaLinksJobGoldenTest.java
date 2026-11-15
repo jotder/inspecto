@@ -183,17 +183,70 @@ class TelcoRaLinksJobGoldenTest {
     @Test
     void aMonthWhoseBillingFileHasNotLandedIsNotReadAsUnbilled() throws Exception {
         // first boot: September's usage file lands before September's billing file. Read as unbilled, every subscriber used in
-        // September would have it unbilled, and the ordinary ones with one earlier unbilled month would be counted (355);
+        // September would have it unbilled, and the ordinary ones with one earlier unbilled month would be counted (357);
         // judged only once that month's billing lands, the count stays the story's
         Map<String, Object> early = countsOver("true", "true", "CAST(period AS DATE) < DATE '2026-09-01'");
         assertEquals(300L, ((Number) early.get("unbilled_subscribers")).longValue(), early.toString());
     }
 
     @Test
+    void onAFirstBootTheCountNeverFallsBackToZeroWhileTheMonthsLand() throws Exception {
+        // LA-TELCO-RA-FIRST-BOOT-RESOLVED-ALERT-1: a first boot lands the twelve monthly files of each feed one at a time, in month
+        // order, and the counts Job (then the Alert Rule) runs between them. Every state is u usage months and b billing months landed;
+        // every interleaving of the two feeds is a path through these states that never steps back. The Alert Rule fires at 1 and
+        // heals at 0, so once the count is up no later state may read 0 - else it fires, heals (a RESOLVED Alert) and fires again.
+        // While the months land, a provisioning lag looks exactly like the story until its third month lands billed: the 2026-11-09
+        // release replayed lags that ended before the story's months, 1 -> 4 -> 0 -> 1 -> 302 -> 300
+        List<String> months = new ArrayList<>();
+        for (Map<String, Object> r : rows("SELECT DISTINCT CAST(CAST(period AS DATE) AS VARCHAR) AS m FROM "
+                + parquet("network_usage/database", "/**/*.parquet") + " ORDER BY m"))
+            months.add((String) r.get("m"));
+        assertEquals(12, months.size(), "twelve landed months");
+        long[][] n = countsWhileLanding(months);
+        for (int u = 0; u <= 12; u++)
+            for (int b = 0; b <= 12; b++) {
+                if (n[u][b] == 0) continue;
+                String at = u + " usage and " + b + " billing months landed (" + n[u][b] + ")";
+                assertTrue(n[u][b] >= 300, "only the story raises the rule while the months land: " + at);
+                if (u < 12) assertTrue(n[u + 1][b] > 0, "the count fell back to 0 when the next usage month landed after " + at);
+                if (b < 12) assertTrue(n[u][b + 1] > 0, "the count fell back to 0 when the next billing month landed after " + at);
+            }
+        assertEquals(300L, n[12][12], "and every month landed: the story's 300 SIMs");
+    }
+
+    /**
+     * The counts Job's own SQL over the real landed feeds as a first boot lands them, month by month: {@code [u][b]} is its
+     * {@code unbilled_subscribers} with the first {@code u} months of network_usage and the first {@code b} of billing_record landed.
+     */
+    private static long[][] countsWhileLanding(List<String> months) throws Exception {
+        JobConfig job = JobConfig.load(TEMPLATE.resolve("config/jobs/telco_ra_unbilled_counts_job.toon").toString());
+        String sql = SqlParamScanner.substitute(job.require("sql"), Map.of("min_unbilled_months", job.require("min_unbilled_months")));
+        long[][] out = new long[months.size() + 1][months.size() + 1];
+        DuckDbUtil.loadDriver();
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("CREATE VIEW subscriber AS SELECT * FROM " + parquet("subscriber/database", "/**/*.parquet"));
+            st.execute("CREATE TABLE usage_all AS SELECT * FROM " + parquet("network_usage/database", "/**/*.parquet"));
+            st.execute("CREATE TABLE billing_all AS SELECT * FROM " + parquet("billing_record/database", "/**/*.parquet"));
+            for (int u = 0; u <= months.size(); u++)
+                for (int b = 0; b <= months.size(); b++) {
+                    st.execute("CREATE OR REPLACE VIEW network_usage AS SELECT * FROM usage_all WHERE CAST(period AS DATE) "
+                            + (u == 0 ? "IS NULL" : "<= DATE '" + months.get(u - 1) + "'"));
+                    st.execute("CREATE OR REPLACE VIEW billing_record AS SELECT * FROM billing_all WHERE CAST(period AS DATE) "
+                            + (b == 0 ? "IS NULL" : "<= DATE '" + months.get(b - 1) + "'"));
+                    try (ResultSet rs = st.executeQuery("SELECT unbilled_subscribers FROM (" + sql + ")")) {
+                        assertTrue(rs.next(), "one row of counts");
+                        out[u][b] = rs.getLong(1);
+                    }
+                }
+        }
+        return out;
+    }
+
+    @Test
     void theLinkJobReadsNoMonthAsUnbilledBeforeItsBillingFileHasLanded() throws Exception {
         // the Basic tier's own view of the same first boot (LA-TELCO-RA-LANDING-ORDER-1): September's usage has landed, its billing
         // file has not. Read as unbilled, every subscriber used in September gains an unbilled month and the unbilled_usage screen
-        // over-counts (395 subscribers, not 352); judged only once that month's billing lands, no count includes it
+        // over-counts (397 subscribers, not 352); judged only once that month's billing lands, no count includes it
         String unbilled = "TRY_CAST(regexp_extract(via, 'unbilled_months:([0-9]+)', 1) AS INTEGER)";
         Map<String, Long> full = new HashMap<>();
         for (Map<String, Object> r : rows("SELECT src, " + unbilled + " AS n FROM " + bl + " WHERE kind = 'activated_by'"))

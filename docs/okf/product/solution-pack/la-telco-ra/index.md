@@ -32,6 +32,4 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `solution-pack.la-telco-ra` — the board is the only list; change the row there.
 
-| Row | Priority | Kind | Title | Hold |
-|---|---|---|---|---|
-| `LA-TELCO-RA-FIRST-BOOT-RESOLVED-ALERT-1` | P3 | defect | on a first boot la-telco-ra's Alert Rule fires, clears and fires again, leaving a stray RESOLVED Alert beside the OPEN one. | — |
+_No open rows._
