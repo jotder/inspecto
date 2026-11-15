@@ -28,6 +28,9 @@ export interface G6Node {
         /** Link Analysis: an Investigation's Working Set has this entity but no effective expand has followed its links
          *  yet (a flagged hub is excluded: its halo already says "not expanded"). Drawn with a dashed outline; absent otherwise. */
         unexpanded?: boolean;
+        /** Link Analysis: a start entity of the Investigation (Working Set hop 0) — drawn with a heavier outline and a
+         *  "start" badge, before and after Save alike. Absent on every other node. */
+        start?: boolean;
         /** Link Analysis Grow (LA-GROW-EXCLUDE-1): a busy entity held back from growing — drawn with a "held" badge. */
         held?: boolean;
         /** Link Analysis Collapse (§5.5): how many pendant neighbours this node folds — drawn as a `+n` badge. */

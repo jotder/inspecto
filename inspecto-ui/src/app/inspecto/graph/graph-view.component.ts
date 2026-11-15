@@ -406,17 +406,64 @@ export function cappedLayout(
 export const EXPAND_RELAYOUT_MAX_NEW = 50;
 
 /**
- * Give each new node (`added`) a position beside its already-positioned neighbours: their centre, pushed out on a
- * golden-angle spiral so siblings of one hub fan out instead of stacking. New nodes linked only to other new nodes are
- * placed in later passes. Replaces the new nodes' entries in `nodes` with positioned copies; returns false when some new node has no positioned
- * neighbour at all, in which case the caller re-runs the layout.
+ * The distance between two node centres an incremental placement keeps clear: the node, plus the gap the Radial layout
+ * leaves between two nodes at the same spacing (`layoutConfig` 'radial' nodeSpacing). LA's defaults (20 px, Wide) give
+ * 80 px; the other hosts (32 px, spacing 1) 56 px. Never under 40 px, so an icon tile (1.44 × the size wide) always clears.
+ */
+export function placementGap(nodeSize?: number, spacing?: number): number {
+    const node = nodeSize ?? HOST_NODE_SIZE;
+    return Math.max(40, Math.round(node + node * 0.75 * (spacing ?? 1)));
+}
+
+type Pt = [number, number];
+
+/** Distance from point `p` to the segment `a`–`b`. */
+function segmentDistance(p: Pt, a: Pt, b: Pt): number {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const len2 = dx * dx + dy * dy;
+    const t = len2 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2)) : 0;
+    return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
+}
+
+/** The middle of the widest empty angle round `c` among `around` (radians), or null when nothing is around. */
+function widestOpening(c: Pt, around: readonly Pt[]): number | null {
+    const angles = around
+        .filter((p) => Math.hypot(p[0] - c[0], p[1] - c[1]) > 1e-6)
+        .map((p) => Math.atan2(p[1] - c[1], p[0] - c[0]))
+        .sort((a, b) => a - b);
+    if (!angles.length) return null;
+    let best = angles[0] + Math.PI; // one neighbour: straight away from it
+    let widest = -1;
+    for (let i = 0; i < angles.length; i++) {
+        const from = angles[i];
+        const to = i + 1 < angles.length ? angles[i + 1] : angles[0] + 2 * Math.PI;
+        if (to - from > widest) {
+            widest = to - from;
+            best = from + (to - from) / 2;
+        }
+    }
+    return best;
+}
+
+/**
+ * Give each new node (`added`) a position beside its already-positioned neighbours, OUTSIDE what is drawn there
+ * (LA-FULL-CYCLE-TEST-1 phase 6, finding 17). A new node is put on a ring round its anchors (the centre of its drawn
+ * neighbours), starting in the direction that leads away from the rest of the graph (an anchor in the middle of a star:
+ * the widest opening between its links), and fanning out to either side of it. A spot is taken only when it keeps
+ * `gap` from every drawn node, does not sit on a drawn link, and the new node's own links do not run through a drawn
+ * node; otherwise the ring widens. Siblings of one hub therefore fan out instead of stacking, and nothing lands inside
+ * a star on top of its links. New nodes linked only to other new nodes are placed in later passes. Replaces the new
+ * nodes' entries in `nodes` with positioned copies; returns false when some new node has no positioned neighbour at all,
+ * in which case the caller re-runs the layout.
  */
 export function placeBesideNeighbours(
     nodes: Record<string, unknown>[],
     edges: readonly { source: unknown; target: unknown }[],
     added: ReadonlySet<string>,
+    gap = placementGap(),
 ): boolean {
-    const at = new Map<string, [number, number]>();
+    const at = new Map<string, Pt>();
     for (const n of nodes) {
         const s = n['style'] as { x?: unknown; y?: unknown } | undefined;
         if (!added.has(String(n['id'])) && typeof s?.x === 'number' && typeof s.y === 'number') {
@@ -427,34 +474,97 @@ export function placeBesideNeighbours(
     for (const e of edges) {
         const a = String(e.source);
         const b = String(e.target);
-        if (added.has(a)) adj.set(a, [...(adj.get(a) ?? []), b]);
-        if (added.has(b)) adj.set(b, [...(adj.get(b) ?? []), a]);
+        adj.set(a, [...(adj.get(a) ?? []), b]);
+        adj.set(b, [...(adj.get(b) ?? []), a]);
     }
+    // the links drawn so far (both ends placed): a new node must not sit on one
+    const links: [Pt, Pt][] = [];
+    const linkSeen = new Set<string>();
+    const addLinksOf = (id: string): void => {
+        for (const nb of adj.get(id) ?? []) {
+            const key = id < nb ? `${id}\u0000${nb}` : `${nb}\u0000${id}`;
+            const a = at.get(id);
+            const b = at.get(nb);
+            if (a && b && !linkSeen.has(key)) {
+                linkSeen.add(key);
+                links.push([a, b]);
+            }
+        }
+    };
+    for (const id of at.keys()) addLinksOf(id);
+    const centre: Pt = at.size
+        ? [
+              [...at.values()].reduce((s, p) => s + p[0], 0) / at.size,
+              [...at.values()].reduce((s, p) => s + p[1], 0) / at.size,
+          ]
+        : [0, 0];
+    const lineClear = gap * 0.4;
+    const fits = (p: Pt, anchors: readonly Pt[]): boolean => {
+        for (const q of at.values()) {
+            if (Math.hypot(p[0] - q[0], p[1] - q[1]) < gap) return false;
+        }
+        for (const [a, b] of links) if (segmentDistance(p, a, b) < lineClear) return false;
+        // the new node's own links: from each anchor to here, past no other drawn node
+        for (const a of anchors)
+            for (const q of at.values()) {
+                if (q === a || anchors.includes(q)) continue;
+                if (segmentDistance(q, a, p) < lineClear) return false;
+            }
+        return true;
+    };
     const indexOf = new Map(nodes.map((n, i) => [String(n['id']), i]));
     let pending = [...added];
-    let k = 0;
     while (pending.length) {
-        const placedNow: [string, [number, number]][] = [];
         const rest: string[] = [];
+        let placedAny = false;
         for (const id of pending) {
-            const anchors = (adj.get(id) ?? []).map((nb) => at.get(nb)).filter((p) => p !== undefined);
-            if (!anchors.length) {
+            const anchorIds = (adj.get(id) ?? []).filter((nb) => at.has(nb));
+            if (!anchorIds.length) {
                 rest.push(id);
                 continue;
             }
-            const cx = anchors.reduce((s, p) => s + p[0], 0) / anchors.length;
-            const cy = anchors.reduce((s, p) => s + p[1], 0) / anchors.length;
-            const r = 60 + 12 * Math.sqrt(k);
-            const angle = k++ * 2.399963; // the golden angle in radians
-            placedNow.push([id, [cx + r * Math.cos(angle), cy + r * Math.sin(angle)]]);
-        }
-        if (!placedNow.length) return false;
-        for (const [id, p] of placedNow) {
+            const anchors = anchorIds.map((nb) => at.get(nb)!);
+            const c: Pt = [
+                anchors.reduce((s, p) => s + p[0], 0) / anchors.length,
+                anchors.reduce((s, p) => s + p[1], 0) / anchors.length,
+            ];
+            // what is drawn round the anchors already (their other neighbours): the ring starts beyond it
+            const around = anchorIds
+                .flatMap((a) => (adj.get(a) ?? []).map((nb) => at.get(nb)))
+                .filter((p): p is Pt => !!p && !anchors.includes(p));
+            const offCentre = Math.hypot(c[0] - centre[0], c[1] - centre[1]) > gap / 2;
+            const heading = offCentre
+                ? Math.atan2(c[1] - centre[1], c[0] - centre[0])
+                : (widestOpening(c, around) ?? 0);
+            const reach = offCentre ? 0 : Math.max(0, ...around.map((p) => Math.hypot(p[0] - c[0], p[1] - c[1])));
+            let spot: Pt | null = null;
+            for (let ring = 0; !spot && ring < 400; ring++) {
+                const r = Math.max(gap * 1.5, reach + gap) + ring * gap * 0.5;
+                const step = Math.min(Math.PI / 12, gap / r);
+                for (let k = 0; !spot && k * step <= Math.PI; k++) {
+                    for (const sign of k ? [1, -1] : [1]) {
+                        const angle = heading + sign * k * step;
+                        const p: Pt = [c[0] + r * Math.cos(angle), c[1] + r * Math.sin(angle)];
+                        if (fits(p, anchors)) {
+                            spot = p;
+                            break;
+                        }
+                    }
+                }
+            }
+            // 400 widening rings never all fail on a finite graph; the guard keeps a broken input from spinning
+            const p = spot ?? [
+                c[0] + (reach + gap * 200) * Math.cos(heading),
+                c[1] + (reach + gap * 200) * Math.sin(heading),
+            ];
             at.set(id, p);
+            addLinksOf(id);
+            placedAny = true;
             const i = indexOf.get(id)!;
             const n = nodes[i];
             nodes[i] = { ...n, style: { ...((n['style'] as Record<string, unknown>) ?? {}), x: p[0], y: p[1] } };
         }
+        if (!placedAny) return false;
         pending = rest;
     }
     return true;
@@ -573,7 +683,15 @@ export function layoutConfig(
             return { type: 'grid' };
         case 'force': {
             // d3's own link distance (30) and charge (-30) are what `k` multiplies; collide keeps a gap round each node.
-            const base = { type: 'sliced-d3-force', collide: { radius: Math.round(node * 0.875) } };
+            // A gentle pull to the centre (d3 forceX/forceY, off in G6's defaults) holds groups with no link between them
+            // near the main one: without it the many-body push threw small unlinked groups to the far corners, so a fit
+            // shrank the main group to a blob (LA-FULL-CYCLE-TEST-1 phase 6, finding 18, claims_network: 426 nodes).
+            const base = {
+                type: 'sliced-d3-force',
+                collide: { radius: Math.round(node * 0.875) },
+                x: { strength: FORCE_GRAVITY },
+                y: { strength: FORCE_GRAVITY },
+            };
             return k === 1 ? base : { ...base, link: { distance: 30 * k }, manyBody: { strength: -30 * k } };
         }
         case 'force-cluster':
@@ -630,6 +748,13 @@ export function layoutConfig(
             return { type: 'antv-dagre', rankdir: 'LR', nodesep: scaled(18), ranksep: scaled(60) };
     }
 }
+
+/**
+ * The Force layout's pull to the centre (d3 `forceX`/`forceY` strength). A node of a group with no link to the rest
+ * settles where this pull meets the push of the others, about √(N · |push| / pull) from the centre: with 0.05 that is
+ * at the edge of the main group, not a screen away from it; d3's own 0.1 squeezed the main group itself.
+ */
+export const FORCE_GRAVITY = 0.05;
 
 /** The relationship kind an edge styles by — the folded-count suffix (`calls · 2`) stripped. */
 export function baseEdgeKind(kind: unknown): string {
@@ -788,6 +913,12 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
      * the edge. Read at construction, like `tooltips`; 0 = the other hosts' edge-to-edge fit.
      */
     @Input() fitPadding: number | [number, number, number, number] = 0;
+    /**
+     * Where to draw a node the canvas has not drawn yet, by node id (Link Analysis: an Investigation just saved, whose
+     * steps replay under its own ids, goes back where the analyst saw it). A hinted node never runs the layout; when
+     * every node of a fresh build has a hint, no layout runs at all. Read on a data change only; null = none.
+     */
+    @Input() positionHints: Readonly<Record<string, readonly [number, number]>> | null = null;
     @Output() nodeClick = new EventEmitter<string>();
     @Output() edgeClick = new EventEmitter<string>();
     /** A double click on a node (only with `interaction.doubleClick`). */
@@ -994,6 +1125,21 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         host?.removeEventListener('pointerdown', this.hideStaleTooltipBound);
         host?.removeEventListener('wheel', this.hideStaleTooltipBound);
         this.destroyGraph();
+    }
+
+    /** Where every drawn node is now, by node id (a node not drawn yet is left out); empty before the first render. */
+    nodePositions(): Record<string, [number, number]> {
+        const out: Record<string, [number, number]> = {};
+        if (!this.graph || !this.data) return out;
+        for (const n of this.data.nodes) {
+            try {
+                const p = this.graph.getElementPosition(String(n.id));
+                if (p && Number.isFinite(p[0]) && Number.isFinite(p[1])) out[String(n.id)] = [p[0], p[1]];
+            } catch {
+                // not rendered yet
+            }
+        }
+        return out;
     }
 
     /** The rendered canvas as a PNG data-URI (Link Analysis export), or `null` before the first render. */
@@ -1389,11 +1535,25 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             this.prevHullKey = '';
         }
         const nodes = this.data.nodes.map((n) => this.seedPosition(n));
+        // A new node the host knows a position for (an Investigation just saved, its ids renamed) goes back there.
+        for (const [i, n] of nodes.entries()) {
+            const id = String(n['id']);
+            const hint = addedIds.has(id) ? this.positionHints?.[id] : undefined;
+            if (!hint) continue;
+            nodes[i] = { ...n, style: { ...((n['style'] as Record<string, unknown>) ?? {}), x: hint[0], y: hint[1] } };
+            addedIds.delete(id);
+        }
         // PERF-P6: a small expand places its new nodes beside their drawn neighbours and keeps every other node where it
         // is; only a large one, or a new node with no drawn neighbour to stand beside, re-runs the whole layout.
         const relayout =
             addedIds.size > 0 &&
-            (addedIds.size > EXPAND_RELAYOUT_MAX_NEW || !placeBesideNeighbours(nodes, this.data.edges, addedIds));
+            (addedIds.size > EXPAND_RELAYOUT_MAX_NEW ||
+                !placeBesideNeighbours(
+                    nodes,
+                    this.data.edges,
+                    addedIds,
+                    placementGap(this.display?.nodeSize, this.display?.layoutSpacing),
+                ));
         graph.setData({ nodes, edges: this.data.edges } as unknown as GraphData);
         this.refreshStyleState();
         this.prevDataKey = dataKey;
@@ -1452,9 +1612,26 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             const kind = kindOf(d);
             return entityTypeIcon(kind, this.nodeColorOf(d), this.display?.nodeShapes);
         };
+        const layoutOptions = layoutConfig(this.effectiveLayout(), {
+            nodeSize: this.display?.nodeSize,
+            spacing: this.display?.layoutSpacing,
+        }) as LayoutOptions;
+        // Every node has a place the host asked for (a just-saved Investigation): draw them there and run no layout. The
+        // layout is set once the first draw is done, so a later relayout or large expand still has one to run.
+        const hints = this.positionHints;
+        const hinted = !!hints && this.data.nodes.every((n) => !!hints[String(n.id)]);
+        const data = hinted
+            ? {
+                  ...this.data,
+                  nodes: this.data.nodes.map((n) => {
+                      const [x, y] = hints[String(n.id)];
+                      return { ...n, style: { ...((n as { style?: object }).style ?? {}), x, y } };
+                  }),
+              }
+            : this.data;
         const graph = new Graph({
             container: this.hostEl.nativeElement,
-            data: this.data as unknown as GraphData,
+            data: data as unknown as GraphData,
             autoFit: 'view',
             // Every fit (autoFit, fitView, a resize re-fit) keeps this margin clear.
             padding: this.fitPadding,
@@ -1480,7 +1657,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     radius: 8,
                     fill: () => this.styleNodeFill,
                     stroke: (d) => this.nodeColorOf(d),
-                    lineWidth: 2,
+                    // A start entity of an Investigation keeps a heavier outline (and its "start" badge) through every step.
+                    lineWidth: (d) => ((d.data as { start?: boolean }).start ? 3.5 : 2),
                     // A stranded node (Link Analysis: excluded by a pushed-down predicate, kept so the analyst
                     // sees what the narrower question removed) renders dimmed with a dashed outline.
                     lineDash: (d) => {
@@ -1496,6 +1674,17 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     // LA-GROW-EXCLUDE-1: a busy entity a Grow held wears a "held" badge over its ring.
                     // §5.5: a collapsed node wears "+n" for the pendant neighbours it folds.
                     badges: (d) => [
+                        ...((d.data as { start?: boolean }).start
+                            ? [
+                                  {
+                                      text: 'start',
+                                      placement: 'left-top' as const,
+                                      fontSize: 9,
+                                      fill: this.styleNodeFill,
+                                      backgroundFill: this.nodeColorOf(d),
+                                  },
+                              ]
+                            : []),
                         ...((d.data as { held?: boolean }).held
                             ? [
                                   {
@@ -1590,10 +1779,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 // The density rule's reveal: set on hover/click by revealEdgeLabels(), over the base style.
                 state: { labelled: { label: true }, detailed: { endArrow: true } },
             },
-            layout: layoutConfig(this.effectiveLayout(), {
-                nodeSize: this.display?.nodeSize,
-                spacing: this.display?.layoutSpacing,
-            }) as LayoutOptions,
+            ...(hinted ? {} : { layout: layoutOptions }),
             behaviors: buildBehaviors(
                 this.interaction,
                 this.plugins,
@@ -1674,6 +1860,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             })
             .then(() => {
                 if (this.graph !== graph) return;
+                if (hinted) graph.setLayout(layoutOptions);
                 demotePositiveTabindex(host);
                 // Registered AFTER render(): G6 binds the behaviours there, so the brush's own release handler (which emits its
                 // final ids, brush-select has immediately:false) runs first and this flush then emits them without a frame's wait.

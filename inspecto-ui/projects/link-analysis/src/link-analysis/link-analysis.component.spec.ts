@@ -33,6 +33,7 @@ import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import {
+    AUTO_NODE_LABEL_MAX,
     CANVAS_FIT_PADDING,
     CANVAS_MIN_PX,
     CANVAS_TOOLS_FOLD_PX,
@@ -103,6 +104,7 @@ class StubGraphView {
     @Input() interaction: unknown;
     @Input() selection: unknown;
     @Input() fitPadding: unknown;
+    @Input() positionHints: unknown;
     @Output() nodeClick = new EventEmitter<string>();
     @Output() edgeClick = new EventEmitter<string>();
     @Output() nodeDblClick = new EventEmitter<string>();
@@ -1424,7 +1426,7 @@ describe('LinkAnalysisComponent', () => {
         await c.saveView();
         const saved = save.mock.calls[0][0];
         expect(saved.display).toEqual({
-            nodeLabels: false, // labels start off (operator 2026-10-15)
+            nodeLabels: true, // a small graph is labelled on its own (LA-FULL-CYCLE-TEST-1 phase 6); the view keeps what it showed
             edgeLabels: false,
             nodeColors: { entity: c.swatches[1] },
             edgeColors: { link: c.swatches[2] },
@@ -1448,17 +1450,25 @@ describe('LinkAnalysisComponent', () => {
         expect(c.displayCustomized()).toBe(false); // a view without display resets to defaults
     });
 
-    it('node and link labels are OFF by default; a saved view that omits them opens with them off, one that states them keeps them', async () => {
+    it('node labels are ON by themselves on a small graph and link labels OFF; the tick wins; a view that omits them follows the size, one that states them keeps them', async () => {
         const { fixture } = create();
         fixture.detectChanges();
         await runQuery(fixture);
         const c = fixture.componentInstance;
 
-        expect(c.nodeLabels()).toBe(false);
+        // LA-FULL-CYCLE-TEST-1 phase 6 (finding 15): a graph of at most AUTO_NODE_LABEL_MAX nodes is labelled
+        expect(c.canvasData()!.nodes.length).toBeLessThanOrEqual(AUTO_NODE_LABEL_MAX);
+        expect(c.nodeLabelsChoice()).toBeNull();
+        expect(c.nodeLabels()).toBe(true);
         expect(c.edgeLabels()).toBe(false);
-        expect(c.displayOptions().nodeLabels).toBe(false);
+        expect(c.displayOptions().nodeLabels).toBe(true);
         expect(c.displayOptions().edgeLabels).toBe(false);
-        expect(c.displayCustomized()).toBe(false); // off IS the default: the paint-brush is not tinted
+        expect(c.displayCustomized()).toBe(false); // the automatic labels ARE the default: the paint-brush is not tinted
+        // the analyst's untick wins, and is a customisation
+        c.nodeLabelsChoice.set(false);
+        expect(c.displayOptions().nodeLabels).toBe(false);
+        expect(c.displayCustomized()).toBe(true);
+        c.nodeLabelsChoice.set(null);
 
         // An OLD saved view: its display block never stated the label switches (the cast is the point of the case).
         const oldDisplay = { nodeColors: {}, edgeColors: {}, nodeShapes: {}, edgePatterns: {}, edgeSizes: {} };
@@ -1469,8 +1479,9 @@ describe('LinkAnalysisComponent', () => {
             query: {},
             display: oldDisplay as unknown as NonNullable<LinkAnalysisView['display']>,
         });
-        expect(c.nodeLabels()).toBe(false); // an old view without the keys must not switch labels on
-        expect(c.edgeLabels()).toBe(false);
+        expect(c.nodeLabelsChoice()).toBeNull(); // an old view without the key follows the graph's size
+        expect(c.nodeLabels()).toBe(true);
+        expect(c.edgeLabels()).toBe(false); // and never switches link labels on
 
         await c.loadView({
             id: 'labelled',
@@ -1482,6 +1493,43 @@ describe('LinkAnalysisComponent', () => {
         expect(c.nodeLabels()).toBe(true); // a stated value is the analyst's choice and is kept
         expect(c.edgeLabels()).toBe(true);
         expect(c.displayCustomized()).toBe(true);
+
+        await c.loadView({
+            id: 'unlabelled',
+            name: 'Unlabelled',
+            sourceId: 'entity-projection',
+            query: {},
+            display: { ...oldDisplay, nodeLabels: false, edgeLabels: false },
+        });
+        expect(c.nodeLabels()).toBe(false); // a stated "off" is kept on a small graph too
+    });
+
+    it('node labels are OFF by themselves above the threshold, the canvas says so and where to turn them on, and a tick wins', async () => {
+        const big: G6GraphData = {
+            nodes: Array.from({ length: AUTO_NODE_LABEL_MAX + 1 }, (_, i) => ({
+                id: `n${i}`,
+                data: { label: `N${i}`, kind: 'entity' },
+            })),
+            edges: [],
+        };
+        const { fixture } = create({ graph: big });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        expect(c.nodeLabels()).toBe(false);
+        expect(c.displayOptions().nodeLabels).toBe(false);
+        expect(c.displayCustomized()).toBe(false);
+        fixture.detectChanges();
+        const note = (): string | undefined =>
+            (fixture.nativeElement as HTMLElement).querySelector('[data-testid="la-labels-off"]')?.textContent?.trim();
+        expect(note()).toBe(`node labels off above ${AUTO_NODE_LABEL_MAX} nodes: Display options turns them on`);
+        c.nodeLabelsChoice.set(true);
+        fixture.detectChanges();
+        expect(c.displayOptions().nodeLabels).toBe(true);
+        expect(note()).toBeUndefined();
+        c.nodeLabelsChoice.set(false); // an untick on a big graph: the note drops the threshold it no longer follows
+        fixture.detectChanges();
+        expect(note()).toBe('node labels off: Display options turns them on');
     });
 
     it('all-link-labels toggle: off by default, persisted in the saved view display, restored on load', async () => {
@@ -2813,7 +2861,7 @@ describe('LinkAnalysisComponent', () => {
         fixture.detectChanges();
         await runQuery(fixture);
         const c = fixture.componentInstance;
-        c.nodeLabels.set(true); // labels start off now: switch them on to see the level-of-detail rule drop them
+        c.nodeLabelsChoice.set(true); // 301 nodes are past the automatic labels: tick them to see the level-of-detail rule drop them
         c.edgeLabels.set(true);
         expect(c.levelOfDetail()).toBe(false); // starts off: a big graph keeps its labels until the user switches the rule on
         expect(c.lodLabelsOff()).toBe(false);
@@ -8122,5 +8170,101 @@ describe('LinkAnalysisComponent - link width by the primary Measure (LA-COLUMN-R
         await c.setLinkWidth('measure');
         expect(queried).toHaveLength(1);
         expect(c.linkWidthDrawn()).toBe('count');
+    });
+});
+
+describe('LinkAnalysisComponent - a drawn graph stays readable (LA-FULL-CYCLE-TEST-1 phase 6)', () => {
+    const node = (id: string, spellings?: string[]): G6Node => ({
+        id,
+        data: { label: id, kind: 'entity', ...(spellings ? { spellings } : {}) },
+    });
+
+    it('finding 19: the start outcome stays while nothing happens, and clears on the next step (an Expand, or a recorded step)', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        c.startNotice.set({
+            variant: 'info',
+            text: 'Drew 1 entity and 14 linked nodes. Expand… (G) goes one degree further.',
+        });
+        TestBed.tick();
+        expect(c.startNotice()).not.toBeNull(); // drawing the start is not a step
+        c.growExclude.lastChange.set({ text: 'Added 2 nodes and 2 links (not saved yet).' });
+        TestBed.tick();
+        expect(c.startNotice()).toBeNull();
+
+        c.startNotice.set({ variant: 'info', text: 'Drew 1 entity and 3 linked nodes.' });
+        TestBed.tick();
+        expect(c.startNotice()).not.toBeNull();
+        c.investigation.lastStep.set({ step: 2 } as unknown as ReturnType<typeof c.investigation.lastStep>);
+        TestBed.tick();
+        expect(c.startNotice()).toBeNull();
+    });
+
+    it('finding 17: Save carries every position to the saved Investigation, whose own ids exploreAliases pairs with the drawn ones', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const internals = c as unknown as { graphView: unknown; carryPositions(): void };
+        // the unsaved canvas, in the Space's aliases, as the analyst left it
+        vi.spyOn(c, 'canvasData').mockReturnValue({
+            nodes: [node('masked:aaa', ['masked:aaa']), node('masked:bbb', ['masked:bbb'])],
+            edges: [],
+        });
+        internals.graphView = { nodePositions: () => ({ 'masked:aaa': [10, 20], 'masked:bbb': [300, 40] }) };
+        internals.carryPositions();
+        expect(c.positionHints()).toBeNull(); // nothing is saved yet: the unsaved canvas needs no hint
+        // saved: the replayed Working Set speaks the Investigation's own aliases
+        vi.spyOn(c, 'canvasData').mockReturnValue({
+            nodes: [node('masked:111', ['masked:111']), node('masked:222', ['masked:222'])],
+            edges: [],
+        });
+        vi.spyOn(c.investigation, 'activeId').mockReturnValue('inv-1');
+        vi.spyOn(c.investigation, 'workingSet').mockReturnValue({
+            exploreAliases: { 'masked:111': 'masked:aaa', 'masked:222': 'masked:bbb' },
+        } as unknown as ReturnType<typeof c.investigation.workingSet>);
+        c.carriedPositions.update((p) => (p ? { ...p } : p)); // re-read (the spies are not signals)
+        expect(c.positionHints()).toEqual({ 'masked:111': [10, 20], 'masked:222': [300, 40] });
+        // once saved as inv-1, another Investigation opened later takes none of it
+        c.carriedPositions.update((p) => (p ? { ...p, investigationId: 'inv-2' } : p));
+        expect(c.positionHints()).toBeNull();
+    });
+
+    it('finding 17: the layout a graph opened with is kept while an Expand grows it into a hub, and re-decided for a new graph', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const opening = (g: G6GraphData) =>
+            (c as unknown as { openingLayout(g: G6GraphData): string }).openingLayout(g);
+        const chain: G6GraphData = {
+            nodes: ['a', 'b', 'c'].map((id) => node(id)),
+            edges: [
+                { id: 'a-b', source: 'a', target: 'b', data: { kind: 'link' } },
+                { id: 'b-c', source: 'b', target: 'c', data: { kind: 'link' } },
+            ],
+        };
+        expect(opening(chain)).toBe('dagre');
+        // an Expand from b adds seven: b becomes a hub, which a fresh graph would open in Force
+        const fresh = ['d', 'e', 'f', 'g', 'h', 'i', 'j'];
+        const grown: G6GraphData = {
+            nodes: [...chain.nodes, ...fresh.map((id) => node(id))],
+            edges: [
+                ...chain.edges,
+                ...fresh.map((id) => ({ id: `b-${id}`, source: 'b', target: id, data: { kind: 'link' } })),
+            ],
+        };
+        expect(defaultLayoutFor(grown, false)).toBe('force');
+        expect(opening(grown)).toBe('dagre'); // kept: re-running a layout would move every node the analyst had read
+        const other: G6GraphData = { ...grown, nodes: grown.nodes.map((n) => node(`x${n.id}`)), edges: [] };
+        other.edges = grown.edges.map((e) => ({
+            ...e,
+            id: `x${e.id}`,
+            source: `x${e.source}`,
+            target: `x${e.target}`,
+        }));
+        expect(opening(other)).toBe('force'); // no node in common: a new graph opens as defaultLayoutFor says
     });
 });

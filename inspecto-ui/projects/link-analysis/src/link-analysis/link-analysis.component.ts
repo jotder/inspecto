@@ -419,7 +419,8 @@ interface PresentationSnapshot {
     collapsedRoots: string[];
     /** Nodes taken off the exploration canvas (Hide on canvas / Hide selected): presentation only, so undoable. */
     hiddenNodeIds: string[];
-    nodeLabels: boolean;
+    /** The analyst's Node labels tick; null = automatic. */
+    nodeLabels: boolean | null;
     edgeLabels: boolean;
     allEdgeLabels: boolean;
     allDetail: boolean;
@@ -460,6 +461,16 @@ export const CANVAS_TOOLS_FOLD_PX = 1350;
 export const CANVAS_FIT_PADDING: [number, number, number, number] = [44, 24, 28, 24];
 /** The narrowest canvas zone worth keeping beside the docks; below it a dock collapses to its rail. */
 export const CANVAS_MIN_PX = 320;
+/**
+ * Node labels show on their own while the canvas draws at most this many nodes (LA-FULL-CYCLE-TEST-1 phase 6, finding
+ * 15); the analyst's tick or untick wins over it. 80 is the embedded Investigation view's own label default
+ * (`display.embed_label_limit`), so a shared embed and the studio agree; and a fitted canvas of about 1,100 × 650 px
+ * gives each of 80 nodes roughly 95 px square, room for a node and its 11 px label (masked aliases are drawn short,
+ * F-11). Past that the labels collide and the shapes read better alone.
+ */
+export const AUTO_NODE_LABEL_MAX = 80;
+/** A count column of the Rows grid: right-aligned and only as wide as its name, its sort and its filter funnel. */
+const NUMBER_COLUMN: ColDef = { type: 'rightAligned', flex: 0, width: 130 };
 const TOOLBOX_OPEN_KEY = 'inspecto.la.toolboxOpen';
 
 /**
@@ -1601,8 +1612,15 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     }
 
     // ── display options (persisted with a saved view; applied on load) ──
-    /** Node and link labels start OFF (operator 2026-10-15): a fresh graph is the shapes; labels are one checkbox away. */
-    readonly nodeLabels = signal(false);
+    /**
+     * The analyst's Node labels tick: true / false, or null = not chosen, when they follow {@link nodeLabelsAuto}
+     * (LA-FULL-CYCLE-TEST-1 phase 6: on while the graph is small). Link labels still start OFF (operator 2026-10-15).
+     */
+    readonly nodeLabelsChoice = signal<boolean | null>(null);
+    /** Labels on their own: on while the canvas draws at most {@link AUTO_NODE_LABEL_MAX} nodes. */
+    readonly nodeLabelsAuto = computed(() => (this.canvasData()?.nodes.length ?? 0) <= AUTO_NODE_LABEL_MAX);
+    readonly nodeLabels = computed(() => this.nodeLabelsChoice() ?? this.nodeLabelsAuto());
+    readonly autoNodeLabelMax = AUTO_NODE_LABEL_MAX;
     readonly edgeLabels = signal(false);
     /** Override the density rule: label every link even on a dense graph (persisted as `display.allEdgeLabels`). */
     readonly allEdgeLabels = signal(false);
@@ -1781,7 +1799,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     /** True when any display option deviates from the defaults (tints the paint-brush button). */
     readonly displayCustomized = computed<boolean>(
         () =>
-            this.nodeLabels() ||
+            this.nodeLabels() !== this.nodeLabelsAuto() ||
             this.edgeLabels() ||
             this.allEdgeLabels() ||
             this.allDetail() ||
@@ -1803,9 +1821,26 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         const picked = this.pickedLayout();
         const g = this.canvasData();
         // Never an over-cap layout, even in the instant before {@link dropOverCapLayout} drops the pick.
-        if (!picked || this.layoutOffReason(picked)) return defaultLayoutFor(g, this.investigation.canvas() !== null);
+        if (!picked || this.layoutOffReason(picked)) return this.openingLayout(g);
         return picked;
     });
+    /** The default layout the graph on screen opened with, and the node ids it held then (see {@link openingLayout}). */
+    private opened: { ids: ReadonlySet<string>; layout: GraphLayoutId } | null = null;
+    /**
+     * {@link defaultLayoutFor}, decided when a graph OPENS and kept while it grows or is saved (LA-FULL-CYCLE-TEST-1 phase
+     * 6, finding 17). Re-deciding it on every Expand flipped a growing graph from Layered to Force (8 nodes, a hub, an
+     * Investigation canvas), and a layout change re-runs the layout over every node, so the graph the analyst had read was
+     * redrawn. A graph sharing no node with the last one is a new graph and decides again; so does a kept layout that is
+     * over its node cap now.
+     */
+    private openingLayout(g: G6GraphData | null): GraphLayoutId {
+        const last = this.opened;
+        const kept =
+            last && g?.nodes.some((n) => last.ids.has(n.id)) && !this.layoutOffReason(last.layout) ? last.layout : null;
+        const layout = kept ?? defaultLayoutFor(g, this.investigation.canvas() !== null);
+        if (g?.nodes.length) this.opened = { ids: new Set(g.nodes.map((n) => n.id)), layout };
+        return layout;
+    }
     /**
      * Radial, Information density and Clustering force (force-atlas2) block the tab for 20 s to minutes on ~800 nodes:
      * above their cap they are disabled in the menus with the reason (UIR-D11). A pick over the cap (saved view, undo, the
@@ -2075,18 +2110,22 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                 id: e.id,
             }));
     });
-    /** The links table's columns in plain words (T-070); the row keeps its `id` for the row click, never shown. */
+    /**
+     * The links table's columns in plain words (T-070); the row keeps its `id` for the row click, never shown. The number
+     * column is narrow (LA-FULL-CYCLE-TEST-1 phase 6, finding 19): stretched like the text columns, its right-aligned name
+     * sat at the far edge with the filter funnel alone at the other, and read as a column with no name.
+     */
     readonly linkTableColumns: ColDef[] = [
         { field: 'source', headerName: 'From' },
         { field: 'relationship', headerName: 'Link kind' },
         { field: 'target', headerName: 'To' },
-        { field: 'rows', headerName: 'Count', type: 'rightAligned' },
+        { field: 'rows', headerName: 'Count', ...NUMBER_COLUMN },
     ];
     /** The nodes table's columns, likewise without the internal id. */
     readonly nodeTableColumns: ColDef[] = [
         { field: 'label', headerName: 'Name' },
         { field: 'kind', headerName: 'Entity Type' },
-        { field: 'links', headerName: 'Links', type: 'rightAligned' },
+        { field: 'links', headerName: 'Links', ...NUMBER_COLUMN },
     ];
     readonly nodeOptions = computed(() => {
         // What the canvas draws: over an Investigation that is its Working Set, whose ids the server run maps (serverIds).
@@ -2375,6 +2414,16 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     });
     /** What the last start did (drawn, held, not found) - shown under the Start box and the graph's status line. */
     readonly startNotice = signal<StartNotice | null>(null);
+    /**
+     * The start's outcome ("Drew 1 entity and 14 linked nodes…") describes the graph as it was drawn: the next step (an
+     * Expand, an Exclude, a Clean up, an Undo, a recorded step, Save) makes it stale, so it clears then
+     * (LA-FULL-CYCLE-TEST-1 phase 6, finding 19). The step's own result line takes its place.
+     */
+    private readonly clearStartNoticeOnStep = effect(() => {
+        const change = this.growExclude.lastChange();
+        const step = this.investigation.lastStep();
+        if (change || step) untracked(() => this.startNotice.set(null));
+    });
     readonly starting = signal(false);
     /** What can be started from: Datasets with a link, and the Entity Types their link ends hold. */
     readonly startCatalogue = computed(() => startCatalogue(this.datasets(), this.views(), this.startTypes()));
@@ -2566,6 +2615,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     async startUnsaved(req: UnsavedStartRequest): Promise<void> {
         if (!this.investigationsEnabled() || this.starting() || this.investigation.chainRunning()) return;
         if (!(await this.leaveUnsaved())) return;
+        this.carriedPositions.set(null);
         this.startNotice.set(null);
         this.investigateIssue.set('');
         this.unsavedWs.set(null);
@@ -3098,11 +3148,14 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
                 .afterClosed(),
         );
         if (!answer) return false;
+        this.carryPositions();
         const out = await this.investigation.saveUnsaved(answer.name, answer.purpose);
         if (!out.created) {
+            this.carriedPositions.set(null);
             this.toastr.error(out.message || 'Could not save the Investigation.');
             return false;
         }
+        this.carriedPositions.update((c) => (c ? { ...c, investigationId: this.investigation.activeId() } : c));
         if (!out.message && u.steps.at(-1)?.kind === 'expand')
             this.growExclude.bindLastExpand(expandStepDegrees(u.steps.at(-1)) ?? 0);
         if (out.message) this.toastr.warning(out.message);
@@ -3114,6 +3167,44 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         this.openInvestigation();
         return true;
     }
+
+    /**
+     * Where the unsaved canvas drew each entity, by its id as the unsaved Working Set spells it (the Space's alias on a
+     * masked Space), kept through Save (LA-FULL-CYCLE-TEST-1 phase 6, finding 17): the saved Investigation replays its
+     * steps under its OWN ids, so without this the canvas redrew every entity somewhere new. `investigationId` is the
+     * Investigation it was saved as (null while the save replays).
+     */
+    readonly carriedPositions = signal<{
+        byRaw: Record<string, [number, number]>;
+        investigationId: string | null;
+    } | null>(null);
+
+    private carryPositions(): void {
+        const at = this.graphView?.nodePositions() ?? {};
+        const byRaw: Record<string, [number, number]> = {};
+        for (const n of this.canvasData()?.nodes ?? []) {
+            const p = at[n.id];
+            if (p) for (const raw of rawIdsOf(n)) byRaw[raw] = p;
+        }
+        this.carriedPositions.set(Object.keys(byRaw).length ? { byRaw, investigationId: null } : null);
+    }
+
+    /** {@link carriedPositions} as the canvas names its nodes now (`exploreAliases` pairs the two ids); null = none. */
+    readonly positionHints = computed<Record<string, [number, number]> | null>(() => {
+        const carried = this.carriedPositions();
+        const active = this.investigation.activeId();
+        if (!carried || !active || (carried.investigationId !== null && carried.investigationId !== active))
+            return null;
+        const toExplore = this.investigation.workingSet()?.exploreAliases ?? {};
+        const out: Record<string, [number, number]> = {};
+        for (const n of this.canvasData()?.nodes ?? []) {
+            const p = rawIdsOf(n)
+                .map((raw) => carried.byRaw[toExplore[raw] ?? raw])
+                .find((x) => !!x);
+            if (p) out[n.id] = p;
+        }
+        return out;
+    });
 
     /**
      * Before something replaces unsaved work (Close, New, Open, a new start): "Save, Discard or Cancel". True = go on
@@ -4360,7 +4451,7 @@ Its prior copies stay in its version history.`,
             timeCutoff: this.timeCutoff(),
             collapsedRoots: this.collapsedRoots(),
             hiddenNodeIds: this.hiddenNodeIds(),
-            nodeLabels: this.nodeLabels(),
+            nodeLabels: this.nodeLabelsChoice(),
             edgeLabels: this.edgeLabels(),
             allEdgeLabels: this.allEdgeLabels(),
             allDetail: this.allDetail(),
@@ -4383,7 +4474,7 @@ Its prior copies stay in its version history.`,
         this.timeCutoff.set(s.timeCutoff);
         this.collapsedRoots.set(s.collapsedRoots);
         this.hiddenNodeIds.set(s.hiddenNodeIds);
-        this.nodeLabels.set(s.nodeLabels);
+        this.nodeLabelsChoice.set(s.nodeLabels);
         this.edgeLabels.set(s.edgeLabels);
         this.allEdgeLabels.set(s.allEdgeLabels);
         this.allDetail.set(s.allDetail);
@@ -4456,7 +4547,8 @@ Its prior copies stay in its version history.`,
 
     private applyDisplay(display: LaDisplayOptions | undefined): void {
         this.linkWidthBy.set(display?.linkWidth === 'measure' ? 'measure' : 'count'); // a view saved before D-2: Count
-        this.nodeLabels.set(display?.nodeLabels ?? false);
+        // a view that never stated it follows the graph's size (LA-FULL-CYCLE-TEST-1 phase 6); a stated value is kept
+        this.nodeLabelsChoice.set(display?.nodeLabels ?? null);
         this.edgeLabels.set(display?.edgeLabels ?? false);
         this.allEdgeLabels.set(display?.allEdgeLabels ?? false);
         this.allDetail.set(display?.allDetail ?? false);

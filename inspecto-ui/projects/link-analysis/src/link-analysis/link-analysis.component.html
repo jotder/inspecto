@@ -453,9 +453,17 @@
                             (click)="$event.stopPropagation()"
                             aria-label="Display options"
                         >
-                            <mat-checkbox [checked]="nodeLabels()" (change)="nodeLabels.set($event.checked)"
-                                >Node labels</mat-checkbox
-                            >
+                            <mat-checkbox
+                                [checked]="nodeLabels()"
+                                data-testid="la-node-labels"
+                                (change)="nodeLabelsChoice.set($event.checked)"
+                                >Node labels
+                                @if (nodeLabelsChoice() === null) {
+                                    <span class="text-secondary text-xs" data-testid="la-node-labels-auto"
+                                        >(on up to {{ autoNodeLabelMax }} nodes)</span
+                                    >
+                                }
+                            </mat-checkbox>
                             <mat-checkbox [checked]="edgeLabels()" (change)="edgeLabels.set($event.checked)"
                                 >Link labels</mat-checkbox
                             >
@@ -1554,6 +1562,7 @@
                                 [plugins]="canvasPlugins()"
                                 [interaction]="canvasInteraction()"
                                 [selection]="selectedOnCanvas()"
+                                [positionHints]="positionHints()"
                                 (nodeClick)="onNodeClick($event)"
                                 (nodeDblClick)="onNodeDblClick($event)"
                                 (selectionChange)="onSelectionChange($event)"
@@ -1810,16 +1819,21 @@
                                 ></inspecto-link-analysis-held-tray>
                             }
                             @if (growExclude.lastChange(); as change) {
+                                <!-- in the top band every fit keeps clear, centred in the gap between the Legend pill (6.5rem)
+                                     and the Graph counts pill (15rem): at the bottom right it covered the minimap, and lower
+                                     down it covers the nodes a fit draws (LA-FULL-CYCLE-TEST-1 phase 6, finding 19) -->
                                 <div
-                                    class="absolute bottom-8 right-2 z-30 flex max-w-[28rem] items-center gap-2 rounded-lg border px-2 py-1 text-xs shadow"
+                                    class="absolute left-[6.5rem] right-[15rem] top-1 z-30 mx-auto flex w-fit max-w-[28rem] items-center gap-2 rounded-lg border px-2 py-0.5 text-xs shadow"
                                     style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
                                     role="status"
                                     data-testid="la-change-line"
                                 >
                                     <span>{{ change.text }}</span>
                                     @if (growExclude.undoable()) {
+                                        <!-- compact (28 px, above the 24 px target minimum): the line fits the 44 px band -->
                                         <button
                                             mat-button
+                                            class="!h-7 !min-h-0 !px-2"
                                             type="button"
                                             (click)="growExclude.undoLast()"
                                             matTooltip="Undo this change (Ctrl+Z)"
@@ -1835,11 +1849,12 @@
                                     }
                                     <button
                                         mat-icon-button
+                                        class="!h-7 !w-7 !p-0"
                                         type="button"
                                         aria-label="Dismiss change note"
                                         (click)="growExclude.lastChange.set(null)"
                                     >
-                                        <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:x-mark"></mat-icon>
                                     </button>
                                 </div>
                             }
@@ -1917,6 +1932,13 @@
                                 }
                                 @if (lodLabelsOff()) {
                                     <span>labels off above {{ lodLabelCap() }} nodes (level of detail)</span>
+                                } @else if (!nodeLabels() && !detailDense()) {
+                                    <!-- finding 15: say that labels are off, and where they come back -->
+                                    <span data-testid="la-labels-off"
+                                        >node labels off{{
+                                            nodeLabelsChoice() === null ? ' above ' + autoNodeLabelMax + ' nodes' : ''
+                                        }}: Display options turns them on</span
+                                    >
                                 }
                             </div>
                             <inspecto-link-analysis-working-set

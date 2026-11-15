@@ -127,6 +127,12 @@ export function workingSetToGraph(
             if (raws.some((raw) => ws.entities.some((e) => e.id === raw))) n.data.unexpanded = true;
         }
     }
+    // LA-FULL-CYCLE-TEST-1 phase 6 (finding 17): the start entities (hop 0) are marked, unsaved and saved alike, so the
+    // canvas keeps showing where the Investigation began after Save. Only when some entities are NOT a start: a seedless
+    // start (the whole Dataset) would otherwise badge every node, which says nothing.
+    const starts = new Set(ws.entities.filter((e) => e.hop === 0).map((e) => e.id));
+    const startNodes = g.nodes.filter((n) => rawIdsOf(n).some((raw) => starts.has(raw)));
+    if (startNodes.length && startNodes.length < g.nodes.length) for (const n of startNodes) n.data.start = true;
     // F-11: a `masked:<16 hex>` alias is drawn short so labels stop overlapping; the label itself stays the full alias
     // (the hover text, the Selected line, search and every op still read it). Nothing the alias hides is shown.
     // D3: an alias the lead revealed is drawn as its real id - drawn only, so every op still speaks the alias.

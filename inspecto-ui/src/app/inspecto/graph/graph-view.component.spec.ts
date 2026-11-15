@@ -9,6 +9,7 @@ import {
     DENSE_EDGE_LABEL_CAP,
     detailHiddenByDensity,
     EXPAND_RELAYOUT_MAX_NEW,
+    FORCE_GRAVITY,
     placeBesideNeighbours,
     GRAPH_DEFAULT_LAYOUT_SPACING,
     GRAPH_DEFAULT_NODE_SIZE,
@@ -113,7 +114,13 @@ describe('GraphViewComponent', () => {
 
 describe('layoutConfig node size and spacing (operator 2026-10-24)', () => {
     it('with neither given, every layout is exactly what it was before they existed', () => {
-        expect(layoutConfig('force')).toEqual({ type: 'sliced-d3-force', collide: { radius: 28 } });
+        // LA-FULL-CYCLE-TEST-1 phase 6 (finding 18): Force pulls gently to the centre, so unlinked groups stay near
+        expect(layoutConfig('force')).toEqual({
+            type: 'sliced-d3-force',
+            collide: { radius: 28 },
+            x: { strength: FORCE_GRAVITY },
+            y: { strength: FORCE_GRAVITY },
+        });
         expect(layoutConfig('dagre')).toEqual({ type: 'antv-dagre', rankdir: 'LR', nodesep: 18, ranksep: 60 });
         // LA-RADIAL-LAYOUT-SQUASH-1: Radial is the per-component radial, kept apart by the drawn node size
         expect(layoutConfig('radial')).toEqual({
