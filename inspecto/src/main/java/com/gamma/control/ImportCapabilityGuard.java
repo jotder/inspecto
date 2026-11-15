@@ -41,7 +41,7 @@ import com.gamma.access.CapabilityManifest;
  * and on every import but a new Space's, for ANY caller ({@code IMPORT-DEDICATED-ONLY-KINDS-1}).
  * {@code ImportCapabilityGuardTest} derives the table's completeness from {@link CapabilityManifest}.
  */
-final class ImportCapabilityGuard {
+public final class ImportCapabilityGuard {
 
     private ImportCapabilityGuard() {}
 
@@ -268,9 +268,10 @@ final class ImportCapabilityGuard {
     /**
      * {@code relPath} as the filesystem resolves it, for classification: {@code /} separators, no empty or {@code .}
      * segments, each segment lower-cased and stripped of the trailing dots and spaces Windows drops — so
-     * {@code Registry/findings-specs./x.toon} is {@code registry/findings-specs/x.toon}.
+     * {@code Registry/findings-specs./x.toon} is {@code registry/findings-specs/x.toon}. Public for the export
+     * ({@code BundleExporter}), which must see a connection by the same name (IMPORT-CONNECTION-CASE-1).
      */
-    static String normalizedPath(String relPath) {
+    public static String normalizedPath(String relPath) {
         List<String> out = new ArrayList<>();
         for (String seg : relPath.replace('\\', '/').split("/")) {
             String s = seg.toLowerCase(Locale.ROOT);

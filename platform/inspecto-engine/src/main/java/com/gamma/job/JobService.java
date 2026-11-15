@@ -2512,8 +2512,9 @@ public final class JobService implements AutoCloseable {
      * scan the {@code scheduler_audit} maintenance task runs, hosted here so every space gets it without
      * shipping that job. Invoked by the hosting service on pipeline-registry rebuilds and by
      * {@link #upsertJob}/{@link #removeJob} (the two transition sources). Cheap — a registry snapshot
-     * scan, no data reads. Skips (like the task) when the host never wired
-     * {@link #pipelineOutputStores(java.util.function.Supplier)}. Emits one
+     * scan plus each enabled Job's {@code pipeline_config:} file, no data reads; run under this service's
+     * Space, as a Job run is, so a path resolves from the base the runner uses. Skips (like the task) when
+     * the host never wired {@link #pipelineOutputStores(java.util.function.Supplier)}. Emits one
      * {@code maintenance.scheduler.findings} WARN signal carrying only the NEW findings.
      *
      * @return the freshly-emitted findings (empty when nothing new, when disabled, or when unwired)
@@ -2522,7 +2523,18 @@ public final class JobService implements AutoCloseable {
         if (!Boolean.parseBoolean(System.getProperty(ORPHAN_AUDIT_FLAG, "true"))) return List.of();
         Map<String, String> stores = pipelineOutputStores();
         if (stores == null) return List.of();
-        List<String> findings = SchedulerAuditTask.orphanOutputStoreFindings(configSnapshot(), stores);
+        boolean scoped = !EventLog.DEFAULT_SPACE_ID.equals(spaceId);
+        String prior = MDC.get(EventLog.SPACE_MDC_KEY);
+        List<String> findings;
+        if (scoped) MDC.put(EventLog.SPACE_MDC_KEY, spaceId);
+        try {
+            findings = SchedulerAuditTask.orphanOutputStoreFindings(configSnapshot(), stores);
+        } finally {
+            if (scoped) {
+                if (prior == null) MDC.remove(EventLog.SPACE_MDC_KEY);
+                else MDC.put(EventLog.SPACE_MDC_KEY, prior);
+            }
+        }
         Set<String> previous = reportedOrphans;
         reportedOrphans = Set.copyOf(findings);
         List<String> fresh = findings.stream().filter(f -> !previous.contains(f)).toList();
@@ -2575,8 +2587,9 @@ public final class JobService implements AutoCloseable {
                 .toList();
     }
 
-    /** Immutable snapshot of every configured job, for the scheduler_audit task. */
-    List<JobConfig> configSnapshot() {
+    /** Immutable snapshot of every configured job, for the scheduler_audit task and the Pipeline save gate's
+     *  "chain with no type: pipeline Job" warning ({@code PIPELINE-CHAIN-NO-JOB-1}). */
+    public List<JobConfig> configSnapshot() {
         return List.copyOf(configs);
     }
 

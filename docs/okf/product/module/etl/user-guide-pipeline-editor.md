@@ -624,7 +624,9 @@ entirely with the metadata grid (D2) — (it IS an output column, stamped at wri
 > palette** (`transform.record`) is a different node: a chain `sql` Step (`steps: - sql:`) that runs **after
 > load**, at rest, from a `type: pipeline` Job writing the top-level `output_store:`. A chain with no
 > `output_store:` never runs, so the save refuses it naming each Step (`ERR_CHAIN_WITHOUT_OUTPUT_STORE`, 422
-> on an active Pipeline; `WARN_CHAIN_WITHOUT_OUTPUT_STORE` on an inactive draft). To shape what lands, edit the
+> on an active Pipeline; `WARN_CHAIN_WITHOUT_OUTPUT_STORE` on an inactive draft). With a store but no enabled
+> `type: pipeline` Job naming the Pipeline's file in `pipeline_config:`, the chain never runs either, and the save
+> warns (`WARN_CHAIN_WITHOUT_PIPELINE_JOB`) until you add that Job. To shape what lands, edit the
 > "Shape …" node; add a palette Record Transformer only to re-shape the landed store into another one.
 
 > **2026-09-05 — `transform.map` is DELETED.** The projection slot `PipelineLift` fills between parser and

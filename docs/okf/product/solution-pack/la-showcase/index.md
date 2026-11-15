@@ -34,7 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-SPACE-SWITCHER-1` | P3 | defect | the Space switcher button overflows the rail, and its list mixes old names, near-twins and no order. | — |
+| `LA-SPACE-SWITCHER-NAMES-1` | P3 | defect | the Space switcher still shows near-twin names, no name on a phone, and squeezes a two-line name. | — |
 | `LA-UI-TEXT-PASS-2` | P3 | defect | wording and vocabulary breaks left on the la-app screens. | — |
 | `LA-SHOWCASE-RELEASE-RESIDUALS-1` | P3 | chore | what the 2026-11-09 showcase release and its live proofs did not cover. | — |
 | `LA-SHOWCASE-COMBINED-DOWNLOAD-1` | P3 | feature | one combined "all showcases" download beside the per-Space downloads? | operator |

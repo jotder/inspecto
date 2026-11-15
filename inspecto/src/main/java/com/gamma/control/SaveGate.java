@@ -102,6 +102,9 @@ final class SaveGate {
         f.addAll(editionFindings(type, draft));   // G9: Standard+ features on a Basic build
         // Referential: a collector bound to a Connection this Space does not have throws once per poll.
         if (referents == Referents.MUST_EXIST) f.addAll(ConfigRoutes.unknownConnectionFindings(type, draft, api));
+        // PIPELINE-CHAIN-NO-JOB-1: a chain with a store that no type: pipeline Job runs — a WARNING, never a
+        // refusal; skipped on a bundle import, whose Jobs may arrive after it, like its Connections.
+        if (referents == Referents.MUST_EXIST) f.addAll(ConfigRoutes.chainWithoutJobFindings(type, draft, api, writeRoot));
         f.addAll(webhookFindings(type, draft, api, referents));
         f.addAll(excelFindings(type, draft));
         f.addAll(selectorFindings(type, draft, configDir));   // LA-ONBOARD-FIXES-1 (F-4)

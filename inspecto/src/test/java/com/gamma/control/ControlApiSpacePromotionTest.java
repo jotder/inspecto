@@ -525,6 +525,91 @@ class ControlApiSpacePromotionTest {
         }
     }
 
+    /**
+     * SPACE-PROMOTION-CASE-PAIRING-1: the change set pairs files by spelling, so a bundle path naming a target file in
+     * another case was an add plus a remove of one file on a case-insensitive filesystem, and with {@code removals: true}
+     * the remove deleted what the add wrote. Such a path, or two bundle paths that differ only in case, is refused (422
+     * {@code caseCollisions}) by both routes, and nothing is written or removed.
+     */
+    @Test
+    void aBundlePathSpelledInAnotherCaseThanATargetFileOrAnotherBundlePathIs422(@TempDir Path root, @TempDir Path tmp)
+            throws Exception {
+        byte[] againstTarget = withEntry(sourceBundle(tmp.resolve("a")), "Registry/datasets/extra.toon",
+                "physicalRef: extra2/database\n");
+        byte[] withinBundle = withEntry(withEntry(sourceBundle(tmp.resolve("b")), "registry/datasets/new.toon",
+                "physicalRef: new/database\n"), "Registry/datasets/NEW.toon", "physicalRef: new2/database\n");
+        try (Ctx c = open(root)) {
+            for (byte[] zip : List.of(againstTarget, withinBundle)) {
+                boolean target = zip == againstTarget;
+                for (String route : List.of("preview", "apply")) {
+                    HttpResponse<String> r = post(c.port, "/spaces/alpha/promotion/" + route, "admin",
+                            body(zip, Map.of("previewHash", "x", "removals", true)));
+                    assertEquals(422, r.statusCode(), route + ": " + r.body());
+                    JsonNode collisions = JSON.readTree(r.body()).findValue("caseCollisions");
+                    assertNotNull(collisions, r.body());
+                    if (target) assertEquals(EXTRA, collisions.path("Registry/datasets/extra.toon").asText(), r.body());
+                    else assertEquals("Registry/datasets/NEW.toon", collisions.path("registry/datasets/new.toon").asText(),
+                            r.body());
+                }
+            }
+            assertEquals("physicalRef: extra/database\n", Files.readString(c.config.resolve(EXTRA)), "nothing was removed");
+            assertTrue(Files.readString(c.config.resolve(ORDERS)).contains("v1"), "nothing was written");
+            assertFalse(Files.exists(c.config.resolve("registry/datasets/new.toon")));
+        }
+    }
+
+    /**
+     * SPACE-PROMOTION-CASE-PAIRING-1: removing a {@code *_job.TOON} that no loader reads (they match names as spelled) only
+     * deletes the file; it does not stop the live Job of the same name, nor revoke its approvals.
+     */
+    @Test
+    void removingAJobFileNoLoaderReadsLeavesTheLiveJobOfThatNameRunning(@TempDir Path root, @TempDir Path tmp)
+            throws Exception {
+        String hello = "job:\n  name: hello\n  type: sample.hello\n  cron: \"0 * * * *\"\n  enabled: true\n";
+        Path src = Files.createDirectories(tmp.resolve("src-config"));
+        write(src, ORDERS, "physicalRef: orders/database\ndescription: v2\n");
+        write(src, SAME, "physicalRef: same/database\n");
+        write(src, PARAM, "physicalRef: eu/database\nowner: alpha\n");
+        write(src, "jobs/hello_job.toon", hello);
+        byte[] zip = BundleExporter.exportSpace(src, null, "src");
+        Path config = Files.createDirectories(root.resolve("alpha/config"));
+        write(config, "jobs/hello_job.toon", hello);
+        write(config, "old/hello_job.TOON", hello);
+        try (Ctx c = open(root)) {
+            assertTrue(send(c, "GET", "/spaces/alpha/jobs").body().contains("\"hello\""));
+            JsonNode p = preview(c, zip);
+            assertTrue(actions(p, "remove").contains("old/hello_job.TOON"), p.toString());
+            HttpResponse<String> r = post(c.port, "/spaces/alpha/promotion/apply", "admin",
+                    body(zip, Map.of("previewHash", p.get("changeSetHash").asText(), "removals", true)));
+            assertEquals(200, r.statusCode(), r.body());
+            assertFalse(Files.exists(c.config.resolve("old/hello_job.TOON")), "the file is removed");
+            HttpResponse<String> jobs = send(c, "GET", "/spaces/alpha/jobs");
+            assertTrue(jobs.body().contains("\"hello\""), "the live Job of that name still runs: " + jobs.body());
+        }
+    }
+
+    /**
+     * SPACE-PROMOTION-CASE-PAIRING-1: a connection named in another case with only secret references is written (no literal
+     * secret excludes it) but not registered live, since no loader reads it and a restart would drop it.
+     */
+    @Test
+    void aConnectionNamedInAnotherCaseIsWrittenButNotRegisteredLive(@TempDir Path root, @TempDir Path tmp) throws Exception {
+        String conn = "connection:\n  id: %s\n  connector: postgres\n  host: h\n  password: ${DB_PASS}\n";
+        byte[] zip = withEntry(withEntry(sourceBundle(tmp), "connections/low_connection.toon", conn.formatted("low")),
+                "connections/up_connection.TOON", conn.formatted("up"));
+        try (Ctx c = open(root)) {
+            JsonNode p = preview(c, zip);
+            HttpResponse<String> r = post(c.port, "/spaces/alpha/promotion/apply", "admin",
+                    body(zip, Map.of("previewHash", p.get("changeSetHash").asText())));
+            assertEquals(200, r.statusCode(), r.body());
+            assertTrue(Files.exists(c.config.resolve("connections/up_connection.TOON")), "it is written");
+            List<String> live = new ArrayList<>();
+            V1Body.of(send(c, "GET", "/spaces/alpha/connections").body()).forEach(n -> live.add(n.get("id").asText()));
+            assertTrue(live.contains("low"), "a connection a loader reads is registered: " + live);
+            assertFalse(live.contains("up"), "one named in another case is not: " + live);
+        }
+    }
+
     private HttpResponse<String> send(Ctx c, String method, String path) throws Exception {
         return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1" + path))
                 .header("Authorization", "Bearer admin").method(method, HttpRequest.BodyPublishers.noBody()).build(),

@@ -3,7 +3,13 @@
     class="flex h-[max(calc(100dvh-var(--shell-chrome-height,7.5rem)),35rem)] min-h-0 min-w-0 flex-auto flex-col p-2 max-sm:h-auto"
 >
     <!-- ── header = File ▾, the title, then both toolbars side by side on ONE row of compact icon buttons (operator 2026-10-28) ── -->
-    <header #laHeader class="la-compact-bar flex min-w-0 flex-nowrap items-center gap-1" data-testid="la-header">
+    <!-- LA-PHONE-OVERFLOW-1: below sm the title row wraps and the toolbars take their own full-width row, where their
+         icons wrap too, so a 375 px phone never scrolls sideways -->
+    <header
+        #laHeader
+        class="la-compact-bar flex min-w-0 flex-nowrap items-center gap-1 max-sm:flex-wrap"
+        data-testid="la-header"
+    >
         <!-- LA-STUDIO-UI-REORG-1 §5.1 / §5.11: File ▾ - New, Open…, Save view, Save view as…, Snapshot, Import / export, Close, Delete -->
         <mat-menu #fileMenu="matMenu">
             <button mat-menu-item (click)="newWork()" [disabled]="investigation.busy()" data-testid="la-file-new">
@@ -174,9 +180,12 @@
         }
         <!-- the two toolbars sit side by side; only when a long selection row cannot fit does the canvas toolbar drop
              under the rail, so nothing is clipped (the canvas toolbar must never be overflow-hidden) -->
-        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1" data-testid="la-toolbars">
+        <div
+            class="flex min-w-0 flex-1 flex-wrap items-center gap-1 max-sm:order-last max-sm:basis-full"
+            data-testid="la-toolbars"
+        >
             <nav
-                class="flex min-w-0 shrink-0 flex-row flex-nowrap items-center gap-0.5 rounded-lg border px-1"
+                class="flex min-w-0 shrink-0 flex-row flex-nowrap items-center gap-0.5 rounded-lg border px-1 max-sm:shrink max-sm:flex-wrap"
                 style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
                 aria-label="Link Analysis tools"
                 data-testid="la-tool-rail"
@@ -854,7 +863,7 @@
                 <!-- LA-STUDIO-UI-REORG-1 §5.2: the second toolbar - work on the canvas. Named groups; when the header row is narrower than CANVAS_TOOLS_FOLD_PX the groups after
                      Canvas mode fold into overflow menus, so it never wraps to a third row. -->
                 <nav
-                    class="flex shrink-0 flex-nowrap items-center gap-0.5 rounded-lg border px-1"
+                    class="flex shrink-0 flex-nowrap items-center gap-0.5 rounded-lg border px-1 max-sm:min-w-0 max-sm:shrink max-sm:flex-wrap"
                     style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
                     aria-label="Canvas tools"
                     data-testid="la-canvas-toolbar"
@@ -1359,7 +1368,7 @@
         </div>
         <!-- the right end reads Full screen · About · ⚙ Settings (operator 2026-10-29); the toolbox panel opens and
              collapses from its own rail -->
-        <div class="flex shrink-0 items-center gap-0.5">
+        <div class="flex shrink-0 items-center gap-0.5 max-sm:ml-auto">
             @if (graph() || workingSetCanvas()) {
                 <button
                     mat-icon-button
@@ -1534,6 +1543,7 @@
                             </p>
                             <inspecto-graph-view
                                 [fill]="true"
+                                [fitPadding]="fitPadding"
                                 [data]="weighedCanvasData()"
                                 [emphasis]="emphasis() ?? geoBrushEmphasis()"
                                 [display]="displayOptions()"

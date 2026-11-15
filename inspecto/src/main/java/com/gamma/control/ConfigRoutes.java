@@ -366,20 +366,10 @@ final class ConfigRoutes {
      */
     static List<Finding> chainOutputStoreFindings(String type, Map<String, Object> draft) {
         if (!"pipeline".equals(type)) return List.of();
-        if (draft.get("output_store") != null && !String.valueOf(draft.get("output_store")).isBlank()) return List.of();
+        if (hasOutputStore(draft)) return List.of();
         boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));
-        Map<?, ?> proc = draft.get("processing") instanceof Map<?, ?> m ? m : Map.of();
-        List<String[]> chain = new ArrayList<>();   // {field, Step, where}
-        if (draft.get("steps") instanceof List<?> steps)
-            for (int i = 0; i < steps.size(); i++)
-                if (steps.get(i) instanceof Map<?, ?> entry && entry.size() == 1) {
-                    String kind = String.valueOf(entry.keySet().iterator().next());
-                    chain.add(new String[]{"steps[" + i + "]." + kind, kind, "steps[" + i + "]"});
-                }
-        for (String kind : List.of("dedup", "summarize", "profile", "join"))
-            if (proc.get(kind) != null) chain.add(new String[]{"processing." + kind, kind, "processing." + kind});
         List<Finding> out = new ArrayList<>();
-        for (String[] s : chain)
+        for (String[] s : chainSteps(draft))
             out.add(new Finding(active ? Severity.ERROR : Severity.WARNING, s[0],
                     "Step '" + s[1] + "' (" + s[2] + ") never runs: a chain runs only at rest, from a type: pipeline "
                             + "Job, and writes the top-level output_store:, which this Pipeline does not set. Set "
@@ -388,6 +378,65 @@ final class ConfigRoutes {
                     active ? FindingCodes.ERR_CHAIN_WITHOUT_OUTPUT_STORE : FindingCodes.WARN_CHAIN_WITHOUT_OUTPUT_STORE,
                     active ? GUIDANCE_ACTIVE : GUIDANCE_INACTIVE));
         return out;
+    }
+
+    private static boolean hasOutputStore(Map<String, Object> draft) {
+        return draft.get("output_store") != null && !String.valueOf(draft.get("output_store")).isBlank();
+    }
+
+    /** The Stage-2 chain Steps of {@code draft}, each as {field, Step, where}: every {@code steps:} entry, then the
+     *  legacy {@code processing.dedup} / {@code summarize} / {@code profile} / {@code join} blocks. */
+    private static List<String[]> chainSteps(Map<String, Object> draft) {
+        Map<?, ?> proc = draft.get("processing") instanceof Map<?, ?> m ? m : Map.of();
+        List<String[]> chain = new ArrayList<>();
+        if (draft.get("steps") instanceof List<?> steps)
+            for (int i = 0; i < steps.size(); i++)
+                if (steps.get(i) instanceof Map<?, ?> entry && entry.size() == 1) {
+                    String kind = String.valueOf(entry.keySet().iterator().next());
+                    chain.add(new String[]{"steps[" + i + "]." + kind, kind, "steps[" + i + "]"});
+                }
+        for (String kind : List.of("dedup", "summarize", "profile", "join"))
+            if (proc.get(kind) != null) chain.add(new String[]{"processing." + kind, kind, "processing." + kind});
+        return chain;
+    }
+
+    /**
+     * A Stage-2 chain WITH a top-level {@code output_store:} that no enabled {@code type: pipeline} Job runs
+     * (PIPELINE-CHAIN-NO-JOB-1): the chain runs only at rest, from a Job whose {@code pipeline_config:} names this
+     * Pipeline's file ({@code PipelineJobRunner} → {@code PipelineLift.stageTwo}), so with none it never runs. A Job
+     * runs this Pipeline when its {@code pipeline_config:} resolves as the runner resolves it (its base,
+     * {@code SpaceConfigRoot.jobPathBase}, and its jail, {@code PipelineConfigIds.registeredIdOf}) to a file whose registered id
+     * is this draft's id — the file's own identity, not its file name, because the shipped samples name
+     * {@code orders_pipeline.toon} for a Pipeline called {@code STEP_DEDUP}. A Job's {@code pipeline:} names an
+     * authored ({@code *_flow.toon}) Pipeline and never lifts this file's chain, so it does not count.
+     *
+     * <p>Always a WARNING, active or not: the Job is a separate config, so refusing would make the order of
+     * authoring matter, and a draft is exactly when the author needs to hear a Job is still owed. Judged only where
+     * the Space's Jobs are known ({@code api != null}); a save or delete of a Job does not re-judge Pipelines (the
+     * default-on {@code JobService.auditOrphanOutputStores} signal covers that transition at run time).
+     */
+    static List<Finding> chainWithoutJobFindings(String type, Map<String, Object> draft, ApiContext api,
+                                                 Path writeRoot) {
+        if (!"pipeline".equals(type) || api == null || !hasOutputStore(draft) || chainSteps(draft).isEmpty())
+            return List.of();
+        String pipeline = ConfigReadRoutes.pipelineIdOf(draft, null);
+        if (pipeline == null) return List.of();
+        List<com.gamma.job.JobConfig> jobs = HostContext.of(api).service().jobService()
+                .map(com.gamma.job.JobService::configSnapshot).orElse(List.of());
+        Path base = com.gamma.pipeline.SpaceConfigRoot.jobPathBase("pipeline_config", writeRoot);
+        for (com.gamma.job.JobConfig j : jobs)
+            if (j.enabled() && "pipeline".equals(j.type())
+                    && pipeline.equalsIgnoreCase(com.gamma.job.PipelineConfigIds.registeredIdOf(
+                            j.params().get("pipeline_config"), base)))
+                return List.of();
+        return List.of(new Finding(Severity.WARNING, "output_store",
+                "Pipeline '" + pipeline + "' has a chain writing output_store '" + draft.get("output_store")
+                        + "', but no enabled type: pipeline Job runs it, so the chain never runs: the ingest lane "
+                        + "runs none of a chain, only a type: pipeline Job whose pipeline_config: names this "
+                        + "Pipeline's file does",
+                FindingCodes.WARN_CHAIN_WITHOUT_PIPELINE_JOB,
+                "add a type: pipeline Job that runs '" + pipeline + "' (pipeline_config: this Pipeline's "
+                        + "*_pipeline.toon file, on_pipeline: " + pipeline + "), or enable the one you have"));
     }
 
     static List<Finding> dedupWindowFindings(String type, Map<String, Object> draft) {

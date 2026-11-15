@@ -223,9 +223,13 @@ public final class BundleExporter {
      * files are {@code registry/<type-dir>/<id>.toon} and carry <em>no</em> suffix — they are typed by
      * their directory ({@code ComponentRegistry.TYPE_BY_DIR}), so a suffix scan classifies every one of
      * them as {@code other}.
+     *
+     * <p>Names are read as the filesystem resolves them, as the import judges them
+     * ({@code ImportCapabilityGuard.normalizedPath}: lower case, no trailing dots or spaces), so a hand-made
+     * {@code x_connection.TOON} or {@code Registry/connections/x.toon} is sanitised too (IMPORT-CONNECTION-CASE-1).
      */
     private static String kindOf(Path file) {
-        String n = file.getFileName().toString();
+        String n = resolved(file.getFileName());
         if (n.endsWith("_pipeline.toon"))    return "pipeline";
         if (n.endsWith("_connection.toon"))  return "connection";
         if (n.endsWith("_job.toon"))         return "job";
@@ -247,9 +251,14 @@ public final class BundleExporter {
     private static String registryDirOf(Path file) {
         Path dir = file.getParent();
         Path up  = dir == null ? null : dir.getParent();
-        return up != null && up.getFileName() != null && "registry".equals(up.getFileName().toString())
-                ? dir.getFileName().toString()
+        return up != null && up.getFileName() != null && "registry".equals(resolved(up.getFileName()))
+                ? resolved(dir.getFileName())
                 : null;
+    }
+
+    /** One path segment as {@link #kindOf} reads it. */
+    private static String resolved(Path name) {
+        return com.gamma.control.ImportCapabilityGuard.normalizedPath(name.toString());
     }
 
     private static byte[] zip(Map<String, byte[]> entries, Map<String, Object> manifest) throws IOException {

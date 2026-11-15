@@ -577,8 +577,10 @@ dragging** and **Highlight on hover**, and the overlays: **Legend**, **Graph cou
 **Grid**, **Community outlines**, **Group single-link neighbours**, **Community shading** and **Link bundling**. Every
 link kind and Entity Type is named as the legend names it, here, in the node-type filter, the links table and the node
 card. Colour rules by attribute
-are in **⚙ Settings ▸ Display rules**. On a canvas narrower than 1,000 px the legend and Working set start as small
-pills. A layout or overlay the graph is too big for is greyed out and says why (*needs at most 300 nodes (this graph
+are in **⚙ Settings ▸ Display rules**. The legend and Graph counts start as small pills at the top of the canvas, so a
+graph is drawn clear of them; open either with one click, and this browser remembers that choice. Fitting the graph
+(on drawing, *Fit to screen*, or a resize) keeps the pills' band, the status line along the bottom and a margin on
+every side clear, so no node is drawn under a pill or cut by the canvas edge. A layout or overlay the graph is too big for is greyed out and says why (*needs at most 300 nodes (this graph
 has 921)*); reduce the graph first with Clean up, a filter or Collapse. The legend's link-kind chips change the
 drawing only — a hidden kind is still followed by the next expand; to leave it out, set link kinds in **Expand** ▸
 **Links** (that is recorded).

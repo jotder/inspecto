@@ -1,5 +1,6 @@
 package com.gamma.job;
 
+import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.signal.Severity;
 import com.gamma.signal.Signals;
 
@@ -94,14 +95,21 @@ final class SchedulerAuditTask {
     /**
      * The orphan {@code output_store:} finding class on its own — shared by the {@code scheduler_audit}
      * task above and the default-on host audit ({@link JobService#auditOrphanOutputStores()}), so the
-     * two can never drift. Pure: a config scan over the job registry snapshot, no data reads.
+     * two can never drift. A config scan over the job registry snapshot, no data reads.
+     *
+     * <p>A Job runs a Pipeline's chain when its {@code pipeline_config:} resolves, as the runner resolves it, to a
+     * file whose registered id is that Pipeline's ({@link PipelineConfigIds#registeredIdOf}, the rule the save
+     * gate uses too) — never by file name (SCHEDULER-AUDIT-PIPELINE-NAME-1): the shipped {@code 07-steps} samples
+     * name {@code orders_pipeline.toon} for {@code STEP_DEDUP}. Resolved from the calling thread's Space
+     * ({@code SpaceConfigRoot.jobPathBase}), so a caller outside a Job run scopes the Space first.
      */
     static List<String> orphanOutputStoreFindings(List<JobConfig> all, Map<String, String> outputStores) {
+        Path base = SpaceConfigRoot.jobPathBase("pipeline_config");
         Set<String> shaped = new HashSet<>();
         for (JobConfig c : all) {
             if (!c.enabled()) continue;
-            String p = c.params().get("pipeline_config");
-            if (p != null && !p.isBlank()) shaped.add(pipelineNameOf(p));
+            String id = PipelineConfigIds.registeredIdOf(c.params().get("pipeline_config"), base);
+            if (id != null) shaped.add(id.toLowerCase());
         }
         List<String> findings = new ArrayList<>();
         outputStores.forEach((pipeline, store) -> {
@@ -145,14 +153,5 @@ final class SchedulerAuditTask {
                         + pipeline + "' — only one runs at a time, the others record SKIPPED");
         });
         return findings;
-    }
-
-    /** The pipeline name a {@code pipeline_config:} path refers to: the file basename, minus the
-     *  {@code .toon} extension and the conventional {@code _pipeline} suffix, lowercased. */
-    private static String pipelineNameOf(String path) {
-        String base = Path.of(path.trim()).getFileName().toString().toLowerCase();
-        if (base.endsWith(".toon")) base = base.substring(0, base.length() - ".toon".length());
-        if (base.endsWith("_pipeline")) base = base.substring(0, base.length() - "_pipeline".length());
-        return base;
     }
 }

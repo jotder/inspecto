@@ -774,6 +774,12 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     @Input() interaction: GraphViewInteraction | null = null;
     /** The page's multi-selection (node ids): painted with a halo and a thicker outline. A repaint, never a rebuild. */
     @Input() selection: string[] | null = null;
+    /**
+     * The margin, in px, that fitting the graph to the view leaves clear: one value for every side, or top, right, bottom,
+     * left. A host that draws controls over the canvas (Link Analysis) keeps the fitted graph out from under them and off
+     * the edge. Read at construction, like `tooltips`; 0 = the other hosts' edge-to-edge fit.
+     */
+    @Input() fitPadding: number | [number, number, number, number] = 0;
     @Output() nodeClick = new EventEmitter<string>();
     @Output() edgeClick = new EventEmitter<string>();
     /** A double click on a node (only with `interaction.doubleClick`). */
@@ -1441,6 +1447,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             container: this.hostEl.nativeElement,
             data: this.data as unknown as GraphData,
             autoFit: 'view',
+            // Every fit (autoFit, fitView, a resize re-fit) keeps this margin clear.
+            padding: this.fitPadding,
             // No element/layout animation (operator, 2026-09-20): on a few-hundred-node Link Analysis canvas the
             // enter/update tweens cost frames on every re-render (filter, emphasis, layout switch) for no
             // analytical value. Static draw — the same graph, just immediately.

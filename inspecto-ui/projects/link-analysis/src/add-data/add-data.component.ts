@@ -153,7 +153,7 @@ const NONE = '';
         ImportDatasetCardComponent,
         PostgresTableComponent,
     ],
-    host: { class: 'block' },
+    host: { class: 'block min-w-0 max-w-full' },
     templateUrl: './add-data.component.html',
 })
 export class AddDataComponent implements OnInit {

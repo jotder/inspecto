@@ -512,6 +512,7 @@ com.gamma.config.spec.FindingCodes | public static final String ERR_WEBHOOK_CONN
 com.gamma.config.spec.FindingCodes | public static final String ERR_WEBHOOK_CONNECTION_UNKNOWN
 com.gamma.config.spec.FindingCodes | public static final String ERR_WEBHOOK_INVALID
 com.gamma.config.spec.FindingCodes | public static final String WARN_CHAIN_WITHOUT_OUTPUT_STORE
+com.gamma.config.spec.FindingCodes | public static final String WARN_CHAIN_WITHOUT_PIPELINE_JOB
 com.gamma.config.spec.FindingCodes | public static final String WARN_COLLECTOR_CONFIG_INVALID
 com.gamma.config.spec.FindingCodes | public static final String WARN_COLLECTOR_KEY_INERT
 com.gamma.config.spec.FindingCodes | public static final String WARN_DEDUP_WINDOW_UNARMABLE
@@ -1270,6 +1271,7 @@ com.gamma.job.JobService | public JobService(List<JobConfig>, ConsignmentEventBu
 com.gamma.job.JobService | public JobService(List<JobConfig>, ConsignmentEventBus, Scheduler, ReportRunner, String, DbJobRunStore, PipelineStore, String, com.gamma.pipeline.exec.DbProvenanceStore)
 com.gamma.job.JobService | public JobService(List<JobConfig>, ConsignmentEventBus, Scheduler, ReportRunner, String, DbJobRunStore, PipelineStore, String, com.gamma.pipeline.exec.DbProvenanceStore, PlatformServiceRegistry)
 com.gamma.job.JobService | public JobTypeCatalog jobTypeCatalog()
+com.gamma.job.JobService | public List<JobConfig> configSnapshot()
 com.gamma.job.JobService | public List<JobRun> runsFor(String)
 com.gamma.job.JobService | public List<JobTypeDescriptor> jobTypes()
 com.gamma.job.JobService | public List<JobView> jobs()

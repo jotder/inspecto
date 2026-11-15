@@ -520,6 +520,52 @@ class ControlApiBundleImportTest {
                 BundleRoutes.APPLY_ORDER.toString());
     }
 
+    /**
+     * IMPORT-CONNECTION-CASE-1: a hand-made bundle may name a connection in another case. {@code POST /import} judges
+     * it as a connection (ImportCapabilityGuard reads the name lower-cased) and writes it, so the export must strip its
+     * literal secret as it does for {@code x_connection.toon}, and it must not go live, since no loader reads it.
+     */
+    @Test
+    void aConnectionImportedUnderAnotherCaseNeverExportsItsLiteralSecretAndIsNotLive(@TempDir Path root) throws Exception {
+        java.util.List<String> names = java.util.List.of("connections/lower_connection.toon",
+                "connections/upper_connection.TOON", "connections/mixed_CONNECTION.toon", "Registry/connections/reg.toon");
+        java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+        try (java.util.zip.ZipOutputStream z = new java.util.zip.ZipOutputStream(bos)) {
+            z.putNextEntry(new java.util.zip.ZipEntry(BundleExporter.MANIFEST));
+            z.write("kind: datasource\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            for (String n : names) {
+                String id = n.substring(n.lastIndexOf('/') + 1, n.indexOf('.'));
+                z.putNextEntry(new java.util.zip.ZipEntry(n));
+                z.write(("connection:\n  id: " + id + "\n  connector: postgres\n  host: h\n  username: svc\n"
+                        + "  password: hunter2\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+        }
+        try (Ctx c = open(root)) {
+            HttpResponse<String> imp = post(c.port, "/spaces/beta/import", bos.toByteArray());
+            assertEquals(200, imp.statusCode(), imp.body());
+            for (String n : names) assertTrue(Files.exists(root.resolve("beta/config").resolve(n)), n + " landed");
+
+            java.util.Map<String, String> exported = new java.util.TreeMap<>();
+            try (java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(
+                    new java.io.ByteArrayInputStream(getBytes(c.port, "/spaces/beta/export").body()))) {
+                for (var e = in.getNextEntry(); e != null; e = in.getNextEntry())
+                    exported.put(e.getName().toLowerCase(java.util.Locale.ROOT),
+                            new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+            }
+            for (String n : names) {
+                String entry = exported.get(n.toLowerCase(java.util.Locale.ROOT));
+                assertNotNull(entry, n + " is exported: " + exported.keySet());
+                assertFalse(entry.contains("hunter2"), n + ": the literal secret must not travel: " + entry);
+                assertTrue(entry.contains("svc"), n + ": the rest of the connection travels: " + entry);
+            }
+
+            String live = new String(getBytes(c.port, "/spaces/beta/connections").body(), java.nio.charset.StandardCharsets.UTF_8);
+            assertTrue(live.contains("lower_connection"), live);
+            assertFalse(live.contains("upper_connection") || live.contains("mixed_CONNECTION"),
+                    "no loader reads a connection named in another case, so the import does not register it: " + live);
+        }
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────────────────────────────
 
     private java.util.List<String> idList(int port, String path) throws Exception {

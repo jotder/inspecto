@@ -23,6 +23,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -129,6 +130,17 @@ public final class SpacePromotion {
         }
     }
 
+    /** Bundle paths that name, as the filesystem resolves them, a target file or another bundle path spelled otherwise
+     *  (SPACE-PROMOTION-CASE-PAIRING-1): on a case-insensitive filesystem both are one file. */
+    static final class CaseCollisions extends RuntimeException {
+        final Map<String, String> byPath;
+
+        CaseCollisions(Map<String, String> byPath) {
+            super("bundle paths spelled in another case than " + byPath, null, false, false);
+            this.byPath = byPath;
+        }
+    }
+
     /**
      * The change set of promoting {@code bundle} (a whole-Space bundle) into the Space whose config root is
      * {@code configRoot}, with {@code params} bound and {@code SPACE} = {@code spaceId}. Writes nothing.
@@ -154,6 +166,8 @@ public final class SpacePromotion {
         Map<String, byte[]> target = targetFiles(root);
         Set<String> referenced = new TreeSet<>(ImportPaths.referencedEntries(incoming));
         referenced.addAll(ImportPaths.referencedEntries(target));
+        Map<String, String> collisions = caseCollisions(root, incoming.keySet(), target.keySet(), referenced);
+        if (!collisions.isEmpty()) throw new CaseCollisions(collisions);
 
         List<Change> changes = new ArrayList<>();
         List<Excluded> excluded = new ArrayList<>();
@@ -215,6 +229,25 @@ public final class SpacePromotion {
         if (!reshaped.isEmpty()) throw new ReshapedByBinding(reshaped);
         changes.sort((a, b) -> a.path().compareTo(b.path()));
         return new ChangeSet(List.copyOf(changes), List.copyOf(excluded), List.copyOf(used), hash(changes));
+    }
+
+    /**
+     * Each promotable bundle path whose resolved form ({@link #resolved}) is that of a target file or an earlier bundle
+     * path spelled otherwise, with that path. The change set pairs files by spelling, so such a pair would be an add and a
+     * remove of one file on a case-insensitive filesystem (the remove deleting what the add wrote), and two files on a
+     * case-sensitive one: refused rather than paired, since which spelling should win is the operator's call.
+     */
+    private static Map<String, String> caseCollisions(Path root, Set<String> incoming, Set<String> target,
+                                                      Set<String> referenced) {
+        Map<String, String> seen = new HashMap<>();
+        for (String t : target) seen.putIfAbsent(resolved(t), t);
+        Map<String, String> out = new TreeMap<>();
+        for (String p : incoming) {
+            if (refusal(root, p, referenced) != null) continue;
+            String other = seen.putIfAbsent(resolved(p), p);
+            if (other != null && !other.equals(p)) out.put(p, other);
+        }
+        return out;
     }
 
     /** Why {@code path} is not a promotion object, or {@code null} when it is. */
@@ -374,6 +407,22 @@ public final class SpacePromotion {
     static boolean isConnection(String path) {
         String p = resolved(path);
         return p.endsWith("_connection.toon") || p.startsWith("registry/connections/");
+    }
+
+    /**
+     * Whether a loader reads {@code path} as a connection, so writing or removing it changes the live registry. The loaders
+     * match a name as spelled ({@code ServiceBootstrap.resolveBySuffix}), so {@code x_connection.TOON} is judged as a
+     * connection ({@link #isConnection}) but never goes live (SPACE-PROMOTION-CASE-PAIRING-1).
+     */
+    static boolean liveConnection(String path) {
+        return path.endsWith("_connection.toon") || path.startsWith("registry/connections/");
+    }
+
+    /** Whether a loader reads {@code path} as a Job ({@code *_job.toon} as spelled, outside {@code registry/}), so
+     *  removing it stops one. {@code registry/} is judged as the loader judges it ({@code ServiceBootstrap.resolveBySuffix},
+     *  {@code Path.startsWith}): in any case on Windows, as spelled on a case-sensitive filesystem. */
+    static boolean liveJob(String path) {
+        return path.endsWith("_job.toon") && !java.nio.file.Path.of(path).startsWith("registry");
     }
 
     /** Whether {@code path} is a {@code *_pipeline.toon}, read as {@link #resolved} reads it. */

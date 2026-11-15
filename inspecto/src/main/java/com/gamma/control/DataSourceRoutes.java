@@ -347,6 +347,8 @@ final class DataSourceRoutes implements RouteModule {
             // pipeline could register before the connection it binds — a 422 that says "unknown connection" about
             // a connection sitting in the very same bundle, decided by zip entry order.
             for (String rel : written) {
+                // as spelled, as the loader reads it (ServiceBootstrap.resolveBySuffix): an x_connection.TOON is judged as
+                // a connection (ImportCapabilityGuard) but never live, so it is not registered (IMPORT-CONNECTION-CASE-1)
                 if (!rel.endsWith("_connection.toon")) continue;
                 ConnectionProfile profile = ConnectionProfile.load(config.resolve(rel));
                 connectionsBefore.putIfAbsent(profile.id(), HostContext.of(api).service().connection(profile.id()));

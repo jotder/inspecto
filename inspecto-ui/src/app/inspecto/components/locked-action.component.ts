@@ -21,7 +21,22 @@ let nextId = 0;
     standalone: true,
     imports: [MatButtonModule, MatIconModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
-    host: { class: 'inline-flex flex-col items-start gap-1' },
+    host: { class: 'inline-flex max-w-full flex-col items-start gap-1' },
+    // A long action name wraps inside the width it is given instead of running off a phone (LA-PHONE-OVERFLOW-1): the
+    // shared button style keeps a label on one line at a fixed 40 px height (`max-height`, lifted here; its padding is
+    // `!important`, so the label's own line box gives the height).
+    styles: `
+        button {
+            max-width: 100%;
+            height: auto;
+            min-height: var(--mat-button-outlined-container-height, 40px);
+            max-height: none;
+            text-align: start;
+        }
+        button ::ng-deep .mdc-button__label {
+            white-space: normal;
+        }
+    `,
     template: `
         <button
             mat-stroked-button

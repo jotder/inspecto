@@ -444,6 +444,11 @@ export const TOOLBOX_NARROW_PX = 1300;
  * in the console beside its side nav as well as in la-app (one full row with a selection needs ~1,330 px).
  */
 export const CANVAS_TOOLS_FOLD_PX = 1350;
+/**
+ * What a fit leaves clear on the canvas (top, right, bottom, left px; LA-OVERLAYS-HIDE-GRAPH-1): the top band holds the
+ * Legend and Graph counts pills, the bottom one the render-status line, and every side keeps a node off the edge.
+ */
+export const CANVAS_FIT_PADDING: [number, number, number, number] = [44, 24, 28, 24];
 /** The narrowest canvas zone worth keeping beside the docks; below it a dock collapses to its rail. */
 export const CANVAS_MIN_PX = 320;
 const TOOLBOX_OPEN_KEY = 'inspecto.la.toolboxOpen';
@@ -841,12 +846,12 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     private readonly graphRuns = inject(GraphRunsService);
     /**
      * Canvas overlays — each minimises to a pill so the graph gets the space. The user's own choice in this browser
-     * wins; otherwise the first measurement of the canvas decides ({@link fitOverlaysToWidth}).
+     * wins; otherwise they start as their pills ({@link overlayStartsOpen}).
      */
-    readonly legendOpen = signal(storedOverlayOpen('legend') ?? true);
-    readonly workingSetOpen = signal(storedOverlayOpen('workingSet') ?? true);
-    /** The canvas zone's last measured width; 0 = not measured yet (no layout, or jsdom), which counts as wide. */
-    private canvasWidth = 0;
+    readonly legendOpen = signal(overlayStartsOpen(storedOverlayOpen('legend')));
+    readonly workingSetOpen = signal(overlayStartsOpen(storedOverlayOpen('workingSet')));
+    /** What fitting the graph leaves clear: the overlays' pills and the canvas edge ({@link CANVAS_FIT_PADDING}). */
+    readonly fitPadding = CANVAS_FIT_PADDING;
     /** What the loaded saved view states about the overlays (`undefined` = it does not say). */
     private overlaysStated: { legend?: boolean; workingSet?: boolean } = {};
     /**
@@ -857,11 +862,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     private readonly watchCanvasWidth = afterNextRender(() => {
         const zone = this.canvasZone?.nativeElement;
         if (!zone || typeof ResizeObserver === 'undefined') return;
-        const ro = new ResizeObserver((entries) => {
-            const width = entries[0]?.contentRect.width ?? 0;
-            this.fitOverlaysToWidth(width);
-            this.fitDocksToWidth(width);
-        });
+        const ro = new ResizeObserver((entries) => this.fitDocksToWidth(entries[0]?.contentRect.width ?? 0));
         ro.observe(zone);
         this.destroyRef.onDestroy(() => ro.disconnect());
     });
@@ -880,27 +881,13 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     }
 
     /**
-     * LA-ONBOARD-FIXES-1 (F-11): on a narrow canvas (a laptop's ~800 px) the open legend and Working set covered most
-     * of the graph, so below {@link OVERLAY_COLLAPSE_BELOW_PX} they START as their pills. Decided on the FIRST
-     * measurement (a later resize never collapses what is open) and again when a saved view is loaded.
-     */
-    fitOverlaysToWidth(zoneWidth: number): void {
-        if (zoneWidth <= 0) return;
-        const first = this.canvasWidth === 0;
-        this.canvasWidth = zoneWidth;
-        if (first) this.applyOverlayStart();
-    }
-
-    /**
-     * The overlays' starting state: a saved view that states `false` keeps that one collapsed; otherwise the choice this
-     * browser remembers, else the width rule. A view's `true` (whoever saved it, on whatever screen) never forces a box
-     * open over a narrow canvas.
+     * The overlays' state when a saved view is loaded: a view that states `false` keeps that one collapsed; otherwise the
+     * choice this browser remembers, else the pills. A view's `true` (whoever saved it, on whatever screen) never forces a
+     * box open over the graph (LA-OVERLAYS-HIDE-GRAPH-1).
      */
     private applyOverlayStart(): void {
         const start = (which: CanvasOverlay): boolean =>
-            this.overlaysStated[which] === false
-                ? false
-                : overlayStartsOpen(storedOverlayOpen(which), this.canvasWidth || Number.POSITIVE_INFINITY);
+            this.overlaysStated[which] === false ? false : overlayStartsOpen(storedOverlayOpen(which));
         this.legendOpen.set(start('legend'));
         this.workingSetOpen.set(start('workingSet'));
     }
@@ -3663,7 +3650,11 @@ Its prior copies stay in its version history.`,
     private readonly rememberOpen = effect(() => {
         const inv = this.investigation;
         const label = inv.active() && !inv.log() ? '' : this.openWorkLabel();
-        untracked(() => rememberOpenWork(label ? { space: this.pageSpace, actor: this.actor, label } : null));
+        // by name for the toast; looked up by pageSpace, so a switch in flight never renames the record
+        const spaceName = this.spaces.availableSpaces().find((s) => s.id === this.pageSpace)?.displayName || undefined;
+        untracked(() =>
+            rememberOpenWork(label ? { space: this.pageSpace, spaceName, actor: this.actor, label } : null),
+        );
     });
 
     /**

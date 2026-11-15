@@ -639,12 +639,59 @@ finding per Step, anchored at `steps[i].<kind>` or `processing.<kind>`, naming t
   already refused that save (field `output_store`, no code, Step not named; it also covers `webhook:` and
   `excel:`), so an active save now carries both findings. What is new: the Step is named, the code is
   stable, and an inactive draft is told at the save rather than at activation.
-- ⚠ **Not covered:** a chain WITH an `output_store:` but no `type: pipeline` Job that runs it saves clean
-  and also never runs; the Job is a separate config, and refusing a Pipeline save for a Job not yet
-  written would make the order of authoring matter. Open as `PIPELINE-CHAIN-NO-JOB-1` (a warning, not a refusal).
+- **A chain WITH a store but no Job that runs it is warned** (2026-11-15, `PIPELINE-CHAIN-NO-JOB-1`):
+  `ConfigRoutes.chainWithoutJobFindings`, run by `SaveGate`, reports one `WARN_CHAIN_WITHOUT_PIPELINE_JOB`
+  at `output_store` when the Pipeline has the same chain, a non-blank `output_store:`, and **no enabled
+  `type: pipeline` Job whose `pipeline_config:` names this Pipeline's file**. The message names the fix:
+  add a `type: pipeline` Job that runs `<pipeline>` (`pipeline_config:` its `*_pipeline.toon`,
+  `on_pipeline: <pipeline>`), or enable the one you have. Decisions:
+  - **Always a WARNING, never a refusal, active or not.** The Job is a separate config; refusing would make
+    the order of authoring matter. A draft gets it too: that is when the author needs to hear a Job is owed.
+  - **A Job is matched by the identity of the file it names,** not the file name: its `pipeline_config:`
+    resolves exactly as `PipelineJobRunner` resolves it: from the run's own base (`SpaceConfigRoot.jobPathBase`,
+    the config read root) through `PathJail.requireJobPathUnderAny` over `PathJail.allowedRoots()`, which also
+    refuses a path outside the jail and a `*.secrets` directory. The file's registered id (`id:`, else `name:`
+    lower-cased) must be this Pipeline's. One helper holds this rule, `PipelineConfigIds.registeredIdOf`
+    in the engine, so the save gate and the run-time audit below cannot drift. The shipped samples name
+    `orders_pipeline.toon` for `STEP_DEDUP`, so a file-name rule would warn on every one of them. A Job's
+    `pipeline:` names an authored Pipeline and never lifts this chain, so it does not count; neither does a
+    disabled Job, nor one whose path the runner would refuse (that file is never read) or whose file is missing.
+  - ⚠ **Known limits — two cases the warning misses.** (1) A Job held by Space evolution (SE-1b) still counts
+    as enabled, though a held Job does not run. (2) An enabled Job with no `cron:`, `on_pipeline:` or
+    `on_signal:` silences the warning, though nothing ever starts it (only a manual run does).
+  - **Doors:** every `SaveGate.check` that knows the Space's Jobs (`Referents.MUST_EXIST` with a live
+    `ApiContext`): `/config/write`, the graph save, settings, rename, history restore, the onboarding and
+    Dataset-feed writes, and `/validate` (the Pipeline's validate route, so the editor shows it before a
+    save). **Not** a pipeline bundle import (`MAY_ARRIVE_LATER`: its Jobs may arrive after it, like its
+    Connections) and not a Space Template seed (`TemplateSeedGate`, no hosted Space yet).
+  - **Saving or deleting a Job does not re-judge Pipelines:** the warning lives on the Pipeline's save. The
+    run-time side already exists: `JobService.auditOrphanOutputStores` (default on, run on a Job upsert or
+    delete and on a registry rebuild) signals `maintenance.scheduler.findings` for an active store with no
+    enabled `pipeline_config:` Job.
+  - That run-time audit (`SchedulerAuditTask.orphanOutputStoreFindings`, shared with the on-demand
+    `scheduler_audit` task) matches a Job by the **same identity rule** (2026-11-15,
+    `SCHEDULER-AUDIT-PIPELINE-NAME-1`; it took the `pipeline_config:` basename less `_pipeline.toon` until
+    then, and so reported every `07-steps` sample as an orphan). It resolves from the Space's own base:
+    `JobService.auditOrphanOutputStores` binds the service's Space for the scan, as a Job run does, because a
+    registry rebuild calls it from a thread bound to no Space. A Job whose file is missing, unreadable or
+    outside the jail runs nothing, so it covers nothing. Pinned by `JobServiceOrphanAuditTest` and
+    `MaintenanceLibraryTest.schedulerAuditFlagsAnOutputStoreNoPipelineConfigJobRuns`.
+  - ⚠ The `webhook:` / `excel:` blocks also run only at rest but are not judged by this warning (only the
+    chain is, as for the store-less finding above).
+  - The default Space's `lookup_step` Pipeline (`spaces/default/config/lookup_step/`) had a chain and a
+    store and no Job, so it got this warning when saved: a true finding. Since 2026-11-15
+    (`DEFAULT-SPACE-LOOKUP-STEP-NO-JOB-1`) it has `jobs/lookup_step_rollup_job.toon`, shaped like its five
+    siblings', so every chained Pipeline of the default Space has the Job that runs it. Pinned by
+    `ControlApiChainWithoutJobTest` (the default Space's Jobs hosted, each chained Pipeline at `/validate`)
+    and `DemoCorpusIngestTest` (the committed Job runs the lookup over the landed sample).
 
 Pinned by `ControlApiChainOutputStoreArmingTest` (graph save active / inactive, the activation patch, a
-chain with a store, the slot alone, a legacy block at `/validate`).
+chain with a store, the slot alone, a legacy block at `/validate`) and `ControlApiChainWithoutJobTest`
+(no Job warns; a disabled Job still warns; an enabled Job naming the file silences it although the file
+name differs from the Pipeline's; an enabled Job naming ANOTHER Pipeline's file leaves the warning; a
+relative `pipeline_config:` resolves from the config read root; a Job whose path lies outside the jail
+leaves the warning; a chain-less Pipeline and a store-less chain get no such warning; `/validate` on an
+inactive legacy block warns; every shipped `pipeline_config:` Job resolves to its Pipeline by identity).
 
 ### Collector checks — throttle, breaker, archive (2026-09-24)
 

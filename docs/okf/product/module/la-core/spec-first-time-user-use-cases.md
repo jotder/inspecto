@@ -384,7 +384,8 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
 - **As built: done.** **Find something interesting** sits at the top of Toolbox → **Analysis**: **Who is busiest**,
   **Which groups stick together**, **How does A reach B**, each row with **Show on graph**, **Start from these**, **Add
   to a list**. F-10 fixed (no Investigation hint on Basic); F-11 fixed (legend and Working set start as pills below a
-  1000 px canvas).
+  1000 px canvas); since 2026-11-15 they start as pills on every canvas, and every fit keeps clear of them
+  (`LA-OVERLAYS-HIDE-GRAPH-1`).
 
 ### UC-13 Keep and share what was found
 

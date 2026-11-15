@@ -369,6 +369,24 @@ class ControlApiSpaceTemplateSeedGateTest {
         }
     }
 
+    /** IMPORT-CONNECTION-CASE-1: a Connection file named in another case is judged too, as the import judges its kind. */
+    @Test
+    void aTemplateConnectionNamedInAnotherCaseIsStillValidated(@TempDir Path root) throws Exception {
+        seedInvokeApiTemplate(root);
+        Path conn = root.resolve("_templates/actions/config/connections/hook_connection.toon");
+        try (Ctx c = open(root)) {
+            for (String name : List.of("odd_connection.TOON", "odd_CONNECTION.toon")) {
+                Path odd = conn.resolveSibling(name);
+                Files.writeString(odd, Files.readString(conn).replace("id: hook", "id: odd").replace("tickets.test", "2130706433"));
+                HttpResponse<String> r = send(c, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"actions\"}", ADMIN);
+                assertEquals(422, r.statusCode(), name + ": " + r.body());
+                assertTrue(r.body().contains("template connection '" + name + "' is refused"), r.body());
+                assertFalse(Files.exists(root.resolve("acme")), "a refused template leaves no Space directory");
+                Files.delete(odd);
+            }
+        }
+    }
+
     @Test
     void theRecoveryCreateStillAsksTheInvokeApiCapability(@TempDir Path root) throws Exception {
         seedInvokeApiTemplate(root);

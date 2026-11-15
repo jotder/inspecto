@@ -47,6 +47,19 @@ describe('LockedActionComponent', () => {
         await expectNoA11yViolations(el);
     });
 
+    it('a long action name wraps inside its container instead of widening a phone page (LA-PHONE-OVERFLOW-1)', () => {
+        const fixture = create();
+        const el = fixture.nativeElement as HTMLElement;
+        const host = el.querySelector('inspecto-locked-action') as HTMLElement;
+        const button = el.querySelector('[data-testid="locked-action"]') as HTMLButtonElement;
+        expect(host.classList).toContain('max-w-full');
+        // the shared button style pins one line at a fixed height (gamma `.mdc-button__label { white-space: nowrap }`)
+        const label = button.querySelector('.mdc-button__label') as HTMLElement;
+        expect(getComputedStyle(label).whiteSpace).toBe('normal');
+        expect(getComputedStyle(button).maxWidth).toBe('100%');
+        expect(getComputedStyle(button).height).toBe('auto');
+    });
+
     it('gives every instance its own reason id', () => {
         const fixture = create();
         const first = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="locked-reason"]')!.id;

@@ -152,6 +152,47 @@ class DemoCorpusIngestTest {
         assertEquals(0, count(db, "REGION IS NULL"), "the mapped REGION column is written, not renamed");
     }
 
+    /**
+     * The default Space's {@code lookup_step} (DEFAULT-SPACE-LOOKUP-STEP-NO-JOB-1): its sample lands, then its
+     * committed {@code lookup_step_rollup} Job, run as the Space runs it (its {@code pipeline_config:} relative to
+     * the Space config root, its data under the Space), lifts the {@code steps: - lookup:} chain and writes
+     * {@code lookup_step_rollup}: 6 rows, {@code STATUS_LABEL} Open / Done / Void, the unmapped RETURNED passed
+     * through, {@code STATUS} untouched.
+     */
+    @Test
+    void defaultLookupStepRollupJobRunsTheLookupChainOverTheLandedStore(@TempDir Path dir) throws Exception {
+        String space = "demo-corpus-lookup";
+        PipelineConfig cfg = stage(dir, "default", "config/lookup_step/lookup_step_pipeline.toon");
+        seed(cfg, "default", "lookup_step/ORDERS_20260701.csv");
+        CollectorProcessor.run(cfg);
+
+        com.gamma.job.JobConfig job = com.gamma.job.JobConfig.load(
+                REPO.resolve("spaces/default/config/jobs/lookup_step_rollup_job.toon").toString());
+        String priorRoots = System.getProperty("assist.safety.roots");
+        System.setProperty("assist.safety.roots", dir.toString());   // the Space's jail
+        SpaceConfigRoot.register(space, dir.resolve("config"));
+        SpaceConfigRoot.registerDataRoot(space, dir.resolve("data"));
+        MDC.put(EventLog.SPACE_MDC_KEY, space);
+        com.gamma.job.JobResult res;
+        try {
+            res = new com.gamma.job.PipelineJobRunner(job, new com.gamma.etl.ConsignmentEventBus(), null,
+                    dir.resolve("data").toString(), dir.resolve("audit").toString()).run();
+        } finally {
+            MDC.remove(EventLog.SPACE_MDC_KEY);
+            SpaceConfigRoot.forget(space);
+            if (priorRoots != null) System.setProperty("assist.safety.roots", priorRoots);
+            else System.clearProperty("assist.safety.roots");
+        }
+
+        assertTrue(res.success(), res.message());
+        Path out = dir.resolve("data/lookup_step_rollup");
+        assertEquals(6, count(out, "true"), "a lookup changes values, never row counts");
+        assertEquals(2, count(out, "STATUS = 'NEW' AND STATUS_LABEL = 'Open'"), "NEW → Open");
+        assertEquals(2, count(out, "STATUS = 'SHIPPED' AND STATUS_LABEL = 'Done'"), "SHIPPED → Done");
+        assertEquals(1, count(out, "STATUS = 'CANCELLED' AND STATUS_LABEL = 'Void'"), "CANCELLED → Void");
+        assertEquals(1, count(out, "STATUS = 'RETURNED' AND STATUS_LABEL = 'RETURNED'"), "unmapped passes through");
+    }
+
     // ── harness ─────────────────────────────────────────────────────────────────────────────────
 
     private static PipelineConfig stage(Path dir, String pipeline) throws Exception {
