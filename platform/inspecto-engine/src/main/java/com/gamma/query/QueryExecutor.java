@@ -206,9 +206,20 @@ public final class QueryExecutor {
         return run(new Request(datasetName, relationSql, null, 0, 0, List.of(), List.of()), planner, policy, null);
     }
 
-    /** How to render each relation {@link #repinnable} returned, for as long as its caller holds the string. */
+    /** How many registered relations are kept: the most recently registered win. */
+    static final int MAX_RENDERERS = 1024;
+
+    /**
+     * How to render each relation {@link #repinnable} returned, held strongly and capped at {@link #MAX_RENDERERS}, least
+     * recently registered dropped first. Not weakly: a caller that wraps the relation in more SQL keeps only the wrapper,
+     * so a weak entry for the embedded relation would vanish at the next GC and take the retry with it.
+     */
     private static final Map<String, java.util.function.Supplier<String>> RENDERERS =
-            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+            java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>(64, 0.75f, false) {
+                @Override protected boolean removeEldestEntry(Map.Entry<String, java.util.function.Supplier<String>> eldest) {
+                    return size() > MAX_RENDERERS;
+                }
+            });
 
     /** Test seam: runs in every attempt once the relation is registered and before the statement scans it. */
     static volatile Runnable beforeScan = () -> { };
@@ -216,13 +227,57 @@ public final class QueryExecutor {
     /**
      * {@code render}'s relation, remembered so that {@link #run} can render it again when a snapshot swap removed a file
      * it pinned (SNAPSHOT-SWAP-UNLOCKED-READERS-1). For the builders of a relation over pinned store files
-     * ({@code DatasetRelation}); a relation from anywhere else, or one a caller has wrapped in more SQL, is not
-     * re-rendered and fails across a swap as before.
+     * ({@code DatasetRelation}). A caller may wrap the relation in more SQL (a UNION of two Datasets, a filtered
+     * sub-select): the retry renders every registered relation the wrapper embeds (SNAPSHOT-SWAP-READER-RESIDUALS-1).
+     *
+     * <p>Two renders of an identical relation share one entry, and the newest render is the one kept: an earlier
+     * caller's ingredients (its Space, its view store) may be gone by the time the relation is rendered again.
      */
     public static String repinnable(java.util.function.Supplier<String> render) {
         String sql = render.get();
-        if (sql != null) RENDERERS.put(sql, render);
+        if (sql == null) return null;
+        synchronized (RENDERERS) {
+            RENDERERS.remove(sql);   // re-inserted as the newest, so a busy relation is never the one dropped
+            RENDERERS.put(sql, render);
+        }
         return sql;
+    }
+
+    /**
+     * {@code relationSql} rendered again on this thread, which pins its stores' files afresh (inside a
+     * {@link SnapshotSwapLock#hold()} block they stay held until the block ends), or unchanged when it embeds no relation
+     * {@link #repinnable} registered or cannot be rendered again (its Dataset changed or went away): the reader then
+     * runs what it was given, as before. For a reader that runs a relation rendered earlier, on another thread (a Link
+     * Analysis index build).
+     */
+    public static String rerendered(String relationSql) {
+        if (relationSql == null) return null;
+        try {
+            String again = rendered(relationSql);
+            return again == null ? relationSql : again;
+        } catch (RuntimeException unusable) {
+            return relationSql;
+        }
+    }
+
+    /**
+     * {@code relationSql} rendered again: by its own registration, else with every registered relation it embeds
+     * rendered again in place (longest first, so a relation inside another is not split); {@code null} when it embeds
+     * none.
+     */
+    private static String rendered(String relationSql) {
+        java.util.function.Supplier<String> own = RENDERERS.get(relationSql);
+        if (own != null) return own.get();
+        List<Map.Entry<String, java.util.function.Supplier<String>>> parts = new ArrayList<>();
+        synchronized (RENDERERS) {
+            for (Map.Entry<String, java.util.function.Supplier<String>> e : RENDERERS.entrySet())
+                if (e.getKey() != null && relationSql.contains(e.getKey())) parts.add(Map.entry(e.getKey(), e.getValue()));
+        }
+        if (parts.isEmpty()) return null;
+        parts.sort((a, b) -> Integer.compare(b.getKey().length(), a.getKey().length()));
+        String out = relationSql;
+        for (Map.Entry<String, java.util.function.Supplier<String>> p : parts) out = out.replace(p.getKey(), p.getValue().get());
+        return out;
     }
 
     /**
@@ -235,16 +290,16 @@ public final class QueryExecutor {
         try {
             return attempt(req, planner, policy, timeZone);
         } catch (SQLException lost) {
-            java.util.function.Supplier<String> render = req.relationSql() == null ? null : RENDERERS.get(req.relationSql());
-            if (render == null || !SnapshotSwapLock.lostPin(lost)) throw lost;
+            if (req.relationSql() == null || !SnapshotSwapLock.lostPin(lost)) throw lost;
             try (SnapshotSwapLock.Held held = SnapshotSwapLock.hold()) {
                 String again;
                 try {
-                    again = render.get();
+                    again = rendered(req.relationSql());
                 } catch (RuntimeException unusable) {
                     lost.addSuppressed(unusable);
                     throw lost;
                 }
+                if (again == null) throw lost;
                 return attempt(new Request(req.datasetName(), again, req.sql(), req.limit(), req.offset(),
                         req.projection(), req.sort(), req.binds()), planner, policy, timeZone);
             }

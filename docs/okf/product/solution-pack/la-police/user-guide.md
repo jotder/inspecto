@@ -198,4 +198,4 @@ and `tools/seed-la-police.test.mjs`.
 - [ ] Advanced tier, on a Demo Auth build: the Alert Rule is armed and raises one WARNING with value 12; the seed runs
       with nothing failed; the outsider cannot open `burglary-series`; only `police.sio` can approve the held expand.
 - [ ] Basic: the log says "Not arming alert rule 'police_repeat_seller_serial_matches'", `police_serial_match_alerts`
-      finds no rule breached, and nothing errors.
+      reports no new breach, and nothing errors.

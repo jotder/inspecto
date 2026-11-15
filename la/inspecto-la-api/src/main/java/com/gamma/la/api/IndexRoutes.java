@@ -137,7 +137,23 @@ public final class IndexRoutes implements RouteModule {
     private static IndexBuildService newService(Path writeRoot) {
         Function<IndexBuilder.Request, IndexBuilder.Result> b = builderOverride != null ? builderOverride : IndexBuilder::build;
         return new IndexBuildService(indexRoot(writeRoot), installLimits(), System::currentTimeMillis, IndexRoutes::auditTerminal,
-                IndexBuildService.WORKER_KEEPALIVE_MS, b, IndexRoutes::installHost, IngestActivity::active);
+                IndexBuildService.WORKER_KEEPALIVE_MS, held(b), IndexRoutes::installHost, IngestActivity::active);
+    }
+
+    /**
+     * {@code build} over its relation rendered again on the build thread, with the stores it pins held until the build
+     * has read them (SNAPSHOT-SWAP-READER-RESIDUALS-1). The relation was rendered when the build was submitted; a snapshot
+     * swap while the build waited (queued, or behind ingest) or ran would remove the files it pinned. A COMPACT reads
+     * only the index, so it holds nothing; with no provider bound there is nothing to render again.
+     */
+    private static Function<IndexBuilder.Request, IndexBuilder.Result> held(Function<IndexBuilder.Request, IndexBuilder.Result> build) {
+        return r -> {
+            Optional<DatasetProvider> provider = DatasetProviders.active();
+            if (r.mode() == IndexBuilder.Mode.COMPACT || provider.isEmpty()) return build.apply(r);
+            return provider.get().readHeld(r.relationSql(), sql -> build.apply(new IndexBuilder.Request(r.datasetId(),
+                    r.mapping(), sql, r.store(), r.baseFingerprint(), r.options(), r.inputFiles(), r.mode(), r.deltaSql(),
+                    r.readRoots(), r.maxDeltas(), r.srcType(), r.dstType())));
+        };
     }
 
     /** The build workers and waiting line in force: the install-wide {@code index.threads} / {@code index.queue}. */

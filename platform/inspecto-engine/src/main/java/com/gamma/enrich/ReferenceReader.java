@@ -3,6 +3,7 @@ package com.gamma.enrich;
 import com.gamma.api.PublicApi;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.ReferenceBinding;
+import com.gamma.job.SnapshotSwapLock;
 import com.gamma.sql.SqlViews;
 
 import java.util.List;
@@ -50,6 +51,10 @@ public final class ReferenceReader {
                     + "' but that pipeline does not declare 'produces: reference'");
         String format = (p.output() == null || p.output().format() == null)
                 ? "PARQUET" : p.output().format().toUpperCase(Locale.ROOT);
+        // The glob is expanded when the statement binds and its files opened when it scans: a reader inside a
+        // SnapshotSwapLock.hold() block keeps the store from a compaction's hide and reveal until the block ends; any
+        // other reader waits here for a compaction under way (SNAPSHOT-SWAP-READER-RESIDUALS-1).
+        SnapshotSwapLock.pin(p.dirs().database()).close();
         String glob = p.dirs().database() + "/**/*." + SqlViews.ext(format);
         String reader = SqlViews.reader(format, glob, true);
         // Reference Phase-2 P1/P2: an `upsert`/`scd2` reference store is append-only (a version row per

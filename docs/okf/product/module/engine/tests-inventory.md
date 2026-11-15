@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-404 test class(es): 404 unit, 0 real-HTTP control-plane, 0 IT.
+405 test class(es): 405 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -82,6 +82,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `EnrichmentEngineTest` | `com.gamma.enrich` | unit | `platform/inspecto-engine/src/test/java/com/gamma/enrich/EnrichmentEngineTest.java` | Tests for the Stage-2 {@link EnrichmentEngine} core — reads a Stage-1-style |
 | `EnrichmentFilterQuotingTest` | `com.gamma.enrich` | unit | `platform/inspecto-engine/src/test/java/com/gamma/enrich/EnrichmentFilterQuotingTest.java` | {@link EnrichmentEngine#buildFilter}: the partition-filter key is an identifier quoted through |
 | `EnrichmentKeyCoverageContractTest` | `com.gamma.enrich` | unit | `platform/inspecto-engine/src/test/java/com/gamma/enrich/EnrichmentKeyCoverageContractTest.java` | <b>The {@code enrichment} config type's parser census</b> — the fourth type to get one |
+| `EnrichmentSwapLockTest` | `com.gamma.enrich` | unit | `platform/inspecto-engine/src/test/java/com/gamma/enrich/EnrichmentSwapLockTest.java` | SNAPSHOT-SWAP-READER-RESIDUALS-1: an enrichment reads a by-name Reference Dataset by GLOB, never through a pinned file |
 | `EnrichmentTransformSandboxTest` | `com.gamma.enrich` | unit | `platform/inspecto-engine/src/test/java/com/gamma/enrich/EnrichmentTransformSandboxTest.java` | SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1 — an authored {@code transformSql} is a single read-only query over |
 | `ReferenceReaderParseTest` | `com.gamma.enrich` | unit | `platform/inspecto-engine/src/test/java/com/gamma/enrich/ReferenceReaderParseTest.java` | {@link ReferenceReader#parse} — the join node's {@code reference} string → the shared |
 | `ReferenceScd2AsOfTest` | `com.gamma.enrich` | unit | `platform/inspecto-engine/src/test/java/com/gamma/enrich/ReferenceScd2AsOfTest.java` | Reference Phase-2 P2 read-side verify: an {@code scd2} reference store keeps its superseded versions, |

@@ -1,6 +1,7 @@
 package com.gamma.exchange;
 
 import com.gamma.exchange.ExchangeSnapshots.SnapshotMeta;
+import com.gamma.job.SnapshotSwapLock;
 import com.gamma.mask.EvidenceMasker;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
@@ -40,6 +41,10 @@ public final class ExchangeSnapshotWriter {
 
     private static final System.Logger LOG = System.getLogger(ExchangeSnapshotWriter.class.getName());
 
+    /** Test seam: runs once the relation has pinned the owner's files and before the COPY scans them; production never
+     *  reassigns it (SNAPSHOT-SWAP-READER-RESIDUALS-1). */
+    static volatile Runnable afterPin = () -> { };
+
     private ExchangeSnapshotWriter() {}
 
     /**
@@ -63,33 +68,40 @@ public final class ExchangeSnapshotWriter {
         Map<String, Object> dataset = new ComponentStore(ownerRegistry).get("dataset", item)
                 .map(ComponentRegistry.Component::content)
                 .orElseThrow(() -> new IllegalArgumentException("no dataset '" + item + "' to snapshot"));
-        // The owner's own dataset, resolved against the owner's local data (SharedRefResolver is not involved).
-        String relationSql = DatasetRelation.relationSql(dataset, ownerDataRoot, new ViewStore(ownerViews));
-
         Path itemDir = ExchangeSnapshots.itemDir(sharedDir, owner, item);
-        // Collision-free across JVMs sharing the store (EXCHANGE-SNAPSHOT-MULTIPOD-1): millis keeps time order,
-        // the random suffix separates same-millisecond publishes; createDirectory fails rather than share a dir.
-        Files.createDirectories(itemDir);
-        String version = ExchangeSnapshots.newVersion(nowMillis);
-        Path verDir = itemDir.resolve(version);
-        Files.createDirectory(verDir);
-        Path tmp = verDir.resolve("snapshot-" + java.util.UUID.randomUUID() + ".parquet.tmp");
-        Path finalFile = verDir.resolve("snapshot.parquet");
-
+        String version;
+        Path tmp, finalFile;
         long rows;
         List<Map<String, Object>> columns;
-        // No Space context: memory-capped, spills under java.io.tmpdir (never the CWD).
-        List<Path> roots = new ArrayList<>(DatasetRelation.readRoots(dataset, ownerDataRoot));
-        roots.add(verDir);
-        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(null, roots);
-             Statement st = conn.createStatement()) {
-            st.execute("CREATE VIEW __src AS " + relationSql);
-            st.execute("COPY (SELECT * FROM __src) TO " + SqlIdent.pathStr(tmp) + " (FORMAT PARQUET)");
-            try (ResultSet rs = st.executeQuery("SELECT count(*) FROM " + SqlViews.parquetFile(tmp))) {
-                rs.next();
-                rows = rs.getLong(1);
+        // The relation pins the owner's files, which the COPY below scans: the owner's stores stay held against a snapshot
+        // swap until the COPY is done, as a materialize holds its source (SNAPSHOT-SWAP-READER-RESIDUALS-1).
+        try (SnapshotSwapLock.Held reading = SnapshotSwapLock.hold()) {
+            // The owner's own dataset, resolved against the owner's local data (SharedRefResolver is not involved).
+            String relationSql = DatasetRelation.relationSql(dataset, ownerDataRoot, new ViewStore(ownerViews));
+
+            // Collision-free across JVMs sharing the store (EXCHANGE-SNAPSHOT-MULTIPOD-1): millis keeps time order,
+            // the random suffix separates same-millisecond publishes; createDirectory fails rather than share a dir.
+            Files.createDirectories(itemDir);
+            version = ExchangeSnapshots.newVersion(nowMillis);
+            Path verDir = itemDir.resolve(version);
+            Files.createDirectory(verDir);
+            tmp = verDir.resolve("snapshot-" + java.util.UUID.randomUUID() + ".parquet.tmp");
+            finalFile = verDir.resolve("snapshot.parquet");
+
+            // No Space context: memory-capped, spills under java.io.tmpdir (never the CWD).
+            List<Path> roots = new ArrayList<>(DatasetRelation.readRoots(dataset, ownerDataRoot));
+            roots.add(verDir);
+            afterPin.run();
+            try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(null, roots);
+                 Statement st = conn.createStatement()) {
+                st.execute("CREATE VIEW __src AS " + relationSql);
+                st.execute("COPY (SELECT * FROM __src) TO " + SqlIdent.pathStr(tmp) + " (FORMAT PARQUET)");
+                try (ResultSet rs = st.executeQuery("SELECT count(*) FROM " + SqlViews.parquetFile(tmp))) {
+                    rs.next();
+                    rows = rs.getLong(1);
+                }
+                columns = describe(st, tmp);
             }
-            columns = describe(st, tmp);
         }
         classify(columns, dataset, item, ownerRegistry, ownerViews);
         Files.move(tmp, finalFile, StandardCopyOption.ATOMIC_MOVE);

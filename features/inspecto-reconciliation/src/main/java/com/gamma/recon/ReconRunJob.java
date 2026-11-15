@@ -4,6 +4,7 @@ import com.gamma.job.Job;
 import com.gamma.job.JobConfig;
 import com.gamma.job.JobContext;
 import com.gamma.job.JobResult;
+import com.gamma.job.SnapshotSwapLock;
 import com.gamma.pipeline.SpaceConfigRoot;
 import com.gamma.objects.ObjectAccess;
 import com.gamma.workflow.ObjectType;
@@ -44,6 +45,10 @@ import java.util.function.Supplier;
  * the JVM-wide {@code -Dassist.write.root} it used to read (as {@link MaterializeTask}/{@code ReportJob}).
  */
 public final class ReconRunJob implements Job {
+
+    /** Test seam: runs once the sides' relations have pinned their files and before the grain scans them; production
+     *  never reassigns it (SNAPSHOT-SWAP-READER-RESIDUALS-1). */
+    static volatile Runnable afterPin = () -> { };
 
     private final JobConfig cfg;
     private final String dataDir;
@@ -95,9 +100,8 @@ public final class ReconRunJob implements Job {
         // naming the Dataset and the fix (no whole-period fallback - operator, 2026-10-09).
         String day = ctx.params() == null ? null : ctx.params().get("day");
         if (day == null || day.isBlank()) day = cfg.opt("day", null);
-        ReconDay.Scoped scoped = ReconDay.resolve(config, datasetFor,
-                dsId -> DatasetRelation.relationSql(datasetFor.apply(dsId), dataRoot, views), dataRoot, day);
-        ReconService.Spec spec = scoped.spec();
+        ReconDay.Scoped scoped;
+        ReconService.Spec spec;
 
         // ONE grain: the summary and the Breaks are both read from it, so each side is scanned once (RECON-UPLIFT-1 B1).
         Map<String, Object> summary;
@@ -106,13 +110,22 @@ public final class ReconRunJob implements Job {
         // cannot be computed (the run is then also not recorded, and says so).
         List<ReconBreaks.Break> fresh = null;
         String computeError = null;
-        try (ReconService.Grain grain = ReconService.openGrain(spec)) {
-            summary = grain.summary();
-            try {
-                fresh = ReconBreaks.compute(grain, ReconStateStore.MAX_BREAKS);
-            } catch (Exception e) {
-                computeError = e.getMessage();
-                ctx.log().warn("could not compute the reconciliation Breaks", "reconciliation", reconId, "error", computeError);
+        // Each side's relation pins its store's files, which the grain scans: the stores stay held against a snapshot
+        // swap until the grain is read (SNAPSHOT-SWAP-READER-RESIDUALS-1). Resolved without the page-burst memos, so
+        // every side is pinned inside this block rather than served from a relation pinned before it.
+        try (SnapshotSwapLock.Held reading = SnapshotSwapLock.hold()) {
+            scoped = ReconDay.resolve(config, datasetFor,
+                    dsId -> DatasetRelation.relationSql(datasetFor.apply(dsId), dataRoot, views), dataRoot, day, false);
+            spec = scoped.spec();
+            afterPin.run();
+            try (ReconService.Grain grain = ReconService.openGrain(spec)) {
+                summary = grain.summary();
+                try {
+                    fresh = ReconBreaks.compute(grain, ReconStateStore.MAX_BREAKS);
+                } catch (Exception e) {
+                    computeError = e.getMessage();
+                    ctx.log().warn("could not compute the reconciliation Breaks", "reconciliation", reconId, "error", computeError);
+                }
             }
         }
         Map<String, Object> byType = summary.get("byType") instanceof Map<?, ?> bt ? cast(bt) : Map.of();

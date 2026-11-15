@@ -89,7 +89,9 @@ final class AlertEvaluateJob implements Job {
         ctx.log().info("alert rules evaluated", "fired", fired.size(), "rules", names);
 
         String msg = fired.isEmpty()
-                ? "alert.evaluate: no rule breached"
+                // An Alert Rule is edge-triggered: a breach whose Alert is still open refreshes that Alert and is not
+                // returned here, so an empty result means no NEW breach, not none (ALERT-EVALUATE-NO-BREACH-WORDING-1).
+                ? "alert.evaluate: no new breach (an Alert still open is refreshed, not raised again)"
                 : "alert.evaluate: " + fired.size() + " breach(es) — " + String.join(", ", names)
                         + " (error/critical rules are promoted to Incidents)";
         return JobResult.ok(msg, (System.nanoTime() - t0) / 1_000_000L);

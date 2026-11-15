@@ -126,6 +126,40 @@ class QueryExecutorSwapRetryTest {
         assertEquals(List.of(3), gens(links));
     }
 
+    // ── SNAPSHOT-SWAP-READER-RESIDUALS-1 ──────────────────────────────────────────
+
+    @Test
+    void aRelationACallerWrappedInMoreSqlRendersTheRelationItEmbedsAgain(@TempDir Path data) throws Exception {
+        Path links = data.resolve("links");
+        publish(links, 1);
+        String relation = DatasetRelation.relationSql(Map.of("physicalRef", "links"), data, null);
+        // What Link Analysis does with two relations (a UNION) or one (a filtered sub-select) before the executor.
+        String wrapped = "SELECT gen * 10 AS gen FROM (" + relation + ") AS w WHERE gen > 0";
+        publish(links, 2);   // the embedded relation's pinned file is gone before the scan
+
+        QueryExecutor.Result r = QueryExecutor.run(read(wrapped));
+
+        assertEquals(List.of(20), column(r), "the wrapper ran again over the embedded relation rendered afresh");
+    }
+
+    @Test
+    void aWrapperWhoseEmbeddedRelationNobodyHoldsStillRetriesAfterAGc(@TempDir Path data) throws Exception {
+        Path links = data.resolve("links");
+        publish(links, 1);
+        String wrapped = wrapped(data);   // the embedded relation string is dropped: only the wrapper is held
+        System.gc();
+        publish(links, 2);
+
+        QueryExecutor.Result r = QueryExecutor.run(read(wrapped));
+
+        assertEquals(List.of(20), column(r), "the registration outlived the embedded string");
+    }
+
+    private static String wrapped(Path data) {
+        return "SELECT gen * 10 AS gen FROM (" + DatasetRelation.relationSql(Map.of("physicalRef", "links"), data, null)
+                + ") AS w WHERE gen > 0";
+    }
+
     @Test
     void anAlertRuleMeasureReadsThePublishedSnapshotWhenASwapLandsBeforeItsScan(@TempDir Path writeRoot, @TempDir Path data)
             throws Exception {

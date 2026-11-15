@@ -1,6 +1,7 @@
 package com.gamma.geolink;
 
 import com.gamma.consignment.ConsignmentSelector;
+import com.gamma.job.SnapshotSwapLock;
 import com.gamma.la.core.DatasetProvider;
 import com.gamma.la.core.FingerprintBudget;
 import com.gamma.la.core.InputFingerprint;
@@ -72,6 +73,13 @@ public final class EngineDatasetProvider implements DatasetProvider {
     @Override
     public String relationSqlOverFiles(Map<String, Object> dataset, Path dataRoot, Path writeRoot, List<String> relativePaths) {
         return DatasetRead.relationSqlOverFiles(dataset, dataRoot, relativePaths);
+    }
+
+    @Override
+    public <T> T readHeld(String relationSql, java.util.function.Function<String, T> read) {
+        try (SnapshotSwapLock.Held held = SnapshotSwapLock.hold()) {
+            return read.apply(QueryExecutor.rerendered(relationSql));
+        }
     }
 
     @Override

@@ -7,6 +7,7 @@ import com.gamma.query.DecisionRuleApplier;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.etl.PartitionWriter;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.job.SnapshotSwapLock;
 import com.gamma.config.spec.Finding;
 import com.gamma.sql.SqlGuard;
 import com.gamma.sql.SqlSandbox;
@@ -70,6 +71,10 @@ public final class EnrichmentEngine {
         java.util.function.Consumer<Connection> hook = beforeFirstViewForTest;
         if (hook != null) hook.accept(conn);
     }
+
+    /** Test seam: runs once a run's views have pinned their stores and before the transform scans them; production
+     *  never reassigns it (SNAPSHOT-SWAP-READER-RESIDUALS-1). */
+    static volatile Runnable afterPin = () -> { };
 
     private EnrichmentEngine() {}
 
@@ -183,22 +188,29 @@ public final class EnrichmentEngine {
             seal(conn, cfg, pipelines, db);
             beforeFirstView(conn);
 
-            // 1. reference views
-            for (EnrichmentConfig.Reference r : cfg.references()) {
-                st.execute("CREATE VIEW " + SqlIdent.q(r.name()) + " AS SELECT * FROM "
-                        + referenceReader(r, pipelines));
+            // 1-3 read the reference stores and the Stage-1 input by glob, which a compaction's hide and reveal would break
+            // mid-read: each store is held from its pin until the transform has scanned it, and released before the
+            // writes below (SNAPSHOT-SWAP-READER-RESIDUALS-1).
+            try (SnapshotSwapLock.Held reading = SnapshotSwapLock.hold()) {
+                // 1. reference views
+                for (EnrichmentConfig.Reference r : cfg.references()) {
+                    st.execute("CREATE VIEW " + SqlIdent.q(r.name()) + " AS SELECT * FROM "
+                            + referenceReader(r, pipelines));
+                }
+
+                // 2. input view over the selected Stage-1 partitions
+                SnapshotSwapLock.pin(cfg.input().database()).close();
+                String inputGlob = cfg.input().database().replace("\\", "/")
+                        + "/**/*." + SqlViews.ext(cfg.input().format());
+                String inputSql = "SELECT * FROM " + SqlViews.reader(cfg.input().format(), inputGlob, true);
+                String where = buildFilter(partitionFilter);
+                if (!where.isEmpty()) inputSql += " WHERE " + where;
+                st.execute("CREATE VIEW input AS " + inputSql);
+                afterPin.run();
+
+                // 3. transform → temp table
+                st.execute("CREATE TABLE __enriched AS " + transform);
             }
-
-            // 2. input view over the selected Stage-1 partitions
-            String inputGlob = cfg.input().database().replace("\\", "/")
-                    + "/**/*." + SqlViews.ext(cfg.input().format());
-            String inputSql = "SELECT * FROM " + SqlViews.reader(cfg.input().format(), inputGlob, true);
-            String where = buildFilter(partitionFilter);
-            if (!where.isEmpty()) inputSql += " WHERE " + where;
-            st.execute("CREATE VIEW input AS " + inputSql);
-
-            // 3. transform → temp table
-            st.execute("CREATE TABLE __enriched AS " + transform);
 
             // 3b. Decision Rules check the enriched output before it is written (tag/route/
             //     quarantine/drop): matched as targetType: job by the enrichment's own name or a

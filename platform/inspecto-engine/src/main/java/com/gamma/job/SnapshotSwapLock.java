@@ -176,6 +176,23 @@ public final class SnapshotSwapLock {
     }
 
     /**
+     * The write lock for deleting {@code file}, a file no new pin includes because the catalog already marks it unreadable
+     * ({@code retire_superseded}): a reader that pinned it earlier may still hold a directory above it. Every directory
+     * above the file that a reader has locked so far is waited for, outermost first and one at a time (a writer holds no
+     * other lock while it waits), and the nearest is kept until the returned handle closes. A directory no reader ever
+     * locked has no reader to wait for; when there is none, nothing is held.
+     */
+    public static Held writeAbove(Path file) throws IOException {
+        List<Path> locked = new ArrayList<>();
+        for (Path dir = file.toAbsolutePath().normalize().getParent(); dir != null; dir = dir.getParent()) {
+            Path k = key(dir);
+            if (LOCKS.containsKey(k) && !locked.contains(k)) locked.add(k);
+        }
+        for (int i = locked.size() - 1; i > 0; i--) write(locked.get(i)).close();
+        return locked.isEmpty() ? NONE : write(locked.get(0));
+    }
+
+    /**
      * Whether {@code e} is DuckDB not finding a file a read pinned: what a swap that renamed it away causes ("No files
      * found that match the pattern" at bind, "Cannot open file" once the scan reaches it).
      */

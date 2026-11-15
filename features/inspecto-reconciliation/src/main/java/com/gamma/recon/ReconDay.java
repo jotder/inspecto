@@ -70,10 +70,24 @@ public final class ReconDay {
     public static Scoped resolve(Map<String, Object> config, Function<String, Map<String, Object>> datasetFor,
                                  Function<String, String> relationSqlFor, Path dataRoot, String requestedDay)
             throws SQLException, IOException {
+        return resolve(config, datasetFor, relationSqlFor, dataRoot, requestedDay, true);
+    }
+
+    /**
+     * {@link #resolve} that, with {@code reuse} false, takes nothing a recent request left: the spec, the input
+     * fingerprint and the scope are computed now, so this call renders every side's relation, pinning its files. For a
+     * reader that holds what it pins until it has scanned it ({@code recon.run} inside {@code SnapshotSwapLock.hold()}):
+     * a reused spec carries relations pinned outside that block, which a snapshot swap may already have removed.
+     */
+    static Scoped resolve(Map<String, Object> config, Function<String, Map<String, Object>> datasetFor,
+                          Function<String, String> relationSqlFor, Path dataRoot, String requestedDay, boolean reuse)
+            throws SQLException, IOException {
         String day = requestedDay == null || requestedDay.isBlank() ? null : isoDay(requestedDay.trim());
         // RECON-CACHE-1: resolving each side's relation walks its store (the consignment-filtered file list); a page
         // burst reuses the spec for FINGERPRINT_TTL_MS, under the same "seen at most that late" contract.
-        ReconService.Spec base = brief("spec|" + dataRoot + "|" + config, () -> ReconConfigLoader.buildSpec(config, relationSqlFor));
+        ReconService.Spec base = reuse
+                ? brief("spec|" + dataRoot + "|" + config, () -> ReconConfigLoader.buildSpec(config, relationSqlFor))
+                : ReconConfigLoader.buildSpec(config, relationSqlFor);
         List<String> columns = new ArrayList<>();
         List<Map<String, Object>> datasets = new ArrayList<>();
         for (ReconService.Side side : base.sides()) {
@@ -81,12 +95,13 @@ public final class ReconDay {
             datasets.add(ds);
             columns.add(temporalColumn(side.datasetId(), ds));   // an undated side throws the named fix
         }
-        String fingerprint = fingerprint(base, datasets, dataRoot);
+        String fingerprint = reuse ? fingerprint(base, datasets, dataRoot)
+                : dataRoot == null ? null : computeFingerprint(base, datasets, dataRoot);
         // RECON-CACHE-1: a resolved scope is a pure function of (inputs, requested day) - serve it BEFORE any DuckDB
         // work. Opening a sandbox + typing every side (a LIMIT 0 over the whole store = every Parquet footer) cost
         // 400-800 ms on EVERY page request, cache hit or not.
         String scopeKey = fingerprint == null ? null : "scope|" + fingerprint + "|" + (day == null ? "latest" : day);
-        Scoped hit = scopeKey == null ? null : Cache.get(scopeKey);
+        Scoped hit = scopeKey == null || !reuse ? null : Cache.get(scopeKey);
         if (hit != null) return hit;
 
         List<String> available = fingerprint == null ? null : Cache.get("days|" + fingerprint);

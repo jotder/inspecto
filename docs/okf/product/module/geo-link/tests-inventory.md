@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.geo-link`](../../../../../product-map/module/geo-link.toon).
 
-131 test class(es): 19 unit, 112 real-HTTP control-plane, 0 IT.
+132 test class(es): 19 unit, 113 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -63,6 +63,7 @@ mvn -o test -pl la/inspecto-geo-link -Dtest=ControlApiAnalystUploadTest,ControlA
 | `ControlApiIndexMaxAgeTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiIndexMaxAgeTest.java` | LA-INDEX-MAX-AGE-1 (operator 2026-10-11) - a Dataset whose input files cannot be fingerprinted (view-backed) is never reported stale, |
 | `ControlApiIndexQueueFullTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiIndexQueueFullTest.java` | LA-DEMO-GUARDS-1 / DR-T7 - the index-build queue bound over REAL HTTP. A Space's {@link IndexBuildService} runs |
 | `ControlApiIndexRefreshOnCommitTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiIndexRefreshOnCommitTest.java` | LA-DEMO-INDEX-1 / DR-T1 - "a day of data arrives, the index refreshes itself", through the REAL signal-to-Job wiring: a real |
+| `ControlApiIndexSwapLockTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiIndexSwapLockTest.java` | SNAPSHOT-SWAP-READER-RESIDUALS-1: an index build's relation is rendered - and its store's files pinned - when the build |
 | `ControlApiIndexTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiIndexTest.java` | D-3 step 4 - {@code /inv/index/*} over REAL HTTP with an ARMED Authenticator throughout: with no Subject attached |
 | `ControlApiInvCaseHistoryTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvCaseHistoryTest.java` | {@code POST /inv/case-history} over real HTTP: every gate (503 write root · 503 Case management absent · 422 body · |
 | `ControlApiInvestigationAlertRuleTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiInvestigationAlertRuleTest.java` | LA-23 — <b>Measure over the Working Set → Alert Rule → Alert</b> over real HTTP: the declared Measures and one |
