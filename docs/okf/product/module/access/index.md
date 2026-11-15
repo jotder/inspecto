@@ -35,3 +35,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `IMPORT-WHOLE-SPACE-SPLIT-1` | P3 | feature | split a whole-Space export into its kinds' own validated routes on import, if ever asked. | demand |
+| `SPACE-ADMISSION-FOLLOWUPS-1` | P3 | chore | what the closed-Space change (D5, 91f0af69a) left on purpose. | — |

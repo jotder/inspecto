@@ -12,6 +12,13 @@
 > parallel lanes. The findings were re-checked against `origin/master` `c8d94b4bd` by reading the code (§3.6): 27
 > commits landed after the tested build, four related board rows shipped, and four of the proposed fixes turned out
 > to reverse recorded decisions.
+> **Progress (2026-11-16).** Shipped: **phase 1** (`195dcd446..8b0fdc635`, plus finding 32 / D5 in `91f0af69a`) and
+> **phase 3** (`9e3c04b21..bcd2cd522`). In build: phases 2, 4 and 6. Not started: 5 and 7, then the final drive.
+> Taken during the build, with reasons in the commits: a Space Template that ships a `roles.toon` admits those roles
+> from creation (the table is the Space's own); a typed guess needs nine values in ten and at least ten agreeing
+> values; ambiguous day/month formats are never guessed. Owed: re-shoot `la-guide-02-create-space.png`. What the
+> closed-Space change left on purpose (panels a caller cannot use, template role names, issuer, bootstrap flags,
+> the tracked scratch file) is board row `SPACE-ADMISSION-FOLLOWUPS-1`.
 
 ## 1. What was tested, and how
 
