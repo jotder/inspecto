@@ -100,6 +100,11 @@ class ControlApiFirstRunTest {
 
         // 1. Create a Space (the Inspecto LA dialog sends the id and the name).
         data(json("POST", "/spaces", "{\"id\":\"mobile-money\",\"display_name\":\"Mobile money\"}", ADMIN), 200);
+        // 1b. A Space a signed-in person creates is closed (D5): others are not there until the Space defines their role.
+        assertEquals(404, json("GET", SPACE + "/settings/data", null, ANALYST).statusCode(), "not admitted yet");
+        data(json("PUT", SPACE + "/access/roles", "{\"roles\":["
+                + "{\"name\":\"operations\",\"capabilities\":[\"canUploadData\"]},"
+                + "{\"name\":\"power\",\"capabilities\":[\"canAuthorWorkbench\",\"canUploadData\"]}]}", ADMIN), 200);
 
         // 2. Where people sign in, Add data is off in a new Space, and the refusal claims nothing about Pipelines:
         //    this Space has none.
