@@ -919,3 +919,67 @@ describe('Transform pane in the definition drawer: Apply arms on every edit', ()
         expect(applyButton(fixture).disabled).toBe(true);
     });
 });
+
+/**
+ * SQL-STEP-METADATA-ROUNDTRIP-1: SQL → Fields rebuilt the rows from the SQL text, which carries no metadata,
+ * so Fields → SQL → Fields with no edit dropped every description, unit, classification and synonym — and
+ * armed Apply, which would have saved the loss. Metadata follows the OUTPUT COLUMN NAME across the switch.
+ */
+describe('Transform pane in the definition drawer: Fields → SQL → Fields keeps column metadata', () => {
+    type DrawerFixture = ReturnType<typeof TestBed.createComponent<DrawerHostComponent>>;
+
+    const applyButton = (fixture: DrawerFixture) =>
+        Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find(
+            (b) => b.textContent?.trim() === 'Apply',
+        )!;
+    const tab = (fixture: DrawerFixture, label: 'Fields' | 'SQL') => {
+        Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+            .find((b) => b.textContent?.trim() === label)!
+            .click();
+        fixture.detectChanges();
+    };
+    const pane = (fixture: DrawerFixture) =>
+        fixture.debugElement.query(By.directive(PipelineTransformSqlDefinitionComponent))
+            .componentInstance as PipelineTransformSqlDefinitionComponent;
+
+    const METADATA = { description: 'Subscriber number', unit: 'digits', classification: 'MSISDN', synonym: 'a_party' };
+    const described = () =>
+        createInDrawer(
+            sqlNode({
+                sql: 'SELECT\n  order_id AS order_id,\n  msisdn AS msisdn\nFROM input',
+                fields: [
+                    field({ name: 'order_id', from: 'order_id', fn: 'keep', description: 'Order key' }),
+                    field({ name: 'msisdn', from: 'msisdn', fn: 'keep', ...METADATA }),
+                ],
+            }),
+        );
+
+    it('carries all four keys across by name, and Apply stays off', async () => {
+        const fixture = await described();
+        tab(fixture, 'SQL');
+        expect(pane(fixture).view()).toBe('sql');
+        expect(applyButton(fixture).disabled).toBe(true);
+        tab(fixture, 'Fields');
+        const c = pane(fixture);
+        expect(c.view()).toBe('fields');
+        expect(c.fields()[0]).toMatchObject({ name: 'order_id', description: 'Order key' });
+        expect(c.fields()[1]).toMatchObject({ name: 'msisdn', ...METADATA });
+        expect(fixture.componentInstance.dirty()).toBe(false);
+        expect(applyButton(fixture).disabled).toBe(true);
+    });
+
+    it('a column renamed in SQL loses its metadata, the others keep theirs, and Apply turns on', async () => {
+        const fixture = await described();
+        tab(fixture, 'SQL');
+        // What the CodeMirror editor's valueChange calls on a keystroke.
+        pane(fixture).onSqlEdited('SELECT\n  order_id AS order_id,\n  msisdn AS subscriber\nFROM input');
+        fixture.detectChanges();
+        tab(fixture, 'Fields');
+        const [orderId, subscriber] = pane(fixture).fields();
+        expect(orderId).toMatchObject({ name: 'order_id', description: 'Order key' });
+        // Same position, same source column, new name: nothing is carried (by position would be wrong).
+        expect(subscriber).toMatchObject({ name: 'subscriber', from: 'msisdn' });
+        for (const key of ['description', 'unit', 'classification', 'synonym']) expect(key in subscriber).toBe(false);
+        expect(applyButton(fixture).disabled).toBe(false);
+    });
+});
