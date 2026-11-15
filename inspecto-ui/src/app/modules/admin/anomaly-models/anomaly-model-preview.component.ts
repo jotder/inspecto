@@ -99,7 +99,8 @@ const fmt = (v: number | null | undefined, digits = 2): string =>
                                 Per-feature explanation of the previewed Anomaly Score
                             </caption>
                             <thead>
-                                <tr class="border-b">
+                                <!-- One line per header: "Self z" broke into two at 1024 px; the box scrolls sideways instead -->
+                                <tr class="border-b whitespace-nowrap">
                                     <th scope="col">Feature</th>
                                     <th scope="col">Observed</th>
                                     <th scope="col">Self z</th>

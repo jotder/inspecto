@@ -355,6 +355,10 @@ describe('AnomalyModelFormDialog', () => {
         expect(el.querySelector('[data-testid="anomaly-preview"]')?.textContent).toContain(
             'Scored under the unsaved draft',
         );
+        // Each column header stays on one line ("Self z" / "Peer z" / "Cohort shift" wrapped at 1024 px).
+        const headers = Array.from(el.querySelectorAll('[data-testid="anomaly-preview"] thead th'));
+        expect(headers.map((h) => h.textContent?.trim())).toContain('Cohort shift');
+        expect(headers.filter((h) => !h.closest('.whitespace-nowrap'))).toEqual([]);
         await expectNoA11yViolations(el);
     });
 
