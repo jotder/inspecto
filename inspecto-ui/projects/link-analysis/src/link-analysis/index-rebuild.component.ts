@@ -34,7 +34,7 @@ const NEEDS = 'Needs Build link index.';
                         type="button"
                         data-testid="index-rebuild-button"
                         [disabled]="!allowed() || busy()"
-                        [attr.aria-label]="allowed() ? 'Rebuild the link index of ' + dataset() : 'Rebuild. ' + needs"
+                        [attr.aria-label]="label()"
                         (click)="rebuild()"
                     >
                         {{ busy() ? 'Rebuilding' : 'Rebuild' }}
@@ -45,6 +45,8 @@ const NEEDS = 'Needs Build link index.';
                 }
             </span>
         }
+        <!-- the end of a rebuild, for a screen reader: the button itself goes away with the out-of-date state -->
+        <span class="sr-only" role="status" data-testid="index-rebuild-status">{{ announcement() }}</span>
     `,
 })
 export class IndexRebuildComponent {
@@ -58,9 +60,18 @@ export class IndexRebuildComponent {
     protected readonly needs = NEEDS;
     protected readonly busy = signal(false);
     protected readonly error = signal('');
+    protected readonly announcement = signal('');
     private readonly status = computed(() => datasetIndexStatus(this.runs.indexes(), this.dataset()));
     protected readonly outOfDate = computed(() => this.status()?.state === 'out_of_date');
     protected readonly allowed = computed(() => this.lens.canBuildLinkIndex());
+    /** The name starts with the words on the button (WCAG 2.5.3 label in name), then says which index. */
+    protected readonly label = computed(() =>
+        this.busy()
+            ? `Rebuilding the link index of ${this.dataset()}`
+            : this.allowed()
+              ? `Rebuild the link index of ${this.dataset()}`
+              : `Rebuild. ${NEEDS}`,
+    );
 
     constructor() {
         inject(DestroyRef).onDestroy(() => this.sub?.unsubscribe());
@@ -72,6 +83,7 @@ export class IndexRebuildComponent {
         if (!req || !this.allowed() || this.busy()) return;
         this.busy.set(true);
         this.error.set('');
+        this.announcement.set('');
         this.sub?.unsubscribe();
         this.sub = this.runs.startBuild(req).subscribe({
             next: (first) => {
@@ -79,6 +91,7 @@ export class IndexRebuildComponent {
                     next: (v) => {
                         if (v.status === 'COMPLETED') {
                             this.busy.set(false);
+                            this.announcement.set(`The link index of ${this.dataset()} is rebuilt.`);
                             this.runs.reloadIndexes();
                         } else if (v.status === 'FAILED' || v.status === 'CANCELLED') {
                             this.busy.set(false);

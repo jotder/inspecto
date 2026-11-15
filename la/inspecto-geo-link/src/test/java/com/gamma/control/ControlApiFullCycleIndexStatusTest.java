@@ -145,6 +145,32 @@ class ControlApiFullCycleIndexStatusTest {
     }
 
     /**
+     * The same answer when the import finishes in the background (above {@code import.inline_max_bytes}: a 202 followed at
+     * {@code /onboard/runs}). That pool carried no Space either, so its build read the store as a glob too (found by the
+     * lane's verification); it now runs under the request's Space, as the index build worker does.
+     */
+    @Test
+    void anImportThatFinishesInTheBackgroundLeavesTheLinkIndexCurrentToo(@TempDir Path root) throws Exception {
+        try (Ctx c = boot(root)) {
+            post(c, "/spaces", "{\"id\":\"bank\"}", 200);
+            data(send(c, "PUT", "/spaces/bank/settings/link-analysis/limits",
+                    "{\"import.inline_max_bytes\":0}".getBytes(StandardCharsets.UTF_8)), 200);
+            JsonNode d = data(send(c, "POST", "/spaces/bank/onboard/files?name=transfers.csv&kind=stream", fixture("transfers.csv")), 200);
+            String runId = post(c, "/spaces/bank/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"transfers\"}", 202)
+                    .get("runId").asText();
+            JsonNode run = null;
+            for (int i = 0; i < 1_500; i++) {
+                run = data(send(c, "GET", "/spaces/bank/onboard/runs/" + runId, null), 200);
+                if (!"running".equals(run.get("state").asText())) break;
+                Thread.sleep(100);
+            }
+            assertEquals("succeeded", run.get("state").asText(), run.toString());
+            assertEquals("BUILT", run.at("/summary/index/result").asText(), run.toString());
+            assertCurrent(indexOf(c, "bank", "transfers"));    // red before: relation_sql_changed, as an inline import was
+        }
+    }
+
+    /**
      * The Rebuild a caller holding {@code canBuildLinkIndex} is offered: the out-of-date index's own mapping, in the mode the
      * server advises ({@code plan.recommended}), on the existing {@code POST /inv/index/builds}. The words for an out-of-date
      * index are plain ones, one sentence per cause, the same on {@code GET /inv/index} and on the Expand's refusal.

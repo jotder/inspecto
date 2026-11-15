@@ -78,7 +78,10 @@ import java.util.regex.Pattern;
  * is the run summary (200). Above it the writes, registration and landing happen inside the request, the run continues
  * in the background, and the answer is 202 with a {@code runId} followed at {@code GET /onboard/runs/{runId}}; a failure
  * there undoes everything exactly as above. The background run captures the Space's roots and service on the request
- * thread - it never re-resolves "the current Space".
+ * thread - it never re-resolves "the current Space". It also runs under the request's logging context (its Space id,
+ * {@code MDC}): the readers that key on the thread's Space - the Consignment registry, the event log, the link index
+ * build - would otherwise serve the default Space's ({@code LA-FULL-CYCLE-TEST-1} phase 4: a 202 import left its link
+ * index out of date at once in every other Space).
  */
 final class OnboardImport {
 
@@ -1398,7 +1401,10 @@ final class OnboardImport {
         rec.put("startedAt", Instant.now().toString());
         RUNS.put(runId, rec);
         String key = job.space.writeRoot() + "|" + job.id;
+        Map<String, String> context = org.slf4j.MDC.getCopyOfContextMap();   // the request's Space: see the class doc
         BACKGROUND.submit(() -> {
+            if (context != null) org.slf4j.MDC.setContextMap(context);
+            else org.slf4j.MDC.clear();
             try {
                 Map<String, Object> summary = work.run();
                 synchronized (rec) {
@@ -1417,6 +1423,7 @@ final class OnboardImport {
                     rec.put("finishedAt", Instant.now().toString());
                 }
                 IN_FLIGHT.remove(key);
+                org.slf4j.MDC.clear();                                         // a pooled thread keeps no Space for the next run
             }
         });
         Map<String, Object> out = new LinkedHashMap<>(rec);

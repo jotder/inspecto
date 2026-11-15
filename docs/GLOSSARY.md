@@ -250,9 +250,10 @@ added and the older rows on the days it covers are removed; every other day stay
 *Replace everything* and *Add rows*. ⛔ not "upsert" (no row keys; that waits for SCD2).
 
 **Link index** — Link Analysis' prebuilt store of a Dataset's links, built from its files so a graph reads fast; built
-in the import run, or by the Space's `la.index.build` Job (Standard and above). Its state is *up to date*, *waiting*
-(files arrived that it does not hold yet) or *out of date* (built over files or a definition the Dataset no longer has:
-the graph is read from the Dataset until someone allowed to build it chooses **Rebuild**). ⛔ not *stale* in screen text.
+in the import run, or by the Space's `la.index.build` Job (Standard and above). Its state is *up to date* or *out of
+date* (the Dataset's files or its definition changed after it was built: the graph is read from the Dataset, or served
+with that note when files were only added, until it is built again; someone allowed to build it chooses **Rebuild**).
+Files it does not hold yet are counted beside it as *waiting*. ⛔ not *stale* in screen text.
 
 **Consignment** — A set of one or more files ingested and processed together as one unit of work. ⛔ *Batch*
 in this entity sense (renamed 2026-08-03, §13 — ✅ **rolled out in the Java code 2026-08-31**: the types are

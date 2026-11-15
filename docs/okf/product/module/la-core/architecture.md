@@ -807,7 +807,8 @@ optional pack field; no route was added.
   glob, every reader in the Space read a pinned file list, the manifest recorded another `relationSqlHash`, and the
   index read `relation_sql_changed` the moment it was published — in every Space but the default one, which is why no
   single-Space test saw it (the test drive blamed the details import; that import is SKIPPED by the index follow-on).
-  Any other pool that renders a Dataset's relation must carry the Space the same way. An index built before the fix
+  Any other pool that renders a Dataset's relation must carry the Space the same way; Add data's background pool (an
+  import above `import.inline_max_bytes`, answered 202) does since the same phase. An index built before the fix
   stays out of date (an APPEND keeps its parent's hash) until a FULL build: the next import, the Space's
   `la.index.build` Job (`allow_full`) or **Rebuild** runs one, since `IndexPlan` advises `full` for a changed definition.
 * **Build service** (`IndexBuildService`, one per write root via `IndexBuildServices`): 1 thread, queue 4; one live

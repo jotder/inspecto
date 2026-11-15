@@ -1287,7 +1287,9 @@ header opens it), and a drawer with four parts:
 
 **An out-of-date link index.** The strip then reads *link index vN out of date* with a WARNING badge, the Data page's
 **Graph** says *out of date*, and the Expand says *Answered from the Dataset because the link index is out of date*:
-the three read one answer, so they never disagree. Until the index is built again the graph is read from the Dataset,
+the three read one judgement of the index. (A Dataset drawn over several column pairs has an index per pair: the strip
+and the Data page warn when any of them is out of date, the Expand speaks of the one it reads.) Until the index is
+built again the graph is read from the Dataset,
 which gives the same answer more slowly. **Rebuild**, beside the words, builds it again in the way the server advises;
 it is enabled for someone allowed to build the link index, and for anyone else it says *Needs Build link index.*
 

@@ -33,7 +33,10 @@ Gates, staleness decisions and the choice of flat versus index belong to la-api.
 2. `IndexPlan` classifies the request against the current manifest and today's input files: `full`, `append` or
    `compact`, with a closed reason when only `full` is sound.
 3. `IndexBuildService` refuses a duplicate, estimates disk against the budget, queues the build, and holds it in
-   `waiting_for_ingest` while ingest runs.
+   `waiting_for_ingest` while ingest runs. The worker runs the build under the submitter's logging context (its Space,
+   `MDC`) and clears it after: the relation rendered again on the worker reads the Space's Consignment registry, and
+   without the Space it read a glob where the Space reads a pinned list, so every index outside the default Space was
+   out of date at once (`LA-FULL-CYCLE-TEST-1` phase 4; [la-core architecture](../la-core/architecture.md) §4).
 4. `IndexBuilder` writes the stage with its own DuckDB connection, verifies, writes the manifest, and `IndexStore`
    publishes it atomically. `gc` keeps the live version plus `index.keep_versions`, skips pinned and young versions,
    and removes crashed stages.

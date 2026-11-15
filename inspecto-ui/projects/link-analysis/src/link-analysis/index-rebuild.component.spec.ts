@@ -95,11 +95,15 @@ describe('IndexRebuildComponent', () => {
             mode: 'full',
         });
         expect(button(f)!.textContent!.trim()).toBe('Rebuilding');
+        expect(button(f)!.getAttribute('aria-label')).toBe('Rebuilding the link index of transfers'); // label in name
         expect(button(f)!.disabled).toBe(true);
 
         watch.next({ buildId: 'ib-1', status: 'COMPLETED' });
         f.detectChanges();
         expect(runs.reloadIndexes).toHaveBeenCalledTimes(1);
+        const status = f.nativeElement.querySelector('[data-testid="index-rebuild-status"]') as HTMLElement;
+        expect(status.getAttribute('role')).toBe('status');
+        expect(status.textContent!.trim()).toBe('The link index of transfers is rebuilt.');
         expect(button(f)!.disabled).toBe(false);
     });
 

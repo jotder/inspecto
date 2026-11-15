@@ -335,9 +335,11 @@ export class LinkAnalysisDataStripComponent {
     readonly inbox = signal<number | null>(null);
 
     readonly indexesRead = computed(() => this.graphRuns.indexes() !== null);
-    readonly index = computed<LinkIndexSummary | null>(
-        () => this.graphRuns.indexes()?.indexes.find((i) => i.dataset === this.dataset()) ?? null,
-    );
+    /** The index the drawer describes: an out-of-date one first, so its reason is the one the strip's warning is about. */
+    readonly index = computed<LinkIndexSummary | null>(() => {
+        const mine = this.graphRuns.indexes()?.indexes.filter((i) => i.dataset === this.dataset()) ?? [];
+        return mine.find((i) => i.stale) ?? mine[0] ?? null;
+    });
     readonly asOfText = computed(() => formatDay(this.dataAsOf()));
     readonly cells = computed(() => {
         const c = this.coverage();

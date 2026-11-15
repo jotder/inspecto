@@ -108,11 +108,13 @@ reads it through ONE helper, `datasetIndexStatus` (`projects/link-analysis/src/l
 (added, removed or replaced)* · *the Dataset's definition changed after the index was built* · *the Dataset cannot be
 read now* · *the index was built by another version of Inspecto (layout …)* · *the index was built with DuckDB X and
 this server runs Y*; a served index that only misses added files says *N files were added to the Dataset after the
-index was built*. The screens say **out of date**, never *stale* (the Glossary's states: up to date, waiting, out of date).
+index was built*. The screens say **out of date**, never *stale* (the Glossary's states: up to date, out of date; files
+not held yet are counted as *waiting*).
 
 **Rebuild** (`<inspecto-la-index-rebuild [dataset]>`, `index-rebuild.component.ts`): shown only while the Dataset's
 index is out of date; enabled for a caller holding `canBuildLinkIndex` (`LensService.canBuildLinkIndex`), otherwise
-disabled with *Needs Build link index.* It sends the stale index's OWN mapping in the mode the server advises
+disabled with *Needs Build link index.* (its accessible name starts with the words on the button, and a status line
+says when the rebuild ends). It sends the stale index's OWN mapping in the mode the server advises
 (`plan.recommended`, `full` when it advises none) to the existing `POST /inv/index/builds` — no new route, so the
 route's gates (capability, Dataset view, queue, disk budget) stay the only ones. When the build completes, `GET /inv/index`
 is read again, so every surface agrees at once; a refused start says why in the index build sentences
@@ -133,8 +135,11 @@ is read again, so every surface agrees at once; a refused start says why in the 
   spelling as its own node (`' acc-1003 '` and `ACC-1003`) while the coverage counts 137 accounts. That is how the index
   keys a node, not whether it is current, so it is left to its own row.
 
-Pinned by `ControlApiFullCycleIndexStatusTest` (geo-link, real HTTP: the full-cycle fixture in a Space of its own, the
-showcase Space laid down as its seed's `--scaffold` does and indexed by its own Job, and an out-of-date index rebuilt
+Add data's background pool (an import above `import.inline_max_bytes`, a 202) had the same hole and carries the request's
+Space since this phase (found by the lane's verification).
+
+Pinned by `ControlApiFullCycleIndexStatusTest` (geo-link, real HTTP: the full-cycle fixture in a Space of its own, inline
+and in the background, the showcase Space laid down as its seed's `--scaffold` does and indexed by its own Job, and an out-of-date index rebuilt
 in the advised mode), `IndexBuildServiceTest.aBuildRunsInTheSpaceThatSubmittedItAndTheWorkerKeepsNoneAfter` and the
 specs `index-status.spec.ts`, `index-rebuild.component.spec.ts`, `index-source.spec.ts`, `data-trust.spec.ts`.
 
