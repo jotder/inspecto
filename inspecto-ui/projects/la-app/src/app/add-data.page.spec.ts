@@ -12,7 +12,7 @@ import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
 import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
-import { SELF_IMPORT_OFF } from '@inspecto/link-analysis/add-data/add-data.model';
+import { NO_UPLOAD_RIGHT, SELF_IMPORT_OFF } from '@inspecto/link-analysis/add-data/add-data.model';
 import { AddDataAccess } from '@inspecto/link-analysis/add-data/add-data-access';
 import { AddDataPageComponent } from './add-data.page';
 import { FirstRun } from './first-run';
@@ -26,7 +26,11 @@ let http: HttpTestingController;
  */
 function create(
     selfImport = true,
-    who: { signIn?: { canAdminister: boolean }; notice?: string; knownOff?: boolean } = {},
+    who: {
+        signIn?: { canAdminister: boolean; canUploadData?: boolean };
+        notice?: string;
+        knownOff?: boolean;
+    } = {},
 ) {
     TestBed.configureTestingModule({
         imports: [AddDataPageComponent],
@@ -42,7 +46,7 @@ function create(
                     exchange: signal(false),
                     geoLink: signal(true),
                     investigations: signal(false),
-                    signIn: signal(false),
+                    signIn: signal(!!who.signIn),
                     edition: signal('basic'),
                     flags: signal({}),
                     featureReasons: signal({}),
@@ -51,7 +55,7 @@ function create(
             {
                 provide: LensService,
                 useValue: {
-                    canUploadData: signal(true),
+                    canUploadData: signal(who.signIn?.canUploadData ?? true),
                     canAuthorWorkbench: signal(true),
                     canAdminister: signal(who.signIn?.canAdminister ?? false),
                 },
@@ -159,6 +163,12 @@ describe('AddDataPageComponent (/add-data, LA-ONBOARD-1 phase 4)', () => {
             expect(el.querySelector('inspecto-add-data')).toBeNull();
             expect(el.querySelector('[data-testid="imported-datasets"]')).toBeNull();
             await expectNoA11yViolations(el);
+        });
+
+        it('an administrator who may not upload data reads that reason, and is not offered a button that would open a locked screen', () => {
+            const { el } = create(false, { signIn: { canAdminister: true, canUploadData: false } });
+            expect(button(el)).toBeNull();
+            expect(el.querySelector('[data-testid="add-data-locked"]')!.textContent).toContain(NO_UPLOAD_RIGHT);
         });
 
         it('with no sign-in the person is their own administrator and gets the button too', () => {

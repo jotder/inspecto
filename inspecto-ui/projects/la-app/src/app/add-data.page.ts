@@ -116,8 +116,13 @@ export class AddDataPageComponent implements OnInit {
     private readonly onboard = inject(OnboardService);
     /** The person is the administrator the locked screen sends people to (OB-7): they get the switch itself. */
     protected readonly mayAdminister = computed(() => this.session.authMode() !== 'oidc' || this.lens.canAdminister());
-    /** Add data is off here and this person may turn it on: the screen is the button, not the locked reason. */
-    protected readonly turnOnOffered = computed(() => this.access.selfImport() === false && this.mayAdminister());
+    /**
+     * Add data is off here and this person may turn it on: the screen is the button, not the locked reason. Not for
+     * someone who could not add a file afterwards: the button would open a screen locked for the missing right.
+     */
+    protected readonly turnOnOffered = computed(
+        () => this.access.selfImport() === false && this.mayAdminister() && this.access.canUpload(),
+    );
     protected readonly turningOn = signal(false);
     /** Why the server refused to turn it on, in its words. */
     protected readonly turnOnRefused = signal('');

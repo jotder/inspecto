@@ -63,12 +63,12 @@ export class FirstRun {
                     this.session.authMode() === 'oidc' ? this.spaces.setSelfImport(created.id, true) : of(null);
                 turnedOn$.subscribe({
                     next: () => this.enter(created.id, then),
-                    error: (e: unknown) => {
-                        this.leaveNotice(
+                    error: (e: unknown) =>
+                        this.enter(
+                            created.id,
+                            then,
                             `The Space was created, but Add data was not turned on: ${apiErrorMessage(e, 'the server did not accept the change.')}`,
-                        );
-                        this.enter(created.id, then);
-                    },
+                        ),
                 });
             });
     }
@@ -110,10 +110,17 @@ export class FirstRun {
         else if (id in STEP_ROUTES) void this.router.navigateByUrl(STEP_ROUTES[id as keyof typeof STEP_ROUTES]);
     }
 
-    /** Make `spaceId` the active Space and land on `url` with a reload. */
-    enter(spaceId: string, url: string): void {
+    /**
+     * Make `spaceId` the active Space and land on `url` with a reload. A `notice` is left for the page the reload
+     * draws, so it is written AFTER the navigation: the router already builds that page once before the reload, and
+     * a notice left earlier would be taken by that first copy and never seen.
+     */
+    enter(spaceId: string, url: string, notice?: string): void {
         this.spaces.selectSpace(spaceId);
-        void this.router.navigateByUrl(url).then(() => this.reload());
+        void this.router.navigateByUrl(url).then(() => {
+            if (notice) this.leaveNotice(notice);
+            this.reload();
+        });
     }
 
     /** A hard reload in place (its own seam so a spec can stub it: jsdom cannot reload). */

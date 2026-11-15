@@ -108,24 +108,37 @@ describe('FirstRun', () => {
             expect(run.takeNotice()).toBeNull();
         });
 
-        it('a refusal still enters the Space on Add data, and names the refused step once for that page', () => {
+        it('a refusal still enters the Space on Add data, and names the refused step once, on the page the reload draws', async () => {
             sessionStorage.clear();
             const refusal = new HttpErrorResponse({
                 status: 403,
                 error: { error: { message: 'An Access Policy does not allow this change.' } },
             });
-            const { run, selectSpace, nav } = create({
+            const { run, selectSpace, nav, reload } = create({
                 authMode: 'oidc',
                 canAdminister: true,
                 created,
                 turnOn: throwError(() => refusal),
             });
+            // The router builds the Add data page once during the navigation, before the reload draws it again: each
+            // copy takes the notice, so the first must find nothing or the copy the person sees would say nothing.
+            const taken: (string | null)[] = [];
+            nav.mockImplementation(() => {
+                taken.push(run.takeNotice()); // the page built by the navigation
+                return Promise.resolve(true);
+            });
+            reload.mockImplementation(() => {
+                taken.push(run.takeNotice()); // the page the reload draws
+            });
             run.createSpace();
             expect(selectSpace).toHaveBeenCalledWith('calls');
             expect(nav).toHaveBeenCalledWith('/add-data');
-            expect(run.takeNotice()).toBe(
+            await Promise.resolve();
+            expect(reload).toHaveBeenCalledTimes(1);
+            expect(taken).toEqual([
+                null,
                 'The Space was created, but Add data was not turned on: An Access Policy does not allow this change.',
-            );
+            ]);
             expect(run.takeNotice()).toBeNull(); // said once
         });
 
