@@ -648,11 +648,16 @@ finding per Step, anchored at `steps[i].<kind>` or `processing.<kind>`, naming t
   - **Always a WARNING, never a refusal, active or not.** The Job is a separate config; refusing would make
     the order of authoring matter. A draft gets it too: that is when the author needs to hear a Job is owed.
   - **A Job is matched by the identity of the file it names,** not the file name: its `pipeline_config:`
-    resolves from the run's own base (`SpaceConfigRoot.jobPathBase`, then `PathJail.resolveJobPath`) and the
-    file's registered id (`id:`, else `name:` lower-cased, `ConfigReadRoutes.pipelineIdOf`) must be this
-    Pipeline's. The shipped samples name `orders_pipeline.toon` for `STEP_DEDUP`, so a file-name rule would
-    warn on every one of them. A Job's `pipeline:` names an authored Pipeline and never lifts this chain, so it
-    does not count; neither does a disabled Job or one whose file is missing or refused by the job-path rule.
+    resolves exactly as `PipelineJobRunner` resolves it: from the run's own base (`SpaceConfigRoot.jobPathBase`,
+    the config read root) through `PathJail.requireJobPathUnderAny` over `PathJail.allowedRoots()`, which also
+    refuses a path outside the jail and a `*.secrets` directory. The file's registered id (`id:`, else `name:`
+    lower-cased, `ConfigReadRoutes.pipelineIdOf`) must be this Pipeline's. The shipped samples name
+    `orders_pipeline.toon` for `STEP_DEDUP`, so a file-name rule would warn on every one of them. A Job's
+    `pipeline:` names an authored Pipeline and never lifts this chain, so it does not count; neither does a
+    disabled Job, nor one whose path the runner would refuse (that file is never read) or whose file is missing.
+  - ⚠ **Known limits — two cases the warning misses.** (1) A Job held by Space evolution (SE-1b) still counts
+    as enabled, though a held Job does not run. (2) An enabled Job with no `cron:`, `on_pipeline:` or
+    `on_signal:` silences the warning, though nothing ever starts it (only a manual run does).
   - **Doors:** every `SaveGate.check` that knows the Space's Jobs (`Referents.MUST_EXIST` with a live
     `ApiContext`): `/config/write`, the graph save, settings, rename, history restore, the onboarding and
     Dataset-feed writes, and `/validate` (the Pipeline's validate route, so the editor shows it before a
@@ -664,18 +669,20 @@ finding per Step, anchored at `steps[i].<kind>` or `processing.<kind>`, naming t
     enabled `pipeline_config:` Job.
   - ⚠ That run-time audit matches by **file name** (`SchedulerAuditTask.pipelineNameOf`: the
     `pipeline_config:` basename less `_pipeline.toon`), not by identity, so it reports the shipped
-    `07-steps` samples as orphans although each has its Job. Not changed here.
+    `07-steps` samples as orphans although each has its Job. Open as `SCHEDULER-AUDIT-PIPELINE-NAME-1`.
   - ⚠ The `webhook:` / `excel:` blocks also run only at rest but are not judged by this warning (only the
     chain is, as for the store-less finding above).
   - The default Space's `lookup_step` Pipeline (`spaces/default/config/lookup_step/`) has a chain and a
-    store and no Job, so it gets this warning when saved: a true finding, not a spurious one.
+    store and no Job, so it gets this warning when saved: a true finding, not a spurious one. Open as
+    `DEFAULT-SPACE-LOOKUP-STEP-NO-JOB-1`.
 
 Pinned by `ControlApiChainOutputStoreArmingTest` (graph save active / inactive, the activation patch, a
 chain with a store, the slot alone, a legacy block at `/validate`) and `ControlApiChainWithoutJobTest`
 (no Job warns; a disabled Job still warns; an enabled Job naming the file silences it although the file
-name differs from the Pipeline's; a chain-less Pipeline and a store-less chain get no such warning;
-`/validate` on an inactive legacy block warns; every shipped `pipeline_config:` Job resolves to its
-Pipeline by identity).
+name differs from the Pipeline's; an enabled Job naming ANOTHER Pipeline's file leaves the warning; a
+relative `pipeline_config:` resolves from the config read root; a Job whose path lies outside the jail
+leaves the warning; a chain-less Pipeline and a store-less chain get no such warning; `/validate` on an
+inactive legacy block warns; every shipped `pipeline_config:` Job resolves to its Pipeline by identity).
 
 ### Collector checks — throttle, breaker, archive (2026-09-24)
 

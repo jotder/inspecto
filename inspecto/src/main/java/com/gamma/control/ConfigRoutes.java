@@ -404,8 +404,8 @@ final class ConfigRoutes {
      * A Stage-2 chain WITH a top-level {@code output_store:} that no enabled {@code type: pipeline} Job runs
      * (PIPELINE-CHAIN-NO-JOB-1): the chain runs only at rest, from a Job whose {@code pipeline_config:} names this
      * Pipeline's file ({@code PipelineJobRunner} → {@code PipelineLift.stageTwo}), so with none it never runs. A Job
-     * runs this Pipeline when its {@code pipeline_config:} resolves (the runner's own base,
-     * {@code SpaceConfigRoot.jobPathBase}) to a file whose registered id ({@link ConfigReadRoutes#pipelineIdOf})
+     * runs this Pipeline when its {@code pipeline_config:} resolves as the runner resolves it (its base,
+     * {@code SpaceConfigRoot.jobPathBase}, and its jail, {@link #chainPipelineOf}) to a file whose registered id ({@link ConfigReadRoutes#pipelineIdOf})
      * is this draft's id — the file's own identity, not its file name, because the shipped samples name
      * {@code orders_pipeline.toon} for a Pipeline called {@code STEP_DEDUP}. A Job's {@code pipeline:} names an
      * authored ({@code *_flow.toon}) Pipeline and never lifts this file's chain, so it does not count.
@@ -438,13 +438,16 @@ final class ConfigRoutes {
                         + "*_pipeline.toon file, on_pipeline: " + pipeline + "), or enable the one you have"));
     }
 
-    /** The registered id of the Pipeline file a Job's {@code pipeline_config:} value names, resolved from
-     *  {@code base} (the run's own, {@code SpaceConfigRoot.jobPathBase}); {@code null} when it is blank, refused by
-     *  the job-path rule, missing or unreadable. */
+    /** The registered id of the Pipeline file a Job's {@code pipeline_config:} value names, resolved exactly as
+     *  {@code PipelineJobRunner} resolves it ({@code PathJail.requireJobPathUnderAny} over
+     *  {@code PathJail.allowedRoots()} from {@code base}, the run's own {@code SpaceConfigRoot.jobPathBase}), so a path
+     *  the runner refuses (outside the jail, or a secrets directory) is "no Job" and is never read; {@code null}
+     *  when it is blank, refused, missing or unreadable. */
     static String chainPipelineOf(String pipelineConfig, Path base) {
         if (pipelineConfig == null || pipelineConfig.isBlank()) return null;
         try {
-            Path file = PathJail.resolveJobPath(base, pipelineConfig.trim(), "job.pipeline_config");
+            Path file = PathJail.requireJobPathUnderAny(PathJail.allowedRoots(), base, pipelineConfig.trim(),
+                    "job.pipeline_config");
             if (!Files.isRegularFile(file)) return null;
             return ConfigReadRoutes.pipelineIdOf(com.gamma.util.ToonHelper.decode(Files.readString(file)), null);
         } catch (Exception unreadable) {   // a Job the runner could not run either: it runs nothing

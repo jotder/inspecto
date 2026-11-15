@@ -111,9 +111,14 @@ class ControlApiChainWithoutJobTest {
 
     /** A {@code type: pipeline} Job running {@code pipelineFile} (absolute, so its base is not in question). */
     private static String job(String name, Path pipelineFile, boolean enabled) {
+        return job(name, pipelineFile.toAbsolutePath().toString().replace('\\', '/'), enabled);
+    }
+
+    /** A {@code type: pipeline} Job whose {@code pipeline_config:} is {@code pipelineConfig} as written. */
+    private static String job(String name, String pipelineConfig, boolean enabled) {
         return """
                 {"name":"%s","type":"pipeline","enabled":%s,"pipeline_config":"%s","on_pipeline":"shop_orders"}"""
-                .formatted(name, enabled, pipelineFile.toAbsolutePath().toString().replace('\\', '/'));
+                .formatted(name, enabled, pipelineConfig);
     }
 
     private static String findings(HttpResponse<String> r) throws Exception {
@@ -153,6 +158,56 @@ class ControlApiChainWithoutJobTest {
             assertEquals(200, r.statusCode(), r.body());
             assertFalse(r.body().contains(CODE), "the Job runs the chain (file orders_pipeline.toon, Pipeline "
                     + "shop_orders — matched by identity, not file name): " + r.body());
+        }
+    }
+
+    @Test
+    @DisplayName("an enabled type: pipeline Job running ANOTHER Pipeline's file leaves the warning")
+    void aJobForAnotherPipelineDoesNotCount(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, "output_store: shop_orders_shaped\n")) {
+            Path other = c.pipe.resolveSibling("returns_pipeline.toon");
+            String content = Files.readString(c.pipe);
+            assertTrue(content.contains("name: shop_orders"), content);
+            Files.writeString(other, content.replace("name: shop_orders", "name: returns"));
+            HttpResponse<String> on = send(c.port, "POST", "/jobs", job("returns_rollup", other, true));
+            assertEquals(200, on.statusCode(), on.body());
+            HttpResponse<String> r = send(c.port, "PUT", "/pipelines/shop_orders/graph", graph(dir, true, true));
+            assertEquals(200, r.statusCode(), r.body());
+            assertTrue(findings(r).contains(CODE), "the only Job runs 'returns', not 'shop_orders': " + r.body());
+        }
+    }
+
+    @Test
+    @DisplayName("a RELATIVE pipeline_config resolves from the runner's base (the config read root) and silences it")
+    void aRelativePipelineConfigResolvesFromTheRunnersBase(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, "output_store: shop_orders_shaped\n")) {
+            Path launch = Path.of("").toAbsolutePath();
+            assertEquals(launch, com.gamma.pipeline.SpaceConfigRoot.currentConfigReadRoot(),
+                    "the premise: the single-tenant read root is the launch dir, not the write root");
+            String rel = launch.relativize(c.pipe.toAbsolutePath()).toString().replace('\\', '/');
+            assertFalse(Path.of(rel).isAbsolute(), rel);
+            assertFalse(Files.exists(c.pipe.getParent().resolve(rel)), "the value means nothing from the write root");
+            HttpResponse<String> on = send(c.port, "POST", "/jobs", job("shop_orders_rollup", rel, true));
+            assertEquals(200, on.statusCode(), on.body());
+            HttpResponse<String> r = send(c.port, "PUT", "/pipelines/shop_orders/graph", graph(dir, true, true));
+            assertEquals(200, r.statusCode(), r.body());
+            assertFalse(r.body().contains(CODE), "the relative path names this Pipeline's file: " + r.body());
+        }
+    }
+
+    @Test
+    @DisplayName("a Job whose pipeline_config the runner would refuse (outside the jail) is no Job: the warning stays")
+    void aJobOutsideTheJailDoesNotCount(@TempDir Path dir, @TempDir Path outside) throws Exception {
+        try (Ctx c = open(dir, "output_store: shop_orders_shaped\n")) {
+            Path copy = outside.resolve("orders_pipeline.toon");
+            Files.copy(c.pipe, copy);   // the same Pipeline's identity, outside assist.safety.roots
+            // A hand-edited Job file the save doors would refuse: registered directly, as a loaded one would be.
+            c.svc.jobServiceOrCreate().upsertJob(new com.gamma.job.JobConfig("outside_rollup", "pipeline", null,
+                    "shop_orders", true, false,
+                    Map.of("pipeline_config", copy.toAbsolutePath().toString().replace('\\', '/')), null, null));
+            HttpResponse<String> r = send(c.port, "PUT", "/pipelines/shop_orders/graph", graph(dir, true, true));
+            assertEquals(200, r.statusCode(), r.body());
+            assertTrue(findings(r).contains(CODE), "the runner refuses that path, so nothing runs the chain: " + r.body());
         }
     }
 
@@ -207,20 +262,27 @@ class ControlApiChainWithoutJobTest {
             }
         int checked = 0;
         boolean nameDiffersFromFile = false;
-        for (Path jobFile : jobs) {
-            Map<String, Object> raw = ToonHelper.decode(Files.readString(jobFile));
-            if (!(raw.get("job") instanceof Map<?, ?> job) || !"pipeline".equals(job.get("type"))
-                    || !(job.get("pipeline_config") instanceof String pc)) continue;
-            // A Space's Job resolves against the Space config root; a sample's against its own directory.
-            Path base = jobFile.getParent().getFileName().toString().equals("jobs")
-                    ? jobFile.getParent().getParent() : jobFile.getParent();
-            Path pipelineFile = base.resolve(pc);
-            String expected = ConfigReadRoutes.pipelineIdOf(ToonHelper.decode(Files.readString(pipelineFile)), null);
-            assertNotNull(expected, pipelineFile.toString());
-            assertEquals(expected, ConfigRoutes.chainPipelineOf(pc, base), jobFile.toString());
-            if (!pipelineFile.getFileName().toString().equalsIgnoreCase(expected + "_pipeline.toon"))
-                nameDiffersFromFile = true;
-            checked++;
+        String priorRoots = System.getProperty("assist.safety.roots");
+        System.setProperty("assist.safety.roots", repo.toString());   // the runner's jail: the shipped tree
+        try {
+            for (Path jobFile : jobs) {
+                Map<String, Object> raw = ToonHelper.decode(Files.readString(jobFile));
+                if (!(raw.get("job") instanceof Map<?, ?> job) || !"pipeline".equals(job.get("type"))
+                        || !(job.get("pipeline_config") instanceof String pc)) continue;
+                // A Space's Job resolves against the Space config root; a sample's against its own directory.
+                Path base = jobFile.getParent().getFileName().toString().equals("jobs")
+                        ? jobFile.getParent().getParent() : jobFile.getParent();
+                Path pipelineFile = base.resolve(pc);
+                String expected = ConfigReadRoutes.pipelineIdOf(ToonHelper.decode(Files.readString(pipelineFile)), null);
+                assertNotNull(expected, pipelineFile.toString());
+                assertEquals(expected, ConfigRoutes.chainPipelineOf(pc, base), jobFile.toString());
+                if (!pipelineFile.getFileName().toString().equalsIgnoreCase(expected + "_pipeline.toon"))
+                    nameDiffersFromFile = true;
+                checked++;
+            }
+        } finally {
+            if (priorRoots != null) System.setProperty("assist.safety.roots", priorRoots);
+            else System.clearProperty("assist.safety.roots");
         }
         assertTrue(checked >= 25, "found " + checked + " shipped pipeline_config Jobs");
         assertTrue(nameDiffersFromFile, "the premise: some shipped Pipeline is not named after its file");

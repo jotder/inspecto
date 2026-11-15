@@ -37,5 +37,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `AUTHORING-REDESIGN-1` | P3 | feature | the authoring redesign's still-open letters. | demand |
 | — | P3 | feature | Step Processor catalog | — |
 | `PARSING-DERIVE-EDITOR-1` | P3 | feature | slice 4 of Parsing D9: an optional profile editor for ASN.1 derive / children. | operator |
+| `DEFAULT-SPACE-LOOKUP-STEP-NO-JOB-1` | P3 | defect | the default Space's lookup_step Pipeline has a chain and an output_store: but no type: pipeline Job, so its chain never runs, and it now… | — |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
 | `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
