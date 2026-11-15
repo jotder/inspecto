@@ -54,8 +54,13 @@ const holding = new Set();
 for (const root of ROOTS)
     for (const f of files(join(uiRoot, root))) {
         const lines = readFileSync(f, 'utf8').split(/\r?\n/);
-        // a tag named in a comment (a doc line, a removed-field note) is not a field
-        const comment = (l) => /^\s*(\/\/|\/\*|\*|<!--)/.test(l);
+        // a tag named in a comment (a doc line, a removed-field note) is not a field; a tag AFTER a closed `<!-- … -->`
+        // on the same line is one (`<!-- note --><mat-form-field` must still carry form-allow, UI-SCHEMA-FORM-EDITOR-1)
+        const comment = (l) => {
+            if (/^\s*(\/\/|\/\*|\*)/.test(l)) return true;
+            const live = l.replace(/<!--[\s\S]*?-->/g, '');
+            return /^\s*<!--/.test(live) || !TAG.test(live);
+        };
         // the tag's line, plus - when the opening tag is not closed there - the lines up to the one that closes it
         const tagLines = (i) => {
             const at = lines[i].slice(lines[i].search(TAG));

@@ -72,3 +72,15 @@ test('form-allow on the line, spec files and unscanned folders pass', () => {
     );
     assert.equal(run({ 'src/@gamma/v.html': BOXED }, []).status, 0, 'vendored scaffolding is out of scope');
 });
+
+test('a field after a closed comment on its line is a field: only form-allow excuses it', () => {
+    const noted = '<!-- a note --><mat-form-field><input matInput /></mat-form-field>\n';
+    assert.equal(run({ 'src/app/a.html': noted }, []).status, 1, 'a leading comment is not an escape');
+    const allowed = '<!-- form-allow: in-row editor --><mat-form-field><input matInput /></mat-form-field>\n';
+    assert.equal(run({ 'src/app/b.html': allowed }, []).status, 0, 'a leading form-allow comment is');
+    assert.equal(
+        run({ 'src/app/c.html': '<!-- was <mat-form-field> before the pen-field move -->\n' }, []).status,
+        0,
+        'a tag inside the comment is still not a field',
+    );
+});
