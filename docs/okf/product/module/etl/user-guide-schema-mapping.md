@@ -190,7 +190,10 @@ catalog and by persisting `fields[]`.
   captured by an earlier Test-Parse (`:20-21,175-204`). Inference only fills the grid as a draft — nothing
   persists until Save (`:181-183`). A suggested DATE fills the **Date format** column (`raw.fields[].format`,
   a strptime pattern such as `%B %d,%Y`) — without it a non-ISO date lands NULL; see
-  [ingestion §3.8](plan-ingestion.md).
+  [ingestion §3.8](plan-ingestion.md). For a column holding an epoch count (`1700000000`, with `0` for none),
+  declare the type `TIMESTAMP` and type `epoch` (seconds) or `epoch_ms` (milliseconds) in **Date format**: it
+  lands as the UTC time and `0` lands empty — no `sql` step needed
+  ([engine parsing options §2.2](../engine/spec-parsing-options.md)).
 - **Suggested selectors follow the frontend** (LA-ONBOARD-FIXES-1, F-4): the route's optional body key
   `frontend` (the value `/config/preview/parsing` reports) picks the selector. Delimited — the default when
   it is absent — and fixed-width get the column's **zero-based index** in the sample's order, because their

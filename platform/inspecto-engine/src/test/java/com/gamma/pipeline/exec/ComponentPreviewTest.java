@@ -4,6 +4,7 @@ import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineRel;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -229,6 +230,28 @@ class ComponentPreviewTest {
         // The projection renames: target columns, not the input's.
         assertEquals(List.of("account", "amount"), List.copyOf(mapped.rows().get(0).keySet()));
         assertEquals("1", mapped.rows().get(0).get("account").toString());
+    }
+
+    /**
+     * MAPPING-EPOCH-TIMESTAMP-1: a TIMESTAMP field with {@code format: epoch} previews by whether the count
+     * converts — {@code 0} ("none") passes like a blank — and the mapped relation shows the UTC timestamp.
+     * A strptime check would reject every row: {@code epoch} is not a pattern.
+     */
+    @Test
+    void schemaPreviewSplitsAnEpochFieldByWhetherTheCountConverts() throws Exception {
+        Map<String, Object> schema = draft(
+                List.of(Map.of("name", "ts", "type", "TIMESTAMP", "format", "epoch")),
+                List.of(Map.of("targetColumn", "ts", "sourceExpression", "ts", "transformType", "DIRECT")));
+        ComponentPreview.Result r = ComponentPreview.schema(schema, List.of(
+                Map.of("ts", "1700000000"), Map.of("ts", "0"), Map.of("ts", "17000x"), Map.of("ts", "1700000000.5")));
+
+        assertEquals(2, rel(r, "data").rowCount());
+        assertEquals(2, rel(r, "rejected").rowCount());
+        ComponentPreview.RelationPreview mapped = rel(r, "mapped");
+        List<String> values = new ArrayList<>();
+        for (Map<String, Object> row : mapped.rows()) values.add(String.valueOf(row.get("ts")));
+        assertTrue(values.stream().anyMatch(v -> v.startsWith("2023-11-14") && v.contains("22:13:20")), values.toString());
+        assertTrue(values.contains("null"), "the 0 sentinel maps to NULL: " + values);
     }
 
     /** The reason B1 exists at all: an EXPR rule's effect is invisible until the rule is compiled. */

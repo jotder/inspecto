@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.etl`](../../../../../product-map/module/etl.toon).
 
-104 test class(es): 104 unit, 0 real-HTTP control-plane, 0 IT.
+105 test class(es): 105 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -105,6 +105,7 @@ mvn -o test -pl platform/inspecto-etl -Dtest=AcceptedConfigKeysDocContractTest,C
 | `RecordTransformLaneTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/RecordTransformLaneTest.java` | Phase 2 — the {@code fields[]} spelling reaching the shared {@code [{name, expr}]} seam that BOTH |
 | `RouteArmingTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/RouteArmingTest.java` | The arming rules as a rule set — the form the SAVE path needs. |
 | `SchemaDriftTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/SchemaDriftTest.java` | {@code quality.schema.drift} (SP-DQ-06): the header a file actually carries vs the {@code raw.fields[]} |
+| `SchemaFieldEpochFormatTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/SchemaFieldEpochFormatTest.java` | MAPPING-EPOCH-TIMESTAMP-1 — the reserved field formats {@code epoch} (seconds) and {@code epoch_ms} |
 | `SchemaFieldFormatTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/SchemaFieldFormatTest.java` | {@code raw.fields[].format} — a date-like field's own strptime pattern, which REPLACES the pipeline's |
 | `SchemaFieldTypesTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/SchemaFieldTypesTest.java` | {@link SchemaFieldTypes} — the honoured {@code raw.fields[].type} vocabulary and the SQL each one |
 | `SchemaMappingDriftTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/SchemaMappingDriftTest.java` | {@link SchemaMappingDrift}: a mapping input naming a column the schema no longer declares is a cell-level ERROR. |

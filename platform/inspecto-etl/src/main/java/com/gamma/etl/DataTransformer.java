@@ -225,6 +225,9 @@ public final class DataTransformer {
                 for (String raw : inputs) {
                     String col = q(sourceTable) + "." + q(raw);
                     select.append("NULLIF(TRIM(CAST(").append(col).append(" AS VARCHAR)), '') IS NOT NULL AND ");
+                    // an epoch column's `0` means "none" and lands NULL on purpose — not a failure
+                    if (SchemaFieldTypes.isEpochFormat(fieldFormats.get(raw)))
+                        select.append("NOT ").append(SchemaFieldTypes.epochNoneSql(col)).append(" AND ");
                 }
                 select.append("(").append(expr).append(") IS NULL THEN 1 ELSE 0 END)");
                 targets.add(String.valueOf(field.get("name")));

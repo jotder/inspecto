@@ -136,7 +136,9 @@ public final class SchemaFieldTypes {
      * {@code %d/%m/%Y} column silently parses as {@code %m/%d/%Y}. A value the format does not match is
      * a coercion failure like any other — NULL, and counted by the cast-failure audit
      * ({@link DataTransformer#countCastFailures}). Honoured on date-like types only;
-     * {@link Identifiers#validateSchema} refuses it anywhere else.
+     * {@link Identifiers#validateSchema} refuses it anywhere else. The reserved values {@link #EPOCH} and
+     * {@link #EPOCH_MS} are not strptime patterns: they read a {@code TIMESTAMP} from a count since 1970
+     * ({@link #epochSql}).
      */
     public static Map<String, String> formatsOf(Map<String, Object> schemaConfig) {
         Map<String, String> out = new LinkedHashMap<>();
@@ -153,6 +155,72 @@ public final class SchemaFieldTypes {
     /** The format list a field parses with: its own {@code format} alone when set, else the pipeline's. */
     public static List<String> formatsFor(String fieldFormat, List<String> pipelineFormats) {
         return fieldFormat == null || fieldFormat.isBlank() ? pipelineFormats : List.of(fieldFormat.trim());
+    }
+
+    /** Reserved field format: the text is a whole count of SECONDS since 1970-01-01T00:00:00Z. */
+    public static final String EPOCH = "epoch";
+    /** Reserved field format: the text is a whole count of MILLISECONDS since 1970-01-01T00:00:00Z. */
+    public static final String EPOCH_MS = "epoch_ms";
+
+    /**
+     * Whether a field {@code format} is one of the reserved epoch-count values ({@link #EPOCH},
+     * {@link #EPOCH_MS}; case-insensitive) rather than a strptime pattern (MAPPING-EPOCH-TIMESTAMP-1).
+     */
+    public static boolean isEpochFormat(String fmt) {
+        if (fmt == null) return false;
+        String f = fmt.trim();
+        return EPOCH.equalsIgnoreCase(f) || EPOCH_MS.equalsIgnoreCase(f);
+    }
+
+    /** The epoch format a field parses with, or {@code null} — a field's own format is its ONLY entry. */
+    static String epochFormatOf(List<String> formats) {
+        return formats != null && formats.size() == 1 && isEpochFormat(formats.get(0)) ? formats.get(0) : null;
+    }
+
+    /**
+     * The SQL turning epoch-count text in {@code col} into a {@code TIMESTAMP} holding the <b>UTC</b> wall
+     * clock — {@code make_timestamp(µs)}, which is naive and session-independent. ({@code to_timestamp}
+     * returns a {@code TIMESTAMPTZ}, and casting that to {@code TIMESTAMP} renders it in DuckDB's session
+     * zone, i.e. the HOST's — the same host-dependence {@link SourceZones} exists to remove.)
+     *
+     * <p>NULL, never a failed batch, for: blank; the {@code 0} "none" sentinel ({@link #epochNoneSql});
+     * anything that is not a whole number after trimming spaces, tabs and CR/LF ({@code TRY_CAST} would
+     * silently ROUND {@code 1700000000.5} and accept {@code 1.7e9}, so a digits-only guard comes first); and
+     * a count outside DuckDB's {@code TIMESTAMP} range.
+     *
+     * <p>⚠ The range is an explicit guard on the COUNT, not {@code TRY}: measured on DuckDB 2.0.0.0,
+     * {@code make_timestamp} accepts µs in [{@value #TS_MIN_MICROS}, 9223372036854775806] and, below the
+     * minimum, returns a value that {@code TRY} does not catch but that cannot be rendered later ("Date out
+     * of range in timestamp conversion"). The bounds per unit are exact divisions of that µs range, so no
+     * guarded count can overflow the multiplication either.
+     */
+    public static String epochSql(String col, String fmt) {
+        boolean ms = EPOCH_MS.equalsIgnoreCase(fmt.trim());
+        String perUnitMicros = ms ? "1000" : "1000000";
+        String lo = ms ? "-9223372022400000" : "-9223372022400";      // TS_MIN_MICROS / unit (exact)
+        String hi = ms ? "9223372036854775" : "9223372036854";        // floor(TS_MAX_MICROS / unit)
+        String text = epochText(col);
+        String count = "NULLIF(TRY_CAST(CASE WHEN regexp_full_match(" + text + ", '[+-]?[0-9]+') THEN "
+                + text + " END AS BIGINT), 0)";
+        return "TRY(make_timestamp(CASE WHEN " + count + " BETWEEN " + lo + " AND " + hi + " THEN "
+                + count + " * " + perUnitMicros + " END))";
+    }
+
+    /** The earliest µs since 1970 DuckDB 2.0.0.0's {@code TIMESTAMP} renders: 290309-12-22 (BC) 00:00:00. */
+    static final long TS_MIN_MICROS = -9223372022400000000L;
+
+    /**
+     * The predicate "this epoch text is the {@code 0} none-sentinel, or only whitespace" — what
+     * {@link #epochSql} maps to NULL on purpose, so the cast-failure audit must not count it as a failed
+     * coercion (the audit's own blank test trims spaces only).
+     */
+    public static String epochNoneSql(String col) {
+        return "regexp_full_match(" + epochText(col) + ", '([+-]?0+)?')";
+    }
+
+    /** The epoch cell as text with spaces, tabs and CR/LF trimmed — DuckDB's one-argument TRIM strips spaces only. */
+    private static String epochText(String col) {
+        return "TRIM(CAST(" + col + " AS VARCHAR), ' ' || chr(9) || chr(10) || chr(13))";
     }
 
     /**
@@ -210,6 +278,11 @@ public final class SchemaFieldTypes {
                 SqlBuilder.appendCoalesce(sb, asText, dateFormats, t);
                 return sb.toString();
             }
+            // An epoch count is an instant, already UTC: no strptime list, and no source zone to apply
+            // (a zone says how a wall clock was WRITTEN; an epoch has none). Refused at config load on
+            // any type but TIMESTAMP (Identifiers.validateFieldFormat).
+            String epoch = epochFormatOf(tsFormats);
+            if (epoch != null && "TIMESTAMP".equals(t)) return epochSql(col, epoch);
             // Parse naive first in both cases: TRY_STRPTIME yields a zone-less TIMESTAMP, and the
             // zone is what turns it into an instant. Casting straight to TIMESTAMPTZ (what this did
             // before) resolves it against the SESSION zone — the host — which is never the data's.

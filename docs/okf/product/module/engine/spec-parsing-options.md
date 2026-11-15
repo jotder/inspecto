@@ -129,6 +129,27 @@ Two consequences worth knowing:
   `INTEGER`, so its output Parquet schema changes on the next write — the declaration finally being
   honoured, but it can trip the schema BACKWARD gate.
 
+### 2.2 Epoch-count field formats (`MAPPING-EPOCH-TIMESTAMP-1`, 2026-11-15)
+
+A field's own `raw.fields[].format` is a strptime pattern, with two **reserved values** that are not:
+`epoch` (a whole count of seconds since 1970-01-01T00:00:00Z) and `epoch_ms` (milliseconds); case-insensitive.
+They replace the `sql` step with `to_timestamp(x::BIGINT)` and a `0` guard that a 10-digit epoch feed needed.
+`SchemaFieldTypes.epochSql` is the one compilation, used by the data column (`castSql`), its `DATE_*`
+partition and event time (`TransformCompiler.dateExpr`) and the schema preview (`ComponentPreview`).
+
+| Decision | Rule | Why |
+|---|---|---|
+| Type | honoured on `TIMESTAMP` only; `DATE`, `TIMESTAMPTZ` and every other type are **refused at load** (`Identifiers.validateFieldFormat`) | a `DATE` would need a zone to pick the calendar day, and a `TIMESTAMPTZ` demands a source zone it would not use |
+| Time zone | lands as the **UTC wall clock** via `make_timestamp(µs)` (naive, session-independent); `parsing.source_timezone` does not shift it, and a field `timezone` / `timezone_column` beside it is **refused** as dead config | an epoch is already an instant; `to_timestamp(x)::TIMESTAMP` would render in DuckDB's session zone, which is the host's (measured: `+05:30` on an `Asia/Calcutta` host, moving the day partition) |
+| `0` and blank | NULL, and **not** counted by the cast-failure audit (`epochNoneSql`); whitespace-only counts as blank | `0` is the feed's "none", like a blank |
+| Invalid | anything not `[+-]?[0-9]+` after trimming spaces, tabs and CR/LF, or out of the `TIMESTAMP` range, is NULL, the row kept and counted — never a failed batch | the policy a strptime miss already has; a bare `TRY_CAST` would round `1700000000.5` and accept `1.7e9`; DuckDB's one-argument `TRIM` strips spaces only, so the trim names its characters |
+| Range | guarded on the **count**: `epoch` −9223372022400 ‥ 9223372036854, `epoch_ms` −9223372022400000 ‥ 9223372036854775 — the µs range `make_timestamp` renders on DuckDB 2.0.0.0, 290309-12-22 (BC) ‥ 294247-01-10 | measured: below the minimum `make_timestamp` returns a value `TRY` does **not** catch and that fails later on read ("Date out of range in timestamp conversion"); inside the bounds the multiplication cannot overflow |
+| xlsx | an epoch field is never rewritten as an Excel day-serial (`DuckDbCsvIngester.xlsxSerialAsText`) | the rewrite turned `0` into 1899-12-30 and any count under 2958466 into an unrelated date |
+
+⚠ Recognition is "the field's ONLY format is `epoch`/`epoch_ms`", which a field `format` always is; a pipeline
+`timestamp_formats` list of exactly that one entry would read the same way, but only the field key is
+documented and validated. Fractional seconds are not supported (a `sql` step still covers them).
+
 ---
 
 ## 3. Corrected & extended DuckDB `read_csv` parameter reference

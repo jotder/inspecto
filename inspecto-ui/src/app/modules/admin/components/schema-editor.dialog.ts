@@ -83,7 +83,8 @@ const COLUMNS: EditableGridColumn[] = [
     { key: 'type', label: 'Type' },
     // strptime pattern for a DATE/TIMESTAMP written in a non-ISO spelling (`%B %d,%Y` for
     // `March 22,2025`) — it replaces the pipeline's format list for this field. "Suggest from sample"
-    // fills it; without it such a column lands NULL. The server refuses it on any other type.
+    // fills it; without it such a column lands NULL. The server refuses it on any other type. The reserved
+    // values `epoch` / `epoch_ms` read a TIMESTAMP from a count since 1970 (UTC, `0` = none).
     { key: 'format', label: 'Date format' },
     { key: 'description', label: 'Description' },
     { key: 'unit', label: 'Unit' },

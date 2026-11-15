@@ -343,7 +343,8 @@ public final class DuckDbCsvIngester {
         for (int i = 0; i < fields.size(); i++) {
             if (i > 0) proj.append(", ");
             String cell = SqlIdent.q(String.valueOf(fields.get(i).get("selector")));
-            proj.append(xlsxSerialAsText(cell, String.valueOf(fields.get(i).get("type")), cfg.csv()))
+            proj.append(xlsxSerialAsText(cell, String.valueOf(fields.get(i).get("type")),
+                            fields.get(i).get("format") instanceof String fmt ? fmt : null, cfg.csv()))
                 .append(" AS ").append(q(String.valueOf(fields.get(i).get("name"))));
         }
 
@@ -367,10 +368,15 @@ public final class DuckDbCsvIngester {
      * <p>⚠ {@code all_varchar} cannot tell a numeric cell from a text cell of digits, so in a
      * date-declared field a TEXT cell of 1–7 digits reads as a serial. An 8-digit {@code yyyymmdd}
      * text is past {@link #XLSX_MAX_SERIAL} and passes through untouched.
+     *
+     * <p>A field read with an epoch format ({@link SchemaFieldTypes#isEpochFormat}) holds a COUNT, not a
+     * serial, and is never rewritten: the rewrite would turn its {@code 0} ("none") into 1899-12-30 and any
+     * count under {@link #XLSX_MAX_SERIAL} into an unrelated date (MAPPING-EPOCH-TIMESTAMP-1 review).
      */
-    private static String xlsxSerialAsText(String cell, String declaredType, PipelineConfig.CsvSettings csv) {
+    private static String xlsxSerialAsText(String cell, String declaredType, String fieldFormat,
+                                           PipelineConfig.CsvSettings csv) {
         String t = SchemaFieldTypes.normalize(declaredType);
-        if (!SchemaFieldTypes.isDateLike(t)) return cell;
+        if (!SchemaFieldTypes.isDateLike(t) || SchemaFieldTypes.isEpochFormat(fieldFormat)) return cell;
         boolean dateOnly = "DATE".equals(t);
         String serial = "TRY_CAST(" + cell + " AS DOUBLE)";
         String value = dateOnly

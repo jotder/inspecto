@@ -3,6 +3,7 @@ package com.gamma.pipeline.exec;
 import com.gamma.api.PublicApi;
 import com.gamma.etl.DataTransformer;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.etl.SchemaFieldTypes;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.sql.SqlSandbox;
 import com.gamma.sql.SqlSandboxPolicy;
@@ -837,7 +838,11 @@ public final class ComponentPreview {
             case "bool", "boolean"                    -> tryCast(col, "BOOLEAN");
             case "date"      -> fmt != null ? "TRY_STRPTIME(" + col + ", " + SqlIdent.sqlStr(fmt) + ") IS NOT NULL"
                                             : tryCast(col, "DATE");
-            case "timestamp", "datetime" -> fmt != null ? "TRY_STRPTIME(" + col + ", " + SqlIdent.sqlStr(fmt) + ") IS NOT NULL"
+            // an epoch count passes when it converts, or is the `0` "none" sentinel (lands NULL, like a blank)
+            case "timestamp", "datetime" -> SchemaFieldTypes.isEpochFormat(fmt)
+                                            ? "(" + SchemaFieldTypes.epochSql(col, fmt) + " IS NOT NULL OR "
+                                              + SchemaFieldTypes.epochNoneSql(col) + ")"
+                                            : fmt != null ? "TRY_STRPTIME(" + col + ", " + SqlIdent.sqlStr(fmt) + ") IS NOT NULL"
                                             : tryCast(col, "TIMESTAMP");
             default -> null;   // varchar / string / text / unknown — always valid
         };
