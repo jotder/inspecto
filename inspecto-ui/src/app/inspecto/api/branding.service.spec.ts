@@ -3,6 +3,7 @@ import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { BrandingService } from './branding.service';
+import { SPACE_STORAGE_KEY } from './spaces.service';
 import { environment } from '../../../environments/environment';
 
 const url = environment.apiBaseUrl + '/v1/settings/branding';
@@ -12,6 +13,9 @@ describe('BrandingService', () => {
     let httpMock: HttpTestingController;
 
     beforeEach(() => {
+        // No active Space, as these tests assume: an earlier spec in the full run may leave one in localStorage
+        // (UI-BRANDING-SPEC-ORDER-1), and SpacesService restores it before the first fetch.
+        localStorage.removeItem(SPACE_STORAGE_KEY);
         TestBed.configureTestingModule({
             providers: [BrandingService, provideHttpClient(withXhr()), provideHttpClientTesting()],
         });
