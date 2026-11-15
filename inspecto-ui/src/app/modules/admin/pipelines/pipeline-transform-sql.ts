@@ -144,6 +144,24 @@ export function seedFields(upstreamColumns: readonly string[]): SqlField[] {
     }));
 }
 
+/**
+ * Copy each prior row's column metadata onto the row with the same OUTPUT NAME — the SQL → Fields switch
+ * rebuilds rows from SQL text, which has nowhere to carry it. Matched by name, never by position: a column
+ * renamed or removed in the SQL is a different output column and starts undescribed. Rows the SQL left
+ * with the same name keep their metadata; a name used twice takes the first prior row's.
+ */
+export function carryMetadata(rows: readonly SqlField[], prior: readonly SqlField[]): SqlField[] {
+    const byName = new Map<string, SqlField>();
+    for (const p of prior) if (p.name && !byName.has(p.name)) byName.set(p.name, p);
+    return rows.map((row) => {
+        const from = byName.get(row.name);
+        if (!from) return row;
+        const next: SqlField = { ...row };
+        for (const key of FIELD_METADATA_KEYS) if (from[key]) next[key] = from[key];
+        return next;
+    });
+}
+
 /** A short id for a row the author adds. */
 export function newFieldId(): string {
     return `f-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;

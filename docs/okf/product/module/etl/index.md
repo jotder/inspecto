@@ -40,4 +40,3 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `PARSING-DERIVE-EDITOR-1` | P3 | feature | slice 4 of Parsing D9: an optional profile editor for ASN.1 derive / children. | operator |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
 | `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
-| `SQL-STEP-METADATA-ROUNDTRIP-1` | P3 | defect | switching a sql Step's pane from Fields to SQL and back drops the column metadata (filed 2026-11-14, seen while fixing SQL-STEP-METADATA-… | — |
