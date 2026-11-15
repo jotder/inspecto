@@ -17,6 +17,7 @@ import { Router } from '@angular/router';
 import { UserService } from 'app/core/user/user.service';
 import { User } from 'app/core/user/user.types';
 import { SessionService } from 'app/inspecto/api';
+import { SCHEME_CHOICES, SchemeChoice, SchemePreferenceService } from 'app/inspecto/shell/scheme-preference.service';
 import { environment } from 'environments/environment';
 import { Subject, takeUntil } from 'rxjs';
 
@@ -40,6 +41,18 @@ export class UserComponent implements OnInit, OnDestroy {
     readonly actorName = this.session.actorName;
 
     @Input() showAvatar: boolean = true;
+    /**
+     * Offer the colour scheme (Match system / Light / Dark) in this menu (Inspecto LA, LA-FULL-CYCLE-TEST-1 phase 6). The
+     * menu then shows on an auth-free edition too, holding just that choice. Off = the console's menu, unchanged.
+     */
+    @Input() schemeChoice = false;
+    readonly schemes = SCHEME_CHOICES;
+    private readonly schemePref = inject(SchemePreferenceService);
+    readonly scheme = this.schemePref.choice;
+
+    chooseScheme(choice: SchemeChoice): void {
+        this.schemePref.choose(choice);
+    }
     user: User;
     private _unsubscribeAll: Subject<null> = new Subject<null>();
 

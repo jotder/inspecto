@@ -4,6 +4,7 @@ import { provideIcons } from 'app/core/icons/icons.provider';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { provideInspectoShell } from '@inspecto/core/shell/provide-inspecto-shell';
 import { environment } from 'environments/environment';
+import { provideToastr } from 'ngx-toastr';
 import { laAppRoutes } from './app.routes';
 import { provideLaAppHostServices } from './la-host.providers';
 import { PRODUCT } from './product.generated';
@@ -17,6 +18,10 @@ import { PRODUCT } from './product.generated';
 export const appConfig: ApplicationConfig = {
     providers: [
         ...provideInspectoShell({ environment, product: PRODUCT, routes: laAppRoutes }),
+        // Notices open at the top centre, not the shell's bottom right (LA-FULL-CYCLE-TEST-1 phase 6, finding 19): there
+        // they covered the graph's minimap, and the top right holds the page's own actions (Save's notice covered Save).
+        // Listed after the shell's provideToastr, so this one is the config in force.
+        provideToastr({ positionClass: 'toast-top-center' }),
         // `GET /bootstrap` once, before routing: the auth mode, the module flags (`LA_FEATURES` reads them), the Product and its
         // nav and, under OIDC, a session resumed from the refresh cookie. Never rejects.
         // The shared-Investigation viewer (`/embed/...`) is anonymous and talks to nothing but its one public read, so it skips the
@@ -29,7 +34,7 @@ export const appConfig: ApplicationConfig = {
         provideGamma({
             gamma: {
                 layout: 'classic',
-                scheme: 'dark',
+                scheme: 'auto',
                 screens: { sm: '600px', md: '960px', lg: '1280px', xl: '1440px' },
                 theme: 'theme-default',
                 themes: [{ id: 'theme-default', name: 'Default' }],

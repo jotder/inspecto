@@ -111,6 +111,10 @@ button that fails.
    password; a secured install shows **Sign in with SSO**.
 2. The front page offers **Link Analysis**, **Geo**, **Entity Lists** and **Alerts** (and **Settings** if you may
    change them). The same areas sit in the slim menu down the left edge, with the Space switcher and your user menu.
+3. **Light or dark.** Inspecto LA follows your browser's light or dark setting, and changes with it. To fix one, open
+   the user menu (the person icon at the foot of the left menu) ▸ **Colour scheme**: **Match system** (the start),
+   **Light** or **Dark**. The choice is kept in this browser for you (for each person who signs in on it); where nobody
+   signs in, the menu holds just this choice.
 
 ### 3.1 The Getting started page
 
@@ -621,8 +625,14 @@ has 921)*); reduce the graph first with Clean up, a filter or Collapse. The lege
 drawing only — a hidden kind is still followed by the next expand; to leave it out, set link kinds in **Expand** ▸
 **Links** (that is recorded).
 
-**How nodes look by default.** Node and link labels start off (a saved view that states them keeps its choice); the
-brush is tinted while a label switch is on.
+**How nodes look by default.** Node labels show on their own while the graph has **at most 80 nodes**, and are off
+above that; the line along the bottom of the canvas then says *node labels off above 80 nodes: Display options turns
+them on*. Your tick or untick of **Node labels** in Display options wins either way, and a saved view keeps the labels
+it was saved with. Link labels start off. The brush is tinted while a label switch differs from that start.
+
+**Notices** (a refusal, a save) open at the top centre of the window, and a step's result line at the top centre of
+the canvas, between the Legend and Graph counts pills, both clear of the minimap and the page's own buttons. The start's outcome (*Drew 1 entity and 14 linked nodes…*) stays above the canvas until your
+next step (an Expand, an Exclude, a Clean up, an Undo, Save), whose own result line takes its place.
 
 * **Node size** is a Display setting, never derived from links or an attribute: *Tiny* 12 · *Small* 20 (the start) ·
   *Medium* 28 · *Large* 40 px. **Node spacing** multiplies the layout's own distances: *Compact* · *Roomy* · *Spacious* ·
@@ -787,6 +797,12 @@ otherwise the value stays blank and the form says why. With entities selected, *
 canvas toolbar has **Keep** beside **Hide** (when the toolbar is folded into **⋯**, **Keep the selected** is there). A node no expand has followed yet has
 a **dotted outline** (legend: *Dotted outline: not expanded yet*); on an Investigation's canvas *Next unexpanded* and
 *Only unexpanded* under that legend row help you go one node at a time.
+
+**Where new nodes go.** An Expand of up to 50 new nodes leaves every node you see where it is and draws the new ones
+**outside** what is already there: past the ring of the entity they hang off, on the side facing away from the rest of
+the graph, never on top of another node or a link. A bigger Expand lays the whole graph out again. The layout a graph
+opened with stays while you expand it; pick another in **Graph layout** to change it. On an Investigation, each **start
+entity** keeps a heavier outline and a small **start** badge through every step.
 
 **Remove** (**Delete**, right-click, or the bin on the canvas toolbar) is offered while you explore, outside an open
 Investigation. It takes the selected nodes off the graph, together with every neighbour left with no link at all once
@@ -1120,7 +1136,9 @@ every degree is already read by the server with the Industry pack's settings (ti
 neighbours per entity, busy limit) and your Links, Time and Limits choices, so what you see is what Save records. If the
 data changed in between and a degree's entities are no longer admitted, Save expands from what is, and still completes. If a step is
 refused partway, the Investigation is saved with the steps before it and a message names the steps that were not
-recorded. If a step needs a second person's approval, Save stops there and the step waits for approval.
+recorded. If a step needs a second person's approval, Save stops there and the step waits for approval. Save keeps
+the picture: every entity is drawn where it was before you saved, even on a Space that masks values (the saved
+Investigation names entities by its own aliases).
 
 **Save** needs *Incident management*. Without it you can still start and Expand; the Save button is disabled and says
 *Needs Incident management.*
@@ -1796,6 +1814,65 @@ around* inside the Pattern section) were decided under operator delegation, reco
   `inspecto-link-analysis-display-rules` (presentational). A Reference-detail rule carries `reference` (the Reference's
   Dataset id); values come from the masked `POST /inv/reference-rows`, batched over the drawn nodes of that Entity Type
   (`LA-REFERENCE-DETAILS-MORE-1`, 2026-11-06).
+
+### Canvas readability internals (`LA-FULL-CYCLE-TEST-1` phase 6, as built 2026-11-16)
+
+Findings 15, 17, 18, 19 and 20 of the 2026-11-15 full-cycle test. Each decision was taken by the lane under the
+operator's delegation ("clean, CXO-presentable"); the operator may reverse any of them.
+
+- **Labels on under 80 nodes** (finding 15). `nodeLabelsChoice` (`boolean | null`, null = automatic) and
+  `nodeLabelsAuto` (canvas ≤ `AUTO_NODE_LABEL_MAX` = 80 nodes) in `link-analysis.component.ts`; `nodeLabels` is the
+  choice, else the automatic value. Why 80: it is the embedded Investigation view's own label default
+  (`display.embed_label_limit`), so a shared embed and the studio agree, and a fitted ~1,100 × 650 px canvas gives each
+  of 80 nodes about 95 px square, room for a node and its 11 px label (masked aliases are drawn short). A constant, not a
+  new `LaLimit`: it is a default the tick overrides, not a cap the server enforces. A saved view stores the state shown
+  (`display.nodeLabels`); a view that never stated it follows the size. The render strip says *node labels off above 80
+  nodes: Display options turns them on* (`data-testid="la-labels-off"`) when the rule, not the analyst, turned them off.
+- **Expand places outside** (finding 17). `placeBesideNeighbours` (`graph-view.component.ts`) puts a new node on a ring
+  round its anchors, starting on the side facing away from the graph's centre (an anchor at the centre: the widest
+  opening between its links, beyond its ring), fanning to both sides; a spot is taken only when it keeps
+  `placementGap(nodeSize, spacing)` (the node plus Radial's gap: 80 px at LA's defaults) from every drawn node, sits
+  0.4 × gap off every drawn link, and the new node's own links pass no drawn node; else the ring widens. Before, a
+  golden-angle spiral at 60 px round the anchors landed inside a star, on its links.
+- **The opening layout is kept** (finding 17). `openingLayout()` decides `defaultLayoutFor` when a graph opens and keeps
+  it while the graph shares a node with the last one (an Expand, a Save) unless the kept layout is now over its node
+  cap. Re-deciding it on every Expand flipped a growing graph from Layered to Force, and a layout change re-runs the
+  layout over every node.
+- **Save keeps positions** (finding 17). `saveUnsaved` first records the canvas positions by each entity's raw
+  spelling (`carriedPositions`, from `GraphViewComponent.nodePositions()`); `positionHints` maps the saved Working Set's
+  ids back through `exploreAliases` (the saved Investigation speaks its own aliases, DR-D2) and the graph view takes them
+  as `[positionHints]`: a hinted new node is drawn at its hint, and a fresh build whose every node is hinted runs no
+  layout (the layout is set after the first draw). The hints belong to the Investigation saved; a new start clears them.
+- **Start entity marked** (finding 17). `workingSetToGraph` sets `data.start` on hop-0 entities (unsaved and saved
+  alike, only when some entities are not a start, so a seedless start badges nothing); the graph view draws a 3.5 px
+  outline and a *start* badge (`left-top`, beside *held* and *+n*).
+- **Banner clears on the next step** (finding 19). An effect clears `startNotice` when `growExclude.lastChange` or
+  `investigation.lastStep` gets a value: every Expand, Exclude, Clean up, Undo and recorded step (Save replays steps)
+  sets one of them, and its own result line takes the banner's place. Drawing the start is not a step.
+- **The change line at the top centre** (finding 19, the "snackbar" over the minimap). The Grow / Exclude result line
+  (`la-change-line`) moved from the canvas's bottom right, where it covered the minimap, to the top band every fit keeps
+  clear (`CANVAS_FIT_PADDING` top 44 px), centred in the gap between the Legend pill (6.5rem) and the Graph counts pill
+  (15rem), so it stays one line beside an open toolbox (a 1,000 px canvas). Tried and dropped: the bottom centre, where it covered the nodes a fit draws along the bottom.
+- **Notices at the top centre in la-app** (finding 19). `provideToastr({ positionClass: 'toast-top-center' })` after
+  the shell's provider in `la-app/app.config.ts`. Bottom right covered the minimap; top right covers the page's own
+  actions (Save's notice covered Save). The console keeps its bottom right.
+- **Rows grid number columns** (finding 19). *Count* and *Links* are `flex: 0, width: 130`: stretched like the text
+  columns, a right-aligned name sat at the far edge with its filter funnel alone at the other, read as a column with no
+  name.
+- **Force pulls to the centre** (finding 18, re-driven 2026-11-16 on `claims_network`, 426 nodes: two unlinked groups
+  were still thrown to the corners after `LA-OVERLAYS-HIDE-GRAPH-1`). `layoutConfig('force')` adds d3 `forceX`/`forceY`
+  at `FORCE_GRAVITY` = 0.05 (off in G6's defaults): an unlinked group settles at the main group's edge
+  (≈ √(N · |push| / pull)); d3's own 0.1 squeezed the main group.
+- **Colour scheme** (finding 20). la-app's Gamma `scheme` is `auto`; `LaAppComponent` follows `prefers-color-scheme`
+  live (a `change` listener). `SchemePreferenceService` (`inspecto/shell/`) keeps *Match system / Light / Dark* per
+  person in this browser (`inspecto.scheme.<actor>`, `inspecto.scheme` where nobody signs in; every storage call in
+  try/catch) and is started by la-app's root only, so the console keeps its configured dark. The shared `<user>` menu
+  offers it with `[schemeChoice]="true"` (la-shell), as `menuitemradio` items; the menu then shows on Basic too.
+- Specs: `graph-view-placement.spec.ts` (the 17-node fixture: no two node boxes overlap after Expand and after Save, no
+  layout run through a Save), `link-analysis.component.spec.ts` ▸ *a drawn graph stays readable*, the label specs,
+  `scheme-preference.service.spec.ts`, `user.component.spec.ts` ▸ *colour scheme*. Live drive (Basic, 2026-11-16):
+  labels note, notices at top centre, scheme switch, `claims_network` fit; the Investigation Save path was not driven
+  live (the drive server is Basic, no Investigations).
 
 ### Search around, Merge and Possible duplicates internals
 

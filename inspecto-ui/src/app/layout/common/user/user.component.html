@@ -1,22 +1,59 @@
 <!-- Basic / offline is an auth-free shell: no principal to name and no session to end, so the whole
-     menu is suppressed rather than left showing a blank "Signed in as" over a Sign out that cannot work. -->
-@if (signedInEdition() === 'oidc') {
+     menu is suppressed rather than left showing a blank "Signed in as" over a Sign out that cannot work.
+     A host that offers the colour scheme (Inspecto LA, `schemeChoice`) shows the menu there too, holding just that. -->
+@if (signedInEdition() === 'oidc' || schemeChoice) {
     <!-- Button -->
     <button mat-icon-button [matMenuTriggerFor]="userActions" aria-label="User menu">
         <mat-icon [svgIcon]="'heroicons_outline:user-circle'"></mat-icon>
     </button>
 
     <mat-menu [xPosition]="'before'" #userActions="matMenu">
-        <button mat-menu-item>
-            <span class="flex flex-col leading-none">
-                <span>Signed in as</span>
-                <span class="mt-1.5 text-md font-medium">{{ actorName() }}</span>
-            </span>
-        </button>
-        <mat-divider class="my-2"></mat-divider>
-        <button mat-menu-item (click)="signOut()">
-            <mat-icon [svgIcon]="'heroicons_outline:arrow-right-on-rectangle'"></mat-icon>
-            <span>Sign out</span>
-        </button>
+        @if (signedInEdition() === 'oidc') {
+            <button mat-menu-item>
+                <span class="flex flex-col leading-none">
+                    <span>Signed in as</span>
+                    <span class="mt-1.5 text-md font-medium">{{ actorName() }}</span>
+                </span>
+            </button>
+            <mat-divider class="my-2"></mat-divider>
+        }
+        @if (schemeChoice) {
+            <!-- LA-FULL-CYCLE-TEST-1 phase 6: Match system (the default) / Light / Dark, remembered per person -->
+            <p
+                class="text-secondary m-0 px-4 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider"
+                aria-hidden="true"
+            >
+                Colour scheme
+            </p>
+            @for (s of schemes; track s.value) {
+                <button
+                    mat-menu-item
+                    role="menuitemradio"
+                    [attr.aria-checked]="scheme() === s.value"
+                    [attr.data-testid]="'scheme-' + s.value"
+                    (click)="chooseScheme(s.value)"
+                >
+                    <mat-icon [svgIcon]="s.icon"></mat-icon>
+                    <span [class.font-semibold]="scheme() === s.value"
+                        >{{ s.label }}<span class="sr-only"> colour scheme</span></span
+                    >
+                    @if (scheme() === s.value) {
+                        <!-- wrapped: a bare mat-icon is projected to the item's leading icon slot, before the label -->
+                        <span class="ml-2 inline-flex align-middle" aria-hidden="true">
+                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:check"></mat-icon>
+                        </span>
+                    }
+                </button>
+            }
+            @if (signedInEdition() === 'oidc') {
+                <mat-divider class="my-2"></mat-divider>
+            }
+        }
+        @if (signedInEdition() === 'oidc') {
+            <button mat-menu-item (click)="signOut()">
+                <mat-icon [svgIcon]="'heroicons_outline:arrow-right-on-rectangle'"></mat-icon>
+                <span>Sign out</span>
+            </button>
+        }
     </mat-menu>
 }

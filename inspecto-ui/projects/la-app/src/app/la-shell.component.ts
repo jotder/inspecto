@@ -188,7 +188,7 @@ export const railLink = (n: ProductNavEntry): RailLink => ({ path: n.path, label
                         preferredSample="la-sample"
                     ></inspecto-space-switcher>
                 </div>
-                <user [showAvatar]="false"></user>
+                <user [showAvatar]="false" [schemeChoice]="true"></user>
                 @if (expanded()) {
                     <p class="text-secondary m-0 px-2 text-xs max-sm:hidden">{{ footer }}</p>
                 }
