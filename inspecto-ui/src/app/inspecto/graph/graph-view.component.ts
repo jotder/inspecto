@@ -31,6 +31,7 @@ import { G6GraphData, entityTypeIcon, nodeColor, nodeKindLabel, nodeShape } from
 import { toSvg } from './graph-export';
 import type { G6Node } from './graph-types';
 import { CAPPED_LAYOUT_FALLBACK, GRAPH_LAYOUTS, type GraphLayoutId } from './graph-layouts';
+import { registerRadialLayout } from './graph-radial-layout';
 import { LayoutSuperseded, registerSlicedLayouts } from './graph-sliced-layout';
 import { NodeRule, NodeRuleDetails, nodeRuleColor } from './node-rules';
 import { NodeKind } from 'app/inspecto/api';
@@ -558,6 +559,7 @@ export function edgeDash(pattern: EdgePattern | undefined): number[] | undefined
  * <p>`nodeSize` and `spacing` (both from {@link GraphDisplayOptions}) scale the layout's distances: with neither given
  * (spacing 1, the host's own node size) every layout is byte-for-byte what it was before they existed, so the catalog
  * and pipeline graphs are untouched. `grid`, `circular` and `mds` carry no spacing parameter in G6 and ignore both.
+ * `radial` is not G6's own radial but `component-radial` (LA-RADIAL-LAYOUT-SQUASH-1, `graph-radial-layout.ts`).
  */
 export function layoutConfig(
     id: GraphLayoutId | null,
@@ -576,8 +578,14 @@ export function layoutConfig(
         }
         case 'force-cluster':
             return { type: 'force-atlas2', kr: scaled(20), preventOverlap: true };
+        // One radial per component, round its best-connected node, nodes kept apart by their drawn size (see graph-radial-layout).
         case 'radial':
-            return { type: 'radial', unitRadius: scaled(120), preventOverlap: true };
+            return {
+                type: 'component-radial',
+                unitRadius: scaled(120),
+                nodeSize: node,
+                nodeSpacing: Math.round(node * 0.75 * k),
+            };
         case 'concentric':
             return {
                 type: 'concentric',
@@ -1427,6 +1435,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     /** Build a brand-new G6 instance. The last resort - see {@link ngOnChanges}. */
     private create(): void {
         registerSlicedLayouts();
+        registerRadialLayout();
         this.hoverLabelled = [];
         this.pinnedLabelled = [];
         this.destroyGraph();

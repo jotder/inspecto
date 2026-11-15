@@ -115,7 +115,13 @@ describe('layoutConfig node size and spacing (operator 2026-10-24)', () => {
     it('with neither given, every layout is exactly what it was before they existed', () => {
         expect(layoutConfig('force')).toEqual({ type: 'sliced-d3-force', collide: { radius: 28 } });
         expect(layoutConfig('dagre')).toEqual({ type: 'antv-dagre', rankdir: 'LR', nodesep: 18, ranksep: 60 });
-        expect(layoutConfig('radial')).toEqual({ type: 'radial', unitRadius: 120, preventOverlap: true });
+        // LA-RADIAL-LAYOUT-SQUASH-1: Radial is the per-component radial, kept apart by the drawn node size
+        expect(layoutConfig('radial')).toEqual({
+            type: 'component-radial',
+            unitRadius: 120,
+            nodeSize: 32,
+            nodeSpacing: 24,
+        });
         expect(layoutConfig('concentric')).toEqual({
             type: 'concentric',
             sortBy: 'degree',
@@ -140,7 +146,8 @@ describe('layoutConfig node size and spacing (operator 2026-10-24)', () => {
             manyBody: { strength: -120 },
         });
         expect(layoutConfig('dagre', { spacing: 4 })).toMatchObject({ nodesep: 72, ranksep: 240 });
-        expect(layoutConfig('radial', { spacing: 2 })).toMatchObject({ unitRadius: 240 });
+        expect(layoutConfig('radial', { spacing: 2 })).toMatchObject({ unitRadius: 240, nodeSpacing: 48 });
+        expect(layoutConfig('radial', { nodeSize: 20 })).toMatchObject({ nodeSize: 20, nodeSpacing: 15 });
         expect(layoutConfig('force-cluster', { spacing: 3 })).toMatchObject({ kr: 60 });
         expect(layoutConfig('dendrogram', { spacing: 2 })).toMatchObject({ nodeSep: 72, rankSep: 240 });
         expect((layoutConfig('mindmap', { spacing: 2 })['getHGap'] as () => number)()).toBe(120);
@@ -412,7 +419,9 @@ describe('GraphViewComponent change classifier (LA-05)', () => {
             // A layout pick changes no style, so the element mappers are not re-run (about 1.7 s at 4,767 elements).
             expect(graph.setData).not.toHaveBeenCalled();
             expect(live['setLayout']).toHaveBeenCalledTimes(1);
-            expect((live['setLayout'] as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({ type: 'radial' });
+            expect((live['setLayout'] as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+                type: 'component-radial',
+            });
             expect(live['layout']).toHaveBeenCalledTimes(1);
             expect(live['fitView']).toHaveBeenCalledTimes(1);
         });

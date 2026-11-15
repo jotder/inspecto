@@ -35,7 +35,8 @@ the dialog was opened with a synthetic key event and works).
 > were fixed and closed on 2026-11-15 (in D-7 the near-twin names come from the installed Spaces, two of them from the
 > tracked templates `la-sample` and `la-mobile-money`; the phone switcher still shows no name and a two-line name is
 > squeezed in its list item: `LA-SPACE-SWITCHER-NAMES-1`. In D-10 node labels still start off, by the operator's
-> 2026-10-15 decision). D-5 and D-14 stay open on the board.
+> 2026-10-15 decision). D-5 was fixed and its row closed on 2026-11-15 (Radial is now one radial per component round
+> its best-connected node; the picked layout still stays chosen for the next graph, by design). D-14 stays open on the board.
 
 Severity: **P1** blocks a user's task · **P2** misleads or breaks a main path · **P3** friction, layout or
 wording. Each defect has a row in `docs/BACKLOG.md` (id in brackets).
