@@ -101,8 +101,10 @@ class ControlApiInvestigationRevealOnScreenTest {
                     "SELECT caller, callee, channel FROM (VALUES ('" + A + "','" + B + "','voice'),('" + A + "','" + C
                             + "','sms'),('" + B + "','" + D + "','voice')) AS t(caller,callee,channel)", "2026-11-16T00:00:00Z"));
             views.write(new ViewDefinition("acct_view", "flow-x", List.of(),
-                    "SELECT msisdn, holder_name, city, score FROM (VALUES ('" + A + "','Thandi Mokoena','Durban',0.82),('"
-                            + B + "','Sipho Dlamini','Soweto',0.10)) AS t(msisdn,holder_name,city,score)", "2026-11-16T00:00:00Z"));
+                    "SELECT msisdn, holder_name, city, score, alarms, opened FROM (VALUES ('" + A
+                            + "','Thandi Mokoena','Durban',0.82,3,DATE '2024-03-01'),('" + B
+                            + "','Sipho Dlamini','Soweto',0.10,0,DATE '2025-07-14')) AS t(msisdn,holder_name,city,score,alarms,opened)",
+                    "2026-11-16T00:00:00Z"));
             ComponentStore reg = new ComponentStore(writeRoot.resolve("registry"));
             reg.write("dataset", "calls_ds", Map.of("view", "calls_view", "columns", List.of(
                     Map.of("name", "caller", "classification", "MSISDN"), Map.of("name", "callee", "classification", "MSISDN"))));
@@ -242,6 +244,9 @@ class ControlApiInvestigationRevealOnScreenTest {
             assertTrue(row.get("holder_name").asText().startsWith("masked:"), "a name beside a masked id is masked with it: " + row);
             assertTrue(row.get("city").asText().startsWith("masked:"), "so is the city: " + row);
             assertTrue(row.get("score").isNumber(), "an indicator score is not an identifier and stays a number: " + row);
+            assertTrue(row.get("alarms").isNumber(),
+                    "under typed a count stays a number (ids are what is classified); only `all` masks integral values: " + row);
+            assertTrue(row.get("opened").asText().startsWith("masked:"), "a date beside a masked id is a personal detail: " + row);
 
             // the same rule for a node mapping's attributes on the exploration canvas
             JsonNode multi = ok(c, "POST", "/inv/projection/multi", "{\"nodes\":[{\"dataset\":\"acct_ds\",\"idColumn\":\"msisdn\","
@@ -282,6 +287,8 @@ class ControlApiInvestigationRevealOnScreenTest {
                 assertTrue(tokens.contains(r.get("key").asText()), "rows keep the key as asked: " + r);
                 names.add(r.at("/row/holder_name").asText());
                 assertFalse(r.at("/row/msisdn").asText().startsWith("masked:"), "unmasked with its id: " + r);
+                assertFalse(r.at("/row/opened").asText().startsWith("masked:"), "every detail with it: " + r);
+                assertTrue(r.at("/row/alarms").isNumber(), r.toString());
             }
             assertEquals(Set.of("Thandi Mokoena", "Sipho Dlamini"), names);
             List<Event> rows = events.stream().filter(e -> "LINK_ENTITY_REVEALED".equals(e.type())).toList();
@@ -302,6 +309,7 @@ class ControlApiInvestigationRevealOnScreenTest {
             for (JsonNode r : all.get("rows")) {
                 assertTrue(Set.of(A, B).contains(r.at("/row/msisdn").asText()), "the key is revealed: " + r);
                 assertTrue(r.at("/row/holder_name").asText().startsWith("masked:"), "the rest stays masked under all: " + r);
+                assertTrue(r.at("/row/alarms").asText().startsWith("masked:"), "`all` masks an integral value too: " + r);
                 assertTrue(r.at("/row/score").isNumber(), r.toString());
             }
             assertTrue(all.at("/masking/masked").asBoolean(), all.toString());

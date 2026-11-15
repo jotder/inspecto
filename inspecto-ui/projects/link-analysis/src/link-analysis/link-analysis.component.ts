@@ -5071,11 +5071,12 @@ Its prior copies stay in its version history.`,
                 inv,
             ]),
         );
-        const real = revealedIdOf(node, this.investigation.revealed());
-        const reason = this.investigation.revealReason();
+        const revealed = this.investigation.revealed();
+        const alias = rawIdsOf(node).find((a) => Object.hasOwn(revealed, a));
+        const reason = alias === undefined ? undefined : this.investigation.revealReasons()[alias];
         return {
             ...(this.investigation.active() && back.size ? { aliasOf: (a: string) => back.get(a) ?? a } : {}),
-            revealed: real !== null && reason ? { id: real, reason } : null,
+            revealed: alias !== undefined && reason ? { id: revealed[alias], reason } : null,
             revealWhyNot: this.revealWhyNot(),
             reveal: async () => {
                 const r = await this.revealOnScreen();

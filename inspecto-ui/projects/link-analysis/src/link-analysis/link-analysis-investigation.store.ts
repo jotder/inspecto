@@ -502,11 +502,12 @@ export class InvestigationSessionStore {
 
     /**
      * D3 (LA-FULL-CYCLE-TEST-1 phase 2): the aliases of the open Investigation this screen revealed, alias → real id, and
-     * the reason given. Browser memory only: closing or switching the Investigation forgets them, so masked stays the
-     * default and nothing raw is stored. A reveal is one action for the nodes on screen (chunked at `input.reveal_ids`).
+     * alias → the reason it was revealed with (a later read of its details is recorded with THAT reason). Browser memory
+     * only: closing or switching the Investigation forgets them, so masked stays the default and nothing raw is stored. A
+     * reveal is one action for the nodes on screen (chunked at `input.reveal_ids`).
      */
     readonly revealed = signal<RevealedIds>({});
-    readonly revealReason = signal<string | null>(null);
+    readonly revealReasons = signal<Readonly<Record<string, string>>>({});
 
     /** Reveal these aliases of the open Investigation with `reason`; returns how many were revealed. Throws the server's refusal. */
     async reveal(tokens: readonly string[], reason: string): Promise<number> {
@@ -521,7 +522,7 @@ export class InvestigationSessionStore {
         }
         if (this.activeId() !== id) return 0; // another Investigation was opened meanwhile: its aliases are not these
         this.revealed.update((m) => ({ ...m, ...got }));
-        this.revealReason.set(reason);
+        this.revealReasons.update((m) => ({ ...m, ...Object.fromEntries(Object.keys(got).map((a) => [a, reason])) }));
         return Object.keys(got).length;
     }
     /** What the canvas draws instead of the query graph; null = the query graph. */
@@ -567,7 +568,7 @@ export class InvestigationSessionStore {
         this.lastOverride.set(null);
         this.addingStart.set(false);
         this.revealed.set({});
-        this.revealReason.set(null);
+        this.revealReasons.set({});
         this.clearRedo();
     }
 

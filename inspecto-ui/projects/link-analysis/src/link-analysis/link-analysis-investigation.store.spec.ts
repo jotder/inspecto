@@ -142,14 +142,14 @@ describe('InvestigationSessionStore - the one Reveal (LA-FULL-CYCLE-TEST-1 D3)',
         expect(revealEntities).toHaveBeenCalledTimes(3); // 100 + 100 + 50: the server's per-call cap
         expect(revealEntities.mock.calls.every((c) => c[0] === 'inv-1' && c[2] === 'warrant 7')).toBe(true);
         expect(store.revealed()[tokens[0]]).toBe('raw-' + tokens[0]);
-        expect(store.revealReason()).toBe('warrant 7');
+        expect(store.revealReasons()[tokens[249]]).toBe('warrant 7'); // each alias keeps the reason it was revealed with
 
         expect(await store.reveal(tokens.slice(0, 5), 'again')).toBe(0); // already revealed: nothing is asked twice
         expect(revealEntities).toHaveBeenCalledTimes(3);
 
         store.close(); // closing (or switching) forgets them: masked stays the default
         expect(store.revealed()).toEqual({});
-        expect(store.revealReason()).toBeNull();
+        expect(store.revealReasons()).toEqual({});
     });
 
     it('a refusal reveals nothing and reaches the caller', async () => {

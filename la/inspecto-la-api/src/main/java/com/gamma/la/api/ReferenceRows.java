@@ -64,9 +64,10 @@ import java.util.TreeSet;
  * lineage masks every column (fail closed). A masked value is the Space's exploration alias, the same one every other
  * exploration read shows for that id.
  *
- * <p><b>Details go with their id</b> (LA-FULL-CYCLE-TEST-1 phase 2, finding 14 and D4): when the key is masked, every
- * other value of its row is masked as {@code all} masks (a holder's name or city beside a masked id identifies it);
- * fractional numbers and flags still pass. The key column reads the alias the caller ASKED with, so inside an
+ * <p><b>Details go with their id</b> (LA-FULL-CYCLE-TEST-1 phase 2, finding 14 and D4): when the key is masked, the text
+ * and date values of its row are masked with it (a holder's name, a city or a date beside a masked id identifies it);
+ * numbers and flags (counts, scores, measures) stay readable, as {@code typed} leaves an unclassified number in the clear
+ * ({@code all} masks integral values anyway). The key column reads the alias the caller ASKED with, so inside an
  * Investigation it is that Investigation's pseudonym, never the Space's second alias for the same entity.
  *
  * <p><b>Reveal</b> (D3): {@code reveal: true} with a {@code reason} reads the named Investigation's entities raw - the key
@@ -165,10 +166,11 @@ final class ReferenceRows {
         if (masking) maskedCols.addAll(classifiedColumns(writeRoot, datasetId, cols));
         if (maskKey) maskedCols.add(keyName);
         else if (reveal) maskedCols.remove(keyName);
-        // `all`'s rule masks every value that may be an id. It applies with a masked key, and under `all` itself even to a
-        // revealed row: there the Space chose to mask every possible id, and a revealed row may hold ANOTHER entity's, so a
-        // reveal lifts the key alone (fail closed). Under `typed` the details were masked only because of the key.
-        boolean allRule = maskKey || reveal && "all".equals(mode);
+        // `all`'s rule masks every value that may be an id (text and integral values). It applies to every row under `all`,
+        // a revealed one too: there the Space chose to mask every possible id, and a revealed row may hold ANOTHER entity's,
+        // so a reveal lifts the key alone (fail closed). Under `typed` ids are what is classified, and a masked key masks its
+        // row's personal details - text and dates - only; a revealed key lifts them with it.
+        boolean allRule = "all".equals(mode) && (maskKey || reveal);
         ExplorationMasking colMask = maskedCols.isEmpty() ? out : ExplorationMasking.forced(writeRoot, mode, "classified column");
 
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -195,12 +197,12 @@ final class ReferenceRows {
                 Map<String, Object> shown = new LinkedHashMap<>();
                 for (String c : cols) {
                     Object v = row.get(c);
-                    // A masked key masks its row's details with it (LA-FULL-CYCLE-TEST-1 finding 14: a holder's name or city
-                    // beside a masked id identifies it), as `all` masks every id: text and integral values (an unclassified
-                    // BIGINT msisdn / imsi) are ids until proven otherwise; only fractional numbers and flags - indicator
-                    // scores - pass. (Under `all` the key is always masked, so this is `all`'s rule too.)
-                    boolean hide = maskedCols.contains(c)
-                            || allRule && !(reveal && c.equals(keyName)) && v != null && !passesUnderAll(v);
+                    // `all` masks every id: text and integral values (an unclassified BIGINT msisdn / imsi) are ids until
+                    // proven otherwise; only fractional numbers and flags - indicator scores - pass. A masked key masks its
+                    // row's personal details with it (LA-FULL-CYCLE-TEST-1 finding 14: a holder's name, a city or a date
+                    // beside a masked id identifies it); numbers and flags - counts, scores, measures - stay readable.
+                    boolean hide = maskedCols.contains(c) || v != null && !(reveal && c.equals(keyName))
+                            && (allRule && !passesUnderAll(v) || maskKey && !(v instanceof Number || v instanceof Boolean));
                     shown.put(c, hide ? colMask.out(v) : v);
                 }
                 for (String asked : askedByRaw.getOrDefault(raw, List.of())) {
@@ -222,7 +224,7 @@ final class ReferenceRows {
 
         audit(ex, datasetId, keys.size(), matched.size(), rows.size(), truncated);
         Map<String, Object> describe = out.describe();
-        describe.put("masked", allRule || !maskedCols.isEmpty());
+        describe.put("masked", maskKey || allRule || !maskedCols.isEmpty());
         describe.put("maskedColumns", List.copyOf(maskedCols));
         if (reveal) describe.put("revealed", true);
         Map<String, Object> res = new LinkedHashMap<>();

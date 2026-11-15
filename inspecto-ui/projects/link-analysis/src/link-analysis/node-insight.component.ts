@@ -623,17 +623,15 @@ export class NodeInsightComponent implements OnInit {
     ngOnInit(): void {
         const c = this.ctx();
         this.revealed.set(c.revealed ?? null);
-        const m = this.mapping();
-        if (m) void this.svc.lookup(m.indicators, [c.key], c.investigationId).then((t) => this.indicators.set(t));
         this.readDetails();
         if (c.graphKey) this.riskResult.set(this.svc.cachedRisk(this.cacheKey(c.graphKey)));
         void this.loadMemberships();
     }
 
     /**
-     * The node's personal details: its Enrichment row and its row of every Reference describing its Entity Type (C6a),
-     * masked by the server with the node's id - and, once this screen revealed the id (D3), read raw with the reason
-     * given, which the server re-checks and records per entity.
+     * The node's own rows: its indicators, its Enrichment row and its row of every Reference describing its Entity Type
+     * (C6a), masked by the server with the node's id - and, once this screen revealed the id (D3), read raw with the
+     * reason given, which the server re-checks and records per entity.
      */
     private readDetails(): void {
         const c = this.ctx();
@@ -642,7 +640,9 @@ export class NodeInsightComponent implements OnInit {
             reason
                 ? this.svc.lookup(ref, [c.key], c.investigationId, reason)
                 : this.svc.lookup(ref, [c.key], c.investigationId);
-        const enrichment = this.mapping()?.enrichment;
+        const m = this.mapping();
+        if (m) void read(m.indicators).then((t) => this.indicators.set(t));
+        const enrichment = m?.enrichment;
         if (enrichment) void read(enrichment).then((t) => this.enrichment.set(t));
         const refs = c.references ?? [];
         this.details.set(refs.map((ref) => ({ ref, table: null })));

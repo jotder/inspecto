@@ -661,7 +661,8 @@ dialog. Three sections look up only the entities they need on the server, so the
 
 * **Masked id** — only for a masked node: it says the name is an alias and offers **Reveal the ids on screen…** (the
   one Reveal, see [Masked ids in an Investigation](#masked-ids-in-an-investigation)), or why you cannot. Once revealed it
-  shows the real id, and the node's details and enrichment are read again in the clear, each recorded with your reason.
+  shows the real id, and the node's details, enrichment and risk factors are read again in the clear, each recorded
+  with your reason. Before that, text and dates beside a masked id are masked with it; counts and scores stay readable.
 
 * **Risk** — on a pack that maps an indicators Dataset (Telecom: `telecom_msisdn_indicators` by `msisdn`), the node's
   **indicator score** and factor columns. **Compute risk** runs propagated risk on the server over the Investigation's

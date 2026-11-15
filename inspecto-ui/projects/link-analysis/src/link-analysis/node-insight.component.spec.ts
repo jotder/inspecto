@@ -256,6 +256,12 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         expect(reveal).toHaveBeenCalledTimes(1);
         expect(el.querySelector('[data-testid="ni-revealed"]')?.textContent).toContain('27820000001');
         expect(svc.lookup).toHaveBeenCalledWith(ref, [alias], 'inv', 'MR-3 warrant');
+        expect(svc.lookup).toHaveBeenCalledWith(
+            expect.objectContaining({ dataset: 'telecom_msisdn_indicators_dataset' }),
+            [alias],
+            'inv',
+            'MR-3 warrant',
+        ); // the indicator factors are the node's own details too
         await expectNoA11yViolations(el);
     });
 

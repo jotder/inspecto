@@ -417,9 +417,11 @@ no later response, and the SPA keeps the real ids in browser memory for the open
 selection sends) stays the alias. The step log rewrites revealed aliases on screen (`revealText`); the Dossier keeps
 them masked (its own hand-off reveal is unchanged). Reveal is offered only in a saved Investigation: an unsaved or
 exploration canvas has no Investigation and purpose to record it against, and says so.
-*Details go with their id:* `/inv/reference-rows` masks every other value of a row whose key is masked as `all` masks
-(text and integral values become aliases; fractional numbers and flags pass), because a holder's name or city beside a
-masked id identifies it; `/inv/projection/multi` masks a node mapping's `attrs` with its id. With `reveal: true`, a
+*Details go with their id:* `/inv/reference-rows` masks the text and date values of a row whose key is masked, because a
+holder's name, a city or a date beside a masked id identifies it; numbers and flags (counts, scores, measures) stay
+readable, as `typed` leaves an unclassified number in the clear (`all` masks integral values anyway).
+`/inv/projection/multi` masks a node mapping's `attrs` with its id: they are read as text (`CAST … AS VARCHAR`), so a
+numeric attribute is masked there too, the fail-closed side of the same rule. With `reveal: true`, a
 `reason` and an `investigationId`, reference rows read that Investigation's pseudonyms raw (the key and the details
 masked only because of it; a column masked by its own classification names another entity and stays masked, and under
 `all`, where the Space masks every value that may be an id whatever the key, a reveal lifts the key alone), under the
