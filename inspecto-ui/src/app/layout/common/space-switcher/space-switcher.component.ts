@@ -58,7 +58,7 @@ export function spacesByName(spaces: readonly Space[]): Space[] {
                 [matMenuTriggerFor]="menu"
                 class="space-switcher min-w-0 max-w-full max-sm:!px-2"
                 [matTooltip]="spaces.availableSpaces().length ? label() + ' (switch Space)' : 'Create a Space'"
-                [attr.aria-label]="label() + (spaces.availableSpaces().length ? ', Switch Space' : ', create a Space')"
+                [attr.aria-label]="label() + (spaces.availableSpaces().length ? ', switch Space' : ', create a Space')"
                 data-testid="space-switcher"
             >
                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:square-3-stack-3d"></mat-icon>

@@ -73,7 +73,7 @@ describe('SpaceSwitcherComponent', () => {
 
     it('renders an accessible switcher when multiple spaces exist', async () => {
         const { fixture } = create(true);
-        const btn = fixture.nativeElement.querySelector('button[aria-label$=", Switch Space"]') as HTMLButtonElement;
+        const btn = fixture.nativeElement.querySelector('button[aria-label$=", switch Space"]') as HTMLButtonElement;
         // WCAG 2.5.3 label in name: the accessible name starts with the visible Space label.
         const visible = btn.querySelector('[data-testid="space-switcher-name"]')!.textContent!.trim();
         expect(visible).toBe('Alpha');
@@ -83,7 +83,7 @@ describe('SpaceSwitcherComponent', () => {
 
     /** Opens the switcher menu and returns its item labels (the menu renders in the CDK overlay). */
     function openMenu(fixture: ReturnType<typeof create>['fixture']): HTMLButtonElement[] {
-        fixture.nativeElement.querySelector('button[aria-label$=", Switch Space"]').click();
+        fixture.nativeElement.querySelector('button[aria-label$=", switch Space"]').click();
         fixture.detectChanges();
         return Array.from(document.querySelectorAll<HTMLButtonElement>('.mat-mdc-menu-panel button[mat-menu-item]'));
     }
@@ -145,7 +145,7 @@ describe('SpaceSwitcherComponent', () => {
             expect(single.fixture.nativeElement.querySelector('button')).toBeNull();
         });
 
-        /** The zero-Space trigger has no ", Switch Space" name, so open it by its own button. */
+        /** The zero-Space trigger has no ", switch Space" name, so open it by its own button. */
         function openMenu2(fixture: ReturnType<typeof create>['fixture']): HTMLButtonElement[] {
             fixture.nativeElement.querySelector('button').click();
             fixture.detectChanges();
@@ -195,11 +195,11 @@ describe('SpaceSwitcherComponent', () => {
                 spaces: [space('alpha', long), space('beta', 'Beta')],
             });
             const btn = fixture.nativeElement.querySelector(
-                'button[aria-label$=", Switch Space"]',
+                'button[aria-label$=", switch Space"]',
             ) as HTMLButtonElement;
             expect(btn.classList).toContain('space-switcher'); // the label truncates (component style)
             expect(btn.classList).toContain('max-w-full');
-            expect(btn.getAttribute('aria-label')).toBe(`${long}, Switch Space`);
+            expect(btn.getAttribute('aria-label')).toBe(`${long}, switch Space`);
             const tip = fixture.debugElement.query(By.directive(MatTooltip)).injector.get(MatTooltip);
             expect(tip.message).toBe(`${long} (switch Space)`);
             // the chevron follows the name rather than sitting between the icon and the name
