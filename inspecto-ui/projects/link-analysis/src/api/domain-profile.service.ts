@@ -76,6 +76,7 @@ export class DomainProfileService {
 
     private apply(s: DomainProfileState): void {
         this.state.set(s);
+        this.failed.set(false); // a save that answers after a failed read is an answer too
         installDomainProfiles((s.installed ?? []).map(profileFromPack), s.active);
     }
 }

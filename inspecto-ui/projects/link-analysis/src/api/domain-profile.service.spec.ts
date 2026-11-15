@@ -31,4 +31,37 @@ describe('DomainProfileService', () => {
         expect(svc.state()).toBeNull();
         http.verify();
     });
+
+    it('clears a failure when the next read starts, and when a save answers', async () => {
+        const space = signal('s1');
+        TestBed.configureTestingModule({
+            providers: [
+                provideHttpClient(),
+                provideHttpClientTesting(),
+                { provide: SpacesService, useValue: { currentSpaceId: space } },
+            ],
+        });
+        const svc = TestBed.inject(DomainProfileService);
+        const http = TestBed.inject(HttpTestingController);
+        const url = (r: { url: string }) => r.url.endsWith('/settings/link-analysis/domain-profile');
+        const answer = { active: 'generic', stated: null, profile: null, installed: [], refused: [] };
+        TestBed.tick();
+        http.expectOne(url).flush({ error: 'boom' }, { status: 500, statusText: 'Server Error' });
+        await svc.ready();
+        expect(svc.failed()).toBe(true);
+
+        space.set('s2'); // another Space: the retry starts, and the old failure no longer shows
+        TestBed.tick();
+        const retry = http.expectOne(url);
+        expect(svc.failed()).toBe(false);
+        retry.flush({ error: 'boom' }, { status: 500, statusText: 'Server Error' });
+        await svc.ready();
+        expect(svc.failed()).toBe(true);
+
+        svc.save('generic').subscribe();
+        http.expectOne((r) => r.method === 'PUT' && url(r)).flush(answer);
+        expect(svc.failed()).toBe(false);
+        expect(svc.state()?.active).toBe('generic');
+        http.verify();
+    });
 });

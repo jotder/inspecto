@@ -40,6 +40,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-OVERLAYS-HIDE-GRAPH-1` | P3 | defect | the expanded Legend and Graph counts cover the drawn graph, fit puts nodes under overlays or on the edge, and node labels start off. | — |
 | `LA-OPEN-DIALOG-ACTIONS-1` | P3 | defect | File ▸ Open puts Open / Rename / Delete below the fold of its scroll area and shows Last changed in UTC. | — |
 | `LA-UI-TEXT-PASS-2` | P3 | defect | wording and vocabulary breaks left on the la-app screens. | — |
+| `LA-DOMAIN-PROFILE-READY-RACE-1` | P3 | defect | DomainProfileService.ready() can resolve before the Space's Domain Profile is read. | — |
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22). Re-triaged 2026-11-05: two items remain. | operator |
 | `LA-GROW-EXCLUDE-THINK-ALOUD-1` | P3 | chore | run a think-aloud test of "Grow and clean a graph" with two analysts new to Link Analysis | external |
 | `LA-INVESTIGATION-STORE-DESIGN-1` | P3 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
