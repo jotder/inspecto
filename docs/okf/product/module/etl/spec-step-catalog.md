@@ -234,7 +234,7 @@ holding one always takes the `steps:` form (like `sql`); the recipe verb is `loo
 | `target` | string | optional | in place | **Write to column.** A new column for the result; blank replaces the source column. |
 | `default` | string | optional | pass through | **Unmatched values become.** The literal written when no mapping matches. |
 
-**Example.** `examples/07-steps/lookup` (8 rows, `STATUS_LABEL` = Open/Done/Void) · `spaces/default/config/lookup_step`.
+**Example.** `examples/07-steps/lookup` (8 rows, `STATUS_LABEL` = Open/Done/Void) · `spaces/default/config/lookup_step`, run at rest by `jobs/lookup_step_rollup_job.toon` into `lookup_step_rollup`.
 
 ## `explode` → `transform.explode` — Array exploder
 

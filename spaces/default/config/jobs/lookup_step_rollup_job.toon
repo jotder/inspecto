@@ -1,0 +1,5 @@
+job:
+  name: lookup_step_rollup
+  type: pipeline
+  pipeline_config: lookup_step/lookup_step_pipeline.toon
+  on_pipeline: lookup_step

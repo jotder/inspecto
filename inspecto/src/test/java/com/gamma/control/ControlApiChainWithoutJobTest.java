@@ -287,4 +287,64 @@ class ControlApiChainWithoutJobTest {
         assertTrue(checked >= 25, "found " + checked + " shipped pipeline_config Jobs");
         assertTrue(nameDiffersFromFile, "the premise: some shipped Pipeline is not named after its file");
     }
+
+    /**
+     * DEFAULT-SPACE-LOOKUP-STEP-NO-JOB-1: the default Space as shipped, its {@code type: pipeline} Jobs hosted and its
+     * config root the runner's base, judges none of its chained Pipelines as Job-less: {@code /validate} of each
+     * Pipeline with a chain and an {@code output_store:} carries no {@code WARN_CHAIN_WITHOUT_PIPELINE_JOB}.
+     * {@code lookup_step} did, until it got {@code lookup_step_rollup_job.toon} like its five siblings.
+     */
+    @Test
+    @DisplayName("every chained Pipeline of the default Space has the Job that runs it")
+    void theDefaultSpacesChainedPipelinesEachHaveTheirJob(@TempDir Path dir) throws Exception {
+        Path config = Path.of("").toAbsolutePath().getParent().resolve("spaces/default/config");
+        List<com.gamma.job.JobConfig> jobs = new ArrayList<>();
+        try (Stream<Path> s = Files.list(config.resolve("jobs"))) {
+            for (Path p : s.filter(f -> f.getFileName().toString().endsWith("_job.toon")).sorted().toList()) {
+                com.gamma.job.JobConfig j = com.gamma.job.JobConfig.load(p.toString());
+                if ("pipeline".equals(j.type())) jobs.add(j);
+            }
+        }
+        List<Path> pipelines;
+        try (Stream<Path> s = Files.walk(config)) {
+            pipelines = s.filter(f -> f.getFileName().toString().endsWith("_pipeline.toon")).sorted().toList();
+        }
+        String priorRoots = System.getProperty("assist.safety.roots");
+        System.setProperty("assist.safety.roots", config.toString());     // the Space's jail
+        System.setProperty("assist.write.root", Files.createDirectories(dir.resolve("wr")).toString());
+        CollectorService svc = null;
+        ControlApi api = null;
+        List<String> judged = new ArrayList<>();
+        try {
+            svc = new CollectorService(List.of(), List.of(), jobs, 3600, 1, null);
+            api = new ControlApi(svc, 0);
+            api.start();
+            // the Space config root is the runner's base, as SpaceBootstrap registers it for a self-contained Space
+            // (after the API: the single-tenant boot publishes the launch dir)
+            com.gamma.pipeline.SpaceConfigRoot.registerConfigReadRoot("default", config);
+            com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
+            for (Path p : pipelines) {
+                Map<String, Object> draft = ToonHelper.decode(Files.readString(p));
+                Object store = draft.get("output_store");
+                boolean chained = draft.get("steps") instanceof List<?> l && !l.isEmpty()
+                        || draft.get("processing") instanceof Map<?, ?> proc && Stream.of("dedup", "summarize",
+                        "profile", "join").anyMatch(k -> proc.get(k) != null);
+                if (store == null || String.valueOf(store).isBlank() || !chained) continue;
+                HttpResponse<String> r = send(api.port(), "POST", "/validate",
+                        json.writeValueAsString(Map.of("type", "pipeline", "config", draft)));
+                assertEquals(200, r.statusCode(), r.body());
+                assertFalse(r.body().contains(CODE), p + ": " + r.body());
+                judged.add(String.valueOf(draft.get("name")));
+            }
+        } finally {
+            if (api != null) api.close();
+            if (svc != null) svc.close();
+            com.gamma.pipeline.SpaceConfigRoot.forget("default");
+            System.clearProperty("assist.write.root");
+            if (priorRoots != null) System.setProperty("assist.safety.roots", priorRoots);
+            else System.clearProperty("assist.safety.roots");
+        }
+        assertTrue(judged.contains("lookup_step"), "judged: " + judged);
+        assertTrue(judged.size() >= 6, "the six chained Step samples at least: " + judged);
+    }
 }

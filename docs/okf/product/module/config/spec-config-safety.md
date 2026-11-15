@@ -678,9 +678,12 @@ finding per Step, anchored at `steps[i].<kind>` or `processing.<kind>`, naming t
     `MaintenanceLibraryTest.schedulerAuditFlagsAnOutputStoreNoPipelineConfigJobRuns`.
   - ⚠ The `webhook:` / `excel:` blocks also run only at rest but are not judged by this warning (only the
     chain is, as for the store-less finding above).
-  - The default Space's `lookup_step` Pipeline (`spaces/default/config/lookup_step/`) has a chain and a
-    store and no Job, so it gets this warning when saved: a true finding, not a spurious one. Open as
-    `DEFAULT-SPACE-LOOKUP-STEP-NO-JOB-1`.
+  - The default Space's `lookup_step` Pipeline (`spaces/default/config/lookup_step/`) had a chain and a
+    store and no Job, so it got this warning when saved: a true finding. Since 2026-11-15
+    (`DEFAULT-SPACE-LOOKUP-STEP-NO-JOB-1`) it has `jobs/lookup_step_rollup_job.toon`, shaped like its five
+    siblings', so every chained Pipeline of the default Space has the Job that runs it. Pinned by
+    `ControlApiChainWithoutJobTest` (the default Space's Jobs hosted, each chained Pipeline at `/validate`)
+    and `DemoCorpusIngestTest` (the committed Job runs the lookup over the landed sample).
 
 Pinned by `ControlApiChainOutputStoreArmingTest` (graph save active / inactive, the activation patch, a
 chain with a store, the slot alone, a legacy block at `/validate`) and `ControlApiChainWithoutJobTest`
