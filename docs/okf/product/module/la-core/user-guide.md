@@ -1832,8 +1832,11 @@ operator's delegation ("clean, CXO-presentable"); the operator may reverse any o
   round its anchors, starting on the side facing away from the graph's centre (an anchor at the centre: the widest
   opening between its links, beyond its ring), fanning to both sides; a spot is taken only when it keeps
   `placementGap(nodeSize, spacing)` (the node plus Radial's gap: 80 px at LA's defaults) from every drawn node, sits
-  0.4 × gap off every drawn link, and the new node's own links pass no drawn node; else the ring widens. Before, a
-  golden-angle spiral at 60 px round the anchors landed inside a star, on its links.
+  0.4 × gap off every drawn link, and the new node's own links pass no drawn node; else the ring widens. Where no such
+  spot exists near the anchors (an evenly spaced Grid, where every own link passes a node), the link rules are dropped
+  after `PLACEMENT_STRICT_TRIES` = 120 spots each and the node takes the first spot that only keeps the gap, which a ring
+  just past the drawing always has (a grid of cells finds it fast): the cost per node stays bounded and the node stays
+  beside the graph. Before, a golden-angle spiral at 60 px round the anchors landed inside a star, on its links.
 - **The opening layout is kept** (finding 17). `openingLayout()` decides `defaultLayoutFor` when a graph opens and keeps
   it while the graph shares a node with the last one (an Expand, a Save) unless the kept layout is now over its node
   cap. Re-deciding it on every Expand flipped a growing graph from Layered to Force, and a layout change re-runs the
@@ -1864,7 +1867,8 @@ operator's delegation ("clean, CXO-presentable"); the operator may reverse any o
   at `FORCE_GRAVITY` = 0.05 (off in G6's defaults): an unlinked group settles at the main group's edge
   (≈ √(N · |push| / pull)); d3's own 0.1 squeezed the main group.
 - **Colour scheme** (finding 20). la-app's Gamma `scheme` is `auto`; `LaAppComponent` follows `prefers-color-scheme`
-  live (a `change` listener). `SchemePreferenceService` (`inspecto/shell/`) keeps *Match system / Light / Dark* per
+  live: on the media query's `change` it emits the Gamma config again (same values), because the graph and map canvases
+  read the scheme only on a config emit and draw with colours they cannot take from CSS. `SchemePreferenceService` (`inspecto/shell/`) keeps *Match system / Light / Dark* per
   person in this browser (`inspecto.scheme.<actor>`, `inspecto.scheme` where nobody signs in; every storage call in
   try/catch) and is started by la-app's root only, so the console keeps its configured dark. The shared `<user>` menu
   offers it with `[schemeChoice]="true"` (la-shell), as `menuitemradio` items; the menu then shows on Basic too.

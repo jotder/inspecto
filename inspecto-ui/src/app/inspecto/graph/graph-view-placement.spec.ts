@@ -189,4 +189,24 @@ describe('graph placement after an Expand and a Save (LA-FULL-CYCLE-TEST-1 phase
                     GAP - 1e-6,
                 );
     });
+
+    it('on an evenly spaced Grid (no spot clears the link rules) it stays fast and puts the node beside the graph', () => {
+        // a 13 x 13 lattice at 100 px with the anchor in the middle: every own link from it passes a lattice node
+        const nodes: Record<string, unknown>[] = [];
+        for (let i = 0; i < 13; i++)
+            for (let j = 0; j < 13; j++) nodes.push({ id: `g${i}-${j}`, style: { x: i * 100, y: j * 100 } });
+        const fresh = ['n0', 'n1', 'n2'];
+        for (const id of fresh) nodes.push({ id });
+        const edges = fresh.map((id) => ({ source: 'g6-6', target: id }));
+        const t0 = performance.now();
+        expect(placeBesideNeighbours(nodes, edges, new Set(fresh), GAP)).toBe(true);
+        expect(performance.now() - t0).toBeLessThan(1000);
+        const placed = nodes.slice(-3).map((n) => n['style'] as { x: number; y: number });
+        for (const p of placed) {
+            // beside the 1,200 px drawing, never thrown far off it
+            expect(Math.hypot(p.x - 600, p.y - 600)).toBeLessThan(600 * Math.SQRT2 + 3 * GAP);
+            for (const q of nodes.slice(0, -3).map((n) => n['style'] as { x: number; y: number }))
+                expect(Math.hypot(p.x - q.x, p.y - q.y)).toBeGreaterThanOrEqual(GAP - 1e-6);
+        }
+    });
 });

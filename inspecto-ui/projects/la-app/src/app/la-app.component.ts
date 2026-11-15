@@ -40,12 +40,13 @@ export class LaAppComponent {
             });
             doc.body.classList.add(config.theme);
         };
-        inject(GammaConfigService)
-            .config$.pipe(takeUntilDestroyed(inject(DestroyRef)))
-            .subscribe(paint);
-        // the browser switched light/dark while the app is open: repaint when following it
+        const gamma = inject(GammaConfigService);
+        gamma.config$.pipe(takeUntilDestroyed(inject(DestroyRef))).subscribe(paint);
+        // The browser switched light/dark while the app is open: when following it, the config is emitted again (same
+        // values), so every reader of the scheme repaints - this page, and the graph and map canvases, which read
+        // prefers-color-scheme on a config emit and draw with colours they cannot take from CSS.
         const onChange = (): void => {
-            if (last?.scheme === 'auto') paint(last);
+            if (last?.scheme === 'auto') gamma.config = {};
         };
         query?.addEventListener?.('change', onChange);
         inject(DestroyRef).onDestroy(() => query?.removeEventListener?.('change', onChange));

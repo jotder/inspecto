@@ -45,14 +45,18 @@ describe('LaAppComponent colour scheme', () => {
         const fixture = TestBed.createComponent(LaAppComponent);
         fixture.detectChanges();
         TestBed.tick();
-        return { query, listeners, fixture };
+        return { query, listeners, fixture, config$ };
     }
 
-    it('paints the browser scheme on auto and repaints when the browser switches', () => {
-        const { query, listeners } = create(false);
+    it('paints the browser scheme on auto and repaints when the browser switches, re-emitting the config for the canvases', () => {
+        const { query, listeners, config$ } = create(false);
         expect(document.body.classList.contains('light')).toBe(true);
+        let emits = 0;
+        config$.subscribe(() => emits++);
+        emits = 0;
         query.matches = true;
         listeners.forEach((fn) => fn());
+        expect(emits).toBe(1); // the graph and map canvases read prefers-color-scheme on a config emit
         expect(document.body.classList.contains('dark')).toBe(true);
         expect(document.body.classList.contains('light')).toBe(false);
     });

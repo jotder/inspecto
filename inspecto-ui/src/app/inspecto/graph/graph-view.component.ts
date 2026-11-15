@@ -446,14 +446,20 @@ function widestOpening(c: Pt, around: readonly Pt[]): number | null {
     return best;
 }
 
+/** How many spots one new node tries under the link rules before it gives them up (see {@link placeBesideNeighbours}). */
+export const PLACEMENT_STRICT_TRIES = 120;
+
 /**
  * Give each new node (`added`) a position beside its already-positioned neighbours, OUTSIDE what is drawn there
  * (LA-FULL-CYCLE-TEST-1 phase 6, finding 17). A new node is put on a ring round its anchors (the centre of its drawn
  * neighbours), starting in the direction that leads away from the rest of the graph (an anchor in the middle of a star:
- * the widest opening between its links), and fanning out to either side of it. A spot is taken only when it keeps
- * `gap` from every drawn node, does not sit on a drawn link, and the new node's own links do not run through a drawn
- * node; otherwise the ring widens. Siblings of one hub therefore fan out instead of stacking, and nothing lands inside
- * a star on top of its links. New nodes linked only to other new nodes are placed in later passes. Replaces the new
+ * the widest opening between its links), and fanning out to either side of it. The first spot that keeps `gap` from
+ * every drawn node, does not sit on a drawn link and whose own links run past no drawn node is taken; the ring widens
+ * until one does. Siblings of one hub therefore fan out instead of stacking, and nothing lands inside a star on top of
+ * its links. On a layout where no such spot exists near the anchors (an evenly spaced Grid: every own link passes a
+ * node), the link rules are given up after {@link PLACEMENT_STRICT_TRIES} spots each and the node goes to the first
+ * spot that keeps `gap` from every node, which a ring just past the drawing always has: the cost per node stays
+ * bounded and the node stays beside the graph. New nodes linked only to other new nodes are placed in later passes. Replaces the new
  * nodes' entries in `nodes` with positioned copies; returns false when some new node has no positioned neighbour at all,
  * in which case the caller re-runs the layout.
  */
@@ -499,12 +505,29 @@ export function placeBesideNeighbours(
           ]
         : [0, 0];
     const lineClear = gap * 0.4;
-    const fits = (p: Pt, anchors: readonly Pt[]): boolean => {
-        for (const q of at.values()) {
-            if (Math.hypot(p[0] - q[0], p[1] - q[1]) < gap) return false;
-        }
+    // the drawn nodes in square cells of `gap`: "keeps gap from every node" reads the nine cells round a spot
+    const grid = new Map<string, Pt[]>();
+    const cellKey = (x: number, y: number): string => `${Math.floor(x / gap)},${Math.floor(y / gap)}`;
+    const put = (p: Pt): void => {
+        const k = cellKey(p[0], p[1]);
+        grid.set(k, [...(grid.get(k) ?? []), p]);
+    };
+    for (const p of at.values()) put(p);
+    const clearOfNodes = (p: Pt): boolean => {
+        const cx = Math.floor(p[0] / gap);
+        const cy = Math.floor(p[1] / gap);
+        for (let dx = -1; dx <= 1; dx++)
+            for (let dy = -1; dy <= 1; dy++)
+                for (const q of grid.get(`${cx + dx},${cy + dy}`) ?? [])
+                    if (Math.hypot(p[0] - q[0], p[1] - q[1]) < gap) return false;
+        return true;
+    };
+    /** The spot keeps the gap, sits on no drawn link and (with `ownLinks`) its own links pass no drawn node. */
+    const fits = (p: Pt, anchors: readonly Pt[], linkRules: boolean, ownLinks: boolean): boolean => {
+        if (!clearOfNodes(p)) return false;
+        if (!linkRules) return true;
         for (const [a, b] of links) if (segmentDistance(p, a, b) < lineClear) return false;
-        // the new node's own links: from each anchor to here, past no other drawn node
+        if (!ownLinks) return true;
         for (const a of anchors)
             for (const q of at.values()) {
                 if (q === a || anchors.includes(q)) continue;
@@ -537,27 +560,31 @@ export function placeBesideNeighbours(
                 ? Math.atan2(c[1] - centre[1], c[0] - centre[0])
                 : (widestOpening(c, around) ?? 0);
             const reach = offCentre ? 0 : Math.max(0, ...around.map((p) => Math.hypot(p[0] - c[0], p[1] - c[1])));
-            let spot: Pt | null = null;
-            for (let ring = 0; !spot && ring < 400; ring++) {
-                const r = Math.max(gap * 1.5, reach + gap) + ring * gap * 0.5;
-                const step = Math.min(Math.PI / 12, gap / r);
-                for (let k = 0; !spot && k * step <= Math.PI; k++) {
-                    for (const sign of k ? [1, -1] : [1]) {
-                        const angle = heading + sign * k * step;
-                        const p: Pt = [c[0] + r * Math.cos(angle), c[1] + r * Math.sin(angle)];
-                        if (fits(p, anchors)) {
-                            spot = p;
-                            break;
+            const r0 = Math.max(gap * 1.5, reach + gap);
+            // past this radius every spot keeps the gap from every drawn node, so the last search below always ends
+            const extent = Math.max(0, ...[...at.values()].map((q) => Math.hypot(q[0] - c[0], q[1] - c[1])));
+            /** The first spot on the widening rings that `ok` accepts, within `tries` spots; null = none. */
+            const search = (ok: (p: Pt) => boolean, tries: number): Pt | null => {
+                for (let ring = 0; tries > 0; ring++) {
+                    const r = r0 + ring * gap * 0.5;
+                    const step = Math.min(Math.PI / 12, gap / r);
+                    for (let k = 0; k * step <= Math.PI; k++)
+                        for (const sign of k ? [1, -1] : [1]) {
+                            const angle = heading + sign * k * step;
+                            const p: Pt = [c[0] + r * Math.cos(angle), c[1] + r * Math.sin(angle)];
+                            if (ok(p)) return p;
+                            if (--tries <= 0) return null;
                         }
-                    }
+                    if (r > extent + gap) return [c[0] + r * Math.cos(heading), c[1] + r * Math.sin(heading)];
                 }
-            }
-            // 400 widening rings never all fail on a finite graph; the guard keeps a broken input from spinning
-            const p = spot ?? [
-                c[0] + (reach + gap * 200) * Math.cos(heading),
-                c[1] + (reach + gap * 200) * Math.sin(heading),
-            ];
+                return null;
+            };
+            const p =
+                search((q) => fits(q, anchors, true, true), PLACEMENT_STRICT_TRIES) ??
+                search((q) => fits(q, anchors, true, false), PLACEMENT_STRICT_TRIES) ??
+                search((q) => fits(q, anchors, false, false), Number.POSITIVE_INFINITY)!;
             at.set(id, p);
+            put(p);
             addLinksOf(id);
             placedAny = true;
             const i = indexOf.get(id)!;

@@ -401,3 +401,26 @@ describe('refusal403: a true plain reason for every 403 (LA-UI-TEXT-PASS-1 X5 re
         expect(refusal403('')).toBe('This was refused.');
     });
 });
+
+describe('start entities on the canvas (LA-FULL-CYCLE-TEST-1 phase 6, finding 17)', () => {
+    const ws = (entities: WorkingSet['entities']): WorkingSet => ({
+        entities,
+        links: [{ source: 'S', target: 'R1', kind: 'call', count: 1 }] as unknown as WorkingSet['links'],
+        excluded: [],
+        hash: 'h',
+    });
+    const startOf = (g: ReturnType<typeof workingSetToGraph>, raw: string) =>
+        g.nodes.find((n) => rawIdsOf(n).includes(raw))?.data.start;
+
+    it('marks the hop-0 entities as the start and nothing else', () => {
+        const g = workingSetToGraph(ws([entity('S'), entity('R1', { hop: 1 }), entity('R2', { hop: 1 })]), P);
+        expect(startOf(g, 'S')).toBe(true);
+        expect(startOf(g, 'R1')).toBeUndefined();
+        expect(startOf(g, 'R2')).toBeUndefined();
+    });
+
+    it('a seedless start (every entity at hop 0) badges nothing: a mark on every node says nothing', () => {
+        const g = workingSetToGraph(ws([entity('S'), entity('R1'), entity('R2')]), P);
+        expect(g.nodes.some((n) => n.data.start)).toBe(false);
+    });
+});
