@@ -34,6 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `LA-FULL-CYCLE-TEST-1` | P2 | defect | a first-time user cannot finish the quick start on a signed-in install, and cannot read their own graph. | — |
 | `LA-RADIAL-LAYOUT-SQUASH-1` | P3 | defect | the Radial layout draws a two-component graph as a narrow, overlapping wedge. | — |
 | `LA-PHONE-OVERFLOW-1` | P3 | defect | at phone width the Link Analysis tool bar and the Add data page scroll sideways. | — |
 | `LA-CLIPPED-CONTROLS-1` | P3 | defect | Link Analysis controls clipped by their panels. | — |

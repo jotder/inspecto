@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **97<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 84<!--count:backlog-p3--> × P3** —
+> **98<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 84<!--count:backlog-p3--> × P3** —
+> ⬆ **97 → 98 (P2 13 → 14) on 2026-11-15**: filed P2 `LA-FULL-CYCLE-TEST-1` [items: module.la-core, product.la · kind: defect] — a full-cycle user drive of Inspecto LA (Preview, demo sign-in; new Space, two files, graph, Investigation, Dossier, five personas) found 33 gaps; findings and a seven-phase plan in `superpower/2026-11-15-la-full-cycle-test-plan.md`.
 > ⬆ **96 → 97 (P3 83 → 84) on 2026-11-15**: filed P3 defect `LA-DOMAIN-PROFILE-READY-RACE-1` [items: module.la-core · kind: defect] — `DomainProfileService.ready()` can resolve before the first read, so a `?seed=` Link Analysis link on a cold load may bind through the generic vocabulary (found by the review of `LA-SETTINGS-PROFILE-FLASH-1`).
 > ⬇ **99 → 96 (P3 86 → 83) on 2026-11-15** — `LA-TOOLBAR-SHIFT-1`, `LA-DARK-RADIO-CONTRAST-1`, `LA-SETTINGS-PROFILE-FLASH-1` shipped (P3 defects from the Basic UI test of 2026-11-10): the canvas tool bar keeps the *Clear search and filters* slot laid out and only shows it while there is something to clear, so a search no longer moves *Fit to screen* and the tools after it; a selected radio button in the dark scheme draws in the scheme-aware primary (primary-400, 4.90:1 on the dark card) instead of the accent slate it was drawn in (one rule in `styles.scss`, every dialog); Settings ▸ Link Analysis says *Reading the Domain Profile…* while the read is in flight and shows *Domain Profile unavailable* only once it has failed (`DomainProfileService.failed`).
 > ⬆ **98 → 99 (P3 85 → 86) on 2026-11-15**: filed P3 defect `SPACE-PROMOTION-EXT-CASE-1` [items: module.config · kind: defect] — promotion compares a file's kind case-sensitively, so a hand-made `connections/<name>.TOON` skips the literal-secret and shape checks (found by the review of `SPACE-PROMOTION-PARAM-TYPES-1`).
@@ -576,11 +577,11 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 84<!--count:backlog-p3--> P3 rows are mostly a list of things
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 84<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 97<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 98<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -883,6 +884,7 @@ declined or closed; every `D-S*`/`D-E*`/`D-U*` decision answered; gate `G-R4` ce
 provenance in [`archived-documents/plans-archive/link-analysis-backlog-plan.md`](archived-documents/plans-archive/link-analysis-backlog-plan.md).
 What it left unbuilt is below, all demand-gated. Geo map deferrals are in §6.
 
+- **P2** · `LA-FULL-CYCLE-TEST-1` — **a first-time user cannot finish the quick start on a signed-in install, and cannot read their own graph.** Full-cycle drive 2026-11-15 (Preview x la x demo, `11aa321c5`): in a Space just created, Add data is off with the wrong reason and the creating admin cannot save a view or change masking; every id is a masked alias with Reveal buried one entity at a time; one bad value hides the time column; the import result does not account for dirty rows; a fresh import shows a stale-index warning; plus Dossier and approval discoverability, layout, wording and time-format gaps. Phases 1-4 are P2, 5-7 P3; split into rows as phases start. → `superpower/2026-11-15-la-full-cycle-test-plan.md` [items: module.la-core, product.la · kind: defect]
 - **P3** · `LA-RADIAL-LAYOUT-SQUASH-1` — **the Radial layout draws a two-component graph as a narrow, overlapping wedge.** Basic UI test 2026-11-10 (D-5): Audit, *Reached by many* answer (27 nodes): `V-001`'s 24 neighbours overlap in a ~40° fan, the other component flattens to lines; the layout stays chosen for the next graph. → `superpower/2026-11-10-la-basic-ui-test-report.md` [items: module.la-core · kind: defect]
 - **P3** · `LA-PHONE-OVERFLOW-1` — **at phone width the Link Analysis tool bar and the Add data page scroll sideways.** Basic UI test 2026-11-10 (D-6): at 375 px the canvas tool bar spans x 138–503 (document 507 px) and overlaps the title and header icons; Add data's *Read from another database or a remote system* button is 469 px; the Space switcher shows no name. → `superpower/2026-11-10-la-basic-ui-test-report.md` [items: module.la-core, layer.la · kind: defect]
 - **P3** · `LA-SPACE-SWITCHER-1` — **the Space switcher button overflows the rail, and its list mixes old names, near-twins and no order.** Basic UI test 2026-11-10 (D-7): *Link Analysis sample (invented data)* makes the button 378 px in a 195 px rail, covering page content; three Spaces keep the *Link Analysis* prefix; *Logistics* / *Logistics cargo theft*, *Utilities* / *Utility*, *Telecom* / *Telecom revenue assurance* cannot be told apart; not alphabetical; the switch toast names the Space id (`la-claims`). → `superpower/2026-11-10-la-basic-ui-test-report.md` [items: layer.la, solution-pack.la-showcase · kind: defect]

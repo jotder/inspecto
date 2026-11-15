@@ -103,6 +103,9 @@ button that fails.
 
 ## 3. Signing in, Getting started and Add data
 
+![The sign-in page of a demonstration install, listing Demo Users](../../assets/la-guide-01-sign-in.png)
+*Sign-in on a demonstration install: pick a Demo User. Screenshots in this guide are from the build of 2026-11-15, with invented data.*
+
 1. Open the application and pick yourself on the sign-in page. A demonstration install lists Demo Users with no
    password; a secured install shows **Sign in with SSO**.
 2. The front page offers **Link Analysis**, **Geo**, **Entity Lists** and **Alerts** (and **Settings** if you may
@@ -120,7 +123,14 @@ Space has no Dataset yet. Three ways in:
 * **Use my own data** — **Create a Space** asks a **Name** (one Space per kind of data, such as *Mobile money* or
   *Call records*) and **What kind of data?**: *Mobile Money*, *Telecom* or *Generic*, each with three example column
   names. The choice sets the Space's **Industry pack**: the words Link Analysis uses for your data and the tools it
-  suggests. Then you land on **Add data**. When a Space already exists, the button is **Add data** itself.
+  suggests. When a Space already exists, the button is **Add data** itself.
+
+![The Create a Space dialog with a name and three kinds of data](../../assets/la-guide-02-create-space.png)
+*Create a Space: click the pencil beside **Name** to type it, then choose the kind of data.*
+
+  As driven on 2026-11-15, **Create** returns to **Getting started** with the new Space open; press **Add data** there.
+  With sign-in, adding data is off in a new Space until an administrator turns on **Settings → Add data → People may add
+  data in this Space**; until then the Add data page says it is not available.
 * **Open my team's data** — shown when Spaces exist: the Space switcher.
 
 A choice you cannot take is greyed out with one line saying why: with sign-in, only an administrator may create a
@@ -158,10 +168,20 @@ is sent anywhere. Administrators see it in **Settings → Getting started counte
 2. **Check the columns.** What was detected is applied, with the reason beside it. A guess is highlighted and marked
    **A guess**: **Confirm** it or change it. Rename a column, change its type or **Leave out** a column; a table shows
    the first rows as they will be kept.
+
+![Step 2 of Onboard a file: the detected separator, header line and column types](../../assets/la-guide-03-check-columns.png)
+*Check the columns: each detected choice gives its reason; a guess is highlighted with **Confirm**.*
+
+   A column with even one value that does not fit (a broken date, a letter in an amount) is read as *Text*. Change its
+   **Type** yourself (*Date and time*, *Decimal number*), then set its **Role** in step 3 (*Time*, *Measure*) so that
+   **When** and **Weighed by** can offer it.
 3. **What does each column hold?** An *Entity Type* (Account, Phone number…) or *Nothing: a detail*. For events:
    which column a link goes **From** and **To**, and optionally its kind, time and amount. For details: **Which
    column identifies each entity?** Without a From and a To the screen warns that the Dataset cannot be drawn as a
    graph.
+
+![Step 3 of Onboard a file: From, To, Kind of link, When and Weighed by](../../assets/la-guide-04-columns-hold.png)
+*What each column holds: a link goes **From** one column **To** another, with its kind, time and amount.*
 4. **Create and run.** The Dataset name comes from the file name (lower-case letters, digits and `_`). **Create and
    run** waits until every guess is confirmed or changed; a very large file runs on the server and the screen
    follows it.
@@ -169,6 +189,9 @@ is sent anywhere. Administrators see it in **Settings → Getting started counte
 The result says how many rows were read and kept, rows set aside and why, whether the link index was built, and each
 Expectation on the data. Then **Explore in Link Analysis** (opens **Start a graph** with the Dataset picked), **Add
 details about these entities**, or **Add another file**.
+
+![The result of an import: rows read and kept, the link index, and the Arrivals list](../../assets/la-guide-05-import-result.png)
+*The result and the Dataset card after **Create and run**.*
 
 **The Dataset card** says *one-time import* and shows the last import. **Add a file** brings in the next file (for
 events, choose whether it *replaces the data* or *adds its rows*; details are always replaced); **Run now** runs the
@@ -339,6 +362,17 @@ shown as aliases**. Someone with Reveal rights can turn an alias back into the r
 ## 5. Building a graph
 
 ### 5.1 Start a graph
+
+![The start form in the Investigation tab with a suggestion list under the Account field](../../assets/la-guide-06-start-form.png)
+*Start from one entity: pick the Dataset and Entity Type, type the first letters and pick a match.*
+
+On an edition with Investigations the empty canvas reads **Start from the Investigation tab →** and this form is in
+the toolbox's **Investigation** tab. When the Entity Type is masked (in Standard and up, *Account*, *Phone number* and
+other identifying types are masked unless the Space says otherwise) nothing is suggested: type the whole value, or turn
+on **Show values (this is logged)** if you may reveal them.
+
+![A first graph: one account in the middle with fourteen linked accounts](../../assets/la-guide-07-first-graph.png)
+*The first graph: the start entity and everything it is linked to. Dotted outlines are entities not expanded yet.*
 
 Without Investigations (Basic, the Explorer level) the first screen is one **Start a graph** box. With
 Investigations the centre shows only **Start from the Investigation tab →**: the start form lives in that tab, so
@@ -918,6 +952,17 @@ binds `events` for you.
 
 ### 11.2 The Investigation tab (Act panel)
 
+![An open Investigation: canvas, the Investigation tab and the Step log in the dock](../../assets/la-guide-08-investigation-step-log.png)
+*An open Investigation with the **Step log** in the dock: every step, who took it and when.*
+
+![The Investigation settings dialog with its sections](../../assets/la-guide-09-investigation-settings.png)
+***Investigation settings…** (bottom of the Investigation tab): General, Case, Members, Share and embed, Drafts, Replay and drift, Oversight and approvals, Measures and templates, Dossier, References.*
+
+Masked ids show as aliases (`masked:…`) on the canvas, in the step log and in the Dossier. To read one, open
+**Investigation settings… ▸ Oversight and approvals ▸ Masked entities** and press **Reveal** beside it (one entity per
+press, each recorded in the audit trail; you need the right to see unmasked ids). A second person approves or denies a
+held expand in the same section.
+
 Top to bottom, most important first:
 
 1. **Header:** the **Name** (a lead renames it in place: label · value · ✎), purpose, Dataset, the data-trust chip
@@ -1006,6 +1051,9 @@ exclusions are dropped and the preview says so); **Instantiate** builds a new In
 
 ### 11.9 Evidence: snapshot, Dossier, sealed bundle
 
+![The Dossier section of Investigation settings after Build Dossier, showing Log intact](../../assets/la-guide-10-dossier.png)
+***Build Dossier** is in **Investigation settings… ▸ Dossier**. *Log intact* means every recorded step still matches the sealed log.*
+
 1. **File ▸ Save snapshot…** freezes the screen as a **snapshot** with a SHA-256 fingerprint. A *saved view*
    re-reads live data; a *snapshot* does not change.
 2. **Build Dossier** (⚙ ▸ Investigation settings ▸ Dossier): summary and topology, a ledger of every step with who
@@ -1036,6 +1084,9 @@ exclusions are dropped and the preview says so); **Instantiate** builds a new In
 
 ## 12. Entity Lists, Alerts and Geo
 
+![The Alerts page listing fired Alerts and the Alert Rules below](../../assets/la-guide-12-alerts.png)
+*Alerts: what fired, with **What happened**, **Acknowledge** and **Resolve** on each row, and the Alert Rules below.*
+
 * **Entity Lists:** named lists of accounts or numbers (watch lists, agent tills), with ranges, CIDR network ranges,
   expiry and every change on the record. Add to one from a *Find something interesting* result (**Add to a list**),
   **Exclude… ▸ Add to a list…**, or, with an Investigation open, the selection. A list can seed or exclude in bulk; a
@@ -1047,6 +1098,9 @@ exclusions are dropped and the preview says so); **Instantiate** builds a new In
 ---
 
 ## 13. Worked examples
+
+![The claims_network saved view: a dense ring of claimants linked to a small group of providers](../../assets/la-guide-11-saved-view-claims.png)
+*A saved view opened from **My work** (*claims_network*, 426 nodes): the dense group is the staged-accident ring. The **Whole Dataset** tab lists the server algorithms.*
 
 **Find a money-mule ring.** Choose **File ▸ Examples ▸ Follow the money**, or open `mule_layering_ring` (on the
 `la-showcase` Space Template: 112 accounts over three days). On screen ▸ **Suspicion score** ▸ **Find suspicious nodes** puts the relays and

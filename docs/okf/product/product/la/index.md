@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `product.la` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `LA-FULL-CYCLE-TEST-1` | P2 | defect | a first-time user cannot finish the quick start on a signed-in install, and cannot read their own graph. | — |
