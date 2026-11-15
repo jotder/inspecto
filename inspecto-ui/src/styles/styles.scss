@@ -231,6 +231,19 @@ body.dark {
         color: var(--gamma-text-default) !important;
         caret-color: var(--gamma-primary);
     }
+
+    /* LA-DARK-RADIO-CONTRAST-1: a radio defaults to the accent palette, whose DEFAULT is the dark card's own slate,
+     * so a selected radio was a dark dot in a dark ring (~1:1). Draw the selected state in the scheme-aware primary
+     * (primary-400 in dark: 4.90:1 on bg-card, 5.98:1 on bg-default; WCAG 1.4.11 asks 3:1). The vendored theme sets
+     * these tokens ON the radio (`.<theme>.dark .mat-mdc-radio-button.mat-accent`, four classes), hence !important;
+     * the primary and warn variants get the same reading. Disabled radios keep the theme's own tokens. */
+    .mat-mdc-radio-button {
+        --mat-radio-selected-icon-color: var(--gamma-text-primary) !important;
+        --mat-radio-selected-focus-icon-color: var(--gamma-text-primary) !important;
+        --mat-radio-selected-hover-icon-color: var(--gamma-text-primary) !important;
+        --mat-radio-selected-pressed-icon-color: var(--gamma-text-primary) !important;
+        --mat-radio-checked-ripple-color: var(--gamma-text-primary) !important;
+    }
 }
 
 /* Full-screen dialog toggle: the panel class is added/removed at runtime (the shared

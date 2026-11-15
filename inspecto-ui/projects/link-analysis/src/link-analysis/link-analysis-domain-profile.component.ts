@@ -90,8 +90,10 @@ import { GENERIC_PROFILE } from '@inspecto/link-analysis/graph/domain-profile';
                 } @else {
                     <p class="text-secondary m-0 text-sm">Generic: the neutral vocabulary, no pack terms.</p>
                 }
-            } @else if (svc.state() === null && loadFailed()) {
-                <inspecto-alert variant="error" title="Domain Profile unavailable">{{ loadFailed() }}</inspecto-alert>
+            } @else if (svc.failed()) {
+                <inspecto-alert variant="error" title="Domain Profile unavailable"
+                    >The server did not answer with the Domain Profile.</inspecto-alert
+                >
             } @else {
                 <p class="text-secondary m-0 text-sm">Reading the Domain Profile…</p>
             }
@@ -106,7 +108,6 @@ export class LinkAnalysisDomainProfileComponent {
     readonly state = this.svc.state;
     readonly canEdit = computed(() => this.lens.canAuthorWorkbench());
     readonly saving = signal(false);
-    readonly loadFailed = signal('');
     readonly choice = new FormControl<string>(GENERIC_PROFILE.id, { nonNullable: true });
     /** The picked id as a signal, so Apply enables the moment a different pack is picked (OnPush). */
     readonly chosen = toSignal(this.choice.valueChanges, { initialValue: this.choice.value });
@@ -122,9 +123,6 @@ export class LinkAnalysisDomainProfileComponent {
         effect(() => {
             const s = this.state();
             if (s) untracked(() => this.choice.setValue(s.active));
-        });
-        void this.svc.ready().then(() => {
-            if (!this.svc.state()) this.loadFailed.set('The server did not answer with the Domain Profile.');
         });
     }
 

@@ -348,13 +348,26 @@ describe('LinkAnalysisComponent', () => {
         expect(c.graph()).toEqual(GRAPH);
         expect(c.nodeKinds()).toEqual(['entity', 'other']);
 
+        // LA-TOOLBAR-SHIFT-1: the clear button keeps its slot whether shown or not, so a search never moves the tools after it
+        fixture.detectChanges();
+        const rail = fixture.nativeElement.querySelector('[data-testid="la-tool-rail"]') as HTMLElement;
+        const clear = () => rail.querySelector('[data-testid="la-clear-filters"]') as HTMLElement;
+        const slots = rail.children.length;
+        expect(clear().classList).toContain('invisible');
+
         c.onSearch('a');
         expect(c.emphasis()?.nodeIds).toEqual(['a']);
+        fixture.detectChanges();
+        expect(clear().classList).not.toContain('invisible');
+        expect(rail.children.length).toBe(slots);
 
         c.toggleKind('other', false);
         expect(c.displayed()?.nodes.map((n) => n.id)).toEqual(['a', 'b', 'c']);
         c.clearFilters();
         expect(c.displayed()?.nodes).toHaveLength(5);
+        fixture.detectChanges();
+        expect(clear().classList).toContain('invisible');
+        expect(rail.children.length).toBe(slots);
     });
 
     it('timeline: filters edges by a temporal attrs column, resets on a fresh run and via clearFilters', async () => {

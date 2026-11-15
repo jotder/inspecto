@@ -36,6 +36,8 @@ export class DomainProfileService {
 
     /** The last answer, or null before the first one (or after a failed read). */
     readonly state = signal<DomainProfileState | null>(null);
+    /** The current Space's read failed; false while it is in flight (LA-SETTINGS-PROFILE-FLASH-1). */
+    readonly failed = signal(false);
     private loaded: Promise<void> = Promise.resolve();
 
     constructor() {
@@ -62,10 +64,12 @@ export class DomainProfileService {
     }
 
     private async load(): Promise<void> {
+        this.failed.set(false);
         try {
             this.apply(await firstValueFrom(this.get()));
         } catch {
             this.state.set(null);
+            this.failed.set(true);
             installDomainProfiles([], null);
         }
     }

@@ -34,10 +34,12 @@ const state = (active: string, extra: Partial<DomainProfileState> = {}): DomainP
     ...extra,
 });
 
-function setup(opts: { state?: DomainProfileState; canEdit?: boolean } = {}) {
-    const st = signal<DomainProfileState | null>(opts.state ?? state('telecom'));
+function setup(opts: { state?: DomainProfileState | null; canEdit?: boolean } = {}) {
+    const st = signal<DomainProfileState | null>(opts.state === undefined ? state('telecom') : opts.state);
+    const failed = signal(false);
     const svc = {
         state: st,
+        failed,
         ready: () => Promise.resolve(),
         save: vi.fn((id: string) => {
             const next = state(id);
@@ -57,7 +59,7 @@ function setup(opts: { state?: DomainProfileState; canEdit?: boolean } = {}) {
     });
     const fixture = TestBed.createComponent(LinkAnalysisDomainProfileComponent);
     fixture.detectChanges();
-    return { fixture, el: fixture.nativeElement as HTMLElement, c: fixture.componentInstance, svc, toastr, st };
+    return { fixture, el: fixture.nativeElement as HTMLElement, c: fixture.componentInstance, svc, toastr, st, failed };
 }
 
 describe('LinkAnalysisDomainProfileComponent', () => {
@@ -97,6 +99,24 @@ describe('LinkAnalysisDomainProfileComponent', () => {
         expect(el.textContent).toContain('needs the author role');
         c.save();
         expect(svc.save).not.toHaveBeenCalled();
+        await expectNoA11yViolations(el);
+    });
+
+    it('reads quietly while the profile loads, and shows the error only once the read has failed (LA-SETTINGS-PROFILE-FLASH-1)', async () => {
+        const { el, fixture, failed } = setup({ state: null });
+        await fixture.whenStable(); // the old page set its error from a promise that settled before the request did
+        fixture.detectChanges();
+        expect(el.textContent).toContain('Reading the Domain Profile…');
+        expect(el.querySelector('inspecto-alert')).toBeNull();
+        expect(el.textContent).not.toContain('Domain Profile unavailable');
+
+        failed.set(true);
+        fixture.detectChanges();
+        expect(el.querySelector('inspecto-alert')?.textContent).toContain(
+            'The server did not answer with the Domain Profile.',
+        );
+        expect(el.textContent).toContain('Domain Profile unavailable');
+        expect(el.textContent).not.toContain('Reading the Domain Profile…');
         await expectNoA11yViolations(el);
     });
 

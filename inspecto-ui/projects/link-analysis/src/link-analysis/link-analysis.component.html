@@ -371,16 +371,18 @@
                     }
                     <!-- Analysis and Investigation open from the right toolbox panel's own rail and tabs (operator 2026-10-29) -->
 
-                    @if (search() || kindFilter().length || timeColumn()) {
-                        <button
-                            mat-icon-button
-                            (click)="clearFilters()"
-                            matTooltip="Clear search and filters"
-                            aria-label="Clear search and filters"
-                        >
-                            <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
-                        </button>
-                    }
+                    <!-- LA-TOOLBAR-SHIFT-1: always laid out, only shown while there is something to clear, so a search
+                         never moves the tools after it under the pointer (invisible = not focusable, not announced) -->
+                    <button
+                        mat-icon-button
+                        [class.invisible]="!(search() || kindFilter().length || timeColumn())"
+                        (click)="clearFilters()"
+                        matTooltip="Clear search and filters"
+                        aria-label="Clear search and filters"
+                        data-testid="la-clear-filters"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                    </button>
                 }
 
                 <mat-menu #saveMenu="matMenu">
