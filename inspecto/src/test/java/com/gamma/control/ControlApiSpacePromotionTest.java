@@ -277,6 +277,25 @@ class ControlApiSpacePromotionTest {
         }
     }
 
+    /**
+     * SPACE-PROMOTION-EXT-CASE-1: a Pipeline spelled in another case is still judged by the config-safety check before
+     * apply writes it, so one naming a path outside the allowed roots is 422 and nothing is written.
+     */
+    @Test
+    void aPipelineNamedInAnotherCaseIsStillSafetyCheckedBeforeApply(@TempDir Path root, @TempDir Path tmp) throws Exception {
+        for (String name : List.of("p_pipeline.toon", "p_pipeline.TOON")) {
+            byte[] zip = withEntry(sourceBundle(tmp), name, "dirs:\n  errors: \"C:/Windows/evil\"\n");
+            try (Ctx c = open(root.resolve(name.endsWith("TOON") ? "upper" : "lower"))) {
+                JsonNode p = preview(c, zip);
+                HttpResponse<String> r = post(c.port, "/spaces/alpha/promotion/apply", "admin",
+                        body(zip, Map.of("previewHash", p.get("changeSetHash").asText())));
+                assertEquals(422, r.statusCode(), name + ": " + r.body());
+                assertTrue(r.body().contains("outside the allowed roots") && !r.body().contains("(parse)"), r.body());
+                assertFalse(Files.exists(c.config.resolve(name)), name + " was not written");
+            }
+        }
+    }
+
     @Test
     void aPlaceholderWithNoValueIs422NamingIt(@TempDir Path root, @TempDir Path tmp) throws Exception {
         byte[] zip = sourceBundle(tmp);

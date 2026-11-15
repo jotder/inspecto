@@ -103,7 +103,11 @@ the approval that lands it).
 - **A path spelled in another case is still compared as written.** Its kind is read as the filesystem resolves it
   (§2, "How a file's kind is read"), but the change set pairs a bundle file with the target file of the same spelling:
   a hand-made `Registry/datasets/d.toon` against the target's `registry/datasets/d.toon` is an `add` and a `remove`,
-  not a `change`. An export never spells a path in another case.
+  not a `change`. An export never spells a path in another case. On a case-insensitive filesystem, with
+  `removals: true`, that `remove` deletes the file the `add` just wrote. Two smaller edges of the same kind: removing a
+  target `foo_job.TOON` that no loader ever read now stops the live Job of that name, and an upper-case connection with
+  only secret references is registered live until a restart drops it. Open as `SPACE-PROMOTION-CASE-PAIRING-1`; the
+  same case-sensitive `_connection.toon` match in the regular import is `IMPORT-CONNECTION-CASE-1`.
 
 ## References
 
