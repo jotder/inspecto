@@ -63,7 +63,7 @@ redeploys: `.claude/memory/preview-la-demo.md`.
   at a time**. Start/stop servers in the Terminal panel (`run_in_terminal`) so Ctrl+C is real; a detached stop is
   abrupt and leaves DuckDB `.wal` files.
 - Seeds need an Advanced or Preview build with Demo Auth; trigger the data-build Jobs before seeding, or the seed
-  gets `409 no data yet`.
+  gets `409 … has no rows yet`.
 
 ## Done means
 

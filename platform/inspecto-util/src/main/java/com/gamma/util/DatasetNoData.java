@@ -12,9 +12,6 @@ public final class DatasetNoData {
 
     private static final String NO_FILES = "No files found that match the pattern";
 
-    /** The folder a Pipeline's sink writes its rows under: {@code <pipeline>/database}. */
-    private static final String SINK_DIR = "database";
-
     private DatasetNoData() {}
 
     /** True when a driver message says a file-backed relation matched no files. */
@@ -29,18 +26,13 @@ public final class DatasetNoData {
     }
 
     /**
-     * The Pipeline that fills a Dataset, read from its stored content: an import's own Pipeline
-     * ({@code importPipeline}), else the Pipeline whose sink store its {@code physicalRef} names
-     * ({@code <pipeline>/database[/...]}, the layout a Pipeline writes). {@code null} when the content does not say -
-     * a bare store name, a {@code shared/} ref or a view is not proof of which Pipeline writes it.
+     * The Pipeline that fills a Dataset, when its stored content records it: an import's own Pipeline
+     * ({@code importPipeline}). {@code null} otherwise. The folder in {@code physicalRef} is not proof: a Pipeline's sink
+     * folder ({@code dirs.database}) is free text, and two Pipelines may write one store, so naming it could name the
+     * wrong Pipeline.
      */
     public static String pipelineOf(Map<String, Object> dataset) {
         if (dataset == null) return null;
-        String own = Values.trimToNull(dataset.get("importPipeline"));
-        if (own != null) return own;
-        String ref = Values.trimToNull(dataset.get("physicalRef"));
-        if (ref == null || ref.startsWith("shared/")) return null;
-        String[] parts = ref.replace('\\', '/').split("/");
-        return parts.length >= 2 && SINK_DIR.equals(parts[1]) && !parts[0].isBlank() ? parts[0] : null;
+        return Values.trimToNull(dataset.get("importPipeline"));
     }
 }

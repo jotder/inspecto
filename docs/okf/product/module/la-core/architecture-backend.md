@@ -536,7 +536,7 @@ Capability constants are in `platform/inspecto-access` `Roles`. OpenAPI fragment
 (`META-INF/inspecto/openapi.fragment.json` in la-api and geo-link) merge into `openapi-v1.json`; a new route also
 needs `CapabilityManifest`, rate-class and auth-gate coverage (see the `endpoint` skill).
 
-**A Dataset read failure is translated in one place (`DatasetReadFault`, la-api).** A file-backed Dataset whose store holds no files yet answers a closed `409 CONFLICT` ("Dataset 'X' has no data yet: nothing has been ingested into its store (S). Run the Pipeline that fills it, or check the Dataset's physicalRef.") on every exploration read (projection, neighbors, multi, traversal, pattern, value measures, geo, reference rows, identity import); any other driver message stays a 422 but loses the JDBC preamble and every absolute path (`<path>`). The SPA's `invErrorMessage` adds a one-line hint.
+**A Dataset read failure is translated in one place (`DatasetReadFault`, la-api).** A file-backed Dataset whose store holds no files yet answers a closed `409 CONFLICT` ("Dataset 'X' has no rows yet: its Pipeline 'P' has not run." - the Pipeline is named only when the Dataset records it, `importPipeline`; the wording is `DatasetNoData` in inspecto-util, shared with the core routes) on every exploration read (projection, neighbors, multi, traversal, pattern, value measures, geo, reference rows, identity import); any other driver message stays a 422 but loses the JDBC preamble and every absolute path (`<path>`). The SPA's `invErrorMessage` adds a one-line hint.
 
 Sections 6.1 to 6.20 are on three pages:
 

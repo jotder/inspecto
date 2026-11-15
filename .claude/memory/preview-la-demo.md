@@ -31,7 +31,7 @@ the Space role names). Operator 2026-10-16: deploy every fix there; zip/linux bu
   `scripts/preview-la/la-smoke.mjs` (real WSO2 sign-in of every user against every Space).
   **Traps:** (1) the graceful Ctrl+C stop needs a REAL console — from the agent's PowerShell/Bash tools it silently never
   arrives (a `ping` test process ignores it too); run the script in the Terminal panel (`run_in_terminal`). (2) The data
-  Datasets come from `*/10` cron jobs, so a seed started right after boot gets `409 no data yet` — trigger the jobs first.
+  Datasets come from `*/10` cron jobs, so a seed started right after boot gets `409 … has no rows yet` — trigger the jobs first.
   (3) The rebase tool needs `jdk.compiler`: run it with the SYSTEM `java`, never the bundle's jlinked runtime.
   (4) `JAVA_HOME` is `C:\.jdks\jdk-27-win` (the old `Program Files\Java\latest` path is gone); the Maven repo is `C:\.m2`.
 

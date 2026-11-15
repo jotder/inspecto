@@ -72,6 +72,7 @@ class ControlApiDatasetEmptyTest {
             store.write("grammar", "g1", Map.of("format", "csv"));
             Files.createDirectories(ranDir.resolve("database").resolve("day=2026-11-15"));
             Files.writeString(ranDir.resolve("database").resolve("day=2026-11-15").resolve("p1.parquet"), "a file is present");
+            Files.writeString(ranDir.resolve("database").resolve("day=2026-11-15").resolve("p2.parquet"), "and a second");
 
             HttpResponse<String> r = get(c, "/components/dataset");
             assertEquals(200, r.statusCode(), r.body());
@@ -100,7 +101,9 @@ class ControlApiDatasetEmptyTest {
     void aReadOfAPipelineFedEmptyDatasetNamesItsPipeline(@TempDir Path cfg, @TempDir Path root) throws Exception {
         String pipeline = "never_run_" + System.nanoTime();
         try (Ctx c = open(cfg, root)) {
-            new ComponentStore(root.resolve("registry")).write("dataset", "fed_ds", Map.of("physicalRef", pipeline + "/database"));
+            ComponentStore store = new ComponentStore(root.resolve("registry"));
+            store.write("dataset", "fed_ds", Map.of("physicalRef", pipeline + "/database", "importPipeline", pipeline));
+            store.write("dataset", "folder_ds", Map.of("physicalRef", "other_" + pipeline + "/database"));
             HttpResponse<String> r = get(c, "/datasets/fed_ds/rows");
             assertEquals(409, r.statusCode(), r.body());
             JsonNode error = V1Body.envelope(r.body()).get("error");
@@ -108,6 +111,11 @@ class ControlApiDatasetEmptyTest {
             assertEquals("Dataset 'fed_ds' has no rows yet: its Pipeline '" + pipeline + "' has not run.", error.get("message").asText());
             for (String dev : List.of("physicalRef", "store", "/database"))
                 assertFalse(r.body().contains(dev), "no '" + dev + "' in " + r.body());
+            // a store folder is not proof of which Pipeline writes it (dirs.database is free text): no name is guessed
+            HttpResponse<String> folder = get(c, "/datasets/folder_ds/rows");
+            assertEquals(409, folder.statusCode(), folder.body());
+            assertEquals("Dataset 'folder_ds' has no rows yet: its Pipeline has not run.",
+                    V1Body.envelope(folder.body()).get("error").get("message").asText());
         }
     }
 }

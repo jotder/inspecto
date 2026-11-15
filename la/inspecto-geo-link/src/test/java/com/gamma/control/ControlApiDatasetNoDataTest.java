@@ -104,7 +104,7 @@ class ControlApiDatasetNoDataTest {
     }
 
     /**
-     * LA-EMPTY-DATASET-WORDING-1: a Dataset over a Pipeline's sink store ({@code <pipeline>/database}) names that Pipeline on
+     * LA-EMPTY-DATASET-WORDING-1: a Dataset that records its Pipeline ({@code importPipeline}) names that Pipeline on
      * every refusal the Data page and Explore meet - the projection, a preset, the shape marks and Discover - with the same
      * status and machine code as before.
      */
@@ -112,7 +112,7 @@ class ControlApiDatasetNoDataTest {
     void aPipelineFedEmptyDatasetNamesItsPipelineInAnalystWords(@TempDir Path cfg, @TempDir Path root) throws Exception {
         String pipeline = "never_run_" + System.nanoTime();
         try (Ctx c = open(cfg, root)) {
-            new ComponentStore(root.resolve("registry")).write("dataset", "fed_ds", Map.of("physicalRef", pipeline + "/database"));
+            new ComponentStore(root.resolve("registry")).write("dataset", "fed_ds", Map.of("physicalRef", pipeline + "/database", "importPipeline", pipeline));
             Map<String, HttpResponse<String>> answers = new java.util.LinkedHashMap<>();
             answers.put("projection", post(c, "/inv/projection", "{\"dataset\":\"fed_ds\",\"sourceCol\":\"who\",\"targetCol\":\"other\"}"));
             answers.put("preset", post(c, "/inv/presets/any/run", "{\"dataset\":\"fed_ds\"}"));
