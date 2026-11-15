@@ -803,6 +803,17 @@ public final class JobService implements AutoCloseable {
         closing = true;
     }
 
+    /**
+     * JOB-OUTLIVES-CLOSE-1: the escalation after a close overran its budget - interrupt every in-flight Run (a Run
+     * blocked in a wait, a sleep or interruptible I/O stops there) and start no more. Marks the Space closing too, so
+     * each interrupted Run is recorded CANCELLED, a planned stop. {@link #close()}'s drain then returns once the Runs
+     * have ended. A Run inside a native statement stops only when that statement returns. Idempotent.
+     */
+    public void interruptRuns() {
+        closing = true;
+        workers.shutdownNow();
+    }
+
     /** Wire the event/signal subscribers and arm cron schedules. */
     public void start() {
         bus.subscribe(this::onConsignmentEvent);
@@ -1853,6 +1864,9 @@ public final class JobService implements AutoCloseable {
                 res = JobResult.cancelled(SHUTTING_DOWN, res.durationMs());
             }
         } finally {
+            // JOB-OUTLIVES-CLOSE-1: interruptRuns' interrupt has done its work once the body returned; spend it, so the
+            // Run's own records below are still written (an interrupted thread's file writes are refused).
+            if (closing) Thread.interrupted();
             packs.releaseRun(packOwner);
             serviceOwners.forEach(packs::releaseRun);
             if (pipelineId != null) runningPipelines.remove(pipelineId);

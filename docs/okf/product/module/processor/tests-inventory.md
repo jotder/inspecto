@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-446 test class(es): 181 unit, 265 real-HTTP control-plane, 0 IT.
+448 test class(es): 183 unit, 265 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -391,6 +391,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ExpectationEvaluatorSwapLockTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/ExpectationEvaluatorSwapLockTest.java` | SNAPSHOT-SWAP-UNLOCKED-READERS-1: an Expectation's count pins the target's files and scans them afterwards; a snapshot |
 | `LaDailyFeedTemplateRulesTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/LaDailyFeedTemplateRulesTest.java` | LA-DATA-TRUST-1 S3, S4, S7 / S8: the rules the shipped {@code spaces/_templates/la-daily-feed} template carries load through |
 | `DryRunCoverageTest` | `com.gamma.job` | unit | `inspecto/src/test/java/com/gamma/job/DryRunCoverageTest.java` | Recurrence guard for {@code PLATFORM-SERVICES-DRYRUN-GAP-1}: every built-in Platform Service the host binds |
+| `JobTypesForTest` | `com.gamma.job` | unit | `inspecto/src/test/java/com/gamma/job/JobTypesForTest.java` | Test access, for host-module tests, to {@link JobService}'s package-private Job Type registration seam. |
 | `ReportJobMaskingTest` | `com.gamma.job` | unit | `inspecto/src/test/java/com/gamma/job/ReportJobMaskingTest.java` | BI-QUERY-MASKING-1: a scheduled Dataset export has no viewer, so the file it writes always carries aliased entity keys |
 | `ModelSettingsStoreTest` | `com.gamma.model` | unit | `inspecto/src/test/java/com/gamma/model/ModelSettingsStoreTest.java` | Covers the S9 core-owned model-settings bridge: {@link ModelSettingsStore} reads the same |
 | `ReportServiceTest` | `com.gamma.report` | unit | `inspecto/src/test/java/com/gamma/report/ReportServiceTest.java` | Tests for {@link ReportService} — it must roll the raw {@code StatusStore} audit up |
@@ -450,6 +451,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `SlaSweepModuleGateTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SlaSweepModuleGateTest.java` | {@code MODULE-REORG-1 P4f}: the SLA sweep tick of {@code CollectorService} consults the Space's module gate. The |
 | `SpaceBootstrapTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceBootstrapTest.java` | Builds one space's runtime from its own {@code config/} directory (the per-space analogue of ServiceBootstrap). |
 | `SpaceCloseFlushTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceCloseFlushTest.java` | {@code DEMO-BAKE-WAL-RACE-1}: a graceful stop of a Space that is still busy when its close budget runs out must not |
+| `SpaceCloseStopsRunsTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceCloseStopsRunsTest.java` | {@code JOB-OUTLIVES-CLOSE-1}: {@code ControlApiSpaceTemplateSeedGateTest} once failed to delete its temp folder |
 | `SpaceCorpusEquivalenceTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceCorpusEquivalenceTest.java` | SE-0 corpus equivalence gate ({@code docs/okf/product/module/config/plan-space-evolution.md} §3): every tracked |
 | `SpaceDataRootTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceDataRootTest.java` | SPACE-DATA-ROOT-1: where a Space's data, audit and DuckDB stores live, and the load-time checks. |
 | `SpaceDiscoveryRuleTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/SpaceDiscoveryRuleTest.java` | Which folders under the Spaces root {@link SpaceManager#discover} admits — real folder trees, no mocks. |

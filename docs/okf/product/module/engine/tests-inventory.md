@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-406 test class(es): 406 unit, 0 real-HTTP control-plane, 0 IT.
+407 test class(es): 407 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -189,6 +189,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `FreshnessSweepTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/FreshnessSweepTest.java` | DUCKLE-C1 residual (1): the freshness sweep is a SYSTEM job — armed and disarmed by the platform, |
 | `HealthLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/HealthLinksJobGoldenTest.java` | The {@code la-health} Space Template (Basic tier) RUN end to end from a verbatim copy: the nine Pipelines land the shipped |
 | `InsiderLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/InsiderLinksJobGoldenTest.java` | The {@code la-insider} Space Template (Basic tier) RUN end to end from a verbatim copy: the six Pipelines land the shipped |
+| `JobCloseStopTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobCloseStopTest.java` | JOB-OUTLIVES-CLOSE-1: a Job Run still writing must stop before its Space's close returns. {@link JobService#close()} |
 | `JobConfigTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobConfigTest.java` | Tests for parsing a {@code *_job.toon} into a {@link JobConfig}. |
 | `JobDeadlineTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobDeadlineTest.java` | The generic Job Run deadline (platform-services R1, operator 2026-10-06): a hung Run is FAILED at its |
 | `JobPackManagerTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobPackManagerTest.java` | P2c Job Packs (§12): a pack jar dropped in the watched dir is loaded through its own isolated |

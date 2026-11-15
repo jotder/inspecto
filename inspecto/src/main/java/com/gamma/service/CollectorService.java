@@ -2312,6 +2312,14 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         if (j != null) j.beginClose();
     }
 
+    /** JOB-OUTLIVES-CLOSE-1: the close overran its budget - interrupt this Space's in-flight Job Runs, so a Run that
+     *  ignored the cooperative cancel stops before the close is abandoned ({@link JobService#interruptRuns}). Called
+     *  by {@link SpaceManager} while {@link #close} is still draining on its own thread. */
+    void interruptRuns() {
+        JobService j = jobs;
+        if (j != null) j.interruptRuns();
+    }
+
     @Override
     public void close() {
         beginClose();

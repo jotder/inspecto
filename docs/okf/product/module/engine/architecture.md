@@ -77,6 +77,21 @@ serialises its one connection (`SingleConnectionSource`), so a store close waits
 never cuts it; only a store still busy after the second budget keeps its `.wal`, which DuckDB replays at the next
 start. The store close runs once, whichever path reaches it first.
 
+**Since `JOB-OUTLIVES-CLOSE-1` (2026-11-15) an overrun drain is escalated before it is abandoned.** A Job Run that
+did not stop for the cooperative cancel (the claim's `cancelled()`, read at `CommitFence.checkpoint`) is interrupted:
+`SpaceManager` calls `CollectorService.interruptRuns()` → `JobService.interruptRuns()` (`shutdownNow()` on the Run
+executor; the Space is marked closing, so an interrupted Run is recorded `CANCELLED`, and the Run spends the
+interrupt before it writes its own record). The drain then gets up to 5 s more (`STOP_GRACE_MS`) to finish, its own
+store close included; only a drain still busy after that is abandoned, and `closeStoresNow()` gets what is left of
+the second budget. The worst case per Space stays two budgets (20 s). Before this a Run still writing its Dataset
+went on writing after `SpaceManager.close()` had returned — on a loaded machine `ControlApiSpaceTemplateSeedGateTest`
+could not delete `t-la-utility/data/transformer_loss`, and its log showed 2–3 Spaces abandoned per run even when it
+passed. `sql.template` now checks the cancel before each write under the data root (before it creates the sink,
+after its query, before each Decision Rule route and before the snapshot swap), so a cancelled Run reveals no
+snapshot. ⚠ Not covered: a Run inside a native DuckDB statement stops only when that statement returns (an interrupt
+does not cancel it); such a Run is still abandoned, as before, with the WARN. Tests: `SpaceCloseStopsRunsTest`,
+`JobCloseStopTest`.
+
 Decision: close the stores at the deadline rather than extend the budget while Jobs finish. A container runtime
 stops a process after its own grace period (10 s for `docker stop`, 30 s for a Kubernetes pod) and Spaces close one
 after another, so a longer budget would not hold; a checkpoint alone would not either, because work that is still

@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **88<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 74<!--count:backlog-p3--> × P3** —
+> **87<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 73<!--count:backlog-p3--> × P3** —
+> ⬇ **88 → 87 (P3 74 → 73) on 2026-11-15** — closed P3 defect `JOB-OUTLIVES-CLOSE-1` [items: module.engine · kind: defect]: closing the server did wait for Job Runs, but only cooperatively and only for `SpaceManager`'s 10 s budget; a drain still busy then was abandoned at once and its Run went on writing after `close()` returned (the test's log showed 2–3 Spaces abandoned per run even when it passed; under a second Maven run `t-la-utility` was one, mid-`transformer_loss`). And `sql.template`, which wrote that Dataset, never read the cooperative cancel. Now an overrun drain is escalated before it is abandoned: `CollectorService.interruptRuns()` → `JobService.interruptRuns()` interrupts the in-flight Runs (recorded `CANCELLED`), and the drain gets up to 5 s more, taken from the store flush's budget, so a Space still closes within two budgets; `sql.template` checks the cancel before each write and reveals no snapshot once cancelled. A Run inside a native DuckDB statement still stops only when the statement returns, and is abandoned as before. Tests `SpaceCloseStopsRunsTest`, `JobCloseStopTest`; as-built in the engine hub's architecture (*Stopping a Space*).
 > ↔ **88 (no count change, P2 14, P3 74) on 2026-11-15**: narrowed P3 chore `DOCS-AGENT-WRITTEN-REVIEW-1` [items: layer.platform, layer.product · kind: chore] — batch 3 of the doc-claim audit, every claim re-verified against code first: about 98 fixed, 48 already right (`tests-doc-claim-audit-2026-10-19.md` § *Second pass*, items 3, 5, 6, 7, 8). The "filed as cross-cutting rows" blockquotes of 14 plans now say none of their `SPEC-*` ids is a board row; the work list's own counts were stale too (34 writable kinds, 30 Space templates, 49 node types). Left: the `access/` claims with the access lane, `la-core/admin-guide-demo` with the `la-*` peer, and the ~70 unsampled `spec*` / `user-guide*` / `architecture*` docs.
 > ↔ **88 (no count change, P2 14, P3 74) on 2026-11-15**: narrowed P3 `ANOMALY-UI-FINDINGS-1` [items: module.anomaly · kind: chore · hold: operator] and held it on the operator: (a)–(j) re-checked against current master, including the UI-FORM-ROWS-1 rework of the Feature editor, and none reproduces. The one nit left on 2026-11-01 is fixed: the draft preview's column headers ("Self z", "Peer z", "Cohort shift") stay on one line and the table scrolls sideways (CSS; spec only, not driven in a browser). What remains is the live (h) token-lapse check, which needs a person to sign in to the IdP; no defect is known, so the row is now a chore.
 > ⬆ **87 → 88 (P3 73 → 74) on 2026-11-15**: filed P3 defect `JOB-OUTLIVES-CLOSE-1` [items: module.engine · kind: defect] — a Job still writing after the control server closed made a template test's temp folder undeletable once (found by the review of `LA-UTILITY-LOOKALIKE-CHECKS-1`).
@@ -600,10 +601,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 74<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 73<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 74<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 88<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 73<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 87<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -821,7 +822,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 
 
-- **P3** · `JOB-OUTLIVES-CLOSE-1` — **a Job can still be writing after the control server has closed, so a test's temp folder cannot be deleted.** Seen once 2026-11-15 by the review of `LA-UTILITY-LOOKALIKE-CHECKS-1`: `ControlApiSpaceTemplateSeedGateTest.everyShippedTemplateApplies` errored with `DirectoryNotEmptyException` because `t-la-utility/data/transformer_loss` was still being written at teardown, while a second Maven run shared the machine; run alone it passes 16/16. Find whether closing the server waits for running Jobs (and their landings) to stop, and make it so, or make the test wait. [items: module.engine · kind: defect]
 - **P3** · `REPORT-PDF-CHARTS-1` — **a report Job's PDF is a table snapshot, never a chart.** `format: pdf` wraps the same table image `format: png` renders (`ReportJob` → `TablePngRenderer`, capped at its row limit), so a scheduled PDF cannot carry the dashboard's charts or KPI tiles. Found in the MFS demo review (2026-10-27, item 25); until then dashboards are the storytelling surface. [items: module.engine · kind: feature]
 
 Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-overview`, `quality-monitor`,

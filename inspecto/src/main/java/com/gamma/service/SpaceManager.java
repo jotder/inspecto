@@ -63,6 +63,21 @@ public final class SpaceManager implements AutoCloseable {
      *  must never block a runtime {@link #delete} nor, via the shutdown hook, JVM exit. */
     private static final long CLOSE_DEADLINE_MS = 10_000;
 
+    /** JOB-OUTLIVES-CLOSE-1: once {@link #CLOSE_DEADLINE_MS} lapses, the Space's Job Runs are interrupted and the close
+     *  waits up to this much longer for them to stop before it is abandoned. Taken from the store flush's own budget
+     *  (the same {@link #CLOSE_DEADLINE_MS}), so the worst case per Space is unchanged. */
+    private static final long STOP_GRACE_MS = 5_000;
+
+    /** The budgets in force; only {@link #closeBudgetsForTest} changes them. */
+    private static volatile long closeDeadlineMs = CLOSE_DEADLINE_MS, stopGraceMs = STOP_GRACE_MS;
+
+    /** Test seam: shorten the close budgets, {@code graceMs} no longer than {@code deadlineMs} (a negative value
+     *  restores that budget's default). */
+    static void closeBudgetsForTest(long deadlineMs, long graceMs) {
+        closeDeadlineMs = deadlineMs < 0 ? CLOSE_DEADLINE_MS : deadlineMs;
+        stopGraceMs = graceMs < 0 ? STOP_GRACE_MS : graceMs;
+    }
+
     private final ConcurrentHashMap<SpaceId, SpaceContext> spaces = new ConcurrentHashMap<>();
     /** Spaces found on disk and owned by this pod whose boot FAILED, by directory name — see {@link #skipped()}. */
     private final ConcurrentHashMap<String, SkippedSpace> skipped = new ConcurrentHashMap<>();
@@ -1055,31 +1070,47 @@ public final class SpaceManager implements AutoCloseable {
     }
 
     /**
-     * S7: drain-and-close one space's service under {@link #CLOSE_DEADLINE_MS}, best-effort. The close runs
+     * S7: drain-and-close one space's service under {@link #closeDeadlineMs}, best-effort. The close runs
      * on a daemon thread; this returns as soon as it finishes or the deadline lapses. A close still running
      * past the deadline is abandoned — being a daemon, it can never hold the JVM open — and any exception it
      * throws is logged, not propagated, so teardown always continues. An abandoned close still closes the
      * Space's stores ({@link CollectorService#closeStoresNow}), so a busy Space leaves no DuckDB {@code .wal}
      * (DEMO-BAKE-WAL-RACE-1). Never throws.
+     *
+     * <p>JOB-OUTLIVES-CLOSE-1: a drain that overruns its budget is not abandoned at once. The Space's Job Runs are
+     * interrupted first ({@link CollectorService#interruptRuns}) and the drain gets {@link #STOP_GRACE_MS} more to
+     * finish, its own close of the stores included; before this a Run still writing its Dataset kept writing after
+     * {@link #close()} had returned. Only a drain still busy after that (a Run that ignores both the cancel and the
+     * interrupt, such as a native statement still in flight) is abandoned, and the flush gets what is left of the
+     * second budget. Worst case per Space: two budgets, as before.
      */
     private void closeWithDeadline(SpaceContext ctx) {
-        if (!runWithDeadline(ctx, "space-close-", ctx::close, "closing")) {
-            log.warn("Close of space '{}' did not finish within {} ms; abandoning its drain and closing its stores now — "
-                    + "a run thread that has not stopped still holds its run lease, which is deliberately NOT released "
-                    + "(a survivor would become a second writer); it expires after its TTL",
-                    ctx.id(), CLOSE_DEADLINE_MS);
-            // DEMO-BAKE-WAL-RACE-1: the abandoned drain would reach the store closes only after the JVM had exited,
-            // leaving every DuckDB store's .wal behind. Close them now, under a budget of their own: a store waits only
-            // for the statement in flight on it.
-            if (!runWithDeadline(ctx, "space-flush-", () -> ctx.service().closeStoresNow(), "flushing the stores of"))
-                log.warn("Stores of space '{}' did not close within {} ms; a store still busy keeps its .wal, which "
-                        + "DuckDB replays at the next start", ctx.id(), CLOSE_DEADLINE_MS);
+        Thread drain = startDaemon(ctx, "space-close-", ctx::close, "closing");
+        if (finishedWithin(drain, closeDeadlineMs)) return;
+        log.warn("Close of space '{}' did not finish within {} ms; interrupting its Job Runs and waiting up to {} ms "
+                + "more for them to stop", ctx.id(), closeDeadlineMs, stopGraceMs);
+        try {
+            ctx.service().interruptRuns();
+        } catch (RuntimeException e) {
+            log.warn("Error interrupting the Job Runs of space '{}': {}", ctx.id(), e.getMessage());
         }
+        if (finishedWithin(drain, stopGraceMs)) return;
+        log.warn("Close of space '{}' did not finish within {} ms; abandoning its drain and closing its stores now — "
+                + "a run thread that has not stopped still holds its run lease, which is deliberately NOT released "
+                + "(a survivor would become a second writer); it expires after its TTL",
+                ctx.id(), closeDeadlineMs + stopGraceMs);
+        // DEMO-BAKE-WAL-RACE-1: the abandoned drain would reach the store closes only after the JVM had exited,
+        // leaving every DuckDB store's .wal behind. Close them now, under a budget of their own: a store waits only
+        // for the statement in flight on it.
+        long flushMs = closeDeadlineMs - stopGraceMs;
+        if (!finishedWithin(startDaemon(ctx, "space-flush-", () -> ctx.service().closeStoresNow(), "flushing the stores of"),
+                flushMs))
+            log.warn("Stores of space '{}' did not close within {} ms; a store still busy keeps its .wal, which "
+                    + "DuckDB replays at the next start", ctx.id(), flushMs);
     }
 
-    /** Run {@code body} on a daemon thread and wait up to {@link #CLOSE_DEADLINE_MS}; {@code true} when it finished. A
-     *  body still running is abandoned (a daemon never holds the JVM open); what it throws is logged. Never throws. */
-    private static boolean runWithDeadline(SpaceContext ctx, String threadPrefix, Runnable body, String what) {
+    /** Run {@code body} on a started daemon thread (a daemon never holds the JVM open); what it throws is logged. */
+    private static Thread startDaemon(SpaceContext ctx, String threadPrefix, Runnable body, String what) {
         Map<String, String> mdc = MDC.getCopyOfContextMap();   // preserve space-log routing on the worker thread
         Thread t = new Thread(() -> {
             if (mdc != null) MDC.setContextMap(mdc);
@@ -1091,8 +1122,14 @@ public final class SpaceManager implements AutoCloseable {
         }, threadPrefix + ctx.id());
         t.setDaemon(true);
         t.start();
+        return t;
+    }
+
+    /** Wait up to {@code ms} for {@code t}; {@code true} when it finished. A thread still running is left to run on
+     *  (abandoned). Never throws. */
+    private static boolean finishedWithin(Thread t, long ms) {
         try {
-            t.join(CLOSE_DEADLINE_MS);
+            t.join(Math.max(1L, ms));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return false;

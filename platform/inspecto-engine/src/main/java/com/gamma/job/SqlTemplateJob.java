@@ -102,6 +102,7 @@ final class SqlTemplateJob implements Job {
 
         IncrementalSpec inc = IncrementalSpec.parse(cfg.name(), type(), cfg.params());
         Path outDir = Path.of(dataDir).resolve(sink);
+        stopIfCancelled(ctx);
         if (inc != null) {
             String refusal = IncrementalSink.layoutRefusal(outDir, inc.column(), cfg.name());
             if (refusal != null) throw new IllegalStateException("sql.template job '" + cfg.name() + "' refused: " + refusal);
@@ -131,6 +132,7 @@ final class SqlTemplateJob implements Job {
                 afterPin.run();
                 st.execute("CREATE TABLE " + OUT_TABLE + " AS " + sql);
             }
+            stopIfCancelled(ctx);   // the query may have run long: a closing host's cancel stops the Run before it writes
             // Decision Rules targeting this job check the materialized result before it becomes the
             // snapshot (tag/route/quarantine/drop): route lands as a snapshot Parquet Dataset under
             // <dataDir>/<destination> (same swap-in discipline as the sink), record-quarantine under
@@ -139,6 +141,7 @@ final class SqlTemplateJob implements Job {
                     DecisionRuleApplier.Subject.job(cfg.name(), ctx.runId()),
                     Path.of(dataDir).resolve(".quarantine").toString(), sink,
                     (c, routedTable, dest) -> {
+                        stopIfCancelled(ctx);
                         Path destDir = Path.of(dataDir).resolve(dest);
                         Files.createDirectories(destDir);
                         cleanLeftovers(destDir);
@@ -148,6 +151,7 @@ final class SqlTemplateJob implements Job {
                             rst.execute("COPY \"" + routedTable + "\" TO "
                                     + sqlStr(routedTmp.toString().replace('\\', '/')) + " (FORMAT PARQUET)");
                         }
+                        stopIfCancelled(ctx);
                         swapIn(destDir, routedTmp, routedSnap);
                         Path revealed = destDir.resolve(routedSnap);
                         return new DecisionRuleApplier.Result(
@@ -155,6 +159,7 @@ final class SqlTemplateJob implements Job {
                                 List.of());
                     });
             meta = resultSetMeta(conn);
+            stopIfCancelled(ctx);
             if (inc != null) {
                 java.time.LocalDate day = runDay(ctx.params());
                 IncrementalSink.Outcome o = IncrementalSink.replace(conn, OUT_TABLE, outDir, inc, day, cfg.name(), ctx.runId());
@@ -172,6 +177,7 @@ final class SqlTemplateJob implements Job {
             st.execute("COPY " + OUT_TABLE + " TO " + sqlStr(tmp.toString().replace('\\', '/')) + " (FORMAT PARQUET)");
         }
 
+        stopIfCancelled(ctx);   // the hidden .tmp is swept by the next Run's cleanLeftovers; the Dataset is untouched
         swapIn(outDir, tmp, snapshot);
         ctx.artifacts().dataset("output", sink, meta, rows, Instant.now());
         ctx.signals().emit(com.gamma.signal.SignalType.JOB_DATASET_PRODUCED, Severity.INFO, Map.of("dataset", sink, "rows", rows));
@@ -214,6 +220,13 @@ final class SqlTemplateJob implements Job {
 
     /** Hide prior snapshots, reveal the new one atomically, drop the hidden ones (see class doc). The hidden ones
      *  can go at once: no reader holding the lock is left on them, and one with a file open keeps reading it. */
+    /** JOB-OUTLIVES-CLOSE-1: a closing host asked this Run to stop (HA-CANCEL-RESIDUALS-1) - throw
+     *  {@code RunCancelledException} before the next write under the data root, so the Run is recorded CANCELLED and
+     *  writes nothing after the Space's close. Placed before each output write; the query itself is native. */
+    private static void stopIfCancelled(JobContext ctx) {
+        com.gamma.inspector.CommitFence.checkpoint(com.gamma.inspector.CommitFence.Scope.JOB, ctx.runId());
+    }
+
     private static void swapIn(Path outDir, Path tmp, String snapshot) throws IOException {
         List<Path> stale = new ArrayList<>();
         try (SnapshotSwapLock.Held swap = SnapshotSwapLock.write(outDir)) {
