@@ -92,4 +92,33 @@ describe('DomainProfileService', () => {
         expect(svc.state()?.active).toBe('generic');
         http.verify();
     });
+
+    it("an older Space's answer that arrives last never overwrites the current Space's profile", async () => {
+        const space = signal('a');
+        TestBed.configureTestingModule({
+            providers: [
+                provideHttpClient(),
+                provideHttpClientTesting(),
+                { provide: SpacesService, useValue: { currentSpaceId: space } },
+            ],
+        });
+        const svc = TestBed.inject(DomainProfileService);
+        const http = TestBed.inject(HttpTestingController);
+        const url = (r: { url: string }) => r.url.endsWith('/settings/link-analysis/domain-profile');
+        const answer = (active: string) => ({ active, stated: active, profile: null, installed: [], refused: [] });
+        TestBed.tick();
+        const forA = http.expectOne(url);
+        space.set('b');
+        TestBed.tick();
+        const forB = http.expectOne(url);
+
+        forB.flush(answer('b'));
+        await svc.ready();
+        forA.flush(answer('a')); // Space a's read answers late
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(svc.state()?.stated).toBe('b');
+        expect(svc.failed()).toBe(false);
+        http.verify();
+    });
 });

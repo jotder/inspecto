@@ -81,10 +81,13 @@ export class DomainProfileService {
     }
 
     private async load(): Promise<void> {
+        const space = this.loadedFor;
         this.failed.set(false);
         try {
-            this.apply(await firstValueFrom(this.get()));
+            const answer = await firstValueFrom(this.get());
+            if (space === this.loadedFor) this.apply(answer); // an older Space's late answer never overwrites
         } catch {
+            if (space !== this.loadedFor) return;
             this.state.set(null);
             this.failed.set(true);
             installDomainProfiles([], null);

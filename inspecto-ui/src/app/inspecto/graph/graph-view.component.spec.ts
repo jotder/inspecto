@@ -21,6 +21,7 @@ import {
     NODE_DBLCLICK_DELAY_MS,
     SELECTED_STATE,
     TOOLTIP_STYLE,
+    tooltipPlugin,
     buildBehaviors,
     buildPluginList,
     lassoSelection,
@@ -945,6 +946,10 @@ describe('dense-graph link labels (telco demo ring, 2026-09-27)', () => {
         expect(card['font-family']).toBe('inherit'); // the plugin's 'Roboto-Regular' is never loaded: serif
         expect(card.visibility).toBe('hidden');
         expect(Object.values(card).join(' ')).not.toMatch(/#|rgb/);
+        // the registered plugin carries that style, and its content is the component's card
+        const plugin = tooltipPlugin(() => '<b>card</b>');
+        expect(plugin['type']).toBe('tooltip');
+        expect(plugin['style']).toBe(TOOLTIP_STYLE);
     });
 });
 

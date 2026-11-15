@@ -645,6 +645,16 @@ export const TOOLTIP_STYLE = {
     },
 };
 
+/** The hover-card plugin the graph registers when tooltips are on: G6's built-in, drawn in {@link TOOLTIP_STYLE}. */
+export function tooltipPlugin(content: (items: ElementDatum[]) => string): Record<string, unknown> {
+    return {
+        type: 'tooltip',
+        trigger: 'hover',
+        getContent: async (_e: unknown, items: ElementDatum[]) => content(items),
+        style: TOOLTIP_STYLE,
+    };
+}
+
 /**
  * Value signature used by the change classifier (LA-05). The Studio binds `[data]`, `[display]`,
  * `[emphasis]` and `[plugins]` from `computed()`s that yield a FRESH object on every evaluation, so
@@ -1576,16 +1586,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 (ids, mode) => this.onBrushSelect(lassoSelection(this.selSet, ids, mode)),
             ) as never[],
             plugins: [
-                ...(this.tooltips
-                    ? [
-                          {
-                              type: 'tooltip',
-                              trigger: 'hover',
-                              getContent: async (_e: unknown, items: ElementDatum[]) => this.tooltipHtml(items),
-                              style: TOOLTIP_STYLE,
-                          },
-                      ]
-                    : []),
+                ...((this.tooltips ? [tooltipPlugin((items) => this.tooltipHtml(items))] : []) as unknown as never[]),
                 ...(buildPluginList(this.plugins, ICON_COLOR_SWATCHES) as unknown as never[]),
             ],
         });
