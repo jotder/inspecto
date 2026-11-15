@@ -67,15 +67,40 @@ public final class SpaceContext implements AutoCloseable {
     /**
      * The {@code space.toon} display metadata. The manifest is optional — a space is discovered by its
      * {@code config/} subtree, so a missing or unreadable manifest defaults the display name to the id.
+     *
+     * <p>{@code createdBy} and {@code admission} (LA-FULL-CYCLE-TEST-1 finding 32, decision D5): who created the Space
+     * when it was created by a signed-in person, and whether it is {@link #CLOSED} - readable only by that person, by
+     * holders of {@code canAdminister} and by the roles its own role table defines ({@code SpaceAdmission}). Both blank on
+     * every Space made before, made without sign-in or placed on disk: such a Space is open, as it always was.
      */
-    public record SpaceManifest(String displayName, String description, String createdAt, String dataRoot) {
+    public record SpaceManifest(String displayName, String description, String createdAt, String dataRoot,
+                                String createdBy, String admission) {
+
+        /** The {@code admission} value of a Space only the people it admits may use. Any other value is open. */
+        public static final String CLOSED = "closed";
 
         private static final Logger log = LoggerFactory.getLogger(SpaceContext.class);
-        private static final java.util.Set<String> OWNED = java.util.Set.of("display_name", "description", "created_at", "data_root");
+        private static final java.util.Set<String> OWNED =
+                java.util.Set.of("display_name", "description", "created_at", "data_root", "created_by", "admission");
+
+        public SpaceManifest {
+            createdBy = createdBy == null ? "" : createdBy;
+            admission = admission == null ? "" : admission;
+        }
 
         /** A manifest with no {@code data_root} (the Space's state stays under its base, or the convention mount). */
         public SpaceManifest(String displayName, String description, String createdAt) {
             this(displayName, description, createdAt, "");
+        }
+
+        /** An open Space with no recorded creator. */
+        public SpaceManifest(String displayName, String description, String createdAt, String dataRoot) {
+            this(displayName, description, createdAt, dataRoot, "", "");
+        }
+
+        /** Whether only the people this Space admits may use it. */
+        public boolean closed() {
+            return CLOSED.equals(admission);
         }
 
         /** Write this manifest to {@code space.toon} at {@code path} (canonical TOON, crash-safe). Keys this record does
@@ -95,12 +120,14 @@ public final class SpaceContext implements AutoCloseable {
             m.put("description", description);
             m.put("created_at", createdAt);
             if (dataRoot != null && !dataRoot.isBlank()) m.put("data_root", dataRoot);
+            if (!createdBy.isBlank()) m.put("created_by", createdBy);
+            if (!admission.isBlank()) m.put("admission", admission);
             AtomicFiles.write(path, JToon.encode(m).getBytes(StandardCharsets.UTF_8), ".space-");
         }
 
         /** Read {@code space.toon} at {@code path}, defaulting the display name to {@code fallbackId} when absent. */
         static SpaceManifest read(Path path, String fallbackId) {
-            String displayName = fallbackId, description = "", createdAt = "", dataRoot = "";
+            String displayName = fallbackId, description = "", createdAt = "", dataRoot = "", createdBy = "", admission = "";
             if (Files.exists(path)) {
                 try {
                     Map<String, Object> m = ToonHelper.load(path.toString());
@@ -108,11 +135,16 @@ public final class SpaceContext implements AutoCloseable {
                     description = ToonHelper.opt(m, "description", "");
                     createdAt   = ToonHelper.opt(m, "created_at", "");
                     dataRoot    = ToonHelper.opt(m, "data_root", "");
+                    createdBy   = ToonHelper.opt(m, "created_by", "");
+                    admission   = ToonHelper.opt(m, "admission", "");
                 } catch (Exception e) {
-                    log.warn("Could not read space manifest {} — defaulting: {}", path, e.getMessage());
+                    // Fail closed: a manifest that exists but does not read may have said `admission: closed`.
+                    admission = CLOSED;
+                    log.warn("Could not read space manifest {} — defaulting, and the Space is closed until it reads: {}",
+                            path, e.getMessage());
                 }
             }
-            return new SpaceManifest(displayName, description, createdAt, dataRoot);
+            return new SpaceManifest(displayName, description, createdAt, dataRoot, createdBy, admission);
         }
     }
 }

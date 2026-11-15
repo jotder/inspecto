@@ -36,7 +36,10 @@ Package `com.gamma.demoauth`, registered in
 
 1. Bearer must verify as an unexpired `a` token.
 2. Look the user up in the bound Space (`Roles.configRoot(ex)`, else the legacy write root), then in every
-   known Space (the identity is global; the bound Space decides which role names it grants).
+   known Space (the identity is global; the bound Space decides which role names it grants). Whether that Space
+   lets the user in at all is the control plane's Space admission, the same for every Authenticator: a closed
+   Space admits its creator, a holder of `canAdminister` and a holder of a role its own `roles.toon` defines
+   ([Auth & Security](../access/admin-guide-auth-security.md); `DemoSpaceAdmissionHttpTest`).
 3. Roles filtered to those the Space's effective role table defines; capabilities are their union minus
    Access Profile denials; data scopes are the union, or unscoped if any held role is unscoped.
 4. Subject `displayName`: the Demo User's name, which the session and an Investigation's owner name read

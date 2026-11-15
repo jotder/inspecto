@@ -431,7 +431,8 @@ the Space/ABAC layer, where a caller's data scopes decide what a read can see �
 only** (`inspecto-policy`, seed `space-isolation`, active only with an IdP `space` claim; `AccessDeciders` reads
 absence as ALLOW), so on Standard an authenticated subject reads every hosted Space (stated 2026-09-17). Affirmed as the **compliance**
 position 2026-09-16 knowing it becomes an auditor-facing claim (`controls-matrix.md` CC6). ⚠ If reads are
-ever gated, that matrix line moves with the code.
+ever gated, that matrix line moves with the code. **Narrowed 2026-11-15:** "every hosted Space" now means every
+*open* Space; a Space a signed-in person creates is closed (the next section but one), and the matrix line moved.
 
 **Three enforcement points, answering different questions** — none replaces another:
 
@@ -498,6 +499,70 @@ Which tokens count as a machine's: [oidc admin guide](../oidc/admin-guide.md) se
 **Evidence** is `compliance/evidence/route-gating.md`, whose inventory table is **generated** by
 `tools/route-gating-report.mjs` and CI-enforced in `--check` mode — the document cannot say something the
 code does not. Plan of record: `archived-documents/plans-archive/route-gating-compliance-plan.md`.
+
+## A Space a signed-in person creates is closed (`LA-FULL-CYCLE-TEST-1` finding 32, decision D5, 2026-11-15)
+
+**What was found.** Until this change every signed-in person could read every hosted Space (the position stated
+above under *Reads are open*). Reproduced over real HTTP on `2959afca1`: a Demo Admin created a Space and added a
+file; a Demo User listed only in ANOTHER Space's `demo-users.toon` then read the new Space's Dataset list and
+definitions, its rows, its arrivals, its settings and its role table (all 200), and the inbox's absolute path on the
+server through `GET /pipelines/authored/{id}/inbox`. With a built-in role (`operations`) the same person also read
+`GET /datasets/{id}/feed`, which carried the same path.
+
+**The decision (D5): fail closed.** A Space is **closed** when its `space.toon` says `admission: closed`.
+`POST /spaces` and `POST /spaces/import` write that, together with `created_by` (the caller's Subject id), whenever
+the caller is signed in. A closed Space admits:
+
+1. the person who created it;
+2. anyone who holds `canAdminister`, judged by that Space's own role table;
+3. anyone who holds a role that Space's own `roles.toon` defines;
+4. a machine whose client that Space's `roles.toon` names in `identity.machineClients` (unchanged).
+
+Everyone else is answered **404 `no such space '<id>'`**, word for word what an unknown id gets, on every route
+under `/spaces/<id>/`: Datasets, rows, arrivals, the inbox, settings, the role table, writes. The Space is left out
+of `GET /spaces` and of the `spaces` list in `/bootstrap`. Each refusal is recorded as an access denial (404) in the
+closed Space's own audit log. Admission is not a capability: an admitted person still needs the capability a route
+asks for (403 stays 403).
+
+**How an administrator admits others.** Open the closed Space, go to Settings, Access, Roles, and define there the
+role those people hold: create it, or edit a built-in role (an edited built-in role is saved into the Space's own
+table). Over the API that is `PUT /spaces/<id>/access/roles` (`canConfigureAccess`). A role that only the built-in
+table defines admits nobody, whatever it grants. *Revert* on the role takes the admission away on the next request.
+So a Space Template that ships a `roles.toon` admits the holders of the roles it defines from the first moment; a
+blank Space, or one from a template with no `roles.toon`, admits its creator and the administrators only.
+
+**What stays open.** A Space whose `space.toon` has no `admission` key: every Space that existed before this
+change, every Space created where nobody signs in, and a Space folder placed on disk. Any signed-in person reads
+such a Space, as before. To close one, add `admission: closed` (and, if you wish, `created_by: <subject id>`) to its
+`space.toon` and restart; to open a closed one, remove the key and restart. A `space.toon` that exists but does not
+read closes the Space until it is repaired. Renaming a Space keeps both keys. Neither key is ever taken from an
+imported bundle, and no config route can write `space.toon` (it sits outside `config/` and is a reserved path).
+
+**No sign-in.** With no Authenticator (Basic) nothing is recorded and nothing is checked: every request passes.
+
+**A request with no `/spaces/<id>` prefix** runs in the fallback Space (`default`, else the smallest id). When that
+Space is closed to the caller, only the sign-in paths (`/bootstrap`, `/auth/*`, the probes), the Space list and its
+create, rename and delete (`/spaces...`) and the Exchange (`/exchange...`) answer; anything else is 404 `not found`.
+
+**The inbox path.** `GET /datasets/{id}/feed` (and the answers of its `PUT`, `DELETE` and of `PUT
+/datasets/{id}/watch`) and `GET /pipelines/authored/{id}/inbox` show `inbox` as the absolute path on the server
+only to a holder of `canAdminister`, and where nobody signs in. Anyone else sees it relative to the Space's data
+folder (`inbox/<dataset>`); a Pipeline inbox that lies outside that folder is left out for them.
+
+**Limits, stated so nobody over-claims.**
+
+- The 404 keeps a signed-in person's ordinary use from confirming that a closed Space exists. It does not hide a
+  Space id from a caller who tries: with no credential the same route answers 401 for a Space that exists and 404
+  for one that does not; a path no route answers gives `not found` under an existing Space and `no such space`
+  under an unknown one; and `/spaces/<id>/bootstrap` gives an anonymous caller that Space's pre-sign-in context
+  (edition, features, branding).
+- A Space id also appears outside its own routes: metric labels, the owning Space of an Exchange offer, an App
+  upgrade preview.
+- Admission is by role, not by person, and no screen shows that a Space is closed (the `GET /spaces` row of a closed
+  Space carries `admission` and `createdBy`; the create answer does too).
+- Code: `SpaceAdmission`, `ServerPaths`, `ControlApi.spaceRefusal` (`inspecto/src/main/java/com/gamma/control/`);
+  the two keys live on `SpaceContext.SpaceManifest`. Tests: `ControlApiSpaceAdmissionTest`,
+  `DemoSpaceAdmissionHttpTest`, `ControlApiPipelineInboxTest`.
 
 ## A Standard/Advanced bundle does not boot without OIDC configuration
 

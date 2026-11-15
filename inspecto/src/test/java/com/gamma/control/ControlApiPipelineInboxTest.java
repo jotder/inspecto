@@ -44,6 +44,7 @@ class ControlApiPipelineInboxTest {
         String auth = ex.getRequestHeaders().getFirst("Authorization");
         if ("Bearer author".equals(auth)) return Optional.of(new Subject("jdoe", Set.of("canAuthorWorkbench")));
         if ("Bearer operator".equals(auth)) return Optional.of(new Subject("olly", Set.of("canOperateRuns")));
+        if ("Bearer admin".equals(auth)) return Optional.of(new Subject("ada", Set.of("canAdminister")));
         return Optional.empty();
     };
 
@@ -83,9 +84,30 @@ class ControlApiPipelineInboxTest {
     }
 
     private HttpResponse<String> list(Ctx c, String id) throws Exception {
+        return list(c, id, "operator");
+    }
+
+    private HttpResponse<String> list(Ctx c, String id, String token) throws Exception {
         return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port
-                + "/api/v1/pipelines/authored/" + id + "/inbox")).header("Authorization", "Bearer operator").GET().build(),
+                + "/api/v1/pipelines/authored/" + id + "/inbox")).header("Authorization", "Bearer " + token).GET().build(),
                 BodyHandlers.ofString());
+    }
+
+    /** LA-FULL-CYCLE-TEST-1 finding 32: where the inbox is on the server's disk is for a holder of canAdminister. */
+    @Test
+    void theInboxPathOnTheServerIsShownToAnAdministratorOnly(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, true)) {
+            HttpResponse<String> admin = list(c, "mini_etl", "admin");
+            assertEquals(200, admin.statusCode(), admin.body());
+            assertEquals(c.inbox.toAbsolutePath().normalize().toString(), V1Body.of(admin.body()).get("inbox").asText());
+
+            // this inbox is outside the Space's data folder, so there is no in-Space form to show: the key is left out
+            HttpResponse<String> operator = list(c, "mini_etl", "operator");
+            assertEquals(200, operator.statusCode(), operator.body());
+            assertFalse(V1Body.of(operator.body()).has("inbox"), operator.body());
+            assertFalse(operator.body().contains(dir.getFileName().toString()), "no server path at all: " + operator.body());
+            assertEquals(0, V1Body.of(operator.body()).get("total").asInt(), "the listing itself is unchanged");
+        }
     }
 
     @Test

@@ -133,7 +133,7 @@ final class BootstrapRoutes implements RouteModule {
         if (!(Authenticators.active().isPresent() && ApiContext.subject(ex).isEmpty())) {
             data.put("configSpecs", configSpecs());
             data.put("enumerations", enumerations());
-            data.put("spaces", spaces(api));
+            data.put("spaces", spaces(api, ex));
             // LA-ONBOARD-1 OB-7: whether this Space lets people Add data (`data.self_import` in force); both apps lock on it.
             data.put("selfImport", DataSettings.forRoot(writeRootOrNull(api)).selfImportInForce());
             // PA-3: the Product's Apps and the nav this caller sees, inventory like the Space roster. Gates: the App's modules ACTIVE
@@ -280,8 +280,9 @@ final class BootstrapRoutes implements RouteModule {
         return m;
     }
 
-    private Object spaces(ApiContext api) {
+    private Object spaces(ApiContext api, HttpExchange ex) {
         return HostContext.of(api).spaces().all().stream()
+                .filter(c -> SpaceAdmission.admits(ex, c))   // a closed Space is listed only to the people it admits
                 .sorted(Comparator.comparing(c -> c.id().value()))
                 .map(BootstrapRoutes::spaceEntry)
                 .toList();

@@ -31,8 +31,9 @@ import java.util.stream.Stream;
 /**
  * <b>How files reach an import Dataset</b> ({@code LA-ARRIVAL-FEEDS-1}, plan {@code la-data-arrival-plan.md} P3, D-1):
  * <ul>
- *   <li>{@code GET /datasets/{id}/feed} - the Dataset's inbox (its absolute path on the server, the files waiting there,
- *       and which of them the import already took under the same name, so Run now skips them)
+ *   <li>{@code GET /datasets/{id}/feed} - the Dataset's inbox (its path: absolute on the server for a holder of
+ *       {@code canAdminister} and with no sign-in, else relative to the Space's data folder, {@link ServerPaths}; the
+ *       files waiting there, and which of them the import already took under the same name, so Run now skips them)
  *       and its feed: {@code uploads} (a person adds files; the Pipeline runs only when asked), {@code folder} (the inbox
  *       is watched) or {@code sftp} (a Connection is read). Every edition: on Basic the files waiting are imported with
  *       <i>Run now</i>, or by <i>Watch this folder</i> ({@link InboxWatch}, {@code BASIC-ONBOARD-1} P2: {@code watch},
@@ -86,10 +87,10 @@ final class DatasetFeed {
 
     static Object read(ApiContext api, HttpExchange ex, String id) throws IOException {
         Import imp = gate(api, ex, id, "Data feed");
-        return describe(imp);
+        return describe(ex, imp);
     }
 
-    private static Map<String, Object> describe(Import imp) throws IOException {
+    private static Map<String, Object> describe(HttpExchange ex, Import imp) throws IOException {
         PipelineConfig cfg = imp.service().configFor(imp.id())
                 .orElseThrow(() -> new ApiException(409, ErrorCodes.CONFLICT, "the import's Pipeline '" + imp.id() + "' is not registered"));
         Path inbox = OnboardImport.inbox(imp.dataRoot(), imp.id()).toAbsolutePath().normalize();
@@ -112,7 +113,7 @@ final class DatasetFeed {
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("dataset", imp.id());
-        out.put("inbox", inbox.toString());
+        out.put("inbox", ServerPaths.shown(ex, inbox, imp.dataRoot()));
         out.put("waiting", waiting.size());
         out.put("alreadyImported", alreadyImported);
         out.put("files", files);
@@ -259,7 +260,7 @@ final class DatasetFeed {
             return trigger;
         });
 
-        Map<String, Object> out = describe(imp);
+        Map<String, Object> out = describe(ex, imp);
         out.put("indexJob", indexJob(imp, ApiContext.actor(ex)));
         return out;
     }
@@ -278,7 +279,7 @@ final class DatasetFeed {
             collector.put("accepts_upload", true);
             return Map.of("type", "manual");
         });
-        return describe(imp);
+        return describe(ex, imp);
     }
 
     /**

@@ -117,13 +117,28 @@ class ControlApiSpaceBundleActionRequestsTest {
                     "canAuthorWorkbench", "canWorkIncidents", "canApproveChanges")));
             case NO_INCIDENTS -> Optional.of(new Subject("admin-1", Set.of("canAdminister", "canOnboardConnections",
                     "canAuthorWorkbench")));
-            case OPERATOR -> Optional.of(new Subject("operator-1", Set.of("canOperateRuns", "canWorkIncidents")));
+            case OPERATOR -> crew(ex, new Subject("operator-1", Set.of("canOperateRuns", "canWorkIncidents")));
             case CHECKER -> Optional.of(new Subject("checker-1", Set.of("canAdminister", "canWorkIncidents",
                     "canApproveChanges")));
-            case ORIGINAL -> Optional.of(new Subject("author-9", Set.of("canWorkIncidents", "canApproveChanges")));
-            case RESTORED -> Optional.of(new Subject("author-0", Set.of("canWorkIncidents", "canApproveChanges")));
+            case ORIGINAL -> crew(ex, new Subject("author-9", Set.of("canWorkIncidents", "canApproveChanges")));
+            case RESTORED -> crew(ex, new Subject("author-0", Set.of("canWorkIncidents", "canApproveChanges")));
             default -> Optional.empty();
         };
+    }
+
+    /**
+     * The Space an import creates is closed (LA-FULL-CYCLE-TEST-1 finding 32): its importer and the administrators
+     * only. The operator and the two authors hold the role {@code crew}, and {@link #admitCrew} defines it in the new
+     * Space - the way an administrator admits anyone - so the four-eyes gates below are what answers them.
+     */
+    private static Optional<Subject> crew(com.sun.net.httpserver.HttpExchange ex, Subject subject) {
+        com.gamma.access.ComponentAccess.heldRoles(ex, Set.of("crew"));
+        return Optional.of(subject);
+    }
+
+    private static void admitCrew(Path root) throws Exception {
+        Files.writeString(root.resolve("beta").resolve("config").resolve("roles.toon"),
+                "roles[1]:\n  - name: crew\n    capabilities[0]:\n");
     }
 
     @AfterEach
@@ -207,6 +222,7 @@ class ControlApiSpaceBundleActionRequestsTest {
             assertEquals(403, refused.statusCode(), "an invoke-api rule needs canWorkIncidents: " + refused.body());
             assertTrue(Files.notExists(root.resolve("beta")), "no Space directory is created");
             data(importSpace(c, zip, IMPORTER), 200);
+            admitCrew(root);
 
             JsonNode stored = data(beta(c, "GET", "/components/decision-rule/leak", null, IMPORTER), 200);
             assertEquals("importer-1", stored.at("/content/updatedBy").asText(), stored.toString());
@@ -276,6 +292,7 @@ class ControlApiSpaceBundleActionRequestsTest {
                     "makers", List.of("author-9", "author-0"),
                     "consequences", List.of(Map.of("action", "invoke-api", "params", Map.of("connection", "hook"))))),
                     IMPORTER), 200);
+            admitCrew(root);
             JsonNode stored = data(beta(c, "GET", "/components/decision-rule/leak", null, IMPORTER), 200);
             assertEquals(List.of("importer-1", "author-9", "author-0"),
                     JSON.convertValue(stored.at("/content/makers"), List.class), stored.toString());

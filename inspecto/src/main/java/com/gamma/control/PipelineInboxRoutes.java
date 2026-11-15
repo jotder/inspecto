@@ -39,7 +39,7 @@ final class PipelineInboxRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        api.get("/pipelines/authored/([^/]+)/inbox", (e, m) -> list(api, ApiContext.name(m)));
+        api.get("/pipelines/authored/([^/]+)/inbox", (e, m) -> list(api, e, ApiContext.name(m)));
         // canAuthorWorkbench, like run-to-here: the affordance lives in the editor's build-and-test loop.
         api.post("/pipelines/authored/([^/]+)/inbox", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> upload(api, e, ApiContext.name(m))));
@@ -49,8 +49,11 @@ final class PipelineInboxRoutes implements RouteModule {
      * {@code GET /pipelines/authored/{id}/inbox} — the regular files directly in the poll directory, newest
      * first, by name (the name is what {@code POST …/run} takes for a Pipeline that binds no connection).
      * 404 unknown Pipeline · 501 a Dataset-fed Pipeline (it has no inbox). An absent directory lists empty.
+     * {@code inbox} is the directory as the caller may see it ({@link ServerPaths}): absolute for a holder of
+     * {@code canAdminister} and with no sign-in, else relative to the Space's data folder, and left out when the
+     * directory is not inside that folder.
      */
-    private Object list(ApiContext api, String id) throws IOException {
+    private Object list(ApiContext api, HttpExchange ex, String id) throws IOException {
         Path inbox = inboxOf(configOf(api, id));
         List<Map<String, Object>> files = new ArrayList<>();
         if (Files.isDirectory(inbox)) {
@@ -67,7 +70,8 @@ final class PipelineInboxRoutes implements RouteModule {
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("pipeline", id);
-        out.put("inbox", inbox.toString());
+        String shown = ServerPaths.shown(ex, inbox, api.dataRoot());
+        if (shown != null) out.put("inbox", shown);
         out.put("total", files.size());
         out.put("truncated", files.size() > MAX_LISTED);
         out.put("files", files.size() > MAX_LISTED ? files.subList(0, MAX_LISTED) : files);

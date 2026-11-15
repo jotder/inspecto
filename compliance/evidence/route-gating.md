@@ -43,6 +43,12 @@ a caller's data scopes decide what a read can see, rather than at route gating. 
 position (operator, 2026-09-16) knowing it becomes a claim an auditor holds us to. ⚠ If reads are ever
 gated, this section and the CC6 row in `controls-matrix.md` move with the code.
 
+**Narrowed 2026-11-15 (decision D5).** Reads are still not capability-gated, but a Space may now be **closed**:
+a Space a signed-in person creates admits only its creator, a holder of `canAdminister` and a holder of a role its
+own role table defines; every other signed-in caller gets 404 on all of its routes, reads included. A Space with no
+`admission` key in its `space.toon` (every Space that existed before, or was placed on disk) stays open. Evidence:
+`ControlApiSpaceAdmissionTest`, `DemoSpaceAdmissionHttpTest`; the CC6 row carries the same statement.
+
 ## How this is enforced, in three places
 
 | Mechanism | What it catches | Where |
@@ -174,8 +180,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/dashboards/([^/]+)/share` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ShareRoutes.java:55` |
 | PUT | `/datasets/([^/]+)/columns/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:88` |
 | POST | `/datasets/([^/]+)/compact` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/DatasetCompaction.java:85` |
-| DELETE | `/datasets/([^/]+)/feed` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/DatasetFeed.java:69` |
-| PUT | `/datasets/([^/]+)/feed` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/DatasetFeed.java:67` |
+| DELETE | `/datasets/([^/]+)/feed` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/DatasetFeed.java:70` |
+| PUT | `/datasets/([^/]+)/feed` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/DatasetFeed.java:68` |
 | POST | `/datasets/([^/]+)/files` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:84` |
 | PUT | `/datasets/([^/]+)/filter` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/ImportFilterEdit.java:48` |
 | POST | `/datasets/([^/]+)/materialize` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/DatasetRoutes.java:68` |
@@ -402,10 +408,10 @@ system: the evidence cannot say something the code does not.
 | PUT | `/settings/scheduler` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/SchedulerRoutes.java:83` |
 | PUT | `/settings/timezone` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:101` |
 | POST | `/space-comparisons` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceComparisonRoutes.java:47` |
-| POST | `/spaces` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:75` |
-| DELETE | `/spaces/([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:82` |
-| PUT | `/spaces/([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:79` |
-| POST | `/spaces/import` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:77` |
+| POST | `/spaces` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:76` |
+| DELETE | `/spaces/([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:83` |
+| PUT | `/spaces/([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:80` |
+| POST | `/spaces/import` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:78` |
 | POST | `/streams/([^/]+)/records` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/StreamPushRoutes.java:89` |
 | PUT | `/system/link-analysis/limits` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/LinkAnalysisLimitsRoutes.java:49` |
 | POST | `/system/operational-db/test` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/SystemRoutes.java:44` |

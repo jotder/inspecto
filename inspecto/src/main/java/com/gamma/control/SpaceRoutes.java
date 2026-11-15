@@ -55,6 +55,7 @@ final class SpaceRoutes implements RouteModule {
         api.get("/spaces", (e, m) -> {
             ApiContext.podScoped(e);
             return HostContext.of(api).spaces().all().stream()
+                    .filter(c -> SpaceAdmission.admits(e, c))   // a closed Space is listed only to the people it admits
                     .sorted(java.util.Comparator.comparing(c -> c.id().value()))
                     .map(c -> withIntegrity(e, c, manifest(c)))
                     .toList();
@@ -95,7 +96,7 @@ final class SpaceRoutes implements RouteModule {
                         ImportCapabilityGuard.checkFiles(e, b.configEntries(), true);   // a NEW Space may seed dedicated-only kinds
                         // a NEW Space: no stored rule, no live registry; carried Jobs server-stamped (MAINT-TASK-AUTHORITY-1)
                         return JobAuthority.stampBundle(e, DecisionRuleGuard.guardImport(e, null, b));
-                    }));
+                    }, creator(e)));
         } catch (com.gamma.service.UnknownClassificationException unknown) {   // no Space and no directory were left
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, unknown.getMessage());
         } catch (IllegalArgumentException badBundle) {   // not a bundle / invalid manifest / zip-slip
@@ -118,11 +119,11 @@ final class SpaceRoutes implements RouteModule {
         try {
             SpaceContext ctx = template == null
                     ? HostContext.of(api).spaces().create(SpaceId.of(id),
-                            ApiContext.str(body, "display_name"), ApiContext.str(body, "description"))
+                            ApiContext.str(body, "display_name"), ApiContext.str(body, "description"), creator(e))
                     : HostContext.of(api).spaces().createFromTemplate(SpaceId.of(id),
                             ApiContext.str(body, "display_name"), ApiContext.str(body, "description"), template,
                             base -> TemplateSeedGate.require(e, base,   // every seeded kind meets its own route
-                                    HostContext.of(api).spaces().templateHasBasicTier(template)));
+                                    HostContext.of(api).spaces().templateHasBasicTier(template)), creator(e));
             Map<String, Object> out = manifest(ctx);
             com.gamma.util.OnboardingCounters.record(com.gamma.util.OnboardingCounters.Event.SPACE_CREATED);   // OB-13
             // OB-12: load the template's samples and run each Pipeline that received files, once. The Space stays
@@ -182,6 +183,14 @@ final class SpaceRoutes implements RouteModule {
                     + "create the Space without loadSamples and add your own data; nothing was created");
     }
 
+    /**
+     * The signed-in person creating a Space, or null with no sign-in. A Space they create records them and is closed
+     * ({@link SpaceAdmission}); with no sign-in nothing is recorded and the Space is open, as before.
+     */
+    private static String creator(HttpExchange e) {
+        return ApiContext.subject(e).map(com.gamma.spi.auth.Subject::id).orElse(null);
+    }
+
     private static void requireMultiSpace(ApiContext api) {
 
         if (!HostContext.of(api).spaces().supportsCrud())
@@ -211,6 +220,10 @@ final class SpaceRoutes implements RouteModule {
         m.put("displayName", ctx.manifest().displayName());
         m.put("description", ctx.manifest().description());
         m.put("createdAt", ctx.manifest().createdAt());
+        if (ctx.manifest().closed()) {   // only on a closed Space, so every other row is as it was
+            m.put("admission", ctx.manifest().admission());
+            m.put("createdBy", ctx.manifest().createdBy());
+        }
         return m;
     }
 }

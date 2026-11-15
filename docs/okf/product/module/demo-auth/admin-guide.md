@@ -65,3 +65,4 @@ users[2]{id,displayName,title,roles,landing}:
 | 401 right after sign-in | The bundle is not a `-Distribution demo` build, or the user was removed from the roster. |
 | Everyone signed out | The server restarted (new signing secret, by design). |
 | Signed in but menus missing | The user's role names do not exist in that Space's role table. |
+| A Demo User does not see a Space a Demo Admin created, or gets "no such space" in it | A Space created while signed in is closed: its creator and the administrators only. Being in a roster does not admit anyone. In that Space, Settings, Access, Roles: define the role the Demo User holds ([Auth & Security](../access/admin-guide-auth-security.md)). |

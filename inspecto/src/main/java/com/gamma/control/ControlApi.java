@@ -773,6 +773,8 @@ public final class ControlApi implements AutoCloseable, HostContext {
         return ApiContext.attr(ex, ATTR_EFFECTIVE_PATH) instanceof String s ? s : ex.getRequestURI().getPath();
     }
     private static void setPath(HttpExchange ex, String path) { ApiContext.attr(ex, ATTR_EFFECTIVE_PATH, path); }
+    /** The Space id a {@code /spaces/{id}/...} request named ({@link #bindSpace}); absent on an un-prefixed request. */
+    private static final String ATTR_NAMED_SPACE = "inspecto.namedSpace";
     /** The route-table path this request matched (no {@code /api/v1} or {@code /spaces/{id}} prefix) — what a
      *  Pending Change records so {@link #replay} can re-run the same route (`ASSURE-MAKER-CHECKER-1`). */
     static String routePath(HttpExchange ex) { return path(ex); }
@@ -793,6 +795,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
             ApiContext.ATTR_RAW_BODY, ApiContext.ATTR_CLIENT_IP, ApiContext.ATTR_SUBJECT, ApiContext.ATTR_SUBJECT_ISSUER, ApiContext.ATTR_CAPABILITY,
             ApiContext.ATTR_RESOURCE_PERMISSIONS,
             ApiContext.ATTR_PAGINATION, ApiContext.ATTR_POD_SCOPED, ApiContext.ATTR_APPROVED_CHANGE, ApiContext.ATTR_AUDIT_ATTRS, ApiContext.ATTR_EMBED_GRANT, ATTR_EFFECTIVE_PATH,
+            ATTR_NAMED_SPACE,
             Roles.ATTR_CONFIG_ROOT, AccessDecider.ATTR_MATCHED_POLICY };
 
     /** Drop the request's whole attribute scope — dispatch's first act (see {@link #correlation}).
@@ -1035,10 +1038,11 @@ public final class ControlApi implements AutoCloseable, HostContext {
             if (sp.matches()) {
                 String id = sp.group(1);
                 if (spaces.space(SpaceId.of(id)).isEmpty()) {
-                    respond(ex, 404, Map.of("error", "no such space '" + id + "'"));
+                    respond(ex, 404, Map.of("error", noSuchSpace(id)));
                     return;
                 }
                 setPath(ex, sp.group(2));
+                ApiContext.attr(ex, ATTR_NAMED_SPACE, id);
                 if (!EventLog.DEFAULT_SPACE_ID.equals(id)) {
                     MDC.put(EventLog.SPACE_MDC_KEY, id);
                     spaceBound = true;
@@ -1048,6 +1052,32 @@ public final class ControlApi implements AutoCloseable, HostContext {
         } finally {
             if (spaceBound) MDC.remove(EventLog.SPACE_MDC_KEY);
         }
+    }
+
+    /** The one wording for a Space id nothing answers to: an unknown id, and a closed Space the caller is not admitted to. */
+    private static String noSuchSpace(String id) {
+        return "no such space '" + id + "'";
+    }
+
+    /**
+     * Space admission (LA-FULL-CYCLE-TEST-1 finding 32, decision D5; the rule is {@link SpaceAdmission}): the 404 message
+     * for a signed-in caller the request's Space does not admit, or null when the request goes on. A request that named
+     * its Space is answered exactly as an unknown id is. An un-prefixed request runs in the fallback Space
+     * ({@link SpaceManager#current()}); there the sign-in paths and the installation-scope routes go on, and anything
+     * else is not found. A share or embed token is its own credential, so those paths are never refused here.
+     */
+    private String spaceRefusal(HttpExchange ex, String path) {
+        if (isSelfVerifyingPublic(path)) return null;
+        String named = ApiContext.attr(ex, ATTR_NAMED_SPACE) instanceof String id ? id : null;
+        if (named == null && (PUBLIC_PATHS.contains(path) || SpaceAdmission.installationScope(path))) return null;
+        SpaceContext ctx;
+        try {
+            ctx = currentContext();
+        } catch (RuntimeException noSpace) {
+            return null;   // no Space is hosted: the route says so (503)
+        }
+        if (SpaceAdmission.admitsBound(ex, ctx)) return null;
+        return named != null ? noSuchSpace(named) : "not found";
     }
 
     /** SE-1a: the one write hook of the Space lock (spec-space-lock.md §6). A mutating request bound to a hosted
@@ -1116,6 +1146,14 @@ public final class ControlApi implements AutoCloseable, HostContext {
             } catch (ApiException ae) {
                 AuditTrail.accessDenied(ex, method, path, ae.status);
                 throw ae;
+            }
+            // Before the rate limit, the policy stage and the handler: a caller the Space does not admit reads nothing
+            // of it, and the refusal is recorded like the 401 and 403 above.
+            String notAdmitted = spaceRefusal(ex, path);
+            if (notAdmitted != null) {
+                AuditTrail.accessDenied(ex, method, path, 404);
+                respond(ex, 404, Map.of("error", notAdmitted));
+                return;
             }
             try {
                 rateLimit(ex, path);

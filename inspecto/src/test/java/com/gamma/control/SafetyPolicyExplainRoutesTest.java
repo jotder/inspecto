@@ -89,13 +89,14 @@ class SafetyPolicyExplainRoutesTest {
                   max_threads: 4
                 """);
         System.setProperty("system.config.dir", serverDir.toString());
+        // Placed on disk, so it carries no admission: in a Space a signed-in caller creates over HTTP the author below
+        // is answered 404 before the capability under test is asked (LA-FULL-CYCLE-TEST-1 finding 32).
+        Path spaceCfg = Files.createDirectories(dir.resolve("root").resolve("acme").resolve("config"));
         SpaceManager spaces = SpaceManager.discover(dir.resolve("root"));
         ControlApi api = new ControlApi(spaces, 0);
         api.start();
         try {
             int port = api.port();
-            assertEquals(200, post(port, "/spaces", "{\"id\":\"acme\"}").statusCode());
-            Path spaceCfg = Files.createDirectories(dir.resolve("root").resolve("acme").resolve("config"));
             Files.writeString(spaceCfg.resolve("safety-policy.toon"), """
                     caps:
                       max_threads: 2

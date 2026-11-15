@@ -46,6 +46,18 @@ is untouched. The owning-Space gate (`ApiContext.requireCapabilityIn`, the Excha
 clears it; the role editor sends the loaded block back). Seed role `integration` grants `canOpenInboundInvestigation`.
 Residual: the routes with no capability gate (reads, read-shaped POSTs) stay open to an admitted machine as to any Subject.
 
+**Space admission (`LA-FULL-CYCLE-TEST-1` finding 32, decision D5, built 2026-11-15).** Whether a signed-in Subject
+may use a Space at all is decided in the control plane, not in this module: `ControlApi.routeDispatch` asks
+`SpaceAdmission` (package `com.gamma.control`, module `inspecto`) right after authentication and before the rate
+limit, the policy stage and the handler. A Space whose `space.toon` says `admission: closed` (written with
+`created_by` by `POST /spaces` and `POST /spaces/import` for a signed-in caller) admits its creator, a holder of
+`canAdminister`, a holder of a role its own `roles.toon` defines (`Roles.load(root).authored()` against
+`ComponentAccess.heldRoles`), and a machine `Roles.admitMachine` admitted. Anyone else is answered 404
+`no such space '<id>'` and the Space is filtered out of `GET /spaces` and `/bootstrap`. This module supplies the two
+inputs (the authored role names and the held role names) and is otherwise unchanged; an Authenticator that does not
+stamp `ComponentAccess.heldRoles` admits nobody by role. No Subject (Basic) means no check. The rule in plain words,
+what stays open and its limits: [admin guide](admin-guide-auth-security.md).
+
 ## Files on disk (per Space config root)
 
 `roles.toon` · `access-policies.toon` · `registry/access-profiles/role-<name>.toon` ·

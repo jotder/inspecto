@@ -97,7 +97,7 @@ refusal rules and the move procedure are on [Spaces §4](architecture.md) and th
 
 | File | Written by | What it holds |
 |---|---|---|
-| `space.toon` | create / `PUT /spaces/{id}` | `display_name`, `description`, `created_at`; optional `data_root` (absolute, or relative to the app root) and `min_product_version` (a WARN at boot when the running product is older). Optional: a Space without it still boots. |
+| `space.toon` | create / `PUT /spaces/{id}` | `display_name`, `description`, `created_at`; optional `data_root` (absolute, or relative to the app root) and `min_product_version` (a WARN at boot when the running product is older). Optional: a Space without it still boots. Since 2026-11-15 also `created_by` and `admission: closed`, written when a signed-in person creates the Space: only the people it admits may use it ([Auth & Security](../access/admin-guide-auth-security.md)). No `admission` key means open; a file that does not read means closed. Read at boot, so a hand edit needs a restart. |
 | `<id>.ref` (in the Spaces root) | operator | the path of a Space folder outside the Spaces root, which must itself be named `<id>` — absolute, or relative to the app root. A real `<id>/` beside it wins. Purge deletes only the `.ref`. |
 | `spaces.ref` (in the app root) | operator | the spaces root, when it is not `<app root>/spaces` — absolute, or relative to the app root. `-Dspaces.root` / `SPACES_ROOT` still win. A present-but-unusable pointer fails the boot loudly rather than falling back. |
 | `.inspecto/value-fingerprint.salt` | the engine, on first use | the salt for the keyed fingerprints that rejected lines and failure texts carry instead of the values themselves (`FailureText.SALT_FILE`). Deleting it changes every future fingerprint. |

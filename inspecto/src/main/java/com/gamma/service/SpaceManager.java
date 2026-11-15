@@ -494,6 +494,15 @@ public final class SpaceManager implements AutoCloseable {
      *                               space with this id (or its directory) already exists
      */
     public SpaceContext create(SpaceId id, String displayName, String description) throws IOException {
+        return create(id, displayName, description, null);
+    }
+
+    /**
+     * {@link #create(SpaceId, String, String)} by a signed-in person: {@code createdBy} (their Subject id) is recorded in
+     * {@code space.toon} and the Space is created closed ({@link SpaceContext.SpaceManifest#CLOSED}), so from its first
+     * request only the people it admits may use it. {@code null} (no sign-in) records nothing: the Space is open.
+     */
+    public SpaceContext create(SpaceId id, String displayName, String description, String createdBy) throws IOException {
         if (spacesRoot == null)
             throw new IllegalStateException("This server hosts a single space; set -Dspaces.root to manage many");
         synchronized (lifecycleLock) {
@@ -504,8 +513,8 @@ public final class SpaceManager implements AutoCloseable {
                 throw new IllegalStateException("Space directory already exists: " + base);
             for (String sub : SPACE_SUBDIRS) Files.createDirectories(base.resolve(sub));
             String name = (displayName == null || displayName.isBlank()) ? id.value() : displayName.trim();
-            new SpaceContext.SpaceManifest(name, description == null ? "" : description.trim(), Instant.now().toString())
-                    .write(base.resolve("space.toon"));
+            new SpaceContext.SpaceManifest(name, description == null ? "" : description.trim(), Instant.now().toString(), "",
+                    createdBy, admissionFor(createdBy)).write(base.resolve("space.toon"));
 
             com.gamma.pipeline.exec.EgressAllowlist.recordEmpty(base.resolve("config"));   // a NEW Space is never seeded
             SpaceContext ctx = bootStarted(base);
@@ -537,6 +546,13 @@ public final class SpaceManager implements AutoCloseable {
      */
     public SpaceContext createFromBundle(SpaceId id, byte[] zip, java.util.function.UnaryOperator<BundleImporter.Bundle> guard)
             throws IOException {
+        return createFromBundle(id, zip, guard, null);
+    }
+
+    /** {@link #createFromBundle(SpaceId, byte[], java.util.function.UnaryOperator)} by a signed-in person: recorded and
+     *  closed as {@link #create(SpaceId, String, String, String)} does. */
+    public SpaceContext createFromBundle(SpaceId id, byte[] zip, java.util.function.UnaryOperator<BundleImporter.Bundle> guard,
+                                         String createdBy) throws IOException {
         if (spacesRoot == null)
             throw new IllegalStateException("This server hosts a single space; set -Dspaces.root to manage many");
         BundleImporter.Bundle bundle = guard.apply(BundleImporter.parse(zip));   // validates the manifest before touching disk
@@ -560,12 +576,15 @@ public final class SpaceManager implements AutoCloseable {
             Path manifest = base.resolve("space.toon");
             if (bundle.spaceToon() != null) {
                 // The exporting Space's data_root belongs to it: the new Space takes the convention default instead.
+                // So do its creator and its admission: a bundle never says who may use the Space it is imported as.
                 Files.write(manifest, bundle.spaceToon());
                 SpaceContext.SpaceManifest m = SpaceContext.SpaceManifest.read(manifest, id.value());
-                if (!m.dataRoot().isBlank())
-                    new SpaceContext.SpaceManifest(m.displayName(), m.description(), m.createdAt()).write(manifest);
+                if (!m.dataRoot().isBlank() || !m.createdBy().isBlank() || !m.admission().isBlank() || createdBy != null)
+                    new SpaceContext.SpaceManifest(m.displayName(), m.description(), m.createdAt(), "",
+                            createdBy, admissionFor(createdBy)).write(manifest);
             }
-            else new SpaceContext.SpaceManifest(id.value(), "", Instant.now().toString()).write(manifest);
+            else new SpaceContext.SpaceManifest(id.value(), "", Instant.now().toString(), "",
+                    createdBy, admissionFor(createdBy)).write(manifest);
 
             com.gamma.pipeline.exec.EgressAllowlist.recordEmpty(base.resolve("config"));   // a NEW Space is never seeded
             SpaceContext ctx = bootStarted(base);
@@ -576,6 +595,11 @@ public final class SpaceManager implements AutoCloseable {
                     id.value(), base, bundle.configEntries().size());
             return ctx;
         }
+    }
+
+    /** A Space a signed-in person creates is closed; one made with no sign-in records nothing and stays open. */
+    private static String admissionFor(String createdBy) {
+        return createdBy == null || createdBy.isBlank() ? "" : SpaceContext.SpaceManifest.CLOSED;
     }
 
     /** The shipped-template catalog root ({@code <spacesRoot>/_templates}) — an underscore sentinel like
@@ -775,6 +799,14 @@ public final class SpaceManager implements AutoCloseable {
     public SpaceContext createFromTemplate(SpaceId id, String displayName, String description,
                                            String templateId, java.util.function.Consumer<Path> seedGate)
             throws IOException {
+        return createFromTemplate(id, displayName, description, templateId, seedGate, null);
+    }
+
+    /** {@link #createFromTemplate(SpaceId, String, String, String, java.util.function.Consumer)} by a signed-in person:
+     *  recorded and closed as {@link #create(SpaceId, String, String, String)} does. */
+    public SpaceContext createFromTemplate(SpaceId id, String displayName, String description,
+                                           String templateId, java.util.function.Consumer<Path> seedGate, String createdBy)
+            throws IOException {
         if (spacesRoot == null)
             throw new IllegalStateException("This server hosts a single space; set -Dspaces.root to manage many");
         Path tpl = templatesRoot().resolve(templateId);
@@ -811,7 +843,8 @@ public final class SpaceManager implements AutoCloseable {
                     ? com.gamma.util.ToonHelper.opt(tplMeta, "name", id.value()) : displayName.trim();
             String desc = (description == null || description.isBlank())
                     ? com.gamma.util.ToonHelper.opt(tplMeta, "tagline", "") : description.trim();
-            new SpaceContext.SpaceManifest(name, desc, Instant.now().toString()).write(base.resolve("space.toon"));
+            new SpaceContext.SpaceManifest(name, desc, Instant.now().toString(), "", createdBy, admissionFor(createdBy))
+                    .write(base.resolve("space.toon"));
             com.gamma.pipeline.exec.EgressAllowlist.recordEmpty(base.resolve("config"));   // a NEW Space is never seeded
             recordProvenance(tpl, base, templateId);   // after every file the server writes at creation, so the hashes are the created state
             SpaceContext ctx = bootStarted(base);
@@ -880,8 +913,10 @@ public final class SpaceManager implements AutoCloseable {
             SpaceContext ctx = spaces.get(id);
             if (ctx == null) return null;
             String name = (displayName == null || displayName.isBlank()) ? id.value() : displayName.trim();
+            // the creator and the admission are not display metadata: a rename keeps a closed Space closed
             SpaceContext.SpaceManifest updated = new SpaceContext.SpaceManifest(
-                    name, description == null ? "" : description.trim(), ctx.manifest().createdAt(), ctx.manifest().dataRoot());
+                    name, description == null ? "" : description.trim(), ctx.manifest().createdAt(), ctx.manifest().dataRoot(),
+                    ctx.manifest().createdBy(), ctx.manifest().admission());
             updated.write(ctx.root().base().resolve("space.toon"));   // a referenced Space lives outside the spaces root
             ctx.updateManifest(updated);
             log.info("Updated space '{}' display metadata", id.value());

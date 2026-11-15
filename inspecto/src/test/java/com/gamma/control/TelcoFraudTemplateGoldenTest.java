@@ -472,10 +472,16 @@ class TelcoFraudTemplateGoldenTest {
         TelcoFraudCorpus corpus = new TelcoFraudCorpus().generate();
         com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
         com.gamma.mask.EvidenceMasker masker = com.gamma.mask.EvidenceMasker.forSpace(config);
-        // "admin" may reveal entity keys; "viewer" holds no capability at all.
-        Authenticators.forTest(ex -> Optional.of("Bearer viewer".equals(ex.getRequestHeaders().getFirst("Authorization"))
-                ? new Subject("viewer", Set.of())
-                : new Subject("admin-1", Set.of(Roles.CAN_ADMINISTER, Roles.CAN_REVEAL_LINK_ENTITIES))));
+        // "admin" may reveal entity keys; "viewer" holds no capability at all. The Space was created over HTTP by a
+        // signed-in admin, so it is closed (LA-FULL-CYCLE-TEST-1 finding 32): the viewer is admitted the way an
+        // administrator admits anyone, by a role the Space's own role table defines.
+        Files.writeString(config.resolve(Roles.FILE), "roles[1]:\n  - name: viewer\n    capabilities[0]:\n");
+        Authenticators.forTest(ex -> {
+            if (!"Bearer viewer".equals(ex.getRequestHeaders().getFirst("Authorization")))
+                return Optional.of(new Subject("admin-1", Set.of(Roles.CAN_ADMINISTER, Roles.CAN_REVEAL_LINK_ENTITIES)));
+            com.gamma.access.ComponentAccess.heldRoles(ex, Set.of("viewer"));
+            return Optional.of(new Subject("viewer", Set.of()));
+        });
         SpaceManager spaces = SpaceManager.discover(root);
         ControlApi api = new ControlApi(spaces, 0);
         try {

@@ -789,10 +789,11 @@ class ControlApiSettingsTest {
                 : "Bearer admin".equals(ex.getRequestHeaders().getFirst("Authorization"))
                 ? Optional.of(new Subject("root", Set.of("canAdminister")))
                 : Optional.empty());
+        // ⚠ Placed on disk, so it carries no admission: a Space a signed-in caller creates over HTTP is closed, and the
+        // capability-less Subject below would be answered 404 before any capability is asked (LA-FULL-CYCLE-TEST-1
+        // finding 32; ControlApiSpaceAdmissionTest). The gate under test is the 403.
+        Files.createDirectories(root.resolve("acme").resolve("config"));
         try (Ctx c = open(root)) {
-            // ⚠ The setup call needs a credential too, and canAdminister: POST /spaces is administration even
-            // while no Space is hosted (TEMPLATE-RECOVERY-IMPORT-GATE-1, 2026-10-03).
-            assertEquals(200, sendAs(c.port, "POST", "/spaces", "{\"id\":\"acme\"}", "Bearer admin").statusCode());
             String body = "{\"projectionNodeCap\":600}";
 
             assertEquals(401, send(c.port, "PUT", "/spaces/acme/settings/link-analysis", body).statusCode(),
@@ -804,7 +805,7 @@ class ControlApiSettingsTest {
             assertTrue(denied.body().contains("canAuthorWorkbench"), "the refusal names the capability");
 
             assertEquals(200, sendAs(c.port, "GET", "/spaces/acme/settings/link-analysis", null, "Bearer plain")
-                    .statusCode(), "reads stay open by policy: the same capability-less Subject may READ");
+                    .statusCode(), "reads of an open Space need no capability: the same capability-less Subject may READ");
 
             HttpResponse<String> allowed = sendAs(c.port, "PUT", "/spaces/acme/settings/link-analysis",
                     body, "Bearer valid");

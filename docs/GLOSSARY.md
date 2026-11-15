@@ -63,6 +63,14 @@ the module manifest and plan use it.
 Collectors, Schemas, Pipelines, Jobs, Datasets, Widgets, Dashboards, Incidents, Config, and audit trail. Activity
 in one Space is invisible to another, except through a consented Exchange grant.
 
+**Closed Space** *(added 2026-11-15, `LA-FULL-CYCLE-TEST-1` finding 32)* — A **Space** that only the people it
+**admits** may use: its creator, a holder of `canAdminister`, and a holder of a **Role** its own role table defines
+(`space.toon` `admission: closed`, with `created_by`). A Space a signed-in person creates is closed; to anyone else
+it answers as if it did not exist. A Space with no `admission` key is an **open Space**: every signed-in person
+reads it. Verbs: a Space *admits* a person; an administrator *admits* a Role by defining it in that Space. ⛔ Not
+*private* (an Investigation's member rule is a different thing), not *member* (a Case, an Investigation and an
+Entity List have members; a Space has none), not *locked* (the **Space lock** is the integrity report).
+
 **Pod** *(added 2026-09-13, `POD-SCOPE-DIVERGENCE-1`)* — One running Inspecto process in a
 horizontally-scaled Advanced deployment. Under partitioning each Pod **owns a subset of Spaces**, so
 state that is implicitly global on a single installation becomes **per-Pod** once there is more than one.

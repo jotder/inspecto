@@ -3,7 +3,7 @@
 //   node tools/seed-screening-demo.mjs --spaces inspecto-demo/spaces [--base http://127.0.0.1:8126]
 // Step 1 (no server needed): writes <spaces>/screening-boot/config/demo-users.toon so the Demo Auth sign-in picker is not empty.
 // Step 2 (server up, run again): signs in as `admin`, creates the Space `screening-demo` from the `aml` template, copies the roster
-//   into it, drops a party register (the template sample + planted names) into data/inbox/aml_parties, creates the two Entity Lists
+//   into it, admits the roster's roles (a Space created while signed in is closed: its creator and administrators only), drops a party register (the template sample + planted names) into data/inbox/aml_parties, creates the two Entity Lists
 //   `aml_sanctions` / `aml_pep` with synthetic entries, and arms nothing else: the walk-through enables the Job.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -57,6 +57,12 @@ export async function run(spaces, base) {
   fs.mkdirSync(inbox, { recursive: true });
   fs.writeFileSync(path.join(inbox, 'AML_PARTIES_20260707.csv'), register(path.join(root, 'spaces', '_templates', 'aml')));
   const out = [];
+  // A Space created while signed in is closed. Admit the roster's other roles by defining each, as it is, in this Space's own role table.
+  const table = await call('admin', 'GET', '/access/roles');
+  const roles = table.data.roles.filter((r) => r.source === 'authored' || ['operations', 'power', 'business'].includes(r.name))
+    .map(({ name, capabilities, dataScopes }) => ({ name, capabilities, ...(dataScopes ? { dataScopes } : {}) }));
+  const admit = await call('admin', 'PUT', '/access/roles', { roles, ...(table.data.identity ? { identity: table.data.identity } : {}) });
+  out.push(`admit roles: PUT ${admit.status}`);
   // The default Entity Types are all name-masking or id-shaped; a sanctions list is public data, so the Space states an unmasked `party`
   // type (the stated list replaces the defaults wholesale, so it is the defaults plus `party`). The PEP list stays on the masked
   // `subscriber` type on purpose: it is the masking beat.

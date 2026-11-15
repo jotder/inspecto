@@ -67,13 +67,13 @@ class ControlApiModuleSettingsTest {
     }
 
     private Ctx open(Path root) throws Exception {
+        // Placed on disk, so they carry no admission: a Space a signed-in caller creates over HTTP is closed to the
+        // `operations` reader these tests use (LA-FULL-CYCLE-TEST-1 finding 32; ControlApiSpaceAdmissionTest).
+        for (String id : java.util.List.of("acme", "beta")) Files.createDirectories(root.resolve(id).resolve("config"));
         SpaceManager spaces = SpaceManager.discover(root);
         ControlApi api = new ControlApi(spaces, 0);
         api.start();
-        Ctx c = new Ctx(spaces, api, api.port(), root);
-        assertEquals(200, send(c, "POST", "/spaces", "{\"id\":\"acme\"}", ADMIN).statusCode());
-        assertEquals(200, send(c, "POST", "/spaces", "{\"id\":\"beta\"}", ADMIN).statusCode());
-        return c;
+        return new Ctx(spaces, api, api.port(), root);
     }
 
     private Path file(Ctx c, String space) {

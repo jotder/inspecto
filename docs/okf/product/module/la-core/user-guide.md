@@ -222,7 +222,7 @@ another file**.
 
 **The Dataset card** says *one-time import* and shows the last import. **Add a file** brings in the next file (for
 events, choose whether it *replaces the data* or *adds its rows*; details are always replaced); **Run now** runs the
-import again. **Inbox** shows the folder on the server where another system may write this Dataset's files, how many
+import again. **Inbox** shows the folder on the server where another system may write this Dataset's files (an administrator sees its full path on the server; anyone else sees it within the Space's data folder, such as `inbox/transfers`), how many
 wait there, and **Import waiting files** (the same as Run now); on Basic nothing is imported on its own unless you turn
 on **Watch this folder**, which checks the inbox every 30 seconds (every edition). **Keep this up to date** is locked on
 Basic. On Standard and up it asks where the files come from (*files written to this inbox*, or

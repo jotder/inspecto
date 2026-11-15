@@ -68,12 +68,13 @@ class ControlApiSpaceComparisonTest {
 
     /** A container hosting {@code alpha} and {@code beta}, each with a two-sample storage series. */
     private Ctx open(Path root) throws Exception {
+        // Placed on disk, so they carry no admission: in a Space a signed-in caller creates over HTTP the plain caller
+        // below is answered 404 before the capability under test is asked (LA-FULL-CYCLE-TEST-1 finding 32).
+        for (String id : java.util.List.of("alpha", "beta")) Files.createDirectories(root.resolve(id).resolve("config"));
         SpaceManager spaces = SpaceManager.discover(root);
         ControlApi api = new ControlApi(spaces, 0);
         api.start();
         Ctx c = new Ctx(spaces, api, api.port());
-        assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"alpha\"}", "Bearer admin").statusCode());
-        assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"beta\"}", "Bearer admin").statusCode());
         grows(dataRoot(c, "alpha"), 100, 300);   // +20 b/day
         grows(dataRoot(c, "beta"), 100, 150);    // +5 b/day
         return c;

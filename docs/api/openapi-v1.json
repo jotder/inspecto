@@ -98,7 +98,7 @@
         },
         "responses" : {
           "200" : {
-            "description" : "Manifests of every hosted Space, sorted by id.",
+            "description" : "Manifests of the hosted Spaces, sorted by id. A closed Space (admission: closed) is listed only to a caller it admits: its creator, a holder of canAdminister, or a holder of a role its own role table defines; with no sign-in every Space is listed.",
             "content" : {
               "application/json" : {
                 "schema" : {
@@ -124,7 +124,7 @@
         "tags" : [ "spaces" ],
         "summary" : "Create a Space, optionally seeded from a Space Template",
         "operationId" : "postSpaces",
-        "description" : "Body {id, display_name?, description?, template?, loadSamples?}. loadSamples: true (LA-ONBOARD-1 OB-12) copies the template's data/samples/<pipeline>/ files into that Pipeline's inbox and runs every Pipeline that then has files waiting, once, and answers samples.pipelines[] = {pipeline, sampleFiles, status: loaded|failed, filesLoaded, filesQuarantined, error?} beside the manifest; the Space stays created whatever a run answers. loadSamples without a template, or with a template that ships no samples (GET /spaces/templates samples: false), is refused 422 and nothing is created. Requires canAdminister, the zero-Space recovery create included (there the IdP admin role resolves through the seeded roles; TEMPLATE-RECOVERY-IMPORT-GATE-1). A template's carried kinds meet the same capability table as /spaces/import; a KPI pack (config/registry/kpis/) also needs canAuthorWorkbench, and each KPI meets the /components/kpi save gate against the template's own Datasets; the first refusal creates no Space (ASSURE-KPI-DEFINITIONS-RESIDUALS-1).",
+        "description" : "Body {id, display_name?, description?, template?, loadSamples?}. loadSamples: true (LA-ONBOARD-1 OB-12) copies the template's data/samples/<pipeline>/ files into that Pipeline's inbox and runs every Pipeline that then has files waiting, once, and answers samples.pipelines[] = {pipeline, sampleFiles, status: loaded|failed, filesLoaded, filesQuarantined, error?} beside the manifest; the Space stays created whatever a run answers. loadSamples without a template, or with a template that ships no samples (GET /spaces/templates samples: false), is refused 422 and nothing is created. Requires canAdminister, the zero-Space recovery create included (there the IdP admin role resolves through the seeded roles; TEMPLATE-RECOVERY-IMPORT-GATE-1). A template's carried kinds meet the same capability table as /spaces/import; a KPI pack (config/registry/kpis/) also needs canAuthorWorkbench, and each KPI meets the /components/kpi save gate against the template's own Datasets; the first refusal creates no Space (ASSURE-KPI-DEFINITIONS-RESIDUALS-1). A signed-in caller is recorded as the Space's creator and the Space is created closed (answer: admission closed, createdBy): every route under /spaces/{id}/ then answers 404 'no such space' to anyone but the creator, a holder of canAdminister and a holder of a role the Space's own role table defines (PUT /access/roles in that Space admits a role). With no sign-in nothing is recorded and the Space is open.",
         "responses" : {
           "200" : {
             "description" : "The created Space manifest (id, displayName, description)."
@@ -10077,7 +10077,7 @@
         "tags" : [ "pipelines" ],
         "summary" : "List the files waiting in a Pipeline's inbox (dirs.poll)",
         "operationId" : "getPipelinesAuthoredByAuthoredIdInbox",
-        "description" : "Open read. The regular files directly in the Pipeline's poll directory, newest first, by bare name (the name POST /pipelines/authored/{authoredId}/run takes for a Pipeline that binds no connection). Bounded at 500 with truncated + the true total; an absent directory lists empty. 404 unknown Pipeline; 501 a Dataset-fed Pipeline (it has no inbox); 422 no dirs.poll.",
+        "description" : "Open read. The regular files directly in the Pipeline's poll directory, newest first, by bare name (the name POST /pipelines/authored/{authoredId}/run takes for a Pipeline that binds no connection). Bounded at 500 with truncated + the true total; an absent directory lists empty. inbox is the directory as the caller may see it: the absolute path on the server for a holder of canAdminister and with no sign-in, else relative to the Space's data folder, and absent when the directory is not inside that folder. 404 unknown Pipeline; 501 a Dataset-fed Pipeline (it has no inbox); 422 no dirs.poll.",
         "parameters" : [ {
           "name" : "authoredId",
           "in" : "path",
@@ -10088,7 +10088,7 @@
         } ],
         "responses" : {
           "default" : {
-            "description" : "Envelope-wrapped {pipeline, inbox, total, truncated, files: [{name, size, modifiedAt}]}."
+            "description" : "Envelope-wrapped {pipeline, inbox?, total, truncated, files: [{name, size, modifiedAt}]}."
           }
         }
       },
@@ -15611,6 +15611,14 @@
           },
           "createdAt" : {
             "type" : [ "string", "null" ]
+          },
+          "admission" : {
+            "type" : "string",
+            "description" : "Present, as closed, only on a Space that admits no one but its creator, a holder of canAdminister and a holder of a role its own role table defines. Absent on an open Space."
+          },
+          "createdBy" : {
+            "type" : "string",
+            "description" : "The Subject id of the signed-in person who created a closed Space. Present only beside admission."
           },
           "integrity" : {
             "type" : "object",

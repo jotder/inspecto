@@ -17,3 +17,7 @@ Screens for Spaces. Design and internals: [Spaces architecture](architecture.md)
 - **Settings → Modules** (`inspecto-ui/src/app/modules/admin/settings/module-settings.component.ts`): the
   per-Space module switches, through `inspecto-ui/src/app/inspecto/api/module-settings.service.ts`.
 - Request prefixing for the selected Space: `inspecto-ui/src/app/inspecto/api/space.interceptor.ts`.
+- **A Space you create while signed in is closed** (2026-11-15): you and the administrators see it; nobody else
+  does, and it is missing from their Space switcher. To let others in, open the Space, go to Settings, Access,
+  Roles and define the role they hold. No screen marks a Space as closed yet. Detail:
+  [Auth & Security](../access/admin-guide-auth-security.md).
