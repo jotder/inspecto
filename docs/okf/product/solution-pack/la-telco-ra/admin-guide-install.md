@@ -126,10 +126,12 @@ lands first is not read as unbilled). The rule fires when a subscriber not on th
 of `DL-047`. The 40 test SIMs of `DL-000` are counted apart as `known_list_subscribers` and never raise it, and the 62
 ordinary subscribers with one dropped month or two late-billed months (`other_unbilled_subscribers`) do not either.
 October changes none of the three figures. The count is a running total, so the rule stays met after every build.
-On a first boot each feed lands its months one at a time and the counts Job runs between them, so the Alert fires on a
-partial count and is refreshed in place up to 300 (it reads 300 to 306 along the way). It never heals in between: a
+On a first boot each feed lands its months one at a time and the counts Job runs between them: the count reads 0 until
+the story's second month has landed in both feeds, then fires at 300 to 306 and is refreshed in place, ending at 300.
+It never heals in between: a
 late-billed subscriber meets the rule until its third month lands billed, and the generator starts every such lag in
-or after the story's first month (2026-03), so the story is counted before any lag is billed. It
+or after the story's first month (2026-03), so the story is counted before any lag is billed. With a customer's own
+feeds a lone provisioning lag does raise the Alert and heal it once the lag is billed: that is the rule working. It
 names no subscriber or dealer; the `unbilled_usage` view shows them. The rule is not grouped by subscriber, because
 `telco_ra_unbilled_counts` is a Job output: a `by` column cannot be checked against its Schema when the Space is
 created.
