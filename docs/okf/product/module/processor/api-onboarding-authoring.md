@@ -339,7 +339,7 @@ the nine-call walkthrough (parse preview → suggest → two `/config/write` →
 | `GET` / `PUT /settings/data` | open / `canAdminister` | the Space's `data.self_import`: `{selfImport, selfImportDefault, selfImportInForce}` |
 
 **Gate order** for the Add data routes: capability 401/403 → no write root 503 → `data.self_import` off 403 ("Add
-data is turned off in this Space: its data comes from Pipelines - ask an administrator to turn it on") → the route's
+data is turned off in this Space; an administrator can turn it on", `OnboardRoutes.SELF_IMPORT_OFF`) → the route's
 own checks. `data.self_import` lives in `data.toon` (a reserved config path: no import may write it); unset = on
 with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carries the value in force as
 `selfImport`. Rate class: the standard bucket (`OnboardRoutes.isRateLimited`).

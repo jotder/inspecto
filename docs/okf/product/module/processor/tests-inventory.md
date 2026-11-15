@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-445 test class(es): 181 unit, 264 real-HTTP control-plane, 0 IT.
+446 test class(es): 181 unit, 265 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -150,6 +150,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiExpectationBaselineTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiExpectationBaselineTest.java` | DUCKLE-C8 — real-HTTP + real-DuckDB tests for the {@code baseline} Expectation kind and its audited |
 | `ControlApiExpectationCensusTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiExpectationCensusTest.java` | COMPONENT-KIND-KEY-CENSUS-1, {@code expectation} third of DUCKLE-C3-DEAD-PROPERTY-1: a top-level key |
 | `ControlApiFindingsSpecGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiFindingsSpecGateTest.java` | D1 = (b) (operator, 2026-09-25, {@code docs/superpower/findings-spec-authoring-ui-design.md} §9): writing a |
+| `ControlApiFirstRunTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiFirstRunTest.java` | The first run, for the person who creates the Space ({@code LA-FULL-CYCLE-TEST-1} phase 1, findings 1 and 2), over real |
 | `ControlApiFrameHeadersTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiFrameHeadersTest.java` | LA-EMBED-FRAME-HEADERS-1 (slice S5) over real HTTP: {@code -Dcontrol.frameDeny} (default OFF) flips the frame headers of EVERY |
 | `ControlApiFreshnessSweepTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiFreshnessSweepTest.java` | DUCKLE-C1 residual (1) over real HTTP: an Alert Rule with {@code maximumAge} arms the minute-cadence |
 | `ControlApiGeoIpTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiGeoIpTest.java` | GeoIP on the audit trail and trigger T5 over real HTTP (ses-sns-adapter-design §6/§8, decision D12): an |

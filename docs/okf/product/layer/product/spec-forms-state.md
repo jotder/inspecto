@@ -28,6 +28,11 @@ draws the same rows, its optional / advanced tiers as named folds that say how m
   named fold groups; a wizard only when a step depends on an earlier answer.
 * **`help`**: one tiny line under a row whose name does not explain itself (a former `<mat-hint>`); an error
   line replaces it.
+* **`open`** (`<inspecto-pen-field [open]="true">`, 2026-11-15): the box stays on screen, for the one value a
+  create dialog asks first. A new thing has no value to read, and a row showing "—" did not look like somewhere to
+  type (Create a Space, `LA-FULL-CYCLE-TEST-1` finding 9). The value is written as it is typed, so the dialog's
+  primary button follows it; Enter submits the form and Escape closes the dialog, as in any text box. Every other
+  row stays closed until opened.
 * **Errors**: the host computes `[error]` from `control.touched && control.hasError(…)`. **Every validator needs
   its line** — a row has no red outline, so a validator without a message makes Save refuse with nothing on
   screen. A server refusal that names a field marks its row with a short pointer ("Refused: see the message

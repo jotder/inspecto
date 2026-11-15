@@ -117,8 +117,11 @@ export class SpaceSwitcherComponent implements OnInit {
     protected lens = inject(LensService);
     private session = inject(SessionService);
 
-    /** The Inspecto LA create: New Space asks the name and What kind of data? only ({@link SpaceFormDialog}). */
-    readonly dataKind = input(false);
+    /**
+     * The host's own create flow, run by New Space in place of the shared form and switch. Inspecto LA passes its
+     * first-run create, so a Space made from here is made exactly as one made from Getting started.
+     */
+    readonly create = input<(() => void) | null>(null);
     /** The sample New from sample picks first (e.g. `la-sample` in Inspecto LA). */
     readonly preferredSample = input<string | undefined>(undefined);
 
@@ -171,8 +174,10 @@ export class SpaceSwitcherComponent implements OnInit {
 
     /** Create a Space through the shared form, then make it the active one. */
     newSpace(): void {
+        const own = this.create();
+        if (own) return own();
         this.dialog
-            .open(SpaceFormDialog, { width: '520px', maxHeight: '90vh', data: { dataKind: this.dataKind() } })
+            .open(SpaceFormDialog, { width: '520px', maxHeight: '90vh' })
             .afterClosed()
             .subscribe((created?: Space) => {
                 if (created) this.switch(created);

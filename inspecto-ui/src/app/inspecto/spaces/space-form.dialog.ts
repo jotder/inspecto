@@ -131,6 +131,7 @@ export const DATA_KIND_OPTIONS: readonly DataKindOption[] = [
                 <inspecto-pen-field
                     cdkFocusInitial
                     [label]="dataKind ? 'Name' : 'Display name'"
+                    [open]="dataKind"
                     [required]="true"
                     formControlName="display_name"
                     [help]="

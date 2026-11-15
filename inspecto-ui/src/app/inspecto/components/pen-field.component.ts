@@ -24,6 +24,10 @@ import { MatIconModule } from '@angular/material/icon';
  * editing, pressing **→** in an empty box (or at the end of a typed prefix of it) fills the default in without typing.
  * A default is only ever a suggestion — it is never written until the author accepts it.
  *
+ * **`open`** keeps the box on screen for the one value a create dialog asks first (a new thing has no value to read, and
+ * a row showing "—" does not look like somewhere to type): the value is written as it is typed, and Enter and Escape
+ * keep their meaning for the form or dialog around the row.
+ *
  * Like `<inspecto-option-picker>` it renders its own label and error line; do not wrap it in a `mat-form-field`.
  */
 @Component({
@@ -43,7 +47,7 @@ import { MatIconModule } from '@angular/material/icon';
                     }
                 </span>
             }
-            @if (editing()) {
+            @if (boxShown()) {
                 @if (multiline()) {
                     <textarea
                         #box
@@ -52,10 +56,11 @@ import { MatIconModule } from '@angular/material/icon';
                         style="background: transparent; color: inherit"
                         [attr.maxlength]="maxlength()"
                         [attr.aria-label]="ariaLabel() || label()"
-                        aria-description="Enter to save, Escape to cancel"
+                        [attr.aria-description]="open() ? null : 'Enter to save, Escape to cancel'"
+                        [attr.aria-required]="open() && required() ? 'true' : null"
                         [placeholder]="placeholder()"
                         [value]="draft()"
-                        (input)="draft.set($any($event.target).value)"
+                        (input)="onInput($any($event.target).value)"
                         (keydown)="onKey($event)"
                         (blur)="commit()"
                     ></textarea>
@@ -69,10 +74,11 @@ import { MatIconModule } from '@angular/material/icon';
                         [attr.max]="max()"
                         [attr.maxlength]="maxlength()"
                         [attr.aria-label]="ariaLabel() || label()"
-                        aria-description="Enter to save, Escape to cancel"
+                        [attr.aria-description]="open() ? null : 'Enter to save, Escape to cancel'"
+                        [attr.aria-required]="open() && required() ? 'true' : null"
                         [placeholder]="placeholder()"
                         [value]="draft()"
-                        (input)="draft.set($any($event.target).value)"
+                        (input)="onInput($any($event.target).value)"
                         (keydown)="onKey($event)"
                         (blur)="commit()"
                     />
@@ -143,6 +149,8 @@ export class PenFieldComponent implements ControlValueAccessor {
     readonly error = input('');
     /** One short line under the row for a field whose name does not explain itself; hidden while an error shows. */
     readonly help = input('');
+    /** Keep the box on screen: a labelled text box that never reads as text (the first value of a create dialog). */
+    readonly open = input(false);
     /**
      * Fired after Enter committed an open row - the hook for a host action on Enter (add the tag, open the new type).
      * A host `(keydown.enter)` would also fire on the Enter that only OPENS a closed row (UI-FORM-ROWS-1 P3).
@@ -158,6 +166,10 @@ export class PenFieldComponent implements ControlValueAccessor {
     private readonly injector = inject(Injector);
 
     protected readonly text = computed(() => (this.value() ?? '') + '');
+    /** The box is on screen: while the row is edited, or always for an `open` row a person may change. */
+    protected readonly boxShown = computed(
+        () => this.editing() || (this.open() && !this.readOnly() && !this.disabled()),
+    );
     protected readonly hasDefault = computed(() => this.default() !== null && this.default() !== '');
     protected readonly defaultText = computed(() => (this.default() ?? '') + '');
     /**
@@ -177,6 +189,7 @@ export class PenFieldComponent implements ControlValueAccessor {
 
     writeValue(v: string | number | null): void {
         this.value.set(v ?? null);
+        if (!this.editing()) this.draft.set(this.text()); // an `open` box shows the draft, so it follows the form
     }
     registerOnChange(fn: (v: string | number | null) => void): void {
         this.onChange = fn;
@@ -226,8 +239,16 @@ export class PenFieldComponent implements ControlValueAccessor {
         this.startEditing(e.key);
     }
 
+    /** What was typed: the draft, and for an `open` row the value too (its form reads it as it is typed). */
+    protected onInput(typed: string): void {
+        this.draft.set(typed);
+        if (this.open()) this.write();
+    }
+
     protected onKey(e: KeyboardEvent): void {
         const el = e.target as HTMLInputElement;
+        // An open row is a plain box: Enter submits the form around it and Escape closes its dialog.
+        if (this.open() && (e.key === 'Enter' || e.key === 'Escape')) return;
         if (e.key === 'Enter') {
             if (this.multiline() && e.shiftKey) return; // Shift+Enter breaks a line in a note
             e.preventDefault();
@@ -259,8 +280,14 @@ export class PenFieldComponent implements ControlValueAccessor {
     }
 
     protected commit(): void {
-        if (!this.editing()) return;
+        if (!this.editing() && !this.open()) return;
         this.editing.set(false);
+        this.write();
+        this.onTouched();
+    }
+
+    /** Write the draft to the value (trimmed; a number field reads a number) and tell the form when it changed. */
+    private write(): void {
         const raw = this.draft().trim();
         let next: string | number | null = raw;
         if (this.type() === 'number') {
@@ -271,6 +298,5 @@ export class PenFieldComponent implements ControlValueAccessor {
             this.value.set(next);
             this.onChange(next);
         }
-        this.onTouched();
     }
 }

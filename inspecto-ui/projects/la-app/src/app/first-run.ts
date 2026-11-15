@@ -1,8 +1,8 @@
 import { computed, inject, Injectable } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { Router } from '@angular/router';
-import { Observable, tap } from 'rxjs';
-import { LensService, SampleSpace, Space, SpacesService } from '@inspecto/core/api';
+import { Observable, of, tap } from 'rxjs';
+import { apiErrorMessage, LensService, SampleSpace, Space, SpacesService } from '@inspecto/core/api';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { LaGuideStepId, SpaceGuideStepId } from '@inspecto/core/onboarding/space-guide';
 import { OnboardingEventsService } from '@inspecto/core/onboarding/onboarding-events.service';
@@ -15,6 +15,8 @@ export const LA_SAMPLE_TEMPLATE = 'la-sample';
 export const LA_SAMPLE_VIEW = 'mule_layering_ring';
 /** The route of the Add data screen (OB-14; built by LA-ONBOARD-1 phase 4). */
 export const ADD_DATA_ROUTE = '/add-data';
+/** Where a create step that was refused waits for the Add data page: entering a Space reloads, which drops a toast. */
+const NOTICE_KEY = 'inspecto.la.firstRunNotice';
 
 /** Where each Space guide line leads in this app (`space` opens the Create Space dialog instead). */
 const STEP_ROUTES: Record<Exclude<LaGuideStepId, 'space'>, string> = {
@@ -41,15 +43,53 @@ export class FirstRun {
     /** May create a Space: no sign-in, or `canAdminister` (OB-11; the server gates `POST /spaces` the same way). */
     readonly canCreate = computed(() => this.session.authMode() !== 'oidc' || this.lens.canAdminister());
 
-    /** Create a Space (name + What kind of data?), then enter it at `then`. */
+    /**
+     * Create a Space (name + What kind of data?), turn Add data on in it, then enter it at `then`. A Space made here
+     * is made to add data to (LA-FULL-CYCLE-TEST-1 D2), so its creator does not meet a locked Add data page: where
+     * people sign in Add data starts off, and this asks the server to turn it on (`canAdminister`, as the create
+     * itself). A refusal is carried to the Add data page, which names it and still offers the switch.
+     */
     createSpace(then: string = ADD_DATA_ROUTE): void {
         this.dialog
             .open(SpaceFormDialog, { width: '520px', maxHeight: '90vh', data: { dataKind: true } })
             .afterClosed()
             .subscribe((created?: Space) => {
-                if (created) this.enter(created.id, then);
-                else this.events.stepAbandoned('space'); // OB-13: the step where people stop
+                if (!created) {
+                    this.events.stepAbandoned('space'); // OB-13: the step where people stop
+                    return;
+                }
+                // With no sign-in Add data is on by default: nothing to turn on, and nothing is pinned.
+                const turnedOn$: Observable<unknown> =
+                    this.session.authMode() === 'oidc' ? this.spaces.setSelfImport(created.id, true) : of(null);
+                turnedOn$.subscribe({
+                    next: () => this.enter(created.id, then),
+                    error: (e: unknown) => {
+                        this.leaveNotice(
+                            `The Space was created, but Add data was not turned on: ${apiErrorMessage(e, 'the server did not accept the change.')}`,
+                        );
+                        this.enter(created.id, then);
+                    },
+                });
             });
+    }
+
+    /** The create step that was refused, once: the Add data page shows it after the reload that entered the Space. */
+    takeNotice(): string | null {
+        try {
+            const notice = sessionStorage.getItem(NOTICE_KEY);
+            sessionStorage.removeItem(NOTICE_KEY);
+            return notice;
+        } catch {
+            return null; // no session storage here: nothing was left
+        }
+    }
+
+    private leaveNotice(notice: string): void {
+        try {
+            sessionStorage.setItem(NOTICE_KEY, notice);
+        } catch {
+            // no session storage here: the Add data page still shows the switch
+        }
     }
 
     /**

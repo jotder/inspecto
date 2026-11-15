@@ -266,6 +266,16 @@ export class SpacesService {
             .pipe(tap(() => this.reads.clear()));
     }
 
+    /**
+     * Turn Add data on or off in a Space (`PUT /spaces/{id}/settings/data`; the server asks `canAdminister`).
+     * Addressed to the named Space, so it works for a Space just created and not yet active.
+     */
+    setSelfImport(spaceId: string, selfImport: boolean): Observable<unknown> {
+        return this.http
+            .put(apiUrl(`/spaces/${encodeURIComponent(spaceId)}/settings/data`), { selfImport })
+            .pipe(tap(() => this.reads.clear()));
+    }
+
     /** Update a space's display name / description (the id/folder is immutable). 400 for `default`, 404 unknown. */
     update(id: string, patch: { display_name?: string; description?: string }): Observable<Space> {
         return this.http

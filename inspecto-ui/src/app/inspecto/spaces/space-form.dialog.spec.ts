@@ -201,6 +201,43 @@ describe('SpaceFormDialog', () => {
             await expectNoA11yViolations(el);
         });
 
+        it('Name is a labelled text box from the start, not a row reading “—”: typing fills the id and enables Create', () => {
+            const { fixture } = create({ dataKind: true });
+            const el = fixture.nativeElement as HTMLElement;
+            const name = penByLabel(el, 'Name')!;
+            const box = name.querySelector('input')!;
+            expect(box).not.toBeNull();
+            expect(box.getAttribute('aria-label')).toBe('Name');
+            expect(box.getAttribute('aria-required')).toBe('true');
+            expect(name.querySelector('button')).toBeNull(); // no value to click and no pencil
+            expect(name.textContent).not.toContain('—');
+            const createButton = el.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+            expect(createButton.disabled).toBe(true);
+
+            box.value = 'Mobile money';
+            box.dispatchEvent(new Event('input'));
+            fixture.detectChanges();
+            expect(fixture.componentInstance.form.get('display_name')!.value).toBe('Mobile money');
+            expect(el.textContent).toContain('mobile-money'); // the id follows as it is typed
+            expect(createButton.disabled).toBe(false);
+            expect(penError(name)).toBe('');
+
+            // emptied and left: the row says what is missing, and Create is off again
+            box.value = '';
+            box.dispatchEvent(new Event('input'));
+            box.dispatchEvent(new Event('blur'));
+            fixture.detectChanges();
+            expect(penError(name)).toBe('A name is required.');
+            expect(createButton.disabled).toBe(true);
+        });
+
+        it('the console’s New space keeps its property row for the name', () => {
+            const { fixture } = create();
+            const name = penByLabel(fixture.nativeElement as HTMLElement, 'Display name')!;
+            expect(name.querySelector('input')).toBeNull();
+            expect(name.querySelector('button')).not.toBeNull();
+        });
+
         it("sets the chosen Industry pack as the new Space's Domain Profile, and writes no branding", () => {
             const { fixture, spaceSave, domainSave, saveFor } = create({ dataKind: true });
             const c = fixture.componentInstance;

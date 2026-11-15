@@ -25,6 +25,7 @@ import { APP_ENVIRONMENT } from '@inspecto/core/api/app-environment';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { LA_APP_SHORTCUTS, ShortcutsHelpDialog, isEditingTarget } from 'app/inspecto/shortcuts-help.dialog';
 import { appAreas, appOfUrl, areaIcon, productNav, ProductNavEntry } from '@inspecto/core/product/product-host';
+import { FirstRun } from './first-run';
 import { PRODUCT } from './product.generated';
 
 export { LA_RAIL_EXPANDED_KEY } from '@inspecto/link-analysis/la-host/la-rail.service';
@@ -182,7 +183,10 @@ export const railLink = (n: ProductNavEntry): RailLink => ({ path: n.path, label
                     >
                 </button>
                 <div [class.slim-switcher]="!expanded()">
-                    <inspecto-space-switcher [dataKind]="true" preferredSample="la-sample"></inspecto-space-switcher>
+                    <inspecto-space-switcher
+                        [create]="createSpace"
+                        preferredSample="la-sample"
+                    ></inspecto-space-switcher>
                 </div>
                 <user [showAvatar]="false"></user>
                 @if (expanded()) {
@@ -262,6 +266,9 @@ export class LaShellComponent {
     private readonly smQuery = typeof matchMedia === 'function' ? matchMedia('(min-width: 600px)') : null;
     protected readonly wide = signal(this.smQuery?.matches ?? true);
     private readonly dialog = inject(MatDialog);
+    private readonly firstRun = inject(FirstRun);
+    /** New Space in the switcher runs the first-run create: Add data on, then Onboard a file. */
+    protected readonly createSpace = (): void => this.firstRun.createSpace();
 
     constructor() {
         // Opening an App's area makes it the App the landing page and Settings keep showing.

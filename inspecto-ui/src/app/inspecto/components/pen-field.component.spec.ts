@@ -65,6 +65,25 @@ class HelpHostComponent {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.Eager,
     imports: [PenFieldComponent, ReactiveFormsModule],
+    template: `
+        <inspecto-pen-field
+            label="Name"
+            [open]="true"
+            [required]="true"
+            [formControl]="ctl"
+            (entered)="entered = entered + 1"
+        />
+    `,
+})
+class OpenHostComponent {
+    ctl = new FormControl<string | null>(null);
+    entered = 0;
+}
+
+@Component({
+    standalone: true,
+    changeDetection: ChangeDetectionStrategy.Eager,
+    imports: [PenFieldComponent, ReactiveFormsModule],
     template: `<inspecto-pen-field label="New tag" [formControl]="ctl" (entered)="entered = entered + 1" />`,
 })
 class EnteredHostComponent {
@@ -304,6 +323,76 @@ describe('PenFieldComponent', () => {
                 expect(e.defaultPrevented).toBe(false);
                 expect(h.querySelector('input')).toBeNull();
             }
+        });
+    });
+
+    describe('an open row: the first value a create dialog asks for', () => {
+        function open(): {
+            fixture: ReturnType<typeof TestBed.createComponent<OpenHostComponent>>;
+            host: HTMLElement;
+            box: HTMLInputElement;
+        } {
+            const fixture = TestBed.createComponent(OpenHostComponent);
+            fixture.detectChanges();
+            const host = (fixture.nativeElement as HTMLElement).querySelector('inspecto-pen-field') as HTMLElement;
+            return { fixture, host, box: host.querySelector('input')! };
+        }
+        const type = (box: HTMLInputElement, text: string): void => {
+            box.value = text;
+            box.dispatchEvent(new Event('input'));
+        };
+        const press = (target: Element, key: string): KeyboardEvent => {
+            const e = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+            target.dispatchEvent(e);
+            return e;
+        };
+
+        it('is a labelled text box from the start: no value button, no pencil, no “—”', () => {
+            const { host, box } = open();
+            expect(box).not.toBeNull();
+            expect(host.querySelector('.prop-label')!.textContent).toContain('Name');
+            expect(box.getAttribute('aria-label')).toBe('Name');
+            expect(box.getAttribute('aria-required')).toBe('true');
+            expect(box.getAttribute('aria-description')).toBeNull(); // Enter and Escape are not this row's keys
+            expect(host.querySelector('button')).toBeNull();
+            expect(host.textContent).not.toContain('—');
+        });
+
+        it('writes the value as it is typed (trimmed), keeps what was typed in the box, and stays open on blur', () => {
+            const { fixture, host, box } = open();
+            type(box, 'Mobile ');
+            fixture.detectChanges();
+            expect(fixture.componentInstance.ctl.value).toBe('Mobile');
+            expect(box.value).toBe('Mobile '); // the trailing space is not eaten under the caret
+            expect(fixture.componentInstance.ctl.touched).toBe(false);
+            box.dispatchEvent(new Event('blur'));
+            fixture.detectChanges();
+            expect(fixture.componentInstance.ctl.touched).toBe(true);
+            expect(host.querySelector('input')).toBe(box);
+        });
+
+        it('leaves Enter to the form and Escape to the dialog around it', () => {
+            const { fixture, host, box } = open();
+            type(box, 'Calls');
+            let escapes = 0; // what a dialog around the row hears
+            (fixture.nativeElement as HTMLElement).addEventListener('keydown', (e) => {
+                if ((e as KeyboardEvent).key === 'Escape') escapes++;
+            });
+            const enter = press(box, 'Enter');
+            press(box, 'Escape');
+            fixture.detectChanges();
+            expect(enter.defaultPrevented).toBe(false); // the form's implicit submit still runs
+            expect(fixture.componentInstance.entered).toBe(0);
+            expect(escapes).toBe(1); // not swallowed
+            expect(fixture.componentInstance.ctl.value).toBe('Calls');
+            expect(host.querySelector('input')).toBe(box);
+        });
+
+        it('follows a value the form writes', () => {
+            const { fixture, box } = open();
+            fixture.componentInstance.ctl.setValue('From the form');
+            fixture.detectChanges();
+            expect(box.value).toBe('From the form');
         });
     });
 

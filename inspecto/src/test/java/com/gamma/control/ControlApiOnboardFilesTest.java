@@ -1662,7 +1662,7 @@ class ControlApiOnboardFilesTest {
             assertFalse(data(json(c, "GET", "/bootstrap", null, UPLOADER), 200).get("selfImport").asBoolean());
             HttpResponse<String> off = send(c, "POST", "/onboard/files?name=t.csv", csv, UPLOADER);
             assertEquals(403, off.statusCode(), off.body());
-            assertTrue(error(off).contains("ask an administrator"), off.body());
+            assertTrue(error(off).contains("an administrator can turn it on"), off.body());
 
             data(json(c, "PUT", "/settings/data", "{\"selfImport\":true}", ADMIN), 200);
             assertTrue(data(json(c, "GET", "/bootstrap", null, UPLOADER), 200).get("selfImport").asBoolean());

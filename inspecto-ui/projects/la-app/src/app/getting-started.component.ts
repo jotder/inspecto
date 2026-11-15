@@ -103,7 +103,7 @@ import { PRODUCT } from './product.generated';
                             Your team may already keep data in another Space. Pick it here.
                         </p>
                         <inspecto-space-switcher
-                            [dataKind]="true"
+                            [create]="createSpace"
                             preferredSample="la-sample"
                         ></inspecto-space-switcher>
                     </li>
@@ -173,6 +173,9 @@ export class GettingStartedComponent implements OnInit {
             },
         });
     }
+
+    /** New Space in the switcher runs the same create as *Use my own data*. */
+    protected readonly createSpace = (): void => this.firstRun.createSpace();
 
     protected useOwnData(): void {
         if (this.state().hasSpace) void this.router.navigateByUrl(ADD_DATA_ROUTE);

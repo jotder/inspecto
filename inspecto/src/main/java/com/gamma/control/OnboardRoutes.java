@@ -119,12 +119,18 @@ final class OnboardRoutes implements RouteModule {
 
     // ── gates shared by the family ──────────────────────────────────────────────────────────────────────────
 
+    /**
+     * Why Add data is refused while the Space's switch is off. It says only what is true of every Space, with or without
+     * a Pipeline: it is off here, and who turns it on. The UI holds the same words ({@code SELF_IMPORT_OFF} in
+     * {@code add-data.model.ts}); {@code ControlApiFirstRunTest} pins this copy.
+     */
+    static final String SELF_IMPORT_OFF = "Add data is turned off in this Space; an administrator can turn it on";
+
     /** Write root 503, then {@code data.self_import} 403. Returns the write root. */
     static Path requireSelfImport(ApiContext api, String what) {
         Path root = WriteGates.requireWriteRoot(api, what);
         if (!DataSettings.forRoot(root).selfImportInForce())
-            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED,
-                    "Add data is turned off in this Space: its data comes from Pipelines; ask an administrator to turn it on");
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, SELF_IMPORT_OFF);
         return root;
     }
 

@@ -173,7 +173,14 @@ limits and the commit's write order are in
     locked screen says "ask an administrator" - who had only `PUT /settings/data`. la-app **Settings → This Space → Add
     data** (`AddDataSettingsComponent`, `OnboardService.setDataSettings`) is that switch (editable with no sign-in or with
     `canAdminister`, read-only otherwise), and the Add data page shows "You may turn it on: Settings, Add data" to the
-    person who may.
+    person who may. **Superseded 2026-11-15 (`LA-FULL-CYCLE-TEST-1` phase 1, D2):** that line was missed in a live
+    drive, so the la-app Add data page (`add-data.page.ts`) now draws one panel with a primary **Turn on Add data**
+    button in place of the locked reason for that person (`OnboardService.setDataSettings(true)`, then the Add data
+    screen opens in place; a refusal is shown under the button). Anyone else reads the locked reason, which now says
+    only what is true of every Space: "Add data is turned off in this Space; an administrator can turn it on"
+    (`OnboardRoutes.SELF_IMPORT_OFF`, mirrored by `SELF_IMPORT_OFF` in `add-data.model.ts`). Create a Space in the la-app
+    turns it on for the new Space (`FirstRun.createSpace`). The default is unchanged: off wherever people sign in, and
+    no import can write `data.toon`.
   * The Link Analysis footer no longer says "pipeline planes" with no graph drawn (no Pipeline word on a Basic screen).
 * **Two phase 7 leftovers fixed.** (1) **A case's name came back as its id in My work**: `ComponentStore.write` stamps
   the content's `name` with the id (in-file identity = URL id), so the display name a save wrote under `name` was

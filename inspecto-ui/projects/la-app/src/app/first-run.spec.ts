@@ -2,7 +2,8 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { provideRouter, Router } from '@angular/router';
-import { of } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Observable, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { LensService, SampleSpace, Space, SpacesService } from '@inspecto/core/api';
 import { SessionService } from '@inspecto/core/auth/session.service';
@@ -22,15 +23,25 @@ const MADE: SampleSpace = {
     },
 };
 
-function create(o: { authMode?: 'none' | 'oidc'; canAdminister?: boolean; made?: SampleSpace; created?: Space } = {}) {
+function create(
+    o: {
+        authMode?: 'none' | 'oidc';
+        canAdminister?: boolean;
+        made?: SampleSpace;
+        created?: Space;
+        /** What turning Add data on answers (default: accepted). */
+        turnOn?: Observable<unknown>;
+    } = {},
+) {
     const selectSpace = vi.fn();
+    const setSelfImport = vi.fn(() => o.turnOn ?? of({}));
     const createSample = vi.fn(() => of(o.made ?? MADE));
     const open = vi.fn(() => ({ afterClosed: () => of(o.created) }));
     const stepAbandoned = vi.fn();
     TestBed.configureTestingModule({
         providers: [
             provideRouter([]),
-            { provide: SpacesService, useValue: { selectSpace, createSample } },
+            { provide: SpacesService, useValue: { selectSpace, createSample, setSelfImport } },
             { provide: SessionService, useValue: { authMode: signal(o.authMode ?? 'none') } },
             { provide: LensService, useValue: { canAdminister: signal(o.canAdminister ?? false) } },
             { provide: MatDialog, useValue: { open } },
@@ -40,7 +51,7 @@ function create(o: { authMode?: 'none' | 'oidc'; canAdminister?: boolean; made?:
     const run = TestBed.inject(FirstRun);
     const reload = vi.spyOn(run, 'reload').mockImplementation(() => undefined);
     const nav = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
-    return { run, selectSpace, createSample, open, reload, nav, stepAbandoned };
+    return { run, selectSpace, createSample, setSelfImport, open, reload, nav, stepAbandoned };
 }
 
 describe('FirstRun', () => {
@@ -73,13 +84,56 @@ describe('FirstRun', () => {
     });
 
     it('Create a Space asks the name and kind of data, then enters the new Space on Add data', () => {
-        const { run, open, selectSpace, nav } = create({
+        const { run, open, selectSpace, nav, setSelfImport } = create({
             created: { id: 'calls', displayName: 'Calls', description: '', createdAt: '' },
         });
         run.createSpace();
         expect(open).toHaveBeenCalledWith(SpaceFormDialog, expect.objectContaining({ data: { dataKind: true } }));
         expect(selectSpace).toHaveBeenCalledWith('calls');
         expect(nav).toHaveBeenCalledWith('/add-data');
+        // nobody signs in: Add data is on by default, so nothing is asked and nothing is pinned
+        expect(setSelfImport).not.toHaveBeenCalled();
+    });
+
+    describe('where people sign in, Create a Space turns Add data on in the new Space (LA-FULL-CYCLE-TEST-1 D2)', () => {
+        const created: Space = { id: 'calls', displayName: 'Calls', description: '', createdAt: '' };
+
+        it('asks the server for the Space it made, then enters it on Add data with nothing to report', () => {
+            sessionStorage.clear();
+            const { run, setSelfImport, selectSpace, nav } = create({ authMode: 'oidc', canAdminister: true, created });
+            run.createSpace();
+            expect(setSelfImport).toHaveBeenCalledWith('calls', true);
+            expect(selectSpace).toHaveBeenCalledWith('calls');
+            expect(nav).toHaveBeenCalledWith('/add-data');
+            expect(run.takeNotice()).toBeNull();
+        });
+
+        it('a refusal still enters the Space on Add data, and names the refused step once for that page', () => {
+            sessionStorage.clear();
+            const refusal = new HttpErrorResponse({
+                status: 403,
+                error: { error: { message: 'An Access Policy does not allow this change.' } },
+            });
+            const { run, selectSpace, nav } = create({
+                authMode: 'oidc',
+                canAdminister: true,
+                created,
+                turnOn: throwError(() => refusal),
+            });
+            run.createSpace();
+            expect(selectSpace).toHaveBeenCalledWith('calls');
+            expect(nav).toHaveBeenCalledWith('/add-data');
+            expect(run.takeNotice()).toBe(
+                'The Space was created, but Add data was not turned on: An Access Policy does not allow this change.',
+            );
+            expect(run.takeNotice()).toBeNull(); // said once
+        });
+
+        it('closing the dialog without a Space asks nothing', () => {
+            const { run, setSelfImport } = create({ authMode: 'oidc', canAdminister: true, created: undefined });
+            run.createSpace();
+            expect(setSelfImport).not.toHaveBeenCalled();
+        });
     });
 
     it('each guide step opens its screen; Space opens the create dialog', () => {

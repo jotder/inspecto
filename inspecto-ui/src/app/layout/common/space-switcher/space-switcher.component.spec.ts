@@ -112,6 +112,18 @@ describe('SpaceSwitcherComponent', () => {
         expect(selectSpace).toHaveBeenCalledWith('gamma');
     });
 
+    it('New Space runs the host’s own create flow when it gives one, in place of the shared form and switch', () => {
+        const created: Space = { id: 'gamma', displayName: 'Gamma', description: '', createdAt: '' };
+        const { fixture, open, selectSpace } = create(true, true, created);
+        const own = vi.fn();
+        fixture.componentRef.setInput('create', own);
+        fixture.detectChanges();
+        openMenu(fixture).at(-2)!.click();
+        expect(own).toHaveBeenCalledTimes(1);
+        expect(open).not.toHaveBeenCalled();
+        expect(selectSpace).not.toHaveBeenCalled();
+    });
+
     it('New from sample opens the sample dialog and switches to the sample Space it creates', () => {
         const created: Space = { id: 'sample', displayName: 'Sample', description: '', createdAt: '' };
         const { fixture, open, selectSpace } = create(true, true, created);

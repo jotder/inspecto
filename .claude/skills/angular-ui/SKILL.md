@@ -498,6 +498,9 @@ src/app/
   listens there, never on `(keydown.enter)`, which also fires on the Enter that only opens a closed row. Initial focus:
   put `cdkFocusInitial` on the `<inspecto-pen-field>` host (the focus trap moves it to the row's value; CDK logs a
   harmless dev-mode warning that the host itself is not focusable).
+  **`[open]="true"`** (2026-11-15) keeps the box on screen for the ONE value a create dialog asks first (Create a Space's
+  Name): a labelled text box in the same row geometry, written as it is typed, with Enter and Escape left to the form
+  and dialog. Not for a row that already holds a value to read.
   ⛔ Do not wrap it in a `mat-form-field`, and do not use it for a CHOICE.
   A row bound to a SIGNAL (one control, no form around it) may bridge with `[ngModel]` / `(ngModelChange)` and
   `[ngModelOptions]="{ standalone: true }"` when it sits inside a form - the one sanctioned use of `ngModel` (UI-FORM-ROWS-1 P3; the dashboard

@@ -172,14 +172,21 @@ whole Standard+ pages (Alerts, Investigations) stay out of the Basic navigation 
   sample…** (F-2 fixed). The **Create a Space** dialog asks a **Name** and **What kind of data?** (*Mobile Money*,
   *Telecom*, *Generic*, each with three example columns), then lands on *Onboard a file*. With sign-in only an
   administrator may create a Space.
+- **As built, 2026-11-15 (`LA-FULL-CYCLE-TEST-1` phase 1, D2).** **Name** is a text box, not a row to open
+  (`<inspecto-pen-field [open]>`). The create turns Add data on in the new Space (`FirstRun.createSpace`: `PUT
+  /spaces/{id}/settings/data {selfImport: true}`, the creator's `canAdminister`; skipped with no sign-in, where it is on
+  by default), then enters the Space on *Onboard a file*. A refused step still enters the Space: the Add data page
+  names it once ("The Space was created, but Add data was not turned on: …") and offers the switch. **New Space…** in
+  the la-app Space switcher runs this same flow (`[create]`), so every create lands in one place.
 
 ### UC-03 Add a file of events (transfers, calls, messages)
 
 - **Actor:** P1 (Basic), P2, P3. **Trigger:** **Add data**, a dropped file (H8), the empty "Explore a Dataset"
   card, or the Space guide.
 - **Context (§1.1):** always available with no sign-in. With sign-in, available only in Spaces where an
-  administrator turned it on, and only with `canUploadData`; elsewhere the control is locked with "Data in this
-  Space comes from Pipelines - ask an administrator" (A-15).
+  administrator turned it on, and only with `canUploadData`; elsewhere the control is locked with "Add data is turned
+  off in this Space; an administrator can turn it on" (A-15; the text claims nothing about Pipelines, which a new Space
+  does not have), and in Inspecto LA an administrator gets a **Turn on Add data** button on that page instead.
 - **Goal:** turn a file into something Link Analysis can draw, without learning Pipelines.
 - **Today:** no UI on Basic. The analyst upload lives inside Investigations (Standard+) and only drops the file in
   a Collector's inbox. Setup took 9 steps over the API (parse preview, schema, a schema rewrite because suggested

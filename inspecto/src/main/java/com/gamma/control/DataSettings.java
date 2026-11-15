@@ -19,8 +19,7 @@ import java.util.Map;
  * {@link TimezoneSettings}; {@code GET|PUT /settings/data}, and the value in force rides {@code /bootstrap}.
  *
  * <p><b>Unset means "follow who the user is"</b> (use cases §1.1, A-15): on with no sign-in (the one person who owns
- * everything), off with sign-in (an administrator turns it on per Space; data there comes from Pipelines). An
- * unreadable file reads as unset.
+ * everything), off with sign-in (an administrator turns it on per Space). An unreadable file reads as unset.
  */
 record DataSettings(Boolean selfImport) {
 

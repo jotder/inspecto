@@ -126,11 +126,13 @@ Space has no Dataset yet. Three ways in:
   suggests. When a Space already exists, the button is **Add data** itself.
 
 ![The Create a Space dialog with a name and three kinds of data](../../assets/la-guide-02-create-space.png)
-*Create a Space: click the pencil beside **Name** to type it, then choose the kind of data.*
+*Create a Space: type the **Name**, then choose the kind of data. (The picture predates the text box: it shows the
+older row with a pencil.)*
 
-  As driven on 2026-11-15, **Create** returns to **Getting started** with the new Space open; press **Add data** there.
-  With sign-in, adding data is off in a new Space until an administrator turns on **Settings → Add data → People may add
-  data in this Space**; until then the Add data page says it is not available.
+  **Create** opens the new Space on **Onboard a file**, from Getting started, from the Space guide and from **New
+  Space…** in the Space switcher alike. With sign-in, adding data is off in a Space until an administrator turns it
+  on; a Space created here has it turned on as part of the create, because whoever may create a Space is an
+  administrator. If that step is refused, the page names it and offers **Turn on Add data**.
 * **Open my team's data** — shown when Spaces exist: the Space switcher.
 
 A choice you cannot take is greyed out with one line saying why: with sign-in, only an administrator may create a
@@ -206,8 +208,9 @@ for). **Stop** goes back to importing only when asked. **Storage** says how many
 merges them into one so reading stays quick, and **Compact now** does it at once; the merge keeps each arrival's
 period on record (the *Arrivals* list shows it once it reads that record, `LA-ARRIVAL-LEDGER-1`). On
 Standard and up, **Keep** sets what the Dataset keeps (*every arrival*, *the last N days* by each row's date, or *the
-last N arrivals*); older rows are removed at the next compaction. If adding data is off in this Space the screen says why (*its data comes from Pipelines*);
-with sign-in an administrator turns it on per Space (**Settings → Add data**, *People may add data in this Space*; after
+last N arrivals*); older rows are removed at the next compaction. If adding data is off in this Space the screen says so, and that an administrator can turn it on. An administrator
+sees **Turn on Add data** on that screen: one press turns it on and the Add data screen opens in place (a refusal is
+shown under the button). The same switch is **Settings → Add data**, *People may add data in this Space* (after
 a refused change or a failed read it offers **Try again**, which reads the setting afresh), and you need the right to
 upload data. The la-app **Access** screen names the role that builds data *Data builder* (its id stays
 `pipeline-developer`).
@@ -1401,7 +1404,10 @@ not exist, is not yours, or its Dataset is no longer shared with you — the sam
 graph-run, index-build and Alert Rule authoring; *Demo FM Manager* is the second approver; *Demo Admin* also holds
 `canAuthorWorkbench`.
 
-**Saved views and settings (Workbench author).** Without the *Workbench author* permission (`canAuthorWorkbench`) —
+**Saved views and settings (Workbench author).** The seeded `admin` role holds the *Workbench author* permission
+(since 2026-11-15, `LA-FULL-CYCLE-TEST-1` D1), as `power`, the developer roles and `super` do, so the administrator
+who creates a Space can save its first view and change its settings; `operations`, `support` and `business` do not
+hold it. Without the *Workbench author* permission (`canAuthorWorkbench`) —
 a separate question from *Incident management* — Settings → Link Analysis shows its values with no Save, and File ▸
 Save view, Save view as… and Delete view (and Rename, Duplicate and Delete in File ▸ Open…) are greyed out with the
 reason. A view shared with you to view only cannot be saved over or renamed (use Save view as… for a copy), and only
