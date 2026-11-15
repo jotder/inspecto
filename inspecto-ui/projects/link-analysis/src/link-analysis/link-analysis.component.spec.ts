@@ -33,6 +33,7 @@ import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import {
+    CANVAS_FIT_PADDING,
     CANVAS_MIN_PX,
     CANVAS_TOOLS_FOLD_PX,
     LinkAnalysisComponent,
@@ -101,6 +102,7 @@ class StubGraphView {
     @Input() plugins: unknown;
     @Input() interaction: unknown;
     @Input() selection: unknown;
+    @Input() fitPadding: unknown;
     @Output() nodeClick = new EventEmitter<string>();
     @Output() edgeClick = new EventEmitter<string>();
     @Output() nodeDblClick = new EventEmitter<string>();
@@ -1922,8 +1924,9 @@ describe('LinkAnalysisComponent', () => {
             workingSet: true,
         });
 
+        c.legendOpen.set(true); // open on screen, not a remembered choice
         await c.loadView({ id: 'x', name: 'x', sourceId: 'entity-projection', query: c.lastRun()!.query });
-        expect(c.legendOpen()).toBe(true); // a view without options resets the overlays
+        expect(c.legendOpen()).toBe(false); // a view without options resets the overlays to their pills
         expect(c.viewOptions().hulls).toBe(true); // …but keeps the plugin set the analyst last chose
     });
 
@@ -2076,6 +2079,24 @@ describe('LinkAnalysisComponent', () => {
         c.fitCanvasToolsToWidth(0); // an unmeasured read never flips the state
         fixture.detectChanges();
         expect(state().moreHidden).toBe(true);
+    });
+
+    it('LA-PHONE-OVERFLOW-1: below sm the header wraps and both toolbars wrap on their own full-width row', async () => {
+        // jsdom has no layout: this pins the classes that make a 375 px phone wrap instead of scroll sideways (the
+        // drive measured the tool rail at x 138-503 in a 507 px document before)
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const cls = (testid: string) => (el.querySelector(`[data-testid="${testid}"]`) as HTMLElement).classList;
+        expect(cls('la-header')).toContain('max-sm:flex-wrap');
+        expect(Array.from(cls('la-toolbars'))).toEqual(
+            expect.arrayContaining(['max-sm:order-last', 'max-sm:basis-full']),
+        );
+        for (const bar of ['la-tool-rail', 'la-canvas-toolbar']) {
+            expect(Array.from(cls(bar))).toEqual(expect.arrayContaining(['max-sm:shrink', 'max-sm:flex-wrap']));
+        }
     });
 
     it('the overflow menu says why its selection items are off, visibly and in their names (axe clean)', async () => {
@@ -5287,7 +5308,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
     });
 });
 
-describe('LinkAnalysisComponent - canvas overlays at laptop width (LA-ONBOARD-FIXES-1, F-11)', () => {
+describe('LinkAnalysisComponent - canvas overlays start as pills, fit clear of them (LA-OVERLAYS-HIDE-GRAPH-1)', () => {
     const LEGEND = 'inspecto.la.overlayOpen.legend';
     const WS = 'inspecto.la.overlayOpen.workingSet';
     const clear = () => [LEGEND, WS].forEach((k) => localStorage.removeItem(k));
@@ -5297,12 +5318,11 @@ describe('LinkAnalysisComponent - canvas overlays at laptop width (LA-ONBOARD-FI
         vi.restoreAllMocks();
     });
 
-    it('on an ~800px canvas the legend and Working set start as their pills, expandable, and axe-clean', async () => {
+    it('the legend and Graph counts start as their pills on any canvas, expandable, and axe-clean', async () => {
         const { fixture } = create({ stubGraph: true });
         fixture.detectChanges();
         await runQuery(fixture);
         const c = fixture.componentInstance;
-        c.fitOverlaysToWidth(800);
         fixture.detectChanges();
         expect([c.legendOpen(), c.workingSetOpen()]).toEqual([false, false]);
         const el = fixture.nativeElement as HTMLElement;
@@ -5312,7 +5332,7 @@ describe('LinkAnalysisComponent - canvas overlays at laptop width (LA-ONBOARD-FI
         expect(ws.querySelector('[aria-label="Working set statistics"]')).toBeNull();
         await expectNoA11yViolations(legend);
         await expectNoA11yViolations(ws);
-        expect(localStorage.getItem(LEGEND)).toBeNull(); // the width rule is not the user's choice
+        expect(localStorage.getItem(LEGEND)).toBeNull(); // the starting state is not the user's choice
 
         (legend.querySelector('button[aria-label="Show the legend"]') as HTMLButtonElement).click();
         fixture.detectChanges();
@@ -5321,29 +5341,30 @@ describe('LinkAnalysisComponent - canvas overlays at laptop width (LA-ONBOARD-FI
         expect(localStorage.getItem(LEGEND)).toBe('true'); // an explicit open is remembered
     });
 
-    it('a wide canvas starts them open, and the rule decides once (a later narrow reading collapses nothing)', () => {
-        const { fixture } = create();
-        const c = fixture.componentInstance;
-        c.fitOverlaysToWidth(1400);
-        expect([c.legendOpen(), c.workingSetOpen()]).toEqual([true, true]);
-        c.fitOverlaysToWidth(600);
-        expect([c.legendOpen(), c.workingSetOpen()]).toEqual([true, true]);
+    it('the canvas fit leaves the pills band, the render-status line and the edges clear', async () => {
+        const { fixture } = create({ stubGraph: true });
+        fixture.detectChanges();
+        await runQuery(fixture);
+        fixture.detectChanges();
+        const view = fixture.debugElement.query(By.directive(StubGraphView)).componentInstance as StubGraphView;
+        expect(view.fitPadding).toEqual(CANVAS_FIT_PADDING);
+        const [top, right, bottom, left] = CANVAS_FIT_PADDING;
+        expect(top).toBeGreaterThanOrEqual(40); // the pills sit at top-2 and are about 24 px tall
+        expect(Math.min(right, bottom, left)).toBeGreaterThanOrEqual(16);
     });
 
-    it('a choice this browser remembers wins over the width rule, both ways', () => {
+    it('a choice this browser remembers wins, both ways', () => {
         localStorage.setItem(LEGEND, 'true');
         localStorage.setItem(WS, 'false');
         const { fixture } = create();
         const c = fixture.componentInstance;
-        c.fitOverlaysToWidth(800);
         expect(c.legendOpen()).toBe(true);
-        c.fitOverlaysToWidth(1400);
         expect(c.workingSetOpen()).toBe(false);
         c.setOverlayOpen('workingSet', true); // View > Overlays, or the pill
         expect(localStorage.getItem(WS)).toBe('true');
     });
 
-    it('a saved view stating the overlays open does not force them open on a narrow canvas; its "collapsed" stands', async () => {
+    it('a saved view stating the overlays open does not force them open over the graph; its "collapsed" stands', async () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
         const view = (legend: boolean, workingSet: boolean) =>
@@ -5354,21 +5375,17 @@ describe('LinkAnalysisComponent - canvas overlays at laptop width (LA-ONBOARD-FI
                 query: { projection: { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target' } },
                 view: { legend, workingSet },
             }) as LinkAnalysisView;
-        // loaded before the canvas was measured (wide until known), then the first measurement says narrow
-        await c.loadView(view(true, true));
-        expect([c.legendOpen(), c.workingSetOpen()]).toEqual([true, true]);
-        c.fitOverlaysToWidth(800);
-        expect([c.legendOpen(), c.workingSetOpen()]).toEqual([false, false]);
-        // the showcase starter view states both open; loaded on the measured narrow canvas they stay pills
+        // the showcase starter views state both open: they stay pills
         await c.loadView(view(true, true));
         expect([c.legendOpen(), c.workingSetOpen()]).toEqual([false, false]);
-        // a wide canvas: the view's own state, including a collapsed Working set
-        c.fitOverlaysToWidth(1400);
+        // the analyst opened the legend in this browser: a view's "collapsed" still wins for that view
+        c.setOverlayOpen('legend', true);
+        c.setOverlayOpen('workingSet', true);
         await c.loadView(view(true, false));
         expect([c.legendOpen(), c.workingSetOpen()]).toEqual([true, false]);
     });
 
-    it('with storage blocked the width rule still applies and a toggle still works', () => {
+    it('with storage blocked the overlays start as pills and a toggle still works', () => {
         const { fixture } = create();
         const c = fixture.componentInstance;
         // blocked after the shell's own services are up (they read storage unguarded at construction)
@@ -5378,7 +5395,6 @@ describe('LinkAnalysisComponent - canvas overlays at laptop width (LA-ONBOARD-FI
         vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
             throw new Error('blocked');
         });
-        c.fitOverlaysToWidth(800);
         expect([c.legendOpen(), c.workingSetOpen()]).toEqual([false, false]);
         c.setOverlayOpen('legend', true);
         expect(c.legendOpen()).toBe(true);

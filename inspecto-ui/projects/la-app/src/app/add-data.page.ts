@@ -25,7 +25,10 @@ import { ImportDatasetCardComponent } from '@inspecto/link-analysis/add-data/imp
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [AddDataComponent, ImportDatasetCardComponent, RouterLink],
     template: `
-        <section class="mx-auto flex w-full max-w-4xl flex-col gap-6 p-6" aria-labelledby="la-add-data-title">
+        <section
+            class="mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-6 p-4 sm:p-6"
+            aria-labelledby="la-add-data-title"
+        >
             <header class="flex flex-col gap-1">
                 <h1 id="la-add-data-title" class="text-title m-0 font-semibold">Onboard a file</h1>
                 <p class="text-secondary m-0">

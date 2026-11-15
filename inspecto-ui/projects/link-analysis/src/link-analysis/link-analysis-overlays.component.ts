@@ -67,12 +67,6 @@ export function hideLinkKinds<G extends G6GraphData>(g: G | null, hidden: readon
 /** The two canvas overlays whose open state a browser remembers. */
 export type CanvasOverlay = 'legend' | 'workingSet';
 
-/**
- * Below this canvas width the legend and Working set overlays START collapsed to their pills (LA-ONBOARD-FIXES-1,
- * F-11): at a laptop's ~800 px canvas the two open boxes (up to 320 + 256 px wide) covered most of the graph.
- */
-export const OVERLAY_COLLAPSE_BELOW_PX = 1000;
-
 const OVERLAY_OPEN_KEY = 'inspecto.la.overlayOpen.';
 
 /** The user's own earlier open/close of an overlay in this browser; null when they never chose (or storage is blocked). */
@@ -90,13 +84,17 @@ export function rememberOverlayOpen(which: CanvasOverlay, open: boolean): void {
     try {
         localStorage.setItem(OVERLAY_OPEN_KEY + which, String(open));
     } catch {
-        // private window / blocked storage: the width rule decides again next time
+        // private window / blocked storage: the overlays start as their pills again next time
     }
 }
 
-/** An overlay's starting state: the remembered choice wins; otherwise open only on a canvas at least the threshold wide. */
-export function overlayStartsOpen(stored: boolean | null, canvasWidth: number): boolean {
-    return stored ?? canvasWidth >= OVERLAY_COLLAPSE_BELOW_PX;
+/**
+ * An overlay's starting state: the remembered choice wins; otherwise its pill. Open, the Legend and Graph counts boxes
+ * covered the top of the graph even on a 1440 px window (LA-OVERLAYS-HIDE-GRAPH-1; before, F-11 collapsed them only below
+ * a 1000 px canvas), so a first graph is drawn clear of them and either opens with one click.
+ */
+export function overlayStartsOpen(stored: boolean | null): boolean {
+    return stored ?? false;
 }
 
 /**

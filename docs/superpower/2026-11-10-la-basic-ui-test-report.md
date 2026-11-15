@@ -31,8 +31,9 @@ the dialog was opened with a synthetic key event and works).
 
 ## Findings, by severity
 
-> **Status 2026-11-15:** D-1 to D-4 are fixed and their rows closed (D-3 was already fixed by `e59b7d540`); D-8, D-9 and
-> D-11 to D-13 were fixed and closed on 2026-11-15. D-5 to D-7, D-10 and D-14 stay open on the board.
+> **Status 2026-11-15:** D-1 to D-4 are fixed and their rows closed (D-3 was already fixed by `e59b7d540`); D-6 to D-13
+> were fixed and closed on 2026-11-15 (in D-7 the old names and near-twins are the demo install's Space names, data not
+> code; in D-10 node labels still start off, by the operator's 2026-10-15 decision). D-5 and D-14 stay open on the board.
 
 Severity: **P1** blocks a user's task · **P2** misleads or breaks a main path · **P3** friction, layout or
 wording. Each defect has a row in `docs/BACKLOG.md` (id in brackets).

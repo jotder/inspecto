@@ -14,6 +14,18 @@ import { SampleSpaceDialog } from 'app/inspecto/spaces/sample-space.dialog';
 import { SpaceFormDialog } from 'app/inspecto/spaces/space-form.dialog';
 
 /**
+ * The Spaces as the switcher lists them: by the name shown (case and accents aside, numbers in number order), the id
+ * breaking a tie, so the order is the same on every load whatever order the server answered in (LA-SPACE-SWITCHER-1).
+ */
+export function spacesByName(spaces: readonly Space[]): Space[] {
+    const name = (s: Space): string => s.displayName || s.id;
+    return [...spaces].sort(
+        (a, b) =>
+            name(a).localeCompare(name(b), 'en', { sensitivity: 'base', numeric: true }) || a.id.localeCompare(b.id),
+    );
+}
+
+/**
  * Header control that shows the active space and switches between them. Rendered on a multi-space (discover)
  * server with spaces to switch between ({@link SpacesService.showSwitcher}) — and, with ZERO Spaces, whenever the
  * user may create one (LA-ONBOARD-1 OB-11, F-2: before, a fresh install had no way to make its first Space).
@@ -44,17 +56,18 @@ import { SpaceFormDialog } from 'app/inspecto/spaces/space-form.dialog';
             <button
                 mat-stroked-button
                 [matMenuTriggerFor]="menu"
-                class="min-w-0 max-sm:!px-2"
-                [matTooltip]="spaces.availableSpaces().length ? 'Switch space' : 'Create a Space'"
+                class="space-switcher min-w-0 max-w-full max-sm:!px-2"
+                [matTooltip]="spaces.availableSpaces().length ? label() + ' (switch Space)' : 'Create a Space'"
                 [attr.aria-label]="label() + (spaces.availableSpaces().length ? ', switch space' : ', create a Space')"
+                data-testid="space-switcher"
             >
                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:square-3-stack-3d"></mat-icon>
                 <!-- label collapses to the icon on phones so the header row fits 375px (Wave 5 P2) -->
-                <span class="ml-2 hidden max-w-40 truncate md:inline">{{ label() }}</span>
-                <mat-icon class="icon-size-5" svgIcon="heroicons_outline:chevron-down"></mat-icon>
+                <span class="ml-2 hidden md:inline" data-testid="space-switcher-name">{{ label() }}</span>
+                <mat-icon class="icon-size-5" iconPositionEnd svgIcon="heroicons_outline:chevron-down"></mat-icon>
             </button>
             <mat-menu #menu="matMenu">
-                @for (s of spaces.availableSpaces(); track s.id) {
+                @for (s of sortedSpaces(); track s.id) {
                     <button
                         mat-menu-item
                         (click)="switch(s)"
@@ -86,9 +99,21 @@ import { SpaceFormDialog } from 'app/inspecto/spaces/space-form.dialog';
             </mat-menu>
         }
     `,
+    // LA-SPACE-SWITCHER-1: a long Space name never pushes the button past its container (it covered page content beside
+    // a 195 px rail); it ends in an ellipsis, and the tooltip and the accessible name carry it whole.
+    styles: `
+        .space-switcher ::ng-deep .mdc-button__label {
+            min-width: 0;
+            max-width: 10rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    `,
 })
 export class SpaceSwitcherComponent implements OnInit {
     readonly spaces = inject(SpacesService);
+    /** The menu's Spaces by name, so one is found where it is expected ({@link spacesByName}). */
+    readonly sortedSpaces = computed(() => spacesByName(this.spaces.availableSpaces()));
     protected lens = inject(LensService);
     private session = inject(SessionService);
 

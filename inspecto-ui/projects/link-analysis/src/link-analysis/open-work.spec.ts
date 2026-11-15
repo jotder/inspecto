@@ -41,4 +41,13 @@ describe('open-work (what a Space switch closed)', () => {
             'Investigation Mule hub was closed when you switched Space. It stays in Space la-showcase; switch back to reopen it.',
         );
     });
+
+    it('names the Space as the switcher does and starts the sentence with a capital (LA-SPACE-SWITCHER-1)', () => {
+        rememberOpenWork({ space: 'la-claims', spaceName: 'Claims', actor: ANALYST, label: 'the analysis' });
+        const work = takeClosedBySpaceSwitch('la-audit', ANALYST)!;
+        expect(work.spaceName).toBe('Claims');
+        expect(closedBySpaceSwitchMessage(work)).toBe(
+            'The analysis was closed when you switched Space. It stays in Space Claims; switch back to reopen it.',
+        );
+    });
 });

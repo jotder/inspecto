@@ -8,6 +8,8 @@ const OPEN_WORK_KEY = 'inspecto.la.openWork';
 /** The open item's label ("Investigation Mule hub"), the Space it belongs to and the user who had it open. */
 export interface OpenWork {
     space: string;
+    /** The Space's name as the switcher shows it, when it was known; the toast falls back to the id. */
+    spaceName?: string;
     actor: string;
     label: string;
 }
@@ -38,13 +40,14 @@ export function takeClosedBySpaceSwitch(space: string, actor: string): OpenWork 
         }
         if (work.space === space) return null;
         sessionStorage.removeItem(OPEN_WORK_KEY);
-        return { space: work.space, actor, label: work.label };
+        return { space: work.space, spaceName: work.spaceName || undefined, actor, label: work.label };
     } catch {
         return null;
     }
 }
 
-/** The toast after a Space switch closed an item. */
+/** The toast after a Space switch closed an item: the Space by its name, the sentence with a capital (LA-SPACE-SWITCHER-1). */
 export function closedBySpaceSwitchMessage(work: OpenWork): string {
-    return `${work.label} was closed when you switched Space. It stays in Space ${work.space}; switch back to reopen it.`;
+    const what = work.label.charAt(0).toUpperCase() + work.label.slice(1);
+    return `${what} was closed when you switched Space. It stays in Space ${work.spaceName || work.space}; switch back to reopen it.`;
 }
