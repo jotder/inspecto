@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.geo-link`](../../../../../product-map/module/geo-link.toon).
 
-133 test class(es): 19 unit, 114 real-HTTP control-plane, 0 IT.
+134 test class(es): 19 unit, 115 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
