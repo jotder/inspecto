@@ -35,6 +35,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | — | P2 | feature | SPACE-LINK-CENSUS-1 one declared census of the links between a Space's config files | — |
+| `PIPELINE-CHAIN-NO-JOB-1` | P3 | defect | a Pipeline chain with an output_store: but no type: pipeline Job that runs it saves clean and never runs. | — |
 | — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
 | `SPACE-PROMOTION-CASE-PAIRING-1` | P3 | defect | promotion pairs a bundle file with the target file of the same spelling, so a path in another case is an add plus a remove. | — |
 | `IMPORT-CONNECTION-CASE-1` | P3 | defect | the regular import and export match _connection.toon case-sensitively, while the import's own path rules lower-case the name first. | — |

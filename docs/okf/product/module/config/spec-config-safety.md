@@ -641,7 +641,7 @@ finding per Step, anchored at `steps[i].<kind>` or `processing.<kind>`, naming t
   stable, and an inactive draft is told at the save rather than at activation.
 - ⚠ **Not covered:** a chain WITH an `output_store:` but no `type: pipeline` Job that runs it saves clean
   and also never runs; the Job is a separate config, and refusing a Pipeline save for a Job not yet
-  written would make the order of authoring matter.
+  written would make the order of authoring matter. Open as `PIPELINE-CHAIN-NO-JOB-1` (a warning, not a refusal).
 
 Pinned by `ControlApiChainOutputStoreArmingTest` (graph save active / inactive, the activation patch, a
 chain with a store, the slot alone, a legacy block at `/validate`).
