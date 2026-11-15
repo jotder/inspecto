@@ -245,7 +245,11 @@ final class SpacePromotionRoutes implements RouteModule {
 
         synchronized (APPLY_LOCK) {
             // re-checked under the lock: nothing changed the target since the gates above read it
-            if (!SpacePromotion.compute(root, r.bundle(), r.parameters(), space).hash().equals(cs.hash())) throw stale();
+            try {
+                if (!SpacePromotion.compute(root, r.bundle(), r.parameters(), space).hash().equals(cs.hash())) throw stale();
+            } catch (SpacePromotion.CaseCollisions c) {   // a colliding file appeared since the first check
+                return collided(e, c);
+            }
             try {
                 return write(api, root, space, cs, applied, toWrite, r.removals());
             } catch (UnknownClassificationException unknown) {   // write put the tree back before it threw

@@ -38,6 +38,17 @@ class SpacePromotionTest {
                 .findFirst().orElse(null);
     }
 
+    /** SPACE-PROMOTION-CASE-PAIRING-1: a Job under {@code registry/} is never live, judged as the loader's {@code Path}
+     *  judges it - in any case where the filesystem ignores case (Windows), as spelled where it does not. */
+    @Test
+    void aJobFileUnderTheRegistryIsLiveExactlyWhenTheLoaderReadsIt() {
+        assertTrue(SpacePromotion.liveJob("jobs/hello_job.toon"));
+        assertFalse(SpacePromotion.liveJob("registry/datasets/hello_job.toon"));
+        assertFalse(SpacePromotion.liveJob("jobs/hello_job.TOON"), "the loader reads the suffix as spelled");
+        boolean caseBlind = Path.of("Registry").startsWith("registry");
+        assertEquals(!caseBlind, SpacePromotion.liveJob("Registry/datasets/hello_job.toon"));
+    }
+
     @Test
     void aBareSecretReferenceIsNotAPlaceholderButAHostPlaceholderIsBound(@TempDir Path target) throws Exception {
         String src = "connection:\n  id: db\n  connector: postgres\n  host: \"${DB_HOST}\"\n  password: \"${DB_PASS}\"\n";

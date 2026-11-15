@@ -419,9 +419,10 @@ public final class SpacePromotion {
     }
 
     /** Whether a loader reads {@code path} as a Job ({@code *_job.toon} as spelled, outside {@code registry/}), so
-     *  removing it stops one. */
+     *  removing it stops one. {@code registry/} is judged as the loader judges it ({@code ServiceBootstrap.resolveBySuffix},
+     *  {@code Path.startsWith}): in any case on Windows, as spelled on a case-sensitive filesystem. */
     static boolean liveJob(String path) {
-        return path.endsWith("_job.toon") && !path.startsWith("registry/");
+        return path.endsWith("_job.toon") && !java.nio.file.Path.of(path).startsWith("registry");
     }
 
     /** Whether {@code path} is a {@code *_pipeline.toon}, read as {@link #resolved} reads it. */
