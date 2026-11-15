@@ -329,7 +329,7 @@ class ControlApiOnboardFullCycleTest {
             data(json(c, "PUT", "/settings/data", "{\"selfImport\":false}", "Bearer admin"), 200);
             HttpResponse<String> off = json(c, "POST", path, body, "Bearer uploader");
             assertEquals(403, off.statusCode(), off.body());
-            assertTrue(error(off).contains("ask an administrator"), off.body());
+            assertTrue(error(off).contains("an administrator can turn it on"), off.body());
         }
     }
 
