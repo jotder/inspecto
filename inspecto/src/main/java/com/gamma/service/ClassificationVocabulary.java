@@ -1,6 +1,5 @@
 package com.gamma.service;
 
-import com.gamma.config.io.ConfigCodec;
 import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.FindingCodes;
 import com.gamma.config.spec.Severity;
@@ -174,7 +173,7 @@ public final class ClassificationVocabulary {
         for (Path file : files) {
             Map<String, Object> doc;
             try {
-                doc = ConfigCodec.toMap(Files.readString(file, StandardCharsets.UTF_8));
+                doc = new LinkedHashMap<>(com.gamma.util.ToonHelper.load(file.toString()));
             } catch (RuntimeException unparseable) {
                 continue;   // no reader can act on it either
             }
