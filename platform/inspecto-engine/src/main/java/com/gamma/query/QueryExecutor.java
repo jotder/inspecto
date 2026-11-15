@@ -206,12 +206,20 @@ public final class QueryExecutor {
         return run(new Request(datasetName, relationSql, null, 0, 0, List.of(), List.of()), planner, policy, null);
     }
 
-    /** How to render each relation {@link #repinnable} returned, for as long as a caller holds the string. */
-    private static final Map<String, Renderer> RENDERERS =
-            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+    /** How many registered relations are kept: the most recently registered win. */
+    static final int MAX_RENDERERS = 1024;
 
-    /** A registered relation: the map's own key (held weakly, as the map holds it) and how to render it again. */
-    private record Renderer(java.lang.ref.WeakReference<String> sql, java.util.function.Supplier<String> render) { }
+    /**
+     * How to render each relation {@link #repinnable} returned, held strongly and capped at {@link #MAX_RENDERERS}, least
+     * recently registered dropped first. Not weakly: a caller that wraps the relation in more SQL keeps only the wrapper,
+     * so a weak entry for the embedded relation would vanish at the next GC and take the retry with it.
+     */
+    private static final Map<String, java.util.function.Supplier<String>> RENDERERS =
+            java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>(64, 0.75f, false) {
+                @Override protected boolean removeEldestEntry(Map.Entry<String, java.util.function.Supplier<String>> eldest) {
+                    return size() > MAX_RENDERERS;
+                }
+            });
 
     /** Test seam: runs in every attempt once the relation is registered and before the statement scans it. */
     static volatile Runnable beforeScan = () -> { };
@@ -222,24 +230,17 @@ public final class QueryExecutor {
      * ({@code DatasetRelation}). A caller may wrap the relation in more SQL (a UNION of two Datasets, a filtered
      * sub-select): the retry renders every registered relation the wrapper embeds (SNAPSHOT-SWAP-READER-RESIDUALS-1).
      *
-     * <p>Two renders of an identical relation share one entry, and the second caller gets the string the first
-     * registered: the entry lives while either caller holds it. Handing back its own equal copy would leave the
-     * second caller without a retry once the first dropped the registered string. The newest render is the one kept:
-     * an earlier caller's ingredients (its Space, its view store) may be gone by the time the relation is rendered again.
+     * <p>Two renders of an identical relation share one entry, and the newest render is the one kept: an earlier
+     * caller's ingredients (its Space, its view store) may be gone by the time the relation is rendered again.
      */
     public static String repinnable(java.util.function.Supplier<String> render) {
         String sql = render.get();
         if (sql == null) return null;
         synchronized (RENDERERS) {
-            Renderer known = RENDERERS.get(sql);
-            String registered = known == null ? null : known.sql().get();
-            if (registered != null) {
-                RENDERERS.put(registered, new Renderer(known.sql(), render));
-                return registered;
-            }
-            RENDERERS.put(sql, new Renderer(new java.lang.ref.WeakReference<>(sql), render));
-            return sql;
+            RENDERERS.remove(sql);   // re-inserted as the newest, so a busy relation is never the one dropped
+            RENDERERS.put(sql, render);
         }
+        return sql;
     }
 
     /**
@@ -265,17 +266,17 @@ public final class QueryExecutor {
      * none.
      */
     private static String rendered(String relationSql) {
-        Renderer own = RENDERERS.get(relationSql);
-        if (own != null) return own.render().get();
-        List<Map.Entry<String, Renderer>> parts = new ArrayList<>();
+        java.util.function.Supplier<String> own = RENDERERS.get(relationSql);
+        if (own != null) return own.get();
+        List<Map.Entry<String, java.util.function.Supplier<String>>> parts = new ArrayList<>();
         synchronized (RENDERERS) {
-            for (Map.Entry<String, Renderer> e : RENDERERS.entrySet())
+            for (Map.Entry<String, java.util.function.Supplier<String>> e : RENDERERS.entrySet())
                 if (e.getKey() != null && relationSql.contains(e.getKey())) parts.add(Map.entry(e.getKey(), e.getValue()));
         }
         if (parts.isEmpty()) return null;
         parts.sort((a, b) -> Integer.compare(b.getKey().length(), a.getKey().length()));
         String out = relationSql;
-        for (Map.Entry<String, Renderer> p : parts) out = out.replace(p.getKey(), p.getValue().render().get());
+        for (Map.Entry<String, java.util.function.Supplier<String>> p : parts) out = out.replace(p.getKey(), p.getValue().get());
         return out;
     }
 

@@ -143,15 +143,21 @@ class QueryExecutorSwapRetryTest {
     }
 
     @Test
-    void twoRendersOfAnIdenticalRelationShareTheRegisteredString(@TempDir Path data) throws Exception {
-        publish(data.resolve("links"), 1);
-        String first = DatasetRelation.relationSql(Map.of("physicalRef", "links"), data, null);
-        String second = DatasetRelation.relationSql(Map.of("physicalRef", "links"), data, null);
+    void aWrapperWhoseEmbeddedRelationNobodyHoldsStillRetriesAfterAGc(@TempDir Path data) throws Exception {
+        Path links = data.resolve("links");
+        publish(links, 1);
+        String wrapped = wrapped(data);   // the embedded relation string is dropped: only the wrapper is held
+        System.gc();
+        publish(links, 2);
 
-        assertEquals(first, second);
-        // The registry holds its key weakly: an equal copy of its own would leave the second caller without a retry once
-        // the first dropped the registered string.
-        assertSame(first, second, "the second render hands back the registered string, so the entry lives while either holds it");
+        QueryExecutor.Result r = QueryExecutor.run(read(wrapped));
+
+        assertEquals(List.of(20), column(r), "the registration outlived the embedded string");
+    }
+
+    private static String wrapped(Path data) {
+        return "SELECT gen * 10 AS gen FROM (" + DatasetRelation.relationSql(Map.of("physicalRef", "links"), data, null)
+                + ") AS w WHERE gen > 0";
     }
 
     @Test

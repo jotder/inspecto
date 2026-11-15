@@ -330,8 +330,9 @@ sink monitor and file lock, which no reader takes), so there is no deadlock.
   enrichment's reference and Stage-1 input globs (a glob read pins the store, so it waits for a compaction under way)
   hold from pin to scan like a Job. A Link Analysis index build re-renders its relation on the build thread
   (`DatasetProvider.readHeld`) and holds it until the build has read it. A caller that wraps a registered relation in
-  more SQL still gets the retry: every relation the wrapper embeds is re-rendered in place. Two renders of an
-  identical relation share one registration (the second caller gets the first string, so it keeps the retry).
+  more SQL still gets the retry: every relation the wrapper embeds is re-rendered in place. The registry holds the
+  last 1,024 relations strongly (a wrapper keeps only its own string, so a weak entry would die at the next GC); two
+  renders of an identical relation share one entry, and the newest render is kept.
   `retire_superseded` deletes a file under `SnapshotSwapLock.writeAbove`, waiting for a reader that pinned it
   before it was superseded.
 Every writer that hides, replaces or deletes a live `*.parquet` holds the write lock: the snapshot swaps,
@@ -342,7 +343,8 @@ keys as `<store>`.
 Limits: a publish waits for the readers in flight when it queued, plus any reader that overtook it while holding
 another store (bounded by the writer's deadline, 24 h by default); runs of one score model take turns (a monitor per
 history directory), so the leftover sweep never meets another run's file;
-one JVM only. Hidden files
+one JVM only; a Link Analysis index build holds its store for the whole build, so a publish queued behind it, and
+new pins of that store behind the publish, wait for the build to end. Hidden files
 never match the readers' `**/*.parquet` glob and are not counted as storage.
 
 ## The parameter contract & runtime Expressions (shipped 2026-08-07/10)
