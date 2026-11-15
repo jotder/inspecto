@@ -26,7 +26,12 @@ const SERVER_ONLY_NODES: Record<string, string> = {
 };
 
 /** Lens capabilities with no catalog node: backend-only gates no Access profile can deny yet. */
-const UNCATALOGUED_CAPABILITIES = ['canBuildLinkIndex', 'canUploadData', 'canShareInvestigation'];
+const UNCATALOGUED_CAPABILITIES = [
+    'canBuildLinkIndex',
+    'canUploadData',
+    'canShareInvestigation',
+    'canSaveSpaceSettings',
+];
 
 function actionNodes(): AccessNode[] {
     return [...indexCatalog(deriveDefaultAccessCatalog()).byId.values()].filter((n) => n.kind === 'action');

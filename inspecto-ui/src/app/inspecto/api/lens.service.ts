@@ -231,9 +231,13 @@ export class LensService {
      *
      *  Without sign-in the gate is a no-op on the server (no Subject is attached), so it always holds there, whatever
      *  the lens. With sign-in it is {@link identityCapability}, not {@link canAuthorWorkbench}: the server asks only who
-     *  the subject is, and a `super` viewing as Business may still save them. No Access-Catalog node carries it. */
+     *  the subject is, and a `super` viewing as Business may still save them. No Access-Catalog node carries it, so
+     *  `allows` answers true for its node id; both branches read that one id, as every capability reads one node. */
     readonly canSaveSpaceSettings = computed(() =>
-        this.session.authMode() !== 'oidc' || this.identityCapability('canAuthorWorkbench', 'space.settings'));
+        this.session.authMode() !== 'oidc'
+            ? this.allows('space.settings')
+            : this.identityCapability('canAuthorWorkbench', 'space.settings'),
+    );
 
     /** May manage Incidents and Cases — the grant the backend puts on opening an Incident/Case, promoting a
      *  Break, Investigation writes, and (D1, operator 2026-09-25) the Case desk's Findings fields
