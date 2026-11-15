@@ -29,6 +29,8 @@ import {
 import { GraphRunsService, LinkIndexSummary } from '@inspecto/link-analysis/api/graph-runs.service';
 import { KIND_TEXT, LinkAnalysisCorrectedDaysComponent } from './link-analysis-corrected-days.component';
 import { buildStrip, dayCells, DataTrustFacts, daysWindow, formatDay, formatInstant, outcomeTone } from './data-trust';
+import { IndexRebuildComponent } from './index-rebuild.component';
+import { datasetIndexStatus } from './index-status';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 
 const PAGE = 25;
@@ -40,7 +42,8 @@ const NO_WINDOW = 'this Investigation sets no time window, and its Files name no
  * ok / warning / problem badge, and a drawer under it: Fresh, Complete (per-day strip), Files (table), Index.
  *
  * <p>Every read degrades on its own: a failed one leaves its part of the strip saying "not assessed" / "not known", never a
- * blank that reads as "fine". Read-only: nothing here re-processes or re-indexes anything.
+ * blank that reads as "fine". The one action is **Rebuild** beside an out-of-date link index (`<inspecto-la-index-rebuild>`,
+ * LA-FULL-CYCLE-TEST-1 phase 4), for a caller allowed to build it; nothing else here re-processes or re-indexes anything.
  *
  * <p><b>Mount point for banners:</b> project any element carrying the attribute {@code la-data-alerts} into this component
  * and it renders directly under the strip line, above the drawer (the corrected-day warning, S5, and later Alert states go
@@ -61,12 +64,14 @@ const NO_WINDOW = 'this Investigation sets no time window, and its Files name no
         StatusBadgeComponent,
         DataTableComponent,
         LinkAnalysisCorrectedDaysComponent,
+        IndexRebuildComponent,
     ],
     template: `
         <section class="flex flex-col gap-2 text-sm" aria-label="Data this graph stands on" data-test="data-strip">
             <div class="flex flex-wrap items-center gap-2">
                 <inspecto-status-badge [value]="strip().tone" [label]="strip().label"></inspecto-status-badge>
                 <span data-test="strip-text">{{ strip().text }}</span>
+                <inspecto-la-index-rebuild [dataset]="dataset()" />
                 @if (coverageError()) {
                     <span class="text-secondary text-xs" data-test="strip-days-reason"
                         >Days not assessed: {{ coverageError() }}</span
@@ -273,10 +278,8 @@ const NO_WINDOW = 'this Investigation sets no time window, and its Files name no
                         <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">Index</h3>
                         @if (index(); as ix) {
                             <p class="m-0" data-test="index-line">
-                                Version {{ ix.version }}{{ ix.stale ? ' — stale' : '' }}
-                                @if (ix.reason) {
-                                    <span> ({{ ix.reason }})</span>
-                                }
+                                Version {{ ix.version
+                                }}{{ ix.stale ? ', out of date' + (ix.reason ? ': ' + ix.reason : '') : '' }}
                                 @if (files()?.summary; as s) {
                                     · {{ s.waiting }} {{ s.waiting === 1 ? 'File' : 'Files' }} waiting
                                     @if (s.unknown) {
@@ -343,11 +346,12 @@ export class LinkAnalysisDataStripComponent {
 
     readonly strip = computed(() => {
         const c = this.coverage();
-        const ix = this.index();
+        // the one answer the Data page reads too (phase 4): out of date when ANY index of the Dataset is
+        const ix = datasetIndexStatus(this.graphRuns.indexes(), this.dataset());
         const facts: DataTrustFacts = {
             dataAsOf: this.dataAsOf(),
             days: c ? { expected: c.expectedDays, covered: c.coveredDays, missing: c.missingDays } : null,
-            index: ix ? { version: ix.version, stale: ix.stale } : null,
+            index: ix ? { version: ix.version, stale: ix.state === 'out_of_date' } : null,
             files: this.files(),
             correctedDays: this.corrections().map((c) => c.day),
         };

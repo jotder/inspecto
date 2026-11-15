@@ -1,4 +1,5 @@
 import { DatasetFilesPage } from '@inspecto/link-analysis/api/inv.service';
+import { indexStateWords } from './index-status';
 
 /**
  * LA-DATA-TRUST-1 S2 - the framework-free half of the Data strip: what the one-line summary says, the tone of its
@@ -134,11 +135,12 @@ export function buildStrip(f: DataTrustFacts): DataTrustStrip {
         worse('warning');
     }
 
-    let index = 'no index';
+    // LA-FULL-CYCLE-TEST-1 phase 4: the Glossary's word (link index) and the same state words as the Data page
+    let index = 'no link index';
     if (f.index) {
-        index = `index v${f.index.version}`;
+        index = `link index v${f.index.version}`;
         if (f.index.stale) {
-            index += ' (stale)';
+            index += ` ${indexStateWords('out_of_date')}`;
             worse('warning');
         }
         if (s) {

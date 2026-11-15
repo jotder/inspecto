@@ -13,6 +13,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subscription } from 'rxjs';
 import { Arrivals, dataStatusLines } from './add-data.model';
 import { OnboardService } from './onboard.service';
+import { GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
+import { datasetIndexStatus } from '@inspecto/link-analysis/link-analysis/index-status';
 
 /**
  * A Dataset's **Data status** (LA-ARRIVAL-LEDGER-1, plan `la-data-arrival-plan.md` §4): *Received · covers · graph*, then
@@ -21,7 +23,9 @@ import { OnboardService } from './onboard.service';
  * labels, `datasetFacts`, LA-STREAM-FACTS-1.)
  *
  * Pass `[arrivals]` when the host already read `GET /datasets/{id}/arrivals`;
- * otherwise it reads them for `[dataset]` itself. A Dataset no import made has no arrivals and shows nothing; so does a
+ * otherwise it reads them for `[dataset]` itself. With a `[dataset]` the *graph* clock is the link index's live status
+ * (`GET /inv/index`, LA-FULL-CYCLE-TEST-1 phase 4) whenever the server gives one - the answer the Data page and the
+ * Investigation's data strip read too. A Dataset no import made has no arrivals and shows nothing; so does a
  * failed read (the status is a help, never a blocker).
  *
  * @example <inspecto-la-data-status [dataset]="datasetId" />
@@ -49,6 +53,7 @@ import { OnboardService } from './onboard.service';
 export class DataStatusComponent {
     private readonly onboard = inject(OnboardService);
     private readonly destroyRef = inject(DestroyRef);
+    private readonly graphRuns = inject(GraphRunsService);
 
     /** The Dataset whose status to read; ignored when {@link arrivals} is given. */
     readonly dataset = input<string | null>(null);
@@ -58,7 +63,11 @@ export class DataStatusComponent {
     private readonly own = signal<Arrivals | null>(null);
     protected readonly lines = computed(() => {
         const given = this.arrivals();
-        return dataStatusLines(given === undefined ? this.own() : given);
+        const id = this.dataset();
+        return dataStatusLines(
+            given === undefined ? this.own() : given,
+            id ? datasetIndexStatus(this.graphRuns.indexes(), id) : null,
+        );
     });
     private reading?: Subscription;
 
@@ -66,6 +75,9 @@ export class DataStatusComponent {
         effect(() => {
             const id = this.arrivals() === undefined ? this.dataset() : null;
             untracked(() => this.read(id));
+        });
+        effect(() => {
+            if (this.dataset()) untracked(() => this.graphRuns.loadIndexes()); // read once per page; a no-op once answered
         });
     }
 

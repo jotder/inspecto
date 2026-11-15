@@ -10,7 +10,8 @@ timestamp: 2026-11-15T00:00:00Z
 # Link analysis core and ports - spec
 
 - **Core** — [classes](#classes-by-concern) · [ports](#ports) · [store selection](#store-selection-investigationstoresofwriteroot) ·
-  [SPI](#spi-investigationstoreprovider) · [invariants](#invariants) · [tests](#tests)
+  [SPI](#spi-investigationstoreprovider) · [invariants](#invariants) ·
+  [link index status and Rebuild](#link-index-status-one-answer-and-rebuild) · [tests](#tests)
 - **[Performance](#performance)** — [operator decisions](#operator-decisions) · [browser seams](#browser-seams-as-built) ·
   [measured no-gos](#measured-no-gos-nothing-shipped) · [known low gaps](#known-low-gaps-accepted-no-row) ·
   [live checks 2026-11-13](#live-checks-2026-11-13-la-perf-live-checks-1)
@@ -78,6 +79,64 @@ published as `live.investigations` on `/health/details`; `probeAtBoot` tries onc
 - The exploration edge reads (`/inv/projection`, `/inv/projection/neighbors`) send compact rows (PERF-P10-1, 2026-11-12);
   the SPA library (`projects/link-analysis/src/api/edge-wire.ts`) decodes them to the `ProjectionTriple` objects every
   fold reads, so no fold changed. Wire contract: [la-api spec](../la-api/spec.md) § Invariants.
+
+## Link index status: one answer, and Rebuild
+
+`LA-FULL-CYCLE-TEST-1` phase 4 (finding 21), as built 2026-11-16. Before it, a fresh import read *index v1 (stale)* in
+the Investigation's data strip and the Expand said the index "is out of date … (the Dataset's relation SQL changed
+since the index was built)", while the Data page said *graph up to date* and nothing offered a rebuild.
+
+**The cause** was not the details import (a Dataset with no link mapping is `SKIPPED` by the index follow-on): every
+index built outside the default Space was out of date the moment it was published, because the build worker carried no
+Space and read the store as a glob where the Space reads a pinned file list ([architecture](architecture.md) §4,
+*A build runs in the Space that submitted it*). Fixed at the cause: the build keeps the hash stable because the
+Dataset's meaning did not change. Rebuilding on every import was the other option, and was not taken: every rebuild
+went through the same worker and came out out of date again.
+
+**One answer.** `IndexStaleness` (la-api) judges an index; `GET /inv/index` serves the judgement per index (`stale`,
+`reasons`, `reason`, `fingerprint`, `plan`), and a read judges the same way before it serves from the index. The SPA
+reads it through ONE helper, `datasetIndexStatus` (`projects/link-analysis/src/link-analysis/index-status.ts`):
+
+| State | When | Data page (*Graph*, *Data status*) | Data strip (Investigation) | Expand note |
+|---|---|---|---|---|
+| `current` | listed, not stale, its files compared (`fingerprint: known`) | *up to date* | *link index vN* | *Answered from the link index vN.* |
+| `out_of_date` | any listed index of the Dataset is stale | *out of date* + **Rebuild** | *link index vN out of date* (WARNING) + **Rebuild**; the drawer adds the reason | *Answered from the Dataset because the link index is out of date (reason).* |
+| `unknown` | listed, files not comparable (a view-backed Dataset) | the arrivals decide | *link index vN* | as the server says |
+| none | no index listed, or `GET /inv/index` cannot answer (Basic) | the arrivals decide (*graph N files behind* …) | *no link index* | as the server says |
+
+**Plain words** (the server's `details`, shown as they are): *the Dataset's files changed after the index was built
+(added, removed or replaced)* · *the Dataset's definition changed after the index was built* · *the Dataset cannot be
+read now* · *the index was built by another version of Inspecto (layout …)* · *the index was built with DuckDB X and
+this server runs Y*; a served index that only misses added files says *N files were added to the Dataset after the
+index was built*. The screens say **out of date**, never *stale* (the Glossary's states: up to date, waiting, out of date).
+
+**Rebuild** (`<inspecto-la-index-rebuild [dataset]>`, `index-rebuild.component.ts`): shown only while the Dataset's
+index is out of date; enabled for a caller holding `canBuildLinkIndex` (`LensService.canBuildLinkIndex`), otherwise
+disabled with *Needs Build link index.* It sends the stale index's OWN mapping in the mode the server advises
+(`plan.recommended`, `full` when it advises none) to the existing `POST /inv/index/builds` — no new route, so the
+route's gates (capability, Dataset view, queue, disk budget) stay the only ones. When the build completes, `GET /inv/index`
+is read again, so every surface agrees at once; a refused start says why in the index build sentences
+(`indexBuildErrorMessage`).
+
+**Decisions** (taken in the lane, each reversible by the operator):
+
+- **The Data page reads the live answer, not its import record.** The arrivals record what the import's build did; the
+  index can go out of date afterwards (a definition change, a removed file). When `GET /inv/index` lists the Dataset's
+  index, its state wins; the arrivals decide only when there is no answer (Basic, no index, files not comparable).
+- **The words live on the server.** `details` were developer text (*relation SQL*, *bucket function*); they are now the
+  sentence every screen shows, so the Expand and the header cannot word one cause two ways.
+- **Rebuild beside the words, not in a menu.** The person reading *out of date* is the one who wants it fixed; a
+  disabled button that names the permission says who can.
+- **No Rebuild on the Expand note.** The note is read inside the canvas, which another lane changes; the data strip
+  above the same Investigation carries Rebuild.
+- **The index's entity count is not this answer.** The import result's *460 links between 138 entities* counts each raw
+  spelling as its own node (`' acc-1003 '` and `ACC-1003`) while the coverage counts 137 accounts. That is how the index
+  keys a node, not whether it is current, so it is left to its own row.
+
+Pinned by `ControlApiFullCycleIndexStatusTest` (geo-link, real HTTP: the full-cycle fixture in a Space of its own, the
+showcase Space laid down as its seed's `--scaffold` does and indexed by its own Job, and an out-of-date index rebuilt
+in the advised mode), `IndexBuildServiceTest.aBuildRunsInTheSpaceThatSubmittedItAndTheWorkerKeepsNoneAfter` and the
+specs `index-status.spec.ts`, `index-rebuild.component.spec.ts`, `index-source.spec.ts`, `data-trust.spec.ts`.
 
 ## Tests
 

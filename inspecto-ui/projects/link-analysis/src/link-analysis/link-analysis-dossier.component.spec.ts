@@ -178,7 +178,7 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
         expect(block).toContain('Not part of the custody hash');
         expect(block).toContain('3 Sep 2026'); // a midnight asOf covers the day BEFORE, read once, by the shared formatter
         expect(block).not.toContain('2026-09-04T00:00:00Z');
-        expect(block).toContain('version 3 — stale');
+        expect(block).toContain('version 3, out of date'); // the link index words of every surface (phase 4)
         expect(block).toContain('2026-09-02 (of 3 expected)');
         expect(el.textContent).toContain('Manifest root');
     });

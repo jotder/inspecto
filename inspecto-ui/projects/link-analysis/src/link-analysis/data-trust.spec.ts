@@ -31,7 +31,7 @@ describe('buildStrip', () => {
             index: { version: 3, stale: false },
             files: files(),
         });
-        expect(s.text).toBe('Data as of 5 Sep 2026 · 7 of 7 days · index v3');
+        expect(s.text).toBe('Data as of 5 Sep 2026 · 7 of 7 days · link index v3');
         expect(s.tone).toBe('success');
         expect(s.label).toBe('OK');
     });
@@ -44,7 +44,9 @@ describe('buildStrip', () => {
             files: files(),
             correctedDays: ['2026-09-01', '2026-09-01', '2026-09-02'],
         });
-        expect(s.text).toBe('Data as of 5 Sep 2026 · 7 of 7 days · 2 days corrected since you last looked · index v3');
+        expect(s.text).toBe(
+            'Data as of 5 Sep 2026 · 7 of 7 days · 2 days corrected since you last looked · link index v3',
+        );
         expect(s.tone).toBe('warning');
         expect(s.label).toBe('WARNING');
     });
@@ -56,18 +58,18 @@ describe('buildStrip', () => {
             index: { version: 3, stale: false },
             files: files({ waiting: 1 }),
         });
-        expect(s.text).toBe('Data as of 5 Sep 2026 · 6 of 7 days · 1 gap · index v3, 1 file waiting');
+        expect(s.text).toBe('Data as of 5 Sep 2026 · 6 of 7 days · 1 gap · link index v3, 1 file waiting');
         expect(s.tone).toBe('warning');
     });
 
     it('never claims more than was measured: unread parts say so', () => {
         const s = buildStrip({ dataAsOf: null, days: null, index: null, files: null });
-        expect(s.text).toBe('Data as-of date not known · days not assessed · no index');
+        expect(s.text).toBe('Data as-of date not known · days not assessed · no link index');
         expect(s.tone).toBe('neutral');
         expect(s.label).toBe('UNKNOWN');
     });
 
-    it('counts problem Files and a stale index', () => {
+    it('counts problem Files and an out-of-date link index, in the words of the Data page', () => {
         const s = buildStrip({
             dataAsOf: '2026-09-05T00:00:00Z',
             days: { expected: 2, covered: 2, missing: [] },
@@ -75,7 +77,7 @@ describe('buildStrip', () => {
             files: files({ problem: 2 }),
         });
         expect(s.text).toContain('2 Files quarantined, partial or failed');
-        expect(s.text).toContain('index v2 (stale)');
+        expect(s.text).toContain('link index v2 out of date');
         expect(s.tone).toBe('warning');
     });
 

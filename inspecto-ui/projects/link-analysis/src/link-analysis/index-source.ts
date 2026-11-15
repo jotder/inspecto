@@ -15,7 +15,8 @@ export const FALLBACK_REASON_TEXT: Record<string, string> = {
     column_not_indexed: 'the link index was not built with a column this read needs',
     time_zone_not_servable: 'the link index cannot answer in this time zone',
     filter_not_indexed: 'the link index cannot apply this filter',
-    index_stale_refused: 'the link index is out of date for this Dataset and may hold rows that were removed',
+    // LA-FULL-CYCLE-TEST-1 phase 4: the words the data strip and the Data page use; the server's `details` say why
+    index_stale_refused: 'the link index is out of date',
     depth_over_index_cap: 'the walk is deeper than the link index serves',
     frontier_over_index_cap: 'too many entities were expanded at once for the link index',
     index_read_failed: 'the link index could not be read',
@@ -29,12 +30,12 @@ export function datasetSourceNote(reason: string, details?: string): string {
     return `Answered from the Dataset because ${FALLBACK_REASON_TEXT[reason] ?? reason}${details ? ` (${details})` : ''}.`;
 }
 
-/** `Answered from the link index v3` (+ a stale warning), or the Dataset sentence; null when the server said nothing. */
+/** `Answered from the link index v3` (+ that it is out of date, and why), or the Dataset sentence; null when the server said nothing. */
 export function indexSourceNote(source: IndexSource | undefined | null): string | null {
     if (!source) return null;
     if (source.kind === 'dataset') return datasetSourceNote(source.reason, source.details);
     const stale = source.stale
-        ? ` (stale: ${source.staleReason ?? 'rows were added to the Dataset after the build'})`
+        ? `, which is out of date (${source.staleReason ?? 'rows were added to the Dataset after it was built'})`
         : '';
     return `Answered from the link index v${source.version}${stale}.`;
 }

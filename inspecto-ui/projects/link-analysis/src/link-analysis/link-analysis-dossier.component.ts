@@ -183,7 +183,7 @@ function saveBlob(blob: Blob, name: string): void {
                         <dt class="text-secondary">Index</dt>
                         <dd class="m-0">
                             @if (f.indexVersion != null) {
-                                version {{ f.indexVersion }}{{ f.indexStale ? ' — stale' : '' }}
+                                version {{ f.indexVersion }}{{ f.indexStale ? ', out of date' : '' }}
                             } @else {
                                 not assessed
                             }

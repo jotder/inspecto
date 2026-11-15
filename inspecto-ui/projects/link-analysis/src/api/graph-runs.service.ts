@@ -230,7 +230,10 @@ export interface LinkIndexSummary {
     };
     version: number;
     stale: boolean;
+    /** Why it is out of date, in plain words (`IndexStaleness`); null when it is not. */
     reason: string | null;
+    /** `unknown` when the Dataset's input files could not be compared, so the server claims no currency either way. */
+    fingerprint?: 'known' | 'unknown';
     /** Appended file groups the version carries (an append is refused at 8: compact first). */
     deltas?: number;
     /** Advice only (D-3 step 8): what differs between the version and the Dataset now, and which build closes the gap. */

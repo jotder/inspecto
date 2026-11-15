@@ -72,6 +72,30 @@ describe('DataStatusComponent', () => {
         );
         fixture.detectChanges();
         expect(status(el)).toBe('Data status: Received 2026-11-02 09:14');
+        http.match(apiUrl('/inv/index')); // the link index list, answered by the next case
+        http.verify();
+    });
+
+    it("says the link index's live answer over the import's record: out of date, as the data strip does (phase 4)", () => {
+        const { fixture, http, el } = create();
+        http.expectOne(apiUrl('/datasets/calls/arrivals')).flush(read('calls', [arrival]));
+        http.expectOne(apiUrl('/inv/index')).flush({
+            enabled: true,
+            indexes: [
+                {
+                    dataset: 'calls',
+                    mapping: { sourceCol: 'a', targetCol: 'b', kindCol: null },
+                    version: 2,
+                    stale: true,
+                    reason: "the Dataset's definition changed after the index was built",
+                    fingerprint: 'known',
+                },
+            ],
+        });
+        fixture.detectChanges();
+        expect(status(el)).toBe(
+            'Data status: Received 2026-11-02 09:14 · covers 2026-10-01 – 2026-11-02 · graph out of date',
+        );
         http.verify();
     });
 
@@ -92,10 +116,11 @@ describe('DataStatusComponent', () => {
 
         fixture.componentInstance.dataset.set(null);
         fixture.detectChanges();
+        http.match(apiUrl('/inv/index')); // read once, while a Dataset was named
         http.verify(); // no Dataset, no read
     });
 
-    it('uses the arrivals the host passes and reads nothing itself', () => {
+    it('uses the arrivals the host passes and reads no arrivals itself', () => {
         const { fixture, http, el } = create();
         http.expectOne(apiUrl('/datasets/calls/arrivals')); // the first render had none passed
         fixture.componentInstance.given.set(
@@ -103,6 +128,7 @@ describe('DataStatusComponent', () => {
         );
         fixture.detectChanges();
         expect(status(el)).toContain('graph 1 file behind');
+        http.match(apiUrl('/inv/index')); // the link index list is the only other read (unanswered here: the arrivals decide)
         http.verify();
     });
 });

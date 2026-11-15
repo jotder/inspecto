@@ -111,6 +111,10 @@ describe('AddDataPageComponent (/add-data, LA-ONBOARD-1 phase 4)', () => {
         http
             ?.match((r) => r.url.endsWith('/coverage'))
             .forEach((r) => !r.cancelled && r.flush({}, { status: 404, statusText: 'Not Found' }));
+        // LA-FULL-CYCLE-TEST-1 phase 4: the Dataset card reads the link index list for its Graph fact (503 = Basic: the arrivals decide)
+        http
+            ?.match((r) => r.url.endsWith('/inv/index'))
+            .forEach((r) => !r.cancelled && r.flush({}, { status: 503, statusText: 'Unavailable' }));
         http?.verify();
     });
 

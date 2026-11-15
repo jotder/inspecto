@@ -93,6 +93,10 @@ describe('ConsoleAddDataPageComponent (/add-data, ONBOARDING-FIRST-RUN-1 C3)', (
         http
             ?.match((r) => r.url.endsWith('/storage'))
             .forEach((r) => !r.cancelled && r.flush({}, { status: 404, statusText: 'Not Found' }));
+        // LA-FULL-CYCLE-TEST-1 phase 4: the Dataset card reads the link index list for its Graph fact (503 = Basic: the arrivals decide)
+        http
+            ?.match((r) => r.url.endsWith('/inv/index'))
+            .forEach((r) => !r.cancelled && r.flush({}, { status: 503, statusText: 'Unavailable' }));
         http?.verify();
     });
 

@@ -4,6 +4,7 @@ import { formatNumber } from '@inspecto/core/viz/number-format';
 import type { ColDef } from 'ag-grid-community';
 import { type ColumnRole, ROLE_LABELS, hintedRole, recordPhrase } from '@inspecto/link-analysis/api/column-roles';
 import type { RecordTypeGuide } from '@inspecto/link-analysis/api/entity-type-options';
+import type { LinkIndexStatus } from '@inspecto/link-analysis/link-analysis/index-status';
 import { pick, plural } from './words';
 
 /**
@@ -1183,9 +1184,10 @@ export function coversText(from: string | null, to: string | null): string {
 /**
  * Every line of a Dataset's **Data status** (`<inspecto-la-data-status>`), the three clocks first. ⚠ Extension point: a
  * later line (files waiting in the inbox, storage) is one more entry here from a field of `GET /datasets/{id}/arrivals`.
+ * `index` is the link index's live status (`datasetIndexStatus`), when `GET /inv/index` answered for the Dataset.
  */
-export function dataStatusLines(read: Arrivals | null): string[] {
-    const clocks = dataStatusLine(read?.arrivals ?? []);
+export function dataStatusLines(read: Arrivals | null, index: LinkIndexStatus | null = null): string[] {
+    const clocks = dataStatusLine(read?.arrivals ?? [], index);
     const lines = clocks ? [clocks] : [];
     const feed = feedSummaryLine(read?.feed ?? null); // LA-ARRIVAL-FEEDS-1
     if (feed) lines.push(feed);
@@ -1196,8 +1198,14 @@ export function dataStatusLines(read: Arrivals | null): string[] {
 
 const INDEXED = new Set(['BUILT', 'UP_TO_DATE']);
 
-/** What the graph holds, from the arrivals' recorded index outcomes, newest first; '' when nothing was recorded. */
-function graphClock(list: readonly Arrival[]): string {
+/**
+ * What the graph holds. The link index's LIVE status wins when the server gave one (LA-FULL-CYCLE-TEST-1 phase 4: the one
+ * answer the Investigation's data strip and the Expand read too, so the Data page can no longer say "up to date" over an
+ * out-of-date index); else the arrivals' recorded index outcomes, newest first; '' when nothing was recorded.
+ */
+function graphClock(list: readonly Arrival[], index: LinkIndexStatus | null): string {
+    if (index?.state === 'out_of_date') return 'graph out of date';
+    if (index?.state === 'current') return 'graph up to date';
     const newest = list[0];
     const k = list.findIndex((a) => !!a.index && INDEXED.has(a.index));
     if (k === 0) return 'graph up to date';
@@ -1215,8 +1223,8 @@ function graphClock(list: readonly Arrival[]): string {
  * **covers** (the period the data still kept covers) · the **graph** (up to date, or how many files behind) - the graph
  * part only when the runs recorded an index outcome.
  */
-export function dataStatusLine(all: readonly Arrival[]): string | null {
-    const c = dataClocks(all);
+export function dataStatusLine(all: readonly Arrival[], index: LinkIndexStatus | null = null): string | null {
+    const c = dataClocks(all, index);
     if (!c) return null;
     const parts = [`Received ${c.received}`];
     if (c.covers) parts.push(`covers ${c.covers}`);
@@ -1225,7 +1233,10 @@ export function dataStatusLine(all: readonly Arrival[]): string | null {
 }
 
 /** The three clocks of {@link dataStatusLine}, each on its own ('' when not known); null when nothing arrived. */
-function dataClocks(all: readonly Arrival[]): { received: string; covers: string; graph: string } | null {
+function dataClocks(
+    all: readonly Arrival[],
+    index: LinkIndexStatus | null,
+): { received: string; covers: string; graph: string } | null {
     const list = all.filter((a) => a.status !== 'REFUSED'); // a refused file never arrived in the data
     const newest = list[0];
     if (!newest) return null;
@@ -1239,7 +1250,7 @@ function dataClocks(all: readonly Arrival[]): { received: string; covers: string
                   tos.reduce((x, y) => (y > x ? y : x)),
               )
             : '';
-    return { received: ledgerTime(newest.received), covers, graph: graphClock(list) };
+    return { received: ledgerTime(newest.received), covers, graph: graphClock(list, index) };
 }
 
 /** One labelled fact of an imported Dataset's card (LA-STREAM-FACTS-1). */
@@ -1255,17 +1266,22 @@ export interface DatasetFact {
  * description), Filter, Received, Covers, Graph, the Inbox or how it is kept up to date, Storage, Compacted. A fact
  * not known is left out. The same words as the one-line *Data status*, split by what each one is.
  */
-export function datasetFacts(read: Arrivals | null, description: string, keeps: string): DatasetFact[] {
+export function datasetFacts(
+    read: Arrivals | null,
+    description: string,
+    keeps: string,
+    index: LinkIndexStatus | null = null,
+): DatasetFact[] {
     const facts: DatasetFact[] = [];
     const add = (label: string, value: string | null | undefined, id: string) => {
         if (value) facts.push({ label, value, id });
     };
     add('Origin', description, 'fact-origin');
     add('Filter', keeps, 'keeps-rows');
-    const c = dataClocks(read?.arrivals ?? []);
+    const c = dataClocks(read?.arrivals ?? [], index);
     add('Received', c?.received, 'fact-received');
     add('Covers', c?.covers, 'fact-covers');
-    // under the label Graph: "up to date", "2 files behind", "not updated"
+    // under the label Graph: "up to date", "out of date", "2 files behind", "not updated"
     add('Graph', c?.graph.replace(/^(the )?graph (was )?/, ''), 'fact-graph');
     const feed = feedFact(read?.feed ?? null); // LA-ARRIVAL-FEEDS-1
     add(feed?.label ?? '', feed?.value, 'fact-feed');

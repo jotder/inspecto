@@ -37,10 +37,10 @@ describe('index source wording (DR-U4)', () => {
         }
     });
 
-    it('says which link index version answered, and warns when it was stale', () => {
+    it('says which link index version answered, and says when it was out of date', () => {
         expect(indexSourceNote({ kind: 'index', version: 7, stale: false })).toBe('Answered from the link index v7.');
         expect(indexSourceNote({ kind: 'index', version: 7, stale: true, staleReason: 'files added' })).toBe(
-            'Answered from the link index v7 (stale: files added).',
+            'Answered from the link index v7, which is out of date (files added).',
         );
     });
 
@@ -52,6 +52,18 @@ describe('index source wording (DR-U4)', () => {
             '(IOException)',
         );
         expect(indexSourceNote({ kind: 'dataset', reason: 'brand_new_reason' })).toContain('brand_new_reason');
+    });
+
+    it("words an out-of-date index as the data strip and the Data page do, with the server's plain reason (phase 4)", () => {
+        expect(
+            indexSourceNote({
+                kind: 'dataset',
+                reason: 'index_stale_refused',
+                details: "the Dataset's definition changed after the index was built",
+            }),
+        ).toBe(
+            "Answered from the Dataset because the link index is out of date (the Dataset's definition changed after the index was built).",
+        );
     });
 
     it('says nothing when the server said nothing', () => {

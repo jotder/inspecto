@@ -287,7 +287,8 @@ line (where its data comes from, how many columns and Mappings it has) until you
 shows it open. Opened, each one shows:
 
 - its card: for a Dataset you added, its facts under their own labels - **Origin**, **Filter**, **Received** (when data
-  last arrived), **Covers** (the period it covers), **Graph** (whether the graph has it), **Inbox** or **Kept up to date**,
+  last arrived), **Covers** (the period it covers), **Graph** (whether the graph has it: *up to date*; *out of date*,
+  with a **Rebuild** button, when its link index must be built again; or how many files behind), **Inbox** or **Kept up to date**,
   **Storage** and **Compacted**, each only when known - then the **Arrivals** table (every file it took, uploaded or put
   in its inbox by another system: File, Arrived, How, Result, Rows, Left out, Covers, Columns; newest first, ten to a
   page; **Left out** counts the file's rows that are not in the Dataset — set aside, or left out by the row filter —
@@ -576,8 +577,9 @@ Conditions are a tree of AND/OR groups; a single bare condition is refused — w
   the bottom right of the **Graph counts** card shows the node limits in force (Escape closes it): *Graph drawn*, *On screen tools* and *Whole Dataset tools*. Every number is a setting ([§15](#15-limits-and-honest-behaviour)).
 * When a cap cuts data you see **Truncated** — never a silent "no results". Narrow the query or use the Server side
   of the catalogue.
-* Each server read says where it was answered: *Answered from the link index v3* (with a stale note when rows were
-  added after the build) or *Answered from the Dataset because …*, with the reason in words.
+* Each server read says where it was answered: *Answered from the link index v3* (*, which is out of date* and why, when
+  files were added after it was built) or *Answered from the Dataset because …*, with the reason in words, for example
+  *because the link index is out of date (the Dataset's definition changed after the index was built)*.
 * Very busy hubs are folded into a **super-node**. Above 20 links on the canvas, link labels show on hover or click
   only; *All link labels* in Display options overrides it. Above 1,000 links, arrowheads and node labels also show on
   hover or click only (the canvas says so at the bottom); *Arrows and node labels on large graphs* overrides it, at the
@@ -1281,14 +1283,20 @@ header opens it), and a drawer with four parts:
   the file *PARTIAL*), when it was ingested (the time it was committed, in UTC, not when it arrived), its outcome
   (*SUCCESS*, *PARTIAL*, *QUARANTINED*, *FAILED*) and its index state (*INDEXED vN*, *WAITING*, *UNKNOWN* past the index's
   file limit, *NO_INDEX*). Newest event day first, then by name.
-* **Index** — the link index version and whether it is behind the data.
+* **Index** — the link index version and whether it is out of date, with the reason in plain words.
+
+**An out-of-date link index.** The strip then reads *link index vN out of date* with a WARNING badge, the Data page's
+**Graph** says *out of date*, and the Expand says *Answered from the Dataset because the link index is out of date*:
+the three read one answer, so they never disagree. Until the index is built again the graph is read from the Dataset,
+which gives the same answer more slowly. **Rebuild**, beside the words, builds it again in the way the server advises;
+it is enabled for someone allowed to build the link index, and for anyone else it says *Needs Build link index.*
 
 **Corrected days.** When a Collector re-delivers a day inside the Investigation's window after your last look, the
 strip turns to a warning naming the corrected days; **Refresh** re-reads the strip and the Investigation. The warning
 clears only after you record a step that reads data (a start, Connect, Expand, Compare or a temporal step); a step that
 reads nothing (exclude, hide, keep, annotate, a window, an undo…) does not count as a look.
 
-**In the Dossier** a data footer gives the data-as-of day, the index version and whether it was stale, files waiting and
+**In the Dossier** a data footer gives the data-as-of day, the index version and whether it was out of date, files waiting and
 days missing. It is labelled as the state at export time: it is outside the Dossier's fingerprint and the bundle's seal.
 
 **Stated limits** (also in the drawer): an unchanged duplicate file is skipped silently; a file still in an inbox is a
