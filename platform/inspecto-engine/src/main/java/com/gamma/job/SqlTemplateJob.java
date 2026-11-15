@@ -218,8 +218,6 @@ final class SqlTemplateJob implements Job {
         return ResultSetMeta.Role.DIMENSION;
     }
 
-    /** Hide prior snapshots, reveal the new one atomically, drop the hidden ones (see class doc). The hidden ones
-     *  can go at once: no reader holding the lock is left on them, and one with a file open keeps reading it. */
     /** JOB-OUTLIVES-CLOSE-1: a closing host asked this Run to stop (HA-CANCEL-RESIDUALS-1) - throw
      *  {@code RunCancelledException} before the next write under the data root, so the Run is recorded CANCELLED and
      *  writes nothing after the Space's close. Placed before each output write; the query itself is native. */
@@ -227,6 +225,8 @@ final class SqlTemplateJob implements Job {
         com.gamma.inspector.CommitFence.checkpoint(com.gamma.inspector.CommitFence.Scope.JOB, ctx.runId());
     }
 
+    /** Hide prior snapshots, reveal the new one atomically, drop the hidden ones (see class doc). The hidden ones
+     *  can go at once: no reader holding the lock is left on them, and one with a file open keeps reading it. */
     private static void swapIn(Path outDir, Path tmp, String snapshot) throws IOException {
         List<Path> stale = new ArrayList<>();
         try (SnapshotSwapLock.Held swap = SnapshotSwapLock.write(outDir)) {

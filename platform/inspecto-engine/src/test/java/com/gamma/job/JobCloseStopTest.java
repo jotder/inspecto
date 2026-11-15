@@ -102,6 +102,106 @@ class JobCloseStopTest {
     }
 
     @Test
+    void aRunThatKeepsTheInterruptAndReturnsStillWritesItsRunLogReceiptAndSignal(@TempDir Path dir) throws Exception {
+        CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
+        JobTypeDescriptor d = new JobTypeDescriptor("t.keeps", "t.keeps", "test",
+                List.of(ParameterDecl.required("p", ParamType.STRING, "a value, so the Run has a parameter receipt")));
+        // a body that restores the interrupt it caught and returns normally - the polite Java idiom
+        JobTypeProvider keeps = JobTypeProvider.of(d, c -> new Job() {
+            @Override public String name() { return c.name(); }
+            @Override public String type() { return "t.keeps"; }
+            @Override public JobResult run() {
+                entered.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return JobResult.ok("returned", 0L);
+            }
+        });
+        // the terminal signal's emit runs on the Run's thread: was that thread still interrupted then?
+        List<Boolean> interruptedAtEmit = new java.util.concurrent.CopyOnWriteArrayList<>();
+        java.util.function.BiConsumer<com.gamma.event.EventLog, com.gamma.audit.Event> tap = (l, e) -> {
+            if (!com.gamma.audit.EventType.SIGNAL.equals(e.type())) return;
+            com.gamma.signal.Signal g = com.gamma.signal.Signal.fromEvent(e);
+            if (com.gamma.signal.SignalType.JOB_RUN_COMPLETED.equals(g.type()) && g.payload() != null
+                    && "keeps".equals(g.payload().get("job")))
+                interruptedAtEmit.add(Thread.currentThread().isInterrupted());
+        };
+        com.gamma.event.EventLog.addTap(tap);
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null, dir.resolve("audit").toString())) {
+            js.registerJobType(keeps);
+            js.upsertJob(new JobConfig("keeps", "t.keeps", null, null, true, false, Map.of("p", "v"), null, null));
+            String runId = js.triggerRun("keeps", "test").orElseThrow();
+            assertTrue(entered.await(10, TimeUnit.SECONDS), "precondition: the Run is in flight");
+
+            js.interruptRuns();
+            JobRun run = awaitDone(js, "keeps");
+
+            assertEquals("SUCCESS", run.status(), "the body returned normally: " + run.message());
+            // the run log and the receipt (Files.writeString) survive an interrupt on this JDK; asserted all the same,
+            // the signal assertion below is the one the interrupt breaks
+            assertTrue(js.runLog(runId).stream().anyMatch(en -> String.valueOf(en.message()).contains("run completed")),
+                    "the run log's closing line is written after the body kept the interrupt: " + js.runLog(runId));
+            assertTrue(js.runArtifacts(runId).stream().anyMatch(a -> "params".equals(a.kind())),
+                    "the parameter receipt is written after the body kept the interrupt: " + js.runArtifacts(runId));
+            assertEquals(List.of(false), interruptedAtEmit,
+                    "the terminal signal is emitted (to an interruptible journal) with the interrupt spent");
+        } finally {
+            release.countDown();
+            com.gamma.event.EventLog.removeTap(tap);
+        }
+    }
+
+    @Test
+    void aRunWaitingForARunSlotWhenInterruptedIsRecordedSkippedShuttingDown(@TempDir Path dir) throws Exception {
+        CountDownLatch holding = new CountDownLatch(1);
+        AtomicBoolean waiterRan = new AtomicBoolean();
+        JobTypeProvider hold = type("t.hold", () -> {
+            holding.countDown();
+            try {
+                Thread.sleep(60_000);
+            } catch (InterruptedException e) {
+                throw new IllegalStateException("interrupted", e);
+            }
+            return JobResult.ok("held", 0L);
+        });
+        JobTypeProvider waiter = type("t.waiter", () -> {
+            waiterRan.set(true);
+            return JobResult.ok("ran", 0L);
+        });
+        Scheduler s = new Scheduler();
+        JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null, dir.resolve("audit").toString());
+        try {
+            js.setMaxConcurrentRuns(1);
+            js.registerJobType(hold);
+            js.registerJobType(waiter);
+            js.upsertJob(new JobConfig("hold", "t.hold", null, null, true, false, Map.of(), null, null));
+            js.upsertJob(new JobConfig("waiter", "t.waiter", null, null, true, false, Map.of(), null, null));
+            js.triggerRun("hold", "test").orElseThrow();
+            assertTrue(holding.await(10, TimeUnit.SECONDS), "precondition: the one run slot is taken");
+            js.triggerRun("waiter", "test").orElseThrow();
+            Thread.sleep(200);   // the waiter is parked on the run slot
+            assertEquals(0, js.availableRunPermits(), "precondition: no slot is free");
+
+            js.beginClose();
+            js.interruptRuns();
+            js.close();
+
+            assertFalse(waiterRan.get(), "a Run that never got a slot must not start");
+            JobRun w = js.lastRunOf("waiter").orElseThrow(
+                    () -> new AssertionError("the Run interrupted while it waited for a slot left no record"));
+            assertEquals("SKIPPED", w.status(), "an unstarted Run is recorded, not left RUNNING: " + w.message());
+            assertEquals(JobService.SHUTTING_DOWN, w.message());
+            assertEquals("CANCELLED", js.lastRunOf("hold").orElseThrow().status());
+        } finally {
+            s.close();
+        }
+    }
+
+    @Test
     void aSqlTemplateRunCancelledWhileItsQueryRunsWritesNothingToItsDataset(@TempDir Path dir) throws Exception {
         Path dataDir = dir.resolve("data");
         Files.createDirectories(dataDir);

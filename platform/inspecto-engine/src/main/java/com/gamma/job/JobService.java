@@ -1499,7 +1499,7 @@ public final class JobService implements AutoCloseable {
             try {
                 if (lane != null) lane.serial().acquireUninterruptibly();   // lane first, then a pool slot
                 try {
-                    if (!acquireRunPermit()) return;
+                    if (!acquireRunPermit()) { skipUnstarted(runId, name, job, trigger, start); return; }
                     try {
                         runJob(runId, name, trigger, start, correlationId, causationId, chainDepth, firing, followUp);
                     } finally {
@@ -1536,6 +1536,16 @@ public final class JobService implements AutoCloseable {
         }
     }
 
+    /** JOB-OUTLIVES-CLOSE-1 review: a Run interrupted ({@link #interruptRuns}) while it waited for a run slot never
+     *  started - recorded SKIPPED "shutting down", exactly as a Run that reaches its start after the Space began to
+     *  close ({@link #skippedBeforeStart}). The interrupt is spent first: the record writes files. */
+    private void skipUnstarted(String runId, String name, Job job, String trigger, String start) {
+        if (!closing) return;   // only interruptRuns interrupts a waiting Run, and it marks the Space closing
+        Thread.interrupted();
+        log.info("job '{}' ({}) skipped: shutting down", name, trigger);
+        recordSkip(runId, name, job, trigger, start, SHUTTING_DOWN);
+    }
+
     /** Always paired with a successful acquire — never re-checks the cap, which may have changed. */
     private void releaseRunPermit() {
         runPermits.release();
@@ -1556,7 +1566,7 @@ public final class JobService implements AutoCloseable {
         workers.submit(() -> {
             if (scoped) MDC.put(EventLog.SPACE_MDC_KEY, spaceId);
             try {
-                if (!acquireRunPermit()) return;
+                if (!acquireRunPermit()) { skipUnstarted(runId, cfg.name(), job, trigger, start); return; }
                 try {
                     runJob(job, cfg, runId, cfg.name(), trigger, start, runId, null, 0, Firing.NONE);
                 } finally {
@@ -1864,8 +1874,11 @@ public final class JobService implements AutoCloseable {
                 res = JobResult.cancelled(SHUTTING_DOWN, res.durationMs());
             }
         } finally {
-            // JOB-OUTLIVES-CLOSE-1: interruptRuns' interrupt has done its work once the body returned; spend it, so the
-            // Run's own records below are still written (an interrupted thread's file writes are refused).
+            // JOB-OUTLIVES-CLOSE-1: interruptRuns' interrupt has done its work once the body returned (a body may also
+            // re-set it and return normally); spend it, so the Run's own records below are written by an uninterrupted
+            // thread. Its terminal signal goes to the event journal, a FileChannel, which an interrupt closes (the
+            // event is then buffered only until the journal rotates); the jobs_runs.csv ledger (FileWriter) is not
+            // interruptible. JobCloseStopTest pins it.
             if (closing) Thread.interrupted();
             packs.releaseRun(packOwner);
             serviceOwners.forEach(packs::releaseRun);

@@ -71,7 +71,7 @@ first asks in-flight runs to stop, then drains them (Jobs, timers, trigger worke
 queue), and closes the stores last. A busy Space can overrun the budget; its drain is then abandoned on a daemon
 thread. **Since `DEMO-BAKE-WAL-RACE-1` (2026-11-12) an abandoned close still closes the Space's stores**
 (`CollectorService.closeStoresNow()`, which also closes the Job run ledger and provenance store through
-`JobService.closeStores()`), under a second 10 s budget. A closing DuckDB store checkpoints, so no `.wal` is left;
+`JobService.closeStores()`), under a second budget (5 s since `JOB-OUTLIVES-CLOSE-1`, below). A closing DuckDB store checkpoints, so no `.wal` is left;
 work still running then fails on a closed store, which is the stop it was already asked to make. Each store
 serialises its one connection (`SingleConnectionSource`), so a store close waits for the statement in flight and
 never cuts it; only a store still busy after the second budget keeps its `.wal`, which DuckDB replays at the next
@@ -80,16 +80,23 @@ start. The store close runs once, whichever path reaches it first.
 **Since `JOB-OUTLIVES-CLOSE-1` (2026-11-15) an overrun drain is escalated before it is abandoned.** A Job Run that
 did not stop for the cooperative cancel (the claim's `cancelled()`, read at `CommitFence.checkpoint`) is interrupted:
 `SpaceManager` calls `CollectorService.interruptRuns()` → `JobService.interruptRuns()` (`shutdownNow()` on the Run
-executor; the Space is marked closing, so an interrupted Run is recorded `CANCELLED`, and the Run spends the
-interrupt before it writes its own record). The drain then gets up to 5 s more (`STOP_GRACE_MS`) to finish, its own
+executor; the Space is marked closing, so an interrupted Run is recorded `CANCELLED`, a Run still waiting for a run
+slot is recorded `SKIPPED` "the Space is shutting down", and a Run spends the interrupt before it writes its own
+records). The drain then gets up to 5 s more (`STOP_GRACE_MS`) to finish, its own
 store close included; only a drain still busy after that is abandoned, and `closeStoresNow()` gets what is left of
-the second budget. The worst case per Space stays two budgets (20 s). Before this a Run still writing its Dataset
+the second budget, 5 s. The worst case per Space stays two budgets (20 s). ⚠ Trade-off: the flush budget is halved on
+every overrun, also when the drain is stuck outside any Run (an agent or a notification queue that will not close),
+where the grace cannot help and only shortens the flush; a store close waits only for its statement in flight, so 5 s
+is normally ample. Before this a Run still writing its Dataset
 went on writing after `SpaceManager.close()` had returned — on a loaded machine `ControlApiSpaceTemplateSeedGateTest`
 could not delete `t-la-utility/data/transformer_loss`, and its log showed 2–3 Spaces abandoned per run even when it
 passed. `sql.template` now checks the cancel before each write under the data root (before it creates the sink,
 after its query, before each Decision Rule route and before the snapshot swap), so a cancelled Run reveals no
 snapshot. ⚠ Not covered: a Run inside a native DuckDB statement stops only when that statement returns (an interrupt
-does not cancel it); such a Run is still abandoned, as before, with the WARN. Tests: `SpaceCloseStopsRunsTest`,
+does not cancel it); such a Run is still abandoned, as before, with the WARN. ⚠ Known limit: an interrupt that lands while a Run emits an
+event closes the event journal's `FileChannel` until its next rotation, exactly as a Run deadline expiry
+(`JobDeadline`) already can; the events appended until then are buffered only ("survives only a clean shutdown",
+`ParquetEventStore`), not crash-durable. Tests: `SpaceCloseStopsRunsTest`,
 `JobCloseStopTest`.
 
 Decision: close the stores at the deadline rather than extend the budget while Jobs finish. A container runtime
