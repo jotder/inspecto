@@ -184,23 +184,43 @@ public final class SchemaFieldTypes {
      * zone, i.e. the HOST's — the same host-dependence {@link SourceZones} exists to remove.)
      *
      * <p>NULL, never a failed batch, for: blank; the {@code 0} "none" sentinel ({@link #epochNoneSql});
-     * anything that is not a whole number ({@code TRY_CAST} would silently ROUND {@code 1700000000.5} and
-     * accept {@code 1.7e9}, so a digits-only guard comes first); and a count outside DuckDB's
-     * {@code TIMESTAMP} range ({@code TRY} catches the BIGINT overflow).
+     * anything that is not a whole number after trimming spaces, tabs and CR/LF ({@code TRY_CAST} would
+     * silently ROUND {@code 1700000000.5} and accept {@code 1.7e9}, so a digits-only guard comes first); and
+     * a count outside DuckDB's {@code TIMESTAMP} range.
+     *
+     * <p>⚠ The range is an explicit guard on the COUNT, not {@code TRY}: measured on DuckDB 2.0.0.0,
+     * {@code make_timestamp} accepts µs in [{@value #TS_MIN_MICROS}, 9223372036854775806] and, below the
+     * minimum, returns a value that {@code TRY} does not catch but that cannot be rendered later ("Date out
+     * of range in timestamp conversion"). The bounds per unit are exact divisions of that µs range, so no
+     * guarded count can overflow the multiplication either.
      */
     public static String epochSql(String col, String fmt) {
-        String text = "TRIM(CAST(" + col + " AS VARCHAR))";
-        String perUnitMicros = EPOCH_MS.equalsIgnoreCase(fmt.trim()) ? "1000" : "1000000";
-        return "TRY(make_timestamp(NULLIF(TRY_CAST(CASE WHEN regexp_full_match(" + text + ", '[+-]?[0-9]+') THEN "
-                + text + " END AS BIGINT), 0) * " + perUnitMicros + "))";
+        boolean ms = EPOCH_MS.equalsIgnoreCase(fmt.trim());
+        String perUnitMicros = ms ? "1000" : "1000000";
+        String lo = ms ? "-9223372022400000" : "-9223372022400";      // TS_MIN_MICROS / unit (exact)
+        String hi = ms ? "9223372036854775" : "9223372036854";        // floor(TS_MAX_MICROS / unit)
+        String text = epochText(col);
+        String count = "NULLIF(TRY_CAST(CASE WHEN regexp_full_match(" + text + ", '[+-]?[0-9]+') THEN "
+                + text + " END AS BIGINT), 0)";
+        return "TRY(make_timestamp(CASE WHEN " + count + " BETWEEN " + lo + " AND " + hi + " THEN "
+                + count + " * " + perUnitMicros + " END))";
     }
 
+    /** The earliest µs since 1970 DuckDB 2.0.0.0's {@code TIMESTAMP} renders: 290309-12-22 (BC) 00:00:00. */
+    static final long TS_MIN_MICROS = -9223372022400000000L;
+
     /**
-     * The predicate "this epoch text is the {@code 0} none-sentinel" — what {@link #epochSql} maps to NULL
-     * on purpose, so the cast-failure audit must not count it as a failed coercion.
+     * The predicate "this epoch text is the {@code 0} none-sentinel, or only whitespace" — what
+     * {@link #epochSql} maps to NULL on purpose, so the cast-failure audit must not count it as a failed
+     * coercion (the audit's own blank test trims spaces only).
      */
     public static String epochNoneSql(String col) {
-        return "regexp_full_match(TRIM(CAST(" + col + " AS VARCHAR)), '[+-]?0+')";
+        return "regexp_full_match(" + epochText(col) + ", '([+-]?0+)?')";
+    }
+
+    /** The epoch cell as text with spaces, tabs and CR/LF trimmed — DuckDB's one-argument TRIM strips spaces only. */
+    private static String epochText(String col) {
+        return "TRIM(CAST(" + col + " AS VARCHAR), ' ' || chr(9) || chr(10) || chr(13))";
     }
 
     /**

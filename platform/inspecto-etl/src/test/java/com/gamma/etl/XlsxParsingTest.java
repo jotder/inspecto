@@ -266,6 +266,60 @@ class XlsxParsingTest {
         }
     }
 
+    /**
+     * MAPPING-EPOCH-TIMESTAMP-1 review: a TIMESTAMP field read with {@code format: epoch} is a count, not an
+     * Excel day-serial — the serial rewrite would turn {@code 0} into 1899-12-30 (a counted failure) and any
+     * count under 2958466 into a date. Numeric and text cells both land as the epoch's UTC time.
+     */
+    @Test
+    void anEpochFormattedTimestampFieldIsNeverReadAsAnExcelSerial(@TempDir Path dir) throws Exception {
+        Path schema = dir.resolve("schema_ep.toon");
+        Files.writeString(schema, """
+                raw:
+                  name: ev
+                  format: CSV
+                  fields[3]{name,selector,type,format}:
+                    ACCOUNT_NUMBER,"account",VARCHAR,""
+                    SEEN,"seen",TIMESTAMP,epoch
+                    SEEN_TEXT,"seen_text",TIMESTAMP,epoch
+                mapping:
+                  canonicalName: ev
+                  rawName: ev
+                  rules[3]{targetColumn,sourceExpression,transformType}:
+                    ACCOUNT_NUMBER,ACCOUNT_NUMBER,DIRECT
+                    SEEN,SEEN,DIRECT
+                    SEEN_TEXT,SEEN_TEXT,DIRECT
+                """, StandardCharsets.UTF_8);
+        PipelineConfig cfg = loadWithSchema(dir, "ep", PARSING, schema);
+        try (Connection conn = open()) {
+            File f = dir.resolve("ep.xlsx").toFile();
+            try (Statement st = conn.createStatement()) {
+                st.execute("COPY (SELECT * FROM (VALUES ('A00001', 1700000000::BIGINT, '1700000000'),"
+                        + " ('B00002', 0::BIGINT, '0'), ('C00003', 86400::BIGINT, '86400'))"
+                        + " v(account, seen, seen_text) ORDER BY account)"
+                        + " TO '" + f.getAbsolutePath().replace("\\", "/").replace("'", "''")
+                        + "' WITH (FORMAT xlsx, HEADER true)");
+            }
+            DuckDbCsvIngester.ingest(f, conn, cfg.schemas().single(), cfg, "raw_f0");
+            assertEquals(List.of("0", "1700000000", "86400"), col(conn, "raw_f0", "SEEN"),
+                    "a numeric cell lands as the count all_varchar yields, not a serial-derived date");
+            assertEquals(List.of("0", "1700000000", "86400"), col(conn, "raw_f0", "SEEN_TEXT"));
+            try (Statement st = conn.createStatement()) {
+                st.execute("ALTER TABLE raw_f0 ADD COLUMN __src_id INTEGER DEFAULT 0");
+            }
+            assertEquals(0, DataTransformer.countCastFailures(conn, cfg.schemas().single(), cfg, "raw_f0"),
+                    "0 is none, not a failed coercion");
+            DataTransformer.materialize(conn, cfg.schemas().single(), cfg, "raw_f0", "t_f0");
+            List<String> rows = new ArrayList<>();
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT SEEN::VARCHAR, SEEN_TEXT::VARCHAR FROM t_f0 ORDER BY ACCOUNT_NUMBER")) {
+                while (rs.next()) rows.add(rs.getString(1) + "|" + rs.getString(2));
+            }
+            assertEquals(List.of("2023-11-14 22:13:20|2023-11-14 22:13:20", "null|null",
+                    "1970-01-02 00:00:00|1970-01-02 00:00:00"), rows);
+        }
+    }
+
     @Test
     void excelAliasSelectsTheSameFrontend(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = load(dir, "al", "parsing:\n  frontend: excel\n");

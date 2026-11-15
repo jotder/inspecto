@@ -746,7 +746,7 @@ Transformations are applied by DuckDB during the `CREATE TABLE AS SELECT` step.
 |---|---|---|
 | `DATE` | `COALESCE(TRY_STRPTIME(col, 'fmt1'), TRY_STRPTIME(col, 'fmt2'), ...)::DATE` | Unparseable value → `NULL` |
 | `TIMESTAMP` | `COALESCE(TRY_STRPTIME(col, 'fmt1'), TRY_STRPTIME(col, 'fmt2'), ...)::TIMESTAMP` | Unparseable value → `NULL` |
-| `TIMESTAMP` + field `format: epoch` / `epoch_ms` | `TRY(make_timestamp(<whole count> * 1000000))` (`* 1000` for `epoch_ms`) — the UTC time, no source zone applied ([§2.2](../engine/spec-parsing-options.md)) | `0`, blank → `NULL` (not a failure); non-integer or out of range → `NULL`, counted |
+| `TIMESTAMP` + field `format: epoch` / `epoch_ms` | `make_timestamp(<whole count> * 1000000)` (`* 1000` for `epoch_ms`) when the count is inside the `TIMESTAMP` range — the UTC time, no source zone applied ([§2.2](../engine/spec-parsing-options.md)) | `0`, blank → `NULL` (not a failure); non-integer or out of range → `NULL`, counted |
 | `DOUBLE` | `TRY_CAST(col AS DOUBLE)` | Non-numeric value → `NULL` |
 | `VARCHAR` | Direct column reference — no cast | Never NULL from cast |
 | `FILENAME_DATE` | `TRY_STRPTIME(regexp_extract(col, 'PREFIX([0-9]{8})', 1), '%Y%m%d')::DATE` | No regex match → `NULL` |

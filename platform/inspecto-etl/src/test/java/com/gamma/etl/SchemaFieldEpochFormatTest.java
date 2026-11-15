@@ -124,6 +124,79 @@ class SchemaFieldEpochFormatTest {
         }
     }
 
+    /**
+     * Review fix: the TIMESTAMP range is guarded on the COUNT. Below 290309-12-22 (BC) {@code make_timestamp}
+     * returned a value {@code TRY} did not catch and that could not be rendered later ("Date out of range in
+     * timestamp conversion") — written uncounted. Both bounds, both units: the bound itself lands, one past it
+     * is a counted NULL, and every landed value renders.
+     */
+    @Test
+    void theTimestampRangeIsGuardedAtBothBoundsForBothUnits(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = config(dir);
+        File db = DuckDbUtil.tempDbFile("epoch_range_");
+        try (Connection conn = DuckDbUtil.openConnection(db); Statement st = conn.createStatement()) {
+            assertEquals(List.of(
+                            "-9223372022400|290309-12-22 (BC) 00:00:00", "-9223372022401|null",
+                            "-9223372036854|null", "9223372036854|294247-01-10 04:00:54", "9223372036855|null"),
+                    rendered(st, "epoch",
+                            "-9223372022400", "-9223372022401", "-9223372036854", "9223372036854", "9223372036855"));
+            assertEquals(List.of(
+                            "-9223372022400000|290309-12-22 (BC) 00:00:00", "-9223372022400001|null",
+                            "-9223372036854775|null", "9223372036854775|294247-01-10 04:00:54.775",
+                            "9223372036854776|null"),
+                    rendered(st, "epoch_ms", "-9223372022400000", "-9223372022400001", "-9223372036854775",
+                            "9223372036854775", "9223372036854776"));
+            assertEquals(SchemaFieldTypes.TS_MIN_MICROS, -9223372022400L * 1_000_000L);
+
+            st.execute("CREATE TABLE raw_input AS SELECT * FROM (VALUES "
+                    + "('a', '-9223372022400', 0), ('b', '-9223372022401', 0), ('c', '-9223372036854', 0),"
+                    + " ('d', '9223372036855', 0)) t(ID, TS, __src_id)");
+            assertEquals(3, DataTransformer.countCastFailures(conn, schema("epoch"), cfg, "raw_input"),
+                    "a count outside the range is a counted failure, not a silent write");
+            DataTransformer.materialize(conn, schema("epoch"), cfg);
+            try (ResultSet rs = st.executeQuery("SELECT count(TS), max(TS::VARCHAR) FROM transformed")) {
+                assertTrue(rs.next());
+                assertEquals(1, rs.getInt(1));
+                assertEquals("290309-12-22 (BC) 00:00:00", rs.getString(2), "every landed value renders");
+            }
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
+    /** {@code value|epochSql(value)::VARCHAR} per input, in input order. */
+    private static List<String> rendered(Statement st, String fmt, String... values) throws Exception {
+        StringBuilder rows = new StringBuilder();
+        for (int i = 0; i < values.length; i++)
+            rows.append(i == 0 ? "" : ", ").append("(").append(i).append(", '").append(values[i]).append("')");
+        List<String> out = new ArrayList<>();
+        try (ResultSet rs = st.executeQuery("SELECT v, (" + SchemaFieldTypes.epochSql("v", fmt)
+                + ")::VARCHAR FROM (VALUES " + rows + ") t(i, v) ORDER BY i")) {
+            while (rs.next()) out.add(rs.getString(1) + "|" + rs.getString(2));
+        }
+        return out;
+    }
+
+    /**
+     * Review fix: DuckDB's one-argument {@code TRIM} strips spaces only, so a tab-padded count used to be a
+     * counted NULL. Tabs and CR/LF are trimmed too, and a whitespace-only cell is "none" like a blank.
+     */
+    @Test
+    void tabsAndLineEndsAroundACountAreTrimmed(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = config(dir);
+        File db = DuckDbUtil.tempDbFile("epoch_tab_");
+        try (Connection conn = DuckDbUtil.openConnection(db); Statement st = conn.createStatement()) {
+            st.execute("CREATE TABLE raw_input AS SELECT * FROM (VALUES "
+                    + "('a', chr(9) || '1700000000' || chr(13), 0), ('b', chr(9) || '0' || chr(10), 0),"
+                    + " ('c', chr(9), 0)) t(ID, TS, __src_id)");
+            assertEquals(0, DataTransformer.countCastFailures(conn, schema("epoch"), cfg, "raw_input"));
+            DataTransformer.materialize(conn, schema("epoch"), cfg);
+            assertEquals(List.of("a|" + T + "|14", "b|null|null", "c|null|null"), landed(st));
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
     /** A source zone never applies: an epoch is already UTC (the pipeline-level zone reaches every field). */
     @Test
     void aSourceZoneDoesNotShiftAnEpochColumn() {
