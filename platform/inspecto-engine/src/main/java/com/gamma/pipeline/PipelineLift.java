@@ -407,7 +407,10 @@ public final class PipelineLift {
         // The projection SLOT is a Record Transformer (transform.sql) — since 2026-09-05 the only
         // spelling; transform.map no longer exists. ⛔ The slot stays a slot: it gets no STEP_KIND
         // entry, because that would change when `steps:` is emitted at all (AUTHOR-1's ⛔).
-        String mapName = (table != null && !table.isBlank()) ? "Shape " + table : "Record Transformer";
+        // Its instance name is "Shape <table>", or "Shape records" with no table — never the Step kind's own
+        // label, which the palette's Record Transformer (a chain Step run at rest) carries
+        // (TRANSFORMER-TWO-NODES-1).
+        String mapName = (table != null && !table.isBlank()) ? "Shape " + table : "Shape records";
         nodes.add(new PipelineNode(mapId, BuiltinNodeType.TRANSFORM_SQL.type(), mapName, null, mapCfg, null));
         edges.add(new PipelineEdge(mapUpstream, mapUpstreamRel, mapId));
 

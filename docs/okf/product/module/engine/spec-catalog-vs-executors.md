@@ -51,6 +51,12 @@ and *Field type cast & renamer matrix* were three labels for three columns of th
 | `quality.schema.validator` — *Schema registry & structural rejects* | DQ | DELIVERED | `parser` (⇒ `addable: false`) | The half that could NOT fold — see below. |
 | `transform.lookup` | XFM | **DELIVERED (2026-09-06)** | `transform.lookup` | Its own node type and executor — an inline `key=value` map over one column, compiled to a `CASE`. A *versioned* reference is `transform.join`. |
 
+**One kind, two nodes (2026-11-15, `TRANSFORMER-TWO-NODES-1`).** The palette entry `transform.record` adds a
+chain `sql` Step that runs after load, at rest, writing the Pipeline's `output_store:` (refused at save
+without one, `ERR_CHAIN_WITHOUT_OUTPUT_STORE`). The projection slot is the other Record Transformer instance:
+`PipelineLift` names it "Shape &lt;table&gt;", or "Shape records" when no table is known (it was "Record
+Transformer", the kind's own label, until 2026-11-15). Type ids, config keys and the palette label are unchanged.
+
 🔴 **Only HALF of "Schema validator & type coercion" folded, and the half that stayed is the load-bearing
 one.** Type coercion as an *authoring act* is now a Record Transformer row (`convert.type` → `TRY_CAST`).
 What cannot move is the schema **contract**: the declared source column + target type are the

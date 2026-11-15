@@ -441,7 +441,7 @@ describe('Transform pane: Apply', () => {
      * every new Pipeline with `UNSUPPORTED_MAP_KEY` (2026-09-25).
      */
     it('in the projection slot writes fields[] only — never the rendered sql', async () => {
-        const slot: AuthoredNode = { id: 'map', type: 'transform.sql', name: 'Record Transformer', config: {} };
+        const slot: AuthoredNode = { id: 'map', type: 'transform.sql', name: 'Shape records', config: {} };
         const fixture = await create(slot, undefined, ['order_id', 'amount']);
         const c = comp(fixture);
         c.setFunction(c.fields()[1].id, 'convert.type');
@@ -698,7 +698,7 @@ describe('Transform pane: column metadata', () => {
     });
 
     it('is not offered in the projection slot, whose fields[] the Catalog never reads', async () => {
-        const slot: AuthoredNode = { id: 'map', type: 'transform.sql', name: 'Record Transformer', config: {} };
+        const slot: AuthoredNode = { id: 'map', type: 'transform.sql', name: 'Shape records', config: {} };
         const fixture = await create(slot, undefined, ['order_id']);
         expect(comp(fixture).canDescribe()).toBe(false);
         expect(describeButton(fixture, 'order_id')).toBeNull();

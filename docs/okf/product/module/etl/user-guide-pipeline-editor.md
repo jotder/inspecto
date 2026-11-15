@@ -617,6 +617,16 @@ entirely with the metadata grid (D2) — (it IS an output column, stamped at wri
 
 ## Load: the projection slot is a Record Transformer; schema on the parser
 
+> **Two nodes, one Step kind (TRANSFORMER-TWO-NODES-1, operator 2026-11-15).** The projection slot is a
+> Record Transformer **instance** named **"Shape &lt;table&gt;"**, or **"Shape records"** when no table is known
+> (`PipelineLift`; before 2026-11-15 the fallback name was "Record Transformer", the Step kind's own label).
+> It saves as `processing.map.fields[]` and runs at ingest, in Stage 1. A **Record Transformer added from the
+> palette** (`transform.record`) is a different node: a chain `sql` Step (`steps: - sql:`) that runs **after
+> load**, at rest, from a `type: pipeline` Job writing the top-level `output_store:`. A chain with no
+> `output_store:` never runs, so the save refuses it naming each Step (`ERR_CHAIN_WITHOUT_OUTPUT_STORE`, 422
+> on an active Pipeline; `WARN_CHAIN_WITHOUT_OUTPUT_STORE` on an inactive draft). To shape what lands, edit the
+> "Shape …" node; add a palette Record Transformer only to re-shape the landed store into another one.
+
 > **2026-09-05 — `transform.map` is DELETED.** The projection slot `PipelineLift` fills between parser and
 > sink is always a **Record Transformer** (`transform.sql`, id `map` / `map_<key>`); `BuiltinNodeType.TRANSFORM_MAP`,
 > the `map` recipe verb, `TransformCompiler`'s rule path and the UI's Load pane are gone. A stored

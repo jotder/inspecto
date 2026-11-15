@@ -491,6 +491,7 @@ com.gamma.config.spec.Finding | public static Finding error(String, String)
 com.gamma.config.spec.Finding | public static Finding warning(String, String)
 com.gamma.config.spec.FindingCodes | public final class FindingCodes
 com.gamma.config.spec.FindingCodes | public static final String ERR_ARMED_WITHOUT_SCHEMA
+com.gamma.config.spec.FindingCodes | public static final String ERR_CHAIN_WITHOUT_OUTPUT_STORE
 com.gamma.config.spec.FindingCodes | public static final String ERR_COLLECTOR_CONFIG_INVALID
 com.gamma.config.spec.FindingCodes | public static final String ERR_DEDUP_WINDOW_UNARMABLE
 com.gamma.config.spec.FindingCodes | public static final String ERR_EDITION_FEATURE
@@ -510,6 +511,7 @@ com.gamma.config.spec.FindingCodes | public static final String ERR_UNKNOWN_CONF
 com.gamma.config.spec.FindingCodes | public static final String ERR_WEBHOOK_CONNECTION_NOT_HTTPS
 com.gamma.config.spec.FindingCodes | public static final String ERR_WEBHOOK_CONNECTION_UNKNOWN
 com.gamma.config.spec.FindingCodes | public static final String ERR_WEBHOOK_INVALID
+com.gamma.config.spec.FindingCodes | public static final String WARN_CHAIN_WITHOUT_OUTPUT_STORE
 com.gamma.config.spec.FindingCodes | public static final String WARN_COLLECTOR_CONFIG_INVALID
 com.gamma.config.spec.FindingCodes | public static final String WARN_COLLECTOR_KEY_INERT
 com.gamma.config.spec.FindingCodes | public static final String WARN_DEDUP_WINDOW_UNARMABLE

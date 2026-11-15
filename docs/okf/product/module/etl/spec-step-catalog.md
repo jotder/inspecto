@@ -984,6 +984,15 @@ after every parser (the schema's `mapping.fields[]` compiles to it) and the Reco
 editor: `transform.record` in the processor catalog, folded 2026-09-04 from expression, cast and
 trim processors — one grid, one compiler.
 
+**Two nodes of this kind (TRANSFORMER-TWO-NODES-1, 2026-11-15).** "Record Transformer" names the Step kind,
+never an instance. The projection slot (id `map` / `map_<key>`, saved as `processing.map.fields[]`, Stage 1)
+is the instance `PipelineLift` names **"Shape &lt;table&gt;"**, or **"Shape records"** when no table is known.
+A Record Transformer added from the palette is a chain Step (`steps: - sql:`) that runs after load, at rest
+(`PipelineLift.stageTwo`, from a `type: pipeline` Job), writing the top-level `output_store:`. A chain with no
+`output_store:` is refused at save, one finding per Step: `ERR_CHAIN_WITHOUT_OUTPUT_STORE` on an active
+Pipeline (422), `WARN_CHAIN_WITHOUT_OUTPUT_STORE` on an inactive draft
+([config safety](../config/spec-config-safety.md), "A chain with no output store").
+
 **Behaviour.** A node carrying `fields[]` / `columns` / `rules` is a **projection** and compiles
 through `RecordTransform` (the same `[{name, expr}]` seam the browser's grid renders); a hand-written
 `sql` string takes the opaque path: `SqlGuard.check` refuses anything but a read-only SELECT (no

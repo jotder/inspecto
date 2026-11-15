@@ -34,7 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `TRANSFORMER-TWO-NODES-1` | P3 | defect | two different Steps are both called "Record Transformer". | — |
 | — | P3 | feature | Branch-aware executor residuals | demand |
 | — | P3 | feature | Consignment addressing | demand |
 | — | P2 | feature | SPACE-LINK-CENSUS-1 one declared census of the links between a Space's config files | — |

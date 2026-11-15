@@ -493,7 +493,8 @@ checks a config save runs, and every Pipeline-config door calls it: `POST /confi
 (`SaveGate.refuses`). The list, in order: spec validate · `ConfigSafetyValidator` (a job judged from the
 Space config root, everything else from its own directory) · schema-file resolution (arming split — see
 below) · the five arming checks · unknown collector Connection · the `webhook:` block · `AcceptedConfigKeys`
-census · route-predicate columns · summarize measure types · step configs (lookup, filter, dedup, profile — G4).
+census · route-predicate columns · summarize measure types · step configs (lookup, filter, dedup, profile — G4)
+· a chain with no output store (below).
 
 🔴 **A delimited / fixed-width pipeline whose schema selects a column by NAME is REFUSED**
 (`ERR_SELECTOR_NOT_INDEX`, `SaveGate.selectorFindings`, LA-ONBOARD-FIXES-1 F-4), active or not: the load
@@ -613,6 +614,37 @@ helper `routeColumnFindings` uses (`branchPredicateFindings`), so they carry the
 `ERR_/WARN_ROUTE_PREDICATE_COLUMN` codes, the same fail-open rule and the same SqlGuard-on-assembled-probe
 rule; a blank predicate stays `routeArmingFindings`' refusal and is not double-reported. Pinned by
 `StepConfigSaveFindingsTest`.
+
+### A chain with no output store (2026-11-15, `TRANSFORMER-TWO-NODES-1`)
+
+`ConfigRoutes.chainOutputStoreFindings`, run by `SaveGate` after the dedup-window check, reports every Step of
+a Stage-2 chain on a Pipeline that sets no top-level `output_store:`. **The exact condition:** the Pipeline has
+a non-empty `steps:` list, or a legacy `processing.dedup` / `summarize` / `profile` / `join` block, and
+`output_store:` is absent or blank. Such a chain never runs: the ingest lane executes none of it, and the only
+lane that does is the at-rest one (`PipelineLift.stageTwo`, from a `type: pipeline` Job), which writes that
+store and refuses to lift without it. `PipelineConfig.requireRunnable` refuses to arm the same shape. One
+finding per Step, anchored at `steps[i].<kind>` or `processing.<kind>`, naming the Step and the fix (set
+`output_store:` and run the chain with a `type: pipeline` Job, or remove the Step). Arming split:
+`ERR_CHAIN_WITHOUT_OUTPUT_STORE` on an active Pipeline (the save is refused, 422),
+`WARN_CHAIN_WITHOUT_OUTPUT_STORE` on an inactive draft (it saves; activation is refused).
+
+- **Every Step of the chain is reported, a Step that feeds a later one included.** `output_store:` belongs to
+  the Pipeline, not to a Step: with it, every Step runs, and its output feeds the next; without it, none
+  does. There is no per-Step "intermediate" case to exempt.
+- **Never judged:** the projection slot (`processing.map`, the "Shape records" / "Shape &lt;table&gt;" node,
+  Stage 1), a `route:` branch's own `steps[]` (ingest lane), the legacy row filter
+  (`csv_settings.where`, Stage 1), and the `webhook:` / `excel:` blocks (the `ConfigSpecs` rule in the next
+  point covers them).
+- ⚠ **Not new for an active Pipeline.** `ConfigSpecs`' cross-field rule `stage-two-blocks-require-output-store`
+  already refused that save (field `output_store`, no code, Step not named; it also covers `webhook:` and
+  `excel:`), so an active save now carries both findings. What is new: the Step is named, the code is
+  stable, and an inactive draft is told at the save rather than at activation.
+- ⚠ **Not covered:** a chain WITH an `output_store:` but no `type: pipeline` Job that runs it saves clean
+  and also never runs; the Job is a separate config, and refusing a Pipeline save for a Job not yet
+  written would make the order of authoring matter.
+
+Pinned by `ControlApiChainOutputStoreArmingTest` (graph save active / inactive, the activation patch, a
+chain with a store, the slot alone, a legacy block at `/validate`).
 
 ### Collector checks — throttle, breaker, archive (2026-09-24)
 

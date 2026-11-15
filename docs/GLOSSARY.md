@@ -543,7 +543,11 @@ Load is the drawer/checklist chip that groups schema + mapping + table definitio
 (rejected working name, same decision) — and not "Publish"/"Go-live", which is the separate
 pipeline-level activation action. *(2026-09-05: the Load **drawer's** mapping grid — the `transform.map`
 Load pane — was deleted with `transform.map`; the projection is authored in the **Record Transformer**
-(Transform pane) and the checklist chip keeps the Load name.)*
+(Transform pane) and the checklist chip keeps the Load name.)* *(2026-11-15, TRANSFORMER-TWO-NODES-1:
+**Record Transformer** is the Step **kind**, never an instance's name. The projection slot is a Record
+Transformer instance named **"Shape &lt;table&gt;"**, or **"Shape records"** when no table is known; it saves
+`processing.map.fields[]` and runs at ingest. A Record Transformer added from the palette is a separate chain
+Step that runs after Load, at rest, writing the Pipeline's `output_store:`.)*
 
 **Trigger** — The start condition of a run. ⚠ **There are TWO models** (corrected 2026-09-09; this entry listed four values, omitted `on_signal` entirely, and counted `event`/`on-pipeline` as two names for one mechanism). **Job triggers:** `cron` \| `on_pipeline` \| `on_signal` (+ a `when` guard) \| `manual`, with `catch_up`. **Pipeline triggers** (`PipelineTrigger.Kind`): `SCHEDULE_INTERVAL` \| `SCHEDULE_CRON` \| `EVENT` (`on: commit` or `on: dataset`) \| `MANUAL` \| `DEFAULT_POLL` \| `STREAM` (the continuous lane, `trigger: {type: stream}` — ⚠ it names how a Pipeline is driven, not a Catalog **Stream**), with coalescing and **no** `catch_up`. See `okf/product/module/engine/plan-pipeline-execution.md` §3.2. Owned by the
 **Scheduler**.

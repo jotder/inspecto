@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-443 test class(es): 181 unit, 262 real-HTTP control-plane, 0 IT.
+444 test class(es): 181 unit, 263 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -92,6 +92,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiBundleNewKindsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBundleNewKindsTest.java` | Metadata Bundle v2 (2026-07-18 follow-up): the three own-store kinds {@code authored-pipeline}/ |
 | `ControlApiBundleTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBundleTest.java` | Metadata Bundle v2 backend (SPC-4) over real HTTP: export (real content + contentHash), the |
 | `ControlApiCatalogTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCatalogTest.java` | Integration tests for the v3.2.0 {@code /catalog*} routes over real HTTP (P6). |
+| `ControlApiChainOutputStoreArmingTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiChainOutputStoreArmingTest.java` | TRANSFORMER-TWO-NODES-1 (C), over real HTTP: a Stage-2 chain with no top-level {@code output_store:} is |
 | `ControlApiClassificationBulkImportTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiClassificationBulkImportTest.java` | CLASSIFICATION-BULK-IMPORT-UNGATED-1 over real HTTP: the importers that land config files as bytes refuse a column |
 | `ControlApiClassificationsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiClassificationsTest.java` | {@code GET /classifications} (UI-CLASSIFICATION-PICKER-1) over real HTTP: the Space's column classification |
 | `ControlApiClassificationVocabularyTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiClassificationVocabularyTest.java` | CLASSIFICATION-UNMASKED-CLASS-1 over real HTTP: every door that saves a column classification refuses one the Space |

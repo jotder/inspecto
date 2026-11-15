@@ -49,6 +49,14 @@ public final class FindingCodes {
     /** The same windowed-dedup refusal on an INACTIVE draft — it bites only at activation. */
     public static final String WARN_DEDUP_WINDOW_UNARMABLE = "WARN_DEDUP_WINDOW_UNARMABLE";
 
+    /** An ACTIVE pipeline with a Stage-2 chain Step (a {@code steps:} entry, or {@code processing.dedup} /
+     *  {@code summarize} / {@code profile} / {@code join}) and no top-level {@code output_store:} — the chain
+     *  runs only at rest, writing that store, so without one it never runs (TRANSFORMER-TWO-NODES-1). */
+    public static final String ERR_CHAIN_WITHOUT_OUTPUT_STORE = "ERR_CHAIN_WITHOUT_OUTPUT_STORE";
+
+    /** The same chain-without-store refusal on an INACTIVE draft — it bites only at activation. */
+    public static final String WARN_CHAIN_WITHOUT_OUTPUT_STORE = "WARN_CHAIN_WITHOUT_OUTPUT_STORE";
+
     /** An ACTIVE pipeline whose {@code lookup} / {@code profile} / {@code dedup} / {@code filter} step config
      *  the run would refuse — a missing or malformed required key, or a column the declared schema does not
      *  carry ({@code PROCESSOR-RELEASE-READINESS-1} G4). */

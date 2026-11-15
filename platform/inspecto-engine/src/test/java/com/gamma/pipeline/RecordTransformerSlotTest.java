@@ -82,6 +82,17 @@ class RecordTransformerSlotTest {
     }
 
     /**
+     * TRANSFORMER-TWO-NODES-1 (A): the slot's instance name is "Shape records" (or "Shape &lt;table&gt;"),
+     * never "Record Transformer" — that is the Step kind, and the palette entry of that name adds a chain
+     * Step that runs at rest, a different node.
+     */
+    @Test
+    void theSlotIsNamedShapeRecordsNotTheStepKind() throws Exception {
+        PipelineNode slot = PipelineLift.lift(configWith("")).byId().get("map");
+        assertEquals("Shape records", slot.name());
+    }
+
+    /**
      * The load-bearing assertion: a Record Transformer slot lowers back into {@code processing.map},
      * NOT into {@code steps:}.
      */

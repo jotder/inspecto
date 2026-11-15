@@ -351,6 +351,45 @@ final class ConfigRoutes {
         return out;
     }
 
+    /**
+     * A Stage-2 chain Step that never runs (TRANSFORMER-TWO-NODES-1): the pipeline has a {@code steps:} chain, or
+     * one of the legacy Stage-2 blocks {@code processing.dedup} / {@code summarize} / {@code profile} /
+     * {@code join}, and no top-level {@code output_store:}. A chain runs only at rest ({@code PipelineLift.stageTwo},
+     * from a {@code type: pipeline} Job) and writes that store; the ingest lane runs none of it. This is the
+     * save-time half of {@code PipelineConfig.requireRunnable}'s rules for the same shape, which refuse to ARM
+     * it. {@code ConfigSpecs}' {@code stage-two-blocks-require-output-store} rule already refuses the ACTIVE
+     * shape as a whole (and also covers {@code webhook:} / {@code excel:}); this finding names each Step, carries
+     * a stable code, and warns on the INACTIVE draft, which saved with no word before. The projection slot
+     * ({@code processing.map}) is not a chain Step and is never judged; neither is a {@code route:} branch's own
+     * {@code steps[]}, which runs on the ingest lane. Every Step of a store-less chain is reported, a Step that
+     * feeds a later one included: the whole chain is what never runs. Severity follows the arming split.
+     */
+    static List<Finding> chainOutputStoreFindings(String type, Map<String, Object> draft) {
+        if (!"pipeline".equals(type)) return List.of();
+        if (draft.get("output_store") != null && !String.valueOf(draft.get("output_store")).isBlank()) return List.of();
+        boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));
+        Map<?, ?> proc = draft.get("processing") instanceof Map<?, ?> m ? m : Map.of();
+        List<String[]> chain = new ArrayList<>();   // {field, Step, where}
+        if (draft.get("steps") instanceof List<?> steps)
+            for (int i = 0; i < steps.size(); i++)
+                if (steps.get(i) instanceof Map<?, ?> entry && entry.size() == 1) {
+                    String kind = String.valueOf(entry.keySet().iterator().next());
+                    chain.add(new String[]{"steps[" + i + "]." + kind, kind, "steps[" + i + "]"});
+                }
+        for (String kind : List.of("dedup", "summarize", "profile", "join"))
+            if (proc.get(kind) != null) chain.add(new String[]{"processing." + kind, kind, "processing." + kind});
+        List<Finding> out = new ArrayList<>();
+        for (String[] s : chain)
+            out.add(new Finding(active ? Severity.ERROR : Severity.WARNING, s[0],
+                    "Step '" + s[1] + "' (" + s[2] + ") never runs: a chain runs only at rest, from a type: pipeline "
+                            + "Job, and writes the top-level output_store:, which this Pipeline does not set. Set "
+                            + "output_store: (the Dataset the chain writes) and run it with a type: pipeline Job, or "
+                            + "remove the Step",
+                    active ? FindingCodes.ERR_CHAIN_WITHOUT_OUTPUT_STORE : FindingCodes.WARN_CHAIN_WITHOUT_OUTPUT_STORE,
+                    active ? GUIDANCE_ACTIVE : GUIDANCE_INACTIVE));
+        return out;
+    }
+
     static List<Finding> dedupWindowFindings(String type, Map<String, Object> draft) {
         if (!"pipeline".equals(type)) return List.of();
         boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));
