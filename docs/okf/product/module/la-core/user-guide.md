@@ -2000,7 +2000,7 @@ it noted, and the call taken for each so the uncropped screen passes:
   instead was rejected: G6 pads a fit per side, not per corner, so keeping a 160 × 100 px box clear costs about a fifth
   of the canvas height (or width) on every graph, and a fitted graph is wholly on screen anyway, so an open minimap only
   repeated it. It now starts folded to an icon button at the right end of the line under the canvas (*Show the
-  minimap* / *Hide the minimap*, `aria-pressed`); open, that line and its button stay to the minimap's left. The View
+  minimap* / *Hide the minimap*: the label says the state, so no `aria-pressed` repeats it); open, that line and its button stay to the minimap's left. The View
   ▸ **Minimap** tick keeps its meaning (does the canvas offer one) and stays in saved views, so no showcase view
   changed; ticking it opens the minimap at once. The fold is a class on `<inspecto-graph-view>`
   (`minimapCollapsed`, hiding G6's `.g6-minimap` element), never a plugin change, because a plugin change rebuilds the

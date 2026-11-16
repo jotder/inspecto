@@ -1888,11 +1888,11 @@
                                 (openChange)="setOverlayOpen('legend', $event)"
                             ></inspecto-link-analysis-legend>
                             <!-- render strip: what the render left out and the level-of-detail state; the counts and Limits are on the Graph counts card, the modules in ⚙ Settings -->
-                            <!-- an open minimap (160 px wide, at the bottom right) keeps the strip, and its own button, to its left -->
+                            <!-- an open minimap (MINIMAP_SIZE, at the bottom right) keeps the strip, and its own button, to its left -->
                             <div
                                 class="text-secondary absolute bottom-1 left-2 z-10 flex flex-wrap items-center gap-x-3 text-[0.6875rem]"
                                 [class.right-2]="!minimapShown()"
-                                [style.right.px]="minimapShown() ? 168 : null"
+                                [style.right.px]="minimapShown() ? minimapClearPx : null"
                                 role="group"
                                 aria-label="Render status"
                             >
@@ -1963,7 +1963,6 @@
                                         type="button"
                                         class="ml-auto !h-6 !w-6 !p-0"
                                         data-testid="la-minimap-toggle"
-                                        [attr.aria-pressed]="minimapOpen()"
                                         [matTooltip]="minimapOpen() ? 'Hide the minimap' : 'Show the minimap'"
                                         [attr.aria-label]="minimapOpen() ? 'Hide the minimap' : 'Show the minimap'"
                                         (click)="minimapOpen.set(!minimapOpen())"

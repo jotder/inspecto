@@ -30,7 +30,7 @@ import type { ConditionGroup } from '@inspecto/core/query/query-types';
 import { GeoLinkBrushService } from '@inspecto/link-analysis/graph/geo-link-brush';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
-import { GraphViewComponent, START_BADGE_RISE } from '@inspecto/core/graph/graph-view.component';
+import { GraphViewComponent, MINIMAP_SIZE, START_BADGE_RISE } from '@inspecto/core/graph/graph-view.component';
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import {
@@ -1958,14 +1958,13 @@ describe('LinkAnalysisComponent', () => {
         expect(plugins.minimap).toBe(true);
         expect(view.minimapCollapsed).toBe(true);
         expect(toggle()!.getAttribute('aria-label')).toBe('Show the minimap');
-        expect(toggle()!.getAttribute('aria-pressed')).toBe('false');
+        expect(toggle()!.hasAttribute('aria-pressed')).toBe(false); // the label says the state once, not twice
         expect(strip().classList).toContain('right-2');
         toggle()!.click();
         fixture.detectChanges();
         expect(view.minimapCollapsed).toBe(false);
         expect(toggle()!.getAttribute('aria-label')).toBe('Hide the minimap');
-        expect(toggle()!.getAttribute('aria-pressed')).toBe('true');
-        expect(strip().style.right).toBe('168px'); // the strip and its button stay left of the open minimap
+        expect(strip().style.right).toBe(`${MINIMAP_SIZE[0] + 8}px`); // the strip and its button stay left of the open minimap
         expect(c.canvasPlugins()).toBe(plugins); // the same plugin set: the graph is not rebuilt or laid out again
         // unticked in View: no minimap and no button; ticked again: shown at once
         c.toggleViewFlag('minimap', false);

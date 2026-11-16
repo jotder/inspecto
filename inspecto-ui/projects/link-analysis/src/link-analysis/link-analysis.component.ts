@@ -252,6 +252,7 @@ import {
     GraphViewComponent,
     GraphViewInteraction,
     GraphViewPlugins,
+    MINIMAP_SIZE,
     START_BADGE_RISE,
     baseEdgeKind,
     detailHiddenByDensity,
@@ -1018,6 +1019,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
      */
     readonly minimapOpen = signal(false);
     readonly minimapShown = computed(() => !!this.viewOptions().minimap && this.minimapOpen());
+    /** Where the line under the canvas ends while the minimap is open: left of it, with the strip's own 8 px gap. */
+    readonly minimapClearPx = MINIMAP_SIZE[0] + 8;
 
     toggleBehavior(id: NonNullable<GraphViewPlugins['behaviors']>[number], on: boolean): void {
         this.viewOptions.update((o) => {

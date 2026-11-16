@@ -377,6 +377,9 @@ export const MINIMAP_MASK_STYLE: Readonly<Record<string, string>> = {
     background: 'var(--gamma-bg-hover)',
 };
 
+/** The minimap's size in px (width, height), anchored to the canvas's bottom-right corner; a host keeps its own controls clear of it. */
+export const MINIMAP_SIZE: readonly [number, number] = [160, 100];
+
 /** The G6 plugin list for a {@link GraphViewPlugins} — pure, so the mapping is unit-testable without a canvas. */
 export function buildPluginList(p: GraphViewPlugins | null, swatches: readonly string[]): Record<string, unknown>[] {
     if (!p) return [];
@@ -387,7 +390,7 @@ export function buildPluginList(p: GraphViewPlugins | null, swatches: readonly s
         out.push({
             type: 'minimap',
             key: 'minimap',
-            size: [160, 100],
+            size: [...MINIMAP_SIZE],
             position: 'right-bottom',
             containerStyle: MINIMAP_CONTAINER_STYLE,
             maskStyle: MINIMAP_MASK_STYLE,
