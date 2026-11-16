@@ -290,7 +290,7 @@ export function swapCommunityShapes(
 
 /**
  * The dotted ring of a Working Set entity no expand has followed yet (LA-UNEXPANDED-MARKER-1). 3 on, 2 off at 2.5 px puts
- * half again as much ink on the ring as the former 2/3 at 2 px, which faded out on a projector against the dark canvas.
+ * nearly twice the ink on the ring (1.5 against 0.8) as the former 2/3 at 2 px, which faded out on a projector against the dark canvas.
  */
 export const UNEXPANDED_DASH: readonly number[] = [3, 2];
 export const UNEXPANDED_LINE_WIDTH = 2.5;

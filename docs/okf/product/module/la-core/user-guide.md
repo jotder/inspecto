@@ -1254,7 +1254,8 @@ The approver's line is written for the person deciding (LA-FULL-CYCLE-TEST-1, 20
 names you: a Demo User's display name, or the signed-in person's own name; under OIDC the browser holds no directory of
 other people, so another person reads as their sign-in id. It leaves the request id out (that is the server's handle; **Oversight and approvals**
 still lists it), and it says the limit as what the expand would do (*read up to 5,000 rows, more than the 1,000
-allowed*, *add every neighbour of each entity…*) rather than in setting words.
+allowed*, *add every neighbour of each entity…*) rather than in setting words; when it crosses both, the two limits
+share one clause (*…; without a second approval the limits are 1,000 rows and 2,000 neighbours of each entity.*).
 
 * **Approve** asks first (*Approve this expand?*, in the same words: who asks and what it would do; approving runs it
   now, as your step, and records them as the approver), then runs it; the line then says what it admitted.

@@ -1300,8 +1300,8 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
             // presentability: no Demo User named alice, so the id stands in; the request id stays out of the sentence
             expect(line(el)?.textContent).toContain('alice asks for your approval.');
             expect(line(el)?.textContent).toContain(
-                'It would read up to 5,000 rows, more than the 1,000 allowed, and add every neighbour of each entity, ' +
-                    'more than the 2,000 allowed without a second approval.',
+                'It would read up to 5,000 rows and add every neighbour of each entity; without a second approval the ' +
+                    'limits are 1,000 rows and 2,000 neighbours of each entity.',
             );
             expect(line(el)?.textContent).not.toContain('p7');
             expect(line(el)?.textContent).not.toContain('fan-out');

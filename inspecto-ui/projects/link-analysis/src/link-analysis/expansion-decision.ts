@@ -26,21 +26,36 @@ const n = (v: number): string => v.toLocaleString('en');
 /**
  * What a held request would do beyond the Space's four-eyes limits, as ONE plain sentence from its sealed sensitivity
  * (LA-FULL-CYCLE-TEST-1 presentability): never a Settings key, "fan-out" or "unbounded" — "It would add every neighbour
- * of each entity, more than the 2,000 allowed without a second approval." A sensitivity with no numbers falls back to
- * the server's sealed reasons put into words ({@link thresholdWords}); '' when nothing is known.
+ * of each entity, more than the 2,000 allowed without a second approval." Both limits crossed: what it would do, then
+ * both limits in one clause, so "without a second approval" cannot read as belonging to the last one only. A sensitivity
+ * with no numbers falls back to the server's sealed reasons put into words ({@link thresholdWords}); '' when nothing is
+ * known.
  */
 export function heldLimitWords(s: ExpansionSensitivity): string {
-    const parts: string[] = [];
-    if (s.fourEyesBudgetAbove != null && s.budget > s.fourEyesBudgetAbove)
-        parts.push(`read up to ${n(s.budget)} rows, more than the ${n(s.fourEyesBudgetAbove)} allowed`);
-    if (s.fourEyesFanOutAbove != null && (s.maxFanOut == null || s.maxFanOut > s.fourEyesFanOutAbove))
-        parts.push(
-            s.maxFanOut == null
-                ? `add every neighbour of each entity, more than the ${n(s.fourEyesFanOutAbove)} allowed`
-                : `add up to ${n(s.maxFanOut)} neighbours of each entity, more than the ${n(s.fourEyesFanOutAbove)} allowed`,
+    const budget =
+        s.fourEyesBudgetAbove != null && s.budget > s.fourEyesBudgetAbove
+            ? { does: `read up to ${n(s.budget)} rows`, limit: `${n(s.fourEyesBudgetAbove)} rows` }
+            : null;
+    const fanOut =
+        s.fourEyesFanOutAbove != null && (s.maxFanOut == null || s.maxFanOut > s.fourEyesFanOutAbove)
+            ? {
+                  does:
+                      s.maxFanOut == null
+                          ? 'add every neighbour of each entity'
+                          : `add up to ${n(s.maxFanOut)} neighbours of each entity`,
+                  limit: `${n(s.fourEyesFanOutAbove)} neighbours of each entity`,
+              }
+            : null;
+    if (budget && fanOut)
+        return (
+            `It would ${budget.does} and ${fanOut.does}; without a second approval the limits are ` +
+            `${budget.limit} and ${fanOut.limit}.`
         );
-    if (parts.length) return `It would ${parts.join(', and ')} without a second approval.`;
-    return s.exceeded?.length ? `It ${thresholdWords(s.exceeded)}.` : '';
+    if (budget)
+        return `It would ${budget.does}, more than the ${n(s.fourEyesBudgetAbove!)} allowed without a second approval.`;
+    if (fanOut)
+        return `It would ${fanOut.does}, more than the ${n(s.fourEyesFanOutAbove!)} allowed without a second approval.`;
+    return s.exceeded?.length ? `It is held: ${thresholdWords(s.exceeded)}.` : '';
 }
 
 /** Who asked, as the reader knows them: `nameOf` turns the requester's id into a display name ("another analyst" if none). */

@@ -218,6 +218,8 @@ describe('LinkAnalysisDataStripComponent', () => {
         expect(text).toContain('1 file waiting for the link index');
         expect(text).not.toContain('v3');
         expect(q(f, '[data-test="strip-text"]')!.getAttribute('title')).toContain('Link index version 3');
+        // the tooltip's words reach a screen reader too (a title alone is not read by every reader, nor by the keyboard)
+        expect(q(f, '[data-test="strip-detail"]')!.textContent).toContain('Link index version 3');
         expect(q(f, 'inspecto-status-badge')!.textContent).toContain('Check data');
     });
 

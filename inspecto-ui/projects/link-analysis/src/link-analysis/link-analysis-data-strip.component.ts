@@ -73,6 +73,8 @@ const NO_WINDOW = 'this Investigation has no time window, and its Files do not s
                 <inspecto-status-badge [value]="strip().tone" [label]="strip().label"></inspecto-status-badge>
                 <!-- one plain sentence that wraps; the link index (version, state) is in its tooltip and Data details -->
                 <span class="min-w-0" data-test="strip-text" [attr.title]="strip().detail">{{ strip().text }}</span>
+                <!-- the tooltip's words, for a screen reader and the keyboard (a title is reached by neither) -->
+                <span class="sr-only" data-test="strip-detail">{{ strip().detail }}</span>
                 <inspecto-la-index-rebuild [dataset]="dataset()" />
                 @if (coverageError()) {
                     <span class="text-secondary text-xs" data-test="strip-days-reason"
