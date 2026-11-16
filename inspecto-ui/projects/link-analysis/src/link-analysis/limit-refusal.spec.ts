@@ -34,11 +34,20 @@ describe('limitRefusalMessage (DR-D6)', () => {
         expect(m).toContain('Next step');
     });
 
-    it('429 names the per-user rate limit (burst of 20, one per 3 seconds) and says to wait', () => {
+    it('429 says a per-user rate limit refused and to wait, stating no budget it cannot know', () => {
         const m = limitRefusalMessage(err(429))!;
-        expect(m).toContain('burst of 20');
-        expect(m).toContain('every 3 seconds');
+        expect(m).toContain('Too many requests');
         expect(m).toContain('Wait a few seconds');
+        // two budgets answer 429 (Link Analysis 30 / 0.5 per s, tunable; /db/query 20 / one per 3 s): never a fixed figure
+        expect(m).not.toMatch(/burst|every \d|\d+ requests/);
+    });
+
+    it('429 says how long to wait when the server sent Retry-After', () => {
+        const throttled = (s: string) =>
+            new HttpErrorResponse({ status: 429, headers: new HttpHeaders({ 'Retry-After': s }) });
+        expect(limitRefusalMessage(throttled('4'))).toContain('Wait 4 seconds and try again.');
+        expect(limitRefusalMessage(throttled('1'))).toContain('Wait 1 second and try again.');
+        expect(limitRefusalMessage(throttled('soon'))).toContain('Wait a few seconds');
     });
 
     it('is silent for any other status, so each surface keeps its own table', () => {
@@ -57,7 +66,7 @@ describe('limitRefusalMessage (DR-D6)', () => {
         ];
         for (const fn of fns) {
             expect(fn(err(413))).toContain('size limit');
-            expect(fn(err(429))).toContain('3 seconds');
+            expect(fn(err(429))).toContain('Too many requests');
         }
     });
 });

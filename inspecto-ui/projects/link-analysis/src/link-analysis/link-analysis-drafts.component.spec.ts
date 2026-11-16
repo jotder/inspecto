@@ -8,7 +8,7 @@ import { InvService, InvestigationDraft } from '@inspecto/link-analysis/api/inv.
 import { LensService, SessionService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
-import { LinkAnalysisDraftsComponent } from './link-analysis-drafts.component';
+import { LinkAnalysisDraftsComponent, draftErrorMessage } from './link-analysis-drafts.component';
 
 @Component({
     standalone: true,
@@ -227,6 +227,26 @@ describe('LinkAnalysisDraftsComponent (DR-U2)', () => {
         await click(f, button(el, 'Fork a Draft'));
         expect(el.textContent).toContain('limit of 50 open Drafts');
         await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
+    });
+
+    it("words the Space's own Draft limit, not the shipped default", async () => {
+        const { f, el } = await create(
+            {
+                forkDraft: vi.fn(() =>
+                    throwError(() => http(409, 'this Space already holds 10 open Drafts (the limit is 10)')),
+                ),
+            },
+            [],
+        );
+        await click(f, button(el, 'Fork a Draft'));
+        expect(el.textContent).toContain('limit of 10 open Drafts');
+        expect(el.textContent).not.toContain('50');
+    });
+
+    it('draftErrorMessage words an open-Drafts refusal that names no limit without a number', () => {
+        expect(draftErrorMessage(http(409, 'too many open Drafts'), 'f')).toBe(
+            'This Space has reached its limit of open Drafts. Discard or promote one, then fork again.',
+        );
     });
 
     it('words the one-live-Draft refusal readably', async () => {

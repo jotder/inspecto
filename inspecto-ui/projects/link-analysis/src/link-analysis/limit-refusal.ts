@@ -18,7 +18,9 @@ export function retryAfterMs(err: unknown): number | null {
  *
  * - 413 (`PAYLOAD_TOO_LARGE`): a Working Set over the Space's `max_set_bytes`, or an Investigation over its
  *   `max_investigation_bytes`. The server's body names the limit and the setting; nothing was stored.
- * - 429 (`RATE_LIMITED`): the per-user Link Analysis rate limit — a burst of 20 requests, then one every 3 seconds.
+ * - 429 (`RATE_LIMITED`): a per-user rate limit. Which budget refused is not knowable here (the expensive Link Analysis
+ *   routes have their own, install-tunable bucket, `rate.link_analysis_burst` / `rate.link_analysis_per_s`; `/db/query` and
+ *   the like share another), so no figure is stated: the wait comes from the response's `Retry-After`.
  */
 export function limitRefusalMessage(err: unknown): string | null {
     const status = (err as { status?: number } | null)?.status;
@@ -37,8 +39,12 @@ export function limitRefusalMessage(err: unknown): string | null {
             'administrator can raise max_set_bytes or max_investigation_bytes.'
         );
     }
+    const secs = Number((err as { headers?: { get(n: string): string | null } }).headers?.get('Retry-After'));
+    const wait =
+        Number.isInteger(secs) && secs > 0 ? `Wait ${secs} ${secs === 1 ? 'second' : 'seconds'}` : 'Wait a few seconds';
     return (
-        'Too many requests. Link Analysis allows each user a burst of 20 requests, then one every 3 seconds. ' +
-        'Wait a few seconds and try again.'
+        'Too many requests. Link Analysis limits how many requests each user can send in a short time. ' +
+        wait +
+        ' and try again.'
     );
 }

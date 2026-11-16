@@ -40,8 +40,11 @@ export function draftErrorMessage(err: unknown, fallback: string): string {
         case 404:
             return 'Not available: the Draft or Investigation is gone or not visible to you.';
         case 409:
-            if (/open Drafts/.test(server))
-                return 'This Space has reached its limit of 50 open Drafts. Discard or promote one, then fork again.';
+            if (/open Drafts/.test(server)) {
+                // The Space's own limit (`drafts.max_open`, default 50), as the server stated it.
+                const cap = /the limit is (\d+)/.exec(server)?.[1];
+                return `This Space has reached its limit of ${cap ? cap + ' ' : ''}open Drafts. Discard or promote one, then fork again.`;
+            }
             if (/already have a live draft/.test(server))
                 return 'You already have a Draft on this Investigation. Continue, promote or discard it first.';
             if (/must rebase/.test(server) && /undone steps/.test(server))
