@@ -79,11 +79,34 @@ class DbProvenanceStoreTest {
         }
     }
 
+    /** Review fix (Postgres schema-per-Space): another schema's 3.x table is neither seen nor touched. */
+    @Test
+    void anotherSchemasLegacyTableIsNeitherSeenNorTouched(@TempDir Path dir) throws Exception {
+        String url = "jdbc:duckdb:" + dir.resolve("two-schemas.duckdb");
+        try (Connection c = JdbcDrivers.connect(url); Statement st = c.createStatement()) {
+            st.execute("CREATE SCHEMA other");
+            st.execute("CREATE TABLE other.inspecto_pipeline_provenance (pipeline_id VARCHAR, batch_id VARCHAR, "
+                    + "node_id VARCHAR, rel VARCHAR, row_count BIGINT, run_ts VARCHAR)");
+        }
+        for (int open = 1; open <= 2; open++) {
+            try (DbProvenanceStore store = DbProvenanceStore.open(url)) {
+                assertEquals(List.of("consignment_id"), consignmentColumns(store), "open " + open);
+            }
+            try (Connection c = JdbcDrivers.connect(url); Statement st = c.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT column_name FROM information_schema.columns WHERE table_schema = 'other' "
+                         + "AND table_name = 'inspecto_pipeline_provenance' AND column_name IN ('batch_id', 'consignment_id')")) {
+                assertTrue(rs.next());
+                assertEquals("batch_id", rs.getString(1), "open " + open + ": the other schema is not this store's");
+                assertFalse(rs.next());
+            }
+        }
+    }
+
     private static List<String> consignmentColumns(DbProvenanceStore store) throws Exception {
         return store.browseSource().with(c -> {
             List<String> out = new ArrayList<>();
             try (Statement st = c.createStatement(); ResultSet rs = st.executeQuery("SELECT column_name "
-                    + "FROM information_schema.columns WHERE table_name = 'inspecto_pipeline_provenance' "
+                    + "FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'inspecto_pipeline_provenance' "
                     + "AND column_name IN ('batch_id', 'consignment_id') ORDER BY 1")) {
                 while (rs.next()) out.add(rs.getString(1));
             }

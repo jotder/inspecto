@@ -1170,7 +1170,9 @@ unmodified tree, 1 failure without the fix with both controls green in BOTH runs
 `JobService` warns on the run log beside the three REJECTED diagnostics. ⛔ **WARNING only, never
 fail-closed** — and the reason is measured: **NINE** keys are read straight through `config.require()`/`opt()`
 that no `JobTypeDescriptor` declares (`data_dir`, `batch_id`, `flow`, `on_pipeline_gate`, `sleep_ms`, `top`,
-`history_days`, `max_attempts`, `backoff_minutes`). A strict version refuses working configs on day one.
+`history_days`, `max_attempts`, `backoff_minutes`). ⚠ Since then seven are declared (`JOB-DESCRIPTORS-LIE-TO-THE-FORM-1`),
+and `batch_id` became `consignment_id` in 4.0.0 (D-12): `consignment_id` is declared, and the old key is still read
+(warned) and not reported as undeclared while the `pipeline` type declares `consignment_id`. A strict version refuses working configs on day one.
 
 ✅ **Blast radius: ZERO of 21 committed `*_job.toon` warn** (both `job_template` instances expanded,
 `sql.template`'s `$`-tokens counted). Quiet **by construction, not by suppression** — hence one framework

@@ -465,6 +465,13 @@ over the old column, `RENAME COLUMN` on both tables, and let `initSchema` recrea
 first because a crash between the steps then leaves `batch_id` in place and the next open redoes both. ⚠ They are
 not one transaction: DuckDB 2.0 failed the payload `UPDATE` placed after the drop and rename in the same transaction
 ("does not have a column named batch_id"). Pinned by `DbStatusStoreTest.aPre400DatabaseIsRenamedOnOpenAndStillServesItsRows`.
+⚠ **All three open-time migrations (this one, §3.6 and §3.10) probe only their own schema.** `SchemaMigration`
+(`inspecto-util`) adds `table_catalog = current_database() AND table_schema = current_schema()` to every
+`information_schema` probe. On Postgres every Space is a schema of one database, so an unscoped probe saw another
+Space's `batch_id` and made a migrated or new store fail to open; a review caught it (`*anotherSchemas*` tests in
+the three store test classes). On Postgres each migration transaction also takes a per-schema
+`pg_advisory_xact_lock` and re-probes under it, so two nodes opening one schema at once do not both migrate. ⚠ That
+lock is **unproven**: no Postgres run covers it. DuckDB needs no lock, because one process holds the file.
 
 ### 3.5 `inspecto_job_runs` — job-run reporting  · **A**
 File: `jobs_report.duckdb`

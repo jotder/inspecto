@@ -7,6 +7,7 @@ import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.StatusStore;
 import com.gamma.util.ConnectionSource;
 import com.gamma.util.JdbcDrivers;
+import com.gamma.util.SchemaMigration;
 import org.duckdb.DuckDBAppender;
 import org.duckdb.DuckDBConnection;
 import org.slf4j.Logger;
@@ -430,25 +431,32 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
         try {
             // ⚠ ONE borrow: the probe and both transactions see the same catalog.
             src.run(conn -> {
-                if (!columnExists(conn, T_COMMITS, "batch_id") && !columnExists(conn, T_LINEAGE, "batch_id")) return;
+                if (!legacyColumnsLeft(conn)) return;
                 boolean autoCommit = conn.getAutoCommit();
                 conn.setAutoCommit(false);
                 try (Statement st = conn.createStatement()) {
+                    // Each transaction takes the schema's advisory lock (Postgres) and re-probes under it, so a
+                    // second node opening the same schema at the same moment waits, then finds the work done.
+                    SchemaMigration.lock(conn, src.isPostgres(), MIGRATION_LOCK);
                     int rewritten = 0;
-                    for (String t : List.of(T_BATCHES, T_FILES, T_LINEAGE, T_QUARANTINE, T_UNPACK))
-                        if (tableExists(conn, t))
-                            rewritten += st.executeUpdate("UPDATE " + t
-                                    + " SET payload = replace(payload, '\"batch_id\":', '\"consignment_id\":')"
-                                    + " WHERE position('\"batch_id\":' IN payload) > 0");
+                    if (legacyColumnsLeft(conn))
+                        for (String t : List.of(T_BATCHES, T_FILES, T_LINEAGE, T_QUARANTINE, T_UNPACK))
+                            if (tableExists(conn, t))
+                                rewritten += st.executeUpdate("UPDATE " + t
+                                        + " SET payload = replace(payload, '\"batch_id\":', '\"consignment_id\":')"
+                                        + " WHERE position('\"batch_id\":' IN payload) > 0");
                     conn.commit();
-                    st.execute("DROP INDEX IF EXISTS " + T_COMMITS + "_by_pipeline");
-                    st.execute("DROP INDEX IF EXISTS " + T_LINEAGE + "_by_pipeline_batch");
-                    for (String t : List.of(T_COMMITS, T_LINEAGE))
-                        if (columnExists(conn, t, "batch_id"))
-                            st.execute("ALTER TABLE " + t + " RENAME COLUMN batch_id TO consignment_id");
+                    SchemaMigration.lock(conn, src.isPostgres(), MIGRATION_LOCK);
+                    if (legacyColumnsLeft(conn)) {
+                        st.execute("DROP INDEX IF EXISTS " + T_COMMITS + "_by_pipeline");
+                        st.execute("DROP INDEX IF EXISTS " + T_LINEAGE + "_by_pipeline_batch");
+                        for (String t : List.of(T_COMMITS, T_LINEAGE))
+                            if (SchemaMigration.columnExists(conn, t, "batch_id"))
+                                st.execute("ALTER TABLE " + t + " RENAME COLUMN batch_id TO consignment_id");
+                        log.info("Status DB: renamed column batch_id -> consignment_id ({} payload row(s) rewritten)",
+                                rewritten);
+                    }
                     conn.commit();
-                    log.info("Status DB: renamed column batch_id -> consignment_id ({} payload row(s) rewritten)",
-                            rewritten);
                 } catch (SQLException e) {
                     try { conn.rollback(); } catch (SQLException ignore) { /* best effort */ }
                     throw e;
@@ -461,25 +469,18 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
         }
     }
 
-    private static boolean columnExists(Connection conn, String table, String column) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = ?")) {
-            ps.setString(1, table);
-            ps.setString(2, column);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        }
+    /** The advisory-lock name {@link #migrateBatchIdColumns} serialises on (per schema — {@link SchemaMigration#lock}). */
+    private static final String MIGRATION_LOCK = "inspecto.status.batch_id-rename";
+
+    /** Whether this schema's commits or lineage table still has a {@code batch_id} column (never another schema's). */
+    private static boolean legacyColumnsLeft(Connection conn) throws SQLException {
+        return SchemaMigration.columnExists(conn, T_COMMITS, "batch_id")
+                || SchemaMigration.columnExists(conn, T_LINEAGE, "batch_id");
     }
 
-    private boolean tableExists(Connection conn, String table) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT 1 FROM information_schema.tables WHERE table_name = ?")) {
-            ps.setString(1, table);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        }
+    /** Scoped to the connection's own schema: on Postgres another Space's same-named table must not count. */
+    private static boolean tableExists(Connection conn, String table) throws SQLException {
+        return SchemaMigration.tableExists(conn, table);
     }
 
     /**

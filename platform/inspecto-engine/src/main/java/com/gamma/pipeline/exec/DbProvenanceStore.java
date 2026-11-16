@@ -4,6 +4,7 @@ import com.gamma.api.PublicApi;
 import com.gamma.util.ConnectionSource;
 import com.gamma.util.JdbcDrivers;
 import com.gamma.util.JdbcRows;
+import com.gamma.util.SchemaMigration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,14 +61,13 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
     private void initSchema() {
         try {
             src.run(conn -> {
+                // D-12 (MoSCoW S4): a pre-4.0.0 table names the column batch_id. One-shot and idempotent — the
+                // catalog is the journal: once renamed, the probe finds no batch_id and this is a no-op. The probe
+                // sees this schema only (SchemaMigration), and the rename runs in a transaction holding the
+                // schema's advisory lock on Postgres and re-probes under it, so a node that opened the same schema
+                // at the same moment waits and then finds nothing to do.
+                if (SchemaMigration.columnExists(conn, T, "batch_id")) renameBatchIdColumn(conn);
                 try (Statement st = conn.createStatement()) {
-                    // D-12 (MoSCoW S4): a pre-4.0.0 table names the column batch_id. One-shot and idempotent —
-                    // the catalog is the journal: once renamed, the probe finds no batch_id and this is a no-op.
-                    // A single DDL statement, so there is no half-renamed state to recover from.
-                    if (hasColumn(conn, "batch_id")) {
-                        st.execute("ALTER TABLE " + T + " RENAME COLUMN batch_id TO consignment_id");
-                        log.info("Provenance DB: renamed column batch_id -> consignment_id");
-                    }
                     st.execute("CREATE TABLE IF NOT EXISTS " + T + " ("
                             + "pipeline_id VARCHAR, consignment_id VARCHAR, node_id VARCHAR, rel VARCHAR, "
                             + "row_count BIGINT, run_ts VARCHAR)");
@@ -82,14 +82,21 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
         }
     }
 
-    private static boolean hasColumn(Connection conn, String column) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = ?")) {
-            ps.setString(1, T);
-            ps.setString(2, column);
-            try (java.sql.ResultSet rs = ps.executeQuery()) {
-                return rs.next();
+    private void renameBatchIdColumn(Connection conn) throws SQLException {
+        boolean autoCommit = conn.getAutoCommit();
+        conn.setAutoCommit(false);
+        try (Statement st = conn.createStatement()) {
+            SchemaMigration.lock(conn, src.isPostgres(), "inspecto.provenance.batch_id-rename");
+            if (SchemaMigration.columnExists(conn, T, "batch_id")) {
+                st.execute("ALTER TABLE " + T + " RENAME COLUMN batch_id TO consignment_id");
+                log.info("Provenance DB: renamed column batch_id -> consignment_id");
             }
+            conn.commit();
+        } catch (SQLException e) {
+            try { conn.rollback(); } catch (SQLException ignore) { /* best effort */ }
+            throw e;
+        } finally {
+            try { conn.setAutoCommit(autoCommit); } catch (SQLException ignore) { /* best effort */ }
         }
     }
 

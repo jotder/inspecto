@@ -346,7 +346,7 @@ per-route latency/count). Add metrics here when you instrument these — and upd
 | Store | Table(s) | Key columns | Default URL | Enable flag |
 |---|---|---|---|---|
 | Job runs (`DbJobRunStore`) | `inspecto_job_runs` | run_id, job, type, "trigger", start/end_time, status, duration_ms, message | `jdbc:duckdb:jobs_report.duckdb` | `-Djobs.backend=duckdb` |
-| Status (`DbStatusStore`) | `inspecto_status_commits/_batches/_files/_lineage/_quarantine` | pipeline, batch_id, seq, payload(JSON) | `jdbc:duckdb:inspecto-status.db` | `-Dstatus.backend=db` |
+| Status (`DbStatusStore`) | `inspecto_status_commits/_batches/_files/_lineage/_quarantine` | pipeline, consignment_id (`batch_id` before 4.0.0, renamed on open), seq, payload(JSON) | `jdbc:duckdb:inspecto-status.db` | `-Dstatus.backend=db` |
 | Acquisition ledger (`DbAcquisitionLedger`) | `inspecto_acquisition_ledger` (PK source_id,relative_path); `inspecto_acquisition_db_watermark` (PK source_key) | source_id, relative_path, size, checksum, last_modified, processed_at, status; watermark_value, advanced_at | `jdbc:duckdb:inspecto-acquisition.db` | `-Dacquire.ledger.backend=db` |
 | Objects/links/notes | (per impl) | — | `inspecto-ops.db` / `-ops-links.db` / `-ops-notes.db` | `-Dobjects.backend=db` |
 | Events (`ParquetEventStore`) | Parquet files (not a table) | event_id, ts_ms, type, source, pipeline, correlation_id, message, attributes, level + level/year/month/day partitions | dir `inspecto-events/` | `-Devents.backend=parquet` |
@@ -481,8 +481,9 @@ skipped until the breaker half-opens. Check connectivity (`POST /connections/{id
 runs for `catch_up: true` cron jobs with a prior audited run. Manual: `POST /jobs/{n}/trigger`. A `SKIPPED` run
 means the previous run is still in flight (`LockingRunner`).
 
-**A flow job writes nothing ("0 file(s)").** Idempotent replay: the same `batch_id` already committed all branches
-(`BranchCommitLog`). Use a fresh `batch_id` (default = per-run timestamp) to recompute. Also: `sink.view` writes no
+**A flow job writes nothing ("0 file(s)").** Idempotent replay: the same `consignment_id` already committed all branches
+(`BranchCommitLog`). Use a fresh `consignment_id` (default = per-run timestamp) to recompute; the pre-4.0.0 key
+`batch_id` is still read, with a warning, until 5.0.0. Also: `sink.view` writes no
 bytes in Phase A.
 
 **Pipeline job fails to build / run.** `IllegalStateException` at build = no `-Dassist.write.root` (flow store

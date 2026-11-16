@@ -325,11 +325,55 @@ class DbStatusStoreTest {
         }
     }
 
+    /**
+     * Review fix (Postgres schema-per-Space): another schema of the same database still holding 3.x tables must not
+     * be seen by this schema's migration. A new store, and then the migrated one reopened, open cleanly in
+     * {@code main}, and the other schema keeps its {@code batch_id} columns and payloads untouched.
+     */
+    @Test
+    void anotherSchemasLegacyTablesAreNeitherSeenNorTouched(@TempDir Path dir) throws Exception {
+        String url = "jdbc:duckdb:" + dir.resolve("two-schemas.duckdb");
+        try (Connection c = DriverManager.getConnection(url); var st = c.createStatement()) {
+            st.execute("CREATE SCHEMA other");
+            st.execute("CREATE TABLE other.inspecto_status_commits (pipeline VARCHAR, batch_id VARCHAR)");
+            st.execute("CREATE TABLE other.inspecto_status_lineage (pipeline VARCHAR, batch_id VARCHAR, seq BIGINT, payload VARCHAR)");
+            st.execute("CREATE TABLE other.inspecto_status_batches (pipeline VARCHAR, seq BIGINT, payload VARCHAR)");
+            st.execute("INSERT INTO other.inspecto_status_batches VALUES ('p', 0, '{\"batch_id\":\"b1\"}')");
+        }
+        String tables = "'inspecto_status_commits', 'inspecto_status_lineage'";
+        for (int open = 1; open <= 2; open++) {
+            try (Connection c = DriverManager.getConnection(url)) {
+                assertDoesNotThrow(() -> new DbStatusStore(c).close(), "open " + open);
+            }
+            try (Connection c = DriverManager.getConnection(url)) {
+                assertEquals(List.of("inspecto_status_commits.consignment_id", "inspecto_status_lineage.consignment_id"),
+                        columnsIn(c, "main", tables), "open " + open);
+                assertEquals(List.of("inspecto_status_commits.batch_id", "inspecto_status_lineage.batch_id"),
+                        columnsIn(c, "other", tables), "open " + open + ": the other schema is not this store's");
+                try (var st = c.createStatement(); var rs = st.executeQuery("SELECT payload FROM other.inspecto_status_batches")) {
+                    assertTrue(rs.next());
+                    assertEquals("{\"batch_id\":\"b1\"}", rs.getString(1), "open " + open + ": its payloads are not rewritten");
+                }
+            }
+        }
+    }
+
+    /** The Consignment columns of {@code schema}'s tables named in {@code tables}, as {@code table.column}. */
+    private static List<String> columnsIn(Connection c, String schema, String tables) throws Exception {
+        List<String> out = new java.util.ArrayList<>();
+        try (var st = c.createStatement(); var rs = st.executeQuery("SELECT table_name, column_name "
+                + "FROM information_schema.columns WHERE table_schema = '" + schema + "' AND table_name IN (" + tables + ") "
+                + "AND column_name IN ('batch_id', 'consignment_id') ORDER BY 1, 2")) {
+            while (rs.next()) out.add(rs.getString(1) + "." + rs.getString(2));
+        }
+        return out;
+    }
+
     /** The {@code table.column} pairs of the status tables whose column names the Consignment, either spelling. */
     private static List<String> consignmentColumns(Connection c) throws Exception {
         List<String> out = new java.util.ArrayList<>();
         try (var st = c.createStatement(); var rs = st.executeQuery("SELECT table_name, column_name "
-                + "FROM information_schema.columns WHERE table_name LIKE 'inspecto_status_%' "
+                + "FROM information_schema.columns WHERE table_schema = current_schema() AND table_name LIKE 'inspecto_status_%' "
                 + "AND column_name IN ('batch_id', 'consignment_id') ORDER BY 1, 2")) {
             while (rs.next()) out.add(rs.getString(1) + "." + rs.getString(2));
         }

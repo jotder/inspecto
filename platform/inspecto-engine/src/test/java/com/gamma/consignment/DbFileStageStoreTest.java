@@ -157,11 +157,38 @@ class DbFileStageStoreTest {
         assertEquals(List.of("consignment_id"), consignmentColumns(url));
     }
 
+    /** Review fix (Postgres schema-per-Space): another schema's 3.x {@code file_stages} is neither seen nor touched. */
+    @Test
+    void anotherSchemasLegacyTableIsNeitherSeenNorTouched(@TempDir Path dir) throws Exception {
+        String url = "jdbc:duckdb:" + dir.resolve("two-schemas.duckdb");
+        try (Connection c = com.gamma.util.JdbcDrivers.connect(url); Statement st = c.createStatement()) {
+            st.execute("CREATE SCHEMA other");
+            st.execute("CREATE TABLE other.file_stages (source_id VARCHAR, relative_path VARCHAR, batch_id VARCHAR, "
+                    + "stage VARCHAR, recorded_at VARCHAR)");
+            st.execute("INSERT INTO other.file_stages VALUES ('src-1','a.csv','batch-1','REGISTERED','t1')");
+        }
+        for (int open = 1; open <= 2; open++) {
+            try (DbFileStageStore db = DbFileStageStore.open(url)) {
+                db.record(List.of(row("b.csv", FileStage.REGISTERED, "t" + open)));
+                assertEquals(1, db.stages("src-1", "b.csv").size(), "open " + open);
+                assertTrue(db.stages("src-1", "a.csv").isEmpty(), "open " + open + ": the other schema's rows are not read");
+            }
+            assertEquals(List.of("consignment_id"), consignmentColumns(url), "open " + open);
+            try (Connection c = com.gamma.util.JdbcDrivers.connect(url); Statement st = c.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT column_name FROM information_schema.columns WHERE table_schema = 'other' "
+                         + "AND table_name = 'file_stages' AND column_name IN ('batch_id', 'consignment_id')")) {
+                assertTrue(rs.next());
+                assertEquals("batch_id", rs.getString(1), "open " + open + ": the other schema is not this store's");
+                assertFalse(rs.next());
+            }
+        }
+    }
+
     private static List<String> consignmentColumns(String url) throws Exception {
         List<String> out = new java.util.ArrayList<>();
         try (Connection c = com.gamma.util.JdbcDrivers.connect(url); Statement st = c.createStatement();
              ResultSet rs = st.executeQuery("SELECT column_name FROM information_schema.columns "
-                     + "WHERE table_name = 'file_stages' AND column_name IN ('batch_id', 'consignment_id')")) {
+                     + "WHERE table_schema = current_schema() AND table_name = 'file_stages' AND column_name IN ('batch_id', 'consignment_id')")) {
             while (rs.next()) out.add(rs.getString(1));
         }
         return out;

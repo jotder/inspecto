@@ -3,6 +3,7 @@ package com.gamma.consignment;
 import com.gamma.api.PublicApi;
 import com.gamma.util.ConnectionSource;
 import com.gamma.util.JdbcDrivers;
+import com.gamma.util.SchemaMigration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,10 +84,7 @@ public final class DbFileStageStore implements AutoCloseable, com.gamma.util.Bro
             // separate borrows would spread it across connections.
             src.run(conn -> {
                 try (Statement st = conn.createStatement()) {
-                    if (tableExists(st)) {
-                        boolean legacyColumn = hasBatchIdColumn(st);
-                        if (legacyColumn || !hasUniqueConstraint(st)) rebuildWithConstraint(conn, st, legacyColumn);
-                    }
+                    if (needsRebuild(conn)) rebuildWithConstraint(conn, st);
                     st.execute(CREATE);
                 }
             });
@@ -95,35 +93,32 @@ public final class DbFileStageStore implements AutoCloseable, com.gamma.util.Bro
         }
     }
 
-    private static boolean tableExists(Statement st) throws SQLException {
-        try (ResultSet rs = st.executeQuery(
-                "SELECT 1 FROM information_schema.tables WHERE table_name = '" + T + "'")) {
-            return rs.next();
-        }
-    }
-
-    private static boolean hasUniqueConstraint(Statement st) throws SQLException {
-        try (ResultSet rs = st.executeQuery("SELECT 1 FROM information_schema.table_constraints "
-                + "WHERE table_name = '" + T + "' AND constraint_type = 'UNIQUE'")) {
-            return rs.next();
-        }
-    }
-
-    private static boolean hasBatchIdColumn(Statement st) throws SQLException {
-        try (ResultSet rs = st.executeQuery("SELECT 1 FROM information_schema.columns "
-                + "WHERE table_name = '" + T + "' AND column_name = 'batch_id'")) {
-            return rs.next();
-        }
+    /**
+     * Whether THIS schema's table predates the constraint or the 4.0.0 column name. Every probe is scoped to the
+     * connection's own schema ({@link SchemaMigration}): on Postgres another Space's {@code file_stages} must not
+     * make this one rebuild a table it does not have.
+     */
+    private static boolean needsRebuild(Connection conn) throws SQLException {
+        return SchemaMigration.tableExists(conn, T)
+                && (SchemaMigration.columnExists(conn, T, "batch_id") || !SchemaMigration.constraintExists(conn, T, "UNIQUE"));
     }
 
     /** Legacy (unconstrained, or pre-4.0.0 {@code batch_id}-named) table → constrained copy under the current
      *  column names, duplicates collapsed, atomically. Runs on the connection {@link #initSchema} borrowed —
-     *  {@code st} is that connection's statement. */
-    private void rebuildWithConstraint(Connection conn, Statement st, boolean legacyColumn) throws SQLException {
+     *  {@code st} is that connection's statement. On Postgres the transaction first takes the schema's advisory
+     *  lock and re-probes under it, so a second node opening the same schema at once waits and then finds the
+     *  table already rebuilt, instead of failing its start on a rename that already happened. */
+    private void rebuildWithConstraint(Connection conn, Statement st) throws SQLException {
         String legacy = T + "_v1";
         boolean auto = conn.getAutoCommit();
         conn.setAutoCommit(false);
         try {
+            SchemaMigration.lock(conn, src.isPostgres(), "inspecto.file-stages.rebuild");
+            if (!needsRebuild(conn)) {
+                conn.commit();
+                return;
+            }
+            boolean legacyColumn = SchemaMigration.columnExists(conn, T, "batch_id");
             st.execute("ALTER TABLE " + T + " RENAME TO " + legacy);
             st.execute(CREATE);
             st.execute("INSERT INTO " + T + " (" + COLS + ") SELECT " + (legacyColumn ? LEGACY_COLS : COLS) + " FROM " + legacy

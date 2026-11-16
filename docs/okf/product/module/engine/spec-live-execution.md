@@ -62,5 +62,5 @@ recorded under the flow id; the chain `ConsignmentEvent` is likewise published u
 `202 {runId, pipeline, status}` + `Location`. **Deliberately `…/trigger`, not `…/run`** — `…/run` is the
 scratch lane's **simulate** verb, `…/trigger` the **operate**; see
 [spec-execution-lanes.md](spec-execution-lanes.md) and [`spec-pipeline-test-run.md`](spec-pipeline-test-run.md).
-Prefer a persisted `*_job.toon` when a run needs `data_dir`/`batch_id` overrides, a schedule,
+Prefer a persisted `*_job.toon` when a run needs `data_dir`/`consignment_id` overrides (`batch_id` before 4.0.0), a schedule,
 or chaining; the ad-hoc route takes no params.
