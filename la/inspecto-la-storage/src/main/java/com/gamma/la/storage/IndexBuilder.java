@@ -642,7 +642,7 @@ public final class IndexBuilder {
                 if (st != null) types.put(st.type(), num(q[5]));
                 if (dt != null) types.put(dt.type(), num(q[6]));
             }
-            Map<String, Map<String, List<String>>> spellings = new LinkedHashMap<>();
+            Map<String, IndexManifest.Spellings> spellings = new LinkedHashMap<>();
             if (st != null && dt != null && st.type().equals(dt.type())) spellings.put(st.type(), spellings(st, "src", "dst"));
             else {
                 if (st != null) spellings.put(st.type(), spellings(st, "src"));
@@ -656,21 +656,25 @@ public final class IndexBuilder {
         }
 
         /**
-         * LA-INDEX-SPELLINGS-1: every key of {@code type} that more than one raw id of {@code cols} (of {@code out}) spells, to
-         * those raw ids in DuckDB's VARCHAR order; null when they are more than {@link IndexManifest#MAX_SPELLINGS} raw ids.
-         * An empty key is no Entity (as {@link #linkStats} leaves it out). Recomputed over the whole version in every mode.
+         * LA-INDEX-SPELLINGS-1: the raw ids of {@code cols} (of {@code out}) that spell each key of {@code type}, in DuckDB's
+         * VARCHAR order ({@link IndexManifest.Spellings}). Complete when every key some raw id other than itself spells fits in
+         * {@link IndexManifest#MAX_SPELLINGS} raw ids; else only the keys spelt by more than one raw id; null when even those
+         * do not fit. An empty key is no Entity (as {@link #linkStats} leaves it out). Recomputed over the whole version in every mode.
          */
-        private Map<String, List<String>> spellings(EndpointKey type, String... cols) throws SQLException {
+        private IndexManifest.Spellings spellings(EndpointKey type, String... cols) throws SQLException {
             String out = SqlViews.parquet(SqlIdent.pathStr(stage.resolve("out"), "/*/*.parquet"), false, SqlViews.Hive.OFF);
             List<String> arms = new ArrayList<>();
             for (String c : cols) arms.add("SELECT " + type.keySql().apply(c) + " AS k, CAST(" + c + " AS VARCHAR) AS r FROM " + out);
-            List<Object[]> found = rows("WITH s AS (SELECT DISTINCT k, r FROM (" + String.join(" UNION ALL ", arms) + ") u WHERE k <> ''),"
-                    + " d AS (SELECT k FROM s GROUP BY k HAVING count(*) > 1)"
-                    + " SELECT s.k, s.r FROM s JOIN d ON s.k = d.k ORDER BY s.k, s.r LIMIT " + (IndexManifest.MAX_SPELLINGS + 1));
+            String pairs = "WITH s AS (SELECT DISTINCT k, r FROM (" + String.join(" UNION ALL ", arms) + ") u WHERE k <> ''),"
+                    + " d AS (SELECT k FROM s GROUP BY k HAVING __having)"
+                    + " SELECT s.k, s.r FROM s JOIN d ON s.k = d.k ORDER BY s.k, s.r LIMIT " + (IndexManifest.MAX_SPELLINGS + 1);
+            List<Object[]> found = rows(pairs.replace("__having", "bool_or(r <> k)"));
+            boolean complete = found.size() <= IndexManifest.MAX_SPELLINGS;
+            if (!complete) found = rows(pairs.replace("__having", "count(*) > 1"));
             if (found.size() > IndexManifest.MAX_SPELLINGS) return null;
             Map<String, List<String>> byKey = new LinkedHashMap<>();
             for (Object[] r : found) byKey.computeIfAbsent(r[0].toString(), k -> new ArrayList<>()).add(r[1].toString());
-            return byKey;
+            return new IndexManifest.Spellings(complete, byKey);
         }
 
         /**

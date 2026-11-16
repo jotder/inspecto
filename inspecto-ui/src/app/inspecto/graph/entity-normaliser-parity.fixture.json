@@ -145,6 +145,46 @@
       "normaliser": "e164",
       "input": " \u00a0+44 12",
       "expected": "+4412"
+    },
+    {
+      "normaliser": "upper-trim",
+      "input": "\ufb01x",
+      "expected": "FIX"
+    },
+    {
+      "normaliser": "upper-trim",
+      "input": "\u0149a",
+      "expected": "\u02bcNA"
+    },
+    {
+      "normaliser": "upper-trim",
+      "input": "\u01f0b",
+      "expected": "J\u030cB"
+    },
+    {
+      "normaliser": "upper-trim",
+      "input": "\u0390",
+      "expected": "\u0399\u0308\u0301"
+    },
+    {
+      "normaliser": "upper-trim",
+      "input": "\u1f80",
+      "expected": "\u1f08\u0399"
+    },
+    {
+      "normaliser": "upper-trim",
+      "input": "\ufb00",
+      "expected": "FF"
+    },
+    {
+      "normaliser": "upper-trim",
+      "input": "\u0587",
+      "expected": "\u0535\u0552"
+    },
+    {
+      "normaliser": "default",
+      "input": "\u0130STANBUL",
+      "expected": "i\u0307stanbul"
     }
   ]
 }

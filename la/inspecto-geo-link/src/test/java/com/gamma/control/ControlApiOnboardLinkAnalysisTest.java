@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.EditionFeatures;
 import com.gamma.etl.PipelineConfigBatchTest;
+import com.gamma.la.storage.IndexManifest;
+import com.gamma.la.storage.IndexStore;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.AfterEach;
@@ -194,9 +196,10 @@ class ControlApiOnboardLinkAnalysisTest {
     /**
      * LA-INDEX-SPELLINGS-1 (b), on the full-cycle fixture: a node stays its raw id, but a start from a value of a typed column
      * reads every raw spelling of its Entity key - from ACC-1003 the transfer T0312 filed under {@code ' acc-1003 '} (to
-     * ACC-1113) is reached - and the link index and the Dataset answer the same rows. A value the index holds under no
-     * spelling ({@code acc-1018}, the key of ACC-1018) is read from the Dataset by its key. Red before: the start matched
-     * the raw value exactly, so ACC-1113 was not reached and {@code acc-1018} read nothing.
+     * ACC-1113) is reached - and the link index and the Dataset answer the same rows. A value that is no raw id
+     * ({@code acc-1018}, the key of ACC-1018) is answered from the index too: its listing of the account spellings is complete,
+     * so it names ACC-1018. Red before: the start matched the raw value exactly, so ACC-1113 was not reached and
+     * {@code acc-1018} read nothing.
      */
     @Test
     void aStartFromATypedAccountReachesEverySpellingOfItsKeyFromTheIndexAndTheDataset(@TempDir Path cfg, @TempDir Path root) throws Exception {
@@ -215,15 +218,20 @@ class ControlApiOnboardLinkAnalysisTest {
             JsonNode fromOtherSpelling = neighbours(c, id, " acc-1003 ");
             assertEquals(sorted(viaIndex.get("rows")), sorted(fromOtherSpelling.get("rows")), "either spelling starts the same entity");
             JsonNode byKeyOnly = neighbours(c, id, "acc-1018");
-            assertEquals("dataset", byKeyOnly.at("/source/kind").asText(), byKeyOnly.get("source").toString());
-            assertEquals("rung_not_indexable", byKeyOnly.at("/source/reason").asText(), byKeyOnly.get("source").toString());
+            assertEquals("index", byKeyOnly.at("/source/kind").asText(), byKeyOnly.get("source").toString());
             assertEquals(sorted(neighbours(c, id, "ACC-1018").get("rows")), sorted(byKeyOnly.get("rows")));
             assertTrue(byKeyOnly.get("rows").size() > 0, byKeyOnly.toString());
+            JsonNode nobody = neighbours(c, id, "acc-9999");
+            assertEquals("index", nobody.at("/source/kind").asText(), "a key no account has is answered by the index, empty: " + nobody.get("source"));
+            assertEquals(0, nobody.get("rows").size(), nobody.toString());
 
             Files.writeString(root.resolve("link-analysis.toon"), "index:\n  enabled: false\n");
             JsonNode viaDataset = neighbours(c, id, "ACC-1003");
             assertEquals("dataset", viaDataset.at("/source/kind").asText(), viaDataset.get("source").toString());
             assertEquals(sorted(viaIndex.get("rows")), sorted(viaDataset.get("rows")), "the index answers as the Dataset does");
+            assertEquals(sorted(byKeyOnly.get("rows")), sorted(neighbours(c, id, "acc-1018").get("rows")), "acc-1018 too");
+            JsonNode nobodyFlat = neighbours(c, id, "acc-9999");
+            assertEquals(0, nobodyFlat.get("rows").size(), nobodyFlat.toString());
 
             // control: the same rows with the account columns untyped match the raw value exactly
             new ComponentStore(root.resolve("registry")).write("dataset", id + "_raw", Map.of("physicalRef", id + "/database",
@@ -268,6 +276,111 @@ class ControlApiOnboardLinkAnalysisTest {
                 for (String raw : List.of("acc-1003", "ACC-1003", "ACC-1113"))
                     assertFalse(body.get("rows").toString().contains(raw), raw + " is revealed: " + body.get("rows"));
         }
+    }
+
+    /**
+     * LA-INDEX-SPELLINGS-1 review (finding 1): the four-eyes fan-out gate counts the widened match, and never less than the
+     * exact one. {@code ﬁx-1} (a ligature) is a value whose SQL key and Java key disagreed (DuckDB's upper maps one character
+     * to one): the key match found none of its own rows, so its count was 0 and a read over the limit was served. And
+     * ACC-1003's count includes the respelled transfer: at its exact count the gate opens, one below the widened count it holds.
+     */
+    @Test
+    void theFourEyesFanOutGateCountsTheWidenedMatchAndNeverLessThanTheExactOne(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        String lig = new String(Character.toChars(0xFB01)) + "x-1";
+        String csv = Files.readString(Path.of("..", "..", "inspecto", "src", "test", "resources", "onboard", "full-cycle", "transfers.csv"))
+                + "T9001," + lig + ",ACC-1003,10.00,2026-01-01T10:00:00,mobile\n"
+                + "T9002," + lig + ",ACC-1004,11.00,2026-01-02T10:00:00,mobile\n";
+        try (Ctx c = open(cfg, root)) {
+            JsonNode d = data(send(c, "POST", "/onboard/files?name=transfers.csv&kind=stream", csv.getBytes(StandardCharsets.UTF_8)), 200);
+            data(send(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit",
+                    ("{\"name\":\"" + id + "\"}").getBytes(StandardCharsets.UTF_8)), 200);
+            JsonNode ligRows = neighbours(c, id, lig);
+            assertEquals(2, ligRows.get("rows").size(), ligRows.toString());
+            int widened = neighbours(c, id, "ACC-1003").get("rows").size();   // the respelled transfer included
+
+            Files.writeString(root.resolve("link-analysis.toon"), "four_eyes_fan_out_above: 1\n");
+            HttpResponse<String> gated = send(c, "POST", "/inv/projection/neighbors", body(id, lig));
+            assertEquals(403, gated.statusCode(), "two links over a limit of one: " + gated.body());
+
+            Files.writeString(root.resolve("link-analysis.toon"), "four_eyes_fan_out_above: " + (widened - 1) + "\n");
+            HttpResponse<String> atExact = send(c, "POST", "/inv/projection/neighbors", body(id, "ACC-1003"));
+            assertEquals(403, atExact.statusCode(), "the widened count is " + widened + ": " + atExact.body());
+            Files.writeString(root.resolve("link-analysis.toon"), "four_eyes_fan_out_above: " + widened + "\n");
+            assertEquals(200, send(c, "POST", "/inv/projection/neighbors", body(id, "ACC-1003")).statusCode());
+        }
+    }
+
+    /**
+     * LA-INDEX-SPELLINGS-1 review (findings 2, 3): when the manifest cannot say which raw ids spell a key, the Dataset answers
+     * the same rows and the source says why - an end built under another Entity Type rule (out of date: rebuild), a type
+     * with too many spellings to list, a key spelt more ways than one start reads, and an incomplete listing that does not
+     * hold a value which is no raw id. The manifest is rewritten in place; each read asks a value or limit not read before
+     * (the projection cache keys on the index version, which a rewrite keeps).
+     */
+    @Test
+    void whenTheManifestCannotSayWhichRawIdsSpellAKeyTheDatasetAnswersAndSaysWhy(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        byte[] fixture = Files.readAllBytes(Path.of("..", "..", "inspecto", "src", "test", "resources", "onboard", "full-cycle", "transfers.csv"));
+        try (Ctx c = open(cfg, root)) {
+            JsonNode d = data(send(c, "POST", "/onboard/files?name=transfers.csv&kind=stream", fixture), 200);
+            data(send(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit",
+                    ("{\"name\":\"" + id + "\"}").getBytes(StandardCharsets.UTF_8)), 200);
+            IndexManifest built = manifest(root);
+            assertTrue(built.spellings().get("account").complete(), built.spellings().toString());
+            List<String> want = sorted(neighbours(c, id, "ACC-1003", 1000).get("rows"));
+
+            // the source end was keyed as another type at build
+            rewrite(root, built.withLinkStats(built.kindEdges(), built.typeNodes(), built.degree(), built.timeSpan(), built.degreeHistogram(),
+                    new IndexManifest.EndpointTypes(new IndexManifest.EndpointType("wallet", "default"), built.endpointTypes().target())));
+            JsonNode stale = neighbours(c, id, "ACC-1003", 1001);
+            assertEquals("index_stale_refused", stale.at("/source/reason").asText(), stale.get("source").toString());
+            assertTrue(stale.at("/source/details").asText().contains("rebuild"), stale.get("source").toString());
+            assertEquals(want, sorted(stale.get("rows")));
+
+            // too many spellings of the type to list
+            Map<String, IndexManifest.Spellings> none = new java.util.LinkedHashMap<>();
+            none.put("account", null);
+            rewrite(root, built.withSpellings(none));
+            JsonNode overType = neighbours(c, id, "ACC-1003", 1002);
+            assertEquals("frontier_over_index_cap", overType.at("/source/reason").asText(), overType.get("source").toString());
+            assertEquals(want, sorted(overType.get("rows")));
+
+            // one key spelt more ways than a start reads
+            // (the account type is upper-trim: the key of ' acc-1003 ' is ACC-1003)
+            assertEquals(List.of(" acc-1003 ", "ACC-1003"), built.spellings().get("account").keys().get("ACC-1003"));
+            List<String> spellings = new java.util.ArrayList<>(built.spellings().get("account").keys().get("ACC-1003"));
+            for (int i = 0; spellings.size() <= 64; i++) spellings.add("acc-1003" + " ".repeat(i + 2));
+            rewrite(root, built.withSpellings(Map.of("account", new IndexManifest.Spellings(true, Map.of("ACC-1003", spellings)))));
+            JsonNode overKey = neighbours(c, id, "ACC-1003", 1003);
+            assertEquals("frontier_over_index_cap", overKey.at("/source/reason").asText(), overKey.get("source").toString());
+            assertEquals(want, sorted(overKey.get("rows")));
+
+            // an incomplete listing (only the keys spelt twice): a raw id is still the index's, a bare key is the Dataset's
+            rewrite(root, built.withSpellings(Map.of("account", new IndexManifest.Spellings(false,
+                    Map.of("ACC-1003", built.spellings().get("account").keys().get("ACC-1003"))))));
+            assertEquals("index", neighbours(c, id, "ACC-1003", 1004).at("/source/kind").asText());
+            JsonNode bare = neighbours(c, id, "acc-1018", 1005);
+            assertEquals("rung_not_indexable", bare.at("/source/reason").asText(), bare.get("source").toString());
+            assertEquals(sorted(neighbours(c, id, "ACC-1018", 1006).get("rows")), sorted(bare.get("rows")));
+        }
+    }
+
+    private IndexManifest manifest(Path root) throws Exception {
+        Path ix = root.resolve("la-index");
+        return IndexManifest.read(new IndexStore(ix, id, IndexStore.mappingHashes(ix, id).get(0)).current().orElseThrow());
+    }
+
+    private void rewrite(Path root, IndexManifest m) throws Exception {
+        Path ix = root.resolve("la-index");
+        m.write(new IndexStore(ix, id, IndexStore.mappingHashes(ix, id).get(0)).current().orElseThrow());
+    }
+
+    private static byte[] body(String dataset, String value) throws Exception {
+        return JSON.writeValueAsBytes(Map.of("dataset", dataset, "sourceCol", "from_account", "targetCol", "to_account", "value", value));
+    }
+
+    private JsonNode neighbours(Ctx c, String dataset, String value, int limit) throws Exception {
+        return data(send(c, "POST", "/inv/projection/neighbors", JSON.writeValueAsBytes(Map.of("dataset", dataset,
+                "sourceCol", "from_account", "targetCol", "to_account", "value", value, "limit", limit))), 200);
     }
 
     private JsonNode neighbours(Ctx c, String dataset, String value) throws Exception {

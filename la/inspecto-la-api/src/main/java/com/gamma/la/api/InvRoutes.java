@@ -1096,10 +1096,11 @@ public final class InvRoutes implements RouteModule {
     }
 
     /**
-     * The neighbours read's match of one value, as {@code extraWhere} with its two binds appended to {@code binds}
-     * (LA-INDEX-SPELLINGS-1): an end typed as an Entity Type matches every raw spelling whose key under the type's rule is the
-     * value's key ({@link EntityKeySql}, the mirror of {@link EntityTypes#normalise}); an untyped end, or a value whose key is
-     * empty, matches the raw value exactly.
+     * The neighbours read's match of one value, as {@code extraWhere} with its binds appended to {@code binds}
+     * (LA-INDEX-SPELLINGS-1): an end typed as an Entity Type matches the raw value and every raw spelling whose key under the
+     * type's rule is the value's key ({@link EntityKeySql}, the mirror of {@link EntityTypes#normalise}); an untyped end, or a
+     * value whose key is empty, matches the raw value exactly. The raw equality stays in the typed match so the match - and the
+     * four-eyes degree counted with it - is never below the exact one, should the SQL and Java keys ever disagree.
      */
     private static String neighbourMatch(String sourceCol, EntityTypes.EntityType sourceType, String targetCol,
                                          EntityTypes.EntityType targetType, String value, List<String> binds) {
@@ -1108,12 +1109,10 @@ public final class InvRoutes implements RouteModule {
 
     private static String endMatch(String col, EntityTypes.EntityType type, String value, List<String> binds) {
         String key = type == null ? "" : EntityTypes.normalise(type.normaliser(), value);
-        if (key.isEmpty()) {
-            binds.add(value);
-            return "CAST(" + q(col) + " AS VARCHAR) = ?";
-        }
+        binds.add(value);
+        if (key.isEmpty()) return "CAST(" + q(col) + " AS VARCHAR) = ?";
         binds.add(key);
-        return EntityKeySql.key(type.normaliser(), q(col)) + " = ?";
+        return "(CAST(" + q(col) + " AS VARCHAR) = ? OR " + EntityKeySql.key(type.normaliser(), q(col)) + " = ?)";
     }
 
     /**

@@ -49,8 +49,8 @@ final class IndexedNeighbors {
         }
     }
 
-    /** One end's raw ids to look up ({@code values}), or why the index cannot say which they are ({@code refusal}). */
-    private record Spellings(List<String> values, boolean complete, String refusal) { }
+    /** One end's raw ids to look up ({@code values}), or why the index does not answer ({@code reason}, {@code refusal}). */
+    private record Spellings(List<String> values, boolean complete, Reason reason, String refusal) { }
 
     /** Rows shaped like the flat statement's: {@code source, target, [kind], [attr_i...], [total], cnt}. */
     record Result(List<Map<String, Object>> rows, boolean truncated) { }
@@ -87,7 +87,7 @@ final class IndexedNeighbors {
         Spellings out = spellings(sel.manifest(), true, rq.sourceType(), rq.value());
         Spellings in = spellings(sel.manifest(), false, rq.targetType(), rq.value());
         for (Spellings s : List.of(out, in))
-            if (s.refusal() != null) return Outcome.flat(Reason.index_stale_refused, s.refusal());
+            if (s.reason() != null) return Outcome.flat(s.reason(), s.refusal());
 
         try (IndexReader reader = IndexReader.borrow(sel.dir(), sel.manifest(), policy)) {
             Set<Folded> distinct = new LinkedHashSet<>();                                    // a self-loop arrives from both copies
@@ -133,29 +133,41 @@ final class IndexedNeighbors {
     }
 
     /**
-     * LA-INDEX-SPELLINGS-1: the raw ids one end looks {@code value} up by. An untyped end, a value whose key is empty, or an index
-     * built before spellings were recorded: the value exactly ({@code complete}). A typed end: every raw id the manifest records
-     * for the value's key under the end's type ({@code complete}), else the value alone - not complete, as one other spelling the
-     * manifest does not list (a key it holds once) may be the only one. Refused when the index keyed this end under another
-     * Entity Type rule, or recorded too many spellings to list them.
+     * LA-INDEX-SPELLINGS-1: the raw ids one end looks {@code value} up by - always the value itself (as the Dataset path matches
+     * the raw value too), plus the spellings of its key. An untyped end, a value whose key is empty, or an index built before
+     * spellings were recorded: the value exactly. A typed end: the raw ids the manifest lists for the key; an unlisted key under
+     * a COMPLETE listing can only be spelt by itself, so the key too. Both {@code complete}. An unlisted key under an incomplete
+     * listing: the value alone, not complete - one raw id the manifest does not list may spell it. Refused when the index keyed
+     * this end under another Entity Type rule, recorded too many spellings to list them, or the key has more spellings than
+     * {@link #MAX_KEY_SPELLINGS}.
      */
     private static Spellings spellings(IndexManifest m, boolean source, EntityTypes.EntityType type, String value) {
         List<String> exact = List.of(value);
         String key = type == null ? "" : EntityTypes.normalise(type.normaliser(), value);
-        if (key.isEmpty() || m.spellings() == null) return new Spellings(exact, true, null);
+        if (key.isEmpty() || m.spellings() == null) return new Spellings(exact, true, null, null);
         IndexManifest.EndpointType built = m.endpointTypes() == null ? null
                 : source ? m.endpointTypes().source() : m.endpointTypes().target();
         String end = source ? "source" : "target";
         if (built == null || !type.id().equals(built.type()) || !type.normaliser().equals(built.normaliser()))
-            return new Spellings(null, false, "the " + end + " column is typed " + type.id() + " (" + type.normaliser()
-                    + ") now, and the link index was built " + (built == null ? "with it untyped" : "with it typed " + built.type()
-                    + " (" + built.normaliser() + ")") + "; rebuild it");
-        if (!m.spellings().containsKey(type.id()) || m.spellings().get(type.id()) == null)
-            return new Spellings(null, false, "the link index records no spellings of " + type.id() + " (more than "
-                    + IndexManifest.MAX_SPELLINGS + ")");
-        List<String> all = m.spellings().get(type.id()).get(key);
-        return all == null ? new Spellings(exact, false, null) : new Spellings(all, true, null);
+            return new Spellings(null, false, Reason.index_stale_refused, "the " + end + " column is typed " + type.id() + " ("
+                    + type.normaliser() + ") now, and the link index was built " + (built == null ? "with it untyped"
+                    : "with it typed " + built.type() + " (" + built.normaliser() + ")") + "; rebuild it");
+        IndexManifest.Spellings sp = m.spellings().get(type.id());
+        if (sp == null)
+            return new Spellings(null, false, Reason.frontier_over_index_cap, "the link index lists no spellings of " + type.id()
+                    + ": more than " + IndexManifest.MAX_SPELLINGS + " raw ids");
+        List<String> listed = sp.keys().get(key);
+        if (listed == null && !sp.complete()) return new Spellings(exact, false, null, null);
+        LinkedHashSet<String> all = new LinkedHashSet<>(exact);
+        all.addAll(listed != null ? listed : List.of(key));
+        if (all.size() > MAX_KEY_SPELLINGS)
+            return new Spellings(null, false, Reason.frontier_over_index_cap, "the key of this value has " + all.size()
+                    + " spellings; the link index reads at most " + MAX_KEY_SPELLINGS + " per start");
+        return new Spellings(List.copyOf(all), true, null, null);
     }
+
+    /** Most raw ids one end of one start looks up in the index (one bucket statement each); a key spelt more ways reads the Dataset. */
+    static final int MAX_KEY_SPELLINGS = 64;
 
     /** DuckDB's VARCHAR order: unsigned bytes of the UTF-8; NULL first. */
     private static int bytes(String a, String b) {

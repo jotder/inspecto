@@ -1,6 +1,11 @@
 package com.gamma.la.api;
 
 import com.gamma.entitystore.EntityTypes;
+import com.gamma.util.SqlIdent;
+
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * The SQL mirror of {@link EntityTypes#normalise} (Entity profile plan D-EP5: one Entity is the NORMALISED typed key), so the
@@ -27,12 +32,45 @@ final class EntityKeySql {
                         + " WHEN starts_with(" + d + ", '00') THEN (CASE WHEN " + d + " = '00' THEN '' ELSE '+' || substr(" + d + ", 3) END)"
                         + " ELSE " + d + " END)";
             }
-            // Java's full upper-case mapping turns sharp s into SS; DuckDB's upper keeps it, so it is folded first
-            case "upper-trim" -> "upper(replace(regexp_replace(regexp_replace(" + v + ", '" + WS + "+', ' ', 'g'), '^ | $', '', 'g'), 'ß', 'SS'))";
-            case "default" -> "regexp_replace(regexp_replace(regexp_replace(replace(lower(" + v + "), 'ς', 'σ'), '"
+            // Java's full case mappings (sharp s to SS, ligatures, ...) are folded first: DuckDB's upper / lower map one character to one
+            case "upper-trim" -> "upper(" + fold("regexp_replace(regexp_replace(" + v + ", '" + WS + "+', ' ', 'g'), '^ | $', '', 'g')", UPPER_FOLDS) + ")";
+            case "default" -> "regexp_replace(regexp_replace(regexp_replace(replace(lower(" + fold(v, LOWER_FOLDS) + "), 'ς', 'σ'), '"
                     + WS + "+', ' ', 'g'), '[ .,;:]+$', ''), '^ | $', '', 'g')";
             default -> throw new IllegalArgumentException("normaliser must be one of " + EntityTypes.NORMALISERS + ", got '" + normaliser + "'");
         };
+    }
+
+    /**
+     * The characters whose full case mapping in {@code Locale.ROOT} (what {@link EntityTypes#normalise} applies) is not their simple
+     * one-character mapping (what DuckDB's {@code upper} / {@code lower} apply), to the full mapping: 102 for upper case (sharp s,
+     * the ligatures, Greek with ypogegrammeni, ...), one for lower case (dotted capital I). Read from the running JDK, so the SQL
+     * follows the Java side's Unicode version (LA-INDEX-SPELLINGS-1 review; the shared parity fixture holds both to it).
+     */
+    private static final Map<String, String> UPPER_FOLDS = folds(true), LOWER_FOLDS = folds(false);
+
+    private static Map<String, String> folds(boolean upper) {
+        Map<String, String> out = new LinkedHashMap<>();
+        for (int cp = 0; cp <= Character.MAX_CODE_POINT; cp++) {
+            if (Character.getType(cp) == Character.UNASSIGNED || Character.getType(cp) == Character.SURROGATE) continue;
+            String s = new String(Character.toChars(cp));
+            String full = upper ? s.toUpperCase(Locale.ROOT) : s.toLowerCase(Locale.ROOT);
+            String simple = new String(Character.toChars(upper ? Character.toUpperCase(cp) : Character.toLowerCase(cp)));
+            if (!full.equals(simple)) out.put(s, full);
+        }
+        return Map.copyOf(out);
+    }
+
+    /** {@code expr} with each {@code folds} character replaced by its mapping; the chain runs only on a value holding one of them. */
+    private static String fold(String expr, Map<String, String> folds) {
+        if (folds.isEmpty()) return expr;
+        StringBuilder chain = new StringBuilder(expr);
+        StringBuilder chars = new StringBuilder();
+        for (Map.Entry<String, String> f : new java.util.TreeMap<>(folds).entrySet()) {
+            chain.insert(0, "replace(").append(", ").append(SqlIdent.sqlStr(f.getKey())).append(", ")
+                    .append(SqlIdent.sqlStr(f.getValue())).append(")");
+            chars.append(f.getKey());
+        }
+        return "(CASE WHEN regexp_matches(" + expr + ", " + SqlIdent.sqlStr("[" + chars + "]") + ") THEN " + chain + " ELSE " + expr + " END)";
     }
 
     /**

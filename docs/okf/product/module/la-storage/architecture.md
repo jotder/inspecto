@@ -75,21 +75,44 @@ stays so. What changed is how one start is read, and what the import counts (ope
 and c; keying nodes by the type's rule, option a, was not taken).
 
 - **The manifest records the spellings.** In `linkStats` (every mode, over the whole version) the build writes
-  `spellings: {type: {key: [raw ids]}}`: for each Entity Type of an end column, every key that more than one raw id
-  spells, with those ids in VARCHAR order. One type at both ends is pooled over both columns, as `typeNodes` is. A key
-  spelt once is not listed, so the entry is small on clean data. Above `IndexManifest.MAX_SPELLINGS` (10 000 raw ids) a
-  type maps to `null`. Additive: `formatVersion` stays 1 and no index is rebuilt; an index built before this has no
-  `spellings` and a start on it matches the raw value exactly, as before, until its next build or append.
+  `spellings: {type: {complete, keys: {key: [raw ids]}}}` for each Entity Type of an end column. One type at both ends
+  is pooled over both columns, as `typeNodes` is. Raw ids are in VARCHAR order. The listing is **complete** — every key
+  that some raw id *other than the key itself* spells — while that fits in `IndexManifest.MAX_SPELLINGS` (10 000 raw
+  ids). On the full-cycle fixture (account is `upper-trim`) that is one key: `ACC-1003: [' acc-1003 ', ACC-1003]`.
+  Past the cap it lists only the keys spelt more than once (`complete: false`); past the cap again, the type maps to
+  `null`. The manifest is parsed on every indexed read, so the cap also bounds that. Additive: `formatVersion` stays 1
+  and no index is rebuilt; an index built before this has no `spellings`, and a start on it matches the raw value
+  exactly, as before, until its next build or append.
 - **A start reads every spelling of its key** (`POST /inv/projection/neighbors`, the edge form). The end columns are
   typed by `IndexRoutes.entityTypeOf`, the rule the build used. The Dataset path matches a typed end by
-  `EntityKeySql.key(normaliser, col) = key(value)`. `IndexedNeighbors` folds each raw id the manifest lists for the
-  key, one bucket lookup each, and unions them. An untyped end, or a value whose key is empty, matches the value
+  `(raw = value OR EntityKeySql.key(normaliser, col) = key(value))`. `IndexedNeighbors` folds the value itself plus
+  each raw id the manifest lists for the key, one bucket lookup each, and unions them. Under a complete listing an
+  unlisted key can only be spelt by itself, so it folds the key too: `acc-1018` reads ACC-1018, and a key nobody
+  has answers empty from the index, quickly. An untyped end, or a value whose key is empty, matches the value
   exactly on both paths. The rows keep their raw ids, so under masking each spelling keeps its own alias; the start
-  alias is resolved before the spellings are found and no raw id is returned.
-- **When the index cannot say which raw ids spell the key, the Dataset answers.** An end typed under another rule than
-  the build used (`index_stale_refused`, *rebuild it*); a type with too many spellings to record; or a typed value that
-  is no raw id of that end and is not listed (`acc-1018` when only `ACC-1018` exists: `rung_not_indexable`). The last
-  is checked only when the end's fold came back empty (`IndexReader.rows`, one more bucket lookup).
+  alias is resolved before the spellings are found and no raw id is returned. A masked caller's raw guess is widened
+  by key too (`acc-1003` finds the account), but the answer holds aliases only, so no raw id and no spelling reaches them.
+- **The SQL key equals the Java key.** `EntityKeySql` folds, before DuckDB's one-to-one `upper` / `lower`, every
+  character whose full case mapping in `Locale.ROOT` differs from its simple one (102 for upper case — sharp s,
+  ligatures such as `ﬁ`, Greek with ypogegrammeni, `ŉ`, `ǰ`, `և` — and `İ` for lower case), read from the JDK at class
+  load. The shared `entity-normaliser-parity.fixture.json` holds Java, the browser and DuckDB to the same answers on
+  those inputs. Before this, `ﬁx-1` keyed `ﬁX-1` in SQL and `FIX-1` in Java. The raw equality stays in the Dataset match,
+  and the value stays in the index fold, so neither answer — nor the four-eyes fan-out count, taken with the same match —
+  can fall below the exact match if the two keys ever drift again.
+- **Cost.** The Dataset match calls regular expressions on the column, so a filter on that column no longer prunes
+  Parquet files or row groups: a typed start that the Dataset answers reads the whole relation, as a neighbours read
+  with the index off always did. The index reads at most `IndexedNeighbors.MAX_KEY_SPELLINGS` (64) raw ids per end of
+  one start, one bucket statement each.
+- **When the index cannot say which raw ids spell the key, the Dataset answers**, with the same rows and the reason on
+  `source`:
+  - an end typed under another rule than the build used: `index_stale_refused`, *rebuild it*. `GET /inv/index` does not
+    show this: its staleness compares the data and the definition, not the Entity Types, so it still says the index is
+    current. A rebuild clears it.
+  - a type with too many spellings to list, or a key spelt more than 64 ways: `frontier_over_index_cap`.
+  - under an incomplete listing only, a typed value that is no raw id of that end and is not listed (`acc-1018`):
+    `rung_not_indexable`. This is checked only when the end's fold came back empty (`IndexReader.rows`, one more
+    bucket lookup). On a two-type mapping (say msisdn to imei) every start under an incomplete listing reaches this check
+    on its other end, and so reads the Dataset. A complete listing never needs it.
 - **The import's entity count** (`ScheduledIndexBuild.done`, the `index.nodes` of Add data, Add a file and Run now) is
   the sum of `typeNodes` when both end columns are typed, so `' acc-1003 '` and `ACC-1003` are one entity (137 on the
   full-cycle fixture, not 138). An untyped or half-typed mapping keeps the distinct raw ids. `typeNodes` leaves out a
@@ -99,7 +122,9 @@ and c; keying nodes by the type's rule, option a, was not taken).
   (`/inv/projection/neighbors/preview`), recursive paths and graph runs.
 
 Pinned by `ControlApiOnboardLinkAnalysisTest` (`aStartFromATypedAccountReachesEverySpellingOfItsKeyFromTheIndexAndTheDataset`,
-`aMaskedStartReachesEverySpellingAndRevealsNone`, the 137 in the full-cycle test) and `IndexLinkStatsTest`.
+`aMaskedStartReachesEverySpellingAndRevealsNone`, `theFourEyesFanOutGateCountsTheWidenedMatchAndNeverLessThanTheExactOne`,
+`whenTheManifestCannotSayWhichRawIdsSpellAKeyTheDatasetAnswersAndSaysWhy`, the 137 in the full-cycle test),
+`IndexLinkStatsTest` and the parity fixture (`EntityKeySqlTest`, `EntityTypesTest`, `entity-key.spec.ts`).
 
 ## Design choices
 

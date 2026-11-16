@@ -170,14 +170,15 @@ class IndexLinkStatsTest {
         List<String> leafIds = new ArrayList<>();
         for (int i = 0; i < LEAVES; i++) leafIds.add("L" + i);
         leafIds.sort(null);
-        assertEquals(Map.of("t", Map.of("L", leafIds)), m.spellings());
+        assertEquals(Map.of("t", new IndexManifest.Spellings(true, Map.of("L", leafIds))), m.spellings());
         assertEquals(m.spellings(), IndexManifest.read(build(tmp.resolve("a"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, leaves, leaves)
                 .directory()).spellings(), "written to manifest.json");
         // only the target is typed: its spellings come from the target column alone
-        assertEquals(Map.of("t", Map.of("L", leafIds)),
+        assertEquals(Map.of("t", new IndexManifest.Spellings(true, Map.of("L", leafIds))),
                 build(tmp.resolve("c"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, null, leaves).manifest().spellings());
-        assertEquals(Map.of("t", Map.of()), build(tmp.resolve("d"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, leaves, null).manifest().spellings(),
-                "the source column spells H only");
+        assertEquals(Map.of("t", new IndexManifest.Spellings(true, Map.of())),
+                build(tmp.resolve("d"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, leaves, null).manifest().spellings(),
+                "the source column spells H only, by itself");
         assertEquals(Map.of(), build(tmp.resolve("e"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, null, null).manifest().spellings(),
                 "untyped ends: recorded, and empty");
 
@@ -212,14 +213,49 @@ class IndexLinkStatsTest {
         assertEquals(with, back);
         assertEquals(Map.of(), back.typeNodes(), "an empty map stays empty, not unrecorded");
 
-        // spellings round-trip, a type with too many to record (null) included
-        Map<String, Map<String, List<String>>> sp = new java.util.LinkedHashMap<>();
-        sp.put("account", Map.of("acc-1", List.of(" acc-1 ", "ACC-1")));
+        // spellings round-trip, an incomplete listing and a type with too many to list (null) included
+        Map<String, IndexManifest.Spellings> sp = new java.util.LinkedHashMap<>();
+        sp.put("account", new IndexManifest.Spellings(false, Map.of("acc-1", List.of(" acc-1 ", "ACC-1"))));
+        sp.put("wallet", new IndexManifest.Spellings(true, Map.of()));
         sp.put("msisdn", null);
         IndexManifest spelt = with.withSpellings(sp);
         IndexManifest spBack = IndexManifest.fromJson(spelt.toJson());
         assertEquals(spelt, spBack);
         assertTrue(spBack.spellings().containsKey("msisdn") && spBack.spellings().get("msisdn") == null, spBack.spellings().toString());
+    }
+
+    /**
+     * LA-INDEX-SPELLINGS-1 review: the listing is COMPLETE (every key a raw id other than itself spells) while that fits in
+     * {@link IndexManifest#MAX_SPELLINGS} raw ids; past it, only the keys spelt more than once (incomplete); past that, none (null).
+     */
+    @Test
+    void spellingsAreListedCompleteWhileTheyFitThenOnlyTheSharedKeysThenNone(@TempDir Path tmp) throws Exception {
+        IndexMapping bare = new IndexMapping("s", "t", null, null, null, null, List.of());
+        IndexBuilder.EndpointKey lower = new IndexBuilder.EndpointKey("t", "lower", c -> "lower(" + c + ")");
+        int n = IndexManifest.MAX_SPELLINGS / 2 + 1;   // 2n raw ids, each spelling its own lower-case key
+        // A0 -> B0 ... : every raw id differs from its key, no key is shared
+        Path small = tmp.resolve("small"), many = tmp.resolve("many"), shared = tmp.resolve("shared");
+        plantPairs(small, "'A' || i", "'B' || i", 10);
+        IndexManifest.Spellings s = build(tmp.resolve("s"), small, bare, IndexBuilder.Mode.FULL, List.of("f0.parquet"), lower, lower)
+                .manifest().spellings().get("t");
+        assertTrue(s.complete(), s.toString());
+        assertEquals(List.of("A3"), s.keys().get("a3"), "a key spelt once, by another raw id, is listed when the listing is complete");
+        plantPairs(many, "'A' || i", "'B' || i", n);
+        s = build(tmp.resolve("m"), many, bare, IndexBuilder.Mode.FULL, List.of("f0.parquet"), lower, lower).manifest().spellings().get("t");
+        assertEquals(new IndexManifest.Spellings(false, Map.of()), s, "too many to list completely, and no key is spelt twice");
+        // A0 -> a0 ... : every key spelt twice, 2n raw ids
+        plantPairs(shared, "'A' || i", "'a' || i", n);
+        IndexManifest m = build(tmp.resolve("x"), shared, bare, IndexBuilder.Mode.FULL, List.of("f0.parquet"), lower, lower).manifest();
+        assertTrue(m.spellings().containsKey("t") && m.spellings().get("t") == null, "too many even of the shared keys: " + m.spellings());
+    }
+
+    /** f0.parquet: {@code rows} edges {@code (s, t)} rendered from {@code range(rows) r(i)}. */
+    private static void plantPairs(Path dir, String s, String t, int rows) throws Exception {
+        Files.createDirectories(dir);
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("COPY (SELECT " + s + " AS s, " + t + " AS t FROM range(" + rows + ") r(i)) TO '" + sql(dir.resolve("f0.parquet"))
+                    + "' (FORMAT parquet)");
+        }
     }
 
     private static void assertStatsEqual(IndexManifest want, IndexManifest got) {
