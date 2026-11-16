@@ -23,6 +23,7 @@ import {
     ElementDatum,
     Graph,
     GraphData,
+    GraphEvent,
     LayoutOptions,
     NodeData,
     NodeEvent,
@@ -338,6 +339,112 @@ export function startBadge(
     };
 }
 
+/** Where a node label sits round its node (G6 `labelPlacement`): `bottom`, unless that would cover a start tab. */
+export type LabelSide = 'bottom' | 'top' | 'right' | 'left';
+/** A box on the canvas in graph units: left, top, right, bottom. */
+export type CanvasBox = readonly [number, number, number, number];
+/** One drawn node as the label rule reads it: its centre, its drawn width and height, its start mark and its label. */
+export interface LabelledNode {
+    id: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    start: boolean;
+    label: string;
+}
+
+const NODE_LABEL_FONT = 11;
+/** The label's gap from the outline ({@link nodeLabelBacking}'s 4 px) and its backing's padding: 1 px tall, 4 px wide. */
+const NODE_LABEL_GAP = 4;
+const NODE_LABEL_PAD: readonly [number, number] = [1, 4];
+/**
+ * How far a label beside its node sits below the node's middle: a start tab is wider than a small node and overlaps its
+ * top edge by 3 px, so a label centred beside a start node would graze its own tab's lower corner.
+ */
+const SIDE_LABEL_DROP = 2;
+/** The label's offset per side: away from the node by {@link NODE_LABEL_GAP} (and a little down beside it). */
+export const LABEL_SIDE_OFFSET: Record<LabelSide, readonly [number, number]> = {
+    bottom: [0, NODE_LABEL_GAP],
+    top: [0, -NODE_LABEL_GAP],
+    right: [NODE_LABEL_GAP, SIDE_LABEL_DROP],
+    left: [-NODE_LABEL_GAP, SIDE_LABEL_DROP],
+};
+
+/**
+ * A text's width on the canvas, estimated (jsdom and the label rule have no canvas to measure with): 0.62 em a character
+ * is a little wider than the canvas sans-serif's capitals and digits, so the box is never smaller than the ink.
+ */
+function textWidth(text: string, fontSize: number): number {
+    return text.length * fontSize * 0.62;
+}
+
+/** The start tab's box over a start node centred at (`x`, `y`) and `h` tall ({@link startBadge}; G6 pads a badge 4 px wide). */
+export function startTabBox(x: number, y: number, h: number): CanvasBox {
+    const w = textWidth('start', START_BADGE_FONT) + 8;
+    const top = y - h / 2 - START_BADGE_RISE;
+    return [x - w / 2, top, x + w / 2, top + START_BADGE_HEIGHT];
+}
+
+/** A node label's box, its backing included, on `side` of its node. */
+export function nodeLabelBox(n: LabelledNode, side: LabelSide): CanvasBox {
+    const w = textWidth(n.label, NODE_LABEL_FONT) + 2 * NODE_LABEL_PAD[1];
+    const h = NODE_LABEL_FONT * 1.3 + 2 * NODE_LABEL_PAD[0];
+    switch (side) {
+        case 'bottom': {
+            const top = n.y + n.h / 2 + NODE_LABEL_GAP - NODE_LABEL_PAD[0];
+            return [n.x - w / 2, top, n.x + w / 2, top + h];
+        }
+        case 'top': {
+            const bottom = n.y - n.h / 2 - NODE_LABEL_GAP + NODE_LABEL_PAD[0];
+            return [n.x - w / 2, bottom - h, n.x + w / 2, bottom];
+        }
+        case 'right': {
+            const left = n.x + n.w / 2 + NODE_LABEL_GAP - NODE_LABEL_PAD[1];
+            const mid = n.y + SIDE_LABEL_DROP;
+            return [left, mid - h / 2, left + w, mid + h / 2];
+        }
+        case 'left': {
+            const right = n.x - n.w / 2 - NODE_LABEL_GAP + NODE_LABEL_PAD[1];
+            const mid = n.y + SIDE_LABEL_DROP;
+            return [right - w, mid - h / 2, right, mid + h / 2];
+        }
+    }
+}
+
+/** Do two boxes overlap (touching edges do not)? */
+export function boxesOverlap(a: CanvasBox, b: CanvasBox): boolean {
+    return a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+}
+
+/**
+ * Labels and start tabs never collide (LA-EXEC-DEMO-POLISH-1, item 16): a label whose usual place under its node would
+ * cover a start tab (SMURF-02's label lay on RELAY-01's tab in the showcase) moves to the first side of its own node,
+ * of top, right and left, that is clear of every start tab, preferring one that also covers no node; with no such side
+ * it stays under its node. The tab never moves: "the tab on top of a node" is how a start entity is recognised on every
+ * canvas, so the label of the other node gives way. G6 5.1.1 has no label collision avoidance that could do this (its
+ * `auto-adapt-label` hides labels by priority, and knows nothing of badges). Only the moved labels are returned.
+ */
+export function labelSidesClearOfStartTabs(nodes: readonly LabelledNode[]): Map<string, LabelSide> {
+    const out = new Map<string, LabelSide>();
+    const tabs = nodes.filter((n) => n.start).map((n) => startTabBox(n.x, n.y, n.h));
+    if (!tabs.length) return out;
+    const clearOfTabs = (box: CanvasBox): boolean => tabs.every((t) => !boxesOverlap(t, box));
+    for (const n of nodes) {
+        if (!n.label || clearOfTabs(nodeLabelBox(n, 'bottom'))) continue;
+        const sides = (['top', 'right', 'left'] as const).filter((s) => clearOfTabs(nodeLabelBox(n, s)));
+        const coversNoNode = (s: LabelSide): boolean =>
+            nodes.every(
+                (o) =>
+                    o === n ||
+                    !boxesOverlap([o.x - o.w / 2, o.y - o.h / 2, o.x + o.w / 2, o.y + o.h / 2], nodeLabelBox(n, s)),
+            );
+        const side = sides.find(coversNoNode) ?? sides[0];
+        if (side) out.set(n.id, side);
+    }
+    return out;
+}
+
 /**
  * A node label's backing (LA-FULL-CYCLE-TEST-1 presentability): the label sits on a rounded chip in the node surface
  * token (white / slate-800), slightly translucent, a few pixels below the outline. Links are drawn under nodes, so a
@@ -497,6 +604,9 @@ export function cappedLayout(
  * neighbours and every other node keeps its position. A typical expand adds one hop of a handful to a few dozen nodes.
  */
 export const EXPAND_RELAYOUT_MAX_NEW = 50;
+
+/** How long drawing must stay quiet before the labels are placed again round the start tabs (a sliced layout draws in bursts). */
+export const RELABEL_SETTLE_MS = 120;
 
 /**
  * The distance between two node centres an incremental placement keeps clear: the node, plus the gap the Radial layout
@@ -1250,6 +1360,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         this.resizeObserver?.disconnect();
         this.dropPendingBrush();
         if (this.fitTimer !== null) clearTimeout(this.fitTimer);
+        if (this.relabelTimer !== null) clearTimeout(this.relabelTimer);
         const host = this.hostEl?.nativeElement;
         host?.removeEventListener('pointerleave', this.hideStaleTooltipBound);
         host?.removeEventListener('pointerdown', this.hideStaleTooltipBound);
@@ -1270,6 +1381,68 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             }
         }
         return out;
+    }
+
+    /** The labels moved off their node's bottom to clear a start tab ({@link labelSidesClearOfStartTabs}); absent = bottom. */
+    private labelSides: ReadonlyMap<string, LabelSide> = new Map();
+    private relabelTimer: ReturnType<typeof setTimeout> | null = null;
+    /** A node is being dragged: the labels are placed again once it is let go, never mid-drag. */
+    private dragging = false;
+
+    /** Where a node's label sits now. */
+    labelSideOf(id: string): LabelSide {
+        return this.labelSides.get(id) ?? 'bottom';
+    }
+
+    /** Place the labels again once drawing has settled (a sliced layout draws many times; only the last counts). */
+    private scheduleRelabel(): void {
+        if (this.relabelTimer !== null) clearTimeout(this.relabelTimer);
+        this.relabelTimer = setTimeout(() => {
+            this.relabelTimer = null;
+            this.relabel();
+        }, RELABEL_SETTLE_MS);
+    }
+
+    /**
+     * Move the label of every node that would cover a start tab to a clear side (LA-EXEC-DEMO-POLISH-1, item 16), from
+     * where the nodes are drawn now. Repaints only when a label changes side, so the draw it causes settles here.
+     */
+    relabel(): void {
+        const graph = this.graph;
+        if (!graph || !this.data || this.dragging) return;
+        const at = this.nodePositions();
+        const size = this.display?.nodeSize ?? HOST_NODE_SIZE;
+        const nodes: LabelledNode[] = [];
+        for (const d of this.data.nodes) {
+            const p = at[String(d.id)];
+            if (!p) continue;
+            const [w, h] = this.nodeIconOf(d as unknown as NodeData)
+                ? [Math.round(size * 1.44), Math.round(size * 1.06)]
+                : [size, size];
+            const nd = d.data as { label?: string; canvasLabel?: string; start?: boolean };
+            nodes.push({
+                id: String(d.id),
+                x: p[0],
+                y: p[1],
+                w,
+                h,
+                start: !!nd.start,
+                label: nd.canvasLabel ?? nd.label ?? '',
+            });
+        }
+        const next = labelSidesClearOfStartTabs(nodes);
+        const same = next.size === this.labelSides.size && [...next].every(([id, s]) => this.labelSides.get(id) === s);
+        if (same) return;
+        this.labelSides = next;
+        // As in applyData: the same nodes, each pinned where it is drawn, so G6 re-runs the style mappers and no layout.
+        graph.setData({
+            nodes: this.data.nodes.map((n) => this.seedPosition(n)),
+            edges: this.data.edges,
+        } as unknown as GraphData);
+        void graph
+            .draw()
+            .then(() => this.syncSelectionState())
+            .catch(() => undefined);
     }
 
     /** The rendered canvas as a PNG data-URI (Link Analysis export), or `null` before the first render. */
@@ -1726,6 +1899,13 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         return { ...node, style: { ...style, x: point[0], y: point[1] } };
     }
 
+    /** The icon a node is drawn with (its own, else its Entity Type's when entity icons are on); undefined = a plain shape. */
+    private nodeIconOf(d: NodeData): string | undefined {
+        const iconSrc = (d.data as { iconSrc?: string }).iconSrc;
+        if (iconSrc || !this.entityIcons) return iconSrc;
+        return entityTypeIcon((d.data as { kind: NodeKind }).kind, this.nodeColorOf(d), this.display?.nodeShapes);
+    }
+
     /** Build a brand-new G6 instance. The last resort - see {@link ngOnChanges}. */
     private create(): void {
         registerSlicedLayouts();
@@ -1733,6 +1913,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         this.hoverLabelled = [];
         this.pinnedLabelled = [];
         this.destroyGraph();
+        this.labelSides = new Map(); // a new instance is laid out afresh: its labels are placed once it is drawn
         if (!this.data?.nodes.length) {
             this.snapshotKeys();
             return;
@@ -1740,12 +1921,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         this.refreshStyleState();
         this.selSet = new Set(this.selection ?? []);
         const kindOf = (d: NodeData): NodeKind => (d.data as { kind: NodeKind }).kind;
-        const iconOf = (d: NodeData): string | undefined => {
-            const iconSrc = (d.data as { iconSrc?: string }).iconSrc;
-            if (iconSrc || !this.entityIcons) return iconSrc;
-            const kind = kindOf(d);
-            return entityTypeIcon(kind, this.nodeColorOf(d), this.display?.nodeShapes);
-        };
+        const iconOf = (d: NodeData): string | undefined => this.nodeIconOf(d);
         const layoutOptions = layoutConfig(this.effectiveLayout(), {
             nodeSize: this.display?.nodeSize,
             spacing: this.display?.layoutSpacing,
@@ -1859,10 +2035,13 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                         (d.data as { label: string }).label,
                     labelFill: () => this.styleFg,
                     labelFontSize: 11,
-                    labelPlacement: 'bottom',
                     // The label sits on a backing in the node surface token, a little below the outline, so a link or
                     // an arrowhead that runs under it never cuts through the text (LA-FULL-CYCLE-TEST-1 presentability).
                     ...nodeLabelBacking(() => this.styleNodeFill),
+                    // Under its node, unless that covers a start tab: then on a clear side (LA-EXEC-DEMO-POLISH-1, item 16).
+                    labelPlacement: (d) => this.labelSideOf(String(d.id)),
+                    labelOffsetX: (d) => LABEL_SIDE_OFFSET[this.labelSideOf(String(d.id))][0],
+                    labelOffsetY: (d) => LABEL_SIDE_OFFSET[this.labelSideOf(String(d.id))][1],
                     cursor: 'pointer',
                     opacity: (d) =>
                         this.nodeDim(d.id as string) ? 0.25 : (d.data as { missing?: boolean }).missing ? 0.45 : 1,
@@ -1982,6 +2161,16 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         graph.on(NodeEvent.POINTER_ENTER, (e) => this.revealEdgeLabels(targetId(e), 'node', false));
         graph.on(EdgeEvent.POINTER_ENTER, (e) => this.revealEdgeLabels(targetId(e), 'edge', false));
         graph.on(NodeEvent.POINTER_LEAVE, () => this.revealEdgeLabels(undefined, 'node', false));
+        // Labels clear of the start tabs: placed again whenever drawing settles, and when a dragged node is let go.
+        graph.on(GraphEvent.AFTER_DRAW, () => this.scheduleRelabel());
+        graph.on(NodeEvent.DRAG_START, () => (this.dragging = true));
+        // A drag that ends off the canvas (a blur) may never send its dragend: any pointer release ends it here too.
+        for (const end of [NodeEvent.DRAG_END, CommonEvent.POINTER_UP])
+            graph.on(end, () => {
+                if (!this.dragging) return;
+                this.dragging = false;
+                this.scheduleRelabel();
+            });
         graph.on(EdgeEvent.POINTER_LEAVE, () => this.revealEdgeLabels(undefined, 'edge', false));
         const host = this.hostEl.nativeElement;
         // A sliced Force layout superseded by a newer layout (or a destroy) rejects this render: the elements are drawn

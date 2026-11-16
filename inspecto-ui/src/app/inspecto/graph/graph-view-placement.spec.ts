@@ -7,8 +7,13 @@ import {
     GRAPH_DEFAULT_LAYOUT_SPACING,
     GRAPH_DEFAULT_NODE_SIZE,
     GraphViewComponent,
+    LabelledNode,
+    boxesOverlap,
+    labelSidesClearOfStartTabs,
+    nodeLabelBox,
     placeBesideNeighbours,
     placementGap,
+    startTabBox,
 } from './graph-view.component';
 
 /**
@@ -208,5 +213,83 @@ describe('graph placement after an Expand and a Save (LA-FULL-CYCLE-TEST-1 phase
             for (const q of nodes.slice(0, -3).map((n) => n['style'] as { x: number; y: number }))
                 expect(Math.hypot(p.x - q.x, p.y - q.y)).toBeGreaterThanOrEqual(GAP - 1e-6);
         }
+    });
+});
+
+/**
+ * LA-EXEC-DEMO-POLISH-1, item 16: a leaf's label lay on a neighbour's "start" tab (SMURF-02 on RELAY-01 in the showcase).
+ * Every node of the 17-node fixture is checked: no label box, on the side the view draws it, intersects a start-tab box.
+ */
+describe('labels clear of the start tabs on the 17-node fixture (LA-EXEC-DEMO-POLISH-1)', () => {
+    const starIds = ['s', ...Array.from({ length: 14 }, (_, i) => `r${i}`)];
+    const expandedIds = [...starIds, 'x1', 'x2'];
+    const expandedEdges: [string, string][] = [...STAR_EDGES, ['r0', 'x1'], ['r0', 'x2']];
+
+    /** The fixture with `starts` marked as start entities (hop 0 of an Investigation). */
+    function withStarts(g: G6GraphData, starts: string[]): G6GraphData {
+        return {
+            ...g,
+            nodes: g.nodes.map((n) => ({ ...n, data: { ...n.data, start: starts.includes(String(n.id)) } })),
+        } as G6GraphData;
+    }
+    /** The drawn nodes as the label rule reads them: no icon here, so each is a NODE-wide shape. */
+    function drawnNodes(g: G6GraphData, drawn: Record<string, Pt>): LabelledNode[] {
+        return g.nodes.map((n) => ({
+            id: String(n.id),
+            x: drawn[String(n.id)][0],
+            y: drawn[String(n.id)][1],
+            w: NODE,
+            h: NODE,
+            start: !!(n.data as { start?: boolean }).start,
+            label: (n.data as { label: string }).label,
+        }));
+    }
+    /** Every node whose label, on the side `sideOf` gives it, covers a start tab; [] = none. */
+    function onATab(nodes: LabelledNode[], sideOf: (id: string) => Parameters<typeof nodeLabelBox>[1]): string[] {
+        const tabs = nodes.filter((n) => n.start).map((n) => startTabBox(n.x, n.y, n.h));
+        return nodes.filter((n) => tabs.some((t) => boxesOverlap(t, nodeLabelBox(n, sideOf(n.id))))).map((n) => n.id);
+    }
+
+    it('after the Expand, with the start entity and the Expand anchor marked, no label covers a start tab', () => {
+        const { comp, drawn, view } = harness(withStarts(graph(starIds, STAR_EDGES), ['s', 'r0']), starPositions());
+        comp.data = withStarts(graph(expandedIds, expandedEdges), ['s', 'r0']);
+        comp.ngOnChanges({ data: {} });
+        view.relabel();
+        expect(Object.keys(drawn)).toHaveLength(17);
+        expect(onATab(drawnNodes(comp.data, drawn), (id) => view.labelSideOf(id))).toEqual([]);
+    });
+
+    it('a leaf drawn just above a start entity (the showcase case): its label leaves the tab, once, and every node stays clear', () => {
+        // r1 sits up and to the left of the start entity s, as SMURF-02 sat over RELAY-01
+        const at = { ...starPositions(), r1: [-10, -45] as Pt };
+        const { comp, stub, drawn, view } = harness(withStarts(graph(starIds, STAR_EDGES), ['s']), at);
+        const nodes = drawnNodes(comp.data!, drawn);
+        expect(onATab(nodes, () => 'bottom')).toEqual(['r1']); // the case bites: under its node, r1's label covers the tab
+        const setData = stub.setData.mock.calls.length;
+        view.relabel();
+        expect(view.labelSideOf('r1')).toBe('top');
+        expect(onATab(drawnNodes(comp.data!, drawn), (id) => view.labelSideOf(id))).toEqual([]);
+        expect(stub.setData.mock.calls.length).toBe(setData + 1); // repainted once, every node where it was
+        expect(drawn['r1']).toEqual([-10, -45]);
+        view.relabel();
+        expect(stub.setData.mock.calls.length).toBe(setData + 1); // nothing changed: no second repaint
+    });
+
+    it("a start entity's own label never moves onto its own tab, and with no start entity drawn nothing moves", () => {
+        const node = (id: string, x: number, y: number, start = false): LabelledNode => ({
+            id,
+            x,
+            y,
+            w: NODE,
+            h: NODE,
+            start,
+            label: id.toUpperCase(),
+        });
+        // start b sits just under start a: b's label under it is clear, a's label under it lies on b's tab
+        const sides = labelSidesClearOfStartTabs([node('a', 0, 0, true), node('b', 0, 40, true)]);
+        expect(sides.get('a')).toBe('right'); // not top: its own tab is there; beside it, a little low, clears both tabs
+        expect(sides.has('b')).toBe(false);
+        // no start entity drawn: nothing moves
+        expect(labelSidesClearOfStartTabs([node('a', 0, 0), node('b', 0, 40)]).size).toBe(0);
     });
 });

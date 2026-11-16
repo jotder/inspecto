@@ -821,8 +821,9 @@ other outlines, so the ring stays visible on a projector); on an Investigation's
 **outside** what is already there: past the ring of the entity they hang off, on the side facing away from the rest of
 the graph, never on top of another node or a link. A bigger Expand lays the whole graph out again. The layout a graph
 opened with stays while you expand it; pick another in **Graph layout** to change it. On an Investigation, each **start
-entity** keeps a heavier outline and a small **start** badge through every step. The badge sits just off the node's
-top-left corner, beside and above it, so it never covers the node's icon or outline.
+entity** keeps a heavier outline and a small **start** tab through every step, centred on the node's top edge. A
+node's name is written under it, unless there it would lie on a start tab of a node just below: then it moves above
+its node, or beside it, wherever it is clear, and back once the nodes move apart.
 
 **Remove** (**Delete**, right-click, or the bin on the canvas toolbar) is offered while you explore, outside an open
 Investigation. It takes the selected nodes off the graph, together with every neighbour left with no link at all once
@@ -2027,8 +2028,9 @@ it noted, and the call taken for each so the uncropped screen passes:
   (permission and not read-only), disabled but focusable, with the tooltip *Only a lead changes the steps of this
   Investigation.*; the component's `undo()` / `redo()` check the same. Ctrl+Z on the canvas still reaches the store
   for them (the page does not know the role), where the server refuses it.
-- **The start tab beside a neighbour's label: left as it is.** On the mule case the force layout puts SMURF-02 directly
-  above RELAY-01, so SMURF-02's label backing ends just above RELAY-01's start tab. Nothing overlaps; they touch. The
+- **The start tab beside a neighbour's label: left as it is** (superseded by round 2, item 16 below: the full-screen
+  review saw the label lie on the tab). On the mule case the force layout puts SMURF-02 directly
+  above RELAY-01, so SMURF-02's label backing ends just above RELAY-01's start tab. The
   tab already rises the least it can while staying a tab of its own node (10 px: its 13 px less a 3 px overlap), and the label's
   4 px drop and 1 px padding are what keep link lines off the letters. Moving either changes the phase-6 and
   presentability-2 placements for every graph to fix one pair, and spacing the layout further changes every layout,
@@ -2042,6 +2044,25 @@ it noted, and the call taken for each so the uncropped screen passes:
 - Specs: `graph-view.component.spec.ts` (fold class, no rebuild), `link-analysis.component.spec.ts` (fold button, tab
   labels, counts words, Reveal dialog text), `link-analysis-investigation.component.spec.ts` (header lines and wrapped
   name, reviewer Undo / Redo), `expansion-decision.spec.ts`, `investigate-number.spec.ts`.
+
+### Executive demo polish, round 2: decisions (`LA-EXEC-DEMO-POLISH-1` items 16-19, as built 2026-11-16)
+
+The sixth review passed the screen full-screen *with notes*; these are its four notes and the call taken for each.
+
+- **16. A label never lies on a start tab: the label moves, the tab stays.** `labelSidesClearOfStartTabs`
+  (`graph-view.component.ts`) reads where each node is drawn; a label whose box under its node meets a start tab's box
+  moves to the first side of its own node, of top, right and left, that meets no start tab, preferring one that covers
+  no node either; with none it stays under. The tab never moves, because "a tab on top of the node" is how a start
+  entity is recognised on every canvas; moving the tab to the far side of a colliding label would make that mark mean
+  nothing at a glance. G6 5.1.1 has no collision avoidance that could do it: its `auto-adapt-label` behaviour hides
+  labels by priority and does not know badges, and hiding a name is worse than moving it. A label beside its node sits
+  2 px below the middle, because a start tab is wider than a small node and would otherwise graze it. The rule runs
+  120 ms after drawing settles (`GraphEvent.AFTER_DRAW`, so a sliced layout's bursts count once) and when a dragged node
+  is let go, never mid-drag; it repaints only when a label changes side, every node pinned where it is (no layout runs,
+  so the phase-6 placements are untouched). Text widths are estimated at 0.62 em a character (no canvas to measure in
+  jsdom), a little wider than the ink. Spec: `graph-view-placement.spec.ts` (the 17-node fixture with start entities:
+  no label box meets a start-tab box; the showcase case, a leaf just above a start entity, moves its label once and
+  settles).
 
 ### Search around, Merge and Possible duplicates internals
 
