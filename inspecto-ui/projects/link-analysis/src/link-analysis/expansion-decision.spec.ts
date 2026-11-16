@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { ExpansionSensitivity, PendingExpansion } from '@inspecto/link-analysis/api/inv.service';
-import { approverWaitingMessage, heldLimitWords, requesterName } from './expansion-decision';
+import type { DegreeOutcome } from './investigate-number';
+import {
+    approverWaitingMessage,
+    heldLimitWords,
+    recordedBefore,
+    requestDifference,
+    requesterName,
+} from './expansion-decision';
 
 const sens = (over: Partial<ExpansionSensitivity>): ExpansionSensitivity => ({
     exceeded: [],
@@ -75,5 +82,75 @@ describe('the approver wording', () => {
         const oneHop = approverWaitingMessage({ ...head, oneHop: 'every entity' }, PENDING, 'Fatima Analyst');
         expect(oneHop.startsWith('Requested next, not yet run: Expand one hop from every entity. Fatima')).toBe(true);
         expect(requesterName({ ...PENDING, requestedBy: null }, (id) => id)).toBe('another analyst');
+    });
+});
+
+// LA-EXEC-DEMO-POLISH-1 item 17: a request that repeats the recorded Expand says how it differs from it
+describe('the approver line against the Expand it repeats', () => {
+    /** The recorded "Expand one hop from every entity (step 2)" of the showcase: 6 strongest links, 500 rows. */
+    const RAN: DegreeOutcome = {
+        degree: 1,
+        admitted: 6,
+        linksAdded: 7,
+        truncated: false,
+        fanOutCapped: 8,
+        budget: 500,
+        maxFanOut: 6,
+        oneHop: 'every entity',
+        step: 2,
+    };
+    const HELD: DegreeOutcome = {
+        degree: 2,
+        admitted: 0,
+        linksAdded: 0,
+        truncated: false,
+        fanOutCapped: 0,
+        awaitingApproval: 'p1',
+        oneHop: 'every entity',
+    };
+
+    it('no limit on links: "again, this time" the difference, then only the number of the limit it crosses', () => {
+        expect(approverWaitingMessage(HELD, PENDING, 'Demo FM Analyst', RAN)).toBe(
+            'Requested next, not yet run: Expand one hop from every entity again, this time adding every link of each ' +
+                'entity, not only the 6 strongest. Demo FM Analyst asks for your approval. That is more than the 2,000 ' +
+                'allowed without a second approval.',
+        );
+    });
+
+    it('a bigger read: the rows, then its limit; both limits crossed: both named', () => {
+        const rows = { ...PENDING, sensitivity: sens({ budget: 5000, fourEyesBudgetAbove: 1000, maxFanOut: 6 }) };
+        expect(approverWaitingMessage(HELD, rows, 'Demo FM Analyst', RAN)).toBe(
+            'Requested next, not yet run: Expand one hop from every entity again, this time reading up to 5,000 rows, ' +
+                'not 500. Demo FM Analyst asks for your approval. That is more than the 1,000 allowed without a second ' +
+                'approval.',
+        );
+        const both = {
+            ...PENDING,
+            sensitivity: sens({ budget: 5000, fourEyesBudgetAbove: 1000, maxFanOut: null, fourEyesFanOutAbove: 2000 }),
+        };
+        expect(approverWaitingMessage(HELD, both, 'X', RAN)).toContain(
+            'again, this time adding every link of each entity, not only the 6 strongest and reading up to 5,000 rows, ' +
+                'not 500. X asks for your approval. It would read up to 5,000 rows and add every neighbour',
+        );
+    });
+
+    it('nothing known differs, or no Expand to repeat: the line as before', () => {
+        const same = { ...PENDING, sensitivity: sens({ budget: 500, maxFanOut: 6, fourEyesFanOutAbove: 2 }) };
+        expect(requestDifference(same.sensitivity!, RAN).words).toEqual([]);
+        expect(approverWaitingMessage(HELD, same, 'X', RAN)).toMatch(
+            /^Requested next, not yet run: Expand one hop from every entity\. X asks/,
+        );
+        expect(approverWaitingMessage(HELD, PENDING, 'X', null)).toMatch(
+            /^Requested next, not yet run: Expand one hop from every entity\. X asks/,
+        );
+    });
+
+    it('the Expand repeated is the latest before the held line with the same head that read data', () => {
+        const ladder: DegreeOutcome = { ...RAN, oneHop: undefined, step: undefined };
+        const denied: DegreeOutcome = { ...HELD, awaitingApproval: 'p0', decision: 'denied' };
+        const approved: DegreeOutcome = { ...HELD, awaitingApproval: 'p9', decision: 'approved', maxFanOut: 9 };
+        expect(recordedBefore([RAN, ladder, denied, HELD], HELD)).toBe(RAN); // a denied one never read
+        expect(recordedBefore([RAN, approved, HELD], HELD)).toBe(approved); // an approved one ran
+        expect(recordedBefore([ladder, HELD, RAN], HELD)).toBeNull(); // after it, or another head: none
     });
 });

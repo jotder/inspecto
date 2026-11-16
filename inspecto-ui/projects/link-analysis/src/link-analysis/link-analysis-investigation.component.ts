@@ -88,6 +88,7 @@ import {
     approverWaitingMessage,
     canDecideExpansion,
     confirmApproveExpansion,
+    recordedBefore,
     requesterName,
 } from './expansion-decision';
 import { INVESTIGATION_PANEL_LABELS, InvestigationPanel, openInvestigationPanel } from './investigation-panel.dialog';
@@ -794,7 +795,7 @@ export class LinkAnalysisInvestigationComponent {
     }
     /** The approver's waiting line, the requester named as the sign-in names them (Demo User or IdP), else by id. */
     approverMessage(o: DegreeOutcome, p: PendingExpansion): string {
-        return approverWaitingMessage(o, p, this.requester(p));
+        return approverWaitingMessage(o, p, this.requester(p), recordedBefore(this.store.degreeOutcomes(), o));
     }
     private requester(p: PendingExpansion): string {
         return requesterName(p, (id) => this.session.subjectName(id));

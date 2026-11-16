@@ -2063,6 +2063,18 @@ The sixth review passed the screen full-screen *with notes*; these are its four 
   jsdom), a little wider than the ink. Spec: `graph-view-placement.spec.ts` (the 17-node fixture with start entities:
   no label box meets a start-tab box; the showcase case, a leaf just above a start entity, moves its label once and
   settles).
+- **17. A held request that repeats a recorded Expand says how it differs.** Round 1's *Requested next, not yet run:*
+  still named the same op as the recorded line above it (*Expand one hop from every entity*), so it read like a
+  repeat. `recordedBefore` (`expansion-decision.ts`) finds the latest Expand before the held line with the same head
+  that read data (not held, not denied); `requestDifference` compares the request's sealed sensitivity with that
+  step's rung, and the line becomes *Requested next, not yet run: Expand one hop from every entity again, this time
+  adding every link of each entity, not only the 6 strongest. Demo FM Analyst asks for your approval. That is more
+  than the 2,000 allowed without a second approval.* Decisions: the difference is said in the recorded line's own
+  words (*the 6 strongest links of each entity*, *reading up to N rows*), never "fan-out" (the presentability rule for
+  approver text stands); the limit sentence names only the number when the difference already says what crosses it,
+  and keeps the full sentence when both limits are crossed, so "without a second approval" still covers both; with no
+  Expand to repeat, or nothing known that differs, the line is as before. Specs: `expansion-decision.spec.ts`,
+  `link-analysis-investigation.component.spec.ts` (the rendered approver line).
 
 ### Search around, Merge and Possible duplicates internals
 

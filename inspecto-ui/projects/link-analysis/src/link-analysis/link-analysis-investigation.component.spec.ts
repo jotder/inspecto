@@ -1397,6 +1397,30 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
             expect(line(el)?.textContent).not.toContain('p7');
         });
 
+        it('LA-EXEC-DEMO-POLISH-1: a request that repeats the recorded Expand says how it differs from it', async () => {
+            const { fixture, store, el } = create({ approver: true, pending: [HELD] });
+            asActor('manager');
+            await openInv(store);
+            const ran = {
+                degree: 1,
+                admitted: 6,
+                linksAdded: 7,
+                truncated: false,
+                fanOutCapped: 8,
+                budget: 500,
+                maxFanOut: 6,
+                oneHop: 'every entity',
+                step: 2,
+            };
+            const held = { ...ran, step: undefined, admitted: 0, linksAdded: 0, awaitingApproval: 'p7' };
+            store.degreeOutcomes.set([ran, held]);
+            fixture.detectChanges();
+            expect(line(el)?.textContent).toContain(
+                'Requested next, not yet run: Expand one hop from every entity again, this time adding every link of ' +
+                    'each entity, not only the 6 strongest and reading up to 5,000 rows, not 500. alice asks',
+            );
+        });
+
         it('the badge brings the waiting line of this panel forward, not a line elsewhere on the page', async () => {
             const { fixture, store, el } = create({ approver: true, pending: [HELD] });
             asActor('manager');
