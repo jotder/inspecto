@@ -1319,6 +1319,27 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
             expect(inv.investigationLog).toHaveBeenCalled(); // re-read: the decision shows on the line
         });
 
+        it('the badge brings the waiting line of this panel forward, not a line elsewhere on the page', async () => {
+            const { fixture, store, el } = create({ approver: true, pending: [HELD] });
+            asActor('manager');
+            await openInv(store);
+            fixture.detectChanges();
+            // a decoy line outside this panel, first in document order
+            const decoy = document.createElement('div');
+            decoy.setAttribute('data-testid', 'approver-line');
+            const decoyButton = document.createElement('button');
+            decoy.appendChild(decoyButton);
+            document.body.prepend(decoy);
+            try {
+                (el.querySelector('[data-testid="approver-badge"]') as HTMLButtonElement).click();
+                fixture.detectChanges();
+                expect(document.activeElement).not.toBe(decoyButton);
+                expect(document.activeElement).toBe(line(el)?.querySelector('button'));
+            } finally {
+                decoy.remove();
+            }
+        });
+
         it('Deny is a second step with an optional reason, sent as typed; Cancel steps back', async () => {
             const { fixture, store, el, inv } = create({ approver: true, pending: [HELD] });
             asActor('manager');
