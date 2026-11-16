@@ -528,11 +528,22 @@ in-flight read. Since 2026-08-10 a recompute writes a **new revision** (its base
 and marks the earlier revision `SUPERSEDED` in `consignment_outputs`; readers resolve through
 `ConsignmentSelector`, which stops naming those files.
 
-Nothing is deleted at that moment, deliberately — the grace period is what lets an already-open read finish
-on the revision it started with. **So without a `retire_superseded` job defined, every full recompute
+Nothing is deleted at that moment. **So without a `retire_superseded` job defined, every full recompute
 leaves a complete extra copy of its output on disk, forever.** That is the one case where "retention is
-never on by default" has a real cost: define this job with a `retention_days` longer than your longest
-query, or a recompute-heavy pipeline will grow without bound.
+never on by default" has a real cost: define this job, or a recompute-heavy pipeline will grow without
+bound. Copy the disabled example `spaces/demo/config/jobs/retire_superseded_job.toon` (weekly, 7 days) and
+set `enabled: true`.
+
+⚠ **`retention_days` counts from the file's last write, not from when it was superseded** (the catalog
+keeps no supersede time). A revision written a month ago and superseded today goes at the next pass. Set
+it to how long you want to keep a superseded revision *after it was written*. An already-open read is not
+protected by the window but by the store lock: the delete waits for every reader still holding the store.
+
+⛔ **It stays off by default (decided 2026-11-17, MoSCoW C7).** Arming it in every Space would make it the
+only deleting task on by default, and on its first pass it would delete every superseded revision an
+install has kept. 3.x installs are not affected by that: 3.x overwrote in place and kept no revisions, so
+the disk growth starts at the 4.0.0 upgrade (release note in
+[plan-api-stability](../../module/api/plan-api-stability.md)).
 
 ⚠ **The cost stopped being silent 2026-08-29.** `PipelineJobRunner.supersedeEarlierRevisions` now asks —
 only after a recompute has actually superseded at least one earlier revision, never unconditionally —

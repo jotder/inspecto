@@ -93,6 +93,28 @@ class MaintenanceLibraryTest {
         }
     }
 
+    /** One path can own an old SUPERSEDED row and a current LIVE one (a same-batch-id replay rewrites its own
+     *  path; output naming is not one file per Consignment). Age is no licence then: a LIVE row means readers
+     *  name the file, so the task must leave it — the property the off-by-default decision (MoSCoW C7) relies
+     *  on when it calls the task safe to run. */
+    @Test
+    void retireSupersededSparesAnAgedFileThatALiveRowStillNames(@TempDir Path dir) throws Exception {
+        Path shared = Files.writeString(dir.resolve("shared.parquet"), "x");
+        Files.setLastModifiedTime(shared, FileTime.from(Instant.now().minus(Duration.ofDays(30))));
+
+        try (var db = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(superseded(shared), new com.gamma.consignment.ConsignmentOutput("c2", "run-2", "cdr",
+                    "", null, shared.toString(), 1, 1, "2026-08-02T10:00:00Z",
+                    com.gamma.consignment.ConsignmentOutput.State.LIVE)));
+            com.gamma.consignment.ConsignmentOutputStores.use(db);
+
+            JobResult r = new MaintenanceJob(job(Map.of("task", "retire_superseded", "retention_days", "7"))).run();
+
+            assertTrue(Files.exists(shared), "a file a LIVE row names is read by every reader — never retired");
+            assertTrue(r.message().contains("retired 0"), r.message());
+        }
+    }
+
     @Test
     void retireSupersededNeedsAnExplicitRetentionAndDegradesWithNoRegistry(@TempDir Path dir) throws Exception {
         assertThrows(Exception.class,

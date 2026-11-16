@@ -203,10 +203,15 @@ The current model:
 2. `supersedeOtherRevisions(table, keep)` marks earlier revisions dead. **Full recomputes only** — an
    incremental run appends a slice, so superseding there would discard every increment before it.
    `keep` is required: omitting it would mark the recompute's own fresh files stale and empty the table.
-3. Nothing is deleted at flip time, so a read already in flight finishes on the revision it started
-   with. The `retire_superseded` maintenance task removes the bytes after an explicit
-   `retention_days`, deleting **files and keeping rows** — a row for a deleted file is harmless, while
-   dropping the row of a file still on disk would let it back into every glob.
+3. Nothing is deleted at flip time. The `retire_superseded` maintenance task removes the bytes of files
+   older than an explicit `retention_days`, deleting **files and keeping rows** — a row for a deleted file
+   is harmless, while dropping the row of a file still on disk would let it back into every glob.
+   ⚠ **`retention_days` counts from the file's last write, not from when it was superseded** — the
+   registry stores no supersede time. A revision written 30 days ago and superseded today goes at the next
+   pass of a 7-day job. What lets a read already in flight finish on the revision it started with is
+   `SnapshotSwapLock.writeAbove`: the delete waits for every reader holding a store above the file
+   (`SnapshotSwapLockTest.retireSupersededWaitsForAReaderHoldingTheStoreBeforeItDeletesAFile`), not the
+   retention window.
 
 ⚠ **Without a `retire_superseded` job defined, every full recompute leaves a complete extra copy of its
 output on disk permanently.** The old overwrite was O(1) disk; this is not. **No longer silent
@@ -215,6 +220,22 @@ supersedes something and no enabled `retire_superseded` job is configured — se
 [operations-reference.md](../../layer/platform/admin-guide-operations-reference.md) for the wiring. A copyable example ships
 **disabled** at `spaces/demo/config/jobs/retire_superseded_job.toon` (2026-09-23): the task reads only
 `retention_days` and walks the process-wide output registry, so it carries **no** path or store key.
+
+⛔ **Off by default — decided 2026-11-17 (MoSCoW C7), do not re-open without the operator.** The task is
+safe to run: the delete waits for readers (`writeAbove`, above), it never deletes a path any `LIVE` row
+still names, however old (`unreadablePaths`;
+`MaintenanceLibraryTest.retireSupersededSparesAnAgedFileThatALiveRowStillNames`), and the only `SIMULATED`
+row writer, `DryRunSinkWriter`, records a placeholder path rather than a real file. It stays off because the product's retention rule is *"retention is never on by default: every
+deleting task is inert until an operator defines a Job"* ([operations-reference.md](../../layer/platform/admin-guide-operations-reference.md)),
+and `retire_superseded` would be the one exception, armed in every Space. Two concrete surprises it would
+cause: on the first pass it would delete every superseded revision a pre-release 4.0.0 install has kept
+since 2026-08-10, and because retention counts from write time, a revision an operator meant to keep "for a
+week" after a recompute could go within minutes of it. What 4.0.0 does instead: the WARN above, the
+disabled demo job to copy, and the release note in
+[plan-api-stability](../api/plan-api-stability.md) (no 3.x release keeps superseded revisions — 3.x
+overwrote in place — so the disk growth is new at the upgrade). Pinned by
+`DemoRetireSupersededJobShipsDisabledTest.shipsDisabledSoTheDefaultIsNotFlipped` and
+`JobServiceTest.retireSupersededCheckIsWiredFromLiveJobConfigNotJustBuildTime`.
 
 ## 5. The Watermark — completeness
 
@@ -241,8 +262,13 @@ still owes rows inside.
   data that was merely late; not advancing is merely no answer.
 
 Absent means **unknown**, so completeness-needing rules do not fire rather than firing on a guess. A
-table written by enrichment or the Consignment processor has no watermark at all, since those paths
-record an unattributed producer with no bounds.
+table written by enrichment or the Consignment processor has a watermark only when its writer declares
+bounds (§2: the enrichment's `{column, source}` partition entry, the processor's stated `EventTimeBounds`);
+both record a producer since 2026-08-10.
+
+⚠ **Built, not yet consumed (re-grounded 2026-11-17).** No production code calls `StreamWatermark.of` or
+`DbConsignmentOutputStore.producerHighWater`; only their tests do. No shipped Alert Rule or Job asks "has this
+window closed" yet, so the rules above describe the primitive, not a running check.
 
 ⚠ **Vocabulary.** *Watermark* is reserved for this concept. `PipelineWatermarkStore` is an incremental
 **read cursor** and `$job.last_success_time` is **wall clock**; neither answers window close.
@@ -276,6 +302,29 @@ Three properties are deliberate:
 nothing split, so it could never be bound to a predicate; it was always `null` besides. Addressing step 8 was
 closed on that basis rather than built. As-built detail:
 [`archived-documents/plans-archive/job-parameter-contract-plan.md`](../../../../archived-documents/plans-archive/job-parameter-contract-plan.md) §5-B, step 17.
+
+## 5-B. Ingest-written streams — no accessor, by design (closed 2026-11-17, MoSCoW C7)
+
+The board carried "the ingest-side Consignment-scoped accessor waits for a consumer" from 2026-08-10 to
+2026-11-17. ⚠ **That accessor was never code.** It was the option the job-parameter contract deferred
+(archived plan §5-B, point 4): an Expression that would read the event-time range of a store written by
+**ingest** rather than by a Job. Grounded 2026-11-17:
+
+- **Ingest records bounds already.** `ConsignmentIngestor.finalizeSource` writes registry rows keyed on the
+  Consignment's table, with bounds from the schema's date partition (§2), so the data such an accessor would
+  read is there.
+- **No Expression can name it.** `$upstream(<job>).artifact(<store>)` resolves through a Job's last
+  successful Run (`JobService.latestArtifacts`). A Collector's ingest is not a Job and records no Run
+  Artifact, so the attrs have no handle on an ingest-written table — the gap the deferral named.
+- **Nothing asks for it.** No Space, example, template or UI uses `event_time_min`/`event_time_max` on an
+  ingest table; the Job editor's parameter catalog lists only the `$upstream` form. The completeness
+  primitive that would read ingest streams (§5) has no consumer either.
+
+**Decision: not built.** Adding a second token (for example a stream-keyed `$stream(<table>).event_time_max`)
+now would be a surface with no caller and a second word for one concept. Build it when a real consumer
+appears — a Job that must bind its window to what a Collector landed, or a completeness rule over an ingest
+stream — and key it on the registry `table_name`, never on a store→dataset reverse lookup (§2). The board
+row is closed; this section is the reopen trigger.
 
 ## 6. Related
 

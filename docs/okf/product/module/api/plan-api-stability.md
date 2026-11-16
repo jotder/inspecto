@@ -554,7 +554,9 @@ Most of these commits are not marked `!`, so a commit-type scan misses them.*
   [editable round-trip §22](../engine/spec-editable-round-trip.md)
 - `DELETE /spaces/{id}?purge=true` answers **409** when it would remove the **last Space directory on disk** (D4); deregister-only on the last Space stays allowed. *(This line stated the rule backwards — "409 unless `?purge=true`" — until 2026-09-08; `SpaceRoutes.java`.)*
 - Full recomputes write a sibling `<pipeline>_<batchId>` table and supersede the old revision in the
-  catalog; **nothing deletes the bytes** until a `retire_superseded` maintenance job is configured.
+  catalog; **nothing deletes the bytes** until a `retire_superseded` maintenance job is configured. 3.x
+  overwrote in place, so after the upgrade every full recompute adds a copy on disk: enable a copy of
+  `spaces/demo/config/jobs/retire_superseded_job.toon` (it stays off by default, MoSCoW C7, 2026-11-17).
 - Run artifacts carry `event_time_min` / `event_time_max` instead of `timeRange`.
 - `mail.send` on a deployment with **no email channel configured** answers **`SKIPPED`**, not SUCCESS — it is
   inert, not green. With **no recipients** (a `to` that resolves entirely blank) it answers **FAILED**.
