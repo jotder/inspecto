@@ -110,7 +110,7 @@ The service restarts the server if it stops, and starts it when the machine star
 **Linux (systemd):**
 
 ```
-sudo bin/install-service.sh            # options: --user <account>  --name <service>  --uninstall
+sudo bash bin/install-service.sh       # options: --user <account>  --name <service>  --uninstall
 systemctl status inspecto
 journalctl -u inspecto -f
 ```
@@ -189,16 +189,18 @@ a firewall keeps `/metrics` and `/health/details` from the network.
 Copy the new zip and its `.sha256` (and `.asc`, if the release is signed) to the server, run your backup Job, then:
 
 ```
-sudo bin/upgrade.sh <new zip> --backup-dir <the backup Job's backup_dir> --proxy-config <your proxy config>
+sudo bash bin/upgrade.sh <new zip> --backup-dir <the backup Job's backup_dir> --proxy-config <your proxy config>
 .\bin\upgrade.ps1 <new zip> -BackupDir <the backup Job's backup_dir> -ProxyConfig <your proxy config>
 ```
 
 It checks the zip against its `.sha256` (`bin/verify-bundle.sh`, `.ps1`) and the newest backup against its manifest,
 refuses a different edition, stops the service, keeps the previous bundle beside this one as
-`<folder>.pre-upgrade-<time>`, replaces everything **except** `spaces/` (your Spaces; only `spaces/_templates` is
-replaced), `logs/`, `inspecto.env` and files of your own, runs the preflight, starts the service and waits for
-`/health` and `/ready`. If the preflight or the start fails it puts the previous bundle back. Without a service, pass
-`--no-service` (`-NoService`) and stop and start the server yourself.
+`<folder>.pre-upgrade-<time>`, replaces everything **except** `spaces/` (your Spaces; in `spaces/_templates` only the
+templates the new bundle ships are replaced, and those your installed Apps added stay), `apps/`, `logs/`,
+`inspecto.env` and files of your own, runs the preflight, starts the service and waits for `/health` and `/ready`. If
+the preflight or the start fails it puts the previous bundle back. Without a service, pass `--no-service`
+(`-NoService`) and stop and start the server yourself. The upgrade replaces `runtime/`: certificates you imported into
+`runtime/lib/security/cacerts` must be imported again (the old file is kept in the `.pre-upgrade-` folder).
 
 By hand: stop the server, unzip the new bundle and replace everything except the folders and files above, then start
 it again. If the new bundle is in a different folder and you run Inspecto as a service, run the installer again from

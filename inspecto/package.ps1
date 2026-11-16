@@ -3065,7 +3065,7 @@ Write-Host "       verify recovery: kill the process, then curl /health -- do no
 Write-Host "  4d. Container: package.ps1 -Target container builds inspecto-<product>:<version>-<edition> and its Helm chart (inspecto-ship/);"
 Write-Host "       by hand: docker build -f deploy/Dockerfile -t <image> .   (from the bundle root, linux_amd64 bundle)"
 Write-Host "  4e. On a server, put it behind the reverse proxy in deploy/proxy/ (nginx or Caddy) with -Dcontrol.bind=127.0.0.1, then"
-Write-Host "       bash bin/preflight.sh  |  .\bin\preflight.ps1      (DEPLOY-EXPOSURE-KIT-1; upgrades: bin/upgrade.sh | .\bin\upgrade.ps1)"
+Write-Host "       bash bin/preflight.sh  |  .\bin\preflight.ps1      (DEPLOY-EXPOSURE-KIT-1; upgrades: sudo bash bin/upgrade.sh | .\bin\upgrade.ps1)"
 Write-Host ""
 if (-not $NoRuntime) {
     Write-Host "Embedded Java runtime included (bundle\runtime\) — no JVM needed on the target."

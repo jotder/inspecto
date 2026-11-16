@@ -40,7 +40,7 @@ certificates by itself where the host has a public name. Both templates carry th
 ## Install behind the proxy (Linux, nginx)
 
 1. Unzip the bundle (for example to `/opt/inspecto/inspecto-deploy`) and install the service:
-   `sudo bin/install-service.sh --user inspecto` ([README](../../../../../inspecto/README.md) *Run as an OS service*).
+   `sudo bash bin/install-service.sh --user inspecto` ([README](../../../../../inspecto/README.md) *Run as an OS service*).
 2. In `inspecto.env` (created by the installer, mode 600), put the server on loopback and trust the proxy's forwarded
    address:
 
@@ -85,17 +85,21 @@ when it exists (`KEY=VALUE` lines, never executed), because the systemd service 
 | `bind` | behind a proxy: `-Dcontrol.bind` unset or not loopback |
 | `trusted-proxies` | never; WARN when `-Dcontrol.trustedProxies` does not name `127.0.0.1` |
 | `tls-keystore` | a keystore is named but missing or unreadable; `--direct` with none |
-| `proxy` | behind a proxy: no `nginx` / `caddy` on PATH and no `--proxy-config`, or a config that does not name `metrics` and `health/details` |
+| `proxy` | behind a proxy: no `nginx` / `caddy` on PATH and no `--proxy-config`, or a config with no rule refusing both paths. Comments are ignored; nginx needs a `location` naming `metrics` and `health/details` whose block holds `deny all` or `return 403`, Caddy a named matcher whose `path_regexp` names both, answered by `respond @<matcher> 403`. A config split over `include` files is read as the one file given |
 | `spaces-root`, `data-root`, `logs` | missing, not writable by the running account, or under `MIN_FREE_GB` (default 5) free |
 | `port` | something already listens on `PORT` (any address) |
 
 Exit 1 when any check FAILs. `--endpoint` prints the base URL the server answers on locally (`http(s)://<bind or
-127.0.0.1>:<PORT>`), which the upgrade script uses for its health check.
+127.0.0.1>:<PORT>`) and `--spaces-root` (`-SpacesRoot`) the spaces root it will use (`SPACES_ROOT`, else `spaces.ref`,
+else `./spaces`); the upgrade script reads both before it moves anything.
+
+Every `.sh` is run through `bash` in this guide: a bundle zipped on Windows carries no executable bits, so
+`bin/upgrade.sh` on its own is refused (`upgrade.sh` sets them on the bundle it installs).
 
 ## Upgrade in place
 
 ```
-sudo bin/upgrade.sh /tmp/inspecto-deploy-linux_amd64.zip --backup-dir /srv/inspecto/spaces/default/backups --proxy-config /etc/nginx/conf.d/inspecto.conf
+sudo bash bin/upgrade.sh /tmp/inspecto-deploy-linux_amd64.zip --backup-dir /srv/inspecto/spaces/default/backups --proxy-config /etc/nginx/conf.d/inspecto.conf
 .\bin\upgrade.ps1 C:\drop\inspecto-deploy-windows_amd64.zip -BackupDir D:\inspecto\backups -ProxyConfig C:\caddy\Caddyfile
 ```
 
@@ -108,19 +112,44 @@ The steps, stopping at the first failure:
    `lib/modules.list`, `lib/edition.properties`) and the **edition**: a different one is refused unless
    `--allow-edition-change`. On Linux, run as root, the unpacked files get the owner of the bundle they replace.
 4. **Stop** the systemd service (`--service`, default `inspecto`) or the Scheduled Task (`-Name`, default `Inspecto`),
-   then wait until nothing listens on the port. On Windows any java still running from the bundle is stopped too:
-   stopping the task ends `cmd.exe`, and a JVM it started can outlive it and hold the files.
-5. **Keep the previous bundle** as `<bundle>.pre-upgrade-<time>/`: `settings/` holds a copy of `inspecto.env`,
-   `spaces.ref`, `conf/` and each Space's `config/` and top-level files (not its data); `product/` holds every entry the
-   new bundle replaced. **Replaced:** every top-level entry the new bundle ships, except `spaces/` (only
-   `spaces/_templates`) and `logs/`. **Kept in place:** your Spaces and their data, `logs/`, `inspecto.env`,
-   `spaces.ref`, `runtime-natives/` and any file of your own. This is the README's manual upgrade rule, scripted.
+   then wait until nothing listens on the port. systemd stops every process of the unit. On Windows, stopping the task
+   ends `cmd.exe` only, and a JVM it started can outlive it and hold the files, so the script also stops every
+   process **of the bundle**: its executable is under `<bundle>\`, or its command line names a path under `<bundle>\`
+   (at a path separator, so `C:\apps\inspecto-deploy-staging\...` is not `C:\apps\inspecto-deploy`), plus a
+   `java.exe` listening on the port (a java from PATH started by `serve.bat` names only relative paths). With
+   `-NoService` it stops nothing and only waits for them to be gone.
+5. **Keep the previous bundle** as `<bundle>.pre-upgrade-<time>/`. `settings/` holds a copy of `inspecto.env`,
+   `spaces.ref`, `conf/`, and of each Space's `config/` and top-level files (not its data) **from the spaces root the
+   server uses** (`--spaces-root` above; an `<id>.ref` Space is followed to the folder it names). `product/` holds every
+   entry the new bundle replaced. **Replaced:** every top-level entry the new bundle ships, except `spaces/` and
+   `logs/`. In the bundle's own `spaces/_templates`, each template the new bundle ships replaces its namesake, a
+   template only the old bundle shipped is moved to `product/`, and a template an App installed at run time (it holds
+   `.installed-by`, `InstalledApps.java`) stays; when the new bundle ships a template of the same name, the shipped
+   one wins and the installed one goes to `product/`. **Kept in place:** your Spaces and their data, `apps/`, `logs/`,
+   `inspecto.env`, `spaces.ref`, `runtime-natives/` and any file of your own. When the spaces root is outside the
+   bundle (`SPACES_ROOT`, `spaces.ref`), nothing in it is moved, its `_templates` included. This is the README's manual
+   upgrade rule, scripted.
 6. **Preflight** the new bundle (`--direct` and `--proxy-config` are passed to it).
-7. **Start** and require `/health` and `/ready` within `HEALTH_TIMEOUT` (default 180 s).
+7. **Start** and require `/health` and `/ready` within `HEALTH_TIMEOUT` (default 180 s), answered by the server the
+   start just launched: on Linux the unit's main process, running from the bundle folder and started after the start
+   was issued; on Windows the process listening on the port (or the `cmd.exe` running `serve.bat` above it), a process
+   of the bundle started after the start. A leftover process answering on the port does not pass.
 
-A failure at 6 or 7 moves the new entries back to the unpack folder, puts the previous ones back, restarts the
-service and exits 1. `--no-service` / `-NoService` skips stop and start: you stop the server first and start it after.
-Delete the `.pre-upgrade-` folder once the new version is accepted.
+A failure at 6 or 7 stops what runs from the bundle (on Windows, the bundle's processes as in step 4, waiting until
+they are gone and the port is free), moves the new entries back to the unpack folder, puts the previous ones back,
+restarts the service, checks it the same way and exits 1. `--no-service` / `-NoService` skips stop and start: you stop
+the server first and start it after. Delete the `.pre-upgrade-` folder once the new version is accepted.
+
+**CA certificates.** The upgrade replaces `runtime/`, so certificates imported into the bundled Java's
+`runtime/lib/security/cacerts` (an identity provider or PostgreSQL signed by a private CA) are gone afterwards, and a
+Standard or Advanced server then fails its OIDC discovery with an `SSLHandshakeException`: the health check fails and
+the upgrade rolls back. Before upgrading such an install, either keep the trust store outside the bundle (copy
+`runtime/lib/security/cacerts` elsewhere, import into the copy, and add `-Djavax.net.ssl.trustStore=<copy>` to
+`INSPECTO_JAVA_OPTS`; that copy no longer follows the JDK's CA updates), or upgrade with `--no-service`, re-import,
+then start. The previous file stays in
+`<bundle>.pre-upgrade-<time>/product/runtime/lib/security/cacerts`, and the script prints a note when the two differ.
+Re-import with the bundle's own keytool:
+`runtime/bin/keytool -importcert -alias <name> -file <ca>.crt -keystore runtime/lib/security/cacerts -storepass changeit -noprompt`.
 
 ## Verify a delivered bundle
 
@@ -155,12 +184,17 @@ refuses to move `bin/` while bash runs a script from it). Each check below was f
 check was broken.
 
 - preflight: an unset, wildcard or non-loopback bind FAILs behind a proxy, a loopback one PASSes; a missing keystore
-  FAILs (named but absent, or `--direct` with none); a proxy config without the fence FAILs; an edition's missing
-  sign-in or database FAILs; a listening port FAILs; a Java older than 27 FAILs; `inspecto.env` is read.
+  FAILs (named but absent, or `--direct` with none); a proxy config without the fence FAILs, and so does each template
+  with its refusal removed, commented out or pointed at another matcher; an edition's missing sign-in or database
+  FAILs; a listening port FAILs; a Java older than 27 FAILs; `inspecto.env` is read; `--spaces-root` follows
+  `SPACES_ROOT` and `spaces.ref`.
 - verify-bundle: a tampered zip, a missing `.sha256` and `--require-signature` without `.asc` FAIL.
 - backup-offsite: only the newest archive and its sidecar are copied; a damaged archive copies nothing.
-- upgrade: the swap keeps Spaces, data, logs and own files and keeps the previous bundle; a failing preflight rolls
-  back; a tampered zip or a different edition changes nothing.
+- upgrade: the swap keeps Spaces, data, logs and own files and keeps the previous bundle; `_templates` is merged (an
+  installed App's template stays, a retired shipped one is moved aside); a `.ref` Space's config is copied; a failing
+  preflight rolls back; a tampered zip or a different edition changes nothing. `upgrade.ps1`: a process under a
+  sibling folder whose name starts with the bundle's is left alone, and a rollback stops a process started from the
+  new bundle that locks a file in `lib\` and listens on the port, then restores.
 - the fence regex matches every route form that reaches either endpoint (`/metrics`, `/metrics/acquisition`, with or
   without `/api/v1` and `/spaces/<id>`) and no other route.
 - `package.ps1` step 6b-4 stages the kit into `bin/` and `deploy/proxy/`, and not into a demo bundle.
@@ -170,5 +204,6 @@ templates, and a request through each proving the 403 from outside and the pass 
 encoded and doubled-slash paths (nginx and Caddy both match on the decoded path with duplicate slashes merged, which is
 also how the server resolves routes, but that is their documented behavior, not observed here); the refresh cookie's
 `Secure` rewrite; SSE through each proxy; `upgrade.sh` against a running systemd service and `upgrade.ps1` against a
-running Scheduled Task, including the health wait and the rollback restart; `backup-offsite` over rsync and an object
+running Scheduled Task, including the health wait, its proof that the new process answers (main PID, cwd and start
+time; listener owner and creation time) and the rollback restart; `backup-offsite` over rsync and an object
 store CLI; `gpg --verify` of a signed release.

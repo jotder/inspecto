@@ -23,7 +23,7 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
-[ -n "$ZIP" ] || { echo "usage: bin/verify-bundle.sh <bundle.zip> [--require-signature]" >&2; exit 2; }
+[ -n "$ZIP" ] || { echo "usage: bash bin/verify-bundle.sh <bundle.zip> [--require-signature]" >&2; exit 2; }
 
 FAILS=0
 row() {   # row PASS|WARN|FAIL <check> <detail>

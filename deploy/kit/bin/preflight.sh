@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # preflight.sh - check this host before Inspecto starts (DEPLOY-EXPOSURE-KIT-1). One PASS / WARN / FAIL line per
-# check; exit 1 when any check FAILs. Run it as the account the service runs as:  sudo -u inspecto bin/preflight.sh
+# check; exit 1 when any check FAILs. Run it as the account the service runs as:  sudo -u inspecto bash bin/preflight.sh
 #
 #   bash bin/preflight.sh [--direct] [--proxy-config <file>] [--env-file <file>]
 #   bash bin/preflight.sh --endpoint        print the base URL the server will answer on locally, and exit
+#   bash bin/preflight.sh --spaces-root     print the spaces root the server will use, and exit
 #
 # Default: Inspecto runs behind a reverse proxy on this host (deploy/proxy/). The server must then listen on
 # loopback only, because /metrics and /health/details answer without sign-in and the proxy is their only fence.
@@ -22,13 +23,15 @@ MODE="proxy"
 PROXY_CONFIG=""
 ENV_FILE=""
 ENDPOINT_ONLY=""
+SPACES_ONLY=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --direct) MODE="direct" ;;
         --proxy-config) PROXY_CONFIG="${2:-}"; shift ;;
         --env-file) ENV_FILE="${2:-}"; shift ;;
         --endpoint) ENDPOINT_ONLY="yes" ;;
-        -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
+        --spaces-root) SPACES_ONLY="yes" ;;
+        -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
         *) echo "[preflight] unknown option $1" >&2; exit 2 ;;
     esac
     shift
@@ -65,7 +68,13 @@ LOCAL_HOST="127.0.0.1"
 [ -n "$BIND" ] && [ "$BIND" != "0.0.0.0" ] && [ "$BIND" != "::" ] && LOCAL_HOST="$BIND"
 case "$LOCAL_HOST" in *:*) case "$LOCAL_HOST" in \[*) ;; *) LOCAL_HOST="[$LOCAL_HOST]" ;; esac ;; esac
 SCHEME="http"; [ -n "$KEYSTORE" ] && SCHEME="https"
+# The spaces root, resolved as the server resolves it: SPACES_ROOT, else ./spaces.ref, else ./spaces.
+abs() { case "$1" in /*|[A-Za-z]:*) printf '%s' "$1" ;; *) printf '%s/%s' "$ROOT" "$1" ;; esac; }
+if [ -n "${SPACES_ROOT:-}" ]; then SPACES_DIR="$(abs "$SPACES_ROOT")"
+elif [ -f spaces.ref ]; then SPACES_DIR="$(abs "$(tr -d '\r\n' < spaces.ref | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')")"
+else SPACES_DIR="$ROOT/spaces"; fi
 if [ -n "$ENDPOINT_ONLY" ]; then echo "${SCHEME}://${LOCAL_HOST}:${PORT}"; exit 0; fi
+if [ -n "$SPACES_ONLY" ]; then echo "$SPACES_DIR"; exit 0; fi
 
 FAILS=0; WARNS=0; PASSES=0
 row() {   # row PASS|WARN|FAIL <check> <detail>
@@ -141,14 +150,29 @@ if [ -n "$KEYSTORE" ]; then
 elif [ "$MODE" = direct ]; then
     row FAIL tls-keystore "--direct without HTTPS_KEYSTORE: the server would serve plain HTTP to the network. Set HTTPS_KEYSTORE (PKCS12) and HTTPS_KEYSTORE_PASSWORD"
 fi
+# The fence as a rule, not the words: comments are dropped, then nginx needs a location naming both paths whose block
+# says `deny all` or `return 403`, and Caddy a named matcher whose path_regexp names both, answered `respond @it 403`.
+fenced() {
+    awk '
+        { sub(/#.*/, "") }
+        /location/ && /metrics/ && /health\/details/ { inloc = 1 }
+        inloc && (/deny[ \t]+all/ || /return[ \t]+403/) { ok = 1 }
+        inloc && /}/ { inloc = 0 }
+        /^[ \t]*@[A-Za-z0-9_-]+/ { m = $1; if (/[{]/) inm = m }
+        /path_regexp/ && /metrics/ && /health\/details/ { f[inm != "" ? inm : m] = 1 }
+        inm != "" && /}/ { inm = "" }
+        /^[ \t]*(respond|error)[ \t]+@/ && /[ \t]403/ { r[$2] = 1 }
+        END { for (k in f) if (k in r) ok = 1; exit ok ? 0 : 1 }
+    ' "$1"
+}
 if [ "$MODE" = proxy ]; then
     if [ -n "$PROXY_CONFIG" ]; then
         if [ ! -r "$PROXY_CONFIG" ]; then
             row FAIL proxy "no readable proxy config at $PROXY_CONFIG"
-        elif grep -q 'metrics' "$PROXY_CONFIG" && grep -q 'health/details' "$PROXY_CONFIG"; then
-            row PASS proxy "$PROXY_CONFIG fences /metrics and /health/details"
+        elif fenced "$PROXY_CONFIG"; then
+            row PASS proxy "$PROXY_CONFIG refuses /metrics and /health/details"
         else
-            row FAIL proxy "$PROXY_CONFIG does not name /metrics and /health/details - start from deploy/proxy/ so they are fenced"
+            row FAIL proxy "$PROXY_CONFIG has no rule refusing /metrics and /health/details (nginx: a location naming both with deny all or return 403; Caddy: a matcher naming both with respond <matcher> 403) - start from deploy/proxy/"
         fi
     else
         found=""
@@ -160,10 +184,6 @@ fi
 
 # -- the folders the server writes, and their free space -------------------------------------------------------------
 MIN_FREE_GB="${MIN_FREE_GB:-5}"
-abs() { case "$1" in /*) printf '%s' "$1" ;; *) printf '%s/%s' "$ROOT" "$1" ;; esac; }
-if [ -n "${SPACES_ROOT:-}" ]; then SPACES_DIR="$(abs "$SPACES_ROOT")"
-elif [ -f spaces.ref ]; then SPACES_DIR="$(abs "$(tr -d '\r\n' < spaces.ref | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')")"
-else SPACES_DIR="$ROOT/spaces"; fi
 check_dir() {   # check_dir <label> <dir>
     local d="$2" probe free_kb need_kb
     if [ ! -d "$d" ]; then row FAIL "$1" "$d does not exist"; return; fi

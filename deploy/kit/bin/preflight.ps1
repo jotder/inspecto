@@ -3,6 +3,7 @@
 #
 #   .\bin\preflight.ps1 [-Direct] [-ProxyConfig <file>]
 #   .\bin\preflight.ps1 -Endpoint        print the base URL the server will answer on locally, and exit
+#   .\bin\preflight.ps1 -SpacesRoot      print the spaces root the server will use, and exit
 #
 # Default: Inspecto runs behind a reverse proxy on this host (deploy\proxy\; Caddy runs on Windows). The server must
 # then listen on loopback only, because /metrics and /health/details answer without sign-in and the proxy is their
@@ -17,7 +18,8 @@
 param(
     [switch]$Direct,
     [string]$ProxyConfig = "",
-    [switch]$Endpoint
+    [switch]$Endpoint,
+    [switch]$SpacesRoot
 )
 $ErrorActionPreference = "Stop"
 # This script lives in bin\; the bundle ROOT is its parent (where serve.bat cd's to as well).
@@ -48,7 +50,14 @@ $urlHost = $localHost
 if ($urlHost.Contains(":")) { $urlHost = "[$urlHost]" }
 $scheme = "http"
 if ($keystore) { $scheme = "https" }
+# The spaces root, resolved as the server resolves it: SPACES_ROOT, else .\spaces.ref, else .\spaces.
+function AbsPath([string]$p) { if ([System.IO.Path]::IsPathRooted($p)) { return $p } return (Join-Path $root $p) }
+$spacesEnv = EnvOr "SPACES_ROOT" ""
+if ($spacesEnv) { $spacesDir = AbsPath $spacesEnv }
+elseif (Test-Path "spaces.ref") { $spacesDir = AbsPath ((Get-Content -Raw "spaces.ref").Trim()) }
+else { $spacesDir = Join-Path $root "spaces" }
 if ($Endpoint) { Write-Output "${scheme}://${urlHost}:$port"; exit 0 }
+if ($SpacesRoot) { Write-Output $spacesDir; exit 0 }
 
 $script:fails = 0; $script:warns = 0; $script:passes = 0
 function Row([string]$status, [string]$check, [string]$detail) {
@@ -138,14 +147,32 @@ if ($keystore) {
 } elseif ($mode -eq "direct") {
     Row "FAIL" "tls-keystore" "-Direct without HTTPS_KEYSTORE: the server would serve plain HTTP to the network. Set HTTPS_KEYSTORE (PKCS12) and HTTPS_KEYSTORE_PASSWORD"
 }
+# The fence as a rule, not the words (as preflight.sh): comments are dropped, then nginx needs a location naming both paths
+# whose block says deny all or return 403, and Caddy a named matcher whose path_regexp names both, answered respond @it 403.
+function Test-Fenced([string]$file) {
+    $inLoc = $false; $inM = ""; $m = ""; $ok = $false
+    $fenced = @{}; $refused = @{}
+    foreach ($raw in Get-Content -LiteralPath $file) {
+        $l = $raw -replace '#.*$', ''
+        $both = ($l -match 'metrics') -and ($l -match 'health/details')
+        if ($l -match 'location' -and $both) { $inLoc = $true }
+        if ($inLoc -and ($l -match 'deny\s+all' -or $l -match 'return\s+403')) { $ok = $true }
+        if ($inLoc -and $l.Contains('}')) { $inLoc = $false }
+        if ($l -match '^\s*(@[A-Za-z0-9_-]+)') { $m = $Matches[1]; if ($l.Contains('{')) { $inM = $m } }
+        if ($both -and $l -match 'path_regexp') { if ($inM) { $fenced[$inM] = $true } else { $fenced[$m] = $true } }
+        if ($inM -and $l.Contains('}')) { $inM = "" }
+        if ($l -match '^\s*(respond|error)\s+(@[A-Za-z0-9_-]+)\s+403\b') { $refused[$Matches[2]] = $true }
+    }
+    foreach ($k in $fenced.Keys) { if ($refused.ContainsKey($k)) { $ok = $true } }
+    return $ok
+}
 if ($mode -eq "proxy") {
     if ($ProxyConfig) {
         if (-not (Test-Path -LiteralPath $ProxyConfig -PathType Leaf)) {
             Row "FAIL" "proxy" "no proxy config at $ProxyConfig"
         } else {
-            $text = Get-Content -Raw -LiteralPath $ProxyConfig
-            if ($text.Contains("metrics") -and $text.Contains("health/details")) { Row "PASS" "proxy" "$ProxyConfig fences /metrics and /health/details" }
-            else { Row "FAIL" "proxy" "$ProxyConfig does not name /metrics and /health/details - start from deploy\proxy\ so they are fenced" }
+            if (Test-Fenced $ProxyConfig) { Row "PASS" "proxy" "$ProxyConfig refuses /metrics and /health/details" }
+            else { Row "FAIL" "proxy" "$ProxyConfig has no rule refusing /metrics and /health/details (nginx: a location naming both with deny all or return 403; Caddy: a matcher naming both with respond <matcher> 403) - start from deploy\proxy\" }
         }
     } else {
         $found = $null
@@ -157,11 +184,6 @@ if ($mode -eq "proxy") {
 
 # -- the folders the server writes, and their free space ----------------------------------------------------------
 $minFreeGb = [int](EnvOr "MIN_FREE_GB" "5")
-function AbsPath([string]$p) { if ([System.IO.Path]::IsPathRooted($p)) { return $p } return (Join-Path $root $p) }
-$spacesRoot = EnvOr "SPACES_ROOT" ""
-if ($spacesRoot) { $spacesDir = AbsPath $spacesRoot }
-elseif (Test-Path "spaces.ref") { $spacesDir = AbsPath ((Get-Content -Raw "spaces.ref").Trim()) }
-else { $spacesDir = Join-Path $root "spaces" }
 function CheckDir([string]$label, [string]$dir) {
     if (-not (Test-Path -LiteralPath $dir -PathType Container)) { Row "FAIL" $label "$dir does not exist"; return }
     $probe = Join-Path $dir ".preflight-$PID"

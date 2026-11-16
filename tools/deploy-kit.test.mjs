@@ -57,8 +57,8 @@ function makeBundle(dir, { edition = 'Basic', java = '27.0.1', marker = 'old' } 
     writeFileSync(join(dir, 'lib', 'edition.properties'), `edition=${edition}\n`);
     writeFileSync(join(dir, 'lib', 'modules.list'), 'lib/inspecto.jar\n');
     writeFileSync(join(dir, 'lib', 'marker'), marker);
-    mkdirSync(join(dir, 'spaces', '_templates'), { recursive: true });
-    writeFileSync(join(dir, 'spaces', '_templates', 'gallery.txt'), marker);
+    mkdirSync(join(dir, 'spaces', '_templates', 'shipped'), { recursive: true });
+    writeFileSync(join(dir, 'spaces', '_templates', 'shipped', 'gallery.txt'), marker);
     mkdirSync(join(dir, 'logs'), { recursive: true });
     writeFileSync(join(dir, 'logs', '.keep'), '');
     if (java) {
@@ -135,7 +135,25 @@ function makeBackups(dir) {
 }
 
 describe('the deploy kit', { concurrency: true }, () => {
-    // ── packaging ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+    /** The two proxy templates with their refusal removed or disarmed: each still names /metrics and /health/details. */
+function unfenced(dir) {
+    const nginx = readFileSync(join(KIT, 'proxy', 'nginx-inspecto.conf'), 'utf8');
+    const caddy = readFileSync(join(KIT, 'proxy', 'Caddyfile'), 'utf8');
+    const out = {
+        'nginx, deny all removed': nginx.replace(/^\s*deny all;\s*$/m, ''),
+        'nginx, deny all commented out': nginx.replace('deny all;', '# deny all;'),
+        'Caddy, respond removed': caddy.replace(/^\s*respond @fenced 403\s*$/m, ''),
+        'Caddy, respond to another matcher': caddy.replace('respond @fenced 403', 'respond @other 403'),
+    };
+    return Object.fromEntries(Object.entries(out).map(([name, text], i) => {
+        const f = join(dir, `unfenced-${i}.conf`);
+        assert.ok(text.includes('metrics') && text.includes('health/details'), name);
+        writeFileSync(f, text);
+        return [name, f];
+    }));
+}
+
+// ── packaging ──────────────────────────────────────────────────────────────────────────────────────────────────────────
     test('package.ps1 stages deploy/kit into bin/ and deploy/proxy/ of every non-demo bundle', async () => {
         const pkg = readFileSync(join(REPO, 'inspecto', 'package.ps1'), 'utf8');
         assert.match(pkg, /Join-Path \$sandboxRoot 'deploy\\kit'/);
@@ -215,6 +233,8 @@ describe('the deploy kit', { concurrency: true }, () => {
         writeFileSync(open, 'server { location / { proxy_pass http://127.0.0.1:8080; } }\n');
         assert.equal(await proxyRow(open), 'FAIL');
         assert.equal(await proxyRow(join(t, 'absent.conf')), 'FAIL');
+        // the words alone are not a fence: each template with its refusal taken out must FAIL
+        for (const [name, cfg] of Object.entries(unfenced(t))) assert.equal(await proxyRow(cfg), 'FAIL', name);
     });
 
     test('preflight.sh: the edition decides what must be set to start', async () => {
@@ -264,6 +284,12 @@ describe('the deploy kit', { concurrency: true }, () => {
         assert.equal((await sh(join(b, 'bin', 'preflight.sh'), ['--endpoint'])).out.trim(), `http://127.0.0.1:${PORT}`);
         rmSync(join(b, 'inspecto.env'));
         assert.equal((await sh(join(b, 'bin', 'preflight.sh'), ['--endpoint'], { PORT: '9443', HTTPS_KEYSTORE: 'x.p12' })).out.trim(), 'https://127.0.0.1:9443');
+        // --spaces-root resolves as the server does: SPACES_ROOT, else spaces.ref, else ./spaces
+        const spacesRoot = async (extra) => (await sh(join(b, 'bin', 'preflight.sh'), ['--spaces-root'], extra)).out.trim().replace(/\\/g, '/');
+        assert.match(await spacesRoot({}), /\/b\/spaces$/);
+        writeFileSync(join(b, 'spaces.ref'), '../elsewhere\n');
+        assert.match(await spacesRoot({}), /\/b\/\.\.\/elsewhere$/);
+        assert.equal(await spacesRoot({ SPACES_ROOT: '/srv/spaces' }), '/srv/spaces');
     });
 
     // ── verify-bundle.sh ─────────────────────────────────────────────────────────────────────────────────────────────────
@@ -311,7 +337,11 @@ describe('the deploy kit', { concurrency: true }, () => {
     });
 
     // ── upgrade.sh (--no-service: systemd itself is not exercised) ───────────────────────────────────────────────────────
-    function upgradeFixture(name, { newEdition = 'Basic' } = {}) {
+    /**
+     * An installed bundle with a Space, a Space kept elsewhere through spaces/<id>.ref, logs, a file of the operator's,
+     * a template an App installed at run time (.installed-by) and one only the old bundle ships; and a new bundle zip.
+     */
+    function upgradeFixture(name, { newEdition = 'Basic', srcHook } = {}) {
         const t = tmp(name);
         const root = makeBundle(join(t, 'inspecto-deploy'));
         mkdirSync(join(root, 'spaces', 'acme', 'config'), { recursive: true });
@@ -319,49 +349,73 @@ describe('the deploy kit', { concurrency: true }, () => {
         writeFileSync(join(root, 'spaces', 'acme', 'space.toon'), 'space');
         mkdirSync(join(root, 'spaces', 'acme', 'data'), { recursive: true });
         writeFileSync(join(root, 'spaces', 'acme', 'data', 'big.parquet'), 'data');
+        const ext = join(t, 'ext');
+        mkdirSync(join(ext, 'config'), { recursive: true });
+        writeFileSync(join(ext, 'config', 'e_pipeline.toon'), 'ext pipeline');
+        writeFileSync(join(root, 'spaces', 'ext.ref'), `${ext}\n`);
+        mkdirSync(join(root, 'spaces', '_templates', 'app-tpl'), { recursive: true });
+        writeFileSync(join(root, 'spaces', '_templates', 'app-tpl', '.installed-by'), 'app=acme-spend\nversion=1.0.0\n');
+        mkdirSync(join(root, 'spaces', '_templates', 'retired'), { recursive: true });
+        writeFileSync(join(root, 'spaces', '_templates', 'retired', 'gallery.txt'), 'old');
         writeFileSync(join(root, 'logs', 'service.log'), 'old log');
         writeFileSync(join(root, 'my-notes.txt'), 'mine');
         const src = makeBundle(join(t, 'src'), { edition: newEdition, marker: 'new' });
+        if (srcHook) srcHook(src);
         const zip = join(t, 'inspecto-deploy-linux_amd64.zip');
         writeZip(zip, src, 'inspecto-deploy');
         writeSha(zip);
         return { t, root, zip };
     }
     const read = (p) => readFileSync(p, 'utf8');
-    // Windows refuses to move bin/ while Git Bash runs a script from it; the .sh form is for Linux hosts, where CI runs these.
-    const LINUX_ONLY = { skip: WIN && 'upgrade.sh swaps bin/ while it runs from it, which Windows forbids (CI runs it on Linux)' };
-
-    test('upgrade.sh: swaps the product folders, keeps the Spaces, logs and own files, and keeps the previous bundle', LINUX_ONLY, async () => {
-        const { t, root, zip } = upgradeFixture('up-ok');
-        const PORT = String(await freePort());
-        const r = (await sh(join(root, 'bin', 'upgrade.sh'), [zip, '--no-service', '--proxy-config', NGINX], { PORT, INSPECTO_JAVA_OPTS: LOOPBACK }));
-        assert.equal(r.code, 0, r.out);
+    /** After a successful upgrade: product swapped, templates merged, everything of the install's kept, settings copied. */
+    function assertUpgraded({ t, root }) {
         assert.equal(read(join(root, 'lib', 'marker')), 'new');
-        assert.equal(read(join(root, 'spaces', '_templates', 'gallery.txt')), 'new');
+        assert.equal(read(join(root, 'spaces', '_templates', 'shipped', 'gallery.txt')), 'new');
+        assert.ok(existsSync(join(root, 'spaces', '_templates', 'app-tpl', '.installed-by')), "an installed App's template stays");
+        assert.ok(!existsSync(join(root, 'spaces', '_templates', 'retired')), 'a template only the old bundle shipped is moved aside');
         assert.equal(read(join(root, 'spaces', 'acme', 'data', 'big.parquet')), 'data');
+        assert.ok(existsSync(join(root, 'spaces', 'ext.ref')));
         assert.equal(read(join(root, 'logs', 'service.log')), 'old log');
         assert.equal(read(join(root, 'my-notes.txt')), 'mine');
         const pre = readdirSync(t).find((d) => d.startsWith('inspecto-deploy.pre-upgrade-'));
         assert.ok(pre, readdirSync(t).join(','));
         assert.equal(read(join(t, pre, 'product', 'lib', 'marker')), 'old');
+        assert.equal(read(join(t, pre, 'product', 'spaces', '_templates', 'retired', 'gallery.txt')), 'old');
         assert.equal(read(join(t, pre, 'settings', 'spaces', 'acme', 'config', 'p_pipeline.toon')), 'pipeline');
         assert.equal(read(join(t, pre, 'settings', 'spaces', 'acme', 'space.toon')), 'space');
+        assert.equal(read(join(t, pre, 'settings', 'spaces', 'ext', 'config', 'e_pipeline.toon')), 'ext pipeline', 'a .ref Space is followed');
         assert.ok(!existsSync(join(t, pre, 'settings', 'spaces', 'acme', 'data')), 'Space data is not copied');
         assert.ok(!readdirSync(t).some((d) => d.startsWith('.inspecto-upgrade-')), 'the staging folder is removed');
+    }
+    /** After a rollback: the previous bundle is back exactly, the new one left unpacked. */
+    function assertRolledBack({ t, root }, out) {
+        assert.match(out, /rolled back/);
+        assert.equal(read(join(root, 'lib', 'marker')), 'old');
+        assert.equal(read(join(root, 'spaces', '_templates', 'shipped', 'gallery.txt')), 'old');
+        assert.equal(read(join(root, 'spaces', '_templates', 'retired', 'gallery.txt')), 'old');
+        assert.ok(existsSync(join(root, 'spaces', '_templates', 'app-tpl', '.installed-by')));
+        assert.equal(read(join(root, 'spaces', 'acme', 'config', 'p_pipeline.toon')), 'pipeline');
+        const stage = readdirSync(t).find((d) => d.startsWith('.inspecto-upgrade-'));
+        assert.equal(read(join(t, stage, 'inspecto-deploy', 'lib', 'marker')), 'new', 'the new bundle is left unpacked');
+    }
+    // Windows refuses to move bin/ while Git Bash runs a script from it; the .sh form is for Linux hosts, where CI runs these.
+    const LINUX_ONLY = { skip: WIN && 'upgrade.sh swaps bin/ while it runs from it, which Windows forbids (CI runs it on Linux)' };
+
+    test('upgrade.sh: swaps the product, merges the templates, keeps the install, and keeps the previous bundle', LINUX_ONLY, async () => {
+        const f = upgradeFixture('up-ok');
+        const PORT = String(await freePort());
+        const r = (await sh(join(f.root, 'bin', 'upgrade.sh'), [f.zip, '--no-service', '--proxy-config', NGINX], { PORT, INSPECTO_JAVA_OPTS: LOOPBACK }));
+        assert.equal(r.code, 0, r.out);
+        assertUpgraded(f);
     });
 
     test('upgrade.sh: a failing preflight puts the previous bundle back', LINUX_ONLY, async () => {
-        const { t, root, zip } = upgradeFixture('up-rollback');
+        const f = upgradeFixture('up-rollback');
         const PORT = String(await freePort());
-        const r = (await sh(join(root, 'bin', 'upgrade.sh'), [zip, '--no-service', '--proxy-config', NGINX], { PORT }));   // no loopback bind
+        const r = (await sh(join(f.root, 'bin', 'upgrade.sh'), [f.zip, '--no-service', '--proxy-config', NGINX], { PORT }));   // no loopback bind
         assert.equal(r.code, 1, r.out);
-        assert.match(r.out, /rolled back/);
-        assert.equal(read(join(root, 'lib', 'marker')), 'old');
-        assert.equal(read(join(root, 'spaces', '_templates', 'gallery.txt')), 'old');
-        assert.equal(read(join(root, 'spaces', 'acme', 'config', 'p_pipeline.toon')), 'pipeline');
-        assert.ok(existsSync(join(root, 'bin', 'upgrade.sh')));
-        const stage = readdirSync(t).find((d) => d.startsWith('.inspecto-upgrade-'));
-        assert.equal(read(join(t, stage, 'inspecto-deploy', 'lib', 'marker')), 'new', 'the new bundle is left unpacked');
+        assertRolledBack(f, r.out);
+        assert.ok(existsSync(join(f.root, 'bin', 'upgrade.sh')));
     });
 
     test('upgrade.sh: a tampered zip or a different edition changes nothing', async () => {
@@ -371,7 +425,7 @@ describe('the deploy kit', { concurrency: true }, () => {
         const r1 = (await sh(join(a.root, 'bin', 'upgrade.sh'), [a.zip, '--no-service'], { PORT, INSPECTO_JAVA_OPTS: LOOPBACK }));
         assert.equal(r1.code, 1, r1.out);
         assert.match(r1.out, /nothing was changed/);
-        assert.deepEqual(readdirSync(a.t).sort(), ['inspecto-deploy', 'inspecto-deploy-linux_amd64.zip', 'inspecto-deploy-linux_amd64.zip.sha256', 'src']);
+        assert.deepEqual(readdirSync(a.t).sort(), ['ext', 'inspecto-deploy', 'inspecto-deploy-linux_amd64.zip', 'inspecto-deploy-linux_amd64.zip.sha256', 'src']);
         const b = upgradeFixture('up-edition', { newEdition: 'Standard' });
         const r2 = (await sh(join(b.root, 'bin', 'upgrade.sh'), [b.zip, '--no-service'], { PORT, INSPECTO_JAVA_OPTS: LOOPBACK }));
         assert.equal(r2.code, 1, r2.out);
@@ -402,6 +456,12 @@ describe('the deploy kit', { concurrency: true }, () => {
             assert.equal(row((await ps(script, [], { PORT: String(server.address().port) })).out, 'port'), 'FAIL');
         } finally { server.close(); }
         assert.equal((await ps(script, ['-Endpoint'], { PORT: '9443', HTTPS_KEYSTORE: 'x.p12' })).out.trim(), 'https://127.0.0.1:9443');
+        assert.equal(row((await ps(script, ['-ProxyConfig', join(KIT, 'proxy', 'Caddyfile')], { PORT, INSPECTO_JAVA_OPTS: LOOPBACK })).out, 'proxy'), 'PASS');
+        for (const [name, cfg] of Object.entries(unfenced(t))) {
+            assert.equal(row((await ps(script, ['-ProxyConfig', cfg], { PORT, INSPECTO_JAVA_OPTS: LOOPBACK })).out, 'proxy'), 'FAIL', name);
+        }
+        writeFileSync(join(b, 'spaces.ref'), 'D:\\elsewhere\n');
+        assert.equal((await ps(script, ['-SpacesRoot'], { PORT })).out.trim(), 'D:\\elsewhere');
     });
 
     test('verify-bundle.ps1 and backup-offsite.ps1: tampering FAILs', { skip: !HAS_PWSH && 'pwsh not on PATH' }, async () => {
@@ -432,21 +492,59 @@ describe('the deploy kit', { concurrency: true }, () => {
         assert.match(damaged.out, /FAIL\s+verify/);
     });
 
-    test('upgrade.ps1 -NoService: swaps, keeps the Spaces, and rolls back on a failing preflight', { skip: !(WIN && HAS_PWSH) && 'Windows + pwsh only' }, async () => {
-        const PORT = String(await freePort());
-        const ok = upgradeFixture('ps-up-ok');
-        const r = (await ps(join(ok.root, 'bin', 'upgrade.ps1'), [ok.zip, '-NoService', '-ProxyConfig', NGINX], { PORT, INSPECTO_JAVA_OPTS: LOOPBACK }));
-        assert.equal(r.code, 0, r.out);
-        assert.equal(read(join(ok.root, 'lib', 'marker')), 'new');
-        assert.equal(read(join(ok.root, 'spaces', 'acme', 'data', 'big.parquet')), 'data');
-        assert.equal(read(join(ok.root, 'logs', 'service.log')), 'old log');
-        const pre = readdirSync(ok.t).find((d) => d.startsWith('inspecto-deploy.pre-upgrade-'));
-        assert.equal(read(join(ok.t, pre, 'settings', 'spaces', 'acme', 'config', 'p_pipeline.toon')), 'pipeline');
+    const WIN_PWSH = { skip: !(WIN && HAS_PWSH) && 'Windows + pwsh only' };
+    const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 
-        const back = upgradeFixture('ps-up-rollback');
-        const r2 = (await ps(join(back.root, 'bin', 'upgrade.ps1'), [back.zip, '-NoService', '-ProxyConfig', NGINX], { PORT }));
-        assert.equal(r2.code, 1, r2.out);
-        assert.match(r2.out, /rolled back/);
-        assert.equal(read(join(back.root, 'lib', 'marker')), 'old');
+    test('upgrade.ps1 -NoService: swaps and merges, and leaves a process under a sibling folder alone', WIN_PWSH, async () => {
+        const PORT = String(await freePort());
+        const f = upgradeFixture('ps-up-ok');
+        // C:\...\inspecto-deploy-staging\ shares the bundle folder's name as a prefix, and is not the bundle
+        const sibling = join(f.t, 'inspecto-deploy-staging');
+        mkdirSync(sibling);
+        writeFileSync(join(sibling, 'idle.js'), 'setTimeout(() => {}, 300000);\n');
+        // node itself, not the pwsh app-execution alias, so the command line naming the sibling path is this process's
+        const idle = spawn(process.execPath, [join(sibling, 'idle.js')], { stdio: 'ignore' });
+        try {
+            await new Promise((ok) => setTimeout(ok, 1500));
+            const r = (await ps(join(f.root, 'bin', 'upgrade.ps1'), [f.zip, '-NoService', '-ProxyConfig', NGINX], { PORT, INSPECTO_JAVA_OPTS: LOOPBACK }));
+            assert.equal(r.code, 0, r.out);
+            assertUpgraded(f);
+            assert.ok(alive(idle.pid), 'the sibling-folder process was not stopped');
+        } finally { idle.kill(); }
+    });
+
+    test('upgrade.ps1: a rollback stops a process of the new bundle that holds a file and the port, then restores', WIN_PWSH, async () => {
+        const PORT = String(await freePort());
+        const t0 = tmp('ps-holder-pid');
+        const pidFile = join(t0, 'holder.pid');
+        // The new bundle's preflight starts a process from the bundle folder - it locks lib\held.lock (no sharing, so
+        // Windows refuses to move lib\) and listens on PORT - then fails, as a new java left running would.
+        const f = upgradeFixture('ps-up-holder', {
+            srcHook: (src) => {
+                writeFileSync(join(src, 'lib', 'holder.ps1'), [
+                    '$lib = Split-Path -Parent $MyInvocation.MyCommand.Path',
+                    "$fs = [System.IO.File]::Open((Join-Path $lib 'held.lock'), 'OpenOrCreate', 'ReadWrite', 'None')",
+                    '$l = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, [int]$env:PORT); $l.Start()',
+                    'Start-Sleep -Seconds 300', ''].join('\r\n'));
+                writeFileSync(join(src, 'bin', 'preflight.ps1'), [
+                    'param([switch]$Endpoint, [switch]$SpacesRoot, [switch]$Direct, [string]$ProxyConfig = "")',
+                    '$root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)',
+                    'if ($Endpoint) { "http://127.0.0.1:$env:PORT"; exit 0 }',
+                    "if ($SpacesRoot) { Join-Path $root 'spaces'; exit 0 }",
+                    "$p = Start-Process -FilePath (Get-Process -Id $PID).Path -ArgumentList @('-NoProfile', '-File', (Join-Path $root 'lib\\holder.ps1')) -WindowStyle Hidden -PassThru",
+                    'Set-Content -Path $env:HOLDER_PID_FILE -Value $p.Id',
+                    'for ($i = 0; $i -lt 40; $i++) { if (@([System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners() | Where-Object { $_.Port -eq [int]$env:PORT }).Count) { break }; Start-Sleep -Milliseconds 250 }',
+                    '"[preflight] FAIL  stub: a new-bundle process is left running"; exit 1', ''].join('\r\n'));
+            },
+        });
+        let holder = 0;
+        try {
+            const r = (await ps(join(f.root, 'bin', 'upgrade.ps1'), [f.zip, '-NoService', '-ProxyConfig', NGINX], { PORT, INSPECTO_JAVA_OPTS: LOOPBACK, HOLDER_PID_FILE: pidFile }));
+            holder = Number(read(pidFile).trim());
+            assert.ok(holder > 0, r.out);
+            assert.equal(r.code, 1, r.out);
+            assertRolledBack(f, r.out);
+            assert.ok(!alive(holder), 'the new-bundle process was stopped');
+        } finally { if (holder && alive(holder)) process.kill(holder); }
     });
 });

@@ -28,7 +28,7 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
-[ -n "$FROM" ] || { echo "usage: bin/backup-offsite.sh --from <backup_dir> (--to <target> [--cmd <command>] | --verify-only)" >&2; exit 2; }
+[ -n "$FROM" ] || { echo "usage: bash bin/backup-offsite.sh --from <backup_dir> (--to <target> [--cmd <command>] | --verify-only)" >&2; exit 2; }
 [ -n "$VERIFY_ONLY" ] || [ -n "$TO" ] || { echo "[backup-offsite] --to <target> is required (or --verify-only)" >&2; exit 2; }
 
 say() { printf '[backup-offsite] %-4s  %-8s %s\n' "$1" "$2" "$3"; }
