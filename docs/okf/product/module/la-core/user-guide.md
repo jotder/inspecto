@@ -1966,7 +1966,8 @@ An independent review of live screenshots for a bank's executives found these; e
   `la-starter.ts`; column names as words, since a Dataset column carries no label of its own; the whole first sentence,
   wrapped, not the Start box's 90-character cut). la-app's `LA_DATASETS` now carries the Data page's `title` (as the
   Dataset's name) and `description`, which it dropped before, so the Start box names Datasets the same way. The stored
-  `mule_transfers_dataset · PAYER_ACCOUNT → PAYEE_ACCOUNT` stays in the line's tooltip and under ⚙ Settings ▸ General;
+  `mule_transfers_dataset · PAYER_ACCOUNT → PAYEE_ACCOUNT` stays in the line's tooltip and, for keyboard and screen
+  reader users too, under ⚙ Settings ▸ Investigation settings ▸ General (*Dataset* and a new *Link columns* row);
   the recorded header and every op still use the stored names.
 - **Working Set line.** Zero excluded / hidden / kept counts are left out; *degree 1 of 4* became *expanded 1 of 4
   degrees* (*not expanded yet* before the first Expand). The word stays *degree*, not *hop*: the Expand stepper, its

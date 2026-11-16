@@ -1778,6 +1778,8 @@ describe(
             const text = general.textContent!.replace(/\s+/g, ' ');
             expect(text).toContain('Burners');
             expect(text).toContain('calls');
+            // presentability 2: the stored From and To names, which the Act header now says in words
+            expect(text).toContain('Link columns A → B');
             expect(text).toMatch(/Time column ?— ?Copied from ?—/); // T-159: no "(timeless)", no "Original"
 
             expect(text).toContain("The Space's pack");

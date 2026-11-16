@@ -44,6 +44,11 @@
                             </dd>
                             <dt class="text-secondary">Dataset</dt>
                             <dd class="m-0">{{ h.dataset }}</dd>
+                            <!-- presentability 2: the stored From and To names the Act header says in words -->
+                            <dt class="text-secondary">Link columns</dt>
+                            <dd class="m-0" data-testid="inv-settings-link-columns">
+                                {{ h.sourceCol }} → {{ h.targetCol }}
+                            </dd>
                             <dt class="text-secondary">Time column</dt>
                             <dd class="m-0">
                                 {{ h.timeCol ? h.timeCol + ' (' + (h.timeColZone || 'UTC') + ')' : '—' }}
