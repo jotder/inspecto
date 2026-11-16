@@ -280,30 +280,37 @@ final class ReportJob implements Job {
         if (!groupBy.isEmpty()) body.put("groupBy", groupBy);
         int limit = datasetLimit();
         body.put("limit", limit);
-        return query(body, measures.isEmpty() && groupBy.isEmpty(), limit, "scope dataset");
+        return query(body, measures.isEmpty() && groupBy.isEmpty(), false, limit, "scope dataset");
     }
 
     /**
      * Run one headless BI query over {@code body}'s Dataset — this Job's own export, or a Widget's chart
-     * (REPORT-PDF-CHARTS-1) — masked for leaving the platform. {@code raw} = a {@code SELECT *} with no aggregation.
+     * (REPORT-PDF-CHARTS-1) — masked for leaving the platform. {@code raw} = a {@code SELECT *} with no aggregation;
+     * {@code chart} = a Widget's query, whose cosmetic category ordering is first prepared the way the dashboard's is.
      */
-    private QueryExecutor.Result query(Map<String, Object> body, boolean raw, int limit, String what) throws Exception {
+    private QueryExecutor.Result query(Map<String, Object> body, boolean raw, boolean chart, int limit, String what)
+            throws Exception {
         // Space-scoped — see SpaceConfigRoot (MATERIALIZE-SPACE-ROOT-1).
         Path writeRoot = SpaceConfigRoot.requireCurrent(what);
         String datasetId = String.valueOf(body.get("dataset"));
 
-        MeasureCompiler.Spec spec = raw
+        MeasureCompiler.Spec parsed = raw
                 ? null   // raw export: SELECT * over the dataset (no aggregation)
                 : MeasureCompiler.parse(body, 10_000, 100_000);
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        Map<String, Object> dataset = store.get("dataset", datasetId)
+                .map(ComponentRegistry.Component::content)
+                .orElseThrow(() -> new IllegalArgumentException("unknown dataset '" + datasetId + "'"));
+        // REPORT-PDF-CHARTS-1 review: a chart over a masked dimension is ordered as the dashboard orders it for a caller who
+        // cannot reveal (by the first Measure), not refused and never by the raw key; mask() below vets what this returns.
+        MeasureCompiler.Spec spec = chart && parsed != null
+                ? ReportRowMasking.provider().map(m -> m.prepareChart(writeRoot, datasetId, dataset, parsed)).orElse(parsed)
+                : parsed;
         // One row PAST the cap (BI-QUERY-TRUNCATION-1): the compiled statement ends in its own LIMIT, so asking for
         // exactly the cap could never show the result was cut. The executor trims back to the cap and flags it.
         MeasureCompiler.Compiled sql = spec != null ? MeasureCompiler.compile(spec.withLimit(spec.limit() + 1))
                 : new MeasureCompiler.Compiled("SELECT * FROM " + SqlIdent.q(datasetId) + " LIMIT " + (limit + 1), List.of());
 
-        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        Map<String, Object> dataset = store.get("dataset", datasetId)
-                .map(ComponentRegistry.Component::content)
-                .orElseThrow(() -> new IllegalArgumentException("unknown dataset '" + datasetId + "'"));
         String relationSql = DatasetRelation.relationSql(dataset,
                 (dataDir == null || dataDir.isBlank()) ? null : Path.of(dataDir),
                 new ViewStore(writeRoot.resolve("views")));
@@ -323,6 +330,11 @@ final class ReportJob implements Job {
         return masked.result();
     }
 
+    /** The rows a Widget's chart page draws: its own query, ordered and masked as for a non-revealing dashboard viewer. */
+    QueryExecutor.Result chartRows(ReportWidget w) throws Exception {
+        return query(w.body(), false, true, ReportWidget.MAX_ROWS, "widgets");
+    }
+
     /** The Widget ids {@code widgets:} lists (REPORT-PDF-CHARTS-1), in page order. */
     private List<String> widgets() {
         return split(cfg.opt("widgets", ""));
@@ -335,7 +347,7 @@ final class ReportJob implements Job {
                 .map(ComponentRegistry.Component::content)
                 .orElseThrow(() -> new IllegalArgumentException("unknown widget '" + id + "'"));
         ReportWidget w = ReportWidget.of(id, content);
-        QueryExecutor.Result r = query(w.body(), false, ReportWidget.MAX_ROWS, "widgets");
+        QueryExecutor.Result r = chartRows(w);
         return WidgetChartRenderer.render(w, r.rows(), r.truncated());
     }
 

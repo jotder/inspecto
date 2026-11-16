@@ -45,19 +45,23 @@ distinct from the analytical **Dashboards** authored in the [Studio](../../layer
   `TablePngRenderer`, JDK-native Graphics2D — a 50-row table snapshot; CSV stays the full export).
   **PDF shipped 2026-07-20** as the backlog's PNG-wrapped-in-PDF fallback (no PDF library on the
   classpath, offline-blocked — see `PdfRenderer`, `platform/inspecto-engine/src/main/java/com/gamma/job/`): reuses
-  `TablePngRenderer.renderImage` for layout, then hand-writes a minimal single-page PDF (one Image
-  XObject, FlateDecode + DeviceRGB, no text layer/fonts) — a snapshot like PNG, not a general-purpose
+  `TablePngRenderer.renderImage` for layout, then hand-writes a minimal PDF (one page per image, one Image
+  XObject each, FlateDecode + DeviceRGB, no text layer/fonts) — a snapshot like PNG, not a general-purpose
   PDF export. `ReportJob` dispatches `format: pdf` alongside `csv`/`png`/`json`.
 * **A report PDF carries Widget charts (2026-11-16, `REPORT-PDF-CHARTS-1`).** A `report` Job with `format: pdf` and
   `widgets: <id>, <id>, …` gets one page per listed Widget, in that order, then the table page. Each chart is drawn on
   the server (`WidgetChartRenderer`, JDK Graphics2D, no new dependency) from the Widget's **own** query, compiled the
   way the SPA's `buildXyQuery` / `buildValueQuery` do (`ReportWidget`): `bar` (grouped bars), `line` (one line per
-  series, a missing point is a gap) and `kpi` (one big number). The x axis is ordered ascending; a time `grain` on x
-  is kept; the query is capped at 1,000 rows and a cut chart says "first N rows". Every chart query goes through the
+  series, a missing point is a gap) and `kpi` (one big number). The categories are ordered ascending, as a cosmetic order exactly like the SPA's: on a
+  dimension the Space masks they are ordered by the first Measure, descending, and labelled with the aliases, as the
+  dashboard does for a viewer who cannot reveal (`ReportRowMasking.prepareChart` → `BiResultMasking.stripCosmeticOrder`).
+  A time `grain` on x or series is kept; values past ±1e300 are drawn at that bound; the query is capped at 1,000 rows and a cut chart says "first N rows". Every chart query goes through the
   same report masking as the table (classified keys aliased), and the attach approval fingerprint covers each listed
   Widget's definition and its Dataset's definition and SQL, so editing a drawn Widget needs a re-approval. ⛔ The Run
   FAILS, with nothing delivered, for: `widgets` on any format but `pdf`; an unknown Widget; any other `vizType` (pie,
-  table, gauge, …); a view-, query- or KPI-definition-bound Widget; a named-measure (`expression`) channel. Not
+  table, gauge, …); a view-, query- or KPI-definition-bound Widget (a `kpi` Widget naming `options.kpi.kpiId` included, even
+  with a `datasetId`: the dashboard draws the definition's value); a named-measure (`expression`) channel. Not
   applied: dashboard filters, palette, `sort` / `categoryOrder` options. A PDF still needs `scope: dataset` (the table
-  page). Tests: `ReportPdfChartsTest` (reads the PDF's page images back and measures the bars).
+  page). Tests: `ReportPdfChartsTest` (reads the PDF's page images back and measures the bars), `ReportJobMaskingTest`
+  (a chart over a classified key).
 * This pane is the **Business lens's home route** (`LENS_HOME.business = 'kpi-reports'`).

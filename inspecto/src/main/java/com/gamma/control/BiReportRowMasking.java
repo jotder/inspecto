@@ -15,6 +15,14 @@ import java.util.Map;
 /** {@link ReportRowMasking} over {@link BiResultMasking}, always as a caller who cannot reveal (a Report Job has no viewer). */
 public final class BiReportRowMasking implements ReportRowMasking {
 
+    /** The dashboard's own step ({@code BiRoutes}): {@link BiResultMasking#stripCosmeticOrder}, as a caller who cannot reveal. */
+    @Override
+    public MeasureCompiler.Spec prepareChart(Path writeRoot, String datasetId, Map<String, Object> dataset,
+                                             MeasureCompiler.Spec spec) {
+        return BiResultMasking.of(writeRoot, new ComponentStore(writeRoot.resolve("registry")),
+                new ViewStore(writeRoot.resolve("views")), datasetId, dataset, false).stripCosmeticOrder(spec, null);
+    }
+
     @Override
     public Masked mask(Path writeRoot, String datasetId, Map<String, Object> dataset, MeasureCompiler.Spec spec,
                                      QueryExecutor.Result rows) {

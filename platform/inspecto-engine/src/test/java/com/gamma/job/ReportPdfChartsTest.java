@@ -146,6 +146,58 @@ class ReportPdfChartsTest {
         assertEquals("Sales", kpi.title());
     }
 
+    /** Review finding 1: a value near Double.MAX_VALUE made the axis top Infinity and the tick loop spin forever. */
+    @Test
+    void valuesAtTheEdgeOfADoubleStillDrawAndFinish() {
+        ReportWidget bar = ReportWidget.of("edge", widget("bar", Map.of(
+                "x", List.of(Map.of("field", "region")),
+                "y", List.of(Map.of("field", "amount", "agg", "sum"))), "Edge"));
+        // one huge positive value: the axis top rounded up past Double.MAX_VALUE, and t += step never got past Infinity
+        java.awt.image.BufferedImage up = assertTimeoutPreemptively(java.time.Duration.ofSeconds(20), () ->
+                WidgetChartRenderer.render(bar, List.of(row("region", "EU", "sum_amount", 1.7e308),
+                        row("region", "US", "sum_amount", 5.0)), false));
+        int[] upRgb = up.getRGB(0, 0, up.getWidth(), up.getHeight(), null, 0, up.getWidth());
+        for (int i = 0; i < upRgb.length; i++) upRgb[i] &= 0xFFFFFF;
+        assertFalse(new Img(up.getWidth(), up.getHeight(), upRgb).columnRuns(WidgetChartRenderer.PALETTE[0].getRGB() & 0xFFFFFF)
+                .isEmpty(), "the huge bar is drawn");
+        // both edges at once: the range itself overflowed to Infinity and nothing was drawn
+        java.awt.image.BufferedImage img = assertTimeoutPreemptively(java.time.Duration.ofSeconds(20), () ->
+                WidgetChartRenderer.render(bar, List.of(row("region", "EU", "sum_amount", 1.7e308),
+                        row("region", "US", "sum_amount", -1.7e308)), false));
+        int[] rgb = img.getRGB(0, 0, img.getWidth(), img.getHeight(), null, 0, img.getWidth());
+        for (int i = 0; i < rgb.length; i++) rgb[i] &= 0xFFFFFF;
+        List<int[]> bars = new Img(img.getWidth(), img.getHeight(), rgb).columnRuns(WidgetChartRenderer.PALETTE[0].getRGB() & 0xFFFFFF);
+        assertEquals(2, bars.size(), "both bars drawn, one up and one down");
+        assertTrue(bars.get(0)[2] > 50 && bars.get(1)[2] > 50, "each a real bar: " + bars.get(0)[2] + " / " + bars.get(1)[2]);
+    }
+
+    /** Review finding 3: the dashboard draws a KPI tile naming a KPI definition from the definition, not its Dataset. */
+    @Test
+    void aKpiWidgetNamingAKpiDefinitionIsRefusedEvenWithADataset() {
+        Map<String, Object> w = widget("kpi", Map.of("value", List.of(Map.of("field", "amount", "agg", "sum"))), "Revenue");
+        w.put("options", Map.of("title", "Revenue", "kpi", Map.of("kpiId", "monthly_revenue")));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> ReportWidget.of("rev_tile", w));
+        assertTrue(e.getMessage().contains("rev_tile") && e.getMessage().contains("KPI definition 'monthly_revenue'"),
+                e.getMessage());
+        w.put("options", Map.of("title", "Revenue", "kpi", Map.of("target", 10)));
+        assertEquals("Revenue", ReportWidget.of("rev_tile", w).title(), "KPI options without a definition still draw");
+    }
+
+    /** Review finding 4: a time grain on the series channel is kept, as the SPA's channelGrains keeps it. */
+    @Test
+    void aGrainOnEitherDimensionChannelIsKept() {
+        ReportWidget w = ReportWidget.of("by_month", widget("line", Map.of(
+                "x", List.of(Map.of("field", "region")),
+                "y", List.of(Map.of("field", "amount", "agg", "sum")),
+                "series", List.of(Map.of("field", "day", "grain", "month"))), "By month"));
+        assertEquals(Map.of("day", "month"), w.body().get("grains"));
+        ReportWidget auto = ReportWidget.of("by_day", widget("line", Map.of(
+                "x", List.of(Map.of("field", "day", "grain", "week")),
+                "y", List.of(Map.of("field", "amount", "agg", "sum")),
+                "series", List.of(Map.of("field", "region", "grain", "auto"))), "By day"));
+        assertEquals(Map.of("day", "week"), auto.body().get("grains"), "auto means no grain");
+    }
+
     private static Map<String, Object> row(Object... kv) {
         Map<String, Object> m = new LinkedHashMap<>();
         for (int i = 0; i < kv.length; i += 2) m.put((String) kv[i], kv[i + 1]);

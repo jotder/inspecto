@@ -115,6 +115,40 @@ class ReportJobMaskingTest {
                 "out_dir", out.toString())).status(), "the same measure over an unclassified Dataset runs");
     }
 
+    /**
+     * REPORT-PDF-CHARTS-1 review finding 2: a chart grouped by a classified key draws on the dashboard (its cosmetic category
+     * order is dropped for a non-revealer, ordering by the first Measure), so the PDF draws it too — with the dashboard's
+     * aliases as labels, never the raw keys. Before the fix the axis order was not cosmetic and the masking refused the Run.
+     */
+    @Test
+    void aChartGroupedByAClassifiedKeyDrawsAliasesAsTheDashboardDoes(@TempDir Path root, @TempDir Path out) throws Exception {
+        seed(root);
+        Map<String, Object> bar = Map.of("vizType", "bar", "datasetId", "calls_ds", "controls", Map.of(
+                "x", List.of(Map.of("field", "msisdn")), "y", List.of(Map.of("field", "amount", "agg", "sum"))));
+        new ComponentStore(root.resolve("registry")).write("widget", "spend_by_subscriber", bar);
+        Map<String, String> params = Map.of("scope", "dataset", "dataset", "calls_ds", "measures", "count",
+                "group_by", "region", "format", "pdf", "widgets", "spend_by_subscriber", "out_dir", out.toString());
+
+        JobResult r = run(params);
+        assertEquals("SUCCESS", r.status(), r.message());
+
+        ReportJob job = new ReportJob(new JobConfig("calls_report", JobType.REPORT, null, null, true, false, params), null);
+        List<Map<String, Object>> drawn = job.chartRows(ReportWidget.of("spend_by_subscriber", bar)).rows();
+        assertEquals(2, drawn.size(), "one bar per subscriber: " + drawn);
+        for (Map<String, Object> row : drawn) {
+            String label = String.valueOf(row.get("msisdn"));
+            assertTrue(label.startsWith("masked:"), "the label is the alias: " + drawn);
+            assertFalse(label.contains(A) || label.contains(B), drawn.toString());
+        }
+        assertEquals(List.of(15.0, 7.0), drawn.stream().map(m -> ((Number) m.get("sum_amount")).doubleValue()).toList(),
+                "ordered by the Measure, descending (the dashboard's order for a masked key), never by the raw key");
+
+        // the negative control: over the unclassified Dataset the same chart draws the raw keys, in key order
+        Map<String, Object> plain = Map.of("vizType", "bar", "datasetId", "plain_ds", "controls", bar.get("controls"));
+        List<Map<String, Object>> raw = job.chartRows(ReportWidget.of("plain_bar", plain)).rows();
+        assertEquals(List.of(A, B), raw.stream().map(m -> String.valueOf(m.get("msisdn"))).toList());
+    }
+
     @Test
     void theReadyEventNamesTheAliasedColumnsAndIsEmptyWhenNothingWas(@TempDir Path root, @TempDir Path out) throws Exception {
         seed(root);

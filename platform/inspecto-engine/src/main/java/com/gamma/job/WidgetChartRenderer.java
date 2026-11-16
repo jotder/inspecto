@@ -33,6 +33,10 @@ final class WidgetChartRenderer {
     private static final Color MUTED = new Color(0x77, 0x77, 0x77);
     private static final Color GRID = new Color(0xE2, 0xE2, 0xE2);
     private static final int MARGIN = 20, AXIS_W = 72, AXIS_H = 56, TICKS = 5;
+    /** The widest value the axis spans: past it a bar is drawn at the bound, so the axis arithmetic stays finite. */
+    static final double AXIS_BOUND = 1e300;
+    /** A hard cap on axis ticks, whatever the arithmetic does. */
+    private static final int MAX_TICKS = 50;
 
     private WidgetChartRenderer() {}
 
@@ -106,11 +110,20 @@ final class WidgetChartRenderer {
     private static void drawXy(Graphics2D g, Model m, boolean line) {
         int left = MARGIN + AXIS_W, right = CHART_W - MARGIN, top = MARGIN + 52, bottom = CHART_H - AXIS_H;
         int n = Math.max(1, m.categories().size());
+        // REPORT-PDF-CHARTS-1 review: a value near Double.MAX_VALUE made max - min (or the rounded-up top) Infinity and the
+        // tick loop below never ended. Every plotted value is held to ±AXIS_BOUND, so the range and its step stay finite.
+        List<double[]> plotted = new ArrayList<>();
+        for (double[] s : m.values()) {
+            double[] c = s.clone();
+            for (int i = 0; i < c.length; i++) if (!Double.isNaN(c[i])) c[i] = Math.max(-AXIS_BOUND, Math.min(AXIS_BOUND, c[i]));
+            plotted.add(c);
+        }
         double max = 0, min = 0;
-        for (double[] s : m.values())
+        for (double[] s : plotted)
             for (double v : s) if (!Double.isNaN(v)) { max = Math.max(max, v); min = Math.min(min, v); }
         double step = niceStep((max - min) / TICKS);
         double lo = Math.floor(min / step) * step, hi = Math.max(lo + step, Math.ceil(max / step) * step);
+        if (!Double.isFinite(lo) || !Double.isFinite(hi) || !(hi > lo)) { lo = min; hi = max > min ? max : min + 1; step = (hi - lo) / TICKS; }
         FontMetrics fm = g.getFontMetrics();
 
         // legend (only when there is more than one series to tell apart)
@@ -127,7 +140,9 @@ final class WidgetChartRenderer {
             }
         }
         // y axis: gridlines + labels
-        for (double t = lo; t <= hi + step / 2; t += step) {
+        for (int i = 0; i <= MAX_TICKS; i++) {   // by index, never t += step: a step lost to rounding cannot spin
+            double t = lo + i * step;
+            if (!(t <= hi + step / 2)) break;
             int y = yOf(t, lo, hi, top, bottom);
             g.setColor(GRID);
             g.drawLine(left, y, right, y);
@@ -147,7 +162,7 @@ final class WidgetChartRenderer {
         int zero = yOf(Math.max(lo, 0), lo, hi, top, bottom);
         int seriesCount = m.values().size();
         for (int s = 0; s < seriesCount; s++) {
-            double[] vals = m.values().get(s);
+            double[] vals = plotted.get(s);
             g.setColor(PALETTE[s % PALETTE.length]);
             if (line) {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -192,6 +207,7 @@ final class WidgetChartRenderer {
     /** Compact: 1.2K / 3.4M / 5.6B above a thousand, at most two decimals below. */
     static String format(double v) {
         double a = Math.abs(v);
+        if (a >= 1e15) return String.format(java.util.Locale.ROOT, "%.3g", v);   // past what a long holds exactly
         if (a >= 1e9) return trim(v / 1e9) + "B";
         if (a >= 1e6) return trim(v / 1e6) + "M";
         if (a >= 1e4) return trim(v / 1e3) + "K";

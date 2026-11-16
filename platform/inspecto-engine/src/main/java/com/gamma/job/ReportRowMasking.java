@@ -27,6 +27,16 @@ public interface ReportRowMasking {
     Masked mask(Path writeRoot, String datasetId, Map<String, Object> dataset, MeasureCompiler.Spec spec,
                 QueryExecutor.Result rows);
 
+    /**
+     * The spec a chart query runs, as the dashboard would run it for a non-revealing caller (REPORT-PDF-CHARTS-1 review): a
+     * COSMETIC category ordering over a masked dimension is replaced by the first Measure, descending — never refused, never
+     * ordered by the raw key. Called BEFORE the query; {@link #mask} then vets the spec it returns. Default: unchanged.
+     */
+    default MeasureCompiler.Spec prepareChart(Path writeRoot, String datasetId, Map<String, Object> dataset,
+                                              MeasureCompiler.Spec spec) {
+        return spec;
+    }
+
     /** The masked rows plus the output columns whose values were replaced by an alias (empty when nothing was aliased). */
     record Masked(QueryExecutor.Result result, List<String> aliasedColumns) { }
 
