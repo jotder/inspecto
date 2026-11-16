@@ -97,7 +97,7 @@ final class DecisionRoutes implements RouteModule {
         rule.put("updatedAt", now);
         rule = DecisionRuleGuard.prepare(e, rule, null, store, name);   // invoke-api gate + server-stamped makers
         PendingChanges.hold(api, e, TYPE, name, rule, null);   // maker-checker
-        return write(store, name, rule);
+        return write(api, store, name, rule);
     }
 
     private Object update(ApiContext api, com.sun.net.httpserver.HttpExchange e, String name, Map<String, Object> body) throws IOException {
@@ -110,7 +110,7 @@ final class DecisionRoutes implements RouteModule {
         rule.put("updatedAt", System.currentTimeMillis());
         rule = DecisionRuleGuard.prepare(e, rule, prev, store, name);   // invoke-api gate + server-stamped makers
         PendingChanges.hold(api, e, TYPE, name, rule, prev);   // maker-checker
-        return write(store, name, rule);
+        return write(api, store, name, rule);
     }
 
     private Object delete(ApiContext api, com.sun.net.httpserver.HttpExchange e, String name) throws IOException {
@@ -514,9 +514,9 @@ final class DecisionRoutes implements RouteModule {
         return rule;
     }
 
-    private static Object write(ComponentStore store, String name, Map<String, Object> content) throws IOException {
+    private static Object write(ApiContext api, ComponentStore store, String name, Map<String, Object> content) throws IOException {
         // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: this kind-specific writer's one funnel.
-        LinkRefusals.requireLinks(store.root().getParent(), TYPE, name, content,
+        LinkRefusals.requireLinks(api, store.root().getParent(), TYPE, name, content,
                 store.get(TYPE, name).map(ComponentRegistry.Component::content).orElse(null));
         try {
             ComponentRegistry.Component c = store.write(TYPE, name, content);

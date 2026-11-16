@@ -1,6 +1,6 @@
 # Space link census — one declaration of every link between config files
 
-**State:** IN PROGRESS — D-LC1…D-LC5 answered 2026-11-11 (§4); LC-1…LC-7 built (table below); the LC-3 shadow → refuse flip remains.
+**State:** SHIPPED 2026-11-16, archived — LC-1…LC-7 built; `refuse` built and ready, the LC-3 shadow → refuse default flip waits for the operator (D-LC3). As-built truth: Space anatomy §12.6; still open: board row `SPACE-LINK-CENSUS-1` (narrowed).
 Board row `SPACE-LINK-CENSUS-1`.
 **Home when shipped:** `docs/okf/product/module/config/architecture-space-anatomy.md` §12.
 
@@ -10,7 +10,7 @@ Board row `SPACE-LINK-CENSUS-1`.
 |---|---|---|---|
 | LC-1 census + graph; impact, validate, import read it | built 2026-11-12 | `037b0a22b`, `312dd995b` | |
 | LC-2 rename reads the census | built 2026-11-13 | `ac4b6c639`, `cffbdec55` | closed `PIPELINE-LINK-GAPS-1` (a), (b), (c), (e); (d) fixed by `ce1daa28d`, row closed 2026-11-13 |
-| LC-3 delete refusal (every kind) and save refusal (active configs) | built 2026-11-13, **shadow** | `e1f48dabd`, `569d0c890` | `-Dlinks.delete` / `-Dlinks.save` default `shadow`; the flip to `refuse` waits for a clean shadow period (D-LC3); save refusal is Standard and Advanced only (D-LC5) |
+| LC-3 delete refusal (every kind) and save refusal (active configs) | built 2026-11-13, **shadow** | `e1f48dabd`, `569d0c890`, 2026-11-16 `(SPACE-LINK-CENSUS-1)` | `-Dlinks.delete` / `-Dlinks.save` default `shadow`; `refuse` is built and ready as an opt-in, the default flip waits for the operator (D-LC3); save refusal is Standard and Advanced only (D-LC5); since 2026-11-16 the save check accepts a Pipeline or Connection the running service registers outside the write root |
 | LC-4 boot integrity report, duplicates | built 2026-11-13 (on the SE-1a lock) | `ff074caa0`, `fc2bb8721` | the report itself is SE-1a's `GET /spaces/{id}/integrity`; added: per-Space `safety-policy.toon` `links: report \| refuse-activation` (refuse mode Standard and Advanced; `-Dlinks.*=off` still wins), a `CONFIG_LINK_BROKEN` event per new broken link, and the findings count on the Spaces screen (`GET /spaces` rows carry `integrity` for authors). the load-time hold came later with SE-1b (`2e0a887dd`, `56eb8a760`): a Job or Pipeline with a dangling link in its own file stays inactive (Pipelines once the census judges one of their links; spec-space-lock §10a) |
 | LC-5 column links, column impact | built 2026-11-13, report-only | `78f5e04d0`, `552a7c05d`, `a7f0e2ad4` | |
 | LC-6 config ledger, hand-edit detection | built 2026-11-13 (on the SE-1a lock) | `ff074caa0` | the lock replaced the ledger; added a `CONFIG_CHANGED_OUTSIDE` event per new outside edit and `POST /spaces/{id}/integrity/accept` (`canAdminister`, every edition, audited). D-LC4's "an edited file stays inactive until accepted where `approval.toon` governs its kind" came with SE-1b (spec-space-lock §12a) |
@@ -22,7 +22,7 @@ Only targeted test classes ran on each lane; the full gate was not run. The firs
 ## 1. Problem
 
 The files of a Space link to each other by plain text: an id, a file path, a store name or a column name
-(the full list is [Space anatomy §12.2](../okf/product/module/config/architecture-space-anatomy.md)). Three
+(the full list is [Space anatomy §12.2](../../okf/product/module/config/architecture-space-anatomy.md)). Three
 facts, all read from the code on 2026-11-11:
 
 1. **Each check keeps its own copy of the link keys.** The same keys are hard-coded in six places:
@@ -122,7 +122,7 @@ All five answered by the operator on 2026-11-11.
 | # | Question | Decision |
 |---|---|---|
 | **D-LC1** | When is a save with a broken link refused? | **Only when the config is active.** A draft (`active: false`) saves with broken links; activating it is refused (422) until they resolve. |
-| **D-LC2** | Boot mode default? | **`report`.** `refuse-activation` becomes the default for **new** Spaces after two releases of clean shadow — answered as D-SE2 of the [Space evolution plan](../okf/product/module/config/plan-space-evolution.md). Existing Spaces never change on their own. |
+| **D-LC2** | Boot mode default? | **`report`.** `refuse-activation` becomes the default for **new** Spaces after two releases of clean shadow — answered as D-SE2 of the [Space evolution plan](../../okf/product/module/config/plan-space-evolution.md). Existing Spaces never change on their own. |
 | **D-LC3** | Delete refusal for every kind — accept the behaviour change for API clients? | **Yes.** Every kind refuses a delete while something uses it, listing the dependents; `?force=true` gives the old outcome. |
 | **D-LC4** | A file changed outside the server? | **Reported, with what it broke; the edit takes effect.** In a Space whose approval policy (`approval.toon`) governs that kind, the edited file stays inactive until accepted. |
 | **D-LC5** | Editions? | **The integrity report on every edition; the refuse modes and the config ledger on Standard and Advanced.** |

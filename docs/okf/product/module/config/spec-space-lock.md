@@ -388,7 +388,9 @@ remote Collector, so no `collector.connection` link is judged in the corpus (the
 line now prints the Pipeline links per key and status.
 
 **The clean-shadow clock (D-SE2, D-LC3) starts 2026-11-13: zero unknowns.** Two releases of clean shadow from here
-gate the default flips (`links.delete` / `links.save` to `refuse`; enforcement for new Spaces).
+gate the default flips (`links.delete` / `links.save` to `refuse`; enforcement for new Spaces); the operator
+decides them. `refuse` is built and ready as an opt-in; the 2026-11-16 re-run of this baseline plus the
+`inspecto/examples/` folders, and the one false refusal it fixed, are in Space anatomy §12.6.
 
 **The regression gate.** `SpaceFindingBaselineTest` computes all of the above and asserts the set equals its
 recorded `EXPECTED` (empty): a new defect in a shipped Space or a new false positive in a check fails it, naming
@@ -409,4 +411,4 @@ clock stops until it is resolved.
   `inspecto/src/main/java/com/gamma/control/ActivationHolds.java`,
   `inspecto/src/main/java/com/gamma/service/ActivationFacts.java`,
   `platform/inspecto-engine/src/main/java/com/gamma/pipeline/ActivationGate.java`.
-- Link census plan: `docs/superpower/2026-11-11-space-link-census-plan.md` §2.2–§2.4, LC-4, LC-6.
+- Link census plan: `docs/archived-documents/plans-archive/2026-11-11-space-link-census-plan.md` (archived 2026-11-16) §2.2–§2.4, LC-4, LC-6.

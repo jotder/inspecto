@@ -26,7 +26,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * `SPACE-LINK-CENSUS-1` LC-3 over real HTTP: the census delete refusal ({@code -Dlinks.delete}, D-LC3) for each kind a
  * census link can name and the route deletes it through, and the save refusal of an active config adding a dangling
  * link ({@code -Dlinks.save}, D-LC1, refuse honoured on Standard/Advanced only per D-LC5). Both modes default to
- * {@code shadow}: nothing is refused, the response reports.
+ * {@code shadow} (nothing is refused, the response reports) until the operator's D-LC3 flip; {@code refuse} is an
+ * explicit opt-in.
  *
  * <p>"Standard" here is the edition {@link BootstrapRoutes#edition()} reports when people sign in: a test
  * {@link Authenticators} that signs every request in as an author.
@@ -107,6 +108,20 @@ class ControlApiLinkRefusalTest {
 
     // ── delete (D-LC3) ──────────────────────────────────────────────────────────────────────
 
+    /** Refuse opted in: a Dataset a Widget reads is not deleted, on Basic too (the reach of D-LC3). */
+    @Test
+    void refuseWhenOptedInADatasetAWidgetReadsIsNotDeleted(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        space(root);
+        System.setProperty(LinkRefusals.DELETE_PROPERTY, "refuse");
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = send(c.port, "DELETE", "/components/dataset/ds1", null);
+            assertEquals(409, r.statusCode(), r.body());
+            assertDependent(body(r).get("dependents"), "widget", "w1", "datasetId");
+            assertTrue(Files.exists(root.resolve("registry/datasets/ds1.toon")), "refused: the Dataset stays");
+        }
+    }
+
+    /** No property set: shadow is the default until the operator's D-LC3 flip. */
     @Test
     void shadowIsTheDefaultDeleteGoesThroughAndListsWhatItBroke(@TempDir Path cfg, @TempDir Path root) throws Exception {
         space(root);
@@ -265,6 +280,23 @@ class ControlApiLinkRefusalTest {
         return null;
     }
 
+    /** Refuse opted in: on Standard an active config adding a broken link is not written. */
+    @Test
+    void refuseWhenOptedInOnStandardAnActiveConfigAddingABrokenLinkIsNotWritten(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        space(root);
+        System.setProperty(LinkRefusals.SAVE_PROPERTY, "refuse");
+        signIn();
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = send(c.port, "POST", "/config/write", enrichment("no_such_feed", false));
+            assertEquals(422, r.statusCode(), r.body());
+            JsonNode f = linkFinding(body(r).get("findings"));
+            assertEquals("ERR_LINK_DANGLING", f.get("code").asText());
+            assertEquals("triggers.on_pipeline", f.get("fieldPath").asText());
+            assertFalse(Files.exists(root.resolve("daily_enrich.toon")), "refused: nothing written");
+        }
+    }
+
     @Test
     void shadowSavesAnActiveConfigWithABrokenLinkAndWarns(@TempDir Path cfg, @TempDir Path root) throws Exception {
         space(root);
@@ -276,6 +308,19 @@ class ControlApiLinkRefusalTest {
             assertEquals("WARN_LINK_DANGLING", f.get("code").asText());
             assertEquals("triggers.on_pipeline", f.get("fieldPath").asText());
             assertTrue(f.get("message").asText().contains("no_such_feed"));
+        }
+    }
+
+    /** No property set: on Standard too the save stays in shadow until the operator's D-LC3 flip. */
+    @Test
+    void shadowIsTheDefaultSaveOnStandard(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        space(root);
+        signIn();
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = send(c.port, "POST", "/config/write", enrichment("no_such_feed", false));
+            assertEquals(200, r.statusCode(), "the default is shadow: " + r.body());
+            assertEquals("WARN_LINK_DANGLING", linkFinding(body(r).get("findings")).get("code").asText());
+            assertTrue(Files.exists(root.resolve("daily_enrich.toon")));
         }
     }
 
@@ -354,6 +399,49 @@ class ControlApiLinkRefusalTest {
                     "refused: the stored Expectation is unchanged");
             HttpResponse<String> ok = send(c.port, "PUT", "/expectations/late", expectation("orders_feed"));
             assertEquals(200, ok.statusCode(), ok.body());
+        }
+    }
+
+    /**
+     * The single-tenant layout ({@code ControlApi <config dir>}, {@code -Dassist.write.root} elsewhere, as
+     * {@code serve-example} runs): the server runs Pipeline {@code MINI_ETL} from {@code cfg}, outside the write
+     * root the census reads. A Job naming it is not a broken link (the false refusal the 2026-11-16 evidence found).
+     */
+    @Test
+    void aJobNamingAPipelineTheServerRunsOutsideTheWriteRootSaves(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        space(root);
+        System.setProperty(LinkRefusals.SAVE_PROPERTY, "refuse");
+        signIn();
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = send(c.port, "POST", "/jobs",
+                    "{\"name\":\"nightly\",\"type\":\"report\",\"on_pipeline\":\"mini_etl\",\"enabled\":true}");
+            assertEquals(200, r.statusCode(), r.body());
+            HttpResponse<String> missing = send(c.port, "POST", "/jobs",
+                    "{\"name\":\"nightly2\",\"type\":\"report\",\"on_pipeline\":\"no_such_feed\",\"enabled\":true}");
+            assertEquals(422, missing.statusCode(), "a Pipeline nobody runs is still refused: " + missing.body());
+        }
+    }
+
+    /** As above for a Connection: the service registered {@code EXT_SFTP} from a file outside the write root. */
+    @Test
+    void aPipelineNamingAConnectionTheServerRegistersOutsideTheWriteRootSaves(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        space(root);
+        System.setProperty(LinkRefusals.SAVE_PROPERTY, "refuse");
+        signIn();
+        try (Ctx c = open(cfg, root)) {
+            Files.copy(cfg.resolve("mini_schema.toon"), root.resolve("mini_schema.toon"));
+            Path conn = Files.writeString(cfg.resolve("ext_sftp_connection.toon"),
+                    "connection:\n  id: EXT_SFTP\n  connector: sftp\n  host: sftp.example.com\n  port: 22\n  username: u\n");
+            c.svc().registerConnection(com.gamma.acquire.ConnectionProfile.load(conn));
+            String draft = """
+                    {"type":"pipeline","config":{"name":"remote_feed","active":true,
+                       "dirs":{"poll":"rin","database":"rout"},"output":{"format":"CSV"},
+                       "processing":{"threads":1,"schema_file":"mini_schema.toon"},
+                       "collector":{"connector":"sftp","connection":"%s"}}}""";
+            HttpResponse<String> r = send(c.port, "POST", "/config/write", draft.formatted("EXT_SFTP"));
+            assertEquals(200, r.statusCode(), r.body());
+            assertNull(linkFinding(body(r).get("findings")), r.body());
         }
     }
 

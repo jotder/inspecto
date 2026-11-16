@@ -418,7 +418,7 @@ below it.
 **On delete** / **On rename** are the census policy for when the target goes away or changes name (`refuse` /
 `warn`, `rewrite` / `report`). **Checked by today**: **load** = checked when the file loads · **run** = the
 Pipeline's run resolves it and fails without it (its Collector cannot be built, every cycle) · **delete 409** =
-deleting the target is refused (`ComponentRoutes`, `ConnectionRoutes`) · **rename** = `POST /pipelines/{name}/rename`
+deleting the target is refused by a check of its own, in every link mode (`ComponentRoutes`, `ConnectionRoutes`) · **rename** = `POST /pipelines/{name}/rename`
 rewrites the link · **impact** = listed by `GET /config/pipeline/{name}/impact` (or the column impact read) and before a
 Pipeline delete · **validate** = reported by the `metadata_validate` maintenance task · **import** = a bundle import
 refuses to add the break · **none** = no check reads it yet. Independently of this column, every link the census
@@ -484,20 +484,26 @@ loader reads a `use` key in a `*_pipeline.toon`. A column link to SQL the parser
 
 Two things this table means in practice:
 
-- **Only a Pipeline's `use:` reference, a Pipeline's dependents and a Connection refuse a delete today.** Deleting a
-  Dataset, Widget or Query that another config names goes through, but since `SPACE-LINK-CENSUS-1` LC-3 the
-  response lists what it broke (`brokenLinks`) and an AUDIT event (`config.delete.links-broken`) records it. That is
-  the shadow of the census delete refusal (`-Dlinks.delete=shadow|refuse|off`, default `shadow`, every edition):
-  in `refuse` the delete answers 409 with `dependents` (kind, name, key) and `?force=true` deletes as before. It
-  covers every link the census judges (the rows naming a Dataset, Query, Widget or Pipeline id); a Pipeline delete
-  keeps its own refusal in every mode.
+- **Only a Pipeline's `use:` reference, a Pipeline's dependents and a Connection refuse a delete by default.**
+  Deleting a Dataset, Widget, Query or any other target a census link still names (`DELETE /components/{type}/{id}`,
+  `DELETE /config/{type}/{name}`) goes through, but since `SPACE-LINK-CENSUS-1` LC-3 the response lists what it
+  broke (`brokenLinks`) and an AUDIT event (`config.delete.links-broken`) records it. That is the shadow of the
+  census delete refusal (`-Dlinks.delete=shadow|refuse|off`, default `shadow`, every edition). The refusal is
+  built and ready: under `refuse` the delete answers 409 with `dependents` (kind, name, key) and `?force=true`
+  deletes as before. It covers every link the census judges (the rows naming a Dataset, Query, Widget or Pipeline
+  id); a Pipeline delete keeps its own refusal in every mode. The default stays `shadow` until the operator's
+  D-LC3 flip (§12.6).
 - **A save that adds a broken link warns.** An active config (not `active: false` / `enabled: false`) that adds
   a link the census judges as dangling saves with a `WARN_LINK_DANGLING` finding (`linkWarnings` on a component
-  save). In `-Dlinks.save=refuse` (Standard and Advanced only; Basic stays in shadow, D-LC5) it is refused 422
+  save). Under `-Dlinks.save=refuse` (Standard and Advanced only; Basic stays in shadow, D-LC5) it is refused 422
   `ERR_LINK_DANGLING` naming the key and the missing target; a draft always saves, and activating one is judged
-  on every dangling link it holds. The kind-specific writers (`/alerts/rules`, `/decision-rules`,
-  `/expectations`, every `/jobs` write including `POST /jobs/{name}/enable`) run the same check; their responses
-  carry no findings, so in shadow they only log it.
+  on every dangling link it holds. A link already broken in the stored version is not one the save adds. The
+  kind-specific writers (`/alerts/rules`, `/decision-rules`, `/expectations`, every `/jobs` write including
+  `POST /jobs/{name}/enable`) run the same check; their responses carry no findings, so in shadow they only log it.
+  The default stays `shadow` until the operator's D-LC3 flip (§12.6).
+  A Pipeline or Connection the running server registers counts as existing even when its file is outside the write
+  root the census reads (the single-tenant layout, `ControlApi <config dir>` with `-Dassist.write.root` elsewhere,
+  as `serve-example` runs).
 - **Column names are reported, not protected.** Renaming a mapped column in a Schema still breaks every widget,
   rule, Expectation and SQL text that uses it; nothing refuses the save. The column impact read lists those
   consumers before the rename, and `metadata_validate` reports each one that dangles after it (`LinkGraph`
@@ -540,11 +546,11 @@ A link is only safe when its target is unique. What the code does today:
 | two registry components of one kind with identical content | reported by `metadata_validate` (`ComponentIntegrity.duplicates`) |
 | a registry id | cannot repeat: the file name is the id |
 | a Pipeline id in two files | refused, at boot and at runtime: "pipeline id … is already registered from …" (`CollectorService`) |
-| a Job or Enrichment `name` in two files of one Space | no refusal found in the `ServiceBootstrap` loaders — not traced further, treat as unprotected |
+| a Job or Enrichment `name`, or a Connection id, claimed by two files of one Space | reported at boot by the Space lock (`GET /spaces/{id}/integrity` `duplicates`, one `kind:id` claimed by two paths, LC-4); not refused at save |
 | a Connection both as `*_connection.toon` and under `registry/connections/` | not traced — treat as unprotected |
 | the same fact restated in two docs | this page links instead (see the banner); the guard keeps its tables equal to the code |
 
-Closing the unchecked rows is part of `SPACE-LINK-CENSUS-1` (§12.6).
+A save-time refusal of a duplicate is still open (board row `SPACE-LINK-CENSUS-1`, §12.6).
 
 ### 12.5 Changing a Space safely
 
@@ -567,20 +573,66 @@ Closing the unchecked rows is part of `SPACE-LINK-CENSUS-1` (§12.6).
 
 4. **Dry-run a changed Pipeline before activating it**, and leave `active: false` until it passes.
    Read the `brokenLinks` of a delete response and the `WARN_LINK_DANGLING` findings of a save response: they
-   are what the census refusal modes (§12.2) would refuse.
+   are what the census refusal modes (§12.2) would refuse. Under `refuse` a delete answers 409 with its
+   `dependents`: repoint or remove them first, or send `?force=true`.
 5. **Never hand-edit server-written state** (§4.6, §5, `audit/`): signatures and hash chains break.
 
-### 12.6 Where enforcement is going
+### 12.6 The link census — as built (`SPACE-LINK-CENSUS-1`)
 
-Today each check keeps its own copy of the link keys: the rename, the impact scan, `metadata_validate`, the
-import pre-check and two delete guards (`PipelineDependents` says so itself: "if a binding is added there, add
-it here"). That copying is why §12.2 has rows marked **none** and why the scans drifted from the loader. The
-planned fix is one declared **link census** that every check reads, refusal of a save or delete that would
-break a link, a column-level check, duplicate detection, and a report of files changed outside the server:
-[Space link census plan](../../../../superpower/2026-11-11-space-link-census-plan.md), board row
-`SPACE-LINK-CENSUS-1`. Built so far: the census and the checks that read it (LC-1, LC-2), the delete and
-save refusals in shadow mode (LC-3, §12.2), column links (LC-5) and this page's link table, generated from the
-census (LC-7).
+Every check that reads a link reads one declaration, `LinkCensus.LINKS` (`inspecto-engine`), resolved by
+`LinkGraph.of(configRoot)` over the loader's own file set: the Pipeline rename and its impact list (§12.3),
+`metadata_validate`, the bundle import pre-check, the delete and save refusals (§12.2), the Space lock's integrity
+report and this page's §12.2 table (`tools/render-space-links.mjs`, `--check` in CI). A parity test
+(`LinkCensusParityTest`) fails when a main source reads a reference-shaped key the census does not declare.
+Built 2026-11-12/13 in seven phases (LC-1 census and graph; LC-2 rename; LC-3 delete and save refusals; LC-4 the
+boot integrity report, `CONFIG_LINK_BROKEN` events and the per-Space `links:` mode on the SE-1a Space lock; LC-5
+column links, report-only; LC-6 `CONFIG_CHANGED_OUTSIDE` and `POST /spaces/{id}/integrity/accept` on the same
+lock; LC-7 the generated table). The LC-3 refusals are built and run in shadow by default.
+
+**Decisions (operator, 2026-11-11).** D-LC1: a save is refused only when the config is active; a draft saves with
+broken links and activating it is refused until they resolve. D-LC2: the per-Space boot mode defaults to `report`;
+`refuse-activation` as the default for new Spaces belongs to `SPACE-EVOLUTION-1` (D-SE2), and an existing Space
+never changes on its own. D-LC3: every kind refuses a delete while something uses it, every edition and every
+Space, `?force=true` giving the old outcome; this is the one accepted exception to the evolution plan's rule that
+an existing Space changes only by an explicit operator step, and it keeps its own kill switch. D-LC4: a file
+changed outside the server is reported with what it broke and takes effect, unless the Space's `approval.toon`
+governs its kind. D-LC5: the integrity report on every edition; the refuse modes and the outside-edit check on
+Standard and Advanced.
+
+**The flip to `refuse` waits for the operator.** `refuse` is built and ready as an explicit opt-in
+(`-Dlinks.delete=refuse`, `-Dlinks.save=refuse`; the save refusal on Standard and Advanced only, D-LC5). D-LC3 keeps
+the defaults at `shadow` until two releases of clean shadow have passed, counted from 2026-11-13 (zero false
+findings on the shipped Spaces, spec-space-lock §14); the operator decides the flip. The MoSCoW S9 decision ("build
+it now", [plan-architecture-moscow](../../layer/platform/plan-architecture-moscow.md) §8) did not override that rule.
+The evidence gathered for it on 2026-11-16:
+
+- **Shipped corpus clean.** `SpaceFindingBaselineTest` over the 3 shipped Spaces and 30 Space Templates: 0 dangling
+  links, 0 findings in every check. Its `everyShippedExampleFolderHasNoDanglingLink` over the 55 config folders
+  under `inspecto/examples/` (87 links, 60 resolved, the rest not judged): 0 dangling.
+- **One false refusal found, and fixed in the census check.** In the single-tenant layout the save check read only
+  the write root, so a Job, Enrichment, Expectation, Decision Rule or Alert Rule naming a Pipeline the server runs
+  from its config directory, or a Pipeline naming a Connection registered there, was refused 422 under `refuse`
+  (proved over real HTTP). The save check now also accepts a Pipeline or Connection the running service registers
+  (`LinkRefusals.served`). The delete check still reads the write root alone, so in that layout a dependent held in
+  the config directory is not listed: a missed refusal, never a false one.
+- **No shipped workflow deletes a used target.** The console deletes one component at a time on an operator's
+  request; template install, bundle import and the seed scripts write files or save in an order the census
+  accepts. Under a `refuse` default, five module test classes that save links to targets they never create
+  (`ControlApiComponentSharesTest`, `ControlApiDecisionRuleSpaceTest`, `RebuiltWritersUnmodelledKeysTest`,
+  `ControlApiDecisionRuleSignalOfferTest`, `ControlApiSpaceLinksModeTest`) would need the `shadow` opt-out set
+  explicitly; the flip changes them with it.
+
+Modes: `-Dlinks.delete=shadow|refuse|off`, `-Dlinks.save=shadow|refuse|off`. A value outside the three reads as
+`shadow`, so a typo never starts refusing. A Space's `links: refuse-activation` turns `shadow` into a refusal
+for that Space (Standard and Advanced), and it drives the load-time holds (spec-space-lock §10a).
+
+**Open** (board row `SPACE-LINK-CENSUS-1`, narrowed 2026-11-16): the default flip to `refuse`, waiting on the
+operator (D-LC3); a rename route for Datasets, Widgets
+and Queries; a duplicate `kind:id` refused at save (the lock only reports it); two Pipelines sharing one
+`dirs.poll` inbox or `dirs.database` store; a column rename rewrite route (column links stay report-only).
+Out of scope by decision: cross-Space links, links from runtime rows (Incidents, Cases) to config, and links inside
+free-form saved-view content beyond `query.projection.datasetId`. Plan (provenance only):
+[space-link-census-plan](../../../../archived-documents/plans-archive/2026-11-11-space-link-census-plan.md).
 
 ## 13. Gotchas
 

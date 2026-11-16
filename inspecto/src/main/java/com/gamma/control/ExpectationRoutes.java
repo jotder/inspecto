@@ -113,7 +113,7 @@ final class ExpectationRoutes implements RouteModule {
         content.put("createdAt", now);
         content.put("updatedAt", now);
         PendingChanges.hold(api, e, TYPE, exp.name(), content, null);   // maker-checker
-        return write(store, exp.name(), content);
+        return write(api, store, exp.name(), content);
     }
 
     private Object update(ApiContext api, com.sun.net.httpserver.HttpExchange e, String name, Map<String, Object> body) throws IOException {
@@ -126,7 +126,7 @@ final class ExpectationRoutes implements RouteModule {
         content.put("createdAt", prev.getOrDefault("createdAt", System.currentTimeMillis()));
         content.put("updatedAt", System.currentTimeMillis());
         PendingChanges.hold(api, e, TYPE, name, content, prev);   // maker-checker
-        return write(store, name, content);
+        return write(api, store, name, content);
     }
 
     private Object delete(ApiContext api, com.sun.net.httpserver.HttpExchange e, String name) throws IOException {
@@ -243,9 +243,9 @@ final class ExpectationRoutes implements RouteModule {
         }
     }
 
-    private static Object write(ComponentStore store, String name, Map<String, Object> content) throws IOException {
+    private static Object write(ApiContext api, ComponentStore store, String name, Map<String, Object> content) throws IOException {
         // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: this kind-specific writer's one funnel.
-        LinkRefusals.requireLinks(store.root().getParent(), TYPE, name, content,
+        LinkRefusals.requireLinks(api, store.root().getParent(), TYPE, name, content,
                 store.get(TYPE, name).map(ComponentRegistry.Component::content).orElse(null));
         try {
             ComponentRegistry.Component c = store.write(TYPE, name, content);

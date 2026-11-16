@@ -840,7 +840,7 @@ final class ComponentRoutes implements RouteModule {
             ComponentRegistry.Component before = existing(store, type, id);
             // SPACE-LINK-CENSUS-1 LC-3 (D-LC1): an active component adding a dangling link — mode links.save.
             List<Finding> linkFindings = new ArrayList<>();
-            Object refused = LinkRefusals.save(ex, api.writeRoot(), type, id, stamped,
+            Object refused = LinkRefusals.save(api, ex, api.writeRoot(), type, id, stamped,
                     before == null ? null : before.content(), linkFindings);
             if (refused != null) return refused;
             PendingChanges.hold(api, ex, type, id, stamped, before == null ? null : before.content());

@@ -121,7 +121,7 @@ final class AlertRoutes implements RouteModule {
         if (RouteErrors.exists(store, TYPE, rule.name()))
             throw new ApiException(409, ErrorCodes.CONFLICT, "alert rule '" + rule.name() + "' already exists (use PUT to update)");
         PendingChanges.hold(api, e, TYPE, rule.name(), persisted(rule, shaped), null);   // maker-checker
-        Map<String, Object> content = write(store, rule.name(), persisted(rule, shaped));
+        Map<String, Object> content = write(api, store, rule.name(), persisted(rule, shaped));
         alerts(api).upsert(rule);                                       // arm in the running engine
         return content;
     }
@@ -138,7 +138,7 @@ final class AlertRoutes implements RouteModule {
         Map<String, Object> shaped = ComponentAccess.onUpdate(e, TYPE, name, stored, patched);
         AlertRule rule = parse(api, shaped);
         PendingChanges.hold(api, e, TYPE, name, persisted(rule, shaped), stored);   // maker-checker
-        Map<String, Object> content = write(store, name, persisted(rule, shaped));
+        Map<String, Object> content = write(api, store, name, persisted(rule, shaped));
         alerts(api).upsert(rule);
         return content;
     }
@@ -165,7 +165,7 @@ final class AlertRoutes implements RouteModule {
         // owner its alerts go to, its shares), exactly as a plain content save does in R3.
         Map<String, Object> shaped = carryEnvelope(storedContent(store, ApiContext.str(body, "name")), body);
         AlertRule rule = parse(api, shaped);
-        Map<String, Object> content = write(store, rule.name(), persisted(rule, shaped));
+        Map<String, Object> content = write(api, store, rule.name(), persisted(rule, shaped));
         alerts(api).upsert(rule);
         return content;
     }
@@ -208,10 +208,10 @@ final class AlertRoutes implements RouteModule {
         return new ComponentStore(WriteGates.requireWriteRoot(api, "alert rule write").resolve("registry"));
     }
 
-    private static Map<String, Object> write(ComponentStore store, String name, Map<String, Object> content)
+    private static Map<String, Object> write(ApiContext api, ComponentStore store, String name, Map<String, Object> content)
             throws IOException {
         // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: this kind-specific writer's one funnel.
-        LinkRefusals.requireLinks(store.root().getParent(), TYPE, name, content,
+        LinkRefusals.requireLinks(api, store.root().getParent(), TYPE, name, content,
                 store.get(TYPE, name).map(ComponentRegistry.Component::content).orElse(null));
         try {
             return store.write(TYPE, name, content).content();

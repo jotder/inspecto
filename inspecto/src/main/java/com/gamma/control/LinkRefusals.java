@@ -44,6 +44,13 @@ import java.util.Set;
  *       only; on Basic it acts as {@code shadow}.</li>
  * </ul>
  *
+ * The defaults stay {@code shadow} until the operator's D-LC3 flip (two releases of clean shadow, counted from
+ * 2026-11-13); {@code refuse} is built and ready as an explicit opt-in.
+ *
+ * A Pipeline or Connection the running service registers counts as existing even when its file is not under the
+ * write root (the single-tenant layout, {@code ControlApi <config dir>} with {@code -Dassist.write.root} elsewhere):
+ * the save check never refuses a link to something this server runs.
+ *
  * A Space whose {@code safety-policy.toon} sets {@code links: refuse-activation} gets {@code refuse} where the JVM mode
  * is {@code shadow} ({@link SpaceLinksMode}, LC-4). A value outside the three reads as {@code shadow}: a typo never
  * starts refusing. The existing Pipeline and
@@ -175,10 +182,10 @@ final class LinkRefusals {
      * {@code job:} section too) is never judged. Refuse mode answers 422 and returns the handled marker; otherwise
      * shadow WARNING findings are appended to {@code findings} and null is returned.
      */
-    static Object save(HttpExchange ex, Path writeRoot, String kind, String name, Map<String, Object> draft,
+    static Object save(ApiContext api, HttpExchange ex, Path writeRoot, String kind, String name, Map<String, Object> draft,
                        Map<String, Object> stored, List<Finding> findings) throws IOException {
         Mode mode = saveMode();
-        List<Finding> added = added(mode, writeRoot, kind, name, draft, stored);
+        List<Finding> added = added(mode, api, writeRoot, kind, name, draft, stored);
         if (added.isEmpty()) return null;
         if (mode == Mode.REFUSE) {
             Map<String, Object> body = new LinkedHashMap<>();
@@ -199,9 +206,10 @@ final class LinkRefusals {
      * {@code /decision-rules}, {@code /expectations}, every {@code /jobs} write including enable): refuse mode throws
      * 422 naming each key and missing target; shadow logs what refuse would have refused.
      */
-    static void requireLinks(Path writeRoot, String kind, String name, Map<String, Object> draft, Map<String, Object> stored) {
+    static void requireLinks(ApiContext api, Path writeRoot, String kind, String name, Map<String, Object> draft,
+                             Map<String, Object> stored) {
         Mode mode = saveMode();
-        List<Finding> added = added(mode, writeRoot, kind, name, draft, stored);
+        List<Finding> added = added(mode, api, writeRoot, kind, name, draft, stored);
         if (added.isEmpty()) return;
         List<String> what = new ArrayList<>();
         for (Finding f : added) what.add(f.message());
@@ -211,8 +219,8 @@ final class LinkRefusals {
         log.warn("[LINKS] shadow: save of {} '{}' adds {} dangling link(s): {}", kind, name, added.size(), String.join("; ", what));
     }
 
-    private static List<Finding> added(Mode mode, Path writeRoot, String kind, String name, Map<String, Object> draft,
-                                       Map<String, Object> stored) {
+    private static List<Finding> added(Mode mode, ApiContext api, Path writeRoot, String kind, String name,
+                                       Map<String, Object> draft, Map<String, Object> stored) {
         if (mode == Mode.OFF || draft == null || LinkCensus.from(kind).isEmpty() || isDraft(kind, draft)) return List.of();
         LinkGraph graph = LinkGraph.of(writeRoot, ReservedConfigPaths::reserved);
         Set<String> before = new HashSet<>();
@@ -222,13 +230,30 @@ final class LinkRefusals {
         List<Finding> added = new ArrayList<>();
         boolean refuse = mode == Mode.REFUSE;
         for (LinkGraph.Edge e : graph.edgesOf(kind, name, draft)) {
-            if (e.status() != LinkGraph.Status.DANGLING || before.contains(e.key() + "\u0000" + e.value())) continue;
+            if (e.status() != LinkGraph.Status.DANGLING || before.contains(e.key() + "\u0000" + e.value())
+                    || served(api, e)) continue;
             added.add(new Finding(refuse ? Severity.ERROR : Severity.WARNING, e.key(),
                     e.key() + " names " + e.toKind() + " '" + e.value() + "', which does not exist in this Space",
                     refuse ? ERR_LINK_DANGLING : WARN_LINK_DANGLING,
                     "create the " + e.toKind() + " first, or save this " + kind + " as a draft (active: false)"));
         }
         return added;
+    }
+
+    /**
+     * Whether the running service registers the Pipeline or Connection a DANGLING edge names: the census reads the
+     * write root, and in the single-tenant layout the service loads its Pipelines and Connections from a config
+     * directory beside it, so their absence there is not a broken link.
+     */
+    private static boolean served(ApiContext api, LinkGraph.Edge e) {
+        if (api == null) return false;
+        String v = e.link().named(e.value()).trim();
+        return switch (e.toKind()) {
+            case "pipeline" -> HostContext.of(api).service().pipelines().stream()
+                    .anyMatch(p -> p.name() != null && p.name().trim().equalsIgnoreCase(v));
+            case "connection" -> HostContext.of(api).service().connection(v).isPresent();
+            default -> false;
+        };
     }
 
     /** The stored version of a config file, or null when there is none yet. */

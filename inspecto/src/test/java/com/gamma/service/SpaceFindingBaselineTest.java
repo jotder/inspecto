@@ -50,6 +50,35 @@ class SpaceFindingBaselineTest {
                 + "\nno longer found (drop from EXPECTED):\n  " + String.join("\n  ", gone));
     }
 
+    /**
+     * `SPACE-LINK-CENSUS-1` LC-3 flip evidence (2026-11-16): every shipped example folder under
+     * {@code inspecto/examples/} (each one a config root for {@code run-example} / {@code serve-example}) holds no
+     * census link the refuse modes would act on. The walk must see links, or it proved nothing.
+     */
+    @Test
+    void everyShippedExampleFolderHasNoDanglingLink() throws IOException {
+        Path examples = Path.of("examples").toAbsolutePath().normalize();
+        assertTrue(java.nio.file.Files.isDirectory(examples), "found no examples/ at " + examples);
+        List<String> dangling = new ArrayList<>();
+        int links = 0;
+        List<Path> dirs;
+        try (java.util.stream.Stream<Path> w = java.nio.file.Files.walk(examples)) {
+            dirs = w.filter(java.nio.file.Files::isDirectory)
+                    .filter(d -> java.util.stream.StreamSupport.stream(examples.relativize(d).spliterator(), false)
+                            .noneMatch(seg -> seg.toString().equals("out")))   // a local run's output, not shipped
+                    .sorted().toList();
+        }
+        for (Path d : dirs) {
+            LinkGraph g = LinkGraph.of(d, ReservedConfigPaths::reserved);
+            links += g.edges().size();
+            for (LinkGraph.Edge e : g.dangling())
+                dangling.add(examples.relativize(d) + " " + e.fromKind() + " '" + e.fromName() + "' " + e.key() + "="
+                        + e.value() + " -> " + e.toKind());
+        }
+        assertTrue(links >= 50, "the walk read only " + links + " links — it proved nothing");
+        assertEquals(List.of(), dangling, "a shipped example holds a dangling link");
+    }
+
     /** The baseline bites: a planted dangling Widget link, a planted Pipeline whose remote Collector names no
      *  Connection (SE-1b) and a planted duplicate Connection are found. */
     @Test

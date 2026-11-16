@@ -238,7 +238,7 @@ final class ConfigWriteRoutes implements RouteModule {
         }
 
         // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: an active config adding a dangling link.
-        Object linkRefusal = LinkRefusals.save(ex, writeRoot, type, ConfigFileSupport.fileBase(type, fileName), draft,
+        Object linkRefusal = LinkRefusals.save(api, ex, writeRoot, type, ConfigFileSupport.fileBase(type, fileName), draft,
                 LinkRefusals.stored(target), findings);
         if (linkRefusal != null) return linkRefusal;
 
@@ -468,7 +468,7 @@ final class ConfigWriteRoutes implements RouteModule {
         }
 
         // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: an active config adding a dangling link.
-        Object linkRefusal = LinkRefusals.save(ex, writeRoot, type, ConfigFileSupport.fileBase(type, fileName), merged,
+        Object linkRefusal = LinkRefusals.save(api, ex, writeRoot, type, ConfigFileSupport.fileBase(type, fileName), merged,
                 LinkRefusals.stored(target), findings);
         if (linkRefusal != null) return linkRefusal;
         PendingChanges.hold(api, ex, type, fileName, merged, existing);   // maker-checker, before any byte

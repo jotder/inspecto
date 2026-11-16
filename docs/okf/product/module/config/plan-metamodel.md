@@ -182,8 +182,8 @@ cross-Space Exchange grant; **`409`** if a `workflow` change would strand live o
 (`requireNoStrandedObjects`); **`409`** if an Alert Rule links the `runbook` (`requireNoLinkingAlertRules`);
 **`409`** if Mappings read the `dataset` (`DatasetEntryRules.mappingsOf`). Census links still naming it
 (`LinkRefusals.delete`, `SPACE-LINK-CENSUS-1`) are reported as `brokenLinks` under the default
-`-Dlinks.delete=shadow` and refused `409` only under `refuse` (`?force=true` overrides). That is the whole
-set. **`ComponentIntegrity`**
+`-Dlinks.delete=shadow` and refused `409` only under `refuse` (`?force=true` overrides); `refuse` is built and
+ready, and the default flip waits for the operator (D-LC3). That is the whole set. **`ComponentIntegrity`**
 (`platform/inspecto-engine/src/main/java/com/gamma/pipeline/ComponentIntegrity.java`) is pure functions over an
 in-memory universe — `brokenRefs` (widget → dataset / query, dashboard tile → widget, reconciliation →
 dataset), `brokenPipelineRefs` (expectation / decision-rule `target`), `duplicates` (content-identical apart
@@ -429,7 +429,7 @@ seams that already exist, the first of which is that **the store IS the registry
 
 | Item | Evidence | Why it matters |
 |---|---|---|
-| **Delete protection is a fixed list, and the widget / dashboard links are only reported by default** | `ComponentRoutes.deleteComponent` (§3.4); `LinkRefusals.delete` defaults to `shadow`; `ComponentIntegrity` runs only in `metadata_validate` and bundle import | Deleting a dataset a widget binds, or a widget a dashboard tiles, succeeds (with `brokenLinks` in the response) unless `-Dlinks.delete=refuse`. `MET-3` reads "delete-protection" as if it were general |
+| **Delete protection is a fixed list, and the widget / dashboard links are only reported by default** | `ComponentRoutes.deleteComponent` (§3.4); `LinkRefusals.delete` defaults to `shadow` (`refuse` built and ready; the flip waits for the operator, D-LC3); `ComponentIntegrity` runs only in `metadata_validate` and bundle import | Deleting a dataset a widget binds, or a widget a dashboard tiles, succeeds (with `brokenLinks` in the response) unless `-Dlinks.delete=refuse`. `MET-3` reads "delete-protection" as if it were general |
 | **No `ConfigSpec` for `mapping`** (and for 29 other writable kinds) | `ConfigSpecs.TYPES` = 9, of which 4 are writable kinds | The Components pane cannot render a spec-driven form for them; `GLOSSARY.md` §13 lists it as OPEN (a) |
 | **The Components pane's generic form and mapping editor send no `If-Match`** | only `schema-editor.dialog.ts` passes `ifMatch` in `inspecto-ui/src/app/modules/admin/components/` | Last-write-wins on grammar / mapping / transform / sink edits (shared with `API` §5's item) |
 | ✅ **Closed 2026-11-14** (`CLASSIFICATION-UNMASKED-CLASS-1`): the field-classification vocabulary has an owner | `ClassificationVocabulary`; page: `spec-config-safety.md`, "The classification vocabulary" | was: free string, nobody could say what values are legal |

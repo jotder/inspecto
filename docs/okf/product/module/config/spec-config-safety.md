@@ -1122,7 +1122,8 @@ Design: [`policy-narrowing-design.md`](../../../../archived-documents/plans-arch
 - 🔴 **Unreadable ⇒ throws, never "no policy".** TOON damage, a stat/IO failure (a *directory* named `safety-policy.toon` forces it), an unknown key (a mistyped `alow:` would otherwise silently drop the narrowing), a bad value, a relative root, `mode` or `require_spaces` in a Space file → `SafetyPolicyUnreadableException` (`ERR_SAFETY_POLICY_UNREADABLE`). `require_spaces[n]` in the server file (D7) makes a named Space with no file unreadable too; an un-named absent file narrows nothing.
 - **`links: report | refuse-activation` (Space file only, 2026-11-13, `SPACE-LINK-CENSUS-1` LC-4).** Absent =
   `report`. Read by the Control API's link checks, not folded into the tier: `refuse-activation` makes this Space's
-  LC-3 save and delete link checks refuse where the JVM mode is `shadow` (Standard and Advanced only, D-LC5). Any
+  LC-3 save and delete link checks refuse where the JVM mode is `shadow` (Standard and Advanced only, D-LC5; `shadow` is
+  the JVM default until the operator's D-LC3 flip). Any
   other value, or the key in the server file, is unreadable like every bad key. `SafetyPolicyFiles.links`,
   `SafetyPolicy.linksForSpace`; behaviour in [spec-space-lock.md](spec-space-lock.md) §10.
 - **`columns: report | refuse-breaking` (Space file only, 2026-11-13, SE-3b).** Absent = `report`. Read by the
