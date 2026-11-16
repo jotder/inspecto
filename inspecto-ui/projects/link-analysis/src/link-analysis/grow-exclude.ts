@@ -125,6 +125,20 @@ export function packTerms(profile: Pick<DomainProfile, 'labels'> | null | undefi
     return { node: singular(nodes), nodes, link: singular(links), links };
 }
 
+/**
+ * The words for the canvas while an Investigation is open (LA-FULL-CYCLE-TEST-1 finding 28): its pack's words only when
+ * that pack binds the Investigation's Dataset (or the Investigation was started under it), else neutral ones. A Space
+ * whose pack is Telecom also holds bank transfers in the showcase; its words ("subscribers", "calls") are wrong there.
+ * Outside an Investigation the Space's pack still speaks.
+ */
+export function investigationTerms(
+    profile: Pick<DomainProfile, 'labels'> | null | undefined,
+    investigationDataset: string | null | undefined,
+    boundProfileId: string | null | undefined,
+): PackTerms {
+    return packTerms(investigationDataset && !boundProfileId ? null : profile);
+}
+
 const fmt = (n: number): string => n.toLocaleString('en');
 const plural = (n: number, one: string, many: string): string => `${fmt(n)} ${n === 1 ? one : many}`;
 

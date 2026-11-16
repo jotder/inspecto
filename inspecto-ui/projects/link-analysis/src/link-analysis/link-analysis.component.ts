@@ -115,7 +115,7 @@ import {
     growKeepsEdge,
     hiddenByListsLine,
     neighboursPreviewBody,
-    packTerms,
+    investigationTerms,
     removedRows,
     withUndrawnLinks,
 } from './grow-exclude';
@@ -6098,7 +6098,9 @@ Its prior copies stay in its version history.`,
 
     readonly growExclude = inject(GrowExcludeStore);
     /** The active pack's words for what the canvas draws ("numbers", "calls"). */
-    readonly growTerms = computed(() => packTerms(this.profile()));
+    readonly growTerms = computed(() =>
+        investigationTerms(this.profile(), this.investigation.header()?.dataset, this.investigation.boundProfileId()),
+    );
     /** Recorded Investigation steps on its Working Set canvas, else the explorer graph (not recorded). */
     readonly growMode = computed<'investigation' | 'basic'>(() =>
         this.investigation.canvas() ? 'investigation' : 'basic',

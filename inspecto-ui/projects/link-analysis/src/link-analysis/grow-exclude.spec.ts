@@ -21,6 +21,7 @@ import {
     hiddenByListsLine,
     listTargets,
     listsInForce,
+    investigationTerms,
     packTerms,
     previewFailure,
     previewSentence,
@@ -81,6 +82,16 @@ describe('grow-exclude — wording', () => {
         expect(packTerms({ labels: { nodes: 'Accounts', links: 'Transfers', rows: '' } }).node).toBe('account');
         expect(packTerms({ labels: { nodes: 'Parties', links: 'Links', rows: '' } }).node).toBe('party');
         expect(packTerms(null).nodes).toBe('nodes');
+    });
+
+    it('inside an Investigation speaks the pack only when the pack binds its Dataset (finding 28)', () => {
+        const telecom = { labels: { nodes: 'Subscribers', links: 'Calls', rows: 'Rows' } };
+        // a bank Dataset in a Telecom Space: no pack binds it, so the words are neutral
+        expect(investigationTerms(telecom, 'mule_transfers_dataset', null)).toEqual(packTerms(null));
+        // the Dataset the pack binds (or a template that named the pack): the pack speaks
+        expect(investigationTerms(telecom, 'telecom_links_dataset', 'telecom').nodes).toBe('subscribers');
+        // no Investigation open: the Space's pack speaks, as before
+        expect(investigationTerms(telecom, undefined, null).links).toBe('calls');
     });
 
     it('says the preview in one plain sentence with the pack words', () => {
