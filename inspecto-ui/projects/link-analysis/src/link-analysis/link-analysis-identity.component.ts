@@ -59,28 +59,28 @@ export function importFieldNames(message: string): string {
     ],
     host: { class: 'block' },
     template: `
-        <section class="flex flex-col gap-2 text-xs" aria-label="Identity history">
+        <section class="flex flex-col gap-2 text-xs" aria-label="Identity Facts">
             <div class="flex items-center gap-1">
-                <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">Identity history</h3>
+                <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">Identity Facts</h3>
                 <button mat-stroked-button class="ml-auto" [disabled]="busy() || !canManage()" (click)="load()">
                     Refresh
                 </button>
             </div>
             @if (error()) {
-                <inspecto-alert variant="error" [title]="chainBroken() ? 'Chain NOT verified' : 'Identity history'">{{
+                <inspecto-alert variant="error" [title]="chainBroken() ? 'Chain NOT verified' : 'Identity Facts'">{{
                     error()
                 }}</inspecto-alert>
             }
             @if (head(); as h) {
                 <inspecto-alert variant="success" title="Chain verified">
                     The server re-checked every link of the chain on this read: {{ h.headSeq }}
-                    {{ h.headSeq === 1 ? 'entry' : 'entries' }}, none altered or missing in between. Removing the newest
-                    entries would leave a shorter chain that still checks out, so keep a copy of the Head hash below and
-                    compare it later.
+                    {{ h.headSeq === 1 ? 'Identity Fact' : 'Identity Facts' }}, none altered or missing in between.
+                    Removing the newest facts would leave a shorter chain that still checks out, so keep a copy of the
+                    Head hash below and compare it later.
                 </inspecto-alert>
-                <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-2" aria-label="Identity history head">
+                <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-2" aria-label="Identity Facts head">
                     <dt class="text-secondary">Head</dt>
-                    <dd class="m-0 tabular-nums">entry {{ h.headSeq }}</dd>
+                    <dd class="m-0 tabular-nums">Identity Fact {{ h.headSeq }}</dd>
                     <dt class="text-secondary">Head hash</dt>
                     <dd class="m-0 break-all">
                         <code>{{ h.headHash }}</code>
@@ -92,7 +92,7 @@ export function importFieldNames(message: string): string {
 
             @if (!canManage()) {
                 <p class="text-secondary m-0" data-testid="identity-read-only">
-                    Read-only: the identity history and its import need the Manage Incidents and Cases permission, also
+                    Read-only: the Identity Facts and their import need the Manage Incidents and Cases permission, also
                     to read.
                 </p>
             } @else {
@@ -198,7 +198,7 @@ export class LinkAnalysisIdentityComponent implements OnInit {
         } catch (err) {
             this.head.set(null); // never leave a stale "verified" beside a failed read
             this.chainBroken.set((err as { status?: number } | null)?.status === 500);
-            this.error.set(chainMessage(err, 'Could not read the identity history.'));
+            this.error.set(chainMessage(err, 'Could not read the Identity Facts.'));
         } finally {
             this.busy.set(false);
         }

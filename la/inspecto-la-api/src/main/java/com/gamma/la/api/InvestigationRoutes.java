@@ -1991,11 +1991,11 @@ public final class InvestigationRoutes implements RouteModule {
         return out;
     }
 
-    /** {@code "Applied identity resolution as of identity history entry 12 (3 groups, 7 member keys)."} — no key is named. */
+    /** {@code "Applied identity resolution as of Identity Fact 12 (3 groups, 7 member keys)."} — no key is named. */
     static String resolveLine(Map<String, Object> e) {
         Map<String, Object> s = resolutionSummary((Map<?, ?>) e.get("resolution"));
         int g = (Integer) s.get("groups"), m = (Integer) s.get("members");
-        return "Applied identity resolution as of identity history entry " + s.get("atSeq") + " (" + g + " group" + (g == 1 ? "" : "s") + ", "
+        return "Applied identity resolution as of Identity Fact " + s.get("atSeq") + " (" + g + " group" + (g == 1 ? "" : "s") + ", "
                 + m + " member key" + (m == 1 ? "" : "s") + "): an entity whose typed key is a member shows as its merged "
                 + "node; traversal and counts are unchanged.";
     }
@@ -2623,12 +2623,12 @@ public final class InvestigationRoutes implements RouteModule {
         return b.append(" no member is admitted again.").toString();
     }
 
-    /** {@code "Entity List `known-mules` (exclusion, 40 members, as of identity history entry 17)"} — the sealed list a list op names. */
+    /** {@code "Entity List `known-mules` (exclusion, 40 members, as of Identity Fact 17)"} — the sealed list a list op names. */
     static String listClause(Map<String, Object> e) {
         Map<?, ?> l = (Map<?, ?>) e.get("list");
         int n = strings(l.get("members")).size();
         return "Entity List `" + l.get("listId") + "` (" + l.get("purpose") + ", " + n + " member" + (n == 1 ? "" : "s")
-                + ", as of identity history entry " + l.get("atSeq") + ")";
+                + ", as of Identity Fact " + l.get("atSeq") + ")";
     }
 
     /** What a {@code threshold} did, in words (the removed entities are in the step's delta, not the line). */

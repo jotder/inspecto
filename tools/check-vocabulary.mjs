@@ -539,7 +539,7 @@ const SOURCE_RULES = [
         id: 'la-developer-phrasing',
         scope: (rel) => CORE_LA_SCOPE.some((p) => rel.startsWith(p)),
         prepare: (raw) => raw,
-        re: /\b(?:[Nn]eeds? Incident management|[Ii]nstantiat(?:e|ed|ing) (?:a|an|it|the)\b|objects store|Identity Fact log|min inclusive|max exclusive|score vectors?|Fill the required fields|Reveal rights|not computed yet|as of fact|name no event day|owner or assignee|writes stay owner-only|set by four_eyes_\w+|maxFanOut (?:unbounded|\d))/g,
+        re: /\b(?:[Nn]eeds? Incident management|[Ii]nstantiat(?:e|ed|ing) (?:a|an|it|the)\b|objects store|min inclusive|max exclusive|score vectors?|Fill the required fields|Reveal rights|not computed yet|as of fact|name no event day|owner or assignee|writes stay owner-only|set by four_eyes_\w+|maxFanOut (?:unbounded|\d))/g,
         msg: 'Developer phrasing in text a Link Analysis user reads (LA-FULL-CYCLE-TEST-1 finding 29): say it in plain words with GLOSSARY terms. A capability by the name it is granted under ("the Manage Incidents and Cases permission"), never a Settings key, a request field or a storage term. If the text really is a contract (a sealed wire value the UI puts into words), put `vocab-allow` on the line naming the contract.',
     },
 ];

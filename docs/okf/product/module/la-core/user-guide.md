@@ -1199,7 +1199,7 @@ Top to bottom, most important first:
 5. **Expand** ([§7.1](#71-expand)): the per-degree results, then ONE Expand form — From, **Expand** with its preview and
    four-eyes line, and the **Expand filter** groups. A reader sees *Needs the Manage Incidents and Cases permission.* instead of the form; a reviewer of the Investigation,
    or someone reading it through its Case, sees *Only a lead expands this Investigation.* and no *How to investigate*
-   coaching. An Expand that finds nothing new is not recorded: the line under the canvas says *Expand found nothing new,
+   coaching. Before you save, an Expand that finds nothing new is not recorded: the line under the canvas says *Expand found nothing new,
    so no step was added.*
 6. **Clean up** ([§7.4](#74-clean-up)): one-press clean-ups with their counts.
 7. **Selected entity:** who it is (masked, busy, not in the Working Set), **Start from it** when it is not in the Working
@@ -1275,7 +1275,7 @@ covered per Collector.
 
 Select two entities and **Merge** (canvas toolbar) to open ⚙ Settings ▸ **Identities** with the pair filled in; state
 that they are the same, with a reason. Keys are typed and normalised (`msisdn:+4477…`); a **mapping Dataset** imports
-many pairs at once (the import answers with counts only). The **Identity history** tab shows its head (entry number and
+many pairs at once (the import answers with counts only). The **Identity Facts** tab shows its head (fact number and
 hash) and *Chain verified* (the whole chain is re-checked on every read); when the check fails it says *Chain NOT
 verified* and hides the head. The screen states what the log alone cannot show: facts cut off its end. Inside an
 Investigation the **resolve** step shows merged nodes; by default this is display only — choose **merged** on a step to
@@ -1710,7 +1710,7 @@ The Link Analysis page (`link-analysis.component.html/.ts`) drives the shared G6
   rendered as text, never a link; no edit or delete (append-only by design).
 - **Compare:** the `compare` op through the Investigation tab hits the same `…/ops` route; checked live against a demo
   backend (activity mode, two windows), answered with a sealed `comparison`.
-- **Identity history** (the Identity Fact log): `LinkAnalysisIdentityComponent` reads `GET /inv/entity-identities`; the server re-verifies the
+- **Identity Facts** tab: `LinkAnalysisIdentityComponent` reads `GET /inv/entity-identities`; the server re-verifies the
   whole chain on every read (`EntityFactLog.read`), so a 500 renders *Chain NOT verified*. Import →
   `POST /inv/entity-identities/import` (counts only).
 - **Alert → Investigation (DR-U9) — decision:** the Alert does NOT carry the breaching entity names.

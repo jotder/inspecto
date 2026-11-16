@@ -231,7 +231,7 @@ class ControlApiInvestigationResolveTest {
 
             JsonNode logView = data(get(c, "/inv/investigations/case-a/log"), 200);
             String line = logView.at("/entries/2/text").asText();
-            assertTrue(line.contains("Applied identity resolution as of identity history entry 2 (2 groups, 4 member keys)"), line);
+            assertTrue(line.contains("Applied identity resolution as of Identity Fact 2 (2 groups, 4 member keys)"), line);
             assertFalse(logView.at("/entries/2/resolution").has("types") || logView.toString().contains(IMSI),
                     "the log view summarises the seal, it does not list keys: " + logView.at("/entries/2"));
         }
