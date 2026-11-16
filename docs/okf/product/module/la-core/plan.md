@@ -100,5 +100,6 @@ lane, each with its reason (as built: [architecture](architecture.md) §3.4).
 | Save defaults under masking | `"<Type>, <time>"` / `"Graph on screen, <time>"` in the one app clock (`ledgerTime`) | Finding 24: every masked start defaulted to "Account". The value cannot enter (a raw id is visible to reviewers, an alias reads as nothing); the time makes two starts differ | A blank required Name: one more field to type |
 | Showcase text | Roles, never ids, in every Investigation name, purpose, reason, annotation, reference label and Draft step; guarded by `tools/seed-la-investigation-text.test.mjs` | Finding 13: the server masks every id inside Investigation text, so "Mule hub MULE-HUB-01" read "Mule hub masked:6021…" | Unmasking titles: a title is visible to reviewers |
 
-Left on purpose: the deep-link reveal still audits a redacted `tokens` attribute; seeded Case titles (Case Management,
+Left on purpose: seeded Case titles (Case Management,
 not an Investigation) still name the story's entity; quick-question answers and the Dossier keep aliases after a reveal.
+The deep-link reveal's redacted `tokens` attribute, left at first, now reads `alias` (LA-DEEPLINK-REVEAL-AUDIT-1, 2026-11-16).

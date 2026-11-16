@@ -2,6 +2,8 @@ package com.gamma.control;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.gamma.access.Roles;
+import com.gamma.audit.Event;
+import com.gamma.event.EventLog;
 import com.gamma.spi.auth.Authenticators;
 import com.gamma.spi.auth.Subject;
 import org.junit.jupiter.api.AfterEach;
@@ -15,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 import static com.gamma.control.EntityProfileFixture.A;
 import static com.gamma.control.EntityProfileFixture.B;
@@ -282,6 +286,46 @@ class ControlApiInvestigationInboundTest {
             assertEquals(422, send(c, "POST", RESOLVE, "{\"entity\":\"msisdn:masked:0000000000000000\"}", OWNER).statusCode(),
                     "an alias this server never minted");
             assertEquals(422, send(c, "POST", RESOLVE, "{\"entity\":\"cell:x\",\"window\":{\"from\":\"yesterday\"}}", OWNER).statusCode());
+        }
+    }
+
+    /**
+     * LA-DEEPLINK-REVEAL-AUDIT-1: the deep-link reveal's audit row, as the event sink stores it (after {@code SecretScrubber}),
+     * names the alias revealed - as {@code alias} and as the row's target, like the on-screen Reveal - never the raw value.
+     * The aliases used to ride as {@code tokens}, which the scrubber redacts. A real secret on the same sink is still redacted.
+     */
+    @Test
+    void aDeepLinkRevealIsAuditedNamingTheAliasAfterScrubbingAndARealSecretIsStillRedacted(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        subjects();
+        try (EntityProfileFixture.Ctx c = open(cfg, root)) {
+            String alias = data(send(c, "POST", "/inv/entities/msisdn/resolve", "{\"key\":\"" + A + "\"}", OWNER)).get("key").asText();
+            List<Event> events = new CopyOnWriteArrayList<>();
+            Consumer<Event> sub = events::add;
+            EventLog.current().addSubscriber(sub);
+            try {
+                JsonNode revealed = data(send(c, "POST", RESOLVE, "{\"entity\":\"msisdn:" + alias + "\",\"reveal\":true}", OWNER));
+                assertEquals(A, revealed.at("/entity/revealed").asText());
+                EventLog.current().emit(Event.builder("LOG").message("probe").attr("tokens", "s3cret-token-value")
+                        .attr("password", "hunter2").build());
+            } finally {
+                EventLog.current().removeSubscriber(sub);
+            }
+
+            List<Event> rows = events.stream().filter(e -> "LINK_ENTITY_REVEALED".equals(e.type())).toList();
+            assertEquals(1, rows.size(), "one audit row for the one entity revealed: " + rows);
+            Event row = rows.get(0);
+            assertEquals("deep-link", row.attributes().get("via"), row.toString());
+            assertEquals(alias, row.attributes().get("alias"), "the trail names the alias revealed: " + row);
+            assertEquals(alias, row.attributes().get("target_id"), "the row's target is the entity: " + row);
+            assertEquals("analyst-1", row.attributes().get("actor"), row.toString());
+            assertFalse(row.toString().contains("***redacted***"), "nothing on the row was redacted: " + row);
+            for (String any : RAW) assertFalse(row.toString().contains(any), "the trail never re-leaks the raw id: " + row);
+
+            Event probe = events.stream().filter(e -> "probe".equals(e.message())).findFirst()
+                    .orElseThrow(() -> new AssertionError("the probe reached the sink: " + events));
+            assertEquals("***redacted***", probe.attributes().get("tokens"), "a secret is still redacted: " + probe);
+            assertEquals("***redacted***", probe.attributes().get("password"), "a secret is still redacted: " + probe);
         }
     }
 

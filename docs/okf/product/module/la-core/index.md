@@ -36,7 +36,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | `LA-FULL-CYCLE-RESIDUALS-1` | P3 | chore | what the full-cycle plan left on purpose, and two environment gaps its drive found. | — |
 | `LA-INDEX-SPELLINGS-1` | P3 | defect | the link index keeps each raw spelling of an entity as its own node | operator |
-| `LA-DEEPLINK-REVEAL-AUDIT-1` | P3 | defect | a deep-link reveal records its aliases under a tokens attribute that the event sink's SecretScrubber redacts | — |
 | `SPACE-ADMISSION-FOLLOWUPS-1` | P3 | chore | what the closed-Space change (D5, 91f0af69a) left on purpose. | — |
 | `LA-SPACE-SWITCHER-NAMES-1` | P3 | defect | the Space switcher still shows near-twin names, no name on a phone, and squeezes a two-line name. | — |
 | `LA-UI-TEXT-PASS-2` | P3 | defect | la-app wording that waits on an operator call. | operator |

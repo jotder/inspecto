@@ -291,7 +291,9 @@ public final class InvestigationInboundRoutes implements RouteModule {
      * masked, revealed?}, investigation?: {id, title}, window?}}. Gates: write root 503 → neither entity nor investigation, a
      * malformed entity, a raw key of a masked type, an alias this server never minted or a bad window 422 → an Investigation the
      * caller cannot read 404 (absence) → {@code reveal} without {@code canRevealLinkEntities} 403. A reveal is audited as
-     * {@code LINK_ENTITY_REVEALED} naming the alias, never the raw value. Reads no Dataset and persists nothing.
+     * {@code LINK_ENTITY_REVEALED} naming the alias as {@code alias} and as the target, never the raw value (as
+     * {@link InvestigationRoutes#auditReveal}: an attribute named {@code *token*} is redacted by the event sink's
+     * {@code SecretScrubber}). Reads no Dataset and persists nothing.
      */
     private static Object resolve(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "deep link");
@@ -323,7 +325,7 @@ public final class InvestigationInboundRoutes implements RouteModule {
                     EventSink.current().emit(Event.builder(LinkEventTypes.LINK_ENTITY_REVEALED).source("inv")
                             .message("link.entity.revealed - deep link, 1 entity").actor(ApiContext.actor(ex))
                             .actorType(ApiContext.actorType(ex)).action("link.entity.revealed").actionCategory("analysis")
-                            .attr("via", "deep-link").attr("tokens", t.shown()).attr("count", 1));
+                            .target("entity", t.shown()).attr("alias", t.shown()).attr("via", "deep-link").attr("count", 1));
                 } catch (RuntimeException ignored) {
                     // best effort, as every Link Analysis audit
                 }

@@ -282,8 +282,9 @@ public final class LinkEventTypes {
      *  read raw through {@code POST /inv/reference-rows} {@code reveal: true}; LA-19 / D-U6, LA-FULL-CYCLE-TEST-1 D3) —
      *  ONE row per entity, by a lead holding {@code canRevealLinkEntities}. {@code investigationId}, {@code alias} and the
      *  target (the pseudonym revealed — never the raw value, so the trail does not re-leak it), {@code reason}, {@code via}
-     *  ({@code investigation} / {@code details}) and {@code count} 1. The deep-link reveal still writes {@code tokens},
-     *  which the event sink's secret scrubber redacts. */
+     *  ({@code investigation} / {@code details} / {@code deep-link}) and {@code count} 1. A deep-link reveal
+     *  ({@code POST /inv/deep-links/resolve}) names no Investigation or reason: {@code alias}, the target, {@code via} and
+     *  {@code count}. Never an attribute named {@code *token*}: the event sink's secret scrubber redacts it. */
     public static final String LINK_ENTITY_REVEALED = "LINK_ENTITY_REVEALED";
 
     /** A sensitive expand was held for four-eyes approval instead of running (LA-19 / D-U7). {@code investigationId},

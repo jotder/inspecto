@@ -410,7 +410,9 @@ characters, 422 otherwise) and writes **one** `LINK_ENTITY_REVEALED` row per ent
 as `alias` and as the row's target, with the reason and `via`, never the raw id. ⚠ Gotcha: the old single row carried
 the aliases as a `tokens` attribute, and `SecretScrubber` redacts every attribute whose key names a secret, so the trail
 read `tokens=***redacted***`; never name an audit attribute `*token*`. The deep-link reveal
-(`InvestigationInboundRoutes`) still writes `tokens` and was left as it was. The gate is unchanged: a lead of the
+(`InvestigationInboundRoutes`) writes the same shape since 2026-11-16 (LA-DEEPLINK-REVEAL-AUDIT-1): the alias as `alias`
+and as the target, `via: deep-link`, `count` 1, and no Investigation or reason, since a deep link carries neither. The
+scrubber is unchanged; the attribute was renamed instead. The gate is unchanged: a lead of the
 Investigation holding the capability; a reviewer or analyst 403, anyone else 404. Nothing is stored: a reveal changes
 no later response, and the SPA keeps the real ids in browser memory for the open Investigation only
 (`InvestigationSessionStore.revealed`), drawn as the node's `canvasLabel` while `label` (what every op, search and

@@ -195,11 +195,13 @@ surface). Outbound (case hand-off, webhooks, client-credentials trust) is a sepa
   a raw value is refused 422 and never repeated. The page posts the parameters to `/inv/deep-links/resolve`, which answers
   `{entity?: {type, key, masked}, investigation?: {id, title}, window?}`; an Investigation the caller cannot read is the 404 of absence.
   `reveal:true` returns a masked entity's raw value only to a holder of `canRevealLinkEntities` (403 otherwise), audited as
-  `LINK_ENTITY_REVEALED` with `via: deep-link` naming the alias. Aliases are resolved from the Space's alias book ([architecture.md](architecture.md#34-masking) §3.4), which is
+  `LINK_ENTITY_REVEALED` with `via: deep-link` naming the alias as `alias` and as the row's target (never as `tokens`, which the
+  event sink's `SecretScrubber` redacts; LA-DEEPLINK-REVEAL-AUDIT-1, 2026-11-16). Aliases are resolved from the Space's alias book ([architecture.md](architecture.md#34-masking) §3.4), which is
   persisted beside the Space key, so a deep link still works after a restart (2026-10-19).
 * **Tests:** `ControlApiInvestigationInboundTest` (geo-link, armed Authenticator: seeding and window, idempotency incl. other system /
   id, invalid entity / reference / window / binding 422 with nothing written, 403 / 401 / 409, 503, the deep-link masking and reveal
-  rules, Investigation 404), `InvestigationInboundRoutesContractTest` (TCK). SPA: `open-link.spec.ts`, `open-in-la.component.spec.ts` (axe).
+  rules, the deep-link reveal's audit row naming the alias after the scrubber while a real secret is still redacted, Investigation
+  404), `InvestigationInboundRoutesContractTest` (TCK). SPA: `open-link.spec.ts`, `open-in-la.component.spec.ts` (axe).
 * **As built 2026-10-20 (`a6866a45f`):** the `window` of a link to an Entity applies. The Open page forwards `?from=&to=` to the Entity
   page, which passes them to `GET /inv/entities/{type}/{key}/profile?from=&to=` (ISO-8601 instants with a zone, half-open `[from, to)`,
   UTC; 422 for a malformed instant or `from >= to`). Inside the window the server reads `where`, `firstSeen`, `lastSeen`, `activeDays`,
