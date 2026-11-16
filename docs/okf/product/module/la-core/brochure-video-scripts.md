@@ -1,6 +1,6 @@
 # Inspecto LA short videos — scripts and agency briefs
 
-> **Six concept videos and nine industry videos, filmed on the real product over synthetic data. Each one is an example that ships with Inspecto LA: it explains the problem, what the graph shows and why it took a graph, and turns raw records into an investigation outcome in a few steps that anyone can repeat on their own data. Each ends by saying that what it showed is in Basic, and what Standard and above add. For each video: a one-page brief for the agency, then a shot-by-shot script with voice-over; a 480p draft round on a Basic install comes before the agency's masters.**
+> **Six concept videos, nine industry videos and twenty case videos, filmed on the real product over synthetic data. Each one is an example that ships with Inspecto LA: it explains the problem, what the graph shows and why it took a graph, and turns raw records into an investigation outcome in a few steps that anyone can repeat on their own data. Each ends by saying that what it showed is in Basic, and what Standard and above add. For each video: a one-page brief for the agency, then a shot-by-shot script with voice-over; a 480p draft round on a Basic install comes before the agency's masters.**
 
 *Audience: marketing, presales and the video agency. Product Map Item `module.la-core`. Draft of 2026-11-08, not
 yet reviewed by product or legal. Every product claim below is taken from the
@@ -58,6 +58,13 @@ Telecom, its banking stories under Banking and finance.
 | 3.8 | Logistics | Cargo theft | 2 min | Basic | Yes |
 | 3.9 | Enterprise | Internal audit · Insider threat | 2 min 30 s | Advanced | Yes (B also on Basic, in the *Enterprise* Space) |
 
+**Case videos** — one per use case bundled with Inspecto LA Basic, 20 in all, each about three minutes. Each
+takes one planted story from raw records to an outcome in a fixed timeline (raw records, metadata, map, context,
+intention, the whole graph, the first sweep, the close-up, the outcome, the evidence), told as a puzzle, and each
+shot has a 2560 × 1440 screenshot taken on a Basic install. They are written so that a video-generation tool can
+make each video from its script and its screenshots alone. The scripts and their screenshots (62 MB) are kept
+outside the repository.
+
 *Features shown* is the lowest edition that has every feature on screen. *Film on* is the install the video must be
 captured on: `la-mobile-money`, `la-showcase` and `la-audit` are templates that need an Advanced install
 (`minEdition: advanced`) today, even where every feature shown is in Basic. The plan's wave B gives those three a Basic
@@ -71,9 +78,13 @@ run on Basic with unmasked ids, while its Investigation, Reveal and Case segment
 **Product name.** *Inspecto LA* in voice-over and titles. "Link Analysis" is the name of the capability
 inside the product, and may appear on screen.
 
-**Tone.** Calm, precise and confident. The product's own voice is plain and honest: it says what it did and
-what it set aside. The videos should sound the same. No thriller music, no hacker clichés (green code rain,
-hooded figures), no "AI magic" language.
+**Tone.** Precise and confident, with a little drama: every story is a puzzle, and the viewer solves it beside the
+analyst. Open on the question nobody can answer from the records, let the first lead turn out to be wrong where the
+data really does that, hold a beat of quiet before the reveal, and close on the next step. The drama comes from the
+pacing, the music bed and the order of the clues, never from fear or from calling anyone guilty. The product's own
+voice is plain and honest: it says what it did and what it set aside, and the videos sound the same. No hacker
+clichés (green code rain, hooded figures), no "AI magic" language. The case videos (below) carry this tone furthest;
+the concept and industry videos keep it lighter.
 
 **Explain the story, not just the clicks (binding).** Tell each story so that a viewer who has never seen a link
 chart can follow it and relate it to their own work:
@@ -158,7 +169,8 @@ shows Standard features and carries their edition labels instead.
   (`AG-18`, `TILL-06`) can show as an alias. Film signed in as a user who can reveal identifiers, and check in the
   first frame that the ids on screen match the script. Basic shows them unmasked.
 - Every story has a **benign look-alike** (named in each brief). It must never appear on screen as part of the
-  story or as suspicious; that is the honest half of the demo.
+  story or as suspicious; that is the honest half of the demo. A case video may show it as the **false lead**: the
+  busiest node the first sweep names. The voice then clears it by name, in the same shot (*popular is not guilty*).
 - A shot showing a feature above Basic carries an on-screen edition label (*Inspecto LA Standard* or *Inspecto LA
   Advanced*) while it is visible. Geo Views are among them: they are inert on Basic. Untagged shots show features
   every edition has.
@@ -937,4 +949,10 @@ Standard and Advanced include by default; sign-in, roles and enforced masking co
   can use their footage.
 - Filming needs both a Basic install (videos 2, 5, 7, 3.3–3.8) and an Advanced install (videos 1, 4, 6, 3.1, 3.2,
   3.9); on the Advanced install, film as a user who can reveal identifiers.
+- **Case videos** (the per-case scripts, kept with their screenshots outside the repository): product checks each case's
+  figures against its Space's ground truth before a video is made. Three points found while taking the stills:
+  the `la-showcase` Space uses the telecom wording, so *Busiest nodes* counts "calls" for bank transfers (cases 6
+  and 7); the close-up of login `S-41` shows 40 swaps where the planted burst is 30 (case 3); and a close-up reads
+  the whole link Dataset, so it can show more links than the saved view does (cases 2 and 9). Retake the stills on
+  the release build: they were taken on the product build of 2026-11-13.
 - Product and legal sign-off on every script before the agency starts.

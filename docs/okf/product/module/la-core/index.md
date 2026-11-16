@@ -24,7 +24,7 @@ tags: [product-item, module]
 | admin-guide | current | [Inspecto LA demo kit - runbook and stakeholder Q&A](admin-guide-demo.md) · [Inspecto LA - administration (LA level, Investigations add-on, masking default, real OIDC sign-in)](admin-guide.md) |
 | api | current | [Link Analysis — API](api.md) |
 | tests | current | [Link Analysis core and ports — tests inventory](tests-inventory.md) · [Link Analysis - live drives and user sessions](tests-live-drives.md) |
-| brochure | current | [Inspecto LA whitepaper](brochure-inspecto-la-whitepaper.md) · [Inspecto LA short videos — scripts and agency briefs](brochure-video-scripts.md) |
+| brochure | current | [Inspecto LA whitepaper](brochure-inspecto-la-whitepaper.md) · [Inspecto LA case demos — generated, one plain live walk-through per case](brochure-video-demo-case-scripts.md) · [Inspecto LA product demo videos — a plain, live walk-through with an explainer voice](brochure-video-demo-scripts.md) · [Inspecto LA Standard demos — from the Basic walk-through to a sealed Dossier](brochure-video-demo-standard-scripts.md) · [Inspecto LA industry videos — story, data, map, investigation, conclusion](brochure-video-industry-scripts.md) · [Inspecto LA short videos — scripts and agency briefs](brochure-video-scripts.md) · [Inspecto LA short vertical videos — collage style, real product screens](brochure-video-short-scripts.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
 

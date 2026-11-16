@@ -1,0 +1,268 @@
+{
+ "Telecom_Structuring": {
+  "entityType": "Wallet",
+  "options": [
+   "Wallet"
+  ]
+ },
+ "Telecom_DeviceFarm": {
+  "entityType": "Wallet",
+  "options": [
+   "Wallet"
+  ]
+ },
+ "Telecom_SimSwap": {
+  "entityType": "Telecom entity",
+  "options": [
+   "Telecom entity",
+   "Merchant",
+   "Not a link end of mfs_screen_links_dataset",
+   "Settlement account",
+   "Subscriber number",
+   "Dealer",
+   "Enterprise trunk",
+   "Destination country",
+   "Agent",
+   "Staff login",
+   "Wallet",
+   "Device",
+   "Shop",
+   "Enterprise customer"
+  ]
+ },
+ "Telecom_WangiriNetwork": {
+  "entityType": null,
+  "options": [
+   "MSISDN",
+   "Billing account",
+   "Not a link end of telecom_links_dataset"
+  ]
+ },
+ "Telecom_DealerCommission": {
+  "entityType": "Telecom entity",
+  "options": [
+   "Telecom entity",
+   "Merchant",
+   "Not a link end of telco_ra_screen_links_dataset",
+   "Settlement account",
+   "Subscriber number",
+   "Dealer",
+   "Enterprise trunk",
+   "Destination country",
+   "Agent",
+   "Staff login",
+   "Wallet",
+   "Device",
+   "Shop",
+   "Enterprise customer"
+  ]
+ },
+ "Banking_TillStructuring": {
+  "entityType": "Billing account",
+  "options": [
+   "Billing account",
+   "MSISDN",
+   "Not a link end of mule_transfers_dataset"
+  ]
+ },
+ "Banking_SanctionedOwner": {
+  "error": "not found: (() => { const hits = []; const w = document.createTreeWalker(document.body, NodeFilter.S"
+ },
+ "Banking_CardCompromise": {
+  "entityType": "Card entity",
+  "options": [
+   "Card entity",
+   "Trade entity",
+   "Not a link end of card_links_dataset",
+   "Online account",
+   "Device",
+   "Crypto entity",
+   "Bank customer",
+   "Company",
+   "Crypto address",
+   "Address cluster",
+   "Exchange account",
+   "Person",
+   "Party",
+   "Payment card",
+   "Cardholder",
+   "Container",
+   "Account",
+   "Bank account",
+   "Trade",
+   "Merchant"
+  ]
+ },
+ "Banking_CircularTrade": {
+  "entityType": "Trade entity",
+  "options": [
+   "Trade entity",
+   "Online account",
+   "Not a link end of trade_circular_trade_links_dataset",
+   "Device",
+   "Crypto entity",
+   "Bank customer",
+   "Company",
+   "Crypto address",
+   "Address cluster",
+   "Exchange account",
+   "Person",
+   "Party",
+   "Payment card",
+   "Cardholder",
+   "Container",
+   "Card entity",
+   "Account",
+   "Bank account",
+   "Trade",
+   "Merchant"
+  ]
+ },
+ "Banking_CryptoCashOut": {
+  "entityType": "Crypto entity",
+  "options": [
+   "Crypto entity",
+   "Trade entity",
+   "Not a link end of crypto_screen_links_dataset",
+   "Online account",
+   "Device",
+   "Bank customer",
+   "Company",
+   "Crypto address",
+   "Address cluster",
+   "Exchange account",
+   "Person",
+   "Party",
+   "Payment card",
+   "Cardholder",
+   "Container",
+   "Card entity",
+   "Account",
+   "Bank account",
+   "Trade",
+   "Merchant"
+  ]
+ },
+ "Insurance_ClaimantRing": {
+  "entityType": "Party",
+  "options": [
+   "Party",
+   "Claim",
+   "Not a link end of claims_links_dataset",
+   "Policy",
+   "Broker"
+  ]
+ },
+ "Utilities_MeterTampering": {
+  "entityType": "Utility entity",
+  "options": [
+   "Utility entity",
+   "Account",
+   "Not a link end of utility_links_dataset",
+   "Bank account",
+   "Premise",
+   "Transformer",
+   "Vending point",
+   "Contractor"
+  ]
+ },
+ "LawEnforcement_BurglarySeries": {
+  "entityType": "Police entity",
+  "options": [
+   "Police entity",
+   "Phone number",
+   "Not a link end of police_property_links_dataset",
+   "Incident",
+   "Item serial",
+   "Dealer",
+   "Person",
+   "Address",
+   "Vehicle"
+  ]
+ },
+ "PublicSector_BidRotation": {
+  "entityType": "Public-sector entity",
+  "options": [
+   "Public-sector entity",
+   "Person",
+   "Not a link end of procurement_links_dataset",
+   "Address",
+   "Benefit claim",
+   "Company",
+   "Bank account",
+   "Tender",
+   "Employer",
+   "Household",
+   "Tax preparer",
+   "Buyer unit"
+  ]
+ },
+ "PublicSector_AddressFarm": {
+  "entityType": "Public-sector entity",
+  "options": [
+   "Public-sector entity",
+   "Person",
+   "Not a link end of benefits_screen_links_dataset",
+   "Address",
+   "Benefit claim",
+   "Company",
+   "Bank account",
+   "Tender",
+   "Employer",
+   "Household",
+   "Tax preparer",
+   "Buyer unit"
+  ]
+ },
+ "Healthcare_ReferralKickbacks": {
+  "entityType": "Health entity",
+  "options": [
+   "Health entity",
+   "Owner",
+   "Not a link end of health_screen_links_dataset",
+   "Address",
+   "Member",
+   "Provider",
+   "Bank account"
+  ]
+ },
+ "Logistics_InsideJob": {
+  "entityType": "Logistics entity",
+  "options": [
+   "Logistics entity",
+   "Trip",
+   "Not a link end of logistics_screen_links_dataset",
+   "Place",
+   "Shipment",
+   "Driver",
+   "Employee",
+   "Carrier"
+  ]
+ },
+ "Enterprise_FictitiousVendor": {
+  "entityType": "Party (vendor, employee, bank account, address)",
+  "options": [
+   "Party (vendor, employee, bank account, address)",
+   "Insider entity",
+   "Not a link end of ap_identity_links_dataset",
+   "Employee",
+   "System",
+   "Legal entity",
+   "Email domain",
+   "Vendor"
+  ]
+ },
+ "Enterprise_AccessCreep": {
+  "entityType": "Insider entity",
+  "options": [
+   "Insider entity",
+   "Party (vendor, employee, bank account, address)",
+   "Not a link end of insider_screen_links_dataset",
+   "Employee",
+   "System",
+   "Legal entity",
+   "Email domain",
+   "Vendor"
+  ]
+ }
+}
