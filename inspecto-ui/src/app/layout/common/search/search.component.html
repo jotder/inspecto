@@ -65,7 +65,7 @@
 
 <!-- Shared result list: jump-to-page destinations -->
 <ng-template #optionList>
-    @if (results() && !results().length) {
+    @if (results()?.length === 0) {
         <mat-option class="text-secondary pointer-events-none bg-transparent px-6 text-md">
             No matching pages
         </mat-option>

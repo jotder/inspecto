@@ -52,7 +52,8 @@ export class WidgetOptionsDialog {
     /** Every option, minus the per-type ones belonging to another vizType. */
     readonly attributes = WIDGET_OPTION_ATTRIBUTES.filter(
         (s) =>
-            !(s.key in WIDGET_OPTION_VIZ_TYPES) || [WIDGET_OPTION_VIZ_TYPES[s.key]].flat().includes(this.input.vizType),
+            !(s.key in WIDGET_OPTION_VIZ_TYPES) ||
+            (this.input.vizType !== undefined && [WIDGET_OPTION_VIZ_TYPES[s.key]].flat().includes(this.input.vizType)),
     );
 
     /** Current options mapped onto the flat attribute keys (axis/legend are flattened). */

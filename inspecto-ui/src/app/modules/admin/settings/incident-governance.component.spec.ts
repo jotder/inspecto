@@ -276,7 +276,7 @@ describe('IncidentGovernanceComponent', () => {
 
         function editing() {
             const s = setup();
-            s.components.list.mockReturnValue(of([RULE, STORED] as never));
+            s.components.list.mockReturnValue(of([RULE, STORED] as never[]));
             s.c.load();
             s.fixture.detectChanges();
             editButton(s.el, 'age-page').click();

@@ -141,11 +141,11 @@
                 <button mat-flat-button color="primary" [disabled]="loading()" (click)="runGraph()">Traverse</button>
             </div>
 
-            @if (graph() && !loading()) {
-                @if (graph().nodes.length) {
+            @if (!loading() && graph(); as g) {
+                @if (g.nodes.length) {
                     <div class="bg-card mt-6 rounded-2xl p-4 shadow">
                         <div class="text-secondary mb-2 text-sm">
-                            {{ graph().nodes.length }} nodes, {{ graph().edges.length }} edges — click a node to inspect
+                            {{ g.nodes.length }} nodes, {{ g.edges.length }} edges — click a node to inspect
                         </div>
                         <inspecto-graph-view [data]="g6Data()" (nodeClick)="openNode($event)"></inspecto-graph-view>
                         <div class="mt-3 flex flex-wrap gap-4">

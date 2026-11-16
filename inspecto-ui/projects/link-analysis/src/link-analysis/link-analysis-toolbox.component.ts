@@ -1173,6 +1173,7 @@ export class LinkAnalysisToolboxComponent {
             case 'index-build':
             case 'server-algorithms':
             case 'value-measures':
+            case 'temporal':
                 return '';
             case 'centrality':
                 return this.ranking().length ? `Top ${this.ranking().length}` : '';

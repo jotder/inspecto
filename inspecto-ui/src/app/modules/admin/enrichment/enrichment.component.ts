@@ -135,8 +135,9 @@ export class EnrichmentComponent implements OnInit {
     }
 
     loadTab(): void {
-        if (!this.selected()) return;
-        const job = this.selected().name;
+        const selected = this.selected();
+        if (!selected) return;
+        const job = selected.name;
         if (this.activeTab === 'report') {
             this.loadReport();
             return;
@@ -159,13 +160,14 @@ export class EnrichmentComponent implements OnInit {
     }
 
     loadReport(): void {
-        if (!this.selected()) return;
+        const selected = this.selected();
+        if (!selected) return;
         this.detailLoading.set(true);
         const window = {
             from: this.from ? this.from.toISOString() : undefined,
             to: this.to ? this.to.toISOString() : undefined,
         };
-        this.api.report(this.selected().name, window).subscribe({
+        this.api.report(selected.name, window).subscribe({
             next: (r) => {
                 this.report.set(r);
                 this.detailLoading.set(false);

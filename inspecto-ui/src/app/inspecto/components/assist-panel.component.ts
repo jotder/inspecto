@@ -145,8 +145,9 @@ export class AssistPanelComponent implements OnInit {
      * `<inspecto-a2ui-render>` host. Null when there is nothing artifact-shaped to render.
      */
     get artifact(): A2uiArtifact | null {
-        if (!this.result()) return null;
-        const served = this.result().artifact ?? this.d('artifact');
+        const result = this.result();
+        if (!result) return null;
+        const served = result.artifact ?? this.d('artifact');
         if (isRecord(served) && typeof served['kind'] === 'string') return served as unknown as A2uiArtifact;
         const parts: A2uiArtifact[] = [];
         if (this.humanReadable) parts.push({ kind: 'text', config: { text: this.humanReadable } });

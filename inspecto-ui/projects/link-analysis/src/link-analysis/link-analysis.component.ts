@@ -411,7 +411,7 @@ interface UnsavedCanvas {
     ws: WorkingSet | null;
     graph: G6GraphData | null;
     expanded: string[];
-    held: ReadonlyMap<string, number>;
+    held: ReadonlyMap<string, number | null>;
 }
 
 /** Undo/redo scope (Phase G): presentation state only — search/filter, display options, layout, and

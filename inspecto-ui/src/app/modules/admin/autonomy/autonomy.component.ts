@@ -165,8 +165,9 @@ export class AutonomyComponent implements OnInit {
 
     /** Engage/disengage the kill switch. Disengaging (re-enabling autonomy) is the destructive confirm. */
     async toggleKillSwitch(): Promise<void> {
-        if (!this.policy() || !this.canOperate) return;
-        const engaging = !this.policy().killSwitch;
+        const policy = this.policy();
+        if (!policy || !this.canOperate) return;
+        const engaging = !policy.killSwitch;
         const ok = engaging
             ? await this.confirm.confirm(
                   'Engaging the kill switch immediately halts every autonomous action, regardless of mode.',
@@ -189,7 +190,8 @@ export class AutonomyComponent implements OnInit {
 
     /** Persist the per-class editor state as a full policy replacement (PUT). Ops-gated. */
     savePolicy(): void {
-        if (!this.policy() || !this.canOperate) return;
+        const policy = this.policy();
+        if (!policy || !this.canOperate) return;
         const classes: Record<string, ClassPolicy> = {};
         for (const r of this.rows()) {
             classes[r.name] = {
@@ -199,7 +201,7 @@ export class AutonomyComponent implements OnInit {
             };
         }
         this.saving.set(true);
-        this.api.updatePolicy({ killSwitch: this.policy().killSwitch, classes }).subscribe({
+        this.api.updatePolicy({ killSwitch: policy.killSwitch, classes }).subscribe({
             next: (p) => {
                 this.policy.set(p);
                 this.rows.set(this.buildRows(p));

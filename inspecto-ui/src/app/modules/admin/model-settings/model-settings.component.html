@@ -12,7 +12,7 @@
         </ng-container>
     </inspecto-page-header>
 
-    @if (settings() && !settings().supported) {
+    @if (settings() && !settings()?.supported) {
         <div class="bg-card mt-6 max-w-160 rounded-2xl p-6 shadow">
             <div class="font-semibold">Settings not supported</div>
             <p class="text-secondary mt-1 text-sm">
@@ -134,10 +134,10 @@
             </div>
 
             <!-- Test results -->
-            @if (testResult()) {
+            @if (testResult(); as results) {
                 <div class="mt-5 flex flex-col gap-2">
                     @for (t of tiers; track t) {
-                        @if (testResult()[t]; as r) {
+                        @if (results[t]; as r) {
                             <div
                                 class="flex items-center gap-2 rounded-lg border p-2 text-sm"
                                 [class.border-green-500]="r.ok"

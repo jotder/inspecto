@@ -124,19 +124,18 @@
                                 {{ metrics()?.success ?? 0 }} of {{ metrics()?.total ?? 0 }} runs
                             </div>
                         </div>
+                        @let m = metrics();
                         <div class="bg-card rounded-2xl p-5 shadow">
                             <div class="text-secondary text-sm">p50 duration</div>
                             <div class="mt-1 text-3xl font-bold">
-                                {{ metrics() ? fmtDuration(metrics().p50Ms) : '—' }}
+                                {{ m ? fmtDuration(m.p50Ms) : '—' }}
                             </div>
-                            <div class="text-secondary mt-1 text-xs">
-                                mean {{ metrics() ? fmtDuration(metrics().meanMs) : '—' }}
-                            </div>
+                            <div class="text-secondary mt-1 text-xs">mean {{ m ? fmtDuration(m.meanMs) : '—' }}</div>
                         </div>
                         <div class="bg-card rounded-2xl p-5 shadow">
                             <div class="text-secondary text-sm">p95 duration</div>
                             <div class="mt-1 text-3xl font-bold">
-                                {{ metrics() ? fmtDuration(metrics().p95Ms) : '—' }}
+                                {{ m ? fmtDuration(m.p95Ms) : '—' }}
                             </div>
                         </div>
                         <div class="bg-card rounded-2xl p-5 shadow">

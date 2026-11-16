@@ -1,7 +1,7 @@
 <div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
     <inspecto-page-header
         [title]="editing() ? 'Edit widget' : 'Widget Builder'"
-        [eyebrow]="editing() ? id : ''"
+        [eyebrow]="editing() ? (id ?? '') : ''"
         backLink="/studio/widgets"
         backLabel="Viz Library"
         [inset]="false"

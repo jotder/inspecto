@@ -74,7 +74,7 @@ export class ObjectLinkDialog implements OnInit {
         }
         this.saving.set(true);
         const { to, relationship } = this.form.getRawValue();
-        this.api.link(this.data.fromId, to, relationship).subscribe({
+        this.api.link(this.data.fromId, to ?? '', relationship ?? '').subscribe({
             next: (l) => {
                 this.toastr.success(`Linked: ${l.relationship} → ${l.to}`);
                 this.ref.close(l);

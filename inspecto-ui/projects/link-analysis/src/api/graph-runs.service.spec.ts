@@ -49,7 +49,11 @@ describe('GraphRunsService', () => {
     afterEach(() => http.verify());
 
     /** Wait until a request to `path` is pending, then answer it. */
-    async function answer(path: string, body: unknown, method = 'GET'): Promise<void> {
+    async function answer(
+        path: string,
+        body: string | number | boolean | object | null,
+        method = 'GET',
+    ): Promise<void> {
         for (let i = 0; i < 200; i++) {
             const m = http.match((r) => r.url === `${base}${path}` && r.method === method);
             if (m.length) {

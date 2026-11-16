@@ -1553,7 +1553,7 @@ describe('LinkAnalysisComponent', () => {
         c.saveForm.patchValue({ name: 'All labels' });
         await c.saveView();
         const saved = save.mock.calls[0][0];
-        expect(saved.display.allEdgeLabels).toBe(true);
+        expect(saved.display?.allEdgeLabels).toBe(true);
 
         c.allEdgeLabels.set(false);
         await c.loadView(saved);
@@ -2988,7 +2988,7 @@ describe('LinkAnalysisComponent', () => {
         });
         expect(c.graph()?.nodes.map((n) => n.id)).toEqual(['entity:acme', 'entity:bob', 'entity:cara']);
         expect(c.emphasis()?.nodeIds).toEqual(['entity:acme', 'entity:bob', 'entity:cara']);
-        expect(c.emphasis()?.edgeIds[0]).toBe('entity:acme->entity:bob:link');
+        expect(c.emphasis()?.edgeIds?.[0]).toBe('entity:acme->entity:bob:link');
         expect(c.serverPaths()).toMatchObject({ edgeYieldCapped: true, depthLimit: 3, deepest: 2 });
     });
 
@@ -3012,7 +3012,7 @@ describe('LinkAnalysisComponent', () => {
             'Delete…',
         ])
             expect(items, name).toContain(name);
-        const open = vi.spyOn(c, 'openOpenDialog').mockImplementation(() => undefined);
+        const open = vi.spyOn(c, 'openOpenDialog').mockResolvedValue(undefined);
         (panel.querySelector('[data-testid="la-file-open"]') as HTMLElement).click();
         expect(open).toHaveBeenCalled();
     });
@@ -8294,7 +8294,7 @@ describe('LinkAnalysisComponent - link width by the primary Measure (LA-COLUMN-R
         expect(measureColOf(queried[1])).toBe('amount');
         expect(c.linkWidthDrawn()).toBe('measure');
         const w = weights(c.weighedCanvasData());
-        expect(w['a->b']).toBeGreaterThan(w['a->c']);
+        expect(w['a->b']).toBeGreaterThan(Number(w['a->c']));
         expect(w['a->d']).toBe(0); // no number: thinnest
         await c.setLinkWidth('count');
         expect(queried).toHaveLength(2);

@@ -33,60 +33,59 @@ import { nodeKindLabel } from 'app/inspecto/graph/catalog-graph';
                     <span class="text-secondary">Loading node…</span>
                 </div>
             }
-            @if (detail() && !loading()) {
+            @if (!loading() && detail(); as d) {
                 <table class="text-sm">
                     <tr>
                         <th scope="row" class="pr-4 text-left align-top">Id</th>
-                        <td>{{ detail().node.id }}</td>
+                        <td>{{ d.node.id }}</td>
                     </tr>
                     <tr>
                         <th scope="row" class="pr-4 text-left align-top">Kind</th>
-                        <td>{{ nodeKindLabel(detail().node.kind) }}</td>
+                        <td>{{ nodeKindLabel(d.node.kind) }}</td>
                     </tr>
-                    @if (detail().node.description) {
+                    @if (d.node.description) {
                         <tr>
                             <th scope="row" class="pr-4 text-left align-top">Description</th>
-                            <td>{{ detail().node.description?.text }}</td>
+                            <td>{{ d.node.description?.text }}</td>
                         </tr>
                     }
-                    @if (detail().node.overlay) {
+                    @if (d.node.overlay) {
                         <tr>
                             <th scope="row" class="pr-4 text-left align-top">Freshness</th>
-                            <td>{{ detail().node.overlay?.freshness || '—' }}</td>
+                            <td>{{ d.node.overlay?.freshness || '—' }}</td>
                         </tr>
                         <tr>
                             <th scope="row" class="pr-4 text-left align-top">Row count</th>
-                            <td>{{ detail().node.overlay?.rowCount ?? '—' }}</td>
+                            <td>{{ d.node.overlay?.rowCount ?? '—' }}</td>
                         </tr>
                     }
                 </table>
 
                 <div class="mt-4 font-semibold">Attributes</div>
                 <pre class="mt-1 max-h-40 overflow-auto rounded bg-gray-100 p-2 text-xs dark:bg-gray-800">{{
-                    pretty(detail().node.attrs || {})
+                    pretty(d.node.attrs || {})
                 }}</pre>
 
                 <div class="mt-4 font-semibold">
-                    Neighbours ({{ detail().neighbors.nodes.length }} nodes,
-                    {{ detail().neighbors.edges.length }} edges)
+                    Neighbours ({{ d.neighbors.nodes.length }} nodes, {{ d.neighbors.edges.length }} edges)
                 </div>
                 <inspecto-data-table
                     tier="mini"
                     sourceName="neighbours"
-                    [rows]="detail().neighbors.nodes"
+                    [rows]="d.neighbors.nodes"
                     [columns]="neighbourColumns"
                     noRowsTitle="No neighbours"
                     (rowClick)="onNeighbourClicked($any($event))"
                 />
 
-                @if (isStore(detail().node.kind)) {
+                @if (isStore(d.node.kind)) {
                     <div class="mt-4 font-semibold">Lineage</div>
-                    <app-store-lineage [store]="detail().node.label" />
+                    <app-store-lineage [store]="d.node.label" />
                 }
 
                 <div class="mt-4 font-semibold">Explain this entity</div>
                 <!-- re-keyed on node id so the panel resets while walking neighbours -->
-                @for (n of [detail().node]; track n.id) {
+                @for (n of [d.node]; track n.id) {
                     <app-assist-panel
                         intent="explain-entity"
                         [screenContext]="{ entityType: 'table', id: n.id }"

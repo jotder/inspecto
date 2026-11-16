@@ -1080,7 +1080,7 @@ export function removeRouteBranch(model: AuthoredPipeline, routeId: string, key:
     for (const e of model.edges)
         if (doomed.has(e.to) && !doomed.has(e.from) && !(e.from === routeId && e.rel === rel)) return null;
     const branches = routeBranchesOf(route).filter((b) => b?.key !== key);
-    const cfg = { ...route.config, branches };
+    const cfg: Record<string, unknown> = { ...route.config, branches };
     if (cfg['default'] === key) delete cfg['default'];
     const withPatch = applyNodePatchInModel(model, { ...route, config: cfg });
     return {

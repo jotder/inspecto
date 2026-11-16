@@ -69,7 +69,7 @@ describe('NotificationPreferencesComponent', () => {
         });
     });
 
-    function load(grid: unknown = GRID): {
+    function load(grid: object = GRID): {
         fixture: ReturnType<typeof TestBed.createComponent<NotificationPreferencesComponent>>;
         http: HttpTestingController;
     } {

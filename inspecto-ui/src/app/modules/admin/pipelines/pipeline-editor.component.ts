@@ -23,7 +23,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { catchError, firstValueFrom, forkJoin, map, of, switchMap } from 'rxjs';
+import { Observable, catchError, firstValueFrom, forkJoin, map, of, switchMap } from 'rxjs';
 import {
     AuthoredPipeline,
     ConfigImpact,
@@ -2144,15 +2144,18 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
                 switchMap((res) =>
                     // Companion cleanup is opt-in now. Each is still best-effort: a companion that was
                     // never created 404s, and that must not fail a delete that already succeeded.
-                    (alsoSchema
-                        ? forkJoin([
-                              this.configApi.remove('schema', companion('schema')).pipe(catchError(() => of(null))),
-                              this.configApi.remove('enrichment', companion('enrich')).pipe(catchError(() => of(null))),
-                              ...segmentSchemas.map((name) =>
-                                  this.configApi.remove('schema', name).pipe(catchError(() => of(null))),
-                              ),
-                          ])
-                        : of([])
+                    (
+                        (alsoSchema
+                            ? forkJoin([
+                                  this.configApi.remove('schema', companion('schema')).pipe(catchError(() => of(null))),
+                                  this.configApi
+                                      .remove('enrichment', companion('enrich'))
+                                      .pipe(catchError(() => of(null))),
+                                  ...segmentSchemas.map((name) =>
+                                      this.configApi.remove('schema', name).pipe(catchError(() => of(null))),
+                                  ),
+                              ])
+                            : of([])) as Observable<unknown>
                     ).pipe(map(() => res)),
                 ),
             )

@@ -590,7 +590,7 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
                           ...d.content,
                           recordType: 'transfer',
                           columns: [
-                              ...d.content.columns,
+                              ...(d.content.columns ?? []),
                               { name: 'amount', type: 'number', role: 'detail' },
                               { name: 'booked_at', type: 'timestamp' },
                               { name: 'status', type: 'string', role: 'dimension' },

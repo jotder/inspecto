@@ -152,7 +152,7 @@ export class PipelineTransformSqlDefinitionComponent {
     /** In the SQL view: how many select items are recognised vs kept as custom SQL. */
     readonly reconcileNote = computed<string | null>(() => {
         const r = this.reconciled();
-        if (!r || r.unsupported) return null;
+        if (!r || r.unsupported || !r.fields) return null;
         const custom = r.fields.filter((f) => f.fn === 'custom').length;
         const n = r.fields.length;
         if (!n) return 'Every incoming column passes through.';
@@ -492,7 +492,7 @@ export class PipelineTransformSqlDefinitionComponent {
     showFieldsView(): void {
         if (this.view() === 'fields') return;
         const r = this.reconciled();
-        if (!r || r.unsupported) return;
+        if (!r || r.unsupported || !r.fields) return;
         const rows = r.fields.length ? r.fields : seedFields(this.upstreamColumns());
         this.fields.set(carryMetadata(rows, this.fields()));
         this.leftOut.set([]);

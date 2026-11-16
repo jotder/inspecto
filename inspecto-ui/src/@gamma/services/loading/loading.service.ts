@@ -37,7 +37,7 @@ export class GammaLoadingService {
     /**
      * Getter for progress
      */
-    get progress$(): Observable<number> {
+    get progress$(): Observable<number | null> {
         return this._progress$.asObservable();
     }
 

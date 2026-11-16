@@ -180,7 +180,10 @@ export class BundleTransferService {
             map(({ res, pipelines, jobs }) => {
                 const items: BundleItem[] = [];
                 for (const kind of COMPONENT_KINDS) {
-                    for (const def of res[kind] as { name: string; content: Record<string, unknown> }[]) {
+                    for (const def of (res as Record<string, unknown>)[kind] as {
+                        name: string;
+                        content: Record<string, unknown>;
+                    }[]) {
                         items.push({ kind, id: def.name, content: def.content });
                     }
                 }

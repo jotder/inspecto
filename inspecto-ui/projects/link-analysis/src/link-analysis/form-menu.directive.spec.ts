@@ -29,13 +29,13 @@ describe('FormMenuDirective', () => {
         form.openMenu();
         f.detectChanges();
         await f.whenStable();
-        const panel = document.getElementById(form.menu!.panelId)!;
+        const panel = document.getElementById(form.menu!.panelId ?? '')!;
         expect(panel.getAttribute('role')).toBe('dialog');
         expect(panel.getAttribute('aria-label')).toBe('Search nodes');
         form.closeMenu();
         plain.openMenu();
         f.detectChanges();
         await f.whenStable();
-        expect(document.getElementById(plain.menu!.panelId)!.getAttribute('role')).toBe('menu');
+        expect(document.getElementById(plain.menu!.panelId ?? '')!.getAttribute('role')).toBe('menu');
     });
 });

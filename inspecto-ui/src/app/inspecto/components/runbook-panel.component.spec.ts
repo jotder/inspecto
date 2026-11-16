@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it } from 'vitest';
-import { ComponentsService } from '../api/components.service';
+import { ComponentDef, ComponentsService } from '../api/components.service';
 import { expectNoA11yViolations } from '../testing/a11y';
 import { RunbookPanelComponent } from './runbook-panel.component';
 
@@ -36,7 +36,7 @@ describe('RunbookPanelComponent', () => {
                         { text: 'Bar the line' },
                     ],
                 },
-            } as never);
+            } as ComponentDef);
         });
         await fixture.whenStable();
         fixture.detectChanges();

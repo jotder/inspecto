@@ -51,7 +51,7 @@ export class GammaVerticalNavigationAsideItemComponent
     private _router = inject(Router);
     private _gammaNavigationService = inject(GammaNavigationService);
 
-    @Input() activeItemId: string;
+    @Input() activeItemId: string | null;
     @Input() autoCollapse: boolean;
     @Input() item: GammaNavigationItem;
     @Input() name: string;

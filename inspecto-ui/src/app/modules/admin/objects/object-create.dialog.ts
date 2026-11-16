@@ -353,7 +353,7 @@ export class ObjectCreateDialog {
         }
         this.saving.set(true);
         const v = this.form.getRawValue();
-        const body: CreateObject = { type: this.data.type, title: v.title };
+        const body: CreateObject = { type: this.data.type, title: v.title ?? '' };
         if (v.description) body.description = v.description;
         if (v.severity) body.severity = v.severity;
         if (v.priority) body.priority = v.priority;

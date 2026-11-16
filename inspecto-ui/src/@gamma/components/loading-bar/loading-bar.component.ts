@@ -29,7 +29,7 @@ export class GammaLoadingBarComponent implements OnChanges, OnInit, OnDestroy {
 
   @Input() autoMode: boolean = true;
   mode: "determinate" | "indeterminate";
-  progress: number = 0;
+  progress: number | null = 0;
   show: boolean = false;
   private _unsubscribeAll: Subject<any> = new Subject<any>();
 

@@ -248,9 +248,10 @@ export class ImportBundleDialog {
 
     /** Import is allowed once a valid preview exists, and conflicts (if any) are acknowledged. */
     canImport(): boolean {
-        if (this.busy() || !this.file || !this.preview()) return false;
-        if (!this.preview().valid) return false;
-        if (this.preview().conflicts.length && !this.overwrite.value) return false;
+        const preview = this.preview();
+        if (this.busy() || !this.file || !preview) return false;
+        if (!preview.valid) return false;
+        if (preview.conflicts.length && !this.overwrite.value) return false;
         return true;
     }
 

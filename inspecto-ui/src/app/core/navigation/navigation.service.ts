@@ -19,7 +19,7 @@ import { Observable, ReplaySubject, catchError, map, of, tap } from 'rxjs';
  * group colliding with a platform group, or an accidental duplicate entry in {@link defaultNavigation}.
  */
 function dedupeById(items: GammaNavigationItem[]): GammaNavigationItem[] {
-    const seen = new Set<string>();
+    const seen = new Set<string | undefined>();
     return items.filter((item) => (seen.has(item.id) ? false : (seen.add(item.id), true)));
 }
 

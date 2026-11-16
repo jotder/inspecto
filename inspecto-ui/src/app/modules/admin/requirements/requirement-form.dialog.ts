@@ -94,9 +94,9 @@ export class RequirementFormDialog {
         }
         const v = this.form.getRawValue();
         this.ref.close({
-            title: v.title.trim(),
+            title: (v.title ?? '').trim(),
             kind: v.kind,
-            description: v.description.trim(),
+            description: (v.description ?? '').trim(),
             targetComponent: v.targetComponent?.trim() || undefined,
         });
     }

@@ -16,7 +16,7 @@
         class="flex flex-auto flex-col items-center p-8 pb-6 sm:flex-row sm:items-start sm:pb-8"
     >
         <!-- Icon -->
-        @if (data.icon.show) {
+        @if (data.icon?.show) {
             <div
                 class="flex h-10 w-10 flex-0 items-center justify-center rounded-full sm:mr-4"
                 [ngClass]="{
@@ -40,7 +40,7 @@
             >
                 <mat-icon
                     class="text-current"
-                    [svgIcon]="data.icon.name"
+                    [svgIcon]="data.icon.name ?? ''"
                 ></mat-icon>
             </div>
         }
@@ -69,19 +69,19 @@
     </div>
 
     <!-- Actions -->
-    @if (data.actions.confirm.show || data.actions.cancel.show) {
+    @if (data.actions?.confirm?.show || data.actions?.cancel?.show) {
         <div
             class="flex items-center justify-center space-x-3 bg-gray-50 px-6 py-4 dark:bg-black dark:bg-opacity-10 sm:justify-end"
         >
             <!-- Cancel -->
-            @if (data.actions.cancel.show) {
+            @if (data.actions?.cancel?.show) {
                 <button mat-stroked-button [matDialogClose]="'cancelled'">
                     {{ data.actions.cancel.label }}
                 </button>
             }
 
             <!-- Confirm -->
-            @if (data.actions.confirm.show) {
+            @if (data.actions?.confirm?.show) {
                 <button
                     mat-flat-button
                     [color]="data.actions.confirm.color"

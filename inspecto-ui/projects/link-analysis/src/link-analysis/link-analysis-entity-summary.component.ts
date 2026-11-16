@@ -176,7 +176,7 @@ export class LinkAnalysisEntitySummaryComponent {
     readonly byLinks = computed(() => this.shown(this.result()?.counterpartsByLinks));
     readonly byAmount = computed(() => this.shown(this.result()?.counterpartsByAmount));
 
-    private shown(rows: EntitySummaryCounterpart[] | undefined): EntitySummaryCounterpart[] {
+    private shown(rows: EntitySummaryCounterpart[] | null | undefined): EntitySummaryCounterpart[] {
         const alias = this.aliasOf();
         return !rows ? [] : alias ? rows.map((r) => ({ ...r, entity: alias(r.entity) })) : rows;
     }

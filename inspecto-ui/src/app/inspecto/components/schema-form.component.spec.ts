@@ -1009,7 +1009,7 @@ describe('InspectoSchemaFormComponent', () => {
             const fixture = create(specs);
             expect(fixture.componentInstance.validate()).toBe(false);
             fixture.detectChanges();
-            const alerts = Array.from(fixture.nativeElement.querySelectorAll('[role="alert"]')).map(
+            const alerts = Array.from<Element>(fixture.nativeElement.querySelectorAll('[role="alert"]')).map(
                 (a: Element) => a.textContent ?? '',
             );
             expect(alerts.some((t) => t.includes('Kind is required'))).toBe(true);

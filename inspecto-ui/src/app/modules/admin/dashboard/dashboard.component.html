@@ -37,8 +37,8 @@
             <!-- KPI tiles -->
             <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
                 <inspecto-stat-tile label="Service" contentValue>
-                    @if (ready()) {
-                        <inspecto-status-badge [value]="ready().status" />
+                    @if (ready(); as rd) {
+                        <inspecto-status-badge [value]="rd.status" />
                     }
                 </inspecto-stat-tile>
                 <inspecto-stat-tile label="Pipelines" [value]="status()?.pipelineCount" />
@@ -81,7 +81,7 @@
             </div>
         }
 
-        @if (report()) {
+        @if (report(); as rep) {
             <!-- Charts -->
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <div class="bg-card rounded-2xl p-6 shadow">
@@ -90,17 +90,17 @@
                         class="mt-4"
                         type="bar"
                         [data]="latencyData()"
-                        [empty]="!report().totalBatches"
+                        [empty]="!rep.totalBatches"
                         emptyMessage="No Consignment has completed yet, so there are no durations to plot."
                     ></inspecto-chart>
                 </div>
                 <div class="bg-card rounded-2xl p-6 shadow">
-                    <div class="font-semibold">Consignment outcomes ({{ report().totalBatches }} total)</div>
+                    <div class="font-semibold">Consignment outcomes ({{ rep.totalBatches }} total)</div>
                     <inspecto-chart
                         class="mt-4"
                         type="doughnut"
                         [data]="outcomeData()"
-                        [empty]="!report().totalBatches"
+                        [empty]="!rep.totalBatches"
                         emptyMessage="No Consignment has completed yet, so there are no outcomes to plot."
                     ></inspecto-chart>
                 </div>
@@ -142,14 +142,14 @@
             </div>
         }
 
-        @if (status()) {
+        @if (status(); as st) {
             <!-- Per-pipeline status grid -->
             <div class="bg-card rounded-2xl p-6 shadow">
                 <div class="mb-4 font-semibold">Pipelines</div>
                 <inspecto-data-table
                     tier="mini"
                     sourceName="dashboard-pipelines"
-                    [rows]="status().pipelines || []"
+                    [rows]="st.pipelines || []"
                     [columns]="pipelineColumns"
                     noRowsTitle="No pipelines configured"
                 />

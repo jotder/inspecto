@@ -28,17 +28,17 @@ import { ChipComponent } from 'app/inspecto/components/chip.component';
                 @if (statusLoading()) {
                     <mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner>
                     <span class="text-secondary">Loading inbox status…</span>
-                } @else if (status()) {
+                } @else if (status(); as st) {
                     <div class="flex items-center gap-2">
                         <mat-icon
                             class="icon-size-5"
-                            [svgIcon]="status().running ? 'heroicons_outline:bolt' : 'heroicons_outline:pause'"
+                            [svgIcon]="st.running ? 'heroicons_outline:bolt' : 'heroicons_outline:pause'"
                         ></mat-icon>
-                        <span class="font-medium">{{ status().running ? 'Processing' : 'Idle' }}</span>
+                        <span class="font-medium">{{ st.running ? 'Processing' : 'Idle' }}</span>
                     </div>
                     <div class="text-secondary">
                         Pending:
-                        <span class="font-medium">{{ status().pending < 0 ? '—' : status().pending }}</span>
+                        <span class="font-medium">{{ st.pending < 0 ? '—' : st.pending }}</span>
                     </div>
                 } @else {
                     <span class="text-secondary">Inbox status unavailable.</span>

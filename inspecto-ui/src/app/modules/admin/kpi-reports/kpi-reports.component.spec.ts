@@ -25,7 +25,7 @@ const REPORT_JOB: JobDetail = {
     enabled: true,
     lastStatus: 'SUCCESS',
     lastRunTime: '2026-07-04T06:00:00Z',
-    nextFire: null,
+    nextFire: undefined,
     params: { dashboardId: 'cdr_overview', format: 'csv', recipients: ['ops@x.com'] },
 };
 

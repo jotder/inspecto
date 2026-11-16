@@ -67,8 +67,14 @@ export function themedChartConfig(
 
 /** Chart.js's own deep merge, except an explicit `undefined` (e.g. `title: undefined` for "no axis title") keeps
  *  the theme's value instead of erasing it. */
-function skipUndefined(key: string, target: Record<string, unknown>, source: Record<string, unknown>, o: object): void {
-    if (source[key] !== undefined) _merger(key, target, source, o);
+function skipUndefined(
+    key: string,
+    target: Record<string, unknown>,
+    source: Record<string, unknown>,
+    o?: object,
+): void {
+    // Chart.js's merge always hands its merger its own options object, so `o` is set here.
+    if (source[key] !== undefined) _merger(key, target, source, o!);
 }
 
 /** The theme fragment alone (before the caller's options are merged over it). Exported for the specs. */

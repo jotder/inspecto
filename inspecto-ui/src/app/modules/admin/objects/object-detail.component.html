@@ -92,60 +92,60 @@
             >
                 <!-- Overview -->
                 <mat-tab label="Overview">
-                    @if (obj()) {
+                    @if (obj(); as o) {
                         <div class="grid grid-cols-1 gap-x-8 gap-y-1 pt-6 sm:grid-cols-2">
                             <div class="flex justify-between border-b py-2">
                                 <span class="text-secondary">Status</span
-                                ><span class="font-medium">{{ obj().status }}</span>
+                                ><span class="font-medium">{{ o.status }}</span>
                             </div>
                             <div class="flex justify-between border-b py-2">
                                 <span class="text-secondary">Type</span
-                                ><span class="font-medium">{{ obj().objectType }}</span>
+                                ><span class="font-medium">{{ o.objectType }}</span>
                             </div>
                             <div class="flex justify-between border-b py-2">
                                 <span class="text-secondary">Severity</span
-                                ><span class="font-medium">{{ obj().severity || '—' }}</span>
+                                ><span class="font-medium">{{ o.severity || '—' }}</span>
                             </div>
                             <div class="flex justify-between border-b py-2">
                                 <span class="text-secondary">Priority</span
-                                ><span class="font-medium">{{ obj().priority || '—' }}</span>
+                                ><span class="font-medium">{{ o.priority || '—' }}</span>
                             </div>
                             <div class="flex justify-between border-b py-2">
                                 <span class="text-secondary">Owner</span
-                                ><span class="font-medium">{{ obj().owner || '—' }}</span>
+                                ><span class="font-medium">{{ o.owner || '—' }}</span>
                             </div>
                             <div class="flex justify-between border-b py-2">
                                 <span class="text-secondary">Assignee</span
-                                ><span class="font-medium">{{ obj().assignee || '—' }}</span>
+                                ><span class="font-medium">{{ o.assignee || '—' }}</span>
                             </div>
                             <div class="flex justify-between border-b py-2">
                                 <span class="text-secondary">Correlation</span
-                                ><span class="font-medium">{{ obj().correlationId || '—' }}</span>
+                                ><span class="font-medium">{{ o.correlationId || '—' }}</span>
                             </div>
                             <div class="flex justify-between border-b py-2">
                                 <span class="text-secondary">Created</span
-                                ><span class="font-medium">{{ fmt(obj().createdAt) }}</span>
+                                ><span class="font-medium">{{ fmt(o.createdAt) }}</span>
                             </div>
                             <div class="flex justify-between border-b py-2">
                                 <span class="text-secondary">Updated</span
-                                ><span class="font-medium">{{ fmt(obj().updatedAt) }}</span>
+                                ><span class="font-medium">{{ fmt(o.updatedAt) }}</span>
                             </div>
                             <div class="flex justify-between border-b py-2">
                                 <span class="text-secondary">Closed</span
-                                ><span class="font-medium">{{ obj().closedAt ? fmt(obj().closedAt) : '—' }}</span>
+                                ><span class="font-medium">{{ o.closedAt ? fmt(o.closedAt) : '—' }}</span>
                             </div>
                         </div>
-                        @if (obj().description) {
+                        @if (o.description) {
                             <div class="mt-6">
                                 <div class="text-secondary mb-1">Description</div>
-                                <div class="whitespace-pre-wrap">{{ obj().description }}</div>
+                                <div class="whitespace-pre-wrap">{{ o.description }}</div>
                             </div>
                         }
                         <!-- WS-10: typed impact, outstanding derived by the server -->
-                        @if (obj().objectType === 'INCIDENT' || obj().objectType === 'CASE') {
+                        @if (o.objectType === 'INCIDENT' || o.objectType === 'CASE') {
                             <app-impact-panel
                                 class="mt-6 block"
-                                [object]="obj()!"
+                                [object]="o"
                                 [headingLevel]="2"
                                 (saved)="obj.set($event)"
                             />
@@ -153,32 +153,32 @@
                             @if (actionRequestsEnabled()) {
                                 <app-action-requests-panel
                                     class="mt-6 block"
-                                    [objectId]="obj().id"
-                                    [objectType]="obj().objectType"
+                                    [objectId]="o.id"
+                                    [objectType]="o.objectType"
                                 />
                             }
                         }
                         <!-- Runbook (operator 2026-10-10): the guidance the raising Alert Rule links -->
-                        @if (obj().attributes?.['runbook']) {
-                            <inspecto-runbook-panel class="mt-6 block" [runbookId]="obj().attributes!['runbook']" />
+                        @if (o.attributes?.['runbook']) {
+                            <inspecto-runbook-panel class="mt-6 block" [runbookId]="o.attributes!['runbook']" />
                         }
                         <!-- ASSURE-RISK-SCORE-1: an Incident raised by a Risk Score Alert Rule (by: [model, entity_key]) -->
-                        @if (obj().attributes?.['key.model'] && obj().attributes?.['key.entity_key']) {
+                        @if (o.attributes?.['key.model'] && o.attributes?.['key.entity_key']) {
                             <inspecto-risk-score-panel
                                 class="mt-6 block"
-                                [model]="obj().attributes!['key.model']"
-                                [entityKey]="obj().attributes!['key.entity_key']"
+                                [model]="o.attributes!['key.model']"
+                                [entityKey]="o.attributes!['key.entity_key']"
                             />
                             <!-- ANOMALY-DETECTION-1: the same keys from an Anomaly Score Alert Rule; hides on a 404 -->
                             <inspecto-anomaly-panel
                                 class="mt-6 block"
-                                [model]="obj().attributes!['key.model']"
-                                [entityKey]="obj().attributes!['key.entity_key']"
+                                [model]="o.attributes!['key.model']"
+                                [entityKey]="o.attributes!['key.entity_key']"
                             />
                             <!-- PREDICTIVE-SURFACE-1: the entity's Customer Segment / Churn Score; hides when none -->
                             <inspecto-prediction-panel
                                 class="mt-6 block"
-                                [entityKey]="obj().attributes!['key.entity_key']"
+                                [entityKey]="o.attributes!['key.entity_key']"
                             />
                         }
                         @if (attributeRows.length) {
@@ -213,7 +213,7 @@
                                 <span class="ml-2">Link…</span>
                             </button>
                         </div>
-                        @if (g6() && g6().nodes.length) {
+                        @if (g6()?.nodes?.length) {
                             <inspecto-graph-view [data]="g6()" (nodeClick)="onNodeClick($event)"></inspecto-graph-view>
                         } @else {
                             <inspecto-empty-state

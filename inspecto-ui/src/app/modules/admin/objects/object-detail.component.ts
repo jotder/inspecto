@@ -223,12 +223,13 @@ export class ObjectDetailComponent implements OnInit {
     };
 
     get actions(): string[] {
-        if (!this.obj() || !this.canWork() || this.obj().inert) return []; // an inert (unknown-type) object is read-only
-        const status = (this.obj().status ?? '').toUpperCase();
+        const obj = this.obj();
+        if (!obj || !this.canWork() || obj.inert) return []; // an inert (unknown-type) object is read-only
+        const status = (obj.status ?? '').toUpperCase();
         const wf = this.workflowDef();
-        if (wf?.type === this.obj().objectType)
+        if (wf?.type === obj.objectType)
             return [...new Set(wf.transitions.filter((t) => t.from === status).map((t) => t.action))];
-        return ObjectDetailComponent.TRANSITIONS[this.obj().objectType]?.[status] ?? [];
+        return ObjectDetailComponent.TRANSITIONS[obj.objectType]?.[status] ?? [];
     }
 
     /** The object's attributes as display rows. */
@@ -352,8 +353,9 @@ export class ObjectDetailComponent implements OnInit {
         // to latch `eventsLoaded = true` over an empty list, and nothing re-drove it — onTabChange fires
         // only on a CHANGE, so staying put never retried and the operator had to switch away and back.
         // Left unloaded here, `loadObject()`'s completion re-drives the active tab.
-        if (!this.obj()) return;
-        const cid = this.obj().correlationId;
+        const obj = this.obj();
+        if (!obj) return;
+        const cid = obj.correlationId;
         if (!cid) {
             this.relatedEvents.set([]);
             this.eventsLoaded.set(true);
@@ -482,10 +484,11 @@ export class ObjectDetailComponent implements OnInit {
     }
 
     openLink(): void {
-        if (!this.obj()) return;
+        const obj = this.obj();
+        if (!obj) return;
         this.dialog
             .open(ObjectLinkDialog, {
-                data: { fromId: this.id(), fromType: this.obj().objectType },
+                data: { fromId: this.id(), fromType: obj.objectType },
                 width: '520px',
                 maxHeight: '85vh',
             })

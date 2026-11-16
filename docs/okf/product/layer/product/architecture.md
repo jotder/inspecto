@@ -36,7 +36,7 @@ Versions are the ones pinned in `inspecto-ui/package.json`.
 | Concern | Choice |
 |---|---|
 | Framework | Angular 22.1.1 (CLI and `@angular/build` 22.1.3). Standalone components only: no `@NgModule` exists under `src/` or `projects/`. Templates use the built-in control flow (`@if`, `@for`, `@switch`). |
-| Language | TypeScript 6.0.3. `strict` is off in `inspecto-ui/tsconfig.json`; the Angular compiler runs with `strictTemplates`, `strictInjectionParameters` and `strictInputAccessModifiers`. There is no `baseUrl`: the import roots `app/*`, `environments/*`, `@gamma`, `@inspecto/core/*` and `@inspecto/link-analysis` are explicit `paths`. |
+| Language | TypeScript 6.0.3. `strict` is on in `inspecto-ui/tsconfig.json` (since 2026-11-16, `UI-TS-STRICT-1`) with `strictPropertyInitialization` off, so every template is null-checked too; the Angular compiler runs with `strictTemplates`, `strictInjectionParameters` and `strictInputAccessModifiers`. There is no `baseUrl`: the import roots `app/*`, `environments/*`, `@gamma`, `@inspecto/core/*` and `@inspecto/link-analysis` are explicit `paths`. |
 | Change detection | Zone.js (`provideZoneChangeDetection` with event coalescing). Every application component is `OnPush`: 414 of 414 component files outside the vendored `src/@gamma` on 2026-11-12 (two vendored components there are not). |
 | State | Angular signals plus RxJS 7.8 for HTTP and streams. No NgRx or other global store. |
 | UI kit | Angular Material and CDK 22.1.2 (themed through the M2 API in `src/@gamma/styles/themes.scss`) and Tailwind 3.4, on the vendored gamma shell in `src/@gamma/`. |

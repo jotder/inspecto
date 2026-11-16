@@ -31,7 +31,7 @@ const noParams = () =>
 function create(
     data: JobFormData,
     save = vi.fn(() => of({ name: 'x' })),
-    describeType = vi.fn(noParams),
+    describeType: () => Observable<JobTypeDescriptor> = vi.fn(noParams),
     types: () => Observable<JobTypeDescriptor[]> = () => of([]),
     expressions: () => Observable<JobExpressionDecl[]> = () => of([]),
     // The chain editor's processor picker. Empty is the stock-install answer, so it is the default here too.

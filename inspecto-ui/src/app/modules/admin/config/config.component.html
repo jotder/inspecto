@@ -57,14 +57,14 @@
                         ></inspecto-empty-state>
                     }
 
-                    @if (spec() && !specLoading()) {
+                    @if (!specLoading() && spec(); as specDef) {
                         <inspecto-schema-form class="mt-4 block" [specs]="attrSpecs()" (submitted)="validateDraft()" />
 
-                        @if (spec().rules.length) {
+                        @if (specDef.rules.length) {
                             <div class="mt-6">
                                 <div class="font-semibold">Cross-field rules</div>
                                 <ul class="mt-1 list-inside list-disc text-sm">
-                                    @for (r of spec().rules; track r.description) {
+                                    @for (r of specDef.rules; track r.description) {
                                         <li>
                                             {{ r.description }}
                                             <span class="text-secondary"
@@ -114,18 +114,18 @@
         }
 
         <!-- Findings -->
-        @if (result()) {
+        @if (result(); as res) {
             <div class="mt-8">
                 <p class="flex items-center gap-2 font-semibold">
                     <inspecto-status-badge
-                        [value]="result().clean ? 'OK' : 'ERROR'"
-                        [label]="result().clean ? 'Clean' : result().findings.length + ' finding(s)'"
+                        [value]="res.clean ? 'OK' : 'ERROR'"
+                        [label]="res.clean ? 'Clean' : res.findings.length + ' finding(s)'"
                     />
-                    @if (result().safetyChecked) {
+                    @if (res.safetyChecked) {
                         <span class="text-secondary text-sm font-normal">safety checked</span>
                     }
                 </p>
-                @if (result().findings.length) {
+                @if (res.findings.length) {
                     <table class="mt-2 w-full text-sm">
                         <thead>
                             <tr>
@@ -135,7 +135,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @for (f of result().findings; track $index) {
+                            @for (f of res.findings; track $index) {
                                 <tr>
                                     <td class="border-b px-2 py-1"><inspecto-status-badge [value]="f.severity" /></td>
                                     <td class="border-b px-2 py-1">{{ f.fieldPath }}</td>

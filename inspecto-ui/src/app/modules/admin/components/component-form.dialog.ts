@@ -379,6 +379,7 @@ export class ComponentFormDialog {
                 return out;
             }
         }
+        return null;
     }
 
     submit(): void {

@@ -141,7 +141,7 @@ export class AnomalyPanelComponent {
                             ? forkJoin(ids.map((id) => this.api.latest(id, key).pipe(catchError(() => of(null)))))
                             : of([]),
                     ),
-                    catchError(() => of([])),
+                    catchError(() => of([] as (AnomalyScore | null)[])),
                 )
                 .subscribe((rows) => this.scores.set(rows.filter((r): r is AnomalyScore => !!r)));
             onCleanup(() => sub.unsubscribe());

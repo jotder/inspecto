@@ -44,7 +44,8 @@ export class TreeTableComponent {
     readonly treeMinWidth = input(260);
     /** Depth auto-expanded on load (-1 = expand all). */
     readonly groupDefaultExpanded = input(1);
-    readonly rowActions = input<InspectoRowAction[]>([]);
+    /** `never`: an action list over any row type fits; its callbacks only ever receive this grid's own rows. */
+    readonly rowActions = input<InspectoRowAction<never>[]>([]);
     readonly pinActions = input(false);
     readonly multiSelect = input(false);
     readonly singleSelect = input(false);
@@ -97,7 +98,9 @@ export class TreeTableComponent {
     readonly gridColumns = computed<ColDef[]>(() => {
         const cols: ColDef[] = [this.treeColumn(), ...this.columns()];
         const acts = this.rowActions();
-        return acts.length ? [...cols, actionsColumn(acts, 160, this.pinActions() ? 'right' : undefined)] : cols;
+        return acts.length
+            ? [...cols, actionsColumn(acts as InspectoRowAction[], 160, this.pinActions() ? 'right' : undefined)]
+            : cols;
     });
 
     // Sorting off: reordering rows would break the parent→child flatten order.
@@ -149,7 +152,7 @@ export class TreeTableComponent {
     }
 
     // ── grid events ──────────────────────────────────────────────────────────────
-    onRowClicked(e: { data?: FlatTreeRow; event?: Event }): void {
+    onRowClicked(e: { data?: FlatTreeRow; event?: Event | null }): void {
         if (e.data) this.nodeClick.emit(e.data);
     }
     onSelectionChanged(e: { api: GridApi<FlatTreeRow> }): void {

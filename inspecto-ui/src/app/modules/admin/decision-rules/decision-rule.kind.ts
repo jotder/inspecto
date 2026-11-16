@@ -1,4 +1,4 @@
-import type { DecisionRule } from 'app/inspecto/api/decision-rules.service';
+import type { DecisionRule, DecisionRuleUpsert } from 'app/inspecto/api/decision-rules.service';
 import {
     ComponentKind,
     ConfigFinding,
@@ -25,6 +25,7 @@ export const DECISION_RULE_KIND: ComponentKind<DecisionRule> = {
     wiring: 'none',
     config: {
         validate: validateDecisionRuleConfig,
+        // A new rule is a draft upsert: the server stamps createdAt/updatedAt when it is saved.
         create: () =>
             ({
                 name: '',
@@ -35,7 +36,7 @@ export const DECISION_RULE_KIND: ComponentKind<DecisionRule> = {
                 consequences: [],
                 priority: 100,
                 enabled: true,
-            }) as DecisionRule,
+            }) as DecisionRuleUpsert as DecisionRule,
     },
     deriveRefs: (config: DecisionRule): Ref[] => decisionRuleRefs(config as unknown as Record<string, unknown>),
     authoring: { editorKey: 'decision-rule' },

@@ -37,7 +37,8 @@
         "lib": ["ES2022", "dom"],
         // @antv/g6's transitive types reference WebXR/Pixi DOM globals our lib set lacks
         "skipLibCheck": true,
-        "strict": false
+        "strict": true,
+        "strictPropertyInitialization": false
     },
     "angularCompilerOptions": {
         "enableI18nLegacyMessageIdFormat": false,

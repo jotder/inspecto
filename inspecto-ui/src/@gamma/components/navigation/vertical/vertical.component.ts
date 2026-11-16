@@ -121,12 +121,12 @@ export class GammaVerticalNavigationComponent
         new ReplaySubject<GammaNavigationItem>(1);
     onRefreshed: ReplaySubject<boolean> = new ReplaySubject<boolean>(1);
     private _animationsEnabled: boolean = false;
-    private _asideOverlay: HTMLElement;
+    private _asideOverlay: HTMLElement | null;
     private readonly _handleAsideOverlayClick: any;
     private readonly _handleOverlayClick: any;
     private _hovered: boolean = false;
     private _mutationObserver: MutationObserver;
-    private _overlay: HTMLElement;
+    private _overlay: HTMLElement | null;
     private _player: AnimationPlayer;
     private _scrollStrategy: ScrollStrategy =
         this._scrollStrategyOptions.block();
@@ -635,7 +635,7 @@ export class GammaVerticalNavigationComponent
         }
 
         // Create the overlay element
-        this._overlay = this._renderer2.createElement('div');
+        this._overlay = this._renderer2.createElement('div') as HTMLElement;
 
         // Add a class to the overlay element
         this._overlay.classList.add('gamma-vertical-navigation-overlay');
@@ -707,7 +707,7 @@ export class GammaVerticalNavigationComponent
                 );
 
                 // Remove the overlay
-                this._overlay.parentNode.removeChild(this._overlay);
+                this._overlay.parentNode?.removeChild(this._overlay);
                 this._overlay = null;
             }
 
@@ -728,7 +728,7 @@ export class GammaVerticalNavigationComponent
         }
 
         // Create the aside overlay element
-        this._asideOverlay = this._renderer2.createElement('div');
+        this._asideOverlay = this._renderer2.createElement('div') as HTMLElement;
 
         // Add a class to the aside overlay element
         this._asideOverlay.classList.add(
@@ -795,7 +795,7 @@ export class GammaVerticalNavigationComponent
                 );
 
                 // Remove the aside overlay
-                this._asideOverlay.parentNode.removeChild(this._asideOverlay);
+                this._asideOverlay.parentNode?.removeChild(this._asideOverlay);
                 this._asideOverlay = null;
             }
         });

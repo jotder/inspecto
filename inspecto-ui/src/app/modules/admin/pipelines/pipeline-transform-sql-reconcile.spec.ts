@@ -4,7 +4,7 @@ import { reconcileSql, splitTopLevel } from './pipeline-transform-sql-reconcile'
 
 function rows(sql: string): Omit<SqlField, 'id'>[] {
     const r = reconcileSql(sql);
-    if (r.unsupported) throw new Error(r.unsupported);
+    if (r.unsupported !== undefined) throw new Error(r.unsupported);
     return r.fields.map(({ id: _id, ...rest }) => rest);
 }
 

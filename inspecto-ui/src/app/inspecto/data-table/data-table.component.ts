@@ -165,7 +165,8 @@ export class DataTableComponent {
     readonly rows = input<unknown[]>([]);
     /** Explicit ag-Grid columns (status `cellRenderer`, date `valueFormatter`, …); omitted ⇒ one per row key. */
     readonly columns = input<ColDef[] | undefined>(undefined);
-    readonly rowActions = input<InspectoRowAction[]>([]);
+    /** `never`: an action list over any row type fits; its callbacks only ever receive this grid's own rows. */
+    readonly rowActions = input<InspectoRowAction<never>[]>([]);
     /** Pin the row-actions column to the right so it stays visible when wide data columns overflow. */
     readonly pinActions = input(false);
     readonly loading = input(false);
@@ -437,7 +438,9 @@ export class DataTableComponent {
             base = sel ? all.filter((c) => sel.includes(String(c.field))) : all;
         }
         const cols = base.map(headerWordFloor);
-        return acts.length ? [...cols, actionsColumn(acts, 160, this.pinActions() ? 'right' : undefined)] : cols;
+        return acts.length
+            ? [...cols, actionsColumn(acts as InspectoRowAction[], 160, this.pinActions() ? 'right' : undefined)]
+            : cols;
     });
 
     /**
@@ -526,17 +529,18 @@ export class DataTableComponent {
         downloadCsv(this.exportName(), toCsv(filtered, cols));
     }
 
-    onRowClicked(e: { data?: Record<string, unknown> }): void {
+    // `data` is one of `rows`, which hosts fill with records; the grid types it `unknown` (rowData is `unknown[]`).
+    onRowClicked(e: { data?: unknown }): void {
         // A click on the selection checkbox toggles selection only — it is not a row "open".
         const target = (e as RowClickedEvent).event?.target as HTMLElement | null;
         if (target?.closest?.('.ag-selection-checkbox')) return;
-        if (e.data) this.rowClick.emit(e.data);
+        if (e.data) this.rowClick.emit(e.data as Record<string, unknown>);
     }
 
-    onCellKeyDown(e: { data?: Record<string, unknown>; event?: Event | null }): void {
+    onCellKeyDown(e: { data?: unknown; event?: Event | null }): void {
         if (!this.enterOpens() || (e.event as KeyboardEvent | null)?.key !== 'Enter' || !e.data) return;
         e.event?.preventDefault();
-        this.rowClick.emit(e.data);
+        this.rowClick.emit(e.data as Record<string, unknown>);
     }
 
     onSelectionChanged(e: { api: GridApi }): void {

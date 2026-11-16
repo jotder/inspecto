@@ -277,7 +277,7 @@ export class JobChainEditorComponent {
 }
 
 /** One chain row's form group. */
-type RowGroup = FormGroup<{ id: FormControl<string>; configText: FormControl<string> }>;
+type RowGroup = FormGroup<{ id: FormControl<string | null>; configText: FormControl<string | null> }>;
 /** The verbatim `chain_config` element, carried on the row's group rather than in the form value. */
 type WithElement = RowGroup & { _element?: Record<string, unknown> };
 

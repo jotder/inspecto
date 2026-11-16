@@ -25,7 +25,7 @@ describe('entity id normalisation (D-S4)', () => {
 
         expect(g.nodes.map((n) => n.id).sort()).toEqual(['entity:acme ltd', 'entity:beta']);
         expect(g.edges).toHaveLength(1);
-        expect(g.edges[0].data['count']).toBe(3);
+        expect((g.edges[0].data as Record<string, unknown>)['count']).toBe(3);
         // the display is a raw spelling, never the lowercase key
         expect(g.nodes.find((n) => n.id === 'entity:acme ltd')?.data.label).toBe('ACME Ltd');
     });
@@ -36,7 +36,7 @@ describe('entity id normalisation (D-S4)', () => {
 
         expect(g.nodes.map((n) => n.id).sort()).toEqual(['entity:acme ltd', 'entity:beta']);
         expect(g.edges).toHaveLength(1);
-        expect(g.edges[0].data['count']).toBe(6);
+        expect((g.edges[0].data as Record<string, unknown>)['count']).toBe(6);
         expect(g.nodes.find((n) => n.id === 'entity:acme ltd')?.data.label).toBe('ACME Ltd');
     });
 

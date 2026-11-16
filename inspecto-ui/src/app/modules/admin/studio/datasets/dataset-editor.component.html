@@ -2,7 +2,7 @@
     <!-- Breadcrumb + header -->
     <inspecto-page-header
         [title]="editing() ? 'Edit dataset' : 'New dataset'"
-        [eyebrow]="editing() ? id : ''"
+        [eyebrow]="editing() ? (id ?? '') : ''"
         backLink="/catalog/datasets"
         backLabel="Datasets"
         [inset]="false"

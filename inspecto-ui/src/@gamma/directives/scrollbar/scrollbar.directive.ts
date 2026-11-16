@@ -37,9 +37,9 @@ export class GammaScrollbarDirective implements OnChanges, OnInit, OnDestroy {
     @Input() gammaScrollbar: boolean = true;
     @Input() gammaScrollbarOptions: PerfectScrollbar.Options;
 
-    private _animation: number;
+    private _animation: number | null;
     private _options: PerfectScrollbar.Options;
-    private _ps: PerfectScrollbar;
+    private _ps: PerfectScrollbar | null;
     private _unsubscribeAll: Subject<any> = new Subject<any>();
 
     // -----------------------------------------------------------------------------------------------------

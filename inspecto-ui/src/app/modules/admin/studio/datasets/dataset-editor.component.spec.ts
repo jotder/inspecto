@@ -242,6 +242,7 @@ describe('DatasetEditorComponent', () => {
             sourceName: 'cdr',
             columns: [],
             measures: [],
+            calculated: [],
         } as Dataset;
         const fixture = create(save, [existing]);
         fixture.detectChanges(); // ngOnInit loads the list + attaches the unique validator

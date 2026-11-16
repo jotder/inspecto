@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormControl, FormGroup, FormRecord, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -145,7 +145,7 @@ export class RegulatoryReportDraftDialog implements OnInit {
         subjectKind: new FormControl<'case' | 'incident'>(this.data.subjectKind ?? 'case', { nonNullable: true }),
         subjectId: new FormControl(this.data.subjectId ?? '', { nonNullable: true, validators: [Validators.required] }),
         reason: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(500)] }),
-        inputs: new FormGroup<Record<string, FormControl<string>>>({}),
+        inputs: new FormRecord<FormControl<string>>({}),
     });
 
     /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */

@@ -72,7 +72,7 @@ export class GrowExcludeStore {
     /** The form's raw values, so the filter survives the tab being closed and shown again. */
     readonly filterSnapshot = signal<unknown>(null);
     /** Basic: busy nodes the last Grow previews named (id → contacts) — drawn held, not grown further. */
-    readonly basicHeld = signal<ReadonlyMap<string, number>>(new Map());
+    readonly basicHeld = signal<ReadonlyMap<string, number | null>>(new Map());
     basicAdapter: BasicGrowAdapter | null = null;
 
     constructor() {

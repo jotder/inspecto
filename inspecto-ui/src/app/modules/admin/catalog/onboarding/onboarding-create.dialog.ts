@@ -449,9 +449,9 @@ export class OnboardingCreateDialog {
         // the shared one on retention_days (30 vs. the shared/engine default of 90 — no operator
         // decision favored 30, so the copy is retired rather than reconciled).
         const config = pipelineScaffold(name, {
-            poll: v.poll,
-            database: v.database,
-            description: v.description,
+            poll: v.poll ?? undefined,
+            database: v.database ?? undefined,
+            description: v.description ?? undefined,
             reference: this.kind() === 'reference',
         });
 

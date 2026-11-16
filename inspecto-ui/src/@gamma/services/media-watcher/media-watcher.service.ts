@@ -50,7 +50,7 @@ export class GammaMediaWatcherService {
                                     // Find the alias of the matching query
                                     const matchingAlias = Object.entries(
                                         screens
-                                    ).find(([alias, q]) => q === query)[0];
+                                    ).find(([alias, q]) => q === query)?.[0];
 
                                     // Add the matching query to the observable values
                                     if (matchingAlias) {

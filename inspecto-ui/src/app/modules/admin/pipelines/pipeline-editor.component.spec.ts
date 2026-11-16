@@ -1493,7 +1493,7 @@ describe('PipelineEditorComponent', () => {
                     { id: 'out', type: 'sink.persistent', config: { database: 'd/db' } },
                     { id: 'quarantine', type: 'sink.persistent', config: { dir: 'q/' } },
                 ]);
-                expect(host.inputDatabase).toBe('d/db');
+                expect(host?.inputDatabase).toBe('d/db');
             });
 
             /** The template passes it only for an `enrichment` node — every other pane ignores it. */

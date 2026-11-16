@@ -287,7 +287,7 @@ describe('RunDetailComponent', () => {
         expect(banner()).toBeNull(); // no cast_failures cell → no banner
 
         vi.spyOn(TestBed.inject(RunsService), 'batches').mockReturnValue(
-            of([
+            of<AuditRow[]>([
                 { ...BATCH, cast_failures: '' }, // blank = not measured: counts as nothing
                 { consignment_id: 'b2', status: 'SUCCESS', cast_failures: '2' },
                 { consignment_id: 'b3', status: 'SUCCESS', cast_failures: '1' },

@@ -189,7 +189,8 @@ export class DashboardComponent implements OnInit {
     }
 
     get errorRatePct(): string {
-        return this.report() ? fmtPercent(this.report().errorRate) : '—';
+        const report = this.report();
+        return report ? fmtPercent(report.errorRate) : '—';
     }
 
     private total(m: AcquisitionMetrics, name: string): number {

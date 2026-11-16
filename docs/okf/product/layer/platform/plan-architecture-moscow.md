@@ -80,7 +80,7 @@ M8 (2026-11-14). Left: M4 (release notes, kept current as changes land), M5 and 
 | # | Item | What is open |
 |---|---|---|
 | C1 | Refused 2026-11-15 (board §6; re-measured: 120 packages, same 7 cycles) | A 13-package cycle inside `inspecto-engine` and a 5-package cycle in the composition root. Nothing is blocked; it only limits dividing the engine further. |
-| C2 | `UI-TS-STRICT-1`, `UI-ZONELESS-1` | UI: TypeScript `strict` is off (the Angular template checks are on); the app runs Zone.js with every application component `OnPush`. |
+| C2 | `UI-ZONELESS-1` (`UI-TS-STRICT-1` closed 2026-11-16) | UI: the app runs Zone.js with every application component `OnPush`. TypeScript `strict` is now on (`strictPropertyInitialization` off), with the Angular template checks. |
 | C3 | `OPENAPI-SKELETON-SUMMARIES-1` | OpenAPI quality: 444 of 621 operations are generated skeletons (re-counted 2026-11-15). The only e2e spec, `backend-smoke.spec.ts`, covers no pane. |
 | C4 | `MODULE-REORG-P4-3` | A Run already started is not interrupted when its module is switched off. No work item until a switchable module owns a subscription. |
 | C5 | `MODULE-REORG-P7-INCIDENTS` | Delete `AlertMigration` one release after the Alert store ships. |
@@ -162,7 +162,7 @@ row's `hold:` tag changed to match.
 | # | Decision | Consequence |
 |---|---|---|
 | C1, C6, C11 | Left as they are. | Already refused, closed or narrowed. |
-| C2 | `UI-TS-STRICT-1` option (a): about 44 null fixes made in place in the vendored `@gamma` code, then `strict` on app-wide. | An operator-approved exception to the rule against editing vendored `@gamma`, scoped to these null fixes only. `hold: operator` removed. `UI-ZONELESS-1` is unchanged. |
+| C2 | `UI-TS-STRICT-1` option (a): about 44 null fixes made in place in the vendored `@gamma` code, then `strict` on app-wide. | An operator-approved exception to the rule against editing vendored `@gamma`, scoped to these null fixes only. `hold: operator` removed. `UI-ZONELESS-1` is unchanged. **Done 2026-11-16:** `strict` is on in `inspecto-ui/tsconfig.json` (`strictPropertyInitialization` stays off); 272 error positions fixed, 39 of them in 10 `@gamma` files, nothing staged; the row is closed. |
 | C3 | Write real OpenAPI summaries for the public routes before 4.0.0 (`OPENAPI-SKELETON-SUMMARIES-1`). | e2e pane specs stay on demand. `hold: demand` removed. |
 | C4 | `MODULE-REORG-P4-3` before 4.0.0. | Scheduled; its "no work item until" trigger no longer applies. |
 | C5 | Keep `AlertMigration` through 4.0.0 and delete it in 5.0.0 (`MODULE-REORG-P7-INCIDENTS`; restated by the operator the same day). | No released version carries the Alert store (it landed on trunk 2026-10-07; the newest tag is `v3.11.0`, and the 3.x line is retired), so 4.0.0 is the first release with it and must ship the migration that adopts a 3.x install's ALERT objects. The first decision, delete in 4.0.0, would have left every 3.x install without that path. |

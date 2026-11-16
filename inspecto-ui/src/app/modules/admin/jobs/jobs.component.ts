@@ -464,7 +464,8 @@ export class JobsComponent implements OnInit, OnDestroy {
 
     /** Success rate as a whole-number percentage for the metric card. */
     get successPct(): number {
-        return this.metrics() ? Math.round(this.metrics().successRate * 100) : 0;
+        const metrics = this.metrics();
+        return metrics ? Math.round(metrics.successRate * 100) : 0;
     }
 
     /** Run all three reporting queries. `silent` (live-tail tick) keeps the view instead of flashing the loader. */

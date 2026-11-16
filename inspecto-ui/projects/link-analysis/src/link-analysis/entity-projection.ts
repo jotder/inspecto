@@ -632,7 +632,8 @@ export function recursivePathsToGraph(
     const paths: GraphSelection[] = mintable.map((p) => {
         const nodeIds = p.nodes.map((raw, i) => {
             const value = String(raw ?? '').trim();
-            const id = resolveEntityId(mappings, value, (x) => nodes.has(x), i === 0 ? 'source' : 'target');
+            // `mintable` kept only paths whose every hop has a candidate id, so one always resolves here.
+            const id = resolveEntityId(mappings, value, (x) => nodes.has(x), i === 0 ? 'source' : 'target')!;
             if (!nodes.has(id)) nodes.set(id, { id, data: { label: value, kind: 'entity', spellings: [value] } });
             return id;
         });
