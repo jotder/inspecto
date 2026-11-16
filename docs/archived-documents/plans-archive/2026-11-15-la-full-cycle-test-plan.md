@@ -1,5 +1,5 @@
 <!--
-  ACTIVE PLAN — docs/superpower/
+  ARCHIVED 2026-11-16 — every phase shipped; see the close-out section at the end.
   Created 2026-11-15 from a hands-on, full-cycle drive of Inspecto LA (Preview x la x demo, built from 11aa321c5).
   Board row: LA-FULL-CYCLE-TEST-1 (docs/BACKLOG.md §3.12). Archive when its phases ship or are split into their own rows.
   Re-checked 2026-11-15 against origin/master c8d94b4bd by reading the code (§3.6); NOT driven again.
@@ -7,7 +7,8 @@
 
 # Inspecto LA full-cycle user test — findings and fix plan (2026-11-15)
 
-> **Status: in build since 2026-11-15.** The five decisions of §4.1 were taken that day under the operator's
+> **Status: CLOSED 2026-11-16 — all seven phases shipped and a live drive of current master confirmed them (§6).**
+> Earlier status: in build since 2026-11-15. The five decisions of §4.1 were taken that day under the operator's
 > delegation ("take decisions with justification"), each recorded with its reason in §4.3, and the phases run as
 > parallel lanes. The findings were re-checked against `origin/master` `c8d94b4bd` by reading the code (§3.6): 27
 > commits landed after the tested build, four related board rows shipped, and four of the proposed fixes turned out
@@ -199,3 +200,26 @@ Screenshots of this drive are in `docs/okf/product/assets/` (files `la-guide-*.p
 the user guide. The test files were invented for the drive (`transfers.csv`, `accounts.csv`) and are not committed.
 **Owed before phase 3:** a synthetic copy of both files (461 and 138 rows, the four dirty rows named in a comment)
 committed as a test fixture, so the phase's "done when" can be run.
+
+## 6. Close-out (2026-11-16)
+
+**Shipped, each lane verified independently before its push (targeted tests only; the full gate was NOT run):**
+phase 1 `195dcd446..8b0fdc635` and finding 32 / D5 `91f0af69a`; phase 2 `..53930e47d`; phase 3 `9e3c04b21..bcd2cd522`;
+phase 4 `1e55a1829..f3a7d9642`; phase 5 `..06238a137`; phase 6 `..7c422c734`; phase 7 `..e7936035b`; the drive fix `6378d56c2`.
+
+**Live drive** of a Preview demo bundle built from `e7936035b` (port 8081, a private copy of `la-showcase` and `la-claims`),
+as the FM analyst and the FM manager, light and dark; screenshots kept outside the repo.
+Confirmed: labels on and start badges on a 9-node graph; "link index v1 out of date" with **Rebuild**, which made it
+"link index v2" and removed the button; one audited **Reveal** for the 9 ids on screen (one call, reason required);
+the manager's "1 to approve" badge leading to the approver's line with **Approve / Deny**; the read-only note instead of
+the coaching; the colour scheme choice in the user menu, and the app following the browser's light or dark; saved
+views named, not ids; the empty canvas saying how to start.
+**Found and fixed in the drive:** a Reveal did not redraw the canvas (the graph signature omitted `canvasLabel` and
+`start`), fixed in `6378d56c2` and driven again.
+**Seen, not code:** the seeded Investigation is still named with a `masked:` id because the Preview Spaces were seeded
+2026-10-24, before phase 2 changed the seed texts; and the shared Preview Spaces root refuses demo sign-in because `admin` is
+defined differently in `inspecto-mfs` and `la-claims`. Finding 28 ("subscribers" on the bank case) was confirmed live.
+
+**Board rows filed at close:** `ALERTS-PAGE-WORDS-1` (finding 30), `LA-DEEPLINK-REVEAL-AUDIT-1`, `LA-INDEX-SPELLINGS-1`,
+`LA-FULL-CYCLE-RESIDUALS-1` (what the lanes left on purpose, the Preview re-bake and roster conflict, the guide screenshot);
+findings 8 and 28 are noted on `LA-INDUSTRY-FOLD-1`; `SPACE-ADMISSION-FOLLOWUPS-1` was filed earlier. `LA-FULL-CYCLE-TEST-1` is closed.

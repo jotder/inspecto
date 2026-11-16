@@ -84,7 +84,7 @@ when edited). The other three were put to the operator; **answers D-1 b, D-2 a, 
 
 ## Decided design: LA-FULL-CYCLE-TEST-1 phase 2 (2026-11-16)
 
-The two large calls were taken with the plan (`docs/superpower/2026-11-15-la-full-cycle-test-plan.md` §4.3): **D3** masked
+The two large calls were taken with the plan (`docs/archived-documents/plans-archive/2026-11-15-la-full-cycle-test-plan.md` §4.3): **D3** masked
 stays the default and a holder of *See unmasked ids* gets one audited Reveal for the nodes on screen, with a reason;
 **D4** aliases stay per Investigation and every surface inside one shows its alias. The smaller calls were taken in the
 lane, each with its reason (as built: [architecture](architecture.md) §3.4).

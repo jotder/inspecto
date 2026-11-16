@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `p
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-FULL-CYCLE-TEST-1` | P2 | defect | a first-time user cannot finish the quick start on a signed-in install, and cannot read their own graph. | — |
+| `LA-FULL-CYCLE-RESIDUALS-1` | P3 | chore | what the full-cycle plan left on purpose, and two environment gaps its drive found. | — |

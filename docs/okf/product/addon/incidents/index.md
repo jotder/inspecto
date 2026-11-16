@@ -35,5 +35,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `a
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LEGAL-HOLD-SCOPE-1` | P3 | feature | a legal hold protects the Incident row but not its evidence (filed 2026-11-15, verified from ARCH-MOSCOW-UNTRACKED-1 item 7). | demand |
+| `ALERTS-PAGE-WORDS-1` | P3 | defect | the shared Alerts screens break the glossary | — |
 | `MODULE-REORG-P7-INCIDENTS` | P3 | chore | Incidents / Case Management split — one item left (everything else shipped 2026-10-06..09; item 2 declined 2026-10-11). | — |
 | `DOCS-SKILLS-ALERTS-AGENTIC-1` | P3 | feature | hub-routed agent skills exist for docs lookup, pipeline authoring, incident investigation and case analysis (.claude/skills/) | demand |
