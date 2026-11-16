@@ -616,7 +616,7 @@ export class LinkAnalysisStartBoxComponent {
             return this.lens.canRevealLinkEntities()
                 ? 'This Entity Type is masked: type the whole value, or Show values. The graph shows aliases until you ' +
                       'save it and press Reveal… on the canvas or in a node’s details (recorded with your reason).'
-                : 'This Entity Type is masked: type the whole value. The graph shows aliases; seeing the real ids ' +
+                : 'This Entity Type is masked: type the whole value. The graph shows aliases; seeing the real identifiers ' +
                       'needs See unmasked ids.';
         if (s.assessed && !s.items.length) return `No ${this.typeLabel()} in ${this.datasetName()} starts like this.`;
         return '';

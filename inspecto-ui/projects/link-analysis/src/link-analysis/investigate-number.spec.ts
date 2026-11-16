@@ -345,6 +345,22 @@ describe('investigate-number - next degree', () => {
         expect(degreeOutcomeMessage({ ...o, admitted: 1, linksAdded: 1, truncated: false, fanOutCapped: 0 })).toBe(
             'Degree 2: 1 new entity, 1 link added.',
         );
+        // LA-EXEC-DEMO-POLISH-1: the recorded one-hop line of the mule case, each sentence closed by its full stop
+        expect(
+            degreeOutcomeMessage({
+                ...o,
+                oneHop: 'every entity',
+                step: 2,
+                admitted: 6,
+                linksAdded: 7,
+                truncated: false,
+                maxFanOut: 5,
+                fanOutCapped: 8,
+            }),
+        ).toBe(
+            'Expand one hop from every entity (step 2): 6 new entities, 7 links added. Only the 5 strongest links of ' +
+                'each entity were added; 8 weaker links were left out.',
+        );
     });
 });
 

@@ -231,7 +231,7 @@ export class LinkAnalysisOversightComponent {
                     width: '32rem',
                     data: {
                         title: 'Reveal the masked entities',
-                        message: `Shows the real ids of ${what}, to you and on this screen only. Each one is recorded in the audit trail with your reason.`,
+                        message: `Shows the real identifiers of ${what}, to you and on this screen only. Each one is recorded in the audit trail with your reason.`,
                         confirmLabel: 'Reveal',
                         maxLength: 200,
                     },

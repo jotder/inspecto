@@ -991,11 +991,14 @@ export function graphSignature(data: G6GraphData | null | undefined): string {
     selector: 'inspecto-graph-view',
     standalone: true,
     template: '<div #host class="relative h-full w-full"></div>',
+    // G6 draws the minimap's own element (class `g6-minimap`, an inline `display: block`), outside Angular's view.
+    styles: [':host(.inspecto-minimap-collapsed) ::ng-deep .g6-minimap { display: none !important; }'],
     // Default: viewport-dynamic height for scrolling pages. `fill` mode instead grows into the
     // remaining space of a flex-column studio (Link Analysis); autoFit:'view' scales the graph.
     changeDetection: ChangeDetectionStrategy.OnPush,
     host: {
         '[class]': `fill ? 'block w-full min-h-0 flex-auto' : 'block w-full min-h-96 h-[62vh]'`,
+        '[class.inspecto-minimap-collapsed]': 'minimapCollapsed',
         // The canvas has no accessible content (LA-A11Y-AUDIT-1, WCAG 1.1.1): a named figure gives a
         // screen reader the graph's size. The textual route to the rows stays the host page's job.
         role: 'figure',
@@ -1022,6 +1025,11 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
     @Input() layout: GraphLayoutId | null = null;
     /** Opt-in canvas plugins/behaviors (Link Analysis View toolbox); `null` = the four existing hosts' defaults. */
     @Input() plugins: GraphViewPlugins | null = null;
+    /**
+     * Keep the minimap plugin but hide it (LA-EXEC-DEMO-POLISH-1: Link Analysis folds it to a button). A class on the
+     * host, never a plugin change, so showing it again neither rebuilds the graph nor re-runs its layout.
+     */
+    @Input() minimapCollapsed = false;
     /** Opt-in pointer model (Link Analysis); `null` = the other hosts' behaviour. Fixed at construction, like `plugins`. */
     @Input() interaction: GraphViewInteraction | null = null;
     /** The page's multi-selection (node ids): painted with a halo and a thicker outline. A repaint, never a rebuild. */

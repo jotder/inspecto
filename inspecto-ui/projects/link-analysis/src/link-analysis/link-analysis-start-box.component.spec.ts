@@ -229,7 +229,7 @@ describe('LinkAnalysisStartBoxComponent (LA-ONBOARD-1 phase 6, OB-9)', () => {
         expect(fixture.componentInstance.starts[0]).toMatchObject({ kind: 'entity', value: 'MULE-HUB-01' });
     });
 
-    it('a masked type says nothing is suggested, and that the real ids need See unmasked ids', async () => {
+    it('a masked type says nothing is suggested, and that the real identifiers need See unmasked ids', async () => {
         const { fixture, el } = create(vi.fn(() => of(answer({ masked: true, items: [], assessed: false }))));
         await settle();
         fixture.detectChanges();

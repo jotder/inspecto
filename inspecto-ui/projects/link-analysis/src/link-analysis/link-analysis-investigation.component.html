@@ -1055,21 +1055,31 @@
                         <div class="min-w-0">
                             <!-- LA-INVESTIGATION-EDIT-HARDENING-1: a lead renames it here too, through the same route as Settings -->
                             @if (canEditDetails()) {
+                                <!-- LA-EXEC-DEMO-POLISH-1: the name wraps to a second line (whole in the tooltip), never "…" at one -->
                                 <inspecto-pen-field
                                     class="font-semibold"
                                     ariaLabel="Name"
+                                    [wrap]="true"
                                     [formControl]="detailsTitle"
                                     [maxlength]="200"
                                     [error]="detailsTitleError()"
                                     data-testid="act-title"
                                 />
                             } @else {
-                                <div class="truncate font-semibold">{{ store.displayTitle() || h.id }}</div>
+                                <div
+                                    class="line-clamp-2 break-words font-semibold"
+                                    [attr.title]="store.displayTitle() || h.id"
+                                    data-testid="act-title-text"
+                                >
+                                    {{ store.displayTitle() || h.id }}
+                                </div>
                             }
+                            <!-- LA-EXEC-DEMO-POLISH-1: three facts on three lines, apart: the case's purpose in the body ink,
+                                 then what it reads ("Data: …") and how it links, each in the secondary ink -->
                             @if (h.purpose) {
                                 <!-- the purpose wraps (up to three lines; the whole of it in the tooltip), never cut mid-word -->
                                 <div
-                                    class="text-secondary line-clamp-3 break-words text-sm"
+                                    class="mt-0.5 line-clamp-3 break-words text-sm"
                                     [attr.title]="h.purpose"
                                     data-testid="act-purpose"
                                 >
@@ -1079,11 +1089,17 @@
                             <!-- presentability 2: the Dataset and its link in words; the stored names in the tooltip -->
                             @if (binding(); as b) {
                                 <div
-                                    class="text-secondary break-words text-sm"
+                                    class="text-secondary mt-1.5 flex flex-col gap-1 break-words text-sm"
                                     [matTooltip]="b.raw"
                                     data-testid="act-binding"
                                 >
-                                    <div data-testid="act-binding-dataset">{{ b.dataset }}</div>
+                                    <!-- &ngsp; keeps the one space Angular would drop between the two spans -->
+                                    <div>
+                                        <span class="font-semibold">Data:</span>&ngsp;<span
+                                            data-testid="act-binding-dataset"
+                                            >{{ b.dataset }}</span
+                                        >
+                                    </div>
                                     <div data-testid="act-binding-links">{{ b.links }}</div>
                                 </div>
                             }

@@ -64,7 +64,7 @@ export function caseMemberCandidates(graph: G6GraphData, originDataset: string |
 export function noCaseMemberReason(graph: G6GraphData): string {
     const masked = graph.nodes.some((n) => isEntityNode(n) && MASKED_NODE_ID.test(n.id));
     return masked
-        ? 'No node on this graph can become a Case member: its ids are masked, and a Case needs the real ids (Reveal shows them on this screen only). Link the Investigation to a Case instead: Investigation settings… ▸ Case.'
+        ? 'No node on this graph can become a Case member: its identifiers are masked, and a Case needs the real identifiers (Reveal shows them on this screen only). Link the Investigation to a Case instead: Investigation settings… ▸ Case.'
         : 'No node on this graph can become a Case member: each must be an Entity with a known source Dataset.';
 }
 

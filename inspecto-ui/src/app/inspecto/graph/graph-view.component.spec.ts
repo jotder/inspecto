@@ -59,6 +59,17 @@ describe('GraphViewComponent', () => {
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
+    it('LA-EXEC-DEMO-POLISH-1: minimapCollapsed marks the host, whose style hides G6’s minimap element', () => {
+        const fixture = create(null);
+        const host = fixture.nativeElement as HTMLElement;
+        expect(host.classList).not.toContain('inspecto-minimap-collapsed'); // the other hosts: as before
+        fixture.componentRef.setInput('minimapCollapsed', true);
+        fixture.detectChanges();
+        expect(host.classList).toContain('inspecto-minimap-collapsed');
+        // the minimap plugin is still built: folding it never changes the plugin list (no rebuild)
+        expect(buildPluginList({ minimap: true }, [])[0]['key']).toBe('minimap');
+    });
+
     it('renders an empty (zero-node) graph with no a11y violations', async () => {
         const fixture = create({ nodes: [], edges: [] });
         await expectNoA11yViolations(fixture.nativeElement);
@@ -364,6 +375,18 @@ describe('GraphViewComponent change classifier (LA-05)', () => {
         comp.ngOnChanges({ display: {} });
         expect(create).not.toHaveBeenCalled();
         expect(graph.draw).not.toHaveBeenCalled();
+    });
+
+    it('LA-EXEC-DEMO-POLISH-1: folding the minimap is a change of input only, never a rebuild or a layout', () => {
+        const { comp, graph, create } = harness(graphOf(['a', 'b']), { a: [10, 20], b: [30, 40] });
+        const c = comp as unknown as { plugins: GraphViewComponent['plugins']; minimapCollapsed: boolean };
+        c.plugins = { minimap: true };
+        comp.snapshotKeys();
+        c.minimapCollapsed = true;
+        comp.ngOnChanges({ minimapCollapsed: {} });
+        expect(create).not.toHaveBeenCalled();
+        expect(graph.destroy).not.toHaveBeenCalled();
+        expect(graph.render).not.toHaveBeenCalled();
     });
 
     // N2: a hulls toggle used to change `pluginKey`, so it rebuilt the graph and re-ran layout (~3 s on 767 nodes).

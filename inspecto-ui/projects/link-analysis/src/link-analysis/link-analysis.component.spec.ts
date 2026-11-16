@@ -103,6 +103,7 @@ class StubGraphView {
     @Input() textHint = '';
     @Input() layout: unknown;
     @Input() plugins: unknown;
+    @Input() minimapCollapsed = false;
     @Input() interaction: unknown;
     @Input() selection: unknown;
     @Input() fitPadding: unknown;
@@ -1942,6 +1943,41 @@ describe('LinkAnalysisComponent', () => {
         expect(c.canvasPlugins().behaviors ?? []).toEqual([]);
     });
 
+    it('LA-EXEC-DEMO-POLISH-1: the minimap starts folded to a button; the button and the View tick open it, no rebuild', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        const el = fixture.nativeElement as HTMLElement;
+        const view = fixture.debugElement.query(By.directive(StubGraphView)).componentInstance as StubGraphView;
+        const toggle = () => el.querySelector('[data-testid="la-minimap-toggle"]') as HTMLButtonElement | null;
+        const strip = () => el.querySelector('[aria-label="Render status"]') as HTMLElement;
+        const plugins = c.canvasPlugins();
+        // offered (View ▸ Minimap is ticked) but folded: nothing covers the bottom-right labels of a fitted graph
+        expect(plugins.minimap).toBe(true);
+        expect(view.minimapCollapsed).toBe(true);
+        expect(toggle()!.getAttribute('aria-label')).toBe('Show the minimap');
+        expect(toggle()!.getAttribute('aria-pressed')).toBe('false');
+        expect(strip().classList).toContain('right-2');
+        toggle()!.click();
+        fixture.detectChanges();
+        expect(view.minimapCollapsed).toBe(false);
+        expect(toggle()!.getAttribute('aria-label')).toBe('Hide the minimap');
+        expect(toggle()!.getAttribute('aria-pressed')).toBe('true');
+        expect(strip().style.right).toBe('168px'); // the strip and its button stay left of the open minimap
+        expect(c.canvasPlugins()).toBe(plugins); // the same plugin set: the graph is not rebuilt or laid out again
+        // unticked in View: no minimap and no button; ticked again: shown at once
+        c.toggleViewFlag('minimap', false);
+        fixture.detectChanges();
+        expect(toggle()).toBeNull();
+        expect(strip().classList).toContain('right-2');
+        c.toggleViewFlag('minimap', true);
+        fixture.detectChanges();
+        expect(view.minimapCollapsed).toBe(false);
+        await expectNoA11yViolations(strip());
+    });
+
     it('view toolbox: plugin and behavior toggles build the canvas plugin set, hulls follow communities, and the view persists them', async () => {
         const { fixture, save } = create();
         fixture.detectChanges();
@@ -2410,6 +2446,10 @@ describe('LinkAnalysisComponent', () => {
         });
         expect(await c.revealOnScreen()).toBe('MR-3 warrant');
         expect(open).toHaveBeenCalledTimes(1);
+        // LA-EXEC-DEMO-POLISH-1: the dialog says "real identifiers", never the shorthand "real ids"
+        const body = (open.mock.calls[0][1] as { data: { message: string } }).data.message;
+        expect(body).toContain('Shows the real identifiers of the 2 masked entities on screen');
+        expect(body).not.toContain(' ids');
         expect(reveal).toHaveBeenCalledTimes(1); // ONE action for every masked node drawn
         expect([...reveal.mock.calls[0][0]].sort()).toEqual([a, b].sort());
         expect(reveal.mock.calls[0][1]).toBe('MR-3 warrant');
@@ -2453,11 +2493,11 @@ describe('LinkAnalysisComponent', () => {
             el.querySelector(`[data-testid="${id}"]`)?.textContent?.replace(/\s+/g, ' ').trim() ?? null;
         c.setOverlayOpen('workingSet', true);
         fixture.detectChanges();
-        expect(text('working-set-on-screen')).toBe('5 nodes · 3 links on screen');
+        expect(text('working-set-on-screen')).toBe('5 entities · 3 links on screen');
         expect(text('working-set-counts')).toBe('Totals for the full graph, before grouping:'); // the tiles, labelled
         c.setOverlayOpen('workingSet', false);
         fixture.detectChanges();
-        expect(text('working-set-pill-on-screen')).toBe('· 5 nodes · 3 links on screen');
+        expect(text('working-set-pill-on-screen')).toBe('· 5 entities · 3 links on screen');
         c.investigation.activeId.set('inv-9');
         c.investigation.log.set({
             header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
@@ -2471,10 +2511,10 @@ describe('LinkAnalysisComponent', () => {
         } as never);
         fixture.detectChanges();
         expect(c.displayed()!.nodes.length).not.toBe(2); // the query graph is still loaded underneath
-        expect(text('working-set-pill-on-screen')).toBe('· 2 nodes · 1 link on screen');
+        expect(text('working-set-pill-on-screen')).toBe('· 2 entities · 1 link on screen');
         c.setOverlayOpen('workingSet', true);
         fixture.detectChanges();
-        expect(text('working-set-on-screen')).toBe('2 nodes · 1 link on screen');
+        expect(text('working-set-on-screen')).toBe('2 entities · 1 link on screen');
         fixture.destroy();
     });
     it('LA-INVESTIGATE-UX-2: the node menu offers Pick neighbours… on one Working Set entity; it selects it and asks the tab for its list', async () => {
@@ -3019,6 +3059,8 @@ describe('LinkAnalysisComponent', () => {
             const list = el.querySelector('[role="tablist"]') as HTMLElement;
             expect(list.getAttribute('aria-label')).toBe('Toolbox tab');
             expect(tabs().map((t) => t.textContent?.trim())).toEqual(['On screen', 'Whole Dataset', 'Investigation']);
+            // LA-EXEC-DEMO-POLISH-1: a label never breaks or squeezes ("On screen" read as "Onscreen" in a narrow dock)
+            for (const t of tabs()) expect(t.classList, t.textContent!).toContain('whitespace-nowrap');
             expect(tabs().map((t) => t.getAttribute('aria-selected'))).toEqual(['true', 'false', 'false']);
             expect(tabs().map((t) => t.tabIndex)).toEqual([0, -1, -1]);
             expect(list.parentElement!.querySelector('[role="radio"], [role="radiogroup"]')).toBeNull(); // the old switch

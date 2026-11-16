@@ -511,6 +511,8 @@ src/app/
   filter bar, the date-range preset, the query `$param` rows). A form of several values stays reactive.
   **`help`** (2026-11-03, `UI-FORM-ROWS-1`) is the one tiny line under the row, as `option-picker`'s `help`: give it
   only to a field whose name does not explain itself; an error replaces it.
+  **`wrap`** (2026-11-16, `LA-EXEC-DEMO-POLISH-1`) reads a one-line value on up to two lines, the whole in its tooltip,
+  instead of cutting it with "…" (a title in a narrow panel: the Investigation's name); it still edits as one line.
   **One row geometry (UI-FORM-ROWS-1 P0, operator 2026-11-03):** `pen-field` and `option-picker` both lay out on
   `styles.scss` `.prop-row` / `.prop-label` - label at the left in `text-sm`, the value right after it, ✎ / ▾ at the
   right edge. Change the row there, never per component. Put rows two per line (`grid sm:grid-cols-2 gap-x-8`) so a
@@ -791,7 +793,7 @@ in use. Look there before picking a class — do not invent a token.
 - **Disabled controls say why** (tooltip): "Draw a graph first.", "Needs the Manage Incidents and Cases permission." — the permission by the name it is granted under,
   no "capability", no raw server text, no ticket ids. A 403 maps to a plain reason (`refusal403` in
   `link-analysis/investigation-state.ts`).
-- **Counts describe what is drawn** ("N nodes · M links on screen"), and a capped result is "Result cut short".
+- **Counts describe what is drawn** ("N entities · M links on screen", LA-EXEC-DEMO-POLISH-1: the word the rest of the UI uses), and a capped result is "Result cut short".
 - **Wording (LA-UI-TEXT-PASS-1 G15, everywhere):** British spelling (neighbour, colour, analyse); Sentence case;
   capitalised Dataset, Space, Collector, Pipeline; "…" only where a dialog opens; no " - " as a dash; curly quotes;
   `▸` in menu paths; real plurals, never "(s)"; thousands comma "3,254". Glossary words always (root `CLAUDE.md`);

@@ -70,6 +70,10 @@ describe('the approver wording', () => {
         );
         expect(line).toContain('Fatima Analyst asks for your approval. It would add every neighbour');
         expect(line).not.toContain('p1');
+        // LA-EXEC-DEMO-POLISH-1: plainly a further Expand, not the recorded one above it
+        expect(line.startsWith('Requested next, not yet run: Degree 2. Fatima Analyst asks')).toBe(true);
+        const oneHop = approverWaitingMessage({ ...head, oneHop: 'every entity' }, PENDING, 'Fatima Analyst');
+        expect(oneHop.startsWith('Requested next, not yet run: Expand one hop from every entity. Fatima')).toBe(true);
         expect(requesterName({ ...PENDING, requestedBy: null }, (id) => id)).toBe('another analyst');
     });
 });

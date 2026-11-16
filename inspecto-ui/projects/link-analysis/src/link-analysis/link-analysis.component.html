@@ -1571,6 +1571,7 @@
                                 textHint="The table (Show the table: Links and Nodes) is its text version."
                                 [layout]="layoutId()"
                                 [plugins]="canvasPlugins()"
+                                [minimapCollapsed]="!minimapOpen()"
                                 [interaction]="canvasInteraction()"
                                 [selection]="selectedOnCanvas()"
                                 [positionHints]="positionHints()"
@@ -1887,8 +1888,11 @@
                                 (openChange)="setOverlayOpen('legend', $event)"
                             ></inspecto-link-analysis-legend>
                             <!-- render strip: what the render left out and the level-of-detail state; the counts and Limits are on the Graph counts card, the modules in ⚙ Settings -->
+                            <!-- an open minimap (160 px wide, at the bottom right) keeps the strip, and its own button, to its left -->
                             <div
-                                class="text-secondary absolute bottom-1 left-2 right-2 z-10 flex flex-wrap items-center gap-x-3 text-[0.6875rem]"
+                                class="text-secondary absolute bottom-1 left-2 z-10 flex flex-wrap items-center gap-x-3 text-[0.6875rem]"
+                                [class.right-2]="!minimapShown()"
+                                [style.right.px]="minimapShown() ? 168 : null"
                                 role="group"
                                 aria-label="Render status"
                             >
@@ -1919,7 +1923,7 @@
                                             [disabledInteractive]="true"
                                             [matTooltip]="
                                                 offer.why ||
-                                                'Show the real ids of the masked entities on screen, to you only'
+                                                'Show the real identifiers of the masked entities on screen, to you only'
                                             "
                                             [attr.aria-label]="
                                                 offer.why
@@ -1951,6 +1955,21 @@
                                             nodeLabelsChoice() === null ? ' above ' + autoNodeLabelMax + ' nodes' : ''
                                         }}: Display options turns them on</span
                                     >
+                                }
+                                @if (viewOptions().minimap) {
+                                    <!-- LA-EXEC-DEMO-POLISH-1: the minimap folds to this button, so it never covers a label -->
+                                    <button
+                                        mat-icon-button
+                                        type="button"
+                                        class="ml-auto !h-6 !w-6 !p-0"
+                                        data-testid="la-minimap-toggle"
+                                        [attr.aria-pressed]="minimapOpen()"
+                                        [matTooltip]="minimapOpen() ? 'Hide the minimap' : 'Show the minimap'"
+                                        [attr.aria-label]="minimapOpen() ? 'Hide the minimap' : 'Show the minimap'"
+                                        (click)="minimapOpen.set(!minimapOpen())"
+                                    >
+                                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:window"></mat-icon>
+                                    </button>
                                 }
                             </div>
                             <inspecto-link-analysis-working-set
@@ -2110,7 +2129,7 @@
                                     <button
                                         type="button"
                                         role="tab"
-                                        class="border px-3 py-1 text-xs"
+                                        class="whitespace-nowrap border px-3 py-1 text-xs"
                                         style="border-color: var(--gamma-border)"
                                         [id]="'la-toolbox-tab-' + t.id"
                                         [class.font-semibold]="toolboxTab() === t.id"

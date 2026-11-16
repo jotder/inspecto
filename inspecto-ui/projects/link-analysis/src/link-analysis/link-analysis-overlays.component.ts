@@ -422,12 +422,15 @@ export class LinkAnalysisWorkingSetComponent {
     readonly countsOf = computed(() => (this.countsGraph() ? 'graph on screen' : ''));
     /** What the canvas draws, counted by the page (`canvasData`); null = not stated (the card shows only its tiles). */
     readonly onScreen = input<{ nodes: number; links: number } | null>(null);
-    /** "12 nodes · 1 link on screen": the card's first line and the minimised chip (operator 2026-10-29: no footer). */
+    /**
+     * "12 entities · 1 link on screen": the card's first line and the minimised chip (operator 2026-10-29: no footer).
+     * Entities, as the Working Set line, the masked count and the toolbox say them (LA-EXEC-DEMO-POLISH-1).
+     */
     readonly onScreenText = computed(() => {
         const c = this.onScreen();
         if (!c) return '';
-        const n = (k: number, one: string) => `${k.toLocaleString('en')} ${k === 1 ? one : one + 's'}`;
-        return `${n(c.nodes, 'node')} · ${n(c.links, 'link')} on screen`;
+        const n = (k: number, one: string, many: string) => `${k.toLocaleString('en')} ${k === 1 ? one : many}`;
+        return `${n(c.nodes, 'entity', 'entities')} · ${n(c.links, 'link', 'links')} on screen`;
     });
     readonly countsNote = computed(() =>
         this.countsGraph() === 'query-under-investigation'

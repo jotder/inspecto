@@ -1584,6 +1584,24 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         await expectNoA11yViolations(el.querySelector('[data-testid="degrees"]') as HTMLElement);
     });
 
+    it('LA-EXEC-DEMO-POLISH-1: a reviewer sees Undo and Redo disabled, the reason in the tooltip, and nothing undone', async () => {
+        const { fixture, store, el } = create({ role: 'reviewer' });
+        await openInv(store);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(store.canUndo()).toBe(true); // there IS a step to undo: only the role turns the buttons off
+        const tip = (id: string) =>
+            fixture.debugElement.query(By.css(`[data-testid="${id}"]`)).injector.get(MatTooltip).message;
+        for (const id of ['act-undo', 'act-redo']) {
+            expect(el.querySelector(`[data-testid="${id}"]`)!.getAttribute('aria-disabled'), id).toBe('true');
+            expect(tip(id), id).toBe('Only a lead changes the steps of this Investigation.');
+        }
+        const undo = vi.spyOn(store, 'undo');
+        await (fixture.debugElement.children[0].componentInstance as LinkAnalysisInvestigationComponent).undo();
+        expect(undo).not.toHaveBeenCalled();
+    });
+
     it('finding 27: a lead keeps the Expand form and the coaching', async () => {
         const { fixture, store, el } = create({ role: 'lead' });
         await openInv(store);
@@ -1606,6 +1624,46 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         expect(line.getAttribute('title')).toBe(purpose);
         expect(line.classList).toContain('line-clamp-3');
         expect(line.classList).not.toContain('truncate');
+    });
+
+    it('LA-EXEC-DEMO-POLISH-1: the name wraps to two lines, and purpose, Data and Links are three lines apart', async () => {
+        const long = 'Mule hub: six feeder accounts and a relay that passes the money on';
+        const { fixture, store, el } = create({ role: 'lead' });
+        await openInv(store);
+        store.log.set({
+            ...store.log()!,
+            header: { ...store.log()!.header, title: long, purpose: 'Cash structured into one hub account' },
+        } as never);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        // a lead's name is the pen row: its value reads on up to two lines, never cut with "…"
+        const value = el.querySelector('[data-testid="act-title"] button') as HTMLElement;
+        expect(value.classList).toContain('line-clamp-2');
+        expect(value.classList).not.toContain('truncate');
+        expect(value.getAttribute('title')).toBe(store.displayTitle());
+        // three facts, three elements: the purpose, then "Data: …", then the links in words
+        const purpose = el.querySelector('[data-testid="act-purpose"]') as HTMLElement;
+        const binding = el.querySelector('[data-testid="act-binding"]') as HTMLElement;
+        expect(purpose.textContent!.trim()).toBe('Cash structured into one hub account');
+        expect(purpose.classList).not.toContain('text-secondary'); // the case's own words, in the body ink
+        expect(binding.contains(purpose)).toBe(false);
+        expect(binding.children.length).toBe(2);
+        expect(binding.children[0].textContent!.replace(/\s+/g, ' ').trim()).toBe('Data: calls');
+        expect(binding.children[1].textContent!.trim()).toBe('Links from a to b');
+        await expectNoA11yViolations(el.querySelector('[data-testid="act-header"]') as HTMLElement);
+
+        // a reader who may not rename it reads the same name, wrapped the same way
+        TestBed.resetTestingModule();
+        const ro = create({ role: 'reviewer' });
+        await openInv(ro.store);
+        ro.fixture.detectChanges();
+        await ro.fixture.whenStable();
+        ro.fixture.detectChanges();
+        const text = ro.el.querySelector('[data-testid="act-title-text"]') as HTMLElement;
+        expect(text.classList).toContain('line-clamp-2');
+        expect(text.classList).not.toContain('truncate');
+        expect(text.getAttribute('title')).toBe(text.textContent!.trim());
     });
 
     it('nothing seeded: the Expand section says why the next degree cannot run (UI test 2026-10-29)', async () => {

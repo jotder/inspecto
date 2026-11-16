@@ -327,19 +327,32 @@ export class LinkAnalysisInvestigationComponent {
     /** A Clean up while unsaved: the page hides these on the drawn Working Set and records the step. */
     readonly unsavedCleanUp = output<{ ids: string[]; reason: string; exclude: boolean }>();
 
+    /**
+     * Undo and Redo change the recorded steps, so they follow {@link canChange}: a reviewer or a reader through the Case
+     * sees them disabled, with the reason as the tooltip, rather than enabled beside a banner saying only a lead changes
+     * steps (LA-EXEC-DEMO-POLISH-1).
+     */
     readonly canUndoNow = computed(() =>
-        this.isUnsaved() ? this.unsavedCanUndo() : this.canWrite() && this.store.canUndo(),
+        this.isUnsaved() ? this.unsavedCanUndo() : this.canChange() && this.store.canUndo(),
     );
     readonly canRedoNow = computed(() =>
-        this.isUnsaved() ? this.unsavedCanRedo() : this.canWrite() && this.store.canRedo(),
+        this.isUnsaved() ? this.unsavedCanRedo() : this.canChange() && this.store.canRedo(),
+    );
+    /** Why Undo and Redo are off for this reader of a saved Investigation; '' when they may change its steps. */
+    private readonly stepsWhyNot = computed(() =>
+        !this.canWrite()
+            ? this.expandNeeds
+            : this.readsOnly()
+              ? 'Only a lead changes the steps of this Investigation.'
+              : '',
     );
     readonly undoTip = computed(() =>
         this.isUnsaved()
             ? this.unsavedCanUndo()
                 ? 'Undo the newest unsaved step (Ctrl+Z)'
                 : 'Nothing to undo'
-            : !this.canWrite()
-              ? this.expandNeeds
+            : this.stepsWhyNot()
+              ? this.stepsWhyNot()
               : this.store.canUndo()
                 ? 'Undo the newest recorded step (Ctrl+Z)'
                 : 'Nothing to undo',
@@ -349,8 +362,8 @@ export class LinkAnalysisInvestigationComponent {
             ? this.unsavedCanRedo()
                 ? 'Take the undone unsaved step again (Ctrl+Shift+Z)'
                 : 'Nothing to redo'
-            : !this.canWrite()
-              ? this.expandNeeds
+            : this.stepsWhyNot()
+              ? this.stepsWhyNot()
               : this.store.canRedo()
                 ? `Record the undone ${this.store.redoName().toLowerCase()} step again (Ctrl+Shift+Z)`
                 : 'Nothing to redo',
@@ -362,7 +375,7 @@ export class LinkAnalysisInvestigationComponent {
             if (this.unsavedCanUndo()) this.unsavedUndo.emit();
             return;
         }
-        if (!this.canWrite()) return;
+        if (!this.canChange()) return;
         if (this.grow?.undoable()) await this.grow.undoLast();
         else await this.store.undo(this.store.undoTarget());
     }
@@ -372,7 +385,7 @@ export class LinkAnalysisInvestigationComponent {
             if (this.unsavedCanRedo()) this.unsavedRedo.emit();
             return;
         }
-        if (this.canWrite()) await this.store.redo();
+        if (this.canChange()) await this.store.redo();
     }
 
     readonly cleanupExclude = signal(false);

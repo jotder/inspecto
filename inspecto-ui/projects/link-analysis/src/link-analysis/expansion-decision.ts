@@ -66,10 +66,16 @@ export function requesterName(p: PendingExpansion, nameOf: (id: string) => strin
 /**
  * The waiting line as an approver reads it: who asks, what it would do, and that the decision is theirs. The request id
  * stays out of the sentence (it is the server's handle, not the reader's); Settings ▸ Oversight lists it.
+ * LA-EXEC-DEMO-POLISH-1: it opens "Requested next, not yet run:", because it sits under the recorded line of the Expand
+ * already run ("… (step 2): 6 new entities, 7 links added.") and, both naming "Expand one hop from every entity", the two
+ * read as one Expand that both added 6 entities and was over the limit.
  */
 export function approverWaitingMessage(o: DegreeOutcome, p: PendingExpansion, requester: string): string {
     const limits = p.sensitivity ? heldLimitWords(p.sensitivity) : '';
-    return `${outcomeHead(o)}: ${requester} asks for your approval.` + (limits ? ` ${limits}` : '');
+    return (
+        `Requested next, not yet run: ${outcomeHead(o)}. ${requester} asks for your approval.` +
+        (limits ? ` ${limits}` : '')
+    );
 }
 
 /** Ask before approving: approving runs the expand at once, as the requester's step, with the approver on record. */

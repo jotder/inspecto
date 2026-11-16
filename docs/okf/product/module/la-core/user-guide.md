@@ -417,7 +417,9 @@ Act on the canvas, read in the dock, configure in **⚙ Settings**.
   all**, **Invert the selection**, **Select neighbours**, **Clear the selection**, and the count), the
   graph edits (**Expand**, which in an Investigation opens its tab section, **Collapse**, **Hide**, **Exclude** and **Merge** on an Investigation's canvas, **Attach to
   Case**), **Clean up** (the broom), and **Held** and **Hidden by lists**.
-* **Canvas:** the graph, with the legend, the Working set tiles and the minimap. It is drawn to read on a projector
+* **Canvas:** the graph, with the legend, the Working set tiles and the minimap. The minimap starts folded to a small
+  button at the right end of the line under the canvas (**Show the minimap** / **Hide the minimap**); View ▸ **Minimap**
+  says whether the canvas offers one at all, and is kept with a saved view. It is drawn to read on a projector
   (LA-FULL-CYCLE-TEST-1, 2026-11-16): a node's name sits on a small backing in the node colour of the scheme, a few
   pixels under the node, so a link or an arrowhead that passes under it never cuts through the letters; in the dark
   scheme links are a lighter grey (about 7:1 against the canvas, was under 4:1, which vanished on a projector); the
@@ -472,7 +474,7 @@ from a type no installed pack investigates waits for the packs before it binds.
 **Masked ids.** Names such as `masked:1d4d76be…` mean your Space hides sensitive ids. The same alias always stands for
 the same account, so you can still group, count, search, seed and follow it. Graph model says **Masking on: ids
 shown as aliases**. Details beside a masked id (a holder's name, a city) are masked with it. Inside a saved
-Investigation, someone with *See unmasked ids* who leads it turns every alias on screen back into its real id in one
+Investigation, someone with *See unmasked ids* who leads it turns every alias on screen back into its real identifier in one
 step: **Reveal…** under the canvas or in a node's details (see [Masked ids in an Investigation](#masked-ids-in-an-investigation)).
 
 ---
@@ -489,7 +491,7 @@ from (one entity, an Entity List, pasted values or the whole Dataset) in the Inv
 you choose Save. To carry on with earlier work, use File ▸ Open…*, with the button **Start from the Investigation tab
 →**. This form is in the toolbox's **Investigation** tab. When the Entity Type is masked (in Standard and up, *Account*, *Phone number* and
 other identifying types are masked unless the Space says otherwise) nothing is suggested: type the whole value, or turn
-on **Show values (this is logged)** if you may reveal them. The line under the field says where the real ids are: if
+on **Show values (this is logged)** if you may reveal them. The line under the field says where the real identifiers are: if
 you have *See unmasked ids*, the graph shows aliases until you save it and press **Reveal…** on the canvas or in a
 node's details; otherwise it says that seeing them needs *See unmasked ids*.
 
@@ -580,7 +582,7 @@ that has its columns (*… (saved here)*). A saved question is shown only to tho
    **Attribute columns** (amount, country, time — they feed the timeline, Value Measures and pattern tools). **Add
    another mapping** stacks more column pairs. **Root**, **depth** and **direction** start from chosen entities and
    grow outwards.
-4. **Run query.** Settings closes and the graph is drawn; the **Graph counts** card says how many nodes and links.
+4. **Run query.** Settings closes and the graph is drawn; the **Graph counts** card says how many entities and links.
    **Refresh** (here in Graph model) runs the same model again later.
 
 ### 5.3 Filters — two stages, deliberately
@@ -687,7 +689,7 @@ dialog. Three sections look up only the entities they need on the server, so the
 
 * **Masked id** — only for a masked node: it says the name is an alias and offers **Reveal the masked entities on screen…** (the
   one Reveal, see [Masked ids in an Investigation](#masked-ids-in-an-investigation)), or why you cannot. Once revealed it
-  shows the real id, and the node's details, enrichment and risk factors are read again in the clear, each recorded
+  shows the real identifier, and the node's details, enrichment and risk factors are read again in the clear, each recorded
   with your reason. Before that, text and dates beside a masked id are masked with it; counts and scores stay readable.
 
 * **Risk** — on a pack that maps an indicators Dataset (Telecom: `telecom_msisdn_indicators` by `msisdn`), the node's
@@ -1091,7 +1093,7 @@ record you attach evidence to.
 
 | Other ways out | Notes |
 |---|---|
-| **Attach to Case** (canvas toolbar) | One step: seals what is on screen and attaches it to a Case — an existing one, or **create a new Case from the selected nodes**; with an Investigation open you may also link the Investigation. If a step after the seal fails, the dialog names the sealed snapshot and **Retry** never seals twice. Needs *Manage Incidents and Cases*. A masked entity cannot become a Case member, and Reveal does not change that (it shows real ids on your screen only): link the Investigation to a Case instead (**Investigation settings… ▸ Case**). |
+| **Attach to Case** (canvas toolbar) | One step: seals what is on screen and attaches it to a Case — an existing one, or **create a new Case from the selected nodes**; with an Investigation open you may also link the Investigation. If a step after the seal fails, the dialog names the sealed snapshot and **Retry** never seals twice. Needs *Manage Incidents and Cases*. A masked entity cannot become a Case member, and Reveal does not change that (it shows real identifiers on your screen only): link the Investigation to a Case instead (**Investigation settings… ▸ Case**). |
 | **Export** (tool rail) | PNG, SVG, JSON, GraphML |
 | **Widget** | A view or an Investigation's Working Set on a Dashboard ([§11.10](#1110-widgets-sharing-and-embed)) |
 
@@ -1188,8 +1190,8 @@ binds `events` for you.
 <a id="masked-ids-in-an-investigation"></a>Masked ids show as aliases (`masked:…`) on the canvas, in the step log
 and in the Dossier, and one entity reads as the same alias everywhere in the Investigation. When ids on the canvas are
 masked, the line under it says *N entities masked* with **Reveal…**; the node details dialog has the same button under
-**Masked id**. Reveal asks for a reason, then shows the real ids of every masked node on screen, to you and on this
-screen only: the canvas labels, the hover text, the node's title and details, and the step log read the real ids. Each entity revealed
+**Masked id**. Reveal asks for a reason, then shows the real identifiers of every masked node on screen, to you and on this
+screen only: the canvas labels, the hover text, the node's title and details, and the step log read the real identifiers. Each entity revealed
 is recorded in the audit trail with your reason. You need *See unmasked ids* and to lead the Investigation; reviewers
 and everyone else keep the aliases, the Dossier stays masked, and closing the Investigation forgets what you revealed.
 On a graph that is not saved yet the button says to save it first: a reveal is recorded against an Investigation and
@@ -1200,9 +1202,10 @@ local `2026-11-15 13:21` form as every other recorded time in Link Analysis.
 
 Top to bottom, most important first:
 
-1. **Header:** the **Name** (a lead renames it in place: label · value · ✎), purpose (it wraps to up to three lines;
-   the whole of it is in its tooltip), the Dataset in words (its name, else the first sentence of its description) and
-   its link (*Links from payer account to payee account*; the stored names are in the line's tooltip), the data-trust sentence and **Data details** ([§11.11](#1111-data-trust-what-data-am-i-looking-at)), a **?** that shows *How to investigate* again, and `⋯` with **Settings…** (⚙ Settings ▸
+1. **Header:** the **Name** (a lead renames it in place: label · value · ✎; a long name wraps to two lines, the whole of
+   it in its tooltip), then three facts on three lines: the purpose (it wraps to up to three lines; the whole of it is in
+   its tooltip), *Data:* and the Dataset in words (its name, else the first sentence of its description), and its link
+   (*Links from payer account to payee account*; the stored names are in the tooltip of those two lines), the data-trust sentence and **Data details** ([§11.11](#1111-data-trust-what-data-am-i-looking-at)), a **?** that shows *How to investigate* again, and `⋯` with **Settings…** (⚙ Settings ▸
    Investigation settings), **Build Dossier…**, **Members…**, **Close** and **Delete**. A person who may approve a held
    expand of someone else sees a **N to approve** badge under the Dataset line; it brings the waiting line into view
    ([§11.4](#114-large-expands-need-a-second-person-four-eyes)). Under it one counts line: *Working Set: 42 entities · 118 links ·
@@ -1210,6 +1213,8 @@ Top to bottom, most important first:
    zero is left out, and before the first Expand it ends *not expanded yet*.
 2. **How to investigate** — five steps, shown until you press **Got it** (remembered in this browser).
 3. **Undo** / **Redo** of recorded steps, which stay at the top while the tab scrolls ([§7](#7-expand-and-clean-up-the-graph)).
+   A reviewer, or someone reading it through its Case, sees both disabled; their tooltip says *Only a lead changes the
+   steps of this Investigation.*
 4. The **queued start entities**, when there are any.
 5. **Expand** ([§7.1](#71-expand)): the per-degree results, then ONE Expand form — From, **Expand** with its preview and
    four-eyes line, and the **Expand filter** groups. A reader sees *Needs the Manage Incidents and Cases permission.* instead of the form; a reviewer of the Investigation,
@@ -1252,8 +1257,10 @@ Investigation is open **selects** it for the next step.
 An expand whose budget or fan-out cap is above the Space's four-eyes thresholds does not run: it says **waiting for
 approval**, names the request (for example *p1*) and the limit crossed. Someone **other than you** with *Approve link
 expansions* opens the same Investigation and sees it at once: a **1 to approve** badge in the header, and on the same
-line, instead of your waiting text, *Degree 2:* (your name) *asks for your approval. It would add every neighbour of
-each entity, more than the 2,000 allowed without a second approval.* with **Approve** and **Deny**.
+line, instead of your waiting text, *Requested next, not yet run: Degree 2.* (your name) *asks for your approval. It
+would add every neighbour of each entity, more than the 2,000 allowed without a second approval.* with **Approve** and
+**Deny**. It opens *Requested next, not yet run* because it sits under the line of the Expand already recorded (*… (step
+2): 6 new entities, 7 links added.*), and both can name the same Expand (*Expand one hop from every entity*).
 
 The approver's line is written for the person deciding (LA-FULL-CYCLE-TEST-1, 2026-11-16). It names you as the sign-in
 names you: a Demo User's display name, or the signed-in person's own name; under OIDC the browser holds no directory of
@@ -1517,7 +1524,7 @@ If a control is greyed out, hover it: it names what is missing.
 | Build a link index | `canBuildLinkIndex` |
 | Approve or deny a held large expand (never your own) | *Approve link expansions* (`canApproveLinkExpansions`) |
 | **Watch** a Measure (bind an Alert Rule) | `canAuthorAlertRules` |
-| See real ids instead of aliases | *Reveal* (`canRevealLinkEntities`) |
+| See real identifiers instead of aliases | *Reveal* (`canRevealLinkEntities`) |
 | Mint an embed link | `canShareInvestigation` and lead of the Investigation |
 | Change Link Analysis settings, set what a column holds, add an Entity Type, choose the Space's Industry pack | `canAuthorWorkbench` |
 | Add data with sign-in, **Upload a CSV** to a Collector | the right to upload data (`canUploadData`) |
@@ -1526,7 +1533,7 @@ If a control is greyed out, hover it: it names what is missing.
 **Read-only roles.** Without *Manage Incidents and Cases* the Investigation tab shows a **Read-only** banner, *Changing an Investigation needs the Manage
 Incidents and Cases permission.* (the banner's title says Read-only, so the sentence does not repeat it): you can open, read, replay, re-read and build, download and verify the Dossier; every
 write control is disabled with that sentence. A reviewer of an Investigation, and a member of its linked Case, read it
-the same way (*You review this Investigation: you can read it and decide approvals…*): only a lead changes its steps, so they get no Expand form. A refusal shows the server's reason; a missing
+the same way (*You review this Investigation: you can read it and decide approvals…*): only a lead changes its steps, so they get no Expand form, and **Undo** and **Redo** are disabled with that reason. A refusal shows the server's reason; a missing
 permission is named in words (*Your role does not have the Workbench author permission*). *Not found* on an Investigation can mean it does
 not exist, is not yours, or its Dataset is no longer shared with you — the same answer on purpose. In the
 `la-showcase` demo, *Demo RA Analyst* and *Demo Manager* are read-only; *Demo FM Analyst* holds manage-incidents,
@@ -1983,6 +1990,58 @@ An independent review of live screenshots for a bank's executives found these; e
 - Specs: `data.page.spec.ts`, `add-data.component.spec.ts`, `graph-view.component.spec.ts` (start tab, hover name),
   `link-analysis.component.spec.ts` (fit band), `link-analysis-investigation.component.spec.ts` (header words, counts
   line, window sentence), `la-starter.spec.ts` (`bindingWords`), `investigation-state.spec.ts`, `investigate-number.spec.ts`.
+
+### Executive demo polish: decisions (`LA-EXEC-DEMO-POLISH-1`, as built 2026-11-16)
+
+The final executive review of six live screens judged the Investigation screen fit for a bank COO *when cropped*. What
+it noted, and the call taken for each so the uncropped screen passes:
+
+- **The minimap folds to a button.** It covered the node labels in the canvas's bottom-right corner. Padding the fit
+  instead was rejected: G6 pads a fit per side, not per corner, so keeping a 160 × 100 px box clear costs about a fifth
+  of the canvas height (or width) on every graph, and a fitted graph is wholly on screen anyway, so an open minimap only
+  repeated it. It now starts folded to an icon button at the right end of the line under the canvas (*Show the
+  minimap* / *Hide the minimap*, `aria-pressed`); open, that line and its button stay to the minimap's left. The View
+  ▸ **Minimap** tick keeps its meaning (does the canvas offer one) and stays in saved views, so no showcase view
+  changed; ticking it opens the minimap at once. The fold is a class on `<inspecto-graph-view>`
+  (`minimapCollapsed`, hiding G6's `.g6-minimap` element), never a plugin change, because a plugin change rebuilds the
+  graph and runs its layout again. Per screen, not stored.
+- **The approver's line says it is a further Expand.** *Requested next, not yet run: Expand one hop from every entity.
+  Demo FM Analyst asks for your approval. It would add every neighbour of each entity, more than the 2,000 allowed
+  without a second approval.* It sits under the recorded line *Expand one hop from every entity (step 2): 6 new
+  entities, 7 links added.*, and with the same head the two read as one Expand that both ran and was over the limit.
+  The "missing full stop" before *Only the 5 strongest links* is in the source and always was (`degreeOutcomeMessage`
+  ends the count sentence with one); the review's screenshots are 800 × 477 px, where a full stop is under a pixel. A
+  spec now pins that exact line.
+- **The header separates its facts.** The name wraps to two lines (its whole in the tooltip) instead of being cut at one
+  (*Mule hub: six feeder accounts and a r…*): a new `wrap` input on `<inspecto-pen-field>`, and the same clamp for a
+  reader who may not rename it. Then three lines with space between them: the purpose in the body ink (it is the
+  case's own sentence), *Data:* and the Dataset in words, and *Links from payer account to payee account*, both in the
+  secondary ink. Not a labelled definition list: a *Links* label would repeat the line's first word, and the purpose
+  needs no label under the name. Theme classes only.
+- **One spelling: *On screen*.** The tab label exists once in the source (`allToolboxTabs`, the G16 wording, matching
+  *on screen* in the counts); no *Onscreen* is written anywhere, and the GLOSSARY has no entry for it. The two readings
+  came from the 800 px screenshots, where the space between the words is about a pixel. The tabs are now
+  `whitespace-nowrap`, so a narrow toolbox can never break or squeeze the label.
+- **Undo and Redo follow the role, not only the permission.** A reviewer, or someone reading through the Case, held
+  the permission, so both looked enabled under a banner saying only a lead changes steps. They now follow `canChange`
+  (permission and not read-only), disabled but focusable, with the tooltip *Only a lead changes the steps of this
+  Investigation.*; the component's `undo()` / `redo()` check the same. Ctrl+Z on the canvas still reaches the store
+  for them (the page does not know the role), where the server refuses it.
+- **The start tab beside a neighbour's label: left as it is.** On the mule case the force layout puts SMURF-02 directly
+  above RELAY-01, so SMURF-02's label backing ends just above RELAY-01's start tab. Nothing overlaps; they touch. The
+  tab already rises the least it can while staying a tab of its own node (10 px: its 13 px less a 3 px overlap), and the label's
+  4 px drop and 1 px padding are what keep link lines off the letters. Moving either changes the phase-6 and
+  presentability-2 placements for every graph to fix one pair, and spacing the layout further changes every layout,
+  so no offset was changed.
+- **Graph counts say entities.** *9 nodes · 8 links on screen* → *9 entities · 8 links on screen*, as the Working Set
+  line, the *N entities masked* line and the toolbox say them.
+- **Reveal says identifiers.** *Shows the real ids of …* → *Shows the real identifiers of …* in the canvas and
+  Oversight Reveal dialogs, the Reveal button's tooltip, the Start box note and the Case-member refusal. The permission
+  keeps its granted name, *See unmasked ids*, and the GLOSSARY's **Masking mode** has no other word for the unmasked
+  value.
+- Specs: `graph-view.component.spec.ts` (fold class, no rebuild), `link-analysis.component.spec.ts` (fold button, tab
+  labels, counts words, Reveal dialog text), `link-analysis-investigation.component.spec.ts` (header lines and wrapped
+  name, reviewer Undo / Redo), `expansion-decision.spec.ts`, `investigate-number.spec.ts`.
 
 ### Search around, Merge and Possible duplicates internals
 

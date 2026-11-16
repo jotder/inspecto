@@ -91,7 +91,41 @@ class EnteredHostComponent {
     entered = 0;
 }
 
+@Component({
+    standalone: true,
+    changeDetection: ChangeDetectionStrategy.Eager,
+    imports: [PenFieldComponent, ReactiveFormsModule],
+    template: `
+        <inspecto-pen-field ariaLabel="Name" [wrap]="true" [formControl]="ctl" />
+        <inspecto-pen-field ariaLabel="Plain" [formControl]="ctl" />
+    `,
+})
+class WrapHostComponent {
+    ctl = new FormControl<string | null>('Mule hub: six feeder accounts and a relay that passes the money on');
+}
+
 describe('PenFieldComponent', () => {
+    it('wrap reads a long one-line value on up to two lines, the whole in its tooltip; it still edits as one line', () => {
+        const fixture = TestBed.createComponent(WrapHostComponent);
+        fixture.detectChanges();
+        const [wrapped, plain] = Array.from(
+            (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('inspecto-pen-field'),
+        ).map((h) => h.querySelector('button:not(.pen-pencil)') as HTMLButtonElement);
+        const value = fixture.componentInstance.ctl.value!;
+        expect(wrapped.classList).toContain('line-clamp-2');
+        expect(wrapped.classList).toContain('break-words');
+        expect(wrapped.classList).not.toContain('truncate');
+        expect(wrapped.getAttribute('title')).toBe(value);
+        // without it, as before: one line, cut with "…", no tooltip
+        expect(plain.classList).toContain('truncate');
+        expect(plain.classList).not.toContain('line-clamp-2');
+        expect(plain.getAttribute('title')).toBeNull();
+        wrapped.click();
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('inspecto-pen-field input')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('inspecto-pen-field textarea')).toBeNull();
+    });
+
     it('entered fires after Enter commits an open row, never on the Enter that opens a closed one (UI-FORM-ROWS-1 P3)', () => {
         const fixture = TestBed.createComponent(EnteredHostComponent);
         fixture.detectChanges();

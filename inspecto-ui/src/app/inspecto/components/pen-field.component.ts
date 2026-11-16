@@ -92,9 +92,12 @@ import { MatIconModule } from '@angular/material/icon';
                     type="button"
                     class="hover:bg-hover min-w-0 flex-1 rounded px-1 py-0.5 text-left text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
                     [class.font-mono]="mono()"
-                    [class.truncate]="!multiline()"
+                    [class.truncate]="!multiline() && !wrap()"
                     [class.whitespace-pre-line]="multiline()"
                     [class.line-clamp-3]="multiline()"
+                    [class.line-clamp-2]="wrap() && !multiline()"
+                    [class.break-words]="wrap() && !multiline()"
+                    [attr.title]="wrap() && !multiline() && text() !== '' ? text() : null"
                     [disabled]="disabled()"
                     [attr.aria-label]="valueAriaLabel()"
                     (click)="startEditing()"
@@ -135,6 +138,11 @@ export class PenFieldComponent implements ControlValueAccessor {
     readonly type = input<'text' | 'number' | 'date' | 'datetime-local'>('text');
     /** A free-text note: edits in a two-row box (Shift+Enter breaks a line, Enter commits) and reads as wrapped text. */
     readonly multiline = input(false);
+    /**
+     * A one-line value that reads on up to two wrapped lines (the whole in its tooltip) instead of being cut with "…": a
+     * title the row's width would truncate (the Link Analysis Investigation's name, LA-EXEC-DEMO-POLISH-1). Edits as one line.
+     */
+    readonly wrap = input(false);
     readonly maxlength = input<number | null>(null);
     /** Suggested value shown as a ghost while empty; **→** accepts it. */
     readonly default = input<string | number | null>(null);

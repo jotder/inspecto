@@ -1007,7 +1007,17 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         on: boolean,
     ): void {
         this.viewOptions.update((o) => ({ ...o, [flag]: on }));
+        if (flag === 'minimap') this.minimapOpen.set(on); // ticked in View: the analyst wants to see it now
     }
+
+    /**
+     * LA-EXEC-DEMO-POLISH-1: the minimap starts folded to a small button at the canvas's bottom right. A fitted graph is
+     * wholly on screen, so an open minimap only repeated it while covering the labels in that corner; it earns its place
+     * once the analyst zooms in, one press away. The View ▸ Minimap tick (kept with a saved view) still says whether
+     * the canvas offers one at all. Per screen, never stored.
+     */
+    readonly minimapOpen = signal(false);
+    readonly minimapShown = computed(() => !!this.viewOptions().minimap && this.minimapOpen());
 
     toggleBehavior(id: NonNullable<GraphViewPlugins['behaviors']>[number], on: boolean): void {
         this.viewOptions.update((o) => {
@@ -5153,7 +5163,7 @@ Its prior copies stay in its version history.`,
                     data: {
                         title: 'Reveal the masked entities on screen',
                         message:
-                            `Shows the real ids of ${what} on screen, to you and on this screen only. Each one is ` +
+                            `Shows the real identifiers of ${what} on screen, to you and on this screen only. Each one is ` +
                             'recorded in the audit trail with your reason. Everyone else, and the Dossier, keep the aliases.',
                         confirmLabel: 'Reveal',
                         maxLength: 200,
