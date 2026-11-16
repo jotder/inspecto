@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it, vi } from 'vitest';
 import { ConnectionProfile, ConnectionsService, ConnectionTestResult } from 'app/inspecto/api';
+import { SessionService } from 'app/inspecto/auth/session.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { penByLabel, penEdit, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { ConnectionFormDialog } from './connection-form.dialog';
@@ -18,7 +19,7 @@ const TEST_OK: ConnectionTestResult = {
     detail: 'ok',
 };
 
-function create(profile?: ConnectionProfile, existingIds?: string[]) {
+function create(profile?: ConnectionProfile, existingIds?: string[], remoteLocked = false) {
     const close = vi.fn();
     const api = {
         create: vi.fn((p: ConnectionProfile) => of(p)),
@@ -35,12 +36,59 @@ function create(profile?: ConnectionProfile, existingIds?: string[]) {
             { provide: ToastrService, useValue: { success: () => {}, error: () => {}, warning: () => {} } },
         ],
     });
+    if (remoteLocked) {
+        // DATA-TIERS-1 P4: what a Basic /bootstrap reports
+        const session = TestBed.inject(SessionService);
+        session.features.set({ remoteSystems: false });
+        session.featureReasons.set({ remoteSystems: REMOTE_WHY });
+    }
     const fixture = TestBed.createComponent(ConnectionFormDialog);
     fixture.detectChanges();
     return { fixture, c: fixture.componentInstance, close, api };
 }
 
+const REMOTE_WHY = 'Collecting from remote systems (SFTP, FTP, object stores, databases, Kafka) is in Standard and above; Basic adds files and copies Postgres tables.';
+
 describe('ConnectionFormDialog', () => {
+    it('DATA-TIERS-1 P4: where remote systems are withheld, a new Connection starts on Local and a remote type shows locked', async () => {
+        const { fixture, c, api } = create(undefined, [], true);
+        expect(c.connType()).toBe('local');
+        expect(c.typeLocked()).toBe(false);
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="locked-reason"]')).toBeNull();
+
+        c.onTypeChange('sftp');
+        fixture.detectChanges();
+        expect(c.typeLocked()).toBe(true);
+        expect(el.querySelector('[data-testid="locked-reason"]')?.textContent).toContain(REMOTE_WHY);
+        const submit = el.querySelector('button[type="submit"]') as HTMLButtonElement;
+        expect(submit.disabled).toBe(true);
+        c.submit();
+        expect(c.step()).toBe('config'); // a locked type never reaches the save step
+        expect(api.create).not.toHaveBeenCalled();
+        await expectNoA11yViolations(fixture.nativeElement);
+
+        // a database Connection is remote too (the db Collector, publish.postgres); https (delivery) is not
+        c.onTypeChange('database');
+        expect(c.typeLocked()).toBe(true);
+        c.onTypeChange('https');
+        expect(c.typeLocked()).toBe(false);
+    });
+
+    it('DATA-TIERS-1 P4: editing a saved remote Connection stays open where the edition withholds new ones', () => {
+        const { c } = create({ id: 'sftp_prod', connector: 'sftp', host: 'h' } as ConnectionProfile, [], true);
+        expect(c.connType()).toBe('sftp');
+        expect(c.remoteLock()).toBeNull();
+        expect(c.typeLocked()).toBe(false);
+    });
+
+    it('DATA-TIERS-1 P4: where the edition offers remote systems nothing is locked (SFTP stays the default)', () => {
+        const { c } = create();
+        expect(c.remoteLock()).toBeNull();
+        c.onTypeChange('database');
+        expect(c.typeLocked()).toBe(false);
+    });
+
     it('defaults to SFTP on the config step with routing collapsed and both hops unselected', () => {
         const { c } = create();
         expect(c.connType()).toBe('sftp');

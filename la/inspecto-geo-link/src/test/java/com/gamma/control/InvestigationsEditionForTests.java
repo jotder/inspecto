@@ -16,7 +16,9 @@ public final class InvestigationsEditionForTests implements EditionFeatureProvid
 
     @Override
     public Set<String> features() {
+        // DATA-TIERS-1 P2: and the data-layer screen gates inspecto-ops declares, so a Standard /bootstrap withholds nothing here
         return Set.of(EditionFeatures.INVESTIGATIONS, EditionFeatures.GEO_MAP, EditionFeatures.LA_WIDGETS,
-                EditionFeatures.ENTITY_PAGES);
+                EditionFeatures.ENTITY_PAGES, EditionFeatures.PIPELINE_AUTOMATION, EditionFeatures.PIPELINE_TRANSFORM,
+                EditionFeatures.PIPELINE_EGRESS, EditionFeatures.REMOTE_SYSTEMS);
     }
 }

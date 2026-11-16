@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Telecom ASN.1 decoder — features
 
-**Product Map Item:** [`module.telecom-asn1`](../../../../../product-map/module/telecom-asn1.toon) · **Status:** ga · **Availability:** Optional module, staged from Standard and every higher Edition (`offerings/standard.toon`). Add-on: [telecomIndustryPack](../../addon/telecomIndustryPack/index.md).
+**Product Map Item:** [`module.telecom-asn1`](../../../../../product-map/module/telecom-asn1.toon) · **Status:** ga · **Availability:** Optional module, staged in Advanced (`offerings/advanced.toon`; Standard and up until 2026-11-17, DT-12). Add-on: [telecomIndustryPack](../../addon/telecomIndustryPack/index.md).
 
 ## What it is
 

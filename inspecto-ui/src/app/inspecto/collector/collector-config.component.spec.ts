@@ -5,6 +5,7 @@ import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { ComponentsService, ConnectionsService } from 'app/inspecto/api';
+import { SessionService } from 'app/inspecto/auth/session.service';
 import { COLLECTOR_ATTRIBUTES } from 'app/inspecto/component-model';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { CollectorConfigComponent } from './collector-config.component';
@@ -184,5 +185,49 @@ describe('CollectorConfigComponent', () => {
     it('has no a11y violations', async () => {
         const fixture = create({ connection: 'sftp_prod' }, 'sftp', [{ id: 'sftp_prod', connector: 'sftp' }]);
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    describe('DATA-TIERS-1 P4: remote systems withheld by the edition', () => {
+        const WHY = 'Collecting from remote systems is in Standard and above.';
+        function lock(fixture: ComponentFixture<CollectorConfigComponent>): void {
+            const session = TestBed.inject(SessionService);
+            session.features.set({ remoteSystems: false });
+            session.featureReasons.set({ remoteSystems: WHY });
+            fixture.detectChanges();
+        }
+
+        it('locks the Connection choice with the reason, and a switch to it does nothing', async () => {
+            const fixture = create();
+            lock(fixture);
+            const c = fixture.componentInstance;
+            expect(c.connectionLocked()).toBe(true);
+            const el = fixture.nativeElement as HTMLElement;
+            expect(el.querySelector('[data-testid="remote-lock"]')?.textContent?.trim()).toBe(WHY);
+            const toggle = Array.from(el.querySelectorAll('mat-button-toggle')).find((t) =>
+                (t.textContent ?? '').includes('Connection'),
+            ) as HTMLElement;
+            expect(toggle.querySelector('button')?.disabled).toBe(true);
+            c.setMode('connection');
+            expect(c.mode()).toBe('local');
+            expect(c.resolveConnector()).toBe('local');
+            await expectNoA11yViolations(fixture.nativeElement);
+        });
+
+        it('keeps a node that already collects through a Connection as it is (it still runs, §5.3)', () => {
+            const fixture = create({ connection: 'sftp_prod' }, 'sftp', [{ id: 'sftp_prod', connector: 'sftp' }]);
+            lock(fixture);
+            const c = fixture.componentInstance;
+            expect(c.mode()).toBe('connection');
+            expect(c.connectionLocked()).toBe(false);
+            expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="remote-lock"]')).toBeNull();
+        });
+
+        it('offers the Connection choice where the edition has it', () => {
+            const fixture = create();
+            const c = fixture.componentInstance;
+            expect(c.remoteLock()).toBeNull();
+            c.setMode('connection');
+            expect(c.mode()).toBe('connection');
+        });
     });
 });

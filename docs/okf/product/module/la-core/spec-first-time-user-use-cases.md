@@ -29,7 +29,7 @@ layer are owned by `DATA-TIERS-1` (the draft `PIPELINE-EDITIONS-1` was merged in
 D-PE decisions map to DT numbers there). Both use the same copy rules: **guide**, never "wizard"; **Onboard** is
 the one verb for creating a data origin (GLOSSARY).
 
-Related: [DATA-TIERS-1 plan](../../../../superpower/data-tier-editions-plan.md) ·
+Related: [DATA-TIERS-1 plan](../../../../archived-documents/plans-archive/data-tier-editions-plan.md) ·
 [LA-ONBOARD-1 plan](../../../../archived-documents/plans-archive/la-onboarding-plan.md) ·
 [ONBOARDING-FIRST-RUN-1 console plan](../../../../archived-documents/plans-archive/first-run-onboarding-plan.md) · [user guide](user-guide.md) ·
 [Space guide steps](user-guide.md#31-the-getting-started-page) · [GLOSSARY](../../../../GLOSSARY.md).
@@ -555,7 +555,7 @@ DT-7.
 
 - Walkthrough commits: `b1102e267` (open/close), `5dd7f4206`, `1b4f96721`, `fc9e0a9c3`, `559ae5d2e`, `cb4feedd9`
   (`LA-GROW-EXCLUDE-1`).
-- [DATA-TIERS-1](../../../../superpower/data-tier-editions-plan.md) decisions DT-1…DT-10 (DT-4 and the data-quality
+- [DATA-TIERS-1](../../../../archived-documents/plans-archive/data-tier-editions-plan.md) decisions DT-1…DT-10 (DT-4 and the data-quality
   placement revised by A-12, A-13).
 - [Entity List spec](../entity-list/spec.md) (purposes, category lists).
 - [GLOSSARY](../../../../GLOSSARY.md): Stream, Reference, Dataset, Entity Type, Collector, Pipeline, Onboard.

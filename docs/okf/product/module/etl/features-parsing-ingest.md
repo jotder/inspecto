@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Parsing and ingest — features
 
-**Availability:** Offering: all tiers; the ASN.1 frontend (module `inspecto-telecom-asn1`) is Standard and above.
+**Availability:** Offering: all tiers; the ASN.1 frontend (module `inspecto-telecom-asn1`) is Advanced only (DATA-TIERS-1 DT-12, 2026-11-17).
 
 ## What it does
 

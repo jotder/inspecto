@@ -11,8 +11,8 @@ timestamp: 2026-10-19T00:00:00Z
 
 ## Requirement
 
-EDITIONS row SP-PRS-06: an ASN.1 BER telecom CDR decoder as a Pipeline step (`parser.asn1.ber`), Standard
-and above, as the Telecom industry pack (`docs/EDITIONS.md`). Design of record: the archived
+EDITIONS row SP-PRS-06: an ASN.1 BER telecom CDR decoder as a Pipeline step (`parser.asn1.ber`), Advanced
+(Standard and above until DATA-TIERS-1 DT-12, 2026-11-17), as the Telecom industry pack (`docs/EDITIONS.md`). Design of record: the archived
 [parser-plugin-framework](../../../../archived-documents/plans-archive/parser-plugin-framework.md) and
 [parser-plugins-trust-design](../../../../archived-documents/plans-archive/parser-plugins-trust-design.md).
 

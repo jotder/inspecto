@@ -72,6 +72,34 @@ public final class ProcessorCatalog {
         return out;
     }
 
+    /**
+     * The acquisition processors that collect from a remote system ({@code DATA-TIERS-1} P4): locked in Basic's palette by
+     * {@link com.gamma.etl.EditionFeatures#REMOTE_SYSTEMS}. The local folder and the Dataset entry stay on every edition.
+     */
+    private static final Set<String> REMOTE_ACQUISITION = Set.of("acquisition.file.sftp", "acquisition.db.jdbc",
+            "acquisition.file.s3", "acquisition.file.azure", "acquisition.file.gcs", "acquisition.stream.kafka");
+
+    /**
+     * The Step node types Basic's no-code shaping keeps (DT-7, DT-15): filter rows and dedupe. {@code transform.mask} has its
+     * own gate ({@link com.gamma.etl.EditionFeatures#PII_MASK}, Advanced) and is left to it.
+     */
+    private static final Set<String> NO_CODE_STEPS = Set.of("transform.filter", "transform.dedup", "transform.mask");
+
+    /**
+     * The edition feature a processor needs beyond Basic ({@code DATA-TIERS-1} P4 / P6), or null when every edition offers it: a
+     * remote acquisition needs {@link com.gamma.etl.EditionFeatures#REMOTE_SYSTEMS}; a Step that computes, joins, enriches
+     * or summarises - every mapped {@code transform.*} Step but the no-code ones, and reference enrichment - needs
+     * {@link com.gamma.etl.EditionFeatures#PIPELINE_TRANSFORM}. A screen gate only (§5.3): the palette locks it, nothing refuses it.
+     */
+    public static String featureOf(Processor p) {
+        if (REMOTE_ACQUISITION.contains(p.id())) return com.gamma.etl.EditionFeatures.REMOTE_SYSTEMS;
+        String t = p.nodeType();
+        if (t == null) return null;
+        if ("enrichment".equals(t) || (t.startsWith("transform.") && !NO_CODE_STEPS.contains(t)))
+            return com.gamma.etl.EditionFeatures.PIPELINE_TRANSFORM;
+        return null;
+    }
+
     public static final List<Family> FAMILIES = List.of(
             new Family("ACQ", "Collectors & Ingestion", "heroicons_outline:arrow-down-tray"),
             new Family("PRS", "Extraction & Format Parsers", "heroicons_outline:document-text"),
@@ -113,7 +141,7 @@ public final class ProcessorCatalog {
             p("PRS", "parser.json", "🧬", "heroicons_outline:code-bracket", "JSON object & JSON Lines (NDJSON) parser", Status.DELIVERED, "parser.json", null, null),
             p("PRS", "parser.excel", "📑", "heroicons_outline:table-cells", "Excel workbook parser", Status.DELIVERED, "parser.xlsx", null, "needs the DuckDB `excel` extension in the bundle (multiformat X1)"),
             p("PRS", "parser.xml", "📑", "heroicons_outline:code-bracket-square", "XML / XPath / DOM unpacker", Status.PARTIAL, "parser.plugin", null, "tree→segments bridge ships XML ingests; no XPath selector grammar yet"),
-            p("PRS", "parser.asn1.ber", "📡", "heroicons_outline:cpu-chip", "ASN.1 BER telecom CDR decoder", Status.DELIVERED, BuiltinNodeType.PARSER_ASN1.type(), null, "Telecom industry pack (inspecto-telecom-asn1) over the asn-parser reactor (decoders, vendor plugins); Standard and above"),
+            p("PRS", "parser.asn1.ber", "📡", "heroicons_outline:cpu-chip", "ASN.1 BER telecom CDR decoder", Status.DELIVERED, BuiltinNodeType.PARSER_ASN1.type(), null, "Telecom industry pack (inspecto-telecom-asn1) over the asn-parser reactor (decoders, vendor plugins); Advanced (DATA-TIERS-1 DT-12)"),
             p("PRS", "parser.pattern.regex", "🔎", "heroicons_outline:magnifying-glass", "Named-group regex extractor", Status.DELIVERED, "parser.text_regex", null, null),
             p("PRS", "parser.plugin", "🧩", "heroicons_outline:puzzle-piece", "Custom ingester plugin (segments, multi-event)", Status.DELIVERED, "parser.plugin", null, "ParserPlugin SPI; `segments: {CALL, SMS}`"),
             p("PRS", "parser.keyvalue", "🏷️", "heroicons_outline:tag", "Key-value / logfmt parser", Status.PLANNED, null, null, null),
@@ -265,8 +293,11 @@ public final class ProcessorCatalog {
             if (p.capability() != null && !absent) m.put("capability", p.capability());
             if (pack != null) m.put("requires", pack.module());
             if (absent) m.put("note", "not installed in this build - requires the optional module " + pack.module()
-                    + " (Telecom industry pack; Standard and above)");
+                    + " (Telecom industry pack; Advanced)");
             else if (p.note() != null) m.put("note", p.note());
+            // DATA-TIERS-1 P4 / P6: the /bootstrap features key this processor needs (a screen gate; the palette locks it when false).
+            String feature = featureOf(p);
+            if (feature != null) m.put("featureFlag", com.gamma.etl.EditionFeatures.flagOf(feature));
             procs.add(m);
         }
         out.put("processors", procs);

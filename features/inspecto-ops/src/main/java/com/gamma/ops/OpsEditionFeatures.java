@@ -20,13 +20,16 @@ import java.util.Set;
  * profile pages ({@link EditionFeatures#ENTITY_PAGES}, D-LAE4, operator 2026-10-25): a route feature on {@code EntityPageRoutes}.
  *
  * <p>And Pipelines that run on their own ({@link EditionFeatures#PIPELINE_AUTOMATION}, DT-5, operator 2026-11-05): an import's
- * <i>Keep this up to date</i> and a Dataset's retention policy.
+ * <i>Keep this up to date</i> and a Dataset's retention policy. And the other {@code DATA-TIERS-1} screen gates (P2, 2026-11-17):
+ * transformation Steps ({@link EditionFeatures#PIPELINE_TRANSFORM}), outbound delivery ({@link EditionFeatures#PIPELINE_EGRESS})
+ * and remote systems ({@link EditionFeatures#REMOTE_SYSTEMS}) - locked with a reason in Basic's screens, never refused on load.
  */
 public final class OpsEditionFeatures implements EditionFeatureProvider {
 
     @Override
     public Set<String> features() {
         return Set.of(EditionFeatures.ALERT_DISPATCH, EditionFeatures.INVESTIGATIONS,
-                EditionFeatures.GEO_MAP, EditionFeatures.LA_WIDGETS, EditionFeatures.ENTITY_PAGES, EditionFeatures.PIPELINE_AUTOMATION);
+                EditionFeatures.GEO_MAP, EditionFeatures.LA_WIDGETS, EditionFeatures.ENTITY_PAGES, EditionFeatures.PIPELINE_AUTOMATION,
+                EditionFeatures.PIPELINE_TRANSFORM, EditionFeatures.PIPELINE_EGRESS, EditionFeatures.REMOTE_SYSTEMS);
     }
 }

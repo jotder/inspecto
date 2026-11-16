@@ -14,7 +14,7 @@ and all nine use cases are must-have. This spec states what a first-time console
 today, and how the product carries them the whole way. It is the requirement the plans build against; it is not a
 plan itself.
 
-**Owners.** The edition gates are [`data-tier-editions-plan.md`](../../../../superpower/data-tier-editions-plan.md)
+**Owners.** The edition gates are [`data-tier-editions-plan.md`](../../../../archived-documents/plans-archive/data-tier-editions-plan.md)
 (`DATA-TIERS-1`, DT-13 and DT-14); the onboarding experience is
 [`first-run-onboarding-plan.md`](../../../../archived-documents/plans-archive/first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`, the
 console) on the shared import route of [`la-onboarding-plan.md`](../../../../archived-documents/plans-archive/la-onboarding-plan.md)

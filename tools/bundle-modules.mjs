@@ -142,7 +142,7 @@ export function editionProfile(edition) {
 
 /**
  * The first-party modules staged for `edition`, in classpath order.
- * Basic 7, Standard 27, Advanced 30, Preview 30 — first-party only; add PG_SIDECAR for the jar count.
+ * Basic 7, Standard 26, Advanced 30, Preview 30 — first-party only; add PG_SIDECAR for the jar count.
  * ⚠ Those numbers are ASSERTED by tools/check-sbom-modules.mjs against this table — it parses this very line.
  */
 export function bundleModules(edition) {

@@ -51,6 +51,7 @@
     "status" : "delivered",
     "nodeType" : "acquisition",
     "note" : "inspecto-connectors (sftp, ftps; key auth, bastion tunnel, host-key pinning)",
+    "featureFlag" : "remoteSystems",
     "addable" : true
   }, {
     "id" : "acquisition.db.jdbc",
@@ -61,6 +62,7 @@
     "status" : "delivered",
     "nodeType" : "acquisition",
     "note" : "the db-export connector (`connector: db`, watermark column)",
+    "featureFlag" : "remoteSystems",
     "addable" : true
   }, {
     "id" : "acquisition.dataset",
@@ -91,6 +93,7 @@
     "status" : "partial",
     "nodeType" : "acquisition",
     "note" : "Connection kind exists (s3 connector, SDK-free SigV4; covers MinIO / GCS-interop); no proven end-to-end acquisition-node run",
+    "featureFlag" : "remoteSystems",
     "addable" : true
   }, {
     "id" : "acquisition.file.azure",
@@ -101,6 +104,7 @@
     "status" : "partial",
     "nodeType" : "acquisition",
     "note" : "Connection kind exists (azure blob connector); ADLS Gen2 semantics not proven",
+    "featureFlag" : "remoteSystems",
     "addable" : true
   }, {
     "id" : "acquisition.file.gcs",
@@ -111,6 +115,7 @@
     "status" : "partial",
     "nodeType" : "acquisition",
     "note" : "Connection kind exists (gcs connector, native JSON API + service-account OAuth2); no proven end-to-end acquisition-node run",
+    "featureFlag" : "remoteSystems",
     "addable" : true
   }, {
     "id" : "acquisition.stream.kafka",
@@ -121,6 +126,7 @@
     "status" : "partial",
     "nodeType" : "acquisition",
     "note" : "**Premium connector, NOT in Basic (MODULE-REORG-1 P7, 2026-10-07): its own module `inspecto-connectors-kafka` (kafka-clients 3.9.x), staged from Standard up — a deliberate behaviour change; Basic's `inspecto-connectors.jar` registers seven factories.** Per-cycle Collector drain ships: frontier on the ledger watermark, re-keyed on land and durable across a restart, one uncommitted slice per partition, lag exported (STREAM-CONSUMER-1); broker consumer groups out by decision; proven against MockConsumer and a fake connector only, never a real broker",
+    "featureFlag" : "remoteSystems",
     "addable" : true
   }, {
     "id" : "acquisition.stream.pulsar",
@@ -267,7 +273,7 @@
     "status" : "delivered",
     "nodeType" : "parser.asn1",
     "requires" : "inspecto-telecom-asn1",
-    "note" : "Telecom industry pack (inspecto-telecom-asn1) over the asn-parser reactor (decoders, vendor plugins); Standard and above",
+    "note" : "Telecom industry pack (inspecto-telecom-asn1) over the asn-parser reactor (decoders, vendor plugins); Advanced (DATA-TIERS-1 DT-12)",
     "addable" : true
   }, {
     "id" : "parser.pattern.regex",
@@ -437,6 +443,7 @@
     "status" : "delivered",
     "nodeType" : "transform.similarity",
     "note" : "`transform.similarity` — a 0..1 score of two columns (Jaro-Winkler, Jaro, Levenshtein, token Jaccard; normalized first by default) on the Analytics Kernel, plus an optional candidate flag at a threshold; proposes candidates, never asserts identity (D-M1) (2026-10-17)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "quality.profiler.inline",
@@ -447,6 +454,7 @@
     "status" : "delivered",
     "nodeType" : "transform.profile",
     "note" : "per-column row/null/distinct counts and min/max, as a Step (2026-09-15)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "quality.sample.reservoir",
@@ -457,6 +465,7 @@
     "status" : "delivered",
     "nodeType" : "transform.sample",
     "note" : "`transform.sample` — a fixed size or a fraction per group, chosen by an MD5 hash of a seed and a row key on the Analytics Kernel (`Sampler`): the same rows every run and in the JVM twin; never `USING SAMPLE` / `random()` (2026-10-17)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "quality.cleanse.transcode",
@@ -485,6 +494,7 @@
     "status" : "delivered",
     "nodeType" : "transform.hash",
     "note" : "Space-keyed HMAC-SHA-256 token per value, joinable within the Space; the key never leaves the Space's secrets (2026-10-06)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "quality.compliance.redact",
@@ -504,6 +514,7 @@
     "status" : "delivered",
     "nodeType" : "transform.sql",
     "note" : "ONE Step that shapes a record: sanitize (trim/pad/replace/case), cast, rename and computed columns — one row per output field over a typed function catalog, generating the SELECT it saves. Folded 2026-09-04 from `transform.expression` + `transform.cast` + `quality.cleanse.trim`, which were three catalog labels over this one grid. `transform.map` was deleted 2026-09-05: a stored `mapping.rules[]` is read as `fields[]` (EXPR → custom, CONCAT_DT → date.concat_parts, FILENAME_DATE → date.from_filename)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "transform.filter",
@@ -522,6 +533,7 @@
     "icon" : "heroicons_outline:arrows-pointing-out",
     "status" : "delivered",
     "nodeType" : "transform.route",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "transform.summarize",
@@ -531,6 +543,7 @@
     "icon" : "heroicons_outline:calculator",
     "status" : "delivered",
     "nodeType" : "transform.summarize",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "transform.join",
@@ -541,6 +554,7 @@
     "status" : "delivered",
     "nodeType" : "transform.join",
     "note" : "at rest only — refused mid-branch (no reference resolver on the ingest lane)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "transform.lookup",
@@ -551,6 +565,7 @@
     "status" : "delivered",
     "nodeType" : "transform.lookup",
     "note" : "inline key=value map over one column (2026-09-06); a versioned reference is transform.join",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "transform.matrix.pivot",
@@ -561,6 +576,7 @@
     "status" : "delivered",
     "nodeType" : "transform.matrix.pivot",
     "note" : "rows to columns over DECLARED values only (at most 200; a dynamic pivot is refused), one Measure-grammar aggregate per value (2026-10-17)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "transform.matrix.unpivot",
@@ -571,6 +587,7 @@
     "status" : "delivered",
     "nodeType" : "transform.matrix.unpivot",
     "note" : "wide columns to (name, value) rows by list or name pattern, cast to one value type (2026-10-06)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "transform.analytics.rank",
@@ -581,6 +598,7 @@
     "status" : "delivered",
     "nodeType" : "transform.analytics.rank",
     "note" : "row_number / rank / dense_rank per group by a stated order, ties broken deterministically; keeps the top N or adds the rank (2026-10-17)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "transform.explode",
@@ -591,6 +609,7 @@
     "status" : "delivered",
     "nodeType" : "transform.explode",
     "note" : "one row per element of a LIST or JSON-array column, optional index (2026-10-06); the grandfathered `transform.split` stays the read-only ancestor",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "transform.join.merge",
@@ -708,6 +727,7 @@
     "status" : "delivered",
     "nodeType" : "transform.timeseries.resample",
     "note" : "one row per key per bucket (second..year, ISO weeks), every bucket present - count/sum fill 0, the rest empty; an explicit time zone for TIMESTAMPTZ (2026-10-17, ANALYTICS-CORE-1 M5)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "transform.timeseries.shift",
@@ -718,6 +738,7 @@
     "status" : "delivered",
     "nodeType" : "transform.timeseries.shift",
     "note" : "the value a key had N buckets earlier, matched by bucket so a gap gives empty, not the wrong period (2026-10-17, ANALYTICS-CORE-1 M5)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "transform.analytics.running",
@@ -728,6 +749,7 @@
     "status" : "delivered",
     "nodeType" : "transform.running",
     "note" : "count/sum/avg/min/max per key over a time (60m) or row (5 rows) window, as a Step (2026-10-06); state is per run — cross-batch velocity stays a SQL-over-sink Job",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "transform.timeseries.forecast",
@@ -738,6 +760,7 @@
     "status" : "delivered",
     "nodeType" : "transform.timeseries.forecast",
     "note" : "seasonal naive or Holt-Winters additive over a regular series, point forecast plus a prediction band per level (2026-10-17, ANALYTICS-CORE-1 S5)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "transform.semantic.metric",
@@ -768,6 +791,7 @@
     "status" : "delivered",
     "nodeType" : "transform.data.binning",
     "note" : "`transform.data.binning` — equal-width or quantile (equal-frequency) bins of a number column, per group, with a bin number and label; a histogram is binning then summarize (count by bin), and the profiler's histogram shares the equal-width bin (2026-10-17, ANALYTICS-CORE-1 S3)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "transform.string.smart_split",
@@ -804,6 +828,7 @@
     "status" : "delivered",
     "nodeType" : "transform.stats.outlier",
     "note" : "`transform.stats.outlier` — Tukey's fences (k, quantile mode) or a robust z (median and MAD) per group; every row kept with its fences or score and a flag (2026-10-17, ANALYTICS-CORE-1 S3)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "transform.stats.correlation",
@@ -814,6 +839,7 @@
     "status" : "delivered",
     "nodeType" : "transform.stats.correlation",
     "note" : "`transform.stats.correlation` — Pearson (default) or Spearman (`method: spearman`: Pearson of the within-group average ranks, ties share their average rank) plus the least-squares line (slope, intercept, r2) per column pair and group, as long-form rows (2026-10-17 Pearson, 2026-10-18 Spearman, ANALYTICS-CORE-1 S3)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "transform.timeseries.changepoint",
@@ -824,6 +850,7 @@
     "status" : "delivered",
     "nodeType" : "transform.timeseries.changepoint",
     "note" : "`transform.timeseries.changepoint` — over a residual series (actual minus expected) and its scale sigma: band breaches, regime changes (a run of K outside points) and drift (two-sided CUSUM), every row kept with 0/1 flags; the Business Assurance forecast template's rule (2026-11-01, ANALYTICS-STEPS-TS-1)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "transform.cohort.retention",
@@ -834,6 +861,7 @@
     "status" : "delivered",
     "nodeType" : "transform.cohort.retention",
     "note" : "`transform.cohort.retention` — acquisition cohorts by hour..year on a stated clock, exact or on-or-after retention per period as of a stated date; a period not yet observable is absent, never 0 (2026-11-01, ANALYTICS-STEPS-TS-1)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "transform.cohort.funnel",
@@ -844,6 +872,7 @@
     "status" : "delivered",
     "nodeType" : "transform.cohort.funnel",
     "note" : "`transform.cohort.funnel` — 2..12 ordered steps per entity, earliest-first from the first step-1 event, with an optional window; entities per step and conversion from the previous and the first step (2026-11-01, ANALYTICS-STEPS-TS-1)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "enrichment.reference",
@@ -854,6 +883,7 @@
     "status" : "delivered",
     "nodeType" : "enrichment",
     "note" : "the shipped enrichment job + versioned references",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "enrichment.geoip",
@@ -896,6 +926,7 @@
     "status" : "delivered",
     "nodeType" : "transform.entity.link",
     "note" : "`transform.entity.link` — every row gets a resolution group: blocking keys + exact match keys (normalised as text, digits or as written) + union-find on the Analytics Kernel, caps fail closed; similarity only flags look-alikes for review, never merges (D-M1) (2026-10-17)",
+    "featureFlag" : "pipelineTransform",
     "addable" : true
   }, {
     "id" : "enrichment.graph.cluster",

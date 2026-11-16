@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Link Analysis daily feed — features
 
-**Product Map Item:** [`solution-pack.la-daily-feed`](../../../../../product-map/solution-pack/la-daily-feed.toon) · **Status:** ga · **Availability:** billable, order code `INS-SP-LA-DAILY-FEED`; content pack listed in `offerings/basic.toon`.
+**Product Map Item:** [`solution-pack.la-daily-feed`](../../../../../product-map/solution-pack/la-daily-feed.toon) · **Status:** ga · **Availability:** billable, order code `INS-SP-LA-DAILY-FEED`; content pack listed in `offerings/standard.toon` (Standard and above since 2026-11-17, DATA-TIERS-1 DT-18: it polls, builds the index on a commit Signal and arms Alert Rules; `minEdition: standard`, `requiresModules: ops`).
 
 ## What it is
 

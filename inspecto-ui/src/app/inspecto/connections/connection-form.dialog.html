@@ -16,6 +16,10 @@
                 cdkFocusInitial
             />
         </div>
+        @if (typeLocked()) {
+        <!-- DATA-TIERS-1 P4 (DT-13): a remote type is shown locked with the server's reason, never a failing save. -->
+        <inspecto-locked-action [label]="'Save a ' + connTypeLabel() + ' connection'" [reason]="remoteLock() ?? ''" />
+        }
 
         <!-- Routing (SSH tunnel + proxy) — hidden behind a routing icon, popped open on click -->
         <div>
@@ -224,7 +228,7 @@
         <button type="button" mat-button (click)="backToConfig()">Back</button>
         }
         <button type="button" mat-button mat-dialog-close>Cancel</button>
-        <button type="submit" mat-flat-button color="primary" [disabled]="saving()">
+        <button type="submit" mat-flat-button color="primary" [disabled]="saving() || typeLocked()">
             {{ isEdit ? 'Save' : step() === 'save' ? 'Create' : 'Continue' }}
         </button>
     </mat-dialog-actions>

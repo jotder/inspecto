@@ -22,7 +22,7 @@ A single analyst, a team lead running a pilot, or a presales engineer who needs 
 - The standard connectors module.
 - Link Analysis explorer ([Link Analysis](../../addon/linkAnalysis/index.md) Add-on, explorer part): graph studio, paths and neighbours, pattern packs, Discover, an entity summary and a question builder without SQL, Entity Lists, identity resolution, PNG/CSV export.
 - Both industry vocabularies for Link Analysis (Telecom, Mobile Money).
-- Content packs: [Orders starter](../../solution-pack/orders-starter/brochure.md) and [Link Analysis daily feed](../../solution-pack/la-daily-feed/brochure.md).
+- Content pack: [Orders starter](../../solution-pack/orders-starter/brochure.md). (The [Link Analysis daily feed](../../solution-pack/la-daily-feed/brochure.md) runs on a schedule and is Standard and above.)
 - Audit log, recorded and readable.
 
 ## How it fits with the Editions

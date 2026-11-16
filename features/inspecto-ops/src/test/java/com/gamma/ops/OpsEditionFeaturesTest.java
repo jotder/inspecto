@@ -43,6 +43,18 @@ class OpsEditionFeaturesTest {
         assertFalse(EditionFeatures.gatesRoutes(EditionFeatures.PIPELINE_AUTOMATION), "the feed and storage routes check it themselves");
     }
 
+    /** DATA-TIERS-1 P2: Standard and up offer transformation Steps, outbound delivery and remote systems in their screens. */
+    @Test
+    void opsDeclaresTheDataTierScreenGates() {
+        EditionFeatures.overrideForTest(null);
+        for (String f : EditionFeatures.SCREEN_FLAGS.values()) {
+            assertTrue(EditionFeatures.present(f), f + " is declared where inspecto-ops ships (Standard and up)");
+            assertFalse(EditionFeatures.gatesRoutes(f), f + " is a screen gate, never a route feature");
+        }
+        for (String flag : EditionFeatures.SCREEN_FLAGS.keySet())
+            assertFalse(EditionFeatures.lockedReasons().containsKey(flag), flag + " is not withheld on Standard");
+    }
+
     @Test
     void opsDeclaresTheDashboardWidgetFlagButItIsNotARouteFeature() {
         EditionFeatures.overrideForTest(null);

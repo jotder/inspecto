@@ -588,7 +588,7 @@ The run of show (T1-T13) moved into the demo runbook, [`admin-guide-demo.md`](..
 
 ### D3. Edition placement (`la-edition-placement-changes-plan`) - D-LAE3, D-LAE4, D-LAE6 open
 
-D-LAE1 (Case history), D-LAE2 (dashboard widgets, UI flag only), D-LAE5 (Geo map, own `geoMap` feature) and D-LAE12 (no migration shim) are built (2026-10-20; as-built in `EDITIONS.md`). D-LAE7…D-LAE11, the ingestion half, belong to `DATA-TIERS-1` ([`data-tier-editions-plan.md`](data-tier-editions-plan.md)): answer them there. Pre-build checks for the three left are in the archived plan §4.3. Row: `LA-EDITION-PLACEMENT-1`.
+D-LAE1 (Case history), D-LAE2 (dashboard widgets, UI flag only), D-LAE5 (Geo map, own `geoMap` feature) and D-LAE12 (no migration shim) are built (2026-10-20; as-built in `EDITIONS.md`). D-LAE7…D-LAE11, the ingestion half, belong to `DATA-TIERS-1` ([`data-tier-editions-plan.md`](../archived-documents/plans-archive/data-tier-editions-plan.md)): answer them there. Pre-build checks for the three left are in the archived plan §4.3. Row: `LA-EDITION-PLACEMENT-1`.
 
 | Id | Question | State |
 |---|---|---|

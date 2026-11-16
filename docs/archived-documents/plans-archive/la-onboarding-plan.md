@@ -142,7 +142,7 @@ Agreed point by point with the session that owns those two plans:
 ## References
 
 - Use cases and operator answers: [`spec-first-time-user-use-cases.md`](../../okf/product/module/la-core/spec-first-time-user-use-cases.md).
-- [`data-tier-editions-plan.md`](../../superpower/data-tier-editions-plan.md) (`DATA-TIERS-1`: owns the data layer's edition rules; DT-2, DT-4, DT-8, DT-11, DT-13, DT-16 used here).
+- [`data-tier-editions-plan.md`](data-tier-editions-plan.md) (`DATA-TIERS-1`: owns the data layer's edition rules; DT-2, DT-4, DT-8, DT-11, DT-13, DT-16 used here).
 - [`first-run-onboarding-plan.md`](first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`, the console companion; OF-1, OF-2, slices C1–C4).
 - GLOSSARY: Onboard, Stream, Reference, Dataset, Entity Type, Collector, Pipeline.
 - [`docs/EDITIONS.md`](../../EDITIONS.md): Basic ships no authenticator; masking on Basic is display-only.

@@ -1,6 +1,6 @@
 # Data layer by edition — what Basic, Standard and Advanced get from ingestion, Pipelines and data quality (`DATA-TIERS-1`)
 
-**Re-planned 2026-11-05 (§5.3): P3 dropped, DT-9 narrowed to "gate in screens", P1 / P10 done, P9 superseded; P8 (docs) done 2026-11-06; P2, P4 (narrowed), P5, P6 (shrunk), P7 remain.** **Status: PLAN — every decision DT-1…DT-19 is answered (DT-1, 2, 4, 6, 8, 11…15 on 2026-10-22; DT-3, 5, 7, 9, 10, 16…19 on 2026-10-25); nothing built.** Written 2026-10-21 (DT-1…DT-10); **merged
+**SHIPPED 2026-11-17 — archived (§12 as built).** Every phase left after the 2026-11-05 re-plan is built: P2 (shrunk), P4 (narrowed), P5, P6 (palette locks), P7 and the DT-18 pack move; P1 / P8 / P10 done before, P3 dropped, P9 superseded. Current knowledge: `docs/EDITIONS.md` *The data layer by edition* and `okf/product/layer/platform/spec-editions.md` *Data layer by edition*. **Re-planned 2026-11-05 (§5.3): P3 dropped, DT-9 narrowed to "gate in screens", P1 / P10 done, P9 superseded; P8 (docs) done 2026-11-06.** Every decision DT-1…DT-19 is answered (DT-1, 2, 4, 6, 8, 11…15 on 2026-10-22; DT-3, 5, 7, 9, 10, 16…19 on 2026-10-25). Written 2026-10-21 (DT-1…DT-10); **merged
 2026-10-22** with the parallel draft `PIPELINE-EDITIONS-1` (never pushed; operator: "merge into a single plan"),
 which added the grounding in §3 and §7, the operator decisions DT-11…DT-14, and the open decisions DT-15…DT-19.
 **Operator answers of 2026-10-22** recorded in the Inspecto LA first-time user use cases (§8, A-1…A-16; confirmed
@@ -9,20 +9,20 @@ tier, so each phase is built from the decided table in §5. When a phase ships, 
 `module/acquire`, `module/engine`, `layer/platform`), update `docs/EDITIONS.md`, move open items to
 `docs/BACKLOG.md`, and archive this file when the last phase ships.
 
-**Takes over** the ingestion half of [`la-edition-placement-changes-plan.md`](../archived-documents/plans-archive/la-edition-placement-changes-plan.md)
+**Takes over** the ingestion half of [`la-edition-placement-changes-plan.md`](la-edition-placement-changes-plan.md)
 (its §6, its §4.3 checks for D-LAE7…D-LAE11, and those decisions). That plan keeps the Link Analysis moves.
 
 **Companions.**
 
-- [`okf/product/module/etl/spec-first-time-user-use-cases.md`](../okf/product/module/etl/spec-first-time-user-use-cases.md): console
+- [`okf/product/module/etl/spec-first-time-user-use-cases.md`](../../okf/product/module/etl/spec-first-time-user-use-cases.md): console
   first-time user use cases, blank slate to a queryable Dataset (an agreed spec in the ETL hub; §6 answered by the
   operator 2026-10-22).
-- [`okf/product/module/la-core/spec-first-time-user-use-cases.md`](../okf/product/module/la-core/spec-first-time-user-use-cases.md):
+- [`okf/product/module/la-core/spec-first-time-user-use-cases.md`](../../okf/product/module/la-core/spec-first-time-user-use-cases.md):
   the same journey in Inspecto LA, from a live blank-slate walkthrough (findings F-1…F-13), with the operator's
   answers A-1…A-16 (§8).
-- [`la-onboarding-plan.md`](../archived-documents/plans-archive/la-onboarding-plan.md) (`LA-ONBOARD-1`): Inspecto LA onboarding and the **shared
+- [`la-onboarding-plan.md`](la-onboarding-plan.md) (`LA-ONBOARD-1`): Inspecto LA onboarding and the **shared
   `/onboard/files` import route** this plan's phase 1 needs.
-- [`first-run-onboarding-plan.md`](../archived-documents/plans-archive/first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`): the console on that
+- [`first-run-onboarding-plan.md`](first-run-onboarding-plan.md) (`ONBOARDING-FIRST-RUN-1`): the console on that
   route (entry points, format evidence, fix catalogue, Dataset page, lookups, remote systems).
 
 ## 1. Why
@@ -112,7 +112,7 @@ protocols, masking, scale and organisational control.
 | DT-14 | **The console work the gates need is part of this plan** (console use cases §6 Q3, Q4): *Add a file* and *Run now* together as one gesture on Basic (today upload is only in the Run-to-here test dialog and *Run now* only on the Collectors pane); Activate copy that follows the edition ("next poll cycle" is wrong on Basic). The `orders-starter` load-and-run sample button is required by this decision but **built elsewhere**: `LA-ONBOARD-1` OB-12 (`loadSamples`) and `ONBOARDING-FIRST-RUN-1` slice C4. The rest of the onboarding experience is `ONBOARDING-FIRST-RUN-1` and `LA-ONBOARD-1`. |
 | DT-1 | **Basic's way in is "Add data"**: upload a file, one column-review step, then a Dataset; the empty "Explore a Dataset" card in Inspecto LA becomes this entry point (LA A-6). One server route (`/onboard/files`, `LA-ONBOARD-1` OB-2) and one screen for both apps (`LA-ONBOARD-1` phase 4; the console's entry points in `ONBOARDING-FIRST-RUN-1`). The 2026-10-21 wording also offered "import from Postgres"; DT-4 removes it. |
 | DT-2 | **A Basic import runs on a hidden one-step Collector and Pipeline** per import, created and run behind the scenes; an upgrade to Standard shows it as an ordinary, editable Pipeline. No parallel ingest path (LA A-6). |
-| DT-4 | **REVERSED 2026-11-05 by `BASIC-ONBOARD-1` (a Postgres table snapshot on Basic; see [`basic-onboard-plan.md`](../archived-documents/plans-archive/basic-onboard-plan.md) §3; built 2026-11-05).** Was: **Files only on Basic; a database is shown locked** (LA A-12: "D-PE6 wins"). **Reverses** the 2026-10-21 DT-4 (a one-off Postgres snapshot in Basic). Every remote adapter, the `db` Collector included, is Standard and up, so the gate is **module absence**: `inspecto-connectors` leaves `offerings/basic.toon`. |
+| DT-4 | **REVERSED 2026-11-05 by `BASIC-ONBOARD-1` (a Postgres table snapshot on Basic; see [`basic-onboard-plan.md`](basic-onboard-plan.md) §3; built 2026-11-05).** Was: **Files only on Basic; a database is shown locked** (LA A-12: "D-PE6 wins"). **Reverses** the 2026-10-21 DT-4 (a one-off Postgres snapshot in Basic). Every remote adapter, the `db` Collector included, is Standard and up, so the gate is **module absence**: `inspecto-connectors` leaves `offerings/basic.toon`. |
 | DT-6 | **Show a Reference's details on nodes and filter by them on Basic; joins that build new Datasets stay Standard** (LA A-5). Refines the 2026-10-21 "no joins or lookups in Basic". |
 | DT-8 | **Formats and limits for "Add data" on Basic**: CSV / TSV, Parquet, JSON / NDJSON (LA A-2), and **Excel when the bundle carries the DuckDB `excel` extension** (operator 2026-10-22: `parser.excel` is delivered, `ProcessorCatalog.java:114`; without the extension the picker says "save as CSV"). Limits through the configurable-limits catalogue: 500 MB per file, 10 million rows per import, 20 imported Datasets per Space. Corrects the 2026-10-21 "no native Excel reader today". |
 | DT-15 | **Expectations, quarantine and dedupe stay on Basic** (LA A-13: "D-PE5 wins"). **Reverses** the 2026-10-21 table (import checks only on Basic). Standard adds delivery Alerts and data trust. |
@@ -255,7 +255,25 @@ needs the step catalogue only (DT-7 is decided). Each new route clears the four 
 
 ## 11. Board
 
-P2 `DATA-TIERS-1` in `BACKLOG.md` §3.8, startable (every decision answered 2026-10-25).
+P2 `DATA-TIERS-1` in `BACKLOG.md` §3.8: **closed 2026-11-17** (MoSCoW S8, operator 2026-11-16: finish before 4.0.0).
+
+## 12. As built (2026-11-17)
+
+| Phase | Built |
+|---|---|
+| P2 (shrunk) | `EditionFeatures.PIPELINE_TRANSFORM` (`pipeline.transform`), `PIPELINE_EGRESS` (`pipeline.egress`), `REMOTE_SYSTEMS` (`collector.remote`) beside `PIPELINE_AUTOMATION`, each with a `refusal()` text and a short `lockedReason()`; declared by `OpsEditionFeatures` (Standard and up). `SCREEN_FLAGS` maps them to the `/bootstrap` keys `pipelineAutomation`, `pipelineTransform`, `pipelineEgress`, `remoteSystems` (booleans in `features`), and `lockedReasons()` adds a `featureReasons` line under the same key for each withheld one. Console: `edition-locks.ts` + `LensService.screenLocks()` (locked only when the server reports false). |
+| P4 (narrowed) | Module `telecom-asn1` and add-on `telecomIndustryPack` moved from `offerings/standard.toon` to `advanced.toon` (DT-12); `package.ps1` stages the ASN.1 sidecar for Advanced / Preview only; the frozen Standard classpaths in `tools/offering-classpath.test.mjs` and the count in `tools/bundle-modules.mjs` follow. Remote kinds locked in Basic's screens (`remoteSystems`): the Collect stage's *Connection* choice (`collector-config.component`), a NEW remote Connection (`connection-form.dialog`, `REMOTE_CONNECTORS`: `db`, `ftp`, `ftps`, `sftp`, object stores, Kafka), and the remote acquisition processors in the palette. `inspecto-connectors` stays in Basic: no refusal on load (§5.3). |
+| P5 | `GET /jobs/types` puts `featureFlag: pipelineEgress` on `objectstore.export` and `publish.postgres` (`EditionFeatures.EGRESS_JOB_TYPES`, `JobService.jobTypeView`); the Job form locks a NEW Job of such a type with the reason; editing a saved one stays open and it runs. |
+| P6 (palette locks) | `ProcessorCatalog.featureOf` → `featureFlag` on each processor of `GET /pipelines/processor-catalog` (every mapped `transform.*` Step except `transform.filter`, `transform.dedup`, `transform.mask`, plus `enrichment` → `pipelineTransform`; the remote acquisitions → `remoteSystems`); contract `processor-catalog.contract.json` regenerated; the palette (`locks` input) shows them locked with the reason and does not count them as addable. No refuse walk, no schema `expression:` check (DT-7). |
+| P7 | `ControlApiDataTierUpgradeTest`: Basic boot imports a file through Add data; a Standard boot over the same write root and data reads the import as an ordinary Pipeline, edits it with `POST /config/patch` (the edit lands in `imports/<id>_pipeline.toon`), and its Dataset and rows are there. |
+| DT-18 | `la-daily-feed` moved from `offerings/basic.toon` to `standard.toon`; template `minEdition: standard`, `requiresModules[1]: ops`. |
+
+**Seams and gotchas.** The screen gates are UI flags only: no route, save or load path refuses on them (only
+`pipeline.automation` is also checked by the feed and storage routes, as before). A test stand-in for `inspecto-ops`
+(`InvestigationsEditionForTests` in geo-link and policy) must declare the four, or a Standard `/bootstrap` there reports
+them withheld. The catalog and Job type markers are static (`featureFlag` names the `/bootstrap` key), so the contract
+JSON does not depend on the edition the test runs as. **Deliberately not built:** refusals on load (DT-9 narrowed),
+Kubernetes and the air-gapped bundle proofs (`CONTAINER-AIRGAP-PROOFS-1`, on demand), the Jobs gate (DT-16 dropped).
 
 ## References
 

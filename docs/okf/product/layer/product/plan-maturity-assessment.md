@@ -15,7 +15,8 @@ timestamp: 2026-10-20T00:00:00Z
 > ⚠ **Since this photograph:** `OFFERING-DECLARATION-DRIFT-1`, cited below as open, was **closed 2026-10-20**
 > (`78fc6e583`: `business-assurance` moved to Standard with `minEdition: standard`, the LA showcase templates
 > listed in `offerings/preview.toon`, `la-daily-feed` kept in Basic by decision), and since 2026-11-08 the LA
-> showcases have Basic tiers listed in `offerings/basic.toon`. Findings below that cite its D1 or D2 describe the
+> showcases have Basic tiers listed in `offerings/basic.toon`; since 2026-11-17 `la-daily-feed` is a Standard content pack
+> (`DATA-TIERS-1` DT-18) and the ASN.1 decoder (`telecom-asn1`, `telecomIndustryPack`) is Advanced only (DT-12). Findings below that cite its D1 or D2 describe the
 > state before those changes.
 
 ## 1. Verdict
@@ -979,7 +980,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **What it is (customer view):** Adds the ASN.1 BER decoder step (`parser.asn1.ber`) so switch, IMS and charging CDRs can be ingested directly into Pipelines from their native binary format.
 - **Scores:** F 2 · B 4 · Q 3 · E 3 · R 2 → **Level L3 (Pilot-ready)**
 - **Evidence:**
-  - The add-on holds one module, `telecom-asn1` (`offerings/standard.toon`; `docs/EDITIONS.md` SP-PRS-06 ✅). The telco RA and fraud controls (`telco-ra`, `telco-fraud`) are separate Standard `contentPacks` and the contract-enforced `solution-pack.industry-telecom` (`product-map/solution-pack/industry-telecom.toon`), not part of this add-on.
+  - The add-on holds one module, `telecom-asn1` (`offerings/advanced.toon` since 2026-11-17, DATA-TIERS-1 DT-12; `docs/EDITIONS.md` SP-PRS-06 Advanced only). The telco RA and fraud controls (`telco-ra`, `telco-fraud`) are separate Standard `contentPacks` and the contract-enforced `solution-pack.industry-telecom` (`product-map/solution-pack/industry-telecom.toon`), not part of this add-on.
   - `plan.md` Built: grammar-less structural preview, grammar-bound preview, stored path-jailed `.asn` grammars, derived columns and child rows, and `missingModule` reporting through `provides.stepKinds`. No open rows.
   - 10 unit test classes (`Asn1ParserPluginTckTest`, `Asn1RecordIngester*Test`, `DemoAsn1CorpusIngestTest`) and 2 feature-db rows. The decoder library `asn-decoders` has 1 test class.
   - `providers/asn-parser/docs/MIGRATION_STATUS.md` covers the library's 30 grammars from legacy operator feeds (Huawei/Ericsson MSC, IMS, GGSN, OCC; TAP and NRTRDE roaming). Only 9 corpus cases are proven (16/16 files at structural parity, 10/16 at content parity 1.0). Six tag-map formats need an `asn migrate` converter, which is not built.

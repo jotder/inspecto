@@ -200,6 +200,10 @@ final class BootstrapRoutes implements RouteModule {
         // D-LAE2: Link Analysis widgets on dashboards - a UI flag ONLY (no route is gated by it: the projection routes the widgets call
         // stay open on Basic). False on Basic and wherever Link Analysis is absent or switched off in this Space.
         f.put("laWidgets", on.contains("geoLink") && com.gamma.etl.EditionFeatures.present(com.gamma.etl.EditionFeatures.LA_WIDGETS));
+        // DATA-TIERS-1 P2: the data-layer screen gates (pipelineAutomation, pipelineTransform, pipelineEgress, remoteSystems) - UI
+        // flags ONLY, like laWidgets: no route or configuration is refused by them (§5.3, Basic runs any configuration); a false
+        // one has its featureReasons line under the same key, and Basic's screens show the control locked with it (DT-13).
+        com.gamma.etl.EditionFeatures.SCREEN_FLAGS.forEach((flag, feature) -> f.put(flag, com.gamma.etl.EditionFeatures.present(feature)));
         // SEP-08: true only when the optional inspecto-entity-list module registered its routes — derived from
         // what registered, never an edition guess, and never from the stub (hasRoute excludes stubs). Probed on
         // POST /entity-lists, a LITERAL write, not on the GET /entity-lists/([^/]+) catch-all shape.

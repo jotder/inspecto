@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-451 test class(es): 183 unit, 268 real-HTTP control-plane, 0 IT.
+453 test class(es): 183 unit, 270 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -126,6 +126,8 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiDatasetMaterializeTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDatasetMaterializeTest.java` | Real-HTTP tests for {@code POST /datasets/{id}/materialize} (STUDIO-HALVES-1) — one per fail-closed |
 | `ControlApiDatasetRowsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDatasetRowsTest.java` | Real-HTTP + real-DuckDB tests for {@code GET /datasets/{id}/rows} — one page of a Dataset's RELATION |
 | `ControlApiDataSourceExportTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDataSourceExportTest.java` | The Stage-6 per-space data-source export endpoints over real HTTP: list data sources, download one <!-- vocab-allow: quoted Javadoc --> |
+| `ControlApiDataTierScreenGatesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDataTierScreenGatesTest.java` | The {@code DATA-TIERS-1} screen gates over real HTTP (P2, P4, P5, P6): what a Basic and a Standard server tell the screens. |
+| `ControlApiDataTierUpgradeTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDataTierUpgradeTest.java` | {@code DATA-TIERS-1} P7, the upgrade path (DT-2): a person adds a file on <b>Basic</b> - the import runs on its hidden |
 | `ControlApiDbBrowserMaskingTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDbBrowserMaskingTest.java` | BI-QUERY-MASKING-1, the {@code /db} routes: a business-data STORE (not a Dataset) carries the classification of the <!-- vocab-allow: quoted Javadoc --> |
 | `ControlApiDbBrowserSwapTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDbBrowserSwapTest.java` | SNAPSHOT-SWAP-UNLOCKED-READERS-1, the store browser: {@code GET /db/table} pins the store's files when it renders the |
 | `ControlApiDbBrowserTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiDbBrowserTest.java` | Real-HTTP + real-DuckDB tests for the raw table browser (design {@code docs/superpower/db-browser-design.md}): |

@@ -21,6 +21,11 @@
             (submitted)="save()"
         ></inspecto-schema-form>
 
+        @if (typeLock(); as why) {
+        <!-- DATA-TIERS-1 P5 (DT-13): an outbound-delivery type is shown locked with the server's reason, never a failing save. -->
+        <inspecto-locked-action class="mt-3" [label]="'Create a ' + (selectedType()?.title || selectedTypeId()) + ' Job'" [reason]="why" />
+        }
+
         <!-- "What this does" (§8.3): the selected type describes itself — what it emits, what it records,
              and where it came from. Provenance answers "what is this job" for a packaged or plugin type. -->
         @if (selectedType(); as t) {
@@ -175,7 +180,7 @@
     <button mat-button type="button" (click)="backToConfig()">Back</button>
     }
     <button mat-button type="button" (click)="requestClose()">Cancel</button>
-    <button mat-flat-button color="primary" (click)="save()" [disabled]="saving()">
+    <button mat-flat-button color="primary" (click)="save()" [disabled]="saving() || !!typeLock()">
         {{ isEdit ? 'Save changes' : step() === 'save' ? 'Create job' : 'Continue' }}
     </button>
 </mat-dialog-actions>

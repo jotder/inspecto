@@ -10,15 +10,16 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ConnectionProfile, ConnectionsService, ConnectionTestResult } from 'app/inspecto/api';
+import { apiErrorMessage, ConnectionProfile, ConnectionsService, ConnectionTestResult, LensService } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import {
     InspectoOptionPickerComponent,
     PickerOption,
     pickerOptions,
 } from 'app/inspecto/components/option-picker.component';
+import { LockedActionComponent } from 'app/inspecto/components/locked-action.component';
 import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
-import { CONNECTION_TYPES, ConnAttr, attrsFor, connTypeDef, typeForConnector } from './connection-types';
+import { CONNECTION_TYPES, ConnAttr, REMOTE_CONNECTORS, attrsFor, connTypeDef, typeForConnector } from './connection-types';
 
 /** Dialog data: `profile` set ⇒ edit mode (name/id locked); absent ⇒ create. */
 interface ConnectionFormData {
@@ -64,6 +65,7 @@ export interface ConnectionFormResult {
         MatTooltipModule,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
+        LockedActionComponent,
         PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -74,7 +76,14 @@ export class ConnectionFormDialog {
     private api = inject(ConnectionsService);
     private toastr = inject(ToastrService);
     private ref = inject(MatDialogRef<ConnectionFormDialog, ConnectionFormResult>);
+    private lens = inject(LensService);
     readonly data = inject<ConnectionFormData>(MAT_DIALOG_DATA);
+
+    /**
+     * Why a NEW Connection to a remote system is locked in this edition (`DATA-TIERS-1` P4, `/bootstrap` `remoteSystems`), or
+     * null. Editing a saved one stays open: it is already in use, and the server runs it (plan §5.3).
+     */
+    readonly remoteLock = computed(() => (this.isEdit ? null : (this.lens.screenLocks()['remoteSystems'] ?? null)));
 
     /** The connection type picker: the description is the option's hint (the dropdown printed "label — description"). */
     readonly typeOptions: PickerOption[] = CONNECTION_TYPES.map((t) => ({
@@ -88,7 +97,11 @@ export class ConnectionFormDialog {
     readonly secretHint = 'a ${ENV:VAR} reference, not a raw secret';
 
     /** Selected connection type → drives the per-type attribute sheet + the saved `connector`. */
-    readonly connType = signal<string>(this.data.profile ? typeForConnector(this.data.profile.connector) : 'sftp');
+    readonly connType = signal<string>(
+        this.data.profile ? typeForConnector(this.data.profile.connector) : this.remoteLock() ? 'local' : 'sftp',
+    );
+    /** The chosen type reaches a remote system and the edition withholds that: shown locked, never saved. */
+    readonly typeLocked = computed(() => !!this.remoteLock() && REMOTE_CONNECTORS.has(connTypeDef(this.connType()).connector));
     readonly attrs = computed(() => attrsFor(this.connType()));
     /** Each select attribute's choices for its picker, by attribute key. */
     readonly attrOptions = computed(() =>
@@ -329,6 +342,7 @@ export class ConnectionFormDialog {
     }
 
     submit(): void {
+        if (this.typeLocked()) return;
         const af = this.attrsForm();
         if (this.form.invalid || af.invalid) {
             this.form.markAllAsTouched();

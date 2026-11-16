@@ -79,7 +79,7 @@ import {
                         </button>
                         @if (isOpen(g.family.code)) {
                             @for (p of g.processors; track p.id) {
-                                @if (p.addable && p.nodeType) {
+                                @if (p.addable && p.nodeType && !lockOf(p)) {
                                     <button
                                         type="button"
                                         class="flex w-full cursor-grab items-center gap-2.5 rounded py-2 pl-8 pr-2 text-left text-base hover:bg-black/5 dark:hover:bg-white/10 disabled:cursor-default disabled:opacity-40"
@@ -107,9 +107,10 @@ import {
                                         class="flex w-full cursor-not-allowed items-center gap-2.5 rounded py-2 pl-8 pr-2 text-left text-base opacity-50"
                                         role="button"
                                         aria-disabled="true"
-                                        [matTooltip]="inactiveReason(p)"
-                                        [attr.aria-label]="p.label + ' — ' + inactiveReason(p)"
+                                        [matTooltip]="lockOf(p) ?? inactiveReason(p)"
+                                        [attr.aria-label]="p.label + ' — ' + (lockOf(p) ?? inactiveReason(p))"
                                         [attr.data-processor]="p.id"
+                                        [attr.data-locked]="lockOf(p) ? 'edition' : null"
                                     >
                                         <mat-icon
                                             class="icon-size-6 shrink-0"
@@ -117,7 +118,12 @@ import {
                                             [style.color]="familyColor(g.family.code)"
                                         ></mat-icon>
                                         <span class="truncate">{{ p.label }}</span>
-                                        @if (p.status !== 'planned') {
+                                        @if (lockOf(p)) {
+                                            <mat-icon
+                                                class="icon-size-4 ml-auto shrink-0"
+                                                svgIcon="heroicons_outline:lock-closed"
+                                            ></mat-icon>
+                                        } @else if (p.status !== 'planned') {
                                             <inspecto-chip class="ml-auto shrink-0" variant="soft" tone="neutral">
                                                 via {{ p.capability || p.nodeType }}
                                             </inspecto-chip>
@@ -204,6 +210,12 @@ export class PipelinePaletteComponent {
      * invisible until someone counted the enabled controls.
      */
     readonly readOnly = input<boolean>(false);
+    /**
+     * The data-layer screen gates this edition withholds, `{flag: reason}` (`DATA-TIERS-1` P4 / P6, `LensService.screenLocks`):
+     * a processor whose `featureFlag` is here shows locked with that reason instead of addable (DT-13). Screen only - a
+     * Pipeline that already uses such a Step still loads, runs and shows it on the canvas.
+     */
+    readonly locks = input<Readonly<Record<string, string>>>({});
     /** A palette entry was clicked — add it at the canvas centre (the no-mouse path). */
     @Output() pick = new EventEmitter<string>();
 
@@ -248,7 +260,12 @@ export class PipelinePaletteComponent {
     readonly typeHeroIcon = typeHeroIcon;
 
     addableCount(g: ProcessorGroup): number {
-        return g.processors.filter((p) => p.addable).length;
+        return g.processors.filter((p) => p.addable && !this.lockOf(p)).length;
+    }
+
+    /** Why this edition withholds the processor (its `featureFlag` is locked), or null. */
+    lockOf(p: { featureFlag?: string }): string | null {
+        return p.featureFlag ? (this.locks()[p.featureFlag] ?? null) : null;
     }
 
     /** Why an inactive entry cannot be added — the tooltip and the accessible name carry it. */

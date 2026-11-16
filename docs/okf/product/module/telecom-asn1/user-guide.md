@@ -9,7 +9,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Telecom ASN.1 decoder — user guide
 
-Available in Standard and higher Editions. If the **ASN.1 — BER/DER encoded records** parser is not offered,
+Available in the Advanced Edition. If the **ASN.1 — BER/DER encoded records** parser is not offered,
 the module is not installed (see [admin-guide](admin-guide.md)).
 
 ## 1. Look at an unknown file first

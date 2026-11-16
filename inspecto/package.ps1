@@ -496,12 +496,15 @@ if ($Edition -ne 'Basic') {
         throw "$Edition edition requested but no SHADED JAR found matching providers\inspecto-connectors-kafka\target\inspecto-connectors-kafka-*-sidecar.jar. The thin jar carries no kafka-clients classes."
     }
     # MODULE-REORG-1 P7: the ASN.1 BER decoder is the Telecom industry pack (inspecto-telecom-asn1). SHADED
-    # ('-sidecar'): the thin jar carries no asn-facade/asn-core classes. Standard and above ONLY - Basic's
-    # inspecto.jar no longer registers an asn1 parser, and the Step Processor catalog reports it not installed.
-    $asn1JarSrc = Get-ChildItem -Path (Join-Path $sandboxRoot 'providers\inspecto-telecom-asn1\target') -Filter 'inspecto-telecom-asn1-*-sidecar.jar' -ErrorAction SilentlyContinue |
-                      Select-Object -First 1 -ExpandProperty FullName
-    if (-not $asn1JarSrc -or -not (Test-Path $asn1JarSrc)) {
-        throw "$Edition edition requested but no SHADED JAR found matching providers\inspecto-telecom-asn1\target\inspecto-telecom-asn1-*-sidecar.jar. The thin jar carries no asn-facade classes."
+    # ('-sidecar'): the thin jar carries no asn-facade/asn-core classes. Advanced and Preview ONLY (DATA-TIERS-1 DT-12,
+    # 2026-11-17: it left Standard) - Basic's and Standard's inspecto.jar register no asn1 parser, and the Step Processor
+    # catalog reports it not installed there.
+    if ($Edition -in @('Advanced', 'Preview')) {
+        $asn1JarSrc = Get-ChildItem -Path (Join-Path $sandboxRoot 'providers\inspecto-telecom-asn1\target') -Filter 'inspecto-telecom-asn1-*-sidecar.jar' -ErrorAction SilentlyContinue |
+                          Select-Object -First 1 -ExpandProperty FullName
+        if (-not $asn1JarSrc -or -not (Test-Path $asn1JarSrc)) {
+            throw "$Edition edition requested but no SHADED JAR found matching providers\inspecto-telecom-asn1\target\inspecto-telecom-asn1-*-sidecar.jar. The thin jar carries no asn-facade classes."
+        }
     }
     # The channels sidecar (EDG-01 cell 1). SHADED for the same reason the security one is: the thin jar
     # carries no javax.mail, and NotificationService discovering SmtpEmailChannel without it kills boot
@@ -854,7 +857,7 @@ if ($kafkaJarSrc) {
 }
 if ($asn1JarSrc) {
     Copy-Item $asn1JarSrc "$libDir\inspecto-telecom-asn1.jar"
-    Write-Host "Bundled Standard-edition Telecom ASN.1 decoder -> inspecto-telecom-asn1.jar" -ForegroundColor Green
+    Write-Host "Bundled Advanced-edition Telecom ASN.1 decoder -> inspecto-telecom-asn1.jar" -ForegroundColor Green
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $asn1Zip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-telecom-asn1.jar")
     try {

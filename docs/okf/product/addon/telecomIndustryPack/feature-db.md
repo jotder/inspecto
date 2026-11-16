@@ -17,5 +17,5 @@ tags: [feature-db, addon]
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
-| ASN.1 BER telecom CDR decoder | processor | telecom-asn1 | standard;advanced;preview | telecomIndustryPack | delivered | `parser.asn1.ber` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
-| parser.asn1.ber | step kind | telecom-asn1 | standard;advanced;preview | telecomIndustryPack | ga | `parser.asn1.ber` | `providers/inspecto-telecom-asn1/src/main/resources/META-INF/inspecto/module.toon` |
+| ASN.1 BER telecom CDR decoder | processor | telecom-asn1 | advanced;preview | telecomIndustryPack | delivered | `parser.asn1.ber` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
+| parser.asn1.ber | step kind | telecom-asn1 | advanced;preview | telecomIndustryPack | ga | `parser.asn1.ber` | `providers/inspecto-telecom-asn1/src/main/resources/META-INF/inspecto/module.toon` |

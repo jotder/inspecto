@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Telecom industry pack — features
 
-**Product Map Item:** [`addon.telecomIndustryPack`](../../../../../product-map/addon/telecomIndustryPack.toon) · **Status:** ga · **Availability:** Billable add-on `INS-AO-TELECOM-INDUSTRY-PACK`, offered from Standard and every higher Edition (`offerings/standard.toon`); it stages [telecom-asn1](../../module/telecom-asn1/index.md).
+**Product Map Item:** [`addon.telecomIndustryPack`](../../../../../product-map/addon/telecomIndustryPack.toon) · **Status:** ga · **Availability:** Billable add-on `INS-AO-TELECOM-INDUSTRY-PACK`, offered in Advanced (`offerings/advanced.toon`; Standard and up until 2026-11-17, DATA-TIERS-1 DT-12); it stages [telecom-asn1](../../module/telecom-asn1/index.md).
 
 ## What it is
 

@@ -52,7 +52,7 @@ Pipeline (frontend: asn1 / parsing.plugin)
 ## Editions
 
 The library carries no edition gate of its own; it reaches a bundle only through its consumer
-`inspecto-telecom-asn1`, which is staged from Standard up (`tools/bundle-modules.mjs`, `docs/EDITIONS.md`).
+`inspecto-telecom-asn1`, which is staged in Advanced and Preview only since 2026-11-17 (DATA-TIERS-1 DT-12; `tools/bundle-modules.mjs`, `docs/EDITIONS.md`).
 
 ## References
 

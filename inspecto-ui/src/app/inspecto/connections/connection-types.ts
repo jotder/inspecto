@@ -218,3 +218,9 @@ export function typeForConnector(connector: string): string {
 export function attrsFor(type: string): ConnAttr[] {
     return connTypeDef(type).attrs;
 }
+
+/**
+ * The connectors that reach a remote system (`DATA-TIERS-1` P4): Standard and above, locked in Basic's screens with the
+ * `remoteSystems` reason. `local` (a folder on this machine) and `https` (a delivery target, not a Collector) stay open.
+ */
+export const REMOTE_CONNECTORS: ReadonlySet<string> = new Set(['db', 'ftp', 'ftps', 'sftp', 's3', 'azure', 'gcs', 'kafka']);

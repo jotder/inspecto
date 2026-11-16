@@ -65,8 +65,13 @@ export type CollectorMode = 'local' | 'connection' | 'dataset';
                     </mat-button-toggle>
                     <mat-button-toggle
                         value="connection"
-                        matTooltip="Collect through a saved Connection (SFTP, Azure Blob, Kafka, Database)"
+                        [matTooltip]="remoteLock() ?? 'Collect through a saved Connection (SFTP, Azure Blob, Kafka, Database)'"
+                        [disabled]="connectionLocked()"
+                        [attr.aria-describedby]="connectionLocked() ? 'collector-remote-lock' : null"
                     >
+                        @if (connectionLocked()) {
+                            <mat-icon class="icon-size-4 mr-1" svgIcon="heroicons_outline:lock-closed"></mat-icon>
+                        }
                         Connection
                     </mat-button-toggle>
                     <mat-button-toggle
@@ -76,6 +81,12 @@ export type CollectorMode = 'local' | 'connection' | 'dataset';
                         Dataset
                     </mat-button-toggle>
                 </mat-button-toggle-group>
+                @if (connectionLocked()) {
+                    <!-- DATA-TIERS-1 P4 (DT-13): locked with the server's reason, never hidden. -->
+                    <p id="collector-remote-lock" class="text-secondary m-0 mt-1 text-xs" data-testid="remote-lock">
+                        {{ remoteLock() }}
+                    </p>
+                }
             </div>
 
             <!-- flat: the same property-row list as every other definition pane (Parse · Transform ·
@@ -158,6 +169,14 @@ export class CollectorConfigComponent {
     };
 
     @Input() readOnly = false;
+
+    /**
+     * Why collecting from a remote system is locked in this edition (`DATA-TIERS-1` P4, `/bootstrap` `remoteSystems`), or
+     * null. Basic collects files only; a node already collecting through a Connection keeps its mode (it still runs, §5.3).
+     */
+    readonly remoteLock = computed(() => this.lens.screenLocks()['remoteSystems'] ?? null);
+    /** The Connection choice is locked: the edition withholds it and this node does not already use it. */
+    readonly connectionLocked = computed(() => !!this.remoteLock() && this.mode() !== 'connection');
 
     /** The collector table to render — the WHOLE shared one, `connection` included (filtered in local mode). */
     @Input({ required: true }) set specs(specs: AttributeSpec[]) {
@@ -260,7 +279,7 @@ export class CollectorConfigComponent {
     }
 
     setMode(m: CollectorMode): void {
-        if (this.readOnly || m === this.mode()) return;
+        if (this.readOnly || m === this.mode() || (m === 'connection' && this.connectionLocked())) return;
         this.seed.update((s) => ({ ...s, ...(this.schemaForm?.value() ?? {}) }));
         this.mode.set(m);
         this.modeTouched.set(true);

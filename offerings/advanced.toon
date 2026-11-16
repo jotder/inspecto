@@ -7,7 +7,7 @@ posture:
   objectsBackend: postgres
   postgresSidecar: bundled
 includes[1]: standard
-modules[3]: policy,la-store-pg,intelligence
+modules[4]: telecom-asn1,policy,la-store-pg,intelligence
 addons:
   linkAnalysis:
     status: built
@@ -15,3 +15,6 @@ addons:
   aiAssist:
     status: built
     modules[1]: intelligence
+  telecomIndustryPack:
+    status: built
+    modules[1]: telecom-asn1

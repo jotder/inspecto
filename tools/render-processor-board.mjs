@@ -25,12 +25,13 @@ const NOT_FOR_PERSONAL = new Set([
     'enrichment.graph.cluster', 'sink.archive',
     // G9 (455f9822b, operator 2026-09-24): gated to Standard+ through EditionFeatureProvider.
     'sink.ducklake',
-    // MODULE-REORG-1 P7 (2026-10-07): the ASN.1 decoder is the Telecom industry pack (inspecto-telecom-asn1), staged from Standard up.
+    // MODULE-REORG-1 P7 (2026-10-07): the ASN.1 decoder is the Telecom industry pack (inspecto-telecom-asn1), staged in Advanced and Preview (DATA-TIERS-1 DT-12, 2026-11-17).
     'parser.asn1.ber',
     // MODULE-REORG-1 P7 (2026-10-07): the Kafka connector is inspecto-connectors-kafka, staged from Standard up.
     'acquisition.stream.kafka',
 ]);
-const ENTERPRISE_ONLY = new Set(['quality.pii.mask', 'quality.compliance.redact']);
+// DATA-TIERS-1 DT-12 (2026-11-17): the ASN.1 decoder (Telecom industry pack) is Advanced only.
+const ENTERPRISE_ONLY = new Set(['quality.pii.mask', 'quality.compliance.redact', 'parser.asn1.ber']);
 
 // Rows whose BASIC cell is PARTIAL even though the processor is delivered platform-wide: the capability
 // still runs on Basic, but a named part of it left with an optional module.

@@ -140,7 +140,7 @@ Moved to [Pipelines and Steps — API](api-pipelines-steps.md).
 ## Parsing and ingest
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.
-> Offering: all tiers; the ASN.1 frontend (module `inspecto-telecom-asn1`) is Standard and above.
+> Offering: all tiers; the ASN.1 frontend (module `inspecto-telecom-asn1`) is Advanced only (DATA-TIERS-1 DT-12, 2026-11-17).
 > Checked against the code on 2026-10-17.
 
 ### 1. What it is

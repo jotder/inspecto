@@ -125,7 +125,7 @@ some modules are in the default reactor so that their tests always run, but ship
 | `inspecto-connectors` | `connectors` | implementation | provider | boot | default | Basic |
 | `inspecto-agent-hosted` | `agent-hosted` | implementation | provider | boot | default | no Offering lists it |
 | `inspecto-demo-auth` | `demo-auth` | implementation | provider | boot | default | no Offering; staged only by `package.ps1 -Distribution demo` |
-| `inspecto-telecom-asn1` | `telecom-asn1` | implementation | provider | boot | default | Standard |
+| `inspecto-telecom-asn1` | `telecom-asn1` | implementation | provider | boot | default | Advanced |
 | `inspecto-oidc` | `oidc` | implementation | provider | boot | standard+ | Standard |
 | `inspecto-secrets` | `secrets` | implementation | provider | boot | standard+ | Standard |
 | `inspecto-geo-country` | `geo-country` | implementation | provider | boot | standard+ | Standard |

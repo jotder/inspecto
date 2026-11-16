@@ -533,6 +533,7 @@
                     <app-pipeline-palette
                         [groups]="paletteGroups()"
                         [processors]="paletteProcessors()"
+                        [locks]="lens.screenLocks()"
                         [readOnly]="!canAuthor()"
                         (pick)="addFromPalette($event)"
                     ></app-pipeline-palette>

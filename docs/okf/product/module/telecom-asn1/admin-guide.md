@@ -11,8 +11,9 @@ timestamp: 2026-10-19T00:00:00Z
 
 ## Install
 
-- **Edition.** Bundled from Standard up as `inspecto-telecom-asn1.jar` (`tools/bundle-modules.mjs`,
-  `from: 'standard'`; add-on `telecomIndustryPack` in `offerings/standard.toon`). Basic does not carry it.
+- **Edition.** Bundled in Advanced (and Preview) as `inspecto-telecom-asn1.jar` (`tools/bundle-modules.mjs`,
+  `from: 'advanced'`; add-on `telecomIndustryPack` in `offerings/advanced.toon`). Basic and Standard do not carry it
+  (DATA-TIERS-1 DT-12, 2026-11-17: it was Standard and up).
 - **Build.** It is a default-reactor module (root `pom.xml`), so `mvn -o clean test` compiles and tests it in
   every build; edition profiles only decide whether `package.ps1` stages it. It depends on
   `com.gamma.asn:asn-facade`, built first from the aggregated `providers/asn-parser/asn-decoders` reactor.

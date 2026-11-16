@@ -104,7 +104,8 @@ map adds the commercial layer (billability, Order Code, billing model, support, 
   declaration honest (each module has a manifest; what the config needs is declared; an Offering listing the template
   ships the module). Eight Standard Solution packs declare `ops`, and `telco-fraud`, `telco-bypass` and
   `partner-settlement` also `case-management`. `la-daily-feed`, a Basic content pack whose Alert Rules made it
-  uncreatable on Basic, gained `minEdition: basic`, as every LA template has.
+  uncreatable on Basic, gained `minEdition: basic`, as every LA template has (since 2026-11-17 it is a Standard
+  content pack, `minEdition: standard` and `requiresModules: ops`, `DATA-TIERS-1` DT-18).
 - **The combined edition SBOM is trimmed with the jars** (same row): the removed jars' own components go, and so does
   every third-party component that only removed jars carry, read from the per-jar SBOMs before they are deleted. The
   pilot customer's bundle: 90 components to 66, equal to the union of its 32 kept jars' per-jar SBOMs, and

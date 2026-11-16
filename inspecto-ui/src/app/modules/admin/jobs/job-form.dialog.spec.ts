@@ -15,6 +15,7 @@ import {
 } from 'app/inspecto/api';
 import { ToastrService } from 'ngx-toastr';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { SessionService } from 'app/inspecto/auth/session.service';
 import { JobFormData, JobFormDialog } from './job-form.dialog';
 
 const noParams = () =>
@@ -995,5 +996,56 @@ describe('JobFormDialog - the Link Analysis Job Types', () => {
             });
             expect(c.schemaForm.form.get('type')?.value).toBe('report');
         });
+    });
+});
+
+describe('JobFormDialog — DATA-TIERS-1 P5: outbound delivery withheld by the edition', () => {
+    const WHY = 'Delivering data out of Inspecto (object storage export, publish to Postgres) is in Standard and above.';
+    const EXPORT = {
+        id: 'objectstore.export',
+        title: 'Object Storage Export',
+        description: 'Pushes a directory to an object store.',
+        parameters: [],
+        emits: [],
+        artifacts: [],
+        requires: [],
+        featureFlag: 'pipelineEgress',
+    } as unknown as JobTypeDescriptor;
+
+    async function open(data: JobFormData, locked: boolean) {
+        const out = create(data, undefined, vi.fn(() => of(EXPORT)), () => of([EXPORT]));
+        const session = TestBed.inject(SessionService);
+        session.features.set({ pipelineEgress: !locked });
+        session.featureReasons.set(locked ? { pipelineEgress: WHY } : {});
+        await Promise.resolve();
+        await Promise.resolve();
+        out.fixture.detectChanges();
+        return out;
+    }
+
+    it('a new Job of an egress type shows locked with the reason and is never saved', async () => {
+        const { c, fixture, save } = await open({ seed: { type: 'objectstore.export' } }, true);
+        expect(c.selectedTypeId()).toBe('objectstore.export');
+        expect(c.typeLock()).toBe(WHY);
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="locked-reason"]')?.textContent).toContain(WHY);
+        const primary = Array.from(el.ownerDocument.querySelectorAll('mat-dialog-actions button, button')).find((b) =>
+            /Continue|Create job/.test(b.textContent ?? ''),
+        ) as HTMLButtonElement;
+        expect(primary.disabled).toBe(true);
+        c.save();
+        expect(c.step()).toBe('config');
+        expect(save).not.toHaveBeenCalled();
+    });
+
+    it('editing a saved egress Job stays open (it still runs, §5.3); the edition that has it offers new ones', async () => {
+        const edit = await open(
+            { job: { name: 'j', type: 'objectstore.export', cron: '0 0 6 * * *', onPipeline: null, enabled: true, params: {} } },
+            true,
+        );
+        expect(edit.c.typeLock()).toBeNull();
+        TestBed.resetTestingModule();
+        const standard = await open({ seed: { type: 'objectstore.export' } }, false);
+        expect(standard.c.typeLock()).toBeNull();
     });
 });

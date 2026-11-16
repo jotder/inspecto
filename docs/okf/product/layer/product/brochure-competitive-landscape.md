@@ -155,7 +155,7 @@ Two lanes, and we should say so rather than apologise for the rest:
 - **File-native acquisition of hard formats.** **10**<!--count:parsing-frontend-tokens--> parsing frontends
   incl. **6**<!--count:builtin-parsers--> DuckDB-native built-ins and **7**<!--count:parser-node-types-->
   `parser.*` node types; binary fixed-width; compressed input; a 154-file ASN.1 decoder subsystem with
-  vendor corpora (`inspecto-telecom-asn1`, Standard and up). Native CDR ingestion is a telecom-specific capability generic platforms do not have.
+  vendor corpora (`inspecto-telecom-asn1`, Advanced). Native CDR ingestion is a telecom-specific capability generic platforms do not have.
 - **Reconciliation → Breaks → Incidents** (Standard and up). The chain from "these two datasets disagree" to "someone owns
   it" is one product here and two or three vendors anywhere else.
 
@@ -250,7 +250,7 @@ at once. This is structural, not a failing — Palantir loses it too.
 | Native ingest ~500K rows/s at 12 columns; transforms >1M rows/s | `performance.md`, measured |
 | ~2.5 / ~5 / ~10 billion 100-column rows/day per 8- / 16- / 32-core Linux node, sized to peak | §1.3: measured end to end on six cores (8.1M cells/s) × a stated server-core factor; conditions stated (concurrent batches, NVMe, console headroom, native lane). Operator decision 2026-09-14: publish without hardware specifics |
 | "~1.35M cells/s per physical core end to end, measured; ~1.8–2.8M on a current Linux server core" | §1.3 — say "measured" only of the first half |
-| Native ASN.1 CDR ingestion (Standard and up) | 154-file decoder subsystem, vendor corpora; `inspecto-telecom-asn1` in `offerings/standard.toon` |
+| Native ASN.1 CDR ingestion (Advanced) | 154-file decoder subsystem, vendor corpora; `inspecto-telecom-asn1` in `offerings/advanced.toon` |
 | Reconciliation with a Breaks lifecycle (Standard and up) | `inspecto-reconciliation` in `offerings/standard.toon`. *Corrected 2026-11-12: this said "in the free tier", true of the Personal edition until 2026-10-07, `MODULE-REORG-1` P7* |
 | Fault-tolerant DR and Kubernetes scale-out as a **signed design** | signed 2026-09-10; DR phase A built but never validated on an HA deployment, T5 **not built** — say so, and name no edition (§1.2). The audit trail is kept on disk (Parquet) in every edition, Basic included (`offerings/*.toon` `eventsBackend: parquet`; `EDITIONS.md`) |
 | **48**<!--count:spi-extension-points--> extension points; the ASN.1 vendor functions ship through one | §1.4; guard-derived |

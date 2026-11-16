@@ -221,6 +221,48 @@ describe('PipelinePaletteComponent', () => {
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
+    it('DATA-TIERS-1 P6: a Step the edition withholds shows locked with the reason, and is offered where the edition has it', async () => {
+        const groups: ProcessorGroup[] = [
+            {
+                family: { code: 'XFM', label: 'Transformers', icon: 'heroicons_outline:adjustments-horizontal' },
+                processors: [
+                    proc('transform.filter', 'XFM', 'Row filter', 'delivered', { nodeType: 'transform.filter', addable: true }),
+                    proc('transform.join', 'XFM', 'Join', 'delivered', {
+                        nodeType: 'transform.join',
+                        addable: true,
+                        featureFlag: 'pipelineTransform',
+                    }),
+                ],
+            },
+        ];
+        const why = 'Steps that compute, join, enrich or summarise are in Standard and above.';
+        const { fixture, c } = create();
+        const picked: string[] = [];
+        c.pick.subscribe((t) => picked.push(t));
+        fixture.componentRef.setInput('processors', groups);
+        fixture.componentRef.setInput('locks', { pipelineTransform: why });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        // Basic: the no-code filter is offered; the join is visible, locked with the server's line, and adds nothing
+        expect(el.querySelector('button[aria-label="Add Row filter"]')).toBeTruthy();
+        expect(el.querySelector('button[aria-label="Add Join"]')).toBeNull();
+        const join = el.querySelector('[data-processor="transform.join"]') as HTMLElement;
+        expect(join.getAttribute('data-locked')).toBe('edition');
+        expect(join.getAttribute('aria-disabled')).toBe('true');
+        expect(join.getAttribute('aria-label')).toBe('Join — ' + why);
+        join.click();
+        expect(picked).toEqual([]);
+        expect(el.textContent).toContain('1/2'); // a locked Step is not counted as addable
+        await expectNoA11yViolations(fixture.nativeElement);
+
+        // Standard: no lock - the same entry is an ordinary add button
+        fixture.componentRef.setInput('locks', {});
+        fixture.detectChanges();
+        (el.querySelector('button[aria-label="Add Join"]') as HTMLButtonElement).click();
+        expect(picked).toEqual(['transform.join']);
+        expect(el.textContent).toContain('2/2');
+    });
+
     it('searches the taxonomy on label, id and mapped node type, and falls back to node-type groups when not served', () => {
         const { fixture, c } = create();
         fixture.componentRef.setInput('processors', PROCESSORS);

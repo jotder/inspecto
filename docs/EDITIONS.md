@@ -67,6 +67,11 @@ an Investigation.
 | *Keep this up to date*: a watched folder or SFTP feed on a schedule | locked | ✅ | ✅ |
 | *Add data* from another database or a remote system | locked | through a Pipeline | through a Pipeline |
 | Enrichment on the Dataset page (*Add the details from X to each row*) | locked (join in a Studio query instead) | ✅ | ✅ |
+| A new Connection to a remote system (SFTP, FTP / FTPS, a database), and *Connection* in a Pipeline's Collect stage | locked | ✅ | ✅ |
+| Pipeline editor Steps that compute, join, enrich or summarise (SQL, join, lookup, summaries, time series, statistics) | locked (filter rows and dedupe stay) | ✅ | ✅ |
+| New outbound-delivery Jobs: *Object Storage Export*, *Publish to Postgres* | locked | ✅ | ✅ |
+| The ASN.1 and telecom decoders (Telecom industry pack) | — | — | ✅ |
+| The *Link Analysis daily feed* Space Template | — | ✅ | ✅ |
 
 **The locks above are in the screens, not the engine.** None of them makes Basic refuse a Pipeline or Collector
 you bring. Steps whose module Basic does not include (for example e-mail and webhook delivery) are not available
@@ -146,6 +151,21 @@ There is no migration; to keep them, move to Standard.
   *Add data* and enrichment on the Dataset page. The retention form is not shown: every file is kept, compacted.
 - **Nothing breaks on load.** A Basic install keeps running the configuration it has. The earlier refusals (PII
   masking, DuckLake, the compliance archive) are unchanged.
+
+**The data layer (2026-11-17):**
+
+- **Standard:** the ASN.1 and telecom decoders (the Telecom industry pack) are now **Advanced only**. A Pipeline that
+  reads ASN.1 files stops running on Standard and is listed as needing the `telecom-asn1` module; no shipped Space
+  Template uses it. To keep it, move to
+  Advanced.
+- **Basic:** the *Link Analysis daily feed* Space Template is now Standard and above (it runs on a schedule). A Space
+  created from it earlier keeps its files.
+- **Basic, locked in the screens:** a new Connection to a remote system, *Connection* in a Pipeline's Collect stage,
+  the Pipeline editor Steps that compute, join, enrich or summarise, and new *Object Storage Export* and *Publish to
+  Postgres* Jobs. Each shows why and which edition has it.
+- **Nothing breaks on load on Basic.** A Pipeline, Connection or Job that already uses one of them still loads and
+  runs, and can still be edited.
+- **Upgrading Basic to Standard:** a file added with *Add data* becomes an ordinary Pipeline you can open and edit.
 
 ## More
 

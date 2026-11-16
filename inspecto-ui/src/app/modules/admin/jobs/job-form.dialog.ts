@@ -34,6 +34,7 @@ import {
     JobType,
     JobTypeDescriptor,
     JobUpsert,
+    LensService,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
@@ -58,6 +59,7 @@ import {
 } from './job-parameter-specs';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
+import { LockedActionComponent } from 'app/inspecto/components/locked-action.component';
 
 /** Dialog input: an existing job ⇒ edit; absent ⇒ create. `focusSchedule` opens with the schedule emphasized
  *  (the "Reschedule" action). */
@@ -153,6 +155,7 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
         ChipComponent,
         InspectoSchemaFormComponent,
         JobChainEditorComponent,
+        LockedActionComponent,
         PenFieldComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -161,6 +164,7 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
 export class JobFormDialog implements AfterViewInit {
     private fb = inject(FormBuilder);
     private api = inject(JobsService);
+    private lens = inject(LensService);
     private ref = inject(MatDialogRef<JobFormDialog, JobFormResult>);
     private confirm = inject(InspectoConfirmService);
     private toastr = inject(ToastrService);
@@ -211,6 +215,16 @@ export class JobFormDialog implements AfterViewInit {
     readonly descriptorMissing = computed(() => !!this.selectedTypeId() && !this.selectedType());
     /** The type id whose descriptor was last looked up — read by the template, so not private. */
     readonly selectedTypeId = signal('');
+    /**
+     * Why a NEW Job of the selected type is locked in this edition, or null (`DATA-TIERS-1` P5): the type names a screen
+     * gate (`featureFlag`, e.g. `pipelineEgress` on `objectstore.export` / `publish.postgres`) that `/bootstrap` reports
+     * false. Editing a saved Job stays open: the server runs it (plan §5.3).
+     */
+    readonly typeLock = computed(() => {
+        if (this.isEdit) return null;
+        const flag = this.typeCatalog().find((d) => d.id === this.selectedTypeId())?.featureFlag;
+        return flag ? (this.lens.screenLocks()[flag] ?? null) : null;
+    });
 
     /** `name (kind)` per declared Run Artifact — what a run of this type records. */
     readonly artifactSummary = computed(() =>
@@ -558,6 +572,7 @@ export class JobFormDialog implements AfterViewInit {
     }
 
     save(): void {
+        if (this.typeLock()) return;
         if (!this.schemaForm.validate()) return;
         if (this.paramForm && !this.paramForm.validate()) return;
         // The chain owns two params the generated form no longer renders, so it validates separately.

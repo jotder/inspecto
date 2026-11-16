@@ -186,6 +186,11 @@ export interface StepProcessor {
     requires?: string;
     note?: string;
     addable: boolean;
+    /**
+     * The `/bootstrap` features key this processor needs beyond Basic (`DATA-TIERS-1` P4 / P6: `pipelineTransform` or
+     * `remoteSystems`); absent = every edition. The palette shows it locked when that flag is false.
+     */
+    featureFlag?: string;
 }
 
 export interface ProcessorCatalog {

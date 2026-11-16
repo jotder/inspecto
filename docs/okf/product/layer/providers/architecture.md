@@ -42,7 +42,7 @@ implementation (and the core falls back or fails closed). Modules whose Product 
 | [secrets](../../module/secrets/index.md) | `providers/inspecto-secrets` | `SecretsProvider` (file keystore) | edition profiles | Standard |
 | [geo-country](../../module/geo-country/index.md) | `providers/inspecto-geo-country` | `GeoCountryResolver` (MaxMind) | edition profiles | Standard |
 | [notify-channels](../../module/notify-channels/index.md) | `providers/inspecto-notify-channels` | `NotificationChannel`, `WebhookSinkTransport` | edition profiles | Standard |
-| [telecom-asn1](../../module/telecom-asn1/index.md) | `providers/inspecto-telecom-asn1` | `ParserPlugin`, step kind `parser.asn1.ber` | default | Standard |
+| [telecom-asn1](../../module/telecom-asn1/index.md) | `providers/inspecto-telecom-asn1` | `ParserPlugin`, step kind `parser.asn1.ber` | default | Advanced |
 | [asn-decoders](../../module/asn-decoders/index.md) | `providers/asn-parser/asn-decoders` | none — a library reactor consumed by telecom-asn1 | default (aggregated) | via telecom-asn1 |
 | [policy](../../module/policy/index.md) | `providers/inspecto-policy` | `AccessDecider` (ABAC) | edition profiles | Advanced |
 | [agent-hosted](../../module/agent-hosted/index.md) | `providers/inspecto-agent-hosted` | `HostedProviderPlugin` (requires `agent`) | default | not a `tools/bundle-modules.mjs` row; the default air-gapped packaging omits it |

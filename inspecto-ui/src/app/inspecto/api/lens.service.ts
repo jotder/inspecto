@@ -1,5 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { SessionService } from '../auth/session.service';
+import { screenLocks } from '../edition-locks';
 
 /** The three persona lenses over the one console (`docs/GLOSSARY.md` §1-A). Not a permission —
  *  under RBAC (Standard, R2) the subject's role grants constrain which lenses are selectable. */
@@ -317,6 +318,13 @@ export class LensService {
      *  {@link identityCapability}, as {@link canManageIncidents} is: the `admin` seed holds it and qualifies
      *  for no non-Business lens, so a lens-scoped grant would hide the verbs from a subject the server allows. */
     readonly canWorkIncidents = computed(() => this.identityCapability('canWorkIncidents', 'incidents.work'));
+
+    /**
+     * The data-layer screen gates this edition withholds, `{flag: reason}` (`DATA-TIERS-1` P2, `edition-locks.ts`): what the
+     * Collect stage, the Connection form, the Job form and the Step palette show locked with its reason (DT-13). Not a
+     * permission - the edition, not the subject, decides it; read here because every pane already asks this service.
+     */
+    readonly screenLocks = computed(() => screenLocks(this.session.features(), this.session.featureReasons()));
 
     /** Set the preferred lens and persist it across reloads. A lens outside {@link allowedLenses}
      *  is remembered but not activated (the switcher never offers one). */

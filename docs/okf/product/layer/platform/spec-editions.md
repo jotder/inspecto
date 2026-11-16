@@ -85,7 +85,7 @@ explorer* below.
 ⚠ **As built (2026-10-17, phases 2–7).** The explorer rows hold in the Basic build (below). Industry packs (phase 4:
 the Telecom and Mobile Money packs and the server Domain Profile, `GET/PUT /settings/link-analysis/domain-profile`) live
 in the base module `inspecto-entity-store` and the core, so they are in every edition, Basic included (ED-5); the
-Telecom ASN.1 decoder (`inspecto-telecom-asn1`, a CDR parser rather than a pack) stays Standard and up. Third-party
+Telecom ASN.1 decoder (`inspecto-telecom-asn1`, a CDR parser rather than a pack) is Advanced only since 2026-11-17 (DATA-TIERS-1 DT-12; it was Standard and up). Third-party
 integration (phases 5–6: `POST /inv/inbound/investigations`, `POST /inv/deep-links/resolve`, `GET/PUT /inv/integration`,
 `POST /inv/investigations/{id}/handoff`, the outbound webhooks) is withheld on Basic by the same `investigations` edition
 feature (ED-6, `LD-EDITIONS-12`): the routes answer 503 and the webhook tap sends nothing; the SPA `/open` page explains
@@ -220,7 +220,7 @@ source for them yet (see `docs/okf/product/layer/platform/spec-module-reorg-deci
 | `oidc` - OIDC authenticator and token relay | providers | provider | — | — | ✅ | ✅ | ✅ |
 | `policy` - Attribute-based access policy | providers | provider | — | — | — | ✅ | ✅ |
 | `secrets` - File-keystore secrets provider | providers | provider | — | — | ✅ | ✅ | ✅ |
-| `telecom-asn1` - Telecom ASN.1 decoder | providers | provider | — | — | ✅ | ✅ | ✅ |
+| `telecom-asn1` - Telecom ASN.1 decoder | providers | provider | — | — | — | ✅ | ✅ |
 | `processor` - Control plane and processor host | inspecto | base | — | 🟦 | 🟦 | 🟦 | 🟦 |
 
 ### Add-ons by edition
@@ -243,7 +243,7 @@ source for them yet (see `docs/okf/product/layer/platform/spec-module-reorg-deci
 | regulatoryReporting | `regulatory-reporting` | — | built | built | built |
 | scoringLists | `entity-list`, `scoring` | — | built | built | built |
 | screening | `screening` | — | built | built | built |
-| telecomIndustryPack | `telecom-asn1` | — | built | built | built |
+| telecomIndustryPack | `telecom-asn1` | — | — | built | built |
 | workflowSla | `ops` | — | built | built | built |
 
 ### Deployment posture
@@ -259,10 +259,10 @@ source for them yet (see `docs/okf/product/layer/platform/spec-module-reorg-deci
 
 | | Basic | Standard | Advanced | Preview |
 |---|:-:|:-:|:-:|:-:|
-| First-party jars (processor + connectors + optional + core thin) | 23 | 43 | 46 | 46 |
+| First-party jars (processor + connectors + optional + core thin) | 23 | 42 | 46 | 46 |
 | of which core thin jars | 16 | 16 | 16 | 16 |
-| Optional modules beyond Basic | 0 | 20 | 23 | 23 |
-| Total on the classpath (+ third-party sidecars) | 23 | 44 | 47 | 47 |
+| Optional modules beyond Basic | 0 | 19 | 23 | 23 |
+| Total on the classpath (+ third-party sidecars) | 23 | 43 | 47 | 47 |
 <!-- offerings-matrix:end -->
 
 ## Preview — not a customer-facing tier
@@ -357,7 +357,7 @@ profile) and by `tools/check-offerings.mjs` (Offering == bundle == pom profile).
 ## Data layer by edition (DATA-TIERS-1, as built 2026-11-06)
 
 Operator rule: *"Basic is not a demo; it must be usable."* **Basic runs any configuration it is given.** Since the
-2026-11-05 re-plan (DT-9 narrowed, [`data-tier-editions-plan.md`](../../../../superpower/data-tier-editions-plan.md) §5.3) the
+2026-11-05 re-plan (DT-9 narrowed, [`data-tier-editions-plan.md`](../../../../archived-documents/plans-archive/data-tier-editions-plan.md) §5.3) the
 edition line in the data layer is **what each edition's screens offer**, not what the engine refuses: no DATA-TIERS-1 gate refuses a Pipeline,
 Step, Collector kind or trigger when a Basic install loads its configuration. The edition refusals that predate it stay
 (a PII `mask` Step, DuckLake registration and the compliance archive are refused on load, `EditionFeatures.requirePipeline`;
@@ -389,18 +389,43 @@ Pipeline (read, arrange, write Parquet, then each application's follow-on; Inspe
 | Discover, entity summary, query builder, preset questions (Inspecto LA, feature `geoLink`) | ✅ | ✅ | ✅ |
 | Add data's *another database or a remote system* | — locked | not locked: the screen says a Pipeline reads them | as Standard |
 | Enrichment offer on the Dataset page (*Add the details from X to each row*) | — locked; join in a Studio query | ✅ | ✅ |
+| A NEW remote Connection (SFTP, FTP / FTPS, `db`) and *Connection* in the Collect stage (`remoteSystems`, P4) | — locked | ✅ | ✅ |
+| Step palette: Steps beyond no-code shaping (`pipelineTransform`, P6; the catalog's `featureFlag`) | — locked; *Row filter* and dedupe stay | ✅ | ✅ |
+| A NEW `objectstore.export` / `publish.postgres` Job (`pipelineEgress`, P5) | — locked | ✅ | ✅ |
+| ASN.1 and telecom decoders (module `telecom-asn1`, add-on `telecomIndustryPack`, DT-12) | — | — | ✅ |
+| `la-daily-feed` Space Template (DT-18) | — | ✅ | ✅ |
 
-**How the locks work today.** `pipeline.automation` (`EditionFeatures.PIPELINE_AUTOMATION`) is declared by
-`inspecto-ops` (`OpsEditionFeatures`), so Standard and up have it and Basic does not. The feed and storage routes check
-it themselves (Basic answers `503 CAPABILITY_UNAVAILABLE`; a retention policy already stored is ignored on Basic, so Basic
-never drops rows), and the feed and storage reads report it (`automatic`, `retentionAvailable`). `/bootstrap` does **not**
-yet serve `features.pipelineAutomation`, `remoteSystems` or `pipelineTransform` (DATA-TIERS-1 P2): the screens lock
-those offers when the flag is absent and the edition is `basic`, with their own wording until the server names one.
+**How the locks work (as built 2026-11-17).** Four **screen gates**, each an edition feature declared by `inspecto-ops`
+(`OpsEditionFeatures`), so Standard and up have them and Basic does not: `pipeline.automation` (`PIPELINE_AUTOMATION`),
+`pipeline.transform` (`PIPELINE_TRANSFORM`), `pipeline.egress` (`PIPELINE_EGRESS`) and `collector.remote`
+(`REMOTE_SYSTEMS`). `EditionFeatures.SCREEN_FLAGS` maps each to its `/bootstrap` key: `features.pipelineAutomation`,
+`pipelineTransform`, `pipelineEgress` and `remoteSystems` are true or false, and a withheld one has a `featureReasons`
+line under the same key (`EditionFeatures.lockedReason`, one short line naming the edition). Two static markers tell the
+screens which offer a gate covers: `GET /pipelines/processor-catalog` puts `featureFlag` on each processor
+(`ProcessorCatalog.featureOf`: the remote acquisitions → `remoteSystems`; every mapped `transform.*` Step except
+`transform.filter`, `transform.dedup` and `transform.mask`, plus reference enrichment → `pipelineTransform`), and
+`GET /jobs/types` puts `featureFlag: pipelineEgress` on `objectstore.export` and `publish.postgres`
+(`EditionFeatures.EGRESS_JOB_TYPES`). The console reads them through `LensService.screenLocks()` (`edition-locks.ts`; a
+flag the server does not report is offered): the Step palette shows a gated processor locked with the reason, the Collect
+stage locks its *Connection* choice, the Connection form locks a NEW `db` / `ftp` / `ftps` / `sftp` / object-store /
+Kafka Connection, and the Job form locks a NEW Job of a gated type. **None of them refuses anything on the server**: a
+Pipeline, Connection or Job already using one loads, runs and stays editable (a node already collecting through a
+Connection keeps that mode). `pipeline.automation` alone is also checked by its routes: the feed and storage routes
+answer `503 CAPABILITY_UNAVAILABLE` on Basic (a retention policy already stored is ignored there, so Basic never drops
+rows), and their reads report it (`automatic`, `retentionAvailable`). The product states nothing either way about
+scheduled or signal-driven Jobs on Basic (DT-16). Upgrade: a Basic import is an ordinary editable Pipeline on Standard
+(`ControlApiDataTierUpgradeTest`).
 
-**Where the line is not drawn yet.** The console's Pipelines, Collectors and Jobs panes carry no edition lock: on Basic
-they open as on Standard. The step-palette locks (P6), the outbound-delivery locks (P5) and the ASN.1 move to Advanced (P4)
-are not built, so the Step Processor, `objectstore.export` and `publish.postgres` rows below still show what the build
-carries. The product states nothing either way about scheduled or signal-driven Jobs on Basic (DT-16).
+### Release note — the data layer by edition (2026-11-17)
+
+- **Standard:** the ASN.1 and telecom decoders (`telecom-asn1`, the Telecom industry pack) are Advanced only (DT-12). A
+  Standard install's ASN.1 Pipeline is listed `hosted:false` with `missingModule: telecom-asn1`; no shipped Space Template
+  uses it.
+- **Basic:** the `la-daily-feed` Space Template is Standard and above (DT-18: `minEdition: standard`, `requiresModules: ops`).
+- **Basic, locked with a reason in the screens:** a new remote Connection and the Collect stage's *Connection*, the step
+  palette's Steps beyond no-code shaping, new `objectstore.export` and `publish.postgres` Jobs; `/bootstrap` reports the
+  four screen gates (`pipelineAutomation`, `pipelineTransform`, `pipelineEgress`, `remoteSystems`) with their reasons.
+- **Nothing breaks on load.** Existing configurations using them load, run and stay editable on Basic.
 
 ### Release note — the data layer by edition (2026-11-06)
 
@@ -584,14 +609,15 @@ of it — the gap is in Notes), 🔲 planned. Every processor is VISIBLE in the 
 render inactive. Edition cells default to the same value in all three unless a board decision says otherwise (SEC-08 →
 E-only for the two compliance processors; CP-09/CP-11/CP-15/OPS-06 → not for Basic). Row ids are `SP-<family>-<nn>`.
 
-⚠ **DATA-TIERS-1 (2026-11-06): these cells say what the build CARRIES and runs, not what Basic's screens offer.** Basic
-runs any configuration it is given (DT-9 narrowed, §5.3), so a configured Step, remote Collector or decoder runs there
-as the cell says. The planned screen locks are not built: the **SP-XFM** transforms are to be locked in Basic's step
-palette (P6; Basic's offer is Add data's no-code shaping: types, rename, choose columns, the row filter, dedupe and
-schema `expression:` columns, DT-7); the remote **SP-ACQ** rows (SFTP / FTPS, JDBC, S3, Azure, GCS) are to be locked in
-Basic's screens apart from the Postgres snapshot (P4; `inspecto-connectors` stays in the Basic Offering, and Add data
-already locks *another database or a remote system* on Basic); **SP-PRS-06** (ASN.1) is to move from Standard to
-Advanced (P4, DT-12; still Standard). See *Data layer by edition* above.
+⚠ **DATA-TIERS-1 (2026-11-17): these cells say what the build CARRIES and runs, not what Basic's screens offer.** Basic
+runs any configuration it is given (DT-9 narrowed, §5.3), so a configured Step or remote Collector runs there as the
+cell says. Basic's step palette shows locked, with the reason, every Step the catalog marks `featureFlag: pipelineTransform`
+(the **SP-XFM** transforms but *Row filter*, the BI and ENR Steps; Basic's offer is Add data's no-code shaping: types,
+rename, choose columns, the row filter, dedupe and schema `expression:` columns, DT-7) and the remote **SP-ACQ** rows
+marked `remoteSystems` (SFTP / FTPS, JDBC, S3, Azure, GCS, Kafka; `inspecto-connectors` stays in the Basic Offering, and
+the Postgres snapshot of Add data needs no Connection). **SP-PRS-06** (ASN.1) is Advanced only since 2026-11-17 (DT-12:
+module `telecom-asn1` and add-on `telecomIndustryPack` moved to `offerings/advanced.toon`). See *Data layer by edition*
+above.
 
 | ID | Processor | Family | P | S | E | Maps to | Notes |
 |---|---|---|---|---|---|---|---|
@@ -620,7 +646,7 @@ Advanced (P4, DT-12; still Standard). See *Data layer by edition* above.
 | SP-PRS-03 | 🧬 JSON object & JSON Lines (NDJSON) parser (`parser.json`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.json` |  |
 | SP-PRS-04 | 📑 Excel workbook parser (`parser.excel`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.xlsx` | needs the DuckDB `excel` extension in the bundle (multiformat X1) |
 | SP-PRS-05 | 📑 XML / XPath / DOM unpacker (`parser.xml`) | Extraction & Format Parsers | 🟡 | 🟡 | 🟡 | `parser.plugin` | tree→segments bridge ships XML ingests; no XPath selector grammar yet |
-| SP-PRS-06 | 📡 ASN.1 BER telecom CDR decoder (`parser.asn1.ber`) | Extraction & Format Parsers | — | ✅ | ✅ | `parser.asn1` | Telecom industry pack (inspecto-telecom-asn1) over the asn-parser reactor (decoders, vendor plugins); Standard and above |
+| SP-PRS-06 | 📡 ASN.1 BER telecom CDR decoder (`parser.asn1.ber`) | Extraction & Format Parsers | — | — | ✅ | `parser.asn1` | Telecom industry pack (inspecto-telecom-asn1) over the asn-parser reactor (decoders, vendor plugins); Advanced (DATA-TIERS-1 DT-12) |
 | SP-PRS-07 | 🔎 Named-group regex extractor (`parser.pattern.regex`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.text_regex` |  |
 | SP-PRS-08 | 🧩 Custom ingester plugin (segments, multi-event) (`parser.plugin`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.plugin` | ParserPlugin SPI; `segments: {CALL, SMS}` |
 | SP-PRS-09 | 🏷️ Key-value / logfmt parser (`parser.keyvalue`) | Extraction & Format Parsers | 🔲 | 🔲 | 🔲 | — |  |

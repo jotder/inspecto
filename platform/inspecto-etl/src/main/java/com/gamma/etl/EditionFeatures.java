@@ -85,6 +85,57 @@ public final class EditionFeatures {
      * {@code inspecto-ops} (operator 2026-11-05: no module declared it, so real Standard bundles refused both).
      */
     public static final String PIPELINE_AUTOMATION = "pipeline.automation";
+    /**
+     * Shaping beyond the no-code kind - Step Processors that compute, join, enrich or summarise (SQL steps, joins and
+     * lookups, enrichment, summaries, time-series and statistics) - Standard and up ({@code DATA-TIERS-1} DT-6, DT-7). Basic
+     * keeps no-code shaping: types, rename, choose columns, filter rows, dedupe and schema expression columns. A SCREEN gate
+     * only (§5.3, DT-9 narrowed: Basic runs any configuration it is given): reported as {@code /bootstrap}
+     * {@code features.pipelineTransform}, and the Step Processor catalog names it on each processor it covers
+     * ({@code featureFlag}), so the palette shows those locked with {@link #lockedReason}. Declared by {@code inspecto-ops}.
+     */
+    public static final String PIPELINE_TRANSFORM = "pipeline.transform";
+    /**
+     * Outbound delivery of data - the {@code objectstore.export} and {@code publish.postgres} Job types - Standard and up
+     * ({@code DATA-TIERS-1} P5). A SCREEN gate only (DT-9 narrowed): reported as {@code /bootstrap}
+     * {@code features.pipelineEgress}, and {@code GET /jobs/types} names it on those types ({@code featureFlag}), so the Job
+     * form shows them locked with {@link #lockedReason}; a Job of either type that arrives in a configuration still runs.
+     * Declared by {@code inspecto-ops}. (The webhook, mail and archive gates are older and unchanged.)
+     */
+    public static final String PIPELINE_EGRESS = "pipeline.egress";
+    /**
+     * Collecting from remote systems - SFTP, FTP / FTPS, object stores, the {@code db} Collector, Kafka - Standard and up
+     * ({@code DATA-TIERS-1} P4, DT-4 as narrowed on 2026-11-05: Basic keeps files and the Postgres table snapshot of Add data,
+     * which reads through DuckDB and needs no Connection). A SCREEN gate only (DT-9 narrowed: {@code inspecto-connectors}
+     * stays in Basic, so a remote Collector in a configuration still runs): reported as {@code /bootstrap}
+     * {@code features.remoteSystems}; the Collect stage's Connection choice, the Connection form's remote types and the
+     * remote acquisition processors of the catalog show locked with {@link #lockedReason}. Declared by {@code inspecto-ops}.
+     */
+    public static final String REMOTE_SYSTEMS = "collector.remote";
+
+    /**
+     * The {@code DATA-TIERS-1} screen gates by their {@code /bootstrap} {@code features} key: each flag is true when its
+     * feature is {@link #present}, and a withheld one has a {@code featureReasons} entry under the same key. Screen gates
+     * only - no route or configuration is refused by them (§5.3).
+     */
+    public static final Map<String, String> SCREEN_FLAGS = screenFlags();
+
+    private static Map<String, String> screenFlags() {
+        Map<String, String> m = new java.util.LinkedHashMap<>();
+        m.put("pipelineAutomation", PIPELINE_AUTOMATION);
+        m.put("pipelineTransform", PIPELINE_TRANSFORM);
+        m.put("pipelineEgress", PIPELINE_EGRESS);
+        m.put("remoteSystems", REMOTE_SYSTEMS);
+        return java.util.Collections.unmodifiableMap(m);
+    }
+
+    /** The {@link #SCREEN_FLAGS} key of {@code feature}, or null when it is not a screen gate. */
+    public static String flagOf(String feature) {
+        for (Map.Entry<String, String> e : SCREEN_FLAGS.entrySet()) if (e.getValue().equals(feature)) return e.getKey();
+        return null;
+    }
+
+    /** The Job types that deliver data out of the product ({@link #PIPELINE_EGRESS}, {@code DATA-TIERS-1} P5). */
+    public static final Set<String> EGRESS_JOB_TYPES = Set.of("objectstore.export", "publish.postgres");
 
     /**
      * Real-time Detection (PRODUCT-ASSEMBLY-1 PA-9d, D-PA44): windowed and Pattern Alert Rules ({@code window:} /
@@ -165,6 +216,15 @@ public final class EditionFeatures {
                     : "Investigations are in Standard and above, with the Investigations add-on.";
         if (GEO_MAP.equals(feature)) return "The Geo map is in Standard and above.";
         if (ENTITY_PAGES.equals(feature)) return "Entity profile pages are in Standard and above.";
+        if (PIPELINE_AUTOMATION.equals(feature))
+            return "Keeping a Dataset up to date on its own, and retention policies, are in Standard and above.";
+        if (PIPELINE_TRANSFORM.equals(feature))
+            return "Steps that compute, join, enrich or summarise are in Standard and above; Basic shapes columns and filters rows.";
+        if (PIPELINE_EGRESS.equals(feature))
+            return "Delivering data out of Inspecto (object storage export, publish to Postgres) is in Standard and above.";
+        if (REMOTE_SYSTEMS.equals(feature))
+            return "Collecting from remote systems (SFTP, FTP, object stores, databases, Kafka) is in Standard and above; "
+                    + "Basic adds files and copies Postgres tables.";
         return refusal(feature);
     }
 
@@ -175,6 +235,8 @@ public final class EditionFeatures {
     public static Map<String, String> lockedReasons() {
         Map<String, String> out = new TreeMap<>();
         for (String f : ROUTE_FEATURES) if (!present(f)) out.put(f, lockedReason(f));
+        // DATA-TIERS-1 P2: the screen gates, under their /bootstrap features key (SCREEN_FLAGS).
+        SCREEN_FLAGS.forEach((flag, f) -> { if (!present(f)) out.put(flag, lockedReason(f)); });
         // PRODUCT-ASSEMBLY-1 PA-7a: every feature only modules the install's signed entitlement leaves out provide.
         for (String f : com.gamma.module.Entitlements.unentitledFeatures()) out.put(f, "Not in this installation's entitlement.");
         return out;
@@ -192,6 +254,11 @@ public final class EditionFeatures {
             case GEO_MAP -> "The Geo map, routes and co-location (POST /geo/projection, POST /geo/routes)";
             case ENTITY_PAGES -> "Entity profile pages (GET /inv/entity-types/{id}/profile, GET /inv/entities/{type}/{key}/profile)";
             case REALTIME -> "Real-time Detection (windowed and Pattern Alert Rules, evaluated on each Stream commit)";
+            case PIPELINE_AUTOMATION -> "Pipelines that run on their own (pipeline.automation - Keep this up to date, retention policies)";
+            case PIPELINE_TRANSFORM -> "Transformation Steps (pipeline.transform - SQL, joins, lookups, enrichment, summaries, "
+                    + "time-series and statistics Steps)";
+            case PIPELINE_EGRESS -> "Outbound delivery (pipeline.egress - the objectstore.export and publish.postgres Job types)";
+            case REMOTE_SYSTEMS -> "Remote systems (collector.remote - SFTP, FTP / FTPS, object stores, the db Collector, Kafka)";
             default -> "'" + feature + "'";
         };
         if (REALTIME.equals(feature))

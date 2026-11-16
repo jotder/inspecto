@@ -158,6 +158,11 @@ export interface JobTypeDescriptor {
     source?: string;
     /** The owning Job Pack's version; '' for anything not from a pack. */
     version?: string;
+    /**
+     * The `/bootstrap` features key this type needs beyond Basic (`DATA-TIERS-1` P5: `pipelineEgress` on `objectstore.export`
+     * and `publish.postgres`); absent = every edition. The Job form shows a new Job of it locked when that flag is false.
+     */
+    featureFlag?: string;
 }
 
 /**

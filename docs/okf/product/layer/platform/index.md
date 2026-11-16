@@ -34,7 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `DATA-TIERS-1` | P2 | feature | RE-PLANNED 2026-11-05 (operator, plan §5.3): P3 automation gate DROPPED; DT-9 narrowed to "gate in screens" (Basic runs any configuration… | — |
 | `NATIVE-LICENCE-LINUX-MACOS-1` | P3 | chore | two licence calls on the tokenizers natives wait on the operator ((a) accepted 2026-11-01). | operator |
 | `RELEASE-PIPELINE-UNRUN-1` | P2 | chore | no release can be cut today: release.yml has never run, and nothing it needs is configured (filed 2026-11-15, verified from ARCH-MOSCOW-U… | operator |
 | `DEPLOY-EXPOSURE-KIT-1` | P3 | chore | /metrics and /health/details are fenced only by the network, and the deploy kit the docs assume is unbuilt (filed 2026-11-15, verified fr… | — |

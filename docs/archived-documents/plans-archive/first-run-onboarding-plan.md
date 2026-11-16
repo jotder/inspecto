@@ -20,7 +20,7 @@ numbers here are **OF-n**, to stay apart from `LA-ONBOARD-1`'s OB-n.
   by the operator.
 - [`okf/product/module/la-core/spec-first-time-user-use-cases.md`](../../okf/product/module/la-core/spec-first-time-user-use-cases.md):
   Inspecto LA, fifteen use cases (UC-01…UC-15), walkthrough findings F-1…F-13, operator answers A-1…A-16.
-- [`data-tier-editions-plan.md`](../../superpower/data-tier-editions-plan.md) (`DATA-TIERS-1`): what each edition may do.
+- [`data-tier-editions-plan.md`](data-tier-editions-plan.md) (`DATA-TIERS-1`): what each edition may do.
 
 **Copy rule.** Product copy never says "wizard" (`GLOSSARY.md`). The step-by-step help is the **guide**; the running
 list of setup steps is the **Space guide** (H1). The button says **Add data**; the screen title says **Onboard a

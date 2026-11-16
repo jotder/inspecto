@@ -60,7 +60,7 @@ test('the unmodified inputs are GREEN', () => {
 
 const RED = {
     'an Offering that lists demo-auth (the module table is derived from the Offerings)': [
-        edit('offerings/advanced.toon', 'modules[3]: policy,la-store-pg,intelligence', 'modules[4]: policy,la-store-pg,intelligence,demo-auth'),
+        edit('offerings/advanced.toon', 'modules[4]: telecom-asn1,policy,la-store-pg,intelligence', 'modules[5]: telecom-asn1,policy,la-store-pg,intelligence,demo-auth'),
         /bundle-modules\.mjs ships inspecto-demo-auth\.jar/,
     ],
     'the boot-smoke classpath literal': [
