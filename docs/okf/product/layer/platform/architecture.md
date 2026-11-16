@@ -484,10 +484,10 @@ naming rule is held by `node tools/check-product-docs.mjs`.
 | Link Analysis audit showcase (`solution-pack.la-audit`) | [architecture](../../solution-pack/la-audit/architecture.md) |  |
 | Link Analysis claims showcase (`solution-pack.la-claims`) | [architecture](../../solution-pack/la-claims/architecture.md) |  |
 | Link Analysis daily feed (`solution-pack.la-daily-feed`) | [architecture](../../solution-pack/la-daily-feed/architecture.md) |  |
-| Link Analysis mobile money (`solution-pack.la-mobile-money`) | [architecture](../../solution-pack/la-mobile-money/architecture.md) |  |
+| Mobile Money (`solution-pack.la-mobile-money`) | [architecture](../../solution-pack/la-mobile-money/architecture.md) |  |
 | Link Analysis ownership showcase (`solution-pack.la-ownership`) | [architecture](../../solution-pack/la-ownership/architecture.md) |  |
-| Link Analysis showcase (feature off) (`solution-pack.la-showcase-off`) | [architecture](../../solution-pack/la-showcase-off/architecture.md) |  |
-| Link Analysis showcase (`solution-pack.la-showcase`) | [architecture](../../solution-pack/la-showcase/architecture.md) |  |
+| Other Examples (feature off) (`solution-pack.la-showcase-off`) | [architecture](../../solution-pack/la-showcase-off/architecture.md) |  |
+| Other Examples (`solution-pack.la-showcase`) | [architecture](../../solution-pack/la-showcase/architecture.md) |  |
 | Link Analysis trade showcase (`solution-pack.la-trade`) | [architecture](../../solution-pack/la-trade/architecture.md) |  |
 | Mobile money (`solution-pack.mobile-money`) | [architecture](../../solution-pack/mobile-money/architecture.md) |  |
 | Orders starter (`solution-pack.orders-starter`) | [architecture](../../solution-pack/orders-starter/architecture.md) |  |

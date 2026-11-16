@@ -1,12 +1,12 @@
 ---
 type: ProductItem
-title: Link Analysis showcase (feature off)
+title: Other Examples (feature off)
 item: solution-pack.la-showcase-off
 description: Documentation hub for solution-pack.la-showcase-off — every document about it, by slot.
 tags: [product-item, solution-pack]
 ---
 
-# Link Analysis showcase (feature off) (`solution-pack.la-showcase-off`)
+# Other Examples (feature off) (`solution-pack.la-showcase-off`)
 
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`solution-pack.la-showcase-off`](../../../../../product-map/solution-pack/la-showcase-off.toon). Editions, add-ons, order codes and dependencies are read

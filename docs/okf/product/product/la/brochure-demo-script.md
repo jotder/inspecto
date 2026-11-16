@@ -41,9 +41,9 @@ The Alert Rules the demo Space holds: those its Space Templates ship and those t
 | Alert Rule | Severity | From | What it finds |
 |---|---|---|---|
 | `mule-pass-through` | CRITICAL | the seed | Added by the demo's seed (`tools/seed-la-showcase.mjs`). |
-| `telecom_irsf_lines` | CRITICAL | [Link Analysis showcase](../../solution-pack/la-showcase/index.md) | IRSF: lines sending 80 % or more of their calls to premium international numbers, averaging 10 minutes or more |
-| `telecom_simbox_lines` | CRITICAL | [Link Analysis showcase](../../solution-pack/la-showcase/index.md) | SIM box: lines rotating across 3 or more handsets shared with 3 or more lines, making 50 times more calls than they receive |
-| `telecom_wangiri_lines` | WARNING | [Link Analysis showcase](../../solution-pack/la-showcase/index.md) | Wangiri: lines ringing 50 or more numbers with an average call under 5 seconds |
+| `telecom_irsf_lines` | CRITICAL | [Other Examples](../../solution-pack/la-showcase/index.md) | IRSF: lines sending 80 % or more of their calls to premium international numbers, averaging 10 minutes or more |
+| `telecom_simbox_lines` | CRITICAL | [Other Examples](../../solution-pack/la-showcase/index.md) | SIM box: lines rotating across 3 or more handsets shared with 3 or more lines, making 50 times more calls than they receive |
+| `telecom_wangiri_lines` | WARNING | [Other Examples](../../solution-pack/la-showcase/index.md) | Wangiri: lines ringing 50 or more numbers with an average call under 5 seconds |
 
 ## Close
 

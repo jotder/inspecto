@@ -1,12 +1,12 @@
 ---
 type: ProductItem
-title: Link Analysis mobile money
+title: Mobile Money
 item: solution-pack.la-mobile-money
 description: Documentation hub for solution-pack.la-mobile-money — every document about it, by slot.
 tags: [product-item, solution-pack]
 ---
 
-# Link Analysis mobile money (`solution-pack.la-mobile-money`)
+# Mobile Money (`solution-pack.la-mobile-money`)
 
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`solution-pack.la-mobile-money`](../../../../../product-map/solution-pack/la-mobile-money.toon). Editions, add-ons, order codes and dependencies are read
