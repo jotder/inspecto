@@ -7946,6 +7946,36 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         expect(el.querySelectorAll('inspecto-link-analysis-start-box').length).toBe(1); // the tab's form only
         fixture.destroy();
     });
+    it('finding 25: Busiest nodes is told the start entities (hop 0) of the Investigation on the canvas, none while exploring', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        expect(c.discoverStartIds()).toEqual([]); // exploring: nothing is a start entity
+        c.investigation.activeId.set('inv-9');
+        c.investigation.log.set({
+            header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
+            entries: [],
+        } as never);
+        c.investigation.workingSet.set({
+            entities: [
+                { id: 'ws-a', hop: 0 },
+                { id: 'ws-b', hop: 1 },
+                { id: 'ws-c', hop: 1 },
+            ],
+            links: [
+                { source: 'ws-a', target: 'ws-b', kind: 'k', count: 1 },
+                { source: 'ws-a', target: 'ws-c', kind: 'k', count: 1 },
+            ],
+            excluded: [],
+            hash: 'h',
+        } as never);
+        const startNode = c.canvasData()!.nodes.find((n) => n.data.label === 'ws-a')!;
+        expect(c.discoverStartIds()).toEqual([startNode.id]);
+        c.investigation.showWorkingSet.set(false); // the query graph again: its nodes are not the Working Set's
+        expect(c.discoverStartIds()).toEqual([]);
+        fixture.destroy();
+    });
     it('finding 22: File offers Build Dossier… and Members… only while an Investigation is open, and opens them', async () => {
         const { fixture } = create();
         fixture.detectChanges();

@@ -941,7 +941,8 @@ where a later bullet supersedes them.
   * **Finding 25: Busiest nodes never offers a start entity.** `busiest(g, t, limit, startIds)`: a start entity (hop 0
     of the saved or unsaved Investigation on the canvas, `LinkAnalysisComponent.discoverStartIds`) is busy by
     construction, so it gets no exclusion hint and its row says *It is a start entity: the graph was drawn round it.*;
-    the hint goes to the busiest non-start entity when it is at least 5 links and twice the next non-start one. The
+    the hint goes to the busiest non-start entity when it is at least 5 links and twice the next non-start one, both
+    taken from the whole ranking (with several start entities on top, the next may lie past the five rows shown). The
     only other exclusion offers (Exclude…, Clean up) act on a selection the analyst made, so they are not offers.
 * **Degrees trims the last Expand** (`LA-DEGREES-TRIM-1`, 2026-10-30): the form takes `lastExpand` and emits
   `degreesChange` after 300 ms; unsaved, `trimExpandStep` / `extendExpandStep` cut or extend from `UnsavedStep.stages` with

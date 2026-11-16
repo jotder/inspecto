@@ -1232,7 +1232,7 @@ Investigation is open **selects** it for the next step.
 An expand whose budget or fan-out cap is above the Space's four-eyes thresholds does not run: it says **waiting for
 approval**, names the request (for example *p1*) and the limit crossed. Someone **other than you** with *Approve link
 expansions* opens the same Investigation and sees it at once: a **1 to approve** badge in the header, and on the same
-line, instead of your waiting text, *Degree 2: request p1 from <you> waits for your approval. It crosses the Space's
+line, instead of your waiting text, *Degree 2: request p1 from* (your name) *waits for your approval. It crosses the Space's
 four-eyes limit: row budget 5,000 (limit 1,000).* with **Approve** and **Deny**.
 
 * **Approve** asks first (*Approve this expand?*: approving runs it now, as your step, and records them as the

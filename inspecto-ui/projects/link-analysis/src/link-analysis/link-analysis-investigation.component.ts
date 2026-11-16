@@ -2,6 +2,7 @@ import { PenFieldComponent } from '@inspecto/core/components/pen-field.component
 import {
     ChangeDetectionStrategy,
     Component,
+    ElementRef,
     computed,
     effect,
     inject,
@@ -720,6 +721,7 @@ export class LinkAnalysisInvestigationComponent {
     // ── LA-FULL-CYCLE-TEST-1 phase 5 (finding 23): the approver's side of a held expand ──
     private readonly session = inject(SessionService);
     private readonly dialog = inject(MatDialog);
+    private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
     /** The open Investigation's held requests THIS reader may decide (never their own, never without a Subject). */
     readonly decidable = computed<PendingExpansion[]>(() => {
         const canApprove = this.lens.canApproveLinkExpansions();
@@ -785,7 +787,7 @@ export class LinkAnalysisInvestigationComponent {
 
     /** The approvals badge: bring the first waiting line into view. */
     showApprovals(): void {
-        const line = document.querySelector<HTMLElement>('[data-testid="approver-line"]');
+        const line = this.host.nativeElement.querySelector<HTMLElement>('[data-testid="approver-line"]');
         line?.scrollIntoView?.({ block: 'nearest' });
         line?.querySelector<HTMLButtonElement>('button')?.focus();
     }

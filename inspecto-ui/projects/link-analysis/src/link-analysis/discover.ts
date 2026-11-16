@@ -60,9 +60,8 @@ export function busiest(
     startIds: ReadonlySet<string> = new Set(),
 ): FoundResult {
     const byId = new Map(entities(g).map((n) => [n.id, n]));
-    const ranked = degreeCentrality(g)
-        .filter((s) => byId.has(s.id) && s.score > 0)
-        .slice(0, limit);
+    const all = degreeCentrality(g).filter((s) => byId.has(s.id) && s.score > 0);
+    const ranked = all.slice(0, limit);
     if (!ranked.length)
         return {
             heading: `The busiest ${t.nodes}`,
@@ -86,12 +85,13 @@ export function busiest(
         };
     });
     // The hint (UC-10): a top entity far busier than the next is usually a hub to leave out, not a lead. A start entity
-    // is busy by construction (the graph was drawn round it), so it is neither offered nor counted as "the next".
-    const others = ranked.filter((s) => !startIds.has(s.id));
+    // is busy by construction (the graph was drawn round it), so it is neither offered nor counted as "the next". Both
+    // come from the WHOLE ranking: with several start entities on top, "the next" may lie past the rows shown.
+    const others = all.filter((s) => !startIds.has(s.id));
     const [top, next] = others;
-    if (top && top.score >= 5 && (!next || top.score >= 2 * next.score))
-        rows[ranked.indexOf(top)].hint =
-            `${top.label} has ${count(top.score, t.link, t.links)}. Add it to an exclusion list?`;
+    const at = top ? ranked.indexOf(top) : -1;
+    if (at >= 0 && top.score >= 5 && (!next || top.score >= 2 * next.score))
+        rows[at].hint = `${top.label} has ${count(top.score, t.link, t.links)}. Add it to an exclusion list?`;
     return {
         heading: `The ${count(rows.length, `busiest ${t.node}`, `busiest ${t.nodes}`)} on this graph`,
         rows,

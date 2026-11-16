@@ -69,6 +69,35 @@ describe('Find something interesting - the readings (LA-ONBOARD-1 phase 7, UC-12
         expect(r.rows.slice(2).every((x) => !x.hint)).toBe(true);
     });
 
+    it('judges the busiest other entity against the next other one even past the rows shown (several starts)', () => {
+        // four start entities (an Entity List) of 20 links each fill the top four; X (8) is not twice Y (7)
+        const starts = ['S1', 'S2', 'S3', 'S4'];
+        const leaves = (p: string, n: number) => Array.from({ length: n }, (_, i) => `${p}${i}`);
+        const g: G6GraphData = {
+            nodes: [
+                ...starts,
+                'X',
+                'Y',
+                ...starts.flatMap((s) => leaves(s + '-', 20)),
+                ...leaves('x', 8),
+                ...leaves('y', 7),
+            ].map((id) => node(id)),
+            edges: [
+                ...starts.flatMap((s) => leaves(s + '-', 20).map((l) => edge(s, l))),
+                ...leaves('x', 8).map((l) => edge('X', l)),
+                ...leaves('y', 7).map((l) => edge('Y', l)),
+            ],
+        };
+        const r = busiest(g, T, 5, new Set(starts));
+        expect(r.rows.map((x) => x.title)).toEqual([...starts, 'X']);
+        expect(r.rows.every((x) => !x.hint)).toBe(true);
+        // and when X does stand out, it is still offered from the fifth row
+        const far = { ...g, edges: g.edges.filter((e) => !(e.source === 'Y' && e.target !== 'y0')) };
+        expect(busiest(far, T, 5, new Set(starts)).rows[4].hint).toBe(
+            'X has 8 transfers. Add it to an exclusion list?',
+        );
+    });
+
     it('a start entity alone on top leaves no hint at all when no other entity stands out', () => {
         const star: G6GraphData = {
             nodes: ['S', 'A1', 'A2', 'A3', 'A4', 'A5'].map((id) => node(id)),
