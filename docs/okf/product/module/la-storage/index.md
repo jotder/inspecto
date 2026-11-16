@@ -34,4 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `LA-ENTITY-KEY-NEW-CASE-PAIRS-1` | P3 | defect | the SQL entity key and the Java key still differ for about 55 letters per case rule. | — |
 | `LA-INDEX-SCALE-MEASURE-1` | P3 | chore | clauses (1) and (2) MEASURED 2026-10-05; clause (3) 10^9 still open, held for a customer sizing. | operator |

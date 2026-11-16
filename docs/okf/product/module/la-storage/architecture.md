@@ -92,13 +92,18 @@ and c; keying nodes by the type's rule, option a, was not taken).
   exactly on both paths. The rows keep their raw ids, so under masking each spelling keeps its own alias; the start
   alias is resolved before the spellings are found and no raw id is returned. A masked caller's raw guess is widened
   by key too (`acc-1003` finds the account), but the answer holds aliases only, so no raw id and no spelling reaches them.
-- **The SQL key equals the Java key.** `EntityKeySql` folds, before DuckDB's one-to-one `upper` / `lower`, every
+- **The SQL key equals the Java key, except for the newest case pairs.** `EntityKeySql` folds, before DuckDB's one-to-one `upper` / `lower`, every
   character whose full case mapping in `Locale.ROOT` differs from its simple one (102 for upper case — sharp s,
   ligatures such as `ﬁ`, Greek with ypogegrammeni, `ŉ`, `ǰ`, `և` — and `İ` for lower case), read from the JDK at class
   load. The shared `entity-normaliser-parity.fixture.json` holds Java, the browser and DuckDB to the same answers on
   those inputs. Before this, `ﬁx-1` keyed `ﬁX-1` in SQL and `FIX-1` in Java. The raw equality stays in the Dataset match,
   and the value stays in the index fold, so neither answer — nor the four-eyes fan-out count, taken with the same match —
-  can fall below the exact match if the two keys ever drift again.
+  can fall below the exact match if the two keys ever drift again. ⚠ They do drift for about 55 letters per case rule
+  (`default`, `upper-trim`; none for `digits`, `e164`): case pairs Unicode added after DuckDB 2.0.0.0's tables, such as
+  `ɤ` / U+A7CB, `ƛ` / U+A7DC, U+1C89 / U+1C8A, U+A7CC–A7DB and Garay U+10D50–10D75 (an exhaustive probe of 2026-11-16).
+  DuckDB leaves them as written while Java folds them, so a key spelt with one of them may miss its other spelling on
+  the Dataset path; the raw equality above keeps every read at or above its exact match. Open as
+  `LA-ENTITY-KEY-NEW-CASE-PAIRS-1`.
 - **Cost.** The Dataset match calls regular expressions on the column, so a filter on that column no longer prunes
   Parquet files or row groups: a typed start that the Dataset answers reads the whole relation, as a neighbours read
   with the index off always did. The index reads at most `IndexedNeighbors.MAX_KEY_SPELLINGS` (64) raw ids per end of
