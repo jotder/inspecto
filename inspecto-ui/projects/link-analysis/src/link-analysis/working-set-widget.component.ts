@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { forkJoin } from 'rxjs';
+import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import { InvService, WorkingSetRelation } from '@inspecto/link-analysis/api/inv.service';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
@@ -160,8 +161,9 @@ export class WorkingSetWidgetComponent {
         const b = this.spec();
         const r = this.ready();
         if (!b || !r) return '';
-        const when = new Date(b.pin.pinnedAt);
-        const saved = isNaN(when.getTime()) ? '' : ` (saved ${when.toLocaleString()})`;
+        // the one app clock every Link Analysis time uses (`ledgerTime`, DATES-ONE-ZONE-1)
+        const at = ledgerTime(b.pin.pinnedAt);
+        const saved = at ? ` (saved ${at})` : '';
         return b.mode === 'live'
             ? `Live at step ${r.shown.head.step} · pinned at step ${b.pin.step}${saved}`
             : `Frozen at step ${b.pin.step}${saved} — it never moves`;
