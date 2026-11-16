@@ -46,7 +46,7 @@ export function buildPlan() {
   ];
   const plan = [
     { id: 'investigation', as: 'fm.analyst', method: 'POST', path: '/inv/investigations', body: {
-      id: INV, title: 'Mule hub and its relays', purpose: 'Showcase: layering ring around one mule hub', dataset: DATASET,
+      id: INV, title: 'Mule hub: six feeder accounts and a relay out', purpose: 'Cash structured into one hub account, then passed on through a relay', dataset: DATASET,
       sourceCol: 'PAYER_ACCOUNT', targetCol: 'PAYEE_ACCOUNT', linkKindCol: 'CHANNEL', timeCol: 'BOOKED_AT' } },
     ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'fm.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
     ...[['ra.analyst', 'reviewer'], ['fm.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (

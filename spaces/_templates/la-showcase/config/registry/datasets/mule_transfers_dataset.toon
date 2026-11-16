@@ -1,5 +1,5 @@
 physicalRef: mule_transfers/database
-description: "Account-to-account transfers carrying a planted money-mule layering ring - the Link Analysis showcase. Synthetic."
+description: "Account-to-account transfers in which a money-mule ring moves cash through one hub account and on through a relay. Synthetic data."
 eventDate: BOOKED_DATE
 columns[3]{name,type,classification}:
   PAYER_ACCOUNT,string,ACCOUNT

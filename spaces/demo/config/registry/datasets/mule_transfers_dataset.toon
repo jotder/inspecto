@@ -1,5 +1,5 @@
 physicalRef: mule_transfers/database
-description: "Account-to-account transfers carrying a planted money-mule layering ring — the Link Analysis fraud demo. Synthetic."
+description: "Account-to-account transfers in which a money-mule ring moves cash through one hub account and on through a relay. Synthetic data."
 columns[2]{name,classification}:
   PAYER_ACCOUNT,ACCOUNT
   PAYEE_ACCOUNT,ACCOUNT
