@@ -165,7 +165,7 @@ row's `hold:` tag changed to match.
 | C2 | `UI-TS-STRICT-1` option (a): about 44 null fixes made in place in the vendored `@gamma` code, then `strict` on app-wide. | An operator-approved exception to the rule against editing vendored `@gamma`, scoped to these null fixes only. `hold: operator` removed. `UI-ZONELESS-1` is unchanged. |
 | C3 | Write real OpenAPI summaries for the public routes before 4.0.0 (`OPENAPI-SKELETON-SUMMARIES-1`). | e2e pane specs stay on demand. `hold: demand` removed. |
 | C4 | `MODULE-REORG-P4-3` before 4.0.0. | Scheduled; its "no work item until" trigger no longer applies. |
-| C5 | Delete `AlertMigration` in 4.0.0 (`MODULE-REORG-P7-INCIDENTS`). | The release notes ([API stability](../../module/api/plan-api-stability.md) §Release notes) say an install upgrading from before the Alert store goes through a 3.x release first. ⚠ No released 3.x carries the Alert store (it landed on trunk 2026-10-07; the newest tag is `v3.11.0`), so that path must be restated before the tag. |
+| C5 | Keep `AlertMigration` through 4.0.0 and delete it in 5.0.0 (`MODULE-REORG-P7-INCIDENTS`; restated by the operator the same day). | No released version carries the Alert store (it landed on trunk 2026-10-07; the newest tag is `v3.11.0`, and the 3.x line is retired), so 4.0.0 is the first release with it and must ship the migration that adopts a 3.x install's ALERT objects. The first decision, delete in 4.0.0, would have left every 3.x install without that path. |
 | C7 | Consignment addressing before 4.0.0. | `hold: demand` removed. |
 | C8 | Branch-aware executor residuals, the listing-with-sizes seam, before 4.0.0. | `hold: demand` removed. |
 | C9 | `REALTIME-DECISIONING-1` only on a bid. | `hold: demand`. |

@@ -604,12 +604,11 @@ Phase 6 deletion of the flat read path (Row 15; the operator decided 2026-11-16 
 with no verification minor before it), and X5's cross-lane StepInfo envelope.
 
 **Decided 2026-11-16 to land before the tag (operator, MoSCoW S4 / C5; each adds its own entry above when it
-lands):** the X-Actor header path removed, the `batch_id` rename trio (above), X5 with the StepInfo envelope, and
-the deletion of `AlertMigration` / `LegacyAlertObjects`.
-- ⚠ **Upgrade (when `AlertMigration` is deleted):** an install upgrading from a release before the Alert store must
-  go through a 3.x release first, so that its still-active ALERT objects are adopted into the Alert store; 4.0.0 no
-  longer adopts them, and they load inert. ⚠ Open before the tag: no released 3.x carries the Alert store (it landed
-  on trunk 2026-10-07, after `v3.11.0`), so this path has no release to name yet — restate it before the tag.
+lands):** the X-Actor header path removed, the `batch_id` rename trio (above) and X5 with the StepInfo envelope.
+- **`AlertMigration` stays in 4.0.0 (operator, MoSCoW C5 restated 2026-11-16).** No released version carries the Alert
+  store (it landed on trunk 2026-10-07, after `v3.11.0`), so 4.0.0 is the first release with it and adopts a 3.x
+  install's still-active ALERT objects on upgrade. `AlertMigration` / `LegacyAlertObjects` are deleted in 5.0.0, whose
+  notes must say an install upgrading from 3.x goes through a 4.x release first.
 
 ## The public surface (as it stands for the pending 4.0.0; unchanged since 2.0.0 except where noted)
 
