@@ -223,3 +223,7 @@ defined differently in `inspecto-mfs` and `la-claims`. Finding 28 ("subscribers"
 **Board rows filed at close:** `ALERTS-PAGE-WORDS-1` (finding 30), `LA-DEEPLINK-REVEAL-AUDIT-1`, `LA-INDEX-SPELLINGS-1`,
 `LA-FULL-CYCLE-RESIDUALS-1` (what the lanes left on purpose, the Preview re-bake and roster conflict, the guide screenshot);
 findings 8 and 28 are noted on `LA-INDUSTRY-FOLD-1`; `SPACE-ADMISSION-FOLLOWUPS-1` was filed earlier. `LA-FULL-CYCLE-TEST-1` is closed.
+
+**After close (2026-11-16):** the full backend gate passed on `3dde984c6` (12,749 tests, 0 failures, 151 skipped). Three
+independent executive reviews of live screens drove two presentability rounds; the last found the graph, Reveal and approval
+screens fit for a bank COO. What it left as polish, and amounts on the links, is board row `LA-EXEC-DEMO-POLISH-1`.
