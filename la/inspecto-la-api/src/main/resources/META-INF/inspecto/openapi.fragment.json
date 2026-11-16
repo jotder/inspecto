@@ -728,7 +728,7 @@
         "tags" : [ "inv" ],
         "summary" : "Undo the latest Investigation step",
         "operationId" : "postInvInvestigationsByInvestigationIdUndo",
-        "description" : "Revert the newest effective step of the main log (a recorded undo entry). Optional body {undoes: step} names the step the caller means to revert (LA-GROW-EXCLUDE-UNDO-RACE-1): when another step is the newest by now - a team member's - the answer is 409 CONFLICT_STALE_VERSION naming it and nothing is written; undoes not a whole number from 1 is 422. Without a body the newest step is undone. 409 CONFLICT when there is nothing to undo.",
+        "description" : "Revert the newest effective step of the main log (a recorded undo entry). Optional body {undoes: step} names the step the caller means to revert (LA-GROW-EXCLUDE-UNDO-RACE-1): when another step is the newest by now - a team member's - the answer is 409 CONFLICT_STALE_VERSION naming it and nothing is written; undoes not a whole number from 1 is 422. Without a body the newest step is undone. 409 CONFLICT when there is nothing to undo. Gated on canManageIncidents, and the caller must be a lead: 403 for another member.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -2633,7 +2633,7 @@
         "tags" : [ "inv" ],
         "summary" : "Undo the latest Draft step",
         "operationId" : "postInvInvestigationsByInvestigationIdDraftsByDraftIdUndo",
-        "description" : "Revert the newest effective step of the Draft's own ops (a recorded undo entry). Optional body {undoes: step} names the step the caller means to revert (LA-GROW-EXCLUDE-UNDO-RACE-1): when another step is the newest by now the answer is 409 CONFLICT_STALE_VERSION naming it and nothing is written; undoes not a whole number from 1 is 422. Without a body the newest step is undone. 409 CONFLICT when there is nothing to undo.",
+        "description" : "Revert the newest effective step of the Draft's own ops (a recorded undo entry). Optional body {undoes: step} names the step the caller means to revert (LA-GROW-EXCLUDE-UNDO-RACE-1): when another step is the newest by now the answer is 409 CONFLICT_STALE_VERSION naming it and nothing is written; undoes not a whole number from 1 is 422. Without a body the newest step is undone. 409 CONFLICT when there is nothing to undo. Gated on canManageIncidents; only the Draft's actor may undo: 403 for a lead or reviewer who is not.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",

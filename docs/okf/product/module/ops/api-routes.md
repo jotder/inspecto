@@ -53,10 +53,10 @@ tags: [api, routes, generated]
 | GET | `/tags/assignments/{assignmentId}/{assignmentId2}` | Tags on one target | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
 | POST | `/tags/assignments/{assignmentId}/{assignmentId2}` | Apply a tag to a target | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
 | DELETE | `/tags/assignments/{assignmentId}/{assignmentId2}/{assignmentId22}` | Remove a tag from a target | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
-| GET | `/tags/rules` | List tag rules | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
-| POST | `/tags/rules` | Save a tag rule | tags | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
-| DELETE | `/tags/rules/{ruleId}` | Delete a tag rule | tags | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
-| POST | `/tags/rules/{ruleId}/apply` | Apply a tag rule to existing objects | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
+| GET | `/tags/rules` | List Tag Rules | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
+| POST | `/tags/rules` | Save a Tag Rule | tags | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
+| DELETE | `/tags/rules/{ruleId}` | Delete a Tag Rule | tags | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
+| POST | `/tags/rules/{ruleId}/apply` | Apply a Tag Rule to existing objects | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
 | GET | `/workflows/{workflowId}` | Effective workflow of an object kind | workflows | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
 
 ## Drift

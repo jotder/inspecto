@@ -3064,7 +3064,7 @@
         "tags" : [ "components" ],
         "summary" : "Restore a component version",
         "operationId" : "postComponentsByComponentIdByComponentId2VersionsByVersionIdRestore",
-        "description" : "Writes an archived version back as the current component; the restore is itself a versioned write. Gated on canAuthorWorkbench, plus the kind's own capability where it has a dedicated route. 503 when read-only; 400 for a non-integer version; 404 for an unknown component or version; 409 when a workflow change would strand live objects; 422 for invalid content.",
+        "description" : "Writes an archived version back as the current component; the restore is itself a versioned write. Gated on canAuthorWorkbench, plus the kind's own capability where it has a dedicated route. 503 when read-only; 400 for a non-integer version; 404 for an unknown component or version; 422 for invalid content.",
         "parameters" : [ {
           "name" : "componentId",
           "in" : "path",
@@ -8189,7 +8189,7 @@
         "tags" : [ "tags" ],
         "summary" : "Rename a tag everywhere",
         "operationId" : "postTagsByTagIdRename",
-        "description" : "Renames a tag (body to) across the registry, every assignment, each affected object's and Widget's tags and any tag rule that applies it; renaming onto an existing tag merges the two. Gated on canAuthorWorkbench. 400 when to is missing; 404 for an unknown tag; 422 for an invalid or unsafe name; 503 when the control plane is read-only.",
+        "description" : "Renames a tag (body to) across the registry, every assignment, each affected object's and Widget's tags and any Tag Rule that applies it; renaming onto an existing tag merges the two. Gated on canAuthorWorkbench. 400 when to is missing; 404 for an unknown tag; 422 for an invalid or unsafe name; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "tagId",
           "in" : "path",
@@ -8210,9 +8210,9 @@
     "/tags/rules" : {
       "get" : {
         "tags" : [ "tags" ],
-        "summary" : "List tag rules",
+        "summary" : "List Tag Rules",
         "operationId" : "getTagsRules",
-        "description" : "Returns the tag rules, saved searches that auto-tag new operational objects. No capability gate. 503 when operational objects are not available.",
+        "description" : "Returns the Tag Rules, saved searches that auto-tag new operational objects. No capability gate. 503 when operational objects are not available.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -8223,9 +8223,9 @@
       },
       "post" : {
         "tags" : [ "tags" ],
-        "summary" : "Save a tag rule",
+        "summary" : "Save a Tag Rule",
         "operationId" : "postTagsRules",
-        "description" : "Creates or replaces a tag rule (body name, tag, filter with at least one of type, q, status, priority, severity, category), persisted as <name>_tagrule.toon; saving registers the tag rule's tag. Gated on canAuthorWorkbench. 422 for an invalid or unmodelled body, an unknown filter key or an unsafe name; 403 when the file path escapes the write root; 503 when the control plane is read-only.",
+        "description" : "Creates or replaces a Tag Rule (body name, tag, filter with at least one of type, q, status, priority, severity, category), persisted as <name>_tagrule.toon; saving registers the Tag Rule's tag. Gated on canAuthorWorkbench. 422 for an invalid or unmodelled body, an unknown filter key or an unsafe name; 403 when the file path escapes the write root; 503 when the control plane is read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -8238,9 +8238,9 @@
     "/tags/rules/{ruleId}" : {
       "delete" : {
         "tags" : [ "tags" ],
-        "summary" : "Delete a tag rule",
+        "summary" : "Delete a Tag Rule",
         "operationId" : "deleteTagsRulesByRuleId",
-        "description" : "Removes the tag rule from the registry and deletes its persisted file. Gated on canAuthorWorkbench. 404 for an unknown tag rule; 422 for an unsafe name; 503 when the control plane is read-only.",
+        "description" : "Removes the Tag Rule from the registry and deletes its persisted file. Gated on canAuthorWorkbench. 404 for an unknown Tag Rule; 422 for an unsafe name; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "ruleId",
           "in" : "path",
@@ -8261,9 +8261,9 @@
     "/tags/rules/{ruleId}/apply" : {
       "post" : {
         "tags" : [ "tags" ],
-        "summary" : "Apply a tag rule to existing objects",
+        "summary" : "Apply a Tag Rule to existing objects",
         "operationId" : "postTagsRulesByRuleIdApply",
-        "description" : "Bulk-applies the tag rule to every existing matching operational object (idempotent) and returns matched and updated. No capability gate. 404 for an unknown tag rule.",
+        "description" : "Bulk-applies the Tag Rule to every existing matching operational object (idempotent) and returns matched and updated. No capability gate. 404 for an unknown Tag Rule.",
         "parameters" : [ {
           "name" : "ruleId",
           "in" : "path",
@@ -8404,7 +8404,7 @@
         "tags" : [ "tags" ],
         "summary" : "Delete a tag",
         "operationId" : "deleteTagsByTagId",
-        "description" : "Retires a tag: its registry entry, its file and every assignment, re-projecting each affected object and Widget. Gated on canAuthorWorkbench. 404 for an unknown tag; 409 while a tag rule still applies it; 503 when the control plane is read-only.",
+        "description" : "Retires a tag: its registry entry, its file and every assignment, re-projecting each affected object and Widget. Gated on canAuthorWorkbench. 404 for an unknown tag; 409 while a Tag Rule still applies it; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "tagId",
           "in" : "path",
@@ -8839,7 +8839,7 @@
         "tags" : [ "inv" ],
         "summary" : "Undo the latest Investigation step",
         "operationId" : "postInvInvestigationsByInvestigationIdUndo",
-        "description" : "Revert the newest effective step of the main log (a recorded undo entry). Optional body {undoes: step} names the step the caller means to revert (LA-GROW-EXCLUDE-UNDO-RACE-1): when another step is the newest by now - a team member's - the answer is 409 CONFLICT_STALE_VERSION naming it and nothing is written; undoes not a whole number from 1 is 422. Without a body the newest step is undone. 409 CONFLICT when there is nothing to undo.",
+        "description" : "Revert the newest effective step of the main log (a recorded undo entry). Optional body {undoes: step} names the step the caller means to revert (LA-GROW-EXCLUDE-UNDO-RACE-1): when another step is the newest by now - a team member's - the answer is 409 CONFLICT_STALE_VERSION naming it and nothing is written; undoes not a whole number from 1 is 422. Without a body the newest step is undone. 409 CONFLICT when there is nothing to undo. Gated on canManageIncidents, and the caller must be a lead: 403 for another member.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -9992,7 +9992,7 @@
         "tags" : [ "components" ],
         "summary" : "Create the Findings spec component",
         "operationId" : "postComponentsFindingsSpec",
-        "description" : "Writes a findings-spec component (the Findings panel of one ObjectType). Gated on canManageIncidents, NOT canAuthorWorkbench (D1 = (b), operator 2026-09-25) - the generic /components write routes answer every other kind. Same body, statuses and semantics as the generic route.",
+        "description" : "Creates a findings-spec component (Case-desk configuration) from the body content and its id or name. Gated on canManageIncidents, not canAuthorWorkbench (the generic /components write routes answer every other kind). 503 when the control plane is read-only; 400 without id; 409 when it exists; 422 for invalid content; 202 when an approval policy holds it.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -10006,7 +10006,7 @@
         "tags" : [ "components" ],
         "summary" : "Replace a Findings spec component",
         "operationId" : "putComponentsFindingsSpecByFindingsspecId",
-        "description" : "Writes a findings-spec component (the Findings panel of one ObjectType). Gated on canManageIncidents, NOT canAuthorWorkbench (D1 = (b), operator 2026-09-25) - the generic /components write routes answer every other kind. Same body, statuses and semantics as the generic route.",
+        "description" : "Replaces one findings-spec component, honouring If-Match against its current content hash. Gated on canManageIncidents, not canAuthorWorkbench (the generic /components write routes answer every other kind). 503 when the control plane is read-only; 404 for an unknown component; 409 on a stale If-Match; 422 for invalid content; 202 when an approval policy holds it.",
         "parameters" : [ {
           "name" : "findingsspecId",
           "in" : "path",
@@ -10026,7 +10026,7 @@
         "tags" : [ "components" ],
         "summary" : "Delete a Findings spec component",
         "operationId" : "deleteComponentsFindingsSpecByFindingsspecId",
-        "description" : "Writes a findings-spec component (the Findings panel of one ObjectType). Gated on canManageIncidents, NOT canAuthorWorkbench (D1 = (b), operator 2026-09-25) - the generic /components write routes answer every other kind. Same body, statuses and semantics as the generic route.",
+        "description" : "Safe-deletes one findings-spec component. Gated on canManageIncidents, not canAuthorWorkbench (the generic /components write routes answer every other kind). 503 when the control plane is read-only; 404 for an unknown component; 409 when a Pipeline references it or it is shared with other Spaces; 202 when an approval policy holds it.",
         "parameters" : [ {
           "name" : "findingsspecId",
           "in" : "path",
@@ -10048,7 +10048,7 @@
         "tags" : [ "components" ],
         "summary" : "Restore a Findings spec version",
         "operationId" : "postComponentsFindingsSpecByFindingsspecIdVersionsByVersionIdRestore",
-        "description" : "Writes a findings-spec component (the Findings panel of one ObjectType). Gated on canManageIncidents, NOT canAuthorWorkbench (D1 = (b), operator 2026-09-25) - the generic /components write routes answer every other kind. Same body, statuses and semantics as the generic route.",
+        "description" : "Writes an archived version of a findings-spec component back as the current one; the restore is itself a versioned write. Gated on canManageIncidents, not canAuthorWorkbench (the generic /components write routes answer every other kind). 503 when the control plane is read-only; 400 for a non-integer version; 404 for an unknown component or version; 422 for invalid content.",
         "parameters" : [ {
           "name" : "findingsspecId",
           "in" : "path",
@@ -12192,7 +12192,7 @@
         "tags" : [ "inv" ],
         "summary" : "Undo the latest Draft step",
         "operationId" : "postInvInvestigationsByInvestigationIdDraftsByDraftIdUndo",
-        "description" : "Revert the newest effective step of the Draft's own ops (a recorded undo entry). Optional body {undoes: step} names the step the caller means to revert (LA-GROW-EXCLUDE-UNDO-RACE-1): when another step is the newest by now the answer is 409 CONFLICT_STALE_VERSION naming it and nothing is written; undoes not a whole number from 1 is 422. Without a body the newest step is undone. 409 CONFLICT when there is nothing to undo.",
+        "description" : "Revert the newest effective step of the Draft's own ops (a recorded undo entry). Optional body {undoes: step} names the step the caller means to revert (LA-GROW-EXCLUDE-UNDO-RACE-1): when another step is the newest by now the answer is 409 CONFLICT_STALE_VERSION naming it and nothing is written; undoes not a whole number from 1 is 422. Without a body the newest step is undone. 409 CONFLICT when there is nothing to undo. Gated on canManageIncidents; only the Draft's actor may undo: 403 for a lead or reviewer who is not.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",

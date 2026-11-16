@@ -761,7 +761,7 @@
         "tags" : [ "tags" ],
         "summary" : "Rename a tag everywhere",
         "operationId" : "postTagsByTagIdRename",
-        "description" : "Renames a tag (body to) across the registry, every assignment, each affected object's and Widget's tags and any tag rule that applies it; renaming onto an existing tag merges the two. Gated on canAuthorWorkbench. 400 when to is missing; 404 for an unknown tag; 422 for an invalid or unsafe name; 503 when the control plane is read-only.",
+        "description" : "Renames a tag (body to) across the registry, every assignment, each affected object's and Widget's tags and any Tag Rule that applies it; renaming onto an existing tag merges the two. Gated on canAuthorWorkbench. 400 when to is missing; 404 for an unknown tag; 422 for an invalid or unsafe name; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "tagId",
           "in" : "path",
@@ -782,9 +782,9 @@
     "/tags/rules" : {
       "get" : {
         "tags" : [ "tags" ],
-        "summary" : "List tag rules",
+        "summary" : "List Tag Rules",
         "operationId" : "getTagsRules",
-        "description" : "Returns the tag rules, saved searches that auto-tag new operational objects. No capability gate. 503 when operational objects are not available.",
+        "description" : "Returns the Tag Rules, saved searches that auto-tag new operational objects. No capability gate. 503 when operational objects are not available.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -795,9 +795,9 @@
       },
       "post" : {
         "tags" : [ "tags" ],
-        "summary" : "Save a tag rule",
+        "summary" : "Save a Tag Rule",
         "operationId" : "postTagsRules",
-        "description" : "Creates or replaces a tag rule (body name, tag, filter with at least one of type, q, status, priority, severity, category), persisted as <name>_tagrule.toon; saving registers the tag rule's tag. Gated on canAuthorWorkbench. 422 for an invalid or unmodelled body, an unknown filter key or an unsafe name; 403 when the file path escapes the write root; 503 when the control plane is read-only.",
+        "description" : "Creates or replaces a Tag Rule (body name, tag, filter with at least one of type, q, status, priority, severity, category), persisted as <name>_tagrule.toon; saving registers the Tag Rule's tag. Gated on canAuthorWorkbench. 422 for an invalid or unmodelled body, an unknown filter key or an unsafe name; 403 when the file path escapes the write root; 503 when the control plane is read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -810,9 +810,9 @@
     "/tags/rules/{ruleId}" : {
       "delete" : {
         "tags" : [ "tags" ],
-        "summary" : "Delete a tag rule",
+        "summary" : "Delete a Tag Rule",
         "operationId" : "deleteTagsRulesByRuleId",
-        "description" : "Removes the tag rule from the registry and deletes its persisted file. Gated on canAuthorWorkbench. 404 for an unknown tag rule; 422 for an unsafe name; 503 when the control plane is read-only.",
+        "description" : "Removes the Tag Rule from the registry and deletes its persisted file. Gated on canAuthorWorkbench. 404 for an unknown Tag Rule; 422 for an unsafe name; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "ruleId",
           "in" : "path",
@@ -833,9 +833,9 @@
     "/tags/rules/{ruleId}/apply" : {
       "post" : {
         "tags" : [ "tags" ],
-        "summary" : "Apply a tag rule to existing objects",
+        "summary" : "Apply a Tag Rule to existing objects",
         "operationId" : "postTagsRulesByRuleIdApply",
-        "description" : "Bulk-applies the tag rule to every existing matching operational object (idempotent) and returns matched and updated. No capability gate. 404 for an unknown tag rule.",
+        "description" : "Bulk-applies the Tag Rule to every existing matching operational object (idempotent) and returns matched and updated. No capability gate. 404 for an unknown Tag Rule.",
         "parameters" : [ {
           "name" : "ruleId",
           "in" : "path",
@@ -976,7 +976,7 @@
         "tags" : [ "tags" ],
         "summary" : "Delete a tag",
         "operationId" : "deleteTagsByTagId",
-        "description" : "Retires a tag: its registry entry, its file and every assignment, re-projecting each affected object and Widget. Gated on canAuthorWorkbench. 404 for an unknown tag; 409 while a tag rule still applies it; 503 when the control plane is read-only.",
+        "description" : "Retires a tag: its registry entry, its file and every assignment, re-projecting each affected object and Widget. Gated on canAuthorWorkbench. 404 for an unknown tag; 409 while a Tag Rule still applies it; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "tagId",
           "in" : "path",

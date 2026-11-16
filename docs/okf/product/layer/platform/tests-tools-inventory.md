@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-108 test file(s). Run one, or all:
+109 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs

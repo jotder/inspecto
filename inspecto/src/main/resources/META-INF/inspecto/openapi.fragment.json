@@ -3516,7 +3516,7 @@
         "tags" : [ "components" ],
         "summary" : "Restore a component version",
         "operationId" : "postComponentsByComponentIdByComponentId2VersionsByVersionIdRestore",
-        "description" : "Writes an archived version back as the current component; the restore is itself a versioned write. Gated on canAuthorWorkbench, plus the kind's own capability where it has a dedicated route. 503 when read-only; 400 for a non-integer version; 404 for an unknown component or version; 409 when a workflow change would strand live objects; 422 for invalid content.",
+        "description" : "Writes an archived version back as the current component; the restore is itself a versioned write. Gated on canAuthorWorkbench, plus the kind's own capability where it has a dedicated route. 503 when read-only; 400 for a non-integer version; 404 for an unknown component or version; 422 for invalid content.",
         "parameters" : [ {
           "name" : "componentId",
           "in" : "path",
@@ -7305,7 +7305,7 @@
         "tags" : [ "components" ],
         "summary" : "Create the Findings spec component",
         "operationId" : "postComponentsFindingsSpec",
-        "description" : "Writes a findings-spec component (the Findings panel of one ObjectType). Gated on canManageIncidents, NOT canAuthorWorkbench (D1 = (b), operator 2026-09-25) - the generic /components write routes answer every other kind. Same body, statuses and semantics as the generic route.",
+        "description" : "Creates a findings-spec component (Case-desk configuration) from the body content and its id or name. Gated on canManageIncidents, not canAuthorWorkbench (the generic /components write routes answer every other kind). 503 when the control plane is read-only; 400 without id; 409 when it exists; 422 for invalid content; 202 when an approval policy holds it.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -7319,7 +7319,7 @@
         "tags" : [ "components" ],
         "summary" : "Replace a Findings spec component",
         "operationId" : "putComponentsFindingsSpecByFindingsspecId",
-        "description" : "Writes a findings-spec component (the Findings panel of one ObjectType). Gated on canManageIncidents, NOT canAuthorWorkbench (D1 = (b), operator 2026-09-25) - the generic /components write routes answer every other kind. Same body, statuses and semantics as the generic route.",
+        "description" : "Replaces one findings-spec component, honouring If-Match against its current content hash. Gated on canManageIncidents, not canAuthorWorkbench (the generic /components write routes answer every other kind). 503 when the control plane is read-only; 404 for an unknown component; 409 on a stale If-Match; 422 for invalid content; 202 when an approval policy holds it.",
         "parameters" : [ {
           "name" : "findingsspecId",
           "in" : "path",
@@ -7339,7 +7339,7 @@
         "tags" : [ "components" ],
         "summary" : "Delete a Findings spec component",
         "operationId" : "deleteComponentsFindingsSpecByFindingsspecId",
-        "description" : "Writes a findings-spec component (the Findings panel of one ObjectType). Gated on canManageIncidents, NOT canAuthorWorkbench (D1 = (b), operator 2026-09-25) - the generic /components write routes answer every other kind. Same body, statuses and semantics as the generic route.",
+        "description" : "Safe-deletes one findings-spec component. Gated on canManageIncidents, not canAuthorWorkbench (the generic /components write routes answer every other kind). 503 when the control plane is read-only; 404 for an unknown component; 409 when a Pipeline references it or it is shared with other Spaces; 202 when an approval policy holds it.",
         "parameters" : [ {
           "name" : "findingsspecId",
           "in" : "path",
@@ -7361,7 +7361,7 @@
         "tags" : [ "components" ],
         "summary" : "Restore a Findings spec version",
         "operationId" : "postComponentsFindingsSpecByFindingsspecIdVersionsByVersionIdRestore",
-        "description" : "Writes a findings-spec component (the Findings panel of one ObjectType). Gated on canManageIncidents, NOT canAuthorWorkbench (D1 = (b), operator 2026-09-25) - the generic /components write routes answer every other kind. Same body, statuses and semantics as the generic route.",
+        "description" : "Writes an archived version of a findings-spec component back as the current one; the restore is itself a versioned write. Gated on canManageIncidents, not canAuthorWorkbench (the generic /components write routes answer every other kind). 503 when the control plane is read-only; 400 for a non-integer version; 404 for an unknown component or version; 422 for invalid content.",
         "parameters" : [ {
           "name" : "findingsspecId",
           "in" : "path",
