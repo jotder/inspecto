@@ -118,7 +118,11 @@ public final class DatasetRelation {
         if (sourceName == null)
             throw new IllegalArgumentException(
                     "a virtual dataset's 'sql' needs a 'sourceName' — the store its FROM reads");
-        String storeRead = storeRelationSql(sourceName, dataRoot);   // path-jails the name first
+        return virtualOver(userSql, sourceName, storeRelationSql(sourceName, dataRoot));   // path-jails the name first
+    }
+
+    /** {@link #virtualRelationSql} over an already built read of its source store (a Run snapshot's pinned files, too). */
+    private static String virtualOver(String userSql, String sourceName, String storeRead) {
         // The store name is proven to be a jailed store ref above, so SqlGuard may let it through as a
         // relation even when it carries a '/' (the same exemption POST /db/query grants a real store).
         List<Finding> findings = SqlGuard.check(userSql, sourceName);
@@ -236,6 +240,55 @@ public final class DatasetRelation {
             abs.add(p.toString());
         }
         return withCalculated("SELECT * FROM " + SqlViews.readerOverLiteral("PARQUET", SqlViews.pathList(abs), false), datasetConfig);
+    }
+
+    /**
+     * A Run snapshot's pin ({@link RunSnapshot}): the readable files of the store the relation reads, as {@link #inputFiles}
+     * names them ({@code names}) and as absolute paths ({@code paths}), in the same order, sorted by name.
+     */
+    record StoreFiles(List<String> names, List<Path> paths) {}
+
+    /**
+     * The files of {@code datasetConfig}'s store, enumerated (the {@link #inputFiles} walk and catalog subtraction, never a
+     * glob) under the store's swap lock: inside a {@link com.gamma.job.SnapshotSwapLock#hold()} block the lock stays held
+     * until the block ends, so the caller can preserve the files before a swap can remove them.
+     *
+     * @return {@code null} when the relation reads no enumerable store (a {@code view}-backed Dataset, no data root, or the
+     *         walk failed)
+     */
+    static StoreFiles storeFiles(Map<String, Object> datasetConfig, Path dataRoot) {
+        String userSql = Values.trimToNull(datasetConfig == null ? null : datasetConfig.get("sql"));
+        if (userSql == null && Values.trimToNull(datasetConfig == null ? null : datasetConfig.get("view")) != null) return null;
+        String ref = userSql != null ? Values.trimToNull(datasetConfig.get("sourceName"))
+                : Values.trimToNull(datasetConfig == null ? null : datasetConfig.get("physicalRef"));
+        if (ref == null) return null;
+        boolean shared = ref.startsWith(SHARED_PREFIX);
+        if (!shared && dataRoot == null) return null;
+        String root = storeReadRoot(ref, dataRoot);
+        Path rel = shared ? Path.of(root) : dataRoot.normalize();
+        String prefix = shared ? ref + "/" : "";
+        try (com.gamma.job.SnapshotSwapLock.Held pin = com.gamma.job.SnapshotSwapLock.pin(root)) {
+            List<String> found = com.gamma.consignment.ConsignmentSelector.readableFiles(root, "parquet", Integer.MAX_VALUE - 1);
+            if (found == null) return null;
+            java.util.TreeMap<String, Path> byName = new java.util.TreeMap<>();
+            for (String f : found) {
+                Path p = Path.of(f).normalize();
+                byName.put(prefix + rel.relativize(p).toString().replace('\\', '/'), p.toAbsolutePath());
+            }
+            return new StoreFiles(List.copyOf(byName.keySet()), List.copyOf(byName.values()));
+        }
+    }
+
+    /**
+     * The relation of {@code datasetConfig} over exactly {@code files} (absolute paths): the read {@link #relationSql}
+     * builds for a {@code physicalRef} or virtual Dataset, with its source store replaced by that list. Not registered with
+     * {@link QueryExecutor#repinnable}: a Run snapshot must never be rendered again onto newer files.
+     */
+    static String relationSqlOverPinned(Map<String, Object> datasetConfig, List<String> files) {
+        String read = "SELECT * FROM " + SqlViews.readerOverLiteral("PARQUET", SqlViews.pathList(files), false);
+        String userSql = Values.trimToNull(datasetConfig.get("sql"));
+        return withCalculated(userSql == null ? read
+                : virtualOver(userSql, Values.trimToNull(datasetConfig.get("sourceName")), read), datasetConfig);
     }
 
     /** The {@code physicalRef} read of one store ref (local, path-jailed; or a granted {@code shared/} snapshot). */

@@ -335,6 +335,27 @@ sink monitor and file lock, which no reader takes), so there is no deadlock.
   renders of an identical relation share one entry, and the newest render is kept.
   `retire_superseded` deletes a file under `SnapshotSwapLock.writeAbove`, waiting for a reader that pinned it
   before it was superseded.
+- **Run-level snapshots** (since 2026-11-17, Platform Services Stage 2, MoSCoW S6): a Job reading through the
+  `datasets` Platform Service (`DatasetAccess`) gets `RunSnapshot`, so the first read of a Dataset in a Run pins it and
+  every later read in the same Run returns that pin; the next Run pins afresh. Holding the read lock for the Run was
+  rejected: a publish would then wait for the slowest Run reading its store, up to the Job deadline (24 h ceiling).
+  A pin keeps the **files** instead: inside `hold()`, under the store's read lock and only while it enumerates and
+  links, each file gets a hard link in `<dataRoot>/.run-snapshots/<uuid>/` (a copy where the file system has none,
+  such as a store on another volume), and the relation reads the links. A swap's rename or a retirement's delete
+  then removes only the store's name for the file; the Run's name keeps the bytes until the Run ends. Keeping the
+  `*.stale` files longer would not do it (the path is gone at the rename, see above). So a swap waits only for a pin
+  under way, never for a Run. The Run's relation is not registered with `QueryExecutor.repinnable`: a lost-pin
+  retry may never move a Run onto a newer snapshot (and with the links in place no pin is lost). Released by
+  `JobService` in the Run's `finally` on success, failure, cancel (`interruptRuns`) and deadline, and by
+  `PackTestHarness` when its Run returns; a read after that is refused. A directory a crash or a still-open file left
+  behind is deleted by the next Run that pins in that data root. Retries inside one Run share its pins.
+  **Covered:** every Job Type declaring `requires: [datasets]` — today only Job Pack types; no built-in Job Type reads
+  through `DatasetAccess`. **Not covered, per-call as before:** a `view`-backed Dataset (no file list to pin), a
+  pack-contributed `DatasetAccess`, and a pack Step in a Pipeline (its grant is taken at load time, not per Run). Every
+  built-in reader above (`sql.template`, `materialize`, `source_store`, `expectation.evaluate`, `recon.run`,
+  `exchange`, `postgres.publish`, enrichment, the scoring and report Jobs, Link Analysis index builds, every
+  `QueryExecutor` reader) keeps its own rule. ⚠ A link shares the file's bytes: a writer must publish by rename, never
+  rewrite a live `*.parquet` in place (the writers listed below publish by rename or write new files).
 Every writer that hides, replaces or deletes a live `*.parquet` holds the write lock: the snapshot swaps,
 `ReferenceCompactor`, `PartitionCompactor`, `DatasetPeriod` replace and restore, `IncrementalSink` prune and
 rollback, `ScoreOutputWriter` prune; `ScoreOutputWriter` also sweeps a crashed run's `.tmp` / `.stale`. A swap

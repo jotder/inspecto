@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-408 test class(es): 408 unit, 0 real-HTTP control-plane, 0 IT.
+410 test class(es): 410 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -256,6 +256,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `RunContextCausationTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/RunContextCausationTest.java` | The causation THREAD, end to end at the producing side. |
 | `RunLogStoreTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/RunLogStoreTest.java` | {@code AUDIT-LOG-UNBOUNDED-READ-1}: {@link RunLogStore#read} streams the run's JSONL instead of loading it |
 | `RunSignalEmitterTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/RunSignalEmitterTest.java` | A Run's Signal emitter: the chain depth on every emitted Signal is the SYSTEM value (a payload |
+| `RunSnapshotReleaseTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/RunSnapshotReleaseTest.java` | Platform Services Stage 2: a Job Run's {@code datasets} pins (com.gamma.query.RunSnapshot) are released when the Run |
 | `SampleJobTypesTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SampleJobTypesTest.java` | The two sample Job Types shipped as learning material: {@code sample.hello}'s declaration is a tour of |
 | `ScaffoldTemplatesTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ScaffoldTemplatesTest.java` | Guards the scaffolder's templates (S1-8) against the rot they are uniquely prone to: they are Java |
 | `SecretMaskingTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SecretMaskingTest.java` | PARAM-SECRET-LEAK-1 — a {@code secret}-declared parameter must not reach the run log or a rejection |
@@ -426,6 +427,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `QueryExecutorSwapRetryTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/QueryExecutorSwapRetryTest.java` | SNAPSHOT-SWAP-UNLOCKED-READERS-1, the interactive readers' seam: a Dataset relation pins its store's files when it is |
 | `ResultSetDescriptorTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/ResultSetDescriptorTest.java` | Parity guard for {@link ResultSetDescriptor} (W4) — the Java mirror of the UI |
 | `RuleTemplateTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/RuleTemplateTest.java` | Rule Template compilation — the {@code :name} → positional-{@code ?} rewrite that makes a stored |
+| `RunSnapshotTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/RunSnapshotTest.java` | {@link RunSnapshot} (Platform Services Stage 2, MoSCoW S6): a Run pins each Dataset once, at its first read, and every |
 | `ViewReaderSqlTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/ViewReaderSqlTest.java` | {@link ViewReaderSql} (consignment addressing §7-A, the {@code deriveViewSql} residual): a view's derived SQL |
 | `AgUiProjectionTest` | `com.gamma.signal` | unit | `platform/inspecto-engine/src/test/java/com/gamma/signal/AgUiProjectionTest.java` | {@link AgUiProjection#project} — the catalogued {@code agent.*} types project to their AG-UI |
 | `DatasetWriteSignalTest` | `com.gamma.signal` | unit | `platform/inspecto-engine/src/test/java/com/gamma/signal/DatasetWriteSignalTest.java` | S3a (ELT amendment Phase 3, design of record 2026-08-06): a Dataset write publishes the |

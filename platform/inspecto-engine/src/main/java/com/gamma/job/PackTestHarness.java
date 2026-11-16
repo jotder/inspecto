@@ -183,9 +183,9 @@ public final class PackTestHarness {
         ctx.params = pr.resolved();
         PlatformServices granted = platform.grant(Set.copyOf(
                 registry.descriptor(typeId).map(JobTypeDescriptor::requires).orElse(List.of())));
-        ctx.services = dryRun ? DryRunServices.wrap(granted, ctx.log()) : granted;
-
-        try {
+        // As a real Run: the datasets reads of this Run pin each Dataset once, released when the Run ends.
+        try (com.gamma.query.RunSnapshot snapshot = com.gamma.query.RunSnapshot.open(granted)) {
+            ctx.services = dryRun ? DryRunServices.wrap(snapshot.services(), ctx.log()) : snapshot.services();
             JobResult res = job.run(ctx);
             return outcome(res.status(), res.message(), ctx);
         } catch (Exception e) {

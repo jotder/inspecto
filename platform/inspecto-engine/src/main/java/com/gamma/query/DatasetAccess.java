@@ -18,8 +18,13 @@ import java.util.function.Supplier;
  * <h3>Inherited from {@code ConsignmentSelector} (D-10, option 1)</h3>
  * The relation and the file list come through {@link DatasetRelation}, which asks the selector: files the
  * Consignment catalog marks unreadable are pruned, and the list is PINNED at this call, so a file landing
- * afterwards never reaches the read. There is no held snapshot handle in this slice — each {@link #read}
- * pins afresh.
+ * afterwards never reaches the read. Each {@link #read} on this service pins afresh.
+ *
+ * <h3>Run-level snapshot (Platform Services Stage 2, 2026-11-17)</h3>
+ * A Job Run is handed a {@link RunSnapshot} instead: the first read of a Dataset in the Run pins its files, and every
+ * later read in the same Run returns that pin, even after a snapshot swap or a retirement removed the files from the
+ * store. The Run ends, the pins are released. A {@code view}-backed Dataset has no file list to pin and is read afresh
+ * each time.
  *
  * <h3>Scope (fail closed)</h3>
  * Per-Space: the service is bound to ONE Space; naming another Space, or a Dataset that Space does not
@@ -50,28 +55,12 @@ public interface DatasetAccess {
      */
     Read read(String spaceId, String datasetId);
 
-    /** The production implementation over one Space's Dataset components; suppliers are read per call. */
+    /**
+     * The production implementation over one Space's Dataset components; suppliers are read per call. A Job Run gets a
+     * {@link RunSnapshot} over it instead, which pins each Dataset once per Run.
+     */
     static DatasetAccess over(String ownSpaceId, Function<String, Optional<Map<String, Object>>> datasets,
                               Supplier<Path> dataRoot, Supplier<ViewStore> views) {
-        return (spaceId, datasetId) -> {
-            if (spaceId == null || !spaceId.equals(ownSpaceId))
-                throw new IllegalStateException("Dataset read refused: Space '" + spaceId
-                        + "' is not the Space this service is bound to ('" + ownSpaceId + "'), dataset '" + datasetId + "'");
-            Map<String, Object> cfg = datasetId == null ? null : datasets.apply(datasetId).orElse(null);
-            if (cfg == null)
-                throw new IllegalStateException("Dataset read refused: no dataset '" + datasetId
-                        + "' in Space '" + ownSpaceId + "'");
-            String sql;
-            Optional<List<String>> files;
-            try {
-                sql = DatasetRelation.relationSql(cfg, dataRoot.get(), views.get());
-                files = DatasetRelation.inputFiles(cfg, dataRoot.get(), Integer.MAX_VALUE - 1)
-                        .map(f -> f.files().stream().map(DatasetRelation.FileStamp::path).toList());
-            } catch (IllegalArgumentException bad) {
-                throw new IllegalStateException("Dataset read refused: dataset '" + datasetId + "' is unusable: "
-                        + bad.getMessage(), bad);
-            }
-            return new Read(datasetId, sql, files);
-        };
+        return new SpaceDatasetAccess(ownSpaceId, datasets, dataRoot, views);
     }
 }

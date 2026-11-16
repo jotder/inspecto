@@ -339,8 +339,9 @@ alone · D-9 cross-pack service dependencies resolved by a retry pass, no manife
 interfaces are engine-published `@PublicApi` only (a shared pack-API loader is a later design only) · D-13 Job
 deadline 30 min default, 24 h ceiling, long built-in types default to the ceiling (operator, 2026-10-06; §7f).
 
-⚠ **Known limit (operator, 2026-10-06):** `DatasetAccess` pins per call (D-10), so two reads in one Run may see
-different file lists; a per-Run held snapshot handle is built ON DEMAND only.
+~~⚠ **Known limit (operator, 2026-10-06):** `DatasetAccess` pins per call (D-10), so two reads in one Run may see
+different file lists; a per-Run held snapshot handle is built ON DEMAND only.~~ **Built 2026-11-17** (operator,
+MoSCoW S6, 2026-11-16): a Job Run pins each Dataset once, at its first read (`RunSnapshot`, §7e).
 
 **Deliberately deferred (each needs a design or an operator call, not just code):** a write side and a
 Subject-level capability check for `DatasetAccess` (needs a Run Subject); filtered `services()` on
@@ -374,8 +375,16 @@ guard exists.
 
 - **D-10 (operator): inherit `ConsignmentSelector` as-is.** `com.gamma.query.DatasetAccess`, service id `datasets`,
   `read(spaceId, datasetId)` -> `Read(datasetId, relationSql, Optional<files>)`. The relation and file list come from
-  `DatasetRelation`, so unreadable files are pruned and the list is pinned per call. No held snapshot handle yet:
-  each read pins afresh. A view-backed Dataset reports no files ('cannot know').
+  `DatasetRelation`, so unreadable files are pruned and the list is pinned per call. A view-backed Dataset reports
+  no files ('cannot know').
+- **Run-level snapshot (Platform Services Stage 2, 2026-11-17).** A Job Run is handed `com.gamma.query.RunSnapshot`
+  instead of the Space's service: the first read of a Dataset in the Run pins it, and every later read in the Run
+  returns that pin, so all reads of one Run see one file list. The pin keeps the files, not the swap lock: under the
+  store's read lock (only while it enumerates and links) each file gets a hard link (a copy where the file system
+  has none) in `<dataRoot>/.run-snapshots/<uuid>/`, and the relation reads the links, so a swap or
+  `retire_superseded` that removes the store's name for a file leaves the Run's. Released in the Run's `finally`
+  (success, failure, cancel, deadline); a leftover is swept by the next Run that pins. A view-backed Dataset and a
+  pack-contributed `DatasetAccess` keep per-call pinning. Detail: [Jobs](spec-jobs.md), "Snapshot swaps and readers".
 - **Read-only, per-Space, fail closed:** bound to one Space; another Space or an unknown Dataset throws naming the
   ids, never an empty result. A Job's authority is its `requires: [datasets]` grant (no Subject at fire time).
 - Engine-published (D-12), `readOnly()` when pack-contributed (no stand-in); disable refuses the grant.

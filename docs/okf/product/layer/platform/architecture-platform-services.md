@@ -59,7 +59,7 @@ registry is a `JobService` constructor parameter, so `requires:` is validated du
 | `incidents` | `IncidentAccess` | logs the would-be Incident, opens nothing |
 | `schema` | `SchemaAccess` | read-only, passes through |
 | `consignment-status` | `ConsignmentStatusAccess` | read-only |
-| `datasets` | `DatasetAccess` | read-only (per-call pinning) |
+| `datasets` | `DatasetAccess` | read-only (a Job Run pins each Dataset once, at its first read) |
 | `analytics` | `AnalyticsAccess` | read-only (Analytics Kernel) |
 | `alerts` | `AlertAccess` | does not evaluate; returns empty and says nothing was checked |
 | `link-index` | `LinkIndexAccess` (a real build needs the `inspecto-geo-link` bridge; without it the call throws and the Job fails closed) | reports `DRY_RUN`, builds nothing |
@@ -107,4 +107,8 @@ There are no Space TOON keys. A Job definition grants through its type's `requir
 - A pack stand-in cannot replace the built-in `notifications`, `incidents`, `alerts` or `link-index` stand-ins.
 - A lean `JobService` with no registry accepts a built-in's `requires:`; third-party providers stay strict.
 - Pack Steps are capped: `StepExecutors.CEILING = {mail}` rejects a Step requiring `mail`.
-- `DatasetAccess` pins per call: two reads in one Run may see different file lists.
+- `DatasetAccess` pins once per Job Run (`RunSnapshot`, since 2026-11-17): the first read of a Dataset in a Run pins
+  its files as hard links under `<dataRoot>/.run-snapshots/<uuid>/`, every later read in the Run returns that pin, and
+  the Run's end deletes the links. A publish never waits for a Run, only for a pin under way. Still per call: a
+  `view`-backed Dataset (no file list), a pack-contributed `DatasetAccess`, and a pack Step's grant (load-time, not
+  per Run). A published file must never be rewritten in place, since a link shares its bytes.

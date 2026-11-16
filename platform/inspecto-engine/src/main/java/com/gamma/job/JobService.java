@@ -1790,11 +1790,16 @@ public final class JobService implements AutoCloseable {
         // S1-2: grant exactly the type's declared requires: — registration already validated the
         // ids, so this cannot throw for a registered type. Grants are honest (R4): a service that
         // exists but was not declared stays invisible to the Run.
+        // Platform Services Stage 2: the Run's datasets reads pin each Dataset once, at its first read (RunSnapshot). It
+        // holds nothing before that read, so the REJECTED return below has nothing to release; the finally of the run
+        // body releases it on every other end (success, failure, cancel, deadline).
+        com.gamma.query.RunSnapshot snapshot = null;
         if (platform != null) {
             PlatformServices granted = platform.grant(Set.copyOf(
                     registry.descriptor(job.type()).map(JobTypeDescriptor::requires).orElse(List.of())));
+            snapshot = com.gamma.query.RunSnapshot.open(granted);
             // S1-3/S1-4 dry-run contract (§3.4): mutating services record instead of act.
-            ctx.services(firing.dryRun() ? DryRunServices.wrap(granted, ctx.log()) : granted);
+            ctx.services(firing.dryRun() ? DryRunServices.wrap(snapshot.services(), ctx.log()) : snapshot.services());
         }
         // resolved Parameter Context (R2/R5) — with declared `secret` values hidden. ⛔ The masking is
         // NOT cosmetic and must not be dropped as noise: this line runs for every Job, before the Job's
@@ -1883,6 +1888,7 @@ public final class JobService implements AutoCloseable {
             if (closing) Thread.interrupted();
             packs.releaseRun(packOwner);
             serviceOwners.forEach(packs::releaseRun);
+            if (snapshot != null) snapshot.close();
             if (pipelineId != null) runningPipelines.remove(pipelineId);
             // DUCKLE-C4: the receipt rides the run whether it succeeded or threw — "why did it use THAT value"
             // matters most for a failed run. GET /jobs/{name}/runs/{runId}/artifacts, kind `params`; layer
