@@ -25,6 +25,11 @@ timestamp: 2026-09-08T00:00:00Z
 > the **Exchange** family shares *across* Spaces. An **Access Policy** is an allow/deny statement over
 > **Attributes**; ⛔ never bare *Rule* or *Policy Rule*. An **Edition** is a build flavour, never a branch and
 > never a runtime flag (§14).
+>
+> ⚠ **Edition names (2026-11-17).** This spec was written before the 2026-10-17 rename (`LA-EDITIONS-1`): read
+> *Personal* as **Basic** and *Enterprise* as **Advanced** (the `edition-advanced` profile, which also carries
+> `inspecto-policy`); *Standard* is unchanged, and `edition-preview` carries the same security modules as Advanced.
+> Dated decisions keep the names they were taken under.
 
 ## 1. Purpose & scope
 
@@ -97,7 +102,7 @@ citing either. The EDITIONS rows are the edition truth and are corrected here in
 |---|---|---|
 | `SEC-09` note | Personal events carry `actor=anonymous` | The unauthenticated default actor is **`appUser`** (`RequestAttrs.actor`, `spi/inspecto-auth-spi/src/main/java/com/gamma/spi/auth/RequestAttrs.java`; `ApiContext.actor` delegates to it): an authenticated `Subject.id()` first, else `agent:<session>`, else the `X-Actor` header, else `appUser`. No `anonymous` string exists in the tree |
 | `SEC-11` note | "client-migration-gated" | The API-v1 sunset apparatus was deleted 2026-07-25; `BACKLOG.md` §2 restated the gate 2026-09-07 as **the next MAJOR tag** |
-| `SEC-12` (end-session redirect) | `— / 🔲 / 🔲`, "nobody has asked" | **Half built.** The SPA implements RP-Initiated Logout (`SessionService.logout()` redirects to `endSessionUrl` with `client_id` + `post_logout_redirect_uri`, 2026-07-26) and reads `boot.auth?.endSessionUrl ?? environment.oidc.endSessionUrl`. **The server never publishes an `auth` block** — `BootstrapRoutes` emits only `features.authMode`; no Java file contains `authorizeUrl` or `endSessionUrl` — so the only working path is the build-time `environment.ts` value. 🟡 for S/E: works, but configured at UI build time, not at deployment |
+| `SEC-12` (end-session redirect) | `— / 🔲 / 🔲`, "nobody has asked" | **Built.** The SPA implements RP-Initiated Logout (`SessionService.logout()`, 2026-07-26) and reads `boot.auth?.endSessionUrl ?? environment.oidc.endSessionUrl`. Since 2026-10-10 the server publishes the `auth` block: `BootstrapRoutes` puts `TokenRelay.bootstrapAuth()` under `auth`, and `OidcTokenRelay` fills it with `authorizeUrl`, `clientId`, `scopes` and `endSessionUrl` whenever an authorize URL is configured or discovered (`OidcConfig`). Since 2026-10-13 `POST /auth/logout` answers the end-session URL **with** `id_token_hint`, built from the HttpOnly `inspecto_idt` cookie (`AuthRoutes.ID_COOKIE`, `OidcTokenRelay.endSessionUrl`); the SPA falls back to the hint-less `client_id` redirect when the server sends none. So it is configured at deployment, not at UI build time |
 
 **Two standing notes no status token can carry:**
 
@@ -110,9 +115,9 @@ citing either. The EDITIONS rows are the edition truth and are corrected here in
    is reachable only with its environment.
 2. ⚠ **The UI's login mode and the server's enforcement are coupled by convention, not derivation.**
    `/bootstrap.features.authMode` is `System.getProperty("auth.mode", "none")`
-   (`BootstrapRoutes.java:83`), while enforcement is decided by whether an `Authenticator` registered. The
+   (`BootstrapRoutes.features`), while enforcement is decided by whether an `Authenticator` registered. The
    bundle's `serve.sh`/`serve.bat` set `-Dauth.mode=oidc` when they detect the security sidecar
-   (`inspecto/package.ps1:895` / `:1004`), so the shipped bundle is consistent. A hand-launched jar with the
+   (the `$serveShContent` / `$serveBatContent` here-strings in `inspecto/package.ps1`), so the shipped bundle is consistent. A hand-launched jar with the
    sidecar on the classpath and no flag leaves the SPA in no-login mode against a server answering 401 on
    every route. `UNTRACKED` — filed in §5.
    🔴 **`serve.bat` did NOT actually do this until 2026-09-11 (`SERVEBAT-OPTS-1`).** The Windows branch was a
@@ -150,7 +155,7 @@ Enforcement returns through five SPIs the core *defines* and never *implements*:
 | SPI | Package | Contract | `@PublicApi` | Implemented by |
 |---|---|---|---|---|
 | `Authenticator` | `com.gamma.spi.auth` | `Optional<Subject> authenticate(HttpExchange)` | `since = "4.0.0"` | `OidcAuthenticator` (`inspecto-oidc`) |
-| `Subject` | `com.gamma.spi.auth` | record `(id, capabilities, dataScopes, attributes)`; `dataScopes == null` = unscoped | — | built by the authenticator |
+| `Subject` | `com.gamma.spi.auth` | record `(id, capabilities, dataScopes, attributes, email, displayName, machineSub)`; `dataScopes == null` = unscoped | — | built by the authenticator |
 | `TokenRelay` | `com.gamma.spi.auth` | `exchangeCode`, `refresh`, default no-op `revoke`; absent ⇒ `/auth/*` answers `503 CAPABILITY_UNAVAILABLE` | `since = "4.0.0"` | `OidcTokenRelay` |
 | `AccessDecider` | `com.gamma.spi.auth` | `decide(...)` → `ALLOW | DENY | ABSTAIN`; `explain(...)`; `seededPolicies()` default-empty | `since = "4.0.0"` | `PolicyEngine` (`inspecto-policy`) |
 | `SecretsProvider` | `com.gamma.acquire` | `supports(scope)`, `resolve(scope, key)` | — | `FileKeystoreSecretsProvider` (`inspecto-secrets`) |
@@ -161,36 +166,37 @@ exposes `active()` (empty on Personal) and a `forTest(...)` seam. ⚠ `Subject` 
 `api-stability.md`), and its absence here is an inconsistency, not a policy.
 
 **Editions** (`GLOSSARY.md` §14 *Edition*): Personal bundles neither module; Standard adds
-`inspecto-oidc` (Maven profile `edition-standard`, `pom.xml:73-77`); Enterprise adds `inspecto-policy` on
-top (`edition-advanced`, `pom.xml:112-116`). `package.ps1 -Edition Standard|Advanced` bundles the
+`inspecto-oidc` (Maven profile `edition-standard` in `pom.xml`); Enterprise adds `inspecto-policy` on
+top (`edition-advanced`). `package.ps1 -Edition Standard|Advanced` bundles the
 **shaded** `inspecto-oidc-*-sidecar.jar` (Nimbus classes verified present at package time — the
 `SEC-SIDECAR-BOOT-1` lesson). No runtime flag selects a module: the classpath entry is the switch, and the
 default `mvn -o clean test` reactor **never compiles either module** — see §8.
 
 ### 3.2 The request-gating order in `ControlApi`
 
-Every request passes, in order (`ControlApi.dispatch`, `inspecto/src/main/java/com/gamma/control/ControlApi.java:716-717`):
+Every request passes, in order (`ControlApi.routeDispatch`, `inspecto/src/main/java/com/gamma/control/ControlApi.java`;
+since 2026-11-15 `SpaceAdmission` runs between stages 1 and 2, then the rate limit — see [spec](spec.md)):
 
-1. **`authenticate(ex, path)`** (`:760-783`). First, on every edition and every matched route (static and SPA assets never reach `authenticate`): a non-blank `X-Actor`
+1. **`authenticate(ex, path)`**. First, on every edition and every matched route (static and SPA assets never reach `authenticate`): a non-blank `X-Actor`
    header is **rejected outright with `403 PERMISSION_DENIED`** (the SEC-7a spoof guard, extended from
    Standard to every edition when the header was removed in 4.0.0 — 2026-11-17, MoSCoW S4: identity comes
    from the `Subject`, or on Basic is `appUser`, never from a header). Then, skipped for `PUBLIC_PATHS` and
    self-verifying public routes: if an `Authenticator` is active, a request that yields no `Subject` gets
-   **`401 UNAUTHENTICATED`** (`:783`). With no `Authenticator` (Personal) the rest of the stage is a no-op.
-2. **`authorize(ex, method, path)`** (`:796-808`) — the ABAC route-level policy enforcement point. No-op when
+   **`401 UNAUTHENTICATED`**. With no `Authenticator` (Personal) the rest of the stage is a no-op.
+2. **`authorize(ex, method, path)`** — the ABAC route-level policy enforcement point. No-op when
    no `AccessDecider` is registered, for public paths, or for subject-less exchanges. `DENY` → `403
-   PERMISSION_DENIED`; `ABSTAIN` falls through. The action verb is derived by `actionFor` (`:812-818`):
+   PERMISSION_DENIED`; `ABSTAIN` falls through. The action verb is derived by `actionFor`:
    `GET`/`HEAD` → `read`; a route manifested under `canOperateRuns` → `operate`; everything else → `write`.
-3. **The route's capability gate** — `ApiContext.withCapability(capability, handler)` (`ApiContext.java:194`)
+3. **The route's capability gate** — `ApiContext.withCapability(capability, handler)` (`spi/inspecto-http-spi`)
    wraps every gated registration; a missing capability is `403 PERMISSION_DENIED`. The set of gated
    registrations is the **capability manifest** (§3.8).
 4. **`WriteGates`** on mutation routes — independent of everything above (§3.12).
 
-**`PUBLIC_PATHS`** (`ControlApi.java:197-198`, exact-match): `/health`, `/ready`, `/metrics`, `/bootstrap`,
+**`PUBLIC_PATHS`** (`ControlApi.PUBLIC_PATHS`, exact-match): `/health`, `/ready`, `/metrics`, `/bootstrap`,
 `/auth/exchange`, `/auth/refresh`, `/auth/logout`. ⚠ `/metrics` in this list is what made a Personal bundle
 serve full telemetry unauthenticated on every interface until EDG-01 cell 5 moved the exposition into
 `inspecto-observability` (2026-09-07) — Personal now answers it `503` naming the module. **Self-verifying public**
-routes (`isSelfVerifyingPublic`, `:756-757`) carry their own credential in the URL and are deliberately not in
+routes (`isSelfVerifyingPublic`) carry their own credential in the URL and are deliberately not in
 the list: `/public/dashboards/*`, `/public/delivery-status/*` and (a registered prefix, `PublicPaths`, 2026-10-12) `/public/investigations/*`. `GET /api/v1/openapi.json` is **auth-gated
 on purpose** (2026-08-25, `38c7a32d`).
 
@@ -200,7 +206,8 @@ Error codes are `ErrorCodes.java` members carried in the v1 envelope: `UNAUTHENT
 
 ### 3.3 The `Subject` and its data scopes
 
-`Subject(id, capabilities, dataScopes, attributes)` (`Subject.java:26-45`). `capabilities` is the
+`Subject(id, capabilities, dataScopes, attributes, email, displayName, machineSub)` (`Subject.java`; the last three
+added for verified-email notification, the display name and machine Subjects). `capabilities` is the
 **effective** set — role grants minus Access-Profile denies (§3.7) — so role names never leave the
 authenticator and every `withCapability` gate enforces profile denies with zero route changes. `dataScopes`
 (SEC-7d, 2026-07-08) is `null` for an unscoped subject, otherwise the union of a `data_scopes` claim, any
@@ -217,12 +224,13 @@ SDK. Configuration is system properties only:
 
 | Property | Role | Required |
 |---|---|---|
-| `-Dauth.oidc.issuer` | expected `iss` | **yes — the process exits without it** |
-| `-Dauth.oidc.jwksUri` | JWKS endpoint (explicit; no discovery fetch by design) | **yes** |
+| `-Dauth.oidc.issuer` | expected `iss` | **yes — the process exits without it** (or from discovery) |
+| `-Dauth.oidc.jwksUri` | JWKS endpoint (explicit, or from discovery / the `keycloak` preset since 2026-10-13) | **yes** |
 | `-Dauth.oidc.audience` | expected `aud` | warn-only by decision (`docs/okf/product/module/oidc/architecture.md`) |
 | `-Dauth.oidc.rolesClaim` | which claim carries role names | default per module |
 | `-Dauth.oidc.clientId` | the public client id the BFF exchanges on behalf of | for the relay |
-| `-Dauth.oidc.tokenEndpoint` | the provider's `token_endpoint` | **mandatory, no default** (D15) — take it from `/.well-known/openid-configuration` |
+| `-Dauth.oidc.tokenEndpoint` | the provider's `token_endpoint` | **mandatory, no default** (D15) unless discovery or the `keycloak` preset supplies it |
+| `-Dauth.oidc.provider` / `.discoveryUrl` | `generic` (default) / `wso2` / `keycloak` preset; an optional discovery document, fetched once (`OidcConfig`, 2026-10-13). Explicit `-D` beats discovery, which beats the preset | opt-in |
 | `-Dauth.oidc.gateway.issuer` / `.jwksUri` / `.header` | the optional **gateway trust mode** | opt-in |
 
 **Gateway trust mode** (R0, 2026-07-23): a second JWT processor validates a *gateway-signed* assertion header
@@ -230,7 +238,7 @@ SDK. Configuration is system properties only:
 valid `Bearer` resolves**. Unsigned header identity is never trusted; `alg:none` and bare strings fail
 verification, test-pinned. Clock skew is Nimbus's bounded 60 s default; no knob was added.
 
-`RoleMapper` (`RoleMapper.java:29-40`) resolves the roles claim → `Roles.Def` → capabilities through the
+`RoleMapper` (`providers/inspecto-oidc`) resolves the roles claim → `Roles.Def` → capabilities through the
 **data-driven role table** (§3.6), fail-closed on an unknown role name; `dataScopesFor` builds the scope set
 of §3.3. Access-Profile denies are stripped here, at authentication time (§3.7).
 
@@ -239,8 +247,9 @@ of §3.3. Access-Profile denies are stripped here, at authentication time (§3.7
 The browser never holds a refresh token. `AuthRoutes` (core — `inspecto/src/main/java/com/gamma/control/AuthRoutes.java`)
 serves `POST /auth/exchange | /auth/refresh | /auth/logout`, delegating to the `TokenRelay`:
 
-- the refresh token lives in the **httpOnly `inspecto_rt` cookie**, `SameSite=Strict` (`:106,113`);
-- every `/auth/*` call passes `requireSameOrigin(ex)` (`:45,58,70`; gate at `:92-103`) — the `Origin` check
+- the refresh token lives in the **httpOnly `inspecto_rt` cookie**, `SameSite=Strict` (`setCookie`), and since
+  2026-10-13 the ID token in a second httpOnly cookie, `inspecto_idt`, read only to build the logout hint;
+- every `/auth/*` call passes `requireSameOrigin(ex)` — the `Origin` check
   is the CSRF defence, not a token;
 - the SPA runs **PKCE (RFC 7636, S256)** as a **public client** — no client secret anywhere in the UI
   (`4x-public-pkce`, 2026-07-25: dead confidential-client code deleted, `appClientSecret` removed from source
@@ -252,26 +261,28 @@ serves `POST /auth/exchange | /auth/refresh | /auth/logout`, delegating to the `
   `Authorization: Bearer` and does 401 → silent refresh → retry.
 - **Sign-out is three layers and all three must fire** (2026-07-26): `POST /auth/logout` revokes and clears
   the cookie; the in-memory access token is dropped; the browser is sent to the provider's
-  `end_session_endpoint` (RP-Initiated Logout 1.0) with `client_id` + `post_logout_redirect_uri` —
-  `id_token_hint` deliberately omitted because the id token lives behind the BFF. `SessionService.redirect()`
+  `end_session_endpoint` (RP-Initiated Logout 1.0) with `client_id` + `post_logout_redirect_uri`. Since
+  2026-10-13 `POST /auth/logout` returns that URL with `id_token_hint` too (`OidcTokenRelay.endSessionUrl`, from
+  the `inspecto_idt` cookie), so the provider skips its confirmation page; the SPA builds the hint-less URL itself
+  only when the server returns none (it omitted the hint until then). `SessionService.redirect()`
   is the single seam that leaves the SPA (it exists because jsdom makes `window.location.assign`
-  non-configurable). ⚠ See §2 on where `endSessionUrl` can come from.
+  non-configurable). See §2 (`SEC-12`) on where `endSessionUrl` comes from.
 - **Personal renders no user menu at all** — no principal to name, no session to end.
 
 ### 3.6 Roles: a seeded, authorable, fail-closed table
 
 `com.gamma.access.Roles` (`platform/inspecto-access`) holds the **seed table** and the doc grammar. Role *assignment* is the IdP's
 (claims); role *definitions* are data. `Roles.effective(ex)` overlays the bound Space's `roles.toon`
-(`Roles.FILE`, `Roles.java:62`) **per role name** — an authored `[]` revokes a seed role, unnamed seed roles
+(`Roles.FILE`) **per role name** — an authored `[]` revokes a seed role, unnamed seed roles
 keep their defaults — cached by the file's text (not mtime + size: a same-size rewrite inside one mtime tick read stale and fail-open) so edits apply on the next request with no restart. **Fail-closed:** an
 existing-but-unreadable `roles.toon` suspends *all* role grants. `GET/PUT /access/roles` author it
-(`AccessRoutes.java:46-47`; PUT gated `canConfigureAccess`); Settings ▸ Access ▸ **Roles** edits it with
+(`AccessRoutes`; PUT gated `canConfigureAccess`); Settings ▸ Access ▸ **Roles** edits it with
 `source: authored|seed` badges, a strike-through overlay for capabilities an Access Profile denies, and a
 Revert that removes the override.
 
 **The capability vocabulary is exactly twenty names** — `Roles.KNOWN_CAPABILITIES`, derived from the
 capabilities `CapabilityManifest` gates on (it said "eleven" until 2026-09-26, four additions after it was
-written; "fifteen" went stale too - 2026-10-01 it is eighteen with `canRunLinkGraphAnalysis`, 2026-10-02 nineteen with `canBuildLinkIndex`, 2026-10-12 twenty with `canShareInvestigation`) — static across editions (a Standard-authored role file
+written; "fifteen" went stale too - 2026-10-01 it is eighteen with `canRunLinkGraphAnalysis`, 2026-10-02 nineteen with `canBuildLinkIndex`, 2026-10-12 twenty with `canShareInvestigation`; **23 on 2026-11-17**, re-counted from `CapabilityManifest.ENTRIES`: the last five rows of the table below) — static across editions (a Standard-authored role file
 must validate on Personal — a per-edition validator was refused, `EDITIONS.md` SEC-10 note):
 
 | Capability | Gates |
@@ -294,15 +305,20 @@ must validate on Personal — a per-edition validator was refused, `EDITIONS.md`
 | `canRunLinkGraphAnalysis` | `POST /inv/graph/runs` — starting a server-side graph run over an Investigation's Working Set (LA separation D-4): a run spends compute, a read does not. Seeded to `operations`/`support`/`power`/`admin` (everyone who holds `canManageIncidents`); reads and list inherit the Investigation's access; cancel is the run's starter or an administrator and has no capability (a manifest `self-service` exemption) |
 | `canShareInvestigation` | `POST /inv/investigations/{id}/embeds` and `.../embeds/{grantId}/revoke` — minting and revoking a read-only EMBED link to one Investigation (LA-EMBED-VIEW-1, operator 2026-10-12 D6): a link hands a masked live view of the evidence to someone with no login. No four-eyes on mint. Seeded to `admin` and `power`; the handler additionally requires a LEAD of the Investigation, and an Access Policy can forbid it with the ABAC action `embed` |
 | `canBuildLinkIndex` | `POST /inv/index/builds` — building a Link Analysis edge/node index over a Dataset (LA separation D-3 step 4): a build spends compute AND disk, a read does not. Seeded to the same roles as `canRunLinkGraphAnalysis`; listing indexes and reading a build inherit the Dataset's view gate; cancel is the build's starter or an administrator and has no capability (a manifest `self-service` exemption) |
+| `canUploadData` | uploading and onboarding data: `/inv/uploads*`, `/onboard/files*`, `/datasets/{id}/files`, `/run`, `/feed`, `/filter` |
+| `canApproveChanges` | deciding someone else's held change — `POST /pending-changes/{id}/approve|decline` (maker-checker, `ASSURE-MAKER-CHECKER-1`) and `/action-requests/{id}/approve|decline|retry|mark-failed` |
+| `canManageExclusionCategories` | `PUT /entity-lists/{id}/attributes` |
+| `canOpenInboundInvestigation` | `POST /inv/inbound/investigations` — the one capability a machine Subject keeps (`Roles.MACHINE_CAPABILITIES`; seed role `integration`) |
+| `canOfferSignals` | `POST /exchange/signal-offers` |
 
-**Seed roles** (`Roles.java:121-131`): `pipeline-developer`, `app-developer`, `developer` (the builder set),
+**Seed roles** (`Roles.SEED`): `pipeline-developer`, `app-developer`, `developer` (the builder set),
 `operations`, `power`, `admin` (`canOnboardConnections`, `canConfigureAccess`, `canApproveShares`,
 `canOfferDatasets`, `canCurateMenus`, `canTriageRequirements`, `canAdminister`, and since 2026-11-15
 `canAuthorWorkbench`: `LA-FULL-CYCLE-TEST-1` D1, reason in `admin-guide-auth-security.md`; the list here is not
 exhaustive, `Roles.SEED` is), `super` (the whole vocabulary via
 `KNOWN_CAPABILITIES`), `business` (**only** `canTriageRequirements`). ⚠ `Roles.SEED` is asserted by an
 *equality* test in `OidcAuthenticatorTest` — every grant change must update it, and that test runs **only**
-under `-Pedition-standard|enterprise` (§8).
+under `-Pedition-standard|preview|advanced` (§8).
 
 ### 3.7 Access Catalog, Access Profiles, and enforcement at authentication time
 
@@ -323,8 +339,8 @@ node** — a capability the server enforces but the client never reads is a bug 
 
 ### 3.8 The capability manifest — one table, asserted in both directions
 
-`CapabilityManifest` (`CapabilityManifest.java:18-25`) declares every gated `method + pattern → capability`
-registration (70 at R4). `CapabilityManifestTest` **source-scans the route files** and fails the build on
+`CapabilityManifest` (`platform/inspecto-access`, `ENTRIES`) declares every gated `method + pattern → capability`
+registration (70 at R4; 293 on 2026-11-17). `CapabilityManifestTest` **source-scans the route files** and fails the build on
 drift in either direction — an entry with no registration, a registration with no entry — matching on the
 capability **string literal** at the registration site; it also asserts every route-demanded capability is
 granted by at least one seed role, and derives `Roles.KNOWN_CAPABILITIES`. ⚠ A manifest entry and its route
@@ -347,7 +363,7 @@ Personal since EDG-01 cell 4; its mechanism is `exchange-sharing.md`.
 
 ### 3.10 Enterprise ABAC — the Access Policy engine
 
-`inspecto-policy` registers `PolicyEngine` (`providers/inspecto-policy/src/main/java/com/gamma/policy/PolicyEngine.java:52`)
+`inspecto-policy` registers `PolicyEngine` (`providers/inspecto-policy/src/main/java/com/gamma/policy/PolicyEngine.java`)
 on the `AccessDecider` SPI. Personal and Standard never bundle it and behave byte-identically.
 
 - **Attributes (A1).** `roles.toon` `identity: {attributeClaims: [...]}` is an **allowlist**; the
@@ -358,34 +374,36 @@ on the `AccessDecider` SPI. Personal and Standard never bundle it and behave byt
   "one policy engine, many policy kinds"): recursive-descent, parse-once, `== != in contains and or not ( )`,
   literals and dotted refs over a nested `Map` context, strict-Boolean truthiness, type-mismatch-is-false,
   offset-bearing parse errors. Pinned by `ConditionsTest`.
-- **The document.** Per-Space `access-policies.toon` (`AccessPolicies.FILE`, `AccessPolicies.java:49`): rows
+- **The document.** Per-Space `access-policies.toon` (`AccessPolicyStore.FILE`, `platform/inspecto-access`; the
+  `AccessPolicies` record types stay in `spi/inspecto-auth-spi`): rows
   `{name, effect: allow|deny, target: {actions?, resourceKinds?}, when?}`; cached by the file's text; one validate
-  grammar shared by the file parser and `GET/PUT /access/policies` (`AccessRoutes.java:49-50`; a `when` that
+  grammar shared by the file parser and `GET/PUT /access/policies` (`AccessRoutes`; a `when` that
   does not parse is `422`). **Unreadable doc ⇒ the engine DENIES loudly**, never "no policies". Authoring
   is core (the routes exist in every edition); *evaluation* is Enterprise.
-- **Decision (A3).** `decide()` (`:74-96`) is **deny-overrides → allow → ABSTAIN** over
-  `AccessPolicies.effective`; context is `subject.{id, capabilities, dataScopes, roles}` + A1 attributes,
+- **Decision (A3).** `decide()` is **deny-overrides → allow → ABSTAIN** over
+  `AccessPolicyStore.effective`; context is `subject.{id, capabilities, dataScopes, roles}` + A1 attributes,
   `env.{action, route, space}`, and at row level `resource.*` with `resource.space` defaulting to the bound
   Space. Two enforcement points: the route-level `authorize` stage (§3.2) and the row-level **`RowScope`**
-  filter (`RowScope.java:26`; used by `inspecto-ops` `ObjectRoutes` and `AnnotationTargets`) — a `DENY` hides
+  filter (`RowScope.visible` / `allowed`; used by `inspecto-ops` `ObjectRoutes` and `AnnotationTargets`, and since by the
+  Link Analysis Investigation and embed routes, `StandingDetection` and the risk, anomaly and prediction score routes) — a `DENY` hides
   the row (`404` / filtered). 🔴 **A policy `ALLOW` never bypasses a capability gate** — the plan's combining
   order was tightened for defence in depth; `ABSTAIN` falls through to the Standard capability / profile /
   sharing gates.
 - **Space isolation (A4 = SPC-5).** Two **engine-resident seed policies** (`PolicyEngine.SEED`:
-  `space-isolation`, `space-isolation-rows`, `:62-66`), overlaid per policy name by the authored doc: deny
+  `space-isolation`, `space-isolation-rows`), overlaid per policy name by the authored doc: deny
   when the subject's mapped `space` home claim ≠ the bound Space, at route and row level. They **engage only
   when a `space` claim is mapped** (unmapped ⇒ no isolation, never a bricked API) and exempt
   `canConfigureAccess` holders. `env.space` is always bound because `EventLog.currentSpaceId()` never returns
   null — un-prefixed server-global routes bind the default Space.
 - **Decision audit (A5).** Every policy `DENY` and every route-level policy-matched `ALLOW` goes through
-  `AuditTrail.policyDecision(...)` (`AuditTrail.java:73-89`) as `access.denied` / `access.granted`, category
+  `AuditTrail.policyDecision(...)` (`platform/inspecto-access`) as `access.denied` / `access.granted`, category
   `authorization`, with actor, verb, route, row kind/id and the matched policy name
   (`AccessDecider.ATTR_MATCHED_POLICY`; `<policies-unreadable>` on a fail-closed deny). Read back via
   `GET /events?type=ACCESS_DENIED|AUDIT`. A row-level *allow* is deliberately **not** audited (it fires per
   surviving row); `ABSTAIN` is not a decision and is never audited.
 - **Operability.** `GET /access/policies` surfaces the seed denies too, each row `source: authored|seed`
   (via `AccessDecider.seededPolicies()`, default-empty). `GET /access/explain?route=&method=&resourceKind=`
-  (`AccessRoutes.java:62`; `PolicyEngine.explain`, `:101`) is a side-effect-free **"why denied?"**
+  (`AccessRoutes`; `PolicyEngine.explain`) is a side-effect-free **"why denied?"**
   dry-run for the caller's own session — decision, matched policy, per-policy `{targeted, conditionHeld,
   source}` trace, enforcing and auditing nothing. **It is a GET on purpose**: a POST would be a `write` the
   policy under test could `403`, locking the denied subject out of their own explanation. Both are
@@ -404,17 +422,17 @@ on the `AccessDecider` SPI. Personal and Standard never bundle it and behave byt
   delete, seed "Override…" behind a confirm, `If-Match` full replace, *Preview impact*). ⚠ **Upgrade bites
   at runtime:** an on-disk doc with a stray key or an un-allowlisted `subject.<claim>` becomes unreadable ⇒
   deny-all on Enterprise. Mechanism, test pins and stated limits:
-  [auth-security.md](admin-guide-auth-security.md) §"Policy authoring guards". ⚠ **Owed: a
-  browser pass over the editor** — covered by vitest specs, not yet driven in the preview.
+  [auth-security.md](admin-guide-auth-security.md) §"Policy authoring guards". The browser pass over the editor
+  ran on 2026-09-27 on the `fff119d6b` demo build, which closed the board row.
 
 ### 3.11 Transport and bind address
 
 `-Dhttps.keystore=<PKCS12 path>` + `-Dhttps.keystore.password=<pw>` switch `ControlApi` from `HttpServer` to
-the pure-JDK `HttpsServer` with `SSLContext.getInstance("TLSv1.3")` (`ControlApi.java:301-324`); unset ⇒
+the pure-JDK `HttpsServer` with `SSLContext.getInstance("TLSv1.3")` (`ControlApi`); unset ⇒
 plain HTTP (the Personal default). `-Dcontrol.bind=<host>` restricts the listen address in every edition
-(`:271-296`) — ⚠ the default binds **every interface**, in Personal too; "localhost-bound" in
+(`ControlApi.bindAddress`) — ⚠ the default binds **every interface**, in Personal too; "localhost-bound" in
 `STAKEHOLDER_OVERVIEW.md` is wrong (plan §8 cluster). HTTPS lives in **core**, not in `inspecto-oidc`, and
-is the one SEC mechanism with **no test** (§8.7).
+is tested since 2026-09-09 by `ControlApiHttpsTest` (5 tests, the fail-closed keystore included; `SEC-4`).
 
 ### 3.12 Secrets
 
@@ -427,7 +445,7 @@ keeps secret-shaped literals out of the tree (§8.6). Vault / cloud KMS: §5.
 
 ### 3.13 The write-root gate — separate from auth, in every edition
 
-`WriteGates.requireWriteRoot(api, what)` (`WriteGates.java:14-24`, `@PublicApi(since = "4.0.0")`): with
+`WriteGates.requireWriteRoot(api, what)` (`platform/inspecto-access`, `@PublicApi(since = "4.0.0")`): with
 `-Dassist.write.root` absent, every mutation route (config writes, connection writes, authored-Pipeline CRUD)
 answers **`503 CONTROL_PLANE_READ_ONLY`** naming the flag; present, writes are jailed to that root
 (`PathJail.contains`, `403`), names validated (`422`), conflicts `409`, and the content validated by
@@ -451,13 +469,13 @@ Which side a capability falls on is decided by **whether lens-scoping can strand
 every seed role holding `canRequestShares` also qualifies for a non-Business lens, so it is lens-scoped; the
 `business` seed's *only* capability is `canTriageRequirements`, so it is identity — with the accepted
 consequence that **"Business lens ⇒ read-only" is no longer true of the product**. `readOnly` is
-presentation, never a boundary (`lens.service.ts:79-85`); the server is the enforcement point. Per-lens
+presentation, never a boundary (`LensService.readOnly`); the server is the enforcement point. Per-lens
 Access Profiles reach the UI through `AccessStateService.setActionGrants()`; feature flags from `/bootstrap`
 (`features.exchange|geoLink|events|ops`) **hide** navigation for an absent module — never a toast.
 
 ⚠ **`permissions[]` is emitted and never read.** `Envelope.success` emits `subject.capabilities() ∩
 applicable` when a route declares `ApiContext.resourcePermissions(...)` (SEC-7b; no `permissions` key on
-Personal). The SPA declares it in `V1Envelope.permissions?: string[]` (`inspecto/api/v1.ts:37`) and **no code
+Personal). The SPA declares it in `V1Envelope.permissions?: string[]` (`inspecto/api/v1.ts`) and **no code
 reads it** — every affordance is gated on `LensService` instead. The contract is correct and the consumer is
 absent; recorded in §5 as an untracked gap, not a contradiction: the envelope field was always documented as
 "a fail-closed affordance signal, never the security boundary".
@@ -478,6 +496,7 @@ earlier one, both appear.
 | 2026-07-25 (**D15**) | **No IdP or gateway vendor of record** — the "Keycloak + WSO2 APIM vs WSO2 IS" question is *withdrawn*, not answered | The client's IAM is the client's; the product stays configurable. Litmus test: any auth code that cannot be pointed at a different compliant IdP by configuration alone is wrong |
 | 2026-07-25 (D15) | `KeycloakTokenRelay` → **`OidcTokenRelay`**; `auth.oidc.tokenEndpoint` **mandatory with no default** | The old default derived one vendor's path layout; there is no discovery fetch to replace it (this module configures `jwksUri` explicitly by design). ⚠ Deployment-breaking for anyone who relied on the derived value |
 | 2026-07-26 | `endSessionUrl` is **declared config, never discovered** | The D15 precedent applied again; a hardcoded IdP host in the SPA is what caused the secret leak. The BACKLOG row asked for `/.well-known` discovery and contradicted the precedent it cited |
+| 2026-10-13 | **Provider preset + optional discovery** (`-Dauth.oidc.provider`, `-Dauth.oidc.discoveryUrl`, `OidcConfig`) supersede the two rows above for an operator who opts in; `generic` still derives nothing, and the server publishes the result in `/bootstrap` `auth` | The client chooses WSO2 Identity Server or Keycloak by configuration; the `keycloak` path layout applies only when asked for, so D15's ban on a vendor default stands (§6.2) |
 | 2026-09-07 (operator) | Edition gating is **ServiceLoader modules for all six EDG-01 cells**, ⛔ not `-D` switches | Personal ships no authenticator and binds every interface; a switch leaves the code in the bundle. `/metrics` in `PUBLIC_PATHS` had served telemetry unauthenticated |
 
 ### Authorization model
@@ -512,6 +531,7 @@ earlier one, both appear.
 | 2026-07-06 (W6d) | **BFF**: refresh token in an httpOnly `SameSite=Strict` cookie + `Origin` check | The browser never holds a refresh token; the `Origin` check is the CSRF defence |
 | 2026-07-25 | The SPA is a **public PKCE client**; every client secret deleted from source and environments | Five secrets had been public in git since 2026-06-12 (SEC-INCIDENT-1). "Verified by compiler and jsdom, never by an IdP" — `ce49a681` had to add real `state` validation afterwards |
 | 2026-07-26 | Sign-out is **three layers**, `id_token_hint` omitted | Without RP-Initiated Logout the next sign-in completes with no credential prompt; the id token lives behind the BFF |
+| 2026-10-13 | The hint is sent after all: the BFF keeps the ID token in the HttpOnly `inspecto_idt` cookie and `POST /auth/logout` returns the end-session URL with `id_token_hint` | Keycloak shows a confirmation page without the hint; the token still never reaches the SPA |
 | 2026-07-26 | **No user menu on Personal** | Nothing to name, nothing to end |
 | 2026-08-17 (operator) | Branch `4.x` deleted; the incident fix commits live on `master` | Nothing had shipped on `4.x` |
 | 2026-08-29 | **SEC-INCIDENT-1 closed by decommission** | The affected system was decommissioned, so no issuer entry remains to rotate; the values stay in public history and are immaterial only because none is in use |
@@ -528,11 +548,11 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 
 | Item | Board id | What remains |
 |---|---|---|
-| **Policy-authoring UX** — browser pass only | `BACKLOG.md` §3.8 *Security: policy-authoring UX*; `EDITIONS.md` SEC-05 | Guards, impact matrix and editor **SHIPPED 2026-09-25** (§3.10 *Authoring guards*); only a browser pass over the Policies-tab editor remains |
-| **Vault / cloud-KMS secrets** (GAP-6 / SEC-8) | `BACKLOG.md` §3 `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` (was *Deployment topology gaps*); §6 standing note | Enterprise-only, **only when a client policy requires it**. The `SecretsProvider` SPI is the seam; nothing else is designed |
+| ✅ ~~**Policy-authoring UX**~~ **CLOSED 2026-09-27** | was `BACKLOG.md` §3.8 *Security: policy-authoring UX*; `EDITIONS.md` SEC-05 | Guards, impact matrix and editor shipped 2026-09-25 (§3.10 *Authoring guards*); the browser pass over the Policies-tab editor ran 2026-09-27 and closed the row |
+| **Vault / cloud-KMS secrets** (GAP-6 / SEC-8) | no open row: the `BACKLOG.md` decided note "SEC-07 Vault/KMS only when a client policy requires it" (`DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1`, the row once named here, closed 2026-09-27 and was about DuckDB memory) | Enterprise-only, **only when a client policy requires it**. The `SecretsProvider` SPI is the seam; nothing else is designed |
 | **Data masking / row scope by field classification** | `EDITIONS.md` SEC-08; `ProcessorCatalog` `quality.pii.mask` (DELIVERED 2026-10-06, `transform.mask`) + `quality.compliance.redact` (`Status.PLANNED`) | Enterprise-only by decision. The `mask` Step is built and gated through `EditionFeatures.PII_MASK`, which only `inspecto-policy` declares ([step catalog](../etl/spec-step-catalog.md)). Dataset-wide masking at read time is not built and has no BACKLOG row of its own. Link Analysis entity-id masking by classification is built and ships with `inspecto-geo-link` (not Enterprise-only) |
-| **SEC-INCIDENT-1 carry-forwards** | `BACKLOG.md` §2 *SEC-INCIDENT-1 carry-forwards* | Delete the off-repo pre-rewrite bundle (five cleartext secrets); confirm no reuse; internal hostnames still in-repo; a dated CC6.1 line in `compliance/controls-matrix.md` |
-| **Compliance program NFR-7** (G8 evidence, pen test, FIPS leg) | `BACKLOG.md` §2 *Compliance program (NFR-7)*, §5 *Compliance repo-side artifacts* | `CMP`'s, listed here because the controls cite SEC mechanisms as evidence |
+| ✅ ~~**SEC-INCIDENT-1 carry-forwards**~~ **DONE** | no board row left | The off-repository pre-rewrite bundle was deleted 2026-08-01 and the no-reuse check completed 2026-08-02; the incident closed by decommission 2026-08-29, recorded in `compliance/controls-matrix.md` CC6.1 ([plan-compliance](../../layer/platform/plan-compliance.md)). The old "internal hostnames still in-repo" clause has no record either way |
+| **Compliance program NFR-7** (G8 evidence, pen test, FIPS leg) | `BACKLOG.md` §2 *Compliance program (NFR-7)* | `CMP`'s, listed here because the controls cite SEC mechanisms as evidence |
 | **Enterprise distributed tier** — per-tenant ABAC beyond Space isolation | `BACKLOG.md` §2 *E1 Enterprise distributed tier* | Design only |
 
 ### `UNTRACKED` — surfaced by this spec, no board row
@@ -543,7 +563,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 > starting point and read the row before acting on it:
 > `CONSUMER-PAIRS-1`, `SPEC-NOPROOF-1`.
 > ⚠ **None of these ids is an open board row today** (re-checked 2026-11-15, `DOCS-AGENT-WRITTEN-REVIEW-1`): `SPEC-STALEREF-1` closed 2026-09-09 when `tools/check-doc-citations.mjs` became a guard, `SPEC-NOPROOF-1` closed 2026-09-09 when all six Musts had tests, and the rest were closed, refuted or split into their own rows by the 2026-09-24 board consolidation. Their history: `docs/archived-documents/backlog-snapshot-2026-09-24.md` and `docs/archived-documents/plans-archive/post-consolidation-sprints.md`.
-> ✅ **`CONSUMER-PAIRS-1` decided 2026-09-10 (operator, per row):** `permissions[]` in the v1 envelope **ADOPT** — the shell interceptor stops discarding the envelope FIRST, then affordances gate on it → `BACKLOG.md` §3 `CLIENT-HALVES-1`.
+> ✅ **`CONSUMER-PAIRS-1` decided 2026-09-10 (operator, per row):** `permissions[]` in the v1 envelope **ADOPT** — the shell interceptor stops discarding the envelope FIRST, then affordances gate on it → `CLIENT-HALVES-1`. ⚠ Reversed the same day by measurement: adoption is **reserved, not scheduled** (§8.7), and the row was deleted 2026-09-14 once its other halves shipped ([plan-control-api](../processor/plan-control-api.md) keeps the record).
 >
 > ⚠ **The remainder stay here deliberately, and that is their correct home.** A finding that is
 > area-specific, is *design* rather than a defect, and is recorded in the owning spec's §5 is already filed —
@@ -554,11 +574,11 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | Item | Evidence | Why it matters |
 |---|---|---|
 | **"Module present, auth off" is impossible** (`SEC-SIDECAR-BOOT-1`) | `auth-security.md` §"does not boot"; `SpiSlot.active()` has no guard | A Standard bundle cannot be smoke-tested without an IdP. Needs a guard around SPI resolution, not a flag — and an operator call on whether that mode should exist at all |
-| **`authMode` is declared, not derived** | `BootstrapRoutes.java:83`; `package.ps1:892` | The SPA's login mode and the server's enforcement agree only because the launcher sets both. Deriving `authMode` from `Authenticators.active()` would close it in one line — but changes the contract of a public path |
-| **`permissions[]` has no consumer** | `v1.ts:37` declared; zero reads in `src/app` | Either the UI adopts it for per-resource affordances (the SEC-7b intent) or the field is documented as reserved. Today it is neither |
-| **Server-published OIDC config** (`bootstrap.auth.*`) | no `authorizeUrl` / `endSessionUrl` in any Java file | The SPA already reads `boot.auth?.endSessionUrl`; `BACKLOG.md` §6 refused it "as scoped" and warns that a server-sent empty string would beat `environment.oidc` because the SPA uses `??`. If it is ever built, that coalescing must change first |
+| **`authMode` is declared, not derived** | `BootstrapRoutes.features`; the launcher here-strings in `package.ps1` | The SPA's login mode and the server's enforcement agree only because the launcher sets both. Deriving `authMode` from `Authenticators.active()` would close it in one line — but changes the contract of a public path |
+| **`permissions[]` has no consumer** | `v1.ts` declared; zero reads in `src/app` (re-checked 2026-11-17) | Either the UI adopts it for per-resource affordances (the SEC-7b intent) or the field is documented as reserved. Today it is neither |
+| ✅ ~~**Server-published OIDC config**~~ (`bootstrap.auth.*`) **BUILT 2026-10-10** | `TokenRelay.bootstrapAuth`, `OidcTokenRelay.bootstrapAuth` | The server publishes `authorizeUrl`, `clientId`, `scopes` and `endSessionUrl`. The `??` hazard does not bite: `OidcTokenRelay` omits a key whose value is blank, and publishes nothing without an authorize URL |
 | ✅ ~~**HTTPS has no test**~~ **CLOSED 2026-09-09** | `ControlApiHttpsTest` — 5 tests | SEC-4 now has proof, including the fail-closed half: a broken keystore must throw, never serve cleartext on the TLS port. Mutation-proven (a silent fallback fails 2 of 5) |
-| **`Subject` and `SecretsProvider` lack `@PublicApi`** | `Subject.java`, `SecretsProvider.java` | Both are implemented outside the core; the marker records intent and is inconsistent across the five SPIs |
+| **`Subject` and `SecretsProvider` lack `@PublicApi`** | `Subject.java`, `SecretsProvider.java` (still true 2026-11-17) | Both are implemented outside the core; the marker records intent and is inconsistent across the five SPIs |
 
 ## 6. Refused & superseded
 
@@ -749,9 +769,9 @@ and `callback.a11y.spec.ts`, `core/navigation/navigation.service.spec.ts` (modul
 
 | Gap | Evidence |
 |---|---|
-| **HTTPS is untested** | zero references to `keystore`, `HttpsServer` or `SSLContext` under `inspecto/src/test`. SEC-4 is a Must (S) |
-| **No test runs against a real IdP** | every OIDC test drives a fake JWKS / token endpoint; the incident plan's own lesson was "verified by compiler and jsdom, never by an IdP". The Keycloak / WSO2 blueprints in `docs/api/deployment/` are unexercised by CI |
-| **The Standard bundle's boot precondition has no test** | `SEC-SIDECAR-BOOT-1` was found by a packaging smoke, by hand |
+| ✅ ~~**HTTPS is untested**~~ **CLOSED 2026-09-09** | `ControlApiHttpsTest` (5 tests; §5) |
+| **No test runs against a real IdP in CI** | `OidcAgainstRealProviderTest` (WSO2 IS) and `OidcKeycloakAgainstRealProviderTest` run the production no-arg constructor against a real provider over real HTTP, but only when one is named (`-Dinspecto.test.oidc.issuer`, `-Dkeycloak.issuer`); without it they skip, so CI still drives fake JWKS / token endpoints only. The Keycloak / WSO2 blueprints in `docs/api/deployment/` are unexercised by CI |
+| ✅ ~~**The Standard bundle's boot precondition has no test**~~ **tested since 2026-09-12** | `AuthenticatorDiscoveryFailClosedTest` (4 tests): a registered-but-misconfigured `inspecto-oidc` propagates out of SPI discovery instead of degrading to "no authenticator". `SEC-SIDECAR-BOOT-1` itself was found by a packaging smoke, by hand |
 | **`authMode` ↔ enforcement coupling — the LAUNCHER half is now tested; the DERIVATION half is not** | ✅ **Half closed 2026-09-14** (`LAUNCHER-GUARD-1`, §2.2): `tools/check-launchers.mjs` executes both emitted launchers over stub jars and asserts that a bundle carrying the sidecar sets `-Dauth.mode=oidc` (and that a Personal bundle sets nothing of the kind). It is wired into `ci.yml` twice — Linux runs `serve.sh` and checks `serve.bat` statically, and a separate `launchers-windows` job **runs `serve.bat` for real**, because the defect it exists to catch is a cmd.exe parsing rule that no Linux runner can observe. ⚠ **This is the sidecar ⇒ flag half only.** The other half stands: `authMode` is *declared* by the launcher, not *derived* from `Authenticators.active()` (§5 row), so a **hand-launched** jar with the sidecar on the classpath and no flag still leaves the SPA in no-login mode against a server answering 401 — no guard over an emitted script can see that, and deriving the property is what would close it |
-| **`permissions[]` has no consumer, and 2026-09-10 measurement says it should stay that way** — the field is `grants ∩ applicable`, so it is always a SUBSET of the session capabilities and the two cannot disagree; only four routes narrow it, three to a single static capability the client derives from the session set, and the fourth (requirements) narrows by a `status` the client already has on every row and **already gates on correctly** (`requirement-decision.dialog.ts:59,69`). Its only `GET` does not stamp at all. ⚠ The envelope also carries ONE array per response, so it cannot express per-row permissions for a collection. ⇒ **reserved, not scheduled** — reopen only for a set the client cannot compute AND reachable on a read (`BACKLOG.md` `CLIENT-HALVES-1`) | §3.14 |
-| **Tamper-evidence of the audit log** | `EDITIONS.md` SEC-09 says "tamper-evident"; `AuditTrail.java` contains no hash, chain or signature. The ledger is append-only; that is the whole claim. Owned by `OPS`, recorded here because the row is `SEC-09` |
+| **`permissions[]` has no consumer, and 2026-09-10 measurement says it should stay that way** — the field is `grants ∩ applicable`, so it is always a SUBSET of the session capabilities and the two cannot disagree; only four routes narrow it, three to a single static capability the client derives from the session set, and the fourth (requirements) narrows by a `status` the client already has on every row and **already gates on correctly** (`requirement-decision.dialog.ts`). Its only `GET` does not stamp at all. ⚠ The envelope also carries ONE array per response, so it cannot express per-row permissions for a collection. ⇒ **reserved, not scheduled** — reopen only for a set the client cannot compute AND reachable on a read (decided as `CLIENT-HALVES-1` (b); that row was deleted 2026-09-14, no board row tracks it) | §3.14 |
+| ✅ ~~**Tamper-evidence of the audit log**~~ **BUILT** (`ASSURE-AUDIT-CHAIN-1`) | Each Space's audit events carry a hash chain (`AuditChain` in `spi/inspecto-audit-spi`, linked by `AuditChainLinker`), checked by `GET /audit/verify` and signed anchors (`/audit/anchors`, `canAdminister`); tested by `AuditChainTest` and `AuditVerifierTest`. Owned by `OPS`, recorded here because the row is `SEC-09` |

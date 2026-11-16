@@ -18,7 +18,8 @@ is no token paste / guard / interceptor. The removed hand-rolled bearer-token pl
 `com.gamma.control`: **`Authenticator`** (validates a request, yields a subject), **`Subject`** (a record of
 `id` + capabilities), and **`TokenRelay`**. `providers/inspecto-oidc/` (artifactId `inspecto-oidc`, **34**
 tests — measured 2026-09-08: 24 + 7 + 3; an earlier "41" was never true of the tree) implements them: `OidcAuthenticator` (Nimbus JOSE+JWT), `RoleMapper` (roles from IAM claims), and
-`OidcTokenRelay`. It joins the reactor **only under the `edition-standard` Maven profile** — the default
+`OidcTokenRelay`. It joins the reactor **only under an edition profile** (`edition-standard`, `-preview` or
+`-advanced`) — the default
 build never compiles it (verify with `-Pedition-standard`); because it's a
 [build flavor](../../layer/platform/architecture-editions.md), the core still carries zero auth code.
 
@@ -32,15 +33,19 @@ third). `SessionService.logout()` (1) POSTs `/auth/logout` so the backend revoke
 `inspecto_rt` cookie, (2) drops the in-memory access token, and (3) — **RP-Initiated Logout 1.0** — sends the
 browser to the provider's `end_session_endpoint` with `client_id` + `post_logout_redirect_uri=<origin>/sign-in`,
 so the IdP's SSO session ends too. Without (3) the next sign-in completes with no credential prompt.
-`id_token_hint` is deliberately omitted: the id token lives behind the BFF, and the spec accepts `client_id`
-as the RP identifier instead.
+**`id_token_hint` is sent since 2026-10-13** (it was omitted until then): the BFF keeps the ID token in a second
+HttpOnly cookie, `inspecto_idt` (`AuthRoutes.ID_COOKIE`), and `POST /auth/logout` answers `endSessionUrl` with the
+hint, `client_id` and `post_logout_redirect_uri` (`OidcTokenRelay.endSessionUrl`), so Keycloak skips its
+confirmation page. The ID token never reaches the SPA; when the server returns no URL, the SPA builds the hint-less
+`client_id` redirect itself, as before.
 
-- **`endSessionUrl` is declared config, never derived or discovered** — `bootstrap.auth.endSessionUrl`
-  falling back to `environment.oidc.endSessionUrl`, sitting beside `authorizeUrl`. This is D15's call for
-  `auth.oidc.tokenEndpoint` applied again: no vendor's path layout is assumed, and a hardcoded IdP host in
-  the SPA is exactly what caused the leaked-secret incident. *(The BACKLOG row asked for `/.well-known`
-  discovery; that contradicts the D15 precedent it cited in the same sentence, so declaration won.)* Leave it
-  blank and sign-out degrades to layers (1)+(2) — all a provider without the endpoint can support anyway.
+- **`endSessionUrl` comes from the server first** — `bootstrap.auth.endSessionUrl` falling back to
+  `environment.oidc.endSessionUrl`, sitting beside `authorizeUrl`. It was declared config, never derived or
+  discovered (2026-07-26, D15's call for `auth.oidc.tokenEndpoint` applied again: a hardcoded IdP host in the SPA
+  is exactly what caused the leaked-secret incident). Since 2026-10-13 the server resolves it, explicit
+  `-Dauth.oidc.endSessionUrl` first, then the discovery document, then the `keycloak` preset (*Provider preset +
+  discovery*, below), and publishes it in `/bootstrap` `auth`. Leave it unresolved and sign-out degrades to layers
+  (1)+(2) — all a provider without the endpoint can support anyway.
 - **`SessionService.redirect()` is the single seam that leaves the SPA** (authorize + end-session). It exists
   because jsdom makes `window.location.assign` non-configurable, so it is the only way to unit-test either
   redirect.
@@ -226,9 +231,9 @@ via `META-INF/services`. Basic/Standard never bundle it and behave byte-identica
   **not built** — D7 fixed the axes (roles × read/write/operate, plus each targeted known kind) instead.
   Decisions D2–D9 were taken on the design's recommendation (D5, D7 on the most fail-closed option) and are
   reversible.
-  ⚠ **Owed: a browser pass over the Policies-tab editor** (create / edit / delete / override confirm /
-  *Preview impact* / 409 and 422 messages). The editor is covered by vitest specs only; it has not been
-  driven in the preview against an Advanced backend.
+  The browser pass over the Policies-tab editor ran on 2026-09-27 on the `fff119d6b` demo build (*Preview
+  impact* matrix, `would-lock-out` refused in the dialog, the `unknown-role` warning under the row, *Why denied?*,
+  delete) and closed the board row; the editor is also covered by vitest specs.
 - **Q3 `canTriageRequirements` grant (2026-07-24, product sign-off).** Seeded to Business + Power + Admin +
   Super (`Roles.SEED`) — requirement triage is a business-analyst activity; Pipeline Developer/Operations
   build/run rather than triage.
@@ -245,8 +250,9 @@ via `META-INF/services`. Basic/Standard never bundle it and behave byte-identica
     `OidcTokenRelayTest`), matching `OidcAuthenticator`'s neutral naming.
   * **`auth.oidc.tokenEndpoint` is now mandatory with no default.** The old fallback derived
     `<auth.oidc.issuer>/protocol/openid-connect/token` — one vendor's path layout baked into the product.
-    There is no discovery fetch to derive it from (this module configures `auth.oidc.jwksUri` explicitly
-    too, by design), so the relay **fails fast** at construction with a message naming the property:
+    There was no discovery fetch to derive it from then (this module configured `auth.oidc.jwksUri` explicitly
+    too; since 2026-10-13 discovery or the `keycloak` preset can supply it, below), so without one the relay
+    **fails fast** at construction with a message naming the property:
     take `token_endpoint` from the provider's `/.well-known/openid-configuration` and pass
     `-Dauth.oidc.tokenEndpoint=…`. ⚠ **Deployment-breaking for anyone who relied on the derived default** —
     Keycloak deployments must now set the flag explicitly (same value as before).
@@ -621,7 +627,7 @@ and the test strengthened to re-arm a slot whose provider genuinely resolves.
 
 ✅ **`AccessDeciders` FLIPPED TOO — operator decision 2026-09-13.** It had the same shape, and the cost of
 absence turned out to be higher than the first reading suggested. Both PEPs read an absent decider as
-**allow** — `ControlApi.authorize` returns early (`:811`) and `RowScope.visible` returns `true` (`:32`) —
+**allow** — `ControlApi.authorize` returns early and `RowScope.visible` returns `true` —
 and `PolicyEngine`'s seeded policies are `space-isolation` / `space-isolation-rows`. So a
 registered-but-unloadable `inspecto-policy` would silently stop enforcing the **multi-tenant Space
 boundary** at both route and row level, letting a subject bound to one Space address and read another.
@@ -738,7 +744,7 @@ got 200, and `Roles.effective` then gave their `developer` role `canAdminister`.
 `POST /pipelines/import?conflict=overwrite` (satellites land in the REGISTERED pipeline's directory, which
 may be the config root itself) and `POST /bundle/import` (`access-profile` / `access-catalog` items, and
 `pipeline` items whose closure carries satellites). Two more fixed-name loaders were reachable the same way:
-`demo-users.toon` (`inspecto-demo-auth` `DemoUsers.java:31`, read from every Space's config root, so a
+`demo-users.toon` (`inspecto-demo-auth` `DemoUsers.FILE`, read from every Space's config root, so a
 `roles: super` Demo User) and `agent/` (`AgentWriteRoot` → `agent/policy.json`, `agent/approvals.jsonl`).
 
 **One judge, four layers, every door** — `com.gamma.service.ImportPaths`, called by `/import` (all entries
@@ -779,8 +785,10 @@ up front), `/pipelines/import` (every satellite, every companion, the pipeline f
    `link-analysis`, `pipeline-history`, `icon-map`, `scheduler`, `nav-menus`, `notification-preferences`,
    `partition`, `space`), `rename.journal`, `dataset-publications.tsv`, `day-manifest.tsv` (LA-DAILY-INGEST-1 T8 delivery manifest, operator 2026-10-06); the directories `pending-changes/`,
    `recon-state/`, `.history/` (anywhere), `audit/`, `agent/`, `expectation-baselines/`,
-   `registry/access-catalog/`, `registry/access-profiles/`. `approval.toon` and `pending-changes/` are
-   reserved as plain paths ahead of maker-checker, which is not on `master`.
+   `registry/access-catalog/`, `registry/access-profiles/`. `approval.toon` and `pending-changes/` hold
+   maker-checker's policy and held changes (shipped 2026-09-26, below). The list above is not complete:
+   `ReservedConfigPaths.FILES` / `DIRS` (34 files and 12 directories on 2026-11-17) are the authority, and
+   `ImportLoaderInventoryTest` fails when a loader reads a fixed name the list neither covers nor allow-lists.
 4. **A real-path check**: the nearest existing parent is resolved with `toRealPath` and compared against
    every reserved file and directory (`isSameFile` / real-path prefix), failing closed on any I/O error.
 

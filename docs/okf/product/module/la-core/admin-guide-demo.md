@@ -37,7 +37,7 @@ store) are in the [showcase variants runbook](../../solution-pack/la-showcase/ad
 | 3 | Start | `bin\serve-demo.bat` (Windows) or `./bin/serve-demo.sh`; port is 8080, override with the `PORT` env var (`set PORT=8096`). Optional extra JVM flags: `INSPECTO_JAVA_OPTS`. | Banner `[serve-demo] DEMO BUILD on http://127.0.0.1:<PORT>`. Bound to 127.0.0.1 only. |
 | 4 | Wait for the first ingest | The Space ingests `TRANSFERS_20260901..03.csv` from its inbox on boot. | The seed in step 5 retries a 422 "cannot read the columns" up to 30 times (2 s apart) until `mule_transfers_dataset` has rows. |
 | 5 | Seed | `node tools/seed-la-showcase.mjs --base http://127.0.0.1:<PORT> --space la-showcase --apply` (a run without `--apply` is a dry run that prints every call) | Ends with `created: ...`, `already there: ...`, `failed: -`. Safe to re-run. See §0.1. |
-| 6 | Smoke | `node tools/la-demo-smoke.mjs --base http://127.0.0.1:<PORT> --space la-showcase` | `PASS` lines then **`9/9 probes passed`** (6 gate probes + route inventory + untouched manifest verifies + tamper verify fails). Exit 0. Any `FAIL` line: stop and fix before presenting. |
+| 6 | Smoke | `node tools/la-demo-smoke.mjs --base http://127.0.0.1:<PORT> --space la-showcase` | `PASS` lines then **`17/17 probes passed`** (6 gate probes + route inventory + untouched manifest verifies + tamper verify fails, and since 2026-10-12 eight more: empty-Dataset projection, read-only persona, three settings round-trip probes, two dark-embed probes, the sign-in picker; a `SKIPPED` line counts as passed). Exit 0. Any `FAIL` line: stop and fix before presenting. |
 | 7 | Optional wider smoke | add `--staged <bundle>\spaces\la-showcase\data\staged\mule_transfers --inbox <bundle>\spaces\la-showcase\data\inbox\mule_transfers` for replay-versus-drift (**writes** a far-future 40-row file into the inbox, so run it BEFORE the stakeholder day, not after); `--burst` for 429/503/409 (starts runs: disposable demo only); `--telecom [--presenter manager]` for the telecom checks (triggers Jobs, creates a `smoke-telecom-<ts>` Investigation, 180 s timeout). | Each adds probes to the `N/N` count; a skipped probe prints `SKIPPED` and still counts as passing. |
 | 8 | Embed (optional aside, S14) | Start with `set INSPECTO_JAVA_OPTS=-Dla.embed.enabled=true` | Without it the mint answers 503 and every public read answers 404. |
 
@@ -70,8 +70,8 @@ ingested until you copy them into the inbox (used live only if you choose the dr
 
 | Demo User | Role in the story | Capabilities that matter |
 |---|---|---|
-| `admin` | Platform admin; Settings; mints embed links; Reveal | admin role plus `la-settings` (`canAuthorWorkbench`); a lead member of the Investigation |
-| `analyst` | Lead analyst, owner | `canManageIncidents`, `canWorkIncidents`, `canRunLinkGraphAnalysis`, `canBuildLinkIndex`, `canAuthorAlertRules` |
+| `admin` | Platform admin; Settings; mints embed links; Reveal | admin role plus `fraud-analyst` and `la-settings` (`canAuthorWorkbench`); a lead member of the Investigation |
+| `analyst` | Lead analyst, owner | `canManageIncidents`, `canWorkIncidents`, `canRunLinkGraphAnalysis`, `canBuildLinkIndex`, `canAuthorAlertRules`, `canRevealLinkEntities`, `canShareInvestigation` (`la-analyst`), so `analyst` can Reveal too |
 | `manager` | Second approver | `canManageIncidents`, `canWorkIncidents`, `canApproveLinkExpansions`, `canOperateRuns` |
 | `reviewer` | Reviewer, read-only | none (`la-viewer`) |
 | `outsider` | Not a member | none (`la-viewer`) |
@@ -95,7 +95,7 @@ served Space (see "if it goes wrong" below).
 
 ## 1. Day-of checklist
 
-* [ ] Server up, `9/9 probes passed` (§0 step 6) within the last hour; **no other Space with a different Demo User roster in `spaces\`**
+* [ ] Server up, `17/17 probes passed` (§0 step 6) within the last hour; **no other Space with a different Demo User roster in `spaces\`**
       (see "if it goes wrong" below).
 * [ ] Port free (default 8080, or the `PORT` you chose); open `http://127.0.0.1:<PORT>/` (not `localhost`, not another host: the
       launcher binds loopback only).
@@ -200,7 +200,7 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
   * `analyst` `POST .../inv/investigations` with `{}` -> **422**
   * `analyst` `GET` on the `la-showcase-off` Space -> **404 `MODULE_DISABLED`**
   * `analyst` `GET .../mule-hub-case/log` -> **200**
-* **Expect:** exactly those statuses (all six are smoke probes, `9/9`). `reviewer` in the UI: the Investigation tab is read-only (Seed, Expand, Undo,
+* **Expect:** exactly those statuses (all six are smoke probes, `17/17`). `reviewer` in the UI: the Investigation tab is read-only (Seed, Expand, Undo,
   Fork a Draft disabled with a note saying why); a mutating `curl` as `reviewer` is 403. Members: a lead can **Grant**/**Revoke**; revoking the last
   lead is refused.
 * **Proves:** members and roles; non-members get 404-as-absence, a member lacking the role gets 403 only after the Dataset-visibility and policy checks
@@ -249,14 +249,14 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
 * **Proves:** SHA-256 manifest over every stored artefact; tampering is detectable (arch §3.1 outputs).
 * **If it goes wrong:** the dossier route needs a seeded Investigation (else 404). Hand-editing JSON in front of the audience is error-prone: prepare the tampered file beforehand.
 
-### S12. Alert to Investigation (2 min) [analyst; needs the full SPA]
+### S12. Alert to Investigation (2 min) [analyst]
 * **Click:** open the Alerts page, find the Alert from the Investigation rule `mule-pass-through`, press **Open Investigation**.
 * **Expect:** the Alert carries aggregate facts only (rule, Measure, threshold, breach count, worst value); **no entity id, name or alias**; entities are read inside the
   Investigation under its own gates and masking (arch §7, `LA-DETECT-ALERT-AGGREGATE-1`). Standing detection runs from the `la_detect` Job every 5 minutes; the rule
   is edited => the sweep refuses with `NOT_ENABLED`.
-* **UNVERIFIED (rehearse first):** (a) the **Alerts page and its Open Investigation action live in the gamma host SPA, not in the la-app** (the la-app has only
-  Link Analysis, Geo, Entity Lists and Settings), so this scene cannot be shown inside the standalone app; (b) the readiness plan lists "Alerts rendering of a fired
-  standing-detection Alert" as not verified; (c) the Alert only exists after `la_detect` has run on a breaching rule. Alternative inside la-app: Investigation tab >
+* **UNVERIFIED (rehearse first):** (a) since 2026-10-12 the la-app has its own **Alerts** area (the console's Alerts page, reused whole), and
+  **Open Investigation** stays inside the la-app (`ALERTS_INVESTIGATION_ROUTE` → `/link-analysis`); (b) the readiness plan lists "Alerts rendering of a fired
+  standing-detection Alert" as not verified; (c) the Alert only exists after `la_detect` has run on a breaching rule. Alternative: Investigation tab >
   the bound Alert Rule / standing-detection panel and Monitoring.
 
 ### S13. Settings (admin) (1 min) [admin]
@@ -280,7 +280,8 @@ Not built: token delivery by a header, a fragment or a POST exchange. A fragment
 send the right `frame-ancestors` (see `okf/product/module/la-core/architecture-http-and-ui.md` §6.2); a POST exchange is a new route and a new client flow. Both are a larger change than the redaction rule above, so this stays a documented operator duty.
 
 ### S14. Embed API aside, API only (2 min) [admin by curl]
-No SPA exists for embed links (the SPA shell is deferred). Start the server with `-Dla.embed.enabled=true` (§0 step 8). Mint needs `canShareInvestigation` AND a lead
+This aside drives the API only; the embed UI exists (mint dialog, grant list, the `/embed/inv/<token>` viewer in both the
+la-app and the full SPA, since 2026-10-12). Start the server with `-Dla.embed.enabled=true` (§0 step 8). Mint needs `canShareInvestigation` AND a lead
 of the Investigation: as `admin` (a lead by the seed).
 ```
 # 1. mint (admin token in $ADMIN)
@@ -314,7 +315,7 @@ Not live. Link index: full build **852 s**, append **31 s** on a synthetic **10^
 
 | Min | Scene | Persona |
 |---|---|---|
-| 0-1 | Pre-flight already green (`9/9 probes passed`); sign in | `analyst` |
+| 0-1 | Pre-flight already green (`17/17 probes passed`); sign in | `analyst` |
 | 1-3 | S1 Follow the money + Suspicion score; S5 Pattern match > Structuring > Run on server (hub, 96 legs, 12 payers) | `analyst` |
 | 3-5 | S6 Value Measures: Pass-through (13 accounts, relays 0.985) and Cash-out (`TILL-06` 97 %) | `analyst` |
 | 5-7 | S2 open `mule-hub-case`, Replay; S8 unbounded expand -> Waiting for approval -> `manager` approves | `analyst`, `manager` |
@@ -334,7 +335,7 @@ Say these before anyone asks. Confidence tags as in [§10](#10-stakeholder-qa).
 * **Fences:** the "engine names no la-* class" rule is guarded in CI by `tools/check-engine-names-no-la.mjs` (DR-T3); the dependency fences are shown by a named guard, not live.
 * **Postgres store, Personal 503, 429/503 bursts:** other variants (see the variants runbook) or `--burst`, not part of this script.
 * **A fired Alert names entities:** it does not, by design (aggregate only).
-* **Alerts inside the standalone app:** the Alerts page is in the full SPA, not the la-app.
+* **Alerts inside the standalone app:** the la-app has its own Alerts area since 2026-10-12, and Open Investigation stays in the la-app.
 * **Real-IAM sign-in** was proven once, end to end, against a local WSO2 Identity Server on 2026-10-13
   ([admin guide §2](admin-guide.md#2-real-oidc-sign-in-runbook-la-app-local-wso2-identity-server)); the demo bundle
   itself never shows it. Confidence: PROVEN on that run, not on the demo bundle.
@@ -363,7 +364,7 @@ This kit follows the figure named; the others should be corrected at source.
 3. **Seeded four-eyes:** the plan's DR-S2 acceptance says "an unbounded expand of the hub creates a pending request"; the seed's own 8 steps use a bounded
    expand (`maxFanOut` 5) so none is pending after seeding. The scene S8 therefore creates the request live.
 4. **Smoke wording:** the task brief expects "N/N pass"; the runner prints `N/N probes passed`.
-5. **Alert -> Open Investigation** is described by the plan and manual as part of the product but is rendered by the gamma host SPA only, not the la-app.
+5. **Alert -> Open Investigation** is described by the plan and manual as part of the product; since 2026-10-12 the la-app renders it too (its Alerts area).
 6. **Algorithms:** 29 in code and in [architecture](architecture.md) §5; the readiness plan's defence matrix says 28.
 7. **Routes:** the readiness plan says 75; the route count today is in [architecture](architecture.md) §6.
 8. **10^8 build:** the first spike says 368 s (17.9 GB peak), the later table 447 s (8 GB cap), the roadmap "24 min
@@ -612,7 +613,7 @@ Confidence: PROVEN for the API. There is no viewer page yet (Section 8).
 **Q8. Where does the data live? Does it leave the server?**
 Source data stays in the customer's own Datasets on the host; Link Analysis reads it in place or from a derived
 Parquet link index on the same disk. The Investigation record (op log, sealed Working Sets, Dossier inputs) is kept in
-the Space's write root on the filesystem, or in the customer's PostgreSQL in Preview and Enterprise. The
+the Space's write root on the filesystem, or in the customer's PostgreSQL in Preview and Advanced. The
 standalone app is a second UI served by the same host process, not a separate service, and nothing is sent to an
 external service.
 Evidence: backend §1, §3.2, §4 (index under `<writeRoot>/la-index/`), §8.
@@ -769,9 +770,11 @@ Confidence: PROVEN as measured; sizing for a customer environment is NOT YET don
 ### 10.6 Deployment and operations
 
 **Q25. Which editions include it, and what is installed?**
-Link Analysis is optional jars discovered at startup, not a separate server. It is present from Standard upward
-(Standard is a Professional alias in the bundler), absent in Personal (the routes answer 503), and the PostgreSQL
-Investigation store and the Enterprise policy engine are Preview and Enterprise only. Per Space it needs the
+Link Analysis is optional jars discovered at startup, not a separate server. Since 2026-10-17 (`LA-EDITIONS-1`, which
+renamed Personal / Professional / Enterprise to Basic / Standard / Advanced) its jars are staged in every edition: Basic
+carries the Link Analysis Explorer, and the Investigation surface needs Standard or up (the `investigations` edition
+feature, which only `inspecto-ops` declares). The PostgreSQL Investigation store and the Advanced policy engine are
+Preview and Advanced only. Per Space it needs the
 `geoLink` module enabled in `modules.toon`.
 Evidence: backend §8 and [architecture-http-and-ui](architecture-http-and-ui.md) §6.1 step 4; `ControlApiGeoLinkModuleGateTest`.
 Confidence: PROVEN for the module gate; DOCUMENTED for packaging.

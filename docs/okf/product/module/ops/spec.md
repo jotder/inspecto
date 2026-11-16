@@ -27,7 +27,7 @@ Domain behaviour (lifecycles, resolve gate, Cases, Findings) is specified in
 
 ## What the module contributes (`module.toon`)
 
-- Feature `ops`; config kinds `workflow`, `sla-policy`, `escalation-rule`.
+- Features `ops` and `alert.dispatch`; config kinds `workflow`, `sla-policy`, `escalation-rule`.
 - Contracts: `ConsequenceProvider` (`create-incident`), `JobTypeProvider` (`objects.analytics`),
   `LinkedSubjectProvider` (Incident and Case as Action Request subjects), `MaintenanceTaskProvider`
   (`incident_purge`), `ObjectEngineProvider`.

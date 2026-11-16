@@ -132,8 +132,9 @@ Moved to [Identity and Access — API](api-access.md).
   `…aBrokenPipelineWhoseFileNameDoesNotNameTheStoreStillFailsClosed`.
 - **Demo auth is not security**: anyone reaching the port can sign in as any Demo User. It refuses to load off
   loopback; a Demo User roster conflict disables sign-in with a `409` while the server keeps running.
-- **Discovery drift**: [Security §6.2](plan-security.md) records OIDC discovery as refused, but
-  `OidcConfig` now supports `auth.oidc.discoveryUrl`; the code is current, the spec section is stale.
+- **Discovery drift — resolved 2026-11-17**: [Security §6.2](plan-security.md) keeps the old refusal as history
+  under a superseded note, and its §3.4 property table and §4 decisions now carry `auth.oidc.discoveryUrl` and the
+  provider preset.
 - **No Vault / cloud KMS** secrets scheme; only ENV, SYS, FILE and KEYSTORE.
 - `POST /access/policies/preview` is evaluated by the route PEP as a write against the current policy
   document, so a subject that document already denies cannot preview.

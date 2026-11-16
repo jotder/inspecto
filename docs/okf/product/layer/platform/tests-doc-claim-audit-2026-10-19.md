@@ -156,7 +156,7 @@ describe a state that has since shipped.
    `admin-guide-operations-reference` (Escalation Rules mutate an Incident and emit `OBJECT_ESCALATED` — 2).
    ⏸ **Open, owned by the access lane:** `access/plan-security` and `admin-guide-auth-security` (HTTPS test,
    policy-editor browser pass, maker-checker, OIDC discovery, the `id_token_hint` cookie, the `auth` block in
-   `/bootstrap`).
+   `/bootstrap`). ✅ **FIXED 2026-11-17 (batch 4)** — item 9.
 2. **Routes that no longer exist**: ✅ **FIXED 2026-11-01** in `admin-guide-operations-reference`:
    `/pipelines/{name}/…` → `/runs/{runId}/…` (route table and prose; `GET|POST /pipelines` → `/runs` for the
    run list and live registration — 4 claims) and the `batch_id` columns → `consignment_id` (status CSV,
@@ -195,7 +195,8 @@ describe a state that has since shipped.
    `user-guide-inline-ai-authoring`), each cited file checked to exist first; the one that did not
    (`onboarding.md`) is marked retired. Line numbers were wrong where sampled (`AgentRoutes`, `JobService`,
    `ConsignmentIngestor`). ⏸ Still open: `access/plan-security` (23, with the access lane) and about 150 in
-   docs not touched yet — the same rule, on their next touch.
+   docs not touched yet — the same rule, on their next touch. ✅ **`access/` done 2026-11-17 (batch 4)** — item 9;
+   the ~150 in untouched docs stay open.
 6. **Dangling BACKLOG pointers**: ✅ **FIXED 2026-11-01 (batch 2):** `CLIENT-HALVES-1` (×4 — row closed),
    `OPENAPI-GEN-1` (shipped 2026-09-15), `SEC-INCIDENT-1` (`plan-compliance` §5.2 said the carry-forwards were
    not done; the controls matrix CC6.1 records both done), `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` in
@@ -246,6 +247,54 @@ describe a state that has since shipped.
    *Collector rename residual* decided note in `docs/BACKLOG.md`, which still said the `source:` block stays.
    ⏸ Skipped: `la-core/admin-guide-demo` (a peer owns the `la-*` hubs). Found in code, not docs: the three
    `since = "5.x"` annotations, and a `PipelineExecutionParityTest` comment repeating the old `toToon` warning.
+   ✅ **`la-core/admin-guide-demo` FIXED 2026-11-17 (batch 4)** — item 9.
+9. **Batch 4 (2026-11-17, MoSCoW S16)**, every claim re-verified against code first:
+   - **`access/` (item 1 and item 5's 23).** `plan-security`: 28 claims fixed — `SEC-12` is built (the server
+     publishes `/bootstrap` `auth` through `TokenRelay.bootstrapAuth` since 2026-10-10, and `POST /auth/logout`
+     returns the end-session URL with `id_token_hint` from the HttpOnly `inspecto_idt` cookie since 2026-10-13, so
+     §3.5 and two new §4 rows say so); OIDC discovery and the provider preset (`OidcConfig`, 2026-10-13) in the §3.4
+     property table and §4; the Policies-editor browser pass ran 2026-09-27 (§3.10, §5); HTTPS is tested
+     (`ControlApiHttpsTest`, §3.11 and §8.7 still said "no test"); real-IdP tests exist but are opt-in
+     (`OidcAgainstRealProviderTest`, `OidcKeycloakAgainstRealProviderTest`); the boot precondition is tested
+     (`AuthenticatorDiscoveryFailClosedTest`); audit tamper evidence is built (`AuditChain`, `/audit/verify`);
+     §5's dangling pointers (`DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` for Vault, the done SEC-INCIDENT-1
+     carry-forwards, a §5 *Compliance repo-side artifacts* row that does not exist, `CLIENT-HALVES-1` ×2); the
+     `Subject` record has seven components, not four (×2); `AccessPolicies.FILE` / `.effective` are
+     `AccessPolicyStore`'s; the gating order is `ControlApi.routeDispatch` with `SpaceAdmission` after stage 1; the
+     capability vocabulary is 23, not 20 (five rows added: `canUploadData`, `canApproveChanges`,
+     `canManageExclusionCategories`, `canOpenInboundInvestigation`, `canOfferSignals`), the manifest 293
+     registrations, not 70; `RowScope` has six more users; `-Pedition-standard|enterprise` named a profile that
+     does not exist; and a reading note for the old edition names (about 50 mentions, dated decisions keep them).
+     **38 line numbers dropped** (the work list said 23; each cited file and symbol checked to exist first). Already
+     right, 12: `authMode` is declared, not derived (×3); "module present, auth off" is impossible; `permissions[]`
+     has no reader (×2); `Subject` / `SecretsProvider` lack `@PublicApi`; the default reactor compiles neither
+     module; the default bind is every interface; the UI seam has no concept file; the seeds; `/access/explain` is
+     an ungated GET. `admin-guide-auth-security`: 7 fixed (`id_token_hint`, where `endSessionUrl` comes from, the
+     browser pass, "no discovery fetch", "maker-checker, which is not on `master`", an incomplete denylist — now
+     points at `ReservedConfigPaths` (34 files, 12 directories) — and "only under `edition-standard`") and 3 line
+     numbers dropped; 5 already right. `access/architecture`: the "discovery drift" bullet is resolved (1).
+     `spec`, `features-access`, `user-guide-access`, `api-access`: about 20 claims, all right.
+   - **`la-core/admin-guide-demo` (item 8).** 11 claims fixed in 15 places: the smoke prints `17/17`, not `9/9`
+     (eight probes added 2026-10-12; ×4); `analyst` holds `canRevealLinkEntities` and `canShareInvestigation`
+     (`la-analyst`) and `admin` also `fraud-analyst`; the la-app has its own Alerts area with Open Investigation
+     since 2026-10-12 (×4: S12, its UNVERIFIED note, the Q&A line, discrepancy 5); an embed UI exists (S14 said
+     "no SPA"); Q25's editions (Link Analysis jars staged in every edition since `LA-EDITIONS-1`, Basic = the
+     Explorer, no "Professional alias", not "absent in Personal") and Q8's "Enterprise". Already right, 8: the
+     `manager` / `reviewer` / `outsider` rows, `reviewer` has no working Reveal, embed is built and dark without
+     `-Dla.embed.enabled` (503), the six gate probes. Left: the "Personal 503" variant mentions (a runbook name).
+   - **Item (c), the unsampled `spec*` / `user-guide*` / `architecture*` docs.** The population is 100 docs of
+     those slots added by the seven 2026-10-19 commits; 11 were in the first sample, so 89 were unsampled. **19
+     done**, about 200 claims checked, 1 wrong: `ops/spec` named one feature, the module provides `ops` and
+     `alert.dispatch`. Right as written: `access/spec`, `access/user-guide-access`, `oidc/spec`,
+     `policy/spec` · `user-guide` · `architecture`, `demo-auth/spec` · `architecture`, `auth-spi`, `audit-spi` and
+     `http-spi` `architecture`, `ops/architecture`, `reconciliation/spec` (every constant), `entity-store/spec`,
+     `connectors-kafka/spec` · `architecture`, `observability/spec`, `secrets/architecture`. These recently
+     maintained hubs were near-clean, as the first sample was. **70 left**: the `la-*`, `geo-*`, `graph`, `sql`,
+     `util`, `workflow`, `scoring`, `case-management`, `intelligence`, `asn-decoders`, `telecom-asn1` and smaller
+     module hubs, five `layer/*` pages, and 23 solution-pack user guides and architecture pages.
+   - **Found in code, not docs:** the `AccessPolicies` Javadoc cites `{@value #FILE}`, a constant that moved to
+     `AccessPolicyStore`; the `Authenticators` Javadoc says its slot is "the only one" that is fail-closed, but
+     `AccessDeciders` and `InvestigationStores` are too.
 
 ### Verified correct — do not "fix"
 
