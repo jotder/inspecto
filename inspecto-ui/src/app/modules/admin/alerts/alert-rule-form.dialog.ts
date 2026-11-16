@@ -28,6 +28,7 @@ import { QueryConditionGroupComponent } from 'app/inspecto/query/query-condition
 import { Condition, ColumnMeta, ConditionGroup, emptyGroup } from 'app/inspecto/query/query-types';
 import { groupByValidator, measureError } from 'app/inspecto/query/measure-grammar';
 import { ALERT_RULE_ATTRIBUTES } from './alert-rule-attributes';
+import { ledgerMetricWords, ruleName, ruleWatchText } from './alert-words';
 
 /** The ledger-row fields a `when` clause can scope on (the columns `AlertService`'s metric math
  *  reads) — fixed, unlike Decision Rule/Expectation's probed-from-a-store columns, since a ledger
@@ -138,13 +139,7 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>
-            {{
-                isEdit
-                    ? 'Edit alert rule — ' + data.rule?.name
-                    : step() === 'save'
-                      ? 'Save alert rule'
-                      : 'New alert rule'
-            }}
+            {{ isEdit ? 'Edit Alert Rule: ' + ruleTitle : step() === 'save' ? 'Save alert rule' : 'New alert rule' }}
         </h2>
 
         <mat-dialog-content class="!pt-2">
@@ -166,7 +161,7 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                 ></inspecto-schema-form>
 
                 @if (kind() === 'metric') {
-                    <div class="mt-4 font-semibold">Only count batches matching (optional)</div>
+                    <div class="mt-4 font-semibold">Only count Consignments matching (optional)</div>
                     <inspecto-query-condition-group
                         class="mt-2 block"
                         [group]="when"
@@ -174,11 +169,23 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                         [root]="true"
                     />
                     @if (whenEmpty()) {
-                        <div class="text-secondary mt-1 text-sm">No conditions — every batch in the window counts.</div>
+                        <div class="text-secondary mt-1 text-sm">
+                            No conditions: every Consignment in the window counts.
+                        </div>
                     }
                 } @else if (!authored) {
                     <!-- Read-only: this form cannot re-author a freshness / Investigation rule's target; save keeps it as stored. -->
                     <dl class="text-secondary mt-4 space-y-1 text-sm" aria-label="Rule target (read-only)">
+                        @if (data.rule?.investigation) {
+                            <div>
+                                <dt class="inline font-semibold">Investigation:</dt>
+                                <dd class="inline">{{ data.rule?.investigation }}</dd>
+                            </div>
+                            <div>
+                                <dt class="inline font-semibold">Watches:</dt>
+                                <dd class="inline">{{ watchText }}</dd>
+                            </div>
+                        }
                         @if (data.rule?.dataset) {
                             <div>
                                 <dt class="inline font-semibold">Dataset:</dt>
@@ -239,6 +246,10 @@ export class AlertRuleFormDialog implements AfterViewInit {
     private confirm = inject(InspectoConfirmService);
     private destroyRef = inject(DestroyRef);
     readonly data = inject<AlertRuleFormData>(MAT_DIALOG_DATA);
+    /** What the edited rule is called: its description, else its id as words. */
+    readonly ruleTitle = this.data.rule ? ruleName(this.data.rule, this.data.rule.name) : '';
+    /** What a stored Investigation rule watches, in words (its target is read-only here). */
+    readonly watchText = this.data.rule ? ruleWatchText(this.data.rule) : '';
 
     @ViewChild(InspectoSchemaFormComponent) schemaForm!: InspectoSchemaFormComponent;
 
@@ -259,7 +270,7 @@ export class AlertRuleFormDialog implements AfterViewInit {
             } catch {
                 // suggestions are best-effort — the documented trio still shows
             }
-            return [...known].sort().map((m) => ({ value: m, label: m }));
+            return [...known].sort().map((m) => ({ value: m, label: ledgerMetricWords(m) }));
         },
         onPipeline: pipelineOptionLoader(),
         dataset: datasetOptionLoader(),

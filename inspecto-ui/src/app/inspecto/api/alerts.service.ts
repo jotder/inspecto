@@ -74,6 +74,10 @@ export interface AlertRule {
     /** Investigation rule (LA-23): the Investigation whose Working Set `relation` the `measure` reads. */
     investigation?: string | null;
     relation?: string | null;
+    /** Value-measure rule (LA-18): the Value Measure it watches over the Investigation's whole Dataset (`name` + its settings). */
+    valueMeasure?: ({ name: string } & Record<string, unknown>) | null;
+    /** Freshness rule over the Link Analysis index (files waiting to be indexed) rather than over publishing. */
+    indexLag?: boolean;
 }
 
 /**

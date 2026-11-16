@@ -19,7 +19,7 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
         tier: 'required',
         default: 'metric',
         options: [
-            { value: 'metric', label: 'A Pipeline metric (over the batch ledger)' },
+            { value: 'metric', label: "A Pipeline's processing Metric (over its recent Consignments)" },
             { value: 'measure', label: 'A Dataset Measure (over its current data)' },
         ],
     },
@@ -48,7 +48,7 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
         tier: 'required',
         dependsOn: { key: 'kind', equals: 'metric' },
         placeholder: 'e.g. error_rate, rejected_files, duration_ms',
-        help: 'The observability metric to watch (as emitted by the engine).',
+        help: 'The processing Metric to watch: error rate, failed Consignments, rejected files or average duration.',
     },
     {
         key: 'comparator',
@@ -69,7 +69,7 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
         label: 'Threshold',
         type: 'number',
         tier: 'required',
-        help: 'A positive number (an error_rate is a fraction, e.g. 0.05).',
+        help: 'A positive number (an error rate is a fraction, e.g. 0.05).',
     },
     {
         key: 'window',
@@ -84,7 +84,7 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
             { value: '1h', label: '1 hour' },
             { value: '24h', label: '24 hours' },
         ],
-        help: 'The evaluation window the metric is aggregated over.',
+        help: 'The span of recent Consignments the Metric is computed over.',
     },
     {
         key: 'severity',

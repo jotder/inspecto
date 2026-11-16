@@ -37,6 +37,16 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
 import { AiStatusData, AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { ALERTS_INVESTIGATION_ROUTE } from './alerts-investigation-route';
+import {
+    firedScopeKind,
+    firedScopeText,
+    firedWatchText,
+    readableId,
+    ruleConditionText,
+    ruleName,
+    ruleScopeText,
+    ruleWatchText,
+} from './alert-words';
 
 export { ALERTS_INVESTIGATION_ROUTE };
 
@@ -90,7 +100,14 @@ export class AlertsComponent implements OnInit {
     readonly pendingState = signal<'loading' | 'ready' | 'error' | 'hidden'>('loading');
 
     readonly pendingColumnDefs: ColDef<PendingAlertRule>[] = [
-        { field: 'name', headerName: 'Rule', flex: 1, minWidth: 160 },
+        {
+            colId: 'name',
+            headerName: 'Name',
+            flex: 1,
+            minWidth: 160,
+            valueGetter: (p) => (p.data ? readableId(p.data.name) : ''),
+            tooltipValueGetter: (p) => p.data?.name,
+        },
         {
             colId: 'afterScore',
             headerName: 'Waits on',
@@ -146,9 +163,27 @@ export class AlertsComponent implements OnInit {
             maxWidth: 150,
             cellRenderer: (p: ICellRendererParams<FiredAlert>) => (p.value ? statusBadgeHtml(p.value as string) : '—'),
         },
-        { field: 'rule', headerName: 'Rule', flex: 1 },
-        { field: 'pipeline', headerName: 'Pipeline', flex: 1 },
-        { field: 'metric', headerName: 'Metric', minWidth: 140 },
+        // The stored id stays in the tooltip; the cell is what a person calls the rule.
+        {
+            colId: 'rule',
+            headerName: 'Alert Rule',
+            flex: 1,
+            valueGetter: (p) => (p.data ? ruleName(this.ruleOf(p.data), p.data.rule) : ''),
+            tooltipValueGetter: (p) => p.data?.rule,
+        },
+        // The server keeps an Alert's scope in `pipeline` whatever it is (a Pipeline, Dataset, Investigation or Job).
+        {
+            colId: 'scope',
+            headerName: 'Scope',
+            flex: 1,
+            valueGetter: (p) => (p.data ? firedScopeText(p.data, this.ruleOf(p.data)) : ''),
+        },
+        {
+            colId: 'watches',
+            headerName: 'Watches',
+            minWidth: 160,
+            valueGetter: (p) => (p.data ? firedWatchText(p.data.metric) : ''),
+        },
         { field: 'value', headerName: 'Value', minWidth: 110 },
         // One line per row, full text in the tooltip: `autoHeight` measured the message before the flex columns were
         // sized, so the first render drew very tall rows with empty cells until a search re-rendered them.
@@ -156,12 +191,20 @@ export class AlertsComponent implements OnInit {
     ];
 
     readonly ruleColumnDefs: ColDef<AlertRule>[] = [
-        { field: 'name', headerName: 'Rule', flex: 1, minWidth: 160 },
         {
-            headerName: 'Metric / Measure',
+            colId: 'name',
+            headerName: 'Name',
+            flex: 1,
+            minWidth: 160,
+            valueGetter: (p) => (p.data ? ruleName(p.data, p.data.name) : ''),
+            tooltipValueGetter: (p) => p.data?.name,
+        },
+        {
+            colId: 'watches',
+            headerName: 'Watches',
             flex: 1,
             minWidth: 140,
-            valueGetter: (p) => (p.data ? ruleMetricText(p.data) : ''),
+            valueGetter: (p) => (p.data ? ruleWatchText(p.data) : ''),
         },
         { headerName: 'Condition', minWidth: 170, valueGetter: (p) => (p.data ? ruleConditionText(p.data) : '') },
         {
@@ -174,7 +217,7 @@ export class AlertsComponent implements OnInit {
         {
             headerName: 'Scope',
             minWidth: 160,
-            valueGetter: (p) => p.data?.onPipeline || 'every pipeline',
+            valueGetter: (p) => (p.data ? ruleScopeText(p.data) : ''),
         },
     ];
 
@@ -201,7 +244,12 @@ export class AlertsComponent implements OnInit {
      */
     /** The Investigation an alert's rule watches (an Investigation rule fires with the Investigation as its scope). */
     investigationOf(a: FiredAlert): string | null {
-        return this.rules().find((r) => r.name === a.rule)?.investigation ?? null;
+        return this.ruleOf(a)?.investigation ?? null;
+    }
+
+    /** The armed rule that raised `a`; none for a built-in rule or one deleted since. */
+    ruleOf(a: FiredAlert): AlertRule | undefined {
+        return this.rules().find((r) => r.name === a.rule);
     }
 
     readonly firedActions = computed<InspectoRowAction<FiredAlert>[]>(() => {
@@ -209,13 +257,17 @@ export class AlertsComponent implements OnInit {
             {
                 icon: 'heroicons_outline:information-circle',
                 hint: 'What happened',
-                onClick: (a) =>
+                // Live state is read for a Pipeline only: a Dataset, Investigation or Job id is not one.
+                onClick: (a) => {
+                    const rule = this.ruleOf(a);
+                    const kind = firedScopeKind(a, rule);
                     this.dialog.open(AiStatusDialog, {
                         data: {
-                            label: a.rule,
-                            pipelineId: a.pipeline,
+                            label: ruleName(rule, a.rule),
+                            ...(kind === 'Pipeline' || kind === null ? { pipelineId: a.pipeline } : {}),
                         } satisfies AiStatusData,
-                    }),
+                    });
+                },
             },
             {
                 // DR-U9: the Alert carries the COUNT only (by design — an Alert is readable by people who are not members
@@ -359,14 +411,14 @@ export class AlertsComponent implements OnInit {
                 this.evaluating.set(false);
                 this.toastr.info(
                     fired.length === 0
-                        ? 'Evaluation pass complete — nothing breached'
-                        : `${fired.length} alert(s) fired`,
+                        ? 'Evaluation complete: nothing crossed its threshold'
+                        : `${fired.length} ${fired.length === 1 ? 'Alert' : 'Alerts'} fired`,
                 );
                 this.load();
             },
             error: (e) => {
                 this.evaluating.set(false);
-                this.toastr.warning(apiErrorMessage(e, 'No alert rules armed — create one under Alert Rules below.'));
+                this.toastr.warning(apiErrorMessage(e, 'No Alert Rules armed: create one under Alert Rules below.'));
             },
         });
     }
@@ -381,7 +433,7 @@ export class AlertsComponent implements OnInit {
             .afterClosed()
             .subscribe((r?: AlertRuleFormResult) => {
                 if (r?.saved) {
-                    this.toastr.success(`Alert rule "${r.saved.name}" armed`);
+                    this.toastr.success(`Alert Rule “${ruleName(r.saved, r.saved.name)}” armed`);
                     this.load();
                 }
             });
@@ -394,27 +446,28 @@ export class AlertsComponent implements OnInit {
             .afterClosed()
             .subscribe((r?: AlertRuleFormResult) => {
                 if (r?.saved) {
-                    this.toastr.success(`Alert rule "${r.saved.name}" saved`);
+                    this.toastr.success(`Alert Rule “${ruleName(r.saved, r.saved.name)}” saved`);
                     this.load();
                 }
             });
     }
 
     async removeRule(rule: AlertRule): Promise<void> {
-        if (!(await this.confirm.confirmDestructive(`Delete alert rule "${rule.name}"?`))) return;
+        const name = ruleName(rule, rule.name);
+        if (!(await this.confirm.confirmDestructive(`Delete Alert Rule “${name}”?`))) return;
         this.api.removeRule(rule.name).subscribe({
             next: () => {
-                this.toastr.success(`Alert rule "${rule.name}" deleted`);
+                this.toastr.success(`Alert Rule “${name}” deleted`);
                 this.rules.set(this.rules().filter((r) => r.name !== rule.name));
             },
-            error: (err) => this.toastr.error(apiErrorMessage(err, `Could not delete "${rule.name}".`)),
+            error: (err) => this.toastr.error(apiErrorMessage(err, `Could not delete “${name}”.`)),
         });
     }
 }
 
 /** What an Alert is called in a button name or announcement: its message, else its rule. */
 export function alertTitle(a: FiredAlert): string {
-    return a.message || a.rule;
+    return a.message || readableId(a.rule);
 }
 
 /** Plain-language reason a 403 / 404 / 422 ack-or-resolve failed. */
@@ -447,18 +500,4 @@ export function alertRuleSeed(q: ParamMap): Partial<AlertRule> {
     const t = q.get('threshold');
     if (t != null && t !== '' && isFinite(Number(t))) seed.threshold = Number(t);
     return seed;
-}
-
-/** The "Metric / Measure" cell: a ledger (observability) Metric, else a Dataset rule's Measure "on" its Dataset (per `by` keys when set). */
-export function ruleMetricText(r: AlertRule): string {
-    if (r.metric) return r.metric;
-    if (!r.measure) return r.dataset ?? '';
-    const by = r.by?.length ? ` by ${r.by.join(', ')}` : '';
-    return r.dataset ? `${r.measure} on ${r.dataset}${by}` : `${r.measure}${by}`;
-}
-
-/** The Condition cell: comparator and threshold, plus ` / window` only when the rule has a window. */
-export function ruleConditionText(r: AlertRule): string {
-    const base = `${r.comparator} ${r.threshold}`;
-    return r.window ? `${base} / ${r.window}` : base;
 }

@@ -103,7 +103,7 @@ describe('AlertsComponent', () => {
         fixture.detectChanges();
         expect(fixture.componentInstance.pendingState()).toBe('ready');
         const text = pendingSection(fixture.nativeElement)!.textContent!;
-        expect(text).toContain('pf_high_risk_account');
+        expect(text).toContain('Pf high risk account'); // the id as words; the id itself is the tooltip
         expect(text).toContain('Risk Score payment_account');
         await expectNoA11yViolations(fixture.nativeElement);
     });
@@ -203,7 +203,7 @@ describe('AlertsComponent', () => {
         const { fixture, api, toastr } = await create();
         fixture.componentInstance.evaluate();
         expect(api.evaluate).toHaveBeenCalled();
-        expect(toastr.info).toHaveBeenCalledWith('1 alert(s) fired');
+        expect(toastr.info).toHaveBeenCalledWith('1 Alert fired');
         expect(fixture.componentInstance.evaluating()).toBe(false);
     });
 
@@ -228,11 +228,11 @@ describe('AlertsComponent', () => {
         await expectNoA11yViolations(empty.fixture.nativeElement);
     });
 
-    it('authoring is capability-gated: rule actions and New rule vanish for the read-only lens', async () => {
+    it('authoring is capability-gated: rule actions and New Alert Rule vanish for the read-only lens', async () => {
         const { fixture } = await create({}, { canAuthor: false });
         const c = fixture.componentInstance;
         expect(c.ruleActions).toEqual([]);
-        expect(fixture.nativeElement.textContent).not.toContain('New rule');
+        expect(fixture.nativeElement.textContent).not.toContain('New Alert Rule');
     });
 
     it('Evaluate now is hidden without canOperateRuns (UI-CAPABILITY-AFFORDANCE-1)', async () => {
@@ -245,11 +245,11 @@ describe('AlertsComponent', () => {
         expect(fixture.nativeElement.textContent).toContain('Evaluate now');
     });
 
-    it('New rule opens the form dialog and a save reloads + toasts', async () => {
+    it('New Alert Rule opens the form dialog and a save reloads + toasts, naming the rule in words', async () => {
         const { fixture, open, toastr } = await create();
         fixture.componentInstance.newRule();
         expect(open).toHaveBeenCalled();
-        expect(toastr.success).toHaveBeenCalledWith('Alert rule "failed_batches" armed');
+        expect(toastr.success).toHaveBeenCalledWith('Alert Rule “Failed batches” armed');
     });
 
     it('delete asks for confirmation, calls the API, and drops the row', async () => {
@@ -413,9 +413,9 @@ describe('alertRuleSeed', () => {
     });
 });
 
-describe('Alert Rules grid text', () => {
-    it('omits the window for a Dataset-measure rule and names its Measure on its Dataset', async () => {
-        const { ruleConditionText, ruleMetricText } = await import('./alerts.component');
+describe('Alert Rules grid text (ALERTS-PAGE-WORDS-1)', () => {
+    it('words a Dataset-measure rule: no window, its Measure per key, its Dataset as the scope', async () => {
+        const { ruleConditionText, ruleScopeText, ruleWatchText } = await import('./alert-words');
         const r = {
             name: 'r',
             comparator: 'gte',
@@ -425,10 +425,130 @@ describe('Alert Rules grid text', () => {
             measure: 'max(risky_payments)',
             by: ['msisdn'],
         };
-        expect(ruleConditionText(r)).toBe('gte 6');
-        expect(ruleMetricText(r)).toBe('max(risky_payments) on pf_sim_swap_payments by msisdn');
-        const ledger = { name: 'l', metric: 'rejects', comparator: 'gt', threshold: 5, window: '1h', severity: 'low' };
-        expect(ruleConditionText(ledger)).toBe('gt 5 / 1h');
-        expect(ruleMetricText(ledger)).toBe('rejects');
+        expect(ruleConditionText(r)).toBe('at least 6');
+        expect(ruleWatchText(r)).toBe('Maximum of risky_payments per msisdn');
+        expect(ruleScopeText(r)).toBe('Dataset pf_sim_swap_payments');
+    });
+
+    it('words a ledger rule: its Metric, its window and every Pipeline when it names none', async () => {
+        const { ruleConditionText, ruleScopeText, ruleWatchText } = await import('./alert-words');
+        const ledger = {
+            name: 'l',
+            metric: 'failed_batches',
+            comparator: 'gt',
+            threshold: 5,
+            window: '1h',
+            severity: 'low',
+        };
+        expect(ruleConditionText(ledger)).toBe('above 5 over the last 1 hour');
+        expect(ruleWatchText(ledger)).toBe('Failed Consignments');
+        expect(ruleScopeText(ledger)).toBe('Every Pipeline');
+        expect(ruleScopeText({ ...ledger, onPipeline: 'cdr_ingest' })).toBe('Pipeline cdr_ingest');
+        expect(ruleConditionText({ ...ledger, window: '20b' })).toBe('above 5 over the last 20 Consignments');
+    });
+
+    it('words a value-measure Investigation rule: "at least 1", the Value Measure by its label, the Investigation', async () => {
+        const { ruleConditionText, ruleScopeText, ruleWatchText, ruleName } = await import('./alert-words');
+        const vm = {
+            name: 'pass_through_watch',
+            comparator: 'gte',
+            threshold: 1,
+            severity: 'WARNING',
+            investigation: 'inv-7',
+            valueMeasure: { name: 'passThrough', last: '7d' },
+        };
+        expect(ruleConditionText(vm)).toBe('at least 1');
+        expect(ruleWatchText(vm)).toBe('Entities breaching Pass-through');
+        expect(ruleScopeText(vm)).toBe('Investigation inv-7');
+        expect(ruleName(vm, vm.name)).toBe('Pass through watch');
+        expect(ruleName({ ...vm, description: 'Mule accounts' }, vm.name)).toBe('Mule accounts');
+    });
+
+    it('words a freshness rule by its age limit', async () => {
+        const { ruleConditionText, ruleWatchText } = await import('./alert-words');
+        const fresh = {
+            name: 'f',
+            comparator: 'gt',
+            threshold: 0,
+            severity: 'WARNING',
+            dataset: 'd',
+            maximumAge: '2h',
+        };
+        expect(ruleConditionText(fresh)).toBe('older than 2 hours');
+        expect(ruleWatchText(fresh)).toBe('Time since last publish');
+    });
+
+    it("words what a fired Alert's metric label stored", async () => {
+        const { firedWatchText } = await import('./alert-words');
+        expect(firedWatchText('entities breaching passThrough')).toBe('Entities breaching Pass-through');
+        expect(firedWatchText('entities count')).toBe('Number of entities');
+        expect(firedWatchText('links sum(amount)')).toBe('Sum of amount of links');
+        expect(firedWatchText('sum(exposure_sar)')).toBe('Sum of exposure_sar');
+        expect(firedWatchText('count')).toBe('Row count');
+        expect(firedWatchText('error_rate')).toBe('Error rate');
+        expect(firedWatchText('file_problem')).toBe('File problem');
+        expect(firedWatchText('freshness')).toBe('Time since last publish');
+    });
+});
+
+describe('fired Alerts grid text (ALERTS-PAGE-WORDS-1)', () => {
+    const INV_RULE = {
+        name: 'pass_through_watch',
+        comparator: 'gte',
+        threshold: 1,
+        severity: 'WARNING',
+        investigation: 'inv-7',
+        valueMeasure: { name: 'passThrough', last: '7d' },
+    };
+    const INV_FIRED = {
+        ...FIRED,
+        rule: 'pass_through_watch',
+        pipeline: 'inv-7',
+        metric: 'entities breaching passThrough',
+        comparator: 'gte',
+        threshold: 1,
+    };
+    const cell = (c: AlertsComponent, colId: string, a: typeof FIRED) => {
+        const def = c.columnDefs.find((d) => d.colId === colId)!;
+        return (def.valueGetter as (p: unknown) => unknown)({ data: a });
+    };
+
+    it('names the scope by what the rule watches, so an Investigation id is never under Pipeline', async () => {
+        const { fixture } = await create({ rules: () => of([RULE, INV_RULE]), recent: () => of([FIRED, INV_FIRED]) });
+        const c = fixture.componentInstance;
+        expect(c.columnDefs.map((d) => d.headerName)).not.toContain('Pipeline');
+        expect(cell(c, 'scope', INV_FIRED)).toBe('Investigation inv-7');
+        expect(cell(c, 'scope', FIRED)).toBe(`Pipeline ${FIRED.pipeline}`);
+        expect(cell(c, 'scope', { ...FIRED, rule: 'file_problem' })).toBe(`Pipeline ${FIRED.pipeline}`);
+        expect(cell(c, 'scope', { ...FIRED, rule: 'deleted_rule' })).toBe(FIRED.pipeline);
+    });
+
+    it('shows the rule by name and what it watches in words, keeping the id in the tooltip', async () => {
+        const { fixture } = await create({ rules: () => of([RULE, INV_RULE]), recent: () => of([INV_FIRED]) });
+        const c = fixture.componentInstance;
+        expect(cell(c, 'rule', INV_FIRED)).toBe('Pass through watch');
+        expect(cell(c, 'watches', INV_FIRED)).toBe('Entities breaching Pass-through');
+        const rule = c.columnDefs.find((d) => d.colId === 'rule')!;
+        expect((rule.tooltipValueGetter as (p: unknown) => unknown)({ data: INV_FIRED })).toBe('pass_through_watch');
+        expect(c.columnDefs.map((d) => d.headerName)).not.toContain('Metric');
+        expect(c.ruleColumnDefs.map((d) => d.headerName)).toEqual([
+            'Name',
+            'Watches',
+            'Condition',
+            'Severity',
+            'Scope',
+        ]);
+    });
+
+    it('What happened reads live Pipeline state only for a Pipeline scope', async () => {
+        const { fixture, open } = await create({ rules: () => of([RULE, INV_RULE]), recent: () => of([INV_FIRED]) });
+        const c = fixture.componentInstance;
+        const what = c.firedActions().find((x) => x.icon === 'heroicons_outline:information-circle')!;
+        what.onClick(INV_FIRED);
+        expect(open).toHaveBeenLastCalledWith(expect.anything(), { data: { label: 'Pass through watch' } });
+        what.onClick(FIRED);
+        expect(open).toHaveBeenLastCalledWith(expect.anything(), {
+            data: { label: 'Failed batches', pipelineId: FIRED.pipeline },
+        });
     });
 });

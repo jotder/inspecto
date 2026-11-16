@@ -2,7 +2,7 @@
     <!-- Header -->
     <inspecto-page-header
         title="Alerts"
-        subtitle="Fired alert-rule breaches — an Alert Rule watches a Metric over the batch ledger, or a Measure over a Dataset, against a threshold and fires when it crosses."
+        subtitle="Alerts raised by Alert Rules. An Alert Rule watches a Pipeline's processing, a Measure over a Dataset or an Investigation, and raises an Alert when the value crosses its threshold."
         [terms]="['Alert', 'Alert Rule', 'Notification', 'Incident']"
         [inset]="false"
     >
@@ -58,7 +58,7 @@
                 [pinActions]="true"
                 [loading]="loading() || !rulesSettled()"
                 noRowsTitle="No alerts fired"
-                noRowsHint="Breaches of the armed alert rules will appear here."
+                noRowsHint="An armed Alert Rule's Alert appears here when its value crosses the threshold."
             />
         }
     </div>
@@ -69,7 +69,7 @@
         @if (lens.canAuthorAlertRules()) {
             <button mat-flat-button color="primary" (click)="newRule()">
                 <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
-                <span class="ml-2">New rule</span>
+                <span class="ml-2">New Alert Rule</span>
             </button>
         }
     </div>
@@ -81,8 +81,8 @@
             [rows]="rules()"
             [columns]="ruleColumnDefs"
             [rowActions]="ruleActions"
-            noRowsTitle="No alert rules armed"
-            noRowsHint="Create a rule to watch a Metric against a threshold — breaches appear above as Alerts."
+            noRowsTitle="No Alert Rules armed"
+            noRowsHint="Create an Alert Rule to watch a value against a threshold; its Alerts appear above."
         />
     </div>
 
