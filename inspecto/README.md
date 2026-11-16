@@ -11,9 +11,9 @@ This README is for the person who installs and runs Inspecto. To use it, read th
 | Folder | Holds |
 |---|---|
 | `README.md` | this file |
-| `bin/` | the launchers: `serve.bat` / `serve.sh` (the server and web console), `run.bat` / `run.sh` (run one Pipeline once), `install-service.ps1` / `install-service.sh` (run as an OS service) |
+| `bin/` | the launchers: `serve.bat` / `serve.sh` (the server and web console), `run.bat` / `run.sh` (run one Pipeline once), `install-service.ps1` / `install-service.sh` (run as an OS service); the deploy kit: `preflight`, `upgrade`, `verify-bundle` and `backup-offsite`, each as `.sh` and `.ps1` |
 | `lib/` | every jar; `modules.list` (the classpath the launchers read); `edition.properties` (your edition); `duckdb/<platform>/` (DuckDB extensions, so no download is needed) |
-| `deploy/` | `Dockerfile` and `Dockerfile.dockerignore`; `inspecto.service` (the systemd unit) |
+| `deploy/` | `Dockerfile` and `Dockerfile.dockerignore`; `inspecto.service` (the systemd unit); `proxy/` (reverse proxy templates for nginx and Caddy) |
 | `logs/` | output captured by the Windows service (`logs/service.log`) |
 | `docs/` | the [User guide](../docs/USER_GUIDE.md), the [Advanced guide](../docs/ADVANCED_GUIDE.md), [Editions](../docs/EDITIONS.md) and the [API documentation](../docs/api/) |
 | `runtime/` | the bundled Java runtime; every launcher uses it before any `java` on the machine |
@@ -167,18 +167,46 @@ Advanced keeps Incidents, Cases, notes, links and tags in PostgreSQL and does no
 `INSPECTO_DB_PASSWORD`. On Standard these variables are optional; when set, the server's processing records (file
 status, batches and lineage) move to PostgreSQL. Basic always uses its local files.
 
-## HTTPS
+## HTTPS and the reverse proxy
 
-The server speaks plain HTTP by default. To serve HTTPS, set `HTTPS_KEYSTORE` to a PKCS12 file holding the
-certificate and key, and `HTTPS_KEYSTORE_PASSWORD` to its password. You can also end TLS at a load balancer.
+On a server, put Inspecto behind a reverse proxy on the same machine. `/metrics` and `/health/details` answer
+without sign-in, and the proxy is what keeps them from everyone but your monitoring network:
+
+1. Listen on loopback only, and let the proxy speak for its callers: add
+   `-Dcontrol.bind=127.0.0.1 -Dcontrol.trustedProxies=127.0.0.1` to `INSPECTO_JAVA_OPTS` (in `inspecto.env` for the
+   Linux service, as a machine-wide variable for the Windows service).
+2. Install nginx with `deploy/proxy/nginx-inspecto.conf`, or Caddy with `deploy/proxy/Caddyfile` (Caddy also runs on
+   Windows). Edit the lines marked `EDIT`: the host name, the certificate, and your Prometheus network.
+3. Check the machine before you start: `bash bin/preflight.sh --proxy-config <your proxy config>` (Linux, as the
+   service account) or `.\bin\preflight.ps1 -ProxyConfig <your proxy config>` (Windows). Fix every FAIL.
+
+Without a proxy the server can serve HTTPS itself: set `HTTPS_KEYSTORE` to a PKCS12 file holding the certificate and
+key, and `HTTPS_KEYSTORE_PASSWORD` to its password, and check with `bin/preflight.sh --direct` (`-Direct`). Then only
+a firewall keeps `/metrics` and `/health/details` from the network.
 
 ## Upgrading
 
-1. Stop the server or the service.
-2. Unzip the new bundle and replace everything **except** `spaces/` (your Spaces), `inspecto.env` (if you created
-   it) and any scripts of your own.
-3. Start it again. If the new bundle is in a different folder and you run Inspecto as a service, run the
-   installer again from the new folder.
+Copy the new zip and its `.sha256` (and `.asc`, if the release is signed) to the server, run your backup Job, then:
+
+```
+sudo bin/upgrade.sh <new zip> --backup-dir <the backup Job's backup_dir> --proxy-config <your proxy config>
+.\bin\upgrade.ps1 <new zip> -BackupDir <the backup Job's backup_dir> -ProxyConfig <your proxy config>
+```
+
+It checks the zip against its `.sha256` (`bin/verify-bundle.sh`, `.ps1`) and the newest backup against its manifest,
+refuses a different edition, stops the service, keeps the previous bundle beside this one as
+`<folder>.pre-upgrade-<time>`, replaces everything **except** `spaces/` (your Spaces; only `spaces/_templates` is
+replaced), `logs/`, `inspecto.env` and files of your own, runs the preflight, starts the service and waits for
+`/health` and `/ready`. If the preflight or the start fails it puts the previous bundle back. Without a service, pass
+`--no-service` (`-NoService`) and stop and start the server yourself.
+
+By hand: stop the server, unzip the new bundle and replace everything except the folders and files above, then start
+it again. If the new bundle is in a different folder and you run Inspecto as a service, run the installer again from
+the new folder.
+
+**Off-site backups.** The backup Job writes inside the Space. `bin/backup-offsite.sh --from <backup_dir> --to <target>`
+(`.ps1`: `-From`, `-To`) copies the newest archive that matches its manifest to a mounted share, an rsync target, or
+an object store through its own command line tool (`--cmd "aws s3 cp"`). Schedule it after the backup Job.
 
 Read the *Upgrading* section of [Editions](../docs/EDITIONS.md) first: it lists what changed between versions
 for each edition.

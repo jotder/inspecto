@@ -9,6 +9,10 @@
 
 - **Serve** — one JVM: fat JAR + bundled JDK runtime; `bin/serve.sh`/`bin/serve.bat` in the deploy bundle (they cd to the bundle root, so any cwd works)
   hosts API + UI on `:8080` (SPA served by the engine). [`admin-guide-operations-reference.md`](admin-guide-operations-reference.md).
+- **On a server: behind the reverse proxy** — `/metrics` and `/health/details` answer without sign-in by design;
+  the bundle's deploy kit (`deploy/proxy/` for nginx or Caddy, `bin/preflight`, `bin/upgrade`, `bin/verify-bundle`,
+  `bin/backup-offsite`) puts the server on loopback behind a proxy that fences them.
+  [`admin-guide-deploy-kit.md`](admin-guide-deploy-kit.md).
 - **Mandatory JVM flag** — DuckDB needs the native-access flag; the bundle scripts set it. Details:
   [build & run](admin-guide-launch-flags.md).
 - **Editions** — Personal boots open (no login); Professional needs the IAM/OIDC settings and HTTPS

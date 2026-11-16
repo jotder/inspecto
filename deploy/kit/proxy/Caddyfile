@@ -1,0 +1,43 @@
+# Caddy in front of Inspecto (DEPLOY-EXPOSURE-KIT-1). Replace every EDIT line, then `caddy validate --config
+# Caddyfile` and `caddy run --config Caddyfile` (or `caddy reload`). Run bin/preflight before the first start.
+#
+# Caddy is the choice on a Windows host (one binary, runs as a service) and wherever you want certificates
+# obtained and renewed for you. With a public DNS name Caddy gets the certificate itself (ACME); on a closed
+# network set the `tls` line to your own certificate and key.
+#
+# What it does:
+#   * ends TLS here and forwards plain HTTP to Inspecto on 127.0.0.1:8080. Start Inspecto with
+#     INSPECTO_JAVA_OPTS="-Dcontrol.bind=127.0.0.1 -Dcontrol.trustedProxies=127.0.0.1" so nothing else can reach it.
+#   * refuses /metrics and /health/details (with or without /api/v1 and a /spaces/<id> prefix) to every address
+#     except the scraper networks you allow below. Inspecto serves both without sign-in by design; this is the fence.
+#   * takes uploads up to 64 MB (the largest body the server accepts). Caddy passes Server-Sent Events (the
+#     console's live streams) through unbuffered on its own.
+#
+# Needs Caddy 2.7 or later. HTTP to HTTPS redirects are automatic.
+
+inspecto.example.com {                                   # EDIT
+	# tls /etc/caddy/tls/inspecto.crt /etc/caddy/tls/inspecto.key   # EDIT: your own certificate, on a closed network
+
+	# One year; add `; includeSubDomains` only when every subdomain is HTTPS too. Inspecto sets its own
+	# X-Content-Type-Options, frame and content-security headers, so none of them is added here.
+	header Strict-Transport-Security "max-age=31536000"
+	header -Server
+
+	request_body {
+		max_size 64MB
+	}
+
+	# -- the fence --------------------------------------------------------------------------------------------
+	# remote_ip is the direct peer; a forwarded header cannot widen it.
+	@fenced {
+		path_regexp fenced (?i)^/(api/v1/)?(spaces/[^/]+/)?(metrics|health/details)(/|$)
+		# EDIT: append your Prometheus or monitoring network to this line, e.g. 10.20.30.0/24
+		not remote_ip 127.0.0.1/8 ::1
+	}
+	respond @fenced 403
+
+	reverse_proxy 127.0.0.1:8080 {                       # EDIT if you changed PORT
+		# Inspecto marks its sign-in refresh cookie Secure only when it serves TLS itself; here TLS ends at Caddy.
+		header_down Set-Cookie "^(.*?)(; Secure)?$" "$1; Secure"
+	}
+}

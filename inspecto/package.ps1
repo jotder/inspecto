@@ -2229,6 +2229,23 @@ Write-Host "[install-service]       ~70s before concluding that recovery failed.
 '@
 Write-CrlfScript -Path "$binDir\install-service.ps1" -Content $installServicePs1Content
 
+# -- step 6b-4: the deploy kit (DEPLOY-EXPOSURE-KIT-1, MoSCoW S11) ---------------------------------------------------------
+# /metrics and /health/details answer without sign-in by design (operator 2026-11-16): the fence is a reverse proxy in front
+# of a loopback-bound server, and the kit makes that the default install. deploy/kit/ is staged as it stands - bin/ -> bin/
+# (preflight, upgrade, verify-bundle, backup-offsite, each as .sh and .ps1) and proxy/ -> deploy/proxy/ (nginx and Caddy
+# templates) - as files rather than here-strings, so tools/deploy-kit.test.mjs runs the very scripts that ship. A demo
+# bundle gets none of it: it listens on loopback for a desk demo and must never be put behind a proxy.
+if (-not $DemoAuth) {
+    $kitSrc = Join-Path $sandboxRoot 'deploy\kit'
+    foreach ($kitPart in @(@('bin', $binDir), @('proxy', (Join-Path $deployDir 'proxy')))) {
+        $kitFrom = Join-Path $kitSrc $kitPart[0]
+        if (-not (Test-Path $kitFrom)) { throw "the deploy kit is missing $kitFrom (DEPLOY-EXPOSURE-KIT-1)" }
+        $null = New-Item -ItemType Directory -Force $kitPart[1]
+        Copy-Item -Path (Join-Path $kitFrom '*') -Destination $kitPart[1] -Force
+    }
+    Write-Host "Bundled the deploy kit -> bin\ (preflight, upgrade, verify-bundle, backup-offsite) + deploy\proxy\ (nginx, Caddy)" -ForegroundColor Green
+}
+
 # -- step 6c: embed a trimmed Java runtime (jlink) so the bundle is self-contained --
 # Produces bundle/runtime/ — the run/serve scripts auto-prefer it over system java.
 # jlink is itself a JVM tool: the platform of the jlink *executable* need not match the platform
@@ -3047,6 +3064,8 @@ Write-Host "       sudo bin/install-service.sh  (Linux, systemd; output -> journ
 Write-Host "       verify recovery: kill the process, then curl /health -- do not assume it"
 Write-Host "  4d. Container: package.ps1 -Target container builds inspecto-<product>:<version>-<edition> and its Helm chart (inspecto-ship/);"
 Write-Host "       by hand: docker build -f deploy/Dockerfile -t <image> .   (from the bundle root, linux_amd64 bundle)"
+Write-Host "  4e. On a server, put it behind the reverse proxy in deploy/proxy/ (nginx or Caddy) with -Dcontrol.bind=127.0.0.1, then"
+Write-Host "       bash bin/preflight.sh  |  .\bin\preflight.ps1      (DEPLOY-EXPOSURE-KIT-1; upgrades: bin/upgrade.sh | .\bin\upgrade.ps1)"
 Write-Host ""
 if (-not $NoRuntime) {
     Write-Host "Embedded Java runtime included (bundle\runtime\) — no JVM needed on the target."

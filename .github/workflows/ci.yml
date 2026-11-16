@@ -289,6 +289,13 @@ jobs:
       - name: Guard — package.ps1 reads no variable before it is assigned (strict mode)
         run: node tools/check-package-strict.mjs && node --test tools/check-package-strict.test.mjs
 
+      # Deploy kit (DEPLOY-EXPOSURE-KIT-1, 2026-11-16). The preflight, upgrade, verify-bundle and backup-offsite scripts every
+      # non-demo bundle ships (deploy/kit/, staged by package.ps1 step 6b-4) run in throwaway fake bundles: a wrong bind, a
+      # missing keystore, a tampered zip and a damaged backup must FAIL, and upgrade.sh must swap and roll back. pwsh (on the
+      # runner) runs the .ps1 forms. No nginx, Caddy, systemd or Scheduled Task is involved; those need a real host.
+      - name: Guard — the deploy kit's scripts catch what they check
+        run: node --test tools/deploy-kit.test.mjs
+
       # Demo sign-in isolation guard (DEMO-AUTH-1, 2026-09-25). The Demo User sign-in module signs anyone in
       # with no password; only `package.ps1 -Distribution demo` may stage it, in place of the security jar. This fails
       # if it enters any edition's module table, is named in package.ps1 outside an if-($DemoAuth) block, is a
