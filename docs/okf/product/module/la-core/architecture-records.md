@@ -909,6 +909,40 @@ where a later bullet supersedes them.
   added. More steps menu = `STEP_GROUPS` (Connect · Time · Compare). Plan:
   [`la-unsaved-investigation.md`](../../../../archived-documents/plans-archive/la-unsaved-investigation.md). Later work
   (undo / redo, clean up, exclude while unsaved): [architecture-http-and-ui.md](architecture-http-and-ui.md) §6.9.1.
+* **Find the important things** (`LA-FULL-CYCLE-TEST-1` phase 5, findings 16, 22, 23, 25; 2026-11-16). Decisions, each
+  taken under the operator's delegation:
+  * **Finding 16: `LA-UNSAVED-INVESTIGATION-1` D1 stands.** One start form, in the Investigation tab, is the recorded
+    decision, and the tested user was not stuck (the pointer opened it) but was told nothing. So the empty canvas with
+    Investigations is now an `inspecto-empty-state` (*Start an Investigation*: what to pick, that work is unsaved until
+    Save, File ▸ Open… for earlier work) keeping the button **Start from the Investigation tab →**
+    (`data-testid="la-start-pointer"` is now the empty state's host; click its inner button). The guide was the side
+    that was wrong: its Studio-screen bullet described Basic's tabbed Start area as the only one.
+  * **Finding 22: Build Dossier… and Members…** in the Investigation's `⋯` menu (after Settings…) and in File (while an
+    Investigation is open, after Save snapshot…). Both open `InvestigationPanelDialog` (`investigation-panel.dialog.ts`),
+    which hosts the SAME `LinkAnalysisDossierComponent` / `LinkAnalysisMembersComponent` as the settings folds; the folds
+    stay, so settings still lists everything about the Investigation. A dialog, not "open Settings at the Dossier fold":
+    the fold sits near the bottom of up to eleven in a section of ⚙ Settings, which is the finding. The File
+    entries are hidden, not greyed, while nothing is open: with nothing open there is no Dossier to name.
+  * **Finding 23: the approver's waiting line.** `canDecideExpansion` (`expansion-decision.ts`): a pending request,
+    `canApproveLinkExpansions`, a signed-in actor (`SessionService.actor`), and not the requester. Those are exactly the
+    server's own refusals (`InvestigationRoutes.decide`: route capability, 403 without a Subject, 403 for the
+    requester), so nothing is offered that the server would refuse on those grounds; membership / PDP refusals still
+    come back from the server and show on the line (`oversightErrorMessage`). Such a reader gets a **N to approve**
+    badge in the Act header (a button that scrolls the line into view) and, instead of the requester's text, *request
+    p1 from X waits for your approval* with the crossed limits in words (no Settings keys) and **Approve** / **Deny**.
+    Approve confirms first (`confirmApproveExpansion`, shared with Settings ▸ Oversight, whose Approve was one click):
+    it runs the expand at once as the requester's step. Deny is a second step on the line: an optional reason
+    (`pen-field`, ≤ 200, the server's 422 bound) and **Deny request** / **Cancel**. **The reason stays optional**: the
+    server takes it as optional, Oversight and the console's Approvals inbox both do, the denial's who and when are
+    always recorded, and a required reason with no server gate would be a rule only one screen enforces. No server
+    change. The requester's own text (*Ask an approver…*) is unchanged. Not done: an inbox or badge ACROSS
+    Investigations in Inspecto LA (the console has the Approvals inbox; la-app has none) — the badge shows once the
+    approver opens the Investigation.
+  * **Finding 25: Busiest nodes never offers a start entity.** `busiest(g, t, limit, startIds)`: a start entity (hop 0
+    of the saved or unsaved Investigation on the canvas, `LinkAnalysisComponent.discoverStartIds`) is busy by
+    construction, so it gets no exclusion hint and its row says *It is a start entity: the graph was drawn round it.*;
+    the hint goes to the busiest non-start entity when it is at least 5 links and twice the next non-start one. The
+    only other exclusion offers (Exclude…, Clean up) act on a selection the analyst made, so they are not offers.
 * **Degrees trims the last Expand** (`LA-DEGREES-TRIM-1`, 2026-10-30): the form takes `lastExpand` and emits
   `degreesChange` after 300 ms; unsaved, `trimExpandStep` / `extendExpandStep` cut or extend from `UnsavedStep.stages` with
   no server call; saved, `GrowExcludeStore.trimLastExpand` posts one `undo` per removed step and `growInvestigation(…,

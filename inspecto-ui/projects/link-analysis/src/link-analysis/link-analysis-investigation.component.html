@@ -1069,6 +1069,25 @@
                             <div class="text-secondary text-sm">
                                 {{ h.dataset }} · {{ h.sourceCol }} → {{ h.targetCol }}
                             </div>
+                            @if (decidable().length; as n) {
+                                <!-- finding 23: an approver sees at once that a decision waits for them -->
+                                <button
+                                    type="button"
+                                    class="la-toggle mt-1"
+                                    [attr.aria-label]="
+                                        n +
+                                        (n === 1 ? ' expand request waits' : ' expand requests wait') +
+                                        ' for your approval: show'
+                                    "
+                                    (click)="showApprovals()"
+                                    data-testid="approver-badge"
+                                >
+                                    <inspecto-status-badge
+                                        value="warning"
+                                        [label]="n + ' to approve'"
+                                    ></inspecto-status-badge>
+                                </button>
+                            }
                         </div>
                         <button
                             mat-icon-button
@@ -1095,6 +1114,15 @@
                             <button mat-menu-item (click)="settingsRequested.emit()" data-testid="act-settings">
                                 <mat-icon svgIcon="heroicons_outline:cog-6-tooth"></mat-icon>
                                 <span>Settings…</span>
+                            </button>
+                            <!-- LA-FULL-CYCLE-TEST-1 phase 5 (finding 22): the two panels people look for, one click away -->
+                            <button mat-menu-item (click)="openPanel('dossier')" data-testid="act-dossier">
+                                <mat-icon svgIcon="heroicons_outline:clipboard-document-list"></mat-icon>
+                                <span>{{ panelLabels.dossier }}</span>
+                            </button>
+                            <button mat-menu-item (click)="openPanel('members')" data-testid="act-members">
+                                <mat-icon svgIcon="heroicons_outline:user-plus"></mat-icon>
+                                <span>{{ panelLabels.members }}</span>
                             </button>
                             <button mat-menu-item (click)="store.close()" aria-label="Close the Investigation">
                                 <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
@@ -1293,9 +1321,76 @@
                             aria-label="Degree results"
                         >
                             @for (o of store.degreeOutcomes(); track $index) {
-                                <li [class.text-warn]="o.truncated">{{ outcomeMessage(o) }}</li>
+                                @if (decidableFor(o); as p) {
+                                    <!-- LA-FULL-CYCLE-TEST-1 phase 5 (finding 23): an approver's line carries the decision -->
+                                    <li
+                                        class="flex flex-col gap-1 rounded-md border p-2"
+                                        style="border-color: var(--gamma-border)"
+                                        data-testid="approver-line"
+                                    >
+                                        <span>{{ approverMessage(o, p) }}</span>
+                                        @if (denying() === p.id) {
+                                            <div class="flex flex-wrap items-center gap-2" data-testid="deny-step">
+                                                <inspecto-pen-field
+                                                    class="min-w-48 flex-auto"
+                                                    label="Reason (optional)"
+                                                    help="The requester sees it on their line."
+                                                    [formControl]="denyReason"
+                                                    [maxlength]="denyReasonMax"
+                                                    [error]="
+                                                        denyReason.touched && denyReason.invalid
+                                                            ? 'At most ' + denyReasonMax + ' characters.'
+                                                            : ''
+                                                    "
+                                                />
+                                                <button
+                                                    mat-flat-button
+                                                    color="warn"
+                                                    type="button"
+                                                    [disabled]="deciding() === p.id"
+                                                    (click)="denyRequest(p)"
+                                                    data-testid="deny-confirm"
+                                                >
+                                                    Deny request
+                                                </button>
+                                                <button mat-button type="button" (click)="denying.set(null)">
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        } @else {
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <button
+                                                    mat-flat-button
+                                                    color="primary"
+                                                    type="button"
+                                                    [disabled]="deciding() === p.id"
+                                                    [attr.aria-label]="'Approve request ' + p.id"
+                                                    (click)="approveRequest(p)"
+                                                    data-testid="approve-request"
+                                                >
+                                                    Approve
+                                                </button>
+                                                <button
+                                                    mat-stroked-button
+                                                    type="button"
+                                                    [disabled]="deciding() === p.id"
+                                                    [attr.aria-label]="'Deny request ' + p.id"
+                                                    (click)="openDeny(p)"
+                                                    data-testid="deny-request"
+                                                >
+                                                    Deny
+                                                </button>
+                                            </div>
+                                        }
+                                    </li>
+                                } @else {
+                                    <li [class.text-warn]="o.truncated">{{ outcomeMessage(o) }}</li>
+                                }
                             }
                         </ul>
+                        @if (decisionError(); as why) {
+                            <inspecto-alert variant="error" title="Not decided">{{ why }}</inspecto-alert>
+                        }
                     }
                     @if (canWrite()) {
                         <!-- the page projects the ONE Expand form (it holds the screen's start, presets and four-eyes limits) -->

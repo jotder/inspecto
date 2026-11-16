@@ -179,6 +179,8 @@ export class LinkAnalysisDiscoverComponent {
     readonly startWhyNot = input('');
     /** Why *Add to a list* cannot run here; '' = it can. */
     readonly listWhyNot = input('');
+    /** The open Investigation's start entities on the canvas (node ids): never offered for exclusion (finding 25). */
+    readonly startIds = input<readonly string[]>([]);
 
     readonly show = output<GraphSelection>();
     readonly startFrom = output<FoundAction>();
@@ -203,7 +205,7 @@ export class LinkAnalysisDiscoverComponent {
         const t = this.terms();
         this.result.set(
             q === 'busiest'
-                ? busiest(g, t)
+                ? busiest(g, t, 5, new Set(this.startIds()))
                 : q === 'groups'
                   ? groups(g, t, this.timeAttr())
                   : route(g, this.from.value ?? '', this.to.value ?? '', t),

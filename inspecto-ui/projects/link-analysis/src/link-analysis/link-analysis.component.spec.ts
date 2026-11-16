@@ -13,6 +13,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, NavigationEnd, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { DatasetRowsService } from '@inspecto/core/viz/dataset-rows.service';
 import { MatDialog } from '@angular/material/dialog';
+import { InvestigationPanelDialog } from './investigation-panel.dialog';
 import { MatMenuTrigger } from '@angular/material/menu';
 import { HttpErrorResponse } from '@angular/common/http';
 import { BehaviorSubject, Observable, Subject, defer, delay, firstValueFrom, of, throwError } from 'rxjs';
@@ -6400,7 +6401,7 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         c.investigation.queueSeeds([{ id: 'q', label: 'q', ids: ['q'] }]); // e.g. a deep link that could not bind
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
-        (el.querySelector('[data-testid="la-start-pointer"]') as HTMLButtonElement).click();
+        (el.querySelector('[data-testid="la-start-pointer"] button') as HTMLButtonElement).click();
         fixture.detectChanges();
         expect(c.toolboxTab()).toBe('investigation');
         expect(el.querySelector('#la-toolbox-tab-investigation')!.getAttribute('aria-selected')).toBe('true');
@@ -7935,10 +7936,51 @@ describe('LinkAnalysisComponent - UI test findings (2026-10-29)', () => {
         fixture.detectChanges();
         const pointer = el.querySelector('[data-testid="la-start-pointer"]')?.textContent ?? '';
         expect(pointer).toContain('Start from the Investigation tab');
+        // finding 16 (LA-FULL-CYCLE-TEST-1 phase 5): D1 stands, and the empty canvas says how to start in plain words
+        expect(pointer).toContain('Start an Investigation');
+        expect(pointer).toContain('Pick a Dataset and what to start from');
+        expect(pointer).toContain('File ▸ Open…');
         expect(el.querySelectorAll('inspecto-link-analysis-start-box').length).toBe(0); // the tab is not open
         c.toolboxTab.set('investigation');
         fixture.detectChanges();
         expect(el.querySelectorAll('inspecto-link-analysis-start-box').length).toBe(1); // the tab's form only
+        fixture.destroy();
+    });
+    it('finding 22: File offers Build Dossier… and Members… only while an Investigation is open, and opens them', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        const el = fixture.nativeElement as HTMLElement;
+        const file = () => {
+            el.querySelector<HTMLButtonElement>('[data-testid="la-file"]')!.click();
+            fixture.detectChanges();
+        };
+        file();
+        expect(document.querySelector('[data-testid="la-file-dossier"]')).toBeNull();
+        expect(document.querySelector('[data-testid="la-file-members"]')).toBeNull();
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+        c.investigation.refs.set([{ id: 'inv-1', title: 'Mule hub' }]);
+        c.investigation.activeId.set('inv-1');
+        TestBed.tick();
+        // the prototype: a standalone import of MatDialogModule gives the component tree its own MatDialog instance
+        const open = vi.spyOn(MatDialog.prototype, 'open').mockReturnValue({} as never);
+        file();
+        const dossier = document.querySelector<HTMLButtonElement>('[data-testid="la-file-dossier"]')!;
+        expect(dossier.textContent?.trim()).toBe('Build Dossier…');
+        expect(document.querySelector('[data-testid="la-file-members"]')?.textContent?.trim()).toBe('Members…');
+        await expectNoA11yViolations(el.querySelector('[data-testid="la-header"]')!);
+        dossier.click();
+        expect(open).toHaveBeenLastCalledWith(
+            InvestigationPanelDialog,
+            expect.objectContaining({ data: { panel: 'dossier', investigationId: 'inv-1', title: 'Mule hub' } }),
+        );
+        c.openPanel('members');
+        expect(open).toHaveBeenLastCalledWith(
+            InvestigationPanelDialog,
+            expect.objectContaining({ data: { panel: 'members', investigationId: 'inv-1', title: 'Mule hub' } }),
+        );
+        open.mockRestore();
         fixture.destroy();
     });
     it('File ▸ New resets the start form: the last typed value does not survive Close then New', async () => {

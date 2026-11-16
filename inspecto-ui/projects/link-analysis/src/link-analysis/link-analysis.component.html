@@ -73,6 +73,17 @@
             <p class="text-secondary m-0 max-w-64 px-4 pb-1 text-xs">
                 A view re-reads live data; a snapshot is frozen.
             </p>
+            <!-- LA-FULL-CYCLE-TEST-1 phase 5 (finding 22): the open Investigation's Dossier and Members, as in its ⋯ menu -->
+            @if (investigation.activeId()) {
+                <button mat-menu-item (click)="openPanel('dossier')" data-testid="la-file-dossier">
+                    <mat-icon svgIcon="heroicons_outline:clipboard-document-list"></mat-icon>
+                    <span>{{ panelLabels.dossier }}</span>
+                </button>
+                <button mat-menu-item (click)="openPanel('members')" data-testid="la-file-members">
+                    <mat-icon svgIcon="heroicons_outline:user-plus"></mat-icon>
+                    <span>{{ panelLabels.members }}</span>
+                </button>
+            }
             <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- stops the click closing File before the transfer menu opens -->
             <div
                 class="flex items-center gap-1 px-2"
@@ -1971,16 +1982,17 @@
                                 ></inspecto-empty-state>
                             }
                             @if (investigationsEnabled()) {
-                                <!-- LA-UNSAVED-INVESTIGATION-1 D1: the start form lives only in the Investigation tab -->
-                                <button
-                                    mat-stroked-button
-                                    type="button"
-                                    class="m-4"
+                                <!-- LA-UNSAVED-INVESTIGATION-1 D1: the start form lives only in the Investigation tab. Finding 16
+                                     (LA-FULL-CYCLE-TEST-1 phase 5): D1 stands, and the empty canvas says plainly how to start -->
+                                <inspecto-empty-state
+                                    class="block w-full max-w-xl p-4"
+                                    icon="heroicons_outline:document-plus"
+                                    title="Start an Investigation"
+                                    message="Pick a Dataset and what to start from (one entity, an Entity List, pasted values or the whole Dataset) in the Investigation tab. You work unsaved until you choose Save. To carry on with earlier work, use File ▸ Open…"
+                                    actionLabel="Start from the Investigation tab →"
                                     data-testid="la-start-pointer"
-                                    (click)="openNewInvestigation()"
-                                >
-                                    Start from the Investigation tab →
-                                </button>
+                                    (action)="openNewInvestigation()"
+                                ></inspecto-empty-state>
                             } @else {
                                 <!-- operator 2026-11-09: one bounded launchpad - a tab strip over ONE panel that scrolls inside
                                itself, so the start area never grows the page and its top is always reachable -->
@@ -2130,6 +2142,7 @@
                                 [nodeOptions]="nodeOptions()"
                                 [startWhyNot]="discoverStartWhyNot()"
                                 [listWhyNot]="discoverListWhyNot()"
+                                [startIds]="discoverStartIds()"
                                 (show)="showFound($event)"
                                 (startFrom)="startFromFound($event)"
                                 (addToList)="addFoundToList($event)"

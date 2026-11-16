@@ -671,15 +671,21 @@ const HUB_SOURCE: Record<'index' | 'flat', string> = {
     flat: 'counted from the Dataset',
 };
 
-/** One degree's result in plain language, truncation and the fan-out cap included. */
-export function degreeOutcomeMessage(o: DegreeOutcome): string {
-    // An override names the hub and the degree its contacts are admitted at — the same words held and approved, so it
-    // is never read as the ladder's own next degree.
-    const head = o.override
+/**
+ * What a degree line is about: the degree, a one-hop expand, or an override. An override names the hub and the degree
+ * its contacts are admitted at — the same words held and approved, so it is never read as the ladder's own next degree.
+ */
+export function outcomeHead(o: DegreeOutcome): string {
+    return o.override
         ? `Expand anyway through ${o.override} (admits at degree ${o.degree})`
         : o.oneHop
           ? `Expand one hop from ${o.oneHop}`
           : `Degree ${o.degree}`;
+}
+
+/** One degree's result in plain language, truncation and the fan-out cap included. */
+export function degreeOutcomeMessage(o: DegreeOutcome): string {
+    const head = outcomeHead(o);
     if (o.decision === 'approved')
         return `${head}: approved (request ${o.awaitingApproval}) — ${
             o.admitted ? `${plural(o.admitted, 'new entity', 'new entities')} admitted.` : 'nothing new was found.'

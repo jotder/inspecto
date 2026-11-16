@@ -13,6 +13,8 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { LensService } from '@inspecto/core/api';
+// eslint-disable-next-line no-restricted-imports -- only `actor`, so the requester of a held expand is not offered to decide it (four-eyes); LA_FEATURES carries module flags, not identity
+import { SessionService } from '@inspecto/core/api';
 import {
     FormControl,
     FormGroup,
@@ -24,6 +26,7 @@ import {
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
+import { MatDialog } from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -34,15 +37,18 @@ import {
     InvService,
     InvestigationCoverage,
     InvestigationLogEntry,
+    PendingExpansion,
     WorkingSetRelationName,
 } from '@inspecto/link-analysis/api/inv.service';
 import { apiErrorMessage, needsPermission } from '@inspecto/core/api';
 import { WORKING_SET_PLUGIN } from '@inspecto/core/viz/plugins/view.plugins';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
+import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
 import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import { DEFAULT_MAX_DEGREE, DegreePresets } from '@inspecto/link-analysis/graph/domain-profile';
 import {
+    DegreeOutcome,
     PendingInvestigation,
     degreeOutcomeMessage,
     degreeState,
@@ -74,7 +80,14 @@ import { LinkAnalysisDraftsComponent } from './link-analysis-drafts.component';
 import { LinkAnalysisMembersComponent } from './link-analysis-members.component';
 import { LinkAnalysisEmbedComponent } from './link-analysis-embed.component';
 import { LinkAnalysisInvestigationCaseComponent } from './link-analysis-investigation-case.component';
-import { LinkAnalysisOversightComponent } from './link-analysis-oversight.component';
+import { LinkAnalysisOversightComponent, oversightErrorMessage } from './link-analysis-oversight.component';
+import {
+    DENY_REASON_MAX,
+    approverWaitingMessage,
+    canDecideExpansion,
+    confirmApproveExpansion,
+} from './expansion-decision';
+import { INVESTIGATION_PANEL_LABELS, InvestigationPanel, openInvestigationPanel } from './investigation-panel.dialog';
 import { LinkAnalysisTemplateMeasuresComponent } from './link-analysis-template-measures.component';
 import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set-rows.component';
 
@@ -159,6 +172,7 @@ import { laLimit } from './la-limits';
         MatTooltipModule,
         InspectoAlertComponent,
         ChipComponent,
+        StatusBadgeComponent,
         InspectoOptionPickerComponent,
         LinkAnalysisDataStripComponent,
         InvestigationWindowOpComponent,
@@ -702,6 +716,86 @@ export class LinkAnalysisInvestigationComponent {
     /** 1 … maxDegree, for the indicator. */
     readonly degreeSteps = computed(() => Array.from({ length: this.maxDegree() }, (_, i) => i + 1));
     readonly outcomeMessage = degreeOutcomeMessage;
+
+    // ── LA-FULL-CYCLE-TEST-1 phase 5 (finding 23): the approver's side of a held expand ──
+    private readonly session = inject(SessionService);
+    private readonly dialog = inject(MatDialog);
+    /** The open Investigation's held requests THIS reader may decide (never their own, never without a Subject). */
+    readonly decidable = computed<PendingExpansion[]>(() => {
+        const canApprove = this.lens.canApproveLinkExpansions();
+        const actor = this.session.actor();
+        return (this.store.log()?.pending ?? []).filter((p) => canDecideExpansion(p, actor, canApprove));
+    });
+    /** The held request a degree line waits on, when this reader may decide it; else null (the requester's text). */
+    decidableFor(o: DegreeOutcome): PendingExpansion | null {
+        return o.awaitingApproval && !o.decision
+            ? (this.decidable().find((p) => p.id === o.awaitingApproval) ?? null)
+            : null;
+    }
+    readonly approverMessage = approverWaitingMessage;
+    /** The request being decided (its buttons wait), or null. */
+    readonly deciding = signal<string | null>(null);
+    /** The request whose Deny asks for a reason (the second step of a deny), or null. */
+    readonly denying = signal<string | null>(null);
+    /** Optional, as the server and Settings ▸ Oversight take it; at most what the server accepts. */
+    readonly denyReason = new FormControl('', {
+        nonNullable: true,
+        validators: [Validators.maxLength(DENY_REASON_MAX)],
+    });
+    readonly denyReasonMax = DENY_REASON_MAX;
+    readonly decisionError = signal('');
+
+    /** Approve: confirm first (it runs the expand at once, as the requester's step), then re-read the Investigation. */
+    async approveRequest(p: PendingExpansion): Promise<void> {
+        if (!(await confirmApproveExpansion(this.confirm, p))) return;
+        await this.decideRequest(p, true);
+    }
+
+    /** Deny, the second step: the reason (optional) was offered; nothing is read. */
+    async denyRequest(p: PendingExpansion): Promise<void> {
+        if (this.denyReason.invalid) {
+            this.denyReason.markAsTouched();
+            return;
+        }
+        await this.decideRequest(p, false);
+    }
+
+    openDeny(p: PendingExpansion): void {
+        this.denyReason.reset('');
+        this.decisionError.set('');
+        this.denying.set(p.id);
+    }
+
+    private async decideRequest(p: PendingExpansion, approve: boolean): Promise<void> {
+        const id = this.store.activeId();
+        if (!id) return;
+        this.deciding.set(p.id);
+        this.decisionError.set('');
+        try {
+            if (approve) await firstValueFrom(this.inv.approveExpansion(id, p.id));
+            else await firstValueFrom(this.inv.denyExpansion(id, p.id, this.denyReason.value.trim() || undefined));
+            this.denying.set(null);
+            await this.store.open(id);
+        } catch (err) {
+            this.decisionError.set(oversightErrorMessage(err, approve ? 'Approve failed.' : 'Deny failed.'));
+        } finally {
+            this.deciding.set(null);
+        }
+    }
+
+    /** The approvals badge: bring the first waiting line into view. */
+    showApprovals(): void {
+        const line = document.querySelector<HTMLElement>('[data-testid="approver-line"]');
+        line?.scrollIntoView?.({ block: 'nearest' });
+        line?.querySelector<HTMLButtonElement>('button')?.focus();
+    }
+
+    // ── finding 22: the Dossier and Members, one click from the ⋯ menu ──
+    readonly panelLabels = INVESTIGATION_PANEL_LABELS;
+    openPanel(panel: InvestigationPanel): void {
+        const id = this.store.activeId();
+        if (id) openInvestigationPanel(this.dialog, panel, id, this.store.displayTitle() || id);
+    }
 
     readonly timeZones: PickerOption[] = timeZoneOptions('UTC (default)');
 

@@ -48,6 +48,35 @@ describe('Find something interesting - the readings (LA-ONBOARD-1 phase 7, UC-12
         ]);
     });
 
+    it('never offers to exclude a start entity (finding 25): its row says why it is busy; the hint moves to a real hub', () => {
+        // the tested drive: a star round the start entity S (14 links), with a merchant BIG that 6 of them also pay
+        const accounts = Array.from({ length: 14 }, (_, i) => `A${i + 1}`);
+        const star: G6GraphData = {
+            nodes: ['S', 'BIG', ...accounts].map((id) => node(id)),
+            edges: [...accounts.map((a) => edge('S', a)), ...accounts.slice(0, 6).map((a) => edge(a, 'BIG'))],
+        };
+        const before = busiest(star, T);
+        expect(before.rows[0].title).toBe('S');
+        expect(before.rows[0].hint).toBe('S has 14 transfers. Add it to an exclusion list?'); // the defect, unguarded
+
+        const r = busiest(star, T, 5, new Set(['S']));
+        expect(r.rows[0].title).toBe('S');
+        expect(r.rows[0].hint).toBeUndefined();
+        expect(r.rows[0].reading).toBe(
+            'S takes part in 14 transfers, the most on this graph. It is a start entity: the graph was drawn round it.',
+        );
+        expect(r.rows[1]).toMatchObject({ title: 'BIG', hint: 'BIG has 6 transfers. Add it to an exclusion list?' });
+        expect(r.rows.slice(2).every((x) => !x.hint)).toBe(true);
+    });
+
+    it('a start entity alone on top leaves no hint at all when no other entity stands out', () => {
+        const star: G6GraphData = {
+            nodes: ['S', 'A1', 'A2', 'A3', 'A4', 'A5'].map((id) => node(id)),
+            edges: ['A1', 'A2', 'A3', 'A4', 'A5'].map((a) => edge('S', a)),
+        };
+        expect(busiest(star, T, 5, new Set(['S'])).rows.every((x) => !x.hint)).toBe(true);
+    });
+
     it('no hint when the top one is not far busier than the next', () => {
         const flat: G6GraphData = {
             nodes: ['A', 'B', 'C'].map((id) => node(id)),

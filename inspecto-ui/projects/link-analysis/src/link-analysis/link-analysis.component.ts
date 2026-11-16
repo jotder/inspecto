@@ -358,6 +358,7 @@ import { LinkAnalysisQueryPanelComponent, QuerySummaryItem } from './link-analys
 import { LinkAnalysisInvestigationComponent } from './link-analysis-investigation.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { InvestigationSettingsSections } from './investigation-settings-sections.component';
+import { INVESTIGATION_PANEL_LABELS, InvestigationPanel, openInvestigationPanel } from './investigation-panel.dialog';
 import { InvestigationSection } from './link-analysis-investigation.component';
 import { CleanupApply, LinkAnalysisCleanupComponent } from './link-analysis-cleanup.component';
 import { foldBranches, foldableOf } from '@inspecto/link-analysis/graph/graph-cleanup';
@@ -6637,6 +6638,27 @@ Its prior copies stay in its version history.`,
     readonly discoverListWhyNot = computed(() =>
         this.lens.canManageIncidents() ? '' : needsPermission('canManageIncidents'),
     );
+    /**
+     * LA-FULL-CYCLE-TEST-1 phase 5 (finding 25): the start entities (hop 0) of the Investigation on the canvas, saved or
+     * unsaved, as canvas node ids - Busiest nodes never offers to exclude one. Empty while exploring.
+     */
+    readonly discoverStartIds = computed<string[]>(() => {
+        const ws = this.investigation.canvas()
+            ? this.investigation.workingSet()
+            : this.investigation.unsaved()
+              ? this.investigation.unsavedWs()
+              : null;
+        if (!ws) return [];
+        const starts = new Set(ws.entities.filter((e) => e.hop === 0).map((e) => e.id));
+        return (this.canvasData()?.nodes ?? []).filter((n) => rawIdsOf(n).some((r) => starts.has(r))).map((n) => n.id);
+    });
+
+    /** Finding 22: File ▸ Build Dossier… / Members… for the open Investigation (the same dialog as its ⋯ menu). */
+    readonly panelLabels = INVESTIGATION_PANEL_LABELS;
+    openPanel(panel: InvestigationPanel): void {
+        const id = this.investigation.activeId();
+        if (id) openInvestigationPanel(this.dialog, panel, id, this.investigation.displayTitle() || id);
+    }
 
     /** The Dataset the graph on screen was drawn from, when a start can draw over it. */
     private discoverDataset(): StartDataset | null {

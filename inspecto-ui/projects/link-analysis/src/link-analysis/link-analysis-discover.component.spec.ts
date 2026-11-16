@@ -27,6 +27,7 @@ const G: G6GraphData = {
             [nodeOptions]="options"
             [startWhyNot]="startWhyNot()"
             [listWhyNot]="listWhyNot()"
+            [startIds]="startIds()"
             (show)="shown.push($event)"
             (startFrom)="started.push($event)"
             (addToList)="added.push($event)"
@@ -39,6 +40,7 @@ class Host {
     readonly options = G.nodes.map((x) => ({ id: x.id, label: x.data.label }));
     readonly startWhyNot = signal('');
     readonly listWhyNot = signal('');
+    readonly startIds = signal<string[]>([]);
     readonly shown: GraphSelection[] = [];
     readonly started: FoundAction[] = [];
     readonly added: FoundAction[] = [];
@@ -125,6 +127,19 @@ describe('LinkAnalysisDiscoverComponent - Find something interesting (LA-ONBOARD
             'not drawn from a Dataset',
         );
         expect(el.querySelector('[data-testid="la-discover-hint"] button')).toBeNull(); // the hint keeps its sentence only
+    });
+
+    it('never offers to exclude the Investigation start entity (finding 25)', async () => {
+        const { el, host, fixture, click } = mount();
+        host.startIds.set(['HUB']); // the Investigation started from HUB: it is busy because the graph is drawn round it
+        fixture.detectChanges();
+        click('[data-testid="la-discover-busiest"]');
+        expect(el.querySelector('[data-testid="la-discover-reading"]')?.textContent?.trim()).toBe(
+            'HUB takes part in 5 transfers, the most on this graph. It is a start entity: the graph was drawn round it.',
+        );
+        expect(el.querySelector('[data-testid="la-discover-hint"]')).toBeNull();
+        expect(el.textContent).not.toContain('exclusion list');
+        await expectNoA11yViolations(el);
     });
 
     it('with no graph, it says to draw one first', () => {

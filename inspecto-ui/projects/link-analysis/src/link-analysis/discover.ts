@@ -24,7 +24,7 @@ export interface FoundRow {
     edgeIds: string[];
     /** The entities' raw values (a masked node gives its alias, written as is - the same values Exclude → Add to a list sends). */
     values: string[];
-    /** UC-10's help, on the busiest row only: "X has N links. Add it to an exclusion list?". */
+    /** UC-10's help, on the busiest row that is not a start entity: "X has N links. Add it to an exclusion list?". */
     hint?: string;
     /** What a start from this row starts from, in words: "MERCHANT-BIG, the busiest account". */
     what: string;
@@ -48,8 +48,17 @@ function valuesOf(nodes: readonly G6Node[]): string[] {
     return [...new Set(nodes.map((n) => rawIdsOf(n)[0]).filter((v): v is string => !!v))];
 }
 
-/** *Who is busiest*: the entities with the most links on this graph (degree centrality). */
-export function busiest(g: G6GraphData, t: PackTerms, limit = 5): FoundResult {
+/**
+ * *Who is busiest*: the entities with the most links on this graph (degree centrality). `startIds` are the open
+ * Investigation's start entities (canvas node ids): one of them is busy BECAUSE the graph was drawn round it, so its row
+ * says so and the exclusion hint is never offered for it (LA-FULL-CYCLE-TEST-1 phase 5, finding 25).
+ */
+export function busiest(
+    g: G6GraphData,
+    t: PackTerms,
+    limit = 5,
+    startIds: ReadonlySet<string> = new Set(),
+): FoundResult {
     const byId = new Map(entities(g).map((n) => [n.id, n]));
     const ranked = degreeCentrality(g)
         .filter((s) => byId.has(s.id) && s.score > 0)
@@ -68,17 +77,21 @@ export function busiest(g: G6GraphData, t: PackTerms, limit = 5): FoundResult {
             title: s.label,
             reading:
                 `${s.label} takes part in ${count(s.score, t.link, t.links)}` +
-                (i === 0 ? ', the most on this graph.' : '.'),
+                (i === 0 ? ', the most on this graph.' : '.') +
+                (startIds.has(s.id) ? ` It is a start entity: the graph was drawn round it.` : ''),
             nodeIds: [s.id],
             edgeIds,
             values: valuesOf([node]),
             what: i === 0 ? `${s.label}, the busiest ${t.node}` : `${s.label}, one of the busiest ${t.nodes}`,
         };
     });
-    // The hint (UC-10): a top entity far busier than the next is usually a hub to leave out, not a lead.
-    const [top, next] = ranked;
-    if (top.score >= 5 && (!next || top.score >= 2 * next.score))
-        rows[0].hint = `${top.label} has ${count(top.score, t.link, t.links)}. Add it to an exclusion list?`;
+    // The hint (UC-10): a top entity far busier than the next is usually a hub to leave out, not a lead. A start entity
+    // is busy by construction (the graph was drawn round it), so it is neither offered nor counted as "the next".
+    const others = ranked.filter((s) => !startIds.has(s.id));
+    const [top, next] = others;
+    if (top && top.score >= 5 && (!next || top.score >= 2 * next.score))
+        rows[ranked.indexOf(top)].hint =
+            `${top.label} has ${count(top.score, t.link, t.links)}. Add it to an exclusion list?`;
     return {
         heading: `The ${count(rows.length, `busiest ${t.node}`, `busiest ${t.nodes}`)} on this graph`,
         rows,

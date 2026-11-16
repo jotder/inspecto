@@ -7,6 +7,7 @@ import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { InvService, InvestigationLog, PendingExpansion, WorkingSet } from '@inspecto/link-analysis/api/inv.service';
 import { LensService } from '@inspecto/core/api';
+import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { LinkAnalysisOversightComponent } from './link-analysis-oversight.component';
 
@@ -59,7 +60,8 @@ class Host {
     });
 }
 
-function create(opts: { approve: boolean; reveal: boolean; approveError?: unknown }) {
+function create(opts: { approve: boolean; reveal: boolean; approveError?: unknown; confirm?: boolean }) {
+    const confirm = { confirmDestructive: vi.fn(async () => opts.confirm ?? true) };
     const inv = {
         approveExpansion: vi.fn(() => (opts.approveError ? throwError(() => opts.approveError) : of({}))),
         denyExpansion: vi.fn(() => of({ id: 'inv-1', pending: { ...PENDING, status: 'denied' } })),
@@ -76,12 +78,13 @@ function create(opts: { approve: boolean; reveal: boolean; approveError?: unknow
             { provide: InvService, useValue: inv },
             { provide: LensService, useValue: lens },
             { provide: MatDialog, useValue: dialog },
+            { provide: InspectoConfirmService, useValue: confirm },
         ],
     });
     const f = TestBed.createComponent(Host);
     f.detectChanges();
     const c = f.debugElement.children[0].componentInstance as LinkAnalysisOversightComponent;
-    return { f, c, el: f.nativeElement as HTMLElement, inv, dialog, host: f.componentInstance };
+    return { f, c, el: f.nativeElement as HTMLElement, inv, dialog, host: f.componentInstance, confirm };
 }
 
 function button(el: HTMLElement, text: string): HTMLButtonElement | undefined {
@@ -100,6 +103,20 @@ describe('LinkAnalysisOversightComponent (D-U6 / D-U7)', () => {
         await f.whenStable();
         expect(inv.approveExpansion).toHaveBeenCalledWith('inv-1', 'p1');
         expect(f.componentInstance.decided).toBe(1);
+    });
+
+    it('asks before approving (finding 23): a declined confirm sends nothing; the confirm names requester and limit', async () => {
+        const { f, c, inv, confirm } = create({ approve: true, reveal: false, confirm: false });
+        await c.decide(PENDING, true);
+        expect(inv.approveExpansion).not.toHaveBeenCalled();
+        expect(f.componentInstance.decided).toBe(0);
+        const [message, opts] = confirm.confirmDestructive.mock.calls[0] as unknown as [string, { title: string }];
+        expect(opts.title).toBe('Approve this expand?');
+        expect(message).toContain('Request p1 from analyst-1');
+        expect(message).toContain('row budget 500 (limit 100)');
+        await c.decide(PENDING, false); // a deny is not asked here: the reason box beside it is its own step
+        expect(inv.denyExpansion).toHaveBeenCalled();
+        expect(confirm.confirmDestructive).toHaveBeenCalledTimes(1);
     });
 
     it('says no approvals are needed when nothing is held or masked (T-152)', () => {

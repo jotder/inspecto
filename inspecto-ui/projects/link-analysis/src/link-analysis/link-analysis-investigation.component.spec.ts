@@ -8,9 +8,12 @@ import {
     InvService,
     InvestigationCoverage,
     InvestigationLog,
+    PendingExpansion,
     WorkingSet,
 } from '@inspecto/link-analysis/api/inv.service';
-import { LensService } from '@inspecto/core/api';
+import { LensService, SessionService } from '@inspecto/core/api';
+import { MatDialog } from '@angular/material/dialog';
+import { InvestigationPanelDialog } from './investigation-panel.dialog';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { LA_FEATURES, LA_WIDGETS } from '@inspecto/link-analysis/la-host';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
@@ -166,6 +169,10 @@ function create(
         timeCol?: string;
         /** The ids `GET …/compare` lists under `entities.onlyB`, and whether that list was cut. */
         onlyB?: { items: string[]; truncated: boolean };
+        /** Holds `canApproveLinkExpansions` (finding 23). */
+        approver?: boolean;
+        /** The four-eyes requests the log lists. */
+        pending?: PendingExpansion[];
     } = {},
 ) {
     const inv = {
@@ -181,8 +188,13 @@ function create(
         ),
         createInvestigation: vi.fn(() => of(LOG.header)),
         investigationLog: vi.fn(() =>
-            of(opts.timeCol ? { ...LOG, header: { ...LOG.header, timeCol: opts.timeCol } } : LOG),
+            of({
+                ...(opts.timeCol ? { ...LOG, header: { ...LOG.header, timeCol: opts.timeCol } } : LOG),
+                ...(opts.pending ? { pending: opts.pending } : {}),
+            }),
         ),
+        approveExpansion: vi.fn(() => of({})),
+        denyExpansion: vi.fn(() => of({})),
         compareInvestigationWindows: vi.fn(() =>
             of({
                 entities: {
@@ -272,6 +284,8 @@ function create(
                 provide: LensService,
                 useValue: {
                     canManageIncidents: signal(opts.canManage ?? true),
+                    canApproveLinkExpansions: signal(opts.approver ?? false),
+                    canRevealLinkEntities: signal(false),
                     canShareInvestigation: signal(false),
                     canUploadData: signal(false),
                 },
@@ -1247,6 +1261,177 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
             'Degree 2: approved (request p2) — nothing new was found.',
         );
         expect(el.textContent).not.toContain('waiting for approval');
+    });
+
+    describe('the approver on the waiting line (LA-FULL-CYCLE-TEST-1 phase 5, finding 23)', () => {
+        const HELD: PendingExpansion = {
+            id: 'p7',
+            investigationId: 'inv-1',
+            op: 'expand',
+            params: { ids: ['a'], budget: 5000 },
+            sensitivity: {
+                exceeded: ['budget 5000 > 1000', 'maxFanOut unbounded (threshold 2000)'],
+                budget: 5000,
+                maxFanOut: null,
+                fourEyesBudgetAbove: 1000,
+                fourEyesFanOutAbove: 2000,
+            },
+            status: 'pending',
+            requestedBy: 'alice',
+            requestedAt: '2026-11-15T10:00:00Z',
+        };
+        const asActor = (actor: string | null) => TestBed.inject(SessionService).actor.set(actor);
+        const line = (el: HTMLElement) => el.querySelector('[data-testid="approver-line"]') as HTMLElement | null;
+        // not whenStable(): a held degree polls the log on an interval, so the zone never settles while it waits
+        const settle = async (fixture: { detectChanges(): void }) => {
+            for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r));
+            fixture.detectChanges();
+        };
+
+        it('shows a badge and Approve / Deny instead of the requester text; Approve asks first and a no sends nothing', async () => {
+            const confirm = vi.fn(async () => false);
+            const { fixture, store, el, inv } = create({ approver: true, pending: [HELD], confirm });
+            asActor('manager');
+            await openInv(store);
+            fixture.detectChanges();
+            const badge = el.querySelector('[data-testid="approver-badge"]') as HTMLButtonElement;
+            expect(badge.textContent).toContain('1 to approve');
+            expect(badge.getAttribute('aria-label')).toBe('1 expand request waits for your approval: show');
+            expect(line(el)?.textContent).toContain('request p7 from alice waits for your approval');
+            expect(line(el)?.textContent).toContain('row budget 5,000 (limit 1,000); fan-out unbounded (limit 2,000)');
+            expect(el.textContent).not.toContain('Ask an approver');
+            expect(el.textContent).not.toContain('four_eyes');
+            await expectNoA11yViolations(el.querySelector('[data-testid="degrees"]')!);
+
+            (el.querySelector('[data-testid="approve-request"]') as HTMLButtonElement).click();
+            await settle(fixture);
+            expect(confirm).toHaveBeenCalledTimes(1);
+            const [message, o] = confirm.mock.calls[0] as unknown as [string, { title: string; confirmText: string }];
+            expect(o).toMatchObject({ title: 'Approve this expand?', confirmText: 'Approve' });
+            expect(message).toContain('as their step, and records you as the approver');
+            expect(inv.approveExpansion).not.toHaveBeenCalled();
+
+            confirm.mockResolvedValue(true);
+            inv.investigationLog.mockClear();
+            (el.querySelector('[data-testid="approve-request"]') as HTMLButtonElement).click();
+            await settle(fixture);
+            expect(inv.approveExpansion).toHaveBeenCalledWith('inv-1', 'p7');
+            expect(inv.investigationLog).toHaveBeenCalled(); // re-read: the decision shows on the line
+        });
+
+        it('Deny is a second step with an optional reason, sent as typed; Cancel steps back', async () => {
+            const { fixture, store, el, inv } = create({ approver: true, pending: [HELD] });
+            asActor('manager');
+            await openInv(store);
+            fixture.detectChanges();
+            (el.querySelector('[data-testid="deny-request"]') as HTMLButtonElement).click();
+            fixture.detectChanges();
+            expect(inv.denyExpansion).not.toHaveBeenCalled(); // the first click only asks
+            expect(el.querySelector('[data-testid="deny-step"]')).not.toBeNull();
+            expect(penByLabel(el, 'Reason (optional)')).not.toBeNull();
+            await expectNoA11yViolations(line(el)!);
+            const cancel = Array.from(line(el)!.querySelectorAll('button')).find(
+                (b) => b.textContent?.trim() === 'Cancel',
+            ) as HTMLButtonElement;
+            cancel.click();
+            fixture.detectChanges();
+            expect(el.querySelector('[data-testid="deny-step"]')).toBeNull();
+
+            (el.querySelector('[data-testid="deny-request"]') as HTMLButtonElement).click();
+            fixture.detectChanges();
+            penEdit(fixture, penByLabel(el, 'Reason (optional)')!, 'not proportionate');
+            (el.querySelector('[data-testid="deny-confirm"]') as HTMLButtonElement).click();
+            await settle(fixture);
+            expect(inv.denyExpansion).toHaveBeenCalledWith('inv-1', 'p7', 'not proportionate');
+        });
+
+        it('a reason past the server limit is refused on screen, never sent', async () => {
+            const { fixture, store, el, inv } = create({ approver: true, pending: [HELD] });
+            asActor('manager');
+            await openInv(store);
+            fixture.detectChanges();
+            (el.querySelector('[data-testid="deny-request"]') as HTMLButtonElement).click();
+            fixture.detectChanges();
+            const c = fixture.debugElement.children[0].componentInstance as LinkAnalysisInvestigationComponent;
+            c.denyReason.setValue('x'.repeat(201));
+            refresh(fixture);
+            (el.querySelector('[data-testid="deny-confirm"]') as HTMLButtonElement).click();
+            await settle(fixture);
+            refresh(fixture);
+            expect(inv.denyExpansion).not.toHaveBeenCalled();
+            expect(penError(penByLabel(el, 'Reason (optional)')!)).toBe('At most 200 characters.');
+        });
+
+        it('the requester and a reader with no sign-in keep the waiting text', async () => {
+            const { fixture, store, el } = create({ approver: true, pending: [HELD] });
+            asActor('alice'); // the requester: four-eyes refuses them, so nothing is offered
+            await openInv(store);
+            fixture.detectChanges();
+            expect(line(el)).toBeNull();
+            expect(el.querySelector('[data-testid="approver-badge"]')).toBeNull();
+            expect(el.querySelector('[aria-label="Degree results"]')?.textContent).toContain('waiting for approval');
+
+            asActor(null); // no Subject (Basic): the server cannot tell two people apart and refuses
+            fixture.detectChanges();
+            expect(line(el)).toBeNull();
+            expect(el.querySelector('[data-testid="approver-badge"]')).toBeNull();
+        });
+
+        it('without the approve capability nothing is offered, even to another person', async () => {
+            const { fixture, store, el } = create({ approver: false, pending: [HELD] });
+            asActor('manager');
+            await openInv(store);
+            fixture.detectChanges();
+            expect(line(el)).toBeNull();
+            expect(el.querySelector('[data-testid="approver-badge"]')).toBeNull();
+        });
+
+        it('a refused decision is said in place, in plain words', async () => {
+            const { fixture, store, el, inv } = create({ approver: true, pending: [HELD], confirm: async () => true });
+            asActor('manager');
+            inv.approveExpansion.mockReturnValue(
+                throwError(
+                    () => new HttpErrorResponse({ status: 409, error: { error: { message: 'already approved' } } }),
+                ) as never,
+            );
+            await openInv(store);
+            fixture.detectChanges();
+            (el.querySelector('[data-testid="approve-request"]') as HTMLButtonElement).click();
+            await settle(fixture);
+            fixture.detectChanges();
+            expect(el.querySelector('[data-testid="degrees"] inspecto-alert')?.textContent).toContain(
+                'Already decided or no longer applicable.',
+            );
+        });
+    });
+
+    it('finding 22: the ⋯ menu opens Build Dossier… and Members… for the open Investigation', async () => {
+        const { fixture, store, el } = create();
+        await openInv(store);
+        fixture.detectChanges();
+        // the prototype: a standalone import of MatDialogModule gives the component tree its own MatDialog instance
+        const open = vi.spyOn(MatDialog.prototype, 'open').mockReturnValue({} as never);
+        (el.querySelector('[data-testid="act-menu"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        // the menu overlay lives on document.body: take the newest one (an earlier test may leave its overlay behind)
+        const last = (id: string) =>
+            Array.from(document.querySelectorAll<HTMLButtonElement>(`[data-testid="${id}"]`)).at(-1)!;
+        const dossier = last('act-dossier');
+        expect(dossier.textContent?.trim()).toBe('Build Dossier…');
+        expect(last('act-members').textContent?.trim()).toBe('Members…');
+        dossier.click();
+        expect(open).toHaveBeenLastCalledWith(
+            InvestigationPanelDialog,
+            expect.objectContaining({ data: { panel: 'dossier', investigationId: 'inv-1', title: 'Burners' } }),
+        );
+        (el.querySelector('[data-testid="act-menu"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        last('act-members').click();
+        expect(open).toHaveBeenLastCalledWith(
+            InvestigationPanelDialog,
+            expect.objectContaining({ data: { panel: 'members', investigationId: 'inv-1', title: 'Burners' } }),
+        );
+        open.mockRestore();
     });
 
     it('LA-INV-EXPAND-1: the Expand section holds the projected Expand form under its heading and the degree reached', async () => {

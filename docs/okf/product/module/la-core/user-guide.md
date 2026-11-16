@@ -398,8 +398,11 @@ Act on the canvas, read in the dock, configure in **⚙ Settings**.
   view* dialog: **Name** and **Description**, the facts (Dataset, layout, industry pack, Investigations, id) and
   **Version history**. **Save** changes only the name and description, never the graph on screen; a view you may not
   change is shown read-only with the reason (LA-VIEW-DETAILS-1, 2026-11-10).
-* **Start area (empty canvas):** one bounded panel with tabs (*Start a graph*, *Preset queries*, *Build a question*,
-  *Explore the Dataset*) that scrolls inside itself; a preset or builder answer opens in a closable card.
+* **Start area (empty canvas):** without Investigations (Basic, the Explorer level), one bounded panel with tabs
+  (*Start a graph*, *Preset queries*, *Build a question*, *Explore the Dataset*) that scrolls inside itself; a preset
+  or builder answer opens in a closable card. With Investigations the empty canvas shows **Start an Investigation**
+  instead: one sentence on what to pick and where, and **Start from the Investigation tab →**, which opens the start
+  form there ([§5.1](#51-start-a-graph)).
 * **Tool rail (file and view):** **File ▾** first ([§10](#10-saving-exporting-and-the-file-menu)), then **Search
   nodes**, **Filter node types**, **Graph layout**, **Filter edges by time**, **Help**, **Glossary**, **Display
   options** (the brush), **Undo** and **Redo** (display and filter changes), **Fit the graph to the screen**, **Show
@@ -470,8 +473,10 @@ step: **Reveal…** under the canvas or in a node's details (see [Masked ids in 
 ![The start form in the Investigation tab with a suggestion list under the Account field](../../assets/la-guide-06-start-form.png)
 *Start from one entity: pick the Dataset and Entity Type, type the first letters and pick a match.*
 
-On an edition with Investigations the empty canvas reads **Start from the Investigation tab →** and this form is in
-the toolbox's **Investigation** tab. When the Entity Type is masked (in Standard and up, *Account*, *Phone number* and
+On an edition with Investigations the empty canvas reads **Start an Investigation**: *Pick a Dataset and what to start
+from (one entity, an Entity List, pasted values or the whole Dataset) in the Investigation tab. You work unsaved until
+you choose Save. To carry on with earlier work, use File ▸ Open…*, with the button **Start from the Investigation tab
+→**. This form is in the toolbox's **Investigation** tab. When the Entity Type is masked (in Standard and up, *Account*, *Phone number* and
 other identifying types are masked unless the Space says otherwise) nothing is suggested: type the whole value, or turn
 on **Show values (this is logged)** if you may reveal them. The line under the field says where the real ids are: if
 you have *See unmasked ids*, the graph shows aliases until you save it and press **Reveal…** on the canvas or in a
@@ -480,9 +485,9 @@ node's details; otherwise it says that seeing them needs *See unmasked ids*.
 ![A first graph: one account in the middle with fourteen linked accounts](../../assets/la-guide-07-first-graph.png)
 *The first graph: the start entity and everything it is linked to. Dotted outlines are entities not expanded yet.*
 
-Without Investigations (Basic, the Explorer level) the first screen is one **Start a graph** box. With
-Investigations the centre shows only **Start from the Investigation tab →**: the start form lives in that tab, so
-Dataset, Start from and Entity Type are asked in one place ([§11.1](#111-start-one)). Pick the **Dataset** first (already picked when you come from
+Without Investigations (Basic, the Explorer level) the first screen is the Start area, its first tab the **Start a
+graph** box. With Investigations the centre shows only how to start and **Start from the Investigation tab →**: the
+start form lives in that tab, so Dataset, Start from and Entity Type are asked in one place ([§11.1](#111-start-one)). Pick the **Dataset** first (already picked when you come from
 *Explore in Link Analysis*), then what to start from:
 
 * **One entity** — pick the **Entity Type** (the Dataset's main one is chosen: accounts for transfers, phone numbers
@@ -876,7 +881,9 @@ The right panel's **On screen** and **Whole Dataset** tabs.
 
 * **Busiest nodes** — the five entities with the most links, each in one sentence (*MERCHANT-BIG takes part in 270
   transfers, the most on this graph.*). When the busiest has at least 5 links and twice the next, it asks: *Add it to
-  an exclusion list?* (button **Add to exclusion list**)
+  an exclusion list?* (button **Add to exclusion list**). An open Investigation's start entities are never offered for
+  exclusion: they are busy because the graph was drawn round them, and their row says so (*It is a start entity: the
+  graph was drawn round it.*); the question then goes to the busiest other entity, judged against the next other one.
 * **Tight groups** — groups of three or more that link mostly among themselves (*Group 1: 9 accounts,
   14 transfers among them within 3 days*).
 * **Route from A to B** — choose **From** and **To**, then **Find route**: the shortest chain following the links'
@@ -1052,6 +1059,7 @@ Server side repeats the search across the whole Dataset.
 | **Save view** | Saves over the open view (with none open it asks a name). Saving, renaming, duplicating and deleting views needs the *Workbench author* permission; without it these items are greyed out and the menu says *Needs Workbench author.* under them. Every greyed-out File item says why (*Draw a graph first.*, *Open an Investigation or saved view first.*). A view shared with others may be deleted only by its owner |
 | **Save view as** | A **Name** and optional description; names the lists the graph uses (the list it started from, the exclusion lists you added to) and says once that a saved view re-reads live data and is not evidence |
 | **Save snapshot…** | Freezes what is on screen (the Working Set while an Investigation is open) with a SHA-256 fingerprint; can attach it to a Case or **create a new Case from graph nodes**. Greyed out with *Draw a graph first.* while nothing is drawn |
+| **Build Dossier…** · **Members…** | Only while an Investigation is open: its Dossier ([§11.9](#119-evidence-snapshot-dossier-sealed-bundle)) or its Members ([§11.5](#115-replay-drift-drafts-and-members)) in a dialog. The same two are in the Investigation's `⋯` menu, and both stay in Investigation settings |
 | **Import or export** | Moves views between Spaces as a file |
 | **Close** | Back to the start; the page keeps its full height |
 | **Delete** | Deletes the open view or Investigation; names it and asks first |
@@ -1179,7 +1187,9 @@ Top to bottom, most important first:
 
 1. **Header:** the **Name** (a lead renames it in place: label · value · ✎), purpose, Dataset, the data-trust chip
    (**Data details**), a **?** that shows *How to investigate* again, and `⋯` with **Settings…** (⚙ Settings ▸
-   Investigation settings), **Close** and **Delete**. Under it one counts line: *Working Set: 42 entities · 118 links ·
+   Investigation settings), **Build Dossier…**, **Members…**, **Close** and **Delete**. A person who may approve a held
+   expand of someone else sees a **N to approve** badge under the Dataset line; it brings the waiting line into view
+   ([§11.4](#114-large-expands-need-a-second-person-four-eyes)). Under it one counts line: *Working Set: 42 entities · 118 links ·
    3 excluded · 2 hidden · 1 kept · degree 2 of 4 · 3 busy held*.
 2. **How to investigate** — five steps, shown until you press **Got it** (remembered in this browser).
 3. **Undo** / **Redo** of recorded steps, which stay at the top while the tab scrolls ([§7](#7-expand-and-clean-up-the-graph)).
@@ -1221,10 +1231,21 @@ Investigation is open **selects** it for the next step.
 
 An expand whose budget or fan-out cap is above the Space's four-eyes thresholds does not run: it says **waiting for
 approval**, names the request (for example *p1*) and the limit crossed. Someone **other than you** with *Approve link
-expansions* opens the same Investigation, finds it under ⚙ Settings ▸ Investigation settings ▸ **Oversight and
-approvals** (in the console also **Approvals Inbox → Link expansions**), sees in plain words what it will read, and
-presses **Approve** (runs it as your step, stamped with who approved) or **Deny…** (optional reason). Nobody can approve
-their own request; where the Investigation has members only a lead or reviewer may decide. Before you press Expand, the
+expansions* opens the same Investigation and sees it at once: a **1 to approve** badge in the header, and on the same
+line, instead of your waiting text, *Degree 2: request p1 from <you> waits for your approval. It crosses the Space's
+four-eyes limit: row budget 5,000 (limit 1,000).* with **Approve** and **Deny**.
+
+* **Approve** asks first (*Approve this expand?*: approving runs it now, as your step, and records them as the
+  approver), then runs it; the line then says what it admitted.
+* **Deny** is a second step on the line: an optional **Reason** (at most 200 characters; you see it on your line) and
+  **Deny request**, or **Cancel**. Nothing is read. The reason is optional because the server, Oversight and the
+  console's inbox all take it as optional, and the denial itself (who, when) is always recorded.
+
+The same decision stays in ⚙ Settings ▸ Investigation settings ▸ **Oversight and approvals** (Approve there asks the
+same question) and, in the console, **Approvals Inbox → Link expansions**. Nobody can approve their own request, and
+without a sign-in (Basic) nobody can approve at all: the server cannot tell two people apart, so neither the badge nor
+the buttons are offered. Where the Investigation has members only a lead or reviewer may decide (a refusal is shown on
+the line). Before you press Expand, the
 form already says *Will need approval from a second person* when it would be held.
 
 ### 11.5 Replay, drift, Drafts and Members
@@ -1235,7 +1256,8 @@ form already says *Will need approval from a second person* when it would be hel
 * **Drafts** (⚙ ▸ Investigation settings): **Fork a Draft** (optionally named, up to 80 characters; one live Draft per
   person, up to 50 open in a Space) to try a side line, then **Conflicts**, **Rebase**, **Promote** (a promote with a
   sensitive expand waits for four-eyes) or **Discard**.
-* **Members**: lead, analyst, reviewer. A lead can **Grant** and **Revoke**; the last lead cannot be removed.
+* **Members** (**File ▸ Members…**, the Investigation's `⋯` menu, or Investigation settings): lead, analyst,
+  reviewer. A lead can **Grant** and **Revoke**; the last lead cannot be removed.
 
 ### 11.6 Working Set rows and Coverage
 
@@ -1273,11 +1295,12 @@ exclusions are dropped and the preview says so); **Instantiate** builds a new In
 ### 11.9 Evidence: snapshot, Dossier, sealed bundle
 
 ![The Dossier section of Investigation settings after Build Dossier, showing Log intact](../../assets/la-guide-10-dossier.png)
-***Build Dossier** is in **Investigation settings… ▸ Dossier**. *Log intact* means every recorded step still matches the sealed log.*
+***Build Dossier** is in **File ▸ Build Dossier…**, the Investigation's `⋯` menu and **Investigation settings… ▸ Dossier**. *Log intact* means every recorded step still matches the sealed log.*
 
 1. **File ▸ Save snapshot…** freezes the screen as a **snapshot** with a SHA-256 fingerprint. A *saved view*
    re-reads live data; a *snapshot* does not change.
-2. **Build Dossier** (⚙ ▸ Investigation settings ▸ Dossier): summary and topology, a ledger of every step with who
+2. **Build Dossier** (**File ▸ Build Dossier…**, the Investigation's `⋯` menu, or ⚙ ▸ Investigation settings ▸
+   Dossier): summary and topology, a ledger of every step with who
    and why, exclusions, score tables and a **SHA-256 manifest**. Download the *steps* and *method* statements or the
    JSON. Masked ids stay masked, even inside free-text reasons.
 3. **Verify this Dossier** reports anything **changed, missing or added** since.

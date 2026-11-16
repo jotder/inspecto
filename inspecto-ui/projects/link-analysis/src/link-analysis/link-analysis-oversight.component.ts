@@ -7,8 +7,10 @@ import { InvService, InvestigationLog, PendingExpansion, WorkingSet } from '@ins
 import { LensService, apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
+import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { RevealedIds, refusal403 } from './investigation-state';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
+import { confirmApproveExpansion } from './expansion-decision';
 
 /** A readable message for a four-eyes / reveal refusal; the server's own reason is always kept. */
 export function oversightErrorMessage(err: unknown, fallback: string): string {
@@ -161,6 +163,7 @@ export class LinkAnalysisOversightComponent {
     private readonly inv = inject(InvService);
     private readonly lens = inject(LensService);
     private readonly dialog = inject(MatDialog);
+    private readonly confirm = inject(InspectoConfirmService);
     readonly canApprove = computed(() => this.lens.canApproveLinkExpansions());
     readonly canReveal = computed(() => this.lens.canRevealLinkEntities());
 
@@ -194,6 +197,8 @@ export class LinkAnalysisOversightComponent {
     }
 
     async decide(p: PendingExpansion, approve: boolean): Promise<void> {
+        // finding 23: approving runs the expand at once, so it is confirmed first (as on the Investigation tab's line)
+        if (approve && !(await confirmApproveExpansion(this.confirm, p))) return;
         const id = this.investigationId();
         this.busy.set(true);
         this.error.set('');
