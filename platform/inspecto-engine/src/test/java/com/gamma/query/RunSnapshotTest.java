@@ -44,6 +44,7 @@ class RunSnapshotTest {
     void resetSeams() {
         RunSnapshot.hardLinks = true;
         RunSnapshot.copyCap = 1L << 30;
+        RunSnapshot.copyFileCap = 256;
         RunSnapshot.beforeCopy = () -> { };
     }
 
@@ -341,6 +342,65 @@ class RunSnapshotTest {
             assertEquals(List.of(), links(root), "the partial pin is removed");
             swap(conn, store, "old.parquet", "fresh.parquet", 2);
             assertEquals("2", ids(conn, datasets.read("own", "cdr")), "per call, as before Stage 2");
+        }
+    }
+
+    @Test
+    void aCopyOfMoreFilesThanTheOpenFileCapIsNotMadeAndTheDatasetIsReadPerCall(@TempDir Path root) throws Exception {
+        Path store = root.resolve("cdr");
+        RunSnapshot.hardLinks = false;
+        RunSnapshot.copyFileCap = 1;
+        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:");
+             RunSnapshot run = RunSnapshot.open(granted(root))) {
+            parquet(conn, store.resolve("a.parquet"), 1);
+            parquet(conn, store.resolve("b.parquet"), 2);
+            DatasetAccess datasets = run.services().get(DatasetAccess.class);
+            DatasetAccess.Read first = datasets.read("own", "cdr");
+            assertFalse(first.relationSql().contains(RunSnapshot.DIR), "read per call: " + first.relationSql());
+            assertEquals("1,2", ids(conn, first));
+            Path runDir = runDirs(root).get(0);
+            try (Stream<Path> s = Files.list(runDir)) {
+                assertEquals(List.of(runDir.resolve(RunSnapshot.LOCK)), s.toList(), "nothing of the pin is left");
+            }
+        }
+    }
+
+    /**
+     * On Linux, closing any channel to a file releases every lock this process holds on it: a sweep that probed a live
+     * Run's lock file from the same JVM would unlock that Run for every other process. (Windows locks belong to the
+     * handle, so this passes there without the guard too.)
+     */
+    @Test
+    void aSweepInThisProcessLeavesALiveRunLockedAgainstOtherProcesses(@TempDir Path root, @TempDir Path src) throws Exception {
+        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:")) {
+            parquet(conn, root.resolve("cdr").resolve("old.parquet"), 1);
+        }
+        Path probe = src.resolve("Probe.java");
+        Files.writeString(probe, String.join("\n",
+                "public class Probe {",
+                "    public static void main(String[] a) throws Exception {",
+                "        try (var ch = java.nio.channels.FileChannel.open(java.nio.file.Path.of(a[0]),",
+                "                java.nio.file.StandardOpenOption.WRITE)) {",
+                "            var lock = ch.tryLock();",
+                "            System.out.println(lock == null ? \"REFUSED\" : \"ACQUIRED\");",
+                "        } catch (java.io.IOException e) {",
+                "            System.out.println(\"REFUSED\");",
+                "        }",
+                "    }",
+                "}"));
+        try (RunSnapshot live = RunSnapshot.open(granted(root))) {
+            live.services().get(DatasetAccess.class).read("own", "cdr");
+            Path liveDir = runDirs(root).get(0);
+            age(liveDir);   // past the age floor, so only the guard keeps the sweep off it
+            try (RunSnapshot next = RunSnapshot.open(granted(root))) {
+                next.services().get(DatasetAccess.class).read("own", "cdr");   // sweeps the data root
+                assertTrue(Files.isDirectory(liveDir));
+            }
+            Process p = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                    probe.toString(), liveDir.resolve(RunSnapshot.LOCK).toString()).redirectErrorStream(true).start();
+            String answer = new BufferedReader(new InputStreamReader(p.getInputStream())).readLine();
+            assertTrue(p.waitFor(30, TimeUnit.SECONDS));
+            assertEquals("REFUSED", answer, "another process may not take a live Run's lock after a sweep in this one");
         }
     }
 

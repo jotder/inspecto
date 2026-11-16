@@ -53,7 +53,9 @@ import java.util.stream.Stream;
  * was cancelled ({@code interruptRuns}) or hit its deadline: the Run's directory is deleted, and a read after that is
  * refused. While the Run lives it holds an OS lock on {@code <its directory>/.lock}; the next Run that pins in the data
  * root deletes every Run directory whose lock it can take (a crash, or a close that could not delete), in any process,
- * and never one younger than {@link #SWEEP_AGE_FLOOR}, whose owner may not have locked it yet.
+ * and never one younger than {@link #SWEEP_AGE_FLOOR}, whose owner may not have locked it yet. A directory of a live Run
+ * of THIS process is skipped before its lock file is opened at all: on Linux, closing any channel to a file releases
+ * every lock the process holds on it, so a probe would unlock the Run for every other process.
  *
  * <p>⚠ Assumes a published Parquet file is never rewritten in place (every writer publishes by rename), since a link shares
  * the file's bytes. Not pinned per Run: a {@code view}-backed Dataset (no file list; read afresh each time) and a
@@ -74,6 +76,15 @@ public final class RunSnapshot implements AutoCloseable {
 
     /** The most bytes one pin may copy where hard links fail; above it the Dataset is read per call (a test lowers it). */
     static volatile long copyCap = 1L << 30;
+
+    /**
+     * The most files one pin may copy: each is held open until the copy ends, so a store of many small files would
+     * otherwise meet the open-file limit. Above it the Dataset is read per call (a test lowers it).
+     */
+    static volatile int copyFileCap = 256;
+
+    /** The Run directories of this process's live Runs: the sweep never opens their lock files (see the class doc). */
+    private static final Set<Path> LIVE = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     /** Test seams: {@code false} forces the copy fallback; {@code beforeCopy} runs after the lock is released, before copying. */
     static volatile boolean hardLinks = true;
@@ -147,6 +158,7 @@ public final class RunSnapshot implements AutoCloseable {
             List<String> names = new ArrayList<>();
             List<String> links = new ArrayList<>();
             long toCopy = 0;
+            boolean tooManyToCopy = false;
             try (SnapshotSwapLock.Held block = SnapshotSwapLock.hold()) {
                 DatasetRelation.StoreFiles files = DatasetRelation.storeFiles(cfg, root);
                 if (files == null) return null;
@@ -157,6 +169,10 @@ public final class RunSnapshot implements AutoCloseable {
                     Files.createDirectories(link.getParent());
                     try {
                         if (!link(file, link)) {
+                            if (copies.size() >= copyFileCap) {
+                                tooManyToCopy = true;
+                                break;
+                            }
                             FileChannel from = FileChannel.open(file, StandardOpenOption.READ);
                             copies.add(new Copy(from, link));
                             toCopy += from.size();
@@ -169,9 +185,10 @@ public final class RunSnapshot implements AutoCloseable {
                 }
             }   // the store's lock ends here; a copy below reads through a handle opened under it
             if (!copies.isEmpty()) {
-                if (toCopy > copyCap) {
+                if (tooManyToCopy || toCopy > copyCap) {
                     log.warn("Dataset '{}' is read per call in this Run, not pinned: this file system cannot hard-link it "
-                            + "and a copy would be {} bytes, over the {}-byte cap", datasetId, toCopy, copyCap);
+                            + "and a copy would be {}, over the cap of {} files and {} bytes", datasetId,
+                            tooManyToCopy ? "more than " + copyFileCap + " files" : toCopy + " bytes", copyFileCap, copyCap);
                     delete(into);
                     return null;
                 }
@@ -228,12 +245,20 @@ public final class RunSnapshot implements AutoCloseable {
         if (dir != null) return dir;
         Path base = dataRoot.toAbsolutePath().normalize().resolve(DIR);
         Path mine = base.resolve(UUID.randomUUID().toString());
-        Files.createDirectories(mine);
-        FileChannel ch = FileChannel.open(mine.resolve(LOCK), StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+        LIVE.add(mine);   // before it exists, so no sweep of this process ever opens its lock file
+        FileChannel ch;
         try {
-            ch.lock();   // held for the Run's life: no sweep, in this process or another, takes this directory
+            Files.createDirectories(mine);
+            ch = FileChannel.open(mine.resolve(LOCK), StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+        } catch (IOException | RuntimeException e) {
+            LIVE.remove(mine);
+            throw e;
+        }
+        try {
+            ch.lock();   // held for the Run's life: no sweep of another process takes this directory
         } catch (IOException | RuntimeException e) {
             ch.close();
+            LIVE.remove(mine);
             throw e;
         }
         lockChannel = ch;
@@ -248,7 +273,7 @@ public final class RunSnapshot implements AutoCloseable {
         try (DirectoryStream<Path> ds = Files.newDirectoryStream(base)) {
             for (Path d : ds) {
                 try {
-                    if (d.equals(mine) || !Files.isDirectory(d)) continue;
+                    if (d.equals(mine) || LIVE.contains(d) || !Files.isDirectory(d)) continue;   // never probe our own
                     if (Files.getLastModifiedTime(d).toInstant().isAfter(floor)) continue;   // its owner may lock it yet
                     if (!unowned(d)) continue;
                     delete(d);
@@ -294,6 +319,8 @@ public final class RunSnapshot implements AutoCloseable {
             delete(dir);
         } catch (IOException e) {
             log.warn("Run snapshot {} not deleted ({}); a later Run that pins in this data root deletes it", dir, e.toString());
+        } finally {
+            LIVE.remove(dir);
         }
     }
 }

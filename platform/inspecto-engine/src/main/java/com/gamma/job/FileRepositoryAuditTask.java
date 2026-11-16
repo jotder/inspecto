@@ -59,8 +59,9 @@ final class FileRepositoryAuditTask {
         } else if (ctx != null) {
             ctx.log().info("unregistered-store check skipped (no component registry configured)");
         }
-        try (Stream<Path> walk = Files.walk(dataRoot)) {
-            for (Path p : walk.filter(Files::isRegularFile).toList()) {
+        // Never into a Run's snapshot links or DuckDB spill: they come and go mid-walk, and are no partial publish.
+        try {
+            for (Path p : com.gamma.util.DuckDbUtil.regularFilesSkippingSpill(dataRoot)) {
                 String name = p.getFileName().toString();
                 boolean partial = name.endsWith(".tmp") || name.endsWith(".compacting")
                         || name.equals(".compact-journal");

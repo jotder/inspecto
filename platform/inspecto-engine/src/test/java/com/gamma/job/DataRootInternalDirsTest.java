@@ -56,6 +56,18 @@ class DataRootInternalDirsTest {
     }
 
     @Test
+    void theFileRepositoryAuditNeverWalksIntoARunsLinksOrSpill(@TempDir Path root) throws Exception {
+        file(root.resolve("cdr").resolve("b0_out.parquet.tmp"));   // a real stale partial
+        file(root.resolve(DuckDbUtil.RUN_SNAPSHOTS_DIR_NAME).resolve("run-1").resolve("0").resolve("cdr").resolve("x.parquet.tmp"));
+        file(root.resolve(DuckDbUtil.SPILL_DIR_NAME).resolve("spill.tmp"));
+        JobConfig cfg = new JobConfig("m", JobType.MAINTENANCE, null, null, true, false, Map.of("task", "file_repository_audit"));
+
+        JobResult r = new MaintenanceJob(cfg, root.toString()).run();
+
+        assertTrue(r.message().contains("1 finding(s)"), "only the store's partial: " + r.message());
+    }
+
+    @Test
     void theDataRootWalkOfBackupAndStorageReportSkipsBothFolders(@TempDir Path root) throws Exception {
         Path store = file(root.resolve("cdr").resolve("a.parquet"));
         file(root.resolve(DuckDbUtil.RUN_SNAPSHOTS_DIR_NAME).resolve("run-1").resolve("0").resolve("cdr").resolve("a.parquet"));

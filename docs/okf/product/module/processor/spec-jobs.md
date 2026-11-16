@@ -350,7 +350,8 @@ sink monitor and file lock, which no reader takes), so there is no deadlock.
   under the lock**: it is opened under the lock and copied from that handle after the lock is released. Copying from
   the path after the release would be wrong: a swap could rename the file away in between and the pin would lose it.
   An open handle is not reached by a rename or a delete, so the copy holds exactly the pinned bytes. A pin that would
-  copy more than 1 GiB is not made: that Dataset is read per call for the rest of the Run, with a WARN, rather than
+  copy more than 1 GiB, or more than 256 files (each is held open until the copy ends, so a store of many small
+  files would meet the open-file limit), is not made: that Dataset is read per call for the rest of the Run, with a WARN, rather than
   failing the Run, so no Run that worked before Run-level snapshots fails because the host cannot link. Each pin that
   copies logs one WARN. A failed pin deletes its partial `<n>/` folder.
   The Run's relation is not registered with `QueryExecutor.repinnable`: a lost-pin retry may never move a Run onto a
@@ -359,8 +360,11 @@ sink monitor and file lock, which no reader takes), so there is no deadlock.
   that is refused. A live Run holds an OS file lock on `<uuid>/.lock`; the next Run that pins in the data root deletes
   every other Run folder whose lock it can take (a crash, a close that could not delete), in this process or another
   (a scale-out or HA peer on the same data root), and never one younger than a minute, whose owner may not have
-  locked it yet. Every data-root walk skips `.run-snapshots/` as it skips `.duckdb_tmp/` (`DuckDbUtil.internalDir`):
-  backup, the storage report, `cleanup` and the object-store export. Retries inside one Run share its pins.
+  locked it yet. The sweep never opens the lock file of a live Run of its own process (an in-process set): on Linux,
+  closing any channel to a file releases every lock the process holds on it, so one probe would unlock the Run for
+  every other process (reproduced in an `eclipse-temurin` container; Windows locks belong to the handle). Every
+  data-root walk skips `.run-snapshots/` as it skips `.duckdb_tmp/` (`DuckDbUtil.internalDir`): backup, the storage
+  report, `cleanup`, the object-store export and `file_repository_audit`. Retries inside one Run share its pins.
   **Covered:** every Job Type declaring `requires: [datasets]` — today only Job Pack types; no built-in Job Type reads
   through `DatasetAccess`. **Not covered, per-call as before:** a `view`-backed Dataset (no file list to pin), a
   pack-contributed `DatasetAccess`, and a pack Step in a Pipeline (its grant is taken at load time, not per Run). Every

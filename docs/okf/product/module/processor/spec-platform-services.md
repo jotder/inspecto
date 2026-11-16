@@ -384,7 +384,7 @@ guard exists.
   `<dataRoot>/.run-snapshots/<uuid>/<n>/<its path under the data root>` (`key=value` folders kept, so a Hive-partitioned
   store reads the same columns), and the relation reads the links, so a swap or `retire_superseded` that removes the
   store's name for a file leaves the Run's. Where hard links fail the file is opened under the lock and copied after
-  it; a copy over 1 GiB is not made and that Dataset is read per call, with a WARN. Released in the Run's `finally`
+  it; a copy over 1 GiB or 256 files is not made and that Dataset is read per call, with a WARN. Released in the Run's `finally`
   (success, failure, cancel, deadline); a live Run holds an OS lock on its folder, and the next Run that pins sweeps
   only folders whose lock it can take. Every data-root walk skips `.run-snapshots/`. A view-backed Dataset and a
   pack-contributed `DatasetAccess` keep per-call pinning. Detail: [Jobs](spec-jobs.md), "Snapshot swaps and readers".
