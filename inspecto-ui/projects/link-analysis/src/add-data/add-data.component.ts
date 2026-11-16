@@ -263,7 +263,7 @@ export class AddDataComponent implements OnInit {
     /** What a row of a Dataset can be, from the Space's packs (ENTITY-TYPE-CATALOG-1 P2); empty = not asked. */
     protected readonly recordTypes = signal<RecordTypeGuide[]>([]);
     protected readonly recordTypeOptions = computed<PickerOption[]>(() => [
-        { value: NONE, label: 'Not said' },
+        { value: NONE, label: 'Not set' },
         ...this.recordTypes().map((r) => ({
             value: r.id,
             label: r.label,

@@ -323,7 +323,7 @@ import {
                                     </p>
                                     @if (recordTypes().length && recordTypeControls().get(d.id); as rt) {
                                         <inspecto-option-picker
-                                            label="Each row is"
+                                            label="Record type"
                                             [options]="recordTypeOptions()"
                                             [formControl]="rt"
                                             help="Puts the Entity Types such a record usually holds first"
@@ -404,7 +404,7 @@ import {
                                                 <!-- LA-COLUMN-ROLES-1 P2: a Time, Measure or Category rides on every link unless kept off -->
                                                 @if (r === 'temporal' || r === 'measure' || r === 'dimension') {
                                                     <inspecto-option-picker
-                                                        label="On each link"
+                                                        label="Keep on each link"
                                                         [options]="carriedOptions"
                                                         [formControl]="carried().get(d.id)!.get(col.name)!"
                                                         [attr.data-testid]="'carried-' + col.name"
@@ -574,7 +574,7 @@ import {
                                                 <!-- LA-COLUMN-ROLES-2: this Mapping's own "On each link" marks -->
                                                 @for (col of mappingCarried(); track col) {
                                                     <inspecto-option-picker
-                                                        [label]="col + ' on each link'"
+                                                        [label]="'Keep ' + col + ' on each link'"
                                                         [options]="carriedOptions"
                                                         [ngModel]="isCarried(col) ? 'yes' : 'no'"
                                                         [ngModelOptions]="{ standalone: true }"
@@ -659,7 +659,7 @@ export class DataPageComponent implements OnInit {
 
     /** What one row of a Dataset can be (ENTITY-TYPE-CATALOG-1 P2): the Space's record types, or not said. */
     protected readonly recordTypeOptions = computed<PickerOption[]>(() => [
-        { value: '', label: 'Not said' },
+        { value: '', label: 'Not set' },
         ...this.recordTypes().map((r) => ({
             value: r.id,
             label: r.label,
@@ -805,10 +805,10 @@ export class DataPageComponent implements OnInit {
     );
     /** Whether a Time, Measure or Category column rides on each link (and in its index); only "no" is stored. */
     protected readonly carriedOptions: PickerOption[] = [
-        { value: 'yes', label: 'Carried', hint: 'Play, filters and profiles can use it; the link index carries it' },
+        { value: 'yes', label: 'Yes', hint: 'Play, filters and profiles can use it; the link index carries it' },
         {
             value: 'no',
-            label: 'Not carried',
+            label: 'No',
             hint: 'Kept off the links: a narrower index, but no filter or play on it',
         },
     ];

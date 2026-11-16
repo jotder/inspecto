@@ -169,7 +169,7 @@ describe('MyWorkComponent - the home page My work (LA-ONBOARD-1 phase 7)', () =>
         await expectNoA11yViolations(el);
     });
 
-    it('nothing yet: each half says what to do next (no violations)', async () => {
+    it('nothing yet: the saved views say what to do next, and What changed is not drawn (no violations)', async () => {
         const { el } = create({
             views: of([]),
             datasets: of([{ type: 'dataset', name: 't', ref: '', content: { origin: 'import', importPipeline: 't' } }]),
@@ -177,7 +177,9 @@ describe('MyWorkComponent - the home page My work (LA-ONBOARD-1 phase 7)', () =>
         });
         expect(el.querySelector('[data-testid="la-cases-empty"]')?.textContent).toContain('Save view as');
         expect(el.querySelector('[data-testid="la-cases-failed"]')).toBeNull();
-        expect(el.querySelector('[data-testid="la-changes-empty"]')?.textContent).toContain('Nothing imported with');
+        // LA-FULL-CYCLE-TEST-1 presentability: nothing imported = no card, not a standing apology
+        expect(el.querySelector('#la-changed-title')).toBeNull();
+        expect(el.querySelector('[data-testid="la-changes"]')).toBeNull();
         expect(el.querySelector('[role="alert"]')).toBeNull();
         await expectNoA11yViolations(el);
     });
@@ -213,6 +215,12 @@ describe('MyWorkComponent - the home page My work (LA-ONBOARD-1 phase 7)', () =>
             Array.from(el.querySelectorAll('[data-testid="la-cases"] a')).map((a) => a.textContent?.trim());
         expect(names()).toEqual(['View 11', 'View 10', 'View 9', 'View 8', 'View 7']);
         expect(el.querySelector('[data-testid="la-cases-pager"]')?.textContent).toContain('1–5 of 12');
+        // a view that uses no Entity List says only when it was saved, not "No Entity List yet" on every card
+        const meta = Array.from(el.querySelectorAll('[data-testid="la-cases"] li .text-xs')).map((s) =>
+            s.textContent?.trim(),
+        );
+        expect(meta.length).toBe(5);
+        for (const m of meta) expect(m).toMatch(/^Saved \d+ Oct 2026$/);
 
         (el.querySelector('[aria-label="Next page of saved views"]') as HTMLButtonElement).click();
         f.detectChanges();

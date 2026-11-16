@@ -207,7 +207,7 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         const add = fixture.debugElement.children[0].componentInstance as unknown as {
             form: { controls: { recordType: { setValue(v: string): void } } };
         };
-        add.form.controls.recordType.setValue(''); // "Not said"
+        add.form.controls.recordType.setValue(''); // "Not set"
         fixture.detectChanges();
         const req = commit(fixture, el);
         expect(bodyOf(req).recordType).toBeNull();

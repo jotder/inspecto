@@ -43,7 +43,7 @@ const card = (n: ProductNavEntry) => ({ path: n.path, label: n.label, icon: area
             } @else {
                 <!-- LA-NO-LONG-PAGES-1: from md up the page is the window; the title stays, the rest scrolls under it -->
                 <section
-                    class="mx-auto flex w-full max-w-4xl flex-col gap-6 p-6 md:h-[calc(100dvh-var(--shell-chrome-height,0rem))] md:overflow-hidden"
+                    class="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6 md:h-[calc(100dvh-var(--shell-chrome-height,0rem))] md:overflow-hidden"
                     aria-labelledby="la-landing-title"
                 >
                     <header class="flex shrink-0 flex-col gap-1">
@@ -82,16 +82,24 @@ const card = (n: ProductNavEntry) => ({ path: n.path, label: n.label, icon: area
                         } @else {
                             <ng-container *ngTemplateOutlet="cards; context: { $implicit: nav() }"></ng-container>
                         }
+                        <!-- LA-FULL-CYCLE-TEST-1 presentability: compact tiles that fill the row by the page's own width, so
+                             at 1440x860 the six Inspecto LA areas sit in one row under My work instead of a half-shown
+                             second row of tall cards -->
                         <ng-template #cards let-items>
-                            <ul class="m-0 grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-2">
+                            <ul
+                                class="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-4 p-0"
+                                data-testid="la-landing-areas"
+                            >
                                 @for (item of items; track item.path) {
                                     <li>
                                         <a
                                             [routerLink]="'/' + item.path"
-                                            class="bg-card flex h-full flex-col gap-2 rounded-lg border p-4 no-underline"
+                                            class="bg-card flex h-full flex-col gap-1 rounded-lg border p-3 no-underline"
                                         >
-                                            <mat-icon class="icon-size-6" [svgIcon]="item.icon"></mat-icon>
-                                            <span class="text-lg font-semibold">{{ item.label }}</span>
+                                            <span class="flex items-center gap-2">
+                                                <mat-icon class="icon-size-5 shrink-0" [svgIcon]="item.icon"></mat-icon>
+                                                <span class="font-semibold">{{ item.label }}</span>
+                                            </span>
                                             <span class="text-secondary text-sm">{{ item.blurb }}</span>
                                         </a>
                                     </li>
@@ -102,7 +110,7 @@ const card = (n: ProductNavEntry) => ({ path: n.path, label: n.label, icon: area
                 </section>
             }
         } @else {
-            <section class="mx-auto flex max-w-4xl flex-col gap-6 p-6" aria-busy="true" aria-label="Loading">
+            <section class="mx-auto flex max-w-6xl flex-col gap-6 p-6" aria-busy="true" aria-label="Loading">
                 <inspecto-skeleton width="40%" height="1.5rem"></inspecto-skeleton>
                 <inspecto-skeleton [lines]="3"></inspecto-skeleton>
             </section>

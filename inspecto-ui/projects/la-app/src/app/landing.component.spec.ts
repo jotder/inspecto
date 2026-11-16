@@ -85,6 +85,11 @@ describe('LandingComponent', () => {
         const work = el.querySelector('la-app-my-work')!;
         expect(guide.compareDocumentPosition(work) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(el.querySelectorAll('ul a').length).toBeGreaterThan(0);
+        // presentability: compact area tiles that fill the row by the page's width (one row of six at 1440 px; the
+        // layout itself is measured in the browser, jsdom has none)
+        const areas = el.querySelector('[data-testid="la-landing-areas"]')!;
+        expect(areas.className).toContain('grid-cols-[repeat(auto-fill,minmax(10rem,1fr))]');
+        expect(areas.querySelectorAll('li a').length).toBeGreaterThan(0);
         await expectNoA11yViolations(el);
     });
 

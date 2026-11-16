@@ -455,7 +455,7 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         http.expectOne(apiUrl('/components/dataset')).flush(DATASETS);
     });
 
-    it('LA-COLUMN-ROLES-1 P2: a Time, Measure or Category has an "On each link" row; Not carried saves carried: false', () => {
+    it('LA-COLUMN-ROLES-1 P2: a Time, Measure or Category has a "Keep on each link" row; No saves carried: false', () => {
         const { fixture, el, c } = create();
         expect(el.querySelector('[data-testid="carried-channel"]')).toBeNull(); // a Detail rides along anyway
         c.roles().get('transfers')!.get('channel')!.setValue('dimension');
@@ -468,7 +468,9 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         };
         http.expectOne(apiUrl('/components/dataset')).flush(typed);
         fixture.detectChanges();
-        expect(el.querySelector('[data-testid="carried-channel"]')!.textContent).toContain('Carried');
+        const row = el.querySelector('[data-testid="carried-channel"]')!.textContent!.replace(/\s+/g, ' ');
+        expect(row).toContain('Keep on each link');
+        expect(row).toContain('Yes');
         c.carried().get('transfers')!.get('channel')!.setValue('no');
         const req = put('channel');
         expect(req.request.body).toEqual({ carried: false });
@@ -540,8 +542,12 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         };
 
         const card = el.querySelector<HTMLElement>('[data-testid="columns"]')!;
-        expect(card.querySelector('[data-testid="record-type"]')).not.toBeNull();
+        expect(card.querySelector('[data-testid="record-type"]')!.textContent).toContain('Record type');
         expect(c.recordTypeControls().get('transfers')!.value).toBe('transfer');
+        // no record type chosen reads "Not set", not "Each row is: Not said"
+        expect(
+            (c as unknown as { recordTypeOptions: () => { value: string; label: string }[] }).recordTypeOptions()[0],
+        ).toEqual({ value: '', label: 'Not set' });
         expect(
             c
                 .holdsOptions()
@@ -656,14 +662,16 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         await fixture.whenStable(); // ngModel writes its value a tick later
         fixture.detectChanges();
         // txn_date is a Time on the base (a date column), so this Mapping may keep it off its links; an end may not
-        expect(q(el, 'mapping-carried-txn_date')!.textContent).toContain('Carried');
+        expect(q(el, 'mapping-carried-txn_date')!.textContent).toContain('Keep txn_date on each link');
+        expect(q(el, 'mapping-carried-txn_date')!.textContent).toContain('Yes');
         expect(q(el, 'mapping-carried-src_id')).toBeNull();
         page.setCarried('txn_date', 'no');
         c.form.patchValue({ name: 'by_dst', from: 'src_id', to: 'dst_id' });
         fixture.detectChanges();
         await fixture.whenStable();
         fixture.detectChanges();
-        expect(q(el, 'mapping-carried-txn_date')!.textContent).toContain('Not carried');
+        expect(q(el, 'mapping-carried-txn_date')!.textContent).toContain('No');
+        expect(q(el, 'mapping-carried-txn_date')!.textContent).not.toContain('Yes');
         c.saveMapping();
         const req = http.expectOne((r) => r.method === 'POST' && r.url.includes('/components/dataset'));
         const cols = req.request.body as { content?: unknown; columns?: unknown } as Record<string, unknown>;

@@ -13,15 +13,14 @@ import {
     LinkAnalysisService,
     SAVED_VIEW_NOT_EVIDENCE,
 } from '@inspecto/link-analysis/link-analysis/link-analysis.service';
-import { ADD_DATA_ROUTE } from './first-run';
 import { CaseRow, caseRows, filterCases, importedDatasets, lastImportLine, WorkRow, workRows } from './my-work';
 import { PRODUCT } from './product.generated';
 
 /**
  * **My work** on the Inspecto LA home page (LA-ONBOARD-1 phase 7; UC-13, UC-14, A-1b): the cases - saved views with the
  * Entity Lists they use - most recent first, each opening its graph; and **What changed in your data**, each imported
- * Dataset's last import read from its Pipeline's run ledger. PRODUCT-ASSEMBLY-1 PA-5b: where the Product's nav offers
- * Incidents or Cases (Inspecto Telco's Case Management), the ones assigned to the caller, or the open ones where nobody
+ * Dataset's last import read from its Pipeline's run ledger, shown only when there is one. PRODUCT-ASSEMBLY-1 PA-5b:
+ * where the Product's nav offers Incidents or Cases (Inspecto Telco's Case Management), the ones assigned to the caller, or the open ones where nobody
  * is signed in. Every read degrades on its own: a failed one shows as nothing, never as an error page.
  */
 @Component({
@@ -82,13 +81,10 @@ import { PRODUCT } from './product.generated';
                                                     >{{ c.description }}</span
                                                 >
                                             }
-                                            <span class="text-secondary mt-auto text-xs">
-                                                {{
-                                                    [c.saved, c.lists || 'No Entity List yet']
-                                                        .filter(nonBlank)
-                                                        .join(' · ')
-                                                }}
-                                            </span>
+                                            <!-- the Entity Lists only when the view uses one: "none" on every card said nothing -->
+                                            @if ([c.saved, c.lists].filter(nonBlank).join(' · '); as meta) {
+                                                <span class="text-secondary mt-auto text-xs">{{ meta }}</span>
+                                            }
                                         </li>
                                     }
                                 </ul>
@@ -151,25 +147,24 @@ import { PRODUCT } from './product.generated';
                         <inspecto-skeleton [lines]="2"></inspecto-skeleton>
                     }
                 </section>
-                <section class="bg-card flex flex-col gap-2 rounded-2xl border p-4" aria-labelledby="la-changed-title">
-                    <h3 id="la-changed-title" class="m-0 text-sm font-semibold">What changed in your data</h3>
-                    @if (changes(); as ch) {
-                        @if (ch.length) {
+                <!-- Only when there is something to list: it lists Add data imports alone, so a Space whose data its
+                     Pipelines keep up to date (every showcase) would show the same apology for ever; Add data stays on
+                     the rail and the Data page. Not drawn while it loads either, so the cards below do not jump. -->
+                @if (changes(); as ch) {
+                    @if (ch.length) {
+                        <section
+                            class="bg-card flex flex-col gap-2 rounded-2xl border p-4"
+                            aria-labelledby="la-changed-title"
+                        >
+                            <h3 id="la-changed-title" class="m-0 text-sm font-semibold">What changed in your data</h3>
                             <ul class="m-0 flex list-none flex-col gap-1 p-0 text-sm" data-testid="la-changes">
                                 @for (line of ch; track line) {
                                     <li>{{ line }}</li>
                                 }
                             </ul>
-                        } @else {
-                            <p class="m-0 text-sm" data-testid="la-changes-empty">
-                                Nothing imported with <a [routerLink]="addData">Add data</a> yet. Data a Pipeline keeps
-                                up to date is not listed here.
-                            </p>
-                        }
-                    } @else {
-                        <inspecto-skeleton [lines]="2"></inspecto-skeleton>
+                        </section>
                     }
-                </section>
+                }
                 @if (workAreas().incidents || workAreas().cases) {
                     <section
                         class="bg-card flex flex-col gap-2 rounded-2xl border p-4 md:col-span-2"
@@ -237,7 +232,6 @@ export class MyWorkComponent implements OnInit {
 
     /** The shared notice starts lower case (it follows "Not evidence:" elsewhere); here it opens a sentence. */
     protected readonly notEvidence = SAVED_VIEW_NOT_EVIDENCE.charAt(0).toUpperCase() + SAVED_VIEW_NOT_EVIDENCE.slice(1);
-    protected readonly addData = ADD_DATA_ROUTE;
     protected readonly nonBlank = (s: string): boolean => !!s;
     /** The cases, most recent first; null while they load. */
     readonly cases = signal<CaseRow[] | null>(null);
