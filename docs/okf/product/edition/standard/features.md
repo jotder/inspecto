@@ -31,7 +31,6 @@ Standard includes Basic and adds sign-in, operations, case, assurance and detect
 - [secrets](../../module/secrets/index.md)
 - [geo-country](../../module/geo-country/index.md)
 - [connectors-kafka](../../module/connectors-kafka/index.md)
-- [telecom-asn1](../../module/telecom-asn1/index.md)
 - [notify-channels](../../module/notify-channels/index.md)
 - [backup](../../module/backup/index.md)
 - [exchange](../../module/exchange/index.md)
@@ -44,7 +43,11 @@ Standard includes Basic and adds sign-in, operations, case, assurance and detect
 - [scoring](../../module/scoring/index.md)
 - [screening](../../module/screening/index.md)
 - [anomaly](../../module/anomaly/index.md)
+- [predictive](../../module/predictive/index.md)
+- [realtime](../../module/realtime/index.md)
 - [agent](../../module/agent/index.md)
+
+The ASN.1 and telecom decoders (`telecom-asn1`) are not here: Advanced only since 2026-11-17 (DATA-TIERS-1 DT-12).
 
 ## Add-ons available
 
@@ -61,23 +64,30 @@ Standard includes Basic and adds sign-in, operations, case, assurance and detect
 | [regulatoryReporting](../../addon/regulatoryReporting/index.md) | `INS-AO-REGULATORY-REPORTING` | regulatory-reporting |
 | [screening](../../addon/screening/index.md) | `INS-AO-SCREENING` | screening |
 | [anomalyDetection](../../addon/anomalyDetection/index.md) | `INS-AO-ANOMALY-DETECTION` | anomaly |
+| [predictiveAnalytics](../../addon/predictiveAnalytics/index.md) | `INS-AO-PREDICTIVE-ANALYTICS` | predictive |
+| [realtimeDetection](../../addon/realtimeDetection/index.md) | `INS-AO-REALTIME-DETECTION` | realtime |
 | [workflowSla](../../addon/workflowSla/index.md) | `INS-AO-WORKFLOW-SLA` | ops |
 | [premiumConnectors](../../addon/premiumConnectors/index.md) | `INS-AO-PREMIUM-CONNECTORS` | connectors-kafka |
-| [telecomIndustryPack](../../addon/telecomIndustryPack/index.md) | `INS-AO-TELECOM-INDUSTRY-PACK` | telecom-asn1 |
+| [laInvestigations](../../addon/laInvestigations/index.md) | `INS-AO-LA-INVESTIGATIONS` | ops |
 
 ## Content packs added over Basic
 
 - [business-assurance](../../solution-pack/business-assurance/index.md)
+- [la-daily-feed](../../solution-pack/la-daily-feed/index.md) (from Basic on 2026-11-17, DATA-TIERS-1 DT-18)
 - [mobile-money](../../solution-pack/mobile-money/index.md)
 - [aml](../../solution-pack/aml/index.md)
 - [payment-fraud](../../solution-pack/payment-fraud/index.md)
 - [telco-fraud](../../solution-pack/telco-fraud/index.md)
 - [telco-ra](../../solution-pack/telco-ra/index.md)
+- [telco-bypass](../../solution-pack/telco-bypass/index.md)
+- [partner-settlement](../../solution-pack/partner-settlement/index.md)
+- [telco-rerating](../../solution-pack/telco-rerating/index.md)
 
-## Data layer over Basic (DATA-TIERS-1, as built 2026-11-06)
+## Data layer over Basic (DATA-TIERS-1, as built 2026-11-17)
 
 - `pipeline.automation` is declared here (by `inspecto-ops`): an import Dataset's *Keep this up to date* (a watched folder or SFTP feed on a chosen schedule) and its retention policy (*every arrival*, *the last N days*, *the last N arrivals*).
 - Add data does not lock *another database or a remote system* (the screen says a Pipeline reads them), and the Dataset page offers adding a Reference's details to each row (enrichment).
+- `inspecto-ops` also declares the other three screen gates, so nothing Basic locks is locked here: `pipeline.transform` (the step palette's Steps that compute, join, enrich or summarise), `pipeline.egress` (new *Object Storage Export* and *Publish to Postgres* Jobs) and `collector.remote` (new remote Connections, *Connection* in the Collect stage). `/bootstrap` reports `pipelineAutomation`, `pipelineTransform`, `pipelineEgress` and `remoteSystems` true.
 - Everything in Basic's data layer is here too. Full table: [EDITIONS.md](../../../../EDITIONS.md) *Data layer by edition*.
 
 ## Limits

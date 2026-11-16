@@ -627,6 +627,21 @@ already depend on it, so the token work must not change that shape as a side eff
 - Migrate: drop the header. To tell callers apart, move to Standard (a Subject per caller); a script that needs
   its own audit name on Basic has none.
 
+**Breaking for Standard installs that read ASN.1 — the data layer by edition (2026-11-17, `DATA-TIERS-1`, MoSCoW S8)**
+- **The ASN.1 and telecom decoders moved from Standard to Advanced** (DT-12): module `telecom-asn1` and the add-on
+  `telecomIndustryPack` (`INS-AO-TELECOM-INDUSTRY-PACK`) are in `offerings/advanced.toon`, and a Standard bundle no
+  longer carries `inspecto-telecom-asn1.jar`. After a Standard upgrade an ASN.1 Pipeline (`parsing.frontend: asn1`)
+  still loads - it is listed `hosted:false` with `missingModule: telecom-asn1` - but every file it picks up fails at
+  run with *"…the ASN.1 decoder is the optional inspecto-telecom-asn1 module (Telecom industry pack, Advanced - not in
+  Basic or Standard)"* (`PluginIngesters`). Migrate: move the install to Advanced (with the Telecom industry pack), or
+  switch the Pipeline off before upgrading. No shipped Space Template uses ASN.1.
+- **The `la-daily-feed` Space Template moved from Basic to Standard** (DT-18: `minEdition: standard`,
+  `requiresModules: ops`): a Basic install no longer offers it. A Space created from it earlier keeps its config and
+  files; its schedules and Alert Rules need Standard to run as designed.
+- Not breaking: Basic's screens now lock transformation Steps, remote systems and outbound-delivery Jobs with a
+  reason (`/bootstrap` `features.pipelineTransform`, `pipelineEgress`, `remoteSystems`, `pipelineAutomation` and
+  their `featureReasons`); a configuration that already uses them loads, runs and stays editable.
+
 **Deferred to this same release by decision:** the token *runtime* model (D2 —
 [`node-types.md`](../engine/spec-node-types.md) § *The token model*), and X5's cross-lane StepInfo envelope.
 

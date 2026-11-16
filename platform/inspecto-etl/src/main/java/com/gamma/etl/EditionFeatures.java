@@ -114,8 +114,9 @@ public final class EditionFeatures {
 
     /**
      * The {@code DATA-TIERS-1} screen gates by their {@code /bootstrap} {@code features} key: each flag is true when its
-     * feature is {@link #present}, and a withheld one has a {@code featureReasons} entry under the same key. Screen gates
-     * only - no route or configuration is refused by them (§5.3).
+     * feature is {@link #present}, and a withheld one has a {@code featureReasons} entry under the same key. No load or save of
+     * a configuration is refused by them (§5.3); only {@link #PIPELINE_AUTOMATION} is also checked by its own routes (the feed
+     * and storage routes answer 503 without it).
      */
     public static final Map<String, String> SCREEN_FLAGS = screenFlags();
 

@@ -44,15 +44,16 @@ Basic is the entry Edition: core connectors, Entity Lists, the Link Analysis stu
 
 ## Content packs added
 
-- [la-daily-feed](../../solution-pack/la-daily-feed/index.md)
 - [orders-starter](../../solution-pack/orders-starter/index.md)
 
-## Data layer (DATA-TIERS-1, as built 2026-11-06)
+The [la-daily-feed](../../solution-pack/la-daily-feed/index.md) pack polls, builds the index on a Signal and arms Alert Rules: Standard and above since 2026-11-17 (DATA-TIERS-1 DT-18).
+
+## Data layer (DATA-TIERS-1, as built 2026-11-17)
 
 - **Add data, three ways in:** upload a file (CSV / TSV, Parquet, JSON / NDJSON, Excel when the bundle carries the DuckDB `excel` extension; a large file may be read in place), an import inbox (*Import waiting files*, or *Watch this folder*: a fixed 30 s poll, off by default), and *Choose a table*: a read-only Postgres snapshot refreshed with *Refresh now* (never polled).
 - **One default Pipeline, no transformation:** the column review (names, types, column roles, Entity Types), a no-code row filter with *Edit filter* later, Expectations, quarantine and dedupe in the import's own run, the arrivals list and compaction; Inspecto LA adds its link index as the import's follow-on.
-- **Locked with a reason in Basic's screens:** *Keep this up to date* on a schedule, another database or a remote system in Add data, enrichment from a Reference on the Dataset page. The retention form is not shown: every file stays, compacted.
-- **Basic runs any configuration it is given.** The edition line is what the screens offer, not a refusal on load; the console's Pipelines, Collectors and Jobs panes are not edition-locked yet. Full table: [EDITIONS.md](../../../../EDITIONS.md) *Data layer by edition*.
+- **Locked with a reason in Basic's screens:** *Keep this up to date* on a schedule, another database or a remote system in Add data, enrichment from a Reference on the Dataset page; in the console, the step palette's Steps that compute, join, enrich or summarise (filter rows and dedupe stay), a new remote Connection and *Connection* in a Pipeline's Collect stage, and new *Object Storage Export* and *Publish to Postgres* Jobs. `/bootstrap` reports `pipelineAutomation`, `pipelineTransform`, `pipelineEgress` and `remoteSystems` false, each with its `featureReasons` line. The retention form is not shown: every file stays, compacted.
+- **Basic runs any configuration it is given.** The edition line is what the screens offer, not a refusal on load: a Pipeline, Connection or Job that already uses a locked feature still loads, runs and can be edited. Full table: [EDITIONS.md](../../../../EDITIONS.md) *Data layer by edition*.
 
 ## Limits
 

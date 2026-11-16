@@ -16,7 +16,10 @@ timestamp: 2026-07-16T00:00:00Z
 > a retention policy and enrichment from a Reference, and Add data no longer locks *another database or a remote
 > system* (a Pipeline reads them). On **Basic** those offers show locked with one line of why, except retention, which is not shown (every file
 > stays, compacted). Basic still runs any configuration it is given:
-> the line is drawn in the screens, and the console's Pipelines, Collectors and Jobs panes are not edition-locked yet.
+> the line is drawn in the screens. Since 2026-11-17 the console's panes draw it too: the step palette's Steps that
+> compute, join, enrich or summarise, a new remote Connection, *Connection* in a Pipeline's Collect stage and new
+> *Object Storage Export* / *Publish to Postgres* Jobs show locked with their reason; a configuration that already
+> uses them still runs and can be edited.
 > Full table: [`EDITIONS.md`](../../../../EDITIONS.md) *Data layer by edition*.
 
 > **File first: Add data in the console (`ONBOARDING-FIRST-RUN-1` slice C3, 2026-11-01).** The primary start is

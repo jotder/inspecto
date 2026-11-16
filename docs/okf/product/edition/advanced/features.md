@@ -27,6 +27,7 @@ Advanced includes Standard and adds policy, a PostgreSQL investigation store and
 
 ## Modules added over Standard
 
+- [telecom-asn1](../../module/telecom-asn1/index.md) (from Standard on 2026-11-17, DATA-TIERS-1 DT-12)
 - [policy](../../module/policy/index.md)
 - [la-store-pg](../../module/la-store-pg/index.md)
 - [intelligence](../../module/intelligence/index.md)
@@ -37,6 +38,7 @@ Advanced includes Standard and adds policy, a PostgreSQL investigation store and
 |---|---|---|
 | [linkAnalysis](../../addon/linkAnalysis/index.md) | `INS-AO-LINK-ANALYSIS` | la-store-pg |
 | [aiAssist](../../addon/aiAssist/index.md) | `INS-AO-AI-ASSIST` | intelligence |
+| [telecomIndustryPack](../../addon/telecomIndustryPack/index.md) | `INS-AO-TELECOM-INDUSTRY-PACK` | telecom-asn1 |
 
 ## Content packs added over Standard
 

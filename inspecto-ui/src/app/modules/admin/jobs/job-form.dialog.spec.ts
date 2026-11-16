@@ -1036,6 +1036,7 @@ describe('JobFormDialog — DATA-TIERS-1 P5: outbound delivery withheld by the e
         c.save();
         expect(c.step()).toBe('config');
         expect(save).not.toHaveBeenCalled();
+        await expectNoA11yViolations(fixture.nativeElement);
     });
 
     it('editing a saved egress Job stays open (it still runs, §5.3); the edition that has it offers new ones', async () => {

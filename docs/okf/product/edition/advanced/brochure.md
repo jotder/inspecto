@@ -20,6 +20,7 @@ Organisations running Inspecto across several teams or nodes, with high-availabi
 - Investigations on Postgres (`la-store-pg`) for multi-node, highly-available deployments; operational objects on Postgres.
 - Policy engine (attribute-based access control that can only narrow what roles allow).
 - Intelligence module ([AI Assist & Intelligence](../../addon/aiAssist/index.md)).
+- The [Telecom industry pack](../../addon/telecomIndustryPack/index.md): native ASN.1 CDR decoding with the telecom vendor decoders.
 - The Link Analysis showcases ([mule ring and telecom](../../solution-pack/la-showcase/brochure.md), [mobile money](../../solution-pack/la-mobile-money/brochure.md), [insurance claims](../../solution-pack/la-claims/brochure.md), [finance audit](../../solution-pack/la-audit/brochure.md)) run on Advanced or Preview builds.
 
 ## How it fits with the Editions
