@@ -1,5 +1,6 @@
 name: telecom_fraud_network
-description: "Telecom fraud network - MSISDNs linked by voice, sms, forwarding, shared device, shared identity, SIM history and shared payment (telecom_links_dataset). Start from the suspect 99979100001 (Wangiri) and expand: degree 1 its twin SIM and the premium number its callbacks forward to, degree 2 the IRSF ring, degree 3 the subscription-fraud identity, degree 4 the SIM box. The taxi-dispatch line 99970000100 is the supernode (650 callers)."
+title: "Telecom fraud network"
+description: "Mobile numbers linked by calls, texts, call forwarding, shared handsets, shared identity, SIM history and shared payment. Five fraud schemes are planted among 2,400 ordinary subscribers: Wangiri call-back fraud, international revenue share fraud, a SIM box, subscription fraud and money mules. Start from the suspect number 99979100001 and Expand one step at a time: its twin SIM and the premium number its call-backs are forwarded to, then the revenue share ring, the subscription-fraud identity and finally the SIM box. The taxi dispatch line 99970000100, called by 650 numbers, is simply a busy number."
 sourceId: entity-projection
 layout: force
 query:

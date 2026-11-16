@@ -1,5 +1,5 @@
 name: accidents_map
-description: "GEO scene 0 - every accident of the claims corpus as a point, coloured by whether a police report exists. Synthetic placements, city-level."
+description: "Every accident in the claims data as a point, coloured by whether a police report exists. Synthetic placements, city-level."
 sourceId: dataset
 display: markers
 query:

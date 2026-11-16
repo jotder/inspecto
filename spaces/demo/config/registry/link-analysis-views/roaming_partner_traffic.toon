@@ -1,5 +1,6 @@
 name: roaming_partner_traffic
-description: "DEMO 1 — Revenue assurance: which partner operators exchange roaming traffic, how much, and where the charges look wrong. Links fold TAP records per (visited, home, event type, settlement status); width = record count. Use Advanced search for Σ CHARGE_SDR per pair — the Northwind Mobile → Aurora Telecom GPRS link is billed at 3.2× the agreed rate — and look for the Quartz↔Fjord backbone (Flow & backbone, Cut points)."
+title: "Roaming partner traffic"
+description: "Revenue assurance: which partner operators exchange roaming traffic, how much, and where the charges look wrong. Each link is the roaming records between two operators for one event type and settlement status; a thicker link means more records. Advanced search sums the charges per pair: the Northwind Mobile to Aurora Telecom data link is billed at 3.2 times the agreed rate. Cut points shows the Quartz and Fjord backbone."
 sourceId: entity-projection
 layout: circular
 profile: telecom

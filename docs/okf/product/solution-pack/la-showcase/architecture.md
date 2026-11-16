@@ -149,6 +149,12 @@ follow the `la-showcase` layout. Each is built to these rules (plan archived:
 - **One kit per lane.** The planned shared kit was dropped: each vertical owns its generator (`tools/gen-la-*-data.py`),
   seed script, smoke runner, runbook and portal. No precision or detection-rate claim is made from synthetic data, and
   plants are called planted.
+- **Saved-view texts are for the audience** (LA-FULL-CYCLE-TEST-1, 2026-11-16). The Home page shows each saved view's
+  `title` and the first two lines of its `description` to whoever opens the Space, so they say what the view shows and
+  why it matters in plain business sentences: no demo-script number (`DEMO 2c`, `GEO scene 1`), no ticket id, no
+  masked token. A view without `title` shows its id in words. `tools/seed-la-saved-view-text.test.mjs` checks every
+  Link Analysis and Geo view of every `la-*` template and of `spaces/demo`, and keeps the la-showcase views that
+  `spaces/demo` also carries equal to the template's.
 
 ## Link Analysis showcase catalogue — architecture
 

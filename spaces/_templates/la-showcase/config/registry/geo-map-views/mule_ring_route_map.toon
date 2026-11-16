@@ -1,5 +1,6 @@
 name: mule_ring_route_map
-description: "GEO scene 1 - the layering ring over Europe: cash placed at small-town branches converges on MULE-HUB-01 in Rotterdam, fans out to Madrid and Warsaw and leaves for George Town; the SHELL loop circles Valencia, Milan, Lyon, Turin. Route colour = role. Synthetic placements."
+title: "The ring across Europe"
+description: "The laundering ring on a map: cash paid in at small-town branches gathers in one hub account in Rotterdam, fans out to relay accounts in Madrid and Warsaw and leaves for George Town; the shell companies’ loop circles Valencia, Milan, Lyon and Turin. Route colour shows each account’s role. Synthetic placements."
 sourceId: od-routes
 display: markers
 query:

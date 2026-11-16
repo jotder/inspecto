@@ -1,5 +1,6 @@
 name: roaming_rejected_settlements
-description: "DEMO 1b — Revenue leakage: the same partner graph narrowed by a saved predicate to REJECTED settlements. Kestrel Telecom's TAP files are rejected ~40% of the time; the predicate travels with the view (two-stage loop: Apply locally is free, Push to server re-projects the Dataset once the backend accepts the filter). Then switch to the IMSI view for the impossible traveller (001010000000042 on four visited networks in three days)."
+title: "Rejected roaming settlements"
+description: "Revenue leakage: the same partner operators, showing only settlements that were rejected. Kestrel Telecom’s roaming files are rejected about 40% of the time. The filter is saved with the view: Apply locally costs nothing, and Push to server narrows the Dataset itself once the server accepts the filter. Then open Roaming subscriber footprint for a subscriber seen on four networks in three days."
 sourceId: entity-projection
 layout: force
 profile: telecom
