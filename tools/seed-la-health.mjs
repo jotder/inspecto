@@ -9,8 +9,8 @@
 //   node tools/seed-la-health.mjs [...] --apply                perform the calls (safe to re-run: existing things are skipped)
 //
 // Stages after the plan (each on by default, skipped with its flag, idempotent, SOFT: a refusal prints a warning, exit code stays 0):
-//   --no-pending   one PENDING four-eyes expand on phantom-billing (an unbounded expand by health.analyst; left undecided for health.manager)
-//   --no-draft     one open Draft of phantom-billing forked by health.analyst, carrying one annotate step, left unpromoted
+//   --no-pending   one PENDING four-eyes expand on phantom-billing (an unbounded expand by analyst; left undecided for manager)
+//   --no-draft     one open Draft of phantom-billing forked by analyst, carrying one annotate step, left unpromoted
 // Needs the Demo Auth build (serve-demo, loopback). Synthetic data only; member and provider ids are invented. Sends only
 // `demo:<id>` codes, never a credential.
 import fs from 'node:fs';
@@ -45,29 +45,29 @@ export function buildPlan() {
     { op: 'snapshot', label: 'showcase baseline' },
   ];
   return [
-    { id: 'investigation', as: 'health.analyst', method: 'POST', path: '/inv/investigations', body: {
+    { id: 'investigation', as: 'analyst', method: 'POST', path: '/inv/investigations', body: {
       id: INV, title: 'Billed in hospital or after death', purpose: `Showcase: phantom billing for ${BILLED.length} members`, dataset: DATASET,
       sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts', entityType: ENTITY_TYPE } },
-    ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'health.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
-    ...[['health.reviewer', 'reviewer'], ['health.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
-      { id: `member-${subject}`, as: 'health.analyst', method: 'POST', path: `${base}/members`, body: { subject, role } })),
-    { id: 'list-billed', as: 'health.analyst', method: 'POST', path: '/entity-lists', body: {
+    ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
+    ...[['reviewer', 'reviewer'], ['manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
+      { id: `member-${subject}`, as: 'analyst', method: 'POST', path: `${base}/members`, body: { subject, role } })),
+    { id: 'list-billed', as: 'analyst', method: 'POST', path: '/entity-lists', body: {
       id: 'billed-in-hospital-or-after-death', title: 'Billed in hospital or after death', purpose: 'watch', entityType: ENTITY_TYPE, reason: `billed by ${CLINIC} while in hospital elsewhere or after death` } },
-    { id: 'list-billed-members', as: 'health.analyst', method: 'POST', path: '/entity-lists/billed-in-hospital-or-after-death/members', body: { add: BILLED, reason: 'showcase phantom billing' } },
-    { id: 'case', as: 'health.analyst', method: 'POST', path: '/cases/from-entities', body: {
+    { id: 'list-billed-members', as: 'analyst', method: 'POST', path: '/entity-lists/billed-in-hospital-or-after-death/members', body: { add: BILLED, reason: 'showcase phantom billing' } },
+    { id: 'case', as: 'analyst', method: 'POST', path: '/cases/from-entities', body: {
       title: CASE_TITLE, entities: [{ id: `entity:${ENTITY_TYPE}:${CLINIC}`, dataset: DATASET }] } },
-    { id: 'case-assign', as: 'health.analyst', method: 'POST', path: '/objects/@case/assign', body: { assignee: 'health.manager' } },
-    { id: 'case-link', as: 'health.analyst', method: 'PUT', path: `${base}/case`, body: { caseRef: '@case' } },
-    { id: 'template', as: 'health.analyst', method: 'POST', path: `${base}/template`, body: { id: 'phantom-billing-template', title: 'Billed in hospital or after death (provider + patients)' } },
+    { id: 'case-assign', as: 'analyst', method: 'POST', path: '/objects/@case/assign', body: { assignee: 'manager' } },
+    { id: 'case-link', as: 'analyst', method: 'PUT', path: `${base}/case`, body: { caseRef: '@case' } },
+    { id: 'template', as: 'analyst', method: 'POST', path: `${base}/template`, body: { id: 'phantom-billing-template', title: 'Billed in hospital or after death (provider + patients)' } },
   ];
 }
 
 /** The link Dataset is a Job output, so a fresh Space may have none yet and the Investigation create is refused: press Run on the link
- *  Job (as health.manager, who holds canOperateRuns) and wait for health_links_dataset to have rows, as seed-la-card.mjs does. */
+ *  Job (as manager, who holds canOperateRuns) and wait for health_links_dataset to have rows, as seed-la-card.mjs does. */
 async function prime(call, log, sleep, tries) {
-  const has = async () => { const r = await call('health.analyst', 'GET', `/datasets/${DATASET}/rows?limit=1`); return r.status === 200 && r.data && (r.data.rows || []).length > 0; };
+  const has = async () => { const r = await call('analyst', 'GET', `/datasets/${DATASET}/rows?limit=1`); return r.status === 200 && r.data && (r.data.rows || []).length > 0; };
   if (await has()) return;
-  const t = await call('health.manager', 'POST', '/jobs/health_links/trigger', {}); log(`  prime health_links: ${t.status}`);
+  const t = await call('manager', 'POST', '/jobs/health_links/trigger', {}); log(`  prime health_links: ${t.status}`);
   for (let i = 0; i < tries; i++) { if (await has()) return; await sleep(2000); }
   log(`  WARNING ${DATASET} still has no rows; the Investigation create will be refused`);
 }
@@ -86,8 +86,8 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   if (!apply) {
     log(`DRY RUN (no request is sent; add --apply). Space '${space}' at ${base}`);
     for (const s of plan) log(`  ${s.as.padEnd(16)} ${s.method} ${s.path}  ${JSON.stringify(s.body)}`);
-    if (want.pending) log(`  health.analyst   POST /inv/investigations/${INV}/ops  ${JSON.stringify(PENDING_EXPAND)}  (held for health.manager; skipped if one is pending)`);
-    if (want.draft) log(`  health.analyst   POST /inv/investigations/${INV}/drafts, then .../ops ${JSON.stringify(DRAFT_STEP)}`);
+    if (want.pending) log(`  analyst   POST /inv/investigations/${INV}/ops  ${JSON.stringify(PENDING_EXPAND)}  (held for manager; skipped if one is pending)`);
+    if (want.draft) log(`  analyst   POST /inv/investigations/${INV}/drafts, then .../ops ${JSON.stringify(DRAFT_STEP)}`);
     return out;
   }
   const tokens = {};
@@ -110,8 +110,8 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   const items = (d) => (Array.isArray(d) ? d : (d && d.items) || []);
   // READINESS: right after /health first answers, the Investigation store may not be loaded; poll the LIST until it answers 200.
   const poll = async (fn, tries) => { let last; for (let i = 0; i < tries; i++) { try { last = await fn(); } catch (e) { last = { status: 0, data: String(e.message || e) }; } if (last.status === 200) return last; await sleep(1000); } return last; };
-  const listed = await poll(() => call('health.analyst', 'GET', '/inv/investigations?limit=200'), readyTries);
-  if (listed.status !== 200) throw new Error(`cannot list Investigations as health.analyst (${listed.status}): is the Space '${space}' created from the la-health template?`);
+  const listed = await poll(() => call('analyst', 'GET', '/inv/investigations?limit=200'), readyTries);
+  if (listed.status !== 200) throw new Error(`cannot list Investigations as analyst (${listed.status}): is the Space '${space}' created from the la-health template?`);
   let existing = items(listed.data).find((i) => i.id === INV);
   if (!existing) await prime(call, log, sleep, readyTries);
   let headStep = existing ? existing.headStep || 0 : 0;
@@ -160,22 +160,22 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   const warn = (stage, e) => { const m = `${stage}: ${e.message || e}; the stage was skipped and left no half-made state`; out.warnings.push(m); log(`  WARNING ${m}`); };
   const must = (r, what) => { if (![200, 201, 202].includes(r.status)) throw new Error(`${what} answered HTTP ${r.status} ${JSON.stringify(r.data).slice(0, 160)}`); return r.data; };
   if (want.pending) try {
-    const inbox = async () => items(must(await call('health.manager', 'GET', '/inv/pending?status=pending&limit=200'), 'approval inbox')).filter((i) => i.investigationId === INV);
+    const inbox = async () => items(must(await call('manager', 'GET', '/inv/pending?status=pending&limit=200'), 'approval inbox')).filter((i) => i.investigationId === INV);
     const mine = await inbox();
     if (mine.length) out.skipped.push('pending-expand');
     else {
-      const d = must(await call('health.analyst', 'POST', `/inv/investigations/${INV}/ops`, PENDING_EXPAND), 'the unbounded expand');
+      const d = must(await call('analyst', 'POST', `/inv/investigations/${INV}/ops`, PENDING_EXPAND), 'the unbounded expand');
       if (d.status !== 'pending') throw new Error('the unbounded expand RAN instead of being held (is four_eyes_fan_out_above set in link-analysis.toon?)');
       out.done.push('pending-expand'); out.summary.pendingRequestId = d.pending.id;
     }
   } catch (e) { warn('pending', e); }
   if (want.draft) try {
     const dbase = `/inv/investigations/${INV}/drafts`;
-    const live = items(must(await call('health.analyst', 'GET', dbase), 'Draft list')).find((d) => d.state === 'open' || d.state === 'hibernated');
+    const live = items(must(await call('analyst', 'GET', dbase), 'Draft list')).find((d) => d.state === 'open' || d.state === 'hibernated');
     if (live && live.steps > 0) { out.skipped.push('draft'); out.summary.draftId = live.draftId; }
     else {
-      const id = live ? live.draftId : must(await call('health.analyst', 'POST', dbase, { label: 'Draft: the admitting hospitals' }), 'Draft fork').draftId;
-      must(await call('health.analyst', 'POST', `${dbase}/${id}/ops`, DRAFT_STEP), 'the Draft step');
+      const id = live ? live.draftId : must(await call('analyst', 'POST', dbase, { label: 'Draft: the admitting hospitals' }), 'Draft fork').draftId;
+      must(await call('analyst', 'POST', `${dbase}/${id}/ops`, DRAFT_STEP), 'the Draft step');
       out.done.push('draft'); out.summary.draftId = id;
     }
   } catch (e) { warn('draft', e); }

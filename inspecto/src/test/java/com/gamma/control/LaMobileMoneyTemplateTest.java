@@ -85,19 +85,19 @@ class LaMobileMoneyTemplateTest {
         List<Map<String, Object>> users = (List<Map<String, Object>>) ToonHelper.load(CFG.resolve("demo-users.toon").toString()).get("users");
         Map<String, Set<String>> caps = new HashMap<>();
         for (Map<String, Object> u : users) caps.put(String.valueOf(u.get("id")), held(String.valueOf(u.get("roles"))));
-        assertEquals(Set.of("admin", "mm.analyst", "mm.manager", "mm.reviewer", "mm.outsider"), caps.keySet());
+        assertEquals(Set.of("admin", "analyst", "manager", "reviewer", "outsider"), caps.keySet());
 
-        Set<String> analyst = caps.get("mm.analyst");
+        Set<String> analyst = caps.get("analyst");
         assertTrue(analyst.containsAll(Set.of(Roles.CAN_MANAGE_INCIDENTS, Roles.CAN_RUN_LINK_GRAPH_ANALYSIS,
                 Roles.CAN_BUILD_LINK_INDEX, Roles.CAN_AUTHOR_ALERT_RULES)), analyst.toString());
         assertFalse(analyst.contains(Roles.CAN_APPROVE_LINK_EXPANSIONS), "the requester cannot also be the approver");
         assertFalse(analyst.contains(Roles.CAN_REVEAL_LINK_ENTITIES));
-        Set<String> manager = caps.get("mm.manager");
+        Set<String> manager = caps.get("manager");
         assertTrue(manager.containsAll(Set.of(Roles.CAN_APPROVE_LINK_EXPANSIONS, Roles.CAN_MANAGE_INCIDENTS, Roles.CAN_OPERATE_RUNS)), manager.toString());
         assertFalse(manager.contains(Roles.CAN_REVEAL_LINK_ENTITIES));
         assertTrue(caps.get("admin").contains(Roles.CAN_REVEAL_LINK_ENTITIES));
         assertTrue(caps.get("admin").contains(Roles.CAN_AUTHOR_WORKBENCH));
-        for (String id : List.of("mm.reviewer", "mm.outsider")) assertEquals(Set.of(), caps.get(id), id);
+        for (String id : List.of("reviewer", "outsider")) assertEquals(Set.of(), caps.get(id), id);
     }
 
     @Test
@@ -107,12 +107,8 @@ class LaMobileMoneyTemplateTest {
         Path other = Path.of("..", "spaces", "_templates", "la-showcase", "config", "demo-users.toon");
         List<Map<String, Object>> mine = (List<Map<String, Object>>) ToonHelper.load(CFG.resolve("demo-users.toon").toString()).get("users");
         List<Map<String, Object>> theirs = (List<Map<String, Object>>) ToonHelper.load(other.toString()).get("users");
-        assertEquals(theirs.stream().filter(u -> "admin".equals(u.get("id"))).findFirst().orElseThrow(),
-                mine.stream().filter(u -> "admin".equals(u.get("id"))).findFirst().orElseThrow());
-        Set<String> theirIds = new HashSet<>();
-        theirs.forEach(u -> theirIds.add(String.valueOf(u.get("id"))));
-        mine.stream().map(u -> String.valueOf(u.get("id"))).filter(id -> !id.equals("admin"))
-                .forEach(id -> assertFalse(theirIds.contains(id), id + " must not collide with la-showcase"));
+        // every LA showcase Space signs in with the same five Demo Users (operator 2026-11-16), so the whole roster reads the same
+        assertEquals(theirs, mine);
     }
 
     @Test

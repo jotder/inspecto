@@ -45,20 +45,20 @@ test('apply signs in once per persona and acts as the right persona', async () =
   assert.equal(m.calls.filter((c) => c.u === '/auth/exchange').length, 1);
   const ops = m.calls.filter((c) => c.u === `/spaces/s/inv/investigations/${INV}/ops`);
   assert.deepEqual(ops.map((c) => c.body.op), ['seed', 'expand', 'annotate', 'threshold', 'window', 'resolve', 'snapshot']);
-  assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:siu.analyst'));
+  assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:analyst'));
   const members = m.calls.filter((c) => c.u.endsWith('/members') && c.u.includes('investigations'));
-  assert.deepEqual(members.map((c) => c.body), [{ subject: 'partner.reviewer', role: 'reviewer' }, { subject: 'siu.manager', role: 'reviewer' }, { subject: 'admin', role: 'lead' }]);
+  assert.deepEqual(members.map((c) => c.body), [{ subject: 'reviewer', role: 'reviewer' }, { subject: 'manager', role: 'reviewer' }, { subject: 'admin', role: 'lead' }]);
   assert.ok(!members.some((c) => c.body.subject === 'outsider'), 'the outsider is not a member');
   const ring = m.calls.find((c) => c.u === '/spaces/s/entity-lists/ring-claimants/members');
   assert.deepEqual(ring.body.add, RING);
   const identity = m.calls.find((c) => c.u === '/spaces/s/inv/entity-identities' && c.method === 'POST');
   assert.deepEqual([identity.body.a, identity.body.b], TWINS.map((t) => `party:${t}`));
-  assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/objects/CASE-7/assign').body, { assignee: 'siu.manager' });
+  assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/objects/CASE-7/assign').body, { assignee: 'manager' });
   assert.deepEqual(m.calls.find((c) => c.method === 'PUT').body, { caseRef: 'CASE-7' });
   assert.ok(!m.calls.find((c) => c.u.endsWith('/alert-rules')), 'no Alert Rule: no value Measure fits claims');
   const refs = m.calls.filter((c) => c.u.endsWith('/references'));
   assert.equal(refs.length, 3);
-  assert.ok(refs.every((c) => c.body.system === 'police-records' && /^https:\/\/records\.example\//.test(c.body.url) && c.auth === 'Bearer tok-demo:siu.analyst'));
+  assert.ok(refs.every((c) => c.body.system === 'police-records' && /^https:\/\/records\.example\//.test(c.body.url) && c.auth === 'Bearer tok-demo:analyst'));
 });
 
 test('re-run skips an Investigation that already has its steps and its Case', async () => {
@@ -100,13 +100,13 @@ test('scaffold lays down the Space once, stamps the index-build owner, and is id
   assert.deepEqual(scaffold(root), []);
 });
 
-test('a fresh Space (no link rows yet) presses Run on claims_links as siu.manager before the create', async () => {
+test('a fresh Space (no link rows yet) presses Run on claims_links as manager before the create', async () => {
   const m = mock(); let n = 0;
   const f = async (url, init = {}) => (url.includes('/datasets/claims_links_dataset/rows') && n++ < 2
     ? { ok: true, status: 200, json: async () => ({ data: { rows: [] } }) } : m.fetchFn(url, init));
   const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, stages: { pending: false, draft: false }, sleep: async () => {} });
   assert.deepEqual(r.failed, []);
   const i = m.calls.findIndex((c) => c.u === '/spaces/s/jobs/claims_links/trigger' && c.method === 'POST');
-  assert.ok(i >= 0 && m.calls[i].auth === 'Bearer tok-demo:siu.manager');
+  assert.ok(i >= 0 && m.calls[i].auth === 'Bearer tok-demo:manager');
   assert.ok(i < m.calls.findIndex((c) => c.u === '/spaces/s/inv/investigations' && c.method === 'POST'));
 });

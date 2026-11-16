@@ -102,16 +102,16 @@ It is safe to re-run; without `--apply` it only prints the calls. It creates the
 with the hacked wallet `syn15z47fslrxrnhuwm4dppk77s0z7` and the first hop `syn1mdsja4svnugvd4chxrt2xnywxr`, expanded once
 along `sent_to` to the second hop, the first deposit address and the wallet's earlier payees; annotated, narrowed to
 14-18 March 2026, snapshotted), its members, the Entity List `peel-chain-accounts` (`XA-03111` to `XA-03116`), a Case
-assigned to `crypto.manager` and linked to the Investigation, an Investigation template, one unbounded expand held for a
+assigned to `manager` and linked to the Investigation, an Investigation template, one unbounded expand held for a
 second person, and one open Draft. To lay the Space out offline instead of unzipping the downloads, `node
 tools/seed-la-crypto.mjs --scaffold <bundle>\spaces` does it before the first start.
 
 | Persona (sign in as) | Role | Sees |
 |---|---|---|
-| `crypto.analyst` | `crypto-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
-| `crypto.manager` | `crypto-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
-| `crypto.reviewer` | `la-viewer`, member as reviewer | reads `hack-peel-chain`; any change is refused (403) |
-| `crypto.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `analyst` | `la-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `manager` | `la-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `reviewer` | `la-viewer`, member as reviewer | reads `hack-peel-chain`; any change is refused (403) |
+| `outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
 | `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
 
 **The Alert Rule.** `crypto_deposit_traced_to_hack` (CRITICAL) reads the one row of `crypto_hack_trace_counts` and fires

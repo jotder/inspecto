@@ -16,10 +16,10 @@ columns[13]{name,type,classification}:
   TO_LON,number,
   TRANSFERS,number,
   TOTAL_AMOUNT,number,
-owner: fm.analyst
+owner: analyst
 shares[5]{subjectType,subjectId,access}:
   user,admin,view
-  user,fm.analyst,view
-  user,fm.manager,view
-  user,ra.analyst,view
-  user,demo.manager,view
+  user,analyst,view
+  user,manager,view
+  user,reviewer,view
+  user,outsider,view

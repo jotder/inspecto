@@ -106,17 +106,17 @@ node tools/seed-la-benefits.mjs --base http://127.0.0.1:8096 --apply
 It is safe to re-run; without `--apply` it only prints the calls. It creates the Investigation `paid-after-death`
 (seeded with the three accounts `SYN-13618314`, `SYN-23138817` and `SYN-96993903`, expanded over `paid_into` to the
 12 claims paid into them and over `claims` to their 10 claimants, annotated, snapshotted), its members, the Entity
-List `deceased-still-paid` (the 9 pensioners), a Case from `CIT-08276` assigned to `benefits.manager` and linked to
+List `deceased-still-paid` (the 9 pensioners), a Case from `CIT-08276` assigned to `manager` and linked to
 the Investigation, an Investigation template, one unbounded expand held for a second person, and one open Draft. To
 lay the Space out offline instead of unzipping the downloads, `node tools/seed-la-benefits.mjs --scaffold
 <bundle>\spaces` does it before the first start.
 
 | Persona (sign in as) | Role | Sees |
 |---|---|---|
-| `benefits.analyst` | `benefits-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
-| `benefits.manager` | `benefits-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
-| `benefits.reviewer` | `la-viewer`, member as reviewer | reads `paid-after-death`; any change is refused (403) |
-| `benefits.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `analyst` | `la-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `manager` | `la-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `reviewer` | `la-viewer`, member as reviewer | reads `paid-after-death`; any change is refused (403) |
+| `outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
 | `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
 
 **The Alert Rule.** `benefits_paid_to_the_deceased_after_notice` (WARNING) reads the one row of

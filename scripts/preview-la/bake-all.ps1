@@ -70,7 +70,7 @@ try {
     if (-not $healthy) { foreach ($f in @($log, "$log.err")) { if (Test-Path $f) { Get-Content $f -Tail 40 | Write-Host } }; throw "the demo bundle never answered /health on :$Port" }
 
     # 3. seed each Space as its Demo Users
-    $managers = @{ 'la-showcase' = 'fm.manager'; 'la-claims' = 'siu.manager'; 'la-mobile-money' = 'mm.manager'; 'la-audit' = 'audit.manager' }
+    $managers = @{ 'la-showcase' = 'manager'; 'la-claims' = 'manager'; 'la-mobile-money' = 'manager'; 'la-audit' = 'manager' }
     $here = Split-Path -Parent $MyInvocation.MyCommand.Path
     foreach ($pair in @(@('seed-la-showcase', 'la-showcase'), @('seed-la-claims', 'la-claims'), @('seed-la-mm', 'la-mobile-money'), @('seed-la-audit', 'la-audit'))) {
         # The data-build jobs are cron (*/10), so the first build would land minutes after boot; run them once now, as the Space's manager.

@@ -11,9 +11,9 @@
 //   2 mule chain    passThrough row at ratio 0.98; shortest path hub -> cash-out agent = 3 hops (4 nodes); max flow = 25 (unit capacity per
 //                   transaction; the amount-weighted flow is the passThrough inbound/outbound)
 //   4 loop          Find cycles on a LOOP-1 neighbourhood: exactly one cycle of 4 nodes
-//   masking         every entity answered to mm.analyst is a `masked:` token
+//   masking         every entity answered to analyst is a `masked:` token
 //   four-eyes       an unbounded expand is HELD (status pending), a bounded one runs
-//   roles           mm.reviewer reads (200) and cannot write (403); mm.outsider is not a member (404)
+//   roles           reviewer reads (200) and cannot write (403); outsider is not a member (404)
 //   7 alert         the mm-structuring Alert exists (seed stage or la_detect), naming a count, never a wallet
 // Exit 1 on any failed probe.
 import path from 'node:path';
@@ -75,29 +75,29 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   const ok = (r, what) => { if (r.status >= 300) throw new Error(`${what}: HTTP ${r.status} ${JSON.stringify(r.data).slice(0, 160)}`); return r.data; };
 
   const Q = 'dataset=mm_links_dataset&sourceCol=src&targetCol=dst&linkKindCol=kind&valueCol=amount&timeCol=ts&from=2026-10-01&to=2026-10-15';
-  const measure = async (extra) => ok(await call('mm.analyst', 'GET', `/inv/value-measures?${Q}&${extra}`), `value measure ${extra}`);
+  const measure = async (extra) => ok(await call('analyst', 'GET', `/inv/value-measures?${Q}&${extra}`), `value measure ${extra}`);
 
   await step('1 structuring Measure: one entity, 25 legs, 25 payers in the top-5% band', async () => structuringVerdict(await measure('name=structuring&min=4750&max=5000')));
   await step('2 passThrough Measure: an entity at 0.98', async () => passThroughVerdict(await measure('name=passThrough')));
   await step('masking typed: every Measure entity is a masked token', async () => allMasked((await measure('name=passThrough')).entities.map((e) => e.entity)));
-  await step('roles: mm.reviewer reads (200) and cannot write (403); mm.outsider is not a member (404)', async () => {
-    const read = await call('mm.reviewer', 'GET', `/inv/investigations/${INV}/working-set`);
-    const write = await call('mm.reviewer', 'POST', `/inv/investigations/${INV}/ops`, { op: 'annotate', ids: ['x'], note: 'x' });
-    const outsider = await call('mm.outsider', 'GET', `/inv/investigations/${INV}/working-set`);
+  await step('roles: reviewer reads (200) and cannot write (403); outsider is not a member (404)', async () => {
+    const read = await call('reviewer', 'GET', `/inv/investigations/${INV}/working-set`);
+    const write = await call('reviewer', 'POST', `/inv/investigations/${INV}/ops`, { op: 'annotate', ids: ['x'], note: 'x' });
+    const outsider = await call('outsider', 'GET', `/inv/investigations/${INV}/working-set`);
     if (read.status !== 200) return `reviewer read answered ${read.status}`;
     if (write.status !== 403) return `reviewer write answered ${write.status}, expected 403`;
     return outsider.status === 404 ? null : `outsider answered ${outsider.status}, expected 404`;
   });
   await step(`7 Alert ${RULE} exists and is aggregate-only`, async () => {
-    const d = ok(await call('mm.analyst', 'GET', '/alerts?limit=200'), 'Alerts list');
+    const d = ok(await call('analyst', 'GET', '/alerts?limit=200'), 'Alerts list');
     return alertVerdict(Array.isArray(d) ? d : d.items || []);
   });
 
   const ts = Date.now();
-  const create = async (id) => ok(await call('mm.analyst', 'POST', '/inv/investigations', { id, title: id, purpose: 'smoke', dataset: 'mm_links_dataset',
+  const create = async (id) => ok(await call('analyst', 'POST', '/inv/investigations', { id, title: id, purpose: 'smoke', dataset: 'mm_links_dataset',
     sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts' }), `create ${id}`);
-  const op = async (id, body) => ok(await call('mm.analyst', 'POST', `/inv/investigations/${id}/ops`, body), `op ${body.op}`);
-  const graph = async (id, algorithm, params) => ok(await call('mm.analyst', 'POST', '/inv/graph/runs', { investigationId: id, algorithm, params }), `graph run ${algorithm}`);
+  const op = async (id, body) => ok(await call('analyst', 'POST', `/inv/investigations/${id}/ops`, body), `op ${body.op}`);
+  const graph = async (id, algorithm, params) => ok(await call('analyst', 'POST', '/inv/graph/runs', { investigationId: id, algorithm, params }), `graph run ${algorithm}`);
   const expand3 = async (id) => { for (let i = 0; i < 3; i++) await op(id, { op: 'expand', direction: 'either', maxFanOut: 100 }); };
 
   const chain = `smoke-mm-chain-${ts}`;

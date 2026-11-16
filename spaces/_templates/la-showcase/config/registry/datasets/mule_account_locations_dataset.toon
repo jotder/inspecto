@@ -7,10 +7,10 @@ columns[6]{name,type,classification}:
   LAT,number,
   LON,number,
   SITE_TYPE,string,
-owner: fm.analyst
+owner: analyst
 shares[5]{subjectType,subjectId,access}:
   user,admin,view
-  user,fm.analyst,view
-  user,fm.manager,view
-  user,ra.analyst,view
-  user,demo.manager,view
+  user,analyst,view
+  user,manager,view
+  user,reviewer,view
+  user,outsider,view

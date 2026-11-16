@@ -9,8 +9,8 @@
 //   node tools/seed-la-mm.mjs [...] --apply                perform the calls (safe to re-run: existing things are skipped)
 //
 // Two optional stages (each on by default, skipped with its flag, idempotent, SOFT: a refusal prints a warning, exit stays 0):
-//   --no-pending   one PENDING four-eyes expand on mm-structuring-case (an unbounded expand by mm.analyst; left for mm.manager)
-//   --no-alert     one run of the la_detect Job (as mm.manager, who holds canOperateRuns) until the mm-structuring Alert exists
+//   --no-pending   one PENDING four-eyes expand on mm-structuring-case (an unbounded expand by analyst; left for manager)
+//   --no-alert     one run of the la_detect Job (as manager, who holds canOperateRuns) until the mm-structuring Alert exists
 //
 // Needs the Demo Auth build (serve-demo, loopback). Synthetic data only. Sends only `demo:<id>` codes, never a credential.
 import fs from 'node:fs';
@@ -40,35 +40,35 @@ export function buildPlan() {
     { op: 'snapshot', label: 'showcase baseline' },
   ];
   return [
-    { id: 'investigation', as: 'mm.analyst', method: 'POST', path: '/inv/investigations', body: {
+    { id: 'investigation', as: 'analyst', method: 'POST', path: '/inv/investigations', body: {
       id: INV, title: 'Mule hub and its chain', purpose: 'Showcase: agent-assisted structuring and the mule chain', dataset: DATASET,
       sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts' } },
-    ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'mm.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
-    ...[['mm.reviewer', 'reviewer'], ['mm.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
-      { id: `member-${subject}`, as: 'mm.analyst', method: 'POST', path: `${base}/members`, body: { subject, role } })),
-    { id: 'list-struct', as: 'mm.analyst', method: 'POST', path: '/entity-lists', body: {
+    ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
+    ...[['reviewer', 'reviewer'], ['manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
+      { id: `member-${subject}`, as: 'analyst', method: 'POST', path: `${base}/members`, body: { subject, role } })),
+    { id: 'list-struct', as: 'analyst', method: 'POST', path: '/entity-lists', body: {
       id: 'struct-wallets', title: 'STRUCT wallets', purpose: 'watch', entityType: 'wallet', reason: 'showcase structuring story' } },
-    { id: 'list-struct-members', as: 'mm.analyst', method: 'POST', path: '/entity-lists/struct-wallets/members', body: {
+    { id: 'list-struct-members', as: 'analyst', method: 'POST', path: '/entity-lists/struct-wallets/members', body: {
       add: structIds, addRanges: [{ prefix: 'STRUCT-' }], reason: 'showcase structuring story' } },
-    { id: 'list-struct-expiring', as: 'mm.analyst', method: 'POST', path: '/entity-lists/struct-wallets/members', body: {
+    { id: 'list-struct-expiring', as: 'analyst', method: 'POST', path: '/entity-lists/struct-wallets/members', body: {
       add: ['HUB-01'], expiresAt: '@+30d', reason: '30 day hold on the mule hub' } },
-    { id: 'list-farm', as: 'mm.analyst', method: 'POST', path: '/entity-lists', body: {
+    { id: 'list-farm', as: 'analyst', method: 'POST', path: '/entity-lists', body: {
       id: 'farm-wallets', title: 'Device farm wallets', purpose: 'watch', entityType: 'wallet', reason: 'showcase device farm' } },
-    { id: 'list-farm-members', as: 'mm.analyst', method: 'POST', path: '/entity-lists/farm-wallets/members', body: {
+    { id: 'list-farm-members', as: 'analyst', method: 'POST', path: '/entity-lists/farm-wallets/members', body: {
       add: farmIds, reason: 'one handset, nine national ids (showcase)' } },
-    { id: 'identity', as: 'mm.analyst', method: 'POST', path: '/inv/entity-identities', body: {
+    { id: 'identity', as: 'analyst', method: 'POST', path: '/inv/entity-identities', body: {
       a: 'wallet:FARM-1', b: 'wallet:FARM-2', reason: 'same handset DEV-FARM-01 (showcase)' } },
     // A Case opened from an entity of a classified Dataset needs canRevealLinkEntities, which only `admin` holds in this Space
-    // (mm.analyst deliberately does not: the masking beat). admin is also the Investigation's lead, so it may link the Case.
+    // (analyst deliberately does not: the masking beat). admin is also the Investigation's lead, so it may link the Case.
     { id: 'case', as: 'admin', method: 'POST', path: '/cases/from-entities', body: {
       title: CASE_TITLE, entities: [{ id: 'entity:wallet:HUB-01', dataset: DATASET }] } },
-    { id: 'case-assign', as: 'admin', method: 'POST', path: '/objects/@case/assign', body: { assignee: 'mm.manager' } },
+    { id: 'case-assign', as: 'admin', method: 'POST', path: '/objects/@case/assign', body: { assignee: 'manager' } },
     { id: 'case-link', as: 'admin', method: 'PUT', path: `${base}/case`, body: { caseRef: '@case' } },
-    { id: 'template', as: 'mm.analyst', method: 'POST', path: `${base}/template`, body: { id: 'mm-mule-chain-template', title: 'Mule chain (hub + relays + cash-out agent)' } },
-    { id: 'alert-rule', as: 'mm.analyst', method: 'POST', path: `${base}/alert-rules`, body: {
+    { id: 'template', as: 'analyst', method: 'POST', path: `${base}/template`, body: { id: 'mm-mule-chain-template', title: 'Mule chain (hub + relays + cash-out agent)' } },
+    { id: 'alert-rule', as: 'analyst', method: 'POST', path: `${base}/alert-rules`, body: {
       name: RULE, severity: 'CRITICAL',
       valueMeasure: { name: 'structuring', valueCol: 'amount', timeCol: 'ts', from: '2026-10-01', to: '2026-10-15', min: 4750, max: 5000, minLegs: 10, minPayers: 5 } } },
-    { id: 'standing', as: 'mm.analyst', method: 'POST', path: `${base}/standing-detection`, body: { rule: RULE } },
+    { id: 'standing', as: 'analyst', method: 'POST', path: `${base}/standing-detection`, body: { rule: RULE } },
   ];
 }
 
@@ -84,8 +84,8 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   if (!apply) {
     log(`DRY RUN (no request is sent; add --apply). Space '${space}' at ${base}`);
     for (const s of plan) log(`  ${s.as.padEnd(11)} ${s.method} ${s.path}  ${JSON.stringify(s.body)}`);
-    if (want.pending) log(`  mm.analyst  POST /inv/investigations/${INV}/ops  ${JSON.stringify(PENDING_EXPAND)}  (held as a pending four-eyes request)`);
-    if (want.alert) log(`  mm.manager  POST /jobs/la_detect/trigger  (skipped if an Alert for ${RULE} already exists)`);
+    if (want.pending) log(`  analyst  POST /inv/investigations/${INV}/ops  ${JSON.stringify(PENDING_EXPAND)}  (held as a pending four-eyes request)`);
+    if (want.alert) log(`  manager  POST /jobs/la_detect/trigger  (skipped if an Alert for ${RULE} already exists)`);
     return out;
   }
   const tokens = {};
@@ -110,10 +110,10 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   // Right after /health first answers the Investigation store may not be loaded: poll the LIST until it answers 200.
   let listed = { status: 0, data: null };
   for (let i = 0; i < readyTries && listed.status !== 200; i++) {
-    try { listed = await call('mm.analyst', 'GET', '/inv/investigations?limit=200'); } catch (e) { listed = { status: 0, data: String(e.message || e) }; }
+    try { listed = await call('analyst', 'GET', '/inv/investigations?limit=200'); } catch (e) { listed = { status: 0, data: String(e.message || e) }; }
     if (listed.status !== 200) await sleep(1000);
   }
-  if (listed.status !== 200) throw new Error(`cannot list Investigations as mm.analyst (${listed.status}): is the Space '${space}' created from the la-mobile-money template?`);
+  if (listed.status !== 200) throw new Error(`cannot list Investigations as analyst (${listed.status}): is the Space '${space}' created from the la-mobile-money template?`);
   const existing = items(listed.data).find((i) => i.id === INV);
   if (!existing) await prime(call, log, sleep, readyTries);
   const headStep = existing ? existing.headStep || 0 : 0;
@@ -133,7 +133,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
     let r = await call(s.as, s.method, p, body);
     // Right after boot the Dataset's first ingest / mm_links run may not have landed yet: the create answers 422 "cannot read the columns".
     for (let i = 1; s.id === 'investigation' && r.status === 422 && i < 60; i++) {
-      log(`  ${s.id}: 422, waiting for the first mm_links run (${i}/59; it runs every 10 minutes, trigger it as mm.manager to skip the wait)`);
+      log(`  ${s.id}: 422, waiting for the first mm_links run (${i}/59; it runs every 10 minutes, trigger it as manager to skip the wait)`);
       await sleep(2000);
       r = await call(s.as, s.method, p, body);
     }
@@ -152,24 +152,24 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
 }
 
 /** The link Dataset is a Job output, so a fresh Space has none until the 10-minute cron and the Investigation create is refused: press Run on
- *  the link Job (as mm.manager, who holds canOperateRuns) and wait for mm_links_dataset to have rows, as seed-la-audit.mjs does. */
+ *  the link Job (as manager, who holds canOperateRuns) and wait for mm_links_dataset to have rows, as seed-la-audit.mjs does. */
 async function prime(call, log, sleep, tries) {
   const has = async () => { const r = await call('admin', 'GET', '/datasets/mm_links_dataset/rows?limit=1'); return r.status === 200 && r.data && (r.data.rows || []).length > 0; };
   if (await has()) return;
-  const t = await call('mm.manager', 'POST', '/jobs/mm_links/trigger', {}); log(`  prime mm_links: ${t.status}`);
+  const t = await call('manager', 'POST', '/jobs/mm_links/trigger', {}); log(`  prime mm_links: ${t.status}`);
   for (let i = 0; i < tries; i++) { if (await has()) return; await sleep(2000); }
   log('  WARNING mm_links_dataset still has no rows; the Investigation create will be refused');
 }
 
-/** ONE pending four-eyes expand. Idempotent: the approver inbox (as mm.manager) is read first. */
+/** ONE pending four-eyes expand. Idempotent: the approver inbox (as manager) is read first. */
 async function stagePending(call, out, log, must) {
-  const inbox = async () => (must(await call('mm.manager', 'GET', '/inv/pending?status=pending&limit=200'), 'approval inbox').items || []).filter((i) => i.investigationId === INV);
+  const inbox = async () => (must(await call('manager', 'GET', '/inv/pending?status=pending&limit=200'), 'approval inbox').items || []).filter((i) => i.investigationId === INV);
   let mine = await inbox();
   if (mine.length) { out.skipped.push('pending-expand'); out.summary.pendingRequestId = mine[0].requestId; return; }
-  const d = must(await call('mm.analyst', 'POST', `/inv/investigations/${INV}/ops`, PENDING_EXPAND), 'the unbounded expand');
+  const d = must(await call('analyst', 'POST', `/inv/investigations/${INV}/ops`, PENDING_EXPAND), 'the unbounded expand');
   if (d.status !== 'pending') throw new Error('the unbounded expand RAN instead of being held (is four_eyes_fan_out_above set in link-analysis.toon?)');
   mine = await inbox();
-  if (mine.length !== 1) throw new Error(`mm.manager's inbox shows ${mine.length} pending request(s) on ${INV}, expected exactly one`);
+  if (mine.length !== 1) throw new Error(`manager's inbox shows ${mine.length} pending request(s) on ${INV}, expected exactly one`);
   out.done.push('pending-expand'); out.summary.pendingRequestId = d.pending.id; log(`  pending-expand: ${d.pending.id}`);
 }
 
@@ -177,11 +177,11 @@ const firedAlert = (alerts) => alerts.find((a) => a.rule === RULE || String(a.ru
 
 /** ONE la_detect run; waits (bounded) for the Alert. Idempotent: an existing Alert for the rule means no run. */
 async function stageAlert(call, out, log, sleep, tries, items, must) {
-  const read = async () => firedAlert(items(must(await call('mm.analyst', 'GET', '/alerts?limit=200'), 'Alerts list')));
+  const read = async () => firedAlert(items(must(await call('analyst', 'GET', '/alerts?limit=200'), 'Alerts list')));
   const id = (x) => `${x.rule}@${x.epochMillis}`;
   let a = await read();
   if (a) { out.skipped.push('alert'); out.summary.alertId = id(a); return; }
-  const t = await call('mm.manager', 'POST', '/jobs/la_detect/trigger');
+  const t = await call('manager', 'POST', '/jobs/la_detect/trigger');
   if (t.status !== 409) must(t, 'la_detect trigger');   // 409 = already running: just wait for it
   for (let i = 0; i < tries && !a; i++) { await sleep(3000); a = await read(); }
   if (!a) throw new Error(`no Alert for ${RULE} appeared after ${tries} polls of the la_detect run (is standing detection enabled on the rule?)`);

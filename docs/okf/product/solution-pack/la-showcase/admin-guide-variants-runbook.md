@@ -42,7 +42,7 @@ Steps:
 2. Create the Space (scaffold or `POST /spaces {"id":"la-showcase","template":"la-showcase"}`), then
    `node tools/seed-la-showcase.mjs --base <url> --apply`.
    The seed also pre-stages four demo scenes, each idempotent, soft-failing (a warning, exit code unchanged) and skipped
-   by its flag: `--no-pending` (one pending four-eyes expand on `mule-hub-case`, left undecided for `fm.manager`),
+   by its flag: `--no-pending` (one pending four-eyes expand on `mule-hub-case`, left undecided for `manager`),
    `--no-alert` (one `la_detect` run until the `mule-pass-through` Alert exists), `--no-coverage` (a second
    Investigation, `delivery-gap-case`, whose window reaches past the landed files) and `--no-draft` (one open Draft with
    one step, left unpromoted). It ends with a line naming the pending request, the Alert, the coverage case and the Draft.

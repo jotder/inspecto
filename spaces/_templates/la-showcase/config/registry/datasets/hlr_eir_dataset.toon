@@ -6,10 +6,10 @@ columns[5]{name,type,classification}:
   imei,string,PII
   forwarding_to,string,MSISDN
   sim_swap_at,timestamp,
-owner: fm.analyst
+owner: analyst
 shares[5]{subjectType,subjectId,access}:
   user,admin,view
-  user,fm.analyst,view
-  user,fm.manager,view
-  user,ra.analyst,view
-  user,demo.manager,view
+  user,analyst,view
+  user,manager,view
+  user,reviewer,view
+  user,outsider,view

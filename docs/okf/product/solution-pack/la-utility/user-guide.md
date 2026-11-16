@@ -154,16 +154,16 @@ golden tests are `tools/gen-la-utility-data.test.mjs` and `UtilityLinksJobGolden
 On a build with sign-in (the demo build: see the [admin guide](admin-guide-install.md#advanced-tier-personas-the-loss-alert-rule-and-the-seed)),
 after `node tools/seed-la-utility.mjs --apply`, sign in as each persona and check what each one sees:
 
-1. **`rp.analyst` (lead):** **Alerts** lists `utility_transformer_loss` (CRITICAL): the highest monthly loss in
+1. **`analyst` (lead):** **Alerts** lists `utility_transformer_loss` (CRITICAL): the highest monthly loss in
    `transformer_loss` reached 15 %. Open `transformer_loss`: only `TX-007` and `TX-019` are `loss over threshold`. Open
    the Investigation `tampering-case`: it is seeded with `C-14` and the two transformers and expanded once. The
    Entity List `tampered-premises` holds the 22 premises of exercise 1. The Case "Meter tampering after C-14 visits"
    is linked to it.
-2. **Four-eyes:** an unbounded expand by `rp.analyst` is held, not run. Sign in as **`rp.manager`**: it is in the
-   approval inbox; approve or refuse it. `rp.analyst` cannot approve its own request.
-3. **`rp.reviewer`:** opens `tampering-case` and reads every step; any change is refused.
-4. **`rp.outsider`:** sees the Datasets, but `tampering-case` is not found (404).
-5. **Draft:** `rp.analyst` has one open Draft that annotates `C-14` about `C-22` (exercise 2); promote it to widen
+2. **Four-eyes:** an unbounded expand by `analyst` is held, not run. Sign in as **`manager`**: it is in the
+   approval inbox; approve or refuse it. `analyst` cannot approve its own request.
+3. **`reviewer`:** opens `tampering-case` and reads every step; any change is refused.
+4. **`outsider`:** sees the Datasets, but `tampering-case` is not found (404).
+5. **Draft:** `analyst` has one open Draft that annotates `C-14` about `C-22` (exercise 2); promote it to widen
    the case, or leave it.
 
 **Not the story:** the holiday home `PRM-0773` (exercise 1's look-alike) is on `TX-031`, which is not metered: it has no

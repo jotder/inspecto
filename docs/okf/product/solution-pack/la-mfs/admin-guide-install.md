@@ -101,16 +101,16 @@ node tools/seed-la-mfs.mjs --base http://127.0.0.1:8096 --apply
 It is safe to re-run; without `--apply` it only prints the calls. It creates the Investigation `sim-swap-takeover`
 (seeded with the call-centre login `S-41`, expanded once over `swapped_by` to the wallets it swapped, annotated,
 snapshotted), its members, the Entity List `mule-wallets` (`WL-07936` to `WL-07940`, the wallets the money went to), a
-Case assigned to `mfs.manager` and linked to the Investigation, an Investigation template, one unbounded expand held for
+Case assigned to `manager` and linked to the Investigation, an Investigation template, one unbounded expand held for
 a second person, and one open Draft. To lay the Space out offline instead of unzipping the downloads,
 `node tools/seed-la-mfs.mjs --scaffold <bundle>\spaces` does it before the first start.
 
 | Persona (sign in as) | Role | Sees |
 |---|---|---|
-| `mfs.analyst` | `mfs-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
-| `mfs.manager` | `mfs-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
-| `mfs.reviewer` | `la-viewer`, member as reviewer | reads `sim-swap-takeover`; any change is refused (403) |
-| `mfs.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `analyst` | `la-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `manager` | `la-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `reviewer` | `la-viewer`, member as reviewer | reads `sim-swap-takeover`; any change is refused (403) |
+| `outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
 | `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
 
 **The Alert Rule.** `mfs_wallet_drained_after_sim_swap` (WARNING) reads the one row of `mfs_swap_drain_counts`: a

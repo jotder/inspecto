@@ -68,12 +68,12 @@ class LaHealthTemplateTest {
         List<Map<String, Object>> users = (List<Map<String, Object>>) ToonHelper.load(CFG.resolve("demo-users.toon").toString()).get("users");
         Map<String, Set<String>> caps = new HashMap<>();
         for (Map<String, Object> u : users) caps.put(String.valueOf(u.get("id")), held(String.valueOf(u.get("roles"))));
-        assertEquals(Set.of("admin", "health.analyst", "health.manager", "health.reviewer", "health.outsider"), caps.keySet());
+        assertEquals(Set.of("admin", "analyst", "manager", "reviewer", "outsider"), caps.keySet());
 
-        Set<String> analyst = caps.get("health.analyst");
+        Set<String> analyst = caps.get("analyst");
         assertTrue(analyst.containsAll(Set.of(Roles.CAN_MANAGE_INCIDENTS, Roles.CAN_RUN_LINK_GRAPH_ANALYSIS, Roles.CAN_AUTHOR_ALERT_RULES)), analyst.toString());
         assertFalse(analyst.contains(Roles.CAN_APPROVE_LINK_EXPANSIONS), "the requester cannot also be the approver");
-        Set<String> manager = caps.get("health.manager");
+        Set<String> manager = caps.get("manager");
         assertTrue(manager.containsAll(Set.of(Roles.CAN_APPROVE_LINK_EXPANSIONS, Roles.CAN_OPERATE_RUNS)), manager.toString());
         assertFalse(manager.contains(Roles.CAN_RUN_LINK_GRAPH_ANALYSIS), "the approver does not run the analysis");
         assertFalse(manager.contains(Roles.CAN_REVEAL_LINK_ENTITIES));
@@ -90,9 +90,9 @@ class LaHealthTemplateTest {
         Map<String, Roles.Def> card = Roles.effective(Path.of("..", "spaces", "_templates", "la-card", "config"));
         for (String shared : List.of("fraud-analyst", "la-viewer", "la-settings"))
             assertEquals(card.get(shared).capabilities(), table.get(shared).capabilities(), shared);
-        for (String id : List.of("health.analyst", "health.manager", "health.reviewer", "health.outsider"))
+        for (String id : List.of("analyst", "manager", "reviewer", "outsider"))
             assertFalse(caps.get(id).contains(Roles.CAN_AUTHOR_WORKBENCH), id + " does not author");
-        for (String id : List.of("health.reviewer", "health.outsider")) assertEquals(Set.of(), caps.get(id), id + " holds no capability of its own");
+        for (String id : List.of("reviewer", "outsider")) assertEquals(Set.of(), caps.get(id), id + " holds no capability of its own");
     }
 
     @Test

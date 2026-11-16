@@ -54,13 +54,13 @@ test('apply signs in once per persona and acts as the right persona', async () =
   assert.ok(ops[1].body.maxFanOut <= 2000, 'the first expand is bounded under four_eyes_fan_out_above, so it runs');
   assert.ok(ops[1].body.maxFanOut >= 336, 'and wide enough for the dealer\'s 336 subscribers, the 300 unbilled among them');
   assert.deepEqual(ops[1].body.linkKinds, ['activated_by']);
-  assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:telcora.analyst'));
+  assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:analyst'));
   const members = m.calls.filter((c) => c.u.endsWith('/members') && c.u.includes('investigations'));
-  assert.deepEqual(members.map((c) => c.body), [{ subject: 'telcora.reviewer', role: 'reviewer' }, { subject: 'telcora.manager', role: 'reviewer' }, { subject: 'admin', role: 'lead' }]);
-  assert.ok(!members.some((c) => c.body.subject === 'telcora.outsider'), 'the outsider is not a member');
+  assert.deepEqual(members.map((c) => c.body), [{ subject: 'reviewer', role: 'reviewer' }, { subject: 'manager', role: 'reviewer' }, { subject: 'admin', role: 'lead' }]);
+  assert.ok(!members.some((c) => c.body.subject === 'outsider'), 'the outsider is not a member');
   assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/entity-lists/unbilled-sims/members').body.add, UNBILLED);
   assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/cases/from-entities').body.entities, [{ id: 'entity:telecom_entity:DL-047', dataset: 'telco_ra_links_dataset' }]);
-  assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/objects/CASE-7/assign').body, { assignee: 'telcora.manager' });
+  assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/objects/CASE-7/assign').body, { assignee: 'manager' });
   assert.deepEqual(m.calls.find((c) => c.method === 'PUT').body, { caseRef: 'CASE-7' });
   assert.ok(!m.calls.find((c) => c.u.endsWith('/alert-rules')), 'the Alert Rule ships in the template, not in the seed');
 });
@@ -115,7 +115,7 @@ test('a pending expand already in the inbox is not requested twice', async () =>
 test('every plan step names a persona the template defines, and the outsider is on the roster', () => {
   const users = fs.readFileSync(new URL('../spaces/_templates/la-telco-ra/config/demo-users.toon', import.meta.url), 'utf8');
   for (const s of buildPlan()) assert.ok(users.includes(`  ${s.as},`), `${s.as} is not a Demo User of the la-telco-ra template`);
-  for (const u of ['telcora.analyst', 'telcora.manager', 'telcora.reviewer', 'telcora.outsider', 'admin']) assert.ok(users.includes(`  ${u},`), u);
+  for (const u of ['analyst', 'manager', 'reviewer', 'outsider', 'admin']) assert.ok(users.includes(`  ${u},`), u);
 });
 
 test('the shared admin reads exactly as in la-showcase (a roster conflict refuses sign-in)', () => {
@@ -143,13 +143,13 @@ test('scaffold lays down the Space once and is idempotent', () => {
   assert.deepEqual(scaffold(root), []);
 });
 
-test('a fresh Space (no link rows yet) presses Run on telco_ra_links as telcora.manager before the create', async () => {
+test('a fresh Space (no link rows yet) presses Run on telco_ra_links as manager before the create', async () => {
   const m = mock(); let n = 0;
   const f = async (url, init = {}) => (url.includes('/datasets/telco_ra_links_dataset/rows') && n++ < 2
     ? { ok: true, status: 200, json: async () => ({ data: { rows: [] } }) } : m.fetchFn(url, init));
   const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, stages: OFF, sleep: async () => {} });
   assert.deepEqual(r.failed, []);
   const i = m.calls.findIndex((c) => c.u === '/spaces/s/jobs/telco_ra_links/trigger' && c.method === 'POST');
-  assert.ok(i >= 0 && m.calls[i].auth === 'Bearer tok-demo:telcora.manager');
+  assert.ok(i >= 0 && m.calls[i].auth === 'Bearer tok-demo:manager');
   assert.ok(i < m.calls.findIndex((c) => c.u === '/spaces/s/inv/investigations' && c.method === 'POST'));
 });

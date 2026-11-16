@@ -378,11 +378,11 @@ Electricity revenue protection: energy leaves a transformer but is not paid for.
 7. **On Standard and above**, open the Geo View `utility_transformer_loss_map`: the two transformers move over the
    15 % threshold.
 8. **On Advanced**, start the demo build, run `node tools/seed-la-utility.mjs --base http://127.0.0.1:8096 --apply`,
-   and sign in as `rp.analyst`:
+   and sign in as `analyst`:
    - **Alerts** lists `utility_transformer_loss` (CRITICAL);
    - the Investigation `tampering-case` is seeded with `C-14`, `TX-007` and `TX-019` and expanded once;
    - the Entity List `tampered-premises` holds the 22 premises;
-   - an unbounded expand by `rp.analyst` is held; sign in as `rp.manager` to approve it.
+   - an unbounded expand by `analyst` is held; sign in as `manager` to approve it.
 
 The other four `la-utility` stories (illegal reconnections, account churn, commercial load, prepaid tokens) are
 exercises 2–5 in the [`la-utility` user guide](../la-utility/user-guide.md#exercises).

@@ -120,16 +120,16 @@ golden tests are `tools/gen-la-card-data.test.mjs` and `CardLinksJobGoldenTest`.
 On a build with sign-in (the demo build: see the [admin guide](admin-guide-install.md#advanced-tier-personas-the-compromised-terminal-alert-rule-and-the-seed)),
 after `node tools/seed-la-card.mjs --apply`, sign in as each persona and check what each one sees:
 
-1. **`card.analyst` (lead):** **Alerts** lists `card_new_cards_at_compromised_terminal` (WARNING) with the value 60:
+1. **`analyst` (lead):** **Alerts** lists `card_new_cards_at_compromised_terminal` (WARNING) with the value 60:
    cards approved at a compromised terminal since its first defrauded card's visit and not defrauded yet. Open the
    Investigation `compromised-terminal`: it is seeded with `M-317` and expanded once to the 60 defrauded cards of
    exercise 4. The Entity List `cards-to-reissue` holds the 10 cards that paid there in the compromise window and were
    not defrauded. The Case "Compromised terminal at M-317" is linked to it.
-2. **Four-eyes:** an unbounded expand by `card.analyst` is held, not run. Sign in as **`card.manager`**: it is in the
-   approval inbox; approve or refuse it. `card.analyst` cannot approve its own request.
-3. **`card.reviewer`:** opens `compromised-terminal` and reads every step; any change is refused.
-4. **`card.outsider`:** sees the Datasets, but `compromised-terminal` is not found (404).
-5. **Draft:** `card.analyst` has one open Draft that annotates `M-317` about the cards to reissue; promote it, or leave
+2. **Four-eyes:** an unbounded expand by `analyst` is held, not run. Sign in as **`manager`**: it is in the
+   approval inbox; approve or refuse it. `analyst` cannot approve its own request.
+3. **`reviewer`:** opens `compromised-terminal` and reads every step; any change is refused.
+4. **`outsider`:** sees the Datasets, but `compromised-terminal` is not found (404).
+5. **Draft:** `analyst` has one open Draft that annotates `M-317` about the cards to reissue; promote it, or leave
    it.
 
 **Not the story:** the supermarket `M-052` is used by about 940 cards, more than any terminal, but none of them was

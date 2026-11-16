@@ -525,8 +525,8 @@ is a masked entity id shows as its per-Investigation pseudonym; the name is neve
 purpose), so it reaches neither the log header, the embed nor the Dossier. Not atomic with the create: a crash between the two writes
 leaves an Investigation that shows its login id, which is the older behaviour, not a failure.
 **Live check 2026-11-01 (Preview Demo Auth bundle of `a24fca153`): FAIL on Demo Auth.** An Investigation instantiated from
-`mule-ring-template` as `fm.analyst` (and one made by a plain create) listed `owner` only, with no `ownerName`, so **File ▸ Open…** read
-"Owner fm.analyst" even to its creator, and no `investigation-details.json` was written. Cause: `DemoAuthenticator` puts the Demo User's
+`mule-ring-template` as `analyst` (and one made by a plain create) listed `owner` only, with no `ownerName`, so **File ▸ Open…** read
+"Owner analyst" even to its creator, and no `investigation-details.json` was written. Cause: `DemoAuthenticator` puts the Demo User's
 name in `Subject.attributes().displayName`, not in the `displayName` component, so `recordOwnerName` finds no name and the list fallback
 none either (defect `DEMO-AUTH-SUBJECT-DISPLAY-NAME-1`). An OIDC sign-in, which fills `displayName`, was not driven.
 **Fixed 2026-11-01 (`DEMO-AUTH-SUBJECT-DISPLAY-NAME-1`):** `DemoAuthenticator` passes the Demo User's name as the Subject's `displayName`

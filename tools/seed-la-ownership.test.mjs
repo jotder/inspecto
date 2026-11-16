@@ -51,13 +51,13 @@ test('apply signs in once per persona and acts as the right persona', async () =
   assert.deepEqual(ops[0].body.ids, ['SL-0137', 'CUS-00528']);
   assert.ok(ops[1].body.maxFanOut <= 2000, 'the first expand is bounded under four_eyes_fan_out_above, so it runs');
   assert.deepEqual(ops[1].body.linkKinds, ['name_match', 'owns', 'customer_is'], 'ownership, customers and list matches; no payments');
-  assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:ownership.analyst'));
+  assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:analyst'));
   const members = m.calls.filter((c) => c.u.endsWith('/members') && c.u.includes('investigations'));
-  assert.deepEqual(members.map((c) => c.body), [{ subject: 'ownership.reviewer', role: 'reviewer' }, { subject: 'ownership.manager', role: 'reviewer' }, { subject: 'admin', role: 'lead' }]);
-  assert.ok(!members.some((c) => c.body.subject === 'ownership.outsider'), 'the outsider is not a member');
+  assert.deepEqual(members.map((c) => c.body), [{ subject: 'reviewer', role: 'reviewer' }, { subject: 'manager', role: 'reviewer' }, { subject: 'admin', role: 'lead' }]);
+  assert.ok(!members.some((c) => c.body.subject === 'outsider'), 'the outsider is not a member');
   assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/entity-lists/sanctions-path-parties/members').body.add, PATH_PARTIES);
   assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/cases/from-entities').body.entities, [{ id: 'entity:party:CUS-00528', dataset: 'ownership_links_dataset' }]);
-  assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/objects/CASE-7/assign').body, { assignee: 'ownership.manager' });
+  assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/objects/CASE-7/assign').body, { assignee: 'manager' });
   assert.deepEqual(m.calls.find((c) => c.method === 'PUT').body, { caseRef: 'CASE-7' });
   assert.ok(!m.calls.find((c) => c.u.endsWith('/alert-rules')), 'the Alert Rule ships in the template, not in the seed');
 });
@@ -114,7 +114,7 @@ test('a pending expand already in the inbox is not requested twice', async () =>
 test('every plan step names a persona the template defines, and the outsider is on the roster', () => {
   const users = fs.readFileSync(new URL('../spaces/_templates/la-ownership/config/demo-users.toon', import.meta.url), 'utf8');
   for (const s of buildPlan()) assert.ok(users.includes(`  ${s.as},`), `${s.as} is not a Demo User of the la-ownership template`);
-  for (const u of ['ownership.analyst', 'ownership.manager', 'ownership.reviewer', 'ownership.outsider', 'admin']) assert.ok(users.includes(`  ${u},`), u);
+  for (const u of ['analyst', 'manager', 'reviewer', 'outsider', 'admin']) assert.ok(users.includes(`  ${u},`), u);
 });
 
 test('the shared admin reads exactly as in la-showcase, la-utility and la-card (a roster conflict refuses sign-in)', () => {
@@ -132,13 +132,13 @@ test('scaffold lays down the Space once and is idempotent', () => {
   assert.deepEqual(scaffold(root), []);
 });
 
-test('a fresh Space (no link rows yet) presses Run on ownership_links as ownership.manager before the create', async () => {
+test('a fresh Space (no link rows yet) presses Run on ownership_links as manager before the create', async () => {
   const m = mock(); let n = 0;
   const f = async (url, init = {}) => (url.includes('/datasets/ownership_links_dataset/rows') && n++ < 2
     ? { ok: true, status: 200, json: async () => ({ data: { rows: [] } }) } : m.fetchFn(url, init));
   const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, stages: OFF, sleep: async () => {} });
   assert.deepEqual(r.failed, []);
   const i = m.calls.findIndex((c) => c.u === '/spaces/s/jobs/ownership_links/trigger' && c.method === 'POST');
-  assert.ok(i >= 0 && m.calls[i].auth === 'Bearer tok-demo:ownership.manager');
+  assert.ok(i >= 0 && m.calls[i].auth === 'Bearer tok-demo:manager');
   assert.ok(i < m.calls.findIndex((c) => c.u === '/spaces/s/inv/investigations' && c.method === 'POST'));
 });

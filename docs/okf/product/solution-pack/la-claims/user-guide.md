@@ -24,9 +24,9 @@ The Space has two tiers.
 
 | User | Works as |
 |---|---|
-| `siu.analyst` | lead: builds the Investigation, authors Alert Rules, runs Graph Runs |
-| `siu.manager` | second approver; presses Run on Jobs |
-| `partner.reviewer` | read-only member |
+| `analyst` | lead: builds the Investigation, authors Alert Rules, runs Graph Runs |
+| `manager` | second approver; presses Run on Jobs |
+| `reviewer` | read-only member |
 | `admin` | Reveal, Settings, embed links |
 
 ## A working day

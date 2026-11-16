@@ -96,7 +96,7 @@ which is not part of any download. The packer reads committed content only, so c
 ## Advanced tier (Preview with demo sign-in)
 
 The Space download also carries the Advanced tier: `config/demo-users.toon` and `config/roles.toon` (the personas
-`police.analyst`, `police.sio`, `police.reviewer`, `police.outsider` and `admin`), four-eyes above a fan-out of 2 000
+`analyst`, `manager`, `reviewer`, `outsider` and `admin`), four-eyes above a fan-out of 2 000
 and Drafts in `config/link-analysis.toon`, and the Alert Rule `police_repeat_seller_serial_matches` with its two Jobs
 (`police_serial_match_counts`, `police_serial_match_alerts`). What each persona does is in the
 [user guide](user-guide.md#advanced-tier-investigation-four-eyes-and-the-serial-match-alert-rule).
@@ -125,7 +125,7 @@ which binds to 127.0.0.1 only:
    ```
 
    It presses Run on `police_links` if the Dataset is not built yet, then creates the Investigation `burglary-series`
-   and its steps, the members, the Entity List `series-sellers`, the Case (assigned to `police.sio`), one held four-eyes
+   and its steps, the members, the Entity List `series-sellers`, the Case (assigned to `manager`), one held four-eyes
    expand and one open Draft. It is safe to re-run: anything already there is skipped. It sends only `demo:<id>` sign-in
    codes, never a password.
 

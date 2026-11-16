@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Provisions a LOCAL WSO2 IS (Docker, https://localhost:9443, admin/admin) for the Preview LA bundle:
-// one public PKCE application, the role groups, and the six Demo Users - idempotent, safe to re-run.
+// one public PKCE application, the role groups, and the five Demo Users - idempotent, safe to re-run.
 //
 //   node scripts/wso2-preview-la-setup.mjs [--base https://localhost:9443] [--callback http://localhost:8080]...
 //
-// Subject: the application asserts the USERNAME as `sub`, so seeded ownership (fm.analyst, ...) matches the signed-in Subject.
+// Subject: the application asserts the USERNAME as `sub`, so seeded ownership (analyst, ...) matches the signed-in Subject.
 // Roles: a user's WSO2 groups are the Inspecto role names (`groups` claim, in the ACCESS token via accessTokenAttributes).
 // Synthetic users, TEST password only, local development host only. Never run against a shared IdP.
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
@@ -17,30 +17,14 @@ if (!origins.length) for (const p of ports) origins.push(`http://localhost:${p}`
 
 export const CLIENT_ID = 'inspecto_preview_la';
 export const PASSWORD = 'Preview#LA2026';   // test value for the synthetic demo users, local only
+// The five shared Demo Users of every LA showcase Space (operator 2026-11-16); each Space decides what the shared role
+// names (la-analyst, la-manager, la-viewer) may do in its own roles.toon.
 export const USERS = [
-  ['demo.manager', 'Demo', 'Manager', ['manager', 'la-viewer']],
-  ['ra.manager', 'Demo RA', 'Manager', ['manager']],
-  // read-only reviewer, as in the demo roster (operator 2026-10-28): `operations` granted canManageIncidents
-  ['ra.analyst', 'Demo RA', 'Analyst', ['la-viewer']],
-  ['fm.manager', 'Demo FM', 'Manager', ['manager', 'fraud-manager']],
-  ['fm.analyst', 'Demo FM', 'Analyst', ['operations', 'fraud-analyst']],
   ['admin', 'Demo', 'Admin', ['super', 'admin', 'fraud-analyst', 'la-settings']],
-  // la-claims (insurance claims showcase): the Space's own roles are siu-analyst / siu-manager; la-viewer is read-only
-  ['siu.analyst', 'Demo SIU', 'Analyst', ['siu-analyst']],
-  ['siu.manager', 'Demo SIU', 'Manager', ['siu-manager']],
-  ['partner.reviewer', 'Demo Partner', 'Reviewer', ['la-viewer']],
+  ['analyst', 'Demo', 'Analyst', ['operations', 'la-analyst']],
+  ['manager', 'Demo', 'Manager', ['manager', 'la-manager']],
+  ['reviewer', 'Demo', 'Reviewer', ['la-viewer']],
   ['outsider', 'Demo', 'Outsider', ['la-viewer']],
-  // la-mobile-money
-  ['mm.analyst', 'Demo MM', 'Analyst', ['mm-analyst']],
-  ['mm.manager', 'Demo MM', 'Manager', ['mm-manager']],
-  ['mm.reviewer', 'Demo MM', 'Reviewer', ['mm-viewer']],
-  ['mm.outsider', 'Demo MM', 'Outsider', ['mm-viewer']],
-  // la-audit
-  ['audit.admin', 'Demo Audit', 'Admin', ['admin', 'audit-lead', 'audit-settings']],
-  ['audit.lead', 'Demo Lead', 'Auditor', ['audit-lead']],
-  ['audit.manager', 'Demo Audit', 'Manager', ['audit-manager']],
-  ['audit.committee', 'Demo Audit', 'Committee', ['audit-committee']],
-  ['audit.outsider', 'Demo', 'Outsider', ['audit-committee']],
 ];
 const GROUPS = [...new Set(USERS.flatMap((u) => u[3]))];
 const auth = 'Basic ' + Buffer.from('admin:admin').toString('base64');

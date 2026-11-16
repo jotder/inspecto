@@ -1499,11 +1499,11 @@ be read no window is sent ("all available data"). `minEvents` 1, `maxFanOut` 500
 expand ranks by `eventsCol`. `config/link-analysis.toon` sets `four_eyes_fan_out_above: 2000` (operator 2026-10-11),
 so the bounded ladder never waits.
 
-**Four-eyes beat.** An unbounded expand (no `maxFanOut`) or any fan-out above 2000 waits for approval: `fm.analyst`
-requests, `fm.manager` approves in **Approvals → Link expansions**; the panel re-reads the log and shows approved /
+**Four-eyes beat.** An unbounded expand (no `maxFanOut`) or any fan-out above 2000 waits for approval: `analyst`
+requests, `manager` approves in **Approvals → Link expansions**; the panel re-reads the log and shows approved /
 denied.
 
-**Gotchas.** Only `fm.manager` (`fraud-manager`, `canOperateRuns`) may press *Run* on the Jobs - the seed `admin` gets
+**Gotchas.** Only `manager` (`la-manager`, `canOperateRuns`) may press *Run* on the Jobs - the seed `admin` gets
 403; press it after seeding rather than waiting for the cron. The benign taxi hub scores like the suspect - a talking
 point (high connectivity is not guilt), not a defect. Offline smoke: `node tools/la-demo-smoke.mjs --telecom`; the
 same runner also probes the empty-Dataset 409, the read-only persona, the settings round-trip and the sign-in picker
@@ -1536,8 +1536,8 @@ write control is disabled with that sentence. A reviewer of an Investigation, an
 the same way (*You review this Investigation: you can read it and decide approvals…*): only a lead changes its steps, so they get no Expand form, and **Undo** and **Redo** are disabled with that reason. A refusal shows the server's reason; a missing
 permission is named in words (*Your role does not have the Workbench author permission*). *Not found* on an Investigation can mean it does
 not exist, is not yours, or its Dataset is no longer shared with you — the same answer on purpose. In the
-`la-showcase` demo, *Demo RA Analyst* and *Demo Manager* are read-only; *Demo FM Analyst* holds manage-incidents,
-graph-run, index-build and Alert Rule authoring; *Demo FM Manager* is the second approver; *Demo Admin* also holds
+`la-showcase` demo, *Demo Reviewer* and *Demo Outsider* are read-only; *Demo Analyst* holds manage-incidents,
+graph-run, index-build and Alert Rule authoring; *Demo Manager* is the second approver; *Demo Admin* also holds
 `canAuthorWorkbench`.
 
 **Saved views and settings (Workbench author).** The seeded `admin` role holds the *Workbench author* permission
@@ -2006,7 +2006,7 @@ it noted, and the call taken for each so the uncropped screen passes:
   (`minimapCollapsed`, hiding G6's `.g6-minimap` element), never a plugin change, because a plugin change rebuilds the
   graph and runs its layout again. Per screen, not stored.
 - **The approver's line says it is a further Expand.** *Requested next, not yet run: Expand one hop from every entity.
-  Demo FM Analyst asks for your approval. It would add every neighbour of each entity, more than the 2,000 allowed
+  Demo Analyst asks for your approval. It would add every neighbour of each entity, more than the 2,000 allowed
   without a second approval.* It sits under the recorded line *Expand one hop from every entity (step 2): 6 new
   entities, 7 links added.*, and with the same head the two read as one Expand that both ran and was over the limit.
   The "missing full stop" before *Only the 5 strongest links* is in the source and always was (`degreeOutcomeMessage`
@@ -2050,7 +2050,7 @@ it noted, and the call taken for each so the uncropped screen passes:
   (presentational, OnPush) is the form. The toggle appears only while `aroundSpec()` is non-null; editing rewrites
   `patternSteps` and the button runs the same `runPattern`. `stepsToSearchAround` returns null on `afterPrevious` /
   `maxGapHours`; the toggle sits in the non-branching branch, after `branchStages()`. The *Custom* reset is pinned in
-  `link-analysis-toolbox.component.spec.ts`. Driven live 2026-10-18 (Advanced la-app demo bundle, Demo FM Analyst): a
+  `link-analysis-toolbox.component.spec.ts`. Driven live 2026-10-18 (Advanced la-app demo bundle, Demo Analyst): a
   *Shared associates* run answered 200 matches as masked aliases.
 - **Merge:** `mergePairOf` (`investigation-state.ts`) takes the two selected entities and
   `InvestigationSessionStore.mergeDraft` carries the pair into `LinkAnalysisIdentitiesComponent`, which prefills *Assert
@@ -2085,7 +2085,7 @@ today `-Product la -Distribution demo`; Demo Admin, `la-showcase`): a two-row CS
   LA-ONBOARD-FIXES-1 F-12). The **Masked** tile: `masking.masked` from the server, else
   `maskedUnder(mode, type.masked)` in `entity-profile-view.ts`; the cards read `/settings/link-analysis`
   `maskingModeInForce` (`none` by default on Basic) and say nothing until it is read (F-6). Driven live (IMS Space,
-  Enterprise demo bundle, Demo FM Analyst): the 15-SIM device shows as IMEI to IMSI, most per Entity 15; the lookup of
+  Enterprise demo bundle, Demo Analyst): the 15-SIM device shows as IMEI to IMSI, most per Entity 15; the lookup of
   the burst number lands on `/entities/msisdn/masked:...` with no raw identifier in the page or the URL.
 - **Open in Inspecto LA page** (as built 2026-10-17; wire contract: architecture-http-and-ui.md §6.4):
   `projects/link-analysis/src/open/*` (`open.routes.ts`, `OpenInLaComponent`, `open-link.ts` with `parseOpenLink` and

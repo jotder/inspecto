@@ -271,14 +271,14 @@ What "inert" means, as seen live on Basic:
 `la-claims` and `la-audit` have their own Advanced tiers, described in their runbooks):
 
 - **Personas.** A lead analyst, a second approver (manager), a read-only reviewer and an outsider who is not a member,
-  named `<prefix>.analyst` and so on (`rp.*` in `la-utility`, `police.sio` as the approver in `la-police`), plus the
+  named `<prefix>.analyst` and so on (`rp.*` in `la-utility`, `manager` as the approver in `la-police`), plus the
   shared `admin`.
 - **One roster across Spaces.** `admin` and the `fraud-analyst`, `la-viewer` and `la-settings` roles are byte-identical
   in these thirteen: a user id defined differently in two Spaces of one server is refused with 409
   `ROSTER_CONFLICT` ([Demo Auth](../../module/demo-auth/admin-guide.md)). Proved 2026-11-09 with all twelve 2026-11-09
   Spaces in one server. The older templates differ in their roles (`la-showcase`'s `fraud-analyst` adds
   `canShareInvestigation`; `la-audit` and `la-mobile-money` define no `la-viewer`; `la-audit`'s roster uses
-  `audit.admin`).
+  `admin`).
 - **Four-eyes and Drafts.** Every `link-analysis.toon` states `four_eyes_fan_out_above: 2000` and the same Drafts limits;
   no Entity Type is masked.
 - **The Alert Rule is a registry rule over a one-row counts Job** (one exception: `la-utility`'s

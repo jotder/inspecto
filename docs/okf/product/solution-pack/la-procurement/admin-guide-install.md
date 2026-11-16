@@ -104,16 +104,16 @@ node tools/seed-la-procurement.mjs --base http://127.0.0.1:8096 --apply
 It is safe to re-run; without `--apply` it only prints the calls. It creates the Investigation `cover-bids` (seeded
 with the IP address `100.64.73.61`, expanded once over `same_ip` to the four firms that bid from it, annotated,
 snapshotted), its members, the Entity List `cover-bidders` (`CO-0153`, `CO-0309`, `CO-0702`), a Case on `CO-0074`
-assigned to `procurement.manager` and linked to the Investigation, an Investigation template, one unbounded expand
+assigned to `manager` and linked to the Investigation, an Investigation template, one unbounded expand
 held for a second person, and one open Draft. To lay the Space out offline instead of unzipping the downloads,
 `node tools/seed-la-procurement.mjs --scaffold <bundle>\spaces` does it before the first start.
 
 | Persona (sign in as) | Role | Sees |
 |---|---|---|
-| `procurement.analyst` | `procurement-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
-| `procurement.manager` | `procurement-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
-| `procurement.reviewer` | `la-viewer`, member as reviewer | reads `cover-bids`; any change is refused (403) |
-| `procurement.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `analyst` | `la-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `manager` | `la-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `reviewer` | `la-viewer`, member as reviewer | reads `cover-bids`; any change is refused (403) |
+| `outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
 | `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
 
 **The Alert Rule.** `procurement_same_tender_shared_ip` (WARNING) reads the one row of

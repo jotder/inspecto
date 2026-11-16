@@ -1,5 +1,5 @@
 // DR-T7: burst scripts for the Link Analysis resource limits, against a running Demo Auth host:
-//   node tools/la-demo-burst.mjs [--base http://127.0.0.1:8096] [--space la-showcase] [--user fm.analyst]
+//   node tools/la-demo-burst.mjs [--base http://127.0.0.1:8096] [--space la-showcase] [--user analyst]
 // The expensive-route bucket is per subject (20 tokens, +1 per 3 s) and SHARED by projection, Graph Runs and Index builds, so
 // the capacity probes wait for tokens first and the 429 probe goes last.
 //   19 concurrent Graph Runs   -> a 503 (pool 2 running + 16 waiting = 18 slots; the 19th is REJECTED). SKIPPED when every run
@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { makeClient } from './lib/la-client.mjs';
 import { rateLimitVerdict, poolVerdict, poolInlineOnly, indexBurstBodies, indexQueueVerdict, INV } from './la-demo-smoke.mjs';
 
-export async function runBurst({ fetchFn = fetch, base, space, user = 'fm.analyst', sleep = (ms) => new Promise((r) => setTimeout(r, ms)), log = () => {} } = {}) {
+export async function runBurst({ fetchFn = fetch, base, space, user = 'analyst', sleep = (ms) => new Promise((r) => setTimeout(r, ms)), log = () => {} } = {}) {
   const call = makeClient({ fetchFn, base, space });
   const results = [];
   const record = (id, reason, skipped = false) => { results.push({ id, ok: !reason, skipped, reason }); log(`${reason ? 'FAIL' : skipped ? 'SKIP' : 'PASS'}  ${id}${reason ? '  - ' + reason : ''}`); };
@@ -40,7 +40,7 @@ export async function runBurst({ fetchFn = fetch, base, space, user = 'fm.analys
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const opt = (k, d) => (args.includes(k) ? args[args.indexOf(k) + 1] : d);
-  runBurst({ base: opt('--base', 'http://127.0.0.1:8096'), space: opt('--space', 'la-showcase'), user: opt('--user', 'fm.analyst'), log: console.log })
+  runBurst({ base: opt('--base', 'http://127.0.0.1:8096'), space: opt('--space', 'la-showcase'), user: opt('--user', 'analyst'), log: console.log })
     .then((rs) => { const bad = rs.filter((r) => !r.ok); console.log(`${rs.length - bad.length}/${rs.length} burst probes passed`); process.exitCode = bad.length ? 1 : 0; })
     .catch((e) => { console.error(e.message); process.exitCode = 2; });
 }

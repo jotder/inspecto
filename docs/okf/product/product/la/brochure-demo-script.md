@@ -15,11 +15,11 @@ Run the **demo** Distribution: it signs people in as Demo Users with no password
 
 | Sign in as | Name | What they show |
 |---|---|---|
-| `fm.analyst` | Demo FM Analyst | Fraud analyst (lead): owns mule-hub-case; works Investigations, Alert Rules and Incidents |
-| `fm.manager` | Demo FM Manager | Fraud manager: the second approver of four-eyes requests; the Case is assigned to this user |
+| `analyst` | Demo Analyst | Fraud analyst (lead): owns mule-hub-case; works Investigations, Alert Rules and Incidents |
+| `manager` | Demo Manager | Fraud manager: the second approver of four-eyes requests; the Case is assigned to this user |
 | `admin` | Demo Admin | Platform administrator: lead on the Investigation; can Reveal masked values and change LA settings |
-| `ra.analyst` | Demo RA Analyst | Revenue Assurance reviewer: a member of the Investigation with no capability (view only) |
-| `demo.manager` | Demo Manager | NOT a member of the Investigation: shows what a non-member sees (refused) |
+| `reviewer` | Demo Reviewer | Revenue Assurance reviewer: a member of the Investigation with no capability (view only) |
+| `outsider` | Demo Outsider | NOT a member of the Investigation: shows what a non-member sees (refused) |
 
 ## The walk-through
 

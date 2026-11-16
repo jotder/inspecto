@@ -97,8 +97,8 @@ every red-flag rule on its own corpus and refuses to write if a flag fires anywh
 
 ## Advanced tier
 
-`config/demo-users.toon` and `config/roles.toon` (`trade.analyst` lead, `trade.manager` second approver, `trade.reviewer`
-read-only, `trade.outsider` not a member, and `admin` defined exactly as in every other showcase), four-eyes above a
+`config/demo-users.toon` and `config/roles.toon` (`analyst` lead, `manager` second approver, `reviewer`
+read-only, `outsider` not a member, and `admin` defined exactly as in every other showcase), four-eyes above a
 fan-out of 2000 and Drafts limits in `link-analysis.toon` (the same values as every Space composed into *Banking and
 finance*; `masking_mode` unset). The Alert Rule is a registry rule over a counts Job, as in `la-police` and `la-card`:
 

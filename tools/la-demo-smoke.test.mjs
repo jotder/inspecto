@@ -75,8 +75,8 @@ test('run() against a stub server passes every probe, and fails a wrong status',
     const res = (status, body) => ({ ok: status < 400, status, json: async () => body });
     if (p === '/auth/exchange') return res(200, { data: { accessToken: JSON.parse(init.body).code } });
     if (!who) return res(wrong401 ? 200 : 401, {});
-    if (who === 'Bearer demo:ra.analyst') return res(403, {});
-    if (who === 'Bearer demo:demo.manager') return res(404, {});
+    if (who === 'Bearer demo:reviewer') return res(403, {});
+    if (who === 'Bearer demo:outsider') return res(404, {});
     if (space === 'la-showcase-off') return res(404, { error: { errorCode: 'MODULE_DISABLED' } });
     if (p === '/inv/investigations' && init.method === 'POST') return res(422, {});
     if (p.endsWith('/log')) return res(200, { data: {} });
@@ -191,7 +191,7 @@ test('runTelecom passes every probe on a healthy Space and polls rows', async ()
 test('runTelecom FAILs each telecom defect', async () => {
   const failed = async (f) => (await runT(f)).results.filter((r) => !r.ok).map((r) => r.id + ' ' + r.reason).join('\n');
   assert.match(await failed({ cols: [{ name: 'a_msisdn' }] }), /lacks columns/);
-  assert.match(await failed({ forbidden: true }), /fm\.manager lacks canOperateRuns/);
+  assert.match(await failed({ forbidden: true }), /manager lacks canOperateRuns/);
   assert.match(await failed({ noRows: true }), /no rows after/);
   assert.match(await failed({ unflagged: true }), /not flagged/);
   assert.match(await failed({ noMatch: true }), /pattern pack telecom-.* 0 matches/);
@@ -203,29 +203,29 @@ test('the dry run lists the telecom group as skipped without --telecom', async (
   assert.ok(lines.some((l) => /telecom.*SKIPPED/.test(l)));
 });
 
-test('--telecom defaults the presenter to fm.manager; an explicit --presenter wins', async () => {
-  assert.equal(resolvePresenter(null, true), 'fm.manager');
-  assert.equal(resolvePresenter(null, false), 'fm.analyst');
-  assert.equal(resolvePresenter('fm.analyst', true), 'fm.analyst');
+test('--telecom defaults the presenter to manager; an explicit --presenter wins', async () => {
+  assert.equal(resolvePresenter(null, true), 'manager');
+  assert.equal(resolvePresenter(null, false), 'analyst');
+  assert.equal(resolvePresenter('analyst', true), 'analyst');
   const { calls } = await runT({});
-  assert.ok(calls.every((c) => c.user === 'fm.manager'));
-  const explicit = await runT({}, { presenter: 'fm.analyst' });
-  assert.ok(explicit.calls.every((c) => c.user === 'fm.analyst'));
+  assert.ok(calls.every((c) => c.user === 'manager'));
+  const explicit = await runT({}, { presenter: 'analyst' });
+  assert.ok(explicit.calls.every((c) => c.user === 'analyst'));
   const lines = [];
   await run({ dryRun: true, telecom: true, log: (l) => lines.push(l) });
-  assert.ok(lines.some((l) => /telecom \(fm\.manager\)/.test(l)), lines.join('\n'));
+  assert.ok(lines.some((l) => /telecom \(manager\)/.test(l)), lines.join('\n'));
 });
 
 test('a 403 trigger FAILs naming persona + canOperateRuns and SKIPs the dependent rows/Alerts probes', async () => {
   assert.equal(denialReason({ status: 202 }, 'x'), null);
-  const { results } = await runT({ forbidden: true }, { presenter: 'fm.analyst' });
+  const { results } = await runT({ forbidden: true }, { presenter: 'analyst' });
   const fails = results.filter((r) => !r.ok);
   assert.equal(fails.filter((r) => /triggers Job/.test(r.id)).length, 3);
   assert.ok(fails.every((r) => !/has rows|no rows|did not produce rows/.test(r.id + r.reason)), JSON.stringify(fails));
-  assert.ok(fails.filter((r) => /triggers Job/.test(r.id)).every((r) => /fm\.analyst lacks canOperateRuns/.test(r.reason)));
+  assert.ok(fails.filter((r) => /triggers Job/.test(r.id)).every((r) => /analyst lacks canOperateRuns/.test(r.reason)));
   const skipped = results.filter((r) => r.skipped);
   assert.equal(skipped.length, 4);
-  assert.ok(skipped.every((r) => /trigger denied: fm\.analyst lacks canOperateRuns/.test(r.reason)));
+  assert.ok(skipped.every((r) => /trigger denied: analyst lacks canOperateRuns/.test(r.reason)));
   assert.ok(skipped.some((r) => /Alerts/.test(r.id)));
 });
 
@@ -294,8 +294,8 @@ function burstStub({ drift = true, queue = 5 } = {}) {
     const res = (status, body) => ({ ok: status < 400, status, json: async () => body });
     if (p === '/auth/exchange') return res(200, { data: { accessToken: JSON.parse(init.body).code } });
     if (!who) return res(401, {});
-    if (who === 'Bearer demo:ra.analyst') return res(403, {});
-    if (who === 'Bearer demo:demo.manager') return res(404, {});
+    if (who === 'Bearer demo:reviewer') return res(403, {});
+    if (who === 'Bearer demo:outsider') return res(404, {});
     if (space === 'la-showcase-off') return res(404, { error: { errorCode: 'MODULE_DISABLED' } });
     if (p === '/inv/investigations' && init.method === 'POST') return res(422, {});
     if (p.endsWith('/log')) return res(200, { data: {} });
@@ -372,8 +372,8 @@ function withNewer(inner, f = {}) {
     if (p.startsWith('/datasets/telecom_links_dataset/rows')) return res(f.rowsMissing ? 404 : 200, { data: { rows: f.rowsExist ? [{ a: 1 }] : [] } });
     if (p === '/inv/projection' && init.method === 'POST' && body.dataset === 'telecom_links_dataset')
       return res(f.wrong409 ? 500 : 409, { error: { message: f.leak ? 'has no rows yet: IO Error: read_parquet C:/data/x' : 'telecom_links_dataset has no rows yet' } });
-    if (p.endsWith('/ops') && who === 'Bearer demo:ra.analyst') return res(f.writeAllowed ? 200 : 403, { error: { message: 'missing capability canInvestigate' } });
-    if (p.endsWith('/log') && who === 'Bearer demo:ra.analyst') return res(200, { data: {} });
+    if (p.endsWith('/ops') && who === 'Bearer demo:reviewer') return res(f.writeAllowed ? 200 : 403, { error: { message: 'missing capability canInvestigate' } });
+    if (p.endsWith('/log') && who === 'Bearer demo:reviewer') return res(200, { data: {} });
     if (p === '/settings/link-analysis') {
       if (!init.method || init.method === 'GET') return res(200, { data: { ...settings, maskingModeInForce: 'mask', hubThresholdInForce: 1 } });
       if (body.index && (body.index.maxAgeHours === 0 || body.index.maxAgeHours === 8761)) return res(f.range422 ? 200 : 422, { error: { message: 'index.maxAgeHours must be 1..8760' } });
@@ -461,5 +461,5 @@ test('signin-picker FAILs a non-demo build or spacesAttached 0', async () => {
 
 test('the dry run lists the newer probes', async () => {
   const lines = []; await run({ dryRun: true, embed: true, log: (l) => lines.push(l) });
-  for (const w of [/has no rows yet/, /ra\.analyst/, /maxAgeHours/, /public GET/, /\/bootstrap/]) assert.ok(lines.some((l) => w.test(l)), String(w));
+  for (const w of [/has no rows yet/, /reviewer/, /maxAgeHours/, /public GET/, /\/bootstrap/]) assert.ok(lines.some((l) => w.test(l)), String(w));
 });

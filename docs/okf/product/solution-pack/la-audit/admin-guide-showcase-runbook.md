@@ -13,7 +13,7 @@ The stakeholder-facing sibling script is the [demo runbook](../../module/la-core
 | 1 | Bundle: the Demo Auth build with the la-app UI | `inspecto\package.ps1 -Edition Advanced -Product la -Distribution demo -NoBakeDemo` (`-Distribution demo` accepts Advanced or Preview only); unzip it inside the checkout, not under `%TEMP%` |
 | 2 | Lay the Space down (offline, before the server starts) | `node tools/seed-la-audit.mjs --scaffold <spacesRoot>` creates `la-audit` and the template gallery |
 | 3 | Start the server with `-Dla.embed.enabled=true` (only for the Embed scene) | without it the mint answers 503 |
-| 4 | Wait for the Jobs: `ap_links` runs on a 10-minute cron; its three derived Jobs and `la_index_build` follow it by signal | or press Run on each as `audit.manager` |
+| 4 | Wait for the Jobs: `ap_links` runs on a 10-minute cron; its three derived Jobs and `la_index_build` follow it by signal | or press Run on each as `manager` |
 | 5 | Seed the runtime state | `node tools/seed-la-audit.mjs --apply` (dry run without `--apply`; safe to re-run). It first presses Run on the link Jobs (a fresh Space has no link rows until the 10-minute cron), then creates two Investigations: `vendor-v117-workpaper` (the workpaper) and `approval-control-review` (the algorithm scenes: E-07 and V-001 expanded twice, 163 nodes and 281 links, so Run on server has a Working Set) |
 | 6 | Smoke | `node tools/la-audit-smoke.mjs` (pins every planted fact against the live Datasets, then builds, verifies and tampers the Dossier) |
 
@@ -23,15 +23,15 @@ The next month (`data/staged`, 40 invoices on existing vendor and approver pairs
 
 ## 1. The cast (Demo Users)
 
-Ids are `audit.*` on purpose: the demo-auth roster refuses one id defined differently in two Spaces, so these never collide with `la-showcase`.
+Ids are the five shared Demo Users of every LA showcase Space (operator, 2026-11-16): the demo-auth roster refuses one id defined differently in two Spaces, so each Space keeps the same five rows and decides in its own `roles.toon` what `la-analyst`, `la-manager` and `la-viewer` may do here.
 
 | Demo User | Role | Can | Cannot |
 |---|---|---|---|
-| `audit.lead` | audit-lead (Lead auditor) | work Investigations, run Graph Runs, build the index, author Alert Rules; a lead member | approve her own expand |
-| `audit.manager` | audit-manager (second approver) | approve held expands, operate Jobs | Reveal; author |
-| `audit.committee` | audit-committee (read-only) | read the Investigation (a reviewer member) | write anything |
-| `audit.outsider` | audit-committee | nothing: not a member (404) | |
-| `audit.admin` | admin + audit-lead + audit-settings | Reveal, Settings, mint embed links; a lead member | operate Jobs (administering is not operating) |
+| `analyst` | la-analyst (Lead auditor) | work Investigations, run Graph Runs, build the index, author Alert Rules; a lead member | approve her own expand |
+| `manager` | la-manager (second approver) | approve held expands, operate Jobs | Reveal; author |
+| `reviewer` | la-viewer (read-only) | read the Investigation (a reviewer member) | write anything |
+| `outsider` | la-viewer | nothing: not a member (404) | |
+| `admin` | admin + fraud-analyst + la-settings | Reveal, Settings, mint embed links; a lead member | operate Jobs (administering is not operating) |
 
 Masking is `typed`: Dataset columns classified `PARTY` (vendors, employees, bank accounts, addresses) are masked for everyone without Reveal; `LEGAL_ENTITY` (the journal) is not masked.
 The Investigation is `vendor-v117-workpaper`, bound to `ap_links_dataset` (`src`, `dst`, `kind`, `ts`).
@@ -58,27 +58,27 @@ with a single approver is a pendant. Three vendors carry the placeholder account
 
 | min | Scene | Who | The point |
 |---|---|---|---|
-| 0:00 | A. Open the workpaper, the cast, masking | audit.lead, audit.committee | masked ids for the committee, the same Investigation |
-| 1:30 | B. Vendor V-117: expand, Connect seeds, Entity profile | audit.lead | conflict of interest in two hops |
-| 3:30 | C. Algorithms on the approval graph (S1 to S5) | audit.lead | client run, then Run on server |
-| 7:00 | D. Four-eyes expand of the CFO, Draft what-if | audit.lead, audit.manager | a second person; a safe sandbox |
-| 9:00 | E. **Dossier: build, verify, change one byte, verify fails** | audit.lead | the headline |
-| 10:30 | F. Members and roles, Settings | audit.admin | who sees what, every limit is a setting |
-| 11:30 | G. Embed to the committee portal (optional) | audit.admin | read-only masked view in their own page |
+| 0:00 | A. Open the workpaper, the cast, masking | analyst, reviewer | masked ids for the committee, the same Investigation |
+| 1:30 | B. Vendor V-117: expand, Connect seeds, Entity profile | analyst | conflict of interest in two hops |
+| 3:30 | C. Algorithms on the approval graph (S1 to S5) | analyst | client run, then Run on server |
+| 7:00 | D. Four-eyes expand of the CFO, Draft what-if | analyst, manager | a second person; a safe sandbox |
+| 9:00 | E. **Dossier: build, verify, change one byte, verify fails** | analyst | the headline |
+| 10:30 | F. Members and roles, Settings | admin | who sees what, every limit is a setting |
+| 11:30 | G. Embed to the committee portal (optional) | admin | read-only masked view in their own page |
 
 ## 4. Scenes with beat-level checks
 
 ### A. Open, cast, masking (1.5 min)
-1. Sign in as `audit.lead`, open Investigations, open `vendor-v117-workpaper`. **Expect:** seeds V-117 and E-31 and their neighbours; a snapshot named "workpaper baseline".
-2. Sign in as `audit.committee` (another window). **Expect:** the same graph, ids masked, every write control disabled; a write via the API answers 403 (`la-audit-smoke.mjs` checks it).
-3. `audit.outsider`: the Investigation is not listed; its API answers 404.
+1. Sign in as `analyst`, open Investigations, open `vendor-v117-workpaper`. **Expect:** seeds V-117 and E-31 and their neighbours; a snapshot named "workpaper baseline".
+2. Sign in as `reviewer` (another window). **Expect:** the same graph, ids masked, every write control disabled; a write via the API answers 403 (`la-audit-smoke.mjs` checks it).
+3. `outsider`: the Investigation is not listed; its API answers 404.
 * **If it goes wrong:** an empty Investigation list means the seed has not run, or the first ingest has not landed (the create answers 422 until it does; the seed script waits).
 
 ### B. V-117, Connect seeds, Entity profile (2 min)
 1. On `ap_vendor_identity` seed V-117, expand: **E-31** appears joined by both `shares_account` (BA-9031) and `shares_address` (AD-9031). Say: two independent attributes, one person.
 2. Seed E-31 and V-117 and run **Connect seeds**: the shortest route is one hop. Switch to `ap_approval_graph`, seed V-117: its only approver is E-15, E-31's own manager (hop 2 from E-31 through the org chart in `ap_org_links_dataset`).
 3. Open the **Entity profile** of V-117 (node panel): reference rows from `vendor_master_dataset` (bank account, address key, onboarding date) and 14 invoice links, the payment account, and the shared links.
-* **Beat check:** the committee sees the same profile with masked ids, and Reveal is held by `audit.admin` and `audit.lead` only (not manager or committee).
+* **Beat check:** the committee sees the same profile with masked ids, and Reveal is held by `admin` and `analyst` only (not manager or committee).
 
 ### C. Algorithms (3.5 min). Each: client run first (instant, small), then **Run on server** for the Job-class ones, progress and result parity
 Plan section 3.1 assigns eight algorithms to this vertical. Always seed first; an all-nodes canvas is a dust cloud.
@@ -98,22 +98,22 @@ Recording parity (plan S6): note seed, top result and run time in the table abov
 Also useful here, from the plan's coverage matrix: **Recursive paths** (approval chain depth through `ap_org_links_dataset`: E-31's chain to the CFO is E-15, E-07, E-03, E-01), the temporal and branching **pattern packs** on the 30 split invoices (branching: one approver to one vendor, TS ascending; band 9 700 to 10 000), and **Find cycles** with **Maximum flow** on `gl_intercompany` (S9 below).
 
 ### D. Four-eyes and the Draft what-if (2 min)
-1. The seed already staged one **pending** four-eyes request (an unbounded expand of the Investigation, over `four_eyes_fan_out_above`). As `audit.lead`, also seed E-01 (the CFO) and press Expand without a fan-out cap. **Expect:** held as a pending request, because the CFO's 40 vendors are over the threshold of 30; `audit.lead` cannot approve it.
-2. Sign in as `audit.manager`, open the approval inbox and approve it. **Expect:** E-01's 40 vendors appear. The CFO and the utilities vendor V-001 (18 approvers, under the threshold, so it expands without a hold) are the benign look-alikes: busy, explained, never flagged.
+1. The seed already staged one **pending** four-eyes request (an unbounded expand of the Investigation, over `four_eyes_fan_out_above`). As `analyst`, also seed E-01 (the CFO) and press Expand without a fan-out cap. **Expect:** held as a pending request, because the CFO's 40 vendors are over the threshold of 30; `analyst` cannot approve it.
+2. Sign in as `manager`, open the approval inbox and approve it. **Expect:** E-01's 40 vendors appear. The CFO and the utilities vendor V-001 (18 approvers, under the threshold, so it expands without a hold) are the benign look-alikes: busy, explained, never flagged.
 3. **Draft** (labelled "Draft: approval limit what-if", seeded): fork, step, rebase, promote or discard. The what-if: a limit of 9 000 would have caught all 30 invoices; a threshold filter AMOUNT >= 9 000 on `ap_approval_graph` shows exactly E-23 to V-099. Discard it; the Investigation is untouched.
 
 ### E. The Dossier as an audit workpaper (1.5 min), the headline
-1. As `audit.lead`, open the Investigation's **Dossier**: build it. **Expect:** a manifest with hashes of the op log, Working Set and links.
+1. As `analyst`, open the Investigation's **Dossier**: build it. **Expect:** a manifest with hashes of the op log, Working Set and links.
 2. **Verify** the untouched manifest: **verified**.
 3. Change **one byte**: open the manifest in an editor and flip one hex digit of any hash, or use the scripted tamper in `tools/la-audit-smoke.mjs` (`tamperManifest`). Verify again: **fails**, and says which part differs. Say: the committee, the external auditor or a regulator can check the workpaper without trusting the system.
 * **Prepare the altered file beforehand**: hand-editing JSON in front of an audience is error-prone.
-* API (as `audit.lead`): `GET .../inv/investigations/vendor-v117-workpaper/dossier`, then `POST .../dossier/verify` with `{manifest}`.
+* API (as `analyst`): `GET .../inv/investigations/vendor-v117-workpaper/dossier`, then `POST .../dossier/verify` with `{manifest}`.
 
-### F. Members, roles, Settings (1 min) [audit.admin]
-Members: `audit.lead` lead, `audit.admin` lead, `audit.manager` and `audit.committee` reviewers, `audit.outsider` absent. Settings > Link Analysis: masking `typed`, four-eyes above 2000, index ON, Draft limits, the embed allow-list, Max fan-out. Entity types: `party` (masked) and `legal_entity` (not masked).
+### F. Members, roles, Settings (1 min) [admin]
+Members: `analyst` lead, `admin` lead, `manager` and `reviewer` reviewers, `outsider` absent. Settings > Link Analysis: masking `typed`, four-eyes above 2000, index ON, Draft limits, the embed allow-list, Max fan-out. Entity types: `party` (masked) and `legal_entity` (not masked).
 
-### G. Embed, optional (1 min) [audit.admin]
-Mint an embed link on the Investigation (`POST .../embeds` or the Share panel; needs `-Dla.embed.enabled=true` and a lead member, hence `audit.admin`). Serve the portal from the allowed origin and open it:
+### G. Embed, optional (1 min) [admin]
+Mint an embed link on the Investigation (`POST .../embeds` or the Share panel; needs `-Dla.embed.enabled=true` and a lead member, hence `admin`). Serve the portal from the allowed origin and open it:
 ```
 python -m http.server 8100 --bind 127.0.0.1 --directory spaces/_templates/la-audit/portal
 # open http://127.0.0.1:8100/committee-portal.html and paste the viewer link http://<host>/embed/inv/<grantId>.<secret>
@@ -128,7 +128,7 @@ Open `gl_intercompany` (journal flows; `LEGAL_ENTITY` ids are not masked). **Fin
 
 ## 5. Decisions recorded while building (operator may overrule)
 
-1. **Template and personas are `la-audit` and `audit.*`.** Existing Spaces keep `admin`, `fm.analyst` and friends; the roster refuses one id with two definitions, so this Space never reuses them.
+1. **Template is `la-audit`; personas are the five shared Demo Users** (`admin`, `analyst`, `manager`, `reviewer`, `outsider`, operator 2026-11-16, replacing the earlier `audit.*` ids). The roster refuses one id with two definitions, so the rows are identical to every other LA showcase Space; this Space's roles give them their audit capabilities.
 2. **One classification, `PARTY`, for every vendor, employee, account and address column.** Typed masking is per column, and a link endpoint column holds several of those, so one masked type covers them; `LEGAL_ENTITY` is the one unmasked type (the journal), which also demonstrates `typed` masking.
 3. **`reports_to` is oriented manager to report (parent to child).** The row reads "src is the manager of dst". `Is forest` and Descendants read the parent-to-child direction; employee to manager would make a tree read as not a forest.
 4. **Master-data links (`reports_to`, `shares_*`) carry the as-of day 2026-09-30** as `ts` and `event_date`, so the data-trust strip is not stretched back to a 2012 hire date.
@@ -143,8 +143,8 @@ Rehearsal 2026-10-16 on an Advanced Demo Auth bundle built from this branch (por
 **Verified:**
 * `la-audit-smoke.mjs`: **30/30** (Job outputs carry every plant; the Dossier verifies and one altered hash fails; committee read-only 403 and 200; outsider 404; pending request in the manager's inbox; a server Graph Run is accepted).
 * The five link Jobs ran and every derived Dataset has rows; a replaced feed file re-ingests in place (counts did not double).
-* Browser as `audit.lead`: the saved view `ap_approval_graph` (175 nodes, 1 804 links, ids masked as aliases, the E-07 portfolio visibly joined to the rest by one link), **Cut points: 3 nodes and 1 bridge**, **Betweenness** ranking (V-001 first at 7 255), the Investigation list, the workpaper Investigation opened, **Build dossier** and **Verify this manifest** ("All 6 recorded hashes still agree with the sealed log"), the four-eyes warning ("above 30, four_eyes_fan_out_above").
-* HTTP: server Graph Runs `articulationPoints`, `bridges`, `kCore` (core 3), `isForest` (false), `betweennessCentrality` (47 ms, 163 nodes and 281 links), `maximumSpanningForest`, `linkPrediction` (4 ms), all COMPLETED with masked ids. Four-eyes: `audit.lead` and `audit.committee` get 403 on approve, `audit.manager` approves and the expand runs as step 7. Draft: conflicts (behind 1, none), rebase, promote. Entity profile of V-117 (resolve the alias first: the type is masked). Embed: mint, public read (200, `frame-ancestors 'none'`), the portal on :8100 framing the masked read-only view, revoke gives 404.
+* Browser as `analyst`: the saved view `ap_approval_graph` (175 nodes, 1 804 links, ids masked as aliases, the E-07 portfolio visibly joined to the rest by one link), **Cut points: 3 nodes and 1 bridge**, **Betweenness** ranking (V-001 first at 7 255), the Investigation list, the workpaper Investigation opened, **Build dossier** and **Verify this manifest** ("All 6 recorded hashes still agree with the sealed log"), the four-eyes warning ("above 30, four_eyes_fan_out_above").
+* HTTP: server Graph Runs `articulationPoints`, `bridges`, `kCore` (core 3), `isForest` (false), `betweennessCentrality` (47 ms, 163 nodes and 281 links), `maximumSpanningForest`, `linkPrediction` (4 ms), all COMPLETED with masked ids. Four-eyes: `analyst` and `reviewer` get 403 on approve, `manager` approves and the expand runs as step 7. Draft: conflicts (behind 1, none), rebase, promote. Entity profile of V-117 (resolve the alias first: the type is masked). Embed: mint, public read (200, `frame-ancestors 'none'`), the portal on :8100 framing the masked read-only view, revoke gives 404.
 
 **Not driven:** the in-browser clicks for Jaccard, Link prediction, Maximum spanning forest and Is forest on the client (their server twins ran and the golden test pins the results); the Draft, Members and Settings panels and the Entity profile page in the browser (their routes were driven); tamper through the Dossier file upload (the smoke runs it through the route); `gl_intercompany` Find cycles and Maximum flow in the browser (pinned by the golden test).
 
@@ -162,7 +162,7 @@ Rehearsal 2026-10-16 on an Advanced Demo Auth bundle built from this branch (por
 * The `la-showcase-off` template's `roles.toon` once differed from `la-showcase`'s (Reveal on the analyst) and failed `LaShowcaseTemplateTest`; fixed in `f1b64ce03` (2026-10-17), the two files are now identical.
 * Recorded precision claims: none. The plants are planted, the counts are the corpus, and no detection rate is implied.
 
-**Browser rehearsal, 2026-10-24.** Driven as `audit.lead`, `audit.manager`-side API and `audit.admin`: k-core, Cut points, Bridges, Betweenness, Strongest backbone, Link prediction, Find cycles and Maximum flow on `gl_intercompany` (3, not 7 200 000), the Draft cycle, Members grant and revoke, Settings, the Entity profile page, and the Dossier tamper through the file upload (one flipped digit names `log.jsonl#2`). Still not driven: Jaccard and Find similar (need a node pick). Is forest has no client button. Detail: [the cross-vertical tour](../la-showcase/admin-guide-cross-vertical-tour.md).
+**Browser rehearsal, 2026-10-24.** Driven as `analyst`, `manager`-side API and `admin`: k-core, Cut points, Bridges, Betweenness, Strongest backbone, Link prediction, Find cycles and Maximum flow on `gl_intercompany` (3, not 7 200 000), the Draft cycle, Members grant and revoke, Settings, the Entity profile page, and the Dossier tamper through the file upload (one flipped digit names `log.jsonl#2`). Still not driven: Jaccard and Find similar (need a node pick). Is forest has no client button. Detail: [the cross-vertical tour](../la-showcase/admin-guide-cross-vertical-tour.md).
 
 ## 7. As part of the *Enterprise* industry Space
 

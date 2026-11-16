@@ -40,7 +40,7 @@ async function login(user) {
   return tr.json();
 }
 const get = async (t, p) => { const r = await fetch(I + '/api/v1' + p, { headers: { authorization: 'Bearer ' + t } }); let j = null; try { j = await r.json(); } catch { /* none */ } return { s: r.status, j }; };
-const users = (process.argv[3] || 'fm.analyst,fm.manager,ra.analyst,demo.manager,siu.analyst,siu.manager,partner.reviewer,outsider,mm.analyst,mm.manager,mm.reviewer,mm.outsider,audit.admin,audit.lead,audit.manager,audit.committee,audit.outsider').split(',');
+const users = (process.argv[3] || 'admin,analyst,manager,reviewer,outsider').split(',');
 let spaces = null;
 for (const u of users) {
   try {

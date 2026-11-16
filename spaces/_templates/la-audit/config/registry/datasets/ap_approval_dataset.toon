@@ -8,10 +8,10 @@ columns[6]{name,type,classification}:
   approved_at,timestamp,
   approved_date,date,
   level,string,
-owner: audit.lead
+owner: analyst
 shares[5]{subjectType,subjectId,access}:
-  user,audit.admin,view
-  user,audit.lead,view
-  user,audit.manager,view
-  user,audit.committee,view
-  user,audit.outsider,view
+  user,admin,view
+  user,analyst,view
+  user,manager,view
+  user,reviewer,view
+  user,outsider,view

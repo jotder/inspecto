@@ -657,11 +657,11 @@ is archived as [`la-studio-ui-reorg-plan`](../../../../archived-documents/plans-
   - The ⚙ Settings Esc handler ignores an Esc that another overlay already handled.
   - A case view sets `loading` before its awaits, and an unknown graph source clears it.
 - **Live drive 2026-10-28** (a Demo Auth bundle on la-showcase; each Demo User was signed in through the sign-in picker in the browser):
-  - **Embed minting:** `fm.analyst` and `admin` get 200; `fm.manager` and `ra.analyst` get 403; `demo.manager`, a non-member, gets 404 on the embed list.
-  - **Read-only toolsets:** the embed viewer and the `la_showcase_overview` dashboard Widget (opened as `ra.analyst`) run Centrality, Communities and Cycles with no server request.
-  - **`fm.manager` and `admin`:** open `mule-hub-case` with the full File menu and ⚙ → Investigation settings. As `admin`, Share and embed offers *Create link*.
-  - **`demo.manager`:** gets "This Investigation is not available…", the same answer whether or not the Investigation exists.
-  - **`ra.analyst` (on Standard):** sees a "Read-only" banner. *Save this analysis* and *Delete* are off, with the reason. Expand…, Expand next degree and Expand the whole Working Set are off.
+  - **Embed minting:** `analyst` and `admin` get 200; `manager` and `reviewer` get 403; `outsider`, a non-member, gets 404 on the embed list.
+  - **Read-only toolsets:** the embed viewer and the `la_showcase_overview` dashboard Widget (opened as `reviewer`) run Centrality, Communities and Cycles with no server request.
+  - **`manager` and `admin`:** open `mule-hub-case` with the full File menu and ⚙ → Investigation settings. As `admin`, Share and embed offers *Create link*.
+  - **`outsider`:** gets "This Investigation is not available…", the same answer whether or not the Investigation exists.
+  - **`reviewer` (on Standard):** sees a "Read-only" banner. *Save this analysis* and *Delete* are off, with the reason. Expand…, Expand next degree and Expand the whole Working Set are off.
   - **Esc in ⚙ Settings,** after a real Graph model edit: the first Esc asks to discard the change; the second Esc closes that confirm without reopening it, and Settings stays open.
 - **Edition and add-on locks, checked live the same day (UIR-D14).** The demo sign-in exists only on Advanced and Preview builds, and Basic has no sign-in at all. So Standard was run as the demo bundle without `inspecto-policy`, and Basic as a real `-Edition Basic` bundle.
   - **Advanced with `-Daddons.laInvestigations=false`:**
@@ -687,11 +687,11 @@ is archived as [`la-studio-ui-reorg-plan`](../../../../archived-documents/plans-
     - The browser then opened the returned callback, and the app finished its own exchange.
     - The la-showcase seed ran with real WSO2 tokens.
   - **Results per user:**
-    - **`fm.analyst`:** the full File menu, Investigation settings with *Create link*, and *Expand…* available.
-    - **`fm.manager`:** opens the Investigation; Share and embed shows no *Create link*.
+    - **`analyst`:** the full File menu, Investigation settings with *Create link*, and *Expand…* available.
+    - **`manager`:** opens the Investigation; Share and embed shows no *Create link*.
     - **`admin`:** *Create link* is offered.
-    - **`demo.manager`:** gets "This Investigation is not available…".
-    - **`ra.analyst`:** may change Investigations here. In WSO2 it is also in the built-in `operations` group, which grants `canManageIncidents`. The demo roster makes it a reviewer only, so this is the identity setup, not a defect. Operator 2026-10-28: `ra.analyst` is a read-only reviewer on WSO2 too; `scripts/wso2-preview-la-setup.mjs` now lists it in `la-viewer` only and removes a user from any of its groups it is no longer listed in.
+    - **`outsider`:** gets "This Investigation is not available…".
+    - **`reviewer`:** may change Investigations here. In WSO2 it is also in the built-in `operations` group, which grants `canManageIncidents`. The demo roster makes it a reviewer only, so this is the identity setup, not a defect. Operator 2026-10-28: `reviewer` is a read-only reviewer on WSO2 too; `scripts/wso2-preview-la-setup.mjs` now lists it in `la-viewer` only and removes a user from any of its groups it is no longer listed in.
 - **Embed Export:** stays unbuilt (operator 2026-10-28, "not now").
 - **Full gate 2026-10-28 (`f0e8a50eb`):**
   - The reactor ran 56 of 56 modules: 11,280 tests, 0 failures, verdict guard PASS. The UI suite passed 6,779 tests.

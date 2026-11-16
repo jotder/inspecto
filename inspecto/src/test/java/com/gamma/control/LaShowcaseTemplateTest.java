@@ -81,33 +81,33 @@ class LaShowcaseTemplateTest {
         List<Map<String, Object>> users = (List<Map<String, Object>>) ToonHelper.load(CFG.resolve("demo-users.toon").toString()).get("users");
         Map<String, Set<String>> caps = new java.util.HashMap<>();
         for (Map<String, Object> u : users) caps.put(String.valueOf(u.get("id")), held(String.valueOf(u.get("roles"))));
-        assertEquals(Set.of("admin", "fm.analyst", "fm.manager", "ra.analyst", "demo.manager"), caps.keySet());
+        assertEquals(Set.of("admin", "analyst", "manager", "reviewer", "outsider"), caps.keySet());
 
-        Set<String> analyst = caps.get("fm.analyst");
+        Set<String> analyst = caps.get("analyst");
         assertTrue(analyst.containsAll(Set.of(Roles.CAN_MANAGE_INCIDENTS, Roles.CAN_RUN_LINK_GRAPH_ANALYSIS,
                 Roles.CAN_BUILD_LINK_INDEX, Roles.CAN_AUTHOR_ALERT_RULES)), analyst.toString());
         assertFalse(analyst.contains(Roles.CAN_APPROVE_LINK_EXPANSIONS), "the requester cannot also be the approver");
         assertTrue(analyst.contains(Roles.CAN_REVEAL_LINK_ENTITIES), "the analyst may reveal (91a03666c, 2026-10-16: Preview LA demo); each reveal is audited");
 
-        Set<String> manager = caps.get("fm.manager");
+        Set<String> manager = caps.get("manager");
         assertTrue(manager.containsAll(Set.of(Roles.CAN_APPROVE_LINK_EXPANSIONS, Roles.CAN_MANAGE_INCIDENTS)), manager.toString());
         assertFalse(manager.contains(Roles.CAN_REVEAL_LINK_ENTITIES));
         assertFalse(manager.contains(Roles.CAN_AUTHOR_WORKBENCH), "no silent write access");
         // D1: POST /jobs/{name}/trigger and POST /alerts/evaluate are gated canOperateRuns; the demo's Run button is
-        // fm.manager's. The seed 'admin' role deliberately lacks it (administering is not operating), and so does
+        // manager's. The seed 'admin' role deliberately lacks it (administering is not operating), and so does
         // every other persona of this template - least privilege.
-        assertTrue(manager.contains(Roles.CAN_OPERATE_RUNS), "fm.manager presses Run on the demo's Jobs: " + manager);
-        for (String id : List.of("admin", "fm.analyst", "ra.analyst", "demo.manager"))
+        assertTrue(manager.contains(Roles.CAN_OPERATE_RUNS), "manager presses Run on the demo's Jobs: " + manager);
+        for (String id : List.of("admin", "analyst", "reviewer", "outsider"))
             assertFalse(caps.get(id).contains(Roles.CAN_OPERATE_RUNS), id + " does not operate runs");
 
         assertTrue(caps.get("admin").contains(Roles.CAN_REVEAL_LINK_ENTITIES));
         // Operator 2026-10-12: the demo's admin edits Settings > Link Analysis (PUT /settings/link-analysis needs
         // canAuthorWorkbench) through the template role 'la-settings'; no other persona gets it.
         assertTrue(caps.get("admin").contains(Roles.CAN_AUTHOR_WORKBENCH), "admin edits the Link Analysis settings");
-        for (String id : List.of("fm.analyst", "fm.manager", "ra.analyst", "demo.manager"))
+        for (String id : List.of("analyst", "manager", "reviewer", "outsider"))
             assertFalse(caps.get(id).contains(Roles.CAN_AUTHOR_WORKBENCH), id + " does not author");
         // the read-only personas: nothing that writes anything
-        for (String id : List.of("ra.analyst", "demo.manager")) assertEquals(Set.of(), caps.get(id), id);
+        for (String id : List.of("reviewer", "outsider")) assertEquals(Set.of(), caps.get(id), id);
     }
 
     /** GEO scene (operator 2026-10-12): synthetic locations + geocoded legs, their Datasets, three saved Geo Views. */

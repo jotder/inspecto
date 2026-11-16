@@ -9,10 +9,10 @@ columns[7]{name,type,classification}:
   amount,number,
   event_date,date,
   via,string,PII
-owner: mm.analyst
+owner: analyst
 shares[5]{subjectType,subjectId,access}:
   user,admin,view
-  user,mm.analyst,view
-  user,mm.manager,view
-  user,mm.reviewer,view
-  user,mm.outsider,view
+  user,analyst,view
+  user,manager,view
+  user,reviewer,view
+  user,outsider,view

@@ -8,7 +8,7 @@
 //   node tools/seed-la-audit.mjs [...] --apply                  perform the calls (safe to re-run: existing things are skipped)
 //
 // Optional stages, each on by default, skipped with its flag, idempotent and SOFT (a refusal prints a warning, exit code stays 0):
-//   --no-pending   one PENDING four-eyes expand (the CFO's 40 vendors, unbounded, over four_eyes_fan_out_above) left for audit.manager
+//   --no-pending   one PENDING four-eyes expand (the CFO's 40 vendors, unbounded, over four_eyes_fan_out_above) left for manager
 //   --no-review    one second Investigation (approval-control-review) over the approval graph, seeded E-07 + V-001 and expanded twice, so Run on server has a Working Set
 //   --no-draft     one open Draft of the workpaper Investigation: the auditor's what-if over the approval limit
 // Needs the Demo Auth build (serve-demo, loopback). Synthetic data only. Never sends a credential: the Demo User exchange takes a
@@ -39,21 +39,21 @@ export function buildPlan() {
     { op: 'snapshot', label: 'workpaper baseline' },
   ];
   return [
-    { id: 'investigation', as: 'audit.lead', method: 'POST', path: '/inv/investigations', body: {
+    { id: 'investigation', as: 'analyst', method: 'POST', path: '/inv/investigations', body: {
       id: INV, title: 'Conflict-of-interest vendor workpaper', purpose: 'Showcase: audit workpaper for the conflict-of-interest vendor', dataset: DATASET,
       sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts' } },
-    ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'audit.lead', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
-    ...[['audit.committee', 'reviewer'], ['audit.manager', 'reviewer'], ['audit.admin', 'lead']].map(([subject, role]) => (
-      { id: `member-${subject}`, as: 'audit.lead', method: 'POST', path: `${base}/members`, body: { subject, role } })),
-    { id: 'list-shells', as: 'audit.lead', method: 'POST', path: '/entity-lists', body: {
+    ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
+    ...[['reviewer', 'reviewer'], ['manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
+      { id: `member-${subject}`, as: 'analyst', method: 'POST', path: `${base}/members`, body: { subject, role } })),
+    { id: 'list-shells', as: 'analyst', method: 'POST', path: '/entity-lists', body: {
       id: 'shell-vendors', title: 'Shell cluster vendors', purpose: 'watch', entityType: 'party', reason: 'showcase shell cluster on one bank account' } },
-    { id: 'list-shells-members', as: 'audit.lead', method: 'POST', path: '/entity-lists/shell-vendors/members', body: {
+    { id: 'list-shells-members', as: 'analyst', method: 'POST', path: '/entity-lists/shell-vendors/members', body: {
       add: ['V-131', 'V-132', 'V-133', 'V-134', 'V-135'], reason: 'five vendors paid to BA-7701 (showcase)' } },
-    { id: 'case', as: 'audit.lead', method: 'POST', path: '/cases/from-entities', body: {
+    { id: 'case', as: 'analyst', method: 'POST', path: '/cases/from-entities', body: {
       title: CASE_TITLE, entities: [{ id: 'entity:party:V-117', dataset: DATASET }] } },
-    { id: 'case-assign', as: 'audit.lead', method: 'POST', path: '/objects/@case/assign', body: { assignee: 'audit.manager' } },
-    { id: 'case-link', as: 'audit.lead', method: 'PUT', path: `${base}/case`, body: { caseRef: '@case' } },
-    { id: 'alert-rule', as: 'audit.lead', method: 'POST', path: `${base}/alert-rules`, body: {
+    { id: 'case-assign', as: 'analyst', method: 'POST', path: '/objects/@case/assign', body: { assignee: 'manager' } },
+    { id: 'case-link', as: 'analyst', method: 'PUT', path: `${base}/case`, body: { caseRef: '@case' } },
+    { id: 'alert-rule', as: 'analyst', method: 'POST', path: `${base}/alert-rules`, body: {
       name: 'ap-split-invoices', severity: 'WARNING',
       valueMeasure: { name: 'structuring', valueCol: 'amount', timeCol: 'ts', from: '2026-03-02', to: '2026-04-02' } } },
   ];
@@ -70,8 +70,8 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   if (!apply) {
     log(`DRY RUN (no request is sent; add --apply). Space '${space}' at ${base}`);
     for (const s of plan) log(`  ${s.as.padEnd(15)} ${s.method} ${s.path}  ${JSON.stringify(s.body)}`);
-    if (want.pending) log(`  audit.lead      POST /inv/investigations/${INV}/ops  ${JSON.stringify(PENDING_EXPAND)}  (held as a pending four-eyes request for audit.manager)`);
-    if (want.draft) log(`  audit.lead      POST /inv/investigations/${INV}/drafts, then .../ops ${JSON.stringify(DRAFT_STEP)}`);
+    if (want.pending) log(`  analyst      POST /inv/investigations/${INV}/ops  ${JSON.stringify(PENDING_EXPAND)}  (held as a pending four-eyes request for manager)`);
+    if (want.draft) log(`  analyst      POST /inv/investigations/${INV}/drafts, then .../ops ${JSON.stringify(DRAFT_STEP)}`);
     return out;
   }
   const client = makeClient({ fetchFn, base, space });
@@ -80,11 +80,11 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   // READINESS: right after /health first answers the Investigation store may not be loaded; poll the LIST until it answers 200.
   let listed = { status: 0 };
   for (let i = 0; i < readyTries; i++) {
-    try { listed = await call('audit.lead', 'GET', '/inv/investigations?limit=200'); } catch (e) { listed = { status: 0, data: String(e.message || e) }; }
+    try { listed = await call('analyst', 'GET', '/inv/investigations?limit=200'); } catch (e) { listed = { status: 0, data: String(e.message || e) }; }
     if (listed.status === 200) break;
     await sleep(1000);
   }
-  if (listed.status !== 200) throw new Error(`cannot list Investigations as audit.lead (${listed.status}): is the Space '${space}' created from the la-audit template?`);
+  if (listed.status !== 200) throw new Error(`cannot list Investigations as analyst (${listed.status}): is the Space '${space}' created from the la-audit template?`);
   const existing = items(listed.data).find((i) => i.id === INV);
   if (!existing) await prime(call, log, sleep, readyTries);
   const headStep = existing ? existing.headStep || 0 : 0;
@@ -112,24 +112,24 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   return out;
 }
 
-/** The link Datasets are Job outputs, so a fresh Space has none until the 10-minute cron: press Run on the link Jobs (as audit.manager, who
+/** The link Datasets are Job outputs, so a fresh Space has none until the 10-minute cron: press Run on the link Jobs (as manager, who
  *  holds canOperateRuns) and wait for ap_links_dataset to have rows. The derived Datasets and the index build follow by signal. */
 async function prime(call, log, sleep, tries) {
-  const has = async () => { const r = await call('audit.admin', 'GET', '/datasets/ap_links_dataset/rows?limit=1'); return r.status === 200 && r.data && (r.data.rows || []).length > 0; };
+  const has = async () => { const r = await call('admin', 'GET', '/datasets/ap_links_dataset/rows?limit=1'); return r.status === 200 && r.data && (r.data.rows || []).length > 0; };
   if (await has()) return;
-  for (const job of ['ap_links', 'gl_links', 'ap_duplicate_payments']) { const t = await call('audit.manager', 'POST', `/jobs/${job}/trigger`, {}); log(`  prime ${job}: ${t.status}`); }
+  for (const job of ['ap_links', 'gl_links', 'ap_duplicate_payments']) { const t = await call('manager', 'POST', `/jobs/${job}/trigger`, {}); log(`  prime ${job}: ${t.status}`); }
   for (let i = 0; i < tries; i++) { if (await has()) return; await sleep(2000); }
   log('  WARNING ap_links_dataset still has no rows; the Investigation create will be refused');
 }
 
 const must = (r, what) => { if (![200, 201, 202].includes(r.status)) throw new Error(`${what} answered HTTP ${r.status} ${JSON.stringify(r.data).slice(0, 160)}`); return r.data; };
 
-/** ONE pending four-eyes expand. Idempotent: the approver inbox (as audit.manager) is read first. */
+/** ONE pending four-eyes expand. Idempotent: the approver inbox (as manager) is read first. */
 async function stagePending(call, out, log) {
-  const inbox = async () => (must(await call('audit.manager', 'GET', '/inv/pending?status=pending&limit=200'), 'approval inbox').items || []).filter((i) => i.investigationId === INV);
+  const inbox = async () => (must(await call('manager', 'GET', '/inv/pending?status=pending&limit=200'), 'approval inbox').items || []).filter((i) => i.investigationId === INV);
   let mine = await inbox();
   if (mine.length) { out.skipped.push('pending-expand'); out.summary.pendingRequestId = mine[0].requestId; return; }
-  const d = must(await call('audit.lead', 'POST', `/inv/investigations/${INV}/ops`, PENDING_EXPAND), 'the unbounded expand');
+  const d = must(await call('analyst', 'POST', `/inv/investigations/${INV}/ops`, PENDING_EXPAND), 'the unbounded expand');
   if (d.status !== 'pending') throw new Error('the unbounded expand RAN instead of being held (is four_eyes_fan_out_above set in link-analysis.toon?)');
   out.done.push('pending-expand'); out.summary.pendingRequestId = d.pending.id; log(`  pending-expand: ${d.pending.id}`);
 }
@@ -137,30 +137,30 @@ async function stagePending(call, out, log) {
 /** The algorithm scenes' Investigation, over the approval graph: seed E-07 (the bridge approver) and V-001 (the utilities hub), expand twice, add the
  *  lead as owner and the others as members. Idempotent: an existing id is left alone. */
 async function stageReview(call, out, log, items) {
-  const listed = items(must(await call('audit.lead', 'GET', '/inv/investigations?limit=200'), 'Investigation list'));
+  const listed = items(must(await call('analyst', 'GET', '/inv/investigations?limit=200'), 'Investigation list'));
   if (listed.some((i) => i.id === REVIEW_INV)) { out.skipped.push('review'); return; }
   const base = `/inv/investigations/${REVIEW_INV}`;
-  must(await call('audit.lead', 'POST', '/inv/investigations', { id: REVIEW_INV, title: 'Approval control review', purpose: 'Showcase: algorithms on the approval graph',
+  must(await call('analyst', 'POST', '/inv/investigations', { id: REVIEW_INV, title: 'Approval control review', purpose: 'Showcase: algorithms on the approval graph',
     dataset: REVIEW_DATASET, sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts' }), 'the review Investigation');
   for (const body of [{ op: 'seed', ids: ['E-07', 'V-001'], entityType: 'party' }, { op: 'expand', direction: 'either', maxFanOut: 30 },
     { op: 'expand', direction: 'either', maxFanOut: 30 }, { op: 'snapshot', label: 'review baseline' }])
-    must(await call('audit.lead', 'POST', `${base}/ops`, body), `review op ${body.op}`);
-  for (const [subject, role] of [['audit.committee', 'reviewer'], ['audit.manager', 'reviewer'], ['audit.admin', 'lead']])
-    must(await call('audit.lead', 'POST', `${base}/members`, { subject, role }), `review member ${subject}`);
+    must(await call('analyst', 'POST', `${base}/ops`, body), `review op ${body.op}`);
+  for (const [subject, role] of [['reviewer', 'reviewer'], ['manager', 'reviewer'], ['admin', 'lead']])
+    must(await call('analyst', 'POST', `${base}/members`, { subject, role }), `review member ${subject}`);
   out.done.push('review'); log(`  review: ${REVIEW_INV}`);
 }
 
-/** ONE open Draft with one step; idempotent (audit.lead's live Draft is reused and only topped up when empty). */
+/** ONE open Draft with one step; idempotent (analyst's live Draft is reused and only topped up when empty). */
 async function stageDraft(call, out, log) {
   const base = `/inv/investigations/${INV}/drafts`;
-  const live = (must(await call('audit.lead', 'GET', base), 'Draft list').items || []).find((d) => d.state === 'open' || d.state === 'hibernated');
+  const live = (must(await call('analyst', 'GET', base), 'Draft list').items || []).find((d) => d.state === 'open' || d.state === 'hibernated');
   if (live && live.steps > 0) { out.skipped.push('draft'); out.summary.draftId = live.draftId; return; }
   const created = !live;
-  const id = live ? live.draftId : must(await call('audit.lead', 'POST', base, { label: 'Draft: approval limit what-if' }), 'Draft fork').draftId;
+  const id = live ? live.draftId : must(await call('analyst', 'POST', base, { label: 'Draft: approval limit what-if' }), 'Draft fork').draftId;
   try {
-    must(await call('audit.lead', 'POST', `${base}/${id}/ops`, DRAFT_STEP), 'the Draft step');
+    must(await call('analyst', 'POST', `${base}/${id}/ops`, DRAFT_STEP), 'the Draft step');
   } catch (e) {
-    if (created) await call('audit.lead', 'POST', `${base}/${id}/discard`, {});
+    if (created) await call('analyst', 'POST', `${base}/${id}/discard`, {});
     throw e;
   }
   out.done.push('draft'); out.summary.draftId = id; log(`  draft: ${id}`);

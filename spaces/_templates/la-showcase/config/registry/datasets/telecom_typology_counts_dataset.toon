@@ -5,10 +5,10 @@ columns[4]{name,type,classification}:
   irsf_lines,number,
   simbox_lines,number,
   scored_lines,number,
-owner: fm.analyst
+owner: analyst
 shares[5]{subjectType,subjectId,access}:
   user,admin,view
-  user,fm.analyst,view
-  user,fm.manager,view
-  user,ra.analyst,view
-  user,demo.manager,view
+  user,analyst,view
+  user,manager,view
+  user,reviewer,view
+  user,outsider,view

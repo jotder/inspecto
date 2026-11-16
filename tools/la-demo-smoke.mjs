@@ -5,10 +5,10 @@
 //
 //   node tools/la-demo-smoke.mjs [--base http://127.0.0.1:8096] [--space la-showcase] [--off-space la-showcase-off]
 //                                [--staged <dir with TRANSFERS_20260904.csv> --inbox <Space inbox/mule_transfers dir>]
-//                                [--burst] [--embed] [--telecom [--presenter fm.manager] [--four-eyes 2000] [--telecom-timeout 180]] [--dry-run]
+//                                [--burst] [--embed] [--telecom [--presenter manager] [--four-eyes 2000] [--telecom-timeout 180]] [--dry-run]
 //
 // Newer behaviour, always run (each prints PASS/FAIL/SKIPPED): empty-dataset (409 'has no rows yet', no engine/path leak; SKIPPED when
-// the telecom Dataset already has rows), read-only-persona (ra.analyst 403 missing capability, read 200), settings-roundtrip (PUT the same
+// the telecom Dataset already has rows), read-only-persona (reviewer 403 missing capability, read 200), settings-roundtrip (PUT the same
 // document back; maxAgeHours 0/8761 = 422 1..8760), signin-picker (/bootstrap auth.mock). --embed (host runs -Dla.embed.enabled=true; admin
 // must lead the Investigation): mint + public GET headers + mangled/revoked uniform 404 + revoke; without it only the dark answers (503/404).
 //
@@ -178,16 +178,16 @@ export function triggerVerdict(res) {
   return res.status === 403 ? `403 (canOperateRuns?) ${excerpt(res)}` : excerpt(res);
 }
 
-/** The telecom presenter: an explicit --presenter wins; else fm.manager (only fm.manager may press Run in la-showcase,
- *  docs/archived-documents/plans-archive/la-telecom-demo-data.md §7). Non-telecom runs keep fm.analyst. */
+/** The telecom presenter: an explicit --presenter wins; else manager (only manager may press Run in la-showcase,
+ *  docs/archived-documents/plans-archive/la-telecom-demo-data.md §7). Non-telecom runs keep analyst. */
 export function resolvePresenter(presenter, telecom) {
-  return presenter || (telecom ? 'fm.manager' : 'fm.analyst');
+  return presenter || (telecom ? 'manager' : 'analyst');
 }
 
 /** A 403 on a Job trigger names the persona and the capability it lacks; null for anything else. */
 export function denialReason(res, persona) {
   if (res.status !== 403) return null;
-  return `${persona} lacks canOperateRuns (403 on Job trigger; run as fm.manager or pass --presenter <persona with canOperateRuns>): ${excerpt(res)}`;
+  return `${persona} lacks canOperateRuns (403 on Job trigger; run as manager or pass --presenter <persona with canOperateRuns>): ${excerpt(res)}`;
 }
 
 /** Expand verdict: entities admitted and, when the hub is reached, flagged highConnectivity. `ws` = working-set?of=entities. */
@@ -220,7 +220,7 @@ export function telecomAlertsVerdict(alerts) {
 }
 
 /** The telecom group (mutates: triggers Jobs, creates an Investigation). `call(user, method, path, body)` as in run(). */
-export async function runTelecom({ call, record, skip = () => {}, presenter = 'fm.manager', fourEyes = 2000, timeoutMs = 180000, pollMs = 3000,
+export async function runTelecom({ call, record, skip = () => {}, presenter = 'manager', fourEyes = 2000, timeoutMs = 180000, pollMs = 3000,
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = () => Date.now() }) {
   const ds = await call(presenter, 'GET', '/components/dataset');
   record('telecom Datasets listed, telecom_links_dataset columns complete', ds.status === 200 ? telecomRegistryVerdict(ds.data) : excerpt(ds));
@@ -373,16 +373,16 @@ export async function runNewer({ call, pub, boot, record, skip, embed = false, i
   const base = `/inv/investigations/${inv}`;
 
   // (1) empty-dataset
-  const rows = await call('fm.analyst', 'GET', `/datasets/${EMPTY_DATASET}/rows?limit=1`);
+  const rows = await call('analyst', 'GET', `/datasets/${EMPTY_DATASET}/rows?limit=1`);
   const emptyId = `empty-dataset: ${EMPTY_DATASET} projection is a calm 409`;
   if (rows.status !== 200) skip(emptyId, `${EMPTY_DATASET} not readable (${excerpt(rows)}); no reliably empty Dataset here`);
   else if (rows.data && Array.isArray(rows.data.rows) && rows.data.rows.length) skip(emptyId, `${EMPTY_DATASET} already has rows (the telecom seed has run)`);
-  else record(emptyId, emptyDatasetVerdict(await call('fm.analyst', 'POST', '/inv/projection', { dataset: EMPTY_DATASET, sourceCol: 'a_msisdn', targetCol: 'b_msisdn' })));
+  else record(emptyId, emptyDatasetVerdict(await call('analyst', 'POST', '/inv/projection', { dataset: EMPTY_DATASET, sourceCol: 'a_msisdn', targetCol: 'b_msisdn' })));
 
   // (2) read-only-persona
-  const write = await call('ra.analyst', 'POST', `${base}/ops`, { op: 'expand', direction: 'either', maxFanOut: 10 });
-  const read = await call('ra.analyst', 'GET', `${base}/log`);
-  record('read-only-persona: ra.analyst mutation is 403 (missing capability), read is 200', readOnlyVerdict(write, read));
+  const write = await call('reviewer', 'POST', `${base}/ops`, { op: 'expand', direction: 'either', maxFanOut: 10 });
+  const read = await call('reviewer', 'GET', `${base}/log`);
+  record('read-only-persona: reviewer mutation is 403 (missing capability), read is 200', readOnlyVerdict(write, read));
 
   // (3) settings-roundtrip
   const before = await call('admin', 'GET', '/settings/link-analysis');
@@ -434,12 +434,12 @@ export function buildProbes({ space = 'la-showcase', offSpace = 'la-showcase-off
   const inv = `/inv/investigations/${INV}`;
   return [
     { id: '401 no token', as: null, method: 'GET', path: '/inv/investigations', want: 401 },
-    { id: '403 ra.analyst on identities', as: 'ra.analyst', method: 'GET', path: '/inv/entity-identities', want: 403 },
-    { id: '404 non-member (demo.manager)', as: 'demo.manager', method: 'GET', path: `${inv}/log`, want: 404 },
-    { id: '404 MODULE_DISABLED on the switched-off Space', as: 'fm.analyst', method: 'GET', path: '/inv/investigations', space: offSpace,
+    { id: '403 reviewer on identities', as: 'reviewer', method: 'GET', path: '/inv/entity-identities', want: 403 },
+    { id: '404 non-member (outsider)', as: 'outsider', method: 'GET', path: `${inv}/log`, want: 404 },
+    { id: '404 MODULE_DISABLED on the switched-off Space', as: 'analyst', method: 'GET', path: '/inv/investigations', space: offSpace,
       want: { status: 404, code: 'MODULE_DISABLED' } },
-    { id: '422 bad Investigation create', as: 'fm.analyst', method: 'POST', path: '/inv/investigations', body: {}, want: 422 },
-    { id: 'member reads the log (200)', as: 'fm.analyst', method: 'GET', path: `${inv}/log`, want: 200 },
+    { id: '422 bad Investigation create', as: 'analyst', method: 'POST', path: '/inv/investigations', body: {}, want: 422 },
+    { id: 'member reads the log (200)', as: 'analyst', method: 'GET', path: `${inv}/log`, want: 200 },
   ].map((p) => ({ space, ...p }));
 }
 
@@ -455,10 +455,10 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   if (dryRun) {
     for (const p of probes) log(`  ${(p.as || '(no token)').padEnd(13)} ${p.method} /spaces/${p.space}${p.path}  -> ${JSON.stringify(p.want)}`);
     log(`  admin         GET /spaces/${space}/audit/route-inventory  -> ${EXPECTED_LA_ROUTES} Link Analysis routes`);
-    log(`  fm.analyst    GET dossier, tamper the manifest, POST dossier/verify  -> verified:false`);
-    log(`  fm.analyst    replay hash before/after copying a staged file  ${inbox && staged ? '' : '(SKIPPED: no --staged/--inbox)'}`);
-    log(`  fm.analyst    GET ${EMPTY_DATASET} rows (empty) then POST /inv/projection  -> 409 'has no rows yet', no IO Error/read_parquet/path  (SKIPPED if it has rows)`);
-    log(`  ra.analyst    POST ops expand -> 403 missing capability; GET log -> 200`);
+    log(`  analyst    GET dossier, tamper the manifest, POST dossier/verify  -> verified:false`);
+    log(`  analyst    replay hash before/after copying a staged file  ${inbox && staged ? '' : '(SKIPPED: no --staged/--inbox)'}`);
+    log(`  analyst    GET ${EMPTY_DATASET} rows (empty) then POST /inv/projection  -> 409 'has no rows yet', no IO Error/read_parquet/path  (SKIPPED if it has rows)`);
+    log(`  reviewer    POST ops expand -> 403 missing capability; GET log -> 200`);
     log(`  admin         GET /settings/link-analysis, PUT it back unchanged, GET equal; PUT index.maxAgeHours 0 and 8761 -> 422 (1..8760)`);
     log(`  admin         embed link ${embed ? 'mint, public GET (CSP frame-ancestors none, DENY, no-store), mangled vs revoked = same 404, revoke' : '(feature dark) mint -> 503 CAPABILITY_UNAVAILABLE, public GET -> 404  (pass --embed when the host runs -Dla.embed.enabled=true)'}`);
     log(`  (no token)    GET /bootstrap -> auth.mock truthy, auth.spacesAttached >= 1 when published`);
@@ -508,17 +508,17 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   const n = inventory.status === 200 ? countLaRoutes(inventory.data) : -1;
   record(`route inventory lists ${EXPECTED_LA_ROUTES} Link Analysis routes`, n === EXPECTED_LA_ROUTES ? null : `got ${n} (HTTP ${inventory.status})`);
 
-  const dossier = await call('fm.analyst', 'GET', `/inv/investigations/${INV}/dossier`);
+  const dossier = await call('analyst', 'GET', `/inv/investigations/${INV}/dossier`);
   if (dossier.status !== 200 || !dossier.data.manifest) record('tamper verify fails', `no dossier manifest (HTTP ${dossier.status})`);
   else {
-    const clean = await call('fm.analyst', 'POST', `/inv/investigations/${INV}/dossier/verify`, { manifest: dossier.data.manifest });
+    const clean = await call('analyst', 'POST', `/inv/investigations/${INV}/dossier/verify`, { manifest: dossier.data.manifest });
     record('untouched manifest verifies', clean.status === 200 && clean.data.verified === true ? null : `HTTP ${clean.status} verified=${clean.data && clean.data.verified}`);
-    const bad = await call('fm.analyst', 'POST', `/inv/investigations/${INV}/dossier/verify`, { manifest: tamperManifest(dossier.data.manifest) });
+    const bad = await call('analyst', 'POST', `/inv/investigations/${INV}/dossier/verify`, { manifest: tamperManifest(dossier.data.manifest) });
     record('tamper verify fails', (bad.status === 200 && bad.data.verified === false) || bad.status === 422 ? null : `HTTP ${bad.status} verified=${bad.data && bad.data.verified}`);
   }
 
   if (inbox && staged) {
-    const hashOf = async () => { const r = await call('fm.analyst', 'POST', `/inv/investigations/${INV}/replay`, {}); return r.status === 200 ? r.data.workingSet.hash : `HTTP ${r.status}`; };
+    const hashOf = async () => { const r = await call('analyst', 'POST', `/inv/investigations/${INV}/replay`, {}); return r.status === 200 ? r.data.workingSet.hash : `HTTP ${r.status}`; };
     const before = await hashOf();
     const file = fs.readdirSync(staged).find((f) => /20260904/.test(f));
     if (!file) record('replay hash unchanged after a file lands', `no *20260904* file in ${staged}`);
@@ -533,7 +533,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
       else {
         await sleep(3000);   // pipeline.commit and the Dataset are visible a moment after the file leaves the inbox
         const after = await hashOf();
-        const reread = await call('fm.analyst', 'POST', `/inv/investigations/${INV}/replay`, { reread: true });
+        const reread = await call('analyst', 'POST', `/inv/investigations/${INV}/replay`, { reread: true });
         record('replay hash unchanged after a file lands', before === after ? null : `${before} -> ${after}`);
         record('Re-read reports drift after a file lands', reread.status === 200 && reread.data.diverged === true ? null : `HTTP ${reread.status} diverged=${reread.data && reread.data.diverged}`);
       }
@@ -547,22 +547,22 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
     // each capacity probe waits for its tokens first; the 429 probe goes last (it only needs a bucket that runs dry).
     const refill = (tokens) => sleep(tokens * 3000);
     // distinct params per run: an identical request is answered from the result cache (200 cached:true) and never reaches the pool
-    const runs = await Promise.all(Array.from({ length: 19 }, (_, i) => call('fm.analyst', 'POST', '/inv/graph/runs',
+    const runs = await Promise.all(Array.from({ length: 19 }, (_, i) => call('analyst', 'POST', '/inv/graph/runs',
       { investigationId: INV, algorithm: 'pageRank', params: { iterations: 60 + i } })));
     const runStatuses = runs.map((r) => r.status);
     if (poolInlineOnly(runStatuses)) skip('19 concurrent Graph Runs -> a 503', 'every run finished inline (a SYNC algorithm under its node ceiling): the pool is unreachable on a graph this small');
     else record('19 concurrent Graph Runs -> a 503', poolVerdict(runStatuses));
     const bodies = indexBurstBodies();
     await refill(bodies.length);
-    const starts = await Promise.all(bodies.map((b) => call('fm.analyst', 'POST', '/inv/index/builds', b)));
+    const starts = await Promise.all(bodies.map((b) => call('analyst', 'POST', '/inv/index/builds', b)));
     record(`${bodies.length} concurrent index builds -> a 503 (queue full)`, indexQueueVerdict(starts.map((r) => r.status)));
     await refill(2);
     const dupBody = { ...bodies[0], attrCols: ['AMOUNT'] };   // outside the 16 burst mappings, so the first of the pair cannot itself be a 409
-    const a = await call('fm.analyst', 'POST', '/inv/index/builds', dupBody);
-    const b = await call('fm.analyst', 'POST', '/inv/index/builds', dupBody);
+    const a = await call('analyst', 'POST', '/inv/index/builds', dupBody);
+    const b = await call('analyst', 'POST', '/inv/index/builds', dupBody);
     record('a second live build of the same mapping -> 409', duplicateBuildVerdict(a, b));
     const seq = [];
-    for (let i = 0; i < 25; i++) seq.push((await call('fm.analyst', 'POST', '/inv/projection',
+    for (let i = 0; i < 25; i++) seq.push((await call('analyst', 'POST', '/inv/projection',
       { dataset: 'mule_transfers_dataset', sourceCol: 'PAYER_ACCOUNT', targetCol: 'PAYEE_ACCOUNT' })).status);
     record('>20 expensive POSTs -> 429', rateLimitVerdict(seq));
   } else log('skip  burst limits (no --burst)');

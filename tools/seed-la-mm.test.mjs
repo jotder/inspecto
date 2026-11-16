@@ -36,17 +36,17 @@ test('apply signs in once per persona and acts as the right persona', async () =
   const m = mock();
   const r = await run({ fetchFn: m.fetchFn, base: 'http://h', space: 's', apply: true, stages: OFF });
   assert.deepEqual(r.failed, []);
-  assert.equal(m.calls.filter((c) => c.u === '/auth/exchange').length, 2);   // mm.analyst, and admin for the Case (needs reveal)
+  assert.equal(m.calls.filter((c) => c.u === '/auth/exchange').length, 2);   // analyst, and admin for the Case (needs reveal)
   const ops = m.calls.filter((c) => c.u === `/spaces/s/inv/investigations/${INV}/ops`);
   assert.deepEqual(ops.map((c) => c.body.op), ['seed', 'expand', 'exclude', 'annotate', 'threshold', 'window', 'resolve', 'snapshot']);
-  assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:mm.analyst'));
+  assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:analyst'));
   assert.ok(ops.find((c) => c.body.op === 'exclude').body.reason);
   assert.ok(ops.find((c) => c.body.op === 'expand').body.maxFanOut <= 100, 'the bounded expand stays under the four-eyes threshold');
   const members = m.calls.filter((c) => c.u.endsWith('/members') && c.u.includes('investigations'));
-  assert.deepEqual(members.map((c) => c.body), [{ subject: 'mm.reviewer', role: 'reviewer' }, { subject: 'mm.manager', role: 'reviewer' }, { subject: 'admin', role: 'lead' }]);
-  assert.ok(!members.some((c) => c.body.subject === 'mm.outsider'), 'the outsider is not a member');
+  assert.deepEqual(members.map((c) => c.body), [{ subject: 'reviewer', role: 'reviewer' }, { subject: 'manager', role: 'reviewer' }, { subject: 'admin', role: 'lead' }]);
+  assert.ok(!members.some((c) => c.body.subject === 'outsider'), 'the outsider is not a member');
   const assign = m.calls.find((c) => c.u === '/spaces/s/objects/CASE-7/assign');
-  assert.deepEqual(assign.body, { assignee: 'mm.manager' });
+  assert.deepEqual(assign.body, { assignee: 'manager' });
   assert.equal(assign.auth, 'Bearer tok-demo:admin');
   assert.deepEqual(m.calls.find((c) => c.method === 'PUT').body, { caseRef: 'CASE-7' });
   assert.ok(Date.parse(m.calls.find((c) => c.body && c.body.expiresAt).body.expiresAt) > Date.now());
@@ -80,14 +80,14 @@ test('scaffold lays the Space and the template gallery, and stamps the index own
   assert.equal(stampIndexBuildOwner('job:\n  type: sql.template\n'), 'job:\n  type: sql.template\n');
 });
 
-test('a fresh Space (no link rows yet) presses Run on mm_links as mm.manager before the create', async () => {
+test('a fresh Space (no link rows yet) presses Run on mm_links as manager before the create', async () => {
   const m = mock(); let n = 0;
   const f = async (url, init = {}) => (url.includes('/datasets/mm_links_dataset/rows') && n++ < 2
     ? { ok: true, status: 200, json: async () => ({ data: { rows: [] } }) } : m.fetchFn(url, init));
   const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, stages: OFF, sleep: async () => {} });
   assert.deepEqual(r.failed, []);
   const i = m.calls.findIndex((c) => c.u === '/spaces/s/jobs/mm_links/trigger' && c.method === 'POST');
-  assert.ok(i >= 0 && m.calls[i].auth === 'Bearer tok-demo:mm.manager');
+  assert.ok(i >= 0 && m.calls[i].auth === 'Bearer tok-demo:manager');
   assert.ok(i < m.calls.findIndex((c) => c.u === '/spaces/s/inv/investigations' && c.method === 'POST'));
 });
 

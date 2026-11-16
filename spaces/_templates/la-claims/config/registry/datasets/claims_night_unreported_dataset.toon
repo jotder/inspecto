@@ -11,10 +11,10 @@ columns[7]{name,type,classification}:
   accident_at,timestamp,
   report_status,string,
   accident_hour,number,
-owner: siu.analyst
+owner: analyst
 shares[5]{subjectType,subjectId,access}:
   user,admin,view
-  user,siu.analyst,view
-  user,siu.manager,view
-  user,partner.reviewer,view
+  user,analyst,view
+  user,manager,view
+  user,reviewer,view
   user,outsider,view

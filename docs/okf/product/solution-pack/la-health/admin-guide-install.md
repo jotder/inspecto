@@ -107,16 +107,16 @@ node tools/seed-la-health.mjs --base http://127.0.0.1:8096 --apply
 It is safe to re-run; without `--apply` it only prints the calls. It creates the Investigation `phantom-billing`
 (seeded with `PR-1241`, expanded once over `treated` to its patients, annotated, snapshotted), its members, the Entity
 List `billed-in-hospital-or-after-death` (the 40 patients `PR-1241` billed while they were in hospital elsewhere or
-after they died), a Case assigned to `health.manager` and linked to the Investigation, an Investigation template, one
+after they died), a Case assigned to `manager` and linked to the Investigation, an Investigation template, one
 unbounded expand held for a second person, and one open Draft. To lay the Space out offline instead of unzipping the
 downloads, `node tools/seed-la-health.mjs --scaffold <bundle>\spaces` does it before the first start.
 
 | Persona (sign in as) | Role | Sees |
 |---|---|---|
-| `health.analyst` | `health-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
-| `health.manager` | `health-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
-| `health.reviewer` | `la-viewer`, member as reviewer | reads `phantom-billing`; any change is refused (403) |
-| `health.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `analyst` | `la-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `manager` | `la-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `reviewer` | `la-viewer`, member as reviewer | reads `phantom-billing`; any change is refused (403) |
+| `outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
 | `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
 
 **The Alert Rule.** `health_billed_in_admission_or_after_death` (WARNING) reads the one row of `health_phantom_counts`

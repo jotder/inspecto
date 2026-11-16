@@ -923,19 +923,19 @@ Two templates: **`la-showcase`** (the demo) and **`la-showcase-off`** (an empty 
   `index.enabled: true` set explicitly, Drafts limits). Jobs: `la_index_build` (`on_signal: pipeline.commit`, guard `$signal.pipeline == mule_transfers &&
   $signal.status == SUCCESS`, `allow_full: "true"`, `owner` is re-stamped to the applier by `TemplateSeedGate`) and `la_detect` (`*/5 * * * *`).
 - **Personas** (`demo-users.toon` + `roles.toon`; an authored role REPLACES a seed role of the same name): `admin` (`admin;fraud-analyst`: Reveal),
-  `fm.analyst` (`fraud-analyst`: Manage Incidents, Run Link Graph Analysis, Build Link Index, Author Alert Rules, Work Incidents),
-  `fm.manager` (`fraud-manager`: Approve Link Expansions, Manage Incidents, Work Incidents - the second approver), `ra.analyst` and `demo.manager`
+  `analyst` (`la-analyst`: Manage Incidents, Run Link Graph Analysis, Build Link Index, Author Alert Rules, Work Incidents),
+  `manager` (`la-manager`: Approve Link Expansions, Manage Incidents, Work Incidents - the second approver), `reviewer` and `outsider`
   (`la-viewer`: no capability at all). The Dataset carries explicit `user` shares for all five (standing detection refuses a role-only share).
 - **Data tuning (DR-S10).** The ordinary traffic is acyclic and triangle-free (first half of the accounts pays the second half) and small, so the Suspicion
   score ranks `MULE-HUB-01` first (top 3 asserted) and `SHELL-A->B->C->D->A` is the only directed cycle. Pinned by `LaShowcaseGoldenTest`
   (inspecto-graph, reads the shipped CSVs); regenerate with `tools/gen-la-showcase-data.py`. Trade-off: the ordinary traffic is less realistic than the
   `demo` Space's, and the manual's section 10 figures that depend on the old noise (170 nodes, 13 pass-through accounts) differ here.
 - **Runtime state has NO template home** (checked 2026-10-10: no registry kind, `case-link.json` is import-reserved, `TemplateSeedGate` seeds registry
-  components only). `tools/seed-la-showcase.mjs` seeds it over HTTP as the right personas: the Investigation `mule-hub-case` (8 ops, owner `fm.analyst`),
-  reviewers `ra.analyst`, `fm.manager`, `admin` (`demo.manager` stays a non-member), Entity List `smurf-accounts` (12 members, one prefix range, one
+  components only). `tools/seed-la-showcase.mjs` seeds it over HTTP as the right personas: the Investigation `mule-hub-case` (8 ops, owner `analyst`),
+  reviewers `reviewer`, `manager`, `admin` (`outsider` stays a non-member), Entity List `smurf-accounts` (12 members, one prefix range, one
   expiring entry), the msisdn watch list `telecom-watch-msisdn` (the Wangiri suspect and IRSF-01, so the telecom node dialog's
-  *Add to watch list* has a list of its Entity Type), one identity assertion, a Case assigned to `fm.manager` and linked, an Investigation Template, and the bound pass-through Alert Rule
-  with standing detection. **Owner is `fm.analyst`, not `admin`**: binding and enabling need the Investigation's owner-and-lead holding Author Alert
+  *Add to watch list* has a list of its Entity Type), one identity assertion, a Case assigned to `manager` and linked, an Investigation Template, and the bound pass-through Alert Rule
+  with standing detection. **Owner is `analyst`, not `admin`**: binding and enabling need the Investigation's owner-and-lead holding Author Alert
   Rules, and the Dataset share must name that owner. Dry run by default; `--apply` writes; re-runs skip what exists.
 - **Operator steps.** (1) `pwsh -File inspecto/package.ps1 -Edition Advanced -Distribution demo [-Product la]`; (2) launch `inspecto-la-app` (it scaffolds
   `inspecto-demo/spaces-la-showcase` with both Spaces, then serves on 8097); (3) `node tools/seed-la-showcase.mjs --base http://127.0.0.1:8097` (dry run), then
@@ -946,7 +946,7 @@ Two templates: **`la-showcase`** (the demo) and **`la-showcase-off`** (an empty 
 - **Variants.** `inspecto-personal` (launch config; a Basic bundle from `package.ps1` with no flags, port 8098): `GET /inv/investigations` answers 503
   `CAPABILITY_UNAVAILABLE`. **Postgres store (no Docker automation):** start the Advanced/Preview server with
   `-Dinvestigations.backend=db -Dinvestigations.db.url=jdbc:postgresql://<host>:5432/<db>` (password through the `SecretResolver`; the `la-store-pg` jar is
-  Preview/Advanced only), create the Space, seed. Sample Advanced PDP policy (deny `ra.analyst` Investigation reads): `config/examples/access-policy-deny-persona.md`,
+  Preview/Advanced only), create the Space, seed. Sample Advanced PDP policy (deny `reviewer` Investigation reads): `config/examples/access-policy-deny-persona.md`,
   inert until applied with `PUT /access/policies`; a persona-based `when` is unverified by any repository test.
 - **Not verified here.** The seed script's request bodies are grounded in route code and tests and unit-tested against a mocked `fetch`; it has NOT been run
   against a live server, nor has a Space been created from the template in a Link Analysis build (the template-scanning tests create it in a build without

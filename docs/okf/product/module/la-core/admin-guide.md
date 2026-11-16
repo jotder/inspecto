@@ -77,7 +77,7 @@ capabilities, refresh/resume, sign-out, expired token, a user with no mapped gro
    from the access token the API validates: no `groups` means zero capabilities, no name claims means the user menu shows the
    raw subject UUID ("Signed in as d13b9996-...").
 5. Requested claims on the app: `groups`, `username`, `givenname`, `lastname`.
-6. Groups named exactly as the Space's `config/roles.toon` roles (the `la-showcase` template: `fraud-analyst`, `fraud-manager`,
+6. Groups named exactly as the Space's `config/roles.toon` roles (the `la-showcase` template: `fraud-analyst`, `la-manager`,
    `la-viewer`, `la-settings`, plus the seeded `admin`), one user per persona (analyst, manager, viewer, admin = `admin` +
    `fraud-analyst` + `la-settings`) and **one user in no group**. Generate the passwords and keep them in a local ignored file.
 

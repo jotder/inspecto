@@ -117,20 +117,20 @@ class LaClaimsTemplateTest {
         List<Map<String, Object>> users = (List<Map<String, Object>>) ToonHelper.load(CFG.resolve("demo-users.toon").toString()).get("users");
         Map<String, Set<String>> caps = new HashMap<>();
         for (Map<String, Object> u : users) caps.put(String.valueOf(u.get("id")), held(String.valueOf(u.get("roles"))));
-        assertEquals(Set.of("admin", "siu.analyst", "siu.manager", "partner.reviewer", "outsider"), caps.keySet());
+        assertEquals(Set.of("admin", "analyst", "manager", "reviewer", "outsider"), caps.keySet());
 
-        Set<String> analyst = caps.get("siu.analyst");
+        Set<String> analyst = caps.get("analyst");
         assertTrue(analyst.containsAll(Set.of(Roles.CAN_MANAGE_INCIDENTS, Roles.CAN_RUN_LINK_GRAPH_ANALYSIS, Roles.CAN_BUILD_LINK_INDEX,
                 Roles.CAN_AUTHOR_ALERT_RULES)), analyst.toString());
         assertFalse(analyst.contains(Roles.CAN_APPROVE_LINK_EXPANSIONS), "the requester cannot also be the approver");
-        Set<String> manager = caps.get("siu.manager");
+        Set<String> manager = caps.get("manager");
         assertTrue(manager.containsAll(Set.of(Roles.CAN_APPROVE_LINK_EXPANSIONS, Roles.CAN_OPERATE_RUNS)), manager.toString());
         assertFalse(manager.contains(Roles.CAN_REVEAL_LINK_ENTITIES));
         assertTrue(caps.get("admin").contains(Roles.CAN_REVEAL_LINK_ENTITIES), "only the admin reveals masked claimants");
         assertTrue(caps.get("admin").contains(Roles.CAN_AUTHOR_WORKBENCH), "the admin edits the Link Analysis settings");
-        for (String id : List.of("siu.analyst", "siu.manager", "partner.reviewer", "outsider"))
+        for (String id : List.of("analyst", "manager", "reviewer", "outsider"))
             assertFalse(caps.get(id).contains(Roles.CAN_AUTHOR_WORKBENCH), id + " does not author");
-        for (String id : List.of("partner.reviewer", "outsider")) assertEquals(Set.of(), caps.get(id), id + " is read-only");
+        for (String id : List.of("reviewer", "outsider")) assertEquals(Set.of(), caps.get(id), id + " is read-only");
     }
 
     @Test

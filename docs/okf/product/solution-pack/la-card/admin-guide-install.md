@@ -100,16 +100,16 @@ node tools/seed-la-card.mjs --base http://127.0.0.1:8096 --apply
 It is safe to re-run; without `--apply` it only prints the calls. It creates the Investigation `compromised-terminal`
 (seeded with `M-317`, expanded once over `visited_before_fraud` to the 60 defrauded cards, annotated, snapshotted), its
 members, the Entity List `cards-to-reissue` (the 10 cards that paid at `M-317` in the compromise window and were not
-defrauded), a Case assigned to `card.manager` and linked to the Investigation, an Investigation template, one
+defrauded), a Case assigned to `manager` and linked to the Investigation, an Investigation template, one
 unbounded expand held for a second person, and one open Draft. To lay the Space out offline instead of unzipping the
 downloads, `node tools/seed-la-card.mjs --scaffold <bundle>\spaces` does it before the first start.
 
 | Persona (sign in as) | Role | Sees |
 |---|---|---|
-| `card.analyst` | `card-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
-| `card.manager` | `card-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
-| `card.reviewer` | `la-viewer`, member as reviewer | reads `compromised-terminal`; any change is refused (403) |
-| `card.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `analyst` | `la-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `manager` | `la-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `reviewer` | `la-viewer`, member as reviewer | reads `compromised-terminal`; any change is refused (403) |
+| `outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
 | `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
 
 **The Alert Rule.** `card_new_cards_at_compromised_terminal` (WARNING) reads the one row of `card_compromise_counts`:

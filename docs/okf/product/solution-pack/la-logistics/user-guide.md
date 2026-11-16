@@ -146,16 +146,16 @@ golden tests are `tools/gen-la-logistics-data.test.mjs` and `LogisticsLinksJobGo
 On a build with sign-in (the demo build: see the [admin guide](admin-guide-install.md#advanced-tier-personas-the-new-carrier-alert-rule-and-the-seed)),
 after `node tools/seed-la-logistics.mjs --apply`, sign in as each persona and check what each one sees:
 
-1. **`logistics.analyst` (lead):** **Alerts** lists `logistics_high_value_trip_new_carrier` (WARNING) with the value
+1. **`analyst` (lead):** **Alerts** lists `logistics_high_value_trip_new_carrier` (WARNING) with the value
    5: high-value trips given to a carrier under 60 days old that is not insured. Open the Investigation
    `fictitious-carrier`: it is seeded with `CAR-022` and expanded once over `carried_by` and `same_phone` to its 5
    loads and to `DRV-0895` (exercise 3). The Entity List `suspect-carriers` holds `CAR-022` and `DRV-0895`. The Case
    "Fictitious carrier CAR-022" is linked to it.
-2. **Four-eyes:** an unbounded expand by `logistics.analyst` is held, not run. Sign in as **`logistics.manager`**: it
-   is in the approval inbox; approve or refuse it. `logistics.analyst` cannot approve its own request.
-3. **`logistics.reviewer`:** opens `fictitious-carrier` and reads every step; any change is refused.
-4. **`logistics.outsider`:** sees the Datasets, but `fictitious-carrier` is not found (404).
-5. **Draft:** `logistics.analyst` has one open Draft that annotates `DRV-0895` about his old trips; promote it, or
+2. **Four-eyes:** an unbounded expand by `analyst` is held, not run. Sign in as **`manager`**: it
+   is in the approval inbox; approve or refuse it. `analyst` cannot approve its own request.
+3. **`reviewer`:** opens `fictitious-carrier` and reads every step; any change is refused.
+4. **`outsider`:** sees the Datasets, but `fictitious-carrier` is not found (404).
+5. **Draft:** `analyst` has one open Draft that annotates `DRV-0895` about his old trips; promote it, or
    leave it.
 
 **Not the story:** 16 high-value trips went to a carrier under 60 days old. The owner-operator `CAR-057` took 9 of

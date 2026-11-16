@@ -98,17 +98,17 @@ node tools/seed-la-ownership.mjs --base http://127.0.0.1:8096 --apply
 It is safe to re-run; without `--apply` it only prints the calls. It creates the Investigation `sanctions-exposure`
 (seeded with the list entry `SL-0137` and the customer `CUS-00528`, expanded once over `name_match`, `owns` and
 `customer_is`, annotated, snapshotted), its members, the Entity List `sanctions-path-parties` (`CUS-00528`, its company
-`CO-04313`, the 50 % owner `CO-04431` and the matched person `PER-03904`), a Case assigned to `ownership.manager` and
+`CO-04313`, the 50 % owner `CO-04431` and the matched person `PER-03904`), a Case assigned to `manager` and
 linked to the Investigation, an Investigation template, one unbounded expand held for a second person, and one open
 Draft. To lay the Space out offline instead of unzipping the downloads, `node tools/seed-la-ownership.mjs --scaffold
 <bundle>\spaces` does it before the first start.
 
 | Persona (sign in as) | Role | Sees |
 |---|---|---|
-| `ownership.analyst` | `ownership-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
-| `ownership.manager` | `ownership-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
-| `ownership.reviewer` | `la-viewer`, member as reviewer | reads `sanctions-exposure`; any change is refused (403) |
-| `ownership.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `analyst` | `la-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `manager` | `la-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `reviewer` | `la-viewer`, member as reviewer | reads `sanctions-exposure`; any change is refused (403) |
+| `outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
 | `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
 
 **The Alert Rule.** `ownership_path_to_listed_person` (CRITICAL) reads the one row of `ownership_sanctions_counts`:

@@ -9,12 +9,12 @@
 //
 // Three optional stages pre-stage the demo scenes after the plan (each on by default, each skipped with its flag, each
 // idempotent, each SOFT: a refusal prints a warning and leaves the Space as it was, the exit code stays 0):
-//   --no-pending   one PENDING four-eyes expand on mule-hub-case (an unbounded expand by fm.analyst; left undecided for fm.manager)
-//   --no-alert     one run of the la_detect Job (as fm.manager, who holds canOperateRuns) until the mule-pass-through Alert exists
+//   --no-pending   one PENDING four-eyes expand on mule-hub-case (an unbounded expand by analyst; left undecided for manager)
+//   --no-alert     one run of the la_detect Job (as manager, who holds canOperateRuns) until the mule-pass-through Alert exists
 //   --no-coverage  one SECOND Investigation (delivery-gap-case) whose window reaches 2026-09-06, one day past the landed files, so the
 //                  coverage read shows a missing day for the mule_transfers Collector (LA-COLLECTOR-COVERAGE-1); the stage reads it back
-//   --no-draft     one open Draft of mule-hub-case forked by fm.analyst, carrying one annotate step, left unpromoted
-// (the Draft carries the label 'Draft: widen the ring'; it is still found again as fm.analyst's one live Draft)
+//   --no-draft     one open Draft of mule-hub-case forked by analyst, carrying one annotate step, left unpromoted
+// (the Draft carries the label 'Draft: widen the ring'; it is still found again as analyst's one live Draft)
 //
 // Needs the Demo Auth build (serve-demo, loopback). Synthetic data only. Never sends a credential: the Demo User exchange
 // takes a `demo:<id>` code and no password.
@@ -49,36 +49,36 @@ export function buildPlan() {
     { op: 'connect', ids: ['MULE-HUB-01', 'RELAY-01'], maxHops: 1, entityType: 'account' },
   ];
   const plan = [
-    { id: 'investigation', as: 'fm.analyst', method: 'POST', path: '/inv/investigations', body: {
+    { id: 'investigation', as: 'analyst', method: 'POST', path: '/inv/investigations', body: {
       id: INV, title: 'Mule hub: six feeder accounts and a relay out', purpose: 'Cash structured into one hub account, then passed on through a relay', dataset: DATASET,
       sourceCol: 'PAYER_ACCOUNT', targetCol: 'PAYEE_ACCOUNT', linkKindCol: 'CHANNEL', timeCol: 'BOOKED_AT' } },
-    ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'fm.analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
-    ...[['ra.analyst', 'reviewer'], ['fm.manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
-      { id: `member-${subject}`, as: 'fm.analyst', method: 'POST', path: `${base}/members`, body: { subject, role } })),
-    { id: 'list-smurfs', as: 'fm.analyst', method: 'POST', path: '/entity-lists', body: {
+    ...ops.map((body, i) => ({ id: `op-${i + 1}-${body.op}`, as: 'analyst', method: 'POST', path: `${base}/ops`, body, opIndex: i })),
+    ...[['reviewer', 'reviewer'], ['manager', 'reviewer'], ['admin', 'lead']].map(([subject, role]) => (
+      { id: `member-${subject}`, as: 'analyst', method: 'POST', path: `${base}/members`, body: { subject, role } })),
+    { id: 'list-smurfs', as: 'analyst', method: 'POST', path: '/entity-lists', body: {
       id: 'smurf-accounts', title: 'SMURF accounts', purpose: 'watch', entityType: 'account', reason: 'showcase structuring ring' } },
-    { id: 'list-smurfs-members', as: 'fm.analyst', method: 'POST', path: '/entity-lists/smurf-accounts/members', body: {
+    { id: 'list-smurfs-members', as: 'analyst', method: 'POST', path: '/entity-lists/smurf-accounts/members', body: {
       add: Array.from({ length: 12 }, (_, i) => `SMURF-${String(i + 1).padStart(2, '0')}`),
       addRanges: [{ prefix: 'SMURF-' }], reason: 'showcase structuring ring' } },
-    { id: 'list-smurfs-expiring', as: 'fm.analyst', method: 'POST', path: '/entity-lists/smurf-accounts/members', body: {
+    { id: 'list-smurfs-expiring', as: 'analyst', method: 'POST', path: '/entity-lists/smurf-accounts/members', body: {
       add: ['TILL-06'], expiresAt: '@+30d', reason: '30 day hold on the cash-out till' } },
     // A watch list of the telecom profile's Entity Type (msisdn), so the node dialog's "Add to watch list" has a target on
     // the telecom graph; it holds the Wangiri suspect and IRSF-01 only, leaving the rest of the ring to be added live.
-    { id: 'list-msisdn-watch', as: 'fm.analyst', method: 'POST', path: '/entity-lists', body: {
+    { id: 'list-msisdn-watch', as: 'analyst', method: 'POST', path: '/entity-lists', body: {
       id: 'telecom-watch-msisdn', title: 'Telecom numbers under watch', purpose: 'watch', entityType: 'msisdn', reason: 'showcase telecom fraud ring' } },
-    { id: 'list-msisdn-watch-members', as: 'fm.analyst', method: 'POST', path: '/entity-lists/telecom-watch-msisdn/members', body: {
+    { id: 'list-msisdn-watch-members', as: 'analyst', method: 'POST', path: '/entity-lists/telecom-watch-msisdn/members', body: {
       add: ['99979100001', '99979200001'], reason: 'Wangiri suspect and IRSF-01 (showcase)' } },
-    { id: 'identity', as: 'fm.analyst', method: 'POST', path: '/inv/entity-identities', body: {
+    { id: 'identity', as: 'analyst', method: 'POST', path: '/inv/entity-identities', body: {
       a: 'account:MULE-HUB-01', b: 'account:ACC-1006', reason: 'same KYC document (showcase)' } },
-    { id: 'case', as: 'fm.analyst', method: 'POST', path: '/cases/from-entities', body: {
+    { id: 'case', as: 'analyst', method: 'POST', path: '/cases/from-entities', body: {
       title: CASE_TITLE, entities: [{ id: 'entity:account:MULE-HUB-01', dataset: DATASET }] } },
-    { id: 'case-assign', as: 'fm.analyst', method: 'POST', path: '/objects/@case/assign', body: { assignee: 'fm.manager' } },
-    { id: 'case-link', as: 'fm.analyst', method: 'PUT', path: `${base}/case`, body: { caseRef: '@case' } },
-    { id: 'template', as: 'fm.analyst', method: 'POST', path: `${base}/template`, body: { id: 'mule-ring-template', title: 'Mule ring (hub + relays)' } },
-    { id: 'alert-rule', as: 'fm.analyst', method: 'POST', path: `${base}/alert-rules`, body: {
+    { id: 'case-assign', as: 'analyst', method: 'POST', path: '/objects/@case/assign', body: { assignee: 'manager' } },
+    { id: 'case-link', as: 'analyst', method: 'PUT', path: `${base}/case`, body: { caseRef: '@case' } },
+    { id: 'template', as: 'analyst', method: 'POST', path: `${base}/template`, body: { id: 'mule-ring-template', title: 'Mule ring (hub + relays)' } },
+    { id: 'alert-rule', as: 'analyst', method: 'POST', path: `${base}/alert-rules`, body: {
       name: 'mule-pass-through', severity: 'CRITICAL',
       valueMeasure: { name: 'passThrough', valueCol: 'AMOUNT', timeCol: 'BOOKED_AT', from: '2026-09-01', to: '2026-09-04' } } },
-    { id: 'standing', as: 'fm.analyst', method: 'POST', path: `${base}/standing-detection`, body: { rule: 'mule-pass-through' } },
+    { id: 'standing', as: 'analyst', method: 'POST', path: `${base}/standing-detection`, body: { rule: 'mule-pass-through' } },
   ];
   return plan;
 }
@@ -97,10 +97,10 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   if (!apply) {
     log(`DRY RUN (no request is sent; add --apply). Space '${space}' at ${base}`);
     for (const s of plan) log(`  ${s.as.padEnd(11)} ${s.method} ${s.path}  ${JSON.stringify(s.body)}`);
-    if (want.pending) log(`  fm.analyst  POST /inv/investigations/${INV}/ops  ${JSON.stringify(PENDING_EXPAND)}  (held as a pending four-eyes request; skipped if fm.manager already sees one)`);
-    if (want.alert) log(`  fm.manager  POST /jobs/la_detect/trigger  (skipped if an Alert for ${RULE} already exists)`);
-    if (want.coverage) log(`  fm.analyst  POST /inv/investigations ${GAP_INV} + window ${JSON.stringify(GAP_WINDOW)}, then GET .../coverage (must show the Collector's missing day)`);
-    if (want.draft) log(`  fm.analyst  POST /inv/investigations/${INV}/drafts, then .../ops ${JSON.stringify(DRAFT_STEP)}  (skipped if fm.analyst has a live Draft)`);
+    if (want.pending) log(`  analyst  POST /inv/investigations/${INV}/ops  ${JSON.stringify(PENDING_EXPAND)}  (held as a pending four-eyes request; skipped if manager already sees one)`);
+    if (want.alert) log(`  manager  POST /jobs/la_detect/trigger  (skipped if an Alert for ${RULE} already exists)`);
+    if (want.coverage) log(`  analyst  POST /inv/investigations ${GAP_INV} + window ${JSON.stringify(GAP_WINDOW)}, then GET .../coverage (must show the Collector's missing day)`);
+    if (want.draft) log(`  analyst  POST /inv/investigations/${INV}/drafts, then .../ops ${JSON.stringify(DRAFT_STEP)}  (skipped if analyst has a live Draft)`);
     return out;
   }
   const tokens = {};
@@ -130,20 +130,20 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   // the LIST can answer 200 with no items while the create answers 409 (it is on disk) and every op 404s. So the list is polled until
   // it answers 200 (not merely once), and every Investigation is re-read by id before a write is trusted (see `readable`).
   const sleepRetry = async (fn, tries) => { let last; for (let i = 0; i < tries; i++) { try { last = await fn(); } catch (e) { last = { status: 0, data: String(e.message || e) }; } if (last.status === 200) return last; await sleep(1000); } return last; };
-  await token('fm.analyst');   // learns whether this build signs in at all
-  const basic = authFree && (await call('fm.analyst', 'GET', '/inv/investigations?limit=200')).status === 503;
+  await token('analyst');   // learns whether this build signs in at all
+  const basic = authFree && (await call('analyst', 'GET', '/inv/investigations?limit=200')).status === 503;
   if (basic) log('  Basic edition (no sign-in, Investigations answer 503): seeding the Entity Lists only');
-  const listed = basic ? { status: 200, data: { items: [] } } : await sleepRetry(() => call('fm.analyst', 'GET', '/inv/investigations?limit=200'), readyTries);
-  if (listed.status !== 200) throw new Error(`cannot list Investigations as fm.analyst (${listed.status}): is the Space '${space}' created from the la-showcase template?`);
+  const listed = basic ? { status: 200, data: { items: [] } } : await sleepRetry(() => call('analyst', 'GET', '/inv/investigations?limit=200'), readyTries);
+  if (listed.status !== 200) throw new Error(`cannot list Investigations as analyst (${listed.status}): is the Space '${space}' created from the la-showcase template?`);
   // There is NO by-id GET for an Investigation (only the list and the /log, /ops, ... sub-routes), so "readable" = the LIST shows the id.
   // A create answered 409 "already exists" can be spurious for a few seconds after /health (live-proven 2026-10-13: nothing on disk, nothing
   // listed, a later create returned 200), so while the id is not listed the create is RE-SENT every third try; a 2xx there is a real create.
   const readable = async (redo) => {
     for (let i = 0; i < readyTries; i++) {
-      let r; try { r = await call('fm.analyst', 'GET', '/inv/investigations?limit=200'); } catch (e) { r = { status: 0, data: String(e.message || e) }; }
+      let r; try { r = await call('analyst', 'GET', '/inv/investigations?limit=200'); } catch (e) { r = { status: 0, data: String(e.message || e) }; }
       const item = r.status === 200 ? (r.data.items || []).find((x) => x.id === INV) : null;
       if (item) return { status: 200, data: item };
-      if (redo && i % 3 === 2) { try { const c = await redo(); if (c.status < 300) { r = await call('fm.analyst', 'GET', '/inv/investigations?limit=200'); const it = r.status === 200 ? (r.data.items || []).find((x) => x.id === INV) : null; if (it) return { status: 200, data: it }; } } catch { /* keep polling */ } }
+      if (redo && i % 3 === 2) { try { const c = await redo(); if (c.status < 300) { r = await call('analyst', 'GET', '/inv/investigations?limit=200'); const it = r.status === 200 ? (r.data.items || []).find((x) => x.id === INV) : null; if (it) return { status: 200, data: it }; } } catch { /* keep polling */ } }
       await sleep(1000);
     }
     return { status: 404, data: {} };
@@ -153,7 +153,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   const state = { case: existing && existing.caseRef ? existing.caseRef : null, caseExisted: !!(existing && existing.caseRef) };
   const adopt = (inv) => { existing = inv; headStep = inv.headStep || 0; if (inv.caseRef) { state.case = inv.caseRef; state.caseExisted = true; } };
   const findCase = async () => {   // an UNLINKED Case a half-finished earlier run made: reuse it instead of opening a second
-    const r = await call('fm.analyst', 'GET', '/objects?limit=200');
+    const r = await call('analyst', 'GET', '/objects?limit=200');
     const rows = r.status === 200 ? (Array.isArray(r.data) ? r.data : (r.data && r.data.items) || []) : [];
     return rows.find((o) => o && o.title === CASE_TITLE && (!o.type || String(o.type).toUpperCase() === 'CASE'));
   };
@@ -204,17 +204,17 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
 
 const must = (r, what, ok = [200, 201, 202]) => { if (!ok.includes(r.status)) throw new Error(`${what} answered HTTP ${r.status} ${JSON.stringify(r.data).slice(0, 160)}`); return r.data; };
 
-/** ONE pending four-eyes expand. Idempotent: the approver inbox (as fm.manager) is read first. */
+/** ONE pending four-eyes expand. Idempotent: the approver inbox (as manager) is read first. */
 async function stagePending(call, out, log) {
-  const inbox = async () => (must(await call('fm.manager', 'GET', '/inv/pending?status=pending&limit=200'), 'approval inbox').items || []).filter((i) => i.investigationId === INV);
+  const inbox = async () => (must(await call('manager', 'GET', '/inv/pending?status=pending&limit=200'), 'approval inbox').items || []).filter((i) => i.investigationId === INV);
   let mine = await inbox();
   if (mine.length) { out.skipped.push('pending-expand'); out.summary.pendingRequestId = mine[0].requestId; return; }
-  const r = await call('fm.analyst', 'POST', `/inv/investigations/${INV}/ops`, PENDING_EXPAND);
+  const r = await call('analyst', 'POST', `/inv/investigations/${INV}/ops`, PENDING_EXPAND);
   if (r.status === 409) { mine = await inbox(); if (mine.length) { out.skipped.push('pending-expand'); out.summary.pendingRequestId = mine[0].requestId; return; } }
   const d = must(r, 'the unbounded expand');
   if (d.status !== 'pending') throw new Error('the unbounded expand RAN instead of being held (is four_eyes_fan_out_above set in link-analysis.toon?) and added a step to the log');
   mine = await inbox();
-  if (mine.length !== 1 || mine[0].requestId !== d.pending.id) throw new Error(`fm.manager's inbox shows ${mine.length} pending request(s) on ${INV}, expected exactly the one just made (${d.pending.id})`);
+  if (mine.length !== 1 || mine[0].requestId !== d.pending.id) throw new Error(`manager's inbox shows ${mine.length} pending request(s) on ${INV}, expected exactly the one just made (${d.pending.id})`);
   out.done.push('pending-expand'); out.summary.pendingRequestId = d.pending.id; log(`  pending-expand: ${d.pending.id}`);
 }
 
@@ -222,11 +222,11 @@ const firedAlert = (alerts) => alerts.find((a) => a.rule === RULE || String(a.ru
 
 /** ONE la_detect run; waits (bounded) for the Alert. Idempotent: an existing Alert for the rule means no run. */
 async function stageAlert(call, out, log, sleep, tries, items) {
-  const read = async () => firedAlert(items(must(await call('fm.analyst', 'GET', '/alerts?limit=200'), 'Alerts list')));
+  const read = async () => firedAlert(items(must(await call('analyst', 'GET', '/alerts?limit=200'), 'Alerts list')));
   const id = (x) => `${x.rule}@${x.epochMillis}`;
   let a = await read();
   if (a) { out.skipped.push('alert'); out.summary.alertId = id(a); return; }
-  const t = await call('fm.manager', 'POST', '/jobs/la_detect/trigger');
+  const t = await call('manager', 'POST', '/jobs/la_detect/trigger');
   if (t.status !== 409) must(t, 'la_detect trigger');   // 409 = already running: just wait for it
   for (let i = 0; i < tries && !a; i++) { await sleep(3000); a = await read(); }
   if (!a) throw new Error(`no Alert for ${RULE} appeared after ${tries} polls of the la_detect run (is standing detection enabled on the rule?)`);
@@ -236,14 +236,14 @@ async function stageAlert(call, out, log, sleep, tries, items) {
 /** ONE extra Investigation over the same Dataset with a window one day past the landed files, then a read-back of its coverage:
  *  the Collector that feeds the Dataset must be assessed and report the missing day. Idempotent: an existing id is only re-read. */
 async function stageCoverage(call, out, log, items) {
-  const listed = items(must(await call('fm.analyst', 'GET', '/inv/investigations?limit=200'), 'Investigation list'));
+  const listed = items(must(await call('analyst', 'GET', '/inv/investigations?limit=200'), 'Investigation list'));
   if (!listed.some((i) => i.id === GAP_INV)) {
-    must(await call('fm.analyst', 'POST', '/inv/investigations', { id: GAP_INV, title: 'Delivery gap check', purpose: 'Showcase: per-Collector delivery coverage',
+    must(await call('analyst', 'POST', '/inv/investigations', { id: GAP_INV, title: 'Delivery gap check', purpose: 'Showcase: per-Collector delivery coverage',
       dataset: DATASET, sourceCol: 'PAYER_ACCOUNT', targetCol: 'PAYEE_ACCOUNT', linkKindCol: 'CHANNEL', timeCol: 'BOOKED_AT' }), 'the gap Investigation');
-    must(await call('fm.analyst', 'POST', `/inv/investigations/${GAP_INV}/ops`, { op: 'window', window: GAP_WINDOW }), 'the gap window');
+    must(await call('analyst', 'POST', `/inv/investigations/${GAP_INV}/ops`, { op: 'window', window: GAP_WINDOW }), 'the gap window');
     out.done.push('coverage-investigation');
   } else out.skipped.push('coverage-investigation');
-  const c = must(await call('fm.analyst', 'GET', `/inv/investigations/${GAP_INV}/coverage`), 'the coverage read');
+  const c = must(await call('analyst', 'GET', `/inv/investigations/${GAP_INV}/coverage`), 'the coverage read');
   const col = c.collectors && c.collectors.assessed ? (c.collectors.collectors || []) : [];
   if (!col.length) throw new Error('coverage reads collectors.assessed=false: no Consignment lineage is attributed to a Collector yet (has the first ingest finished?)');
   if (!col.some((k) => (k.missingDays || []).length)) throw new Error(`coverage lists Collector(s) ${col.map((k) => k.collector).join(', ')} but no missing day`);
@@ -251,19 +251,19 @@ async function stageCoverage(call, out, log, items) {
   log(`  coverage: ${out.summary.coverage}`);
 }
 
-/** ONE open Draft with one step. Idempotent: fm.analyst's live Draft (open or hibernated) is reused, and only topped up when it is empty. */
+/** ONE open Draft with one step. Idempotent: analyst's live Draft (open or hibernated) is reused, and only topped up when it is empty. */
 async function stageDraft(call, out, log) {
   const base = `/inv/investigations/${INV}/drafts`;
-  const live = (must(await call('fm.analyst', 'GET', base), 'Draft list').items || []).find((d) => d.state === 'open' || d.state === 'hibernated');
+  const live = (must(await call('analyst', 'GET', base), 'Draft list').items || []).find((d) => d.state === 'open' || d.state === 'hibernated');
   if (live && live.steps > 0) { out.skipped.push('draft'); out.summary.draftId = live.draftId; return; }
   const created = !live;
-  const id = live ? live.draftId : must(await call('fm.analyst', 'POST', base, { label: 'Draft: widen the ring' }), 'Draft fork').draftId;
+  const id = live ? live.draftId : must(await call('analyst', 'POST', base, { label: 'Draft: widen the ring' }), 'Draft fork').draftId;
   try {
-    must(await call('fm.analyst', 'POST', `${base}/${id}/ops`, DRAFT_STEP), 'the Draft step');
-    const d = must(await call('fm.analyst', 'GET', `${base}/${id}`), 'Draft read');
+    must(await call('analyst', 'POST', `${base}/${id}/ops`, DRAFT_STEP), 'the Draft step');
+    const d = must(await call('analyst', 'GET', `${base}/${id}`), 'Draft read');
     if (d.steps !== 1 || d.behind !== 0) throw new Error(`the Draft reads steps=${d.steps} behind=${d.behind}, expected 1 and 0`);
   } catch (e) {
-    if (created) await call('fm.analyst', 'POST', `${base}/${id}/discard`, {});   // no half-made Draft left behind
+    if (created) await call('analyst', 'POST', `${base}/${id}/discard`, {});   // no half-made Draft left behind
     throw e;
   }
   out.done.push('draft'); out.summary.draftId = id; log(`  draft: ${id}`);

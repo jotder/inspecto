@@ -36,19 +36,19 @@ test('apply acts as the audit personas, in order, and never as a reviewer', asyn
   assert.deepEqual(r.failed, []);
   const ops = m.calls.filter((c) => c.u === `/spaces/s/inv/investigations/${INV}/ops`);
   assert.deepEqual(ops.map((c) => c.body.op), ['seed', 'expand', 'annotate', 'window', 'resolve', 'snapshot']);
-  assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:audit.lead'));
+  assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:analyst'));
   assert.equal(ops[0].body.entityType, 'party');
   assert.ok(ops[1].body.maxFanOut < 2000, 'the seeded expand stays under four_eyes_fan_out_above');
   const members = m.calls.filter((c) => c.u.endsWith('/members') && c.u.includes('investigations'));
-  assert.deepEqual(members.map((c) => c.body), [{ subject: 'audit.committee', role: 'reviewer' }, { subject: 'audit.manager', role: 'reviewer' }, { subject: 'audit.admin', role: 'lead' }]);
-  assert.ok(!members.some((c) => c.body.subject === 'audit.outsider'), 'the outsider is not a member');
-  assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/objects/CASE-9/assign').body, { assignee: 'audit.manager' });
+  assert.deepEqual(members.map((c) => c.body), [{ subject: 'reviewer', role: 'reviewer' }, { subject: 'manager', role: 'reviewer' }, { subject: 'admin', role: 'lead' }]);
+  assert.ok(!members.some((c) => c.body.subject === 'outsider'), 'the outsider is not a member');
+  assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/objects/CASE-9/assign').body, { assignee: 'manager' });
   assert.deepEqual(m.calls.find((c) => c.method === 'PUT').body, { caseRef: 'CASE-9' });
   assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/entity-lists/shell-vendors/members').body.add, ['V-131', 'V-132', 'V-133', 'V-134', 'V-135']);
 });
 
-test('every plan step names an audit Demo User', () => {
-  for (const s of buildPlan()) assert.match(s.as, /^audit\./, s.id);
+test('every plan step names one of the five shared Demo Users', () => {
+  for (const s of buildPlan()) assert.match(s.as, /^(admin|analyst|manager|reviewer|outsider)$/, s.id);
 });
 
 test('scaffold lays down the Space once and stamps the index build owner', () => {
@@ -57,7 +57,7 @@ test('scaffold lays down the Space once and stamps the index build owner', () =>
     assert.deepEqual(scaffold(root), ['_templates', 'la-audit']);
     assert.deepEqual(scaffold(root), []);
     const job = fs.readFileSync(path.join(root, 'la-audit', 'config', 'jobs', 'la_index_build_job.toon'), 'utf8');
-    assert.match(job, /updatedBy: audit\.admin/);
+    assert.match(job, /updatedBy: admin\b/);
     assert.ok(fs.existsSync(path.join(root, 'la-audit', 'data', 'inbox', 'ap_invoice')));
     assert.equal(stampIndexBuildOwner('job:\n  type: sql.template\n'), 'job:\n  type: sql.template\n');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }

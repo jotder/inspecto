@@ -54,12 +54,12 @@ test('apply signs in once per persona and acts as the right persona', async () =
   const ops = m.calls.filter((c) => c.u === `/spaces/s/inv/investigations/${INV}/ops`);
   assert.deepEqual(ops.map((c) => c.body.op), ['seed', 'expand', 'annotate', 'window', 'snapshot']);
   assert.deepEqual(ops[0].body.ids, [PLATE, SELLERS[0]]);
-  assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:police.analyst'));
+  assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:analyst'));
   const members = m.calls.filter((c) => c.u.endsWith('/members') && c.u.includes('investigations'));
-  assert.deepEqual(members.map((c) => c.body), [{ subject: 'police.reviewer', role: 'reviewer' }, { subject: 'police.sio', role: 'reviewer' }, { subject: 'admin', role: 'lead' }]);
-  assert.ok(!members.some((c) => c.body.subject === 'police.outsider'), 'the outsider is not a member');
+  assert.deepEqual(members.map((c) => c.body), [{ subject: 'reviewer', role: 'reviewer' }, { subject: 'manager', role: 'reviewer' }, { subject: 'admin', role: 'lead' }]);
+  assert.ok(!members.some((c) => c.body.subject === 'outsider'), 'the outsider is not a member');
   assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/entity-lists/series-sellers/members').body.add, SELLERS);
-  assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/objects/CASE-7/assign').body, { assignee: 'police.sio' });
+  assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/objects/CASE-7/assign').body, { assignee: 'manager' });
   assert.deepEqual(m.calls.find((c) => c.method === 'PUT').body, { caseRef: 'CASE-7' });
   assert.ok(!m.calls.find((c) => c.u.endsWith('/alert-rules')), 'the Alert Rule ships in the template, not in the seed');
 });
@@ -70,9 +70,9 @@ test('the pending expand is unbounded, sent by the analyst and left for the SIO'
   assert.deepEqual(r.warnings, []);
   assert.equal(r.summary.pendingRequestId, 'PR-1');
   assert.equal(r.summary.draftId, 'D-1');
-  assert.ok(m.calls.some((c) => c.u.startsWith('/spaces/s/inv/pending') && c.auth === 'Bearer tok-demo:police.sio'));
+  assert.ok(m.calls.some((c) => c.u.startsWith('/spaces/s/inv/pending') && c.auth === 'Bearer tok-demo:manager'));
   const held = m.calls.find((c) => c.u.endsWith('/ops') && c.body && c.body.op === 'expand' && c.body.maxFanOut === undefined);
-  assert.equal(held.auth, 'Bearer tok-demo:police.analyst');
+  assert.equal(held.auth, 'Bearer tok-demo:analyst');
 });
 
 test('re-run skips an Investigation that already has its steps and its Case', async () => {
@@ -94,7 +94,7 @@ test('a 409 on create counts as already there, not a failure', async () => {
 test('every plan step names a persona the template defines, with the Entity Type the link Dataset carries', () => {
   const users = fs.readFileSync(new URL('../spaces/_templates/la-police/config/demo-users.toon', import.meta.url), 'utf8');
   for (const s of buildPlan()) assert.ok(users.includes(`  ${s.as},`), `${s.as} is not a Demo User of the la-police template`);
-  for (const u of ['police.sio', 'police.reviewer', 'police.outsider']) assert.ok(users.includes(`  ${u},`), u);
+  for (const u of ['manager', 'reviewer', 'outsider']) assert.ok(users.includes(`  ${u},`), u);
   const la = fs.readFileSync(new URL('../spaces/_templates/la-police/config/link-analysis.toon', import.meta.url), 'utf8');
   assert.ok(la.includes(`id: ${TYPE}`) && la.includes('four_eyes_fan_out_above:'));
 });
@@ -107,13 +107,13 @@ test('scaffold lays down the Space once and is idempotent', () => {
   assert.deepEqual(scaffold(root), []);
 });
 
-test('a fresh Space (no link rows yet) presses Run on police_links as police.sio before the create', async () => {
+test('a fresh Space (no link rows yet) presses Run on police_links as manager before the create', async () => {
   const m = mock(); let n = 0;
   const f = async (url, init = {}) => (url.includes('/datasets/police_links_dataset/rows') && n++ < 2
     ? { ok: true, status: 200, json: async () => ({ data: { rows: [] } }) } : m.fetchFn(url, init));
   const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, stages: OFF, sleep: async () => {} });
   assert.deepEqual(r.failed, []);
   const i = m.calls.findIndex((c) => c.u === '/spaces/s/jobs/police_links/trigger' && c.method === 'POST');
-  assert.ok(i >= 0 && m.calls[i].auth === 'Bearer tok-demo:police.sio');
+  assert.ok(i >= 0 && m.calls[i].auth === 'Bearer tok-demo:manager');
   assert.ok(i < m.calls.findIndex((c) => c.u === '/spaces/s/inv/investigations' && c.method === 'POST'));
 });

@@ -103,17 +103,17 @@ node tools/seed-la-trade.mjs --base http://127.0.0.1:8096 --apply
 It is safe to re-run; without `--apply` it only prints the calls. It creates the Investigation `over-invoicing` (seeded
 with the exporter `CO-02275`, expanded once over `traded_with` and `directed_by` to its four buyers and its two
 directors, the importer `CO-01461` and the shared director `PER-00291` among them; annotated, snapshotted), its members,
-the Entity List `related-party-traders` (`CO-02275`, `CO-01461`, `PER-00291`), a Case assigned to `trade.manager` and
+the Entity List `related-party-traders` (`CO-02275`, `CO-01461`, `PER-00291`), a Case assigned to `manager` and
 linked to the Investigation, an Investigation template, one unbounded expand held for a second person, and one open
 Draft. To lay the Space out offline instead of unzipping the downloads, `node tools/seed-la-trade.mjs --scaffold
 <bundle>\spaces` does it before the first start.
 
 | Persona (sign in as) | Role | Sees |
 |---|---|---|
-| `trade.analyst` | `trade-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
-| `trade.manager` | `trade-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
-| `trade.reviewer` | `la-viewer`, member as reviewer | reads `over-invoicing`; any change is refused (403) |
-| `trade.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `analyst` | `la-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `manager` | `la-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `reviewer` | `la-viewer`, member as reviewer | reads `over-invoicing`; any change is refused (403) |
+| `outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
 | `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
 
 **The Alert Rule.** `trade_unit_price_over_reference` (WARNING) reads the one row of `trade_over_reference_counts` and

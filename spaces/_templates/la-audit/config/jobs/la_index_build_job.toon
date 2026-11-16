@@ -9,7 +9,7 @@ job:
   target_col: dst
   kind_col: kind
   time_col: ts
-  owner: audit.admin
+  owner: admin
   allow_full: "true"
   timeout_seconds: "600"
   wait_seconds: "300"

@@ -145,10 +145,10 @@ load. Setting it up is in the [admin guide](admin-guide-install.md#advanced-tier
 
 | Persona (Demo User) | Role in the story | What they can do |
 |---|---|---|
-| `police.analyst` | intelligence analyst, lead of the Investigation | runs the analysis, adds steps, asks for a large expand, authors Alert Rules; cannot approve their own request |
-| `police.sio` | senior investigating officer, second approver | a member of the Investigation (reviewer); approves or denies a held expand; runs Jobs; owns the Case |
-| `police.reviewer` | reviewer, read-only | a member: reads the Investigation, adds nothing, approves nothing |
-| `police.outsider` | not a member | cannot open the Investigation |
+| `analyst` | intelligence analyst, lead of the Investigation | runs the analysis, adds steps, asks for a large expand, authors Alert Rules; cannot approve their own request |
+| `manager` | senior investigating officer, second approver | a member of the Investigation (reviewer); approves or denies a held expand; runs Jobs; owns the Case |
+| `reviewer` | reviewer, read-only | a member: reads the Investigation, adds nothing, approves nothing |
+| `outsider` | not a member | cannot open the Investigation |
 | `admin` | platform administrator | lead member; edits the Link Analysis settings |
 
 No Entity Type is masked: every id is synthetic and names no real person, so no persona needs a Reveal.
@@ -156,10 +156,10 @@ No Entity Type is masked: every id is synthetic and names no real person, so no 
 **The Investigation** `burglary-series` (over `police_links_dataset`) starts from the plate `ZX 9117 X` and the seller
 `P-00476`, expands one step, notes the plate, and narrows the time to February to May 2026. The Entity List
 `series-sellers` holds the three sellers. The Case *Burglary series, Leeds North and East, Feb-Apr 2026* is linked to
-it and assigned to `police.sio`.
+it and assigned to `manager`.
 
 **Four-eyes:** an expand with no fan-out limit (or a fan-out above 2 000) does not run; it waits in
-`police.sio`'s approval inbox. Try it: as `police.analyst`, expand with no limit, then sign in as `police.sio` and
+`manager`'s approval inbox. Try it: as `analyst`, expand with no limit, then sign in as `manager` and
 approve it.
 
 **The Alert Rule** `police_repeat_seller_serial_matches` watches the stolen-property matches. After each build of
@@ -174,11 +174,11 @@ a second one.
 
 ### 5. Advanced tier — who may see and do what?
 
-*Hint:* sign in as each persona and open `burglary-series`; as `police.analyst`, expand with no limit.
+*Hint:* sign in as each persona and open `burglary-series`; as `analyst`, expand with no limit.
 
-**Answer:** `police.analyst`, `police.sio`, `police.reviewer` and `admin` can open it; `police.outsider` gets "not
-found". Only `police.analyst` and `admin` add steps. The unlimited expand is held; `police.analyst` and
-`police.reviewer` cannot approve it; `police.sio` approves it and it runs. **Not the story:** the one-off sellers
+**Answer:** `analyst`, `manager`, `reviewer` and `admin` can open it; `outsider` gets "not
+found". Only `analyst` and `admin` add steps. The unlimited expand is held; `analyst` and
+`reviewer` cannot approve it; `manager` approves it and it runs. **Not the story:** the one-off sellers
 of ordinary stolen goods never raise the Alert, however many of them there are.
 
 ## Tester's checklist
@@ -196,6 +196,6 @@ and `tools/seed-la-police.test.mjs`.
 - [ ] No look-alike links to a story entity: `ZX 3465 D` and `P-05203`, `+447700900260` and `P-00371`, `ADR-0264`
       and its residents and numbers, `P-01231`.
 - [ ] Advanced tier, on a Demo Auth build: the Alert Rule is armed and raises one WARNING with value 12; the seed runs
-      with nothing failed; the outsider cannot open `burglary-series`; only `police.sio` can approve the held expand.
+      with nothing failed; the outsider cannot open `burglary-series`; only `manager` can approve the held expand.
 - [ ] Basic: the log says "Not arming alert rule 'police_repeat_seller_serial_matches'", `police_serial_match_alerts`
       reports no new breach, and nothing errors.

@@ -18,10 +18,10 @@ columns[17]{name,type,classification}:
   imei_per_msisdn,number,
   msisdn_per_imei,number,
   activated_at,date,
-owner: fm.analyst
+owner: analyst
 shares[5]{subjectType,subjectId,access}:
   user,admin,view
-  user,fm.analyst,view
-  user,fm.manager,view
-  user,ra.analyst,view
-  user,demo.manager,view
+  user,analyst,view
+  user,manager,view
+  user,reviewer,view
+  user,outsider,view

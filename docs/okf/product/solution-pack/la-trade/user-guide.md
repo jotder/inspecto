@@ -153,16 +153,16 @@ the busy vessels and background partners in the whole Dataset, they can sit a fe
 On a build with sign-in (the demo build: see the [admin guide](admin-guide-install.md#6-advanced-tier-personas-the-unit-price-alert-rule-and-the-seed)),
 after `node tools/seed-la-trade.mjs --apply`, sign in as each persona and check what each one sees:
 
-1. **`trade.analyst` (lead):** **Alerts** lists `trade_unit_price_over_reference` (WARNING) with the value 14: trades
+1. **`analyst` (lead):** **Alerts** lists `trade_unit_price_over_reference` (WARNING) with the value 14: trades
    priced over 3 times the reference between an exporter and an importer that share a director. Open the Investigation
    `over-invoicing`: it is seeded with `CO-02275` and expanded once to its buyers and directors, `CO-01461` and
    `PER-00291` among them (exercise 1). The Entity List `related-party-traders` holds `CO-02275`, `CO-01461` and
    `PER-00291`. The Case "Over-invoicing between CO-02275 and CO-01461" is linked to it.
-2. **Four-eyes:** an unbounded expand by `trade.analyst` is held, not run. Sign in as **`trade.manager`**: it is in the
-   approval inbox; approve or refuse it. `trade.analyst` cannot approve its own request.
-3. **`trade.reviewer`:** opens `over-invoicing` and reads every step; any change is refused.
-4. **`trade.outsider`:** sees the Datasets, but `over-invoicing` is not found (404).
-5. **Draft:** `trade.analyst` has one open Draft that annotates `CO-01461` about its other suppliers; promote it, or
+2. **Four-eyes:** an unbounded expand by `analyst` is held, not run. Sign in as **`manager`**: it is in the
+   approval inbox; approve or refuse it. `analyst` cannot approve its own request.
+3. **`reviewer`:** opens `over-invoicing` and reads every step; any change is refused.
+4. **`outsider`:** sees the Datasets, but `over-invoicing` is not found (404).
+5. **Draft:** `analyst` has one open Draft that annotates `CO-01461` about its other suppliers; promote it, or
    leave it.
 
 **Not the story:** the specialty supplier `CO-02169` has 28 trades over 3 times the reference, more than the pair, but

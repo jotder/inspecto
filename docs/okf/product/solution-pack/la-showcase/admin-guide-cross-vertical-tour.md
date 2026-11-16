@@ -11,7 +11,7 @@ The tour shows three verticals back to back on **one server**: A [`la-mobile-mon
 | 1 | One bundle: `inspecto\package.ps1 -Edition Advanced -Product la -Distribution demo -NoBakeDemo` (unzip or use `inspecto-demo\`, inside the checkout) | `serve-demo.bat`; `-NoBakeDemo` because the bake needs an interactive console |
 | 2 | Lay the four Spaces down offline: `node tools/seed-la-showcase.mjs --scaffold <bundle>\spaces`, then `seed-la-mm.mjs`, `seed-la-audit.mjs`, `seed-la-claims.mjs` the same way | `la-showcase`, `la-showcase-off`, `la-mobile-money`, `la-audit`, `la-claims`; the Demo User roster merges (no id is defined two ways) |
 | 3 | Start with `PORT=<free>` and `INSPECTO_JAVA_OPTS=-Dla.embed.enabled=true`; wait for the ingest | `/health` 200 |
-| 4 | **The seeds press Run on their link Job themselves** on a fresh Space (`mm_links` as `mm.manager`, `claims_links` as `siu.manager`, `ap_links` as `audit.manager`) and wait for its rows. Then `la_index_build` in each Space as the **manager** persona (`admin` has no `canOperateRuns`: 403) | Run `SUCCESS`; a re-run of a seed skips what exists (the identity is matched on its reason) |
+| 4 | **The seeds press Run on their link Job themselves** on a fresh Space (`mm_links` as `manager`, `claims_links` as `manager`, `ap_links` as `manager`) and wait for its rows. Then `la_index_build` in each Space as the **manager** persona (`admin` has no `canOperateRuns`: 403) | Run `SUCCESS`; a re-run of a seed skips what exists (the identity is matched on its reason) |
 | 5 | Seed each Space `--base http://127.0.0.1:<PORT> --apply`, then run the smokes | rehearsal: `la-demo-smoke` 16/16 (20/20 with `--staged --inbox --embed`), `la-mm-smoke` 10/10, `la-audit-smoke` 30/30, `la-claims-smoke --embed` 32/32 |
 
 Two things the audience must not see go wrong:
@@ -23,15 +23,15 @@ Two things the audience must not see go wrong:
 
 | Min | Beat | Vertical, persona | One line to say |
 |---|---|---|---|
-| 0:00 | Sign in, switch Space | A, `mm.analyst` | "Five Spaces on one server; each persona sees its own." |
-| 0:01 | **Ladder and masking** (3) | A, `mm.analyst`, then `admin` | "The analyst sees structure, not wallets; Reveal is `admin`'s, audited." |
-| 0:04 | **Four-eyes** (3) | A, `mm.analyst`, `mm.manager` | "Unbounded expand waits for a second person." |
-| 0:07 | **Algorithms A** (4) | A, `mm.analyst` | "Client first, then the same answer from the server." |
-| 0:11 | **Algorithms B** (4) | B, `audit.lead` | "The cut vertex, not the score, is the finding." |
-| 0:15 | **Algorithms C** (4) | C, `siu.analyst` | "Nine server runs; the ring is a community, the busy clinic is not." |
-| 0:19 | **Dossier tamper** (4) | B, `audit.lead` | "One flipped digit, and Verify says which part." |
+| 0:00 | Sign in, switch Space | A, `analyst` | "Five Spaces on one server; each persona sees its own." |
+| 0:01 | **Ladder and masking** (3) | A, `analyst`, then `admin` | "The analyst sees structure, not wallets; Reveal is `admin`'s, audited." |
+| 0:04 | **Four-eyes** (3) | A, `analyst`, `manager` | "Unbounded expand waits for a second person." |
+| 0:07 | **Algorithms A** (4) | A, `analyst` | "Client first, then the same answer from the server." |
+| 0:11 | **Algorithms B** (4) | B, `analyst` | "The cut vertex, not the score, is the finding." |
+| 0:15 | **Algorithms C** (4) | C, `analyst` | "Nine server runs; the ring is a community, the busy clinic is not." |
+| 0:19 | **Dossier tamper** (4) | B, `analyst` | "One flipped digit, and Verify says which part." |
 | 0:23 | **Embed** (3) | C, `admin` | "A read-only masked view in the partner's own page; revoke and it is gone." |
-| 0:26 | **Alert to Case** (2) | A, `mm.manager` | "Aggregate only; the Case holds the Investigation." |
+| 0:26 | **Alert to Case** (2) | A, `manager` | "Aggregate only; the Case holds the Investigation." |
 | 0:28 | Close (2) | all | claims we do not make (section 4) |
 
 ### 1.1 Ladder and masking (A, 3 min)
@@ -42,8 +42,8 @@ Two things the audience must not see go wrong:
 
 ### 1.2 Four-eyes (A, 3 min)
 
-* **Click:** the seed leaves a pending request `p1` ("exceeds the Space's four-eyes limit: maxFanOut unbounded (threshold 100)"). Sign in as `mm.manager`, open the same Investigation, *⋯* > *Settings…* > *Investigation settings* > *Oversight and approvals*: *Approve*.
-* **Expect (read):** nothing in the log until the approval; then 300 to **494 entities / 1,436 links**, step "approved by mm.manager". The requester sees "Waiting for a different person with the approve-expansions capability"; `audit.lead` and `audit.committee` self or read-only approve answers 403 `canApproveLinkExpansions`.
+* **Click:** the seed leaves a pending request `p1` ("exceeds the Space's four-eyes limit: maxFanOut unbounded (threshold 100)"). Sign in as `manager`, open the same Investigation, *⋯* > *Settings…* > *Investigation settings* > *Oversight and approvals*: *Approve*.
+* **Expect (read):** nothing in the log until the approval; then 300 to **494 entities / 1,436 links**, step "approved by manager". The requester sees "Waiting for a different person with the approve-expansions capability"; `analyst` and `reviewer` self or read-only approve answers 403 `canApproveLinkExpansions`.
 * **Four-eyes on the *Investigate* card:** the card sends the active Domain Profile's expand presets; these Spaces set no profile fan-out, so its one-degree expand is held above `four_eyes_fan_out_above` and the degree line says to ask an approver or use *Expand…* with a smaller fan-out. For a solo demo, open a seeded Investigation or set a fan-out first.
 
 ### 1.3 Algorithms (A, B, C; 12 min). Client first, then **Run on server**, then compare
@@ -82,9 +82,9 @@ Run times are the server's own "Ran on the server in N ms" line.
 
 ### 1.4 Dossier tamper by upload (B, 4 min)
 
-* **Click:** as `audit.lead`, `?investigation=vendor-v117-workpaper`, *⋯* > *Settings…* > *Investigation settings* > *Dossier* > *Build dossier* > *Verify this manifest*. Then *Verify an uploaded manifest…* with a manifest file in which one hex digit of an artefact hash is changed (prepare it beforehand; the manifest is the `manifest` member of `GET …/dossier`).
+* **Click:** as `analyst`, `?investigation=vendor-v117-workpaper`, *⋯* > *Settings…* > *Investigation settings* > *Dossier* > *Build dossier* > *Verify this manifest*. Then *Verify an uploaded manifest…* with a manifest file in which one hex digit of an artefact hash is changed (prepare it beforehand; the manifest is the `manifest` member of `GET …/dossier`).
 * **Expect (read):** the untouched manifest: **Verified**, "Self-consistent yes", Changed / Missing / Added / Content changed all "none" (root `sha256:00e09f6c…` at step 7). The edited file: **NOT verified**, "The manifest's root does not match its own body", Self-consistent "no", **Changed: `log.jsonl#2`** (the part whose digit was flipped). On A the same flow showed "Verified" for the built Dossier (root `sha256:d5643c0c…`) and NOT verified for an edited upload.
-* **Drafts and Members on the same Investigation (extra):** the seeded Draft: *Conflicts* "No conflicts", *Rebase* "Rebased onto step 6", *Discard*; a fresh *Fork a Draft* > *Work on this Draft* > *Mark this position* > *Promote* made step 7 on the Investigation. Members: *Grant* `audit.outsider` as analyst, then *Revoke* (no confirmation).
+* **Drafts and Members on the same Investigation (extra):** the seeded Draft: *Conflicts* "No conflicts", *Rebase* "Rebased onto step 6", *Discard*; a fresh *Fork a Draft* > *Work on this Draft* > *Mark this position* > *Promote* made step 7 on the Investigation. Members: *Grant* `outsider` as analyst, then *Revoke* (no confirmation).
 
 ### 1.5 Embed (C, 3 min)
 
@@ -93,8 +93,8 @@ Run times are the server's own "Ran on the server in N ms" line.
 
 ### 1.6 Alert to Case (A, 2 min)
 
-* **Click:** as `mm.manager`, left rail *Alerts*: `mm-structuring` CRITICAL OPEN, "Entities breaching structuring in mm-structuring-case is 1" (aggregate, no wallet). Row actions *Open Investigation* (lands on `mm-structuring-case`), *Acknowledge*, *Resolve*. The Investigation header shows "Linked to Case CASE-…" with *Unlink*.
-* **Trap (defect row `LA-BOUND-RULE-AUTHOR-READONLY-1`):** the Value Measures *Watch* line and the bound Alert Rule say "your role cannot author Alert Rules" for `mm.analyst` and `fm.analyst`, although the API lists `canAuthorAlertRules` among their permissions.
+* **Click:** as `manager`, left rail *Alerts*: `mm-structuring` CRITICAL OPEN, "Entities breaching structuring in mm-structuring-case is 1" (aggregate, no wallet). Row actions *Open Investigation* (lands on `mm-structuring-case`), *Acknowledge*, *Resolve*. The Investigation header shows "Linked to Case CASE-…" with *Unlink*.
+* **Trap (defect row `LA-BOUND-RULE-AUTHOR-READONLY-1`):** the Value Measures *Watch* line and the bound Alert Rule say "your role cannot author Alert Rules" for `analyst` and `analyst`, although the API lists `canAuthorAlertRules` among their permissions.
 
 ## 2. Panel checklist (what each persona can reach)
 
@@ -110,7 +110,7 @@ Run times are the server's own "Ran on the server in N ms" line.
 
 ## 3. Everything the three verticals share
 
-* One server holds all of them; the Demo User picker lists every persona of every Space (the outsiders are told apart: `audit.outsider` is "Demo Outsider", the claims `outsider` is "Demo Claims Outsider").
+* One server holds all of them; the Demo User picker lists every persona of every Space (the outsiders are told apart: `outsider` is "Demo Outsider", the claims `outsider` is "Demo Outsider").
 * Typed masking everywhere: raw ids only through the audited Reveal. Free text is not masked: the claims references and the Investigation title carry ids typed by the seed.
 * Link Jobs first, index second: `mm_links` / `ap_links` / `claims_links`, then `la_index_build` (a cron or the produced-Dataset signal).
 
@@ -133,7 +133,7 @@ No precision or detection rate (the plants are planted); the 40x dormant-wake fi
 | B | Find similar / Jaccard from `V-131` | **PASS** (order) | Browser: `V-132` 0.71; `V-133`, `V-134`, `V-135`, `BA-7701` 0.57; `V-136` 0.13 last. The runbook's 1.0 / 0.33 is on the approved plus paid_to graph; this view's scores differ, the order holds. Server Jaccard needs an Investigation (not run on the view) |
 | C | `claimant_ring_shared_identity` | **PASS** | 227 nodes, 343 links, community hulls drawn (runbook: 227 / 343) |
 | C | Geo View `staged_accident_junction_map` | **PASS** | *Geo Map Analysis* > saved views > *Load view*: one cluster badge **11** at the junction (`claims_night_unreported_dataset`, lat/lon, entity `accident_id`); runbook: 11 |
-| C | Identity resolution `CL-0332` + `CL-0141` | **PASS** | Investigation `rehearsal-identity` as `siu.analyst`: seed both, *Expand* (fan-out 40), *Resolve*: Working Set **12 entities, 12 links**; the two records share one identity group. Runbook: 12 |
+| C | Identity resolution `CL-0332` + `CL-0141` | **PASS** | Investigation `rehearsal-identity` as `analyst`: seed both, *Expand* (fan-out 40), *Resolve*: Working Set **12 entities, 12 links**; the two records share one identity group. Runbook: 12 |
 
 Click-path notes from this pass (the text above is updated): no *Connect several numbers* (seed from the query graph); one Analysis catalogue with the *Browser* / *Server* toggle; server cards need an Investigation; aliases are per Investigation, so a named entity in a masked view is found through its Entity page. No product defect was found; the seed's Alert-stage warning is not re-driven here.
 
@@ -149,6 +149,6 @@ Click-path notes from this pass (the text above is updated): no *Connect several
 | B Dossier tamper | PASS (API; UI on A) | untouched Dossier verifies, one altered hash fails; the same upload flow driven in the browser on `mule-hub-case` (NOT verified, Changed `log.jsonl#1`) |
 | C embed | PASS (API) / viewer FAIL in console | public GET with link-only headers, revoke, mangled and revoked both 404; console viewer missing (`LA-CONSOLE-EMBED-VIEWER-1`) |
 | A Alert to Case | PASS (API) | `mm-structuring` CRITICAL, aggregate only (no wallet in the message) |
-| B / C roles | PASS (API) | `audit.committee` and `partner.reviewer` read-only (403 on write), outsiders 404 |
+| B / C roles | PASS (API) | `reviewer` and `reviewer` read-only (403 on write), outsiders 404 |
 
 **Still open:** a spoken run with an audience (needs a person); the portal on `:8140`; the B Alert beat; a click-through of this second pass in the browser on an `-Product la` bundle (with the embed viewer).

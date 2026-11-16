@@ -1,5 +1,5 @@
 // DR-T6: pre-demo check that the manual's section 10 figures hold on the live mule data, READ-ONLY (two GETs):
-//   node tools/la-demo-figures.mjs [--base http://127.0.0.1:8096] [--space la-showcase] [--user fm.analyst]
+//   node tools/la-demo-figures.mjs [--base http://127.0.0.1:8096] [--space la-showcase] [--user analyst]
 // Under typed masking the ids are `masked:<hex>`: the figures are then checked by count, score, share and position (ids must
 // be masked tokens); pass `--user <persona that holds reveal>` (e.g. admin) to check the named accounts too.
 // Pass-through flags 13 accounts, exactly two (the RELAY-* accounts) at about 0.985; TILL-06 holds 97 % of cash-out value.
@@ -51,7 +51,7 @@ export function cashOutVerdict(res) {
   return out;
 }
 
-export async function runFigures({ fetchFn = fetch, base, space, user = 'fm.analyst', log = () => {} } = {}) {
+export async function runFigures({ fetchFn = fetch, base, space, user = 'analyst', log = () => {} } = {}) {
   const call = makeClient({ fetchFn, base, space });
   const results = [];
   const record = (id, reasons) => { results.push({ id, ok: !reasons.length, reason: reasons.join('; ') }); log(`${reasons.length ? 'FAIL' : 'PASS'}  ${id}${reasons.length ? '  - ' + reasons.join('; ') : ''}`); };
@@ -63,7 +63,7 @@ export async function runFigures({ fetchFn = fetch, base, space, user = 'fm.anal
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const opt = (k, d) => (args.includes(k) ? args[args.indexOf(k) + 1] : d);
-  runFigures({ base: opt('--base', 'http://127.0.0.1:8096'), space: opt('--space', 'la-showcase'), user: opt('--user', 'fm.analyst'), log: console.log })
+  runFigures({ base: opt('--base', 'http://127.0.0.1:8096'), space: opt('--space', 'la-showcase'), user: opt('--user', 'analyst'), log: console.log })
     .then((rs) => { const bad = rs.filter((r) => !r.ok); console.log(`${rs.length - bad.length}/${rs.length} figures hold`); process.exitCode = bad.length ? 1 : 0; })
     .catch((e) => { console.error(e.message); process.exitCode = 2; });
 }

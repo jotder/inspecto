@@ -8,10 +8,10 @@ columns[6]{name,type,classification}:
   lon,number,
   accident_at,timestamp,
   police_report_ref,string,
-owner: siu.analyst
+owner: analyst
 shares[5]{subjectType,subjectId,access}:
   user,admin,view
-  user,siu.analyst,view
-  user,siu.manager,view
-  user,partner.reviewer,view
+  user,analyst,view
+  user,manager,view
+  user,reviewer,view
   user,outsider,view

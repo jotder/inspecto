@@ -91,10 +91,10 @@ administrator would set up).
 
 | Check | Result | What the screen showed |
 |---|---|---|
-| Add data locked (no right) | PASS | Demo FM Analyst: *Onboard a file* is the reason "Adding data needs the right to upload data in this Space - ask an administrator"; **What can I do next?** shows **Add data** locked with the same line. |
+| Add data locked (no right) | PASS | Demo Analyst: *Onboard a file* is the reason "Adding data needs the right to upload data in this Space - ask an administrator"; **What can I do next?** shows **Add data** locked with the same line. |
 | Add data locked until turned on | PASS after a fix | Demo Admin: "Add data is turned off in this Space: its data comes from Pipelines - ask an administrator to turn it on" - but there was no screen for the administrator to turn it on (only `PUT /settings/data`). Built in this phase: **Settings → This Space → Add data** (*People may add data in this Space*, read-only for others) and, on the locked screen, "You may turn it on: Settings, Add data" for the person who may. Turned on → `transfers.csv` imported (2,215 rows, index built). |
 | Masking on | PASS | Demo Admin, Start from: "This Entity Type is masked: type the whole value - nothing is suggested"; MULE-HUB typed whole → "Drew 1 start and 9 linked nodes"; the query panel: "Masking: typed (ids shown as aliases)". |
-| Investigation actions locked | PASS | Demo FM Analyst, toolbox **Open the Investigation** → **Start an Investigation** locked: "Needs the Investigations add-on, which this installation does not hold." |
+| Investigation actions locked | PASS | Demo Analyst, toolbox **Open the Investigation** → **Start an Investigation** locked: "Needs the Investigations add-on, which this installation does not hold." |
 | Analyst sees the imported data | FAIL (filed) | The Dataset the administrator added is `owner: admin`, `shares[0]`: private to its owner. The FM Analyst's Start from... said "No Dataset in this Space has a link yet" and Inspecto LA has no screen to share it (`LA-ONBOARD-RESIDUALS-1`). Fixed 2026-10-23: an import is shared with its Space (`architecture-data-onboarding.md` §6.12). |
 | Sign out, sign in as someone else | FAIL (filed) | After signing out and in as another Demo User in the same tab, Link Analysis showed the previous person's page state (the page is kept alive across navigation) until a reload (`LA-ONBOARD-DEFECTS-1`). Fixed 2026-10-23 (`architecture-data-onboarding.md` §6.12). |
 
@@ -128,7 +128,7 @@ Plan: [la-data-trust-plan.md](../../../../archived-documents/plans-archive/la-da
 | 9 | Stopped feed, index lag, refused build | PASS after fix | Freshness fired (WARNING, RESOLVED when the next File landed). Index-lag fired with the limit at 2m and resolved on the covering build. Refused build: `la_index_build` Alert `FULL_NOT_ALLOWED`. All three were dead before fix D1 |
 | 10 | Dossier footer | PASS | `dataFooter`: `sealed: false`, as-of, index version 12, files waiting 0, `notAssessed: [days]`. Two exports 2 s apart had the same root hash; `dossier/verify` returned `verified: true`; the bundle downloaded (200) |
 | 11 | Alert Rules evaluated without a hand trigger | PASS for Alert Rules, FAIL for Expectations | Freshness sweep and Signal bridge fire unattended. The volume Expectation does not (R2) |
-| 12 | Accessibility and masking | PARTIAL | Strip and drawer vitest specs include an axe run (green). The strip and drawer hold no entity key by construction; no raw MSISDN appeared in the Files route as `fm.analyst` and `ra.analyst` read it (HTTP 200). A live axe pass and a masked-column persona were NOT DRIVEN |
+| 12 | Accessibility and masking | PARTIAL | Strip and drawer vitest specs include an axe run (green). The strip and drawer hold no entity key by construction; no raw MSISDN appeared in the Files route as `analyst` and `reviewer` read it (HTTP 200). A live axe pass and a masked-column persona were NOT DRIVEN |
 
 ### Defects found and fixed
 
@@ -170,15 +170,15 @@ read back evidence. Results are in section 3; a use case marked NOT DRIVEN was n
 
 | Id | Persona | Goal | Surfaces covered |
 |---|---|---|---|
-| UC1 | `fm.analyst` | Find a mule ring from a saved view | Start cards, Open saved view, Suspicion score, Pattern match (Structuring), Explain node |
-| UC2 | `fm.analyst` | Build a graph by hand from a Dataset | Query panel, column mapping, Filters, size limits, footer counts, legend chips |
-| UC3 | `fm.analyst` | Quantify behaviour | Value Measures: Pass-through, Velocity, Cash-out concentration |
-| UC4 | `fm.analyst` | Run an Investigation end to end | Create, seed, expand, exclude, annotate, window, Identity resolution, snapshot, replay and drift |
-| UC5 | `fm.analyst` + `fm.manager` | Four-eyes expansion | A fan-out above the limit is held; the second approver releases it |
-| UC6 | `fm.analyst` | Hand over evidence | Save this analysis, Case from nodes, Dossier, export |
-| UC7 | `fm.analyst` | Investigate a number | MSISDN card, Expand next degree, Telecom profile |
-| UC8 | `fm.analyst` | Know what the graph stands on | Data trust strip: freshness, coverage, Files, index state |
-| UC9 | `ra.analyst` / `demo.manager` | Read-only user is refused honestly | Disabled or hidden controls, a clear refusal, no write |
+| UC1 | `analyst` | Find a mule ring from a saved view | Start cards, Open saved view, Suspicion score, Pattern match (Structuring), Explain node |
+| UC2 | `analyst` | Build a graph by hand from a Dataset | Query panel, column mapping, Filters, size limits, footer counts, legend chips |
+| UC3 | `analyst` | Quantify behaviour | Value Measures: Pass-through, Velocity, Cash-out concentration |
+| UC4 | `analyst` | Run an Investigation end to end | Create, seed, expand, exclude, annotate, window, Identity resolution, snapshot, replay and drift |
+| UC5 | `analyst` + `manager` | Four-eyes expansion | A fan-out above the limit is held; the second approver releases it |
+| UC6 | `analyst` | Hand over evidence | Save this analysis, Case from nodes, Dossier, export |
+| UC7 | `analyst` | Investigate a number | MSISDN card, Expand next degree, Telecom profile |
+| UC8 | `analyst` | Know what the graph stands on | Data trust strip: freshness, coverage, Files, index state |
+| UC9 | `reviewer` / `outsider` | Read-only user is refused honestly | Disabled or hidden controls, a clear refusal, no write |
 | UC10 | `admin` | Operate | Settings, Entity Lists, Geo area, Share (embed link), Reveal |
 | UC11 | any | Usability and accessibility sweep | Keyboard path, empty and error states, dark and light, narrow window |
 
@@ -204,7 +204,7 @@ testing from it.** Driven through the browser as Demo Users; the pane was 875-14
 | UC6 | Evidence hand-over | PASS: *Save this analysis* froze a 112-node snapshot and showed its SHA-256; the Dossier of `mule-hub-case` reads "Log intact, all 9 recorded hashes agree", lists nine steps including the four-eyes approval, and masks an entity id inside a free-text reason. *Case from nodes* and the sealed bundle download not driven. Found F-15. |
 | UC7 | Investigate a number | PASS: MSISDN card switched the profile to Telecom, asked the purpose, created the Investigation and expanded one degree: 403 entities, 403 links (30 days to 29 Sep 2026). Found F-14. |
 | UC8 | Data trust | PARTIAL: strip reads "Data as of 4 Sep 2026 . 3 of 3 days . index v2". The seed reported "4 covered, missing 2026-09-05"; not reconciled. |
-| UC9 | Read-only reviewer (`ra.analyst`) | PASS: opens and reads; 31 controls disabled, each with the missing capability named. |
+| UC9 | Read-only reviewer (`reviewer`) | PASS: opens and reads; 31 controls disabled, each with the missing capability named. |
 | UC10 | Admin | PASS (read, plus Reveal): Reveal turned the hub's alias into its real id in one click, marked "reveal audited" (no reason is asked: a policy question, F-16). The embed Share card says embed links are off on this host; the mint itself was proven in the earlier LA-EMBED-VIEW-1 pass and not re-run.  Settings shows each limit with its in-force value; Entity Lists shows both lists and a verified Identity Fact chain (7 facts). Opening another user's Investigation link as admin gives a clear red "not available" message. Minting an embed link and Reveal not driven. |
 | UC11 | Usability and axe | axe-core 0 violations (dark) on Link Analysis with a graph, the open Investigation, Entity Lists, Settings, Geo and Alerts. One run on the Investigation page right after a Reveal reported 3 (colour contrast on text read as black, an ag-grid header and a grid scroll region); two re-runs were clean, so it is recorded as not reproducible. Light mode, the Save dialog and the Value Measures form were not scanned. |
 

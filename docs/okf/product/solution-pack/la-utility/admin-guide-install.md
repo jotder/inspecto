@@ -108,16 +108,16 @@ node tools/seed-la-utility.mjs --base http://127.0.0.1:8096 --apply
 It is safe to re-run; without `--apply` it only prints the calls. It creates the Investigation `tampering-case`
 (seeded with `C-14`, `TX-007` and `TX-019`, expanded once, annotated, snapshotted), its members, the Entity Lists
 `tampered-premises` (the 22 premises) and `revenue-protection-watch` (`C-14`, `C-22`, `V-08`), a Case assigned to
-`rp.manager` and linked to the Investigation, an Investigation template, one unbounded expand held for a second
+`manager` and linked to the Investigation, an Investigation template, one unbounded expand held for a second
 person, and one open Draft. To lay the Space out offline instead of unzipping the downloads,
 `node tools/seed-la-utility.mjs --scaffold <bundle>\spaces` does it before the first start.
 
 | Persona (sign in as) | Role | Sees |
 |---|---|---|
-| `rp.analyst` | `rp-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
-| `rp.manager` | `rp-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
-| `rp.reviewer` | `la-viewer`, member as reviewer | reads `tampering-case`; any change is refused (403) |
-| `rp.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `analyst` | `la-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `manager` | `la-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `reviewer` | `la-viewer`, member as reviewer | reads `tampering-case`; any change is refused (403) |
+| `outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
 | `admin` | `admin` | administers the Space; shared with the other demo Spaces |
 
 **The Alert Rule.** `utility_transformer_loss` fires (CRITICAL) when a metered transformer's monthly loss in

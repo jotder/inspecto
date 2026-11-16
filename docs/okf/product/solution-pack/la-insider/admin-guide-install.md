@@ -106,16 +106,16 @@ It is safe to re-run; without `--apply` it only prints the calls. It creates the
 with the operations manager `EMP-0007`, expanded once over `granted_by` to the 11 people whose grants it approved, the
 four reports `EMP-0482`, `EMP-0636`, `EMP-1059` and `EMP-1415` among them, and to its own approver; annotated,
 snapshotted), its members, the Entity List `finance-access-review` (the four reports), a Case assigned to
-`insider.manager` and linked to the Investigation, an Investigation template, one unbounded expand held for a second
+`manager` and linked to the Investigation, an Investigation template, one unbounded expand held for a second
 person, and one open Draft. To lay the Space out offline instead of unzipping the downloads,
 `node tools/seed-la-insider.mjs --scaffold <bundle>\spaces` does it before the first start.
 
 | Persona (sign in as) | Role | Sees |
 |---|---|---|
-| `insider.analyst` | `insider-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
-| `insider.manager` | `insider-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
-| `insider.reviewer` | `la-viewer`, member as reviewer | reads `access-creep`; any change is refused (403) |
-| `insider.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `analyst` | `la-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `manager` | `la-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `reviewer` | `la-viewer`, member as reviewer | reads `access-creep`; any change is refused (403) |
+| `outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
 | `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
 
 **The Alert Rule.** `insider_finance_grant_without_ticket` (WARNING) reads the one row of

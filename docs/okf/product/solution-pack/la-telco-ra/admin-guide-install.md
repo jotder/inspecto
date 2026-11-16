@@ -106,16 +106,16 @@ node tools/seed-la-telco-ra.mjs --base http://127.0.0.1:8096 --apply
 It is safe to re-run; without `--apply` it only prints the calls. It creates the Investigation `unbilled-usage`
 (seeded with `DL-047`, expanded once over `activated_by` to the dealer's 336 subscribers, the 300 unbilled SIMs among
 them, annotated, snapshotted), its members, the Entity List `unbilled-sims` (the 300), a Case assigned to
-`telcora.manager` and linked to the Investigation, an Investigation template, one unbounded expand held for a second
+`manager` and linked to the Investigation, an Investigation template, one unbounded expand held for a second
 person, and one open Draft. To lay the Space out offline instead of unzipping the downloads,
 `node tools/seed-la-telco-ra.mjs --scaffold <bundle>\spaces` does it before the first start.
 
 | Persona (sign in as) | Role | Sees |
 |---|---|---|
-| `telcora.analyst` | `telcora-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
-| `telcora.manager` | `telcora-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
-| `telcora.reviewer` | `la-viewer`, member as reviewer | reads `unbilled-usage`; any change is refused (403) |
-| `telcora.outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `analyst` | `la-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
+| `manager` | `la-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
+| `reviewer` | `la-viewer`, member as reviewer | reads `unbilled-usage`; any change is refused (403) |
+| `outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
 | `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
 
 **The Alert Rule.** `telco_ra_usage_without_billing` (WARNING) reads the one row of `telco_ra_unbilled_counts`. The

@@ -74,7 +74,7 @@ class LaAuditTemplateTest {
         assertEquals("dst", p.get("target_col"));
         assertEquals("kind", p.get("kind_col"));
         assertEquals("ts", p.get("time_col"));
-        assertEquals("audit.admin", p.get("owner"));
+        assertEquals("admin", p.get("owner"));
         assertEquals("la.detect", JobConfig.load(CFG.resolve("jobs").resolve("la_detect_job.toon").toString()).type());
     }
 
@@ -129,21 +129,21 @@ class LaAuditTemplateTest {
         List<Map<String, Object>> users = (List<Map<String, Object>>) ToonHelper.load(CFG.resolve("demo-users.toon").toString()).get("users");
         Map<String, Set<String>> caps = new HashMap<>();
         for (Map<String, Object> u : users) caps.put(String.valueOf(u.get("id")), held(String.valueOf(u.get("roles"))));
-        assertEquals(Set.of("audit.admin", "audit.lead", "audit.manager", "audit.committee", "audit.outsider"), caps.keySet());
+        assertEquals(Set.of("admin", "analyst", "manager", "reviewer", "outsider"), caps.keySet());
 
-        Set<String> lead = caps.get("audit.lead");
+        Set<String> lead = caps.get("analyst");
         assertTrue(lead.containsAll(Set.of(Roles.CAN_MANAGE_INCIDENTS, Roles.CAN_RUN_LINK_GRAPH_ANALYSIS, Roles.CAN_BUILD_LINK_INDEX,
                 Roles.CAN_AUTHOR_ALERT_RULES)), lead.toString());
         assertFalse(lead.contains(Roles.CAN_APPROVE_LINK_EXPANSIONS), "the requester cannot also be the approver");
-        Set<String> manager = caps.get("audit.manager");
+        Set<String> manager = caps.get("manager");
         assertTrue(manager.containsAll(Set.of(Roles.CAN_APPROVE_LINK_EXPANSIONS, Roles.CAN_OPERATE_RUNS)), manager.toString());
         assertFalse(manager.contains(Roles.CAN_REVEAL_LINK_ENTITIES));
-        assertTrue(caps.get("audit.admin").contains(Roles.CAN_REVEAL_LINK_ENTITIES));
-        assertTrue(caps.get("audit.admin").contains(Roles.CAN_AUTHOR_WORKBENCH));
-        for (String id : List.of("audit.lead", "audit.manager", "audit.committee", "audit.outsider"))
+        assertTrue(caps.get("admin").contains(Roles.CAN_REVEAL_LINK_ENTITIES));
+        assertTrue(caps.get("admin").contains(Roles.CAN_AUTHOR_WORKBENCH));
+        for (String id : List.of("analyst", "manager", "reviewer", "outsider"))
             assertFalse(caps.get(id).contains(Roles.CAN_AUTHOR_WORKBENCH), id);
-        for (String id : List.of("audit.committee", "audit.outsider")) assertEquals(Set.of(), caps.get(id), id + " is read-only");
-        for (String id : List.of("audit.admin", "audit.lead", "audit.committee", "audit.outsider"))
+        for (String id : List.of("reviewer", "outsider")) assertEquals(Set.of(), caps.get(id), id + " is read-only");
+        for (String id : List.of("admin", "analyst", "reviewer", "outsider"))
             assertFalse(caps.get(id).contains(Roles.CAN_OPERATE_RUNS), id + " does not operate runs");
     }
 
@@ -156,7 +156,8 @@ class LaAuditTemplateTest {
             assertTrue(Files.exists(CFG.resolve("registry").resolve("datasets").resolve(feed + "_dataset.toon")), feed + " Dataset");
         }
         String ds = Files.readString(CFG.resolve("registry").resolve("datasets").resolve("ap_links_dataset.toon"));
+        // the shares name only the five shared Demo Users of every LA showcase Space (operator 2026-11-16)
         for (String id : ds.lines().filter(l -> l.startsWith("  user,")).map(l -> l.split(",")[1]).toList())
-            assertTrue(id.startsWith("audit."), id + " is not an audit Demo User");
+            assertTrue(List.of("admin", "analyst", "manager", "reviewer", "outsider").contains(id), id + " is not a shared Demo User");
     }
 }

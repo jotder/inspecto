@@ -6,7 +6,7 @@
 //   node tools/la-claims-smoke.mjs [--base http://127.0.0.1:8096] [--space la-claims] [--embed] [--timeout 180] [--dry-run]
 //
 // Probes (each PASS/FAIL): the five personas sign in; the outsider is a 404 and the partner reviewer is read-only (403 on a write);
-// claims_links_dataset declares every link column; the Jobs claims_links and claims_policy_timing (siu.manager presses Run) fill their
+// claims_links_dataset declares every link column; the Jobs claims_links and claims_policy_timing (manager presses Run) fill their
 // Datasets; a fresh Investigation seeded on the repeat passenger grows into the ring (>= 15 entities: 12 claimants + garage, clinic, lawyer);
 // the Working Set is MASKED under typed masking (no raw claimant id) and the admin's audited Reveal returns it; the nine Algorithms of
 // the claims showcase accept a server Graph Run and finish; the seeded Dossier verifies and a tampered manifest does not; with --embed
@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { excerpt, expectStatus, tamperManifest, publicViewVerdict, uniform404Verdict, mangleToken, triggerVerdict, denialReason } from './la-demo-smoke.mjs';
 import { INV, REPEAT_PASSENGER, RING, PROVIDERS } from './seed-la-claims.mjs';
 
-export const PERSONAS = ['admin', 'siu.analyst', 'siu.manager', 'partner.reviewer', 'outsider'];
+export const PERSONAS = ['admin', 'analyst', 'manager', 'reviewer', 'outsider'];
 export const LINK_COLUMNS = ['src', 'dst', 'kind', 'ts', 'amount', 'event_date', 'via'];
 export const JOBS = [['claims_links', 'claims_links_dataset'], ['claims_policy_timing', 'claims_policy_timing_dataset']];
 /** The nine Algorithms the plan assigns to the claims showcase (ids as the server catalogue names them). */
@@ -72,10 +72,10 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   const skip = (id, reason) => { results.push({ id, ok: true, skipped: true, reason }); log(`SKIPPED  ${id}  - ${reason}`); };
   if (dryRun) {
     log(`  sign in as ${PERSONAS.join(', ')}`);
-    log(`  outsider GET ${INV}/log -> 404; partner.reviewer GET -> 200, POST ops -> 403`);
+    log(`  outsider GET ${INV}/log -> 404; reviewer GET -> 200, POST ops -> 403`);
     log(`  GET /components/dataset: claims_links_dataset declares ${LINK_COLUMNS.join(', ')}`);
-    log(`  siu.manager POST /jobs/{${JOBS.map(([j]) => j).join(', ')}}/trigger, wait for rows`);
-    log(`  siu.analyst seed ${REPEAT_PASSENGER} + expand x2 -> >= 15 entities; masked Working Set; admin Reveal`);
+    log(`  manager POST /jobs/{${JOBS.map(([j]) => j).join(', ')}}/trigger, wait for rows`);
+    log(`  analyst seed ${REPEAT_PASSENGER} + expand x2 -> >= 15 entities; masked Working Set; admin Reveal`);
     log(`  Graph Runs: ${ALGORITHMS.join(', ')}`);
     log(`  Dossier verify, tamper verify; embed ${embed ? 'mint, public view, revoke, mangled = revoked' : '(SKIPPED: no --embed)'}`);
     return results;
@@ -109,21 +109,21 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   }
   const inv = `/inv/investigations/${INV}`;
   record('outsider is not a member: 404', expectStatus(await call('outsider', 'GET', `${inv}/log`), 404));
-  record('partner.reviewer reads the log: 200', expectStatus(await call('partner.reviewer', 'GET', `${inv}/log`), 200));
-  const denied = await call('partner.reviewer', 'POST', `${inv}/ops`, { op: 'annotate', ids: ['CLI-04'], note: 'smoke' });
-  record('partner.reviewer is read-only: a write is 403', expectStatus(denied, 403));
+  record('reviewer reads the log: 200', expectStatus(await call('reviewer', 'GET', `${inv}/log`), 200));
+  const denied = await call('reviewer', 'POST', `${inv}/ops`, { op: 'annotate', ids: ['CLI-04'], note: 'smoke' });
+  record('reviewer is read-only: a write is 403', expectStatus(denied, 403));
 
-  const ds = await call('siu.manager', 'GET', '/components/dataset');
+  const ds = await call('manager', 'GET', '/components/dataset');
   record('claims_links_dataset declares every link column', ds.status === 200 ? registryVerdict(ds.data) : excerpt(ds));
 
   for (const [job, dataset] of JOBS) {
-    const t = await call('siu.manager', 'POST', `/jobs/${job}/trigger`, {});
-    const d = denialReason(t, 'siu.manager');
-    record(`siu.manager triggers Job ${job}`, d || triggerVerdict(t));
+    const t = await call('manager', 'POST', `/jobs/${job}/trigger`, {});
+    const d = denialReason(t, 'manager');
+    record(`manager triggers Job ${job}`, d || triggerVerdict(t));
     const deadline = now() + timeoutMs;
     let last;
     for (;;) {
-      last = await call('siu.manager', 'GET', `/datasets/${dataset}/rows?limit=1`);
+      last = await call('manager', 'GET', `/datasets/${dataset}/rows?limit=1`);
       if (last.status === 200 && last.data && Array.isArray(last.data.rows) && last.data.rows.length) { last = null; break; }
       if (now() >= deadline) break;
       await sleep(pollMs);
@@ -133,35 +133,35 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
 
   const id = `smoke-claims-${now()}`;
   const mine = `/inv/investigations/${id}`;
-  const created = await call('siu.analyst', 'POST', '/inv/investigations', { id, title: 'smoke claims', purpose: 'la-claims-smoke probe', dataset: 'claims_links_dataset',
+  const created = await call('analyst', 'POST', '/inv/investigations', { id, title: 'smoke claims', purpose: 'la-claims-smoke probe', dataset: 'claims_links_dataset',
     sourceCol: 'src', targetCol: 'dst', linkKindCol: 'kind', timeCol: 'ts', entityType: 'party' });
   if (created.status >= 300) record('a fresh Investigation seeds the repeat passenger and the ring grows', `create ${excerpt(created)}`);
   else {
-    const seed = await call('siu.analyst', 'POST', `${mine}/ops`, { op: 'seed', ids: [REPEAT_PASSENGER], entityType: 'party' });
+    const seed = await call('analyst', 'POST', `${mine}/ops`, { op: 'seed', ids: [REPEAT_PASSENGER], entityType: 'party' });
     let ws = null;
     if (seed.status !== 200) record('a fresh Investigation seeds the repeat passenger and the ring grows', `seed ${excerpt(seed)}`);
     else {
-      for (let i = 0; i < 2; i++) await call('siu.analyst', 'POST', `${mine}/ops`, { op: 'expand', direction: 'either', maxFanOut: 40 });
-      ws = await call('siu.analyst', 'GET', `${mine}/working-set?of=entities`);
+      for (let i = 0; i < 2; i++) await call('analyst', 'POST', `${mine}/ops`, { op: 'expand', direction: 'either', maxFanOut: 40 });
+      ws = await call('analyst', 'GET', `${mine}/working-set?of=entities`);
       record('a fresh Investigation seeds the repeat passenger and the ring grows', ringGrowthVerdict(ws));
       record('typed masking: the Working Set carries no raw claimant id', maskedVerdict(ws));
       const row = ((ws.data && ws.data.rows) || [])[0];
       const token0 = row && (row.entityId || row.id);
       if (!token0) skip('admin Reveal returns the id (audited)', 'no Working Set row to reveal');
       else {
-        await call('siu.analyst', 'POST', `${mine}/members`, { subject: 'admin', role: 'lead' });
+        await call('analyst', 'POST', `${mine}/members`, { subject: 'admin', role: 'lead' });
         const rv = await call('admin', 'POST', `${mine}/reveal`, { tokens: [token0] });
         record('admin Reveal returns the id (audited)', rv.status === 200 && /CL-\d{4}|GAR-|CLI-|LAW-/.test(JSON.stringify(rv.data)) ? null : excerpt(rv));
       }
       for (const algorithm of ALGORITHMS) {
-        let r = await call('siu.analyst', 'POST', '/inv/graph/runs', { investigationId: id, algorithm });
+        let r = await call('analyst', 'POST', '/inv/graph/runs', { investigationId: id, algorithm });
         const deadline = now() + timeoutMs;
         while (r.status === 202 || (r.status === 200 && /queued|running|pending/i.test(String((r.data && (r.data.status || r.data.state)) || '')))) {
           if (now() >= deadline) break;
           await sleep(1000);
           const rid = r.data && (r.data.id || r.data.runId);
           if (!rid) break;
-          r = await call('siu.analyst', 'GET', `/inv/graph/runs/${rid}`);
+          r = await call('analyst', 'GET', `/inv/graph/runs/${rid}`);
         }
         record(`Graph Run ${algorithm} finishes`, runVerdict(r));
       }
@@ -169,7 +169,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   }
 
   // every saved Geo View must project to at least one point (the same request the Geo page sends: the saved projection, datasetId sent as 'dataset')
-  const views = await call('siu.analyst', 'GET', '/components/geo-map-view');
+  const views = await call('analyst', 'GET', '/components/geo-map-view');
   const listed = views.status === 200 ? (Array.isArray(views.data) ? views.data : (views.data && views.data.items) || []) : [];
   for (const name of GEO_VIEWS) {
     const v = listed.find((x) => (x.name || x.id) === name);
@@ -177,14 +177,14 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
     const projection = content && content.query && content.query.projection;
     if (!projection) { record(`Geo View ${name} projects to points`, v ? 'the view has no projection' : `not listed (HTTP ${views.status})`); continue; }
     const { datasetId, ...rest } = projection;
-    record(`Geo View ${name} projects to points`, geoVerdict(await call('siu.analyst', 'POST', '/geo/projection', { ...rest, dataset: datasetId })));
+    record(`Geo View ${name} projects to points`, geoVerdict(await call('analyst', 'POST', '/geo/projection', { ...rest, dataset: datasetId })));
   }
 
-  const dossier = await call('siu.analyst', 'GET', `${inv}/dossier`);
+  const dossier = await call('analyst', 'GET', `${inv}/dossier`);
   if (dossier.status !== 200 || !dossier.data.manifest) record('Dossier verifies and a tampered manifest does not', `no dossier manifest (HTTP ${dossier.status})`);
   else {
-    const clean = await call('siu.analyst', 'POST', `${inv}/dossier/verify`, { manifest: dossier.data.manifest });
-    const bad = await call('siu.analyst', 'POST', `${inv}/dossier/verify`, { manifest: tamperManifest(dossier.data.manifest) });
+    const clean = await call('analyst', 'POST', `${inv}/dossier/verify`, { manifest: dossier.data.manifest });
+    const bad = await call('analyst', 'POST', `${inv}/dossier/verify`, { manifest: tamperManifest(dossier.data.manifest) });
     const ok = clean.status === 200 && clean.data.verified === true && ((bad.status === 200 && bad.data.verified === false) || bad.status === 422);
     record('Dossier verifies and a tampered manifest does not', ok ? null : `clean ${excerpt(clean)}; tampered ${excerpt(bad)}`);
   }

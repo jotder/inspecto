@@ -21,16 +21,16 @@ stays in the [demo runbook](../../module/la-core/admin-guide-demo.md).
 | 4 | Seed the runtime state | `node tools/seed-la-claims.mjs --base http://127.0.0.1:8096 --apply` (without `--apply` it prints every call) | `created: ...`; it waits (up to 40 x 3 s) for the first `claims_links` build |
 | 5 | Smoke | `node tools/la-claims-smoke.mjs --base http://127.0.0.1:8096 --embed` | `PASS` lines and `n/n probes passed` |
 
-The Space has **no landed link Dataset until the `claims_links` Job has run** (it runs on a 10 minute cron; the smoke presses Run as `siu.manager`).
+The Space has **no landed link Dataset until the `claims_links` Job has run** (it runs on a 10 minute cron; the smoke presses Run as `manager`).
 `la_index_build` then fires on the `claims_links` Dataset being produced, so the first Investigation read can be served from the index.
 
 ### Personas (Demo Users of the template)
 
 | User | Role | Does |
 |---|---|---|
-| `siu.analyst` | lead | builds the Investigation, authors Alert Rules, runs Graph Runs |
-| `siu.manager` | second approver | approves the held expand, presses Run on Jobs |
-| `partner.reviewer` | read-only | reads the Investigation; every write is 403 |
+| `analyst` | lead | builds the Investigation, authors Alert Rules, runs Graph Runs |
+| `manager` | second approver | approves the held expand, presses Run on Jobs |
+| `reviewer` | read-only | reads the Investigation; every write is 403 |
 | `outsider` | not a member | the Investigation is 404 |
 | `admin` | lead and Reveal | audited Reveal, Settings, mints the embed link |
 
@@ -59,7 +59,7 @@ Symmetric kinds are stored once (`src` < `dst`); `via` names the claim, the acci
 
 ## 2. The 12-minute version
 
-Start as `siu.analyst`. Always **seed first**: an all-nodes canvas is a dust cloud.
+Start as `analyst`. Always **seed first**: an all-nodes canvas is a dust cloud.
 
 | Min | Scene | Click | Say | Expect |
 |---|---|---|---|---|
@@ -150,7 +150,7 @@ presenter shows that **centrality alone is not guilt** and the ring is found by 
 ## 6. Rehearsal record, 2026-10-16 (Advanced Demo Auth bundle, port 8142)
 
 **Verified.** `tools/seed-la-claims.mjs --apply` (Investigation `ring-case`, 7 ops, 3 members, 3 police-report-request references, 2 Entity Lists, the identity, a Case assigned to
-`siu.manager` and linked, an Investigation Template, one pending four-eyes expand, one open Draft); `tools/la-claims-smoke.mjs --embed` **29 of 29**: five sign-ins, outsider 404, partner reviewer
+`manager` and linked, an Investigation Template, one pending four-eyes expand, one open Draft); `tools/la-claims-smoke.mjs --embed` **29 of 29**: five sign-ins, outsider 404, partner reviewer
 read 200 and write 403, link columns, both Jobs fill their Datasets, the ring grows to at least 15 entities, no raw id under typed masking, admin Reveal, all nine server Graph Runs finish,
 Dossier verifies and a tampered manifest fails, embed mint / link-only headers / revoke / uniform 404. Browser: sign-in picker with the five personas; the saved view `claimant_ring_shared_identity`
 drew 227 nodes and 343 links (masking banner "typed, ids shown as aliases") and the client community run found 51 communities, the largest 16 nodes; Geo View (14 points); the partner portal

@@ -52,13 +52,13 @@ test('apply signs in once per persona and acts as the right persona', async () =
   assert.deepEqual(ops[0].body.ids, ['EMP-0007']);
   assert.ok(ops[1].body.maxFanOut <= 2000, 'the first expand is bounded under four_eyes_fan_out_above, so it runs');
   assert.deepEqual(ops[1].body.linkKinds, ['granted_by'], 'one hop reaches everyone whose grants the manager approved');
-  assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:insider.analyst'));
+  assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:analyst'));
   const members = m.calls.filter((c) => c.u.endsWith('/members') && c.u.includes('investigations'));
-  assert.deepEqual(members.map((c) => c.body), [{ subject: 'insider.reviewer', role: 'reviewer' }, { subject: 'insider.manager', role: 'reviewer' }, { subject: 'admin', role: 'lead' }]);
-  assert.ok(!members.some((c) => c.body.subject === 'insider.outsider'), 'the outsider is not a member');
+  assert.deepEqual(members.map((c) => c.body), [{ subject: 'reviewer', role: 'reviewer' }, { subject: 'manager', role: 'reviewer' }, { subject: 'admin', role: 'lead' }]);
+  assert.ok(!members.some((c) => c.body.subject === 'outsider'), 'the outsider is not a member');
   assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/entity-lists/finance-access-review/members').body.add, ['EMP-0482', 'EMP-0636', 'EMP-1059', 'EMP-1415']);
   assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/cases/from-entities').body.entities, [{ id: 'entity:insider_entity:EMP-0007', dataset: 'insider_links_dataset' }]);
-  assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/objects/CASE-7/assign').body, { assignee: 'insider.manager' });
+  assert.deepEqual(m.calls.find((c) => c.u === '/spaces/s/objects/CASE-7/assign').body, { assignee: 'manager' });
   assert.deepEqual(m.calls.find((c) => c.method === 'PUT').body, { caseRef: 'CASE-7' });
   assert.ok(!m.calls.find((c) => c.u.endsWith('/alert-rules')), 'the Alert Rule ships in the template, not in the seed');
 });
@@ -113,7 +113,7 @@ test('a pending expand already in the inbox is not requested twice', async () =>
 test('every plan step names a persona the template defines, and the outsider is on the roster', () => {
   const users = fs.readFileSync(new URL('../spaces/_templates/la-insider/config/demo-users.toon', import.meta.url), 'utf8');
   for (const s of buildPlan()) assert.ok(users.includes(`  ${s.as},`), `${s.as} is not a Demo User of the la-insider template`);
-  for (const u of ['insider.analyst', 'insider.manager', 'insider.reviewer', 'insider.outsider', 'admin']) assert.ok(users.includes(`  ${u},`), u);
+  for (const u of ['analyst', 'manager', 'reviewer', 'outsider', 'admin']) assert.ok(users.includes(`  ${u},`), u);
 });
 
 test('the shared admin reads exactly as in la-showcase (a roster conflict refuses sign-in)', () => {
@@ -130,13 +130,13 @@ test('scaffold lays down the Space once and is idempotent', () => {
   assert.deepEqual(scaffold(root), []);
 });
 
-test('a fresh Space (no link rows yet) presses Run on insider_links as insider.manager before the create', async () => {
+test('a fresh Space (no link rows yet) presses Run on insider_links as manager before the create', async () => {
   const m = mock(); let n = 0;
   const f = async (url, init = {}) => (url.includes('/datasets/insider_links_dataset/rows') && n++ < 2
     ? { ok: true, status: 200, json: async () => ({ data: { rows: [] } }) } : m.fetchFn(url, init));
   const r = await run({ fetchFn: f, base: 'http://h', space: 's', apply: true, stages: OFF, sleep: async () => {} });
   assert.deepEqual(r.failed, []);
   const i = m.calls.findIndex((c) => c.u === '/spaces/s/jobs/insider_links/trigger' && c.method === 'POST');
-  assert.ok(i >= 0 && m.calls[i].auth === 'Bearer tok-demo:insider.manager');
+  assert.ok(i >= 0 && m.calls[i].auth === 'Bearer tok-demo:manager');
   assert.ok(i < m.calls.findIndex((c) => c.u === '/spaces/s/inv/investigations' && c.method === 'POST'));
 });

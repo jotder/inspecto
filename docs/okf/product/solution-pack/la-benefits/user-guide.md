@@ -144,16 +144,16 @@ golden tests are `tools/gen-la-benefits-data.test.mjs` and `BenefitsLinksJobGold
 On a build with sign-in (the demo build: see the [admin guide](admin-guide-install.md#advanced-tier-personas-the-payments-to-the-deceased-alert-rule-and-the-seed)),
 after `node tools/seed-la-benefits.mjs --apply`, sign in as each persona and check what each one sees:
 
-1. **`benefits.analyst` (lead):** **Alerts** lists `benefits_paid_to_the_deceased_after_notice` (WARNING) with the
+1. **`analyst` (lead):** **Alerts** lists `benefits_paid_to_the_deceased_after_notice` (WARNING) with the
    value 9: claims of people on the death register still paid more than 30 days after the notice. Open the
    Investigation `paid-after-death`: it is seeded with the three accounts of exercise 2 and expanded to the 12 claims
    paid into them and their 10 claimants. The Entity List `deceased-still-paid` holds the 9 pensioners. The Case
    "Pensions paid after death into accounts of CIT-08276" is linked to it.
-2. **Four-eyes:** an unbounded expand by `benefits.analyst` is held, not run. Sign in as **`benefits.manager`**: it is
-   in the approval inbox; approve or refuse it. `benefits.analyst` cannot approve its own request.
-3. **`benefits.reviewer`:** opens `paid-after-death` and reads every step; any change is refused.
-4. **`benefits.outsider`:** sees the Datasets, but `paid-after-death` is not found (404).
-5. **Draft:** `benefits.analyst` has one open Draft that annotates `CIT-08276`, asking who else lives at that address;
+2. **Four-eyes:** an unbounded expand by `analyst` is held, not run. Sign in as **`manager`**: it is
+   in the approval inbox; approve or refuse it. `analyst` cannot approve its own request.
+3. **`reviewer`:** opens `paid-after-death` and reads every step; any change is refused.
+4. **`outsider`:** sees the Datasets, but `paid-after-death` is not found (404).
+5. **Draft:** `analyst` has one open Draft that annotates `CIT-08276`, asking who else lives at that address;
    promote it, or leave it.
 
 **Not the story:** `CIT-05289` was paid for 42 days after the death, longer than many, but the notice arrived 40 days

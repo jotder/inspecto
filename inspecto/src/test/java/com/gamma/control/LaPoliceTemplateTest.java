@@ -60,25 +60,25 @@ class LaPoliceTemplateTest {
         List<Map<String, Object>> users = (List<Map<String, Object>>) ToonHelper.load(CFG.resolve("demo-users.toon").toString()).get("users");
         Map<String, Set<String>> caps = new HashMap<>();
         for (Map<String, Object> u : users) caps.put(String.valueOf(u.get("id")), held(String.valueOf(u.get("roles"))));
-        assertEquals(Set.of("admin", "police.analyst", "police.sio", "police.reviewer", "police.outsider"), caps.keySet());
+        assertEquals(Set.of("admin", "analyst", "manager", "reviewer", "outsider"), caps.keySet());
 
-        Set<String> analyst = caps.get("police.analyst");
+        Set<String> analyst = caps.get("analyst");
         assertTrue(analyst.containsAll(Set.of(Roles.CAN_MANAGE_INCIDENTS, Roles.CAN_RUN_LINK_GRAPH_ANALYSIS, Roles.CAN_AUTHOR_ALERT_RULES)), analyst.toString());
         assertFalse(analyst.contains(Roles.CAN_APPROVE_LINK_EXPANSIONS), "the requester cannot also be the approver");
-        Set<String> sio = caps.get("police.sio");
+        Set<String> sio = caps.get("manager");
         assertTrue(sio.containsAll(Set.of(Roles.CAN_APPROVE_LINK_EXPANSIONS, Roles.CAN_OPERATE_RUNS)), sio.toString());
         assertFalse(sio.contains(Roles.CAN_RUN_LINK_GRAPH_ANALYSIS), "the approver does not run the analysis");
         assertTrue(caps.get("admin").contains(Roles.CAN_AUTHOR_WORKBENCH), "the admin edits the Link Analysis settings");
-        for (String id : List.of("police.analyst", "police.sio", "police.reviewer", "police.outsider"))
+        for (String id : List.of("analyst", "manager", "reviewer", "outsider"))
             assertFalse(caps.get(id).contains(Roles.CAN_AUTHOR_WORKBENCH), id + " does not author");
-        for (String id : List.of("police.reviewer", "police.outsider")) assertEquals(Set.of(), caps.get(id), id + " is read-only");
+        for (String id : List.of("reviewer", "outsider")) assertEquals(Set.of(), caps.get(id), id + " is read-only");
     }
 
     @Test
     @SuppressWarnings("unchecked")
     void theSharedAdminIsDefinedExactlyAsInLaShowcase() throws Exception {
         // DemoUsers refuses a user id defined differently in two Spaces (409 ROSTER_CONFLICT), so `admin` must read the same;
-        // it was admin;police-analyst;la-settings until 2026-11-09
+        // it was admin;la-analyst;la-settings until 2026-11-09
         Path other = Path.of("..", "spaces", "_templates", "la-showcase", "config", "demo-users.toon");
         List<Map<String, Object>> mine = (List<Map<String, Object>>) ToonHelper.load(CFG.resolve("demo-users.toon").toString()).get("users");
         List<Map<String, Object>> theirs = (List<Map<String, Object>>) ToonHelper.load(other.toString()).get("users");

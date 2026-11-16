@@ -131,18 +131,18 @@ customer and a story customer may have paid the same busy supplier, two hops apa
 On a build with sign-in (the demo build: see the [admin guide](admin-guide-install.md#advanced-tier-personas-the-listed-person-alert-rule-and-the-seed)),
 after `node tools/seed-la-ownership.mjs --apply`, sign in as each persona and check what each one sees:
 
-1. **`ownership.analyst` (lead):** **Alerts** lists `ownership_path_to_listed_person` (CRITICAL) with the value 1: one
+1. **`analyst` (lead):** **Alerts** lists `ownership_path_to_listed_person` (CRITICAL) with the value 1: one
    ownership path of 3 hops or fewer from a customer's company up to a person matched to the sanctions list. Open the
    Investigation `sanctions-exposure`: it is seeded with `SL-0137` and `CUS-00528` and expanded once over `name_match`,
    `owns` and `customer_is`, which brings in `PER-03904` and `CO-04313`; `CO-04431`, the 50 % owner between them, is
    two hops from either seed and not in yet. The Entity List `sanctions-path-parties` holds the four parties on the
    path. The Case "Sanctions exposure of CUS-00528" is linked to it.
-2. **Four-eyes:** an unbounded expand by `ownership.analyst` is held, not run. Sign in as **`ownership.manager`**: it
-   is in the approval inbox; approve it and the expand runs, bringing in `CO-04431` among others. `ownership.analyst`
+2. **Four-eyes:** an unbounded expand by `analyst` is held, not run. Sign in as **`manager`**: it
+   is in the approval inbox; approve it and the expand runs, bringing in `CO-04431` among others. `analyst`
    cannot approve its own request.
-3. **`ownership.reviewer`:** opens `sanctions-exposure` and reads every step; any change is refused.
-4. **`ownership.outsider`:** sees the Datasets, but `sanctions-exposure` is not found (404).
-5. **Draft:** `ownership.analyst` has one open Draft that annotates `PER-03904` about bringing in the owner; promote
+3. **`reviewer`:** opens `sanctions-exposure` and reads every step; any change is refused.
+4. **`outsider`:** sees the Datasets, but `sanctions-exposure` is not found (404).
+5. **Draft:** `analyst` has one open Draft that annotates `PER-03904` about bringing in the owner; promote
    it, or leave it.
 
 **Not the story:** the near-namesake `PER-02226` owns 100 % of `CO-04242`, the customer `CUS-00642`, so he is closer

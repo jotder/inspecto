@@ -38,7 +38,7 @@ store) are in the [showcase variants runbook](../../solution-pack/la-showcase/ad
 | 4 | Wait for the first ingest | The Space ingests `TRANSFERS_20260901..03.csv` from its inbox on boot. | The seed in step 5 retries a 422 "cannot read the columns" up to 30 times (2 s apart) until `mule_transfers_dataset` has rows. |
 | 5 | Seed | `node tools/seed-la-showcase.mjs --base http://127.0.0.1:<PORT> --space la-showcase --apply` (a run without `--apply` is a dry run that prints every call) | Ends with `created: ...`, `already there: ...`, `failed: -`. Safe to re-run. See §0.1. |
 | 6 | Smoke | `node tools/la-demo-smoke.mjs --base http://127.0.0.1:<PORT> --space la-showcase` | `PASS` lines then **`9/9 probes passed`** (6 gate probes + route inventory + untouched manifest verifies + tamper verify fails). Exit 0. Any `FAIL` line: stop and fix before presenting. |
-| 7 | Optional wider smoke | add `--staged <bundle>\spaces\la-showcase\data\staged\mule_transfers --inbox <bundle>\spaces\la-showcase\data\inbox\mule_transfers` for replay-versus-drift (**writes** a far-future 40-row file into the inbox, so run it BEFORE the stakeholder day, not after); `--burst` for 429/503/409 (starts runs: disposable demo only); `--telecom [--presenter fm.manager]` for the telecom checks (triggers Jobs, creates a `smoke-telecom-<ts>` Investigation, 180 s timeout). | Each adds probes to the `N/N` count; a skipped probe prints `SKIPPED` and still counts as passing. |
+| 7 | Optional wider smoke | add `--staged <bundle>\spaces\la-showcase\data\staged\mule_transfers --inbox <bundle>\spaces\la-showcase\data\inbox\mule_transfers` for replay-versus-drift (**writes** a far-future 40-row file into the inbox, so run it BEFORE the stakeholder day, not after); `--burst` for 429/503/409 (starts runs: disposable demo only); `--telecom [--presenter manager]` for the telecom checks (triggers Jobs, creates a `smoke-telecom-<ts>` Investigation, 180 s timeout). | Each adds probes to the `N/N` count; a skipped probe prints `SKIPPED` and still counts as passing. |
 | 8 | Embed (optional aside, S14) | Start with `set INSPECTO_JAVA_OPTS=-Dla.embed.enabled=true` | Without it the mint answers 503 and every public read answers 404. |
 
 `serve-demo` flags: `--enable-native-access=ALL-UNNAMED -Dcontrol.bind=127.0.0.1 -Dauth.mode=demo -Dobjects.backend=db
@@ -50,15 +50,15 @@ ingested until you copy them into the inbox (used live only if you choose the dr
 ### 0.1 What the seed creates (read from `tools/seed-la-showcase.mjs`, not guessed)
 
 * **Investigation `mule-hub-case`** over `mule_transfers_dataset` (payer `PAYER_ACCOUNT`, payee `PAYEE_ACCOUNT`, link kind
-  `CHANNEL`, time `BOOKED_AT`), created as `fm.analyst` with 8 steps: seed `MULE-HUB-01`, `RELAY-01`, `RELAY-02`,
+  `CHANNEL`, time `BOOKED_AT`), created as `analyst` with 8 steps: seed `MULE-HUB-01`, `RELAY-01`, `RELAY-02`,
   `SMURF-01` (type `account`); a bounded expand (`maxFanOut` 5, either direction); exclude `RELAY-02` with a reason; annotate
   `MULE-HUB-01`; threshold 1; window 2026-09-01..2026-09-04; resolve; snapshot "showcase baseline".
-* **Members:** `fm.analyst` is the owner (lead); `ra.analyst` reviewer; `fm.manager` reviewer; `admin` lead. `demo.manager` is
+* **Members:** `analyst` is the owner (lead); `reviewer` reviewer; `manager` reviewer; `admin` lead. `outsider` is
   deliberately NOT a member.
 * **Entity Lists:** `smurf-accounts` (SMURF-01..SMURF-12, a `SMURF-` prefix range, and `TILL-06` expiring in 30 days);
   `telecom-watch-msisdn` (`99979100001`, `99979200001`).
 * **Identity assertion:** `account:MULE-HUB-01` = `account:ACC-1006` ("same KYC document").
-* **A Case** "Mule ring around MULE-HUB-01" from the hub, assigned to `fm.manager` and linked to the Investigation.
+* **A Case** "Mule ring around MULE-HUB-01" from the hub, assigned to `manager` and linked to the Investigation.
 * **Investigation Template** `mule-ring-template`; **Alert Rule** `mule-pass-through` (CRITICAL, pass-through Measure over
   `AMOUNT`/`BOOKED_AT`, 2026-09-01..2026-09-04) with **standing detection** enabled.
 * **From the Space Template (not the seed):** `link-analysis.toon` (`masking_mode: typed`, `four_eyes_fan_out_above: 2000`,
@@ -71,10 +71,10 @@ ingested until you copy them into the inbox (used live only if you choose the dr
 | Demo User | Role in the story | Capabilities that matter |
 |---|---|---|
 | `admin` | Platform admin; Settings; mints embed links; Reveal | admin role plus `la-settings` (`canAuthorWorkbench`); a lead member of the Investigation |
-| `fm.analyst` | Lead analyst, owner | `canManageIncidents`, `canWorkIncidents`, `canRunLinkGraphAnalysis`, `canBuildLinkIndex`, `canAuthorAlertRules` |
-| `fm.manager` | Second approver | `canManageIncidents`, `canWorkIncidents`, `canApproveLinkExpansions`, `canOperateRuns` |
-| `ra.analyst` | Reviewer, read-only | none (`la-viewer`) |
-| `demo.manager` | Not a member | none (`la-viewer`) |
+| `analyst` | Lead analyst, owner | `canManageIncidents`, `canWorkIncidents`, `canRunLinkGraphAnalysis`, `canBuildLinkIndex`, `canAuthorAlertRules` |
+| `manager` | Second approver | `canManageIncidents`, `canWorkIncidents`, `canApproveLinkExpansions`, `canOperateRuns` |
+| `reviewer` | Reviewer, read-only | none (`la-viewer`) |
+| `outsider` | Not a member | none (`la-viewer`) |
 
 ### 0.3 Other Spaces and Space Templates
 
@@ -85,11 +85,11 @@ served Space (see "if it goes wrong" below).
 
 | Template | Use | Lay down / seed | Demo Users (`config/demo-users.toon`) |
 |---|---|---|---|
-| `la-showcase` | this runbook | `tools/seed-la-showcase.mjs` | `admin`, `fm.analyst`, `fm.manager`, `ra.analyst`, `demo.manager` |
+| `la-showcase` | this runbook | `tools/seed-la-showcase.mjs` | `admin`, `analyst`, `manager`, `reviewer`, `outsider` |
 | `la-showcase-off` | smoke `MODULE_DISABLED` probe | laid down with `la-showcase` | same roster as `la-showcase` |
-| `la-mobile-money` | [mobile-money runbook](../../solution-pack/la-mobile-money/admin-guide-showcase-runbook.md) | `tools/seed-la-mm.mjs --scaffold` / `--apply` | `admin`, `mm.analyst`, `mm.manager`, `mm.reviewer`, `mm.outsider` |
-| `la-audit` | [audit runbook](../../solution-pack/la-audit/admin-guide-showcase-runbook.md) | `tools/seed-la-audit.mjs --scaffold` / `--apply` | `audit.admin`, `audit.lead`, `audit.manager`, `audit.committee`, `audit.outsider` |
-| `la-claims` | [claims runbook](../../solution-pack/la-claims/admin-guide-showcase-runbook.md) | `tools/seed-la-claims.mjs --scaffold` / `--apply` | `admin`, `siu.analyst`, `siu.manager`, `partner.reviewer`, `outsider` |
+| `la-mobile-money` | [mobile-money runbook](../../solution-pack/la-mobile-money/admin-guide-showcase-runbook.md) | `tools/seed-la-mm.mjs --scaffold` / `--apply` | `admin`, `analyst`, `manager`, `reviewer`, `outsider` |
+| `la-audit` | [audit runbook](../../solution-pack/la-audit/admin-guide-showcase-runbook.md) | `tools/seed-la-audit.mjs --scaffold` / `--apply` | `admin`, `analyst`, `manager`, `reviewer`, `outsider` |
+| `la-claims` | [claims runbook](../../solution-pack/la-claims/admin-guide-showcase-runbook.md) | `tools/seed-la-claims.mjs --scaffold` / `--apply` | `admin`, `analyst`, `manager`, `reviewer`, `outsider` |
 | `la-daily-feed` | the reusable daily-feed shape (one telecom XDR CSV per UTC day; Pipeline, Collector, Dataset, freshness and index-lag Alert Rules, `la_index_build` Job); no persona demo | copy a sample day from `data/samples` into `data/inbox/daily_xdr` | none |
 | `la-sample` | first-run sample of *Getting started* (every edition, no personas, no Jobs) | created by the app: `POST /spaces {template: "la-sample", loadSamples: true}` | none |
 
@@ -102,8 +102,8 @@ served Space (see "if it goes wrong" below).
 * [ ] Browser at 1440x900 or larger (the canvas is about 506 x 708 px with both panels open at 1440x900; below 1300 px wide the
       Toolbox starts collapsed). Hide bookmarks bar; zoom 100%.
 * [ ] **Sign-in order** (each persona in its own browser profile or private window so sessions do not collide):
-      `fm.analyst` (main window, scenes S1-S2, S5-S11), `fm.manager` (S8, S9), `admin` (S3, S4 Reveal, S13, S14), `ra.analyst` and
-      `demo.manager` (S7). The sign-in page lists the Demo Users under "Demo sign-in / Not secure, local only".
+      `analyst` (main window, scenes S1-S2, S5-S11), `manager` (S8, S9), `admin` (S3, S4 Reveal, S13, S14), `reviewer` and
+      `outsider` (S7). The sign-in page lists the Demo Users under "Demo sign-in / Not secure, local only".
 * [ ] Have open: a terminal at the bundle with the `curl` commands of S7 and S14 ready; the architecture page; the 10^8 slide (S15).
 * [ ] **Do not run the seed during the demo** and do not leave the telecom Jobs running a long trigger.
 
@@ -122,8 +122,8 @@ served Space (see "if it goes wrong" below).
 
 Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page section.
 
-### S1. The graph and Suspicion score (2 min) [fm.analyst]
-* **Click:** sign in as `fm.analyst` > *Link Analysis*. On the starter cards press **Follow the money (example)** (shown only when the
+### S1. The graph and Suspicion score (2 min) [analyst]
+* **Click:** sign in as `analyst` > *Link Analysis*. On the starter cards press **Follow the money (example)** (shown only when the
   Space has a fitting saved view; otherwise **Open a saved view** > `mule_layering_ring`). Toolbox > **Analysis** > **Suspicion score**.
 * **Audience sees:** the layering ring drawn from the Dataset; the footer states nodes and links drawn plus the caps.
 * **Expect (verified):** on the showcase corpus the hub ranks first (`LaShowcaseGoldenTest`, readiness plan §4); `mule_layering_ring`
@@ -132,7 +132,7 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
 * **Proves:** exploration is a live projection over a Dataset; it is not evidence (manual §1; arch §1).
 * **If it goes wrong:** blank canvas or "has no rows yet" = seed/ingest not done (§1). "Truncated" banner is honest behaviour, narrow the query.
 
-### S2. The Investigation ladder, Replay and drift (3 min) [fm.analyst]
+### S2. The Investigation ladder, Replay and drift (3 min) [analyst]
 * **Click:** Toolbox > **Investigation** tab > **Investigations** list > **Open** `mule-hub-case` (or **Open by id**). Scroll the ops ladder (8 steps).
   Press **Replay**. Then, optionally, land a new file (copy `data/staged/mule_transfers/TRANSFERS_20260904.csv` into
   `data/inbox/mule_transfers/`, wait for ingest) and press **Replay** again; for drift tick the **Re-read current data (drift check)** checkbox, then **Replay** (rehearsed 2026-10-24: "Replay is equivalent", then a Drift table, step 2, 8 sealed rows, 8 now, "changed").
@@ -144,7 +144,7 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
 * **If it goes wrong:** *Compare and seal* historically reloaded the page (DR-D1, fixed per the plan): the plan lists a sealed Compare as still
   to be driven live, so avoid it unless rehearsed. **Compare and seal: UNVERIFIED (rehearse first).**
 
-### S3. Masked ids: typed versus all (2 min) [fm.analyst, then admin]
+### S3. Masked ids: typed versus all (2 min) [analyst, then admin]
 * **Click:** read the **Masking: typed** badge in the Query panel. In the Investigation, open the Working Set rows. To show `all`, sign in as
   `admin` > *Settings* (left rail) > Link Analysis > masking mode `all`, save, then reload the Investigation.
 * **Expect:** under `typed` only values of Entity Types marked masked appear as `masked:...` aliases; under `all` every identifying value does
@@ -154,18 +154,18 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
 * **Proves:** tokens out, raw stays inside; `typed` default (arch §3.4, invariant 1).
 * **Which ids are masked under `typed` on la-showcase is not pinned by a test I could find: UNVERIFIED (rehearse first)** which of
   `MULE-HUB-01` / `ACC-*` show as aliases. **Put the mode back to `typed` after the scene.**
-* **If it goes wrong:** a changed mode needs `admin` (`canAuthorWorkbench`); `fm.analyst` sees the fields read-only.
+* **If it goes wrong:** a changed mode needs `admin` (`canAuthorWorkbench`); `analyst` sees the fields read-only.
 
 ### S4. Reveal is audited (1 min) [admin]
 * **Click:** as `admin` (a lead of `mule-hub-case`), open the Investigation, then **Reveal…** on the line under the canvas (*N ids
   masked*), or in a masked node's details under **Masked id**; type a reason and press **Reveal**.
 * **Expect:** every masked node on screen now reads its real id (canvas, node title, step log); the toast says each was recorded
-  with your reason. As `ra.analyst` (reviewer) the same canvas still shows aliases and offers no working Reveal.
+  with your reason. As `reviewer` (reviewer) the same canvas still shows aliases and offers no working Reveal.
 * **Proves:** one Reveal for the nodes on screen, a reason required, one `LINK_ENTITY_REVEALED` audit row per entity
   (LA-FULL-CYCLE-TEST-1 D3; arch §3.4, §6.1 step 7: `LINK_*` audit events). The showcase names no entity in its
   Investigation's name, reasons or notes, so the story reads before and after the reveal.
 
-### S5. Graph Run on the server (2 min) [fm.analyst]
+### S5. Graph Run on the server (2 min) [analyst]
 * **Click:** Toolbox > **Analysis** > a group offering **Run on server** (for example Pattern match > **Structuring (smurfing)** > **Run on server**,
   or the **All algorithms (server)** group). **Run on index** is offered where the algorithm supports it.
 * **Expect (verified):** Pattern match **Structuring** finds `MULE-HUB-01` with 96 in-band legs from 12 payers
@@ -173,16 +173,16 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
 * **Proves:** Graph Run is a server-side, budgeted, pooled run (pool 2 threads, queue 16; arch §5, §9). The 19-concurrent-runs 503 is
   `--burst`, not a live scene; on this corpus a SYNC algorithm finishes inline, so the pool is unreachable (the smoke runner says so and skips).
 * **If it goes wrong:** server tools are gated by the *Show the query graph* checkbox and the *Run link graph analysis* capability
-  (`fm.analyst` has it; `ra.analyst`/`demo.manager` do not). Press **Seed** first, then untick *Show the query graph*.
+  (`analyst` has it; `reviewer`/`outsider` do not). Press **Seed** first, then untick *Show the query graph*.
 
-### S6. Value Measures: pass-through and cash-out (3 min) [fm.analyst]
+### S6. Value Measures: pass-through and cash-out (3 min) [analyst]
 * **Click:** Toolbox > Value Measures (Dataset, link columns and `BOOKED_AT` are prefilled from the open Investigation). Choose
   **Pass-through**, From `2026-09-01`, To `2026-09-04` (To is exclusive), **Run Measure**. Then the concentration Measure with cash-out kind `cash_out` (on the Telecom Domain profile of this Space the picker calls it **Withdrawal concentration**; the 97 % is checked by `node tools/la-demo-figures.mjs`).
 * **Expect (verified, `ControlApiLaShowcaseFiguresTest`):** Pass-through flags **13 accounts**; the two relays sit at ratio **0.985**
   (exactly two at 0.985); `MULE-HUB-01` is in the list (manual: 0.979; `SHELL-A` above 1). Velocity lists at least 3 fast forwarders. Cash-out
   concentration: `TILL-06` holds **97 %** (test tolerance 0.97 +/- 0.005) of cash-out value from **8 payers**. Benefit-transfer isolates `SKIMMER-01`
   with **6 recipients**.
-  **Names depend on masking:** under typed masking (the demo's default for `fm.analyst`) the measure returns `masked:<hex>` ids, so `MULE-HUB-01` / `TILL-06` /
+  **Names depend on masking:** under typed masking (the demo's default for `analyst`) the measure returns `masked:<hex>` ids, so `MULE-HUB-01` / `TILL-06` /
   `RELAY-*` read as tokens; the counts, the two 0.985 scores, the 97 % and the 8 payers hold unchanged. `node tools/la-demo-figures.mjs` checks them that way,
   and checks the names too when run `--user <a persona that holds reveal>`.
 * **Contradiction to be aware of:** the readiness plan's DR-T6 row says `TILL-06` "at 82 %". The test and the manual say **97 %**. Quote 97 %.
@@ -190,42 +190,42 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
 * **If it goes wrong:** **Run Measure** stays disabled until the form is valid; the window is capped at 31 days, evaluated in UTC; 413/429 have plain
   sentences (burst of 30 then one request per 2 s).
 
-### S7. Members, roles and gates (3 min) [fm.analyst, ra.analyst, demo.manager, curl]
-* **Click:** as `fm.analyst`, Investigation header > **Members**: owner/lead `fm.analyst`, `admin` lead, `ra.analyst` and `fm.manager` reviewers. Then show
+### S7. Members, roles and gates (3 min) [analyst, reviewer, outsider, curl]
+* **Click:** as `analyst`, Investigation header > **Members**: owner/lead `analyst`, `admin` lead, `reviewer` and `manager` reviewers. Then show
   the gates with `curl` (token from the demo exchange: `POST /api/v1/auth/exchange` with `{"code":"demo:<id>","codeVerifier":"x","redirectUri":"..."}`;
   the smoke runner does exactly this):
   * no token `GET /api/v1/spaces/la-showcase/inv/investigations` -> **401**
-  * `demo.manager` `GET .../inv/investigations/mule-hub-case/log` -> **404** (non-member: 404-as-absence, same answer as "does not exist")
-  * `ra.analyst` `GET .../inv/entity-identities` -> **403**
-  * `fm.analyst` `POST .../inv/investigations` with `{}` -> **422**
-  * `fm.analyst` `GET` on the `la-showcase-off` Space -> **404 `MODULE_DISABLED`**
-  * `fm.analyst` `GET .../mule-hub-case/log` -> **200**
-* **Expect:** exactly those statuses (all six are smoke probes, `9/9`). `ra.analyst` in the UI: the Investigation tab is read-only (Seed, Expand, Undo,
-  Fork a Draft disabled with a note saying why); a mutating `curl` as `ra.analyst` is 403. Members: a lead can **Grant**/**Revoke**; revoking the last
+  * `outsider` `GET .../inv/investigations/mule-hub-case/log` -> **404** (non-member: 404-as-absence, same answer as "does not exist")
+  * `reviewer` `GET .../inv/entity-identities` -> **403**
+  * `analyst` `POST .../inv/investigations` with `{}` -> **422**
+  * `analyst` `GET` on the `la-showcase-off` Space -> **404 `MODULE_DISABLED`**
+  * `analyst` `GET .../mule-hub-case/log` -> **200**
+* **Expect:** exactly those statuses (all six are smoke probes, `9/9`). `reviewer` in the UI: the Investigation tab is read-only (Seed, Expand, Undo,
+  Fork a Draft disabled with a note saying why); a mutating `curl` as `reviewer` is 403. Members: a lead can **Grant**/**Revoke**; revoking the last
   lead is refused.
 * **Proves:** members and roles; non-members get 404-as-absence, a member lacking the role gets 403 only after the Dataset-visibility and policy checks
   (arch §3.1, §6.1 gate order step 6).
 * **If it goes wrong:** a 401 on a persona's token means the demo exchange was refused: wrong build (not `-Distribution demo`) or the Space does not define that user.
 
-### S8. Four-eyes: a sensitive expand waits for a second person (3 min) [fm.analyst, fm.manager]
-* **Click:** as `fm.analyst`, Investigation tab > select `MULE-HUB-01` > **Expand one hop** with **Maximum fan-out per entity** left **blank**
+### S8. Four-eyes: a sensitive expand waits for a second person (3 min) [analyst, manager]
+* **Click:** as `analyst`, Investigation tab > select `MULE-HUB-01` > **Expand one hop** with **Maximum fan-out per entity** left **blank**
   (blank = unbounded; the Space threshold is `four_eyes_fan_out_above: 2000`, and an unbounded fan-out exceeds any fan-out threshold).
-  The panel answers **Waiting for approval**. Switch to `fm.manager` (holds `canApproveLinkExpansions`), open the same Investigation (a reviewer), Investigation
+  The panel answers **Waiting for approval**. Switch to `manager` (holds `canApproveLinkExpansions`), open the same Investigation (a reviewer), Investigation
   tab > **Oversight** > the request ("Expand request ...", "Four-eyes threshold crossed: maxFanOut unbounded (threshold 2000)") > **Approve**.
-* **Expect:** nothing enters the log until `fm.manager` approves; the Oversight section shows who requested it and when; on approval it runs as a
-  new step "sealed with who approved it". `fm.analyst` never sees the request as decidable ("Waiting for a different person with the approve-expansions
+* **Expect:** nothing enters the log until `manager` approves; the Oversight section shows who requested it and when; on approval it runs as a
+  new step "sealed with who approved it". `analyst` never sees the request as decidable ("Waiting for a different person with the approve-expansions
   capability.") and the server refuses a self-decision. The seeded bounded expand (`maxFanOut` 5) did NOT trigger this: only the unbounded one does.
 * **Proves:** four-eyes by construction: a pending request is never written to the log (arch §3.1 "Pending approvals"; `ControlApiInvestigationFourEyesRaceTest`,
   `ControlApiInvestigationApprovalInboxTest`).
-* **If it goes wrong:** "no pending request visible to the approver" = the approver is not a lead/reviewer of this Investigation (`fm.manager` is a reviewer by
+* **If it goes wrong:** "no pending request visible to the approver" = the approver is not a lead/reviewer of this Investigation (`manager` is a reviewer by
   the seed) or you expanded with a fan-out at or below 2000 (it just runs). One pending request per Investigation: a second is a 409. A hub (more than 500
   distinct contacts) is added but flagged *high connectivity* and not expanded further (manual §9.2).
   **The exact on-screen text and the approve-then-step flow in the standalone la-app: UNVERIFIED (rehearse first)**: the plan records the Oversight panel
   as a gap closed on the gamma host and the live la-showcase four-eyes pass is not recorded.
 
-### S9. Drafts: fork, step, rebase, promote (3 min) [fm.analyst, fm.manager]
-* **Click:** as `fm.analyst`, Investigation tab > **Drafts** > **Fork a Draft** > add a step in the Draft > **Working Set** (size) > **Conflicts** ("No conflicts - a
-  rebase would carry every step.") > **Rebase** > **Promote**. For the four-eyes variant, put a sensitive expand in the Draft and **Promote**: it is held and `fm.manager`
+### S9. Drafts: fork, step, rebase, promote (3 min) [analyst, manager]
+* **Click:** as `analyst`, Investigation tab > **Drafts** > **Fork a Draft** > add a step in the Draft > **Working Set** (size) > **Conflicts** ("No conflicts - a
+  rebase would carry every step.") > **Rebase** > **Promote**. For the four-eyes variant, put a sensitive expand in the Draft and **Promote**: it is held and `manager`
   approves it under **Oversight**.
 * **Expect:** one live Draft per member, at most 10 open in this Space (`drafts.max_open: 10`); a Draft shows a state badge (open, hibernated) and how many steps the
   Investigation has moved. Conflict classes: no-op, changed, superseded, blocked. A **sensitive expand cannot be added to a Draft directly** (422: four-eyes
@@ -234,14 +234,14 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
 * **UNVERIFIED (rehearse first):** the plan says the Draft cycle was driven live on 2026-10-11 ("Members, the Draft cycle and DR-D1"), but a full
   fork/step/rebase/promote with a held four-eyes promote on la-showcase in the la-app bundle has no recorded run or smoke probe.
 
-### S10. Entity Lists and the identity head hash (2 min) [fm.analyst]
+### S10. Entity Lists and the identity head hash (2 min) [analyst]
 * **Click:** the left rail > **Entity Lists** > `smurf-accounts` (12 members plus the `SMURF-` range and expiring `TILL-06`); the **Identity Facts** tab.
 * **Expect:** the head (fact number and hash) and the success banner **Chain verified**. The seeded assertion `MULE-HUB-01` = `ACC-1006` appears in
   Identity resolution. Note the head hash; cutting the end of the chain leaves a shorter valid chain, so compare later. A broken chain shows **Chain NOT verified**.
 * **Proves:** the Identity Fact log is append-only and hash-chained (arch §3.5). The hash is verified on every read.
-* **If it goes wrong:** `ra.analyst` gets 403 on identities (S7). The tamper-evidence script for this log (DR-T10) is not a live scene: **tampering: UNVERIFIED (rehearse first).**
+* **If it goes wrong:** `reviewer` gets 403 on identities (S7). The tamper-evidence script for this log (DR-T10) is not a live scene: **tampering: UNVERIFIED (rehearse first).**
 
-### S11. Dossier build, verify and the tamper check (3 min) [fm.analyst]
+### S11. Dossier build, verify and the tamper check (3 min) [analyst]
 * **Click:** Investigation tab > **Dossier** > build; **Download manifest**; **Verify** (shows "Verified" / "Log intact"). Then **Verify an uploaded manifest...**
   with a copy of the manifest in which one hash digit was changed. Optional: **Download sealed bundle** and **Verify a bundle...** on an edited copy.
 * **Expect (verified by smoke):** the untouched manifest verifies; a manifest with one hash flipped fails (`verified: false` or HTTP 422; the UI shows "NOT verified" /
@@ -249,7 +249,7 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
 * **Proves:** SHA-256 manifest over every stored artefact; tampering is detectable (arch §3.1 outputs).
 * **If it goes wrong:** the dossier route needs a seeded Investigation (else 404). Hand-editing JSON in front of the audience is error-prone: prepare the tampered file beforehand.
 
-### S12. Alert to Investigation (2 min) [fm.analyst; needs the full SPA]
+### S12. Alert to Investigation (2 min) [analyst; needs the full SPA]
 * **Click:** open the Alerts page, find the Alert from the Investigation rule `mule-pass-through`, press **Open Investigation**.
 * **Expect:** the Alert carries aggregate facts only (rule, Measure, threshold, breach count, worst value); **no entity id, name or alias**; entities are read inside the
   Investigation under its own gates and masking (arch §7, `LA-DETECT-ALERT-AGGREGATE-1`). Standing detection runs from the `la_detect` Job every 5 minutes; the rule
@@ -263,7 +263,7 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
 * **Click:** as `admin`, left rail > **Settings** (shown only with `canAuthorWorkbench`).
 * **Expect:** per-Space limits: four-eyes thresholds, hub threshold (default 500), masking mode with the mode in force, the link index (enabled, build workers,
   waiting line, disk budget, `index.max_age`), the server graph-run budget with the server's ceilings, the Draft limits, the embed-link limits and the
-  Entity Types in force; the active Investigation store (filesystem or PostgreSQL) read-only. Without the capability every field is read-only (try as `fm.analyst`).
+  Entity Types in force; the active Investigation store (filesystem or PostgreSQL) read-only. Without the capability every field is read-only (try as `analyst`).
 * **Proves:** limits and bounds are Space settings (arch §9). Editing live and the Edge index first-build flow: the plan lists an editing Settings pass as open:
   **editing: UNVERIFIED (rehearse first)**; show read-only if you have not rehearsed.
 
@@ -300,7 +300,7 @@ curl -s -X POST -H "Authorization: Bearer $ADMIN" \
   A POST/PUT/DELETE on the public path is 405.
 * **Proves:** a read-only, link-only, masked share of ONE Investigation for someone with no login; token stored hashed, shown once (arch §6.2).
 * **If it goes wrong:** mint answers **503** = `-Dla.embed.enabled=true` was not set; mint **403** = the caller is not a lead or lacks `canShareInvestigation`
-  (`fm.analyst` has no such capability in this Space); **422** = a ttl above the Space cap (default cap 720 h) or a refused classification; **404** on the public
+  (`analyst` has no such capability in this Space); **422** = a ttl above the Space cap (default cap 720 h) or a refused classification; **404** on the public
   GET straight after a mint = the flag is off on the serving JVM. The exact path prefix of the public URL (`/api/v1/public/investigations/<token>`) is taken from the
   test's request base, so confirm it once with the `url` in the mint response. **The curl transcript itself was not run by this lane: UNVERIFIED (rehearse first).**
 
@@ -314,11 +314,11 @@ Not live. Link index: full build **852 s**, append **31 s** on a synthetic **10^
 
 | Min | Scene | Persona |
 |---|---|---|
-| 0-1 | Pre-flight already green (`9/9 probes passed`); sign in | `fm.analyst` |
-| 1-3 | S1 Follow the money + Suspicion score; S5 Pattern match > Structuring > Run on server (hub, 96 legs, 12 payers) | `fm.analyst` |
-| 3-5 | S6 Value Measures: Pass-through (13 accounts, relays 0.985) and Cash-out (`TILL-06` 97 %) | `fm.analyst` |
-| 5-7 | S2 open `mule-hub-case`, Replay; S8 unbounded expand -> Waiting for approval -> `fm.manager` approves | `fm.analyst`, `fm.manager` |
-| 7-8 | S11 Dossier: Verify, then the prepared tampered manifest -> NOT verified | `fm.analyst` |
+| 0-1 | Pre-flight already green (`9/9 probes passed`); sign in | `analyst` |
+| 1-3 | S1 Follow the money + Suspicion score; S5 Pattern match > Structuring > Run on server (hub, 96 legs, 12 payers) | `analyst` |
+| 3-5 | S6 Value Measures: Pass-through (13 accounts, relays 0.985) and Cash-out (`TILL-06` 97 %) | `analyst` |
+| 5-7 | S2 open `mule-hub-case`, Replay; S8 unbounded expand -> Waiting for approval -> `manager` approves | `analyst`, `manager` |
+| 7-8 | S11 Dossier: Verify, then the prepared tampered manifest -> NOT verified | `analyst` |
 | 8-9 | S7 the 401/404/403/422 `curl` block | terminal |
 | 9-10 | S15 evidence slide; take questions; S14 only if asked | slides |
 
@@ -377,7 +377,7 @@ Bundle: `package.ps1 -Edition Advanced -DemoAuth -Ui la-app` *(removed 2026-11-1
 | # | Beat | Result | Evidence |
 |---|---|---|---|
 | 1 | Bake path | PASS | Bake booted, seeded, rebased 357 files; the old spurious 409 now logs "investigation: 409, now readable (head step 0)" and carries on |
-| 2 | Sign in as `fm.analyst` (full reload returns to the deep link) | PASS | picker lists 5 Demo Users; Link Analysis menu present |
+| 2 | Sign in as `analyst` (full reload returns to the deep link) | PASS | picker lists 5 Demo Users; Link Analysis menu present |
 | 3 | Start an Investigation from *Explore a Dataset* | FAIL then PASS | first press refused (422, DATE time column prefilled); typing `BOOKED_AT` works. Fixed: Time column now defaults blank (`LA-EXPLORE-TIMECOL-DATE-1`) |
 | 4 | Seed ONE entity, **Expand one hop** | PASS | Working Set 1 -> 7 entities, 6 links |
 | 5 | Unexpanded marker | PASS | 6 dotted nodes, legend "Dotted outline: not expanded yet", count in the legend |
@@ -389,8 +389,8 @@ Bundle: `package.ps1 -Edition Advanced -DemoAuth -Ui la-app` *(removed 2026-11-1
 | 11 | Undo, then reopen | PASS | "Undid step 7", 26 -> 25; reopening keeps the log |
 | 12 | Dossier build and verify | PASS | "Verified", "Log intact"; tampered manifest is the smoke probe (PASS) |
 | 13 | Detection / Alert path | PASS | Alert `mule-pass-through` (13 breaching, aggregate only, no ids); *Open Investigation* lands on `mule-hub-case`. The Alerts page IS in the la-app now (S12's claim is out of date) |
-| 14 | Masked persona view | PASS | `fm.analyst` sees `masked:<hex>` everywhere; `ra.analyst` read-only 403 and non-member 404 are smoke probes. Admin Reveal not re-driven this pass |
-| 15 | Four-eyes (S8) | PASS | the bake leaves a pending request `p1`; `fm.analyst` approve is 403, `fm.manager` approve is 200 and runs the expand |
+| 14 | Masked persona view | PASS | `analyst` sees `masked:<hex>` everywhere; `reviewer` read-only 403 and non-member 404 are smoke probes. Admin Reveal not re-driven this pass |
+| 15 | Four-eyes (S8) | PASS | the bake leaves a pending request `p1`; `analyst` approve is 403, `manager` approve is 200 and runs the expand |
 | 16 | *Investigate a number* `99979100001` | PASS with a note | two degrees in seconds, but 895 nodes / 2,901 links (hairball); fixed: the card expands one degree, *Choose neighbours* goes further (`LA-INVESTIGATE-NUMBER-HAIRBALL-1`) |
 
 Not rehearsed this pass: Drafts cycle, Compare and seal, Settings editing, embed curl transcript (S14), Postgres/Personal variants.
@@ -404,7 +404,7 @@ Bundle: `package.ps1 -Edition Advanced -DemoAuth -Ui la-app` *(removed 2026-11-1
 
 | # | Beat | Result | Evidence |
 |---|---|---|---|
-| 1 | Sign in as `fm.analyst` | PASS | picker lists 5 Demo Users; menu has Link Analysis, Geo, Entity Lists, Alerts |
+| 1 | Sign in as `analyst` | PASS | picker lists 5 Demo Users; menu has Link Analysis, Geo, Entity Lists, Alerts |
 | 2 | *Investigate a number* `99979100001` (purpose required) | PASS | one degree: 403 nodes, 403 links, a star, not a hairball (that number has 402 contacts) |
 | 3 | Legend hide/show a link kind | PASS | `forwarding` hidden 403 -> 402 links, shown 403 |
 | 4 | Unexpanded marker and *Only unexpanded* | PASS | legend count 402; only-unexpanded draws 402 nodes, 0 links; off restores |
@@ -414,20 +414,20 @@ Bundle: `package.ps1 -Edition Advanced -DemoAuth -Ui la-app` *(removed 2026-11-1
 | 8 | *Expand from these nodes (8)* | PASS | one sealed step, 407 -> 782 nodes, "161 more left out by the fan-out cap" stated |
 | 9 | *All algorithms (server)* | PASS | 29 algorithms; PageRank 782 nodes in 28 ms; Louvain 8 communities |
 | 10 | Undo, then reload | PASS | "Undid step 6", 782 -> 407; after reload the same 7-step log and Working Set |
-| 11 | Members | PASS | grant `demo.manager`, revoke it, last-lead revoke refused with the server wording |
+| 11 | Members | PASS | grant `outsider`, revoke it, last-lead revoke refused with the server wording |
 | 12 | Drafts | PASS | fork, step, Conflicts ("No conflicts"), Rebase, Promote -> step 8 on the Investigation |
 | 13 | Dossier build and verify | PASS | "Log intact", "Verified", sealed bundle download 200 |
 | 14 | References | PASS | `jira/ticket FM-1042` added, "1 of at most 200" |
 | 15 | Compare and seal | PASS | needs From/To on both windows (inline hint says so); sealed step 9 with fingerprint |
 | 16 | Embed: mint, open without a session, revoke (admin) | PASS | mint dialog shows the link once; the viewer opens masked, read-only, token scrubbed from the address bar; after confirming *Revoke* the public GET is 404 |
 | 17 | Admin Reveal | PASS | `MULE-HUB-01 (reveal audited)` |
-| 18 | Four-eyes (S8) | PASS | the baked request `p1` waits; `fm.manager` *Approve* -> step 9 "requested by fm.analyst, approved by fm.manager", 9 -> 15 entities |
-| 19 | Detection and an Alert | PASS | Alerts page lists `mule-pass-through` (13 breaching); `fm.analyst` *Open Investigation* lands on `mule-hub-case` |
-| 20 | Masked persona view | PASS | `ra.analyst`: 30 `masked:<hex>` ids, `MULE-HUB-01` absent; mutating buttons disabled with reasons |
+| 18 | Four-eyes (S8) | PASS | the baked request `p1` waits; `manager` *Approve* -> step 9 "requested by analyst, approved by manager", 9 -> 15 entities |
+| 19 | Detection and an Alert | PASS | Alerts page lists `mule-pass-through` (13 breaching); `analyst` *Open Investigation* lands on `mule-hub-case` |
+| 20 | Masked persona view | PASS | `reviewer`: 30 `masked:<hex>` ids, `MULE-HUB-01` absent; mutating buttons disabled with reasons |
 | 21 | Coverage display | PASS | "Every day has data", `mule_transfers` 3 of 3 |
-| 22 | Settings as non-admin | PASS | `fm.analyst` and `ra.analyst`: no rail link, `/settings` has no editable field and no Save; `admin`: 26 editable fields |
+| 22 | Settings as non-admin | PASS | `analyst` and `reviewer`: no rail link, `/settings` has no editable field and no Save; `admin`: 26 editable fields |
 
-Noted, not filed (cosmetic, no functional effect): the console logs "Unable to preventDefault inside passive event listener" on canvas wheel/zoom; the Add-reference form keeps System and Type after a successful add; the *Open Investigation* action was not seen in the `fm.manager` Alerts view (not investigated: `fm.analyst` has it).
+Noted, not filed (cosmetic, no functional effect): the console logs "Unable to preventDefault inside passive event listener" on canvas wheel/zoom; the Add-reference form keeps System and Type after a successful add; the *Open Investigation* action was not seen in the `manager` Alerts view (not investigated: `analyst` has it).
 
 **GO.** 22/22 beats pass on the customer-zip path; no FAIL to fix or file.
 
@@ -481,9 +481,9 @@ For a CISO, lead architect and forensic reviewer: every PROVEN row of the [white
 | T2 | Explainable Suspicion score, Propagated Risk (§3.2-§3.3) | S1 | `GraphSuspicionParityTest`, `ControlApiGraphRunTest` | **PARTIAL**: `mule_layering_ring` (113 nodes, 225 links after the drift file) ranks the hub first (the same token as its 0.979 pass-through row); for the per-node **Factors**, type `mule_account` in the *Risk Score model* field: the `la-showcase` template ships that Risk Score model and its `mule_risk_score` Job (every 10 minutes; trigger it once after the first ingest), and MULE-HUB-01 scores 100 from three factors (cash deposits in, distinct payers in, value wired out) |
 | T3 | 29 algorithms, TypeScript and Java parity (§3.1) | S5 | `GraphAlgorithmsParityTest` | PASS: Analysis tab > *Server* lists 33 cards: the 29 algorithms plus *Find paths (server)*, *Edge index*, *Value Measures* and *Burst and periodicity* (there is no "29 algorithms on the server" line since the 2026-10-28 reorganization: count the cards); client and server agree on every algorithm compared in the [tour](../../solution-pack/la-showcase/admin-guide-cross-vertical-tour.md) section 1.3 |
 | T4 | Value Measures, the 97 % cash-out (§3.4) | S6 | `ControlApiLaShowcaseFiguresTest` | PASS: Pass-through 2026-09-01 to 2026-09-04: 13 entities, the two relays at 0.98499982, the hub at 0.9793; the 97 % is `node tools/la-demo-figures.mjs` (2/2: Pass-through 13, TILL-06 at 97 %), not driven in the form (the picker resets while selecting) |
-| T5 | Keyed masking, audited Reveal (§5.2, §5.4) | S3, S4 | `ControlApiExplorationMaskingTest`, `ControlApiInvestigationOversightTest` | PASS: tokens only for `fm.analyst`; Reveal is under the Investigation's *⋯* > *Settings…* > *Investigation settings* > *Oversight and approvals* > *Masked entities*. The template's `fraud-analyst` role holds `canRevealLinkEntities`, so `fm.analyst` may Reveal too (audited, 2026-10-28: "→ MULE-HUB-01 (reveal audited)"); `admin` Reveal answers "→ MULE-HUB-01 (reveal audited)"; Settings > Link Analysis masking `all` saved and "In force: all", then restored to `typed`. Under `typed` every Account id is already masked on this Space, so typed versus all differ only for an unmasked Entity Type |
-| T6 | Gate order, strict 404 (§5.1) | S7 | `ControlApiGeoLinkModuleGateTest`, `ControlApiInvestigationMembersTest` | PASS: smoke 401 no token, 403 `ra.analyst`, 404 non-member, 404 `MODULE_DISABLED`, 422 bad create, 200 member (the six probes; 20/20 with the drift and embed probes) |
-| T7 | Four-eyes, self-approval refused (§5.3) | S8 | `ControlApiInvestigationOversightTest` | PASS: the request is under *⋯* > *Settings…* > *Investigation settings* > *Oversight and approvals*; `fm.manager` Approve: step 9 "requested by fm.analyst, approved by fm.manager", 9 to 15 entities; the requester sees "Waiting for a different person"; `audit.lead` and `audit.committee` approve answer 403 `canApproveLinkExpansions` (the same-person refusal is the test) |
+| T5 | Keyed masking, audited Reveal (§5.2, §5.4) | S3, S4 | `ControlApiExplorationMaskingTest`, `ControlApiInvestigationOversightTest` | PASS: tokens only for `analyst`; Reveal is under the Investigation's *⋯* > *Settings…* > *Investigation settings* > *Oversight and approvals* > *Masked entities*. The template's `fraud-analyst` role holds `canRevealLinkEntities`, so `analyst` may Reveal too (audited, 2026-10-28: "→ MULE-HUB-01 (reveal audited)"); `admin` Reveal answers "→ MULE-HUB-01 (reveal audited)"; Settings > Link Analysis masking `all` saved and "In force: all", then restored to `typed`. Under `typed` every Account id is already masked on this Space, so typed versus all differ only for an unmasked Entity Type |
+| T6 | Gate order, strict 404 (§5.1) | S7 | `ControlApiGeoLinkModuleGateTest`, `ControlApiInvestigationMembersTest` | PASS: smoke 401 no token, 403 `reviewer`, 404 non-member, 404 `MODULE_DISABLED`, 422 bad create, 200 member (the six probes; 20/20 with the drift and embed probes) |
+| T7 | Four-eyes, self-approval refused (§5.3) | S8 | `ControlApiInvestigationOversightTest` | PASS: the request is under *⋯* > *Settings…* > *Investigation settings* > *Oversight and approvals*; `manager` Approve: step 9 "requested by analyst, approved by manager", 9 to 15 entities; the requester sees "Waiting for a different person"; `analyst` and `reviewer` approve answer 403 `canApproveLinkExpansions` (the same-person refusal is the test) |
 | T8 | Op log, replay, drift on file append (§2.2) | S2 | `ControlApiReplayDriftOnFileAppendTest` | PASS: *Replay* "Replay is equivalent"; ticking *Re-read current data (drift check)* then *Replay* adds a Drift table (step 2, 8 sealed rows, 8 now, "changed"). The smoke's far-future file moves the Data strip to "27 Apr 2033": run it before the day |
 | T9 | SHA-256 Dossier, tamper-evident (§2.3) | S11 | `ControlApiDossierTest` | PASS: untouched manifest Verified; one flipped digit uploaded: NOT verified, Changed `log.jsonl#2` (B) and `mm-structuring-case` (A) |
 | T10 | Drafts, atomic promotion (§2.4) | S9 | Draft tests | PASS: Conflicts "No conflicts", Rebase, Promote (step 7), Discard; Discard takes no confirmation |
@@ -497,17 +497,17 @@ Say out loud: 10^9 edges, retention purge (D-U8), precision rates, multi-pod HA,
 
 **Still owed (row `LA-WHITEPAPER-DEMO-1`):** (1) one spoken rehearsal with a sceptical second person, timed against 45 and 35 minutes: an assistant cannot be its own reviewer, and nothing here was timed against an audience; (2) the operator's confirmation of the two calls below.
 
-**Rehearsal record, 2026-10-28 (re-walk on the reorganized Studio, assistant alone).** Advanced Demo Auth console bundle of `9d543b35f` (`C:\sandbox\inspecto-mfs-bundle`), a second server on `:8099` with `-Dla.embed.enabled=true` over a fresh Spaces root laid down by the four seeders (`--scaffold`, then `--apply`: every stage created, nothing failed). Driven as `fm.analyst` in the built-in browser until the pane was closed mid-run; the rest by API and the smokes, as the Evidence column says. Click paths: the per-Investigation panels (Members, Share and embed, Drafts, Replay and drift, Oversight and approvals, Dossier) are folds of the Investigation's *⋯* > *Settings…* > *Investigation settings*; saved views open from *File* > *Open…*; the toolbox Analysis tab is one catalogue with a *Browser* / *Server* toggle.
+**Rehearsal record, 2026-10-28 (re-walk on the reorganized Studio, assistant alone).** Advanced Demo Auth console bundle of `9d543b35f` (`C:\sandbox\inspecto-mfs-bundle`), a second server on `:8099` with `-Dla.embed.enabled=true` over a fresh Spaces root laid down by the four seeders (`--scaffold`, then `--apply`: every stage created, nothing failed). Driven as `analyst` in the built-in browser until the pane was closed mid-run; the rest by API and the smokes, as the Evidence column says. Click paths: the per-Investigation panels (Members, Share and embed, Drafts, Replay and drift, Oversight and approvals, Dossier) are folds of the Investigation's *⋯* > *Settings…* > *Investigation settings*; saved views open from *File* > *Open…*; the toolbox Analysis tab is one catalogue with a *Browser* / *Server* toggle.
 
 | # | Result | Evidence (2026-10-28) |
 |---|---|---|
 | T1 | PASS | `check-module-deps` (13 extracted modules, enforcer rules match) and `check-engine-names-no-la` green |
-| T2 | **FAIL** | `mule_layering_ring` 113 nodes, 225 links, top suspicion 61; `mule_risk_score` triggered as `fm.manager`: "96 entit(ies) scored, 1 high", but the *Risk Score* column stays blank and *Factors* 404s: the Studio asks for the masked alias (defect `LA-SUSPICION-FACTORS-MASKED-1`, fixed the same day for exploration views: the risk-score read now resolves the Space alias; an Investigation canvas is `LA-SUSPICION-FACTORS-INVESTIGATION-1`). By raw key the API gives MULE-HUB-01 100 with three factors. Until fixed, show the factors from the API or say NOT shown live |
+| T2 | **FAIL** | `mule_layering_ring` 113 nodes, 225 links, top suspicion 61; `mule_risk_score` triggered as `manager`: "96 entit(ies) scored, 1 high", but the *Risk Score* column stays blank and *Factors* 404s: the Studio asks for the masked alias (defect `LA-SUSPICION-FACTORS-MASKED-1`, fixed the same day for exploration views: the risk-score read now resolves the Space alias; an Investigation canvas is `LA-SUSPICION-FACTORS-INVESTIGATION-1`). By raw key the API gives MULE-HUB-01 100 with three factors. Until fixed, show the factors from the API or say NOT shown live |
 | T3 | PASS | 33 *Server* cards = 29 algorithms + 4 (row above); parity as the tour's 1.3 (re-driven today for Shortest path and Maximum flow) |
 | T4 | PASS | `la-demo-figures`: 2/2 (Pass-through 13, TILL-06 at 97 %); smoke Measures PASS |
-| T5 | PASS | Working Set all `masked:<hex>`; Reveal as `fm.analyst` inline "→ MULE-HUB-01 (reveal audited)"; smoke `ra.analyst` 403 on identities |
+| T5 | PASS | Working Set all `masked:<hex>`; Reveal as `analyst` inline "→ MULE-HUB-01 (reveal audited)"; smoke `reviewer` 403 on identities |
 | T6 | PASS | `la-demo-smoke --staged --inbox --embed` 20/20: 401, 403, 404 non-member, 404 `MODULE_DISABLED`, 422, 200 |
-| T7 | PASS (API for the approve) | requester sees "Waiting for a different person with the approve-expansions capability" in the browser; approve via API: `fm.analyst` and `audit.lead` 403 `canApproveLinkExpansions`, `fm.manager` 200, step 10 "approved by fm.manager", 6 entities admitted (9 to 15) |
+| T7 | PASS (API for the approve) | requester sees "Waiting for a different person with the approve-expansions capability" in the browser; approve via API: `analyst` and `analyst` 403 `canApproveLinkExpansions`, `manager` 200, step 10 "approved by manager", 6 entities admitted (9 to 15) |
 | T8 | PASS | *Replay*: "Replay is equivalent"; with *Re-read current data (drift check)*: Drift table step 2, 8 sealed, 8 now, "changed". Data strip "19 Sep 2034" after the smoke's far-future file |
 | T9 | PASS | *Build dossier* > *Verify this manifest*: Verified, root `sha256:fd88ab6e…`; *Verify an uploaded manifest…* with one flipped digit: NOT verified, "the manifest itself was edited", Self-consistent no, Changed `log.jsonl#1` |
 | T10 | PASS | seeded Draft: *Conflicts* "No conflicts", *Rebase* "Rebased onto step 8", *Promote* "the Draft's steps are now in the Investigation"; a fresh *Fork a Draft* > *Discard* now asks to confirm ("This cannot be undone") |
@@ -515,7 +515,7 @@ Say out loud: 10^9 edges, retention purge (D-U8), precision rates, multi-pod HA,
 | T12 | PASS | "Data as of 19 Sep 2034 · 3 of 3 days · index v2" on `mule-hub-case` |
 | T13 | evidence only | `InvTraversalBench` and `tests-index-scale-run.md` exist |
 
-**Rehearsal record, 2026-11-01 (T2 only, after the Factors fix `LA-SUSPICION-FACTORS-INVESTIGATION-1`).** Preview Demo Auth la-app bundle of `a24fca153` on `:8097` over a copy of the live demo's `la-showcase`, driven as `fm.analyst` in the built-in browser. **T2 PASS:** `mule-hub-case` > toolbox *On screen* > *Suspicion score*, *Risk model* `mule_account`, *Find suspicious nodes*: top 9, the hub alias first at 80 (next 29); its *Factors* sends `?investigation=mule-hub-case` and answers 200: "Risk Score 100 High · mule_account. High from 60", cash deposits in 40 (capped), distinct payers in 36, value wired out 30 (capped). The *Risk Score* column holds the *Factors* button only, never a number (by design). **Before the day:** a Space baked before the model shipped has neither `config/registry/risk-scores/mule_account.toon` nor `config/jobs/mule_risk_score_job.toon` (the live demo's `la-showcase` lacked both: *Factors* 404 "no Risk Score"); copy both from `spaces\_templates\la-showcase`, restart, and trigger `mule_risk_score` once as `fm.manager` ("95 entit(ies) scored, 1 high").
+**Rehearsal record, 2026-11-01 (T2 only, after the Factors fix `LA-SUSPICION-FACTORS-INVESTIGATION-1`).** Preview Demo Auth la-app bundle of `a24fca153` on `:8097` over a copy of the live demo's `la-showcase`, driven as `analyst` in the built-in browser. **T2 PASS:** `mule-hub-case` > toolbox *On screen* > *Suspicion score*, *Risk model* `mule_account`, *Find suspicious nodes*: top 9, the hub alias first at 80 (next 29); its *Factors* sends `?investigation=mule-hub-case` and answers 200: "Risk Score 100 High · mule_account. High from 60", cash deposits in 40 (capped), distinct payers in 36, value wired out 30 (capped). The *Risk Score* column holds the *Factors* button only, never a number (by design). **Before the day:** a Space baked before the model shipped has neither `config/registry/risk-scores/mule_account.toon` nor `config/jobs/mule_risk_score_job.toon` (the live demo's `la-showcase` lacked both: *Factors* 404 "no Risk Score"); copy both from `spaces\_templates\la-showcase`, restart, and trigger `mule_risk_score` once as `manager` ("95 entit(ies) scored, 1 high").
 
 **Calls decided by the assistant, pending operator confirmation (2026-10-24):**
 
@@ -590,7 +590,7 @@ Confidence: DOCUMENTED for OIDC; real-IAM sign-in is NOT YET verified (Section 8
 No. A large expansion (above the Space's thresholds) is held as a pending request, the requester cannot decide it,
 and the approver inbox never lists the caller's own requests. Self-approval is refused with 403 even for someone
 holding the approve capability, and when several approvers decide at once exactly one decision lands. In the
-shipped demo `fm.manager` holds the approve capability and `admin` holds reveal.
+shipped demo `manager` holds the approve capability and `admin` holds reveal.
 Evidence: feature page "Oversight surface" and "Approver inbox"; `ControlApiInvestigationOversightTest
 .aSensitiveExpandWaitsForADifferentPersonsApproval`; `ControlApiInvestigationFourEyesRaceTest`; demo readiness plan
 section 0.

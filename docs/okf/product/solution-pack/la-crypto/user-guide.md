@@ -143,18 +143,18 @@ are `tools/gen-la-crypto-data.test.mjs` and `CryptoLinksJobGoldenTest`.
 On a build with sign-in (the demo build: see the [admin guide](admin-guide-install.md#advanced-tier-personas-the-hack-trace-alert-rule-and-the-seed)),
 after `node tools/seed-la-crypto.mjs --apply`, sign in as each persona and check what each one sees:
 
-1. **`crypto.analyst` (lead):** **Alerts** lists `crypto_deposit_traced_to_hack` (CRITICAL) with the value 2: exchange
+1. **`analyst` (lead):** **Alerts** lists `crypto_deposit_traced_to_hack` (CRITICAL) with the value 2: exchange
    deposit addresses that the coins stolen from the wallet labelled hacked reach within 5 transfers of the theft. Open the
    Investigation `hack-peel-chain`: it is seeded with the hacked wallet `syn15z47fslrxrnhuwm4dppk77s0z7` and the first hop
    `syn1mdsja4svnugvd4chxrt2xnywxr`, and expanded once along `sent_to`, which brings in the second hop, the first deposit
    address `syn1cpxfwce0udltzgxc65dk6a20xu` and the merchants the wallet's owner paid before the theft (exercise 1). The
    Entity List `peel-chain-accounts` holds `XA-03111` to `XA-03116`. The Case "Peel chain from the hacked wallet …" is
    linked to it.
-2. **Four-eyes:** an unbounded expand by `crypto.analyst` is held, not run. Sign in as **`crypto.manager`**: it is in the
-   approval inbox; approve or refuse it. `crypto.analyst` cannot approve its own request.
-3. **`crypto.reviewer`:** opens `hack-peel-chain` and reads every step; any change is refused.
-4. **`crypto.outsider`:** sees the Datasets, but `hack-peel-chain` is not found (404).
-5. **Draft:** `crypto.analyst` has one open Draft that annotates the first deposit address about its account `XA-03111`;
+2. **Four-eyes:** an unbounded expand by `analyst` is held, not run. Sign in as **`manager`**: it is in the
+   approval inbox; approve or refuse it. `analyst` cannot approve its own request.
+3. **`reviewer`:** opens `hack-peel-chain` and reads every step; any change is refused.
+4. **`outsider`:** sees the Datasets, but `hack-peel-chain` is not found (404).
+5. **Draft:** `analyst` has one open Draft that annotates the first deposit address about its account `XA-03111`;
    promote it, or leave it.
 
 **Why 2, not 6:** the chain peels into six deposit addresses, but only two lie within 5 transfers of the theft (the first

@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-106 test file(s). Run one, or all:
+107 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -80,6 +80,7 @@ node --test tools/
 | `tools/la-claims-smoke.test.mjs` | node --test tools/la-claims-smoke.test.mjs  -  the claims smoke's pure verdicts and its dry run (no server). |
 | `tools/la-demo-burst.test.mjs` | node --test tools/la-demo-burst.test.mjs - runBurst against a fake server with the real limits (pool 18 slots, queue 5, bucket 20). |
 | `tools/la-demo-figures.test.mjs` | node --test tools/la-demo-figures.test.mjs - verdicts on fixtures shaped like GET /inv/value-measures, plus a fake-server run. |
+| `tools/la-demo-roster.test.mjs` | node --test tools/la-demo-roster.test.mjs - every Link Analysis showcase Space Template signs in with the SAME five Demo Users. |
 | `tools/la-demo-smoke.test.mjs` | Unit test for the pure assertion helpers of tools/la-demo-smoke.mjs, plus a stub-server run. node --test tools/la-demo-smoke.test.mjs |
 | `tools/la-mm-smoke.test.mjs` | node --test tools/la-mm-smoke.test.mjs  -  the pure verdicts of the mobile-money smoke runner, plus a dry run (no server). |
 | `tools/la_gen_io.test.mjs` | Unit test of tools/la_gen_io.py, the safe output helper of the gen-la-*-data.py generators (LA-GENERATOR-DELETE-FIRST-1). |

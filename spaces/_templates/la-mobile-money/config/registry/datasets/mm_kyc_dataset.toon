@@ -10,10 +10,10 @@ columns[8]{name,type,classification}:
   opened_date,date,
   last_active_date,date,
   prior_lifetime_volume,number,
-owner: mm.analyst
+owner: analyst
 shares[5]{subjectType,subjectId,access}:
   user,admin,view
-  user,mm.analyst,view
-  user,mm.manager,view
-  user,mm.reviewer,view
-  user,mm.outsider,view
+  user,analyst,view
+  user,manager,view
+  user,reviewer,view
+  user,outsider,view

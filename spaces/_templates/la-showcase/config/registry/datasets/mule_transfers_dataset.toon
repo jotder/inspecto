@@ -5,10 +5,10 @@ columns[3]{name,type,classification}:
   PAYER_ACCOUNT,string,ACCOUNT
   PAYEE_ACCOUNT,string,ACCOUNT
   BOOKED_DATE,date,
-owner: fm.analyst
+owner: analyst
 shares[5]{subjectType,subjectId,access}:
   user,admin,view
-  user,fm.analyst,view
-  user,fm.manager,view
-  user,ra.analyst,view
-  user,demo.manager,view
+  user,analyst,view
+  user,manager,view
+  user,reviewer,view
+  user,outsider,view

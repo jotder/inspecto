@@ -1,9 +1,11 @@
-roles[4]:
-  - name: audit-lead
+roles[5]:
+  - name: fraud-analyst
     capabilities[6]: canManageIncidents,canWorkIncidents,canRunLinkGraphAnalysis,canBuildLinkIndex,canAuthorAlertRules,canRevealLinkEntities
-  - name: audit-manager
+  - name: la-analyst
+    capabilities[6]: canManageIncidents,canWorkIncidents,canRunLinkGraphAnalysis,canBuildLinkIndex,canAuthorAlertRules,canRevealLinkEntities
+  - name: la-manager
     capabilities[4]: canManageIncidents,canWorkIncidents,canApproveLinkExpansions,canOperateRuns
-  - name: audit-committee
+  - name: la-viewer
     capabilities[0]:
-  - name: audit-settings
+  - name: la-settings
     capabilities[1]: canAuthorWorkbench

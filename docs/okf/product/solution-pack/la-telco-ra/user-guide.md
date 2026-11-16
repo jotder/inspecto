@@ -135,16 +135,16 @@ golden tests are `tools/gen-la-telco-ra-data.test.mjs` and `TelcoRaLinksJobGolde
 On a build with sign-in (the demo build: see the [admin guide](admin-guide-install.md#advanced-tier-personas-the-usage-without-billing-alert-rule-and-the-seed)),
 after `node tools/seed-la-telco-ra.mjs --apply`, sign in as each persona and check what each one sees:
 
-1. **`telcora.analyst` (lead):** **Alerts** lists `telco_ra_usage_without_billing` (WARNING) with the value 300:
+1. **`analyst` (lead):** **Alerts** lists `telco_ra_usage_without_billing` (WARNING) with the value 300:
    subscribers not on the known list whose usage reached no billing record in 2 or more months and is still unbilled.
    Open the Investigation `unbilled-usage`: it is seeded with `DL-047` and expanded once over `activated_by` to the
    dealer's 336 subscribers, the 300 SIMs of exercise 1 among them. The Entity List `unbilled-sims` holds the 300. The
    Case "Unbilled usage at DL-047" is linked to it.
-2. **Four-eyes:** an unbounded expand by `telcora.analyst` is held, not run. Sign in as **`telcora.manager`**: it is in
-   the approval inbox; approve or refuse it. `telcora.analyst` cannot approve its own request.
-3. **`telcora.reviewer`:** opens `unbilled-usage` and reads every step; any change is refused.
-4. **`telcora.outsider`:** sees the Datasets, but `unbilled-usage` is not found (404).
-5. **Draft:** `telcora.analyst` has one open Draft that annotates `DL-047` about its activation device `DEV-00086`.
+2. **Four-eyes:** an unbounded expand by `analyst` is held, not run. Sign in as **`manager`**: it is in
+   the approval inbox; approve or refuse it. `analyst` cannot approve its own request.
+3. **`reviewer`:** opens `unbilled-usage` and reads every step; any change is refused.
+4. **`outsider`:** sees the Datasets, but `unbilled-usage` is not found (404).
+5. **Draft:** `analyst` has one open Draft that annotates `DL-047` about its activation device `DEV-00086`.
    The device itself is two hops out (dealer, SIM, device) and not in the Working Set, so the note goes on the dealer.
    Promote it, or leave it.
 

@@ -24,17 +24,17 @@ The Space has two tiers.
 
 | User | Works as |
 |---|---|
-| `mm.analyst` | lead: runs algorithms, builds the index, authors the Alert Rule; no Reveal, no approval |
-| `mm.manager` | second person: approves expansions, presses Run on Jobs, owns the Case |
-| `mm.reviewer` | read-only member (regulator liaison) |
+| `analyst` | lead: runs algorithms, builds the index, authors the Alert Rule; no Reveal, no approval |
+| `manager` | second person: approves expansions, presses Run on Jobs, owns the Case |
+| `reviewer` | read-only member (regulator liaison) |
 | `admin` | Reveal, Settings, embed links; opens the Case |
 
 ## A working day
 
 1. **Check data trust.** Open the Investigation `mm-structuring-case`; read the footer counts and the data-trust strip.
-2. **Seed and expand.** Seed `HUB-01` and expand; wallets show as `masked:` tokens. An expand above 100 neighbours is held until `mm.manager` approves it in Approvals.
+2. **Seed and expand.** Seed `HUB-01` and expand; wallets show as `masked:` tokens. An expand above 100 neighbours is held until `manager` approves it in Approvals.
 3. **Measure.** Value Measures: `structuring` (4 750 to 5 000), `passThrough`, `cashOutConcentration`.
 4. **Follow the money.** Shortest path and Maximum flow from the hub to the cash-out agent; Find cycles on a `LOOP-1` neighbourhood. Client run first, then **Run on server**.
 5. **Rank with care.** Suspicion score and its factor breakdown; the biller shows high connectivity is not guilt.
 6. **Entity profile.** Reference rows come from the KYC Dataset `mm_kyc_dataset`; the `mm_device_farm` view shows the shared handset.
-7. **Alert to Case.** Alerts > `mm-structuring` (aggregate only) > Incident > the Case owned by `mm.manager`. Build and Verify the Dossier; share a masked read-only embed with the regulator.
+7. **Alert to Case.** Alerts > `mm-structuring` (aggregate only) > Incident > the Case owned by `manager`. Build and Verify the Dossier; share a masked read-only embed with the regulator.

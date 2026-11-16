@@ -13,10 +13,10 @@ defaultLinkMapping:
   from: broker_id
   to: policy_id
   primaryTime: inception_date
-owner: siu.analyst
+owner: analyst
 shares[5]{subjectType,subjectId,access}:
   user,admin,view
-  user,siu.analyst,view
-  user,siu.manager,view
-  user,partner.reviewer,view
+  user,analyst,view
+  user,manager,view
+  user,reviewer,view
   user,outsider,view

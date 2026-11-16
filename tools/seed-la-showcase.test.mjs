@@ -42,20 +42,20 @@ test('apply signs in once per persona and acts as the right persona', async () =
   assert.deepEqual(ops.map((c) => c.body.op), ['seed', 'expand', 'exclude', 'annotate', 'threshold', 'window', 'resolve', 'snapshot', 'connect']);
   // the hub -> relay route is drawn: the Expand's 5-strongest cap drops it, the Connect step puts it on the canvas
   assert.deepEqual(ops.find((c) => c.body.op === 'connect').body.ids, ['MULE-HUB-01', 'RELAY-01']);
-  assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:fm.analyst'));
+  assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:analyst'));
   assert.ok(ops.find((c) => c.body.op === 'exclude').body.reason);
   const members = m.calls.filter((c) => c.u.endsWith('/members') && c.u.includes('investigations'));
-  assert.deepEqual(members.map((c) => c.body), [{ subject: 'ra.analyst', role: 'reviewer' }, { subject: 'fm.manager', role: 'reviewer' }, { subject: 'admin', role: 'lead' }]);   // admin is a lead: the only persona holding canShareInvestigation, so it can mint an embed link
-  assert.ok(!members.some((c) => c.body.subject === 'demo.manager'));
+  assert.deepEqual(members.map((c) => c.body), [{ subject: 'reviewer', role: 'reviewer' }, { subject: 'manager', role: 'reviewer' }, { subject: 'admin', role: 'lead' }]);   // admin is a lead: the only persona holding canShareInvestigation, so it can mint an embed link
+  assert.ok(!members.some((c) => c.body.subject === 'outsider'));
   const assign = m.calls.find((c) => c.u === '/spaces/s/objects/CASE-7/assign');
-  assert.deepEqual(assign.body, { assignee: 'fm.manager' });
+  assert.deepEqual(assign.body, { assignee: 'manager' });
   assert.deepEqual(m.calls.find((c) => c.method === 'PUT').body, { caseRef: 'CASE-7' });
   const expiring = m.calls.find((c) => c.body && c.body.expiresAt);
   assert.ok(Date.parse(expiring.body.expiresAt) > Date.now());
   assert.ok(m.calls.find((c) => c.u.endsWith('/standing-detection')));
   const watch = m.calls.find((c) => c.u === '/spaces/s/entity-lists' && c.body.entityType === 'msisdn');
   assert.deepEqual([watch.body.id, watch.body.purpose], ['telecom-watch-msisdn', 'watch']);
-  assert.equal(watch.auth, 'Bearer tok-demo:fm.analyst');
+  assert.equal(watch.auth, 'Bearer tok-demo:analyst');
   const watched = m.calls.find((c) => c.u === '/spaces/s/entity-lists/telecom-watch-msisdn/members');
   assert.deepEqual(watched.body.add, ['99979100001', '99979200001']);
   assert.ok(watched.body.reason);
@@ -93,8 +93,8 @@ test('scaffold lays down both Spaces once and is idempotent', () => {
   assert.deepEqual(scaffold(root), []);
 });
 
-test('plan never grants demo.manager anything', () => {
-  assert.ok(!JSON.stringify(buildPlan()).includes('demo.manager'));
+test('plan never grants outsider anything', () => {
+  assert.ok(!JSON.stringify(buildPlan()).includes('outsider'));
 });
 
 import { stampIndexBuildOwner } from './seed-la-showcase.mjs';
@@ -142,7 +142,7 @@ function staged(opts = {}) {
     const method = init.method || 'GET', u = url.replace('http://h/api/v1/spaces/s', ''), body = init.body ? JSON.parse(init.body) : undefined;
     const as = ((init.headers && init.headers.authorization) || '').replace('Bearer tok-demo:', '');
     if (opts.fail && opts.fail(method, u, as)) return reply(opts.failStatus || 500, {});
-    if (u.startsWith('/inv/pending')) return reply(200, { items: as === 'fm.manager' ? st.pending.map((r) => ({ investigationId: INV, requestId: r })) : [] });
+    if (u.startsWith('/inv/pending')) return reply(200, { items: as === 'manager' ? st.pending.map((r) => ({ investigationId: INV, requestId: r })) : [] });
     if (u === `/inv/investigations/${INV}/ops` && body.op === 'expand') {
       m.calls.push({ method, u, as, body });
       if (opts.held === false) return reply(200, { status: 'ok' });
@@ -167,7 +167,7 @@ function staged(opts = {}) {
 }
 const go = (s, extra = {}) => run({ fetchFn: s.fetchFn, base: 'http://h', space: 's', apply: true, sleep: async () => {}, ...extra, stages: { coverage: false, ...extra.stages } });
 
-test('stage 1 creates ONE pending unbounded expand as fm.analyst and confirms it in fm.manager\'s inbox', async () => {
+test('stage 1 creates ONE pending unbounded expand as analyst and confirms it in manager\'s inbox', async () => {
   const s = staged();
   const r = await go(s, { stages: { alert: false, draft: false } });
   assert.deepEqual(r.warnings, []);
@@ -176,7 +176,7 @@ test('stage 1 creates ONE pending unbounded expand as fm.analyst and confirms it
   const expand = s.calls.find((c) => c.body && c.body.op === 'expand' && c.as);
   assert.deepEqual(expand.body, { op: 'expand', direction: 'either' });
   assert.equal('maxFanOut' in expand.body, false);
-  assert.equal(expand.as, 'fm.analyst');
+  assert.equal(expand.as, 'analyst');
 });
 
 test('stage 1 is idempotent: a request already pending means no expand is sent', async () => {
@@ -194,7 +194,7 @@ test('stage 1 soft-fails when the expand RUNS instead of being held, and never f
   assert.equal(r.summary.pendingRequestId, undefined);
 });
 
-test('stage 2 triggers la_detect once as fm.manager and waits for the Alert', async () => {
+test('stage 2 triggers la_detect once as manager and waits for the Alert', async () => {
   const s = staged({ alertAfter: 2 }); const slept = [];
   const r = await go(s, { stages: { pending: false, draft: false }, sleep: async (ms) => { slept.push(ms); } });
   assert.equal(s.st.triggers, 1);
@@ -225,7 +225,7 @@ test('stage 2 soft-fails when the trigger is refused', async () => {
   assert.match(r.warnings[0], /la_detect trigger answered HTTP 403/);
 });
 
-test('stage 3 forks one Draft as fm.analyst, adds one step, and checks it is open with one step and mainMoved 0', async () => {
+test('stage 3 forks one Draft as analyst, adds one step, and checks it is open with one step and mainMoved 0', async () => {
   const s = staged();
   const r = await go(s, { stages: { pending: false, alert: false } });
   assert.deepEqual(r.warnings, []);
