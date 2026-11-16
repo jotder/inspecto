@@ -1612,7 +1612,10 @@ the sealed `linkAnnotations` render, and the Dossier stamps `linkId` on its link
   files to `COMPACTED_AWAY`; a pin that rots is worse than none). When replay is wanted, copy `ReferenceReader`'s SCD2
   `asOf` read.
 * **D-U8 — NO purge** (operator 2026-09-24): no retention period, purge task or legal-hold record; reopen only on a
-  regulator or retention policy (pattern: `incident_purge`).
+  regulator or retention policy (pattern: `incident_purge`). **Amended by LEGAL-HOLD-SCOPE-1 (2026-11-17):** still no
+  Investigation-level hold record, but an Investigation linked to a Case under legal hold (`CasePort.legalHold`, the
+  Case's own hold or a held Incident it contains; any Case state) refuses `DELETE /inv/investigations/{id}`,
+  `DELETE …/case` and a `PUT …/case` to another Case with 409 and an `AUDIT` `legal_hold.refused` event.
 * **D-U9 — per-Collector coverage, shipped 2026-10-05** (`LA-COLLECTOR-COVERAGE-1`): `collectors` attributed through
   `CollectorCoveragePort` (bridge `HostCollectorCoveragePort`): each Pipeline's `batches` CSV (Consignment → output store)
   joined to its `lineage` CSV (Consignment → event-day partition, rows), kept when they wrote the Dataset's

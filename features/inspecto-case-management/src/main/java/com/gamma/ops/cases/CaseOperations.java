@@ -215,6 +215,7 @@ public final class CaseOperations {
      * @throws NoSuchElementException   unknown survivor/source id
      * @throws IllegalArgumentException empty {@code sources}
      * @throws IllegalStateException    a non-CASE participant, self-merge, or an already-closed/merged source
+     * @throws com.gamma.objects.LegalHoldException a source Case under legal hold (LEGAL-HOLD-SCOPE-1)
      */
     public MergeResult mergeCases(String survivorId, List<String> sources, String actor) {
         if (sources == null || sources.isEmpty())
@@ -225,6 +226,9 @@ public final class CaseOperations {
             if (id.equals(survivorId)) throw new IllegalStateException("a case cannot be merged into itself");
             absorbed.add(requireActiveCase(id, "merge source"));
         }
+        // LEGAL-HOLD-SCOPE-1: an absorbed Case loses every member, so a held one (or one holding a held Incident) cannot be
+        // absorbed - its Investigations would no longer be held through it. Checked before anything moves.
+        for (OperationalObject src : absorbed) svc.requireNotHeld(src, "merge", actor);
         long now = System.currentTimeMillis();
         int moved = 0;
         Set<String> tags = new LinkedHashSet<>(svc.tagsOf(survivor.id()));
@@ -272,12 +276,14 @@ public final class CaseOperations {
      * @throws NoSuchElementException   unknown case id
      * @throws IllegalArgumentException blank title / empty members
      * @throws IllegalStateException    a non-CASE or closed case, or a member the case does not contain
+     * @throws com.gamma.objects.LegalHoldException the case is under legal hold (LEGAL-HOLD-SCOPE-1)
      */
     public SplitResult splitCase(String caseId, String title, List<String> members,
                                  String assignee, String actor) {
         if (title == null || title.isBlank()) throw new IllegalArgumentException("split needs a 'title' for the new case");
         if (members == null || members.isEmpty()) throw new IllegalArgumentException("split needs at least one member");
         OperationalObject original = requireActiveCase(caseId, "split");
+        svc.requireNotHeld(original, "split", actor);   // LEGAL-HOLD-SCOPE-1: a held Case keeps its members
         Set<String> contained = new LinkedHashSet<>();
         for (ObjectLink l : sub.links().incident(caseId)) {
             if (l.fromId().equals(caseId) && LinkRelationship.CONTAINS.equalsIgnoreCase(l.relationship()))

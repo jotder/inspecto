@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.case-management`](../../../../../product-map/module/case-management.toon).
 
-23 test class(es): 16 unit, 7 real-HTTP control-plane, 0 IT.
+24 test class(es): 16 unit, 8 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -33,6 +33,7 @@ mvn -o test -pl features/inspecto-case-management -Dtest=BypassBoxCaseRuleTest,P
 | `ControlApiCaseGroupTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-case-management/src/test/java/com/gamma/control/ControlApiCaseGroupTest.java` | Case group management over real HTTP (GLOSSARY §9): {@code POST /objects/{id}/merge}, |
 | `ControlApiCaseRuleTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-case-management/src/test/java/com/gamma/control/ControlApiCaseRuleTest.java` | Rule-raised cases + case analytics over real HTTP (C5/C4): {@code /cases/rules} CRUD behind the |
 | `ControlApiCaseTriageGateTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-case-management/src/test/java/com/gamma/control/ControlApiCaseTriageGateTest.java` | The Case-management routes stay {@code canAdminister} (merge / split / Case-Rule evaluate), proven with an armed |
+| `ControlApiLegalHoldEvidenceTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-case-management/src/test/java/com/gamma/control/ControlApiLegalHoldEvidenceTest.java` | LEGAL-HOLD-SCOPE-1 over real HTTP: while an Incident is under legal hold, no route may remove its evidence links — |
 | `ControlApiScopedCaseMergeTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-case-management/src/test/java/com/gamma/control/ControlApiScopedCaseMergeTest.java` | SEC-7d on the Case merge route (moved from {@code ControlApiScopedObjectsTest}, MODULE-REORG-P7): the by-id scope guard only |
 | `PartnerSettlementDisputeCaseTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-case-management/src/test/java/com/gamma/control/PartnerSettlementDisputeCaseTest.java` | {@code PACK-PARTNER-SETTLEMENT-1} slice S5, the Case half (decision PS-O5: an administrator applies the dispute governance through |
 | `CaseRuleEvalJobTest` | `com.gamma.job` | unit | `features/inspecto-case-management/src/test/java/com/gamma/job/CaseRuleEvalJobTest.java` | The {@code caserule.evaluate} Job Type: evaluates a saved {@link CaseRule}, grouping matching in-window |

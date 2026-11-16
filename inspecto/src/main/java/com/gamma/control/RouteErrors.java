@@ -43,6 +43,8 @@ public final class RouteErrors {
             return body.get();
         } catch (NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
+        } catch (com.gamma.objects.LegalHoldException held) {   // LEGAL-HOLD-SCOPE-1: a conflict with the hold, not a bad request
+            throw new ApiException(409, ErrorCodes.CONFLICT, held.getMessage());
         } catch (IllegalStateException illegal) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, illegal.getMessage());
         } catch (IllegalArgumentException bad) {

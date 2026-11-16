@@ -48,8 +48,10 @@ Config kinds: `workflow`, `sla-policy`, `escalation-rule` (in `registry/`, picke
 ## Retention
 
 Nothing is purged by default. Stand up a maintenance Job with `task: incident_purge` and a required
-`retention_days` (optional `max_count`, default 1000); run it dry first. A `legalHold` attribute keeps an Incident;
-the event-log history is never purged. Recipe: [operations reference](../../layer/platform/admin-guide-operations-reference.md).
+`retention_days` (optional `max_count`, default 1000); run it dry first. A `legalHold` attribute keeps an Incident
+and its evidence: its notes and attachments, Alerts, links, the Case it is in and that Case's Investigations, and
+the `event_prune` days from its first day on; deletes and merges that would remove them answer 409 until the hold
+is released (LEGAL-HOLD-SCOPE-1). Recipe and the full list: [operations reference](../../layer/platform/admin-guide-operations-reference.md).
 
 ## Health and common failures
 

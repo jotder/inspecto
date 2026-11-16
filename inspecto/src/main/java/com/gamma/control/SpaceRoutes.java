@@ -161,9 +161,33 @@ final class SpaceRoutes implements RouteModule {
         if (purge && HostContext.of(api).spaces().space(SpaceId.of(id)).isPresent() && HostContext.of(api).spaces().isLastOnDisk(SpaceId.of(id)))
             throw new ApiException(409, ErrorCodes.CONFLICT, "refusing to purge '" + id + "' — it is the last space on disk; "
                     + "delete it without ?purge=true (the files stay for re-discovery), or create another space first");
+        if (purge) refuseHeldPurge(api, e, id);
         if (!HostContext.of(api).spaces().delete(SpaceId.of(id), purge))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + id + "'");
         return Map.of("id", id, "deleted", true, "purged", purge);
+    }
+
+    /**
+     * LEGAL-HOLD-SCOPE-1: purging a Space removes its whole tree — every Incident, Case, note, attachment, Investigation and
+     * the audit history with them — so it is refused (409, audited) while anything in it is under legal hold. A hold that
+     * cannot be read refuses too. Deregister-only (no {@code ?purge}) stays allowed: the files are kept.
+     */
+    private static void refuseHeldPurge(ApiContext api, HttpExchange e, String id) {
+        var objects = HostContext.of(api).spaces().space(SpaceId.of(id)).flatMap(s -> s.service().objects());
+        if (objects.isEmpty()) return;   // no operational objects in this build: nothing can be held
+        java.util.Map<String, Long> held;
+        try {
+            held = objects.get().legalHolds();
+        } catch (RuntimeException unreadable) {
+            throw new ApiException(409, ErrorCodes.CONFLICT, "refusing to purge '" + id
+                    + "' — its legal holds could not be read (" + unreadable.getMessage() + "); nothing was removed");
+        }
+        if (held.isEmpty()) return;
+        java.util.List<String> ids = held.keySet().stream().sorted().limit(5).toList();
+        String reason = held.size() + " object(s) in Space '" + id + "' are under legal hold (" + String.join(", ", ids)
+                + (held.size() > ids.size() ? ", …" : "") + ")";
+        throw new ApiException(409, ErrorCodes.CONFLICT, com.gamma.objects.LegalHoldException
+                .audited("purge Space '" + id + "'", reason, "space", id, ApiContext.actor(e)).getMessage());
     }
 
     /** {@code loadSamples} needs a template that ships sample data: 422 naming the reason otherwise (400 for an unknown one). */

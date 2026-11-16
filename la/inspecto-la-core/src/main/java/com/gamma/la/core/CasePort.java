@@ -33,4 +33,12 @@ public interface CasePort {
      * caller resolves any alias first and must not echo it. Throws the host's 422 for an unsearchable key.
      */
     Map<String, Object> history(ApiContext api, HttpExchange ex, String type, String key, String status, int limit);
+
+    /**
+     * LEGAL-HOLD-SCOPE-1: why the Case {@code ref}'s evidence is under legal hold (the Case's own hold, or a held
+     * Incident it contains), or empty. An Investigation linked to a held Case is that Case's evidence: it cannot be
+     * deleted, nor unlinked or re-linked away from the Case, until the hold is released. Unbound or default: nothing is
+     * held, because nothing can be held without Case management.
+     */
+    default Optional<String> legalHold(ApiContext api, String ref) { return Optional.empty(); }
 }

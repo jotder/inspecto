@@ -184,12 +184,13 @@ public final class InvestigationRoutes implements RouteModule {
 
     /**
      * {@code DELETE /inv/investigations/{id}} (LA-INVESTIGATION-DELETE-1) — gates, in order: {@code canManageIncidents} 403 →
-     * {@link #open} lead-only (503 · 422 · 403 · 404; a read-only Case member never reaches it) → 409 while the Investigation is
-     * linked to an OPEN Case or holds a pending four-eyes approval → the store removes it (503 on a backend that cannot), THEN the audit event (title, owner, what was removed;
+     * {@link #open} lead-only (503 · 422 · 403 · 404; a read-only Case member never reaches it) → 409 while the linked Case (in
+     * any state) is under legal hold (LEGAL-HOLD-SCOPE-1, audited) → 409 while the Investigation is linked to an OPEN Case or holds a pending four-eyes approval → the store removes it (503 on a backend that cannot), THEN the audit event (title, owner, what was removed;
      * written only once it is true) (the Investigation, its Drafts and everything beside the log are gone with it).
      */
     private static Object delete(ApiContext api, HttpExchange ex, String id) throws IOException {
         Inv inv = open(api, ex, id);
+        InvestigationCaseRoutes.refuseHeld(api, ex, inv.store(), id, "delete investigation '" + id + "'");
         String openCase = InvestigationCaseRoutes.openCaseRef(api, inv.store(), id);
         if (openCase != null)
             throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' is linked to open case '" + openCase

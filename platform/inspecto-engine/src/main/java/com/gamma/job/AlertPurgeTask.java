@@ -18,9 +18,11 @@ import java.time.Instant;
  *   <li>{@code OPEN} and {@code ACKNOWLEDGED} Alerts are never touched: they carry de-duplication state, and a deleted
  *       active row would let its rule fire again. A resolved row closed exactly at the cutoff, or with no close
  *       time, is kept.</li>
- *   <li>Age only. An Alert's {@code incident_id} is a text reference to a row in another store; nothing reads an
- *       Alert row back through an Incident (the Incident's {@code ESCALATED_FROM} edge has no node behind it by
- *       design), so a purged Alert leaves a harmless dangling reference.</li>
+ *   <li>Age only — except under <b>legal hold</b> (LEGAL-HOLD-SCOPE-1): a resolved Alert escalated into an Incident
+ *       whose evidence is held ({@code ObjectAccess#legalHold}) is kept and reported as its own count, and goes on the
+ *       first run after the hold is released. Otherwise an Alert's {@code incident_id} is a text reference to a row in
+ *       another store; nothing reads an Alert row back through an Incident (the Incident's {@code ESCALATED_FROM} edge
+ *       has no node behind it by design), so a purged Alert leaves a harmless dangling reference.</li>
  *   <li>Without an Alert engine attached the task <b>fails</b> rather than reporting success: a retention control
  *       that deletes nothing and says "ok" is worse than one that fails (the {@code incident_purge} lesson).</li>
  *   <li>Ships <b>unscheduled</b>: nothing runs it until an operator adds a maintenance Job with
@@ -41,7 +43,8 @@ final class AlertPurgeTask {
             throw new IllegalStateException("alert_purge: no Alert engine attached - refusing to report a purge that did not run");
         Instant cutoff = Instant.now().minus(Duration.ofDays(days));
         var p = alerts.get().purgeResolved(cutoff, dryRun);
-        String kept = p.keptResolved() + " resolved within retention, " + p.keptActive() + " open/acknowledged kept";
+        String kept = p.keptResolved() + " resolved within retention, " + p.keptActive() + " open/acknowledged kept"
+                + (p.keptHeld() == 0 ? "" : ", " + p.keptHeld() + " held by a legal hold on their Incident");
         long ms = (System.nanoTime() - t0) / 1_000_000L;
         if (dryRun)
             return JobResult.ok("alert_purge[dry-run]: would delete " + p.purged() + " resolved Alert(s) closed more than "
@@ -52,7 +55,8 @@ final class AlertPurgeTask {
                     .actor("job:" + cfg.name()).actorType("system")
                     .action("alerts.purged").actionCategory("retention")
                     .target("job", cfg.name())
-                    .attr("purge_before", cutoff).attr("alerts_removed", p.purged()).attr("retention_days", days)));
+                    .attr("purge_before", cutoff).attr("alerts_removed", p.purged()).attr("retention_days", days)
+                    .attr("alerts_held", p.keptHeld())));
         return JobResult.ok("alert_purge: deleted " + p.purged() + " resolved Alert(s) closed more than " + days
                 + "d ago (" + kept + ")", ms);
     }

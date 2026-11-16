@@ -162,6 +162,17 @@ public final class ObjectServiceAccess implements ObjectAccess {
         return service.get(objectId).map(ObjectServiceAccess::flatten);
     }
 
+    /** LEGAL-HOLD-SCOPE-1: the object's own hold, or one {@code CONTAINS} hop away ({@link ObjectService#legalHoldReason}). */
+    @Override
+    public Optional<String> legalHold(String objectId) {
+        return service.legalHoldReason(objectId);
+    }
+
+    @Override
+    public Map<String, Long> legalHolds() {
+        return service.legalHolds();
+    }
+
     @Override
     public Optional<Map<String, Object>> detail(String objectId) {
         return service.get(objectId).map(ObjectServiceAccess::detailOf);

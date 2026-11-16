@@ -28,6 +28,16 @@ Split across two layers:
   lets core code open an Incident without depending on the ops module;
 - the store, service, routes and governance live in `features/inspecto-ops`.
 
+## Legal hold
+
+An Incident with the `legalHold` attribute (set with `PATCH /objects/{id}`; there is no screen yet) keeps its
+**evidence** until the hold is released (LEGAL-HOLD-SCOPE-1, 2026-11-17): its notes and attachments, the Alerts
+escalated into it, its links and Case membership, the Case it is in and that Case's Investigations, and its audit
+history. The retention tasks skip it and report it as held; a delete, merge, split, Investigation delete or Space
+purge that would remove it answers 409 naming the hold and is audited (`legal_hold.refused`). The rule is
+`ObjectService.legalHoldReason`, offered to core and Link Analysis as `ObjectAccess.legalHold`. Not covered: a
+Pipeline's data partitions (`partition_prune`). Full list: [operations reference](../../layer/platform/admin-guide-operations-reference.md).
+
 A bundle without `inspecto-ops` reports `features.ops=false`; the object routes answer 503 and openers fall
 back to signal-only behaviour. See [platform-services](../../layer/platform/architecture-platform-services.md) (`objects` service).
 

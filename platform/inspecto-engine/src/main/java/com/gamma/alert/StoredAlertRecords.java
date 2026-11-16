@@ -56,8 +56,18 @@ final class StoredAlertRecords implements AlertRecords {
         return store.allActive().stream().filter(r -> AlertLifecycle.initialState().equals(r.state())).toList();
     }
 
+    /**
+     * LEGAL-HOLD-SCOPE-1: an Alert escalated into an Incident whose evidence is under legal hold is kept. Fail-safe: a
+     * hold lookup that throws keeps the row, because a wrong delete cannot be undone and a wrong keep costs one more run.
+     */
     @Override public AlertStore.Purge purgeResolvedAlerts(java.time.Instant cutoff, boolean dryRun) {
-        return store.purgeResolvedBefore(cutoff, dryRun);
+        return store.purgeResolvedBefore(cutoff, incidentId -> objects.map(o -> {
+            try {
+                return o.legalHold(incidentId).isPresent();
+            } catch (RuntimeException unknown) {
+                return true;
+            }
+        }).orElse(false), dryRun);
     }
 
     @Override public boolean reopenIncident(String incidentId, String actor) {

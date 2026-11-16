@@ -33,6 +33,13 @@ public final class HostCasePort implements CasePort {
         return AnnotationTargets.objectVisibleTo(ex, summary);
     }
 
+    /** Over {@link ObjectAccess#legalHold}: the Case's own hold or a held Incident it contains (LEGAL-HOLD-SCOPE-1). */
+    @Override
+    public Optional<String> legalHold(ApiContext api, String ref) {
+        Optional<ObjectAccess> objects = HostContext.of(api).service().objects();
+        return objects.isPresent() ? objects.get().legalHold(ref) : Optional.empty();
+    }
+
     /** Over {@link ObjectAccess#byEntity}: the ops module's own {@code GET /objects/by-entity} read. */
     @Override
     public Map<String, Object> history(ApiContext api, HttpExchange ex, String type, String key, String status, int limit) {

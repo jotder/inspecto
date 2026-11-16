@@ -42,6 +42,7 @@ Detail: [API](api-case-management.md), [architecture § 8](architecture.md).
 | 422 on from-entities | more than 100 entities in one call |
 | merge refused | non-Case, merge into itself, or a closed / already-merged source |
 | split refused | the Case is closed, or a member it does not contain |
+| 409 naming a legal hold on merge, split or removing a member | the Case, or an Incident it contains, is under legal hold (a source Case cannot be absorbed, a held Case keeps its members); release the hold (`legalHold: false`) — [LEGAL-HOLD-SCOPE-1](../../layer/platform/admin-guide-operations-reference.md) |
 | 409 `CONFLICT_STALE_VERSION` | concurrent write on the same Case; reload and retry |
 | a Case Rule never opens a Case | `threshold` not met within `windowMinutes`, or the Incidents are already in a Case |
 | evaluation reports nothing | run under a dry run (the `objects` service is substituted) |

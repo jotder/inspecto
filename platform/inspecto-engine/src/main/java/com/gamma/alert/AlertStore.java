@@ -80,10 +80,17 @@ public interface AlertStore extends AutoCloseable {
      * @param purged        the {@code RESOLVED} rows whose {@code closedAt} is strictly before the cutoff
      * @param keptResolved  the {@code RESOLVED} rows that stay: closed at or after the cutoff, or with no close time
      * @param keptActive    the {@code OPEN} / {@code ACKNOWLEDGED} rows, never touched
+     * @param keptHeld      the {@code RESOLVED} rows past the cutoff that stay because the Incident they were escalated
+     *                      into is under legal hold (LEGAL-HOLD-SCOPE-1); not counted in {@code purged} or {@code keptResolved}
      */
-    record Purge(long purged, long keptResolved, long keptActive, List<Alert> fired) {
+    record Purge(long purged, long keptResolved, long keptActive, long keptHeld, List<Alert> fired) {
         public Purge {
             fired = fired == null ? List.of() : List.copyOf(fired);
+        }
+
+        /** A purge with nothing held back. */
+        public Purge(long purged, long keptResolved, long keptActive, List<Alert> fired) {
+            this(purged, keptResolved, keptActive, 0L, fired);
         }
     }
 
@@ -92,8 +99,18 @@ public interface AlertStore extends AutoCloseable {
      * {@code cutoff}; with {@code dryRun} only count. ⛔ An {@code OPEN} or {@code ACKNOWLEDGED} row is never
      * deleted (it carries de-duplication state: deleting it would let its rule fire again), and a resolved row with
      * no close time ({@code closedAt <= 0}) is kept, age unknown. The age is the Alert's own {@code closedAt}.
+     * Nothing is held back: {@link #purgeResolvedBefore(java.time.Instant, java.util.function.Predicate, boolean)}.
      */
-    Purge purgeResolvedBefore(java.time.Instant cutoff, boolean dryRun);
+    default Purge purgeResolvedBefore(java.time.Instant cutoff, boolean dryRun) {
+        return purgeResolvedBefore(cutoff, incidentId -> false, dryRun);
+    }
+
+    /**
+     * As {@link #purgeResolvedBefore(java.time.Instant, boolean)}, but a row escalated into an Incident for which
+     * {@code heldIncident} answers true is KEPT and counted in {@link Purge#keptHeld} (LEGAL-HOLD-SCOPE-1: an Alert is
+     * evidence of the Incident it raised). The predicate is asked once per distinct Incident id among the aged rows.
+     */
+    Purge purgeResolvedBefore(java.time.Instant cutoff, java.util.function.Predicate<String> heldIncident, boolean dryRun);
 
     @Override
     default void close() {}

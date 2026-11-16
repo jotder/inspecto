@@ -32,6 +32,10 @@ import java.util.regex.Pattern;
  *   <li>{@code DELETE /inv/investigations/{id}/case} — owner-only.</li>
  * </ul>
  *
+ * <p><b>Legal hold</b> (LEGAL-HOLD-SCOPE-1): while the linked Case's evidence is held ({@link CasePort#legalHold}) the
+ * link is frozen — {@code DELETE …/case} and a {@code PUT …/case} naming another Case answer 409 — because removing it
+ * would let the Investigation be deleted around the hold.
+ *
  * <p><b>The link is OPTIONAL</b> and lives OUTSIDE the sealed header ({@code case-link.json}), so it can be set at
  * create or later and removed without touching evidence. An Investigation with no link works exactly as before.
  *
@@ -82,6 +86,9 @@ public final class InvestigationCaseRoutes implements RouteModule {
         InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
         Map<String, Object> record = linkRecord(api, ex, ApiContext.str(body, "caseRef"));
         if (record == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'caseRef'");
+        String prior = caseRef(inv.store(), id);
+        if (prior != null && !prior.equals(record.get("caseRef")))
+            refuseHeld(api, ex, inv.store(), id, "re-link investigation '" + id + "' to another case");
         write(ex, inv.store(), id, record);
         return describe(api, ex, inv);
     }
@@ -89,6 +96,7 @@ public final class InvestigationCaseRoutes implements RouteModule {
     /** {@code DELETE …/case} — gates: {@code canManageIncidents} 403 → owner-only {@link InvestigationRoutes#open}. */
     private static Object unlink(ApiContext api, HttpExchange ex, String id) throws IOException {
         InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
+        refuseHeld(api, ex, inv.store(), id, "unlink investigation '" + id + "' from its case");
         String prior = caseRef(inv.store(), id);
         if (inv.store().deleteCaseLink(id))
             emit(ex, LinkEventTypes.LINK_INVESTIGATION_CASE_UNLINKED, "link.investigation.case.unlinked",
@@ -162,6 +170,30 @@ public final class InvestigationCaseRoutes implements RouteModule {
         if (objects == null) return null;
         Map<String, Object> c = objects.summary(api, caseRef).orElse(null);
         return c != null && "case".equals(c.get("kind")) && Boolean.FALSE.equals(c.get("closed")) ? caseRef : null;
+    }
+
+    /**
+     * LEGAL-HOLD-SCOPE-1: 409 (audited) when this Investigation is linked to a Case whose evidence is under legal hold
+     * ({@link CasePort#legalHold}) — in any state, closed included: a hold outlives the Case's workflow. {@code what} names
+     * the refused act. A no-op with no link or no Case management.
+     */
+    static void refuseHeld(ApiContext api, HttpExchange ex, InvestigationStore store, String id, String what) throws IOException {
+        String caseRef = caseRef(store, id);
+        if (caseRef == null) return;
+        CasePort objects = CasePorts.available(api).orElse(null);
+        if (objects == null) return;
+        String hold = objects.legalHold(api, caseRef).orElse(null);
+        if (hold == null) return;
+        String message = what + " refused: it is linked to case '" + caseRef + "' and " + hold + " — release the legal hold first";
+        try {
+            EventSink.current().emit(Event.builder(com.gamma.audit.EventType.AUDIT).source("inv").message(message)
+                    .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
+                    .action("legal_hold.refused").actionCategory("retention")
+                    .target("investigation", id).attr("refused", what).attr("hold", hold).attr("caseId", caseRef));
+        } catch (RuntimeException ignored) {
+            // best effort: the refusal stands whether or not it could be recorded
+        }
+        throw new ApiException(409, ErrorCodes.CONFLICT, message);
     }
 
     static String caseRef(InvestigationStore store, String id) throws IOException {

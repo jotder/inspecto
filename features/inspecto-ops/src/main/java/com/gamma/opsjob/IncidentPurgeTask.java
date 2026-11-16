@@ -35,9 +35,10 @@ import java.util.List;
  * log is not the record being retention-managed. This is a stated decision (MNT-14 G3), not an
  * oversight, and it is the first question a legal/DPA reviewer asks.
  *
- * <p>Legal hold: an Incident carrying {@link com.gamma.ops.ObjectService#ATTR_LEGAL_HOLD} is never
- * purged however old it is, and is reported as its own count ("12 eligible, 3 held") rather than
- * silently skipped — an operator cannot trust a sweep whose arithmetic does not add up.
+ * <p>Legal hold: an Incident whose evidence is held is never purged however old it is, and is reported as its own
+ * count ("12 eligible, 3 held") rather than silently skipped — an operator cannot trust a sweep whose arithmetic does
+ * not add up. Held means {@link com.gamma.ops.ObjectService#legalHoldReason}: the Incident carries
+ * {@link com.gamma.ops.ObjectService#ATTR_LEGAL_HOLD} itself, or sits in a Case that does (LEGAL-HOLD-SCOPE-1).
  */
 final class IncidentPurgeTask {
 
@@ -68,7 +69,7 @@ final class IncidentPurgeTask {
         List<com.gamma.ops.OperationalObject> candidates =
                 objects.purgeEligible(com.gamma.workflow.ObjectType.INCIDENT, "ARCHIVED", cutoff, limit);
         List<com.gamma.ops.OperationalObject> purgeable = candidates.stream()
-                .filter(o -> !com.gamma.ops.ObjectService.hasLegalHold(o)).toList();
+                .filter(o -> objects.legalHoldReason(o).isEmpty()).toList();
         int held = candidates.size() - purgeable.size();
         String scope = " archived more than " + days + "d ago"
                 + (held == 0 ? "" : " (" + held + " held)");

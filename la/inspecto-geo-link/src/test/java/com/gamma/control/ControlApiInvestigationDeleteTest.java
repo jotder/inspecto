@@ -60,6 +60,7 @@ class ControlApiInvestigationDeleteTest {
     @AfterEach
     void reset() {
         CaseTeamObjectEngine.CASES = null;
+        CaseTeamObjectEngine.HELD.clear();
         Authenticators.forTest(null);
     }
 
@@ -177,6 +178,45 @@ class ControlApiInvestigationDeleteTest {
             assertEquals(409, status(c, "DELETE", INV, null, OWNER), "pending four-eyes approval");
 
             new FsInvestigationStore(root).writePending("inv-a", "p1", "{\"id\":\"p1\",\"status\":\"denied\"}");
+            ok(c, "DELETE", INV, null, OWNER);
+            assertFalse(Files.exists(dir(c)));
+        }
+    }
+
+    /**
+     * LEGAL-HOLD-SCOPE-1: an Investigation linked to a Case under legal hold is that Case's evidence — closed Case or not,
+     * the delete, the unlink and a re-link to another Case all answer 409 naming the hold, each audited; once the hold
+     * is released the delete goes through.
+     */
+    @Test
+    void aCaseUnderLegalHoldKeepsItsInvestigationUntilReleased(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        subjects();
+        Map<String, Map<String, Object>> cases = CaseTeamObjectEngine.arm();
+        cases.put("CASE-1", CaseTeamObjectEngine.caseOf("CASE-1", "lead-1", "analyst-2", false));
+        cases.put("CASE-2", CaseTeamObjectEngine.caseOf("CASE-2", "lead-1", "analyst-2", false));
+        try (Ctx c = open(cfg, root)) {
+            investigation(c);
+            ok(c, "PUT", INV + "/case", "{\"caseRef\":\"CASE-1\"}", OWNER);
+            cases.put("CASE-1", CaseTeamObjectEngine.caseOf("CASE-1", "lead-1", "analyst-2", true));   // closed: no open-Case 409
+            CaseTeamObjectEngine.HELD.put("CASE-1", "Case CASE-1 contains Incident INC-7, which is under legal hold");
+            List<Event> seen = new CopyOnWriteArrayList<>();
+            Consumer<Event> sub = seen::add;
+            EventLog.current().addSubscriber(sub);
+            try {
+                HttpResponse<String> r = send(c, "DELETE", INV, null, OWNER);
+                assertEquals(409, r.statusCode(), r.body());
+                assertTrue(r.body().contains("Incident INC-7, which is under legal hold"), r.body());
+                assertEquals(409, status(c, "DELETE", INV + "/case", null, OWNER), "unlinking would let it be deleted around the hold");
+                assertEquals(409, status(c, "PUT", INV + "/case", "{\"caseRef\":\"CASE-2\"}", OWNER), "so would re-linking it");
+            } finally {
+                EventLog.current().removeSubscriber(sub);
+            }
+            assertTrue(Files.isRegularFile(dir(c).resolve("header.json")), "nothing was removed");
+            assertTrue(send(c, "GET", INV + "/case", null, OWNER).body().contains("CASE-1"), "still linked to the held Case");
+            assertEquals(3, seen.stream().filter(e -> "legal_hold.refused".equals(e.attributes().get(com.gamma.audit.AuditAttrs.ACTION))
+                    && "inv-a".equals(e.attributes().get(com.gamma.audit.AuditAttrs.TARGET_ID))).count(), "each refusal is audited");
+
+            CaseTeamObjectEngine.HELD.clear();   // released
             ok(c, "DELETE", INV, null, OWNER);
             assertFalse(Files.exists(dir(c)));
         }

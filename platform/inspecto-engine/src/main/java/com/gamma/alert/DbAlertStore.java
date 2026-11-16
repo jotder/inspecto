@@ -189,19 +189,32 @@ public final class DbAlertStore implements AlertStore {
         }
     }
 
-    @Override public Purge purgeResolvedBefore(java.time.Instant cutoff, boolean dryRun) {
+    @Override public Purge purgeResolvedBefore(java.time.Instant cutoff, java.util.function.Predicate<String> heldIncident,
+                                               boolean dryRun) {
         final String aged = "state = 'RESOLVED' AND closed_at > 0 AND closed_at < ?";
         try {
             return src.with(conn -> {
                 long cut = cutoff.toEpochMilli();
                 long resolved = scalar(conn, "SELECT count(*) FROM inspecto_alerts WHERE state = 'RESOLVED'", null);
                 long total = scalar(conn, "SELECT count(*) FROM inspecto_alerts", null);
-                long purged = scalar(conn, "SELECT count(*) FROM inspecto_alerts WHERE " + aged, cut);
+                long agedCount = scalar(conn, "SELECT count(*) FROM inspecto_alerts WHERE " + aged, cut);
+                // LEGAL-HOLD-SCOPE-1: an aged row escalated into a held Incident stays; the hold is asked per Incident
+                List<String> held = new ArrayList<>();
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT DISTINCT incident_id FROM inspecto_alerts WHERE " + aged + " AND incident_id IS NOT NULL")) {
+                    ps.setLong(1, cut);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) if (heldIncident.test(rs.getString(1))) held.add(rs.getString(1));
+                    }
+                }
+                String keep = held.isEmpty() ? ""
+                        : " AND (incident_id IS NULL OR incident_id NOT IN (" + String.join(",", java.util.Collections.nCopies(held.size(), "?")) + "))";
+                long purged = held.isEmpty() ? agedCount : count(conn, "SELECT count(*) FROM inspecto_alerts WHERE " + aged + keep, cut, held);
                 List<Alert> fired = new ArrayList<>();
                 if (!dryRun && purged > 0) {
                     try (PreparedStatement ps = conn.prepareStatement(
-                            "SELECT fired_json FROM inspecto_alerts WHERE " + aged + " AND fired_json IS NOT NULL")) {
-                        ps.setLong(1, cut);
+                            "SELECT fired_json FROM inspecto_alerts WHERE " + aged + keep + " AND fired_json IS NOT NULL")) {
+                        bind(ps, cut, held);
                         try (ResultSet rs = ps.executeQuery()) {
                             while (rs.next()) {
                                 try {
@@ -213,15 +226,29 @@ public final class DbAlertStore implements AlertStore {
                             }
                         }
                     }
-                    try (PreparedStatement ps = conn.prepareStatement("DELETE FROM inspecto_alerts WHERE " + aged)) {
-                        ps.setLong(1, cut);
+                    try (PreparedStatement ps = conn.prepareStatement("DELETE FROM inspecto_alerts WHERE " + aged + keep)) {
+                        bind(ps, cut, held);
                         ps.executeUpdate();
                     }
                 }
-                return new Purge(purged, resolved - purged, total - resolved, fired);
+                return new Purge(purged, resolved - agedCount, total - resolved, agedCount - purged, fired);
             });
         } catch (SQLException e) {
             throw new IllegalStateException("could not purge resolved Alerts: " + e.getMessage(), e);
+        }
+    }
+
+    private static void bind(PreparedStatement ps, long cut, List<String> held) throws SQLException {
+        ps.setLong(1, cut);
+        for (int i = 0; i < held.size(); i++) ps.setString(i + 2, held.get(i));
+    }
+
+    private static long count(Connection conn, String sql, long cut, List<String> held) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            bind(ps, cut, held);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : 0L;
+            }
         }
     }
 

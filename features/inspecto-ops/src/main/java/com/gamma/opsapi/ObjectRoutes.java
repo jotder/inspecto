@@ -241,6 +241,9 @@ public final class ObjectRoutes implements RouteModule {
                 return h.handle(e, m);   // absent ids keep their existing 404/behaviour
             } catch (com.gamma.ops.InertObjectException inert) {
                 throw new ApiException(409, ErrorCodes.CONFLICT, inert.getMessage());   // the far end of a link / merge is inert
+            } catch (com.gamma.objects.LegalHoldException held) {
+                // LEGAL-HOLD-SCOPE-1: already audited where it was refused; the message names the hold
+                throw new ApiException(409, ErrorCodes.CONFLICT, held.getMessage());
             } catch (com.gamma.ops.ObjectVersionConflictException lost) {
                 // The service already re-ran its read-modify-write ObjectService.MAX_RMW_ATTEMPTS times: a writer
                 // that keeps winning the race. Recoverable - the client re-reads (GET carries `version`) and retries.

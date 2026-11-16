@@ -573,6 +573,28 @@ purged, however long its window has expired. The check is **fail-safe**: only an
 not delete them. It is re-checked at purge time against the live row, so a hold applied between the
 preview and the run still wins.
 
+**What a hold protects (LEGAL-HOLD-SCOPE-1, 2026-11-17).** A hold covers the Incident's **evidence**, not
+only its row. An object is held when it carries `legalHold` itself or is one `CONTAINS` hop from one that
+does: an Incident in a held Case, or a Case that contains a held Incident. A Case shared with another,
+unheld Incident is still held (the safe default); the unheld Incident itself is not. Every path below
+refuses while held — the route answers **409** naming the hold, and each refusal is an `AUDIT` event with
+action `legal_hold.refused` — and works again the moment the hold is released (`legalHold: false`):
+
+| Evidence | Path that would remove it | Under hold |
+|---|---|---|
+| Incident row, notes, attachments, links, tag edges | `incident_purge` (cascade) | skipped and counted `(N held)` |
+| Alerts escalated into the Incident | `alert_purge` | kept, counted `N held by a legal hold on their Incident` |
+| the Incident's audit history | `event_prune` (whole UTC days) | every day from the held evidence's first day (creation, or `occurredAt` if earlier) is kept |
+| Case membership and other links | `DELETE /objects/{id}/links` | 409 when either end is held |
+| a held Case's members | `POST /objects/{id}/merge` (held source) · `POST /objects/{id}/split` (held Case) | 409 |
+| Investigations linked to a held Case (log, Steps, Drafts) | `DELETE /inv/investigations/{id}` · `DELETE …/case` · `PUT …/case` to another Case | 409, closed Case included |
+| everything in the Space | `DELETE /spaces/{id}?purge=true` | 409 (deregister without `purge` still allowed) |
+
+Not covered: `partition_prune` drops a Pipeline's data partitions by date and has no link from an
+Incident to the rows that raised it, so held source data is **not** protected — keep that window longer
+than any hold. Drafts are exploration, not evidence (D20), and expire as before unless their
+Investigation is deleted, which the hold refuses. Snapshots and Case notes have no delete path.
+
 > ⚠ **A purge is not "all trace removed" — say this before a legal or DPA reviewer asks it.**
 > The event ledger is append-only. Each purged Incident's `OBJECT_ACTIVITY` history — including the
 > record of its own purge — **survives the purge**. What retention manages is the operational record;

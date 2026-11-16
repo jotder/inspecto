@@ -1353,11 +1353,20 @@ public final class ObjectService {
     /**
      * Remove the edge {@code fromId → toId} via {@code relationship} (case group management: e.g.
      * removing a member incident from a Case). The removal is audited as an {@link EventType#OBJECT_ACTIVITY}
-     * event; {@code false} when no such edge exists. Unknown {@code fromId} → {@link NoSuchElementException}.
+     * event; {@code false} when no such edge exists. Unknown {@code fromId} → {@link NoSuchElementException}. An
+     * existing edge with either end under legal hold ({@link #legalHoldReason}) is refused with an audited
+     * {@link com.gamma.objects.LegalHoldException} (LEGAL-HOLD-SCOPE-1).
      */
     public boolean unlink(String fromId, String toId, String relationship, String actor) {
         OperationalObject from = require(fromId);
         String rel = (relationship == null || relationship.isBlank()) ? LinkRelationship.RELATED_TO : relationship;
+        // LEGAL-HOLD-SCOPE-1: a link touching held evidence is part of it (a held Incident's Case membership, above all)
+        if (links.incident(fromId).stream().anyMatch(l -> l.fromId().equals(fromId) && l.toId().equals(toId)
+                && l.relationship().equalsIgnoreCase(rel))) {
+            OperationalObject to = store.get(toId).orElse(null);
+            if (to != null) requireNotHeld(to, "unlink", actor);   // the member first: its own hold is the plainer reason
+            requireNotHeld(from, "unlink", actor);
+        }
         boolean removed = links.remove(fromId, toId, rel);
         if (removed) {
             EventLog.current().emit(Event.builder(EventType.OBJECT_ACTIVITY)
@@ -1514,14 +1523,17 @@ public final class ObjectService {
      * emitted below — outlives it permanently. That is the intended behaviour: the audit log is not the
      * record being retention-managed. Anyone answering a legal/DPA erasure question needs to know this.
      *
-     * @throws IllegalStateException if the object is under {@link #hasLegalHold legal hold}
+     * @throws com.gamma.objects.LegalHoldException if the object's evidence is under legal hold ({@link #legalHoldReason}:
+     *         its own hold, or one CONTAINS hop away — LEGAL-HOLD-SCOPE-1)
      */
     public PurgeOutcome purge(String objectId, String actor) {
         OperationalObject o = require(objectId);
         // Checked here rather than only in the caller's preview: a hold applied between preview and run
         // must still be honoured, and this is the only chokepoint every purge passes through.
-        if (hasLegalHold(o))
-            throw new IllegalStateException("object '" + objectId + "' is under legal hold — not purgeable");
+        Optional<String> hold = legalHoldReason(o);
+        if (hold.isPresent())
+            throw com.gamma.objects.LegalHoldException.audited("purge", hold.get(), o.objectType().name().toLowerCase(java.util.Locale.ROOT),
+                    objectId, actor);
         String correlationId = o.correlationId();          // read before the row is gone
         int notesRemoved = notes.deleteForTarget(AnnotationKinds.OBJECT, objectId);
         int linksRemoved = links.removeAllIncident(objectId);
@@ -1541,6 +1553,81 @@ public final class ObjectService {
                 .attr("tagEdgesRemoved", String.valueOf(tagsRemoved))
                 .attr("actor", actor));
         return new PurgeOutcome(objectId, notesRemoved, linksRemoved, tagsRemoved);
+    }
+
+    // ── legal hold over an object's evidence (LEGAL-HOLD-SCOPE-1) ────────────────────────────────────
+
+    /** {@link #legalHoldReason(OperationalObject)} by id; empty for an unknown id. */
+    public Optional<String> legalHoldReason(String objectId) {
+        OperationalObject o = objectId == null ? null : store.get(objectId).orElse(null);
+        return o == null ? Optional.empty() : legalHoldReason(o);
+    }
+
+    /**
+     * Why {@code o}'s evidence is under legal hold, or empty. Held when {@code o} carries {@link #ATTR_LEGAL_HOLD} itself
+     * ({@link #hasLegalHold}), or when it is ONE {@code CONTAINS} hop from an object that does: an Incident in a held
+     * Case, or a Case containing a held Incident. Operator decision (2026-11-16, MoSCoW S12): a hold on an Incident
+     * also holds the Case it is in, and that Case's Investigations, even when the Case is shared with another, unheld
+     * Incident — holding is the safe default. The unheld Incident itself is NOT held by that; only what it shares.
+     * One hop, deliberately: a Case's other members are not pulled in through it, or one hold would freeze a whole
+     * neighbourhood. Read live, so releasing the hold restores normal retention at once.
+     */
+    public Optional<String> legalHoldReason(OperationalObject o) {
+        if (o == null) return Optional.empty();
+        if (hasLegalHold(o)) return Optional.of(holdLabel(o) + " is under legal hold");
+        for (com.gamma.ops.link.ObjectLink l : links.incident(o.id())) {
+            if (!LinkRelationship.CONTAINS.equalsIgnoreCase(l.relationship())) continue;
+            boolean outgoing = l.fromId().equals(o.id());
+            OperationalObject other = store.get(outgoing ? l.toId() : l.fromId()).orElse(null);
+            if (other != null && hasLegalHold(other))
+                return Optional.of(holdLabel(o) + (outgoing ? " contains " : " is in ") + holdLabel(other)
+                        + ", which is under legal hold");
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Every object whose evidence is under legal hold, with the earliest time its evidence began
+     * ({@link com.gamma.objects.ObjectAccess#legalHolds}): each object carrying the hold, plus everything one
+     * {@code CONTAINS} hop from it. A full walk of the Incidents and Cases, for the space-wide retention tasks and a
+     * Space purge; never a request path.
+     */
+    public Map<String, Long> legalHolds() {
+        Map<String, Long> out = new java.util.LinkedHashMap<>();
+        for (ObjectType type : List.of(ObjectType.INCIDENT, ObjectType.CASE)) {
+            for (OperationalObject o : allMatching(ObjectQuery.builder().objectType(type).build())) {
+                if (!hasLegalHold(o)) continue;
+                out.merge(o.id(), evidenceSince(o), Math::min);
+                for (com.gamma.ops.link.ObjectLink l : links.incident(o.id())) {
+                    if (!LinkRelationship.CONTAINS.equalsIgnoreCase(l.relationship())) continue;
+                    store.get(l.fromId().equals(o.id()) ? l.toId() : l.fromId())
+                            .ifPresent(other -> out.merge(other.id(), evidenceSince(other), Math::min));
+                }
+            }
+        }
+        return out;
+    }
+
+    /** When an object's evidence began: its creation, or its recorded occurrence ({@link #ATTR_OCCURRED_AT}) when earlier. */
+    private static long evidenceSince(OperationalObject o) {
+        long occurred = parseEpoch(o.attributes().get(ATTR_OCCURRED_AT));
+        return occurred > 0 && occurred < o.createdAt() ? occurred : o.createdAt();
+    }
+
+    private static String holdLabel(OperationalObject o) {
+        String t = o.objectType().name().toLowerCase(java.util.Locale.ROOT);
+        return Character.toUpperCase(t.charAt(0)) + t.substring(1) + " " + o.id();
+    }
+
+    /**
+     * Refuse a delete of evidence when {@code o} is held: audit the refusal and throw. {@code what} names the act
+     * ("unlink", "merge", "split"). A no-op when nothing is held.
+     */
+    public void requireNotHeld(OperationalObject o, String what, String actor) {
+        Optional<String> hold = legalHoldReason(o);
+        if (hold.isPresent())
+            throw com.gamma.objects.LegalHoldException.audited(what, hold.get(),
+                    o.objectType().name().toLowerCase(java.util.Locale.ROOT), o.id(), actor);
     }
 
     private static long parseEpoch(String s) {

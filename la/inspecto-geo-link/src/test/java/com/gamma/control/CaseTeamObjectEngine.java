@@ -27,6 +27,9 @@ public final class CaseTeamObjectEngine implements ObjectEngineProvider {
     static volatile boolean HISTORY_TRUNCATED;
     static final List<String> ASKED = new java.util.concurrent.CopyOnWriteArrayList<>();
 
+    /** LEGAL-HOLD-SCOPE-1: object id → the hold reason {@link ObjectAccess#legalHold} answers; absent = not held. */
+    static final Map<String, String> HELD = new ConcurrentHashMap<>();
+
     static Map<String, Map<String, Object>> arm() {
         CASES = new ConcurrentHashMap<>();
         return CASES;
@@ -43,6 +46,7 @@ public final class CaseTeamObjectEngine implements ObjectEngineProvider {
         if (cases == null) return null;
         ObjectAccess access = new ObjectAccess() {
             public Optional<Map<String, Object>> summary(String id) { return Optional.ofNullable(cases.get(id)); }
+            public Optional<String> legalHold(String id) { return Optional.ofNullable(HELD.get(id)); }
             public boolean hasActive(ObjectType kind, String scope) { return false; }
             public boolean hasActiveMatching(ObjectType kind, String scope, Map<String, String> m) { return false; }
             public Map<String, String> activeAttributeIndex(ObjectType kind, String scope, String a) { return Map.of(); }

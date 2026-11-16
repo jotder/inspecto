@@ -78,7 +78,7 @@ explorer* below.
 | Integrate | Third-party integration (case managers, fraud products) | — | ✅ | ✅ | ✅ |
 | Govern | Investigations on Postgres (multi-node, HA) | — | — | ✅ | ✅ |
 | | Policy engine (ABAC; can only narrow) | — | — | ✅ | ✅ |
-| | Scale-out, retention, legal hold, residency (not built yet) | — | — | ✅ | ✅ |
+| | Scale-out, retention, residency (not built yet); legal hold of an Incident's evidence, Investigations included (built 2026-11-17, `LEGAL-HOLD-SCOPE-1`; not edition-gated: it works wherever Incidents do) | — | — | ✅ | ✅ |
 | All | Configurable limits (Basic: Space layer; Standard: Space + install; Advanced: all) | ✅ | ✅ | ✅ | ✅ |
 | | Standalone Inspecto LA app or inside the console | ✅ | ✅ | ✅ | ✅ |
 

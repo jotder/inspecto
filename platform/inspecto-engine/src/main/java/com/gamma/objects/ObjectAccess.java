@@ -203,4 +203,22 @@ public interface ObjectAccess {
     default Map<String, Object> byEntity(Path writeRoot, HttpExchange ex, String type, String key, String status, int limit) {
         throw new UnsupportedOperationException("case history needs the ops module");
     }
+
+    /**
+     * LEGAL-HOLD-SCOPE-1: why the evidence of {@code objectId} is under legal hold, in words a refusal can quote, or
+     * empty when it is not (or no such object exists). An object is held when it carries the {@code legalHold}
+     * attribute itself, or when it is one {@code CONTAINS} hop from a held object: an Incident in a held Case, or a
+     * Case that contains a held Incident — so a Case and its Investigations stay held even when they are shared with
+     * another, unheld Incident. Read live on every call: releasing the hold restores normal retention at once.
+     * The default (no ops module) holds nothing, because nothing can be held there.
+     */
+    default Optional<String> legalHold(String objectId) { return Optional.empty(); }
+
+    /**
+     * Every object of this Space whose evidence is under legal hold ({@link #legalHold}), by id, with the earliest
+     * time (epoch ms) its evidence began: the object's creation, or its recorded occurrence when that is earlier.
+     * Empty when nothing is held. What the space-wide retention tasks and a Space purge consult; a full scan, so
+     * not for a per-request path.
+     */
+    default Map<String, Long> legalHolds() { return Map.of(); }
 }

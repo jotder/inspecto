@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.ops`](../../../../../product-map/module/ops.toon).
 
-72 test class(es): 47 unit, 25 real-HTTP control-plane, 0 IT.
+74 test class(es): 48 unit, 26 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -41,6 +41,7 @@ mvn -o test -pl features/inspecto-ops -Dtest=AlertMigrationOpsTest,AlertServiceP
 | `ControlApiIncidentFinishGateTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiIncidentFinishGateTest.java` | INCIDENT-FINISH-GATE-1 (operator, 2026-09-26: "narrow route"): an analyst holding {@code canWorkIncidents} can |
 | `ControlApiInertObjectsTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiInertObjectsTest.java` | An object of a type this build does not know (a legacy {@code ALERT} row, or a module that is not installed) is |
 | `ControlApiKeepUpToDateStandardTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiKeepUpToDateStandardTest.java` | Operator 2026-11-05: on a real Standard bundle - this module on the class path, NO test override - an import can be kept up |
+| `ControlApiLegalHoldSpacePurgeTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiLegalHoldSpacePurgeTest.java` | LEGAL-HOLD-SCOPE-1 over real HTTP: {@code DELETE /spaces/{id}?purge=true} removes the Space's whole tree, held |
 | `ControlApiNoteRoutesTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiNoteRoutesTest.java` | BACKLOG D10 over real HTTP: the kind-addressed {@code /notes/{targetKind}/{targetId}/…} surface. |
 | `ControlApiObjectReadMaskingTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiObjectReadMaskingTest.java` | Read-time masking of the {@code key.<column>} attributes on {@code GET /objects} and {@code GET /objects/{id}} |
 | `ControlApiObjectsByEntityTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ControlApiObjectsByEntityTest.java` | {@code GET /objects/by-entity} over real HTTP — an Entity's case history. One test per gate: 401 with no |
@@ -58,6 +59,7 @@ mvn -o test -pl features/inspecto-ops -Dtest=AlertMigrationOpsTest,AlertServiceP
 | `OpsWritersUnmodelledKeysTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/OpsWritersUnmodelledKeysTest.java` | {@code MODULE-REORG-P4-2} (the ops writers): Tag and Tag Rule persist (the Case Rule writer moved to inspecto-case-management) what they REBUILD from a typed |
 | `ProfessionalAlertRulesAcceptedTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-ops/src/test/java/com/gamma/control/ProfessionalAlertRulesAcceptedTest.java` | The STANDARD half of `PROCESSOR-RELEASE-READINESS-1` G9 for Alert Rules: with this module on the |
 | `IncidentPurgeTaskTest` | `com.gamma.job` | unit | `features/inspecto-ops/src/test/java/com/gamma/job/IncidentPurgeTaskTest.java` | {@code incident_purge} — Incident retention with legal-hold rules (BACKLOG D5 / MNT-14). |
+| `LegalHoldRetentionTest` | `com.gamma.job` | unit | `features/inspecto-ops/src/test/java/com/gamma/job/LegalHoldRetentionTest.java` | LEGAL-HOLD-SCOPE-1 — the space-wide retention tasks skip a held Incident's evidence and take it on the first run |
 | `ObjectsAnalyticsJobTest` | `com.gamma.job` | unit | `features/inspecto-ops/src/test/java/com/gamma/job/ObjectsAnalyticsJobTest.java` | The {@code objects.analytics} Job Type: samples {@link ObjectService#analytics(ObjectType)} for each object |
 | `CreateIncidentConsequenceTest` | `com.gamma.ops` | unit | `features/inspecto-ops/src/test/java/com/gamma/ops/CreateIncidentConsequenceTest.java` |  |
 | `DbObjectStoreTest` | `com.gamma.ops` | unit | `features/inspecto-ops/src/test/java/com/gamma/ops/DbObjectStoreTest.java` | {@link DbObjectStore} over an in-memory DuckDB: INSERT/SELECT round-trips every column (incl. the |

@@ -24,7 +24,7 @@ Organisations running Inspecto across several teams or nodes, with high-availabi
 
 ## How it fits with the Editions
 
-Advanced includes all of [Standard](../../edition/standard/brochure.md) and therefore [Basic](../../edition/basic/brochure.md). It is the top customer Edition; [Preview](../../edition/preview/brochure.md) carries the same modules for evaluation. Some Advanced items — scale-out, retention, legal hold and data residency — are **not built yet** and are on the roadmap.
+Advanced includes all of [Standard](../../edition/standard/brochure.md) and therefore [Basic](../../edition/basic/brochure.md). It is the top customer Edition; [Preview](../../edition/preview/brochure.md) carries the same modules for evaluation. Some Advanced items — scale-out, retention and data residency — are **not built yet** and are on the roadmap. **Legal hold is built:** an Incident under legal hold keeps its evidence — its notes and attachments, its Alerts, its links and Case membership, the Case it is in and that Case's Investigations, and its audit history — out of reach of every retention task and delete until the hold is released, and every refused attempt is audited. The hold is set through the API (`PATCH /objects/{id}`); there is no screen for it yet, and a Pipeline's own data partitions are not covered ([what a hold protects](../../layer/platform/admin-guide-operations-reference.md)).
 
 ## How it works
 

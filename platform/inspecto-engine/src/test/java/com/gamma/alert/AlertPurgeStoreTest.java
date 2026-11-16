@@ -62,6 +62,32 @@ class AlertPurgeStoreTest {
         });
     }
 
+    /** LEGAL-HOLD-SCOPE-1: an aged row escalated into a held Incident is kept and counted as held, on both stores. */
+    @Test
+    void anAgedRowOfAHeldIncidentIsKeptAndCountedAsHeld(@TempDir Path dir) throws Exception {
+        onBothStores(dir, s -> {
+            seed(s);
+            s.insert(row("OLD-FREE", "RESOLVED", CUT - 5, "INC-9", fired("f")));
+            s.insert(row("OLD-NONE", "RESOLVED", CUT - 5, null, fired("g")));
+            List<String> asked = new java.util.ArrayList<>();
+            AlertStore.Purge dry = s.purgeResolvedBefore(CUTOFF, id -> { asked.add(id); return "INC-1".equals(id); }, true);
+            assertEquals(2, dry.purged());
+            assertEquals(1, dry.keptHeld());
+            assertEquals(8, s.size(), "a dry run deletes nothing");
+            assertEquals(List.of("INC-1", "INC-9"), asked.stream().sorted().distinct().toList(), "asked once per Incident");
+
+            AlertStore.Purge p = s.purgeResolvedBefore(CUTOFF, "INC-1"::equals, false);
+            assertEquals(2, p.purged());
+            assertEquals(1, p.keptHeld());
+            assertEquals(3, p.keptResolved(), "held rows are not double-counted as within retention");
+            assertTrue(s.get("OLD-RES").isPresent(), "the held Incident's Alert stays");
+            assertTrue(s.get("OLD-FREE").isEmpty() && s.get("OLD-NONE").isEmpty());
+            assertEquals(List.of(fired("f"), fired("g")), p.fired().stream().sorted(java.util.Comparator.comparing(Alert::rule)).toList());
+
+            assertEquals(1, s.purgeResolvedBefore(CUTOFF, id -> false, false).purged(), "released: it goes next time");
+        });
+    }
+
     @Test
     void aDryRunCountsAndDeletesNothing(@TempDir Path dir) throws Exception {
         onBothStores(dir, s -> {
