@@ -15,13 +15,13 @@ tags: [api, routes, generated]
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
-| GET | `/inv/investigations/{investigationId}/alert-rules` | GET /inv/investigations/{investigationId}/alert-rules (generated skeleton) | inv | — | `la/inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java` |
-| POST | `/inv/investigations/{investigationId}/alert-rules` | POST /inv/investigations/{investigationId}/alert-rules (generated skeleton) | inv | `canAuthorAlertRules` | `la/inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java` |
-| PUT | `/inv/investigations/{investigationId}/alert-rules/{alertruleId}` | PUT /inv/investigations/{investigationId}/alert-rules/{alertruleId} (generated skeleton) | inv | `canAuthorAlertRules` | `la/inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java` |
-| GET | `/inv/investigations/{investigationId}/data-changes` | GET /inv/investigations/{investigationId}/data-changes (generated skeleton) | inv | — | `la/inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationDataChangesRoutes.java` |
-| GET | `/inv/investigations/{investigationId}/measures` | GET /inv/investigations/{investigationId}/measures (generated skeleton) | inv | — | `la/inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java` |
-| POST | `/inv/investigations/{investigationId}/standing-detection` | POST /inv/investigations/{investigationId}/standing-detection (generated skeleton) | inv | `canAuthorAlertRules` | `la/inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java` |
-| DELETE | `/inv/investigations/{investigationId}/standing-detection/{standingdetectionId}` | DELETE /inv/investigations/{investigationId}/standing-detection/{standingdetectionId} (generated skeleton) | inv | `canAuthorAlertRules` | `la/inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java` |
+| GET | `/inv/investigations/{investigationId}/alert-rules` | Alert Rules bound to an Investigation | inv | — | `la/inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java` |
+| POST | `/inv/investigations/{investigationId}/alert-rules` | Bind an Alert Rule to an Investigation Measure | inv | `canAuthorAlertRules` | `la/inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java` |
+| PUT | `/inv/investigations/{investigationId}/alert-rules/{alertruleId}` | Edit an Investigation's bound Alert Rule | inv | `canAuthorAlertRules` | `la/inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java` |
+| GET | `/inv/investigations/{investigationId}/data-changes` | Corrected days in an Investigation's window | inv | — | `la/inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationDataChangesRoutes.java` |
+| GET | `/inv/investigations/{investigationId}/measures` | Measures over an Investigation's Working Set | inv | — | `la/inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java` |
+| POST | `/inv/investigations/{investigationId}/standing-detection` | Enable standing detection for a bound Alert Rule | inv | `canAuthorAlertRules` | `la/inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java` |
+| DELETE | `/inv/investigations/{investigationId}/standing-detection/{standingdetectionId}` | Disable standing detection for a bound Alert Rule | inv | `canAuthorAlertRules` | `la/inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java` |
 
 ## Drift
 

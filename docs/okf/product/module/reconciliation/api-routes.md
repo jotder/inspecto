@@ -15,16 +15,16 @@ tags: [api, routes, generated]
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
-| POST | `/recon/{reconId}/breaks/status` | POST /recon/{reconId}/breaks/status (generated skeleton) | recon | `canOperateRuns` | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java` |
-| POST | `/recon/{reconId}/record` | POST /recon/{reconId}/record (generated skeleton) | recon | `canOperateRuns` | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java` |
-| GET | `/recon/{reconId}/state` | GET /recon/{reconId}/state (generated skeleton) | recon | — | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java` |
+| POST | `/recon/{reconId}/breaks/status` | Resolve, re-open or assign a Reconciliation Break | recon | `canOperateRuns` | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java` |
+| POST | `/recon/{reconId}/record` | Record a run of a Reconciliation | recon | `canOperateRuns` | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java` |
+| GET | `/recon/{reconId}/state` | Recorded state of one Reconciliation | recon | — | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java` |
 | POST | `/recon/breaks` | The paged Break sets of one anchor-relative pair | recon | — | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java` |
-| POST | `/recon/columns` | POST /recon/columns (generated skeleton) | recon | — | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java` |
-| POST | `/recon/promote` | POST /recon/promote (generated skeleton) | recon | `canManageIncidents` | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java` |
-| GET | `/recon/promoted` | GET /recon/promoted (generated skeleton) | recon | — | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java` |
-| POST | `/recon/rows` | POST /recon/rows (generated skeleton) | recon | — | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java` |
+| POST | `/recon/columns` | Inventory the columns of Reconciliation Datasets | recon | — | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java` |
+| POST | `/recon/promote` | Promote a Reconciliation Break to an Incident | recon | `canManageIncidents` | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java` |
+| GET | `/recon/promoted` | Breaks of a Reconciliation that have an active Incident | recon | — | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java` |
+| POST | `/recon/rows` | Raw rows behind one Reconciliation key | recon | — | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java` |
 | POST | `/recon/run` | One day of the Board: a page of grain rows + the day's exact totals and Break summary | recon | — | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java` |
-| GET | `/recon/state` | GET /recon/state (generated skeleton) | recon | — | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java` |
+| GET | `/recon/state` | Last-run state of every Reconciliation | recon | — | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java` |
 
 ## Drift
 

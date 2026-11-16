@@ -470,6 +470,11 @@ jobs:
       - name: Guard — the OpenAPI document is the merge of the module fragments
         run: node tools/check-openapi-fragments.mjs && node --test tools/check-openapi-fragments.test.mjs
 
+      # OpenAPI summaries guard (OPENAPI-SKELETON-SUMMARIES-1): no public operation keeps the generated skeleton summary
+      # or stock description; the allow-list in the tool may only shrink. Reads the document only; no build, ~0.3s.
+      - name: Guard — every public OpenAPI operation has a real summary
+        run: node tools/check-openapi-summaries.mjs && node --test tools/check-openapi-summaries.test.mjs
+
       # Per-jar signing wiring in release.yml (MODULE-REORG-1 P3h): opt-in on secrets, byte-identical command lines when unset,
       # no secret inside a run: block, keystore removed in an always() step. Text-level; no build, ~0.1s.
       - name: Guard — release.yml per-jar signing is opt-in and leak-free

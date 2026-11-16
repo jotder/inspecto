@@ -16,12 +16,12 @@ tags: [api, routes, generated]
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
 | POST | `/cases/from-entities` | Open a Case whose first members are minted from Link Analysis Entities | cases | `canManageIncidents` | `features/inspecto-case-management/src/main/java/com/gamma/ops/cases/CaseRoutes.java` |
-| GET | `/cases/rules` | GET /cases/rules (generated skeleton) | cases | — | `features/inspecto-case-management/src/main/java/com/gamma/ops/cases/CaseRoutes.java` |
-| POST | `/cases/rules` | POST /cases/rules (generated skeleton) | cases | `canAuthorWorkbench` | `features/inspecto-case-management/src/main/java/com/gamma/ops/cases/CaseRoutes.java` |
-| DELETE | `/cases/rules/{ruleId}` | DELETE /cases/rules/{ruleId} (generated skeleton) | cases | `canAuthorWorkbench` | `features/inspecto-case-management/src/main/java/com/gamma/ops/cases/CaseRoutes.java` |
-| POST | `/cases/rules/{ruleId}/evaluate` | POST /cases/rules/{ruleId}/evaluate (generated skeleton) | cases | `canAdminister` | `features/inspecto-case-management/src/main/java/com/gamma/ops/cases/CaseRoutes.java` |
-| POST | `/objects/{objectId}/merge` | POST /objects/{objectId}/merge (generated skeleton) | objects | `canAdminister` | `features/inspecto-case-management/src/main/java/com/gamma/ops/cases/CaseRoutes.java` |
-| POST | `/objects/{objectId}/split` | POST /objects/{objectId}/split (generated skeleton) | objects | `canAdminister` | `features/inspecto-case-management/src/main/java/com/gamma/ops/cases/CaseRoutes.java` |
+| GET | `/cases/rules` | List Case Rules | cases | — | `features/inspecto-case-management/src/main/java/com/gamma/ops/cases/CaseRoutes.java` |
+| POST | `/cases/rules` | Save a Case Rule | cases | `canAuthorWorkbench` | `features/inspecto-case-management/src/main/java/com/gamma/ops/cases/CaseRoutes.java` |
+| DELETE | `/cases/rules/{ruleId}` | Delete a Case Rule | cases | `canAuthorWorkbench` | `features/inspecto-case-management/src/main/java/com/gamma/ops/cases/CaseRoutes.java` |
+| POST | `/cases/rules/{ruleId}/evaluate` | Evaluate a Case Rule | cases | `canAdminister` | `features/inspecto-case-management/src/main/java/com/gamma/ops/cases/CaseRoutes.java` |
+| POST | `/objects/{objectId}/merge` | Merge Cases into this Case | objects | `canAdminister` | `features/inspecto-case-management/src/main/java/com/gamma/ops/cases/CaseRoutes.java` |
+| POST | `/objects/{objectId}/split` | Split members out of a Case | objects | `canAdminister` | `features/inspecto-case-management/src/main/java/com/gamma/ops/cases/CaseRoutes.java` |
 
 ## Drift
 

@@ -39,6 +39,7 @@ node --test tools/
 | `tools/check-native-licences.test.mjs` | Fixture tests for check-native-licences.mjs (NATIVE-LICENCE-LINUX-MACOS-1): plants each violation in a |
 | `tools/check-offerings.test.mjs` | Fixture test for tools/check-offerings.mjs. Run: node --test tools/check-offerings.test.mjs |
 | `tools/check-openapi-fragments.test.mjs` | Negative fixtures for tools/check-openapi-fragments.mjs (+ the split/merge round trip on the REAL document). |
+| `tools/check-openapi-summaries.test.mjs` | Negative fixtures for tools/check-openapi-summaries.mjs. |
 | `tools/check-package-strict.test.mjs` | Run: node --test tools/check-package-strict.test.mjs |
 | `tools/check-product-build.test.mjs` | node --test tools/check-product-build.test.mjs - the Product matrix check (PRODUCT-ASSEMBLY-1 PA-5d). |
 | `tools/check-product-docs.test.mjs` | Fixture test for tools/check-product-docs.mjs. Run: node --test tools/check-product-docs.test.mjs |

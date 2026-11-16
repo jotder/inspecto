@@ -3,9 +3,9 @@
     "/regulatory-reports" : {
       "get" : {
         "tags" : [ "regulatory-reports" ],
-        "summary" : "GET /regulatory-reports (generated skeleton)",
+        "summary" : "List regulatory reports",
         "operationId" : "getRegulatoryReports",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the regulatory reports whose Case or Incident the caller can see, newest first, capped at 500 with the true total and a truncated flag; query status, template, caseId and incidentId filter it. Needs canWorkIncidents or canApproveChanges (checked in the handler). 403 without either capability.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -15,9 +15,9 @@
       },
       "post" : {
         "tags" : [ "regulatory-reports" ],
-        "summary" : "POST /regulatory-reports (generated skeleton)",
+        "summary" : "Draft a regulatory report",
         "operationId" : "postRegulatoryReports",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Renders and saves a draft report from a template for exactly one Case or Incident (body template, caseId or incidentId, optional inputs, reason). Gated on canWorkIncidents. 422 for an unknown key, an unknown or unloadable template, a bad input, unbindable or too many rows, or a refused render; 404 for an absent or out-of-scope subject or rows Dataset; 403 when a member Incident is out of scope; 503 when read-only or operational objects are absent.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -29,9 +29,9 @@
     "/regulatory-reports/templates" : {
       "get" : {
         "tags" : [ "regulatory-reports" ],
-        "summary" : "GET /regulatory-reports/templates (generated skeleton)",
+        "summary" : "List regulatory report templates",
         "operationId" : "getRegulatoryReportsTemplates",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the Space's regulatory report templates and any problems loading them. Needs canWorkIncidents or canApproveChanges (checked in the handler). 403 without either capability.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -83,9 +83,9 @@
     "/regulatory-reports/{regulatoryreportId}" : {
       "get" : {
         "tags" : [ "regulatory-reports" ],
-        "summary" : "GET /regulatory-reports/{regulatoryreportId} (generated skeleton)",
+        "summary" : "One regulatory report",
         "operationId" : "getRegulatoryReportsByRegulatoryreportId",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns one report with its content; while draft or pending it also says whether its Case or Incident changed since rendering, and while pending whether anyone is eligible to approve. Needs canWorkIncidents or canApproveChanges (checked in the handler). 403 without either capability; 404 when absent, not visible or no write root is set; 422 for an unsafe id.",
         "parameters" : [ {
           "name" : "regulatoryreportId",
           "in" : "path",
@@ -105,9 +105,9 @@
     "/regulatory-reports/{regulatoryreportId}/request-approval" : {
       "post" : {
         "tags" : [ "regulatory-reports" ],
-        "summary" : "POST /regulatory-reports/{regulatoryreportId}/request-approval (generated skeleton)",
+        "summary" : "Send a regulatory report for approval",
         "operationId" : "postRegulatoryReportsByRegulatoryreportIdRequestApproval",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Moves a draft report to pending with an expiry (optional body reason). Gated on canWorkIncidents. 422 for a body key other than reason, an over-long reason or an unsafe id; 404 when the report is absent or not visible; 409 when it fails its integrity check or is not a draft; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "regulatoryreportId",
           "in" : "path",
@@ -127,9 +127,9 @@
     "/regulatory-reports/{regulatoryreportId}/approve" : {
       "post" : {
         "tags" : [ "regulatory-reports" ],
-        "summary" : "POST /regulatory-reports/{regulatoryreportId}/approve (generated skeleton)",
+        "summary" : "Approve a regulatory report",
         "operationId" : "postRegulatoryReportsByRegulatoryreportIdApprove",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Four-eyes approval of a pending report (optional body reason), which then delivers its pinned bytes to the drop directory and records submitted or failed. Gated on canApproveChanges. 403 without an authenticated Subject, for a maker of the report or a caller not on the approver roster; 422 for a body key other than reason or an unsafe id; 404 when absent or not visible; 409 when it fails its integrity check or is not pending; 503 when read-only.",
         "parameters" : [ {
           "name" : "regulatoryreportId",
           "in" : "path",
@@ -149,9 +149,9 @@
     "/regulatory-reports/{regulatoryreportId}/decline" : {
       "post" : {
         "tags" : [ "regulatory-reports" ],
-        "summary" : "POST /regulatory-reports/{regulatoryreportId}/decline (generated skeleton)",
+        "summary" : "Decline a regulatory report",
         "operationId" : "postRegulatoryReportsByRegulatoryreportIdDecline",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Four-eyes decline of a pending report (optional body reason); nothing is delivered. Gated on canApproveChanges. 403 without an authenticated Subject, for a maker of the report or a caller not on the approver roster; 422 for a body key other than reason or an unsafe id; 404 when absent or not visible; 409 when it fails its integrity check or is not pending; 503 when read-only.",
         "parameters" : [ {
           "name" : "regulatoryreportId",
           "in" : "path",
@@ -171,9 +171,9 @@
     "/regulatory-reports/{regulatoryreportId}/retry" : {
       "post" : {
         "tags" : [ "regulatory-reports" ],
-        "summary" : "POST /regulatory-reports/{regulatoryreportId}/retry (generated skeleton)",
+        "summary" : "Retry a failed regulatory report submission",
         "operationId" : "postRegulatoryReportsByRegulatoryreportIdRetry",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Re-delivers a failed report's same pinned bytes to its drop directory (optional body reason). Gated on canApproveChanges. 403 without an authenticated Subject; 422 for a body key other than reason or an unsafe id; 404 when the report is absent or not visible; 409 when it fails its integrity check or is not failed; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "regulatoryreportId",
           "in" : "path",
@@ -193,9 +193,9 @@
     "/regulatory-reports/{regulatoryreportId}/verify" : {
       "get" : {
         "tags" : [ "regulatory-reports" ],
-        "summary" : "GET /regulatory-reports/{regulatoryreportId}/verify (generated skeleton)",
+        "summary" : "Verify a submitted regulatory report's file",
         "operationId" : "getRegulatoryReportsByRegulatoryreportIdVerify",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Re-hashes the delivered file and reads its .sha256 sidecar against the pinned digest; ok only when both match. Needs canWorkIncidents or canApproveChanges (checked in the handler). 403 without either capability; 404 when absent, not visible or no write root is set; 409 when the report is not submitted; 422 for an unsafe id.",
         "parameters" : [ {
           "name" : "regulatoryreportId",
           "in" : "path",

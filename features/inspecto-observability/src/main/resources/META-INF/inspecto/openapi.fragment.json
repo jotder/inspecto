@@ -3,9 +3,9 @@
     "/metrics" : {
       "get" : {
         "tags" : [ "metrics" ],
-        "summary" : "GET /metrics (generated skeleton)",
+        "summary" : "Prometheus metrics scrape",
         "operationId" : "getMetrics",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the global metric registry in Prometheus text exposition format (version 0.0.4). No capability gate.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -18,9 +18,9 @@
     "/events" : {
       "get" : {
         "tags" : [ "events" ],
-        "summary" : "GET /events (generated skeleton)",
+        "summary" : "Recent operational events",
         "operationId" : "getEvents",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the newest events from the live-tail ring (query limit, default 50); on /api/v1 it is instead a cursor-paginated page (limit up to 500, cursor) of the full retained history, newest first. Audit rows are masked for a caller without the unmask capability. No capability gate.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -33,9 +33,9 @@
     "/events/search" : {
       "get" : {
         "tags" : [ "events" ],
-        "summary" : "GET /events/search (generated skeleton)",
+        "summary" : "Search operational events",
         "operationId" : "getEventsSearch",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns events matching the query filters level, type, pipeline, correlationId, q, from, to, limit and offset; for a masked caller q and correlationId match the masked event. No capability gate.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -48,9 +48,9 @@
     "/events/export" : {
       "get" : {
         "tags" : [ "events" ],
-        "summary" : "GET /events/export (generated skeleton)",
+        "summary" : "Export operational events",
         "operationId" : "getEventsExport",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Exports the events matching the search filters as JSON, or as CSV with query format=csv; a CSV filtered to type AUDIT or ACCESS_DENIED adds one column per audit attribute. No capability gate.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -63,9 +63,9 @@
     "/events/views" : {
       "get" : {
         "tags" : [ "events" ],
-        "summary" : "GET /events/views (generated skeleton)",
+        "summary" : "List saved event views",
         "operationId" : "getEventsViews",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the server-wide saved event filter views. No capability gate.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -76,9 +76,9 @@
       },
       "post" : {
         "tags" : [ "events" ],
-        "summary" : "POST /events/views (generated skeleton)",
+        "summary" : "Save an event view",
         "operationId" : "postEventsViews",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Creates or replaces a server-wide saved filter view from body name and optional level, type, pipeline, correlationId, q, from, to. Gated on canAuthorWorkbench. 400 when name is missing; 422 for any other unmodelled body key.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -91,9 +91,9 @@
     "/events/views/{viewId}/delete" : {
       "post" : {
         "tags" : [ "events" ],
-        "summary" : "POST /events/views/{viewId}/delete (generated skeleton)",
+        "summary" : "Delete a saved event view",
         "operationId" : "postEventsViewsByViewIdDelete",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Deletes the server-wide saved event view with the given name. Gated on canAuthorWorkbench. 404 when no saved view has that name.",
         "parameters" : [ {
           "name" : "viewId",
           "in" : "path",
@@ -114,9 +114,9 @@
     "/events/{eventId}" : {
       "get" : {
         "tags" : [ "events" ],
-        "summary" : "GET /events/{eventId} (generated skeleton)",
+        "summary" : "One operational event",
         "operationId" : "getEventsByEventId",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Scans the newest retained events for an exact event id and returns it, masked for a caller without the unmask capability. No capability gate. 404 when no recent event has that id.",
         "parameters" : [ {
           "name" : "eventId",
           "in" : "path",

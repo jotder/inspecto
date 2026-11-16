@@ -15,14 +15,14 @@ tags: [api, routes, generated]
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
-| GET | `/events` | GET /events (generated skeleton) | events | — | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` |
-| GET | `/events/{eventId}` | GET /events/{eventId} (generated skeleton) | events | — | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` |
-| GET | `/events/export` | GET /events/export (generated skeleton) | events | — | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` |
-| GET | `/events/search` | GET /events/search (generated skeleton) | events | — | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` |
-| GET | `/events/views` | GET /events/views (generated skeleton) | events | — | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` |
-| POST | `/events/views` | POST /events/views (generated skeleton) | events | `canAuthorWorkbench` | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` |
-| POST | `/events/views/{viewId}/delete` | POST /events/views/{viewId}/delete (generated skeleton) | events | `canAuthorWorkbench` | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` |
-| GET | `/metrics` | GET /metrics (generated skeleton) | metrics | — | `features/inspecto-observability/src/main/java/com/gamma/metricsapi/MetricsRoutes.java` |
+| GET | `/events` | Recent operational events | events | — | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` |
+| GET | `/events/{eventId}` | One operational event | events | — | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` |
+| GET | `/events/export` | Export operational events | events | — | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` |
+| GET | `/events/search` | Search operational events | events | — | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` |
+| GET | `/events/views` | List saved event views | events | — | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` |
+| POST | `/events/views` | Save an event view | events | `canAuthorWorkbench` | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` |
+| POST | `/events/views/{viewId}/delete` | Delete a saved event view | events | `canAuthorWorkbench` | `features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java` |
+| GET | `/metrics` | Prometheus metrics scrape | metrics | — | `features/inspecto-observability/src/main/java/com/gamma/metricsapi/MetricsRoutes.java` |
 
 ## Drift
 

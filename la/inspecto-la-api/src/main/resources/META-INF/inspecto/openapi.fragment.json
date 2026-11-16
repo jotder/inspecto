@@ -3,9 +3,9 @@
     "/geo/projection" : {
       "post" : {
         "tags" : [ "geo" ],
-        "summary" : "POST /geo/projection (generated skeleton)",
+        "summary" : "Project a Dataset onto map points",
         "operationId" : "postGeoProjection",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns one map point per row with valid coordinates (body dataset, latCol, lonCol, optional entityCol, entityIdCol, kindCol, timeCol, attrCols, limit), plus truncated and the count of skipped rows. No capability gate. 422 when dataset or a coordinate column is missing or a column is not a safe identifier; 404 for an unknown or not-viewable Dataset; 503 when the control plane is read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -18,9 +18,9 @@
     "/geo/routes" : {
       "post" : {
         "tags" : [ "geo" ],
-        "summary" : "POST /geo/routes (generated skeleton)",
+        "summary" : "Project a Dataset onto map routes",
         "operationId" : "postGeoRoutes",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Folds origin-to-destination rows into points and routes deduplicated per (origin, destination, kind) with a summed weight (body dataset, fromLatCol, fromLonCol, toLatCol, toLonCol, optional fromCol, toCol, kindCol, limit). No capability gate. 422 when dataset or a coordinate column is missing or a column is not a safe identifier; 404 for an unknown or not-viewable Dataset; 503 when the control plane is read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -264,9 +264,9 @@
     "/inv/projection/multi" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/projection/multi (generated skeleton)",
+        "summary" : "Project entities across several Datasets",
         "operationId" : "postInvProjectionMulti",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Runs node mappings and edge projections over several Datasets in one call (body nodes, edges, optional filter, limit per mapping) and returns their union, each node and edge tagged with its provenance Dataset. No capability gate. 422 when neither nodes nor edges is given, there are too many mappings or an identifier or filter is invalid; 404 for an unknown or not-viewable Dataset; 503 when the control plane is read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -364,9 +364,9 @@
     "/inv/schema/relationships" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/schema/relationships (generated skeleton)",
+        "summary" : "Suggest entity relationships across Datasets",
         "operationId" : "getInvSchemaRelationships",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Infers entity-projection mappings by naming convention: each <base>_id column is linked to the Dataset named <base> on its id column (high confidence) or a same-named column (medium); Datasets that cannot be probed are skipped and counted. No capability gate. 503 when the control plane is read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -407,9 +407,9 @@
     "/inv/schema/overlap-profile" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/schema/overlap-profile (generated skeleton)",
+        "summary" : "Profile value overlap between Dataset columns",
         "operationId" : "postInvSchemaOverlapProfile",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Estimates the distinct-value overlap of column pairs across different Datasets (body optional datasets, columns, limit on pairs measured) and reports pairsConsidered and truncated. No capability gate. 404 for a named Dataset that is unknown or not viewable; 422 for a column that no profiled Dataset has or an unsafe name; 503 when the control plane is read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -422,9 +422,9 @@
     "/inv/snapshots" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/snapshots (generated skeleton)",
+        "summary" : "Seal a Link Analysis evidence snapshot",
         "operationId" : "postInvSnapshots",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Stores the graph snapshot body as given (id, manifestHash, nodes, edges and the rest); a sealed snapshot is never replaced. Gated on canManageIncidents. 422 for a missing or unsafe id or a missing manifestHash; 403 when the id escapes the snapshot directory; 409 when the id already exists; 500 when the body cannot be serialised; 503 when the control plane is read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -435,9 +435,9 @@
       },
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/snapshots (generated skeleton)",
+        "summary" : "List sealed Link Analysis snapshots",
         "operationId" : "getInvSnapshots",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns sealed evidence snapshot ids, newest first, with the true total and a truncated flag; query limit defaults to and is clamped by the Space's snapshot page limits. No capability gate. 422 when limit is not an integer; 503 when the control plane is read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -450,9 +450,9 @@
     "/inv/snapshots/attach" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/snapshots/attach (generated skeleton)",
+        "summary" : "Attach a sealed snapshot to a Case",
         "operationId" : "postInvSnapshotsAttach",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Records that a sealed snapshot (body snapshotId) is attached to a Case (body caseId) in a separate log, never reopening the snapshot; returns the snapshot's attachments. Gated on canManageIncidents. 422 for a bad snapshotId or a missing caseId; 404 for an unknown snapshot or a Case the caller cannot see; 503 when the control plane is read-only or Case management is not installed.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -465,9 +465,9 @@
     "/inv/investigations" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations (generated skeleton)",
+        "summary" : "Create an Investigation",
         "operationId" : "postInvInvestigations",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Creates an Investigation over a Dataset (body purpose, dataset, sourceCol, targetCol, optional id, title, linkKindCol, timeCol, timeColZone, eventsCol, caseRef); the Space's auto-applied category lists become its first steps. Gated on canManageIncidents. 422 for a missing or unsafe field or a column the Dataset lacks; 404 for an unknown or not-viewable Dataset; 409 when the id is taken; 503 when the control plane is read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -478,7 +478,7 @@
       },
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations (generated skeleton)",
+        "summary" : "List readable Investigations",
         "operationId" : "getInvInvestigations",
         "description" : "The Investigations the caller may read, newest first, paged by limit and offset. Answers {items, total, offset, limit, truncated}; each item {id, title, dataset, owner, ownerName?, createdAt, headStep, caseRef?, access, readOnly}, the title masked per the Space's maskingMode. ownerName (T-186, additive) is the owner's display name as recorded when the Investigation was created, forked or instantiated, masked as the title; an older Investigation without one names only the caller's own (from the signed-in Subject) and is absent otherwise, so a client shows the owner login id.",
         "responses" : {
@@ -493,9 +493,9 @@
     "/inv/investigations/{investigationId}/ops" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/ops (generated skeleton)",
+        "summary" : "Append a step to an Investigation",
         "operationId" : "postInvInvestigationsByInvestigationIdOps",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Appends one op from the closed vocabulary (seed, expand, exclude, hide, keep, window, annotate and others; body op plus its params) to the main log, sealing what it read. Gated on canManageIncidents, and the caller must be a lead. 422 when op is missing, outside the vocabulary or its params are invalid; 404 when the Investigation is absent or not readable; 403 for a member who is not a lead; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -661,7 +661,7 @@
     "/inv/investigations/{investigationId}" : {
       "delete" : {
         "tags" : [ "inv" ],
-        "summary" : "DELETE /inv/investigations/{investigationId} (generated skeleton)",
+        "summary" : "Delete an Investigation",
         "operationId" : "deleteInvInvestigationsByInvestigationId",
         "description" : "Delete an Investigation with its sealed log, Working Sets, Drafts, members, references, alert-rule bindings, pending records, Case link and embed grants (LA-INVESTIGATION-DELETE-1); it cannot be undone. Gated on canManageIncidents and a lead of the Investigation (a read-only Case member or a stranger reads 404). 409 CONFLICT while the Investigation is linked to an open Case or has a pending four-eyes approval. An audit event LINK_INVESTIGATION_DELETED (actor, time, id, title, steps and Drafts removed) is written first. Answers {id, deleted, steps, drafts}. 503 on a store backend that cannot delete (Postgres).",
         "parameters" : [ {
@@ -726,7 +726,7 @@
     "/inv/investigations/{investigationId}/undo" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/undo (generated skeleton)",
+        "summary" : "Undo the latest Investigation step",
         "operationId" : "postInvInvestigationsByInvestigationIdUndo",
         "description" : "Revert the newest effective step of the main log (a recorded undo entry). Optional body {undoes: step} names the step the caller means to revert (LA-GROW-EXCLUDE-UNDO-RACE-1): when another step is the newest by now - a team member's - the answer is 409 CONFLICT_STALE_VERSION naming it and nothing is written; undoes not a whole number from 1 is 422. Without a body the newest step is undone. 409 CONFLICT when there is nothing to undo.",
         "parameters" : [ {
@@ -762,9 +762,9 @@
     "/inv/investigations/{investigationId}/reorder" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/reorder (generated skeleton)",
+        "summary" : "Fork an Investigation with its steps reordered",
         "operationId" : "postInvInvestigationsByInvestigationIdReorder",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Creates a new Investigation whose header names this one as parent, re-applying the effective op steps in the body order (a permutation of them) and re-reading every expand; optional id and title. Gated on canManageIncidents, and the caller must be a lead. 422 when order is missing or not a permutation of the effective steps; 409 when the fork id is taken; 404 when absent or not readable; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -785,9 +785,9 @@
     "/inv/investigations/{investigationId}/replay" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/replay (generated skeleton)",
+        "summary" : "Replay an Investigation's sealed log",
         "operationId" : "postInvInvestigationsByInvestigationIdReplay",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Re-evaluates the sealed log (to body at when given) and reports whether every step's Working Set hash still matches; with body reread, re-runs each effective expand's recorded query and reports drift. Persists nothing. No capability gate; any member may call it. 404 when the Investigation is absent or not readable; 422 for an unsafe id; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -808,9 +808,9 @@
     "/inv/investigations/{investigationId}/log" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations/{investigationId}/log (generated skeleton)",
+        "summary" : "An Investigation's step log",
         "operationId" : "getInvInvestigationsByInvestigationIdLog",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the Investigation's log entries, bounded by query limit, with the true total. No capability gate; any member, or a member of a linked Case, may read it. 422 for a bad limit or unsafe id; 404 when the Investigation is absent or not readable; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -854,9 +854,9 @@
     "/inv/investigations/{investigationId}/pending/{pendingId}/approve" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/pending/{pendingId}/approve (generated skeleton)",
+        "summary" : "Approve a pending four-eyes request",
         "operationId" : "postInvInvestigationsByInvestigationIdPendingByPendingIdApprove",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "A second person approves a held sensitive expand or Draft promote, which then runs as the requester's step, sealed with the approval. Gated on canApproveLinkExpansions; a lead or reviewer where there are members. 403 without an authenticated Subject or when the requester decides their own request; 404 for an unknown request or Investigation; 409 when already decided or nothing is left to expand; 422 for an unsafe request id or a reason over 200 characters.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -884,9 +884,9 @@
     "/inv/investigations/{investigationId}/pending/{pendingId}/deny" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/pending/{pendingId}/deny (generated skeleton)",
+        "summary" : "Deny a pending four-eyes request",
         "operationId" : "postInvInvestigationsByInvestigationIdPendingByPendingIdDeny",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "A second person denies a held sensitive expand, recording who denied it and an optional body reason; nothing is read. Gated on canApproveLinkExpansions; a lead or reviewer where the Investigation has members. 403 without an authenticated Subject or when the requester decides their own request; 404 for an unknown request or Investigation; 409 when already decided; 422 for an unsafe request id or a reason over 200 characters.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -948,9 +948,9 @@
     "/inv/investigations/{investigationId}/dossier" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations/{investigationId}/dossier (generated skeleton)",
+        "summary" : "An Investigation's Dossier",
         "operationId" : "getInvInvestigationsByInvestigationIdDossier",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Builds the Investigation's Dossier from its sealed log (query at, snapshots, format json|steps|method|html), masked per the Space's masking mode; steps and method answer plain text, html one printable page. No capability gate; any member or linked-Case member may read it. 422 for a bad at, format, unsafe id or an unanchored snapshot; 404 when the Investigation or a snapshot is absent or not readable; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -971,9 +971,9 @@
     "/inv/investigations/{investigationId}/dossier/verify" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/dossier/verify (generated skeleton)",
+        "summary" : "Verify a Dossier manifest",
         "operationId" : "postInvInvestigationsByInvestigationIdDossierVerify",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Rebuilds the Dossier manifest from the store as it is now for the submitted position and snapshots (body manifest, or a whole Dossier) and names every artefact that changed, went missing or appeared. Persists nothing. No capability gate. 422 when the body is not a manifest for this Investigation or names too many snapshots; 404 when the Investigation is absent or not readable; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -994,9 +994,9 @@
     "/inv/investigations/{investigationId}/working-set" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations/{investigationId}/working-set (generated skeleton)",
+        "summary" : "An Investigation's Working Set",
         "operationId" : "getInvInvestigationsByInvestigationIdWorkingSet",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns one page of the Working Set (query of entities|links|excluded, limit, offset, optional at step), masked per the Space's masking mode, with an ETag answering 304 when unchanged. No capability gate; any member or linked-Case member may read it. 422 for a bad of, offset, at or an unsafe id; 404 when the Investigation is absent or not readable; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -1022,9 +1022,9 @@
     "/inv/investigations/{investigationId}/coverage" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations/{investigationId}/coverage (generated skeleton)",
+        "summary" : "Data coverage of an Investigation's window",
         "operationId" : "getInvInvestigationsByInvestigationIdCoverage",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Names the local calendar days of a window (query from, to, timezone, else the Investigation's latest window op) that have no rows in its bound Dataset, plus per-Collector coverage where the Consignment trail allows. No capability gate; any member or linked-Case member may read it. 422 when the Investigation has no time column, the window is unbounded or over the day cap, or the read fails; 404 when absent or not readable.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -1045,9 +1045,9 @@
     "/inv/investigations/{investigationId}/compare" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations/{investigationId}/compare (generated skeleton)",
+        "summary" : "Compare an Investigation's Working Set across two windows",
         "operationId" : "getInvInvestigationsByInvestigationIdCompare",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the entities and links present in window A only, B only and both (query aFrom, aTo, bFrom, bTo, optional timezone, at, mode presence|activity, minAbsDelta for activity), masked as the Working Set is. Persists nothing. No capability gate; any member or linked-Case member may read it. 422 when a window is missing, mode is unknown, minAbsDelta is used without activity or at is out of range; 404 when absent or not readable.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -1068,9 +1068,9 @@
     "/inv/investigations/{investigationId}/template" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/template (generated skeleton)",
+        "summary" : "Save an Investigation as a template",
         "operationId" : "postInvInvestigationsByInvestigationIdTemplate",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Saves the Investigation's effective log as a reusable method: seeds and windows become parameters and case-specific ops are dropped (body optional id, title, pack). Gated on canManageIncidents, and the caller must be a lead. 422 for an unsafe template id or pack, or no effective seed step; 403 when the id escapes the template store or for a non-lead member; 409 when the template id is taken; 404 when the Investigation is absent or not readable; 503 when read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -1091,9 +1091,9 @@
     "/inv/investigation-templates/{investigationtemplateId}" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigation-templates/{investigationtemplateId} (generated skeleton)",
+        "summary" : "One Investigation template",
         "operationId" : "getInvInvestigationTemplatesByInvestigationtemplateId",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the template document; only its owner may read it. No capability gate. 422 for an unsafe template id; 404 when it is absent or another owner's; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "investigationtemplateId",
           "in" : "path",
@@ -1114,9 +1114,9 @@
     "/inv/investigation-templates/{investigationtemplateId}/instantiate" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigation-templates/{investigationtemplateId}/instantiate (generated skeleton)",
+        "summary" : "Instantiate an Investigation template",
         "operationId" : "postInvInvestigationTemplatesByInvestigationtemplateIdInstantiate",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Creates a new Investigation from the template, binding its seed parameters and optionally another Dataset with the same column roles (body purpose, params, optional id, title, dataset, sourceCol, targetCol, linkKindCol); every expand reads and seals that Dataset now. Gated on canManageIncidents. 422 for a missing, empty or unknown parameter or a column the Dataset lacks; 404 for an unknown template or Dataset; 409 when the id is taken.",
         "parameters" : [ {
           "name" : "investigationtemplateId",
           "in" : "path",
@@ -1137,9 +1137,9 @@
     "/inv/investigations/{investigationId}/case" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations/{investigationId}/case (generated skeleton)",
+        "summary" : "An Investigation's Case link",
         "operationId" : "getInvInvestigationsByInvestigationIdCase",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the Investigation's optional link to a Case and what it grants the caller; a linked open Case's owner or assignee may read the Investigation. No capability gate; any member or linked-Case member may read it. 404 when the Investigation is absent or not readable; 422 for an unsafe id; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -1158,9 +1158,9 @@
       },
       "put" : {
         "tags" : [ "inv" ],
-        "summary" : "PUT /inv/investigations/{investigationId}/case (generated skeleton)",
+        "summary" : "Link an Investigation to a Case",
         "operationId" : "putInvInvestigationsByInvestigationIdCase",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Links the Investigation to a Case (body caseRef) outside its sealed header, sharing read-only access with the Case's owner and assignee while it stays open. Gated on canManageIncidents, and the caller must be a lead. 422 when caseRef is missing or unsafe; 404 for a Case the caller cannot see, or an Investigation absent or not readable; 409 for a closed Case; 403 for a non-lead member; 503 when read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -1179,9 +1179,9 @@
       },
       "delete" : {
         "tags" : [ "inv" ],
-        "summary" : "DELETE /inv/investigations/{investigationId}/case (generated skeleton)",
+        "summary" : "Unlink an Investigation from its Case",
         "operationId" : "deleteInvInvestigationsByInvestigationIdCase",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Removes the Investigation's Case link, audits the unlink and returns the link status. Gated on canManageIncidents, and the caller must be a lead. 404 when the Investigation is absent or not readable; 403 for a non-lead member; 422 for an unsafe id; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -1202,9 +1202,9 @@
     "/inv/investigations/{investigationId}/dossier/bundle" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations/{investigationId}/dossier/bundle (generated skeleton)",
+        "summary" : "Export an Investigation's sealed Dossier bundle",
         "operationId" : "getInvInvestigationsByInvestigationIdDossierBundle",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns one portable JSON bundle holding the masked Dossier, its references and a custody block, sealed with SHA-256 over its canonical JSON (query at, snapshots); the export is audited. No capability gate; any member or linked-Case member may read it. 422 for a bad at, unsafe id or an unanchored snapshot; 404 when the Investigation or a snapshot is absent or not readable; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -1225,9 +1225,9 @@
     "/inv/investigations/{investigationId}/dossier/bundle/verify" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/dossier/bundle/verify (generated skeleton)",
+        "summary" : "Verify a Dossier bundle",
         "operationId" : "postInvInvestigationsByInvestigationIdDossierBundleVerify",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Checks a bundle's seal, its Dossier manifest root and appended references, and the custody of every artefact against the store as it is now (body a bundle, or {bundle}). Persists nothing. No capability gate. 422 when the body is not an inspecto-dossier-bundle/1 bundle or is for another Investigation; 404 when the Investigation is absent or not readable; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -1248,9 +1248,9 @@
     "/inv/investigations/{investigationId}/references" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations/{investigationId}/references (generated skeleton)",
+        "summary" : "External references of an Investigation",
         "operationId" : "getInvInvestigationsByInvestigationIdReferences",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the Investigation's external references ({system, type, id, url, label}) in the order added, each marked trusted false, with the count and the Space's maximum. No capability gate; any member or linked-Case member may read them. 404 when the Investigation is absent or not readable; 422 for an unsafe id; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -1269,9 +1269,9 @@
       },
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/references (generated skeleton)",
+        "summary" : "Add an external reference to an Investigation",
         "operationId" : "postInvInvestigationsByInvestigationIdReferences",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Appends one pointer to another system (body system, type, id, optional url, label); it is never fetched and grants nothing. Gated on canManageIncidents, and the caller must be a lead. 422 for a missing or invalid field or a url that is not absolute http(s) or embeds credentials; 409 for a duplicate (system, type, id) or a full list; 404 when the Investigation is absent or not readable; 503 when read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -1292,9 +1292,9 @@
     "/inv/investigations/{investigationId}/members" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations/{investigationId}/members (generated skeleton)",
+        "summary" : "Members of an Investigation",
         "operationId" : "getInvInvestigationsByInvestigationIdMembers",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the Investigation's current member roles (lead, analyst, reviewer), the membership history and the caller's own role. No capability gate; any member may read it. 404 for a non-member or an absent Investigation; 422 for an unsafe id; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -1313,9 +1313,9 @@
       },
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/members (generated skeleton)",
+        "summary" : "Grant a role on an Investigation",
         "operationId" : "postInvInvestigationsByInvestigationIdMembers",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Grants or changes a member's role (body subject, role lead|analyst|reviewer). Gated on canManageIncidents, and the caller must be a lead. 422 for an invalid subject or role, or when it would demote the last lead; 403 for a member who is not a lead; 404 for a non-member or absent Investigation; 409 (CONFLICT_STALE_VERSION) when concurrent changes keep winning; 503 when read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -1336,9 +1336,9 @@
     "/inv/investigations/{investigationId}/members/revoke" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/members/revoke (generated skeleton)",
+        "summary" : "Revoke a member of an Investigation",
         "operationId" : "postInvInvestigationsByInvestigationIdMembersRevoke",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Revokes a member's role (body subject) and the embed links they minted. Gated on canManageIncidents, and the caller must be a lead. 422 for an invalid subject or when it would revoke the last lead; 404 when the subject is not a member or the Investigation is absent or not readable; 403 for a non-lead member; 409 (CONFLICT_STALE_VERSION) when concurrent changes keep winning; 503 when read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -1443,9 +1443,9 @@
     "/inv/value-measures" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/value-measures (generated skeleton)",
+        "summary" : "Evaluate a value Measure over a Dataset",
         "operationId" : "getInvValueMeasures",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Runs one named value Measure over a whole Dataset and returns the entities breaching its thresholds in a window (query dataset, sourceCol, targetCol, optional linkKindCol, name, valueCol, timeCol, from and to or last, plus the Measure's thresholds); entities are masked when the Space masks them. No capability gate. 422 for a missing or unsafe query field or an invalid Measure; 404 for an unknown or not-viewable Dataset; 503 when read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -1458,9 +1458,9 @@
     "/inv/pattern/branching" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/pattern/branching (generated skeleton)",
+        "summary" : "Match a branching pattern over a whole Dataset",
         "operationId" : "postInvPatternBranching",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Runs a branching motif (such as structuring) over a whole Dataset (body dataset, sourceCol, targetCol, optional linkKindCol, timeCol, stages, filter, limit) and returns the matches with their legs; a refusal the browser would give is a 200 with refusal. No capability gate. 422 for a missing or unsafe field, an unknown column or a bad filter; 404 for an unknown or not-viewable Dataset; 503 when the control plane is read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -1473,9 +1473,9 @@
     "/inv/pattern/temporal" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/pattern/temporal (generated skeleton)",
+        "summary" : "Scan a Dataset for burst or periodic links",
         "operationId" : "postInvPatternTemporal",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Finds bursts or periodic series in each link's (or entity's) event times (body dataset, sourceCol, targetCol, timeCol, mode burst|periodicity, optional series, filter, limit, windowSeconds, minEvents, maxCv). No capability gate. 422 for a missing or unsafe field, a bad mode or series, an out-of-range number, an unknown field or column, or a bad filter; 404 for an unknown or not-viewable Dataset; 403 when the scan needs four-eyes approval; 503 when read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -1488,9 +1488,9 @@
     "/inv/entity-identities" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/entity-identities (generated skeleton)",
+        "summary" : "Resolved Entity identity groups",
         "operationId" : "getInvEntityIdentities",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns every identity group folded from the live identity assertions (query at, a log seq) with atSeq, headSeq and headHash; member keys are masked per the Space's masking mode. Gated on canManageIncidents. 422 for a bad at; 503 when the control plane is read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -1501,9 +1501,9 @@
       },
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/entity-identities (generated skeleton)",
+        "summary" : "Assert two Entity keys are one identity",
         "operationId" : "postInvEntityIdentities",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Records an identity assertion that two typed Entity keys (body a, b as <type>:<value>, reason) are one identity, normalised with the type's normaliser; answers 201 with the assertion and the resulting group. Gated on canManageIncidents. 422 for a missing reason, a malformed or masked key, a type not in force, an empty value, or two keys equal after normalising; 503 when the control plane is read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -1516,9 +1516,9 @@
     "/inv/entity-identities/group" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/entity-identities/group (generated skeleton)",
+        "summary" : "Identity group of one Entity key",
         "operationId" : "getInvEntityIdentitiesGroup",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the identity group of one typed, normalised Entity key (query key, optional at); a key in no live assertion resolves to a one-member group. Gated on canManageIncidents. 422 when key is not a typed Entity key or at is invalid; 503 when the control plane is read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -1531,9 +1531,9 @@
     "/inv/entity-identities/import" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/entity-identities/import (generated skeleton)",
+        "summary" : "Import identity assertions from a mapping Dataset",
         "operationId" : "postInvEntityIdentitiesImport",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Turns each distinct (aCol, bCol) row of a mapping Dataset into an identity assertion (body dataset, aCol, bCol, reason, optional aType, bType, limit); already-imported pairs are skipped, so a re-import adds nothing (200). Gated on canManageIncidents. 422 for a missing or unsafe field, equal or unknown columns, a type the columns do not support or a bad limit; 404 for an unknown or not-viewable Dataset; 403 when it needs four-eyes approval; 503 when read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -1668,9 +1668,9 @@
     "/inv/entity-identities/{entityidentityId}/retract" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/entity-identities/{entityidentityId}/retract (generated skeleton)",
+        "summary" : "Retract an identity assertion",
         "operationId" : "postInvEntityIdentitiesByEntityidentityIdRetract",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Retracts the identity assertion at the given log seq (body reason) and returns the groups of its two keys afterwards. Gated on canManageIncidents. 422 for a missing reason or a seq that is not an integer of at least 1; 409 when no assertion is at that seq or it is already retracted; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "entityidentityId",
           "in" : "path",
@@ -2432,9 +2432,9 @@
     "/inv/investigations/{investigationId}/drafts" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/drafts (generated skeleton)",
+        "summary" : "Fork a Draft of an Investigation",
         "operationId" : "postInvInvestigationsByInvestigationIdDrafts",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Creates the caller's own working copy forked from the main log (body optional at step, label); one live Draft per member. Gated on canManageIncidents; a lead or analyst. 403 for a role that does not fork; 422 for a bad at or label; 409 when the member already has a live Draft, the Space is full or the id is taken; 404 for a non-member; 503 when read-only or the Draft store is busy.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -2453,9 +2453,9 @@
       },
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations/{investigationId}/drafts (generated skeleton)",
+        "summary" : "List Drafts of an Investigation",
         "operationId" : "getInvInvestigationsByInvestigationIdDrafts",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the caller's own Drafts of the Investigation (a lead or reviewer sees all), live ones only unless query discarded=true. No capability gate; the caller must be a member. 404 for a non-member or an absent Investigation; 422 for an unsafe id; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -2476,9 +2476,9 @@
     "/inv/investigations/{investigationId}/drafts/{draftId}" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations/{investigationId}/drafts/{draftId} (generated skeleton)",
+        "summary" : "One Draft of an Investigation",
         "operationId" : "getInvInvestigationsByInvestigationIdDraftsByDraftId",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the Draft's header, head step and whether the main log has moved on since it forked. No capability gate; the Draft's actor, or a lead or reviewer. 404 for a non-member, an unknown Draft or another analyst's Draft; 422 for a malformed Draft id.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -2506,9 +2506,9 @@
     "/inv/investigations/{investigationId}/drafts/{draftId}/log" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations/{investigationId}/drafts/{draftId}/log (generated skeleton)",
+        "summary" : "A Draft's own step log",
         "operationId" : "getInvInvestigationsByInvestigationIdDraftsByDraftIdLog",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the Draft's own log entries (the steps after the base it forked from). No capability gate; the Draft's actor, or a lead or reviewer. 404 for a non-member, an unknown Draft or another analyst's Draft; 409 when the Draft was discarded, promoted or expired, or the main log's forked prefix changed; 422 for a malformed Draft id.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -2536,9 +2536,9 @@
     "/inv/investigations/{investigationId}/drafts/{draftId}/working-set" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations/{investigationId}/drafts/{draftId}/working-set (generated skeleton)",
+        "summary" : "A Draft's Working Set",
         "operationId" : "getInvInvestigationsByInvestigationIdDraftsByDraftIdWorkingSet",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns one page of the Draft's Working Set (query of entities|links|excluded, limit, offset, at), served as the main Working Set route serves it. No capability gate; the Draft's actor, or a lead or reviewer. 404 for a non-member or an unknown or unreadable Draft; 409 when the Draft is closed or its base changed; 422 for a malformed id or bad query.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -2571,9 +2571,9 @@
     "/inv/investigations/{investigationId}/drafts/{draftId}/replay" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations/{investigationId}/drafts/{draftId}/replay (generated skeleton)",
+        "summary" : "Replay a Draft's log",
         "operationId" : "getInvInvestigationsByInvestigationIdDraftsByDraftIdReplay",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Re-folds the main prefix plus the Draft's own steps from scratch and reports any step whose recorded hash or persisted set hash no longer matches. No capability gate; the Draft's actor, or a lead or reviewer. 404 for a non-member or an unknown or unreadable Draft; 409 when the Draft is closed or its base changed; 422 for a malformed Draft id.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -2601,9 +2601,9 @@
     "/inv/investigations/{investigationId}/drafts/{draftId}/ops" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/drafts/{draftId}/ops (generated skeleton)",
+        "summary" : "Append a step to a Draft",
         "operationId" : "postInvInvestigationsByInvestigationIdDraftsByDraftIdOps",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Appends one op to the Draft with the same validation and sealing as the main log (body op plus its params). Gated on canManageIncidents; the Draft's actor only. 403 for a lead or reviewer who is not its actor; 404 for a non-member or an unknown Draft; 409 when the Draft is closed, its base changed or its index pin expired (rebase first); 422 for an invalid op.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -2631,7 +2631,7 @@
     "/inv/investigations/{investigationId}/drafts/{draftId}/undo" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/drafts/{draftId}/undo (generated skeleton)",
+        "summary" : "Undo the latest Draft step",
         "operationId" : "postInvInvestigationsByInvestigationIdDraftsByDraftIdUndo",
         "description" : "Revert the newest effective step of the Draft's own ops (a recorded undo entry). Optional body {undoes: step} names the step the caller means to revert (LA-GROW-EXCLUDE-UNDO-RACE-1): when another step is the newest by now the answer is 409 CONFLICT_STALE_VERSION naming it and nothing is written; undoes not a whole number from 1 is 422. Without a body the newest step is undone. 409 CONFLICT when there is nothing to undo.",
         "parameters" : [ {
@@ -2674,9 +2674,9 @@
     "/inv/investigations/{investigationId}/drafts/{draftId}/discard" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/drafts/{draftId}/discard (generated skeleton)",
+        "summary" : "Discard a Draft",
         "operationId" : "postInvInvestigationsByInvestigationIdDraftsByDraftIdDiscard",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Closes the Draft with an audit marker, deletes its log and sealed sets, and releases its index pins; a repeat answers alreadyDiscarded. Gated on canManageIncidents; the Draft's actor or a lead. 403 for anyone else who can see it; 404 for a non-member or an unknown Draft; 409 when the Draft was promoted; 422 for a malformed Draft id.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -2704,9 +2704,9 @@
     "/inv/investigations/{investigationId}/drafts/{draftId}/conflicts" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations/{investigationId}/drafts/{draftId}/conflicts (generated skeleton)",
+        "summary" : "Conflicts a Draft rebase would meet",
         "operationId" : "getInvInvestigationsByInvestigationIdDraftsByDraftIdConflicts",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the conflict report a rebase of the Draft onto the current main head would produce; writes nothing. No capability gate; the Draft's actor, or a lead or reviewer. 404 for a non-member or an unknown or unreadable Draft; 409 when the Draft is closed or its base changed; 422 for a malformed Draft id.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -2734,9 +2734,9 @@
     "/inv/investigations/{investigationId}/drafts/{draftId}/rebase" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/drafts/{draftId}/rebase (generated skeleton)",
+        "summary" : "Rebase a Draft onto the main head",
         "operationId" : "postInvInvestigationsByInvestigationIdDraftsByDraftIdRebase",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Replays the Draft's effective ops over the current main head, re-pins index versions and swaps the result in (body optional confirm list of superseded or blocked steps, expectHead). Gated on canManageIncidents; the Draft's actor only. 409 when expectHead is not the head or a conflict is unconfirmed, or the Draft is closed; 422 for a bad confirm or expectHead; 403 for a non-actor; 404 for a non-member or unknown Draft.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -2764,9 +2764,9 @@
     "/inv/investigations/{investigationId}/drafts/{draftId}/promote" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/drafts/{draftId}/promote (generated skeleton)",
+        "summary" : "Promote a Draft into the main log",
         "operationId" : "postInvInvestigationsByInvestigationIdDraftsByDraftIdPromote",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Appends the Draft's effective ops to the main log atomically (body optional expectHead); a promote carrying a sensitive expand is held as a pending four-eyes request (202). Gated on canManageIncidents; the Draft's actor or a lead. 409 when expectHead is not the head, the Draft must rebase first or is closed; 422 when it has no ops or expectHead is bad; 403 for anyone else; 404 for a non-member or unknown Draft.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -2794,9 +2794,9 @@
     "/inv/investigation-templates" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigation-templates (generated skeleton)",
+        "summary" : "List the caller's Investigation templates",
         "operationId" : "getInvInvestigationTemplates",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the caller's own Investigation templates, newest first, as summaries (id, title, pack, createdAt, dataset, investigation, and counts of parameters and ops). No capability gate. 503 when the control plane is read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."

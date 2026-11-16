@@ -3,9 +3,9 @@
     "/objects/{objectId}/merge" : {
       "post" : {
         "tags" : [ "objects" ],
-        "summary" : "POST /objects/{objectId}/merge (generated skeleton)",
+        "summary" : "Merge Cases into this Case",
         "operationId" : "postObjectsByObjectIdMerge",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Absorbs the body sources Cases into this surviving Case: members re-point, tags and watchers union, and the sources close with a merged-into trace. Gated on canAdminister. 400 when sources is empty; 404 for an unknown or out-of-scope Case; 422 for a non-Case, a self-merge or a source already closed or merged; 409 for an inert object.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",
@@ -26,9 +26,9 @@
     "/objects/{objectId}/split" : {
       "post" : {
         "tags" : [ "objects" ],
-        "summary" : "POST /objects/{objectId}/split (generated skeleton)",
+        "summary" : "Split members out of a Case",
         "operationId" : "postObjectsByObjectIdSplit",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Carves the listed member Incidents (body members, title, optional assignee, actor) out of this Case into a new Case. Gated on canAdminister. 400 when title or members is missing; 404 for an unknown or out-of-scope Case or member; 422 for a non-Case, a closed Case or a member it does not contain; 409 for an inert object.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",
@@ -111,9 +111,9 @@
     "/cases/rules" : {
       "get" : {
         "tags" : [ "cases" ],
-        "summary" : "GET /cases/rules (generated skeleton)",
+        "summary" : "List Case Rules",
         "operationId" : "getCasesRules",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the registered Case Rules that auto-group Incidents into a Case. No capability gate. 503 when operational objects are not available.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -124,9 +124,9 @@
       },
       "post" : {
         "tags" : [ "cases" ],
-        "summary" : "POST /cases/rules (generated skeleton)",
+        "summary" : "Save a Case Rule",
         "operationId" : "postCasesRules",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Creates or replaces a Case Rule (body name, title, filter with at least one criterion, optional threshold, windowMinutes, category, tags), persisted as <name>_caserule.toon under the write root. Gated on canAuthorWorkbench. 422 for an invalid or unmodelled body or an unsafe name; 403 when the file path escapes the write root; 503 when the control plane is read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -139,9 +139,9 @@
     "/cases/rules/{ruleId}" : {
       "delete" : {
         "tags" : [ "cases" ],
-        "summary" : "DELETE /cases/rules/{ruleId} (generated skeleton)",
+        "summary" : "Delete a Case Rule",
         "operationId" : "deleteCasesRulesByRuleId",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Removes the Case Rule from the registry and deletes its persisted file. Gated on canAuthorWorkbench. 404 for an unknown Case Rule; 422 for an unsafe name; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "ruleId",
           "in" : "path",
@@ -162,9 +162,9 @@
     "/cases/rules/{ruleId}/evaluate" : {
       "post" : {
         "tags" : [ "cases" ],
-        "summary" : "POST /cases/rules/{ruleId}/evaluate (generated skeleton)",
+        "summary" : "Evaluate a Case Rule",
         "operationId" : "postCasesRulesByRuleIdEvaluate",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Groups the Incidents matching the Case Rule into a Case and returns matched, grouped, caseId and opened. Gated on canAdminister. 404 for an unknown Case Rule.",
         "parameters" : [ {
           "name" : "ruleId",
           "in" : "path",

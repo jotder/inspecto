@@ -3,9 +3,9 @@
     "/objects" : {
       "get" : {
         "tags" : [ "objects" ],
-        "summary" : "GET /objects (generated skeleton)",
+        "summary" : "List operational objects",
         "operationId" : "getObjects",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Lists Alerts, Incidents, Cases and Tasks the caller may see, filtered by query type, status, severity, assignee, owner, correlationId, q, limit and offset (on /api/v1, cursor-paginated newest first), masked for a caller who cannot reveal keys. No capability gate. 400 for an unknown type; 503 when operational objects are not available.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -16,9 +16,9 @@
       },
       "post" : {
         "tags" : [ "objects" ],
-        "summary" : "POST /objects (generated skeleton)",
+        "summary" : "Open an Incident or other operational object",
         "operationId" : "postObjects",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Creates an operational object (body title required, type default INCIDENT, optional description, severity, priority, owner, assignee, correlationId, attributes, dueAt or dueInMinutes) linked to at least one existing object named in links. Gated on canManageIncidents. 400 when title or links is missing or type is unknown; 404 for a link target that is absent or out of scope; 422 for an attribute owned by a dedicated route (impact, disposition).",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -31,9 +31,9 @@
     "/objects/analytics" : {
       "get" : {
         "tags" : [ "objects" ],
-        "summary" : "GET /objects/analytics (generated skeleton)",
+        "summary" : "Operational object analytics",
         "operationId" : "getObjectsAnalytics",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the analytics roll-up of operational objects, optionally for one object kind (query type). No capability gate. 400 for an unknown type; 503 when operational objects are not available.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -66,9 +66,9 @@
     "/objects/{objectId}/ack" : {
       "post" : {
         "tags" : [ "objects" ],
-        "summary" : "POST /objects/{objectId}/ack (generated skeleton)",
+        "summary" : "Acknowledge an operational object",
         "operationId" : "postObjectsByObjectIdAck",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Applies the ack lifecycle action; the actor is the signed-in Subject, else body actor. Gated on canWorkIncidents. 404 for an unknown or out-of-scope object; 422 when the workflow does not allow the move; 409 for an inert object or a lost concurrent update.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",
@@ -215,9 +215,9 @@
     "/objects/{objectId}/assign" : {
       "post" : {
         "tags" : [ "objects" ],
-        "summary" : "POST /objects/{objectId}/assign (generated skeleton)",
+        "summary" : "Assign an operational object",
         "operationId" : "postObjectsByObjectIdAssign",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Assigns the object to body assignee; the actor is the signed-in Subject, else body actor. Gated on canWorkIncidents. 400 when assignee is missing or invalid; 404 for an unknown or out-of-scope object; 422 when the object's state refuses it; 409 for an inert object or a lost concurrent update.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",
@@ -238,9 +238,9 @@
     "/objects/{objectId}/links" : {
       "post" : {
         "tags" : [ "objects" ],
-        "summary" : "POST /objects/{objectId}/links (generated skeleton)",
+        "summary" : "Link two operational objects",
         "operationId" : "postObjectsByObjectIdLinks",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Correlates this object with another (body to, optional relationship such as CONTAINS, actor); a duplicate edge returns the existing one. No capability gate. 400 when to is missing; 404 for an unknown or out-of-scope object or target; 409 for an inert object.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",
@@ -259,9 +259,9 @@
       },
       "get" : {
         "tags" : [ "objects" ],
-        "summary" : "GET /objects/{objectId}/links (generated skeleton)",
+        "summary" : "Correlation links of an operational object",
         "operationId" : "getObjectsByObjectIdLinks",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the object's correlation links. No capability gate. 404 when the object is out of the caller's data scope; 503 when operational objects are not available.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",
@@ -280,9 +280,9 @@
       },
       "delete" : {
         "tags" : [ "objects" ],
-        "summary" : "DELETE /objects/{objectId}/links (generated skeleton)",
+        "summary" : "Remove a link between operational objects",
         "operationId" : "deleteObjectsByObjectIdLinks",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Removes one correlation edge named by query to and optional relationship (for example a member Incident leaving a Case); the removal is audited. No capability gate. 400 when to is missing; 404 for an unknown or out-of-scope object or an absent link; 409 for an inert object.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",
@@ -303,9 +303,9 @@
     "/objects/{objectId}/graph" : {
       "get" : {
         "tags" : [ "objects" ],
-        "summary" : "GET /objects/{objectId}/graph (generated skeleton)",
+        "summary" : "Correlation graph around an operational object",
         "operationId" : "getObjectsByObjectIdGraph",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the correlation subgraph around the object (query depth, default 2, at most 5), pruning nodes and edges outside the caller's data scope. No capability gate. 404 for an unknown or out-of-scope object.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",
@@ -326,9 +326,9 @@
     "/objects/{objectId}/comments" : {
       "post" : {
         "tags" : [ "objects" ],
-        "summary" : "POST /objects/{objectId}/comments (generated skeleton)",
+        "summary" : "Comment on an operational object",
         "operationId" : "postObjectsByObjectIdComments",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Adds a comment (body body); the author is the signed-in Subject, else body author. No capability gate. 400 when body is missing; 404 for an unknown or out-of-scope object; 409 for an inert object.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",
@@ -347,9 +347,9 @@
       },
       "get" : {
         "tags" : [ "objects" ],
-        "summary" : "GET /objects/{objectId}/comments (generated skeleton)",
+        "summary" : "Comments on an operational object",
         "operationId" : "getObjectsByObjectIdComments",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the object's comments, masked for a caller who cannot reveal keys. No capability gate. 404 when the object is out of the caller's data scope; 503 when operational objects are not available.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",
@@ -370,9 +370,9 @@
     "/objects/{objectId}/attachments" : {
       "post" : {
         "tags" : [ "objects" ],
-        "summary" : "POST /objects/{objectId}/attachments (generated skeleton)",
+        "summary" : "Attach evidence to an operational object",
         "operationId" : "postObjectsByObjectIdAttachments",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Records an evidence reference, metadata only (body name, uri, optional contentType, author, caption). No capability gate. 400 when name or uri is missing; 404 for an unknown or out-of-scope object; 409 for an inert object.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",
@@ -391,9 +391,9 @@
       },
       "get" : {
         "tags" : [ "objects" ],
-        "summary" : "GET /objects/{objectId}/attachments (generated skeleton)",
+        "summary" : "Attachments of an operational object",
         "operationId" : "getObjectsByObjectIdAttachments",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the object's evidence attachments (metadata only), masked for a caller who cannot reveal keys. No capability gate. 404 when the object is out of the caller's data scope; 503 when operational objects are not available.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",
@@ -414,9 +414,9 @@
     "/objects/{objectId}/rca" : {
       "post" : {
         "tags" : [ "objects" ],
-        "summary" : "POST /objects/{objectId}/rca (generated skeleton)",
+        "summary" : "Seed an RCA skeleton on an operational object",
         "operationId" : "postObjectsByObjectIdRca",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Adds one comment per section of an RCA template: body template names a loaded template, or carries an inline {name, sections}, or the body itself is the template. No capability gate. 400 for an invalid inline template; 404 for an unknown named template or an unknown or out-of-scope object; 409 for an inert object.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",
@@ -481,9 +481,9 @@
     "/objects/{objectId}" : {
       "get" : {
         "tags" : [ "objects" ],
-        "summary" : "GET /objects/{objectId} (generated skeleton)",
+        "summary" : "One operational object",
         "operationId" : "getObjectsByObjectId",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the object, masked for a caller who cannot reveal keys. No capability gate. 404 for an unknown or out-of-scope object; 503 when operational objects are not available.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",
@@ -524,9 +524,9 @@
     "/rca/templates" : {
       "get" : {
         "tags" : [ "rca" ],
-        "summary" : "GET /rca/templates (generated skeleton)",
+        "summary" : "List RCA templates",
         "operationId" : "getRcaTemplates",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the RCA templates loaded from *_rca.toon files. No capability gate.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -539,9 +539,9 @@
     "/workflows/{workflowId}" : {
       "get" : {
         "tags" : [ "workflows" ],
-        "summary" : "GET /workflows/{workflowId} (generated skeleton)",
+        "summary" : "Effective workflow of an object kind",
         "operationId" : "getWorkflowsByWorkflowId",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the effective lifecycle definition (built-in or overridden) for an operational object kind such as INCIDENT or CASE, so the UI can derive folders and action verbs. No capability gate. 400 for an unknown kind; 503 when operational objects are not available.",
         "parameters" : [ {
           "name" : "workflowId",
           "in" : "path",
@@ -562,9 +562,9 @@
     "/findings/{findingId}" : {
       "get" : {
         "tags" : [ "findings" ],
-        "summary" : "GET /findings/{findingId} (generated skeleton)",
+        "summary" : "Effective Findings sections of an object kind",
         "operationId" : "getFindingsByFindingId",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the authored findings-spec for an operational object kind, or case.<caseType> for one Case type falling back to the generic Case spec, else the built-in default. No capability gate. 400 for an unknown kind.",
         "parameters" : [ {
           "name" : "findingId",
           "in" : "path",
@@ -585,9 +585,9 @@
     "/notes/{noteId}/{noteId2}" : {
       "get" : {
         "tags" : [ "notes" ],
-        "summary" : "GET /notes/{noteId}/{noteId2} (generated skeleton)",
+        "summary" : "All notes on a target",
         "operationId" : "getNotesByNoteIdByNoteId2",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the comments and attachments on one target, newest first; the path names the target kind (object, or a component type such as link-analysis-view) and the target id. No capability gate; the caller must be able to see the target. 400 for an unknown target kind; 404 for an absent or not-visible target.",
         "parameters" : [ {
           "name" : "noteId",
           "in" : "path",
@@ -615,9 +615,9 @@
     "/notes/{noteId}/{noteId2}/comments" : {
       "get" : {
         "tags" : [ "notes" ],
-        "summary" : "GET /notes/{noteId}/{noteId2}/comments (generated skeleton)",
+        "summary" : "Comments on a target",
         "operationId" : "getNotesByNoteIdByNoteId2Comments",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the comments on one target, newest first; the path names the target kind (object or a component type) and the target id. An object's notes are masked for a caller who cannot reveal keys. No capability gate; the caller must be able to see the target. 400 for an unknown target kind; 404 for an absent or not-visible target.",
         "parameters" : [ {
           "name" : "noteId",
           "in" : "path",
@@ -643,9 +643,9 @@
       },
       "post" : {
         "tags" : [ "notes" ],
-        "summary" : "POST /notes/{noteId}/{noteId2}/comments (generated skeleton)",
+        "summary" : "Comment on a target",
         "operationId" : "postNotesByNoteIdByNoteId2Comments",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Adds a comment (body body) to the target named by the path's kind and id; the author is the signed-in Subject, else body author. No capability gate; the caller must be able to see the target. 400 when body is missing or the target kind is unknown; 404 for an absent or not-visible target.",
         "parameters" : [ {
           "name" : "noteId",
           "in" : "path",
@@ -673,9 +673,9 @@
     "/notes/{noteId}/{noteId2}/attachments" : {
       "get" : {
         "tags" : [ "notes" ],
-        "summary" : "GET /notes/{noteId}/{noteId2}/attachments (generated skeleton)",
+        "summary" : "Attachments on a target",
         "operationId" : "getNotesByNoteIdByNoteId2Attachments",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the evidence attachments on one target, newest first; the path names the target kind (object or a component type) and the target id. No capability gate; the caller must be able to see the target. 400 for an unknown target kind; 404 for an absent or not-visible target.",
         "parameters" : [ {
           "name" : "noteId",
           "in" : "path",
@@ -701,9 +701,9 @@
       },
       "post" : {
         "tags" : [ "notes" ],
-        "summary" : "POST /notes/{noteId}/{noteId2}/attachments (generated skeleton)",
+        "summary" : "Attach evidence to a target",
         "operationId" : "postNotesByNoteIdByNoteId2Attachments",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Records an evidence reference, metadata only (body name, uri, optional contentType, author, caption), on the target named by the path's kind and id. No capability gate; the caller must be able to see the target. 400 when name or uri is missing or the target kind is unknown; 404 for an absent or not-visible target.",
         "parameters" : [ {
           "name" : "noteId",
           "in" : "path",
@@ -731,9 +731,9 @@
     "/tags" : {
       "get" : {
         "tags" : [ "tags" ],
-        "summary" : "GET /tags (generated skeleton)",
+        "summary" : "List tags",
         "operationId" : "getTags",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the tag registry, first adopting tags that exist only inside a Widget's own config. No capability gate. 503 when operational objects are not available.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -744,9 +744,9 @@
       },
       "post" : {
         "tags" : [ "tags" ],
-        "summary" : "POST /tags (generated skeleton)",
+        "summary" : "Create a tag",
         "operationId" : "postTags",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Registers a tag (body name) and persists it as <name>_tag.toon under the write root. Gated on canAuthorWorkbench. 409 when the tag already exists; 422 for an invalid, unsafe or unmodelled body; 403 when the file path escapes the write root; 503 when the control plane is read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -759,9 +759,9 @@
     "/tags/{tagId}/rename" : {
       "post" : {
         "tags" : [ "tags" ],
-        "summary" : "POST /tags/{tagId}/rename (generated skeleton)",
+        "summary" : "Rename a tag everywhere",
         "operationId" : "postTagsByTagIdRename",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Renames a tag (body to) across the registry, every assignment, each affected object's and Widget's tags and any tag rule that applies it; renaming onto an existing tag merges the two. Gated on canAuthorWorkbench. 400 when to is missing; 404 for an unknown tag; 422 for an invalid or unsafe name; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "tagId",
           "in" : "path",
@@ -782,9 +782,9 @@
     "/tags/rules" : {
       "get" : {
         "tags" : [ "tags" ],
-        "summary" : "GET /tags/rules (generated skeleton)",
+        "summary" : "List tag rules",
         "operationId" : "getTagsRules",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the tag rules, saved searches that auto-tag new operational objects. No capability gate. 503 when operational objects are not available.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -795,9 +795,9 @@
       },
       "post" : {
         "tags" : [ "tags" ],
-        "summary" : "POST /tags/rules (generated skeleton)",
+        "summary" : "Save a tag rule",
         "operationId" : "postTagsRules",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Creates or replaces a tag rule (body name, tag, filter with at least one of type, q, status, priority, severity, category), persisted as <name>_tagrule.toon; saving registers the tag rule's tag. Gated on canAuthorWorkbench. 422 for an invalid or unmodelled body, an unknown filter key or an unsafe name; 403 when the file path escapes the write root; 503 when the control plane is read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -810,9 +810,9 @@
     "/tags/rules/{ruleId}" : {
       "delete" : {
         "tags" : [ "tags" ],
-        "summary" : "DELETE /tags/rules/{ruleId} (generated skeleton)",
+        "summary" : "Delete a tag rule",
         "operationId" : "deleteTagsRulesByRuleId",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Removes the tag rule from the registry and deletes its persisted file. Gated on canAuthorWorkbench. 404 for an unknown tag rule; 422 for an unsafe name; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "ruleId",
           "in" : "path",
@@ -833,9 +833,9 @@
     "/tags/rules/{ruleId}/apply" : {
       "post" : {
         "tags" : [ "tags" ],
-        "summary" : "POST /tags/rules/{ruleId}/apply (generated skeleton)",
+        "summary" : "Apply a tag rule to existing objects",
         "operationId" : "postTagsRulesByRuleIdApply",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Bulk-applies the tag rule to every existing matching operational object (idempotent) and returns matched and updated. No capability gate. 404 for an unknown tag rule.",
         "parameters" : [ {
           "name" : "ruleId",
           "in" : "path",
@@ -856,9 +856,9 @@
     "/tags/{tagId}/targets" : {
       "get" : {
         "tags" : [ "tags" ],
-        "summary" : "GET /tags/{tagId}/targets (generated skeleton)",
+        "summary" : "Everything carrying a tag",
         "operationId" : "getTagsByTagIdTargets",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the tag's assignments across target kinds, filtered to the targets the caller may see, so counts can differ between callers. No capability gate.",
         "parameters" : [ {
           "name" : "tagId",
           "in" : "path",
@@ -879,9 +879,9 @@
     "/tags/assignments/{assignmentId}/{assignmentId2}" : {
       "get" : {
         "tags" : [ "tags" ],
-        "summary" : "GET /tags/assignments/{assignmentId}/{assignmentId2} (generated skeleton)",
+        "summary" : "Tags on one target",
         "operationId" : "getTagsAssignmentsByAssignmentIdByAssignmentId2",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the tags on the target named by the path's target kind and target id, alphabetical. No capability gate; the caller must be able to see the target. 404 for an absent or not-visible target; 400 for an unknown target kind.",
         "parameters" : [ {
           "name" : "assignmentId",
           "in" : "path",
@@ -907,9 +907,9 @@
       },
       "post" : {
         "tags" : [ "tags" ],
-        "summary" : "POST /tags/assignments/{assignmentId}/{assignmentId2} (generated skeleton)",
+        "summary" : "Apply a tag to a target",
         "operationId" : "postTagsAssignmentsByAssignmentIdByAssignmentId2",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Applies an existing tag (body tag, optional actor) to the target named by the path's target kind and id, idempotently, and returns the stored assignment. No capability gate; the caller must be able to see the target. 400 when tag is missing; 404 for an absent or not-visible target or an unregistered tag.",
         "parameters" : [ {
           "name" : "assignmentId",
           "in" : "path",
@@ -937,9 +937,9 @@
     "/tags/assignments/{assignmentId}/{assignmentId2}/{assignmentId22}" : {
       "delete" : {
         "tags" : [ "tags" ],
-        "summary" : "DELETE /tags/assignments/{assignmentId}/{assignmentId2}/{assignmentId22} (generated skeleton)",
+        "summary" : "Remove a tag from a target",
         "operationId" : "deleteTagsAssignmentsByAssignmentIdByAssignmentId2ByAssignmentId22",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Removes one tag (last path segment) from the target named by the path's target kind and id, idempotently, and reports whether it was removed. No capability gate; the caller must be able to see the target. 404 for an absent or not-visible target; 400 for an unknown target kind.",
         "parameters" : [ {
           "name" : "assignmentId",
           "in" : "path",
@@ -974,9 +974,9 @@
     "/tags/{tagId}" : {
       "delete" : {
         "tags" : [ "tags" ],
-        "summary" : "DELETE /tags/{tagId} (generated skeleton)",
+        "summary" : "Delete a tag",
         "operationId" : "deleteTagsByTagId",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Retires a tag: its registry entry, its file and every assignment, re-projecting each affected object and Widget. Gated on canAuthorWorkbench. 404 for an unknown tag; 409 while a tag rule still applies it; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "tagId",
           "in" : "path",
@@ -997,9 +997,9 @@
     "/objects/{objectId}/postmortem" : {
       "put" : {
         "tags" : [ "objects" ],
-        "summary" : "PUT /objects/{objectId}/postmortem (generated skeleton)",
+        "summary" : "Save an Incident's postmortem",
         "operationId" : "putObjectsByObjectIdPostmortem",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Stores body postmortem (an object, and nothing else) as the object's postmortem attribute, which resolving an Incident requires; audited with the request's actor. Gated on canWorkIncidents. 400 when postmortem is missing or not an object; 422 for any other body key; 404 for an unknown or out-of-scope object; 409 for an inert object.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",
@@ -1086,9 +1086,9 @@
     "/objects/{objectId}/category" : {
       "put" : {
         "tags" : [ "objects" ],
-        "summary" : "PUT /objects/{objectId}/category (generated skeleton)",
+        "summary" : "Set an operational object's category",
         "operationId" : "putObjectsByObjectIdCategory",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Sets body category (a non-blank string, and nothing else), the categorisation Accept requires; audited with the request's actor. Gated on canWorkIncidents. 400 when category is missing or blank; 422 for any other body key; 404 for an unknown or out-of-scope object; 409 for an inert object.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",

@@ -92,6 +92,8 @@ The contract is [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (O
 - To add a route, add its operation to your module's fragment and run `node tools/openapi-merge.mjs --write`.
 - `OpenApiPathsContractTest` fails when a live route has no operation. `tools/check-openapi-fragments.mjs` and
   `ContractFragmentsTest` check the merge and each module's `provides.routes`.
+- Give the new operation a real summary and description. `tools/check-openapi-summaries.mjs` fails on the
+  generated skeleton summary.
 
 Read [`docs/api/README.md`](../../../../api/README.md).
 

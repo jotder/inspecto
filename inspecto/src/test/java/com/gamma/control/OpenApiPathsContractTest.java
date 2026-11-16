@@ -115,7 +115,8 @@ class OpenApiPathsContractTest {
             return;
         }
         assertTrue(missing.isEmpty(), () -> missing.size() + " live route(s) have NO operation in docs/api/openapi-v1.json."
-                + " Regenerate the skeleton with -Dopenapi.paths.write=true (then fill in schemas by hand), or document"
+                + " Regenerate the skeleton with -Dopenapi.paths.write=true (then write its summary and description, which"
+                + " tools/check-openapi-summaries.mjs requires, and fill in schemas by hand), or document"
                 + " them: " + missing);
         assertTrue(stale.isEmpty(), () -> "generated skeleton(s) whose route no longer exists — regenerate with"
                 + " -Dopenapi.paths.write=true: " + stale);

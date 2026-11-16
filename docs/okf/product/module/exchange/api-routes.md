@@ -15,18 +15,18 @@ tags: [api, routes, generated]
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
-| GET | `/exchange/datasets/{datasetId}/{datasetId2}` | GET /exchange/datasets/{datasetId}/{datasetId2} (generated skeleton) | exchange | — | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
-| GET | `/exchange/grants` | GET /exchange/grants (generated skeleton) | exchange | — | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
-| POST | `/exchange/grants/{grantId}/{action}` | POST /exchange/grants/{grantId}/{action} (generated skeleton) | exchange | `canApproveShares` | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
-| POST | `/exchange/grants/{grantId}/expiry` | POST /exchange/grants/{grantId}/expiry (generated skeleton) | exchange | `canApproveShares` | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
-| POST | `/exchange/grants/{grantId}/pin` | POST /exchange/grants/{grantId}/pin (generated skeleton) | exchange | `canRequestShares` | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
-| GET | `/exchange/offers` | GET /exchange/offers (generated skeleton) | exchange | — | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
-| POST | `/exchange/offers` | POST /exchange/offers (generated skeleton) | exchange | `canOfferDatasets` | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
-| POST | `/exchange/refresh` | POST /exchange/refresh (generated skeleton) | exchange | `canOfferDatasets` | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
-| POST | `/exchange/requests` | POST /exchange/requests (generated skeleton) | exchange | `canRequestShares` | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
-| POST | `/exchange/signal-offers` | POST /exchange/signal-offers (generated skeleton) | exchange | `canOfferSignals` | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
-| GET | `/exchange/views/{viewId}/{viewId2}` | GET /exchange/views/{viewId}/{viewId2} (generated skeleton) | exchange | — | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
-| GET | `/exchange/widgets/{widgetId}/{widgetId2}` | GET /exchange/widgets/{widgetId}/{widgetId2} (generated skeleton) | exchange | — | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
+| GET | `/exchange/datasets/{datasetId}/{datasetId2}` | One offered Dataset's Exchange metadata | exchange | — | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
+| GET | `/exchange/grants` | List Exchange grants | exchange | — | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
+| POST | `/exchange/grants/{grantId}/{action}` | Approve, deny or revoke an Exchange grant | exchange | `canApproveShares` | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
+| POST | `/exchange/grants/{grantId}/expiry` | Set an Exchange grant's expiry | exchange | `canApproveShares` | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
+| POST | `/exchange/grants/{grantId}/pin` | Pin an Exchange grant to a snapshot version | exchange | `canRequestShares` | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
+| GET | `/exchange/offers` | List Exchange offers | exchange | — | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
+| POST | `/exchange/offers` | Offer a Dataset, Widget or saved View on the Exchange | exchange | `canOfferDatasets` | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
+| POST | `/exchange/refresh` | Refresh an offered Dataset's snapshot | exchange | `canOfferDatasets` | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
+| POST | `/exchange/requests` | Request a share from another Space | exchange | `canRequestShares` | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
+| POST | `/exchange/signal-offers` | Offer a Signal type on the Exchange | exchange | `canOfferSignals` | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
+| GET | `/exchange/views/{viewId}/{viewId2}` | Render-only view of a shared saved View | exchange | — | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
+| GET | `/exchange/widgets/{widgetId}/{widgetId2}` | Render-only view of a shared Widget | exchange | — | `features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java` |
 
 ## Drift
 

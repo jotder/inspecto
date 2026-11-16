@@ -3,9 +3,9 @@
     "/inv/investigations/{investigationId}/measures" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations/{investigationId}/measures (generated skeleton)",
+        "summary" : "Measures over an Investigation's Working Set",
         "operationId" : "getInvInvestigationsByInvestigationIdMeasures",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the declared Measures over the Working Set (entity, link, event and excluded counts, deepest hop, links by kind) and optionally one more in Measure shorthand (query relation and measure, given together), exactly what a bound Alert Rule would compute. No capability gate; any member or linked-Case member may read it. 422 for a measure without its relation or an invalid measure; 404 when absent or not readable.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -26,9 +26,9 @@
     "/inv/investigations/{investigationId}/data-changes" : {
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations/{investigationId}/data-changes (generated skeleton)",
+        "summary" : "Corrected days in an Investigation's window",
         "operationId" : "getInvInvestigationsByInvestigationIdDataChanges",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Lists the delivery-anomaly Signals (redelivered, renamed correction, part count changed, duplicate skipped) that moved a day inside the Investigation's window since the analyst last looked, attributed to the Dataset through Consignment lineage; assessed false when no Pipeline can be attributed. No capability gate; any member or linked-Case member may read it. 404 when the Investigation is absent or not readable.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -49,9 +49,9 @@
     "/inv/investigations/{investigationId}/alert-rules" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/alert-rules (generated skeleton)",
+        "summary" : "Bind an Alert Rule to an Investigation Measure",
         "operationId" : "postInvInvestigationsByInvestigationIdAlertRules",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Creates an Alert Rule over one Working Set Measure (body name, optional relation, measure, comparator, threshold, severity; or name, valueMeasure, severity), records the binding and arms it. Gated on canAuthorAlertRules, and the caller must be a lead. 422 for a field outside that shape, an invalid Alert Rule or an unevaluable Measure; 409 when the name is taken; 404 when the Investigation is absent or not readable; 503 when the alert engine is unavailable.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -70,9 +70,9 @@
       },
       "get" : {
         "tags" : [ "inv" ],
-        "summary" : "GET /inv/investigations/{investigationId}/alert-rules (generated skeleton)",
+        "summary" : "Alert Rules bound to an Investigation",
         "operationId" : "getInvInvestigationsByInvestigationIdAlertRules",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the Alert Rules bound to the Investigation, whether each was edited out of band since binding, and its standing-detection state (enabled, principal, enabledAt, dataset). No capability gate; any member or linked-Case member may read it. 404 when the Investigation is absent or not readable; 503 when the alert engine is unavailable or the control plane is read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -93,9 +93,9 @@
     "/inv/investigations/{investigationId}/standing-detection" : {
       "post" : {
         "tags" : [ "inv" ],
-        "summary" : "POST /inv/investigations/{investigationId}/standing-detection (generated skeleton)",
+        "summary" : "Enable standing detection for a bound Alert Rule",
         "operationId" : "postInvInvestigationsByInvestigationIdStandingDetection",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Records the owner's authority so a bound value-measure Alert Rule (body rule) keeps reading the live Dataset, re-decided at every Alert sweep. Gated on canAuthorAlertRules; the Investigation's owner only. 422 for another body field, an unsafe name, a non-value-measure Alert Rule or refused authority; 403 for a caller who is not the owner; 404 for an Alert Rule not armed or not bound here; 409 when it was edited since binding; 503 when the alert engine is unavailable.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -116,9 +116,9 @@
     "/inv/investigations/{investigationId}/standing-detection/{standingdetectionId}" : {
       "delete" : {
         "tags" : [ "inv" ],
-        "summary" : "DELETE /inv/investigations/{investigationId}/standing-detection/{standingdetectionId} (generated skeleton)",
+        "summary" : "Disable standing detection for a bound Alert Rule",
         "operationId" : "deleteInvInvestigationsByInvestigationIdStandingDetectionByStandingdetectionId",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Drops the recorded authority of the named bound Alert Rule, so every sweep refuses it; the Alert Rule stays bound and armed. Idempotent. Gated on canAuthorAlertRules, and the caller must be a lead. 422 for an unsafe Alert Rule name; 404 when it is not bound to this Investigation or the Investigation is absent or not readable; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -146,9 +146,9 @@
     "/inv/investigations/{investigationId}/alert-rules/{alertruleId}" : {
       "put" : {
         "tags" : [ "inv" ],
-        "summary" : "PUT /inv/investigations/{investigationId}/alert-rules/{alertruleId} (generated skeleton)",
+        "summary" : "Edit an Investigation's bound Alert Rule",
         "operationId" : "putInvInvestigationsByInvestigationIdAlertRulesByAlertruleId",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Replaces a bound Alert Rule in place with the binding route's body (name, when given, must equal the path's); the binding takes the new Alert Rule's hash and loses its standing-detection authority. Gated on canAuthorAlertRules, and the caller must be a lead. 422 for a different name, a body outside the shape or an invalid Alert Rule; 404 when it is not armed or not bound here; 409 when it was edited out of band; 503 when the alert engine is unavailable.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",

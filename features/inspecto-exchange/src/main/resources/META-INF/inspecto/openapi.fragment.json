@@ -3,9 +3,9 @@
     "/exchange/offers" : {
       "get" : {
         "tags" : [ "exchange" ],
-        "summary" : "GET /exchange/offers (generated skeleton)",
+        "summary" : "List Exchange offers",
         "operationId" : "getExchangeOffers",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the cross-Space shareable catalog (metadata only, never rows) with each offer's snapshot freshness and last refresh outcome; optional query owner narrows to one Space. No capability gate. 409 in single-tenant mode, where cross-Space sharing is not available.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -16,9 +16,9 @@
       },
       "post" : {
         "tags" : [ "exchange" ],
-        "summary" : "POST /exchange/offers (generated skeleton)",
+        "summary" : "Offer a Dataset, Widget or saved View on the Exchange",
         "operationId" : "postExchangeOffers",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Lists or updates an offer of a component in the owner Space (body kind dataset|widget|view, owner, item, optional description, resultSet, refresh); a Widget or saved View needs its Datasets offered first. Gated on canOfferDatasets in the owner Space. 400 for a bad kind, item or owner, or a signal kind; 404 for an unknown Space or component; 409 in single-tenant mode or when a bound Dataset is not offered; 422 for an invalid refresh or an unshareable component.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -31,9 +31,9 @@
     "/exchange/signal-offers" : {
       "post" : {
         "tags" : [ "exchange" ],
-        "summary" : "POST /exchange/signal-offers (generated skeleton)",
+        "summary" : "Offer a Signal type on the Exchange",
         "operationId" : "postExchangeSignalOffers",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "The owner Space announces a dotted Signal type (body owner, item, optional description, payloadKeys allowlist) that another Space may request to receive. Gated on canOfferSignals in the owner Space. 400 for an invalid owner, Signal type or payload key; 403 when the owner Space is not hosted; 422 for a delivered exchange.* Signal type; 409 in single-tenant mode.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -46,9 +46,9 @@
     "/exchange/refresh" : {
       "post" : {
         "tags" : [ "exchange" ],
-        "summary" : "POST /exchange/refresh (generated skeleton)",
+        "summary" : "Refresh an offered Dataset's snapshot",
         "operationId" : "postExchangeRefresh",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Publishes a fresh Exchange snapshot of an offered Dataset from the owner Space's current data (body owner, item) and returns the snapshot metadata. Gated on canOfferDatasets in the owner Space. 400 for an invalid owner or item; 404 for an unknown Space or a Dataset that is not offered; 409 in single-tenant mode or when the Space has no registry; 422 when the snapshot is refused as invalid.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -61,9 +61,9 @@
     "/exchange/requests" : {
       "post" : {
         "tags" : [ "exchange" ],
-        "summary" : "POST /exchange/requests (generated skeleton)",
+        "summary" : "Request a share from another Space",
         "operationId" : "postExchangeRequests",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "A consumer Space requests use of an offered item (body kind, owner, consumer, item, optional purpose, mode) and receives the requested grant. Gated on canRequestShares in the consumer Space. 400 for a bad kind, item or Space id, or a Space requesting from itself; 404 for an unknown Space or no such offer; 409 in single-tenant mode or for a conflicting grant; 422 for an invalid mode.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -76,9 +76,9 @@
     "/exchange/grants/{grantId}/{action}" : {
       "post" : {
         "tags" : [ "exchange" ],
-        "summary" : "POST /exchange/grants/{grantId}/{action} (generated skeleton)",
+        "summary" : "Approve, deny or revoke an Exchange grant",
         "operationId" : "postExchangeGrantsByGrantIdByAction",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "The owner Space acts on a share grant; action is approve, deny or revoke. Approving a snapshot-mode Dataset share also publishes its first snapshot and reports the outcome under snapshots. Gated on canApproveShares in the grant's owner Space. 404 for an unknown grant; 409 in single-tenant mode or when the grant's state does not allow the action.",
         "parameters" : [ {
           "name" : "grantId",
           "in" : "path",
@@ -106,9 +106,9 @@
     "/exchange/grants/{grantId}/pin" : {
       "post" : {
         "tags" : [ "exchange" ],
-        "summary" : "POST /exchange/grants/{grantId}/pin (generated skeleton)",
+        "summary" : "Pin an Exchange grant to a snapshot version",
         "operationId" : "postExchangeGrantsByGrantIdPin",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "The consumer Space sets or clears (body version) the snapshot version its grant resolves to. Gated on canRequestShares in the grant's consumer Space. 404 for an unknown grant; 409 in single-tenant mode.",
         "parameters" : [ {
           "name" : "grantId",
           "in" : "path",
@@ -129,9 +129,9 @@
     "/exchange/grants/{grantId}/expiry" : {
       "post" : {
         "tags" : [ "exchange" ],
-        "summary" : "POST /exchange/grants/{grantId}/expiry (generated skeleton)",
+        "summary" : "Set an Exchange grant's expiry",
         "operationId" : "postExchangeGrantsByGrantIdExpiry",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "The owner Space sets or clears a grant's expiry; body expiresAt is epoch millis, null or absent clears it. Gated on canApproveShares in the grant's owner Space. 400 when expiresAt is not epoch millis; 404 for an unknown grant; 409 in single-tenant mode.",
         "parameters" : [ {
           "name" : "grantId",
           "in" : "path",
@@ -152,9 +152,9 @@
     "/exchange/grants" : {
       "get" : {
         "tags" : [ "exchange" ],
-        "summary" : "GET /exchange/grants (generated skeleton)",
+        "summary" : "List Exchange grants",
         "operationId" : "getExchangeGrants",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the share-grant ledger; optional query space narrows it to grants shared by or with that Space. No capability gate. 409 in single-tenant mode.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -167,9 +167,9 @@
     "/exchange/datasets/{datasetId}/{datasetId2}" : {
       "get" : {
         "tags" : [ "exchange" ],
-        "summary" : "GET /exchange/datasets/{datasetId}/{datasetId2} (generated skeleton)",
+        "summary" : "One offered Dataset's Exchange metadata",
         "operationId" : "getExchangeDatasetsByDatasetIdByDatasetId2",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the offer for the Dataset named by the path's owner Space and item, with snapshot freshness; with query consumer it also carries that consumer's grant. No capability gate. 404 when the Dataset is not offered; 409 in single-tenant mode.",
         "parameters" : [ {
           "name" : "datasetId",
           "in" : "path",
@@ -197,9 +197,9 @@
     "/exchange/widgets/{widgetId}/{widgetId2}" : {
       "get" : {
         "tags" : [ "exchange" ],
-        "summary" : "GET /exchange/widgets/{widgetId}/{widgetId2} (generated skeleton)",
+        "summary" : "Render-only view of a shared Widget",
         "operationId" : "getExchangeWidgetsByWidgetIdByWidgetId2",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the Widget's config (path names the owner Space and Widget) read-only, with the shared Dataset ref the consumer binds through. No capability gate; the consumer's grants decide. 400 when query consumer is missing; 403 without an active grant on the Widget and its Dataset; 404 for an unknown Space or Widget; 409 in single-tenant mode.",
         "parameters" : [ {
           "name" : "widgetId",
           "in" : "path",
@@ -227,9 +227,9 @@
     "/exchange/views/{viewId}/{viewId2}" : {
       "get" : {
         "tags" : [ "exchange" ],
-        "summary" : "GET /exchange/views/{viewId}/{viewId2} (generated skeleton)",
+        "summary" : "Render-only view of a shared saved View",
         "operationId" : "getExchangeViewsByViewIdByViewId2",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the saved View's config (path names the owner Space and View) read-only, its Dataset mappings rewritten to the consumer's shared refs. No capability gate; the consumer's grants decide. 400 when query consumer is missing; 403 without an active grant on the View and every Dataset it reads; 404 for an unknown Space or View; 409 in single-tenant mode.",
         "parameters" : [ {
           "name" : "viewId",
           "in" : "path",

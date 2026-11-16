@@ -15,15 +15,15 @@ tags: [api, routes, generated]
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
-| GET | `/action-requests` | GET /action-requests (generated skeleton) | action-requests | — | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java` |
-| POST | `/action-requests` | POST /action-requests (generated skeleton) | action-requests | `canWorkIncidents` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java` |
-| GET | `/action-requests/{actionrequestId}` | GET /action-requests/{actionrequestId} (generated skeleton) | action-requests | — | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java` |
-| POST | `/action-requests/{actionrequestId}/approve` | POST /action-requests/{actionrequestId}/approve (generated skeleton) | action-requests | `canApproveChanges` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java` |
-| POST | `/action-requests/{actionrequestId}/decline` | POST /action-requests/{actionrequestId}/decline (generated skeleton) | action-requests | `canApproveChanges` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java` |
-| POST | `/action-requests/{actionrequestId}/mark-failed` | POST /action-requests/{actionrequestId}/mark-failed (generated skeleton) | action-requests | `canApproveChanges` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java` |
-| POST | `/action-requests/{actionrequestId}/retry` | POST /action-requests/{actionrequestId}/retry (generated skeleton) | action-requests | `canApproveChanges` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java` |
-| GET | `/incidents/{incidentId}/briefs` | GET /incidents/{incidentId}/briefs (generated skeleton) | incidents | `canWorkIncidents` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/IncidentBriefRoutes.java` |
-| POST | `/incidents/{incidentId}/briefs` | POST /incidents/{incidentId}/briefs (generated skeleton) | incidents | `canWorkIncidents` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/IncidentBriefRoutes.java` |
+| GET | `/action-requests` | List Action Requests | action-requests | — | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java` |
+| POST | `/action-requests` | Propose an Action Request | action-requests | `canWorkIncidents` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java` |
+| GET | `/action-requests/{actionrequestId}` | One Action Request | action-requests | — | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java` |
+| POST | `/action-requests/{actionrequestId}/approve` | Approve an Action Request | action-requests | `canApproveChanges` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java` |
+| POST | `/action-requests/{actionrequestId}/decline` | Decline an Action Request | action-requests | `canApproveChanges` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java` |
+| POST | `/action-requests/{actionrequestId}/mark-failed` | Mark a stuck Action Request failed | action-requests | `canApproveChanges` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java` |
+| POST | `/action-requests/{actionrequestId}/retry` | Retry a failed Action Request | action-requests | `canApproveChanges` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java` |
+| GET | `/incidents/{incidentId}/briefs` | Briefs of an Incident | incidents | `canWorkIncidents` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/IncidentBriefRoutes.java` |
+| POST | `/incidents/{incidentId}/briefs` | Build an Incident Brief | incidents | `canWorkIncidents` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/IncidentBriefRoutes.java` |
 
 ## Drift
 

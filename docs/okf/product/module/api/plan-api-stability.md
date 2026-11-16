@@ -598,6 +598,20 @@ Most of these commits are not marked `!`, so a commit-type scan misses them.*
 ⛔ **The `consignment.process` contract stays FROZEN, including its correlation identifier** — plugins
 already depend on it, so the token work must not change that shape as a side effect. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
 
+**Additive — every public OpenAPI operation is described (2026-11-17, `OPENAPI-SKELETON-SUMMARIES-1`, MoSCoW C3)**
+- `docs/api/openapi-v1.json` (also served at `GET /api/v1/openapi.json`) had 440 operations that were generated
+  skeletons: the summary `<METHOD> <path> (generated skeleton)` and a stock description. 439 of them now carry a
+  summary and a one- or two-sentence description read from the handler: what the route does, the capability it
+  needs, and its main refusals. The text lives in each module's `openapi.fragment.json`.
+- **Public** means every `/api/v1` operation registered by shipped (main) code. The server has no internal or
+  UI-only route class, and the console calls the same surface an integrator does. The one skeleton left,
+  `GET /test-discovered/ping`, is registered only by the test RouteModule `TestDiscoveredRoutes`.
+- Those operations keep `x-generated: true`: they still have no request or response schemas, so the schema
+  coverage `ApiContractTest` prints is unchanged.
+- Guard: `tools/check-openapi-summaries.mjs` (CI `guards` job) fails on a skeleton summary or the stock description
+  outside its allow-list. The allow-list may only shrink: an entry that gets a real summary, or whose route is
+  gone, also fails.
+
 **Deferred to this same release by decision:** the token *runtime* model (D2 —
 [`node-types.md`](../engine/spec-node-types.md) § *The token model*), the ELT
 Phase 6 deletion of the flat read path (Row 15; the operator decided 2026-11-16 to delete it in 4.0.0 itself,
@@ -688,6 +702,9 @@ that contract is documented on `StreamingFileIngester`/`RecordSink`, not on `Dat
 
 ## What is *not* covered by code-level stability — but is still stable
 
+- **HTTP Control API contract** (`docs/api/openapi-v1.json`) — additive-only within `/api/v1` (rules in
+  [`docs/api/README.md`](../../../../api/README.md)); every public operation has a real summary and description
+  (`tools/check-openapi-summaries.mjs`).
 - **Pipeline `.toon` config format** — treated as a stable user-facing contract;
   changes are additive and documented in [configuration.md](../config/admin-guide-configuration-reference.md).
 - **On-disk output** (Hive-partitioned Parquet/CSV layout, audit CSVs, commit log

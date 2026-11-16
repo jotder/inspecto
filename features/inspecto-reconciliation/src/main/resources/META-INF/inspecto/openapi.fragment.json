@@ -3,9 +3,9 @@
     "/recon/columns" : {
       "post" : {
         "tags" : [ "recon" ],
-        "summary" : "POST /recon/columns (generated skeleton)",
+        "summary" : "Inventory the columns of Reconciliation Datasets",
         "operationId" : "postReconColumns",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns each listed Dataset's columns plus the cross-side auto-matches for a Reconciliation's unified column list; body datasets is the list of Dataset ids. No capability gate. 422 when datasets is missing, a Dataset config is unusable or the inventory query fails; 404 for an unknown Dataset; 503 when the control plane is read-only or the query sandbox cannot be opened.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -290,9 +290,9 @@
     "/recon/promote" : {
       "post" : {
         "tags" : [ "recon" ],
-        "summary" : "POST /recon/promote (generated skeleton)",
+        "summary" : "Promote a Reconciliation Break to an Incident",
         "operationId" : "postReconPromote",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Opens one Incident for a single Break of a saved Reconciliation (body reconciliation, key, optional type, column, runId), deduped on the Break's (type, key, column) identity; returns incidentId and deduped. Gated on canManageIncidents. 422 when reconciliation or key is missing; 404 for an unknown Reconciliation; 503 when the control plane is read-only or operational objects are not installed.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -304,9 +304,9 @@
     "/recon/promoted" : {
       "get" : {
         "tags" : [ "recon" ],
-        "summary" : "GET /recon/promoted (generated skeleton)",
+        "summary" : "Breaks of a Reconciliation that have an active Incident",
         "operationId" : "getReconPromoted",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Maps each Break identity of the Reconciliation named by query reconciliation to its active (non-terminal) Incident id, capped at 1000 entries with the true total and a truncated flag. No capability gate. 422 when reconciliation is missing or not a safe name; 404 for an unknown Reconciliation; 503 when operational objects are not installed.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -318,9 +318,9 @@
     "/recon/rows" : {
       "post" : {
         "tags" : [ "recon" ],
-        "summary" : "POST /recon/rows (generated skeleton)",
+        "summary" : "Raw rows behind one Reconciliation key",
         "operationId" : "postReconRows",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the raw rows on both compared sides for one key of a saved Reconciliation (id) or an inline config; body key must name every key column, with optional side (b or c), day and limit. No capability gate. 422 when key is missing, side is not b|c or the config or comparison fails; 404 for an unknown Reconciliation or Dataset; 503 when the control plane is read-only or the query sandbox cannot be opened.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -368,9 +368,9 @@
     "/recon/state" : {
       "get" : {
         "tags" : [ "recon" ],
-        "summary" : "GET /recon/state (generated skeleton)",
+        "summary" : "Last-run state of every Reconciliation",
         "operationId" : "getReconState",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Lists one row per saved Reconciliation with lastRunAt and runs (never-run ones included), capped at 1000 with the true total and a truncated flag; empty when no write root is set. No capability gate. 403 when a state file escapes its jail; 503 when a recorded state cannot be read.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -382,9 +382,9 @@
     "/recon/{reconId}/state" : {
       "get" : {
         "tags" : [ "recon" ],
-        "summary" : "GET /recon/{reconId}/state (generated skeleton)",
+        "summary" : "Recorded state of one Reconciliation",
         "operationId" : "getReconByReconIdState",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the Reconciliation's recorded lastRunAt, runs and Breaks, each with occurrences, recurrences, lastSeenAt, assignee and the read-time ageDays. No capability gate. 422 for an unsafe id; 404 for an unknown Reconciliation; 403 when the state path escapes its jail; 503 when the state cannot be read.",
         "parameters" : [ {
           "name" : "reconId",
           "in" : "path",
@@ -404,9 +404,9 @@
     "/recon/{reconId}/record" : {
       "post" : {
         "tags" : [ "recon" ],
-        "summary" : "POST /recon/{reconId}/record (generated skeleton)",
+        "summary" : "Record a run of a Reconciliation",
         "operationId" : "postReconByReconIdRecord",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision. Records ONE day (`day`, else the latest present) and answers the state plus the recorded `day` (RECON-PERF-1).",
+        "description" : "Computes every Break of the saved Reconciliation server-side (optional body day), merges them into its recorded state and stamps lastRunAt; returns the new state. Gated on canOperateRuns. 422 for an unsafe id, an unusable config, a failing comparison or more Breaks than the state may hold; 404 for an unknown Reconciliation or Dataset; 403 on a jail escape; 503 when the control plane is read-only or the sandbox or state is unavailable. Records ONE day (`day`, else the latest present) and answers the state plus the recorded `day` (RECON-PERF-1).",
         "parameters" : [ {
           "name" : "reconId",
           "in" : "path",
@@ -443,9 +443,9 @@
     "/recon/{reconId}/breaks/status" : {
       "post" : {
         "tags" : [ "recon" ],
-        "summary" : "POST /recon/{reconId}/breaks/status (generated skeleton)",
+        "summary" : "Resolve, re-open or assign a Reconciliation Break",
         "operationId" : "postReconByReconIdBreaksStatus",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Sets one Break's status by identity (body type, key, status resolved|open|assigned, optional pair AB|AC, column, day, note, and assignee only with assigned); returns the reconciliation and the updated break. Gated on canOperateRuns. 422 for an unsafe id, invalid field, AC on a two-way Reconciliation or a full state; 404 for an unknown Reconciliation; 403 on a jail escape; 503 when the control plane is read-only or the state is unreadable.",
         "parameters" : [ {
           "name" : "reconId",
           "in" : "path",

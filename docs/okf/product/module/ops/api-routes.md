@@ -15,49 +15,49 @@ tags: [api, routes, generated]
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
-| GET | `/findings/{findingId}` | GET /findings/{findingId} (generated skeleton) | findings | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| GET | `/notes/{noteId}/{noteId2}` | GET /notes/{noteId}/{noteId2} (generated skeleton) | notes | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java` |
-| GET | `/notes/{noteId}/{noteId2}/attachments` | GET /notes/{noteId}/{noteId2}/attachments (generated skeleton) | notes | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java` |
-| POST | `/notes/{noteId}/{noteId2}/attachments` | POST /notes/{noteId}/{noteId2}/attachments (generated skeleton) | notes | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java` |
-| GET | `/notes/{noteId}/{noteId2}/comments` | GET /notes/{noteId}/{noteId2}/comments (generated skeleton) | notes | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java` |
-| POST | `/notes/{noteId}/{noteId2}/comments` | POST /notes/{noteId}/{noteId2}/comments (generated skeleton) | notes | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java` |
-| GET | `/objects` | GET /objects (generated skeleton) | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| POST | `/objects` | POST /objects (generated skeleton) | objects | `canManageIncidents` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| GET | `/objects/{objectId}` | GET /objects/{objectId} (generated skeleton) | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| GET | `/findings/{findingId}` | Effective Findings sections of an object kind | findings | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| GET | `/notes/{noteId}/{noteId2}` | All notes on a target | notes | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java` |
+| GET | `/notes/{noteId}/{noteId2}/attachments` | Attachments on a target | notes | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java` |
+| POST | `/notes/{noteId}/{noteId2}/attachments` | Attach evidence to a target | notes | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java` |
+| GET | `/notes/{noteId}/{noteId2}/comments` | Comments on a target | notes | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java` |
+| POST | `/notes/{noteId}/{noteId2}/comments` | Comment on a target | notes | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java` |
+| GET | `/objects` | List operational objects | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| POST | `/objects` | Open an Incident or other operational object | objects | `canManageIncidents` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| GET | `/objects/{objectId}` | One operational object | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
 | PATCH | `/objects/{objectId}` | Edit an object's operator-mutable fields (priority, severity, assignee, attributes) | objects | `canAdminister` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| POST | `/objects/{objectId}/ack` | POST /objects/{objectId}/ack (generated skeleton) | objects | `canWorkIncidents` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| POST | `/objects/{objectId}/assign` | POST /objects/{objectId}/assign (generated skeleton) | objects | `canWorkIncidents` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| GET | `/objects/{objectId}/attachments` | GET /objects/{objectId}/attachments (generated skeleton) | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| POST | `/objects/{objectId}/attachments` | POST /objects/{objectId}/attachments (generated skeleton) | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| PUT | `/objects/{objectId}/category` | PUT /objects/{objectId}/category (generated skeleton) | objects | `canWorkIncidents` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| GET | `/objects/{objectId}/comments` | GET /objects/{objectId}/comments (generated skeleton) | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| POST | `/objects/{objectId}/comments` | POST /objects/{objectId}/comments (generated skeleton) | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| POST | `/objects/{objectId}/ack` | Acknowledge an operational object | objects | `canWorkIncidents` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| POST | `/objects/{objectId}/assign` | Assign an operational object | objects | `canWorkIncidents` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| GET | `/objects/{objectId}/attachments` | Attachments of an operational object | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| POST | `/objects/{objectId}/attachments` | Attach evidence to an operational object | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| PUT | `/objects/{objectId}/category` | Set an operational object's category | objects | `canWorkIncidents` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| GET | `/objects/{objectId}/comments` | Comments on an operational object | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| POST | `/objects/{objectId}/comments` | Comment on an operational object | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
 | PUT | `/objects/{objectId}/findings` | Save a Case's Findings values (collaboration; open to anyone who can see the object) | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| GET | `/objects/{objectId}/graph` | GET /objects/{objectId}/graph (generated skeleton) | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| GET | `/objects/{objectId}/graph` | Correlation graph around an operational object | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
 | PUT | `/objects/{objectId}/impact` | Replace an Incident's or Case's typed financial impact (WS-10) | objects | `canWorkIncidents` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| DELETE | `/objects/{objectId}/links` | DELETE /objects/{objectId}/links (generated skeleton) | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| GET | `/objects/{objectId}/links` | GET /objects/{objectId}/links (generated skeleton) | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| POST | `/objects/{objectId}/links` | POST /objects/{objectId}/links (generated skeleton) | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| PUT | `/objects/{objectId}/postmortem` | PUT /objects/{objectId}/postmortem (generated skeleton) | objects | `canWorkIncidents` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| POST | `/objects/{objectId}/rca` | POST /objects/{objectId}/rca (generated skeleton) | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| DELETE | `/objects/{objectId}/links` | Remove a link between operational objects | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| GET | `/objects/{objectId}/links` | Correlation links of an operational object | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| POST | `/objects/{objectId}/links` | Link two operational objects | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| PUT | `/objects/{objectId}/postmortem` | Save an Incident's postmortem | objects | `canWorkIncidents` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| POST | `/objects/{objectId}/rca` | Seed an RCA skeleton on an operational object | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
 | POST | `/objects/{objectId}/resolve` | Resolve an Incident, Alert or Case | objects | `canWorkIncidents` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
 | POST | `/objects/{objectId}/transition` | Move an object through its Workflow | objects | `canWorkIncidents` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| GET | `/objects/analytics` | GET /objects/analytics (generated skeleton) | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| GET | `/objects/analytics` | Operational object analytics | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
 | GET | `/objects/by-entity` | GET /objects/by-entity — an Entity's case history | objects | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| GET | `/rca/templates` | GET /rca/templates (generated skeleton) | rca | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
-| GET | `/tags` | GET /tags (generated skeleton) | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
-| POST | `/tags` | POST /tags (generated skeleton) | tags | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
-| DELETE | `/tags/{tagId}` | DELETE /tags/{tagId} (generated skeleton) | tags | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
-| POST | `/tags/{tagId}/rename` | POST /tags/{tagId}/rename (generated skeleton) | tags | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
-| GET | `/tags/{tagId}/targets` | GET /tags/{tagId}/targets (generated skeleton) | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
-| GET | `/tags/assignments/{assignmentId}/{assignmentId2}` | GET /tags/assignments/{assignmentId}/{assignmentId2} (generated skeleton) | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
-| POST | `/tags/assignments/{assignmentId}/{assignmentId2}` | POST /tags/assignments/{assignmentId}/{assignmentId2} (generated skeleton) | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
-| DELETE | `/tags/assignments/{assignmentId}/{assignmentId2}/{assignmentId22}` | DELETE /tags/assignments/{assignmentId}/{assignmentId2}/{assignmentId22} (generated skeleton) | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
-| GET | `/tags/rules` | GET /tags/rules (generated skeleton) | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
-| POST | `/tags/rules` | POST /tags/rules (generated skeleton) | tags | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
-| DELETE | `/tags/rules/{ruleId}` | DELETE /tags/rules/{ruleId} (generated skeleton) | tags | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
-| POST | `/tags/rules/{ruleId}/apply` | POST /tags/rules/{ruleId}/apply (generated skeleton) | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
-| GET | `/workflows/{workflowId}` | GET /workflows/{workflowId} (generated skeleton) | workflows | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| GET | `/rca/templates` | List RCA templates | rca | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
+| GET | `/tags` | List tags | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
+| POST | `/tags` | Create a tag | tags | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
+| DELETE | `/tags/{tagId}` | Delete a tag | tags | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
+| POST | `/tags/{tagId}/rename` | Rename a tag everywhere | tags | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
+| GET | `/tags/{tagId}/targets` | Everything carrying a tag | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
+| GET | `/tags/assignments/{assignmentId}/{assignmentId2}` | Tags on one target | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
+| POST | `/tags/assignments/{assignmentId}/{assignmentId2}` | Apply a tag to a target | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
+| DELETE | `/tags/assignments/{assignmentId}/{assignmentId2}/{assignmentId22}` | Remove a tag from a target | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
+| GET | `/tags/rules` | List tag rules | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
+| POST | `/tags/rules` | Save a tag rule | tags | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
+| DELETE | `/tags/rules/{ruleId}` | Delete a tag rule | tags | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
+| POST | `/tags/rules/{ruleId}/apply` | Apply a tag rule to existing objects | tags | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java` |
+| GET | `/workflows/{workflowId}` | Effective workflow of an object kind | workflows | — | `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java` |
 
 ## Drift
 

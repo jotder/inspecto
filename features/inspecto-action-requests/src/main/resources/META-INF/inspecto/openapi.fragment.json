@@ -3,9 +3,9 @@
     "/action-requests" : {
       "get" : {
         "tags" : [ "action-requests" ],
-        "summary" : "GET /action-requests (generated skeleton)",
+        "summary" : "List Action Requests",
         "operationId" : "getActionRequests",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the Action Requests whose linked Incident or Case the caller can see, newest first, capped at 500 with the true total and a truncated flag; query status, incidentId and caseId filter it. Needs canWorkIncidents or canApproveChanges (checked in the handler); the target's response body is withheld from non-approvers. 403 without either capability.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -15,9 +15,9 @@
       },
       "post" : {
         "tags" : [ "action-requests" ],
-        "summary" : "POST /action-requests (generated skeleton)",
+        "summary" : "Propose an Action Request",
         "operationId" : "postActionRequests",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Saves a pending outbound call raised from one Incident or Case (body connection, payloadTemplate, incidentId or caseId, optional method, idempotencyKey, reason, context) for four-eyes approval. Gated on canWorkIncidents. 422 for an unknown key, an invalid field or a Connection refused by egress checks; 404 for an unknown linked object; 413 when the rendered payload is too large; 503 when read-only or operational objects or outbound transport are absent.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -29,9 +29,9 @@
     "/action-requests/{actionrequestId}" : {
       "get" : {
         "tags" : [ "action-requests" ],
-        "summary" : "GET /action-requests/{actionrequestId} (generated skeleton)",
+        "summary" : "One Action Request",
         "operationId" : "getActionRequestsByActionrequestId",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns one Action Request with its rendered payload, the parsed egress target and, while pending, whether anyone is eligible to approve it. Needs canWorkIncidents or canApproveChanges (checked in the handler). 403 without either capability; 404 when it is absent, its linked object is not visible to the caller, or no write root is set; 422 for an unsafe id.",
         "parameters" : [ {
           "name" : "actionrequestId",
           "in" : "path",
@@ -51,9 +51,9 @@
     "/action-requests/{actionrequestId}/approve" : {
       "post" : {
         "tags" : [ "action-requests" ],
-        "summary" : "POST /action-requests/{actionrequestId}/approve (generated skeleton)",
+        "summary" : "Approve an Action Request",
         "operationId" : "postActionRequestsByActionrequestIdApprove",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Four-eyes approval of a pending Action Request (optional body reason), which then dispatches it. Gated on canApproveChanges. 403 without an authenticated Subject or when the author or a co-author decides; 422 for a body key other than reason, an over-long reason or an unsafe id; 404 when absent or not visible; 409 when it fails its integrity check or is not pending; 503 when read-only.",
         "parameters" : [ {
           "name" : "actionrequestId",
           "in" : "path",
@@ -73,9 +73,9 @@
     "/action-requests/{actionrequestId}/decline" : {
       "post" : {
         "tags" : [ "action-requests" ],
-        "summary" : "POST /action-requests/{actionrequestId}/decline (generated skeleton)",
+        "summary" : "Decline an Action Request",
         "operationId" : "postActionRequestsByActionrequestIdDecline",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Four-eyes decline of a pending Action Request (optional body reason); nothing is sent. Gated on canApproveChanges. 403 without an authenticated Subject or when the author or a co-author decides; 422 for a body key other than reason, an over-long reason or an unsafe id; 404 when absent or not visible; 409 when it fails its integrity check or is not pending; 503 when read-only.",
         "parameters" : [ {
           "name" : "actionrequestId",
           "in" : "path",
@@ -95,9 +95,9 @@
     "/action-requests/{actionrequestId}/retry" : {
       "post" : {
         "tags" : [ "action-requests" ],
-        "summary" : "POST /action-requests/{actionrequestId}/retry (generated skeleton)",
+        "summary" : "Retry a failed Action Request",
         "operationId" : "postActionRequestsByActionrequestIdRetry",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Re-dispatches a failed Action Request under the same idempotency key (optional body reason). Gated on canApproveChanges. 403 without an authenticated Subject; 422 for a body key other than reason, an over-long reason or an unsafe id; 404 when absent or not visible; 409 when it fails its integrity check or is not failed; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "actionrequestId",
           "in" : "path",
@@ -117,9 +117,9 @@
     "/action-requests/{actionrequestId}/mark-failed" : {
       "post" : {
         "tags" : [ "action-requests" ],
-        "summary" : "POST /action-requests/{actionrequestId}/mark-failed (generated skeleton)",
+        "summary" : "Mark a stuck Action Request failed",
         "operationId" : "postActionRequestsByActionrequestIdMarkFailed",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Moves an Action Request stuck in dispatched with no progress for the configured minutes (default 15) to failed, so it can be retried; optional body reason. Gated on canApproveChanges. 403 without an authenticated Subject; 422 for a body key other than reason or an unsafe id; 404 when absent or not visible; 409 when it fails its integrity check, is not dispatched or progressed too recently; 503 when read-only.",
         "parameters" : [ {
           "name" : "actionrequestId",
           "in" : "path",
@@ -139,9 +139,9 @@
     "/incidents/{incidentId}/briefs" : {
       "get" : {
         "tags" : [ "incidents" ],
-        "summary" : "GET /incidents/{incidentId}/briefs (generated skeleton)",
+        "summary" : "Briefs of an Incident",
         "operationId" : "getIncidentsByIncidentIdBriefs",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the Incident's Briefs, newest first, with their citations filtered to what the caller can see. Gated on canWorkIncidents. 404 when the Incident is absent or not visible; 422 when the object is not an Incident; 503 when operational objects are not installed.",
         "parameters" : [ {
           "name" : "incidentId",
           "in" : "path",
@@ -159,9 +159,9 @@
       },
       "post" : {
         "tags" : [ "incidents" ],
-        "summary" : "POST /incidents/{incidentId}/briefs (generated skeleton)",
+        "summary" : "Build an Incident Brief",
         "operationId" : "postIncidentsByIncidentIdBriefs",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Builds and saves a Brief for the Incident, optionally filing its proposed next action as a pending Action Request (body propose: connection, method, payloadTemplate, idempotencyKey, reason) that neither the caller nor the Brief's agent may approve. Gated on canWorkIncidents. 422 for an unknown key, a non-object propose or an object that is not an Incident; 404 when the Incident is absent or not visible; 503 when read-only or operational objects are not installed.",
         "parameters" : [ {
           "name" : "incidentId",
           "in" : "path",

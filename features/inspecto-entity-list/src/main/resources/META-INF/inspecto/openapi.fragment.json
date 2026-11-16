@@ -3,9 +3,9 @@
     "/entity-lists" : {
       "get" : {
         "tags" : [ "entity-lists" ],
-        "summary" : "GET /entity-lists (generated skeleton)",
+        "summary" : "List Entity Lists",
         "operationId" : "getEntityLists",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns every Entity List of the Space (retired ones included) as summaries, with the fact log's headSeq and headHash. No capability gate. 503 when the control plane is read-only; 500 when the fact chain is broken.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -16,9 +16,9 @@
       },
       "post" : {
         "tags" : [ "entity-lists" ],
-        "summary" : "POST /entity-lists (generated skeleton)",
+        "summary" : "Create an Entity List",
         "operationId" : "postEntityLists",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Creates a named set of typed Entity keys (body title, purpose allow|block|watch|exclusion, entityType, reason, optional id; an exclusion list may carry ownerKind, autoApply, visibility); answers 201. Gated on canManageIncidents, plus canManageExclusionCategories for an admin-owned list. 422 for a bad title, purpose, Entity Type, id or attribute; 409 when the id was ever used; 403 for an admin list without that capability; 503 when read-only.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -31,9 +31,9 @@
     "/entity-lists/{entitylistId}" : {
       "get" : {
         "tags" : [ "entity-lists" ],
-        "summary" : "GET /entity-lists/{entitylistId} (generated skeleton)",
+        "summary" : "One Entity List",
         "operationId" : "getEntityListsByEntitylistId",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Returns the list's summary and members as of a log position (query at, default the head) with atSeq and headHash; members are masked per the Space's masking mode, and a restricted list hides them from a caller without the reveal or exclusion-category capability. No capability gate. 422 for a bad at; 404 for an unknown list; 503 when read-only.",
         "parameters" : [ {
           "name" : "entitylistId",
           "in" : "path",
@@ -54,9 +54,9 @@
     "/entity-lists/{entitylistId}/members" : {
       "post" : {
         "tags" : [ "entity-lists" ],
-        "summary" : "POST /entity-lists/{entitylistId}/members (generated skeleton)",
+        "summary" : "Change an Entity List's members",
         "operationId" : "postEntityListsByEntitylistIdMembers",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Adds and removes members (body add, remove, addRanges, removeRanges, optional expiresAt, reason) and returns the list with changed; under an approval policy the change may be held as a Pending Change. Gated on canManageIncidents, plus canManageExclusionCategories for an admin-owned list. 422 for a bad value, range, expiresAt, too many values or a key in both add and remove; 404 for an unknown list; 409 when retired; 503 when read-only.",
         "parameters" : [ {
           "name" : "entitylistId",
           "in" : "path",
@@ -77,9 +77,9 @@
     "/entity-lists/{entitylistId}/retire" : {
       "post" : {
         "tags" : [ "entity-lists" ],
-        "summary" : "POST /entity-lists/{entitylistId}/retire (generated skeleton)",
+        "summary" : "Retire an Entity List",
         "operationId" : "postEntityListsByEntitylistIdRetire",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Retires the list (body reason); its id is never reused. Under an approval policy the retirement may be held as a Pending Change. Gated on canManageIncidents, plus canManageExclusionCategories for an admin-owned list. 404 for an unknown list; 409 when already retired; 422 for a missing reason; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "entitylistId",
           "in" : "path",
@@ -140,9 +140,9 @@
     "/entity-lists/{entitylistId}/match" : {
       "post" : {
         "tags" : [ "entity-lists" ],
-        "summary" : "POST /entity-lists/{entitylistId}/match (generated skeleton)",
+        "summary" : "Match values against an Entity List",
         "operationId" : "postEntityListsByEntitylistIdMatch",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Reports for each value (body values, 1 to 5000 strings, masked aliases accepted) whether it matches a live member or range of the list, and which. Read-shaped, persists nothing. No capability gate. 422 when values is empty, too long or invalid; 404 for an unknown list; 403 for a restricted list when the caller may not see its members; 503 when the control plane is read-only.",
         "parameters" : [ {
           "name" : "entitylistId",
           "in" : "path",

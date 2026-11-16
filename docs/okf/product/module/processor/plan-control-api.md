@@ -368,7 +368,10 @@ because they are known to the core only as 503 stubs). `OpenApiPathsContractTest
 `/config/{type}/{name}` satisfies the live `/config/([^/]+)/([^/]+)`, and never overwrites a hand-written
 operation; generated param names come from the preceding segment (`/spaces/{spaceId}`). ⚠ A skeleton has no
 schemas — `responses.default` only — so "documented" now has two grades, and the exemplar-coverage decision (§5)
-is about promoting skeletons, not about undocumented routes. JSON rather than the design's per-context YAML because the lean SBOM
+is about promoting skeletons, not about undocumented routes. Since 2026-11-17 (`OPENAPI-SKELETON-SUMMARIES-1`) every
+public operation also has a real summary and description, written in its fragment; `tools/check-openapi-summaries.mjs`
+fails on the generated `(generated skeleton)` summary outside a shrinking allow-list (only the test-only
+`GET /test-discovered/ping` is on it). The `x-generated` mark stays until the operation gets schemas. JSON rather than the design's per-context YAML because the lean SBOM
 has no YAML parser and the toolchain has no offline `$ref` bundler; splitting is reversible and deferred.
 `docs/api/examples/` holds six canonical bodies (`envelope-health`, four `error-*`, `signal`).
 

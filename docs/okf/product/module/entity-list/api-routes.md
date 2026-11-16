@@ -15,14 +15,14 @@ tags: [api, routes, generated]
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
-| GET | `/entity-lists` | GET /entity-lists (generated skeleton) | entity-lists | — | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
-| POST | `/entity-lists` | POST /entity-lists (generated skeleton) | entity-lists | `canManageIncidents` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
-| GET | `/entity-lists/{entitylistId}` | GET /entity-lists/{entitylistId} (generated skeleton) | entity-lists | — | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
+| GET | `/entity-lists` | List Entity Lists | entity-lists | — | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
+| POST | `/entity-lists` | Create an Entity List | entity-lists | `canManageIncidents` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
+| GET | `/entity-lists/{entitylistId}` | One Entity List | entity-lists | — | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
 | PUT | `/entity-lists/{entitylistId}/attributes` | Change an exclusion list's ownership, auto-apply and visibility | entity-lists | `canManageExclusionCategories` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
-| POST | `/entity-lists/{entitylistId}/match` | POST /entity-lists/{entitylistId}/match (generated skeleton) | entity-lists | — | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
-| POST | `/entity-lists/{entitylistId}/members` | POST /entity-lists/{entitylistId}/members (generated skeleton) | entity-lists | `canManageIncidents` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
+| POST | `/entity-lists/{entitylistId}/match` | Match values against an Entity List | entity-lists | — | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
+| POST | `/entity-lists/{entitylistId}/members` | Change an Entity List's members | entity-lists | `canManageIncidents` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
 | POST | `/entity-lists/{entitylistId}/register-dataset` | Register an Entity List's sidecar as a Dataset | entity-lists | `canAuthorWorkbench` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
-| POST | `/entity-lists/{entitylistId}/retire` | POST /entity-lists/{entitylistId}/retire (generated skeleton) | entity-lists | `canManageIncidents` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
+| POST | `/entity-lists/{entitylistId}/retire` | Retire an Entity List | entity-lists | `canManageIncidents` | `features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java` |
 
 ## Drift
 
