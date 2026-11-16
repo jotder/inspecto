@@ -1,5 +1,5 @@
 name: ap_approval_graph
-description: "AUDIT 1 - The approval graph: approvers linked to the vendors whose invoices they approved (one link per invoice, TS and AMOUNT on the links). Run Cut points (E-07 and V-041 are the only cut nodes at a vendor with more than one approver), Cohesive groups by Dense core (k-core) (E-07, E-08 and E-09 form the densest core with their 20 vendors) and Centrality by Betweenness (the utilities vendor V-001 and the CFO E-01 lead: busy, not guilty)."
+description: "The approval graph: approvers linked to the vendors whose invoices they approved (one link per invoice, TS and AMOUNT on the links). Run Cut points (E-07 and V-041 are the only cut nodes at a vendor with more than one approver), Cohesive groups by Dense core (k-core) (E-07, E-08 and E-09 form the densest core with their 20 vendors) and Centrality by Betweenness (the utilities vendor V-001 and the CFO E-01 lead: busy, not guilty)."
 sourceId: entity-projection
 layout: force
 profile: finance

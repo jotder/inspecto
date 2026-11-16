@@ -1,5 +1,5 @@
 name: ap_vendor_identity
-description: "AUDIT 2 - The vendor identity graph: vendors, the bank accounts they are paid to, and shared-account and shared-address links. Expand V-117 (shares its account and address with employee E-31), find the five-vendor shell cluster on BA-7701, run Link prediction (it proposes the unlinked sixth vendor V-136) and Jaccard similarity from V-131."
+description: "The vendor identity graph: vendors, the bank accounts they are paid to, and shared-account and shared-address links. Expand V-117 (shares its account and address with employee E-31), find the five-vendor shell cluster on BA-7701, run Link prediction (it proposes the unlinked sixth vendor V-136) and Jaccard similarity from V-131."
 sourceId: entity-projection
 layout: force
 profile: finance

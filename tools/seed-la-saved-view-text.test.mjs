@@ -14,6 +14,9 @@ const KINDS = ['link-analysis-views', 'geo-map-views'];
 const BANNED = [
     [/\bDEMO \d/i, 'a demo-script number'],
     [/\bGEO scene \d/i, 'a demo-script number'],
+    // any other script marker that opens a text: "AUDIT 2 - …", "CLAIMS 1b — …", "Sample — …"
+    [/^(title|description): "[A-Z]{2,}(?: [A-Za-z]+)? \d+[a-z]? [-–—]/, 'a demo-script number'],
+    [/^(title|description): "Sample [-–—]/, 'a demo-script marker'],
     [/\bLA-\d+/, 'a ticket id'],
     [/masked:/i, 'a masked token'],
 ];
