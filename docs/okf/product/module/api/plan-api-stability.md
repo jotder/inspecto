@@ -626,9 +626,14 @@ already depend on it, so the token work must not change that shape as a side eff
   its own audit name on Basic has none.
 
 **Deferred to this same release by decision:** the token *runtime* model (D2 —
-[`node-types.md`](../engine/spec-node-types.md) § *The token model*), the ELT
-Phase 6 deletion of the flat read path (Row 15; the operator decided 2026-11-16 to delete it in 4.0.0 itself,
-with no verification minor before it), and X5's cross-lane StepInfo envelope.
+[`node-types.md`](../engine/spec-node-types.md) § *The token model*), and X5's cross-lane StepInfo envelope.
+
+**Deferred pending the operator (2026-11-17): the ELT Phase 6 deletion of the flat read path** (BACKLOG §2 Row 15,
+MoSCoW S3). The operator decided 2026-11-16 to delete it in 4.0.0 itself; on 2026-11-17 that was found infeasible,
+and nothing was deleted. The parity gate is red since D-11 (2026-10-04): 31 shipped `output_store:` + step-chain
+Pipelines still write on the flat lane. And `inspecto migrate-configs` writes `pipelines/*.toon` recipes that no
+runtime loads. Until the operator re-scopes it, 4.0.0 keeps both lanes and `-Dingest.lane`, and this list carries
+no entry for the deletion.
 
 **Decided 2026-11-16 to land before the tag (operator, MoSCoW S4 / C5; each adds its own entry above when it
 lands):** the X-Actor header path removed (landed 2026-11-17, entry above), the `batch_id` rename trio (above) and X5
