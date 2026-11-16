@@ -23,7 +23,8 @@
 set -uo pipefail
 
 main() {
-    ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+    # -P: the resolved path, as /proc/<pid>/cwd reports it, so a bundle reached through a symlink still matches healthy()
+    ROOT="$(cd "$(dirname "$0")/.." && pwd -P)"
     PARENT="$(dirname "$ROOT")"
     STAMP="$(date +%Y%m%d-%H%M%S)"
     ZIP=""; BACKUP_DIR=""; SERVICE="inspecto"; NO_SERVICE=""; ALLOW_EDITION=""
@@ -227,7 +228,7 @@ healthy() {
     while [ "$(date +%s)" -lt "$deadline" ]; do
         if curl -fsSk -o /dev/null "$base/health" 2>/dev/null && curl -fsSk -o /dev/null "$base/ready" 2>/dev/null; then
             pid="$(systemctl show -p MainPID --value "$SERVICE" 2>/dev/null)"
-            cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null)"
+            cwd="$(readlink -f "/proc/$pid/cwd" 2>/dev/null)"
             age="$(ps -o etimes= -p "$pid" 2>/dev/null | tr -d ' ')"
             if [ -n "$age" ] && [ "$cwd" = "$ROOT" ] && [ $(( $(date +%s) - age )) -ge $(( $1 - 2 )) ]; then
                 echo "[upgrade] PASS  $base/health and /ready answer from PID $pid, started from $ROOT"
