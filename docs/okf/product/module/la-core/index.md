@@ -35,6 +35,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LA-FULL-CYCLE-RESIDUALS-1` | P3 | chore | what the full-cycle plan left on purpose, and two environment gaps its drive found. | — |
+| `LA-TRAINING-SERIES-1` | P3 | feature | an Inspecto LA user training video series, planned and decided (D-TR1…D-TR7, 2026-11-16), not started. | operator |
 | `LA-EXEC-DEMO-POLISH-1` | P3 | chore | what the third executive review of Inspecto LA (2026-11-16) left as polish, plus amounts on the links. | — |
 | `SPACE-ADMISSION-FOLLOWUPS-1` | P3 | chore | what the closed-Space change (D5, 91f0af69a) left on purpose. | — |
 | `LA-SPACE-SWITCHER-NAMES-1` | P3 | defect | the Space switcher still shows near-twin names, no name on a phone, and squeezes a two-line name. | — |
