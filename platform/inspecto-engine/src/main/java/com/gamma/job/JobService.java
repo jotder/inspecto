@@ -136,6 +136,8 @@ public final class JobService implements AutoCloseable {
     /** Job Type id -> why a Job of it may not run in this Space now, or null (P4e). */
     private volatile java.util.function.Function<String, String> typeGate = type -> null;
     private volatile java.util.function.Function<String, String> taskGate = task -> null;
+    /** MODULE-REORG-P4-3: the Runs executing now, by Run id - what {@link #cancelSwitchedOffRuns} looks through. */
+    private final Map<String, Executing> executing = new ConcurrentHashMap<>();
     /** Job Type id -> the known-but-absent module that declares it, or null (P4e). */
     private volatile java.util.function.Function<String, String> unhostedTypeModule = type -> null;
     /** The space this service's jobs belong to; each job run executes under this MDC so the per-space EventLog /
@@ -813,6 +815,70 @@ public final class JobService implements AutoCloseable {
     public void interruptRuns() {
         closing = true;
         workers.shutdownNow();
+    }
+
+    /** The reason a Run cancelled by {@link #cancelSwitchedOffRuns} is recorded with. */
+    static final String MODULE_SWITCHED_OFF = "module switched off";
+
+    /**
+     * MODULE-REORG-P4-3: the stop half of the per-Space module gate. Re-reads {@link #jobTypeGate} and
+     * {@link #jobTaskGate} for every Run executing now and interrupts each one the gate now turns away, as
+     * {@link #interruptRuns} does at a close but only for those Runs: each is recorded CANCELLED with
+     * {@value #MODULE_SWITCHED_OFF} and the gate's sentence, never FAILED. Other Runs, and the Space, are untouched.
+     * A Run that keeps the interrupt and returns a result keeps that result (its work is done). The control plane
+     * calls it after a module is switched off in the Space. Returns the Run ids interrupted (one whose body had
+     * already returned keeps its result). A cancelled Run is never retried.
+     */
+    public List<String> cancelSwitchedOffRuns() {
+        List<String> out = new ArrayList<>();
+        executing.forEach((runId, x) -> {
+            String off = switchedOffReason(x.job, x.cfg);
+            if (off != null && x.cancel(MODULE_SWITCHED_OFF + ": " + off)) {
+                log.info("job '{}' run {} cancelled: {}", x.name, runId, off);
+                out.add(runId);
+            }
+        });
+        return out;
+    }
+
+    /** One executing Run: its thread, and why it was cancelled. An interrupt is delivered only before the Run's
+     *  {@link #finish}, under the same lock, so it can never land on the Run's own records or the pool's next task. */
+    private static final class Executing {
+        final Thread thread;
+        final Job job;
+        final JobConfig cfg;
+        final String name;
+        private String reason;
+        private boolean done;
+
+        Executing(Thread thread, Job job, JobConfig cfg, String name) {
+            this.thread = thread;
+            this.job = job;
+            this.cfg = cfg;
+            this.name = name;
+        }
+
+        synchronized boolean cancel(String why) {
+            if (done || reason != null) return false;
+            reason = why;
+            thread.interrupt();
+            return true;
+        }
+
+        /** Cancelled before its body started (no interrupt needed: the body is not run). */
+        synchronized void cancelBeforeStart(String why) {
+            if (reason == null) reason = why;
+        }
+
+        synchronized String reason() {
+            return reason;
+        }
+
+        /** No interrupt is delivered after this; returns whether one may have been. */
+        synchronized boolean finish() {
+            done = true;
+            return reason != null;
+        }
     }
 
     /** Wire the event/signal subscribers and arm cron schedules. */
@@ -1642,7 +1708,8 @@ public final class JobService implements AutoCloseable {
                 // only by this thread, after the run has stopped.
                 try (com.gamma.inspector.CommitFence.Held fence = com.gamma.inspector.CommitFence.hold(
                         com.gamma.inspector.CommitFence.Scope.JOB, runId, () -> worst(arming, authored),
-                        () -> arming.cancelled() || (authored != null && authored.cancelled()))) {
+                        () -> arming.cancelled() || (authored != null && authored.cancelled())
+                                || switchedOffWhileRunning(runId))) {   // MODULE-REORG-P4-3: a checkpoint stops it too
                     // policy-narrowing-design S2b (D8): the Space's effective Safety Policy is resolved ONCE here,
                     // before anything starts, and pinned for the run. An unreadable policy file refuses the run
                     // as a FAILED Run naming the file - never started under "no policy".
@@ -1679,14 +1746,27 @@ public final class JobService implements AutoCloseable {
         }
         // The Space's module gate comes before the three exclusions: a Job whose module is switched off here is not
         // run at all, and says why. Config untouched; the next fire after the module is back on runs normally.
-        String off = typeGate.apply(job.type());
-        if (off == null) off = taskDisabledReason(job, cfg).orElse(null);
+        String off = switchedOffReason(job, cfg);
         if (off != null) {
             log.info("job '{}' ({}) not run: {}", name, trigger, off);
             recordSkip(runId, name, job, trigger, start, off);
             return true;
         }
         return false;
+    }
+
+    /** Why the Space's module gate turns {@code job} away now (its Job Type's or its maintenance task's module is
+     *  switched off here), or {@code null} when it may run. */
+    private String switchedOffReason(Job job, JobConfig cfg) {
+        String off = typeGate.apply(job.type());
+        return off != null ? off : taskDisabledReason(job, cfg).orElse(null);
+    }
+
+    /** Whether Run {@code runId} was cancelled by {@link #cancelSwitchedOffRuns} - the cooperative half, read at a
+     *  {@code CommitFence} checkpoint. */
+    private boolean switchedOffWhileRunning(String runId) {
+        Executing x = executing.get(runId);
+        return x != null && x.reason() != null;
     }
 
     /** The weaker of the run's claims: a run holds its lease only while it holds both. */
@@ -1839,19 +1919,31 @@ public final class JobService implements AutoCloseable {
         // deadline_seconds:, capped by the ceiling. Expiry interrupts this thread and the Run is FAILED, even
         // when the body swallows the interrupt and returns a result.
         long t0 = System.nanoTime();
+        // MODULE-REORG-P4-3: registered for cancelSwitchedOffRuns, then the gate read once more - a switch-off whose
+        // sweep ran before this Run registered is seen here, so no Run of a switched-off module starts unseen.
+        Executing self = new Executing(Thread.currentThread(), job, cfg, name);
         JobDeadline.Watch watch = JobDeadline.arm(deadline);
         try {
+            executing.put(runId, self);   // inside the try: the finally below always ends and removes it
+            String offAtStart = switchedOffReason(job, cfg);
+            if (offAtStart != null) self.cancelBeforeStart(MODULE_SWITCHED_OFF + ": " + offAtStart);
             try {
-                res = runWithRetry(job, ctx, RetryPolicy.resolve(job.type(), params), name);
+                res = self.reason() != null ? JobResult.cancelled(self.reason(), 0L)
+                        : runWithRetry(job, ctx, RetryPolicy.resolve(job.type(), params), name);
             } catch (com.gamma.inspector.CommitFence.RunCancelledException e) {
                 // HA-CANCEL-RESIDUALS-1: the host is closing and cancelled this Run at a checkpoint - a planned
                 // stop, recorded CANCELLED with an INFO job.run.completed, never FAILED/CRITICAL. A genuine lease
                 // LOSS (the parent LeaseLostException) still takes the failure path below.
-                log.info("Job '{}' ({}) cancelled: {}", name, trigger, e.getMessage());
-                ctx.log().info("run cancelled", "reason", String.valueOf(e.getMessage()));
-                res = JobResult.cancelled(String.valueOf(e.getMessage()), (System.nanoTime() - t0) / 1_000_000L);
+                String why = self.reason() != null ? self.reason() : String.valueOf(e.getMessage());
+                log.info("Job '{}' ({}) cancelled: {}", name, trigger, why);
+                ctx.log().info("run cancelled", "reason", why);
+                res = JobResult.cancelled(why, (System.nanoTime() - t0) / 1_000_000L);
             } catch (Exception e) {
-                if (closing) {   // JOB-SHUTDOWN-FAILED-1: the Space closed under the Run - a planned stop, not a failure
+                if (self.reason() != null) {   // MODULE-REORG-P4-3: its module was switched off under the Run
+                    log.info("Job '{}' ({}) cancelled: {} ({})", name, trigger, self.reason(), e.toString());
+                    ctx.log().info("run cancelled", "reason", self.reason(), "error", e.toString());
+                    res = JobResult.cancelled(self.reason(), (System.nanoTime() - t0) / 1_000_000L);
+                } else if (closing) {   // JOB-SHUTDOWN-FAILED-1: the Space closed under the Run - a planned stop, not a failure
                     log.info("Job '{}' ({}) cancelled: {} ({})", name, trigger, SHUTTING_DOWN, e.toString());
                     ctx.log().info("run cancelled", "reason", SHUTTING_DOWN, "error", e.toString());
                     res = JobResult.cancelled(SHUTTING_DOWN, (System.nanoTime() - t0) / 1_000_000L);
@@ -1874,7 +1966,11 @@ public final class JobService implements AutoCloseable {
             // JOB-SHUTDOWN-FAILED-1: a body that REPORTS a failure while the Space closes (la.index.build returns FAILED
             // when the index service it calls was stopped) is the same planned stop as one that throws. A deadline
             // expiry (threw) stays FAILED.
-            if (closing && !threw && "FAILED".equals(res.status())) {
+            if (self.reason() != null && !threw && "FAILED".equals(res.status())) {   // MODULE-REORG-P4-3, likewise
+                log.info("Job '{}' ({}) cancelled: {} (it reported: {})", name, trigger, self.reason(), res.message());
+                ctx.log().info("run cancelled", "reason", self.reason(), "reported", String.valueOf(res.message()));
+                res = JobResult.cancelled(self.reason(), res.durationMs());
+            } else if (closing && !threw && "FAILED".equals(res.status())) {
                 log.info("Job '{}' ({}) cancelled: {} (it reported: {})", name, trigger, SHUTTING_DOWN, res.message());
                 ctx.log().info("run cancelled", "reason", SHUTTING_DOWN, "reported", String.valueOf(res.message()));
                 res = JobResult.cancelled(SHUTTING_DOWN, res.durationMs());
@@ -1885,7 +1981,10 @@ public final class JobService implements AutoCloseable {
             // thread. Its terminal signal goes to the event journal, a FileChannel, which an interrupt closes (the
             // event is then buffered only until the journal rotates); the jobs_runs.csv ledger (FileWriter) is not
             // interruptible. JobCloseStopTest pins it.
-            if (closing) Thread.interrupted();
+            // MODULE-REORG-P4-3: likewise for cancelSwitchedOffRuns' interrupt; none can arrive after finish().
+            boolean cancelledHere = self.finish();
+            executing.remove(runId);
+            if (closing || cancelledHere) Thread.interrupted();
             packs.releaseRun(packOwner);
             serviceOwners.forEach(packs::releaseRun);
             if (snapshot != null) snapshot.close();
@@ -1932,7 +2031,9 @@ public final class JobService implements AutoCloseable {
             try {
                 return job.run(ctx);
             } catch (Exception e) {
-                if (closing || retry > policy.retries() || !RetryPolicy.transientFailure(e)) throw e;   // no retry into a closing Space
+                // no retry into a closing Space, nor of a Run whose module was switched off (MODULE-REORG-P4-3)
+                if (closing || switchedOffWhileRunning(ctx.runId()) || retry > policy.retries()
+                        || !RetryPolicy.transientFailure(e)) throw e;
                 java.time.Duration wait = policy.waitBefore(retry);
                 log.warn("Job '{}' attempt {} failed transiently ({}); retrying in {}s",
                         name, retry, e.getMessage(), wait.toSeconds());

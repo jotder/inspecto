@@ -119,7 +119,8 @@ through the same `ExchangeSnapshotWriter.publish` path when (1) it has a cadence
 since the later of the last attempt and the live snapshot's `refreshedAt`. The tick is module-gated per owning
 Space: background id `exchange-snapshot-refresh` (declared in the module's `provides.background`, checked with
 `ModuleGate.paused` against the owner's config). ⚠ It is NOT in `ModuleGate.GATED_BACKGROUND` — that set is the
-*host's* gated ids and `OpsBackgroundManifestTest` pins it equal to ops' list.
+*host's* gated ids and `OpsBackgroundManifestTest` pins it equal to ops' list. The Signal forwarder is gated the same way
+at each Signal, as background id `exchange-signal-forward` (`MODULE-REORG-P4-3`), also module-owned.
 **Every publish attempt (manual / approve / schedule) records its outcome** in a sibling
 `last-refresh.toon` (`{at, trigger, status: published|failed, version|error}`), surfaced on offer/metadata
 responses as `lastRefresh`. A failure never moves `current.toon`, so `lastRefresh` is the only place it shows;

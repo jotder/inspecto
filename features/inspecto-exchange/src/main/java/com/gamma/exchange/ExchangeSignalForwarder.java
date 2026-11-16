@@ -39,6 +39,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * </ul>
  * No grant for the type: nothing happens and nothing is recorded (N3).
  *
+ * <p>Switched off (MODULE-REORG-P4-3): this tap is a long-lived subscription of the {@code exchange} module, gated per
+ * Space at each Signal like the module's other background work ({@link #BACKGROUND_ID}, declared in its
+ * {@code provides.background}). With the module switched off in the ORIGIN Space nothing is forwarded and nothing is
+ * recorded, as with no grant; switched off in the CONSUMER Space the delivery is undeliverable, with that reason.
+ *
  * <p>Loops (T4): a delivered type is {@code exchange.*}, which is never forwarded again, never offerable, and
  * never emittable by a Job or Decision Rule. A loop through Jobs on both sides is cut on the CHAIN's depth: the
  * delivered Signal carries the origin's {@code chainDepth} + 1, a Run triggered by it runs one deeper, and a
@@ -50,6 +55,12 @@ public final class ExchangeSignalForwarder implements java.util.function.BiConsu
 
     public static final String DELIVERED = "exchange.signal.delivered";
     public static final String UNDELIVERABLE = "exchange.signal.undeliverable";
+
+    /** This subscription's background-work id ({@code module.toon provides.background}). */
+    public static final String BACKGROUND_ID = "exchange-signal-forward";
+
+    /** The undeliverable reason when the consumer Space switched the {@code exchange} module off. */
+    static final String CONSUMER_SWITCHED_OFF = "the exchange module is switched off in the consumer Space";
 
     public static final String ATTR_ORIGIN_SPACE = "originSpace";
     public static final String ATTR_ORIGIN_SIGNAL = "originSignalId";
@@ -100,6 +111,7 @@ public final class ExchangeSignalForwarder implements java.util.function.BiConsu
     /** {@code offerTo} non-null (a Decision Rule's emit-signal named ONE Space): only that consumer's grant. */
     private void forward(SpaceManager m, SpaceContext origin, EventLog originLog, Signal sig, String offerTo) {
         Exchange ex = Exchange.under(m.containerRoot());
+        if (com.gamma.control.ModuleGate.paused(BACKGROUND_ID, origin.root().config())) return;   // switched off at the origin
         String owner = origin.id().value();
         List<ShareGrant> grants = ex.grants().stream()
                 .filter(g -> Exchange.SIGNAL.equals(g.kind()) && owner.equals(g.owner()) && sig.type().equals(g.item()))
@@ -119,6 +131,7 @@ public final class ExchangeSignalForwarder implements java.util.function.BiConsu
         if (offer.isEmpty()) return "offer withdrawn";
         Optional<SpaceContext> target = SpaceId.isValid(g.consumer()) ? m.space(SpaceId.of(g.consumer())) : Optional.empty();
         if (target.isEmpty()) return "consumer not hosted here";
+        if (com.gamma.control.ModuleGate.paused(BACKGROUND_ID, target.get().root().config())) return CONSUMER_SWITCHED_OFF;
         String cid = sig.correlationId() == null || sig.correlationId().isBlank() ? sig.signalId() : sig.correlationId();
         int max = Integer.getInteger("jobs.signal.maxChainDepth", 8);
         int depth = intOf(sig.payload().get("chainDepth")) + 1;

@@ -20,7 +20,7 @@ Groups and regulators that combine assurance across several entities.
 
 ## Key capabilities
 
-- 12 routes and the `exchange-snapshot-refresh` background task — [feature-db](feature-db.md)
+- 12 routes and two background tasks, `exchange-snapshot-refresh` and `exchange-signal-forward` (both paused while the module is switched off in a Space) — [feature-db](feature-db.md)
 - Module detail — [Exchange features](../../module/exchange/features-exchange.md)
 
 ## Related hubs

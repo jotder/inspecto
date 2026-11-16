@@ -110,7 +110,10 @@ public final class IntegrationWebhooks implements BiConsumer<EventLog, Event>, R
             Optional<Path> root = rootOf(api, log);
             if (root.isEmpty()) continue;
             try {
-                if (ModuleSettings.disabled(root.get()).contains("geoLink")) return;
+                // MODULE-REORG-P4-3: off when either feature of the integration routes is switched off in the Space, as
+                // the routes are (ControlApi refuses a route when any one of its features is disabled)
+                java.util.Set<String> off = ModuleSettings.disabled(root.get());
+                if (off.contains("geoLink") || off.contains("investigations")) return;
                 LaIntegration.Settings s = LaIntegration.read(root.get());
                 if (s.webhooks() == null || !s.webhooks().events().contains(name)) return;
                 Map<String, String> mdc = MDC.getCopyOfContextMap();

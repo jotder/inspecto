@@ -13,10 +13,11 @@ tags: [feature-db, module]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`module.exchange`](../../../../../product-map/module/exchange.toon).
 
-14 row(s).
+15 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
+| exchange-signal-forward | background task | exchange | standard;advanced;preview | multiEntity | ga | `exchange-signal-forward` | `features/inspecto-exchange/src/main/resources/META-INF/inspecto/module.toon` |
 | exchange-snapshot-refresh | background task | exchange | standard;advanced;preview | multiEntity | ga | `exchange-snapshot-refresh` | `features/inspecto-exchange/src/main/resources/META-INF/inspecto/module.toon` |
 | exchange | feature | exchange | standard;advanced;preview | multiEntity | ga | `exchange` | `features/inspecto-exchange/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /exchange/datasets/([^/]+)/([^/]+)" | route | exchange | standard;advanced;preview | multiEntity | ga | `"GET /exchange/datasets/([^/]+)/([^/]+)"` | `features/inspecto-exchange/src/main/resources/META-INF/inspecto/module.toon` |

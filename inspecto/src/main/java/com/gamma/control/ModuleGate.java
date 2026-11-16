@@ -23,6 +23,9 @@ import java.util.function.Function;
  * asks {@link #paused} at the top of EACH tick and returns when the answer is yes. A tick turned away does nothing and
  * changes nothing - the work simply happens on the first tick after the module is switched back on. A tick already
  * running is never interrupted. A {@code modules.toon} that cannot be read disables nothing (fail-open, as for the routes).
+ * A long-lived subscription a module owns asks the same question at each event (the {@code exchange} Signal forwarder,
+ * MODULE-REORG-P4-3). Only the Runs of a switched-off module already in flight are stopped, not checked: the switch-off
+ * route cancels them ({@code JobService.cancelSwitchedOffRuns}).
  *
  * <p><b>Logged once per transition</b>, never per tick: the first tick that finds the work paused logs it, and the
  * first tick after re-enable logs the resume.

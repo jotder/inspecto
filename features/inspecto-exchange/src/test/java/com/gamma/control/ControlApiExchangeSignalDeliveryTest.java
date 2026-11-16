@@ -138,6 +138,34 @@ class ControlApiExchangeSignalDeliveryTest {
         }
     }
 
+    /** MODULE-REORG-P4-3: the forwarder is a long-lived subscription of the exchange module, gated per Space at each Signal. */
+    @Test
+    void switchedOffAtTheOriginNothingIsForwardedAndBackOnItIs(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            consent(c, "hub");
+            java.nio.file.Files.writeString(configOf(c, "opco").resolve("modules.toon"), "disabled[1]: exchange\n");
+            emit(c, "opco", "fraud.alert", Map.of("caseId", "C-1"), null);
+            assertTrue(signals(c, "hub", DELIVERED_TYPE).isEmpty(), "the origin switched the module off: nothing crosses");
+            assertTrue(signals(c, "opco", ExchangeSignalForwarder.DELIVERED).isEmpty());
+            assertTrue(signals(c, "opco", ExchangeSignalForwarder.UNDELIVERABLE).isEmpty(), "and nothing is recorded, as with no grant");
+
+            java.nio.file.Files.writeString(configOf(c, "opco").resolve("modules.toon"), "disabled[0]:\n");
+            emit(c, "opco", "fraud.alert", Map.of("caseId", "C-2"), null);
+            assertEquals(1, signals(c, "hub", DELIVERED_TYPE).size(), "back on: the next Signal is delivered");
+        }
+    }
+
+    @Test
+    void switchedOffAtTheConsumerTheDeliveryIsUndeliverable(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            consent(c, "hub");
+            java.nio.file.Files.writeString(configOf(c, "hub").resolve("modules.toon"), "disabled[1]: exchange\n");
+            emit(c, "opco", "fraud.alert", Map.of("caseId", "C-1"), null);
+            assertTrue(signals(c, "hub", DELIVERED_TYPE).isEmpty(), "the consumer switched the module off");
+            assertEquals("the exchange module is switched off in the consumer Space", reasonOf(c));
+        }
+    }
+
     @Test
     void anotherTypeFromTheSameOwnerIsNotDelivered(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {

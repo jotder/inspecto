@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-411 test class(es): 411 unit, 0 real-HTTP control-plane, 0 IT.
+412 test class(es): 412 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -193,6 +193,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `JobCloseStopTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobCloseStopTest.java` | JOB-OUTLIVES-CLOSE-1: a Job Run still writing must stop before its Space's close returns. {@link JobService#close()} |
 | `JobConfigTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobConfigTest.java` | Tests for parsing a {@code *_job.toon} into a {@link JobConfig}. |
 | `JobDeadlineTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobDeadlineTest.java` | The generic Job Run deadline (platform-services R1, operator 2026-10-06): a hung Run is FAILED at its |
+| `JobModuleStopTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobModuleStopTest.java` | MODULE-REORG-P4-3: switching a module off in a Space stops its Runs already in flight. The gate the scheduler reads |
 | `JobPackManagerTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobPackManagerTest.java` | P2c Job Packs (§12): a pack jar dropped in the watched dir is loaded through its own isolated |
 | `JobPackParserTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobPackParserTest.java` | A parser is the fifth Job Pack kind (parser-plugins-trust-design.md slice P2, operator D1 2026-09-25): a |
 | `JobPackStagingSweepTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobPackStagingSweepTest.java` | {@link JobPackManager#sweepOrphans}: a crashed process's {@code job-packs-*} staging dir is removed at the |

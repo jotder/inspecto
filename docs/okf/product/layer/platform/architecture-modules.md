@@ -18,8 +18,9 @@ system see [architecture.md](architecture.md).
 The module model was built by the module reorganisation (`MODULE-REORG-1`, phases P0 to P7, closed 2026-10-18).
 Every module carries a manifest, the host activates modules from those manifests, a Space can switch an optional
 module off, and Offerings decide what each edition ships. Three board rows remain open in `docs/BACKLOG.md`:
-`MODULE-REORG-P3-THIN-JARS` (release signing needs the operator's keystore), `MODULE-REORG-P4-3` (a disabled
-module's in-flight work is not cancelled) and `MODULE-REORG-P7-INCIDENTS` (one dated deletion). The decisions
+`MODULE-REORG-P3-THIN-JARS` (release signing needs the operator's keystore), `MODULE-REORG-P7-INCIDENTS` (one
+dated deletion) and `MODULE-REORG-P4-3` (a disabled module's Link Analysis runs in flight; its Job Runs and
+subscriptions stop since 2026-11-17). The decisions
 (D-MR1 to D-MR12, declined items, deliberate exceptions) are in
 [spec-module-reorg-decisions.md](spec-module-reorg-decisions.md); the traps are in
 [spec-module-reorg-gotchas.md](spec-module-reorg-gotchas.md). Vocabulary: `docs/GLOSSARY.md` §15.
@@ -235,8 +236,20 @@ A feature is reached through three gates, none of them inside feature code:
 - A module switched off in a Space also stops its Jobs there: the fire is recorded `SKIPPED`, a manual trigger or
   replay answers `404 MODULE_DISABLED`, the config is untouched and the Job resumes when the module is re-enabled
   (`JobModuleGate`, `ModuleDisabledJobTest`). Periodic work is paused the same way: the owning tick asks the
-  shared `ModuleGate` first, and `GET /modules` lists the paused ids as `backgroundPaused`. A Run already started
-  is not interrupted.
+  shared `ModuleGate` first, and `GET /modules` lists the paused ids as `backgroundPaused`.
+- **Switching off is a stop (`MODULE-REORG-P4-3`, 2026-11-17).** After `PUT /settings/modules` writes the file,
+  `JobService.cancelSwitchedOffRuns` re-reads the Job gate for every Run executing in that Space and interrupts each
+  one the gate now turns away (a Job of the module's Job Types, or a `maintenance` Job of a task it contributes): it is
+  recorded `CANCELLED` with `module switched off: <the gate's sentence>`, never `FAILED`, and a `CommitFence`
+  checkpoint in the Run stops it too. Other Runs and other Spaces are untouched; a Run that keeps the interrupt and
+  returns keeps its result, and a cancelled Run is never retried. A module's long-lived subscription is gated at each
+  event, not unregistered: the `exchange` Signal forwarder (a process-wide tap) asks `ModuleGate.paused` for
+  `exchange-signal-forward` in the origin Space (off: nothing forwarded or recorded) and the consumer Space (off:
+  undeliverable, with the reason); the `geo-link` integration webhook tap sends nothing while `geoLink` or
+  `investigations` is off. Link Analysis graph runs and index builds already running are not stopped (row open). An approved Action Request already in its dispatch attempts is not interrupted,
+  by decision: the send cannot be undone, and its attempts are bounded. `realtime` cannot be switched off in a
+  Space (it registers no route, so its feature id is not one `PUT /settings/modules` accepts), so its listeners are
+  not gated.
 
 ## 5. Seams
 

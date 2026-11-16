@@ -91,6 +91,14 @@ final class ModuleSettingsRoutes implements RouteModule {
         } catch (RuntimeException | com.fasterxml.jackson.core.JsonProcessingException ignored) {
             // best effort, like every audit emit on a request path
         }
+        // MODULE-REORG-P4-3: switching a module off stops its work already in flight - the Space's Runs of its Job Types
+        // and maintenance tasks are cancelled (CANCELLED, "module switched off"). Subscriptions and ticks read the same
+        // file at each event, so they stop on their own.
+        try {
+            HostContext.of(api).service().jobService().ifPresent(com.gamma.job.JobService::cancelSwitchedOffRuns);
+        } catch (RuntimeException noService) {
+            // no Collector service on this context (a route-only test double): no Runs to stop
+        }
         return view(api, root);
     }
 }

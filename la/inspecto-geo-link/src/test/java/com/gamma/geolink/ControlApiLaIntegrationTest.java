@@ -414,6 +414,25 @@ class ControlApiLaIntegrationTest {
         }
     }
 
+    /** MODULE-REORG-P4-3: the webhook tap is a long-lived subscription of geo-link; switched off, it stops firing. */
+    @Test
+    void withInvestigationsSwitchedOffInTheSpaceNoWebhookIsSentAndBackOnItIs(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, "none")) {
+            allow(c, "hooks.test");
+            ok(c, "PUT", "/inv/integration", "{\"webhooks\":{\"connection\":\"hub\",\"signingSecret\":\"${SYS:" + SECRET_PROP
+                    + "}\",\"events\":[\"investigation.created\"]},\"retry\":{\"count\":0}}", ADMIN);
+            Files.writeString(root.resolve("modules.toon"), "disabled[1]: investigations\n");
+            c.svc().eventLog().emit(Event.builder(LinkEventTypes.LINK_INVESTIGATION_CREATED).source("test")
+                    .message("created").attr("investigationId", "inv-off"));
+            assertEquals(0, hookHits.size(), "the integration routes are off, and so are their webhooks: " + hookHits);
+
+            Files.writeString(root.resolve("modules.toon"), "disabled[0]:\n");
+            c.svc().eventLog().emit(Event.builder(LinkEventTypes.LINK_INVESTIGATION_CREATED).source("test")
+                    .message("created").attr("investigationId", "inv-on"));
+            assertEquals(1, hookHits.size(), "back on: the next event is sent");
+        }
+    }
+
     @Test
     void anUnresolvableSigningSecretSendsNothing(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, "none")) {

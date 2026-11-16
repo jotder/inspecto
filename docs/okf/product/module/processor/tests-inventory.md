@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-450 test class(es): 183 unit, 267 real-HTTP control-plane, 0 IT.
+451 test class(es): 183 unit, 268 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -333,6 +333,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ModuleSettingsSameTickTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ModuleSettingsSameTickTest.java` | A same-size rewrite of {@code modules.toon} inside one mtime tick must take effect: keyed on (mtime ms, size) the |
 | `ModulesInertReferencesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ModulesInertReferencesTest.java` | {@code MODULE-REORG-1 P4e} (P4-1) - {@code GET /modules} lists what the current Space holds that no installed module |
 | `ModulesRoutesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ModulesRoutesTest.java` | MODULE-REORG-1 P2a: {@code GET /modules} over real HTTP. A read route — no write-root, spec or conflict gate |
+| `ModuleSwitchOffStopsRunsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ModuleSwitchOffStopsRunsTest.java` | {@code MODULE-REORG-P4-3} over real HTTP: {@code PUT /settings/modules} switching a module off stops that module's |
 | `NoActionRequestsShipsInThePersonalBuildTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/NoActionRequestsShipsInThePersonalBuildTest.java` | MODULE-REORG-P7 - the assertion that makes the Action Requests gating REAL rather than claimed, on the DEFAULT |
 | `NoAnomalyShipsInThePersonalBuildTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/NoAnomalyShipsInThePersonalBuildTest.java` | ANOMALY-UI-FINDINGS-1 (j): the contract the SPA's hide-on-503 path (the entity anomaly panel) leans on, pinned on the |
 | `NoCaseManagementShipsInThePersonalBuildTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/NoCaseManagementShipsInThePersonalBuildTest.java` | MODULE-REORG-P7 - the assertion that makes the Case Management gating REAL rather than claimed, on the DEFAULT (Basic) |

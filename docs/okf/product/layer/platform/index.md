@@ -51,7 +51,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `SCALEOUT-HELM-NPOD-1` | P2 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
 | `SCALEOUT-D14-D16-DECISIONS-1` | P2 | chore | D14 and D16 SIGNED yes 2026-10-20 (operator, accepted the recommended answer); D15 SIGNED 2026-10-18 (operator: refuse ZK/etcd, fund the… | operator |
 | `SCALEOUT-LIVE-HALVES-1` | P3 | chore | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
-| `MODULE-REORG-P4-3` | P3 | feature | a disabled module's in-flight work and long-lived subscriptions (the only P4 residue). | — |
+| `MODULE-REORG-P4-3` | P3 | feature | a disabled module's Link Analysis runs in flight (the only P4 residue). | — |
 | `MODULE-REORG-P3-THIN-JARS` | P3 | feature | thin per-module jars + Offering-driven launcher classpath. | — |
 | `CODEGRAPH-AFFECTED-UNUSABLE-1` | P3 | chore | codegraph affected over-reports to uselessness; only the upstream defect is open. | — |
 | `PRODUCT-MAP-S6-1` | P3 | feature | Product Map slice S6, on demand: | demand |

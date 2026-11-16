@@ -248,7 +248,8 @@ signed event webhooks, configured per Space. No named adapter exists; one is bui
   forwarder uses), so Alerts fired off a request thread are seen too. Events: `investigation.created`
   (`LINK_INVESTIGATION_CREATED`), `draft.promoted` (`LINK_DRAFT_PROMOTED`), `alert.fired` (`ALERT_FIRED` carrying an
   `investigation` attribute, which `AlertService` now stamps on an Investigation rule's event) and `approval.needed`
-  (`LINK_EXPANSION_REQUESTED`). The notification webhook channel did not fit (one JVM-wide URL, unsigned, no retry).
+  (`LINK_EXPANSION_REQUESTED`). Nothing is sent from a Space that switched `geoLink` or `investigations` off (the
+  integration routes' two features; `MODULE-REORG-P4-3`). The notification webhook channel did not fit (one JVM-wide URL, unsigned, no retry).
   Delivery is asynchronous (a virtual thread) through the same `OutboundPort`; each delivery writes
   `LINK_WEBHOOK_DELIVERED` or `LINK_WEBHOOK_FAILED` on the Space's ledger. A webhook carries no entity id, so masking
   has nothing to act on; the payload says so. A signing secret that does not resolve sends nothing.

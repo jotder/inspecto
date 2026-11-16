@@ -45,6 +45,9 @@ answers 409. `ExchangeBootHook` installs the host seams at boot; without the mod
 6. **Signals** (`ExchangeSignalForwarder`). Under an active `signal` grant with the consumer hosted in the same Pod,
    a Signal is re-emitted on the consumer's ledger as `exchange.<origin>.<type>`, actor `exchange-grant:<id>`,
    allowlisted payload only. Otherwise `exchange.signal.undeliverable` is recorded on the origin; never queued.
+   Module-gated per Space at each Signal (background id `exchange-signal-forward`, `MODULE-REORG-P4-3`): with
+   `exchange` switched off in the origin Space nothing is forwarded or recorded; switched off in the consumer Space
+   the delivery is undeliverable, reason "the exchange module is switched off in the consumer Space".
 
 ## 5. Configuration
 

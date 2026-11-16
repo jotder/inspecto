@@ -78,7 +78,6 @@ No general rule engine (a second language, a large dependency, a poor fit for se
 | **Decision Kernel step 7** - Access Policies' `Conditions` text compiled into the tree (2026-10-08) | security: the tree is fail-open where `Conditions` fails closed | the operator asks. Precondition status: strict mode + equivalence corpus BUILT 2026-10-09 (`ConditionTree.matchedStrict`/`filterStrict`/`validateStrict`, `ConditionSql.predicateStrict`; `ConditionsTreeEquivalenceTest` + golden `platform/inspecto-engine/src/test/resources/conditions-tree-equivalence.golden.txt`); corpus verdict over 50136 context x expression pairs (12 contexts, 4178 expressions): EQUAL 29768, DIVERGENT 5476, UNTRANSLATABLE 14892; 25 malformed sources fail identically in `Conditions.parse` and the translator; remaining blockers: the tree needs a collection-membership operator (`in`/`contains` over list attributes, 250 + 358 scalar-stringify pairs), missing-attribute semantics (a missing attribute is `null` in `Conditions`, an absent key is FALSE in strict: 3882 pairs), null vs empty-string (300), type inference from text vs strict typing (`'5' == 5`, `'05' == '5'`: 660), case-insensitive substring (26), and expressions the tree cannot express at all (list literals / `literal contains ref` / `null` members / the empty-string operand: 14892 pairs). Step 7 would still need those operators/semantics decided (or the divergences accepted) |
 | **RBAC capability contribution** (P1-D3) | only 8 of 219 capabilities are module-exclusive (4 `exchange`, 4 `la-api`); moving them edits `Roles.CAN_*`, the `SEED` grants and the literal-only scanner guards, and makes the role vocabulary depend on the classpath. Capabilities therefore stay OUT of `provides` | a module with many exclusive capabilities appears (then a `CapabilityContributor` SPI in `auth-spi`, string literals only, because of the `Roles` / `CapabilityManifest` / contributor init cycle) |
 | **Renaming `ops` to `incidents`** | measured blast radius (~177 files / 484 lines in `inspecto-ops` alone, plus packages, SPA lines, docs) for a retitle | never needed: the `ops` id, packages and directory stay |
-| **In-flight cancellation** of a disabled module's Run (`MODULE-REORG-P4-3`) | needs a per-module start/stop lifecycle contract: a decision | a switchable module owns a long-lived subscription, or cancellation is requested |
 | **Workflow & SLA slice 2 step 2** (second governed source, `GovernedItemProvider` SPI) - **DECLINED 2026-10-11 (operator)** (research memo below is the revisit playbook) | no demand: a promoted Break already gets a per-Break SLA through `POST /recon/promote` (`BREAK-INCIDENT-1`) into an Incident governed by the INCIDENT sla-policy / escalation rules; no consumer has asked for SLAs on never-promoted Breaks | a named consumer wants an SLA on unpromoted Breaks (then the memo's plan applies, starting at Q2); step 1 shipped (`SlaDecisions` over a `GovernedItem` view in `inspecto-workflow`; ops keeps the writes, events and cap) |
 | Serving the OpenAPI document merged at boot; module-only schemas in fragments | the Basic build has no module fragments on its classpath and absent modules' paths must stay documented as 503 stubs | the Basic classpath question is answered |
 | Hand-authored EDITIONS capability rows as generated | a generated table that cannot express a decision makes its guard revert it | never; the module/add-on/posture/jar tables ARE generated |
@@ -117,6 +116,39 @@ Breaking changes are free on any surface (nothing after 3.x was in production): 
 - **Unmodelled-key policy (P4):** every writer that rebuilds a config from a typed `toMap()` keeps `x-` keys and refuses any other unmodelled key 422 `ERR_UNKNOWN_CONFIG_KEY`, so a save never silently drops config.
 - **The telecom-asn1 split packages** (`ingester`, `parse`) were first deliberate, then retired (P3g, `com.gamma.telecom.asn1`).
 - **The jlink hand list is retired** (2026-10-18, taken on the operator's behalf): `package.ps1` links the derived set alone and **fails closed** on a lock mismatch or a missing section, rather than falling back to a hand list; `tools/jlink-runtime-extra.txt` stays as the one hand-kept list, because each entry carries its WHY; every edition must have a lock section (`--check`, CI guards job). Reverse by restoring the union block in `package.ps1` (git history).
+- **Switching a module off stops its work in flight (`MODULE-REORG-P4-3`, 2026-11-17, decided under operator
+  delegation; MoSCoW C4).** The stop contract reuses what exists; there is **no new SPI method and no start/stop
+  lifecycle**. *Runs:* `PUT /settings/modules`, after writing the file, calls `JobService.cancelSwitchedOffRuns()`,
+  which re-reads the same Job gate the scheduler reads at each fire (`jobTypeGate` + `jobTaskGate`, so the module's
+  Job Types and the `maintenance` tasks it contributes) for every Run executing in that Space, and interrupts each one
+  it now turns away the way `interruptRuns` (`JOB-OUTLIVES-CLOSE-1`) does at a close, but only those: recorded
+  `CANCELLED` with `module switched off: <the gate's sentence>`, a `CommitFence` checkpoint stops it too, and a Run
+  that keeps the interrupt and returns keeps its result. The interrupt and the Run's own end share a lock, so it never
+  lands on the Run's records or on the pool's next task; a Run that registers after the sweep reads the gate again
+  before its body and is cancelled there. *Subscriptions:* gated at each event, not unregistered - the subscription
+  asks `ModuleGate.paused(<background id>, <Space config root>)` (the id declared in the owning module's
+  `provides.background`) and does nothing while the module is off. **Why not unregister or an `onDisable` hook:** the
+  subscriptions switchable modules own are process-wide taps (`EventLog.addTap`) serving every Space, so there is
+  nothing per Space to unregister; a gate read at each event needs no ordering with `modules.toon` writes and honours
+  a hand edit too, as the P4f ticks do.
+  **Survey (2026-11-17).** Switchable means a feature id an installed `RouteModule` registers
+  (`ApiContext.registeredFeatures`, the only ids `PUT /settings/modules` accepts). `exchange` Signal forwarder - gated
+  (`exchange-signal-forward`: off at the origin, nothing forwarded or recorded; off at the consumer, undeliverable with
+  the reason); `geo-link` integration webhook tap (`IntegrationWebhooks`) - already checked `geoLink` per Space, now
+  also `investigations`, the integration routes' other feature (a route is refused when any one of its features is off);
+  `exchange` snapshot refresh, `geo-link` embed expiry sweep, `ops` SLA sweep - ticks already gated per
+  Space; `case-management` `ObjectEngineExtension` - config loading only. **Not switchable, so not gated:** the
+  Real-time Detection session's commit and stream-idle listeners - `realtime` declares a feature id in its manifest
+  but registers no route, so `PUT /settings/modules` refuses it (422) and a hand-written id is listed `inert` and
+  disables nothing; gating them would contradict that. If `realtime` ever becomes switchable, its two listeners in
+  `CollectorService` need the same check. **Not interrupted, by decision:** an approved Action Request already in its
+  dispatch attempt loop (`ActionDispatcher`) - the send cannot be undone, its attempts are bounded, and the routes that
+  start one already answer 404 `MODULE_DISABLED` while the module is off. A cancelled Run is never retried (a body that
+  turns the interrupt into an I/O error would otherwise look transient). **Left (the row, narrowed):** Link Analysis
+  graph runs (`GraphRunService`) and index builds (`IndexBuildService`) - LA-owned, host-free run tables with their own
+  cancel, not Job Runs; stopping them on a switch-off needs a host-to-LA hook that does not exist. Tests:
+  `JobModuleStopTest` (4), `ModuleSwitchOffStopsRunsTest` (real HTTP), `ControlApiExchangeSignalDeliveryTest` (2
+  added), `ControlApiLaIntegrationTest` (1 added).
 
 ## Open rows (BACKLOG section Module architecture)
-The umbrella row `MODULE-REORG-1` was closed 2026-10-18 (decided under operator delegation): every phase P0..P7 shipped, its model is this record plus [architecture-modules.md](architecture-modules.md), and its open work is tracked only in the sub-rows. `MODULE-REORG-P3-THIN-JARS` (operator: production keystore, secrets, TSA URL) - `MODULE-REORG-P4-3` (no work item) - `MODULE-REORG-P7-INCIDENTS` (`AlertMigration` deletion; the Workflow & SLA second source was declined 2026-10-11, see the memo above). `MODULE-REORG-P7-KERNEL` closed 2026-10-09: steps 1, 3–6 and the Escalation Rule edit UI shipped; step 7 and the five unregistered Consequences declined (BACKLOG §6).
+The umbrella row `MODULE-REORG-1` was closed 2026-10-18 (decided under operator delegation): every phase P0..P7 shipped, its model is this record plus [architecture-modules.md](architecture-modules.md), and its open work is tracked only in the sub-rows. `MODULE-REORG-P3-THIN-JARS` (operator: production keystore, secrets, TSA URL) - `MODULE-REORG-P4-3` (narrowed 2026-11-17 to Link Analysis runs in flight, see above) - `MODULE-REORG-P7-INCIDENTS` (`AlertMigration` deletion; the Workflow & SLA second source was declined 2026-10-11, see the memo above). `MODULE-REORG-P7-KERNEL` closed 2026-10-09: steps 1, 3–6 and the Escalation Rule edit UI shipped; step 7 and the five unregistered Consequences declined (BACKLOG §6).
