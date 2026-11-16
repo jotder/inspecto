@@ -116,6 +116,10 @@ src/app/
   sheets are in `docs/archived-documents/superpower-reviews/` (`docs/superpower/reviews/` is gone); its R6
   step was mock parity, which no longer exists. The Definition of Done in §12 is the live gate.
 - **Vendored** gamma/Fuse code (`src/@gamma/**`, `modules/auth/**`) is out of scope — don't restyle, audit, or guard it.
+  **One operator-approved exception (2026-11-16, MoSCoW C2, `UI-TS-STRICT-1`):** the ~44 null fixes in `src/@gamma`
+  that turning TypeScript `strict` on app-wide needs may be made in place. Only those type-safety edits (null checks,
+  types, `!` removal) — no restyling, refactoring or behaviour change in vendored code; anything else still needs the
+  operator.
 
 ## 4. Component design
 
