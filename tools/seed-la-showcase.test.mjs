@@ -38,8 +38,10 @@ test('apply signs in once per persona and acts as the right persona', async () =
   assert.deepEqual(r.failed, []);
   assert.equal(m.calls.filter((c) => c.u === '/auth/exchange').length, 1);
   const ops = m.calls.filter((c) => c.u === `/spaces/s/inv/investigations/${INV}/ops`);
-  assert.equal(ops.length, 8);                                  // >= 8 steps
-  assert.deepEqual(ops.map((c) => c.body.op), ['seed', 'expand', 'exclude', 'annotate', 'threshold', 'window', 'resolve', 'snapshot']);
+  assert.equal(ops.length, 9);                                  // >= 8 steps
+  assert.deepEqual(ops.map((c) => c.body.op), ['seed', 'expand', 'exclude', 'annotate', 'threshold', 'window', 'resolve', 'snapshot', 'connect']);
+  // the hub -> relay route is drawn: the Expand's 5-strongest cap drops it, the Connect step puts it on the canvas
+  assert.deepEqual(ops.find((c) => c.body.op === 'connect').body.ids, ['MULE-HUB-01', 'RELAY-01']);
   assert.ok(ops.every((c) => c.auth === 'Bearer tok-demo:fm.analyst'));
   assert.ok(ops.find((c) => c.body.op === 'exclude').body.reason);
   const members = m.calls.filter((c) => c.u.endsWith('/members') && c.u.includes('investigations'));
@@ -59,8 +61,15 @@ test('apply signs in once per persona and acts as the right persona', async () =
   assert.ok(watched.body.reason);
 });
 
-test('re-run skips an Investigation that already has its steps and its Case', async () => {
+test('re-run on a case seeded before the Connect step appends only that step', async () => {
   const m = mock([{ id: INV, headStep: 8, caseRef: 'CASE-7' }]);
+  await run({ fetchFn: m.fetchFn, base: 'http://h', space: 's', apply: true, stages: OFF });
+  const ops = m.calls.filter((c) => c.u.endsWith('/ops'));
+  assert.deepEqual(ops.map((c) => c.body.op), ['connect']);
+});
+
+test('re-run skips an Investigation that already has its steps and its Case', async () => {
+  const m = mock([{ id: INV, headStep: 9, caseRef: 'CASE-7' }]);
   const r = await run({ fetchFn: m.fetchFn, base: 'http://h', space: 's', apply: true, stages: OFF });
   assert.equal(m.calls.filter((c) => c.u.endsWith('/ops')).length, 0);
   assert.equal(m.calls.filter((c) => c.u.includes('/cases/') || c.u.includes('/objects/')).length, 0);

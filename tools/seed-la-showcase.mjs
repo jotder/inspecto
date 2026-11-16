@@ -43,6 +43,10 @@ export function buildPlan() {
     { op: 'window', window: { from: '2026-09-01T00:00:00Z', to: '2026-09-04T00:00:00Z' } },
     { op: 'resolve' },
     { op: 'snapshot', label: 'showcase baseline' },
+    // The Expand keeps each entity's 5 strongest links, and the hub's many structuring deposits outrank its two wires to the
+    // relay, so without this step the case drew the feeders and the relay as two clusters (executive review 2026-11-16).
+    // Last, so a re-run on a Space seeded before it appends just this step. A recorded Connect between the two start entities draws the route the case is about: feeders -> hub -> relay -> offshore.
+    { op: 'connect', ids: ['MULE-HUB-01', 'RELAY-01'], maxHops: 1, entityType: 'account' },
   ];
   const plan = [
     { id: 'investigation', as: 'fm.analyst', method: 'POST', path: '/inv/investigations', body: {
