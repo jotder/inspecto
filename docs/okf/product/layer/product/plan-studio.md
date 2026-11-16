@@ -418,7 +418,7 @@ and `format`, path-jails the directory, and writes `<job>_<timestamp>.<ext>`:
 | `json` | nothing — the rollup default | pretty-printed report |
 | `csv` | `scope: dataset` | row serialisation |
 | `png` | `scope: dataset` | `TablePngRenderer`, JDK-native Graphics2D, a 50-row table snapshot |
-| `pdf` | `scope: dataset` | `PdfRenderer` — the PNG wrapped in a hand-written single-page PDF (one image XObject, no text layer), because no PDF library is on the classpath and the build is offline |
+| `pdf` | `scope: dataset` | `PdfRenderer` — the PNG wrapped in a hand-written PDF (one image XObject per page, no text layer), because no PDF library is on the classpath and the build is offline. Since 2026-11-16 (`REPORT-PDF-CHARTS-1`) `widgets:` adds one chart page per bar / line / KPI Widget before the table page — see [`user-guide-kpi-reports.md`](../../module/analytics/user-guide-kpi-reports.md) |
 
 The artifact is registered on the run and a `REPORT_READY` event is emitted carrying `job`, `scope` and
 `path`. ⚠ **`json` is missing from both user-facing lists** — `GLOSSARY.md` and `USER_GUIDE.md`

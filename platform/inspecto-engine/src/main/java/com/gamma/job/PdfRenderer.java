@@ -13,11 +13,12 @@ import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
 /**
- * Renders a tabular dataset-export result as a single-page PDF (BI-4). JDK-native only, no PDF
+ * Renders a tabular dataset-export result as a PDF (BI-4). JDK-native only, no PDF
  * library on the classpath (offline build — see docs/BACKLOG.md BI-4): this is the "PNG-wrapped-
  * in-PDF" fallback the backlog calls for, not general-purpose PDF authoring. It reuses
- * {@link TablePngRenderer#renderImage} for layout, then hand-writes a minimal single-object PDF
- * (one Page, one Image XObject, FlateDecode + DeviceRGB) — no text layer, no fonts embedded.
+ * {@link TablePngRenderer#renderImage} for layout, then hand-writes a minimal PDF (one Page per
+ * image, one Image XObject each, FlateDecode + DeviceRGB) — no text layer, no fonts embedded.
+ * Since REPORT-PDF-CHARTS-1 a report's {@link WidgetChartRenderer} chart pages come before the table page.
  */
 final class PdfRenderer {
 
@@ -27,34 +28,42 @@ final class PdfRenderer {
     private PdfRenderer() {}
 
     static void render(String title, List<Map<String, Object>> rows, Path out) throws IOException {
-        BufferedImage img = TablePngRenderer.renderImage(title, rows);
-        int w = img.getWidth(), h = img.getHeight();
+        render(List.of(TablePngRenderer.renderImage(title, rows)), out);
+    }
 
-        byte[] rgb = new byte[w * h * 3];
-        int p = 0;
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                int argb = img.getRGB(x, y);
-                rgb[p++] = (byte) ((argb >> 16) & 0xFF);
-                rgb[p++] = (byte) ((argb >> 8) & 0xFF);
-                rgb[p++] = (byte) (argb & 0xFF);
-            }
-        }
-        byte[] deflated = deflate(rgb);
-
-        double ptW = w / PX_PER_PT, ptH = h / PX_PER_PT;
-        String content = "q " + fmt(ptW) + " 0 0 " + fmt(ptH) + " 0 0 cm /Im0 Do Q";
-        byte[] contentBytes = content.getBytes(StandardCharsets.US_ASCII);
-
+    /** One page per image, in order, each page sized to its image (REPORT-PDF-CHARTS-1: chart pages, then the table). */
+    static void render(List<BufferedImage> pages, Path out) throws IOException {
         List<byte[]> objects = new ArrayList<>();
         objects.add(obj("<< /Type /Catalog /Pages 2 0 R >>"));
-        objects.add(obj("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"));
-        objects.add(obj("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + fmt(ptW) + " " + fmt(ptH)
-                + "] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>"));
-        objects.add(streamObj("<< /Length " + contentBytes.length + " >>", contentBytes));
-        objects.add(streamObj("<< /Type /XObject /Subtype /Image /Width " + w + " /Height " + h
-                + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length "
-                + deflated.length + " >>", deflated));
+        StringBuilder kids = new StringBuilder();
+        for (int i = 0; i < pages.size(); i++) kids.append(i == 0 ? "" : " ").append(3 + 3 * i).append(" 0 R");
+        objects.add(obj("<< /Type /Pages /Kids [" + kids + "] /Count " + pages.size() + " >>"));
+        for (int i = 0; i < pages.size(); i++) {
+            BufferedImage img = pages.get(i);
+            int w = img.getWidth(), h = img.getHeight();
+            byte[] rgb = new byte[w * h * 3];
+            int p = 0;
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) {
+                    int argb = img.getRGB(x, y);
+                    rgb[p++] = (byte) ((argb >> 16) & 0xFF);
+                    rgb[p++] = (byte) ((argb >> 8) & 0xFF);
+                    rgb[p++] = (byte) (argb & 0xFF);
+                }
+            }
+            byte[] deflated = deflate(rgb);
+
+            double ptW = w / PX_PER_PT, ptH = h / PX_PER_PT;
+            byte[] contentBytes = ("q " + fmt(ptW) + " 0 0 " + fmt(ptH) + " 0 0 cm /Im0 Do Q")
+                    .getBytes(StandardCharsets.US_ASCII);
+            int page = 3 + 3 * i;   // this page's object number; its content and image follow it
+            objects.add(obj("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + fmt(ptW) + " " + fmt(ptH)
+                    + "] /Resources << /XObject << /Im0 " + (page + 2) + " 0 R >> >> /Contents " + (page + 1) + " 0 R >>"));
+            objects.add(streamObj("<< /Length " + contentBytes.length + " >>", contentBytes));
+            objects.add(streamObj("<< /Type /XObject /Subtype /Image /Width " + w + " /Height " + h
+                    + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length "
+                    + deflated.length + " >>", deflated));
+        }
 
         try (OutputStream os = java.nio.file.Files.newOutputStream(out)) {
             writePdf(os, objects);

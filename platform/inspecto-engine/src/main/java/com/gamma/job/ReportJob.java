@@ -53,12 +53,14 @@ import java.util.Set;
  *       sealed connection, {@link XlsxWorkbook}; {@code format: png}/{@code pdf} render a table-image snapshot, capped
  *       at {@link TablePngRenderer#MAX_ROWS} rows — {@code pdf} is the same snapshot wrapped in a
  *       minimal hand-written PDF via {@link PdfRenderer}, no PDF library on the classpath); reports
- *       render JSON.</li>
+ *       render JSON. With {@code widgets} (comma-separated Widget ids, {@code format: pdf} only) each listed
+ *       Dataset-bound bar / line / kpi Widget is drawn on its own page before the table, from its own query
+ *       ({@link ReportWidget}, {@link WidgetChartRenderer}; REPORT-PDF-CHARTS-1).</li>
  * </ul>
  *
  * <p>Params: {@code scope}, {@code out_dir}, {@code format}
  * ({@code json} | {@code csv} | {@code xlsx} | {@code png} | {@code pdf}), {@code recipients} (comma-separated
- * addresses mailed once the artifact is delivered), {@code attach} ({@code true} attaches it), and the
+ * addresses mailed once the artifact is delivered), {@code attach} ({@code true} attaches it), {@code widgets}, and the
  * dataset-scope params above. Text cells in {@code csv} and {@code xlsx} are formula-neutralised
  * ({@link XlsxWorkbook#neutralise}).
  */
@@ -106,6 +108,9 @@ final class ReportJob implements Job {
             throw new IllegalArgumentException(
                     "Dashboard export is not supported — recreate this schedule for a Dataset");
         String scope = cfg.opt("scope", "status").toLowerCase();
+        if (!widgets().isEmpty() && !"pdf".equalsIgnoreCase(cfg.opt("format", "")))
+            throw new IllegalArgumentException("widgets draws chart pages in format pdf only, got format '"
+                    + cfg.opt("format", "") + "'");
         long t0 = System.nanoTime();
 
         aliasedColumns = List.of();
@@ -214,7 +219,12 @@ final class ReportJob implements Job {
         } else if ("pdf".equals(format)) {
             if (rows == null) throw new IllegalArgumentException(
                     "format pdf requires scope dataset (rollup reports render as json)");
-            PdfRenderer.render(cfg.name(), rows, artifact);
+            // REPORT-PDF-CHARTS-1: each listed Widget's chart page first, in order, then the table page. Every chart is
+            // drawn before a byte is written, so a refused Widget fails the Run with nothing delivered.
+            List<java.awt.image.BufferedImage> pages = new ArrayList<>();
+            for (String id : widgets()) pages.add(widgetChart(id));
+            pages.add(TablePngRenderer.renderImage(cfg.name(), rows));
+            PdfRenderer.render(pages, artifact);
         } else {
             Files.writeString(artifact, JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report));
         }
@@ -260,9 +270,6 @@ final class ReportJob implements Job {
 
     /** The dataset-scope export rows: a headless BI query compiled from this job's params (BI-4/BI-7). */
     private QueryExecutor.Result datasetRows() throws Exception {
-        // Space-scoped — see SpaceConfigRoot (MATERIALIZE-SPACE-ROOT-1).
-        Path writeRoot = SpaceConfigRoot.requireCurrent("scope dataset");
-
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("dataset", cfg.require("dataset"));
         // The grammar's own split (MEASURE-SHORTHAND-ONE-HOME-1); message unchanged (no context prefix).
@@ -273,19 +280,30 @@ final class ReportJob implements Job {
         if (!groupBy.isEmpty()) body.put("groupBy", groupBy);
         int limit = datasetLimit();
         body.put("limit", limit);
+        return query(body, measures.isEmpty() && groupBy.isEmpty(), limit, "scope dataset");
+    }
 
-        MeasureCompiler.Spec spec = measures.isEmpty() && groupBy.isEmpty()
+    /**
+     * Run one headless BI query over {@code body}'s Dataset — this Job's own export, or a Widget's chart
+     * (REPORT-PDF-CHARTS-1) — masked for leaving the platform. {@code raw} = a {@code SELECT *} with no aggregation.
+     */
+    private QueryExecutor.Result query(Map<String, Object> body, boolean raw, int limit, String what) throws Exception {
+        // Space-scoped — see SpaceConfigRoot (MATERIALIZE-SPACE-ROOT-1).
+        Path writeRoot = SpaceConfigRoot.requireCurrent(what);
+        String datasetId = String.valueOf(body.get("dataset"));
+
+        MeasureCompiler.Spec spec = raw
                 ? null   // raw export: SELECT * over the dataset (no aggregation)
                 : MeasureCompiler.parse(body, 10_000, 100_000);
         // One row PAST the cap (BI-QUERY-TRUNCATION-1): the compiled statement ends in its own LIMIT, so asking for
         // exactly the cap could never show the result was cut. The executor trims back to the cap and flags it.
         MeasureCompiler.Compiled sql = spec != null ? MeasureCompiler.compile(spec.withLimit(spec.limit() + 1))
-                : new MeasureCompiler.Compiled("SELECT * FROM " + SqlIdent.q(cfg.require("dataset")) + " LIMIT " + (limit + 1), List.of());
+                : new MeasureCompiler.Compiled("SELECT * FROM " + SqlIdent.q(datasetId) + " LIMIT " + (limit + 1), List.of());
 
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        Map<String, Object> dataset = store.get("dataset", cfg.require("dataset"))
+        Map<String, Object> dataset = store.get("dataset", datasetId)
                 .map(ComponentRegistry.Component::content)
-                .orElseThrow(() -> new IllegalArgumentException("unknown dataset '" + cfg.require("dataset") + "'"));
+                .orElseThrow(() -> new IllegalArgumentException("unknown dataset '" + datasetId + "'"));
         String relationSql = DatasetRelation.relationSql(dataset,
                 (dataDir == null || dataDir.isBlank()) ? null : Path.of(dataDir),
                 new ViewStore(writeRoot.resolve("views")));
@@ -293,14 +311,32 @@ final class ReportJob implements Job {
         // The cap the executor trims to must be the one the SQL's probe was built from: the spec parser clamps to its
         // maximum, so an unclamped `limit` above it would leave the executor waiting for rows the SQL can never return.
         int cap = spec != null ? spec.limit() : limit;
-        QueryExecutor.Result raw = QueryExecutor.run(new QueryExecutor.Request(
-                cfg.require("dataset"), relationSql, sql.sql(), cap, 0, List.of(), List.of(), sql.params()));
+        QueryExecutor.Result result = QueryExecutor.run(new QueryExecutor.Request(
+                datasetId, relationSql, sql.sql(), cap, 0, List.of(), List.of(), sql.params()));
         // BI-QUERY-MASKING-1: the file leaves the platform, so classified entity keys are always aliased (no viewer to ask).
         ReportRowMasking.Masked masked = ReportRowMasking.provider()
-                .map(m -> m.mask(writeRoot, cfg.require("dataset"), dataset, spec, raw))
-                .orElse(new ReportRowMasking.Masked(raw, List.of()));
-        aliasedColumns = masked.aliasedColumns();
+                .map(m -> m.mask(writeRoot, datasetId, dataset, spec, result))
+                .orElse(new ReportRowMasking.Masked(result, List.of()));
+        Set<String> aliased = new LinkedHashSet<>(aliasedColumns);
+        aliased.addAll(masked.aliasedColumns());
+        aliasedColumns = List.copyOf(aliased);
         return masked.result();
+    }
+
+    /** The Widget ids {@code widgets:} lists (REPORT-PDF-CHARTS-1), in page order. */
+    private List<String> widgets() {
+        return split(cfg.opt("widgets", ""));
+    }
+
+    /** One Widget's chart page: its own query (masked like the export), drawn by {@link WidgetChartRenderer}. */
+    private java.awt.image.BufferedImage widgetChart(String id) throws Exception {
+        Path writeRoot = SpaceConfigRoot.requireCurrent("widgets");
+        Map<String, Object> content = new ComponentStore(writeRoot.resolve("registry")).get("widget", id)
+                .map(ComponentRegistry.Component::content)
+                .orElseThrow(() -> new IllegalArgumentException("unknown widget '" + id + "'"));
+        ReportWidget w = ReportWidget.of(id, content);
+        QueryExecutor.Result r = query(w.body(), false, ReportWidget.MAX_ROWS, "widgets");
+        return WidgetChartRenderer.render(w, r.rows(), r.truncated());
     }
 
     /** The configured row cap (default 10,000), as the request carries it. */

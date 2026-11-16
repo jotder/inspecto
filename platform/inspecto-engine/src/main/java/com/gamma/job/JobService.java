@@ -475,6 +475,7 @@ public final class JobService implements AutoCloseable {
                         ParameterDecl.optional("out_dir", ParamType.STRING, null, "Delivery directory (enables artifact + REPORT_READY)"),
                         ParameterDecl.optional("format", ParamType.STRING, null, "json | csv | xlsx | png | pdf"),
                         ParameterDecl.optional("dataset", ParamType.DATASET_REF, null, "Dataset id (scope=dataset)"),
+                        ParameterDecl.optional("widgets", ParamType.STRING, null, "format pdf: comma-separated bar / line / kpi Widget ids, each drawn as a chart page before the table"),
                         ParameterDecl.optional("recipients", ParamType.STRING, null, "Comma-separated addresses mailed when the report is delivered"),
                         ParameterDecl.optional("attach", ParamType.STRING, "false", "true attaches the delivered report to that mail"))),
                 List.of(EventType.REPORT_READY), List.of(ArtifactDecl.report("report")), List.of("mail")),

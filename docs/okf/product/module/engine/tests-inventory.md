@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-407 test class(es): 407 unit, 0 real-HTTP control-plane, 0 IT.
+408 test class(es): 408 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -250,6 +250,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `RecipeExecutionParityTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/RecipeExecutionParityTest.java` | The Phase-3 parity gate (S4), execution half — deferred 2026-08-06 ("lands with S3's executor |
 | `ReferenceCompactorTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ReferenceCompactorTest.java` | Reference Phase-2 P3 verify: {@link ReferenceCompactor} collapses an append-only versioned Reference |
 | `ReportJobDeliveryTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ReportJobDeliveryTest.java` | BI-4 scheduled export delivery: the dataset scope renders a CSV artifact into out_dir. |
+| `ReportPdfChartsTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ReportPdfChartsTest.java` | REPORT-PDF-CHARTS-1: a {@code format: pdf} report Job with {@code widgets:} carries each bar / line / KPI Widget as a |
 | `RetryPolicyTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/RetryPolicyTest.java` | D8: the retry policy's defaults, backoff and the transient/permanent split. |
 | `RunArtifactStoreTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/RunArtifactStoreTest.java` | P1d Run Artifacts (§10): recording through {@code ctx.artifacts()} persists to JSONL and reads back |
 | `RunContextCausationTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/RunContextCausationTest.java` | The causation THREAD, end to end at the producing side. |

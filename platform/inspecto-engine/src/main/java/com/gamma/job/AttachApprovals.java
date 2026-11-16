@@ -24,7 +24,8 @@ import java.util.TreeMap;
  * <ul>
  *   <li><b>What is hashed</b> — {@link #fingerprint}: ONLY what decides what is sent and to whom — the Job's
  *       {@link #SENSITIVE} keys, template-EXPANDED, plus for its Dataset the definition AND the resolved relation
- *       SQL ({@link DatasetRelation#relationSql}, so a view's SQL is inside). Schedule and {@code enabled} are not.</li>
+ *       SQL ({@link DatasetRelation#relationSql}, so a view's SQL is inside), and the same for each Widget a PDF draws
+ *       ({@code widgets}, REPORT-PDF-CHARTS-1). Schedule and {@code enabled} are not.</li>
  *   <li><b>When it is fixed</b> — at HOLD time, from the PROPOSED content; stored on the Pending Change. Approve
  *       refuses (409) unless the live content still hashes to it, and then records THAT fingerprint, bound to the
  *       Pending Change id and a nonce ({@link #record}). Nothing written between proposal and replay is blessed.</li>
@@ -116,6 +117,39 @@ public final class AttachApprovals {
                         + "resolved (" + unresolvable.getMessage() + ") — not approvable until it can", unresolvable);
             }
             canon.put("datasetSql", sql);
+        }
+        // REPORT-PDF-CHARTS-1: the chart pages carry each Widget's own query, so its definition and its Dataset are part of
+        // what is sent. Added ONLY when the Job lists widgets: a Job without them keeps the fingerprint it was approved at.
+        String widgets = str(j.get("widgets"));
+        if (widgets != null && !widgets.isEmpty() && root != null) {
+            ComponentStore store = new ComponentStore(root.resolve("registry"));
+            Map<String, Object> drawn = new TreeMap<>();
+            for (String raw : widgets.split(",")) {
+                String id = raw.trim();
+                if (id.isEmpty()) continue;
+                Map<String, Object> w = store.get("widget", id).map(ComponentRegistry.Component::content)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "the Widget '" + id + "' this report attaches does not exist — not approvable"));
+                Map<String, Object> entry = new TreeMap<>();
+                entry.put("definition", w);
+                String ds = str(w.get("datasetId"));
+                if (ds != null && !ds.isEmpty()) {
+                    Map<String, Object> def = store.get("dataset", ds).map(ComponentRegistry.Component::content)
+                            .orElseThrow(() -> new IllegalArgumentException("the Dataset '" + ds + "' Widget '" + id
+                                    + "' draws does not exist — not approvable"));
+                    entry.put("datasetDefinition", def);
+                    try {
+                        entry.put("datasetSql", DatasetRelation.relationSql(def,
+                                dataDir == null || dataDir.isBlank() ? null : Path.of(dataDir), new ViewStore(root.resolve("views"))));
+                    } catch (RuntimeException unresolvable) {
+                        throw new IllegalArgumentException("the Dataset '" + ds + "' Widget '" + id + "' draws cannot be "
+                                + "resolved (" + unresolvable.getMessage() + ") — not approvable until it can", unresolvable);
+                    }
+                }
+                drawn.put(id, entry);
+            }
+            canon.put("job.widgets", widgets);
+            canon.put("widgets", drawn);
         }
         return ApprovalFingerprint.hash(canon);
     }

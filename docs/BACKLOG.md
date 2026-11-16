@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **92<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 79<!--count:backlog-p3--> × P3** —
+> **91<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 78<!--count:backlog-p3--> × P3** —
+> ⬇ **92 → 91 (P3 79 → 78) on 2026-11-16** — closed P3 feature `REPORT-PDF-CHARTS-1` [items: module.engine · kind: feature]: a report Job's PDF was the table image only. Now `format: pdf` with `widgets: <id>, …` draws one page per listed Dataset-bound `bar` / `line` / `kpi` Widget before the table page, server side with JDK Graphics2D (`ReportWidget` compiles the Widget's own query the way the SPA does; `WidgetChartRenderer`; `PdfRenderer` now writes one page per image), no new dependency. Each chart query is masked like the export, and the attach-approval fingerprint covers each drawn Widget and its Dataset (only when `widgets` is set, so existing approvals keep their hash). Other viz types, view-/query-/KPI-bound Widgets, named measures and `widgets` on a non-pdf format fail the Run by name. Not applied: dashboard filters, palette, sort options. Tests `ReportPdfChartsTest` (8, read the PDF page images back and measure the bars). Doc: `module/analytics/user-guide-kpi-reports.md`.
 > ⬆ **89 → 92 (P2 14 → 13, P3 75 → 79) on 2026-11-16** — closed P2 defect `LA-FULL-CYCLE-TEST-1` [items: module.la-core, product.la · kind: defect]: all seven phases of the full-cycle plan shipped (phases 2 and 4-7 since the last line: one audited Reveal for the ids on screen and one alias per entity; the link index built in the Space that asked for it, so a fresh import is not out of date, one status in plain words with **Rebuild**; Dossier and Members one click away and the approver's **Approve / Deny** on the waiting line; labels on under 80 nodes, expanded nodes placed outside, positions kept on Save, light/dark following the browser with a choice in the user menu; one clock and plain words), each lane verified before its push. A live drive of current master confirmed them and found one more: a Reveal did not redraw the canvas (`6378d56c2`). Full gate NOT run. Plan archived. Filed P3 `LA-FULL-CYCLE-RESIDUALS-1` [items: module.la-core, product.la · kind: chore], `LA-INDEX-SPELLINGS-1` [items: module.la-core, module.la-storage · kind: defect], `LA-DEEPLINK-REVEAL-AUDIT-1` [items: module.la-core · kind: defect] and `ALERTS-PAGE-WORDS-1` [items: addon.incidents · kind: defect]; findings 8 and 28 noted on `LA-INDUSTRY-FOLD-1`.
 > ⬆ **88 → 89 (P3 74 → 75) on 2026-11-16**: filed P3 chore `SPACE-ADMISSION-FOLLOWUPS-1` [items: module.access, module.config, module.la-core · kind: chore] — what the closed-Space lane (D5) left on purpose, from its report and its independent review.
 > ↔ **89 (no count change, P2 14, P3 75) on 2026-11-16**: narrowed P2 defect `LA-FULL-CYCLE-TEST-1` [items: module.la-core, product.la · kind: defect] — phases 1 and 3 shipped. Phase 1: the seeded `admin` holds `canAuthorWorkbench` (D1); creating a Space turns Add data on for a creator who may administer, and the locked panel has a **Turn on Add data** button (D2); the Add data refusal no longer claims a Pipeline; Create a Space has a plain Name box (finding 9); a Space a signed-in person creates is closed to everyone it does not admit (creator, `canAdminister`, roles its own `roles.toon` defines) and answers them 404, and the inbox's server path is shown only to administrators (D5, finding 32; existing Spaces and Basic unchanged). Phase 3: a column almost all dates or numbers is proposed as that type at low confidence; a Type or Role change asks the server again (`POST /onboard/files/{draftId}/redraft`); **Confirm all** per step; the result accounts for blanked, unlinked and respelled rows; Explore after a details import; a synthetic fixture (461 + 138 rows) in `inspecto/src/test/resources/onboard/full-cycle/`. Each lane passed an independent verification; targeted tests only, the full gate was NOT run, nothing driven in a browser. Phases 2, 4 and 6 in build; 5 and 7 not started.
@@ -605,10 +606,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 79<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 78<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 79<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 92<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 78<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 91<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -826,7 +827,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 
 
-- **P3** · `REPORT-PDF-CHARTS-1` — **a report Job's PDF is a table snapshot, never a chart.** `format: pdf` wraps the same table image `format: png` renders (`ReportJob` → `TablePngRenderer`, capped at its row limit), so a scheduled PDF cannot carry the dashboard's charts or KPI tiles. Found in the MFS demo review (2026-10-27, item 25); until then dashboards are the storytelling surface. [items: module.engine · kind: feature]
 
 Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-overview`, `quality-monitor`,
 `trend-monitor` today. See [`okf/product/layer/product/user-guide-studio.md`](okf/product/layer/product/user-guide-studio.md).
