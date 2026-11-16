@@ -340,15 +340,27 @@ sink monitor and file lock, which no reader takes), so there is no deadlock.
   every later read in the same Run returns that pin; the next Run pins afresh. Holding the read lock for the Run was
   rejected: a publish would then wait for the slowest Run reading its store, up to the Job deadline (24 h ceiling).
   A pin keeps the **files** instead: inside `hold()`, under the store's read lock and only while it enumerates and
-  links, each file gets a hard link in `<dataRoot>/.run-snapshots/<uuid>/` (a copy where the file system has none,
-  such as a store on another volume), and the relation reads the links. A swap's rename or a retirement's delete
-  then removes only the store's name for the file; the Run's name keeps the bytes until the Run ends. Keeping the
-  `*.stale` files longer would not do it (the path is gone at the rename, see above). So a swap waits only for a pin
-  under way, never for a Run. The Run's relation is not registered with `QueryExecutor.repinnable`: a lost-pin
-  retry may never move a Run onto a newer snapshot (and with the links in place no pin is lost). Released by
-  `JobService` in the Run's `finally` on success, failure, cancel (`interruptRuns`) and deadline, and by
-  `PackTestHarness` when its Run returns; a read after that is refused. A directory a crash or a still-open file left
-  behind is deleted by the next Run that pins in that data root. Retries inside one Run share its pins.
+  links, each file gets a hard link at `<dataRoot>/.run-snapshots/<uuid>/<n>/<its path under the data root>`, and the
+  relation reads the links. The path below `<n>/` keeps the `key=value` folders, so a Hive-partitioned store (a sink
+  written with `PARTITION_BY`) reads the same partition columns pinned as per call. A swap's rename or a retirement's
+  delete then removes only the store's name for the file; the Run's name keeps the bytes until the Run ends. Keeping
+  the `*.stale` files longer would not do it (the path is gone at the rename, see above). So a swap waits only for a
+  pin under way (list and link one Dataset), never for a Run.
+  **Where hard links fail** (no hard links on the file system, a store on another volume) the file is **copied, but not
+  under the lock**: it is opened under the lock and copied from that handle after the lock is released. Copying from
+  the path after the release would be wrong: a swap could rename the file away in between and the pin would lose it.
+  An open handle is not reached by a rename or a delete, so the copy holds exactly the pinned bytes. A pin that would
+  copy more than 1 GiB is not made: that Dataset is read per call for the rest of the Run, with a WARN, rather than
+  failing the Run, so no Run that worked before Run-level snapshots fails because the host cannot link. Each pin that
+  copies logs one WARN. A failed pin deletes its partial `<n>/` folder.
+  The Run's relation is not registered with `QueryExecutor.repinnable`: a lost-pin retry may never move a Run onto a
+  newer snapshot (and with the links in place no pin is lost). Released by `JobService` in the Run's `finally` on
+  success, failure, cancel (`interruptRuns`) and deadline, and by `PackTestHarness` when its Run returns; a read after
+  that is refused. A live Run holds an OS file lock on `<uuid>/.lock`; the next Run that pins in the data root deletes
+  every other Run folder whose lock it can take (a crash, a close that could not delete), in this process or another
+  (a scale-out or HA peer on the same data root), and never one younger than a minute, whose owner may not have
+  locked it yet. Every data-root walk skips `.run-snapshots/` as it skips `.duckdb_tmp/` (`DuckDbUtil.internalDir`):
+  backup, the storage report, `cleanup` and the object-store export. Retries inside one Run share its pins.
   **Covered:** every Job Type declaring `requires: [datasets]` — today only Job Pack types; no built-in Job Type reads
   through `DatasetAccess`. **Not covered, per-call as before:** a `view`-backed Dataset (no file list to pin), a
   pack-contributed `DatasetAccess`, and a pack Step in a Pipeline (its grant is taken at load time, not per Run). Every

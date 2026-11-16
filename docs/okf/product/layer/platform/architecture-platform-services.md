@@ -108,7 +108,9 @@ There are no Space TOON keys. A Job definition grants through its type's `requir
 - A lean `JobService` with no registry accepts a built-in's `requires:`; third-party providers stay strict.
 - Pack Steps are capped: `StepExecutors.CEILING = {mail}` rejects a Step requiring `mail`.
 - `DatasetAccess` pins once per Job Run (`RunSnapshot`, since 2026-11-17): the first read of a Dataset in a Run pins
-  its files as hard links under `<dataRoot>/.run-snapshots/<uuid>/`, every later read in the Run returns that pin, and
-  the Run's end deletes the links. A publish never waits for a Run, only for a pin under way. Still per call: a
+  its files as hard links under `<dataRoot>/.run-snapshots/<uuid>/` (a copy, made outside the swap lock, where links
+  fail; over 1 GiB the Dataset is read per call), every later read in the Run returns that pin, and the Run's end
+  deletes the links. A publish never waits for a Run, only for a pin under way. Data-root walks (backup, storage
+  report, `cleanup`, object-store export) skip that folder. Still per call: a
   `view`-backed Dataset (no file list), a pack-contributed `DatasetAccess`, and a pack Step's grant (load-time, not
   per Run). A published file must never be rewritten in place, since a link shares its bytes.

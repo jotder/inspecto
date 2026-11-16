@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-410 test class(es): 410 unit, 0 real-HTTP control-plane, 0 IT.
+411 test class(es): 411 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -182,6 +182,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `ConsignmentProcessJobTypeTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ConsignmentProcessJobTypeTest.java` | §14.4 step 3 — the adapter. Proves the "author doesn't think about it" promise from the <em>processor's</em> |
 | `ConsignmentProcessParameterTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ConsignmentProcessParameterTest.java` | §14.4 step 3's acceptance criterion, at the layer that actually decides it: <b>"a third-party processor gets |
 | `CryptoLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/CryptoLinksJobGoldenTest.java` | The {@code la-crypto} Space Template (Basic tier) RUN end to end from a verbatim copy: the six Pipelines land the shipped extracts |
+| `DataRootInternalDirsTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/DataRootInternalDirsTest.java` | A data-root walk never touches a live Run's snapshot links ({@code .run-snapshots/}, com.gamma.query.RunSnapshot) or |
 | `DbJobRunStoreTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/DbJobRunStoreTest.java` | {@link DbJobRunStore} (T27): the DuckDB projection of job runs that backs the reporting endpoints. |
 | `DemoRetireSupersededJobShipsDisabledTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/DemoRetireSupersededJobShipsDisabledTest.java` | Pins the committed {@code spaces/demo} {@code retire_superseded} maintenance job — the example the |
 | `DryRunServicesTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/DryRunServicesTest.java` | The dry-run contract for Platform Services (§3.4): mutating services record instead of act — the |

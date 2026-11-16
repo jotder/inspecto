@@ -75,7 +75,7 @@ Interfaces live beside their engine facility and carry `@PublicApi`.
 | `analytics` | `AnalyticsAccess` (`com.gamma.query`): `mean`, `variance`/`stddev` (`Spread.POPULATION` \| `SAMPLE`), `median(MedianMode)`, `quantile(QuantileMode)`, `mad`, `scaledMad`, `zScore`, `robustZ`, `iqr`, `ratio`, `rate`; `profileSql(DatasetAccess.Read, columns, quantiles…)`; `truncate` / `truncateSql(TimeGrain, ZoneId)` | the Analytics Kernel (`platform/inspecto-analytics`) — `AnalyticsAccess.kernel()` delegates every call; the interface is in the engine because the kernel may not reach it (D-12 + D-AN1). Profiling composes with a `datasets` read the caller already holds; it opens nothing. Bound by the host and pre-bound in `PackTestHarness` (ANALYTICS-CORE-1 S7, 2026-10-17) | n/a — read-only: pure functions, handed through unchanged |
 | `mail` | `MailAccess.send(to, cc, subject, body[, attachments])` | the notification channels (`MailAccess.overChannels()`); used by the `mail.send` Job Type | logs the would-be send (recipient **count** and subject — never the addresses or the body), sends nothing and answers `false`; `mail.send` then reports SKIPPED *dry run — nothing sent* |
 | `objects` | `ObjectAccess` — `hasActive`, `hasActiveMatching`, `activeAttributeIndex`, `open`, `transition` | `inspecto-ops` `ObjectServiceAccess`, bound only when the Incidents add-on is installed; used by `objects.analytics` and `caserule.evaluate` | reads (`hasActive*`, `activeAttributeIndex`, tags, `summary`, `findByStatus`, `byEntity`) pass through; every write (`open`, `transition`, `saveAttributes`, `link`, `linkSubject`, `addTag`, `ensureTag`) logs and changes nothing — `open` returns a synthetic `dry-run:` id, `transition` / `saveAttributes` answer `false`. ⚠ The stand-in is not an `ObjectServiceAccess`, so `OpsJobTypes.engineFor` finds **no engine** under a dry run: `caserule.evaluate` reports it evaluated nothing (no preview form, like `alert.evaluate`) and `objects.analytics` reports nothing read |
-| `datasets` | `DatasetAccess.read(spaceId, datasetId)` | `DatasetRelation` with per-call pinning (§7e) | n/a — read-only |
+| `datasets` | `DatasetAccess.read(spaceId, datasetId)` | `DatasetRelation`; a Job Run pins each Dataset once, at its first read (`RunSnapshot`, §7e) | n/a — read-only |
 | `link-index` | `LinkIndexAccess.build(Request)` | the Link Analysis index builder | reports a `DRY_RUN` outcome, builds nothing |
 
 **The engine is the seam's first consumer** — the CONTROL trio's dispatch was rewired through
@@ -380,10 +380,13 @@ guard exists.
 - **Run-level snapshot (Platform Services Stage 2, 2026-11-17).** A Job Run is handed `com.gamma.query.RunSnapshot`
   instead of the Space's service: the first read of a Dataset in the Run pins it, and every later read in the Run
   returns that pin, so all reads of one Run see one file list. The pin keeps the files, not the swap lock: under the
-  store's read lock (only while it enumerates and links) each file gets a hard link (a copy where the file system
-  has none) in `<dataRoot>/.run-snapshots/<uuid>/`, and the relation reads the links, so a swap or
-  `retire_superseded` that removes the store's name for a file leaves the Run's. Released in the Run's `finally`
-  (success, failure, cancel, deadline); a leftover is swept by the next Run that pins. A view-backed Dataset and a
+  store's read lock (only while it enumerates and links) each file gets a hard link in
+  `<dataRoot>/.run-snapshots/<uuid>/<n>/<its path under the data root>` (`key=value` folders kept, so a Hive-partitioned
+  store reads the same columns), and the relation reads the links, so a swap or `retire_superseded` that removes the
+  store's name for a file leaves the Run's. Where hard links fail the file is opened under the lock and copied after
+  it; a copy over 1 GiB is not made and that Dataset is read per call, with a WARN. Released in the Run's `finally`
+  (success, failure, cancel, deadline); a live Run holds an OS lock on its folder, and the next Run that pins sweeps
+  only folders whose lock it can take. Every data-root walk skips `.run-snapshots/`. A view-backed Dataset and a
   pack-contributed `DatasetAccess` keep per-call pinning. Detail: [Jobs](spec-jobs.md), "Snapshot swaps and readers".
 - **Read-only, per-Space, fail closed:** bound to one Space; another Space or an unknown Dataset throws naming the
   ids, never an empty result. A Job's authority is its `requires: [datasets]` grant (no Subject at fire time).

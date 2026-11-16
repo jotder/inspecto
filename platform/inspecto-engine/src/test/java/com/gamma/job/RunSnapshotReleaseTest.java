@@ -51,12 +51,7 @@ class RunSnapshotReleaseTest {
     /** Runs a Job of {@code body} that first reads Dataset {@code cdr}; {@code pinnedInRun} is how many Run directories it saw. */
     private static JobRun run(Path dir, Function<JobContext, JobResult> body, long[] pinnedInRun,
                               java.util.function.Consumer<JobService> whileRunning, CountDownLatch reading) throws Exception {
-        Path data = dir.resolve("data");
-        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:"); Statement st = conn.createStatement()) {
-            Files.createDirectories(data.resolve("cdr"));
-            st.execute("COPY (SELECT 1 AS id) TO '" + data.resolve("cdr/a.parquet").toString().replace("\\", "/")
-                    + "' (FORMAT PARQUET)");
-        }
+        Path data = seed(dir);
         PlatformServiceRegistry platform = new PlatformServiceRegistry();
         platform.register("datasets", DatasetAccess.class, DatasetAccess.over(EventLog.DEFAULT_SPACE_ID,
                 id -> Optional.ofNullable("cdr".equals(id) ? Map.<String, Object>of("physicalRef", "cdr") : null),
@@ -91,6 +86,17 @@ class RunSnapshotReleaseTest {
             fail("the Run never ended");
             return null;
         }
+    }
+
+    /** A data root holding one Parquet file in store {@code cdr}. */
+    private static Path seed(Path dir) throws Exception {
+        Path data = dir.resolve("data");
+        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:"); Statement st = conn.createStatement()) {
+            Files.createDirectories(data.resolve("cdr"));
+            st.execute("COPY (SELECT 1 AS id) TO '" + data.resolve("cdr/a.parquet").toString().replace("\\", "/")
+                    + "' (FORMAT PARQUET)");
+        }
+        return data;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -145,5 +151,33 @@ class RunSnapshotReleaseTest {
         }, reading);
         assertEquals("CANCELLED", r.status(), r.message());
         assertEquals(1, seen[0], "precondition: the Run pinned its Dataset");
+    }
+
+    @Test
+    void aPackTestHarnessRunReleasesItsPinsOnSuccessAndFailure(@TempDir Path dir) throws Exception {
+        Path data = seed(dir);
+        long[] seen = {-1, -1};
+        DatasetAccess datasets = DatasetAccess.over("default",
+                id -> Optional.ofNullable("cdr".equals(id) ? Map.<String, Object>of("physicalRef", "cdr") : null),
+                () -> data, () -> null);
+        PackTestHarness h = PackTestHarness.create().service("datasets", DatasetAccess.class, datasets).load(
+                type("t.ok", ctx -> {
+                    ctx.services().get(DatasetAccess.class).read(ctx.spaceId(), "cdr");
+                    seen[0] = pinned(data);
+                    return JobResult.ok("read", 0L);
+                }),
+                type("t.fails", ctx -> {
+                    ctx.services().get(DatasetAccess.class).read(ctx.spaceId(), "cdr");
+                    seen[1] = pinned(data);
+                    throw new IllegalStateException("boom");
+                }));
+
+        assertEquals("SUCCESS", h.run("t.ok", Map.of()).status());
+        assertEquals(1, seen[0], "precondition: the Run pinned its Dataset");
+        assertEquals(0, pinned(data), "released when the harness Run returned");
+
+        assertEquals("FAILED", h.run("t.fails", Map.of()).status());
+        assertEquals(1, seen[1], "precondition: the Run pinned its Dataset");
+        assertEquals(0, pinned(data), "released when the harness Run failed");
     }
 }

@@ -112,6 +112,22 @@ class BackupTaskTest {
         assertTrue(names.stream().anyMatch(n -> n.endsWith("a.toon")), "the rest is archived: " + names);
     }
 
+    /** A live Run's snapshot links and DuckDB spill are copies or transients, never archived (Run-level snapshots). */
+    @Test
+    void aBackupNeverCarriesRunSnapshotLinksOrSpill(@TempDir Path source, @TempDir Path backupDir) throws Exception {
+        JobConfig cfg = backupCfg(source, backupDir);
+        Files.writeString(Files.createDirectories(source.resolve(".run-snapshots").resolve("run-1").resolve("0"))
+                .resolve("a.parquet"), "link");
+        Files.writeString(Files.createDirectories(source.resolve(".duckdb_tmp")).resolve("spill.tmp"), "spill");
+        new MaintenanceJob(cfg).run();
+        java.util.List<String> names = new java.util.ArrayList<>();
+        try (var zin = new java.util.zip.ZipInputStream(Files.newInputStream(onlyZip(backupDir)))) {
+            for (var e = zin.getNextEntry(); e != null; e = zin.getNextEntry()) names.add(e.getName());
+        }
+        assertFalse(names.stream().anyMatch(n -> n.contains(".run-snapshots") || n.contains(".duckdb_tmp")), "archived: " + names);
+        assertTrue(names.stream().anyMatch(n -> n.endsWith("a.toon")), "the rest is archived: " + names);
+    }
+
     /** No backup or restore job may point INTO a Space's {@code config.secrets/} — source or target (PathJail). */
     @Test
     void aJobPointedAtTheSecretsDirectoryIsRefused(@TempDir Path source, @TempDir Path backupDir,

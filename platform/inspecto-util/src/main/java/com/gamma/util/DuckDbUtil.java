@@ -191,16 +191,38 @@ public final class DuckDbUtil {
     }
 
     /**
-     * Every regular file under {@code root}, never descending into a {@link #SPILL_DIR_NAME} directory —
-     * concurrent jobs' DuckDB spill is transient, so a data-root walk (backup, storage report) must neither
-     * archive/count it nor fail when a spill file vanishes mid-walk. Other vanished entries are skipped too.
+     * {@code <dataRoot>/.run-snapshots}: each live Job Run's links to the Dataset files it pinned
+     * ({@code com.gamma.query.RunSnapshot}). Copies of store files, never data of their own.
+     */
+    public static final String RUN_SNAPSHOTS_DIR_NAME = ".run-snapshots";
+
+    /** The engine-internal folders a data-root walk never descends into: DuckDB spill and Run snapshots. */
+    private static final java.util.Set<String> INTERNAL_DIR_NAMES = java.util.Set.of(SPILL_DIR_NAME, RUN_SNAPSHOTS_DIR_NAME);
+
+    /** Whether {@code dir}'s own name is an engine-internal folder ({@link #SPILL_DIR_NAME}, {@link #RUN_SNAPSHOTS_DIR_NAME}). */
+    public static boolean internalDir(Path dir) {
+        return dir.getFileName() != null && INTERNAL_DIR_NAMES.contains(dir.getFileName().toString());
+    }
+
+    /** Whether {@code p} lies in an engine-internal folder below {@code root}: the check for a walk that cannot prune. */
+    public static boolean inInternalDir(Path root, Path p) {
+        Path rel = root.toAbsolutePath().normalize().relativize(p.toAbsolutePath().normalize());
+        for (Path seg : rel) if (INTERNAL_DIR_NAMES.contains(seg.toString())) return true;
+        return false;
+    }
+
+    /**
+     * Every regular file under {@code root}, never descending into an engine-internal folder ({@link #internalDir}) —
+     * concurrent jobs' DuckDB spill is transient and a Run's snapshot links duplicate store files, so a data-root walk
+     * (backup, storage report) must neither archive/count them nor fail when one vanishes mid-walk. Other vanished
+     * entries are skipped too.
      */
     public static java.util.List<Path> regularFilesSkippingSpill(Path root) throws IOException {
         java.util.List<Path> out = new java.util.ArrayList<>();
         Files.walkFileTree(root, new java.nio.file.SimpleFileVisitor<>() {
             @Override
             public java.nio.file.FileVisitResult preVisitDirectory(Path dir, java.nio.file.attribute.BasicFileAttributes a) {
-                return dir.getFileName() != null && SPILL_DIR_NAME.equals(dir.getFileName().toString())
+                return internalDir(dir)
                         ? java.nio.file.FileVisitResult.SKIP_SUBTREE : java.nio.file.FileVisitResult.CONTINUE;
             }
             @Override

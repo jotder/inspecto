@@ -203,6 +203,7 @@ public final class ObjectStoreExportJobType implements JobTypeProvider {
                 if (!Files.isRegularFile(f)) continue;
                 String fileName = f.getFileName().toString();
                 if (fileName.startsWith(".") || fileName.endsWith(".tmp")) continue;   // in-flight / hidden
+                if (com.gamma.util.DuckDbUtil.inInternalDir(root, f)) continue;        // a Run's links, DuckDB spill
                 if (!PathJail.contains(dataRoot, f))
                     throw new IllegalStateException(f + " is outside the data root " + dataRoot);
                 if (fileName.equals(MANIFEST))

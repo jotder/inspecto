@@ -58,6 +58,7 @@ final class CleanupTask {
         List<Path> matches;
         try (Stream<Path> walk = Files.walk(dir)) {
             matches = new ArrayList<>(walk.filter(Files::isRegularFile)
+                    .filter(p -> !com.gamma.util.DuckDbUtil.inInternalDir(dir, p))   // never a Run's links or spill
                     .filter(p -> matcher.matches(p.getFileName()))
                     .filter(p -> archiveDir == null || !p.startsWith(archiveDir))   // never re-clean the archive
                     .toList());
