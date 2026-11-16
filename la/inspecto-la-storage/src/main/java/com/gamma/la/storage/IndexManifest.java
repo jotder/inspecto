@@ -63,6 +63,12 @@ import java.util.Objects;
  * @param degreeHistogram degree to the number of keys with it, ascending: the whole distribution {@code degree} summarises,
  *                        so hubs over any threshold, single-link keys and one key's percentile are read without a scan
  * @param endpointTypes   the Entity Type (id + normaliser) each endpoint column was keyed by at build, null for an untyped end
+ * @param spellings       LA-INDEX-SPELLINGS-1: per Entity Type of an endpoint column, every key that more than one raw id
+ *                        spells, to those raw ids (sorted) - the columns of one type pooled, as {@code typeNodes} pools them. A
+ *                        node stays its raw id; this lets a start from a typed value reach every spelling of its key with one
+ *                        lookup instead of a scan. A type maps to null when it had more than {@link #MAX_SPELLINGS} such raw
+ *                        ids (not recorded). Optional and additive like {@code inputFiles}: null = not recorded (an index built
+ *                        before it: a start then matches its raw id exactly), empty when neither end is typed
  */
 public record IndexManifest(long version, String builtAt, Builder builder, String duckdbVersion, String bucketFn,
                             int buckets, int rowGroupSize, IndexMapping mapping, String mappingHash, String dataset,
@@ -70,12 +76,14 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
                             Map<String, TableStats> tables, long droppedNull, List<Delta> deltas, String parent,
                             List<InputFile> inputFiles, String bucketSizing, Map<String, Long> kindEdges,
                             Map<String, Long> typeNodes, Degree degree, TimeSpan timeSpan, Map<Long, Long> degreeHistogram,
-                            EndpointTypes endpointTypes, Long loopsMaxDegree) {
+                            EndpointTypes endpointTypes, Long loopsMaxDegree, Map<String, Map<String, List<String>>> spellings) {
 
     public static final int FORMAT_VERSION = 1;
     public static final String FILE_NAME = "manifest.json";
     /** Most input files a manifest lists; above this only the fingerprint hash is kept. */
     public static final int MAX_INPUT_FILES = 5_000;
+    /** Most raw ids one Entity Type's {@code spellings} records; above this the type's spellings are not recorded. */
+    public static final int MAX_SPELLINGS = 10_000;
     private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
     public enum Builder { FULL, APPEND, COMPACT }
@@ -139,6 +147,28 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
         kindEdges = kindEdges == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(kindEdges));
         typeNodes = typeNodes == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(typeNodes));
         degreeHistogram = degreeHistogram == null ? null : Collections.unmodifiableMap(new java.util.TreeMap<>(degreeHistogram));
+        if (spellings != null) {
+            Map<String, Map<String, List<String>>> copy = new LinkedHashMap<>();
+            spellings.forEach((type, byKey) -> {
+                if (byKey == null) { copy.put(type, null); return; }
+                Map<String, List<String>> k = new LinkedHashMap<>();
+                byKey.forEach((key, raws) -> k.put(key, List.copyOf(raws)));
+                copy.put(type, Collections.unmodifiableMap(k));
+            });
+            spellings = Collections.unmodifiableMap(copy);
+        }
+    }
+
+    /** A manifest with no recorded spellings (what every manifest written before LA-INDEX-SPELLINGS-1 reads as). */
+    public IndexManifest(long version, String builtAt, Builder builder, String duckdbVersion, String bucketFn, int buckets,
+                         int rowGroupSize, IndexMapping mapping, String mappingHash, String dataset, String relationSqlHash,
+                         String baseFingerprint, String timeColZone, Map<String, TableStats> tables, long droppedNull,
+                         List<Delta> deltas, String parent, List<InputFile> inputFiles, String bucketSizing, Map<String, Long> kindEdges,
+                         Map<String, Long> typeNodes, Degree degree, TimeSpan timeSpan, Map<Long, Long> degreeHistogram,
+                         EndpointTypes endpointTypes, Long loopsMaxDegree) {
+        this(version, builtAt, builder, duckdbVersion, bucketFn, buckets, rowGroupSize, mapping, mappingHash, dataset, relationSqlHash,
+                baseFingerprint, timeColZone, tables, droppedNull, deltas, parent, inputFiles, bucketSizing, kindEdges, typeNodes, degree,
+                timeSpan, degreeHistogram, endpointTypes, loopsMaxDegree, null);
     }
 
     /** A manifest with no derived tables (what every manifest written before LA-INDEX-PAIRS-LOOPS-1 reads as). */
@@ -160,7 +190,7 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
     public IndexManifest withLoopsMaxDegree(long loopsMaxDegree) {
         return new IndexManifest(version, builtAt, builder, duckdbVersion, bucketFn, buckets, rowGroupSize, mapping, mappingHash,
                 dataset, relationSqlHash, baseFingerprint, timeColZone, tables, droppedNull, deltas, parent, inputFiles,
-                bucketSizing, kindEdges, typeNodes, degree, timeSpan, degreeHistogram, endpointTypes, loopsMaxDegree);
+                bucketSizing, kindEdges, typeNodes, degree, timeSpan, degreeHistogram, endpointTypes, loopsMaxDegree, spellings);
     }
 
     /** This manifest with the given link statistics (the four optional fields) in place of its own. */
@@ -168,7 +198,14 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
                                        Map<Long, Long> degreeHistogram, EndpointTypes endpointTypes) {
         return new IndexManifest(version, builtAt, builder, duckdbVersion, bucketFn, buckets, rowGroupSize, mapping, mappingHash,
                 dataset, relationSqlHash, baseFingerprint, timeColZone, tables, droppedNull, deltas, parent, inputFiles,
-                bucketSizing, kindEdges, typeNodes, degree, timeSpan, degreeHistogram, endpointTypes, loopsMaxDegree);
+                bucketSizing, kindEdges, typeNodes, degree, timeSpan, degreeHistogram, endpointTypes, loopsMaxDegree, spellings);
+    }
+
+    /** This manifest recording {@code spellings} (LA-INDEX-SPELLINGS-1) in place of its own. */
+    public IndexManifest withSpellings(Map<String, Map<String, List<String>>> spellings) {
+        return new IndexManifest(version, builtAt, builder, duckdbVersion, bucketFn, buckets, rowGroupSize, mapping, mappingHash,
+                dataset, relationSqlHash, baseFingerprint, timeColZone, tables, droppedNull, deltas, parent, inputFiles,
+                bucketSizing, kindEdges, typeNodes, degree, timeSpan, degreeHistogram, endpointTypes, loopsMaxDegree, spellings);
     }
 
     /** The sizing signature that chose {@code buckets}: the recorded one, else the shipped {@link BucketFunction.Sizing#DEFAULT}. */
@@ -226,6 +263,14 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
             endpoint(e, "source", endpointTypes.source());
             endpoint(e, "target", endpointTypes.target());
         }
+        if (spellings != null) {
+            ObjectNode s = n.putObject("spellings");
+            spellings.forEach((type, byKey) -> {
+                if (byKey == null) { s.putNull(type); return; }
+                ObjectNode k = s.putObject(type);
+                byKey.forEach((key, raws) -> raws.forEach(k.putArray(key)::add));
+            });
+        }
         try {
             return JSON.writeValueAsString(n);
         } catch (IOException e) {
@@ -272,6 +317,20 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
         }
         JsonNode ep = n.path("endpointTypes");
         EndpointTypes endpoints = ep.isObject() ? new EndpointTypes(endpoint(ep.path("source")), endpoint(ep.path("target"))) : null;
+        Map<String, Map<String, List<String>>> spellings = null;             // absent in an older manifest: not recorded
+        if (n.path("spellings").isObject()) {
+            spellings = new LinkedHashMap<>();
+            for (var t : (Iterable<Map.Entry<String, JsonNode>>) n.get("spellings")::fields) {
+                if (!t.getValue().isObject()) { spellings.put(t.getKey(), null); continue; }
+                Map<String, List<String>> byKey = new LinkedHashMap<>();
+                for (var k : (Iterable<Map.Entry<String, JsonNode>>) t.getValue()::fields) {
+                    List<String> raws = new ArrayList<>();
+                    k.getValue().forEach(r -> raws.add(r.asText()));
+                    byKey.put(k.getKey(), raws);
+                }
+                spellings.put(t.getKey(), byKey);
+            }
+        }
         Builder b;
         try {
             b = Builder.valueOf(req(n, "builder").asText().toUpperCase(Locale.ROOT));
@@ -284,7 +343,7 @@ public record IndexManifest(long version, String builtAt, Builder builder, Strin
                 text(n, "baseFingerprint"), text(n, "timeColZone"), tables, n.path("droppedNull").asLong(), deltas,
                 text(n, "parent"), inputFiles, text(n, "bucketSizing"), counts(n, "kindEdges"), counts(n, "typeNodes"),
                 degree, timeSpan, histogram, endpoints,
-                n.hasNonNull("loopsMaxDegree") ? n.get("loopsMaxDegree").asLong() : null);
+                n.hasNonNull("loopsMaxDegree") ? n.get("loopsMaxDegree").asLong() : null, spellings);
     }
 
     public void write(Path dir) throws IOException {

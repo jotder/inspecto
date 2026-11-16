@@ -68,6 +68,39 @@ Gates, staleness decisions and the choice of flat versus index belong to la-api.
 - `IndexedTraversal` and `SqlGraphEngine` walk level by level under `index.traversal_depth` and `index.frontier_cap`;
   a wider frontier throws, and the caller answers from the flat path instead, never mixing the two.
 
+### Spellings of one key (`LA-INDEX-SPELLINGS-1`, 2026-11-16)
+
+A node is the raw column value everywhere — the buckets, the `nodes` table, Investigations, Cases, Drafts, aliases — and
+stays so. What changed is how one start is read, and what the import counts (operator decision 2026-11-16: options b
+and c; keying nodes by the type's rule, option a, was not taken).
+
+- **The manifest records the spellings.** In `linkStats` (every mode, over the whole version) the build writes
+  `spellings: {type: {key: [raw ids]}}`: for each Entity Type of an end column, every key that more than one raw id
+  spells, with those ids in VARCHAR order. One type at both ends is pooled over both columns, as `typeNodes` is. A key
+  spelt once is not listed, so the entry is small on clean data. Above `IndexManifest.MAX_SPELLINGS` (10 000 raw ids) a
+  type maps to `null`. Additive: `formatVersion` stays 1 and no index is rebuilt; an index built before this has no
+  `spellings` and a start on it matches the raw value exactly, as before, until its next build or append.
+- **A start reads every spelling of its key** (`POST /inv/projection/neighbors`, the edge form). The end columns are
+  typed by `IndexRoutes.entityTypeOf`, the rule the build used. The Dataset path matches a typed end by
+  `EntityKeySql.key(normaliser, col) = key(value)`. `IndexedNeighbors` folds each raw id the manifest lists for the
+  key, one bucket lookup each, and unions them. An untyped end, or a value whose key is empty, matches the value
+  exactly on both paths. The rows keep their raw ids, so under masking each spelling keeps its own alias; the start
+  alias is resolved before the spellings are found and no raw id is returned.
+- **When the index cannot say which raw ids spell the key, the Dataset answers.** An end typed under another rule than
+  the build used (`index_stale_refused`, *rebuild it*); a type with too many spellings to record; or a typed value that
+  is no raw id of that end and is not listed (`acc-1018` when only `ACC-1018` exists: `rung_not_indexable`). The last
+  is checked only when the end's fold came back empty (`IndexReader.rows`, one more bucket lookup).
+- **The import's entity count** (`ScheduledIndexBuild.done`, the `index.nodes` of Add data, Add a file and Run now) is
+  the sum of `typeNodes` when both end columns are typed, so `' acc-1003 '` and `ACC-1003` are one entity (137 on the
+  full-cycle fixture, not 138). An untyped or half-typed mapping keeps the distinct raw ids. `typeNodes` leaves out a
+  key whose only links are self-links. `GET /inv/index` still reports the `nodes` table's rows beside `typeNodes`.
+- **Not widened** (still exact raw match): the Investigation `expand` (sealed reads; LA-17 `merged: true` is the opt-in
+  that reads through identity groups), the neighbour list (`list: true`), the Grow preview
+  (`/inv/projection/neighbors/preview`), recursive paths and graph runs.
+
+Pinned by `ControlApiOnboardLinkAnalysisTest` (`aStartFromATypedAccountReachesEverySpellingOfItsKeyFromTheIndexAndTheDataset`,
+`aMaskedStartReachesEverySpellingAndRevealsNone`, the 137 in the full-cycle test) and `IndexLinkStatsTest`.
+
 ## Design choices
 
 - **Both directions stored** (`out/` and `in/`): data doubles, but a reverse lookup is as cheap as a forward one.

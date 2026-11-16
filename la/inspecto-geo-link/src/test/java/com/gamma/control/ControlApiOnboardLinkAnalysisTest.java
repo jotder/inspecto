@@ -184,10 +184,101 @@ class ControlApiOnboardLinkAnalysisTest {
             assertEquals(1, s.at("/unlinked/rows").asLong(), s.toString());
             assertEquals(s.get("rowsAfter").asLong() - s.at("/unlinked/rows").asLong(), s.at("/index/edges").asLong(),
                     "every kept row is a link, or is named as drawing none: " + s);
-            // ' acc-1003 ' is named as a second spelling of ACC-1003. (The index itself keeps each spelling as a node id:
-            // index.nodes is 138 here for 137 accounts - not this lane's to change, so it is not pinned.)
+            // ' acc-1003 ' is named as a second spelling of ACC-1003 ...
             assertEquals("ACC-1003", s.at("/respelled/0/readAs").asText(), s.toString());
+            // ... and LA-INDEX-SPELLINGS-1 (c): the index counts it as that account too - 137 accounts, not 138 raw ids
+            assertEquals(137, s.at("/index/nodes").asLong(), s.get("index").toString());
         }
+    }
+
+    /**
+     * LA-INDEX-SPELLINGS-1 (b), on the full-cycle fixture: a node stays its raw id, but a start from a value of a typed column
+     * reads every raw spelling of its Entity key - from ACC-1003 the transfer T0312 filed under {@code ' acc-1003 '} (to
+     * ACC-1113) is reached - and the link index and the Dataset answer the same rows. A value the index holds under no
+     * spelling ({@code acc-1018}, the key of ACC-1018) is read from the Dataset by its key. Red before: the start matched
+     * the raw value exactly, so ACC-1113 was not reached and {@code acc-1018} read nothing.
+     */
+    @Test
+    void aStartFromATypedAccountReachesEverySpellingOfItsKeyFromTheIndexAndTheDataset(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        byte[] fixture = Files.readAllBytes(Path.of("..", "..", "inspecto", "src", "test", "resources", "onboard", "full-cycle", "transfers.csv"));
+        try (Ctx c = open(cfg, root)) {
+            JsonNode d = data(send(c, "POST", "/onboard/files?name=transfers.csv&kind=stream", fixture), 200);
+            assertEquals("BUILT", data(send(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit",
+                    ("{\"name\":\"" + id + "\"}").getBytes(StandardCharsets.UTF_8)), 200).at("/index/result").asText());
+            assertEquals("account", data(send(c, "GET", "/inv/index", null), 200).at("/indexes/0/typeNodes").fieldNames().next(),
+                    "the fixture's account columns are typed");
+
+            JsonNode viaIndex = neighbours(c, id, "ACC-1003");
+            assertEquals("index", viaIndex.at("/source/kind").asText(), viaIndex.get("source").toString());
+            assertTrue(hasLink(viaIndex, " acc-1003 ", "ACC-1113"), "the respelled transfer is reached: " + viaIndex);
+            assertTrue(hasLink(viaIndex, "ACC-1003", "MERCH-001"), viaIndex.toString());
+            JsonNode fromOtherSpelling = neighbours(c, id, " acc-1003 ");
+            assertEquals(sorted(viaIndex.get("rows")), sorted(fromOtherSpelling.get("rows")), "either spelling starts the same entity");
+            JsonNode byKeyOnly = neighbours(c, id, "acc-1018");
+            assertEquals("dataset", byKeyOnly.at("/source/kind").asText(), byKeyOnly.get("source").toString());
+            assertEquals("rung_not_indexable", byKeyOnly.at("/source/reason").asText(), byKeyOnly.get("source").toString());
+            assertEquals(sorted(neighbours(c, id, "ACC-1018").get("rows")), sorted(byKeyOnly.get("rows")));
+            assertTrue(byKeyOnly.get("rows").size() > 0, byKeyOnly.toString());
+
+            Files.writeString(root.resolve("link-analysis.toon"), "index:\n  enabled: false\n");
+            JsonNode viaDataset = neighbours(c, id, "ACC-1003");
+            assertEquals("dataset", viaDataset.at("/source/kind").asText(), viaDataset.get("source").toString());
+            assertEquals(sorted(viaIndex.get("rows")), sorted(viaDataset.get("rows")), "the index answers as the Dataset does");
+
+            // control: the same rows with the account columns untyped match the raw value exactly
+            new ComponentStore(root.resolve("registry")).write("dataset", id + "_raw", Map.of("physicalRef", id + "/database",
+                    "columns", List.of(Map.of("name", "from_account"), Map.of("name", "to_account"))));
+            JsonNode untyped = neighbours(c, id + "_raw", "ACC-1003");
+            assertTrue(hasLink(untyped, "ACC-1003", "MERCH-001"), untyped.toString());
+            assertFalse(hasLink(untyped, " acc-1003 ", "ACC-1113"), "an untyped column is matched exactly: " + untyped);
+            assertEquals(viaDataset.get("rows").size() - 1, untyped.get("rows").size(), untyped.toString());
+            assertEquals(0, neighbours(c, id + "_raw", "acc-1018").get("rows").size());
+        }
+    }
+
+    /**
+     * LA-INDEX-SPELLINGS-1 (b) under masking: each raw spelling keeps its own alias, a start from ACC-1003's alias reaches the
+     * respelled transfer too, and no raw id of either spelling is in the answer.
+     */
+    @Test
+    void aMaskedStartReachesEverySpellingAndRevealsNone(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        byte[] fixture = Files.readAllBytes(Path.of("..", "..", "inspecto", "src", "test", "resources", "onboard", "full-cycle", "transfers.csv"));
+        try (Ctx c = open(cfg, root)) {
+            JsonNode d = data(send(c, "POST", "/onboard/files?name=transfers.csv&kind=stream", fixture), 200);
+            data(send(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit",
+                    ("{\"name\":\"" + id + "\"}").getBytes(StandardCharsets.UTF_8)), 200);
+            JsonNode plain = neighbours(c, id, "ACC-1003");
+            int all = plain.get("rows").size();
+            java.util.Set<String> plainIds = new java.util.TreeSet<>();
+            for (JsonNode r : plain.get("rows")) plainIds.addAll(List.of(r.get("source").asText(), r.get("target").asText()));
+            assertTrue(plainIds.contains(" acc-1003 "), plainIds.toString());
+            Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: all\n");
+            JsonNode masked = neighbours(c, id, "ACC-1003");
+            assertEquals("index", masked.at("/source/kind").asText(), masked.get("source").toString());
+            assertEquals(all, masked.get("rows").size(), masked.toString());
+            java.util.Map<String, Integer> seen = new java.util.TreeMap<>();
+            for (JsonNode r : masked.get("rows"))
+                for (String end : List.of("source", "target")) seen.merge(r.get(end).asText(), 1, Integer::sum);
+            String start = seen.entrySet().stream().max(Map.Entry.comparingByValue()).orElseThrow().getKey();   // on every row but one
+            assertEquals(all - 1, seen.get(start), seen.toString());
+            assertEquals(plainIds.size(), seen.size(), "one alias per raw id, ' acc-1003 ' its own: " + seen);
+            JsonNode fromAlias = neighbours(c, id, start);
+            assertEquals(sorted(masked.get("rows")), sorted(fromAlias.get("rows")), "the alias starts the same entity");
+            for (JsonNode body : List.of(masked, fromAlias))
+                for (String raw : List.of("acc-1003", "ACC-1003", "ACC-1113"))
+                    assertFalse(body.get("rows").toString().contains(raw), raw + " is revealed: " + body.get("rows"));
+        }
+    }
+
+    private JsonNode neighbours(Ctx c, String dataset, String value) throws Exception {
+        return data(send(c, "POST", "/inv/projection/neighbors", JSON.writeValueAsBytes(Map.of("dataset", dataset,
+                "sourceCol", "from_account", "targetCol", "to_account", "value", value))), 200);
+    }
+
+    private static boolean hasLink(JsonNode read, String source, String target) {
+        for (JsonNode r : read.get("rows"))
+            if (source.equals(r.get("source").asText()) && target.equals(r.get("target").asText())) return true;
+        return false;
     }
 
     /**

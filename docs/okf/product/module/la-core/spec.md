@@ -131,9 +131,11 @@ is read again, so every surface agrees at once; a refused start says why in the 
   disabled button that names the permission says who can.
 - **No Rebuild on the Expand note.** The note is read inside the canvas, which another lane changes; the data strip
   above the same Investigation carries Rebuild.
-- **The index's entity count is not this answer.** The import result's *460 links between 138 entities* counts each raw
+- **The index's entity count is not this answer.** The import result's *460 links between 138 entities* counted each raw
   spelling as its own node (`' acc-1003 '` and `ACC-1003`) while the coverage counts 137 accounts. That is how the index
-  keys a node, not whether it is current, so it is left to its own row.
+  keys a node, not whether it is current, so it was left to its own row. *Since `LA-INDEX-SPELLINGS-1` (2026-11-16):* when
+  both end columns are typed the import counts Entities by the type's rule (the manifest's `typeNodes`), so it reads
+  *460 links between 137 entities*; a node is still the raw id (see la-storage `architecture.md` § Spellings of one key).
 
 Add data's background pool (an import above `import.inline_max_bytes`, a 202) had the same hole and carries the request's
 Space since this phase (found by the lane's verification).

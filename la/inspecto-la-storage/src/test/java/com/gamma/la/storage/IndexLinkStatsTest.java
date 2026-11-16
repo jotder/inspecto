@@ -166,6 +166,21 @@ class IndexLinkStatsTest {
                 m.endpointTypes());
 
         // every end folds to one key: every link is a self-link, so there is nothing to count - and the build still publishes
+        // LA-INDEX-SPELLINGS-1: the key L is spelt by the hundred leaves (in VARCHAR order), H by itself only, so H is not listed
+        List<String> leafIds = new ArrayList<>();
+        for (int i = 0; i < LEAVES; i++) leafIds.add("L" + i);
+        leafIds.sort(null);
+        assertEquals(Map.of("t", Map.of("L", leafIds)), m.spellings());
+        assertEquals(m.spellings(), IndexManifest.read(build(tmp.resolve("a"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, leaves, leaves)
+                .directory()).spellings(), "written to manifest.json");
+        // only the target is typed: its spellings come from the target column alone
+        assertEquals(Map.of("t", Map.of("L", leafIds)),
+                build(tmp.resolve("c"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, null, leaves).manifest().spellings());
+        assertEquals(Map.of("t", Map.of()), build(tmp.resolve("d"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, leaves, null).manifest().spellings(),
+                "the source column spells H only");
+        assertEquals(Map.of(), build(tmp.resolve("e"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, null, null).manifest().spellings(),
+                "untyped ends: recorded, and empty");
+
         IndexBuilder.EndpointKey all = new IndexBuilder.EndpointKey("t", "one", c -> "'K'");
         IndexManifest none = build(tmp.resolve("b"), data, MAPPING, IndexBuilder.Mode.FULL, BOTH, all, all).manifest();
         assertEquals(Map.of(), none.kindEdges());
@@ -179,9 +194,10 @@ class IndexLinkStatsTest {
                 IndexBuilder.ROW_GROUP_SIZE, MAPPING, MAPPING.hash(), DS, "h", "fp", "UTC",
                 Map.of("out", new IndexManifest.TableStats(3, 1, 10)), 0, null, null, null, null);
         String json = old.toJson();
-        for (String f : List.of("kindEdges", "typeNodes", "degree", "timeSpan"))
+        for (String f : List.of("kindEdges", "typeNodes", "degree", "timeSpan", "spellings"))
             assertFalse(json.contains("\"" + f + "\""), "an unrecorded field is not written: " + f);
         IndexManifest read = IndexManifest.fromJson(json);
+        assertNull(read.spellings(), "an index built before spellings were recorded");
         assertNull(read.kindEdges());
         assertNull(read.typeNodes());
         assertNull(read.degree());
@@ -195,6 +211,15 @@ class IndexLinkStatsTest {
         IndexManifest back = IndexManifest.fromJson(with.toJson());
         assertEquals(with, back);
         assertEquals(Map.of(), back.typeNodes(), "an empty map stays empty, not unrecorded");
+
+        // spellings round-trip, a type with too many to record (null) included
+        Map<String, Map<String, List<String>>> sp = new java.util.LinkedHashMap<>();
+        sp.put("account", Map.of("acc-1", List.of(" acc-1 ", "ACC-1")));
+        sp.put("msisdn", null);
+        IndexManifest spelt = with.withSpellings(sp);
+        IndexManifest spBack = IndexManifest.fromJson(spelt.toJson());
+        assertEquals(spelt, spBack);
+        assertTrue(spBack.spellings().containsKey("msisdn") && spBack.spellings().get("msisdn") == null, spBack.spellings().toString());
     }
 
     private static void assertStatsEqual(IndexManifest want, IndexManifest got) {
@@ -203,5 +228,6 @@ class IndexLinkStatsTest {
         assertEquals(want.degree(), got.degree(), "degree");
         assertEquals(want.timeSpan(), got.timeSpan(), "timeSpan");
         assertEquals(want.degreeHistogram(), got.degreeHistogram(), "degreeHistogram");
+        assertEquals(want.spellings(), got.spellings(), "spellings");
     }
 }

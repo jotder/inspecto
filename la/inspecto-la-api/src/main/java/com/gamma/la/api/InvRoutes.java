@@ -1006,12 +1006,14 @@ public final class InvRoutes implements RouteModule {
         // judged on that node's real counted degree (distinct links), exactly what an Investigation expand holds.
         refuseIfSensitive(writeRoot, (neighborsOf != null ? "a neighbours read" : "a projection")
                 + " (limit " + limit + ")", limit, 0);
+        // LA-INDEX-SPELLINGS-1: a typed end matches every raw spelling of the value's key; the index read below reads the same
+        EntityTypes.EntityType sourceType = neighborsOf == null ? null : IndexRoutes.entityTypeOf(writeRoot, datasetId, sourceCol);
+        EntityTypes.EntityType targetType = neighborsOf == null ? null : IndexRoutes.entityTypeOf(writeRoot, datasetId, targetCol);
         if (neighborsOf != null && LinkAnalysisSettings.forRoot(writeRoot).fourEyesFanOutAbove() != null) {
-            String s0 = q(sourceCol), t0 = q(targetCol);
-            List<String> cb = new ArrayList<>(List.of(neighborsOf, neighborsOf));
-            cb.addAll(filter.binds());
+            List<String> cb = new ArrayList<>();
             String countSql = "SELECT COUNT(*) AS n FROM (" + edgeSql(datasetId, sourceCol, targetCol, kindCol, attrCols,
-                    " AND (CAST(" + s0 + " AS VARCHAR) = ? OR CAST(" + t0 + " AS VARCHAR) = ?)", filter) + ")";
+                    neighbourMatch(sourceCol, sourceType, targetCol, targetType, neighborsOf, cb), filter) + ")";
+            cb.addAll(filter.binds());
             try {
                 List<Map<String, Object>> cr = DatasetProviders.require().run(new DatasetProvider.Request(
                         datasetId, relationSql, countSql, 1, 0, List.of(), List.of(), cb)).rows();
@@ -1046,7 +1048,8 @@ public final class InvRoutes implements RouteModule {
         IndexedRead.Outcome<IndexedNeighbors.Result> indexed = null;
         if (neighborsOf != null) {
             indexed = IndexedNeighbors.attempt(writeRoot, api.dataRoot(), relationSql, new IndexedNeighbors.Request(datasetId, sourceCol,
-                    targetCol, kindCol, attrCols, body.get("filter"), neighborsOf, limit, measureCol), traversalPolicy(writeRoot));
+                    targetCol, kindCol, attrCols, body.get("filter"), neighborsOf, limit, measureCol, sourceType, targetType),
+                    traversalPolicy(writeRoot));
             if (indexed.served()) {
                 List<Object[]> rows = edgeArrays(indexed.result().rows(), kindCol != null, measureCol != null, attrCols, mask);
                 Map<String, Object> out = edgeBody(mask, rows, measureCol != null, attrCols);
@@ -1066,15 +1069,9 @@ public final class InvRoutes implements RouteModule {
         // PreparedStatement branch, which retired this route's hand-rolled quote-doubling. Two `?` in
         // source order — binds are positional, and `wrap()` adds none of its own. Column identifiers are
         // still built from validated identifiers; JDBC cannot bind those.
-        String src = q(sourceCol), tgt = q(targetCol);
-        String neighborFilter = neighborsOf != null
-                ? " AND (CAST(" + src + " AS VARCHAR) = ? OR CAST(" + tgt + " AS VARCHAR) = ?)" : "";
         // The filter's binds follow the neighbour pair: edgeSql puts `extraWhere` ahead of the filter predicate.
         List<String> binds = new ArrayList<>();
-        if (neighborsOf != null) {
-            binds.add(neighborsOf);
-            binds.add(neighborsOf);
-        }
+        String neighborFilter = neighborsOf != null ? neighbourMatch(sourceCol, sourceType, targetCol, targetType, neighborsOf, binds) : "";
         binds.addAll(filter.binds());
         // Server-built from validated identifiers only; one extra row detects truncation.
         String sql = edgeSql(datasetId, sourceCol, targetCol, kindCol, attrCols, neighborFilter, filter, measureCol);
@@ -1096,6 +1093,27 @@ public final class InvRoutes implements RouteModule {
         } catch (SQLException e) {
             throw DatasetReadFault.of("projection failed", datasetId, writeRoot, e);
         }
+    }
+
+    /**
+     * The neighbours read's match of one value, as {@code extraWhere} with its two binds appended to {@code binds}
+     * (LA-INDEX-SPELLINGS-1): an end typed as an Entity Type matches every raw spelling whose key under the type's rule is the
+     * value's key ({@link EntityKeySql}, the mirror of {@link EntityTypes#normalise}); an untyped end, or a value whose key is
+     * empty, matches the raw value exactly.
+     */
+    private static String neighbourMatch(String sourceCol, EntityTypes.EntityType sourceType, String targetCol,
+                                         EntityTypes.EntityType targetType, String value, List<String> binds) {
+        return " AND (" + endMatch(sourceCol, sourceType, value, binds) + " OR " + endMatch(targetCol, targetType, value, binds) + ")";
+    }
+
+    private static String endMatch(String col, EntityTypes.EntityType type, String value, List<String> binds) {
+        String key = type == null ? "" : EntityTypes.normalise(type.normaliser(), value);
+        if (key.isEmpty()) {
+            binds.add(value);
+            return "CAST(" + q(col) + " AS VARCHAR) = ?";
+        }
+        binds.add(key);
+        return EntityKeySql.key(type.normaliser(), q(col)) + " = ?";
     }
 
     /**

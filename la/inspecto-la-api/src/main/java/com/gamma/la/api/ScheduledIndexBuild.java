@@ -282,9 +282,17 @@ public final class ScheduledIndexBuild {
         }
     }
 
-    /** The edges and DISTINCT nodes the version {@code dir} holds (its main plus every delta). */
+    /**
+     * The edges and DISTINCT nodes the version {@code dir} holds (its main plus every delta). When both endpoint columns are typed
+     * the nodes are its Entities, counted by their Entity Type's rule ({@code typeNodes}, LA-INDEX-SPELLINGS-1): two spellings of
+     * one key are one Entity, as the import's coverage counts them. Otherwise, the distinct raw ids.
+     */
     private static Outcome done(String result, String mode, String message, IndexManifest m, Path dir) {
         long edges = m.tables().containsKey("out") ? m.tables().get("out").rows() : 0L;
+        IndexManifest.EndpointTypes et = m.endpointTypes();
+        if (m.typeNodes() != null && et != null && et.source() != null && et.target() != null)
+            return new Outcome(result, mode, null, message, edges, m.typeNodes().values().stream().mapToLong(Long::longValue).sum(),
+                    m.deltas().size());
         long nodes = m.tables().containsKey("nodes") ? m.tables().get("nodes").rows() : 0L;
         if (dir != null && !m.deltas().isEmpty()) {
             try {

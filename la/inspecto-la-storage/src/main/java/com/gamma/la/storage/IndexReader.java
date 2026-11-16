@@ -373,18 +373,21 @@ public final class IndexReader implements AutoCloseable {
      */
     public long degree(String key) throws SQLException {
         long total = 0;
-        for (Side side : Side.values()) {
-            String own = side == Side.OUT ? "src" : "dst";
-            String sql = "SELECT COUNT(*) FROM e_" + (side == Side.OUT ? "out" : "in") + " WHERE bucket = "
-                    + BucketFunction.bucketOf(key, buckets) + " AND " + own + " = ?";
-            try (PreparedStatement ps = sandbox.preparedStatement(sql)) {
-                ps.setString(1, key);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) total += rs.getLong(1);
-                }
+        for (Side side : Side.values()) total += rows(key, side);
+        return total;
+    }
+
+    /** How many edge ROWS hold {@code key} on {@code side} (as the source for OUT, the target for IN): one equality statement. */
+    public long rows(String key, Side side) throws SQLException {
+        String own = side == Side.OUT ? "src" : "dst";
+        String sql = "SELECT COUNT(*) FROM e_" + (side == Side.OUT ? "out" : "in") + " WHERE bucket = "
+                + BucketFunction.bucketOf(key, buckets) + " AND " + own + " = ?";
+        try (PreparedStatement ps = sandbox.preparedStatement(sql)) {
+            ps.setString(1, key);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : 0;
             }
         }
-        return total;
     }
 
     /** One key's links as the manifest's link statistics count them: its distinct neighbours and its links per kind (a NULL kind as a null key). */

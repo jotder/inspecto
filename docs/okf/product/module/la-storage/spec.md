@@ -21,7 +21,7 @@ is a library that [la-api](../la-api/spec.md) calls.
 | `IndexMapping` | edge mapping: source, destination, kind, time (+ IANA zone), weight, carried attributes; its hash names the index directory |
 | `IndexStore` | versioned directories for one (Dataset, mapping): `stage()`, `publish()`, `current()`, `gc()` |
 | `IndexBuilder` | full / append / compact build into a stage, verification, manifest |
-| `IndexManifest` | `manifest.json` of one version; ignores unknown fields, refuses a higher `formatVersion` |
+| `IndexManifest` | `manifest.json` of one version; ignores unknown fields, refuses a higher `formatVersion`; optional `spellings` (raw ids per typed key, [architecture](architecture.md) § Spellings of one key) |
 | `IndexPlan` | pure classification: what a version needs to cover the Dataset now (`full` / `append` / `compact`) |
 | `IndexBuildService` | lifecycle: `QUEUED → RUNNING → COMPLETED / CANCELLED / FAILED`, bounded executor, disk budget, `retune` |
 | `IndexReader` | one sealed `SqlSandbox` connection per request over one version |

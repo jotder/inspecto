@@ -211,8 +211,9 @@ The result accounts for every row and value, one line each:
 - rows that **draw no link** because their From or To is empty (*1 row has no From (from_account), so it draws no
   link*) — which is why the graph can have fewer links than the Dataset has rows;
 - values of an entity column that are **a second spelling** of an entity already there, differing only by spaces or
-  letter case (*' acc-1003 ' is ACC-1003*) — worth correcting in the file: an Entity profile counts both as one
-  entity, but the graph draws each spelling as its own node;
+  letter case (*' acc-1003 ' is ACC-1003*) — worth correcting in the file: an Entity profile and the import's entity
+  count take both as one entity, and a graph started from either spelling reads the links of both, but the graph still
+  draws each spelling as its own node;
 - whether the link index was built, with its links and entities, and each Expectation on the data when the Dataset
   has any (a first import has none).
 
