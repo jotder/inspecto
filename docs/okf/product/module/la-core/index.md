@@ -20,7 +20,7 @@ tags: [product-item, module]
 | architecture | current | [Link Analysis — data onboarding](architecture-data-onboarding.md) · [Link Analysis — HTTP surface and Investigation UI](architecture-http-and-ui.md) · [Link Analysis — as-built reference and design records](architecture-records.md) · [Link Analysis — architecture](architecture.md) |
 | features | current | [Link Analysis — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Link Analysis — User Guide](user-guide.md) |
+| user-guide | current | [Inspecto LA training videos — A · Getting started: narration scripts](user-guide-training-a-getting-started.md) · [Inspecto LA training videos — B · Building a graph: narration scripts](user-guide-training-b-building-a-graph.md) · [Inspecto LA training videos — C · Reading and shaping the canvas: narration scripts](user-guide-training-c-the-canvas.md) · [Inspecto LA training videos — D · The analysis toolbox: narration scripts](user-guide-training-d-analysis-toolbox.md) · [Inspecto LA training videos — E · Keeping and sharing your work: narration scripts](user-guide-training-e-keeping-and-sharing.md) · [Inspecto LA training videos — F · Investigations (Standard): narration scripts](user-guide-training-f-investigations.md) · [Inspecto LA training videos — G · Geo and entity pages (Standard): narration scripts](user-guide-training-g-geo-and-entity-pages.md) · [Inspecto LA training videos — H · Administering a Space: narration scripts](user-guide-training-h-administering-a-space.md) · [Inspecto LA training videos — I · Advanced edition: narration scripts](user-guide-training-i-advanced-edition.md) · [Inspecto LA training videos — narration scripts](user-guide-training-scripts.md) · [Link Analysis — User Guide](user-guide.md) |
 | admin-guide | current | [Inspecto LA demo kit - runbook and stakeholder Q&A](admin-guide-demo.md) · [Inspecto LA - administration (LA level, Investigations add-on, masking default, real OIDC sign-in)](admin-guide.md) |
 | api | current | [Link Analysis — API](api.md) |
 | tests | current | [Link Analysis core and ports — tests inventory](tests-inventory.md) · [Link Analysis - live drives and user sessions](tests-live-drives.md) |
@@ -35,7 +35,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LA-FULL-CYCLE-RESIDUALS-1` | P3 | chore | what the full-cycle plan left on purpose, and two environment gaps its drive found. | — |
-| `LA-TRAINING-SERIES-1` | P3 | feature | an Inspecto LA user training video series, planned and decided (D-TR1…D-TR7, 2026-11-16), not started. | operator |
+| `LA-TRAINING-SERIES-1` | P3 | feature | an Inspecto LA user training video series, planned and decided (D-TR1…D-TR7, 2026-11-16); narration for all 41 episodes drafted (267 UI c… | operator |
 | `LA-EXEC-DEMO-POLISH-1` | P3 | chore | what the third executive review of Inspecto LA (2026-11-16) left as polish, plus amounts on the links. | — |
 | `SPACE-ADMISSION-FOLLOWUPS-1` | P3 | chore | what the closed-Space change (D5, 91f0af69a) left on purpose. | — |
 | `LA-SPACE-SWITCHER-NAMES-1` | P3 | defect | the Space switcher still shows near-twin names, no name on a phone, and squeezes a two-line name. | — |

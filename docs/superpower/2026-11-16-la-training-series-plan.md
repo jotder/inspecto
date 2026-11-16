@@ -39,7 +39,9 @@
    screen vs Whole Dataset, caps, the link index). The claim "search and filter stay fast on millions of records" is kept
    (operator, D-TR6) and said in the same words as the case videos; no other performance figure is claimed.
 6. **Plain words, GLOSSARY terms** (Entity, Link, Dataset, Working Set, Investigation, Entity List, Alert Rule, Measure,
-   Collector, Pipeline). The ten *About* terms (§5.7) are introduced in A1 and reused verbatim.
+   Collector, Pipeline). The ten *About* terms (§5.7) are introduced in A1 and reused verbatim; the rest of the guide's
+   vocabulary (user guide §17) is defined the first time it is said: Space and Industry pack (A2), Entity Type (A4),
+   Snapshot (E1), Entity List (E2), Step log (F1), Identity resolution (F7), Measure, Alert Rule, Incident and Case (F9).
 7. **Every episode ends with "Try it":** one exercise on the shipped zips (`la-basic.zip` / `la-standard.zip`), and one
    check question with its answer in the description.
 8. **Honest about limits:** where a tool has a cap or a locked state, show the lock and read its reason (the product's own
@@ -47,7 +49,9 @@
 
 ## 3. Categories and episodes
 
-40 episodes in 9 categories (~4 h; category I added for Advanced, D-TR3). Waves (§9) order the work; the episode numbers are the viewing order.
+41 episodes in 9 categories (~4 h; category I added for Advanced, D-TR3; H3 added 2026-11-16 after the review against
+the user guide, which found §5.3, §12.1, §14 and §16 untaught). The user guide's §18 (users of the old Studio) is left
+out on purpose: the series is for new users. Waves (§9) order the work; the episode numbers are the viewing order.
 
 | # | Episode | Ed. | Space · story | Covers (inventory §) |
 |---|---|---|---|---|
@@ -60,7 +64,7 @@
 | B1 | Start a graph: one entity, a list, pasted values, the whole Dataset | B | Telecom · SIM swap | Start a graph (all *Start from* choices, Dataset, Entity Type, value box and suggestions, Degrees), Draw (§5.2i) |
 | B2 | Preset queries and Build a question | B | Banking · card compromise | Preset queries, Build a question (every field), Draw these, Save as preset (§5.2i) |
 | B3 | Explore the Dataset and the Graph model | B | Utilities | Explore the Dataset (Show what is in it, Busiest, Draw these), File ▸ Explore Dataset, Examples ▸ Follow the money, Settings ▸ Graph model (Run, Refresh, Industry pack) (§5.2a, §5.4) |
-| B4 | Find and filter: search, node types, time, timeline | B | Telecom · Wangiri | Search nodes, Filter node types, Filter links by time (time column, cutoff), Clear search and filters, timeline playback (slice, play, window, age fade), Limits and graph counts (§5.2a, §5.2g) |
+| B4 | Find and filter: search, node types, time, timeline | B | Telecom · Wangiri | Search nodes, Filter node types, Filter links by time (time column, cutoff), Clear search and filters, timeline playback (slice, play, window, age fade), Limits and graph counts; the Rows filter in two stages (Apply locally, Push to server, AND/OR groups) and the "≥ 5 000 hides structuring" trap (§5.2a, §5.2g, §5.2h; user guide §5.3) |
 | **C** | **Reading and shaping the canvas** | | | |
 | C1 | Moving around and selecting | B | Insurance · claimant ring | Canvas modes Pan/Lasso/Fisheye/Link filter (L, F, Esc), Select all/Invert/Neighbours/Clear, selection count, Shift+click, arrows and +/−, hover card, node detail dialog (§5.2b, §5.2d, §5.6) |
 | C2 | Layouts, legend, counts and minimap | B | Public sector · bid rotation | all 14 layouts with caps and the over-cap message, Fit to screen, Legend (node/link kinds, hide a kind, ringed/dotted meanings), Graph counts (customise), minimap (§5.2f, §5.2g) |
@@ -88,14 +92,15 @@
 | F6 | Drafts: work in parallel | S | Enterprise | Drafts fold: fork, work, rebase, promote; Draft banner (walk in UI first, §6.3) |
 | F7 | Masked data and audited reveal; resolving identities | S | Mobile Money | masking in the node detail, Reveal with reason, the reveal log, identity resolution step (Add a resolve step), merge identities (§5.2d, §5.4) |
 | F8 | Evidence: coverage, Dossier and the sealed bundle | S | Banking · card compromise | Coverage (Check coverage), data trust strip, Build Dossier (at step, snapshots), downloads (steps, method, HTML, manifest), Verify, tamper check on an edited manifest, Download Dossier (sealed), Verify a bundle (§5.2h, §5.3) |
-| F9 | From finding to action: Alert Rules, Cases, widgets and sharing | S | Mobile Money | Watch this Measure (Alert Rule, severity), standing detection, Alerts page (evaluate, acknowledge, resolve, open Investigation), Attach to Case, Case history, Measures and templates, Pin to a Widget, Share and embed (§5.3, §5.5) |
+| F9 | From finding to action: Alert Rules, Cases, widgets and sharing | S | Mobile Money | Watch this Measure (Alert Rule, severity), standing detection, Alerts page (evaluate, acknowledge, resolve, open Investigation), Attach to Case, Case history, Measures and templates, Pin to a Widget, Share and embed; a link from another system: the *Open in Inspecto LA* page (Open the Investigation, Open the Entity, Reveal the value) (§5.3, §5.5; user guide §12.1) |
 | **G** | **Geo and entity pages (Standard)** | | | |
 | G1 | The Geo map | S | (Space with coordinates, §6.3) | Geo query form, points/flows, Heatmap, Filter to view, Layer manager, Measure/Radius/Polygon/Note tools, saved views, Export the map (§5.5) |
 | G2 | Geo intelligence and pivoting between map and graph | S | (same) | Co-location, Frequent locations, Stay points, View as graph, pivot graph ↔ map (§5.5, user guide §6.3) |
 | G3 | Entity profiles | S | Banking | Open the Entity page, profile (first/last seen, activity, measures, links, history), Investigate from a profile (§5.5) |
 | **H** | **Administering a Space** | | | |
-| H1 | Settings for a Space and for you | S | Other Examples | Settings page: My browser, Investigation access, Link Analysis (masking, Entity Types, index, embed), Analysis limits, Add data, Access (roles), Host resources, Getting started counters; Settings dialog ▸ Installed modules (§5.5) |
+| H1 | Settings for a Space and for you | S | Other Examples | Settings page: My browser, Investigation access, Link Analysis (masking, Entity Types, index, embed), Analysis limits, Add data, Access (roles), Host resources, Getting started counters; Settings dialog ▸ Installed modules; who can do what, by role and by edition; every limit is a setting, in three sections (Analysis, Host resources, My browser) (§5.5; user guide §14, §15) |
 | H2 | From your own file to a first finding (capstone) | B | new Space | Add data / Onboard a file, Upload a CSV, columns and roles, a Mapping, first graph, first Quick question, first saved view (§5.5, user guide §2–§3) |
+| H3 | When the product says no: locked controls, Truncated and refusals | B→S | Telecom | a greyed control and its tooltip reason, *Truncated* and what to do, Layered greyed on a wide graph, `masked:…` ids, *Waiting for approval*, *Investigation is not available*, a pattern that finds nothing on a cut graph, 413 / 429 messages, sign-in and *No Space is attached* messages; views are not evidence (user guide §15, §16) |
 
 | **I** | **Advanced edition** (D-TR3) | | | |
 | I1 | Access Policies: narrowing what roles allow | A | Banking | Settings ▸ Access, an attribute-based Access Policy that can only narrow a role (e.g. a reviewer refused one Investigation), the refusal as the user sees it; sample `config/examples/access-policy-deny-persona.md` (walk in UI first, §6.3) |
@@ -263,7 +268,7 @@ copyrighted track), only under the intro and outro cards, never under narration.
 | P2 | Pilot: C4, D3, F8 scripted, recorded, reviewed | 3 episodes, method confirmed |
 | P3 | Wave 1 — the new-user path: A1–A3, B1, B4, C1, C2, C4, D1, E1, F1, F8 (12) | core course |
 | P4 | Wave 2 — depth: A4, B2, B3, C3, C5, D2–D7, E2, F2–F5, F7, F9 (19) | full analyst course |
-| P5 | Wave 3 — admin and specialist: D8, F6, G1–G3, H1, H2 (7, minus the pilots already done) | admin course |
+| P5 | Wave 3 — admin and specialist: D8, F6, G1–G3, H1–H3 (8, minus the pilots already done) | admin course |
 | P6 | Publish: playlist per category, captions, chapter markers, shortcut card, links to the case videos; guide fixes (§7) | released series |
 
 Effort per episode once P1 is done: script 1–2 h, recording and render ~30–40 min machine time, review 30 min, fixes as found.
@@ -278,6 +283,53 @@ Effort per episode once P1 is done: script 1–2 h, recording and render ~30–4
 - **D-TR4 branding and music:** delegated; as in §6.2.
 - **D-TR5 language:** English.
 - **D-TR6 performance claim:** keep "search and filter stay fast on millions of records" (§2 rule 5).
-- **D-TR7 episode list:** taken as approved (40 episodes with category I); the pilot (P2) may still merge or split episodes.
+- **D-TR7 episode list:** taken as approved (40 episodes with category I; 41 with H3, added after the user-guide review);
+  the pilot (P2) may still merge or split episodes.
+
+**Narration scripts (operator, 2026-11-16):** a full spoken script per episode, the three pilots first (C4, D3, F8), then
+the rest. One file per episode group (operator, 2026-11-16), `user-guide-training-<group>.md` in the la-core hub, listed
+by the overview [`user-guide-training-scripts.md`](../okf/product/module/la-core/user-guide-training-scripts.md); in each,
+one `## <episode>` section per video in the renderer's format (`### <scene> · <title>`, one `- Voice:` line per scene;
+`- Action:` and `- Impact:` lines are for the recorder and the reviewer). Places the §6.3 walk has not confirmed are
+marked `[check in UI: …]` in the Action line, never in the Voice line.
 
 Wave 3 (P5) gains I1–I3.
+
+## 10. Found while writing the scripts (2026-11-16)
+
+All 41 scripts are drafted (about 33,800 spoken words, 267 `[check in UI]` marks to settle on the live product). Writing
+them against the UI source and the shipped zips corrected the §3 rows below; each episode card states its own change.
+The shipped zips hold 11 industry Spaces (display names: Banking and finance, Enterprise, Healthcare, Insurance, Law
+enforcement, Logistics, Mobile Money, Public sector, Other Examples, Telecom, Utilities), not the `spaces/_templates`
+names.
+
+- **Edition:** Basic shows only the toolbox's **On screen** tab (the guide's §8 says Basic's Whole Dataset tab still runs
+  Dataset reads; the code hides it), so Find paths (D2), Value Measures and Burst and periodicity (D7), and Seed / Exclude
+  by list (E2) record on Standard; A4 is Standard (Entities and the profile pages are not on Basic); D5's Propagated risk
+  needs an open Investigation and pack risk data (Telecom pack only).
+- **Space changes:** A3 → Banking and finance (*Find a Dataset* shows only above 6 Datasets); B4 → Other Examples
+  (`mule_structuring`, with a time column and a ≥ 5 000 twin view; Wangiri is there, not in Telecom); D1, D6, F1, F2 →
+  Other Examples; G1 → Other Examples, G2 → Insurance; I3 → Other Examples (the only daily feed and index-build Job).
+- **Rows that did not match the product:** B1 and C4 — Basic's *Start a graph* has no Degrees stepper (one ring; the
+  stepper is the Investigation start form's); C2 — *Customise counts* is not reachable on the Link Analysis page; C5 —
+  *Switch off / on* a list is Investigation-only (Basic: *Show them again*); A2 — *What changed in your data* never shows
+  on the shipped Spaces (shown in H2), and Getting started needs an empty Space; C3 — single-Dataset views give nodes no
+  details, so Display rules use a two-Dataset graph; C4 — the busy limit is 500 and nothing planted reaches it, so the
+  episode lowers it to 20 for one Expand; D3 — Rank nodes fills a table and does not restyle the canvas; F1 — Name and
+  Purpose are asked by Save, not the start form; F2 — the fourth direction is labelled *Reciprocal*; F7 — there is no
+  reveal-log screen (Oversight and approvals ▸ Masked entities), and masked wallets cannot be merged; F9 — share and reveal
+  need Demo Admin, *Evaluate now* needs Demo Manager, embed needs `la.embed.enabled`; G2 — no shipped Geo Dataset has a
+  `caseId` / `incidentId` / `objectId`, so the map ↔ graph pivot cannot be recorded, and Stay points finds no tracks;
+  H2 — the quick-start CSVs are `inspecto/src/test/resources/onboard/full-cycle/*.csv` and must ship with the series;
+  H3 — the UI says *Result cut short*, not *Truncated*; I1 — the policy editor is console-only and Advanced signs in
+  through the identity provider (a demo sign-in build is needed); I2 — blocked: the next release ships without
+  PostgreSQL (operator, 2026-10-23); I3 — its features are Standard and up, and index builds wait on §6.4.
+- **Defects found:** *fixed 2026-11-16* — the 429 text said *a burst of 20 requests, then one every 3 seconds*
+  (`limit-refusal.ts`), right only for `/db/query`-class routes (the Link Analysis bucket is 30, then one every 2 s, and
+  tunable); it now states no budget and names the wait from `Retry-After`. *Fixed 2026-11-16* — the Drafts refusal said
+  *its limit of 50 open Drafts* whatever the Space's `drafts.max_open`; it now names the limit the server's 409 states
+  (`link-analysis-drafts.component.ts`). *Open, a decision* — on Standard, a start from one entity in any
+  Space whose Industry pack sets no neighbour limit is an unbounded Expand, always above `four_eyes_fan_out_above`, so the
+  unsaved start is refused (`UNSAVED_FOUR_EYES_START`) — by design, but every new user meets it first.
+- **User-guide wording to fix (§7):** §8 Whole Dataset on Basic; *Run query* → *Run* (Graph model); *Truncated* →
+  *Result cut short*; *Both ways, mutual* → *Reciprocal*; the Telecom Space has no Industry pack set (Generic).

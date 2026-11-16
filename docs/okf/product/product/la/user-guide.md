@@ -7,6 +7,16 @@
 ## Link Analysis
 
 - [Geo Map Analysis](../../module/geo-link/user-guide-geo-map.md)
+- [Inspecto LA training videos — A · Getting started: narration scripts](../../module/la-core/user-guide-training-a-getting-started.md)
+- [Inspecto LA training videos — B · Building a graph: narration scripts](../../module/la-core/user-guide-training-b-building-a-graph.md)
+- [Inspecto LA training videos — C · Reading and shaping the canvas: narration scripts](../../module/la-core/user-guide-training-c-the-canvas.md)
+- [Inspecto LA training videos — D · The analysis toolbox: narration scripts](../../module/la-core/user-guide-training-d-analysis-toolbox.md)
+- [Inspecto LA training videos — E · Keeping and sharing your work: narration scripts](../../module/la-core/user-guide-training-e-keeping-and-sharing.md)
+- [Inspecto LA training videos — F · Investigations (Standard): narration scripts](../../module/la-core/user-guide-training-f-investigations.md)
+- [Inspecto LA training videos — G · Geo and entity pages (Standard): narration scripts](../../module/la-core/user-guide-training-g-geo-and-entity-pages.md)
+- [Inspecto LA training videos — H · Administering a Space: narration scripts](../../module/la-core/user-guide-training-h-administering-a-space.md)
+- [Inspecto LA training videos — I · Advanced edition: narration scripts](../../module/la-core/user-guide-training-i-advanced-edition.md)
+- [Inspecto LA training videos — narration scripts](../../module/la-core/user-guide-training-scripts.md)
 - [Link Analysis — User Guide](../../module/la-core/user-guide.md)
 
 ## The Space Templates it ships
