@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `DEPLOY-EXPOSURE-KIT-1` | P3 | feature | /metrics and /health/details are fenced only by the network, and the deploy kit the docs assume is unbuilt (filed 2026-11-15, verified fr… | operator |
+| `DEPLOY-EXPOSURE-KIT-1` | P3 | feature | /metrics and /health/details are fenced only by the network, and the deploy kit the docs assume is unbuilt (filed 2026-11-15, verified fr… | — |

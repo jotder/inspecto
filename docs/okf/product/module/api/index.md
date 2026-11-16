@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `OPENAPI-SKELETON-SUMMARIES-1` | P3 | chore | 444 of 621 OpenAPI operations are generated skeletons (filed 2026-11-15, verified from ARCH-MOSCOW-UNTRACKED-1 item 11). | demand |
+| `OPENAPI-SKELETON-SUMMARIES-1` | P3 | chore | 444 of 621 OpenAPI operations are generated skeletons (filed 2026-11-15, verified from ARCH-MOSCOW-UNTRACKED-1 item 11). | — |

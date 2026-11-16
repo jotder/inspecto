@@ -5,7 +5,8 @@
 > Items marked *(no row)* were found in the docs and are **not verified in the code**; the board row
 > `ARCH-MOSCOW-UNTRACKED-1` owns checking each one and either filing or refusing it.
 > Re-rank when the next MAJOR is tagged or a first customer deployment is scheduled.
-> **Refreshed 2026-11-15:** the nightly CI and UI workflows are green on Linux again (CI at `47c5dc33f`, UI at
+> **Refreshed 2026-11-16:** the operator decided every Should and Could item in an interview (§8); the Must items
+> were postponed, unchanged. C14 moved to Won't. **Refreshed 2026-11-15:** the nightly CI and UI workflows are green on Linux again (CI at `47c5dc33f`, UI at
 > `16d259204`; red since 2026-11-11 and at least 2026-10-10), and every snapshot reader and writer now takes the swap
 > lock (M8 follow-up). **Refreshed 2026-11-14:** M1, M3, M6 and M8 are closed, as are S5, S13 and the layout half of S14; the
 > tables mark each with the date. The ranking itself was not redone.
@@ -59,7 +60,7 @@ M8 (2026-11-14). Left: M4 (release notes, kept current as changes land), M5 and 
 |---|---|---|---|
 | S1 | `ARCH-MOSCOW-UNTRACKED-1` item 4 *(no row of its own)* | Six config types (`enrichment`, `job`, `schema`, `expectation`, `widget`, `dashboard`) accept unknown keys. **Checked in code 2026-11-14: stale.** `enrichment` has a census in `AcceptedConfigKeys`; `widget`, `dashboard` and `expectation` are refused at the top level by `ComponentRoutes.refuseUnknownComponentKeys`. Only `schema` and `job` remain open, each for a recorded reason (`spec-config-safety.md`, "The accepted-key census"). | Fail-open by omission, against the fail-closed design, but nothing is known to exploit it. First to promote if the check confirms it. |
 | S2 | ~~`PUBLIC-API-SURFACE-1`~~ **shipped 2026-11-12** | ~~`JobTypeProvider`, `ConsequenceProvider` and `CollectorConnector` lack `@PublicApi`; no guard diffs marked signatures between releases.~~ All six extension points and the types they expose are marked; `tools/check-public-api.mjs` holds the marked signatures to `platform/inspecto-api/public-api.txt`. | Built on operator request before a partner asked. |
-| S3 | Row 15 — ELT Phase 6 deletion half | The legacy flat read path stays beside the graph lane. | Two read paths are a cost, not a fault; needs an operator call, then rides the MAJOR. |
+| S3 | Row 15 — ELT Phase 6 deletion half | The legacy flat read path stays beside the graph lane. | Two read paths are a cost, not a fault. **Decided 2026-11-16:** deleted in 4.0.0 (§8). |
 | S4 | X-Actor full removal · `batch_id` rename trio · X5 and the StepInfo envelope | Breaking cleanups that can only land with a MAJOR. | Missing the MAJOR means carrying them to the next one. |
 | S5 | `ENTITLEMENT-SPI-NARROWING-1` | A signed entitlement closes routes, features and Job Types of a left-out module, but not its Consequences, Step kinds, Collector connectors, maintenance tasks or boot hooks. | A Decision Rule can still fire a Consequence of a module the customer did not buy; no customer build is narrowed yet. **Closed 2026-11-13** (`d60866682`); its edition features followed on 2026-11-14 (`ENTITLEMENT-UNLISTED-FEATURES-1`). |
 | S6 | Platform Services Stage 2 | `DatasetAccess` pins per call; a Run holds no snapshot. | Two reads in one Run may see different file lists; no failure has been reported. |
@@ -71,10 +72,10 @@ M8 (2026-11-14). Left: M4 (release notes, kept current as changes land), M5 and 
 | S12 | `LEGAL-HOLD-SCOPE-1` (was untracked item 7) | Retention and legal hold cover Incidents only. | The Advanced brochure promises legal hold; either build it or narrow the claim. |
 | S13 | `DEMO-BAKE-WAL-RACE-1` | Closing a busy Space gives up after 10 s and leaves `.wal` files. | Seen while baking demo images; the row itself says it is open for a production stop. **Closed 2026-11-12:** a stop past the close budget now closes the stores anyway. |
 | S14 | core→feature lint-enforced 2026-11-15; feature-to-feature refused (board §6); `LA-PERF-N4-1` for the layouts | UI: "the core never imports a feature" is not lint-enforced, and 48 feature-to-feature imports rest on review. Link Analysis graph layouts run on the main thread (2.3 to 3.6 s at 767 nodes). | The convention holds today; the freeze is a usability cost. The lint is small. The layout half closed 2026-11-13 (`LA-PERF-N4-1`: Force layouts run in time slices). |
-| S15 | `ARCH-DOC-CONTRADICTIONS-1` | Fourteen places (one settled since) where current docs contradict each other (thin-jar count, shading, Postgres multi-user state, D15, old Edition names and more). | Docs, not behaviour; but a reader acting on the wrong page gets the wrong answer. |
+| S15 | `ARCH-DOC-CONTRADICTIONS-1` | Fourteen places (one settled since) where current docs contradict each other (thin-jar count, shading, Postgres multi-user state, D15, old Edition names and more). | Docs, not behaviour; but a reader acting on the wrong page gets the wrong answer. **Closed 2026-11-15** (all fourteen settled against the code). |
 | S16 | `DOCS-AGENT-WRITTEN-REVIEW-1` | A work list of wrong claims in plan and admin-guide pages remains; module architecture pages were not re-checked. | Same reason as S15; done a module at a time when next touched. |
 
-## 4. Could — 14 items
+## 4. Could — 13 items (C14 refused 2026-11-16, now in §5)
 
 | # | Item | What is open |
 |---|---|---|
@@ -91,7 +92,6 @@ M8 (2026-11-14). Left: M4 (release notes, kept current as changes land), M5 and 
 | C11 | `JOB-LOADER-SAVED-VIEW-SUFFIX-1` · `UI-SCHEMA-FORM-EDITOR-1` | A WARN on every boot (fixed 2026-11-13: the boot scan skips `registry/`); the last file on the forms lint allow-list. |
 | C12 | `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` · `CODEGRAPH-AFFECTED-UNUSABLE-1` · `AGT-5` | Three upstream reports or seams owed outside this repo. |
 | C13 | `LA-SHOWCASE-RELEASE-RESIDUALS-1` · `NATIVE-LICENCE-LINUX-MACOS-1` | The Linux product zip; two licence calls on native libraries. |
-| C14 | `DOCS-FUNCTIONALITY-HUBS-1` | Whether `functionality/` items get hubs. |
 
 ## 5. Won't (this time) — refused or postponed, each with its reopen trigger
 
@@ -109,6 +109,7 @@ M8 (2026-11-14). Left: M4 (release notes, kept current as changes land), M5 and 
 | Compliance certification (NFR-7, SOC 2 Type II) | Externally gated: auditor, pen test, an observation window not started. Months. | An engagement starts. |
 | Masking edges, `PATH-2`, Decision Kernel step 7 | Refused or declined. Step 7 leaves the condition tree failing open where `Conditions` fails closed. | Not stated; step 7 deserves a second look if Access Policy text is ever compiled. |
 | Mid-write interrupt, fetch-lane FIFO, startup backfill, `PKG-5`, connector sidecar gating, publishing eoiagent to a registry | Refused, board §6. | Each row states its own trigger. |
+| Hubs of their own for `functionality/` Product Map Items (`DOCS-FUNCTIONALITY-HUBS-1`, was C14) | Refused by the operator 2026-11-16, board §6: a functionality item stays documented in the module hub that implements it. | Explicit operator request. |
 
 ## 6. What this ranking says
 
@@ -131,4 +132,44 @@ M8 (2026-11-14). Left: M4 (release notes, kept current as changes land), M5 and 
 - Sizes are given only where a document states one.
 - Several source documents contradict each other (S15); where they did, the board and the code-checked
   system-set pages were preferred.
-- Hold states of `REALTIME-DECISIONING-1` and `SCALEOUT-U1-REMOTE-ACQUIRE-1` were not confirmed.
+- Hold states of `REALTIME-DECISIONING-1` and `SCALEOUT-U1-REMOTE-ACQUIRE-1` were not confirmed. (2026-11-16: the
+  operator set `REALTIME-DECISIONING-1` to on a bid only, §8.)
+
+## 8. Operator decisions 2026-11-16 (Should and Could)
+
+Taken by the operator in one interview on 2026-11-16. **The Must items were postponed: nothing about M1 to M8
+changed.** Each decision is also on its board row in [`docs/BACKLOG.md`](../../../../BACKLOG.md), dated, with the
+row's `hold:` tag changed to match.
+
+**Should**
+
+| # | Decision | Consequence |
+|---|---|---|
+| S1, S2, S5, S10, S13, S14 | Left as they are. | Already closed or stale. |
+| S3 | Delete the ELT Phase 6 legacy flat read path in 4.0.0. | D-2 is amended: the MAJOR itself removes it, with no flagged verification release before it. Build before the tag, with a release-notes entry. |
+| S4 | Do X-Actor full removal, the `batch_id` rename trio, and X5 with the StepInfo envelope before 4.0.0. | All three are trunk work before the tag, each with its release-notes entry. |
+| S6 | Build Platform Services Stage 2, the Run-level snapshot, now. | `hold: demand` removed; the per-Run held snapshot handle is startable. Filtered `services()` and the devkit jar stay on demand. |
+| S7 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` waits until a multi-Pod deployment is scheduled. | `hold: operator`; tied to the postponed scale-out work in §5. Single-Pod installs are unaffected. |
+| S8 | Finish `DATA-TIERS-1` before 4.0.0. | The Kubernetes install and `CONTAINER-AIRGAP-PROOFS-1` stay on demand (`hold: external` → `demand`). |
+| S9 | Build `SPACE-LINK-CENSUS-1` (P2) now. | Startable; no tag change. |
+| S11 | Ship the `DEPLOY-EXPOSURE-KIT-1` deploy kit. | `/metrics` and `/health/details` stay open in the product, with no product token; the proxy, TLS and preflight templates and the backup, verify and upgrade scripts make the fence the default install. `hold: operator` removed. |
+| S12 | Build `LEGAL-HOLD-SCOPE-1`: legal hold for an Incident's evidence (attached files, Cases, Investigations). | The Advanced brochure claim becomes true rather than narrowed. `hold: demand` removed. |
+| S15 | Finish `ARCH-DOC-CONTRADICTIONS-1` before 4.0.0. | Already met: the row closed 2026-11-15. |
+| S16 | Finish `DOCS-AGENT-WRITTEN-REVIEW-1` before 4.0.0. | No longer only "a module at a time when next touched". |
+
+**Could**
+
+| # | Decision | Consequence |
+|---|---|---|
+| C1, C6, C11 | Left as they are. | Already refused, closed or narrowed. |
+| C2 | `UI-TS-STRICT-1` option (a): about 44 null fixes made in place in the vendored `@gamma` code, then `strict` on app-wide. | An operator-approved exception to the rule against editing vendored `@gamma`, scoped to these null fixes only. `hold: operator` removed. `UI-ZONELESS-1` is unchanged. |
+| C3 | Write real OpenAPI summaries for the public routes before 4.0.0 (`OPENAPI-SKELETON-SUMMARIES-1`). | e2e pane specs stay on demand. `hold: demand` removed. |
+| C4 | `MODULE-REORG-P4-3` before 4.0.0. | Scheduled; its "no work item until" trigger no longer applies. |
+| C5 | Delete `AlertMigration` in 4.0.0 (`MODULE-REORG-P7-INCIDENTS`). | The release notes ([API stability](../../module/api/plan-api-stability.md) §Release notes) say an install upgrading from before the Alert store goes through a 3.x release first. ⚠ No released 3.x carries the Alert store (it landed on trunk 2026-10-07; the newest tag is `v3.11.0`), so that path must be restated before the tag. |
+| C7 | Consignment addressing before 4.0.0. | `hold: demand` removed. |
+| C8 | Branch-aware executor residuals, the listing-with-sizes seam, before 4.0.0. | `hold: demand` removed. |
+| C9 | `REALTIME-DECISIONING-1` only on a bid. | `hold: demand`. |
+| C10 | `LA-INDEX-SCALE-MEASURE-1` kept on hold for now. | `hold: demand` → `operator`. |
+| C12 | The upstream reports for `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1`, `CODEGRAPH-AFFECTED-UNUSABLE-1` and `AGT-5` before 4.0.0. | `hold: external` removed from all three; what follows each report still waits on the upstream fix. |
+| C13 | The `LA-SHOWCASE-RELEASE-RESIDUALS-1` Linux zip and `NATIVE-LICENCE-LINUX-MACOS-1` kept on hold for now. | Both `hold: operator`. |
+| C14 | `DOCS-FUNCTIONALITY-HUBS-1` refused. | `functionality/` items stay documented in the module hubs that implement them. Moved to §5 Won't; the board row is closed into board §6. |

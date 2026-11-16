@@ -600,8 +600,16 @@ already depend on it, so the token work must not change that shape as a side eff
 
 **Deferred to this same release by decision:** the token *runtime* model (D2 —
 [`node-types.md`](../engine/spec-node-types.md) § *The token model*), the ELT
-Phase 6 deletion of the flat read path (Row 15; the `-Dingest.lane` flag ships, the deletion waits for the
-verification minor), and X5's cross-lane StepInfo envelope.
+Phase 6 deletion of the flat read path (Row 15; the operator decided 2026-11-16 to delete it in 4.0.0 itself,
+with no verification minor before it), and X5's cross-lane StepInfo envelope.
+
+**Decided 2026-11-16 to land before the tag (operator, MoSCoW S4 / C5; each adds its own entry above when it
+lands):** the X-Actor header path removed, the `batch_id` rename trio (above), X5 with the StepInfo envelope, and
+the deletion of `AlertMigration` / `LegacyAlertObjects`.
+- ⚠ **Upgrade (when `AlertMigration` is deleted):** an install upgrading from a release before the Alert store must
+  go through a 3.x release first, so that its still-active ALERT objects are adopted into the Alert store; 4.0.0 no
+  longer adopts them, and they load inert. ⚠ Open before the tag: no released 3.x carries the Alert store (it landed
+  on trunk 2026-10-07, after `v3.11.0`), so this path has no release to name yet — restate it before the tag.
 
 ## The public surface (as it stands for the pending 4.0.0; unchanged since 2.0.0 except where noted)
 

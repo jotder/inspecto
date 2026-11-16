@@ -34,8 +34,8 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| — | P3 | feature | Platform Services Stage 2 / 3 | demand |
+| — | P3 | feature | Platform Services Stage 2 / 3 | — |
 | — | P3 | feature | Bundle / Exchange — "load as draft" residuals | — |
 | `ONBOARDING-REMOTE-SYSTEMS-1` | P3 | feature | Connect a system on Standard: Add data and the guided editor's Collect stage offer remote kinds (SFTP, object stores, other databases) wi… | — |
-| `DEPLOY-EXPOSURE-KIT-1` | P3 | feature | /metrics and /health/details are fenced only by the network, and the deploy kit the docs assume is unbuilt (filed 2026-11-15, verified fr… | operator |
+| `DEPLOY-EXPOSURE-KIT-1` | P3 | feature | /metrics and /health/details are fenced only by the network, and the deploy kit the docs assume is unbuilt (filed 2026-11-15, verified fr… | — |
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22). Re-triaged 2026-11-05: two items remain. | operator |
