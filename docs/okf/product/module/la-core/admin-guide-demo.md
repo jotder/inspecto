@@ -145,7 +145,7 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
   to be driven live, so avoid it unless rehearsed. **Compare and seal: UNVERIFIED (rehearse first).**
 
 ### S3. Masked ids: typed versus all (2 min) [analyst, then admin]
-* **Click:** read the **Masking: typed** badge in the Query panel. In the Investigation, open the Working Set rows. To show `all`, sign in as
+* **Click:** read the **Masking: typed** badge in the Query panel. In the Investigation, open the Working Set table. To show `all`, sign in as
   `admin` > *Settings* (left rail) > Link Analysis > masking mode `all`, save, then reload the Investigation.
 * **Expect:** under `typed` only values of Entity Types marked masked appear as `masked:...` aliases; under `all` every identifying value does
   (the badge reads `Masking: all (ids shown as aliases)`); aliases are stable, so you can still group and count by them. Under masking the

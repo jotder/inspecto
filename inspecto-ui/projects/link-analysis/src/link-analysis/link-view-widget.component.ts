@@ -335,6 +335,7 @@ import {
                         [edgeKinds]="edgeKinds()"
                         [hiddenEdgeKinds]="hiddenLinkKinds()"
                         [edgeColors]="view()?.display?.edgeColors ?? {}"
+                        [edgePatterns]="view()?.display?.edgePatterns ?? {}"
                         (edgeKindToggle)="hiddenLinkKinds.set(toggleHiddenKind(hiddenLinkKinds(), $event))"
                         [open]="legendOpen()"
                         (openChange)="legendOpen.set($event)"

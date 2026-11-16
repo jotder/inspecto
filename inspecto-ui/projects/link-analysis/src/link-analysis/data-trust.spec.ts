@@ -15,7 +15,7 @@ const files = (over: Partial<NonNullable<DatasetFilesPage['summary']>> = {}): Da
     }) as DatasetFilesPage;
 
 describe('buildStrip', () => {
-    it('reads as one plain sentence and says Data OK when nothing is wrong; the index version is in the tooltip', () => {
+    it('reads as one plain sentence and says All clear when nothing is wrong; the index version is in the tooltip', () => {
         const s = buildStrip({
             dataAsOf: '2026-09-05T10:00:00Z',
             days: { expected: 7, covered: 7, missing: [] },
@@ -24,7 +24,7 @@ describe('buildStrip', () => {
         });
         expect(s.text).toBe('Data current to 5 Sep 2026 (7 of 7 days).');
         expect(s.tone).toBe('success');
-        expect(s.label).toBe('Data OK');
+        expect(s.label).toBe('All clear');
         expect(s.detail).toBe('Link index version 3, up to date.');
         expect(s.text).not.toContain('link index'); // no news for the reader: the tooltip and Data details carry it
     });

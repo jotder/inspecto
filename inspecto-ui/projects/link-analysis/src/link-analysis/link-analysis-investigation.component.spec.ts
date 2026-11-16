@@ -1141,7 +1141,9 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
             ],
         });
         fixture.detectChanges();
-        expect(el.querySelector('[data-testid="degree-label"]')?.textContent?.trim()).toBe('· expanded 4 of 4 degrees');
+        expect(el.querySelector('[data-testid="degree-label"]')?.textContent?.trim()).toBe(
+            '· 4 degrees from the start, up to 4',
+        );
         expect(el.querySelector('[data-testid="degree-blocked"]')?.textContent).toContain('Degree 4 reached');
         expect(el.querySelector('[aria-label="Degree results"]')?.textContent).toContain(
             'Degree 1: 3 new entities, 4 links added. The read stopped at its budget of 2,000 rows',

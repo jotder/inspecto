@@ -435,7 +435,7 @@ Act on the canvas, read in the dock, configure in **⚙ Settings**.
   everywhere: **label · value · ✎** (click the pencil or the value, Enter keeps it, Escape drops it), and a choice
   opens as a list in a popup.
 * **Dock (bottom):** **Rows** (the links and nodes behind the graph) and **Results** (a long algorithm table), plus **Steps** (one line per step) while an Investigation is still unsaved, or,
-  with an Investigation open, **Step log**, **Working Set rows**, **Coverage**, **Annotations** and **Excluded
+  with an Investigation open, **Step log**, **Working Set table**, **Coverage**, **Annotations** and **Excluded
   entities**. Its tabs are plain text tabs, the open one underlined; on a narrow screen they scroll sideways. Drag its
   edge to resize; it remembers its tab and height in this browser. It never opens on nothing: **Results** is not
   remembered (its table lives only until the page reloads), so a dock left on Results comes back collapsed to its tabs,
@@ -636,7 +636,10 @@ dragging** and **Highlight on hover**, and the overlays: **Legend**, **Graph cou
 link kind and Entity Type is named as the legend names it, here, in the node-type filter, the links table and the node
 card. Colour rules by attribute
 are in **⚙ Settings ▸ Display rules**. The legend and Graph counts start as small pills at the top of the canvas, so a
-graph is drawn clear of them; open either with one click, and this browser remembers that choice. Fitting the graph
+graph is drawn clear of them; open either with one click, and this browser remembers that choice. The one exception:
+while the canvas draws links in more than one style (a coloured kind, a dashed or dotted one), the legend starts open,
+so no link style is left unexplained; minimise it and this browser remembers that too. A dashed or dotted link kind's
+chip shows its line pattern beside its name. Fitting the graph
 (on drawing, *Fit to screen*, or a resize) keeps the pills' band, the status line along the bottom and a margin on
 every side clear, so no node is drawn under a pill or cut by the canvas edge. A layout or overlay the graph is too big for is greyed out and says why (*needs at most 300 nodes (this graph
 has 921)*); reduce the graph first with Clean up, a filter or Collapse. The legend's link-kind chips change the
@@ -1210,7 +1213,8 @@ Top to bottom, most important first:
    Investigation settings), **Build Dossier…**, **Members…**, **Close** and **Delete**. A person who may approve a held
    expand of someone else sees a **N to approve** badge under the Dataset line; it brings the waiting line into view
    ([§11.4](#114-large-expands-need-a-second-person-four-eyes)). Under it one counts line: *Working Set: 42 entities · 118 links ·
-   3 excluded · 2 hidden · 1 kept · expanded 2 of 4 degrees · 3 busy held*; a count of excluded, hidden or kept that is
+   3 excluded · 2 hidden · 1 kept · 2 degrees from the start, up to 4 · 3 busy held*: how many links out from the start
+   entities the Working Set reaches, and the most this Space allows. A count of excluded, hidden or kept that is
    zero is left out, and before the first Expand it ends *not expanded yet*.
 2. **How to investigate** — five steps, shown until you press **Got it** (remembered in this browser).
 3. **Undo** / **Redo** of recorded steps, which stay at the top while the tab scrolls ([§7](#7-expand-and-clean-up-the-graph)).
@@ -1236,7 +1240,7 @@ Top to bottom, most important first:
 10. Two links: **Open the Step log** (the dock's Step log tab) and **Investigation settings…**.
 
 The tab lists no steps: the full record is in the dock's **Step log** (with **Undo** and **Re-order steps…**, which
-creates a fork), beside **Working Set rows**, **Coverage**, **Annotations** (entity and link) and **Excluded
+creates a fork), beside **Working Set table**, **Coverage**, **Annotations** (entity and link) and **Excluded
 entities**. **Replay** is in ⚙ Settings ▸ Investigation settings ▸ *Replay and drift*. Clicking a node while an
 Investigation is open **selects** it for the next step.
 
@@ -1294,9 +1298,9 @@ form already says *Will need approval from a second person* when it would be hel
 * **Members** (**File ▸ Members…**, the Investigation's `⋯` menu, or Investigation settings): lead, analyst,
   reviewer. A lead can **Grant** and **Revoke**; the last lead cannot be removed.
 
-### 11.6 Working Set rows and Coverage
+### 11.6 Working Set table and Coverage
 
-**Working Set rows** lists entities, links or exclusions with paging and says if and where it is truncated.
+**Working Set table** lists entities, links or exclusions with paging and says if and where it is truncated.
 **Coverage** (**Check coverage**) shows which days of the window have no rows at all (*Days with no data* / *Every day
 has data*) — an empty result on a missing day says nothing about activity — and, where the Dataset can tell, days
 covered per Collector.
@@ -1366,7 +1370,7 @@ exclusions are dropped and the preview says so); **Instantiate** builds a new In
 An open Investigation shows a **Data strip** above it: a status badge and one plain sentence, for example *Data
 current to 4 Sep 2026 (3 of 3 days).*, and **Data details**, which opens a drawer with four parts. The sentence says
 how current and how complete the data is, and adds a second sentence only for what needs a look (*1 missing day; the
-link index is out of date.*). The badge says what its colour means: **Data OK**, **Check data**, **Data problem** or
+link index is out of date.*). The badge says what its colour means: **All clear**, **Check data**, **Data problem** or
 **Not known**. The link index version, and a link index that is simply up to date, are no news to the reader, so they
 are in the sentence's tooltip (*Link index version 2, up to date.*) and in Data details, not in the sentence
 (LA-FULL-CYCLE-TEST-1, 2026-11-16: *link index v2* and a bare *OK* meant nothing to someone outside the team). The
@@ -2026,8 +2030,8 @@ it noted, and the call taken for each so the uncropped screen passes:
 - **Undo and Redo follow the role, not only the permission.** A reviewer, or someone reading through the Case, held
   the permission, so both looked enabled under a banner saying only a lead changes steps. They now follow `canChange`
   (permission and not read-only), disabled but focusable, with the tooltip *Only a lead changes the steps of this
-  Investigation.*; the component's `undo()` / `redo()` check the same. Ctrl+Z on the canvas still reaches the store
-  for them (the page does not know the role), where the server refuses it.
+  Investigation.*; the component's `undo()` / `redo()` check the same. Ctrl+Z on the canvas still reached the store
+  for them (the page did not know the role), where the server refused it; round 2, item 19, closes that.
 - **The start tab beside a neighbour's label: left as it is** (superseded by round 2, item 16 below: the full-screen
   review saw the label lie on the tab). On the mule case the force layout puts SMURF-02 directly
   above RELAY-01, so SMURF-02's label backing ends just above RELAY-01's start tab. The
@@ -2075,6 +2079,38 @@ The sixth review passed the screen full-screen *with notes*; these are its four 
   and keeps the full sentence when both limits are crossed, so "without a second approval" still covers both; with no
   Expand to repeat, or nothing known that differs, the line is as before. Specs: `expansion-decision.spec.ts`,
   `link-analysis-investigation.component.spec.ts` (the rendered approver line).
+- **18. The Legend starts open while more than one link style is drawn.** The yellow and the dashed links on the mule
+  case are link kinds the automatic look styled (`autoStyle`: the commonest kind stays neutral, each rarer one gets a
+  colour and a line pattern); a dashed link is not a mark of a Connect step. Folded, the Legend explained none of them.
+  Rule (`linkStyleCount`, `overlayStartsOpen(stored, needed)` in `link-analysis-overlays.component.ts`): count the
+  distinct colour and pattern pairs over the drawn, not hidden, link kinds; more than one and nobody chose, the Legend
+  starts open. Why this rule: one style needs no key, so the LA-OVERLAYS-HIDE-GRAPH-1 pill stays the default for most
+  graphs, and the box covers a corner only when it explains something a reader cannot otherwise read; an unexplained
+  colour costs more than the corner. The reader's own open or minimise is remembered in this browser and wins either
+  way, and a saved view's *collapsed* still stands. Labelling the styled links in place was rejected: one link label per
+  styled link clutters the canvas and repeats the kind on every link. The chip's swatch now draws a dashed or dotted
+  kind as that line (`edgePatterns` on the legend, also on the Dashboard Widget), since a coloured block could not
+  explain a dash. `legendOpen` is a `linkedSignal` over the choice and the need, so it follows a graph that gains a
+  second style until the reader chooses. Specs: `link-analysis-overlays.component.spec.ts`, `link-analysis.component.spec.ts`.
+- **19. Plain words, and the keys follow the role.**
+  - *Data OK* → **All clear**: it says only what green means on the strip, that nothing needs a look, the plain
+    partner of *Check data*. Not *Data current*: the sentence beside the badge already opens *Data current to …*, and
+    green does not promise a complete window (days not delivered yet stay green).
+  - *expanded 1 of 4 degrees* → **1 degree from the start, up to 4**. The GLOSSARY defines neither word for the Expand
+    distance (its only *degree* is an Entity Profile's link count), so the term in use stays: the Expand button
+    (*Expand 2 degrees*), the result lines (*Degree 2: …*) and this guide all say degree. What read as developer words
+    was the progress-meter phrasing; it is now a distance from the start entities, as "degrees of separation" is.
+  - *Working Set rows* → **Working Set table** (the dock tab, its heading and its section label). *Working Set* is the
+    Glossary's term and stays; *rows* was the developer word. *Table*, because it is a paged table with columns.
+  - **Ctrl+Z / Ctrl+Shift+Z do nothing** on a saved Investigation's canvas for a caller who may not change its steps
+    (no permission, a reviewer, a reader through its Case), as its Undo and Redo buttons are disabled: no undo the
+    server would refuse, and no display undo standing in for it (the rail's display Undo button still works). The page
+    now knows the role: the caller's role moved from the Investigation panel into `InvestigationSessionStore`
+    (`callerRole`, `readsOnly`, `loadCallerRole`, read once per open Investigation and only used for the one it was
+    read for); the page reads it when an Investigation opens, the panel reads the same answer. While the role is
+    unread nothing is withheld, as before; the server stays the gate. Specs: `data-trust.spec.ts`,
+    `link-analysis-investigation.component.spec.ts`, `link-analysis-investigation.store.spec.ts`,
+    `link-analysis.component.spec.ts`.
 
 ### Search around, Merge and Possible duplicates internals
 

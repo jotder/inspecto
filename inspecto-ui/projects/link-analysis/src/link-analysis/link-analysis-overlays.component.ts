@@ -8,7 +8,7 @@ import { SUPER_NODE_KIND } from '@inspecto/link-analysis/graph/graph-analysis';
 import { activeDomainProfileId, domainProfile, termLabel } from '@inspecto/link-analysis/graph/domain-profile';
 import { WorkingSetStat } from '@inspecto/link-analysis/graph/working-set-stats';
 import { entityTypeIcon, nodeColor } from '@inspecto/core/graph/catalog-graph';
-import { baseEdgeKind } from '@inspecto/core/graph/graph-view.component';
+import { baseEdgeKind, EdgePattern } from '@inspecto/core/graph/graph-view.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { LinkAnalysisCapsComponent } from './link-analysis-caps.component';
 
@@ -89,12 +89,27 @@ export function rememberOverlayOpen(which: CanvasOverlay, open: boolean): void {
 }
 
 /**
- * An overlay's starting state: the remembered choice wins; otherwise its pill. Open, the Legend and Graph counts boxes
- * covered the top of the graph even on a 1440 px window (LA-OVERLAYS-HIDE-GRAPH-1; before, F-11 collapsed them only below
- * a 1000 px canvas), so a first graph is drawn clear of them and either opens with one click.
+ * An overlay's starting state: the remembered choice wins; otherwise its pill, unless `needed`. Open, the Legend and Graph
+ * counts boxes covered the top of the graph even on a 1440 px window (LA-OVERLAYS-HIDE-GRAPH-1; before, F-11 collapsed them
+ * only below a 1000 px canvas), so a first graph is drawn clear of them and either opens with one click. The Legend is
+ * `needed` when the canvas draws more than one link style ({@link linkStyleCount}, LA-EXEC-DEMO-POLISH-1 item 18): folded,
+ * a coloured or dashed link means nothing to a reader, which costs more than the corner of the graph the box covers.
  */
-export function overlayStartsOpen(stored: boolean | null): boolean {
-    return stored ?? false;
+export function overlayStartsOpen(stored: boolean | null, needed = false): boolean {
+    return stored ?? needed;
+}
+
+/**
+ * How many link styles the canvas draws: distinct colour and line pattern pairs over the drawn link kinds (`kinds`, the
+ * hidden ones left out by the caller). A kind with no colour of its own is drawn in the default link ink, and one with no
+ * pattern solid, so those count as one style. One style needs no key; more than one does.
+ */
+export function linkStyleCount(
+    kinds: readonly string[],
+    colors: Readonly<Record<string, string>>,
+    patterns: Readonly<Record<string, EdgePattern | undefined>>,
+): number {
+    return new Set(kinds.map((k) => `${colors[k] ?? ''}|${patterns[k] ?? 'solid'}`)).size;
 }
 
 /**
@@ -218,12 +233,28 @@ export function overlayStartsOpen(stored: boolean | null): boolean {
                                         [variant]="hiddenEdgeKinds().includes(k) ? 'outline' : 'soft'"
                                         [tone]="hiddenEdgeKinds().includes(k) ? 'neutral' : 'primary'"
                                     >
-                                        <span
-                                            class="inline-block h-2 w-3 shrink-0 rounded-sm"
-                                            [style.background]="edgeColors()[k] ?? 'var(--gamma-text-secondary)'"
-                                            [style.opacity]="hiddenEdgeKinds().includes(k) ? 0.4 : 1"
-                                            aria-hidden="true"
-                                        ></span>
+                                        <!-- the swatch is drawn as the link is: a dashed or dotted kind shows its pattern (item 18) -->
+                                        @if (patternOf(k); as pattern) {
+                                            <span
+                                                class="inline-block w-3 shrink-0"
+                                                [style.border-top]="
+                                                    '2px ' +
+                                                    pattern +
+                                                    ' ' +
+                                                    (edgeColors()[k] ?? 'var(--gamma-text-secondary)')
+                                                "
+                                                [style.opacity]="hiddenEdgeKinds().includes(k) ? 0.4 : 1"
+                                                [attr.data-pattern]="pattern"
+                                                aria-hidden="true"
+                                            ></span>
+                                        } @else {
+                                            <span
+                                                class="inline-block h-2 w-3 shrink-0 rounded-sm"
+                                                [style.background]="edgeColors()[k] ?? 'var(--gamma-text-secondary)'"
+                                                [style.opacity]="hiddenEdgeKinds().includes(k) ? 0.4 : 1"
+                                                aria-hidden="true"
+                                            ></span>
+                                        }
                                         <span [class.line-through]="hiddenEdgeKinds().includes(k)">{{
                                             linkLabel(k)
                                         }}</span>
@@ -281,6 +312,12 @@ export class LinkAnalysisLegendComponent {
     readonly hiddenEdgeKinds = input<string[]>([]);
     /** The view's per-kind link colours — the swatch; a kind without one shows the default link ink. */
     readonly edgeColors = input<Record<string, string>>({});
+    /** The view's per-kind line patterns: a dashed or dotted kind's swatch is drawn as that line, not a solid block. */
+    readonly edgePatterns = input<Record<string, EdgePattern | undefined>>({});
+    protected patternOf(kind: string): 'dashed' | 'dotted' | null {
+        const p = this.edgePatterns()[kind];
+        return p === 'dashed' || p === 'dotted' ? p : null;
+    }
     /** A link-kind chip was pressed: the host toggles that kind's links on the canvas. */
     readonly edgeKindToggle = output<string>();
     readonly hint = input('');

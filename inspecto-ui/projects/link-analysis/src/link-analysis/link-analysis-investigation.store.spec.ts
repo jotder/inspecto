@@ -1533,3 +1533,46 @@ describe('InvestigationSessionStore - Save records what the screen drew (LA-UNSA
         expect(t.store.error()).toBe(out.message);
     });
 });
+
+// LA-EXEC-DEMO-POLISH-1 item 19: the caller's role lives in the store, so the page's Ctrl+Z reads the panel's answer
+describe('InvestigationSessionStore - the caller may change the steps', () => {
+    it('reads the role once per open Investigation; a reviewer, or a reader through the Case, reads only', async () => {
+        const { store, inv } = setup();
+        const members = vi.fn((id: string) =>
+            id === 'inv-2'
+                ? throwError(() => new HttpErrorResponse({ status: 404 }))
+                : of({ investigationId: id, owner: 'a', members: [], history: [], you: 'reviewer' }),
+        );
+        (inv as unknown as { investigationMembers: typeof members }).investigationMembers = members;
+        store.activeId.set('inv-1');
+        expect(store.readsOnly()).toBe(false); // unread: nothing withheld on a guess
+        await store.loadCallerRole('inv-1');
+        await store.loadCallerRole('inv-1');
+        expect(members).toHaveBeenCalledTimes(1);
+        expect(store.readsOnly()).toBe(true);
+        expect(store.readsThroughCase()).toBe(false);
+
+        store.activeId.set('inv-2'); // another Investigation: the role read for inv-1 is not used
+        expect(store.readsOnly()).toBe(false);
+        await store.loadCallerRole('inv-2');
+        expect(store.readsOnly()).toBe(true);
+        expect(store.readsThroughCase()).toBe(true);
+    });
+
+    it('a lead changes the steps; a role answered after the Investigation was left is dropped and read again', async () => {
+        const { store, inv } = setup();
+        const members = vi.fn((id: string) =>
+            of({ investigationId: id, owner: 'a', members: [], history: [], you: 'lead' }),
+        );
+        (inv as unknown as { investigationMembers: typeof members }).investigationMembers = members;
+        store.activeId.set('inv-1');
+        const pending = store.loadCallerRole('inv-1');
+        store.activeId.set(null);
+        await pending;
+        expect(store.callerRole()).toBeNull();
+        store.activeId.set('inv-1');
+        await store.loadCallerRole('inv-1');
+        expect(members).toHaveBeenCalledTimes(2);
+        expect(store.readsOnly()).toBe(false);
+    });
+});

@@ -101,7 +101,11 @@ export function splitMissing(
  * only when something needs a look, a second sentence naming it ("1 missing day; the link index is out of date."). The
  * link index's version and an index that is merely up to date are no news to the reader: they go to {@link
  * DataTrustStrip.detail} (the tooltip) and Data details. The badge says what the tone means in two words, never a bare
- * "OK". The judgement is unchanged: the same tones from the same facts; the index state is {@link datasetIndexStatus}'s.
+ * "OK". LA-EXEC-DEMO-POLISH-1 item 19: the green badge is "All clear", not "Data OK" (a status code to a reader): it
+ * says only what green means here, that nothing in the strip needs a look, the plain partner of "Check data". Not "Data
+ * current": the sentence beside it already opens "Data current to …", and green does not promise the window is complete
+ * (days not delivered yet stay green). The judgement is unchanged: the same tones from the same facts; the index state is
+ * {@link datasetIndexStatus}'s.
  */
 export function buildStrip(f: DataTrustFacts): DataTrustStrip {
     const notes: string[] = [];
@@ -159,7 +163,7 @@ export function buildStrip(f: DataTrustFacts): DataTrustStrip {
         tone,
         label:
             tone === 'success'
-                ? 'Data OK'
+                ? 'All clear'
                 : tone === 'warning'
                   ? 'Check data'
                   : tone === 'error'

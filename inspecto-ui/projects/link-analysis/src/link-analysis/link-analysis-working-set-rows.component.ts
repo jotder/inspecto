@@ -59,9 +59,9 @@ export function expandedRow(r: Record<string, unknown>): Record<string, unknown>
     ],
     host: { class: 'block' },
     template: `
-        <section class="flex flex-col gap-2 text-sm" aria-label="Working Set rows">
+        <section class="flex flex-col gap-2 text-sm" aria-label="Working Set table">
             <div class="flex items-center gap-1">
-                <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Working Set rows</h3>
+                <h3 class="text-secondary m-0 text-sm font-semibold uppercase tracking-wide">Working Set table</h3>
                 <button mat-button class="ml-auto" [disabled]="loading()" (click)="load()">Refresh</button>
             </div>
             <inspecto-option-picker
@@ -71,7 +71,7 @@ export function expandedRow(r: Record<string, unknown>): Record<string, unknown>
                 (ngModelChange)="relation.set($event)"
             ></inspecto-option-picker>
             @if (error()) {
-                <inspecto-alert variant="error" title="Working Set rows">{{ error() }}</inspecto-alert>
+                <inspecto-alert variant="error" title="Working Set table">{{ error() }}</inspecto-alert>
             } @else {
                 @if (page(); as p) {
                     <p class="text-secondary m-0 tabular-nums" aria-label="Relation status">

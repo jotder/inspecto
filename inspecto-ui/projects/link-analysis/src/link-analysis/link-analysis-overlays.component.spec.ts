@@ -9,6 +9,8 @@ import {
     LinkAnalysisLegendComponent,
     LinkAnalysisWorkingSetComponent,
     hideLinkKinds,
+    linkStyleCount,
+    overlayStartsOpen,
     toggleHiddenKind,
 } from './link-analysis-overlays.component';
 
@@ -25,6 +27,7 @@ import {
             [edgeKinds]="['sms', 'wire']"
             [hiddenEdgeKinds]="hidden()"
             [edgeColors]="{ wire: 'var(--gamma-primary)' }"
+            [edgePatterns]="{ wire: 'dashed' }"
             (edgeKindToggle)="toggled.push($event); hidden.set(toggle(hidden(), $event))"
             [open]="legendOpen()"
             (openChange)="legendOpen.set($event)"
@@ -303,5 +306,36 @@ describe('Link Analysis legend - Industry pack relabels', () => {
         } finally {
             installDomainProfiles([], null);
         }
+    });
+});
+
+// LA-EXEC-DEMO-POLISH-1 item 18: a coloured or dashed link is never left unexplained
+describe('Link Analysis legend - link styles', () => {
+    it('counts the colour and pattern pairs drawn; a kind with neither is the default style', () => {
+        expect(linkStyleCount(['sms'], {}, {})).toBe(1);
+        expect(linkStyleCount(['sms', 'call'], {}, { call: 'solid' })).toBe(1); // both default: one style
+        expect(linkStyleCount(['sms', 'wire'], { wire: 'var(--gamma-primary)' }, {})).toBe(2);
+        expect(linkStyleCount(['sms', 'wire'], {}, { wire: 'dashed' })).toBe(2);
+        expect(linkStyleCount([], {}, {})).toBe(0);
+    });
+
+    it('starts open when needed, unless the reader chose; a choice wins both ways', () => {
+        expect(overlayStartsOpen(null)).toBe(false);
+        expect(overlayStartsOpen(null, true)).toBe(true);
+        expect(overlayStartsOpen(false, true)).toBe(false);
+        expect(overlayStartsOpen(true, false)).toBe(true);
+    });
+
+    it("draws a dashed kind's swatch as a dashed line, a plain kind's as a block", () => {
+        TestBed.configureTestingModule({ imports: [Host], providers: [provideNoopAnimations()] });
+        const fixture = TestBed.createComponent(Host);
+        fixture.detectChanges();
+        const el: HTMLElement = fixture.nativeElement;
+        const swatch = (kind: string) =>
+            el.querySelector(`[data-kind="${kind}"] span[aria-hidden="true"]`) as HTMLElement | null;
+        expect(swatch('wire')?.getAttribute('data-pattern')).toBe('dashed');
+        expect(swatch('wire')?.style.borderTop).toContain('dashed');
+        expect(swatch('sms')?.getAttribute('data-pattern')).toBeNull();
+        expect(swatch('sms')?.classList.contains('h-2')).toBe(true);
     });
 });

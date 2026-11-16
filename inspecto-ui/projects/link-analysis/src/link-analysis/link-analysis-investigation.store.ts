@@ -382,6 +382,45 @@ export class InvestigationSessionStore {
     /** Every Investigation this screen knows about (created here or restored from a saved view). */
     readonly refs = signal<InvestigationRef[]>([]);
     readonly activeId = signal<string | null>(null);
+    /**
+     * The caller's role on an Investigation, from the members route (`you`): null = no Subject, nothing enforced; 'reader' =
+     * not a member; `caseReader` = the route answered 404, so the caller reads it through its linked Case. Read once per
+     * open Investigation ({@link loadCallerRole}); it belongs to `id`, so a role read for another one is never used.
+     */
+    readonly callerRole = signal<{ id: string; role: string | null; caseReader: boolean } | null>(null);
+    private callerRoleFor: string | null = null;
+    /** The open Investigation is read through its linked Case, not as a member (false while the role is unread). */
+    readonly readsThroughCase = computed(() => {
+        const r = this.callerRole();
+        return !!r && r.id === this.activeId() && r.caseReader;
+    });
+    /**
+     * This caller reads the open Investigation but never changes its steps: a reviewer, or a reader through its Case (only
+     * a lead writes the log, D7-1). False while the role is unread: nothing is withheld on a guess; the server stays the gate.
+     */
+    readonly readsOnly = computed(() => {
+        const r = this.callerRole();
+        return !!r && r.id === this.activeId() && (r.role === 'reviewer' || r.caseReader);
+    });
+
+    /** Read the caller's role on `id` once (the Act panel, Settings ▸ General and the page's keys all ask). */
+    async loadCallerRole(id: string): Promise<void> {
+        if (this.callerRoleFor === id) return;
+        this.callerRoleFor = id;
+        let role: string | null = 'reader';
+        let caseReader = false;
+        try {
+            role = (await firstValueFrom(this.inv.investigationMembers(id))).you;
+        } catch (err) {
+            // not a member (a Case member reads 404): read-only
+            caseReader = (err as { status?: number } | null)?.status === 404;
+        }
+        if (this.activeId() !== id) {
+            if (this.callerRoleFor === id) this.callerRoleFor = null; // left before it answered: read again on return
+            return;
+        }
+        this.callerRole.set({ id, role, caseReader });
+    }
     /** LA-UI-DRAFT-OPS-1: the Draft that is the working scope — ops, undo, the log and the Working Set go to it; null = the main log. */
     readonly activeDraftId = signal<string | null>(null);
     /** The main-log step the scope Draft forked at — log entries up to it are the main prefix, not the Draft's own. */

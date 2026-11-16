@@ -12,6 +12,7 @@ import {
     computed,
     effect,
     inject,
+    linkedSignal,
     signal,
     untracked,
     WritableSignal,
@@ -224,6 +225,7 @@ import {
     hideLinkKinds,
     legendEdgeKindsFor,
     legendItemsFor,
+    linkStyleCount,
     toggleHiddenKind,
     CanvasOverlay,
     GraphLimits,
@@ -546,7 +548,7 @@ const DOCK_TABS: readonly { id: DockTab; label: string; inv?: boolean; unsaved?:
     { id: 'rows', label: 'Rows' },
     { id: 'steps', label: 'Steps', unsaved: true },
     { id: 'oplog', label: 'Step log', inv: true },
-    { id: 'ws-rows', label: 'Working Set rows', inv: true },
+    { id: 'ws-rows', label: 'Working Set table', inv: true },
     { id: 'coverage', label: 'Coverage', inv: true },
     { id: 'annotations', label: 'Annotations', inv: true },
     { id: 'excluded', label: 'Excluded entities', inv: true },
@@ -872,13 +874,33 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     );
     /** LA-10: the open Investigation (op log + Working Set); the Investigation tab renders it. */
     readonly investigation = inject(InvestigationSessionStore);
+    /** The caller's role on an opened Investigation is read at once, so Ctrl+Z knows who may change its steps (item 19). */
+    private readonly readCallerRole = effect(() => {
+        const id = this.investigation.activeId();
+        if (id) untracked(() => void this.investigation.loadCallerRole(id));
+    });
     private readonly cdr = inject(ChangeDetectorRef);
     private readonly graphRuns = inject(GraphRunsService);
     /**
      * Canvas overlays — each minimises to a pill so the graph gets the space. The user's own choice in this browser
-     * wins; otherwise they start as their pills ({@link overlayStartsOpen}).
+     * wins; otherwise they start as their pills ({@link overlayStartsOpen}), except the Legend while the canvas draws more
+     * than one link style (LA-EXEC-DEMO-POLISH-1 item 18): then it starts open, so a coloured or dashed link is explained.
+     * `legendChoice` is the user's own open/close (a view's "collapsed" sets it for that view); null = never chose.
      */
-    readonly legendOpen = signal(overlayStartsOpen(storedOverlayOpen('legend')));
+    private readonly legendChoice = signal<boolean | null>(storedOverlayOpen('legend'));
+    /** The drawn links show more than one colour or line pattern, so a folded Legend leaves some unexplained. */
+    readonly legendNeeded = computed(() => {
+        const hidden = new Set(this.hiddenLinkKinds());
+        const d = this.displayOptions();
+        return (
+            linkStyleCount(
+                this.legendLinkKinds().filter((k) => !hidden.has(k)),
+                d.edgeColors,
+                d.edgePatterns,
+            ) > 1
+        );
+    });
+    readonly legendOpen = linkedSignal(() => overlayStartsOpen(this.legendChoice(), this.legendNeeded()));
     readonly workingSetOpen = signal(overlayStartsOpen(storedOverlayOpen('workingSet')));
     /** What fitting the graph leaves clear: the overlays' pills and the canvas edge ({@link CANVAS_FIT_PADDING}). */
     readonly fitPadding = CANVAS_FIT_PADDING;
@@ -918,12 +940,14 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     private applyOverlayStart(): void {
         const start = (which: CanvasOverlay): boolean =>
             this.overlaysStated[which] === false ? false : overlayStartsOpen(storedOverlayOpen(which));
-        this.legendOpen.set(start('legend'));
+        this.legendChoice.set(this.overlaysStated.legend === false ? false : storedOverlayOpen('legend'));
+        this.legendOpen.set(overlayStartsOpen(this.legendChoice(), this.legendNeeded()));
         this.workingSetOpen.set(start('workingSet'));
     }
 
     /** The user opened or minimised an overlay (its pill / minimise button, or View ▸ Overlays): remembered per browser. */
     setOverlayOpen(which: CanvasOverlay, open: boolean): void {
+        if (which === 'legend') this.legendChoice.set(open);
         (which === 'legend' ? this.legendOpen : this.workingSetOpen).set(open);
         rememberOverlayOpen(which, open);
     }
@@ -4562,6 +4586,19 @@ Its prior copies stay in its version history.`,
         if (!(e.ctrlKey || e.metaKey)) return;
         // LA-INVESTIGATE-UX-1: on an Investigation's canvas Ctrl+Z / Ctrl+Shift+Z undo and redo RECORDED steps (the
         // display changes keep the rail's own Undo / Redo); elsewhere they are the display history, as before.
+        const onSaved =
+            this.investigation.canvas() !== null && !this.investigation.unsaved() && this.canvasKeyTarget(target);
+        // LA-EXEC-DEMO-POLISH-1 item 19: a caller who may not change the steps (no permission, a reviewer, a reader through
+        // the Case) gets nothing from the keys, as from the disabled Undo / Redo buttons: no undo the server would refuse,
+        // and no display undo standing in for it.
+        if (
+            onSaved &&
+            (!this.lens.canManageIncidents() || this.investigation.readsOnly()) &&
+            ['z', 'y'].includes(e.key.toLowerCase())
+        ) {
+            e.preventDefault();
+            return;
+        }
         const recorded =
             this.investigation.canvas() !== null && this.lens.canManageIncidents() && this.canvasKeyTarget(target);
         if (e.key.toLowerCase() === 'z' && !e.shiftKey) {

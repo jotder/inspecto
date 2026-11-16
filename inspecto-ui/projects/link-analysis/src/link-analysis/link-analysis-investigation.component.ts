@@ -110,7 +110,7 @@ export const INVESTIGATION_SECTION_LABELS: Record<InvestigationSection, string> 
     act: 'Investigation',
     settings: 'Investigation settings',
     oplog: 'Investigation step log',
-    'ws-rows': 'Investigation Working Set rows',
+    'ws-rows': 'Investigation Working Set table',
     coverage: 'Investigation coverage',
     annotations: 'Investigation annotations',
     excluded: 'Investigation exclusions',
@@ -550,9 +550,12 @@ export class LinkAnalysisInvestigationComponent {
 
     // ── Settings ▸ General: rename and restate the purpose (LA-INVESTIGATION-RENAME-1) ──
     /** The caller's role on the open Investigation (members route): null = no Subject, nothing enforced; 'reader' = not a member; undefined = not read yet. */
-    private readonly detailsRole = signal<string | null | undefined>(undefined);
+    private readonly detailsRole = computed(() => {
+        const r = this.store.callerRole();
+        return r && r.id === this.store.activeId() ? r.role : undefined;
+    });
     /** The members route answered 404: the caller reads the open Investigation through its linked Case, not as a member. */
-    private readonly caseReader = signal(false);
+    private readonly caseReader = computed(() => this.store.readsThroughCase());
     /** Title and Purpose are editable for a lead holding `canManageIncidents` — the server's own gate. */
     readonly canEditDetails = computed(
         () => this.canWrite() && (this.detailsRole() === 'lead' || this.detailsRole() === null),
@@ -592,20 +595,6 @@ export class LinkAnalysisInvestigationComponent {
         this.detailsPurpose.setValue(h?.purpose ?? '', { emitEvent: false });
     }
 
-    private async loadDetailsRole(id: string): Promise<void> {
-        let role: string | null = 'reader';
-        let caseReader = false;
-        try {
-            role = (await firstValueFrom(this.inv.investigationMembers(id))).you;
-        } catch (err) {
-            // not a member (a Case member reads 404): read-only
-            caseReader = (err as { status?: number } | null)?.status === 404;
-        }
-        if (this.store.activeId() !== id) return;
-        this.detailsRole.set(role);
-        this.caseReader.set(caseReader);
-    }
-
     /** Back on the tab: one instance (the Act panel) re-reads, so a decision made elsewhere shows without reopening. */
     onWindowFocus(): void {
         if (this.section() === 'act') void this.store.reload();
@@ -615,9 +604,7 @@ export class LinkAnalysisInvestigationComponent {
         // Settings ▸ General and the Act header: read the caller's role once per open Investigation, and show the values in force.
         effect(() => {
             const id = this.section() === 'settings' || this.section() === 'act' ? this.store.activeId() : null;
-            this.detailsRole.set(undefined);
-            this.caseReader.set(false);
-            if (id) untracked(() => void this.loadDetailsRole(id));
+            if (id) untracked(() => void this.store.loadCallerRole(id));
         });
         effect(() => {
             this.store.header();
@@ -974,11 +961,16 @@ export class LinkAnalysisInvestigationComponent {
             .filter(Boolean)
             .join(' · ');
     });
-    /** How far it has expanded, as a phrase (presentability 2): "expanded 1 of 4 degrees", never "degree 1 of 4". */
+    /**
+     * How far it reaches, as a distance (LA-EXEC-DEMO-POLISH-1 item 19): "1 degree from the start, up to 4". "Expanded 1 of
+     * 4 degrees" read as a progress meter in graph jargon. The word stays degree, the one the Expand button, the result
+     * lines ("Degree 2: …") and the guide use, said as a distance from the start entities as "degrees of separation" is.
+     */
     readonly degreeLine = computed(() => {
         const at = this.degree().current;
-        const max = this.maxDegree();
-        return at <= 0 ? 'not expanded yet' : `expanded ${at} of ${max} ${max === 1 ? 'degree' : 'degrees'}`;
+        return at <= 0
+            ? 'not expanded yet'
+            : `${at} ${at === 1 ? 'degree' : 'degrees'} from the start, up to ${this.maxDegree()}`;
     });
 
     readonly parentRemembered = computed(() => {

@@ -4463,7 +4463,7 @@ describe('LinkAnalysisComponent - the bottom dock (LA-STUDIO-UI-REORG-1 §5.9)',
         expect(tabs(el)).toEqual([
             'Rows',
             'Step log',
-            'Working Set rows',
+            'Working Set table',
             'Coverage',
             'Annotations',
             'Excluded entities',
@@ -8471,5 +8471,82 @@ describe('LinkAnalysisComponent - a drawn graph stays readable (LA-FULL-CYCLE-TE
             target: `x${e.target}`,
         }));
         expect(opening(other)).toBe('force'); // no node in common: a new graph opens as defaultLayoutFor says
+    });
+});
+
+describe('LinkAnalysisComponent - executive demo polish, round 2 (LA-EXEC-DEMO-POLISH-1 items 18, 19)', () => {
+    const LEGEND = 'inspecto.la.overlayOpen.legend';
+    beforeEach(() => localStorage.removeItem(LEGEND));
+    afterEach(() => {
+        localStorage.removeItem(LEGEND);
+        vi.restoreAllMocks();
+    });
+
+    /** An open Investigation on the canvas whose links are of `kinds` (a, b, c in a chain). */
+    async function onInvestigation(kinds: string[]) {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        c.investigation.activeId.set('inv-9');
+        c.investigation.log.set({
+            header: { dataset: 'links-ds', sourceCol: 'src', targetCol: 'dst' },
+            entries: [{ step: 1, kind: 'op', op: 'seed', undoneBy: null, params: { ids: ['ws-a'] } }],
+        } as never);
+        c.investigation.workingSet.set({
+            entities: ['ws-a', 'ws-b', 'ws-c'].map((id, i) => ({
+                id,
+                hop: Math.min(i, 1),
+                hidden: false,
+                kept: false,
+            })),
+            links: kinds.map((kind, i) => ({ source: 'ws-a', target: i ? 'ws-c' : 'ws-b', kind, count: 1 })),
+            excluded: [],
+            hash: 'h',
+        } as never);
+        fixture.detectChanges();
+        // the page reads the caller's role when the Investigation opens: let that answer land first
+        for (let i = 0; i < 3; i++) await new Promise((r) => setTimeout(r));
+        return { fixture, c };
+    }
+
+    it('item 18: one link style drawn needs no key: the Legend stays its pill', async () => {
+        const { c } = await onInvestigation(['k']);
+        expect(c.legendNeeded()).toBe(false);
+        expect(c.legendOpen()).toBe(false);
+    });
+
+    it('item 18: the Legend starts open while more than one link style is drawn; a fold is remembered and wins', async () => {
+        const { c } = await onInvestigation(['k', 'wire']); // two kinds: the automatic look styles one of them
+        expect(c.legendNeeded()).toBe(true);
+        expect(c.legendOpen()).toBe(true);
+        expect(localStorage.getItem(LEGEND)).toBeNull(); // the starting state is not the reader's choice
+        c.setOverlayOpen('legend', false);
+        expect(localStorage.getItem(LEGEND)).toBe('false');
+        expect(c.legendOpen()).toBe(false);
+        c.hiddenLinkKinds.set(['wire']); // one style drawn, then two again: the fold stands
+        c.hiddenLinkKinds.set([]);
+        expect(c.legendOpen()).toBe(false);
+    });
+
+    it('item 19: Ctrl+Z / Ctrl+Shift+Z do nothing for a reviewer of the open Investigation, as its disabled buttons', async () => {
+        const { c } = await onInvestigation(['k']);
+        const undo = vi.spyOn(c.investigation, 'undo').mockResolvedValue(true);
+        const redo = vi.spyOn(c.investigation, 'redo').mockResolvedValue(true);
+        const display = vi.spyOn(c, 'undoPresentation');
+        const displayRedo = vi.spyOn(c, 'redoPresentation');
+        c.investigation.callerRole.set({ id: 'inv-9', role: 'reviewer', caseReader: false });
+        const key = (shiftKey: boolean) => {
+            const e = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey, cancelable: true });
+            document.dispatchEvent(e);
+            return e;
+        };
+        expect(key(false).defaultPrevented).toBe(true); // the browser's own undo does not run either
+        key(true);
+        expect([undo, redo, display, displayRedo].map((s) => s.mock.calls.length)).toEqual([0, 0, 0, 0]);
+
+        c.investigation.callerRole.set({ id: 'inv-9', role: 'lead', caseReader: false });
+        key(false);
+        expect(undo).toHaveBeenCalledWith(1); // a lead's Ctrl+Z undoes the recorded step, as before
     });
 });
