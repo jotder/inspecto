@@ -212,11 +212,13 @@ describe('LinkAnalysisDataStripComponent', () => {
         const f = setup();
         await settle(f);
         const text = q(f, '[data-test="strip-text"]')!.textContent!;
-        expect(text).toContain('Data as of 5 Sep 2026');
-        expect(text).toContain('1 of 3 days');
-        expect(text).toContain('2 gaps');
-        expect(text).toContain('index v3, 1 file waiting');
-        expect(q(f, 'inspecto-status-badge')!.textContent).toContain('WARNING');
+        // presentability: a plain sentence; the index version is only in the tooltip (and Data details)
+        expect(text).toContain('Data current to 5 Sep 2026 (1 of 3 days).');
+        expect(text).toContain('2 missing days');
+        expect(text).toContain('1 file waiting for the link index');
+        expect(text).not.toContain('v3');
+        expect(q(f, '[data-test="strip-text"]')!.getAttribute('title')).toContain('Link index version 3');
+        expect(q(f, 'inspecto-status-badge')!.textContent).toContain('Check data');
     });
 
     it('projects a banner into the documented mount point and starts closed', async () => {
@@ -341,7 +343,7 @@ describe('LinkAnalysisDataStripComponent', () => {
     it('an unknown data-as-of date says so', async () => {
         const f = setup({ asOf: null });
         await settle(f);
-        expect(q(f, '[data-test="strip-text"]')!.textContent).toContain('Data as-of date not known');
+        expect(q(f, '[data-test="strip-text"]')!.textContent).toContain('Data date not known');
     });
 
     it('mounts no corrected-day banner when nothing was corrected', async () => {
@@ -362,7 +364,7 @@ describe('LinkAnalysisDataStripComponent', () => {
             'Day 2026-09-01 was corrected after you last looked',
         );
         expect(q(f, '[data-test="strip-text"]')!.textContent).toContain('1 day corrected since you last looked');
-        expect(q(f, 'inspecto-status-badge')!.textContent).toContain('WARNING');
+        expect(q(f, 'inspecto-status-badge')!.textContent).toContain('Check data');
         q(f, '[data-test="strip-toggle"]')!.click();
         await settle(f);
         const row = q(f, '[data-test="correction-row"]')!.textContent!.replace(/\s+/g, ' ');

@@ -2340,7 +2340,7 @@
             <div class="flex shrink-0 flex-col rounded-lg border" role="region" aria-label="Dock" data-testid="la-dock">
                 <!-- kept mounted while collapsed so #dockSplit stays resolvable for the body's height -->
                 <div
-                    [class.hidden]="!bottomOpen()"
+                    [class.hidden]="!bottomOpen() || dockBodyEmpty()"
                     inspectoSplit="link-analysis.dock"
                     #dockSplit="inspectoSplit"
                     axis="y"
@@ -2405,7 +2405,7 @@
                         class="relative max-h-[45dvh] overflow-auto border-t px-3 py-3"
                         style="border-color: var(--gamma-border)"
                         [attr.aria-labelledby]="'la-dock-tab-' + dockTabShown()"
-                        [style.height.px]="dockSplit.width()"
+                        [style.height.px]="dockBodyEmpty() ? null : dockSplit.width()"
                     >
                         @switch (dockTabShown()) {
                             @case ('steps') {

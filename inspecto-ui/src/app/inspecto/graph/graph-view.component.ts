@@ -288,6 +288,86 @@ export function swapCommunityShapes(
     }
 }
 
+/**
+ * The dotted ring of a Working Set entity no expand has followed yet (LA-UNEXPANDED-MARKER-1). 3 on, 2 off at 2.5 px puts
+ * half again as much ink on the ring as the former 2/3 at 2 px, which faded out on a projector against the dark canvas.
+ */
+export const UNEXPANDED_DASH: readonly number[] = [3, 2];
+export const UNEXPANDED_LINE_WIDTH = 2.5;
+
+/** The "start" mark's font size; the offsets below are measured from it (9 px text + the badge's 2 px padding). */
+const START_BADGE_FONT = 9;
+
+/**
+ * An Investigation's start mark (LA-FULL-CYCLE-TEST-1 presentability): a small badge diagonally off the node's top-left
+ * corner, clear of the outline and the icon. G6 anchors a `left-top` badge's top-right corner ON the node's corner (it
+ * then grows left and down, over the outline); the offsets lift it by its own height and move it left by its right
+ * padding plus a gap, so it sits beside and above the node instead of on it. The text stays the node surface on the
+ * node's own colour, as before.
+ */
+export function startBadge(
+    textFill: string,
+    background: string,
+): {
+    text: string;
+    placement: 'left-top';
+    fontSize: number;
+    offsetX: number;
+    offsetY: number;
+    fill: string;
+    backgroundFill: string;
+} {
+    return {
+        text: 'start',
+        placement: 'left-top',
+        fontSize: START_BADGE_FONT,
+        // right padding (4) + 3 px gap; height ≈ 9 px line + 2 + 2 padding, + 3 px gap
+        offsetX: -7,
+        offsetY: -(START_BADGE_FONT + 2 + 2 + 3),
+        fill: textFill,
+        backgroundFill: background,
+    };
+}
+
+/**
+ * A node label's backing (LA-FULL-CYCLE-TEST-1 presentability): the label sits on a rounded chip in the node surface
+ * token (white / slate-800), slightly translucent, a few pixels below the outline. Links are drawn under nodes, so a
+ * link or arrowhead that crosses a label now passes behind the chip instead of through the letters. `fill` is read
+ * live, so a scheme switch repaints the chip like the rest of the style.
+ */
+export function nodeLabelBacking(fill: () => string): Record<string, unknown> {
+    return {
+        labelOffsetY: 4,
+        labelBackground: true,
+        labelBackgroundFill: fill,
+        labelBackgroundOpacity: 0.85,
+        labelBackgroundRadius: 4,
+        labelPadding: [1, 4],
+    };
+}
+
+/**
+ * The minimap's frame in the theme's tokens (LA-FULL-CYCLE-TEST-1 presentability). G6 draws its viewport mask with a
+ * light-grey border, the brightest line on a dark canvas; the frame is now the scheme's own hairline on the card surface, so it
+ * reads as a quiet inset in both schemes. Written as inline styles, so `var(--gamma-*)` follows a scheme switch with no
+ * rebuild. The position keys anchor it to the canvas's right/bottom edge (see {@link buildPluginList}).
+ */
+export const MINIMAP_CONTAINER_STYLE: Readonly<Record<string, string>> = {
+    left: 'auto',
+    top: 'auto',
+    right: '0px',
+    bottom: '0px',
+    border: '1px solid var(--gamma-border)',
+    borderRadius: '0.375rem',
+    background: 'var(--gamma-bg-card)',
+    overflow: 'hidden',
+};
+/** The minimap's viewport rectangle: the scheme's hairline over the hover tint, never G6's default light-grey box. */
+export const MINIMAP_MASK_STYLE: Readonly<Record<string, string>> = {
+    border: '1px solid var(--gamma-border)',
+    background: 'var(--gamma-bg-hover)',
+};
+
 /** The G6 plugin list for a {@link GraphViewPlugins} — pure, so the mapping is unit-testable without a canvas. */
 export function buildPluginList(p: GraphViewPlugins | null, swatches: readonly string[]): Record<string, unknown>[] {
     if (!p) return [];
@@ -300,7 +380,8 @@ export function buildPluginList(p: GraphViewPlugins | null, swatches: readonly s
             key: 'minimap',
             size: [160, 100],
             position: 'right-bottom',
-            containerStyle: { left: 'auto', top: 'auto', right: '0px', bottom: '0px' },
+            containerStyle: MINIMAP_CONTAINER_STYLE,
+            maskStyle: MINIMAP_MASK_STYLE,
         });
     if (p.gridLine) out.push({ type: 'grid-line', key: 'grid-line', follow: true });
     if (p.fisheye) out.push({ type: 'fisheye', key: 'fisheye', trigger: 'drag', r: 120, scaleRBy: 'wheel' });
@@ -1687,13 +1768,17 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     fill: () => this.styleNodeFill,
                     stroke: (d) => this.nodeColorOf(d),
                     // A start entity of an Investigation keeps a heavier outline (and its "start" badge) through every step.
-                    lineWidth: (d) => ((d.data as { start?: boolean }).start ? 3.5 : 2),
+                    // An unexpanded one's dotted ring is a little heavier too, so it survives a projector.
+                    lineWidth: (d) => {
+                        const nd = d.data as { start?: boolean; unexpanded?: boolean; missing?: boolean };
+                        return nd.start ? 3.5 : nd.unexpanded && !nd.missing ? UNEXPANDED_LINE_WIDTH : 2;
+                    },
                     // A stranded node (Link Analysis: excluded by a pushed-down predicate, kept so the analyst
                     // sees what the narrower question removed) renders dimmed with a dashed outline.
                     lineDash: (d) => {
                         const nd = d.data as { missing?: boolean; unexpanded?: boolean };
                         // LA-UNEXPANDED-MARKER-1: a Working Set entity no expand has followed yet wears a dotted outline.
-                        return nd.missing ? [4, 3] : nd.unexpanded ? [2, 3] : undefined;
+                        return nd.missing ? [4, 3] : nd.unexpanded ? [...UNEXPANDED_DASH] : undefined;
                     },
                     // A high-connectivity entity (Link Analysis hub suppression) wears a wide halo in its own colour.
                     halo: (d) => !!(d.data as { highConnectivity?: boolean }).highConnectivity,
@@ -1704,15 +1789,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     // §5.5: a collapsed node wears "+n" for the pendant neighbours it folds.
                     badges: (d) => [
                         ...((d.data as { start?: boolean }).start
-                            ? [
-                                  {
-                                      text: 'start',
-                                      placement: 'left-top' as const,
-                                      fontSize: 9,
-                                      fill: this.styleNodeFill,
-                                      backgroundFill: this.nodeColorOf(d),
-                                  },
-                              ]
+                            ? [startBadge(this.styleNodeFill, this.nodeColorOf(d))]
                             : []),
                         ...((d.data as { held?: boolean }).held
                             ? [
@@ -1759,6 +1836,9 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     labelFill: () => this.styleFg,
                     labelFontSize: 11,
                     labelPlacement: 'bottom',
+                    // The label sits on a backing in the node surface token, a little below the outline, so a link or
+                    // an arrowhead that runs under it never cuts through the text (LA-FULL-CYCLE-TEST-1 presentability).
+                    ...nodeLabelBacking(() => this.styleNodeFill),
                     cursor: 'pointer',
                     opacity: (d) =>
                         this.nodeDim(d.id as string) ? 0.25 : (d.data as { missing?: boolean }).missing ? 0.45 : 1,

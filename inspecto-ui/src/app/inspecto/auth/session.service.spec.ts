@@ -590,6 +590,16 @@ describe('SessionService (W6d edition switch)', () => {
         expect(svc.actorName()).toBe('Demo Manager');
     });
 
+    // LA-FULL-CYCLE-TEST-1 presentability: another subject (a held expand's requester) is named the same way
+    it('subjectName is a Demo User displayName, the signed-in subject own name, else the id', () => {
+        svc.demoUsers.set([{ id: 'fm.analyst', displayName: 'Fatima Analyst', title: 'Analyst' }]);
+        expect(svc.subjectName('fm.analyst')).toBe('Fatima Analyst');
+        expect(svc.subjectName('f3a9-uuid')).toBe('f3a9-uuid'); // OIDC: the browser has no directory of others
+        svc.actor.set('f3a9-uuid');
+        svc.subjectDisplayName.set('Ana Lopez');
+        expect(svc.subjectName('f3a9-uuid')).toBe('Ana Lopez');
+    });
+
     it('the post-sign-in bootstrap re-read carries session.displayName into actorName', async () => {
         const done = svc.init();
         httpMock.expectOne(`${base}/bootstrap`).flush({

@@ -178,7 +178,7 @@ export const ICON_COLOR_SWATCHES: readonly string[] = [
 export interface CanvasTheme {
     /** Label / tick / legend text. */
     fg: string;
-    /** Node fill behind the kind-coloured outline. */
+    /** Node fill behind the kind-coloured outline; also the backing a graph node's label sits on. */
     surface: string;
     /** Graph edge stroke. */
     edge: string;
@@ -186,8 +186,19 @@ export interface CanvasTheme {
     grid: string;
 }
 
+/**
+ * Dark edges are slate-400, not slate-500 (LA-FULL-CYCLE-TEST-1 presentability): slate-500 on the navy canvas measured
+ * 3.75:1 on slate-900 and 3.07:1 on slate-800 and vanished on a projector; slate-400 is 6.96:1 and 5.71:1.
+ */
 export function canvasTheme(dark: boolean): CanvasTheme {
     return dark
-        ? { fg: SLATE[200], surface: SLATE[800], edge: SLATE[500], grid: 'rgba(148,163,184,0.15)' }
+        ? { fg: SLATE[200], surface: SLATE[800], edge: SLATE[400], grid: 'rgba(148,163,184,0.15)' }
         : { fg: SLATE[700], surface: '#ffffff', edge: SLATE[400], grid: 'rgba(100,116,139,0.15)' };
 }
+
+/**
+ * The greys a link reads as "no type" in: today's default link colour and slate-500, the dark scheme's default before
+ * it was raised to slate-400. The automatic look keeps every type colour away from all of them, so raising the dark
+ * edge did not hand a grey-blue swatch to a link type (nor reshuffle every automatic colour).
+ */
+export const NEUTRAL_LINK_GREYS: readonly string[] = [SLATE[400], SLATE[500]];

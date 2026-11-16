@@ -14,7 +14,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { LensService } from '@inspecto/core/api';
-// eslint-disable-next-line no-restricted-imports -- only `actor`, so the requester of a held expand is not offered to decide it (four-eyes); LA_FEATURES carries module flags, not identity
+// eslint-disable-next-line no-restricted-imports -- only `actor` (the requester of a held expand is not offered to decide it, four-eyes) and `subjectName` (the requester's display name on the approver's line); LA_FEATURES carries module flags, not identity
 import { SessionService } from '@inspecto/core/api';
 import {
     FormControl,
@@ -87,6 +87,7 @@ import {
     approverWaitingMessage,
     canDecideExpansion,
     confirmApproveExpansion,
+    requesterName,
 } from './expansion-decision';
 import { INVESTIGATION_PANEL_LABELS, InvestigationPanel, openInvestigationPanel } from './investigation-panel.dialog';
 import { LinkAnalysisTemplateMeasuresComponent } from './link-analysis-template-measures.component';
@@ -282,14 +283,17 @@ export class LinkAnalysisInvestigationComponent {
     readonly readsOnly = computed(() => this.detailsRole() === 'reviewer' || this.caseReader());
     /** May change the open Investigation's steps, as far as this screen can tell (the server stays the gate). */
     readonly canChange = computed(() => this.canWrite() && !this.readsOnly());
-    /** Why the open Investigation is read-only here, in words; '' when it is not. */
+    /**
+     * Why the open Investigation is read-only here, in words; '' when it is not. The banner's title already says
+     * "Read-only", so the sentence does not repeat it (LA-FULL-CYCLE-TEST-1 presentability: a shorter banner in a narrow panel).
+     */
     readonly readOnlyReason = computed(() =>
         !this.canWrite()
-            ? 'Read-only: changing an Investigation needs the Manage Incidents and Cases permission.'
+            ? 'Changing an Investigation needs the Manage Incidents and Cases permission.'
             : this.detailsRole() === 'reviewer'
-              ? 'Read-only: you review this Investigation. You can read it and decide approvals; only a lead changes its steps.'
+              ? 'You review this Investigation: you can read it and decide approvals; only a lead changes its steps.'
               : this.caseReader()
-                ? 'Read-only: you read this Investigation through its Case; only a lead changes its steps.'
+                ? 'You read this Investigation through its Case; only a lead changes its steps.'
                 : '',
     );
     dismissHowTo(): void {
@@ -759,7 +763,13 @@ export class LinkAnalysisInvestigationComponent {
             ? (this.decidable().find((p) => p.id === o.awaitingApproval) ?? null)
             : null;
     }
-    readonly approverMessage = approverWaitingMessage;
+    /** The approver's waiting line, the requester named as the sign-in names them (Demo User or IdP), else by id. */
+    approverMessage(o: DegreeOutcome, p: PendingExpansion): string {
+        return approverWaitingMessage(o, p, this.requester(p));
+    }
+    private requester(p: PendingExpansion): string {
+        return requesterName(p, (id) => this.session.subjectName(id));
+    }
     /** The request being decided (its buttons wait), or null. */
     readonly deciding = signal<string | null>(null);
     /** The request whose Deny asks for a reason (the second step of a deny), or null. */
@@ -774,7 +784,7 @@ export class LinkAnalysisInvestigationComponent {
 
     /** Approve: confirm first (it runs the expand at once, as the requester's step), then re-read the Investigation. */
     async approveRequest(p: PendingExpansion): Promise<void> {
-        if (!(await confirmApproveExpansion(this.confirm, p))) return;
+        if (!(await confirmApproveExpansion(this.confirm, p, this.requester(p)))) return;
         await this.decideRequest(p, true);
     }
 

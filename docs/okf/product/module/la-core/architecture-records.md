@@ -928,8 +928,10 @@ where a later bullet supersedes them.
     server's own refusals (`InvestigationRoutes.decide`: route capability, 403 without a Subject, 403 for the
     requester), so nothing is offered that the server would refuse on those grounds; membership / PDP refusals still
     come back from the server and show on the line (`oversightErrorMessage`). Such a reader gets a **N to approve**
-    badge in the Act header (a button that scrolls the line into view) and, instead of the requester's text, *request
-    p1 from X waits for your approval* with the crossed limits in words (no Settings keys) and **Approve** / **Deny**.
+    badge in the Act header (a button that scrolls the line into view) and, instead of the requester's text, *X asks for
+    your approval* (X = `SessionService.subjectName`: the Demo User's display name, the signed-in subject's own name, else
+    the id; no request id) with what the expand would do beyond the limits in words (*It would add every neighbour of each
+    entity, more than the 2,000 allowed without a second approval.*; no Settings keys) and **Approve** / **Deny**.
     Approve confirms first (`confirmApproveExpansion`, shared with Settings ▸ Oversight, whose Approve was one click):
     it runs the expand at once as the requester's step. Deny is a second step on the line: an optional reason
     (`pen-field`, ≤ 200, the server's 422 bound) and **Deny request** / **Cancel**. **The reason stays optional**: the

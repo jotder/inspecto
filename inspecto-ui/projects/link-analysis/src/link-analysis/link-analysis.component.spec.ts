@@ -42,6 +42,7 @@ import {
     defaultLayoutFor,
     mergeWorkingSets,
     nodeDisplayId,
+    readDock,
     snapshotTitle,
 } from './link-analysis.component';
 import { ConditionalReadCache } from '@inspecto/link-analysis/api/conditional-read-cache';
@@ -4436,6 +4437,33 @@ describe('LinkAnalysisComponent - the bottom dock (LA-STUDIO-UI-REORG-1 §5.9)',
         fixture.detectChanges();
         expect(tabs(el)).toEqual(['Rows', 'Results']);
         expect(c.dockTabShown()).toBe('rows');
+        fixture.destroy();
+    });
+
+    it('never reopens on an empty Results tab: a remembered Results tab comes back collapsed on Rows', () => {
+        localStorage.setItem('inspecto.la.dock', JSON.stringify({ open: true, tab: 'results' }));
+        expect(readDock()).toEqual({ open: false, tab: 'rows' });
+        localStorage.setItem('inspecto.la.dock', JSON.stringify({ open: true, tab: 'rows' }));
+        expect(readDock()).toEqual({ open: true, tab: 'rows' }); // a tab with something to show is still remembered
+    });
+
+    it('an empty Results tab is one line high, not the dock height, and hides its resize handle', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const el = fixture.nativeElement as HTMLElement;
+        c.openDock('results');
+        fixture.detectChanges();
+        const body = el.querySelector<HTMLElement>('#bottom-panel-body')!;
+        expect(body.querySelector('[data-testid="dock-results-empty"]')).not.toBeNull();
+        expect(body.style.height).toBe('');
+        expect(el.querySelector('[data-testid="la-dock"] [role="separator"]')!.classList).toContain('hidden');
+
+        c.openDock('rows'); // a tab with content takes the dock's set height again
+        fixture.detectChanges();
+        expect(el.querySelector<HTMLElement>('#bottom-panel-body')!.style.height).not.toBe('');
+        expect(el.querySelector('[data-testid="la-dock"] [role="separator"]')!.classList).not.toContain('hidden');
         fixture.destroy();
     });
 });

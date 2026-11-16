@@ -1,7 +1,7 @@
 import { ENTITY_TYPE_GLYPH } from '@inspecto/core/graph/catalog-graph';
 import { baseEdgeKind, EdgePattern } from '@inspecto/core/graph/graph-view.component';
 import type { G6GraphData } from '@inspecto/core/graph/graph-types';
-import { canvasTheme, ICON_COLOR_SWATCHES } from '@inspecto/core/theme/chart-tokens';
+import { ICON_COLOR_SWATCHES, NEUTRAL_LINK_GREYS } from '@inspecto/core/theme/chart-tokens';
 import { SUPER_NODE_KIND } from '@inspecto/link-analysis/graph/graph-analysis';
 
 /**
@@ -46,7 +46,7 @@ export function rgbOf(hex: string): [number, number, number] {
 
 /** How close (Euclidean RGB distance, of 441) a colour may come to the default link colour before it reads as neutral. */
 export const NEUTRAL_DISTANCE = 40;
-const NEUTRAL_LINK_COLORS = [canvasTheme(false).edge, canvasTheme(true).edge].map(rgbOf);
+const NEUTRAL_LINK_COLORS = NEUTRAL_LINK_GREYS.map(rgbOf);
 /** The colours the automatic look draws from: the shared swatches, minus any too close to a default link colour. */
 export const AUTO_COLORS: readonly string[] = ICON_COLOR_SWATCHES.filter((c) => {
     const [r, g, b] = rgbOf(c);

@@ -99,10 +99,10 @@ reads it through ONE helper, `datasetIndexStatus` (`projects/link-analysis/src/l
 
 | State | When | Data page (*Graph*, *Data status*) | Data strip (Investigation) | Expand note |
 |---|---|---|---|---|
-| `current` | listed, not stale, its files compared (`fingerprint: known`) | *up to date* | *link index vN* | *Answered from the link index vN.* |
-| `out_of_date` | any listed index of the Dataset is stale | *out of date* + **Rebuild** | *link index vN out of date* (WARNING) + **Rebuild**; the drawer adds the reason | *Answered from the Dataset because the link index is out of date (reason).* |
-| `unknown` | listed, files not comparable (a view-backed Dataset) | the arrivals decide | *link index vN* | as the server says |
-| none | no index listed, or `GET /inv/index` cannot answer (Basic) | the arrivals decide (*graph N files behind* …) | *no link index* | as the server says |
+| `current` | listed, not stale, its files compared (`fingerprint: known`) | *up to date* | nothing in the sentence; tooltip *Link index version N, up to date.* | *Answered from the link index vN.* |
+| `out_of_date` | any listed index of the Dataset is stale | *out of date* + **Rebuild** | *The link index is out of date.* (**Check data**) + **Rebuild**; tooltip *Link index version N, out of date.*; the drawer adds the reason | *Answered from the Dataset because the link index is out of date (reason).* |
+| `unknown` | listed, files not comparable (a view-backed Dataset) | the arrivals decide | nothing in the sentence; tooltip *Link index version N.* | as the server says |
+| none | no index listed, or `GET /inv/index` cannot answer (Basic) | the arrivals decide (*graph N files behind* …) | nothing in the sentence; tooltip *No link index for this Dataset.* | as the server says |
 
 **Plain words** (the server's `details`, shown as they are): *the Dataset's files changed after the index was built
 (added, removed or replaced)* · *the Dataset's definition changed after the index was built* · *the Dataset cannot be

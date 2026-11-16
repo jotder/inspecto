@@ -1039,7 +1039,7 @@
                 <!-- the New form carries its own lock note at its top; this one serves the pending and queued starts -->
                 @if (!canWrite() && (pending() || store.queuedSeeds().length)) {
                     <inspecto-alert variant="info" title="Read-only" data-testid="investigation-read-only">
-                        Read-only: starting an Investigation needs the Manage Incidents and Cases permission.
+                        Starting an Investigation needs the Manage Incidents and Cases permission.
                     </inspecto-alert>
                 }
                 <p class="text-secondary m-0 text-sm">Open an existing Investigation with File ▸ Open…</p>
@@ -1062,7 +1062,12 @@
                                 <div class="truncate font-semibold">{{ store.displayTitle() || h.id }}</div>
                             }
                             @if (h.purpose) {
-                                <div class="text-secondary truncate text-sm" [attr.title]="h.purpose">
+                                <!-- the purpose wraps (up to three lines; the whole of it in the tooltip), never cut mid-word -->
+                                <div
+                                    class="text-secondary line-clamp-3 break-words text-sm"
+                                    [attr.title]="h.purpose"
+                                    data-testid="act-purpose"
+                                >
                                     {{ h.purpose }}
                                 </div>
                             }

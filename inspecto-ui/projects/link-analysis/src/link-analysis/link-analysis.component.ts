@@ -549,9 +549,15 @@ const DOCK_TABS: readonly { id: DockTab; label: string; inv?: boolean; unsaved?:
     { id: 'results', label: 'Results' },
 ];
 export const DOCK_STORAGE_KEY = 'inspecto.la.dock';
-function readDock(): { open: boolean; tab: DockTab } {
+/**
+ * The dock's remembered state. The Results tab is never restored (LA-FULL-CYCLE-TEST-1 presentability): its answer lives
+ * in memory only, so after a reload it could only show its empty hint while taking a fifth of the screen. A remembered
+ * Results tab comes back as a collapsed Rows tab; the dock opens on Results again with the next *Open in the dock*.
+ */
+export function readDock(): { open: boolean; tab: DockTab } {
     try {
         const v = JSON.parse(localStorage.getItem(DOCK_STORAGE_KEY) ?? 'null');
+        if (v && v.tab === 'results') return { open: false, tab: 'rows' };
         if (v && DOCK_TABS.some((t) => t.id === v.tab)) return { open: v.open === true, tab: v.tab };
     } catch {
         /* unreadable or blocked storage: the defaults */
@@ -1935,6 +1941,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     /** Open the dock on one tab (the Act panel's "Open the Op log"; the Rows toggle). */
     /** The dock's Results tab: the last long answer sent there with *Open in the dock* (headline + every row). */
     readonly dockResult = signal<{ algorithm: string; headline: string; rows: Record<string, unknown>[] } | null>(null);
+    /** The Results tab with no answer in it: the body shrinks to its one-line hint instead of the dock's set height. */
+    readonly dockBodyEmpty = computed(() => this.dockTabShown() === 'results' && !this.dockResult());
     showResultInDock(r: GraphRunResult): void {
         this.dockResult.set({
             algorithm: r.algorithm,

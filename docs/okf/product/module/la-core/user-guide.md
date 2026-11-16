@@ -414,7 +414,12 @@ Act on the canvas, read in the dock, configure in **⚙ Settings**.
   all**, **Invert the selection**, **Select neighbours**, **Clear the selection**, and the count), the
   graph edits (**Expand**, which in an Investigation opens its tab section, **Collapse**, **Hide**, **Exclude** and **Merge** on an Investigation's canvas, **Attach to
   Case**), **Clean up** (the broom), and **Held** and **Hidden by lists**.
-* **Canvas:** the graph, with the legend, the Working set tiles and the minimap.
+* **Canvas:** the graph, with the legend, the Working set tiles and the minimap. It is drawn to read on a projector
+  (LA-FULL-CYCLE-TEST-1, 2026-11-16): a node's name sits on a small backing in the node colour of the scheme, a few
+  pixels under the node, so a link or an arrowhead that passes under it never cuts through the letters; in the dark
+  scheme links are a lighter grey (about 7:1 against the canvas, was under 4:1, which vanished on a projector); the
+  minimap's frame is the scheme's own faint line on the card colour rather than a bright grey box, so it no longer
+  outshines the graph. Every colour comes from the theme, in both schemes.
 * **Right panel**, collapsed to a thin rail (**Show the toolbox**, **On screen**, **Whole Dataset**, **Investigation**) or open
   with three tabs (**«** collapses it again; LA-PANELS-REDESIGN-1, 2026-10-29):
   * **On screen**: *Find something interesting* and the tools that run on the graph on screen.
@@ -427,7 +432,10 @@ Act on the canvas, read in the dock, configure in **⚙ Settings**.
 * **Dock (bottom):** **Rows** (the links and nodes behind the graph) and **Results** (a long algorithm table), plus **Steps** (one line per step) while an Investigation is still unsaved, or,
   with an Investigation open, **Step log**, **Working Set rows**, **Coverage**, **Annotations** and **Excluded
   entities**. Its tabs are plain text tabs, the open one underlined; on a narrow screen they scroll sideways. Drag its
-  edge to resize; it remembers its tab and height in this browser.
+  edge to resize; it remembers its tab and height in this browser. It never opens on nothing: **Results** is not
+  remembered (its table lives only until the page reloads), so a dock left on Results comes back collapsed to its tabs,
+  on **Rows**; and an empty Results tab is one line high (*Long algorithm results open here…*), not the dock's height.
+  An empty dock used to take a fifth of the screen.
 * There is no status bar under the canvas (2026-10-29). The graph model and **Refresh** are in **⚙ Settings ▸ Graph
   model**; the counts are on the **Graph counts** card on the canvas, whose **Limits** icon (bottom right) shows the
   node limits in force; **Installed modules** is a section of ⚙ Settings.
@@ -800,14 +808,16 @@ entity and its Entity Type. On a Space that masks the entity, the node shows onl
 entities, the form is filled with the real value through the audited reveal (the form says the reveal is recorded);
 otherwise the value stays blank and the form says why. With entities selected, **G** (or **E**) expands them with the filter, **K** keeps and **H** hides them; the
 canvas toolbar has **Keep** beside **Hide** (when the toolbar is folded into **⋯**, **Keep the selected** is there). A node no expand has followed yet has
-a **dotted outline** (legend: *Dotted outline: not expanded yet*); on an Investigation's canvas *Next unexpanded* and
+a **dotted outline** (legend: *Dotted outline: not expanded yet*; the dots are close-set and slightly heavier than
+other outlines, so the ring stays visible on a projector); on an Investigation's canvas *Next unexpanded* and
 *Only unexpanded* under that legend row help you go one node at a time.
 
 **Where new nodes go.** An Expand of up to 50 new nodes leaves every node you see where it is and draws the new ones
 **outside** what is already there: past the ring of the entity they hang off, on the side facing away from the rest of
 the graph, never on top of another node or a link. A bigger Expand lays the whole graph out again. The layout a graph
 opened with stays while you expand it; pick another in **Graph layout** to change it. On an Investigation, each **start
-entity** keeps a heavier outline and a small **start** badge through every step.
+entity** keeps a heavier outline and a small **start** badge through every step. The badge sits just off the node's
+top-left corner, beside and above it, so it never covers the node's icon or outline.
 
 **Remove** (**Delete**, right-click, or the bin on the canvas toolbar) is offered while you explore, outside an open
 Investigation. It takes the selected nodes off the graph, together with every neighbour left with no link at all once
@@ -1187,8 +1197,8 @@ local `2026-11-15 13:21` form as every other recorded time in Link Analysis.
 
 Top to bottom, most important first:
 
-1. **Header:** the **Name** (a lead renames it in place: label · value · ✎), purpose, Dataset, the data-trust chip
-   (**Data details**), a **?** that shows *How to investigate* again, and `⋯` with **Settings…** (⚙ Settings ▸
+1. **Header:** the **Name** (a lead renames it in place: label · value · ✎), purpose (it wraps to up to three lines;
+   the whole of it is in its tooltip), Dataset, the data-trust sentence and **Data details** ([§11.11](#1111-data-trust-what-data-am-i-looking-at)), a **?** that shows *How to investigate* again, and `⋯` with **Settings…** (⚙ Settings ▸
    Investigation settings), **Build Dossier…**, **Members…**, **Close** and **Delete**. A person who may approve a held
    expand of someone else sees a **N to approve** badge under the Dataset line; it brings the waiting line into view
    ([§11.4](#114-large-expands-need-a-second-person-four-eyes)). Under it one counts line: *Working Set: 42 entities · 118 links ·
@@ -1237,11 +1247,17 @@ Investigation is open **selects** it for the next step.
 An expand whose budget or fan-out cap is above the Space's four-eyes thresholds does not run: it says **waiting for
 approval**, names the request (for example *p1*) and the limit crossed. Someone **other than you** with *Approve link
 expansions* opens the same Investigation and sees it at once: a **1 to approve** badge in the header, and on the same
-line, instead of your waiting text, *Degree 2: request p1 from* (your name) *waits for your approval. It crosses the Space's
-four-eyes limit: row budget 5,000 (limit 1,000).* with **Approve** and **Deny**.
+line, instead of your waiting text, *Degree 2:* (your name) *asks for your approval. It would add every neighbour of
+each entity, more than the 2,000 allowed without a second approval.* with **Approve** and **Deny**.
 
-* **Approve** asks first (*Approve this expand?*: approving runs it now, as your step, and records them as the
-  approver), then runs it; the line then says what it admitted.
+The approver's line is written for the person deciding (LA-FULL-CYCLE-TEST-1, 2026-11-16). It names you as the sign-in
+names you: a Demo User's display name, or the signed-in person's own name; under OIDC the browser holds no directory of
+other people, so another person reads as their sign-in id. It leaves the request id out (that is the server's handle; **Oversight and approvals**
+still lists it), and it says the limit as what the expand would do (*read up to 5,000 rows, more than the 1,000
+allowed*, *add every neighbour of each entity…*) rather than in setting words.
+
+* **Approve** asks first (*Approve this expand?*, in the same words: who asks and what it would do; approving runs it
+  now, as your step, and records them as the approver), then runs it; the line then says what it admitted.
 * **Deny** is a second step on the line: an optional **Reason** (at most 200 characters; you see it on your line) and
   **Deny request**, or **Cancel**. Nothing is read. The reason is optional because the server, Oversight and the
   console's inbox all take it as optional, and the denial itself (who, when) is always recorded.
@@ -1333,12 +1349,18 @@ exclusions are dropped and the preview says so); **Instantiate** builds a new In
 
 ### 11.11 Data trust: what data am I looking at
 
-An open Investigation shows a **Data strip** above it: one line with a status badge (the **Data details** chip in the
-header opens it), and a drawer with four parts:
+An open Investigation shows a **Data strip** above it: a status badge and one plain sentence, for example *Data
+current to 4 Sep 2026 (3 of 3 days).*, and **Data details**, which opens a drawer with four parts. The sentence says
+how current and how complete the data is, and adds a second sentence only for what needs a look (*1 missing day; the
+link index is out of date.*). The badge says what its colour means: **Data OK**, **Check data**, **Data problem** or
+**Not known**. The link index version, and a link index that is simply up to date, are no news to the reader, so they
+are in the sentence's tooltip (*Link index version 2, up to date.*) and in Data details, not in the sentence
+(LA-FULL-CYCLE-TEST-1, 2026-11-16: *link index v2* and a bare *OK* meant nothing to someone outside the team). The
+judgement behind it is unchanged, and the index state is the one answer the Data page reads too. The drawer:
 
 * **Fresh** — when data last arrived for the Dataset.
 * **Complete** — the days of the Investigation's window, day by day. A missing day inside the span of the delivered
-  files is a **gap**; a missing day before the first or after the newest file reads *not delivered yet* (not a gap, no
+  files is a **gap** (the strip's sentence counts it as a *missing day*); a missing day before the first or after the newest file reads *not delivered yet* (not a gap, no
   warning); with no delivered day known every missing day is a gap. An Investigation with no time window is judged over
   the files' span; with no event day in any file it says *this Investigation sets no time window, and its Files name
   no event day.*
@@ -1348,7 +1370,7 @@ header opens it), and a drawer with four parts:
   file limit, *NO_INDEX*). Newest event day first, then by name.
 * **Index** — the link index version and whether it is out of date, with the reason in plain words.
 
-**An out-of-date link index.** The strip then reads *link index vN out of date* with a WARNING badge, the Data page's
+**An out-of-date link index.** The strip then adds *The link index is out of date.* with a **Check data** badge, the Data page's
 **Graph** says *out of date*, and the Expand says *Answered from the Dataset because the link index is out of date*:
 the three read one judgement of the index. (A Dataset drawn over several column pairs has an index per pair: the strip
 and the Data page warn when any of them is out of date, the Expand speaks of the one it reads.) Until the index is
@@ -1495,10 +1517,10 @@ If a control is greyed out, hover it: it names what is missing.
 | Add data with sign-in, **Upload a CSV** to a Collector | the right to upload data (`canUploadData`) |
 | See **Getting started counters** | an administrator (`canAdminister`) |
 
-**Read-only roles.** Without *Manage Incidents and Cases* the Investigation tab says *Read-only: changing an Investigation needs the Manage
-Incidents and Cases permission.*: you can open, read, replay, re-read and build, download and verify the Dossier; every
+**Read-only roles.** Without *Manage Incidents and Cases* the Investigation tab shows a **Read-only** banner, *Changing an Investigation needs the Manage
+Incidents and Cases permission.* (the banner's title says Read-only, so the sentence does not repeat it): you can open, read, replay, re-read and build, download and verify the Dossier; every
 write control is disabled with that sentence. A reviewer of an Investigation, and a member of its linked Case, read it
-the same way (*Read-only: you review this Investigation…*): only a lead changes its steps, so they get no Expand form. A refusal shows the server's reason; a missing
+the same way (*You review this Investigation: you can read it and decide approvals…*): only a lead changes its steps, so they get no Expand form. A refusal shows the server's reason; a missing
 permission is named in words (*Your role does not have the Workbench author permission*). *Not found* on an Investigation can mean it does
 not exist, is not yours, or its Dataset is no longer shared with you — the same answer on purpose. In the
 `la-showcase` demo, *Demo RA Analyst* and *Demo Manager* are read-only; *Demo FM Analyst* holds manage-incidents,

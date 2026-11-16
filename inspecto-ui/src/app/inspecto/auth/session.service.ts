@@ -292,6 +292,21 @@ export class SessionService {
     });
 
     /**
+     * What to CALL another subject the UI only knows by id (the requester of a held expand, say): the Demo User's
+     * `displayName` when the picker lists that id, the signed-in subject's own {@link actorName} when it is them, else the
+     * id itself. Under OIDC the browser holds no directory of other people, so another subject reads as its id. Display
+     * only - never identity.
+     */
+    subjectName(id: string): string {
+        if (id === this.actor()) return this.actorName() ?? id;
+        return (
+            this.demoUsers()
+                .find((u) => u.id === id)
+                ?.displayName?.trim() || id
+        );
+    }
+
+    /**
      * LIVEFIX2 #3: the server ANSWERED `GET /bootstrap` with an error (a 4xx/5xx — e.g. a Demo User conflict), so the
      * edition, the session and the capabilities are unknown. Not set for an unreachable backend (status 0): the
      * connectivity banner owns that, and the shell still degrades to Basic. The sign-in page shows this text.

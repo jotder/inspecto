@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { G6GraphData } from '@inspecto/core/graph/graph-types';
-import { canvasTheme, ICON_COLOR_SWATCHES } from '@inspecto/core/theme/chart-tokens';
+import { canvasTheme, ICON_COLOR_SWATCHES, NEUTRAL_LINK_GREYS } from '@inspecto/core/theme/chart-tokens';
 import { SUPER_NODE_KIND } from '@inspecto/link-analysis/graph/graph-analysis';
 import {
     AUTO_COLORS,
@@ -149,7 +149,10 @@ describe('autoStyle (colour and shape per node type, colour and pattern per link
     });
 
     it('never gives a type the default link colour, so no link type looks neutral by accident', () => {
-        const neutral = [canvasTheme(false).edge, canvasTheme(true).edge];
+        // both schemes' default link colour is among the neutral greys (the dark one was raised to slate-400)
+        expect(NEUTRAL_LINK_GREYS).toContain(canvasTheme(false).edge);
+        expect(NEUTRAL_LINK_GREYS).toContain(canvasTheme(true).edge);
+        const neutral = NEUTRAL_LINK_GREYS;
         const far = (c: string): boolean =>
             neutral.every((n) => {
                 const [r, g, b] = rgbOf(c);

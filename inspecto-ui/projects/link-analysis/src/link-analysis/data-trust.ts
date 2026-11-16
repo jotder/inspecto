@@ -1,5 +1,5 @@
 import { DatasetFilesPage } from '@inspecto/link-analysis/api/inv.service';
-import { indexStateWords } from './index-status';
+import { indexStateWords, LinkIndexState } from './index-status';
 
 /**
  * LA-DATA-TRUST-1 S2 - the framework-free half of the Data strip: what the one-line summary says, the tone of its
@@ -15,8 +15,8 @@ export interface DataTrustFacts {
     dataAsOf: string | null;
     /** From the coverage read: expected / covered / missing days; null when the read needs a window the Investigation lacks. */
     days: { expected: number; covered: number; missing: string[] } | null;
-    /** From `GET /inv/index` for the Dataset. */
-    index: { version: number; stale: boolean } | null;
+    /** From `GET /inv/index` for the Dataset, as {@link datasetIndexStatus} answers it (the ONE answer, phase 4). */
+    index: { version: number; state: LinkIndexState } | null;
     /** The first Files page (its `summary` spans every File). */
     files: DatasetFilesPage | null;
     /** Days corrected after the analyst last looked (S5); omitted/empty = nothing to say. */
@@ -24,10 +24,13 @@ export interface DataTrustFacts {
 }
 
 export interface DataTrustStrip {
+    /** A plain sentence (or two): how current and complete the data is, then only what needs a look. */
     text: string;
     tone: DataTrustTone;
-    /** The badge's word - the tone is never conveyed by colour alone. */
+    /** The badge's words - the tone is never conveyed by colour alone. */
     label: string;
+    /** The tooltip: the link index (version and state) and what could not be matched to it. Data details has the rest. */
+    detail: string;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -93,60 +96,76 @@ export function splitMissing(
     return { holes, notDelivered: missing.filter((d) => d < first || d > last) };
 }
 
+/**
+ * The strip as a plain sentence (LA-FULL-CYCLE-TEST-1 presentability): "Data current to 4 Sep 2026 (3 of 3 days)." and,
+ * only when something needs a look, a second sentence naming it ("1 missing day; the link index is out of date."). The
+ * link index's version and an index that is merely up to date are no news to the reader: they go to {@link
+ * DataTrustStrip.detail} (the tooltip) and Data details. The badge says what the tone means in two words, never a bare
+ * "OK". The judgement is unchanged: the same tones from the same facts; the index state is {@link datasetIndexStatus}'s.
+ */
 export function buildStrip(f: DataTrustFacts): DataTrustStrip {
-    const parts: string[] = [];
+    const notes: string[] = [];
     let tone: DataTrustTone = 'success';
     const worse = (t: DataTrustTone) => {
         if (t === 'error' || (t === 'warning' && tone !== 'error') || (t === 'neutral' && tone === 'success')) tone = t;
     };
 
     const asOf = formatDay(f.dataAsOf);
-    parts.push(asOf ? `Data as of ${asOf}` : 'Data as-of date not known');
+    let head = asOf ? `Data current to ${asOf}` : 'Data date not known';
     if (!asOf) worse('neutral');
 
     if (f.days) {
-        parts.push(`${f.days.covered} of ${f.days.expected} days`);
+        head += ` (${f.days.covered} of ${plural(f.days.expected, 'day')})`;
         const { holes, notDelivered } = splitMissing(f.days.missing, f.files?.assessed ? f.files.days : null);
         if (holes.length) {
-            parts.push(plural(holes.length, 'gap'));
+            notes.push(plural(holes.length, 'missing day'));
             worse('warning');
         }
-        if (notDelivered.length) parts.push(`${notDelivered.length} not delivered yet`);
-    } else parts.push('days not assessed');
+        if (notDelivered.length) notes.push(`${plural(notDelivered.length, 'day')} not delivered yet`);
+    } else head += ' (days not assessed)';
 
     const s = f.files?.assessed ? f.files.summary : undefined;
     if (s && s.problem > 0) {
-        parts.push(`${plural(s.problem, 'File')} quarantined, partial or failed`);
+        notes.push(`${plural(s.problem, 'File')} quarantined, partial or failed`);
         worse('warning');
     }
 
     const corrected = new Set(f.correctedDays ?? []).size;
     if (corrected > 0) {
-        parts.push(`${plural(corrected, 'day')} corrected since you last looked`);
+        notes.push(`${plural(corrected, 'day')} corrected since you last looked`);
         worse('warning');
     }
 
     // LA-FULL-CYCLE-TEST-1 phase 4: the Glossary's word (link index) and the same state words as the Data page
-    let index = 'no link index';
+    let detail = 'No link index for this Dataset.';
     if (f.index) {
-        index = `link index v${f.index.version}`;
-        if (f.index.stale) {
-            index += ` ${indexStateWords('out_of_date')}`;
+        const state = indexStateWords(f.index.state);
+        detail = `Link index version ${f.index.version}${state ? `, ${state}` : ''}.`;
+        if (f.index.state === 'out_of_date') {
+            notes.push(`the link index is ${indexStateWords('out_of_date')}`);
             worse('warning');
         }
         if (s) {
             if (s.waiting > 0) {
-                index += `, ${plural(s.waiting, 'file')} waiting`;
+                notes.push(`${plural(s.waiting, 'file')} waiting for the link index`);
                 worse('warning');
-            } else if (s.unknown > 0) index += `, ${s.unknown} unknown`;
+            } else if (s.unknown > 0) detail += ` ${plural(s.unknown, 'file')} could not be matched to it.`;
         }
     }
-    parts.push(index);
 
+    const note = notes.join('; ');
     return {
-        text: parts.join(' · '),
+        text: `${head}.` + (note ? ` ${note.charAt(0).toUpperCase()}${note.slice(1)}.` : ''),
         tone,
-        label: tone === 'success' ? 'OK' : tone === 'warning' ? 'WARNING' : tone === 'error' ? 'PROBLEM' : 'UNKNOWN',
+        label:
+            tone === 'success'
+                ? 'Data OK'
+                : tone === 'warning'
+                  ? 'Check data'
+                  : tone === 'error'
+                    ? 'Data problem'
+                    : 'Not known',
+        detail,
     };
 }
 

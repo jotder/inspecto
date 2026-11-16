@@ -71,7 +71,8 @@ const NO_WINDOW = 'this Investigation has no time window, and its Files do not s
         <section class="flex flex-col gap-2 text-sm" aria-label="Data this graph stands on" data-test="data-strip">
             <div class="flex flex-wrap items-center gap-2">
                 <inspecto-status-badge [value]="strip().tone" [label]="strip().label"></inspecto-status-badge>
-                <span data-test="strip-text">{{ strip().text }}</span>
+                <!-- one plain sentence that wraps; the link index (version, state) is in its tooltip and Data details -->
+                <span class="min-w-0" data-test="strip-text" [attr.title]="strip().detail">{{ strip().text }}</span>
                 <inspecto-la-index-rebuild [dataset]="dataset()" />
                 @if (coverageError()) {
                     <span class="text-secondary text-xs" data-test="strip-days-reason"
@@ -135,7 +136,7 @@ const NO_WINDOW = 'this Investigation has no time window, and its Files do not s
                         <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">Fresh</h3>
                         <p class="m-0" data-test="fresh-asof">
                             @if (dataAsOf()) {
-                                Data as of {{ asOfText() }} (the newest event time in {{ dataset() }}).
+                                Data current to {{ asOfText() }} (the newest event time in {{ dataset() }}).
                             } @else {
                                 Data as-of date not known: the Dataset names no event-date column, or it holds no rows.
                             }
@@ -356,7 +357,7 @@ export class LinkAnalysisDataStripComponent {
         const facts: DataTrustFacts = {
             dataAsOf: this.dataAsOf(),
             days: c ? { expected: c.expectedDays, covered: c.coveredDays, missing: c.missingDays } : null,
-            index: ix ? { version: ix.version, stale: ix.state === 'out_of_date' } : null,
+            index: ix ? { version: ix.version, state: ix.state } : null,
             files: this.files(),
             correctedDays: this.corrections().map((c) => c.day),
         };

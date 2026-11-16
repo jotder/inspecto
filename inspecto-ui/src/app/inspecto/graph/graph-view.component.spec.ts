@@ -33,6 +33,10 @@ import {
     layoutConfig,
     graphSignature,
     stableKey,
+    startBadge,
+    nodeLabelBacking,
+    UNEXPANDED_DASH,
+    UNEXPANDED_LINE_WIDTH,
 } from './graph-view.component';
 
 /** G6 can't instantiate in jsdom (per the angular-ui skill) — only the empty/no-data path is testable
@@ -87,7 +91,46 @@ describe('GraphViewComponent', () => {
 
     it('the minimap is anchored to the right/bottom edge, so a canvas narrowed by the right panel keeps it inside', () => {
         const [minimap] = buildPluginList({ minimap: true }, []);
-        expect(minimap['containerStyle']).toEqual({ left: 'auto', top: 'auto', right: '0px', bottom: '0px' });
+        expect(minimap['containerStyle']).toMatchObject({ left: 'auto', top: 'auto', right: '0px', bottom: '0px' });
+    });
+
+    // ── LA-FULL-CYCLE-TEST-1 presentability: the canvas reads on a projector, in both schemes ──
+    it("the minimap's frame and viewport box use theme tokens, never G6's default light-grey box", () => {
+        const [minimap] = buildPluginList({ minimap: true }, []);
+        const container = minimap['containerStyle'] as Record<string, string>;
+        const mask = minimap['maskStyle'] as Record<string, string>;
+        expect(container['border']).toBe('1px solid var(--gamma-border)');
+        expect(container['background']).toBe('var(--gamma-bg-card)');
+        expect(mask).toEqual({ border: '1px solid var(--gamma-border)', background: 'var(--gamma-bg-hover)' });
+        // every colour is a token: no literal hex or rgb value survives from G6's defaults
+        for (const v of [...Object.values(container), ...Object.values(mask)]) expect(v).not.toMatch(/#|rgb/);
+    });
+
+    it('the start mark sits off the top-left corner, clear of the outline and the icon', () => {
+        const b = startBadge('surface', 'kind');
+        expect(b).toMatchObject({ text: 'start', placement: 'left-top', fill: 'surface', backgroundFill: 'kind' });
+        // G6 anchors a left-top badge's top-right corner ON the node's corner and grows it left and down (2/4 px
+        // padding): moved left past its right padding and up past its own height, the whole badge is outside the node.
+        const font = b['fontSize'] as number;
+        expect(b['offsetX'] as number).toBeLessThan(-4);
+        expect(b['offsetY'] as number).toBeLessThanOrEqual(-(font + 2 + 2));
+    });
+
+    it('a node label sits on a backing in the node surface token, below the outline', () => {
+        let fill = 'white';
+        const s = nodeLabelBacking(() => fill);
+        expect(s).toMatchObject({ labelBackground: true, labelOffsetY: 4, labelBackgroundRadius: 4 });
+        expect(s['labelBackgroundOpacity'] as number).toBeGreaterThanOrEqual(0.8);
+        // read live, so a scheme switch repaints it without a rebuild
+        const mapper = s['labelBackgroundFill'] as () => string;
+        expect(mapper()).toBe('white');
+        fill = 'navy';
+        expect(mapper()).toBe('navy');
+    });
+
+    it('an unexpanded ring puts more ink on the outline than the former 2-on 3-off at 2 px', () => {
+        const ink = (dash: readonly number[], width: number) => (dash[0] / (dash[0] + dash[1])) * width;
+        expect(ink(UNEXPANDED_DASH, UNEXPANDED_LINE_WIDTH)).toBeGreaterThan(ink([2, 3], 2) * 1.5);
     });
 
     // ── LA-09: View toolbox completions ──

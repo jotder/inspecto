@@ -335,7 +335,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="investigation-read-only"]')?.textContent).toContain(
-            'Read-only: changing an Investigation needs the Manage Incidents and Cases permission.',
+            'Changing an Investigation needs the Manage Incidents and Cases permission.',
         );
         // Mark this position sits behind More steps ▾ (§5.8 block 7)
         (fixture.debugElement.children[0].componentInstance as LinkAnalysisInvestigationComponent).moreStep.set(
@@ -358,7 +358,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         penEdit(ro.fixture, penByLabel(ro.el, 'Purpose')!, 'warrant 7');
         expect(ro.button('Start Investigation').disabled).toBe(true);
         expect(ro.el.querySelector('[data-testid="investigation-read-only"]')?.textContent).toContain(
-            'Read-only: starting an Investigation needs the Manage Incidents and Cases permission.',
+            'Starting an Investigation needs the Manage Incidents and Cases permission.',
         );
         expect(ro.el.querySelector('[data-testid="investigation-read-only"]')?.textContent).not.toContain(
             "Your role can't start Investigations (needs Incident management)",
@@ -1297,8 +1297,14 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
             const badge = el.querySelector('[data-testid="approver-badge"]') as HTMLButtonElement;
             expect(badge.textContent).toContain('1 to approve');
             expect(badge.getAttribute('aria-label')).toBe('1 expand request waits for your approval: show');
-            expect(line(el)?.textContent).toContain('request p7 from alice waits for your approval');
-            expect(line(el)?.textContent).toContain('row budget 5,000 (limit 1,000); fan-out unbounded (limit 2,000)');
+            // presentability: no Demo User named alice, so the id stands in; the request id stays out of the sentence
+            expect(line(el)?.textContent).toContain('alice asks for your approval.');
+            expect(line(el)?.textContent).toContain(
+                'It would read up to 5,000 rows, more than the 1,000 allowed, and add every neighbour of each entity, ' +
+                    'more than the 2,000 allowed without a second approval.',
+            );
+            expect(line(el)?.textContent).not.toContain('p7');
+            expect(line(el)?.textContent).not.toContain('fan-out');
             expect(el.textContent).not.toContain('Ask an approver');
             expect(el.textContent).not.toContain('four_eyes');
             await expectNoA11yViolations(el.querySelector('[data-testid="degrees"]')!);
@@ -1308,6 +1314,7 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
             expect(confirm).toHaveBeenCalledTimes(1);
             const [message, o] = confirm.mock.calls[0] as unknown as [string, { title: string; confirmText: string }];
             expect(o).toMatchObject({ title: 'Approve this expand?', confirmText: 'Approve' });
+            expect(message).toContain('alice asks to expand.');
             expect(message).toContain('as their step, and records you as the approver');
             expect(inv.approveExpansion).not.toHaveBeenCalled();
 
@@ -1317,6 +1324,17 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
             await settle(fixture);
             expect(inv.approveExpansion).toHaveBeenCalledWith('inv-1', 'p7');
             expect(inv.investigationLog).toHaveBeenCalled(); // re-read: the decision shows on the line
+        });
+
+        it("names the requester by the sign-in's display name (a Demo User's), never the internal request id", async () => {
+            const { fixture, store, el } = create({ approver: true, pending: [HELD] });
+            asActor('manager');
+            TestBed.inject(SessionService).demoUsers.set([{ id: 'alice', displayName: 'Alice Analyst', title: '' }]);
+            await openInv(store);
+            fixture.detectChanges();
+            expect(line(el)?.textContent).toContain('Alice Analyst asks for your approval.');
+            expect(line(el)?.textContent).not.toContain('alice asks');
+            expect(line(el)?.textContent).not.toContain('p7');
         });
 
         it('the badge brings the waiting line of this panel forward, not a line elsewhere on the page', async () => {
@@ -1498,8 +1516,10 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         expect(el.querySelector('[data-testid="act-howto"]')).toBeNull();
         expect(el.querySelector('[data-testid="act-howto-toggle"]')).toBeNull();
         expect(el.querySelector('[data-testid="investigation-read-only"]')!.textContent).toContain(
-            'You can read it and decide approvals; only a lead changes its steps.',
+            'You review this Investigation: you can read it and decide approvals; only a lead changes its steps.',
         );
+        // the banner's title says Read-only once; the sentence does not repeat it
+        expect(el.querySelector('[data-testid="investigation-read-only"]')!.textContent).not.toContain('Read-only:');
         expect(el.textContent).not.toContain('Incident management');
         await expectNoA11yViolations(el.querySelector('[data-testid="degrees"]') as HTMLElement);
     });
@@ -1513,6 +1533,19 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         expect(el.querySelector('[data-testid="projected-expand"]')).not.toBeNull();
         expect(el.querySelector('[data-testid="act-howto-toggle"]')).not.toBeNull();
         expect(el.querySelector('[data-testid="investigation-read-only"]')).toBeNull();
+    });
+
+    it('presentability: the purpose wraps (up to three lines, the whole in its tooltip) instead of being cut', async () => {
+        const { fixture, store, el } = create({ role: 'lead' });
+        await openInv(store);
+        const purpose = 'Showcase: layering ring around a mule hub, its smurfs and the relay that moves the money out';
+        store.log.set({ ...store.log()!, header: { ...store.log()!.header, purpose } } as never);
+        fixture.detectChanges();
+        const line = el.querySelector<HTMLElement>('[data-testid="act-purpose"]')!;
+        expect(line.textContent?.trim()).toBe(purpose);
+        expect(line.getAttribute('title')).toBe(purpose);
+        expect(line.classList).toContain('line-clamp-3');
+        expect(line.classList).not.toContain('truncate');
     });
 
     it('nothing seeded: the Expand section says why the next degree cannot run (UI test 2026-10-29)', async () => {

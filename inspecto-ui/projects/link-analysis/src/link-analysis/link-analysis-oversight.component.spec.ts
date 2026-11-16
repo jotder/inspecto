@@ -6,7 +6,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { InvService, InvestigationLog, PendingExpansion, WorkingSet } from '@inspecto/link-analysis/api/inv.service';
-import { LensService } from '@inspecto/core/api';
+import { LensService, SessionService } from '@inspecto/core/api';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
@@ -80,6 +80,11 @@ function create(opts: { approve: boolean; reveal: boolean; approveError?: unknow
             { provide: LensService, useValue: lens },
             { provide: MatDialog, useValue: dialog },
             { provide: InspectoConfirmService, useValue: confirm },
+            // the sign-in's names: a Demo User's display name for analyst-1, any other id as it is
+            {
+                provide: SessionService,
+                useValue: { subjectName: (id: string) => (id === 'analyst-1' ? 'Ann Analyst' : id) },
+            },
         ],
     });
     const f = TestBed.createComponent(Host);
@@ -114,8 +119,10 @@ describe('LinkAnalysisOversightComponent (D-U6 / D-U7)', () => {
         expect(f.componentInstance.decided).toBe(0);
         const [message, opts] = confirm.confirmDestructive.mock.calls[0] as unknown as [string, { title: string }];
         expect(opts.title).toBe('Approve this expand?');
-        expect(message).toContain('Request p1 from analyst-1');
-        expect(message).toContain('row budget 500 (limit 100)');
+        // presentability: the requester's display name, no request id, and the limit in plain words
+        expect(message).toContain('Ann Analyst asks to expand.');
+        expect(message).not.toContain('p1');
+        expect(message).toContain('It would read up to 500 rows, more than the 100 allowed without a second approval.');
         await c.decide(PENDING, false); // a deny is not asked here: the reason box beside it is its own step
         expect(inv.denyExpansion).toHaveBeenCalled();
         expect(confirm.confirmDestructive).toHaveBeenCalledTimes(1);
