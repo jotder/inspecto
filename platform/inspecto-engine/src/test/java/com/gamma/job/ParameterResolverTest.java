@@ -393,6 +393,16 @@ class ParameterResolverTest {
     }
 
     @Test
+    void theDeprecatedBatchIdKeyIsExcusedOnlyBesideItsConsignmentIdDeclaration() {
+        // D-12 (MoSCoW S4): PipelineJobRunner still reads `batch_id` (warning on each run) where the pipeline
+        // type declares its 4.0.0 name `consignment_id` — so it is not a dead key there, and IS one elsewhere.
+        List<ParameterDecl> pipeline = List.of(decl("consignment_id", false, null, null));
+        assertEquals(List.of(), resolve(pipeline, Map.of("batch_id", "b1"), ctx(Optional.empty())).undeclared());
+        assertEquals(List.of("batch_id"),
+                resolve(List.of(decl("task", false, null, null)), Map.of("batch_id", "b1"), ctx(Optional.empty())).undeclared());
+    }
+
+    @Test
     void triggerArgsAndBindAreNotCheckedForUndeclaredKeys() {
         // Only the authored config layer is a config that can rot; a per-firing extra arg is not.
         List<ParameterDecl> decls = List.of(decl("dir", false, null, null));

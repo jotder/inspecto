@@ -323,7 +323,7 @@ back (no double, no record-less registration). The table is created on demand (`
 existing lake needs no migration; rows registered before it have no record and are not deduplicated retroactively.
 `finalizeSource` passes the batch id, suffixed per sink (`<id>|<sink.database>`, `sinkKey`) so two sinks that
 resolve to one lake and table never skip each other. The job lane passes its run's `batchId` (unique per run:
-`currentTimeMillis`, unless the operator pins `batch_id`, in which case a re-run with that id is skipped), so a
+`currentTimeMillis`, unless the operator pins `consignment_id`, in which case a re-run with that id is skipped), so a
 full recompute over the same stable paths registers again while a retry inside one run dedupes. A caller with no
 id (none remain in main code) gets a key over each file's path, size and mtime, never paths alone.
 ⚠ `RecordReplay.replay` reaches `finalizeSource` through `CollectorProcessor.ingestCandidates` and registers
@@ -339,7 +339,7 @@ already cached in the machine's DuckDB extension directory (LOAD only). ⚠ Thos
 (`realDuckLakeRegistersOnce`, and `DuckLakeRegistrarRegisterWiringTest`, which drives `register()` with two sinks
 sharing one lake and `registerInto` with a pinned id) skip QUIETLY through `assumeTrue` where the extension is not
 cached, so a plain CI run leaves the real-lake transaction and the per-sink key unverified; the skip message says so.
-⚠ A pinned `batch_id` on the job lane is the same skip made opt-in: re-running an overwriting Pipeline with it is
+⚠ A pinned `consignment_id` (pre-4.0.0 key `batch_id`, still read until 5.0.0) on the job lane is the same skip made opt-in: re-running an overwriting Pipeline with it is
 skipped in the lake and keeps the first run's rows (logged at WARN); pinned by
 `registerInto_skipsARerunWithTheSamePinnedIdEvenWhenTheDataChanged`.
 ⚠ A long lease-table outage makes every run refuse each cycle ("lease unverifiable"), with no attempt spent and
@@ -429,17 +429,17 @@ UTC days and returns the number of **days** — not rows — so both durable bac
 (Parquet deletes day partitions). The boundary is exclusive: an event ON the cutoff day is retained.
 
 ```sql
-CREATE TABLE IF NOT EXISTS inspecto_status_commits    (pipeline VARCHAR, batch_id VARCHAR);
+CREATE TABLE IF NOT EXISTS inspecto_status_commits    (pipeline VARCHAR, consignment_id VARCHAR);
 CREATE TABLE IF NOT EXISTS inspecto_status_batches    (pipeline VARCHAR, seq BIGINT, payload VARCHAR);
 CREATE TABLE IF NOT EXISTS inspecto_status_files      (pipeline VARCHAR, seq BIGINT, payload VARCHAR);
-CREATE TABLE IF NOT EXISTS inspecto_status_lineage    (pipeline VARCHAR, batch_id VARCHAR, seq BIGINT, payload VARCHAR);
+CREATE TABLE IF NOT EXISTS inspecto_status_lineage    (pipeline VARCHAR, consignment_id VARCHAR, seq BIGINT, payload VARCHAR);
 CREATE TABLE IF NOT EXISTS inspecto_status_quarantine (pipeline VARCHAR, seq BIGINT, payload VARCHAR);
 CREATE TABLE IF NOT EXISTS inspecto_status_unpack     (pipeline VARCHAR, seq BIGINT, payload VARCHAR);
 
 CREATE INDEX IF NOT EXISTS inspecto_status_commits_by_pipeline          ON inspecto_status_commits    (pipeline);
 CREATE INDEX IF NOT EXISTS inspecto_status_batches_by_pipeline          ON inspecto_status_batches    (pipeline, seq);
 CREATE INDEX IF NOT EXISTS inspecto_status_files_by_pipeline            ON inspecto_status_files      (pipeline, seq);
-CREATE INDEX IF NOT EXISTS inspecto_status_lineage_by_pipeline_batch    ON inspecto_status_lineage    (pipeline, batch_id, seq);
+CREATE INDEX IF NOT EXISTS inspecto_status_lineage_by_pipeline_consignment ON inspecto_status_lineage (pipeline, consignment_id, seq);
 CREATE INDEX IF NOT EXISTS inspecto_status_quarantine_by_pipeline       ON inspecto_status_quarantine (pipeline, seq);
 CREATE INDEX IF NOT EXISTS inspecto_status_unpack_by_pipeline           ON inspecto_status_unpack     (pipeline, seq);
 ```
@@ -448,19 +448,23 @@ CREATE INDEX IF NOT EXISTS inspecto_status_unpack_by_pipeline           ON inspe
 against these tables goes through the `StatusStore` seam — `committedBatches` and `readRows` in `DbStatusStore`
 are the only two SQL sites, and the list endpoints (`/runs/{p}/batches`, `/lineage`, `/quarantine`,
 `ReportService`, `MetricsService`) all reach them through it — so the predicates are closed: `WHERE pipeline = ?`
-everywhere, `AND batch_id = ?` on lineage only, `ORDER BY seq` on the five payload tables. The leading `pipeline`
+everywhere, `AND consignment_id = ?` on lineage only, `ORDER BY seq` on the five payload tables. The leading `pipeline`
 column also serves `deletePipeline` (the per-sync DELETE) and `renamePipeline`. `seq` trails deliberately: on
 Postgres the composite lets the sort be read off the index, while DuckDB's ART index serves the `pipeline`
 lookup and sorts after — the extra column is free there rather than a DuckDB-only bet.
 `DbStatusStoreTest.everyListPredicateHasABackingIndexOnTheColumnsItFilters` pins the exact (table → columns)
 set in both directions, so a new predicate without an index and an index without a predicate both fail.
 
-⚠ **These two `batch_id` columns are deliberately NOT renamed** (consignment-ELT plan §11.3, slice 3 took the
-ledgers-and-manifest split only). Since 2026-08-04 the source ledgers spell the column `consignment_id` and
-`Csv.readInto` canonicalises the legacy header, so `DbStatusStore` reads the row key **`consignment_id`** while
-writing it into the column still named **`batch_id`**. The asymmetry is intentional: renaming a column in existing
-`.duckdb` files needs an `ALTER TABLE … RENAME COLUMN` migration, and the `payload` blob embeds the literal too —
-tracked in `BACKLOG.md` §4. The `payload` JSON now carries `consignment_id` for newly synced rows.
+**The two Consignment columns were `batch_id` until 4.0.0** (D-12 rename trio, MoSCoW S4, 2026-11-17). Since
+2026-08-04 the source ledgers spell the key `consignment_id` (`Csv.readInto` canonicalises the legacy header), and
+since 4.0.0 the columns do too. `DbStatusStore.migrateBatchIdColumns` converts a 3.x database on open, one-shot and
+idempotent. The catalog is the record: it runs only while a `batch_id` column exists. It runs as two transactions,
+**payloads first**: (1) rewrite the `"batch_id":` key in every `payload` (`replace`, matched with `position`, so a
+JSON value that merely contains the text is untouched, because its quotes are escaped), then (2) drop the two indexes
+over the old column, `RENAME COLUMN` on both tables, and let `initSchema` recreate the indexes. The rewrite runs
+first because a crash between the steps then leaves `batch_id` in place and the next open redoes both. ⚠ They are
+not one transaction: DuckDB 2.0 failed the payload `UPDATE` placed after the drop and rename in the same transaction
+("does not have a column named batch_id"). Pinned by `DbStatusStoreTest.aPre400DatabaseIsRenamedOnOpenAndStillServesItsRows`.
 
 ### 3.5 `inspecto_job_runs` — job-run reporting  · **A**
 File: `jobs_report.duckdb`
@@ -519,7 +523,7 @@ LIST, `JobRun` is nine scalars built at seven call sites, and the reverse questi
 here rather than a `LIKE` over a joined string (the shipped `replay:<runId>` linkage could ride the
 `trigger` column only because it is one scalar). (2) **The registry, not the rows, is the source.** The
 plan assumed `DISTINCT __batch_id` over the rows read; grounding showed ordinary output files carry NO
-per-row batch id (only the SCD2/reference write path stamps `__batch_id`) — the file-level
+per-row batch id (only the SCD2/reference write path stamps one — `__consignment_id` since 4.0.0, `__batch_id` before) — the file-level
 `consignment_outputs` registry is the only place the identity exists for a general store, which is also
 what makes retire/supersede honest (a SUPERSEDED file is excluded from the read AND the trail).
 (3) **Unknown is not empty.** With the registry off the selector reads the raw glob and `kept` is `null`;
@@ -533,8 +537,8 @@ File: `provenance.duckdb`
 
 ```sql
 CREATE TABLE IF NOT EXISTS inspecto_pipeline_provenance (
-  pipeline_id VARCHAR,
-  batch_id    VARCHAR,
+  pipeline_id    VARCHAR,
+  consignment_id VARCHAR,   -- batch_id before 4.0.0; renamed on open (D-12)
   node_id     VARCHAR,
   rel         VARCHAR,
   row_count   BIGINT,
@@ -546,7 +550,9 @@ CREATE TABLE IF NOT EXISTS inspecto_pipeline_provenance (
 simulated BOOLEAN DEFAULT FALSE` (PIPELINE-DRYRUN-1, 2026-09-18) — a row from a whole-pipeline dry run
 (`JobContext.dryRun()`) is written with `simulated = true` so `GET /provenance` can render it distinctly
 instead of indistinguishably from a real run's counts; a row from before the column existed reads back
-`false` (a real run).
+`false` (a real run). Before the CREATE, a 3.x table's `batch_id` column is renamed to `consignment_id` (one
+`ALTER TABLE … RENAME COLUMN`, run only while `information_schema.columns` still lists `batch_id`). `batches()`
+returns `consignmentId` plus the deprecated alias `batchId` (same value, removed in 5.0.0).
 
 ### 3.7 `inspecto_acquisition_ledger` + `_db_watermark` — acquisition dedup  · ledger **M**, watermark **M**
 File: `inspecto-acquisition.db`
@@ -850,10 +856,10 @@ File: `inspecto-file-stages.db`
 CREATE TABLE IF NOT EXISTS file_stages (
   source_id      VARCHAR,
   relative_path  VARCHAR,
-  batch_id       VARCHAR,
+  consignment_id VARCHAR,  -- batch_id before 4.0.0; renamed by the rebuild below (D-12)
   stage          VARCHAR,  -- FileStage: REGISTERED | MANIFESTED | OUTPUT_REGISTERED | BACKED_UP | MARKED | WATERMARK_ADVANCED
   recorded_at    VARCHAR,
-  UNIQUE (batch_id, source_id, relative_path, stage)
+  UNIQUE (consignment_id, source_id, relative_path, stage)
 );
 ```
 
@@ -865,7 +871,9 @@ unconstrained** — and, as of 2026-09-12, *provably* cannot be constrained yet 
 **rebuilt on open** — `RENAME TO file_stages_v1` → create → `INSERT … SELECT … ON CONFLICT DO NOTHING`
 → drop — in one transaction, because DuckDB has no `ADD CONSTRAINT` (probed 2026-09-12: partial
 indexes and `ALTER … ADD CONSTRAINT` are both "not supported"). The already-migrated check is
-`information_schema.table_constraints`, portable to Postgres.
+`information_schema.table_constraints`, portable to Postgres. The same rebuild carries the 4.0.0 column rename
+(D-12): a table that still has a `batch_id` column, constrained or not, is rebuilt with its rows copied from
+`batch_id` into `consignment_id`.
 
 Phase 4 §2.4's per-file stage progression: one row per `(source_id, relative_path)` file at each
 boundary `ConsignmentIngestor.finalizeSource` genuinely crosses, so *"where is file X right now"* is a

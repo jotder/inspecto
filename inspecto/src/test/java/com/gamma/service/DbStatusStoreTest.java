@@ -233,8 +233,8 @@ class DbStatusStoreTest {
         try (DbStatusStore store = new DbStatusStore(legacy)) {
             assertNotNull(store);
             try (var st = legacy.createStatement();
-                 var rs = st.executeQuery("SELECT batch_id FROM inspecto_status_commits")) {
-                assertTrue(rs.next(), "migrated row present");
+                 var rs = st.executeQuery("SELECT consignment_id FROM inspecto_status_commits")) {
+                assertTrue(rs.next(), "migrated row present, under the 4.0.0 column name");
                 assertEquals("b1", rs.getString(1));
             }
             try (var st = legacy.createStatement();
@@ -260,7 +260,7 @@ class DbStatusStoreTest {
         }
 
         // commits is looked up by pipeline only (committedBatches); the other five also ORDER BY seq,
-        // and lineage additionally filters batch_id.
+        // and lineage additionally filters consignment_id.
         assertTrue(byTable.get("inspecto_status_commits").contains("(pipeline)"),
                 "commits: WHERE pipeline = ?");
         for (String t : List.of("inspecto_status_batches", "inspecto_status_files",
@@ -268,12 +268,72 @@ class DbStatusStoreTest {
             assertTrue(byTable.get(t) != null && byTable.get(t).contains("(pipeline, seq)"),
                     t + ": WHERE pipeline = ? ORDER BY seq — got " + byTable.get(t));
         }
-        assertTrue(byTable.get("inspecto_status_lineage").contains("(pipeline, batch_id, seq)"),
-                "lineage: WHERE pipeline = ? AND batch_id = ? ORDER BY seq");
+        assertTrue(byTable.get("inspecto_status_lineage").contains("(pipeline, consignment_id, seq)"),
+                "lineage: WHERE pipeline = ? AND consignment_id = ? ORDER BY seq");
 
         assertEquals(Set.of("inspecto_status_commits", "inspecto_status_batches", "inspecto_status_files",
                             "inspecto_status_lineage", "inspecto_status_quarantine", "inspecto_status_unpack"),
                 byTable.keySet(), "no index without a predicate: an unused index is dead weight on every sync");
+    }
+
+    /** D-12 (MoSCoW S4): a new status DB names the Consignment column {@code consignment_id}, never {@code batch_id}. */
+    @Test
+    void aNewDatabaseNamesTheConsignmentColumnConsignmentId() throws Exception {
+        assertEquals(List.of("inspecto_status_commits.consignment_id", "inspecto_status_lineage.consignment_id"),
+                consignmentColumns(conn));
+    }
+
+    /**
+     * D-12 (MoSCoW S4): a status DB written by 3.x — {@code batch_id} columns, the old lineage index, payloads
+     * carrying the {@code "batch_id"} key — is renamed when 4.0.0 opens it, and serves every row it held under the
+     * new names. A second open finds nothing to do and changes nothing.
+     */
+    @Test
+    void aPre400DatabaseIsRenamedOnOpenAndStillServesItsRows(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(
+                TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema()).write().toString());
+        String p = cfg.identity().pipelineName();
+        String url = "jdbc:duckdb:" + dir.resolve("status-3x.duckdb");
+        try (Connection old = DriverManager.getConnection(url); var st = old.createStatement()) {
+            st.execute("CREATE TABLE inspecto_status_commits (pipeline VARCHAR, batch_id VARCHAR)");
+            st.execute("CREATE TABLE inspecto_status_batches (pipeline VARCHAR, seq BIGINT, payload VARCHAR)");
+            st.execute("CREATE TABLE inspecto_status_files (pipeline VARCHAR, seq BIGINT, payload VARCHAR)");
+            st.execute("CREATE TABLE inspecto_status_lineage (pipeline VARCHAR, batch_id VARCHAR, seq BIGINT, payload VARCHAR)");
+            st.execute("CREATE TABLE inspecto_status_quarantine (pipeline VARCHAR, seq BIGINT, payload VARCHAR)");
+            st.execute("CREATE INDEX inspecto_status_commits_by_pipeline ON inspecto_status_commits (pipeline)");
+            st.execute("CREATE INDEX inspecto_status_lineage_by_pipeline_batch ON inspecto_status_lineage (pipeline, batch_id, seq)");
+            st.execute("INSERT INTO inspecto_status_commits VALUES ('" + p + "', 'b1')");
+            st.execute("INSERT INTO inspecto_status_lineage VALUES ('" + p + "', 'b1', 0, '{\"batch_id\":\"b1\",\"rows\":\"3\"}')");
+            st.execute("INSERT INTO inspecto_status_batches VALUES ('" + p + "', 0, "
+                    + "'{\"batch_id\":\"b1\",\"note\":\"says \\\"batch_id\\\": in a value\"}')");
+        }
+
+        for (int open = 1; open <= 2; open++) {
+            try (Connection c = DriverManager.getConnection(url); DbStatusStore store = new DbStatusStore(c)) {
+                assertEquals(List.of("inspecto_status_commits.consignment_id", "inspecto_status_lineage.consignment_id"),
+                        consignmentColumns(c), "open " + open + ": no batch_id column is left");
+                assertEquals(Set.of("b1"), store.committedBatches(cfg), "open " + open);
+                List<Map<String, String>> lineage = store.lineage(cfg, "b1");
+                assertEquals(1, lineage.size(), "open " + open + ": the lineage filter reads the renamed column");
+                assertEquals(Map.of("consignment_id", "b1", "rows", "3"), lineage.get(0), "open " + open);
+                Map<String, String> batch = store.batches(cfg).get(0);
+                assertEquals("b1", batch.get("consignment_id"), "open " + open + ": the payload key was rewritten");
+                assertFalse(batch.containsKey("batch_id"), "open " + open);
+                assertEquals("says \"batch_id\": in a value", batch.get("note"),
+                        "open " + open + ": a value that merely contains the old key is left alone");
+            }
+        }
+    }
+
+    /** The {@code table.column} pairs of the status tables whose column names the Consignment, either spelling. */
+    private static List<String> consignmentColumns(Connection c) throws Exception {
+        List<String> out = new java.util.ArrayList<>();
+        try (var st = c.createStatement(); var rs = st.executeQuery("SELECT table_name, column_name "
+                + "FROM information_schema.columns WHERE table_name LIKE 'inspecto_status_%' "
+                + "AND column_name IN ('batch_id', 'consignment_id') ORDER BY 1, 2")) {
+            while (rs.next()) out.add(rs.getString(1) + "." + rs.getString(2));
+        }
+        return out;
     }
 
     /** The indexes are created by a guarded DDL, so re-opening the same database must not fail. */
@@ -292,7 +352,7 @@ class DbStatusStoreTest {
             }
             @Override public List<Map<String, String>> files(PipelineConfig c) { return List.of(); }
             @Override public List<Map<String, String>> lineage(PipelineConfig c, String batchId) {
-                return List.of(Map.of("rows", "3"));   // no consignment_id: batch_id is NULL
+                return List.of(Map.of("rows", "3"));   // no consignment_id: the column is NULL
             }
             @Override public List<Map<String, String>> quarantine(PipelineConfig c) { return List.of(); }
             @Override public List<Map<String, String>> unpack(PipelineConfig c) { return List.of(Map.of("member", "m")); }

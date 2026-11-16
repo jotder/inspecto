@@ -97,9 +97,15 @@ public final class ReferenceReader {
         return new EnrichmentConfig.Reference(s, s, format);
     }
 
-    /** The system columns a versioned reference store carries (§2.1) — stripped from every derived view. */
+    /**
+     * The system columns a versioned reference store carries (§2.1) — stripped from every derived view. Both
+     * spellings of the Consignment column are listed (D-12, MoSCoW S4): a store written before 4.0.0 carries
+     * {@code __batch_id}, one written since carries {@code __consignment_id}, and a store with files of both ages
+     * carries both (the read is {@code union_by_name}). The strip is therefore a {@code COLUMNS} filter, not an
+     * {@code EXCLUDE}: {@code EXCLUDE} is a Binder error for a name the relation lacks.
+     */
     private static final String REF_SYSTEM_COLUMNS =
-            "__key_hash, __row_hash, __valid_from, __op, __batch_id";
+            "'__key_hash', '__row_hash', '__valid_from', '__op', '__consignment_id', '__batch_id'";
 
     /**
      * The read over an append-only versioned reference store: pick the winning version per
@@ -114,7 +120,7 @@ public final class ReferenceReader {
     private static String versionedView(String reader, String asOf) {
         String candidates = "SELECT * FROM " + reader;
         if (asOf != null) candidates += " WHERE __valid_from <= TIMESTAMP '" + asOf + "'";
-        return "(SELECT * EXCLUDE (" + REF_SYSTEM_COLUMNS + ") FROM ("
+        return "(SELECT COLUMNS(lambda c: c NOT IN (" + REF_SYSTEM_COLUMNS + ")) FROM ("
                 + candidates
                 + " QUALIFY row_number() OVER (PARTITION BY __key_hash ORDER BY __valid_from DESC) = 1"
                 + ") WHERE __op != 'delete') AS _ref_current";

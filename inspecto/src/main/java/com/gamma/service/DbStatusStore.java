@@ -52,7 +52,7 @@ import java.util.Set;
  * <h3>Schema</h3>
  * The audit rows are dynamic {@code header → value} maps (columns vary by artifact and
  * carry list-valued fields), so each row's map is stored verbatim as a JSON {@code payload}
- * plus the few columns we actually index on ({@code pipeline}, {@code batch_id},
+ * plus the few columns we actually index on ({@code pipeline}, {@code consignment_id},
  * {@code seq} for stable ordering). This round-trips the maps faithfully and serialises
  * straight back to JSON for the API.
  *
@@ -122,7 +122,7 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
         try {
             src.run(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement(
-                        "SELECT batch_id FROM " + T_COMMITS + " WHERE pipeline = ?")) {
+                        "SELECT consignment_id FROM " + T_COMMITS + " WHERE pipeline = ?")) {
                     ps.setString(1, p);
                     try (ResultSet rs = ps.executeQuery()) {
                         while (rs.next()) ids.add(rs.getString(1));
@@ -161,11 +161,11 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
         return readRows(T_UNPACK, name(cfg), null);
     }
 
-    /** Read a table's payload rows for one pipeline (ordered by seq), optionally filtered by batch_id. */
+    /** Read a table's payload rows for one pipeline (ordered by seq), optionally filtered by consignment_id. */
     private List<Map<String, String>> readRows(String table, String pipeline, String batchId) {
         List<Map<String, String>> out = new ArrayList<>();
         String sql = "SELECT payload FROM " + table + " WHERE pipeline = ?"
-                + (batchId != null ? " AND batch_id = ?" : "") + " ORDER BY seq";
+                + (batchId != null ? " AND consignment_id = ?" : "") + " ORDER BY seq";
         try {
             src.run(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -281,7 +281,7 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
             return;
         }
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO " + T_COMMITS + " (pipeline, batch_id) VALUES (?, ?)")) {
+                "INSERT INTO " + T_COMMITS + " (pipeline, consignment_id) VALUES (?, ?)")) {
             for (String id : ids) {
                 ps.setString(1, pipeline);
                 ps.setString(2, id);
@@ -293,13 +293,9 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
 
     /**
      * Insert payload rows for one pipeline. When {@code batchIdKey} is non-null the
-     * row's value for that key is also stored in the indexed {@code batch_id} column
-     * (lineage), so {@link #lineage} can filter without parsing every payload.
-     *
-     * <p>Note the asymmetry, which is deliberate: the <b>key read from the row map</b> is the canonical
-     * {@code consignment_id} (ledger headers are canonicalised by {@code Csv.readInto}), while this table's own
-     * <b>DDL column stays {@code batch_id}</b> — renaming a column in existing {@code .duckdb} files needs a
-     * real {@code ALTER TABLE} migration, which is scoped out of the §11.3 slice that renamed the ledgers.
+     * row's value for that key is also stored in the indexed {@code consignment_id} column
+     * (lineage), so {@link #lineage} can filter without parsing every payload. The key read from the row map
+     * is the canonical {@code consignment_id} too (ledger headers are canonicalised by {@code Csv.readInto}).
      */
     private void insertRows(Connection conn, String table, String pipeline,
                             List<Map<String, String>> rows, String batchIdKey) throws SQLException {
@@ -319,7 +315,7 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
             return;
         }
         String sql = withBatchId
-                ? "INSERT INTO " + table + " (pipeline, batch_id, seq, payload) VALUES (?, ?, ?, ?)"
+                ? "INSERT INTO " + table + " (pipeline, consignment_id, seq, payload) VALUES (?, ?, ?, ?)"
                 : "INSERT INTO " + table + " (pipeline, seq, payload) VALUES (?, ?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             long seq = 0;
@@ -339,17 +335,18 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
 
     private void initSchema() {
         migrateLegacyTables();
+        migrateBatchIdColumns();
         try {
             src.run(conn -> {
                 try (Statement st = conn.createStatement()) {
                     st.execute("CREATE TABLE IF NOT EXISTS " + T_COMMITS
-                            + " (pipeline VARCHAR, batch_id VARCHAR)");
+                            + " (pipeline VARCHAR, consignment_id VARCHAR)");
                     st.execute("CREATE TABLE IF NOT EXISTS " + T_BATCHES
                             + " (pipeline VARCHAR, seq BIGINT, payload VARCHAR)");
                     st.execute("CREATE TABLE IF NOT EXISTS " + T_FILES
                             + " (pipeline VARCHAR, seq BIGINT, payload VARCHAR)");
                     st.execute("CREATE TABLE IF NOT EXISTS " + T_LINEAGE
-                            + " (pipeline VARCHAR, batch_id VARCHAR, seq BIGINT, payload VARCHAR)");
+                            + " (pipeline VARCHAR, consignment_id VARCHAR, seq BIGINT, payload VARCHAR)");
                     st.execute("CREATE TABLE IF NOT EXISTS " + T_QUARANTINE
                             + " (pipeline VARCHAR, seq BIGINT, payload VARCHAR)");
                     // No legacy migration for this one: no ucc_status_unpack ever existed.
@@ -363,7 +360,7 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
                     // closed and enumerable, not guessed. It is:
                     //   commits                        WHERE pipeline = ?
                     //   batches/files/quarantine/unpack WHERE pipeline = ?                   ORDER BY seq
-                    //   lineage                         WHERE pipeline = ? [AND batch_id = ?] ORDER BY seq
+                    //   lineage                         WHERE pipeline = ? [AND consignment_id = ?] ORDER BY seq
                     // The leading `pipeline` column also serves `deletePipeline` and `renamePipeline`, which
                     // filter on exactly that column in all six tables — every table therefore earns its index
                     // from the WRITE path even before a read.
@@ -374,7 +371,7 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
                     st.execute("CREATE INDEX IF NOT EXISTS " + T_COMMITS + "_by_pipeline ON " + T_COMMITS + " (pipeline)");
                     st.execute("CREATE INDEX IF NOT EXISTS " + T_BATCHES + "_by_pipeline ON " + T_BATCHES + " (pipeline, seq)");
                     st.execute("CREATE INDEX IF NOT EXISTS " + T_FILES + "_by_pipeline ON " + T_FILES + " (pipeline, seq)");
-                    st.execute("CREATE INDEX IF NOT EXISTS " + T_LINEAGE + "_by_pipeline_batch ON " + T_LINEAGE + " (pipeline, batch_id, seq)");
+                    st.execute("CREATE INDEX IF NOT EXISTS " + T_LINEAGE + "_by_pipeline_consignment ON " + T_LINEAGE + " (pipeline, consignment_id, seq)");
                     st.execute("CREATE INDEX IF NOT EXISTS " + T_QUARANTINE + "_by_pipeline ON " + T_QUARANTINE + " (pipeline, seq)");
                     st.execute("CREATE INDEX IF NOT EXISTS " + T_UNPACK + "_by_pipeline ON " + T_UNPACK + " (pipeline, seq)");
                 }
@@ -407,6 +404,71 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
             });
         } catch (SQLException e) {
             throw new IllegalStateException("Could not migrate legacy status tables", e);
+        }
+    }
+
+    /**
+     * The {@code batch_id} → {@code consignment_id} rename of a pre-4.0.0 status DB (D-12, MoSCoW S4) — one-shot at
+     * open and idempotent. Only a DB whose {@code inspecto_status_commits} or {@code inspecto_status_lineage} still
+     * has a {@code batch_id} column is touched, so the catalog itself is the journal: once renamed, an open finds
+     * the new name and does nothing. Two transactions, in this order:
+     * <ol>
+     *   <li><b>Payloads first.</b> Rewrite the {@code "batch_id":} key in every stored {@code payload} — rows
+     *       synced before 2026-08-04 carry it, and a pipeline no longer configured is never re-synced, so its rows
+     *       would otherwise serve the old key forever. A JSON <em>value</em> cannot match: inside a string its
+     *       quotes are escaped.</li>
+     *   <li><b>Then the columns.</b> Drop the two indexes over the old column (DuckDB refuses to alter a table an
+     *       index depends on; {@link #initSchema} recreates them under the new column right after), then
+     *       {@code RENAME COLUMN} on both tables.</li>
+     * </ol>
+     * ⚠ Not one transaction: with the rewrite AFTER the drop and rename in one transaction, DuckDB 2.0 failed the
+     * payload {@code UPDATE} of the lineage table with "does not have a column named batch_id" (observed
+     * 2026-11-17 — the dropped index still bound the old column until commit). The order keeps it crash-safe anyway — a crash between
+     * the two leaves {@code batch_id} in place, so the next open redoes both, and step 1 finds nothing left.
+     */
+    private void migrateBatchIdColumns() {
+        try {
+            // ⚠ ONE borrow: the probe and both transactions see the same catalog.
+            src.run(conn -> {
+                if (!columnExists(conn, T_COMMITS, "batch_id") && !columnExists(conn, T_LINEAGE, "batch_id")) return;
+                boolean autoCommit = conn.getAutoCommit();
+                conn.setAutoCommit(false);
+                try (Statement st = conn.createStatement()) {
+                    int rewritten = 0;
+                    for (String t : List.of(T_BATCHES, T_FILES, T_LINEAGE, T_QUARANTINE, T_UNPACK))
+                        if (tableExists(conn, t))
+                            rewritten += st.executeUpdate("UPDATE " + t
+                                    + " SET payload = replace(payload, '\"batch_id\":', '\"consignment_id\":')"
+                                    + " WHERE position('\"batch_id\":' IN payload) > 0");
+                    conn.commit();
+                    st.execute("DROP INDEX IF EXISTS " + T_COMMITS + "_by_pipeline");
+                    st.execute("DROP INDEX IF EXISTS " + T_LINEAGE + "_by_pipeline_batch");
+                    for (String t : List.of(T_COMMITS, T_LINEAGE))
+                        if (columnExists(conn, t, "batch_id"))
+                            st.execute("ALTER TABLE " + t + " RENAME COLUMN batch_id TO consignment_id");
+                    conn.commit();
+                    log.info("Status DB: renamed column batch_id -> consignment_id ({} payload row(s) rewritten)",
+                            rewritten);
+                } catch (SQLException e) {
+                    try { conn.rollback(); } catch (SQLException ignore) { /* best effort */ }
+                    throw e;
+                } finally {
+                    try { conn.setAutoCommit(autoCommit); } catch (SQLException ignore) { /* best effort */ }
+                }
+            });
+        } catch (SQLException e) {
+            throw new IllegalStateException("Could not rename the status DB's batch_id columns", e);
+        }
+    }
+
+    private static boolean columnExists(Connection conn, String table, String column) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = ?")) {
+            ps.setString(1, table);
+            ps.setString(2, column);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
         }
     }
 

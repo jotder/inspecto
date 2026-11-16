@@ -61,8 +61,15 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
         try {
             src.run(conn -> {
                 try (Statement st = conn.createStatement()) {
+                    // D-12 (MoSCoW S4): a pre-4.0.0 table names the column batch_id. One-shot and idempotent —
+                    // the catalog is the journal: once renamed, the probe finds no batch_id and this is a no-op.
+                    // A single DDL statement, so there is no half-renamed state to recover from.
+                    if (hasColumn(conn, "batch_id")) {
+                        st.execute("ALTER TABLE " + T + " RENAME COLUMN batch_id TO consignment_id");
+                        log.info("Provenance DB: renamed column batch_id -> consignment_id");
+                    }
                     st.execute("CREATE TABLE IF NOT EXISTS " + T + " ("
-                            + "pipeline_id VARCHAR, batch_id VARCHAR, node_id VARCHAR, rel VARCHAR, "
+                            + "pipeline_id VARCHAR, consignment_id VARCHAR, node_id VARCHAR, rel VARCHAR, "
                             + "row_count BIGINT, run_ts VARCHAR)");
                     // PIPELINE-DRYRUN-1: additive migration, same rule as consignment_outputs' own columns —
                     // CREATE TABLE IF NOT EXISTS never widens a pre-existing table, and a row written before
@@ -72,6 +79,17 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
             });
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise provenance DB schema", e);
+        }
+    }
+
+    private static boolean hasColumn(Connection conn, String column) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = ?")) {
+            ps.setString(1, T);
+            ps.setString(2, column);
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
         }
     }
 
@@ -100,7 +118,7 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
         try {
             src.run(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement("INSERT INTO " + T
-                        + " (pipeline_id, batch_id, node_id, rel, row_count, run_ts, simulated) VALUES (?,?,?,?,?,?,?)")) {
+                        + " (pipeline_id, consignment_id, node_id, rel, row_count, run_ts, simulated) VALUES (?,?,?,?,?,?,?)")) {
                     for (ProvenanceRow r : rows) {
                         ps.setString(1, r.pipelineId());
                         ps.setString(2, r.batchId());
@@ -128,7 +146,7 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
     public List<Map<String, Object>> query(String pipelineId, String batchId) {
         String sql = "SELECT node_id AS \"nodeId\", rel, row_count AS \"rowCount\", "
                 + "coalesce(simulated, FALSE) AS \"simulated\""
-                + " FROM " + T + " WHERE pipeline_id = ? AND batch_id = ? ORDER BY node_id, rel";
+                + " FROM " + T + " WHERE pipeline_id = ? AND consignment_id = ? ORDER BY node_id, rel";
         try {
             return src.with(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -144,14 +162,16 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
     }
 
     /**
-     * The most recent runs of a pipeline (distinct {@code batchId}, newest first) — for picking a run to inspect.
+     * The most recent runs of a pipeline (distinct {@code consignmentId}, newest first) — for picking a run to inspect.
+     * Each row also carries {@code batchId}, the same value under its pre-4.0.0 name: ⚠ <b>deprecated in 4.0.0,
+     * removed in 5.0.0</b> — kept one MAJOR so a client reading the old field keeps working (D-12 release note).
      * {@code simulated} is {@code true} when any row of the batch came from a dry run
      * (DRYRUN-INVISIBLE-ON-FLAT-LANE-1 b), so a run picker can mark it before its counts are fetched.
      */
     public List<Map<String, Object>> batches(String pipelineId, int limit) {
-        String sql = "SELECT batch_id AS \"batchId\", max(run_ts) AS \"runTs\", sum(row_count) AS \"totalRows\", "
+        String sql = "SELECT consignment_id AS \"consignmentId\", consignment_id AS \"batchId\", max(run_ts) AS \"runTs\", sum(row_count) AS \"totalRows\", "
                 + "bool_or(coalesce(simulated, FALSE)) AS \"simulated\""
-                + " FROM " + T + " WHERE pipeline_id = ? GROUP BY batch_id ORDER BY \"runTs\" DESC LIMIT ?";
+                + " FROM " + T + " WHERE pipeline_id = ? GROUP BY consignment_id ORDER BY \"runTs\" DESC LIMIT ?";
         try {
             return src.with(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {

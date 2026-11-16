@@ -140,7 +140,7 @@ final class ParameterResolver {
      * the UI/API contract, not the read set: a Job may legitimately reach a key its own descriptor never
      * declares straight through {@link JobConfig#require}/{@link JobConfig#opt}, so a fail-closed version
      * would refuse working configs. ⚠ The seven built-in keys this paragraph used to list as the standing
-     * example — {@code data_dir}/{@code batch_id} ({@code PipelineJobRunner}), {@code sleep_ms}
+     * example — {@code data_dir}/{@code consignment_id} ({@code PipelineJobRunner}), {@code sleep_ms}
      * ({@code MaintenanceJob}), {@code top} ({@code StorageReportTask}/{@code StorageTrendTask}),
      * {@code history_days} ({@code ReferenceCompactor}), {@code max_attempts}/{@code backoff_minutes}
      * ({@code SoftBounceRetryTask}) — are now DECLARED on their descriptors
@@ -158,6 +158,7 @@ final class ParameterResolver {
         for (String key : config.keySet()) {
             if (declared.contains(key) || FRAMEWORK_KEYS.contains(key)) continue;
             if ("flow".equals(key) && declared.contains("pipeline")) continue;   // the config:flow rung read it
+            if ("batch_id".equals(key) && declared.contains("consignment_id")) continue;   // D-12: read, and warned, by PipelineJobRunner
             extra.add(key);
         }
         return List.copyOf(extra);

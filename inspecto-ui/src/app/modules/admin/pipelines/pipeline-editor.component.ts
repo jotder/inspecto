@@ -632,7 +632,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
                   rowCount,
                   runTs: batch.runTs,
                   simulated: batch.simulated === true,
-                  latest: batch.batchId === this.runBatches()[0]?.batchId,
+                  latest: batch.consignmentId === this.runBatches()[0]?.consignmentId,
               };
     }
 
@@ -1300,7 +1300,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         const epoch = ++this.overlayEpoch;
         this.overlayRun.set(batch);
         this.overlayCounts.set(new Map());
-        this.api.provenance(id, batch.batchId).subscribe({
+        this.api.provenance(id, batch.consignmentId).subscribe({
             next: (rows) => {
                 if (epoch === this.overlayEpoch) this.overlayCounts.set(provenanceCounts(rows));
             },

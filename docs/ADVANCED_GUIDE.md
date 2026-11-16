@@ -194,7 +194,7 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
   (`PipelineJobRunner`) — sinks via `PartitionSinkWriter`, `sink.view` as a durable `ViewDefinition`
   (`GET /views`, `GET /views/{name}[/data]`), idempotent multi-branch commits via
   `BranchCommitCoordinator`/`BranchCommitLog`, optional data-plane provenance
-  (`-Dprovenance.backend=duckdb` + `-Dprovenance.db.url`; `GET /provenance?flow=&batch=`).
+  (`-Dprovenance.backend=duckdb` + `-Dprovenance.db.url`; `GET /provenance?flow=&consignment=`).
 - ⚠ **The `*_flow.toon` authoring surface is RETIRED**
   ([`pipeline-graph-design.md`](okf/product/module/engine/architecture-pipeline-graph.md) §16):
   grandfathered flows stay readable/runnable/deletable, never newly written.

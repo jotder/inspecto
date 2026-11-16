@@ -312,22 +312,22 @@
                         matTooltip="The run painted on the canvas — pick another recorded run"
                         [attr.aria-label]="'Run overlay: ' + runLabel(b) + '. Pick another run'"
                     >
-                        {{ b.batchId === runBatches()[0]?.batchId ? 'last run' : 'run' }}: {{ runLabel(b) }}
+                        {{ b.consignmentId === runBatches()[0]?.consignmentId ? 'last run' : 'run' }}: {{ runLabel(b) }}
                         <mat-icon class="icon-size-3" svgIcon="heroicons_outline:chevron-down"></mat-icon>
                     </button>
                     <mat-menu #runMenu="matMenu">
-                        @for (r of runBatches(); track r.batchId) {
+                        @for (r of runBatches(); track r.consignmentId) {
                             <button
                                 mat-menu-item
                                 role="menuitemradio"
-                                [attr.aria-checked]="r.batchId === b.batchId"
+                                [attr.aria-checked]="r.consignmentId === b.consignmentId"
                                 (click)="pickRun(r)"
                             >
                                 <mat-icon
                                     [svgIcon]="
-                                        r.batchId === b.batchId ? 'heroicons_outline:check' : 'heroicons_outline:minus'
+                                        r.consignmentId === b.consignmentId ? 'heroicons_outline:check' : 'heroicons_outline:minus'
                                     "
-                                    [style.visibility]="r.batchId === b.batchId ? 'visible' : 'hidden'"
+                                    [style.visibility]="r.consignmentId === b.consignmentId ? 'visible' : 'hidden'"
                                 ></mat-icon>
                                 <span>{{ runLabel(r) }}</span>
                             </button>

@@ -131,14 +131,14 @@ latest-version-wins**, the current view derived at read time. `load: replace` (d
   `cfg.producesReference() && cfg.reference().load()==UPSERT`, it materialises `__ref_versioned` from
   the `transformed` table with the §2.1 system columns appended — `__key_hash`
   (`md5(concat_ws(chr(31), COALESCE(CAST(key AS VARCHAR),'')…))`), `__valid_from` (`now()`), `__op`
-  (`'upsert'`, or `'delete'` from a `reference.delete` marker — D5-ref, below), `__batch_id` — and folds
+  (`'upsert'`, or `'delete'` from a `reference.delete` marker — D5-ref, below), `__consignment_id` (`__batch_id` in files written before 4.0.0) — and folds
   within-batch key dupes via `QUALIFY row_number() OVER (PARTITION BY <hash>) = 1` (tie-break arbitrary
   unless `reference.order_by` is set — D6-ref, below). `__src_id` is
   kept so `PartitionWriter`'s default exclude + `LineageCollector` are unchanged. The write reveals
   under a **batch-unique file stem** (`<base>__v_<batchId>`) so versions accumulate instead of
   overwriting — append via unique filename, not a new writer mode.
 - **Read** (`EnrichmentEngine.currentView`, in `referenceReader`'s by-name branch when the bound
-  pipeline is `UPSERT`): `SELECT * EXCLUDE(__key_hash,__valid_from,__op,__batch_id) FROM (… QUALIFY
+  pipeline is `UPSERT`): `SELECT COLUMNS(lambda c: c NOT IN (<the system columns, both Consignment spellings>)) FROM (… QUALIFY
   row_number() OVER (PARTITION BY __key_hash ORDER BY __valid_from DESC)=1) WHERE __op != 'delete'` —
   latest version per key, tombstoned keys dropped, system columns stripped. `path:` refs and `replace`
   stores read verbatim (today's behaviour).

@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Reference Phase-2 P1 write-side verify: {@link ConsignmentIngestStrategy#stampReferenceVersions} appends
- * the §2.1 system columns ({@code __key_hash}/{@code __valid_from}/{@code __op}/{@code __batch_id}) and
+ * the §2.1 system columns ({@code __key_hash}/{@code __valid_from}/{@code __op}/{@code __consignment_id}) and
  * folds out within-batch key duplicates (one version per key per batch).
  */
 class ReferenceVersionStampTest {
@@ -39,7 +39,7 @@ class ReferenceVersionStampTest {
             try (ResultSet rs = st.executeQuery(
                     "SELECT COUNT(DISTINCT __key_hash) AS keys, "
                     + "COUNT(*) FILTER (WHERE __op='upsert') AS upserts, "
-                    + "COUNT(*) FILTER (WHERE __batch_id='batch-42') AS tagged, "
+                    + "COUNT(*) FILTER (WHERE __consignment_id='batch-42') AS tagged, "
                     + "COUNT(*) FILTER (WHERE __valid_from IS NOT NULL) AS stamped "
                     + "FROM __ref_versioned")) {
                 assertTrue(rs.next());

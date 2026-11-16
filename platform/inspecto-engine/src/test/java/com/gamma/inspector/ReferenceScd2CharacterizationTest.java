@@ -51,7 +51,7 @@ class ReferenceScd2CharacterizationTest {
                     "(SELECT * FROM store) AS _store");
 
             // The changed row is emitted as a NEW version row; nothing rewrites or closes the old one.
-            try (ResultSet rs = st.executeQuery("SELECT region, __op, __batch_id FROM appended")) {
+            try (ResultSet rs = st.executeQuery("SELECT region, __op, __consignment_id FROM appended")) {
                 assertTrue(rs.next());
                 assertEquals("APAC", rs.getString(1));
                 assertEquals("upsert", rs.getString(2));

@@ -217,7 +217,7 @@ No inter-node queues: the durable inbox is the queue, and back-pressure is admis
 
 Per-(node, relationship) row counts are collected inline by `ProvenanceCollector` during authored
 runs and persisted by `DbProvenanceStore` when `-Dprovenance.backend=duckdb` is set (default off).
-`GET /provenance?flow=&batch=` + `GET /provenance/batches?flow=` feed the editor's last-run overlay
+`GET /provenance?flow=&consignment=` + `GET /provenance/batches?flow=` feed the editor's last-run overlay
 and the per-edge Sankey; the conservation invariant (§6) is checked over these counts. The plane
 shares the pipeline graph's topology — quantities painted onto its edges.
 

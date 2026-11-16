@@ -335,7 +335,7 @@ interface ConsignmentIngestStrategy {
 
         // Reference Phase-2 P1/P2: a `produces: reference` pipeline with `load: upsert|scd2` writes an
         // append-only versioned store — each batch stamps system columns (__key_hash/__row_hash/
-        // __valid_from/__op/__batch_id), folds out within-batch key duplicates, skips rows identical to
+        // __valid_from/__op/__consignment_id), folds out within-batch key duplicates, skips rows identical to
         // the store's current version, and reveals under a batch-unique file stem so prior versions
         // survive (latest-version-wins / as-of are derived at read time by the enrichment views).
         // `load: replace` (the default) is untouched — plain overwrite. (Refused with sinks:>1 at prepare().)
@@ -643,7 +643,13 @@ interface ConsignmentIngestStrategy {
 
     /** The reference system columns a versioned store carries (§2.1) — never part of the payload hash. */
     List<String> REF_SYSTEM_COLUMNS =
-            List.of("__key_hash", "__row_hash", "__valid_from", "__op", "__batch_id");
+            List.of("__key_hash", "__row_hash", "__valid_from", "__op", "__consignment_id");
+
+    /**
+     * The pre-4.0.0 name of {@code __consignment_id} (D-12, MoSCoW S4). Files a 3.x install wrote keep it — landed
+     * Parquet is never rewritten — so every reader that strips or skips the system columns treats it as one too.
+     */
+    String LEGACY_CONSIGNMENT_COLUMN = "__batch_id";
 
     /**
      * Reference Phase-2 P1/P2 (design (c) — append-only, latest-version-wins): materialise {@code dst}
@@ -652,7 +658,7 @@ interface ConsignmentIngestStrategy {
      * {@code reference.key} columns), {@code __row_hash} (canonical hash of the whole payload),
      * {@code __valid_from} (load instant), {@code __op} ({@code 'upsert'}, or {@code 'delete'} for a row
      * whose {@code reference.delete} marker matches — D5-ref; the marker column is excluded from the
-     * output and from {@code __row_hash}) and {@code __batch_id}. The lineage tag {@code __src_id} is kept so {@link PartitionWriter}'s default
+     * output and from {@code __row_hash}) and {@code __consignment_id}. The lineage tag {@code __src_id} is kept so {@link PartitionWriter}'s default
      * exclude and {@link LineageCollector} keep working unchanged — but it is excluded from
      * {@code __row_hash}, since it is per-batch bookkeeping and would make every re-delivery look changed.
      *
@@ -701,7 +707,7 @@ interface ConsignmentIngestStrategy {
         String staged = "SELECT " + star + ", " + keyHash + " AS __key_hash, " + rowHash + " AS __row_hash, "
                 + "now()::TIMESTAMP AS __valid_from, "
                 + opExpr + " AS __op, "
-                + SqlIdent.sqlStr(batchId) + " AS __batch_id "
+                + SqlIdent.sqlStr(batchId) + " AS __consignment_id "
                 + "FROM " + SqlIdent.q(src) + " "
                 + "QUALIFY row_number() OVER (PARTITION BY " + keyHash + order + ") = 1";
         String sql = "CREATE TABLE " + SqlIdent.q(dst) + " AS SELECT * FROM (" + staged + ") AS _staged";
@@ -745,7 +751,7 @@ interface ConsignmentIngestStrategy {
             java.sql.ResultSetMetaData md = rs.getMetaData();
             for (int i = 1; i <= md.getColumnCount(); i++) {
                 String c = md.getColumnName(i);
-                if (!"__src_id".equals(c) && !REF_SYSTEM_COLUMNS.contains(c)) cols.add(c);
+                if (!"__src_id".equals(c) && !REF_SYSTEM_COLUMNS.contains(c) && !LEGACY_CONSIGNMENT_COLUMN.equals(c)) cols.add(c);
             }
         }
         if (cols.isEmpty())

@@ -96,7 +96,7 @@ export class PipelineGraphSource implements GraphSource {
         if (!counts) return this.graph.toG6Data(g);
         const batches = await firstValueFrom(this.pipelines.provenanceBatches(pipeline)).catch(() => []);
         if (!batches.length) return this.graph.toG6Data(g);
-        const rows = await firstValueFrom(this.pipelines.provenance(pipeline, batches[0].batchId)).catch(() => []);
+        const rows = await firstValueFrom(this.pipelines.provenance(pipeline, batches[0].consignmentId)).catch(() => []);
         return this.graph.toG6Data(g, this.graph.provenanceCounts(rows));
     }
 }

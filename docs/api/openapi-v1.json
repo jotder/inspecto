@@ -4868,7 +4868,7 @@
         "tags" : [ "provenance" ],
         "summary" : "Record counts of one Pipeline Run",
         "operationId" : "getProvenance",
-        "description" : "Returns per-(node, relationship) record counts of one Pipeline Run for painting onto the Pipeline graph edges (query pipeline, or its pre-rename alias, and batch). No capability gate. 400 when pipeline or batch is missing; 404 when the provenance store is not enabled or no Jobs are registered.",
+        "description" : "Returns per-(node, relationship) record counts of one Pipeline Run for painting onto the Pipeline graph edges (query pipeline, or its pre-rename alias, and consignment, or batch, its pre-4.0.0 alias, deprecated until 5.0.0). No capability gate. 400 when pipeline or consignment is missing; 404 when the provenance store is not enabled or no Jobs are registered.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -4882,7 +4882,7 @@
         "tags" : [ "provenance" ],
         "summary" : "List recent batches of a Pipeline",
         "operationId" : "getProvenanceBatches",
-        "description" : "Returns a Pipeline's recent Runs, newest first, to pick one for provenance (query pipeline, or its pre-rename alias, and limit, default 20). No capability gate. 400 when pipeline is missing; 404 when the provenance store is not enabled or no Jobs are registered.",
+        "description" : "Returns a Pipeline's recent Runs, newest first, each as consignmentId, runTs, totalRows and simulated (plus batchId, the pre-4.0.0 name of consignmentId, deprecated until 5.0.0), to pick one for provenance (query pipeline, or its pre-rename alias, and limit, default 20). No capability gate. 400 when pipeline is missing; 404 when the provenance store is not enabled or no Jobs are registered.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."

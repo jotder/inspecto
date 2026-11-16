@@ -19,7 +19,7 @@ import java.util.Set;
 /**
  * <b>T11 — partial-commit state with a branch dimension.</b> A durable, append-only,
  * {@code fsync}-per-record ledger (the same crash-safety contract as {@link com.gamma.etl.CommitLog})
- * extended with the {@code (batch_id, branch)} key a branch-aware pipeline needs. Two phases are recorded:
+ * extended with the {@code (consignment_id, branch)} key a branch-aware pipeline needs. Two phases are recorded:
  * <ul>
  *   <li>{@code BRANCH} — one branch's outputs + manifest are durable on disk;</li>
  *   <li>{@code SOURCE} — every branch committed and the source files were finalised (backup / markers
@@ -31,13 +31,14 @@ import java.util.Set;
  * every expected branch is present and no {@code SOURCE} row exists yet. A single-branch pipeline degrades
  * to one {@code BRANCH} row + one {@code SOURCE} row — the legacy single-output sequence.
  *
- * <p>Format (CSV, header on first creation): {@code recorded_at,batch_id,branch,phase} (a {@code SOURCE}
- * row uses {@code *} for the branch).
+ * <p>Format (CSV, header on first creation): {@code recorded_at,consignment_id,branch,phase} (a {@code SOURCE}
+ * row uses {@code *} for the branch). A ledger created before 4.0.0 keeps the header {@code batch_id}: rows are read
+ * positionally and the header line is skipped by its {@code recorded_at,} prefix, so the old header is cosmetic.
  */
 @PublicApi(since = "4.0.0")
 public final class BranchCommitLog {
 
-    private static final String HEADER = "recorded_at,batch_id,branch,phase\n";
+    private static final String HEADER = "recorded_at,consignment_id,branch,phase\n";
     static final String PHASE_BRANCH = "BRANCH";
     static final String PHASE_SOURCE = "SOURCE";
 

@@ -158,7 +158,7 @@ class FlatLaneDryRunTest {
             assertEquals(1, batches.size(), "exactly one provenance batch: " + batches);
             assertEquals(Boolean.TRUE, batches.getFirst().get("simulated"),
                     "the dry-run batch must be flagged simulated: " + batches);
-            String batchId = (String) batches.getFirst().get("batchId");
+            String batchId = (String) batches.getFirst().get("consignmentId");
             assertEquals(published.getFirst().batchId(), batchId, "keyed by the published event's batch id");
 
             List<java.util.Map<String, Object>> rows = store.query(pipeline, batchId);
@@ -193,7 +193,7 @@ class FlatLaneDryRunTest {
             assertEquals(1, batches.size(), batches.toString());
             assertEquals(Boolean.FALSE, batches.getFirst().get("simulated"), batches.toString());
             List<java.util.Map<String, Object>> rows =
-                    store.query(pipeline, (String) batches.getFirst().get("batchId"));
+                    store.query(pipeline, (String) batches.getFirst().get("consignmentId"));
             assertEquals(List.of("parse", "sink"), rows.stream().map(r -> r.get("nodeId")).toList(), rows.toString());
             assertEquals(2L, ((Number) rows.get(0).get("rowCount")).longValue(), rows.toString());
         } finally {

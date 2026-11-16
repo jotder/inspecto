@@ -377,7 +377,8 @@ export interface PipelineInboxUpload {
 
 /** One run of a pipeline that recorded provenance (GET /provenance/batches), newest first. */
 export interface ProvenanceBatch {
-    batchId: string;
+    /** The Consignment the run committed (4.0.0; the server still sends the deprecated `batchId` alias until 5.0.0). */
+    consignmentId: string;
     runTs: string;
     totalRows: number;
     /** `true` when the batch came from a dry run (`?dryRun=true`) — its counts landed nothing. */
@@ -830,9 +831,10 @@ export class PipelinesService {
     /**
      * The per-(node, relationship) record counts of one run — painted onto the pipeline's edges as weights.
      * `pipeline=` is the canonical query param (GLOSSARY §13); the server still dual-reads the pre-rename
-     * `flow=` for callers not yet updated, but nothing here sends it any more.
+     * `flow=` for callers not yet updated, but nothing here sends it any more. Likewise `consignment=` is
+     * canonical since 4.0.0 and `batch=` its deprecated pre-rename spelling.
      */
-    provenance(pipeline: string, batch: string): Observable<ProvenanceCount[]> {
-        return this.http.get<ProvenanceCount[]>(apiUrl('/provenance'), { params: { pipeline, batch } });
+    provenance(pipeline: string, consignment: string): Observable<ProvenanceCount[]> {
+        return this.http.get<ProvenanceCount[]>(apiUrl('/provenance'), { params: { pipeline, consignment } });
     }
 }

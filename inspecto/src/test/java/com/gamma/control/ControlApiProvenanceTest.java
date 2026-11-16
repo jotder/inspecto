@@ -57,6 +57,12 @@ class ControlApiProvenanceTest {
             // Tier 3 dual-read (vocabulary plan §4): the canonical `pipeline=` param works the same way
             assertEquals(404, get(c.port, "/provenance?pipeline=f&batch=b").statusCode());
             assertEquals(404, get(c.port, "/provenance/batches?pipeline=f").statusCode());
+
+            // D-12 (MoSCoW S4): `consignment=` is the canonical run param; `batch=` (above) its deprecated alias
+            assertTrue(missing.body().contains("'consignment'") && !missing.body().contains("'batch'"),
+                    "the 400 names the canonical run param: " + missing.body());
+            assertEquals(400, get(c.port, "/provenance?pipeline=f").statusCode());
+            assertEquals(404, get(c.port, "/provenance?pipeline=f&consignment=b").statusCode());
         }
     }
 

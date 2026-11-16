@@ -34,7 +34,7 @@ import java.util.function.Function;
  * Reconciliations via {@code ReconService}), and DuckDB identifiers match case-insensitively even when quoted —
  * so a link matches its column case-insensitively. Expectation {@code column}/{@code refColumn} and
  * Reconciliation {@code keyColumns} are trimmed first, as their loaders trim. A name starting {@code __} is a
- * system column ({@code __batch_id}, {@code __tags}, lineage) and stays unchecked.
+ * system column ({@code __consignment_id}, {@code __tags}, lineage) and stays unchecked.
  *
  * <p><b>SQL text</b> (Enrichment {@code transform}, Query {@code text}, virtual Dataset {@code sql}, Dataset
  * {@code calculated[].expr}) is read through DuckDB's own parse tree ({@link SqlGuard#parseSelectNode}, the

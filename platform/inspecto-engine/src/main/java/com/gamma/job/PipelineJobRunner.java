@@ -97,7 +97,8 @@ import static com.gamma.util.SqlIdent.q;
  *   cron: "0 2 * * *"          # OR on_pipeline: events_etl  (event)  OR manual (trigger API)
  *   data_dir: database         # optional — overrides the injected data root; must not point inside
  *                              #   the space data root (sinks are top-level stores — see below)
- *   batch_id: ...              # optional — fixed batch id (idempotent re-run); default per-run timestamp
+ *   consignment_id: ...        # optional — fixed Consignment id (idempotent re-run); default per-run timestamp.
+ *                              #   `batch_id` is its pre-4.0.0 name, still read until 5.0.0 (warned)
  * </pre>
  *
  * <p><b>Scope (T32 Phase C):</b> multiple {@code source_store}s (each seeded as its own view; a
@@ -110,6 +111,23 @@ import static com.gamma.util.SqlIdent.q;
 public final class PipelineJobRunner implements Job {
 
     private static final Logger log = LoggerFactory.getLogger(PipelineJobRunner.class);
+
+    /**
+     * The Consignment id this run commits under: the authored {@code consignment_id}, else the pre-4.0.0 key
+     * {@code batch_id} — ⚠ deprecated in 4.0.0, read until 5.0.0 and warned on every run so the config gets renamed
+     * (D-12, MoSCoW S4) — else {@code <job name>-<epoch millis>}. When both keys are authored the canonical one wins.
+     */
+    static String consignmentId(JobConfig cfg) {
+        String pinned = cfg.opt("consignment_id", null);
+        if (pinned == null) {
+            pinned = cfg.opt("batch_id", null);
+            if (pinned != null)
+                log.warn("[PIPELINEJOB] job '{}' pins its Consignment with the deprecated key 'batch_id' — rename it "
+                        + "'consignment_id' (the old key is read until 5.0.0)", cfg.name());
+        }
+        return pinned != null ? pinned
+                : cfg.name().toLowerCase().replace(' ', '_') + "-" + System.currentTimeMillis();
+    }
     private static final String SEED_VIEW_PREFIX = "pipeline_src";
 
     /** Test seam: runs once the seed views have pinned their stores' files and before the run scans them; production
@@ -307,8 +325,7 @@ public final class PipelineJobRunner implements Job {
             if (!resolved.equals(Path.of(dir.trim()).toAbsolutePath().normalize())) dir = resolved.toString();
         }
         requireTopLevelSinks(g, dir);
-        String batchId = cfg.opt("batch_id", cfg.name().toLowerCase().replace(' ', '_')
-                + "-" + System.currentTimeMillis());
+        String batchId = consignmentId(cfg);
         List<Seed> seeds = seedsOf(g);
         String incCol = cfg.opt("incremental_column", "").trim();   // T32 Phase C — opt-in incremental re-run
         // Spliced as a quoted identifier into the view predicate and max() query, on a connection that is not yet
@@ -369,7 +386,7 @@ public final class PipelineJobRunner implements Job {
             // increment is its own file — and a full recompute now does too, so it writes a new revision beside
             // the old one instead of rewriting bytes a catalog row points at.
             //
-            // This keeps the property the old stable name existed for. That name was chosen so a same-batch_id
+            // This keeps the property the old stable name existed for. That name was chosen so a same-consignment_id
             // replay stayed idempotent; deriving the name FROM the batch id keeps exactly that (a replay writes
             // its own path again) while giving each genuine recompute a path of its own. It also avoids the
             // `_g<N>_` spelling the plan proposed, which DuckDbRecordSink already uses for a memory-bounded

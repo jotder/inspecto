@@ -26,12 +26,14 @@ import java.util.List;
  * point in time, never updated or superseded; the history for one file is its own progression.
  *
  * <p><b>Idempotent (CONSIGNMENT-ID-DETERMINISTIC-1, constraints half).</b> The table carries
- * {@code UNIQUE (batch_id, source_id, relative_path, stage)} and {@link #record} is
+ * {@code UNIQUE (consignment_id, source_id, relative_path, stage)} and {@link #record} is
  * {@code ON CONFLICT DO NOTHING}, so two executors of the same work — or a retry of one transition —
  * leave one row, not two. Insert-only is what makes this key safe: there is no state transition to
  * collide with. A pre-constraint table is rebuilt on open (rename → create → copy distinct → drop) in
  * one transaction, because neither DuckDB nor a live table accepts {@code ADD CONSTRAINT}; the
- * already-migrated check reads {@code information_schema.table_constraints}, which both engines expose.
+ * already-migrated check reads {@code information_schema.table_constraints}, which both engines expose. The same
+ * rebuild renames a pre-4.0.0 {@code batch_id} column to {@code consignment_id} (D-12, MoSCoW S4): the copy reads
+ * the old column into the new one, and the {@code information_schema.columns} probe is what makes it one-shot.
  *
  * <p><b>Absence is not degraded correctness.</b> With no store registered, {@link FileStages#record}
  * is a no-op and the crash-safe ordering {@code finalizeSource} already enforces is unchanged — this
@@ -43,7 +45,9 @@ public final class DbFileStageStore implements AutoCloseable, com.gamma.util.Bro
 
     private static final Logger log = LoggerFactory.getLogger(DbFileStageStore.class);
     private static final String T = "file_stages";
-    private static final String COLS = "source_id, relative_path, batch_id, stage, recorded_at";
+    private static final String COLS = "source_id, relative_path, consignment_id, stage, recorded_at";
+    /** The same columns as a pre-4.0.0 table names them — the rebuild's copy source (D-12). */
+    private static final String LEGACY_COLS = "source_id, relative_path, batch_id, stage, recorded_at";
 
     private final ConnectionSource src;
 
@@ -69,9 +73,9 @@ public final class DbFileStageStore implements AutoCloseable, com.gamma.util.Bro
     }
 
     private static final String CREATE = "CREATE TABLE IF NOT EXISTS " + T + " ("
-            + "source_id VARCHAR, relative_path VARCHAR, batch_id VARCHAR, "
+            + "source_id VARCHAR, relative_path VARCHAR, consignment_id VARCHAR, "
             + "stage VARCHAR, recorded_at VARCHAR, "
-            + "UNIQUE (batch_id, source_id, relative_path, stage))";
+            + "UNIQUE (consignment_id, source_id, relative_path, stage))";
 
     private void initSchema() {
         try {
@@ -79,7 +83,10 @@ public final class DbFileStageStore implements AutoCloseable, com.gamma.util.Bro
             // separate borrows would spread it across connections.
             src.run(conn -> {
                 try (Statement st = conn.createStatement()) {
-                    if (tableExists(st) && !hasUniqueConstraint(st)) rebuildWithConstraint(conn, st);
+                    if (tableExists(st)) {
+                        boolean legacyColumn = hasBatchIdColumn(st);
+                        if (legacyColumn || !hasUniqueConstraint(st)) rebuildWithConstraint(conn, st, legacyColumn);
+                    }
                     st.execute(CREATE);
                 }
             });
@@ -102,20 +109,29 @@ public final class DbFileStageStore implements AutoCloseable, com.gamma.util.Bro
         }
     }
 
-    /** Legacy (unconstrained) table → constrained copy, duplicates collapsed, atomically. Runs on the
-     *  connection {@link #initSchema} borrowed — {@code st} is that connection's statement. */
-    private void rebuildWithConstraint(Connection conn, Statement st) throws SQLException {
+    private static boolean hasBatchIdColumn(Statement st) throws SQLException {
+        try (ResultSet rs = st.executeQuery("SELECT 1 FROM information_schema.columns "
+                + "WHERE table_name = '" + T + "' AND column_name = 'batch_id'")) {
+            return rs.next();
+        }
+    }
+
+    /** Legacy (unconstrained, or pre-4.0.0 {@code batch_id}-named) table → constrained copy under the current
+     *  column names, duplicates collapsed, atomically. Runs on the connection {@link #initSchema} borrowed —
+     *  {@code st} is that connection's statement. */
+    private void rebuildWithConstraint(Connection conn, Statement st, boolean legacyColumn) throws SQLException {
         String legacy = T + "_v1";
         boolean auto = conn.getAutoCommit();
         conn.setAutoCommit(false);
         try {
             st.execute("ALTER TABLE " + T + " RENAME TO " + legacy);
             st.execute(CREATE);
-            st.execute("INSERT INTO " + T + " (" + COLS + ") SELECT " + COLS + " FROM " + legacy
+            st.execute("INSERT INTO " + T + " (" + COLS + ") SELECT " + (legacyColumn ? LEGACY_COLS : COLS) + " FROM " + legacy
                     + " ON CONFLICT DO NOTHING");
             st.execute("DROP TABLE " + legacy);
             conn.commit();
-            log.info("file-stages: rebuilt {} with its unique constraint", T);
+            log.info("file-stages: rebuilt {} with its unique constraint{}", T,
+                    legacyColumn ? " (column batch_id renamed to consignment_id)" : "");
         } catch (SQLException e) {
             conn.rollback();
             throw e;
@@ -208,7 +224,7 @@ public final class DbFileStageStore implements AutoCloseable, com.gamma.util.Bro
 
     private static FileStageRecord map(ResultSet rs) throws SQLException {
         return new FileStageRecord(
-                rs.getString("source_id"), rs.getString("relative_path"), rs.getString("batch_id"),
+                rs.getString("source_id"), rs.getString("relative_path"), rs.getString("consignment_id"),
                 FileStage.valueOf(rs.getString("stage")), rs.getString("recorded_at"));
     }
 

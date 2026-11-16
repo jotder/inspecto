@@ -149,14 +149,14 @@ class JobServiceTest {
     }
 
     /**
-     * `JOB-DESCRIPTORS-LIE-TO-THE-FORM-1`, pipeline half: `data_dir` and `batch_id` are read by
+     * `JOB-DESCRIPTORS-LIE-TO-THE-FORM-1`, pipeline half: `data_dir` and `consignment_id` are read by
      * {@code PipelineJobRunner:275/277} and must be declared — but with **no {@code defaultValue}**.
      * Their real fallbacks are computed, not authorable literals (the JobService-injected space
      * {@code dataDir}; {@code <job name>-<epoch millis>}), so any literal here would publish a constant
      * the code never uses. The fallback is stated in the description instead.
      */
     @Test
-    void thePipelineTypeDeclaresDataDirAndBatchIdWithNoLiteralDefault(@TempDir Path dir) throws Exception {
+    void thePipelineTypeDeclaresDataDirAndConsignmentIdWithNoLiteralDefault(@TempDir Path dir) throws Exception {
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString())) {
@@ -165,7 +165,7 @@ class JobServiceTest {
             var byName = pipeline.parameters().stream()
                     .collect(java.util.stream.Collectors.toMap(ParameterDecl::name, d -> d));
 
-            for (String key : List.of("data_dir", "batch_id")) {
+            for (String key : List.of("data_dir", "consignment_id")) {
                 ParameterDecl d = byName.get(key);
                 assertNotNull(d, "pipeline must declare '" + key + "' — PipelineJobRunner reads it");
                 assertFalse(d.required(), "'" + key + "' must stay OPTIONAL: it has a computed fallback");
@@ -1028,7 +1028,7 @@ class JobServiceTest {
         writeRollupFlow(store, "evt_rollup");
 
         JobConfig fj = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
-                Map.of("flow", "evt_rollup", "data_dir", dataDir, "batch_id", "b1"));
+                Map.of("flow", "evt_rollup", "data_dir", dataDir, "consignment_id", "b1"));
         try (var registry = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:");
              Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(fj), new ConsignmentEventBus(), s, null,
@@ -1042,7 +1042,7 @@ class JobServiceTest {
             // no retire_superseded job registered: the second recompute supersedes the first batch and
             // must still complete (the missing-job case only warns, never fails the run)
             js.upsertJob(new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
-                    Map.of("flow", "evt_rollup", "data_dir", dataDir, "batch_id", "b2")));
+                    Map.of("flow", "evt_rollup", "data_dir", dataDir, "consignment_id", "b2")));
             assertTrue(js.trigger("nightly"));
             JobRun run2 = await(() -> js.runsFor("nightly").size() >= 2 ? js.runsFor("nightly").get(0) : null);
             assertEquals("SUCCESS", run2.status(),
@@ -1052,7 +1052,7 @@ class JobServiceTest {
             js.upsertJob(new JobConfig("reclaim", JobType.MAINTENANCE, null, null, true, false,
                     Map.of("task", "retire_superseded", "retention_days", "30")));
             js.upsertJob(new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
-                    Map.of("flow", "evt_rollup", "data_dir", dataDir, "batch_id", "b3")));
+                    Map.of("flow", "evt_rollup", "data_dir", dataDir, "consignment_id", "b3")));
             assertTrue(js.trigger("nightly"));
             JobRun run3 = await(() -> js.runsFor("nightly").size() >= 3 ? js.runsFor("nightly").get(0) : null);
             assertEquals("SUCCESS", run3.status(), run3.message() + " -- recompute with retire_superseded now configured");
@@ -1475,7 +1475,7 @@ class JobServiceTest {
             js.authoredClaims(claims);
             js.start();
             js.upsertJob(new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
-                    Map.of("flow", "evt_rollup", "data_dir", dataDir, "batch_id", "b1")));
+                    Map.of("flow", "evt_rollup", "data_dir", dataDir, "consignment_id", "b1")));
             // the ad-hoc run of evt_rollup is in flight — i.e. something holds the FLOW
             try (RunClaims.Claim adhoc = claims.tryClaim("evt_rollup")) {
                 assertNotNull(adhoc);
@@ -1502,7 +1502,7 @@ class JobServiceTest {
             js.authoredClaims(claims);
             js.start();
             js.upsertJob(new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
-                    Map.of("flow", "evt_rollup", "data_dir", dataDir, "batch_id", "b2")));
+                    Map.of("flow", "evt_rollup", "data_dir", dataDir, "consignment_id", "b2")));
             try (RunClaims.Claim byName = claims.tryClaim("nightly")) {
                 assertNotNull(byName);
                 assertTrue(js.trigger("nightly"));
@@ -1542,7 +1542,7 @@ class JobServiceTest {
             js.authoredClaims(takeover);
             js.start();
             js.upsertJob(new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
-                    Map.of("flow", "evt_rollup", "data_dir", dataDir, "batch_id", "b1")));
+                    Map.of("flow", "evt_rollup", "data_dir", dataDir, "consignment_id", "b1")));
 
             assertTrue(js.trigger("nightly"));
             JobRun lost = await(() -> js.lastRunOf("nightly").orElse(null));

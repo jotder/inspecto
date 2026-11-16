@@ -122,6 +122,51 @@ class DbFileStageStoreTest {
         }
     }
 
+    /**
+     * D-12 (MoSCoW S4): a 3.x table already carries its unique constraint but names the column {@code batch_id}.
+     * Opening it rebuilds it under {@code consignment_id} with every row and the key intact; a second open does
+     * nothing. (A new table is born with {@code consignment_id}: {@code aNewTableNamesTheColumnConsignmentId}.)
+     */
+    @Test
+    void aPre400ConstrainedTableHasItsBatchIdColumnRenamed(@TempDir Path dir) throws Exception {
+        String url = "jdbc:duckdb:" + dir.resolve("file-stages-3x.duckdb");
+        try (Connection c = com.gamma.util.JdbcDrivers.connect(url); Statement st = c.createStatement()) {
+            st.execute("CREATE TABLE file_stages (source_id VARCHAR, relative_path VARCHAR, batch_id VARCHAR, "
+                    + "stage VARCHAR, recorded_at VARCHAR, UNIQUE (batch_id, source_id, relative_path, stage))");
+            st.execute("INSERT INTO file_stages VALUES ('src-1','a.csv','batch-1','REGISTERED','t1'),"
+                    + "('src-1','a.csv','batch-1','MANIFESTED','t2')");
+        }
+        for (int open = 1; open <= 2; open++) {
+            try (DbFileStageStore db = DbFileStageStore.open(url)) {
+                List<FileStageRecord> stages = db.stages("src-1", "a.csv");
+                assertEquals(2, stages.size(), "open " + open);
+                assertEquals("batch-1", stages.get(0).batchId(), "open " + open + ": the id moved to the new column");
+                db.record(List.of(row("a.csv", FileStage.MANIFESTED, "t9")));
+                assertEquals(2, db.stages("src-1", "a.csv").size(), "open " + open + ": the key is still enforced");
+            }
+            assertEquals(List.of("consignment_id"), consignmentColumns(url), "open " + open);
+        }
+    }
+
+    @Test
+    void aNewTableNamesTheColumnConsignmentId(@TempDir Path dir) throws Exception {
+        String url = "jdbc:duckdb:" + dir.resolve("file-stages-new.duckdb");
+        try (DbFileStageStore db = DbFileStageStore.open(url)) {
+            db.record(List.of(row("a.csv", FileStage.REGISTERED, "t1")));
+        }
+        assertEquals(List.of("consignment_id"), consignmentColumns(url));
+    }
+
+    private static List<String> consignmentColumns(String url) throws Exception {
+        List<String> out = new java.util.ArrayList<>();
+        try (Connection c = com.gamma.util.JdbcDrivers.connect(url); Statement st = c.createStatement();
+             ResultSet rs = st.executeQuery("SELECT column_name FROM information_schema.columns "
+                     + "WHERE table_name = 'file_stages' AND column_name IN ('batch_id', 'consignment_id')")) {
+            while (rs.next()) out.add(rs.getString(1));
+        }
+        return out;
+    }
+
     @Test
     void emptyAndNullRecordAreNoOps() throws Exception {
         try (DbFileStageStore db = DbFileStageStore.open("jdbc:duckdb:")) {

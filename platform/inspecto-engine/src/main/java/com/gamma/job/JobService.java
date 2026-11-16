@@ -577,12 +577,13 @@ public final class JobService implements AutoCloseable {
                         // JOB-DESCRIPTORS-LIE-TO-THE-FORM-1: both read by PipelineJobRunner:275/277 and
                         // undeclared until now. ⚠ Neither carries a defaultValue, and deliberately so:
                         // their real fallbacks are COMPUTED, not authorable literals — data_dir falls back
-                        // to the JobService-injected space dataDir, batch_id to <job name>-<epoch millis>.
+                        // to the JobService-injected space dataDir, consignment_id to <job name>-<epoch millis>.
                         // Putting either in defaultValue would publish a constant the code never uses.
                         ParameterDecl.optional("data_dir", ParamType.STRING, null,
                                 "Data root this run reads and writes under. Default: the Space's own data directory."),
-                        ParameterDecl.optional("batch_id", ParamType.STRING, null,
-                                "Batch id to commit under. Default: derived per run from the job name and the fire time."))),
+                        ParameterDecl.optional("consignment_id", ParamType.STRING, null,
+                                "Consignment id to commit under. Default: derived per run from the job name and the "
+                                        + "fire time. Was 'batch_id' before 4.0.0; that key is still read until 5.0.0."))),
                 List.of("pipeline.commit"), List.of()),
                 this::buildPipelineJob));
         // sql.template (P3b, §15.1): the first Run Artifact producer. Config-aware parameters — the

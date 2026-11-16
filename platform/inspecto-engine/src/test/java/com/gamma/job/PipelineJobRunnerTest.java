@@ -131,7 +131,7 @@ class PipelineJobRunnerTest {
             com.gamma.consignment.ConsignmentOutputStores.use(registry);
 
             JobConfig cfg = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
-                    Map.of("flow", "evt_dryrun", "data_dir", dataDir, "batch_id", "dry-1"));
+                    Map.of("flow", "evt_dryrun", "data_dir", dataDir, "consignment_id", "dry-1"));
             CapturingJobContext ctx = new CapturingJobContext(Map.of(), true);
             JobResult res = new PipelineJobRunner(cfg, bus, store, dataDir, auditDir).run(ctx);
 
@@ -174,13 +174,13 @@ class PipelineJobRunnerTest {
             com.gamma.consignment.ConsignmentOutputStores.use(registry);
 
             JobConfig cfg1 = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
-                    Map.of("flow", "evt_rollup2", "data_dir", dataDir, "batch_id", "b1"));
+                    Map.of("flow", "evt_rollup2", "data_dir", dataDir, "consignment_id", "b1"));
             assertTrue(new PipelineJobRunner(cfg1, new ConsignmentEventBus(), store, dataDir, auditDir,
                     null, null, null, notConfigured).run().success());
             assertEquals(0, asked.get(), "the first run superseded nothing — no reason to ask yet");
 
             JobConfig cfg2 = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
-                    Map.of("flow", "evt_rollup2", "data_dir", dataDir, "batch_id", "b2"));
+                    Map.of("flow", "evt_rollup2", "data_dir", dataDir, "consignment_id", "b2"));
             assertTrue(new PipelineJobRunner(cfg2, new ConsignmentEventBus(), store, dataDir, auditDir,
                     null, null, null, notConfigured).run().success());
             assertEquals(1, asked.get(), "the second full recompute superseded the first — now it's asked");
@@ -206,11 +206,11 @@ class PipelineJobRunnerTest {
             com.gamma.consignment.ConsignmentOutputStores.use(registry);
 
             JobConfig cfg1 = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
-                    Map.of("flow", "evt_rollup3", "data_dir", dataDir, "batch_id", "b1"));
+                    Map.of("flow", "evt_rollup3", "data_dir", dataDir, "consignment_id", "b1"));
             assertTrue(new PipelineJobRunner(cfg1, new ConsignmentEventBus(), store, dataDir, auditDir).run().success());
 
             JobConfig cfg2 = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
-                    Map.of("flow", "evt_rollup3", "data_dir", dataDir, "batch_id", "b2"));
+                    Map.of("flow", "evt_rollup3", "data_dir", dataDir, "consignment_id", "b2"));
             assertTrue(new PipelineJobRunner(cfg2, new ConsignmentEventBus(), store, dataDir, auditDir).run().success(),
                     "the pre-existing 5-arg constructor (no supplier) must keep superseding without crashing");
         } finally {
@@ -288,7 +288,7 @@ class PipelineJobRunnerTest {
                         new PipelineNode("out", "sink.persistent", "Out", null, Map.of("store", "rollup"), null)),
                 List.of(PipelineEdge.data("src", "out"))));
         JobConfig cfg = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
-                Map.of("pipeline", "evt", "data_dir", dataDir, "batch_id", "legacy-b1"));
+                Map.of("pipeline", "evt", "data_dir", dataDir, "consignment_id", "legacy-b1"));
 
         try (var registry = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:")) {
             com.gamma.consignment.ConsignmentOutputStores.use(registry);
@@ -422,7 +422,7 @@ class PipelineJobRunnerTest {
                 List.of(PipelineEdge.data("src", "out"))));
 
         JobConfig cfg = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
-                Map.of("flow", "evt_rollup", "data_dir", dataDir, "batch_id", "fixed-1"));
+                Map.of("flow", "evt_rollup", "data_dir", dataDir, "consignment_id", "fixed-1"));
         ConsignmentEventBus bus = new ConsignmentEventBus();
 
         JobResult first = new PipelineJobRunner(cfg, bus, store, dataDir, auditDir).run();
@@ -433,6 +433,27 @@ class PipelineJobRunnerTest {
         assertTrue(second.success(), second.message());
         assertTrue(second.message().startsWith("0 file(s)"), "replay should write nothing: " + second.message());
         assertEquals(List.of(1, 3), readIds(dataDir, "rollup"), "output unchanged by the idempotent replay");
+    }
+
+    /**
+     * D-12 (MoSCoW S4): the pinned Consignment is authored as `consignment_id`; the pre-4.0.0 key `batch_id` is
+     * still read (warned) until 5.0.0, the canonical key wins when both are set, and with neither the id is derived.
+     */
+    @Test
+    void thePinnedConsignmentIsReadFromConsignmentIdAndTheDeprecatedBatchIdKey() {
+        assertEquals("c-1", PipelineJobRunner.consignmentId(job(Map.of("consignment_id", "c-1"))));
+        assertEquals("b-1", PipelineJobRunner.consignmentId(job(Map.of("batch_id", "b-1"))),
+                "a 3.x config keeps its pinned id");
+        assertEquals("c-1", PipelineJobRunner.consignmentId(job(Map.of("consignment_id", "c-1", "batch_id", "b-1"))),
+                "the canonical key wins");
+        assertTrue(PipelineJobRunner.consignmentId(job(Map.of())).matches("nightly-[0-9]+"),
+                "with neither key the id is <job name>-<epoch millis>");
+    }
+
+    private static JobConfig job(Map<String, String> params) {
+        Map<String, String> p = new java.util.HashMap<>(params);
+        p.put("flow", "evt");
+        return new JobConfig("nightly", JobType.PIPELINE, null, null, true, false, p);
     }
 
     @Test
@@ -539,14 +560,14 @@ class PipelineJobRunnerTest {
 
         // run 1 — no prior watermark ⇒ reads all of batch1 (ids 1,2)
         JobConfig r1 = new JobConfig("incjob", JobType.PIPELINE, null, null, true, false,
-                Map.of("flow", "inc_flow", "data_dir", dataDir, "incremental_column", "id", "batch_id", "inc1"));
+                Map.of("flow", "inc_flow", "data_dir", dataDir, "incremental_column", "id", "consignment_id", "inc1"));
         assertTrue(new PipelineJobRunner(r1, new ConsignmentEventBus(), store, dataDir, auditDir).run().success());
         assertEquals(List.of(1, 2), readIds(dataDir, "rollup"), "first run reads the whole store");
 
         // new data arrives, then run 2 — watermark=2 ⇒ reads only ids 3,4 and appends (output accumulates)
         seedParquetFile(dataDir, "events", "batch2", "(3,200),(4,300)");
         JobConfig r2 = new JobConfig("incjob", JobType.PIPELINE, null, null, true, false,
-                Map.of("flow", "inc_flow", "data_dir", dataDir, "incremental_column", "id", "batch_id", "inc2"));
+                Map.of("flow", "inc_flow", "data_dir", dataDir, "incremental_column", "id", "consignment_id", "inc2"));
         assertTrue(new PipelineJobRunner(r2, new ConsignmentEventBus(), store, dataDir, auditDir).run().success());
         assertEquals(List.of(1, 2, 3, 4), readIds(dataDir, "rollup"), "second run appends only the new rows");
     }
@@ -566,7 +587,7 @@ class PipelineJobRunnerTest {
                         new PipelineNode("out", "sink.persistent", "Rollup", null, Map.of("store", "rollup"), null)),
                 List.of(PipelineEdge.data("src", "out"))));
         JobConfig cfg = new JobConfig("incjob", JobType.PIPELINE, null, null, true, false,
-                Map.of("flow", "inc_flow", "data_dir", dataDir, "incremental_column", "id", "batch_id", "inc1"));
+                Map.of("flow", "inc_flow", "data_dir", dataDir, "incremental_column", "id", "consignment_id", "inc1"));
 
         boolean refused;
         try {
@@ -617,7 +638,7 @@ class PipelineJobRunnerTest {
                 List.of(PipelineEdge.data("src_a", "m"), PipelineEdge.data("src_b", "m"), PipelineEdge.data("m", "out"))));
 
         JobConfig run1 = new JobConfig("inc_job", JobType.PIPELINE, null, null, true, false,
-                Map.of("flow", "inc_merge", "data_dir", dataDir, "incremental_column", "amt", "batch_id", "b1"));
+                Map.of("flow", "inc_merge", "data_dir", dataDir, "incremental_column", "amt", "consignment_id", "b1"));
         new PipelineJobRunner(run1, new ConsignmentEventBus(), store, dataDir, auditDir).run();
         assertEquals(List.of(1, 2, 3), readIds(dataDir, "combined"), "run 1 (no watermark) reads every source in full");
 
@@ -625,7 +646,7 @@ class PipelineJobRunnerTest {
         seedParquetFile(dataDir, "events_a", "a2", "(4,30)");
         seedParquetFile(dataDir, "events_b", "b2", "(5,25)");
         JobConfig run2 = new JobConfig("inc_job", JobType.PIPELINE, null, null, true, false,
-                Map.of("flow", "inc_merge", "data_dir", dataDir, "incremental_column", "amt", "batch_id", "b2"));
+                Map.of("flow", "inc_merge", "data_dir", dataDir, "incremental_column", "amt", "consignment_id", "b2"));
         new PipelineJobRunner(run2, new ConsignmentEventBus(), store, dataDir, auditDir).run();
 
         // run 2 appended only id4 (events_a amt 30>20) and id5 (events_b amt 25>15) — no re-read of 1,2,3
@@ -699,13 +720,13 @@ class PipelineJobRunnerTest {
                         new PipelineNode("out", "sink.persistent", "Rollup", null, Map.of("store", "rollup"), null)),
                 List.of(PipelineEdge.data("src", "out"))));
         JobConfig r1 = new JobConfig("istr", JobType.PIPELINE, null, null, true, false,
-                Map.of("flow", "inc_str", "data_dir", dataDir, "incremental_column", "ts", "batch_id", "i1"));
+                Map.of("flow", "inc_str", "data_dir", dataDir, "incremental_column", "ts", "consignment_id", "i1"));
         new PipelineJobRunner(r1, new ConsignmentEventBus(), store, dataDir, auditDir).run();
         assertEquals(List.of(1, 2), readIds(dataDir, "rollup"), "run 1 reads the whole store");
 
         seedTsFile(dataDir, "events", "a2", "(3,'2020-01-03')");
         JobConfig r2 = new JobConfig("istr", JobType.PIPELINE, null, null, true, false,
-                Map.of("flow", "inc_str", "data_dir", dataDir, "incremental_column", "ts", "batch_id", "i2"));
+                Map.of("flow", "inc_str", "data_dir", dataDir, "incremental_column", "ts", "consignment_id", "i2"));
         new PipelineJobRunner(r2, new ConsignmentEventBus(), store, dataDir, auditDir).run();
         // truncated watermark '2020-01-' would re-admit ids 1,2 (lexically > the prefix) → [1,1,2,2,3];
         // the fix stores the true max '2020-01-02', so run 2 appends only id 3.
@@ -726,7 +747,7 @@ class PipelineJobRunnerTest {
                 List.of(PipelineEdge.data("src", "flt"), PipelineEdge.data("flt", "out"))));
 
         JobConfig cfg = new JobConfig("provjob", JobType.PIPELINE, null, null, true, false,
-                Map.of("flow", "prov_flow", "data_dir", dataDir, "batch_id", "prov1"));
+                Map.of("flow", "prov_flow", "data_dir", dataDir, "consignment_id", "prov1"));
 
         String url = "jdbc:duckdb:" + tmp.resolve("prov.duckdb").toString().replace("\\", "/");
         try (DbProvenanceStore prov = DbProvenanceStore.open(url)) {
@@ -1405,7 +1426,7 @@ class PipelineJobRunnerTest {
         seedParquet(dataDir, "wh_etl", "(1,150),(2,50),(3,200)");
 
         JobConfig cfg = new JobConfig("hooker", JobType.PIPELINE, null, null, true, false,
-                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir, "batch_id", "wh-b1"));
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir, "consignment_id", "wh-b1"));
         JobResult res = withCapturingWebhookTransport(() ->
                 new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir, auditDir).run());
 
@@ -1444,7 +1465,7 @@ class PipelineJobRunnerTest {
         Path flat = writeWebhookPipeline("whf_etl", "sent_f");
         seedParquet(dataDir, "whf_etl", "(1,150),(2,50),(3,200)");
         JobConfig cfg = new JobConfig("hookfail", JobType.PIPELINE, null, null, true, false,
-                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir, "batch_id", "wh-b2"));
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir, "consignment_id", "wh-b2"));
 
         CapturingWebhookTransport.reject = true;
         IllegalStateException e = assertThrows(IllegalStateException.class, () -> withCapturingWebhookTransport(() ->

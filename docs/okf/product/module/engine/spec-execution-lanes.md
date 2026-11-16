@@ -286,5 +286,6 @@ The Batch→Consignment rename shipped as one commit (`ff33246a`): `ConsignmentI
 `ConsignmentGraphRunner`, `ConsignmentEvent`/`ConsignmentEventBus`, `ConsignmentManifest`,
 `ConsignmentAuditWriter`. ⚠ Wire and persisted spellings are deliberately unchanged (BACKLOG §4):
 the `batch_id` ledger columns keep their read-alias, `GET /runs/{n}/batches` keeps its path, the
-`__batch_id` output column and the `batch_id` `.toon` job key are deferred decisions, and the
+`__batch_id` reference column and the `batch_id` job key became `__consignment_id` / `consignment_id` in 4.0.0
+(D-12, legacy reads kept), and the
 `DbProvenanceStore`/`DbStatusStore` DDL columns await a data migration.

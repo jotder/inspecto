@@ -147,7 +147,7 @@ final class JobRoutes implements RouteModule {
 
         // ── data-plane provenance (T22, §11): per-(node, relationship) record counts of a past pipeline run,
         // for painting quantities onto the PipelineGraph edges (Sankey). 404 unless -Dprovenance.backend is set. ──
-        api.get("/provenance", (e, m) -> provenanceData(api, pipelineParam(e), ApiContext.query(e, "batch")));
+        api.get("/provenance", (e, m) -> provenanceData(api, pipelineParam(e), consignmentParam(e)));
         api.get("/provenance/batches", (e, m) -> provenanceBatches(api, pipelineParam(e), ApiContext.query(e, "limit")));
     }
 
@@ -156,6 +156,13 @@ final class JobRoutes implements RouteModule {
     private static String pipelineParam(HttpExchange e) {
         String p = ApiContext.query(e, "pipeline");
         return (p == null || p.isBlank()) ? ApiContext.query(e, "flow") : p;
+    }
+
+    /** D-12 dual-read: {@code ?consignment=} is canonical; {@code ?batch=} is the pre-4.0.0 name — ⚠ deprecated in
+     *  4.0.0, removed in 5.0.0. */
+    private static String consignmentParam(HttpExchange e) {
+        String c = ApiContext.query(e, "consignment");
+        return (c == null || c.isBlank()) ? ApiContext.query(e, "batch") : c;
     }
 
     /**
@@ -369,7 +376,7 @@ final class JobRoutes implements RouteModule {
      */
     private Object provenanceData(ApiContext api, String pipeline, String batch) {
         if (pipeline == null || pipeline.isBlank() || batch == null || batch.isBlank())
-            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "both 'pipeline' and 'batch' query params are required");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "both 'pipeline' and 'consignment' query params are required");
         return provenanceStore(api).query(pipeline, batch);
     }
 

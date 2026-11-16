@@ -3129,7 +3129,7 @@ describe('PipelineEditorComponent', () => {
 
     it('selecting a pipeline loads its last-run overlay and paints edge counts (T17)', () => {
         api.provenanceBatches.mockReturnValue(
-            of([{ batchId: 'b2', runTs: '2026-07-18T10:00:00Z', totalRows: 50, simulated: false }]),
+            of([{ consignmentId: 'b2', runTs: '2026-07-18T10:00:00Z', totalRows: 50, simulated: false }]),
         );
         api.provenance.mockReturnValue(of([{ nodeId: 'src', rel: 'data', rowCount: 50, simulated: false }]));
         const c = make();
@@ -3137,7 +3137,7 @@ describe('PipelineEditorComponent', () => {
         expect(api.provenanceBatches).toHaveBeenCalledWith('demo');
         expect(api.provenance).toHaveBeenCalledWith('demo', 'b2');
         expect(c.overlayRun()).toEqual({
-            batchId: 'b2',
+            consignmentId: 'b2',
             runTs: '2026-07-18T10:00:00Z',
             totalRows: 50,
             simulated: false,
@@ -3155,8 +3155,8 @@ describe('PipelineEditorComponent', () => {
 
     /** PIPELINE-RUN-HISTORY-OVERLAY-1: the overlay is no longer pinned to the latest run. */
     it('picking an earlier run re-paints the overlay from THAT run, and marks it as not the latest', () => {
-        const latest = { batchId: 'b2', runTs: '2026-07-18T10:00:00Z', totalRows: 50, simulated: false };
-        const older = { batchId: 'b1', runTs: '2026-07-17T10:00:00Z', totalRows: 7, simulated: false };
+        const latest = { consignmentId: 'b2', runTs: '2026-07-18T10:00:00Z', totalRows: 50, simulated: false };
+        const older = { consignmentId: 'b1', runTs: '2026-07-17T10:00:00Z', totalRows: 7, simulated: false };
         api.provenanceBatches.mockReturnValue(of([latest, older]));
         api.provenance.mockImplementation((_p: string, batch: string) =>
             of([{ nodeId: 'src', rel: 'data', rowCount: batch === 'b1' ? 7 : 50, simulated: false }]),
@@ -3177,7 +3177,7 @@ describe('PipelineEditorComponent', () => {
 
     /** DRYRUN-INVISIBLE-ON-FLAT-LANE-1 (b): a dry run's batch must not be drawn as if it were real. */
     it('a dry-run batch is marked in the run picker label, the node summary and the edge data', () => {
-        const dry = { batchId: 'd1', runTs: '2026-07-19T10:00:00Z', totalRows: 4, simulated: true };
+        const dry = { consignmentId: 'd1', runTs: '2026-07-19T10:00:00Z', totalRows: 4, simulated: true };
         api.provenanceBatches.mockReturnValue(of([dry]));
         api.provenance.mockReturnValue(of([{ nodeId: 'src', rel: 'data', rowCount: 4, simulated: true }]));
         const c = make();
@@ -3191,7 +3191,7 @@ describe('PipelineEditorComponent', () => {
 
     it('a node absent from the last run has no overlay (null, not zero)', () => {
         api.provenanceBatches.mockReturnValue(
-            of([{ batchId: 'b2', runTs: '2026-07-18T10:00:00Z', totalRows: 50, simulated: false }]),
+            of([{ consignmentId: 'b2', runTs: '2026-07-18T10:00:00Z', totalRows: 50, simulated: false }]),
         );
         api.provenance.mockReturnValue(of([{ nodeId: 'src', rel: 'data', rowCount: 50, simulated: false }]));
         const c = make();

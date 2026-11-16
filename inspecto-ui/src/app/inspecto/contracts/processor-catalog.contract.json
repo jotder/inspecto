@@ -992,7 +992,7 @@
     "icon" : "heroicons_outline:clipboard-document-check",
     "status" : "delivered",
     "nodeType" : "sink.persistent",
-    "note" : "`filename_column` + the per-file/batch/lineage ledgers + `__batch_id` provenance",
+    "note" : "`filename_column` + the per-file/batch/lineage ledgers + `__consignment_id` provenance",
     "addable" : true
   }, {
     "id" : "control.throttle",

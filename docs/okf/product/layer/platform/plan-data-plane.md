@@ -150,7 +150,7 @@ snapshot store reads unchanged; an explicit deeper ref is honoured; `shared/…`
 `sourceName` is **never defaulted** (a source-less Dataset once read empty everywhere, indistinguishable from
 an empty store). A **Reference Dataset** is produced by a pipeline (`produces: reference`, node `ref:<pipeline>`)
 and bound by name; its load semantics (`replace | upsert | scd2`, `key[]`, `refresh_seconds`) are authorable
-config, and `upsert`/`scd2` are **built** as an append-only version store (rechecked 2026-10-06, `LA-DAILY-INGEST-1` D-ING4): `ConsignmentIngestStrategy.stampReferenceVersions` stamps `__key_hash/__row_hash/__valid_from/__op/__batch_id`, skips unchanged rows and appends changed ones under `__v_<batch>`; `ReferenceReader` derives the current view, or, for `scd2`, one `as_of` instant per binding (`__valid_from <= instant`, `ReferenceScd2AsOfTest`). What is **unbuilt** is the `transform.dim.scd2` processor (`Status.PLANNED`), a `valid_to` column, a feed-supplied effective date (`__valid_from` is ingest `now()`), and a per-fact-row as-of join.
+config, and `upsert`/`scd2` are **built** as an append-only version store (rechecked 2026-10-06, `LA-DAILY-INGEST-1` D-ING4): `ConsignmentIngestStrategy.stampReferenceVersions` stamps `__key_hash/__row_hash/__valid_from/__op/__consignment_id` (`__batch_id` before 4.0.0), skips unchanged rows and appends changed ones under `__v_<batch>`; `ReferenceReader` derives the current view, or, for `scd2`, one `as_of` instant per binding (`__valid_from <= instant`, `ReferenceScd2AsOfTest`). What is **unbuilt** is the `transform.dim.scd2` processor (`Status.PLANNED`), a `valid_to` column, a feed-supplied effective date (`__valid_from` is ingest `now()`), and a per-fact-row as-of join.
 
 **Daily-updated Reference file (verified 2026-10-06, `LA-DAILY-INGEST-1` T6).** `load: replace` overwrites the
 SAME output file (the output stem is the input file name), so a dimension file named with its date leaves
@@ -551,7 +551,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | `retire_superseded` must be configured or a recompute keeps an extra copy forever; `DatasetRelation.temporalColumn` has no caller | `BACKLOG.md` §3 *Consignment addressing* | |
 | `DatasetAccess` after the Consignment Selector; a fragment guard for third-party `LOWERED` steps | `BACKLOG.md` §3 *Platform Services Stage 2 / 3* | |
 | Reference-Dataset promotion export; "the engine has no grouping transform" | `BACKLOG.md` §3 *Unification W4 / W5* | |
-| The `batch_id` DDL / `__batch_id` / `.toon` key trio | `BACKLOG.md` §2 release notes; §7 | Rides the MAJOR |
+| The `batch_id` DDL / `__batch_id` / `.toon` key trio | `okf/product/module/api/plan-api-stability.md` release notes | ✅ Landed 2026-11-17 (MoSCoW S4) |
 | Studio analytics step processors `SP-BI-*` | `EDITIONS.md` board | No BACKLOG row |
 
 ### `UNTRACKED` — surfaced by this spec, no board row
@@ -624,7 +624,7 @@ for credential-less families; database-per-Space and PgBouncer (`SPC` §6.7).
 ### 6.7 `hive_partitioning=true` for Datasets; a synthetic `table` backfill; the `batch_id` rename now — REFUSED
 
 Partition segments would appear as columns on every Dataset; a wrong lineage edge is worse than an absent one;
-the DDL rename needs `ALTER TABLE` plus a `payload` blob rewrite and rides the MAJOR.
+the DDL rename needs `ALTER TABLE` plus a `payload` blob rewrite and rides the MAJOR (it landed for 4.0.0 on 2026-11-17, MoSCoW S4).
 
 ### 6.8 Sealing and the partition-state machinery — DROPPED (operator, 2026-08-30)
 

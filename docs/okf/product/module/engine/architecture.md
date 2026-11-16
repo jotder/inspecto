@@ -111,8 +111,9 @@ separate mechanisms rather than one attribute bag. As-built after the consignmen
 (shipped 2026-08-12/13; provenance from S3, the live gauge from S7, the audit holes closed after).
 Vocabulary: **Consignment** in code too since the Phase-7 rename shipped (`ff33246a` —
 `ConsignmentAuditWriter`, `ConsignmentManifest`, `ConsignmentEvent`, …); ⚠ wire and persisted
-spellings deliberately kept `batch_id`/`batches` (ledger columns via read-alias, `GET /runs/{n}/batches`,
-the `__batch_id` output column, the `batch_id` `.toon` job key — deferred residuals, BACKLOG §4).
+spellings deliberately kept `batch_id`/`batches` (ledger columns via read-alias, `GET /runs/{n}/batches`).
+The persisted trio (the DB columns, the `__batch_id` reference column, the `batch_id` job key) became
+`consignment_id` / `__consignment_id` in 4.0.0 (D-12, 2026-11-17), with legacy reads kept.
 
 ### Per lane
 

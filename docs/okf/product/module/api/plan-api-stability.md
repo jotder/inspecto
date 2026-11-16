@@ -427,10 +427,7 @@ Most of these commits are not marked `!`, so a commit-type scan misses them.*
   `params.url`; it proposes a pending Action Request and no longer emits the `decision-rule.invoke-api` signal
   (`24c5c171`, 2026-09-27).
 
-- **Consignment rename, persisted surfaces (D-12, confirmed 2026-09-06):** `batch_id` DDL columns in `DbProvenanceStore` /
-  `DbStatusStore` → `consignment_id` (versioned migration, `payload` literal rewritten); the `__batch_id` system column in
-  output Parquet/CSV → `__consignment_id` (output-schema break, documented); the `.toon` key `batch_id` → `consignment_id`
-  with the old key accepted on read for the major. All three ride this MAJOR, none earlier.
+- The job key `batch_id` is now `consignment_id` (D-12, 2026-11-17): see *Breaking — the `batch_id` rename trio* below.
 
 **Breaking — HTTP routes REMOVED (`RETIRE-HALVES-1`, 2026-09-14)**
 - `GET /bi/datasets` is **gone**. Dataset listing is the generic component registry
@@ -642,6 +639,39 @@ already depend on it, so the token work must not change that shape as a side eff
   reason (`/bootstrap` `features.pipelineTransform`, `pipelineEgress`, `remoteSystems`, `pipelineAutomation` and
   their `featureReasons`); a configuration that already uses them loads, runs and stays editable.
 
+**Breaking — the `batch_id` rename trio (D-12, 2026-11-17, MoSCoW S4)**
+
+The unit of work is a Consignment (GLOSSARY §13); the three places that still persisted it as `batch_id` now say
+`consignment_id`. Existing installs keep reading their old data: each surface either migrates itself once on open
+or is read under both names.
+- **Database columns → `consignment_id`, migrated on open.** `inspecto_status_commits` and
+  `inspecto_status_lineage` (`DbStatusStore`), `inspecto_pipeline_provenance` (`DbProvenanceStore`) and
+  `file_stages` (`DbFileStageStore`). The first 4.0.0 open of a 3.x database renames the column. It is one-shot and
+  idempotent: the database catalog is the record, so a second open finds `consignment_id` and does nothing. The status DB
+  also rewrites the `"batch_id"` key inside its stored `payload` JSON, and drops and recreates its lineage index
+  (now `inspecto_status_lineage_by_pipeline_consignment`). `file_stages` is rebuilt (rename, create, copy, drop) in
+  one transaction, the same way its unique constraint was added. ⚠ A raw SQL query or BI tool reading these tables by
+  the old column name must change. ⚠ No downgrade: a 3.x binary over a migrated database finds no `batch_id` column.
+- **Reference store system column `__batch_id` → `__consignment_id`, read under both names.** A `produces:
+  reference` Pipeline with `load: upsert|scd2` stamps `__consignment_id` on new versions. Files already landed keep
+  `__batch_id`; no Parquet file is rewritten. The current and as-of views strip both names, so an enrichment or a
+  join sees the same columns as before. ⚠ A raw read of a store with files of both ages (`union_by_name`) shows
+  **both** columns, each `NULL` on the other age's rows. A query of the raw store that selects `__batch_id` must
+  read `coalesce(__consignment_id, __batch_id)`. `ReferenceCompactor` keeps both columns when it merges such a store.
+- **Job key `batch_id` → `consignment_id` (the `pipeline` Job Type).** The pinned Consignment id is read from
+  `consignment_id`. `batch_id` is still read when `consignment_id` is absent, with a WARN on every run, until
+  5.0.0. The Job Type descriptor declares `consignment_id`, and the undeclared-key warning does not flag `batch_id`
+  while it is still read. No shipped config used the key.
+- **API, deprecated alias kept.** `GET /provenance/batches` returns `consignmentId` on each row. `batchId` is still
+  sent with the same value, deprecated, removed in 5.0.0. `GET /provenance` takes `?consignment=`; `?batch=` is
+  still read, deprecated, removed in 5.0.0, and its 400 names `consignment`. The console reads the new names.
+- Cosmetic, nothing to migrate: a new `BranchCommitLog` CSV gets the header `recorded_at,consignment_id,branch,phase`.
+  An existing one keeps `batch_id`, because rows are read by position. The ingest ledgers and the manifest were renamed
+  in 2026-08 with a read alias (`Csv.LEGACY_HEADERS`, `@SerializedName(alternate)`), and that alias stays.
+- ⚠ **Not renamed:** the route paths `/runs/{n}/batches` and `/provenance/batches`, the `batchId` fields of the
+  run, reprocess, drain and lineage routes, and the `batch_max_*` keys (those mean grouping, not a Consignment).
+  None of them is part of the trio decided on 2026-09-06.
+
 **Deferred to this same release by decision:** the token *runtime* model (D2 —
 [`node-types.md`](../engine/spec-node-types.md) § *The token model*), and X5's cross-lane StepInfo envelope.
 
@@ -653,8 +683,8 @@ runtime loads. Until the operator re-scopes it, 4.0.0 keeps both lanes and `-Din
 no entry for the deletion.
 
 **Decided 2026-11-16 to land before the tag (operator, MoSCoW S4 / C5; each adds its own entry above when it
-lands):** the X-Actor header path removed (landed 2026-11-17, entry above), the `batch_id` rename trio (above) and X5
-with the StepInfo envelope.
+lands):** the X-Actor header path removed (landed 2026-11-17, entry above), the `batch_id` rename trio (landed
+2026-11-17, entry above) and X5 with the StepInfo envelope.
 - **`AlertMigration` stays in 4.0.0 (operator, MoSCoW C5 restated 2026-11-16).** No released version carries the Alert
   store (it landed on trunk 2026-10-07, after `v3.11.0`), so 4.0.0 is the first release with it and adopts a 3.x
   install's still-active ALERT objects on upgrade. `AlertMigration` / `LegacyAlertObjects` are deleted in 5.0.0, whose
