@@ -381,11 +381,14 @@ class ControlApiAuthV1Test {
     }
 
     @Test
-    void xActorHeaderStillHonouredOnPersonal(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        // No Authenticator (Basic): X-Actor stays the historic actor mechanism — the reject never fires.
+    void xActorHeaderIsRejectedOnBasic(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        // X-Actor removal (MoSCoW S4, 4.0.0): no Authenticator (Basic) used to take X-Actor as the actor. The header
+        // now carries no identity on any edition, so Basic refuses it with the same code as Standard.
         try (Ctx c = open(cfg, root)) {
+            assertEquals(200, get(c.port, "/components/grammar").statusCode(), "the same call without the header passes");
             HttpResponse<String> r = get(c.port, "/components/grammar", "X-Actor", "alice");
-            assertEquals(200, r.statusCode(), r.body());
+            assertEquals(403, r.statusCode(), r.body());
+            assertEquals("PERMISSION_DENIED", V1Body.of(r.body()).get("error").get("errorCode").asText());
         }
     }
 

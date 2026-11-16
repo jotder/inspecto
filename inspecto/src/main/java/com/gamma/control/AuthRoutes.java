@@ -100,8 +100,8 @@ final class AuthRoutes implements RouteModule {
     /**
      * Who the session just minted belongs to: the edition's {@link Authenticator} verifying the new access token,
      * exactly as it would on the next request. {@code unknown} when there is no authenticator or it refuses the
-     * token — never the caller-written {@code X-Actor} header, since this route is public and trigger T5 (new
-     * country for a subject) keys on this row's actor.
+     * token — never the request's fallback actor, since this route is public and trigger T5 (new country for a
+     * subject) keys on this row's actor.
      */
     private static String sessionSubject(HttpExchange ex, TokenRelay.Tokens t) {
         try {

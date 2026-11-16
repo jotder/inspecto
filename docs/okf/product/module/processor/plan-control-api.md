@@ -560,7 +560,6 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | Item | Board id | What remains |
 |---|---|---|
 | Cursor pagination on further list families; `ETags.respond` on further singleton reads; the Standard jlink runtime vs Nimbus re-check | `BACKLOG.md` §3 *API v1* (P2) | Demand-driven by policy; `RunRoutes.paged()` migrates only on reported truncation pain |
-| `X-Actor` header path removal | `BACKLOG.md` §2 *X-Actor full removal*; `EDITIONS.md` SEC-11 | Gate: the next MAJOR tag |
 | Release notes for the pending MAJOR | `BACKLOG.md` §2 *Release notes for the next MAJOR* | The draft accrues in `api-stability.md`; the tag is not cut |
 | X5 cross-lane StepInfo envelope | `BACKLOG.md` §2 *X5* | ~1 KB pointer + schema + diagnostics, deferred to the MAJOR |
 | Platform Services Stage 2 (open Step-kind registry) and Stage 3 (pack-contributed services); no timeout/cancellation either side | `BACKLOG.md` §4 *Platform Services* | Design only |

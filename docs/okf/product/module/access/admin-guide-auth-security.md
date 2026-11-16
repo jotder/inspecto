@@ -397,8 +397,13 @@ Three things a future change must not undo:
   lens-scoping it revoked the single grant that role has. Consequence, accepted deliberately:
   **"Business lens ⇒ read-only" is no longer a true statement about the product.**
 
-Still-open (carried to [BACKLOG](../../../../BACKLOG.md), non-blocking): X-Actor is already rejected on Standard (the SEC-7a spoof guard), so only its full removal remains,
-gated on **the next MAJOR tag** (restated 2026-09-07 — the API-v1 sunset apparatus this used to cite was deleted 2026-07-25). The capability spec [`okf/product/module/access/plan-security.md`](plan-security.md) is the front door for what was required, left and refused; this page stays the mechanism.
+**X-Actor removed (2026-11-17, MoSCoW S4, 4.0.0 — breaking).** The header carries no identity on any edition:
+`RequestAttrs.actor` is the Subject's id, else `agent:<session>` for an `X-Agent-Session` call, else `appUser`. The
+SEC-7a spoof guard moved out of the Authenticator branch of `ControlApi.authenticate`, so a request still sending a
+non-blank `X-Actor` is refused `403 PERMISSION_DENIED` on every edition, Basic included, and the refusal
+is audited under the request's actor, never the claimed name. Refused, not ignored: a stale client fails loudly
+instead of having its writes audited under `appUser`, and the console never sent the header. Release note:
+[plan-api-stability](../api/plan-api-stability.md) §Release notes. The capability spec [`okf/product/module/access/plan-security.md`](plan-security.md) is the front door for what was required, left and refused; this page stays the mechanism.
 
 `package.ps1 -Edition Advanced` **shipped 2026-07-25** — a superset of Standard (both the `security` and
 `policy` jars are bundled), with `serve.sh`/`serve.bat` deriving the edition from bundle contents. No
@@ -460,7 +465,7 @@ for everyone. All four are now `canAdminister` (fail closed; reads stay open), p
 `CapabilityManifestTest.sharedNotificationStateWritesStayAdminGated` and exercised WITH a Subject in
 `ControlApiNotificationsTest`. ⚠ Consequence: a non-admin's bell could no longer mark read or dismiss.
 **Resolved for READ state, 2026-09-25 (operator):** read state is now per reader — `NotificationReadState`,
-keyed by `ApiContext.actor` (the Subject id; on Basic the `appUser` / `X-Actor` fallback) — so `POST
+keyed by `ApiContext.actor` (the Subject id; on Basic the `appUser` fallback) — so `POST
 /notifications/read-all`, `POST /notifications/{id}/read` and the new `POST /notifications/{id}/unread` are
 `self-service` exemptions again, this time scoped in the store. Delete (archive) stays `canAdminister`: it
 still writes the one shared feed. See [events-metrics](../event/spec-events-metrics.md) §Notifications

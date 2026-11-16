@@ -119,9 +119,9 @@ diagnostic context, AG-UI streaming, A2UI inline artifacts — and finally to a 
 
 * **`actor=agent:*` audit convention** — additive `X-Agent-Session` request header.
   `ApiContext.actor(ex)`/`actorType(ex)`: an authenticated `Subject` always wins (`"user"`); the
-  header applies only when there is none; its absence is byte-identical to pre-S6 behavior (actor
-  from `X-Actor`, `actorType "user"`). Same trust model as the pre-existing client-supplied `X-Actor`
-  header — **attribution only, never a capability grant**.
+  header applies only when there is none; without it the actor is `appUser`, `actorType "user"` (the
+  client-supplied `X-Actor` it once fell back to was removed in 4.0.0). **Attribution only, never a
+  capability grant**.
 * **Invoke round-trip** (conservative cut — the plan explicitly allows it): an A2UI `invoke` action's
   `target` must name an **existing, human-authored Decision Rule** — the agent proposes to *run* one,
   never authors one on the fly. Client: "Dry-run" → `POST /decision-rules/{target}/simulate` (no

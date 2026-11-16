@@ -94,22 +94,28 @@ class ControlApiAuditTest {
         }
     }
 
+    /** X-Actor removal (MoSCoW S4, 4.0.0): on Basic the header used to become the audit actor. It is now refused,
+     *  the refusal is audited, and the claimed name reaches no row — the denial files under {@code appUser}. */
     @Test
-    void honoursCustomActorHeader(@TempDir Path dir) throws Exception {
+    void xActorHeaderIsRefusedAndNeverBecomesTheAuditActor(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
+            String claimed = "support_agent_" + System.nanoTime();
             HttpRequest req = HttpRequest.newBuilder(
                             URI.create("http://localhost:" + c.port + "/api/v1" + "/runs/" + c.name + "/pause"))
-                    .header("X-Actor", "support_agent")
+                    .header("X-Actor", claimed)
                     .POST(BodyPublishers.noBody()).build();
-            assertEquals(200, client.send(req, BodyHandlers.ofString()).statusCode());
+            HttpResponse<String> r = client.send(req, BodyHandlers.ofString());
+            assertEquals(403, r.statusCode(), r.body());
 
-            JsonNode events = recentEvents(c);
-            boolean found = false;
-            for (JsonNode e : events) {
-                if ("AUDIT".equals(e.get("type").asText())
-                        && "support_agent".equals(e.get("attributes").path("actor").asText())) found = true;
+            boolean denied = false;
+            for (JsonNode e : recentEvents(c)) {
+                JsonNode a = e.get("attributes");
+                assertNotEquals(claimed, a.path("actor").asText(), "the X-Actor value is never an audit actor");
+                if ("ACCESS_DENIED".equals(e.get("type").asText())
+                        && a.path("http_path").asText().endsWith("/runs/" + c.name + "/pause")
+                        && "appUser".equals(a.path("actor").asText())) denied = true;
             }
-            assertTrue(found, "X-Actor header threads through as the audit actor");
+            assertTrue(denied, "the refusal is audited under the local default actor");
         }
     }
 
@@ -132,7 +138,8 @@ class ControlApiAuditTest {
     /**
      * R2-12 (operator, 2026-09-26): a read-shaped POST — here the dashboard tile's {@code /bi/query}, bare and
      * Space-prefixed — leaves no AUDIT row, while a real mutation by the same caller still does. Rows are
-     * matched by a per-run actor, because the default Space's event store is shared with other tests.
+     * matched by a per-run actor ({@code agent:<session>}), because the default Space's event store is shared
+     * with other tests.
      */
     @Test
     void readShapedPostLeavesNoAuditRowButAMutationDoes(@TempDir Path dir, @TempDir Path root) throws Exception {
@@ -151,7 +158,7 @@ class ControlApiAuditTest {
             List<String> actions = new ArrayList<>();
             for (JsonNode e : recentEvents(c)) {
                 JsonNode a = e.get("attributes");
-                if ("AUDIT".equals(e.get("type").asText()) && actor.equals(a.path("actor").asText()))
+                if ("AUDIT".equals(e.get("type").asText()) && ("agent:" + actor).equals(a.path("actor").asText()))
                     actions.add(a.path("action").asText() + " " + a.path("http_path").asText());
             }
             assertEquals(List.of("pipeline.paused /runs/" + c.name + "/pause"), actions,
@@ -187,7 +194,7 @@ class ControlApiAuditTest {
             List<String> actions = new ArrayList<>();
             for (JsonNode e : recentEvents(c)) {
                 JsonNode a = e.get("attributes");
-                if ("AUDIT".equals(e.get("type").asText()) && actor.equals(a.path("actor").asText()))
+                if ("AUDIT".equals(e.get("type").asText()) && ("agent:" + actor).equals(a.path("actor").asText()))
                     actions.add(a.path("action").asText() + " " + a.path("http_path").asText());
             }
             String row = "pipeline.paused /runs/" + c.name + "/pause";
@@ -199,9 +206,11 @@ class ControlApiAuditTest {
         return sendAs(port, actor, path, body, null);
     }
 
+    /** Sends as the per-run actor {@code agent:<actor>}: the X-Agent-Session attribution is the one Basic still
+     *  distinguishes callers by, now that X-Actor is gone. */
     private HttpResponse<String> sendAs(int port, String actor, String path, String body, String idempotencyKey) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
-                .header("X-Actor", actor)
+                .header("X-Agent-Session", actor)
                 .POST(body == null ? BodyPublishers.noBody() : BodyPublishers.ofString(body));
         if (idempotencyKey != null) b.header("Idempotency-Key", idempotencyKey);
         return client.send(b.build(), BodyHandlers.ofString());

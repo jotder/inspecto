@@ -20,8 +20,7 @@ public final class AuditAttrs {
     private AuditAttrs() {}
 
     // ── actor (who) ───────────────────────────────────────────────────────────────
-    /** The acting identity. Auth-free core defaults to {@code appUser}; an edition's security module
-     *  injects the real principal via the {@code X-Actor} request header. */
+    /** The acting identity: the authenticated Subject's id; auth-free core defaults to {@code appUser}. */
     public static final String ACTOR = "actor";
     /** Actor kind: {@code user}, {@code system}, {@code api_key}, … (defaults to {@code user}). */
     public static final String ACTOR_TYPE = "actor_type";

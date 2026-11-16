@@ -1277,6 +1277,14 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // verified (signature + expiry) by ShareRoutes. Sharing as a whole is disabled unless
         // -Dbi.share.secret is configured, so this exemption is inert by default.
         boolean required = !PUBLIC_PATHS.contains(path) && !isSelfVerifyingPublic(path);
+        // X-Actor removal (MoSCoW S4, 4.0.0): the header carries no identity on any edition — the actor is the
+        // authenticated Subject, or on Basic the local default appUser. A request still sending it is refused on
+        // every edition (the SEC-7a code), so a stale client fails loudly instead of having its writes silently
+        // audited under appUser.
+        String claimed = ex.getRequestHeaders().getFirst("X-Actor");
+        if (claimed != null && !claimed.isBlank())
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED,
+                    "X-Actor is not accepted; the actor is taken from the authenticated session, or is the local default on Basic");
         Authenticators.active().ifPresent(a -> {
             // RBAC R1: hand the authenticator the bound space's config root so it can resolve the
             // authored roles.toon (Roles.effective) for THIS request — per-space, restart-free.
@@ -1286,13 +1294,6 @@ public final class ControlApi implements AutoCloseable, HostContext {
             // roles, and the recovery route (POST /spaces) stays reachable instead of 500ing in the gate.
             java.nio.file.Path rolesRoot = spaces.size() == 0 ? null : writeRoot();
             if (rolesRoot != null) Roles.configRoot(ex, rolesRoot);
-            // SEC-7(a): on Standard the acting identity is authoritative from the authenticated Subject; a
-            // client-supplied X-Actor header is an attempted actor spoof and is rejected outright. (Basic
-            // has no Authenticator, so this branch never runs there and X-Actor stays the historic actor.)
-            String spoof = ex.getRequestHeaders().getFirst("X-Actor");
-            if (spoof != null && !spoof.isBlank())
-                throw new ApiException(403, ErrorCodes.PERMISSION_DENIED,
-                        "X-Actor is not accepted on this edition; the actor is taken from the authenticated session");
             java.util.Optional<Subject> subject = a.authenticate(ex);
             // OIDC-CC-INTEGRATION-ROLE-1 (B1 + C2): a machine only in a Space naming its client, with allowlisted grants
             // only. On a public path a refused machine just stays anonymous.

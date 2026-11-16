@@ -194,8 +194,8 @@ class ControlApiNotificationsTest {
         }
     }
 
-    /** Basic edition: no Subject, so the reader is the historic fallback identity — {@code appUser}, or the
-     *  honour-system {@code X-Actor} — the same convention the audit trail's actor uses. */
+    /** Basic edition: no Subject, so the reader is the fallback identity — {@code appUser}, or {@code agent:<session>}
+     *  for an agent-confirmed call — the same convention the audit trail's actor uses (X-Actor is gone in 4.0.0). */
     @Test
     void withoutASubjectTheReaderIsTheFallbackActor(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
@@ -204,9 +204,9 @@ class ControlApiNotificationsTest {
 
             HttpRequest bob = HttpRequest.newBuilder(
                     URI.create("http://localhost:" + c.port + "/api/v1/notifications/unread-count"))
-                    .header("X-Actor", "bob").GET().build();
+                    .header("X-Agent-Session", "bob").GET().build();
             assertEquals(1, V1Body.of(client.send(bob, BodyHandlers.ofString()).body()).get("count").asInt(),
-                    "appUser's read is not bob's");
+                    "appUser's read is not agent:bob's");
             assertEquals(0, json(send(c.port, "GET", "/notifications/unread-count", null)).get("count").asInt());
         }
     }

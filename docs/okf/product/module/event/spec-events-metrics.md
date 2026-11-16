@@ -40,8 +40,8 @@ timestamp: 2026-07-16T00:00:00Z
   `NotificationPreferences` (category × channel; critical categories locked on).
 * **Read state is per reader** (operator, 2026-09-25) — the feed (`NotificationStore`) is one shared
   state per Space, but each reader's read marks live in **`NotificationReadState`**, keyed by
-  `(ApiContext.actor, notification id)`: the Subject id, or on Personal the `appUser` / `X-Actor`
-  fallback. `POST /notifications/{id}/read`, `POST /notifications/{id}/unread` (new) and
+  `(ApiContext.actor, notification id)`: the Subject id, or on Personal the `appUser` fallback
+  (`X-Actor` was removed in 4.0.0). `POST /notifications/{id}/read`, `POST /notifications/{id}/unread` (new) and
   `POST /notifications/read-all` touch only the caller's marks and are **self-service** (open to any
   authenticated caller — `CapabilityManifest.EXEMPTIONS`); `GET /notifications`, the SSE frames and
   `/notifications/unread-count` report `read` / `state` / `readAt` **as the caller sees them**. Delete

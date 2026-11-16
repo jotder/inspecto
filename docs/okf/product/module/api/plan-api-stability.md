@@ -134,8 +134,8 @@ Most of these commits are not marked `!`, so a commit-type scan misses them.*
   capability) and mark only the caller's own state; `GET /notifications`, the `/notifications/stream` frames
   and `/notifications/unread-count` report `state` / `readAt` as the caller sees them, plus a new additive
   boolean **`read`**. New route **`POST /notifications/{id}/unread`** (404 unknown id). A client that read
-  another user's mark through the shared `state` no longer can. On Basic the caller is `appUser` (or the
-  honour-system `X-Actor`).
+  another user's mark through the shared `state` no longer can. On Basic the caller is `appUser` (the
+  honour-system `X-Actor` it also took is removed, below).
 - **Behaviour change (Standard/Advanced, 2026-09-25 — ses-sns §7):** notification **preferences are
   per caller**. `PUT /notifications/preferences` is open to any authenticated caller again and writes only
   that caller's override (a `null` cell resets it); the deployment default moved to the **new `PUT
@@ -612,13 +612,27 @@ already depend on it, so the token work must not change that shape as a side eff
   outside its allow-list. The allow-list may only shrink: an entry that gets a real summary, or whose route is
   gone, also fails.
 
+**Breaking — the `X-Actor` header is removed (2026-11-17, MoSCoW S4)**
+- The `X-Actor` request header carries no identity on any edition. The actor is the authenticated Subject; on
+  Basic, with no Subject, it is the local default `appUser` (or `agent:<session>` for a call carrying
+  `X-Agent-Session`). Before, a server with no Authenticator (Basic) took the header's value as the audit actor and as the reader of
+  notification read state.
+- A request that still sends a non-blank `X-Actor` is refused with `403 PERMISSION_DENIED` on **every** edition, and
+  the refusal is audited as `access.denied` under the request's actor, never under the claimed name. A server with an
+  Authenticator active already answered 403 (SEC-7a); Basic now does the same. Refused rather than ignored so a
+  client that relied on it fails loudly instead of having its writes filed under `appUser`. The console, `tools/`
+  and the Space seed scripts never sent it.
+- Migrate: drop the header. To tell callers apart, move to Standard (a Subject per caller); a script that needs
+  its own audit name on Basic has none.
+
 **Deferred to this same release by decision:** the token *runtime* model (D2 —
 [`node-types.md`](../engine/spec-node-types.md) § *The token model*), the ELT
 Phase 6 deletion of the flat read path (Row 15; the operator decided 2026-11-16 to delete it in 4.0.0 itself,
 with no verification minor before it), and X5's cross-lane StepInfo envelope.
 
 **Decided 2026-11-16 to land before the tag (operator, MoSCoW S4 / C5; each adds its own entry above when it
-lands):** the X-Actor header path removed, the `batch_id` rename trio (above) and X5 with the StepInfo envelope.
+lands):** the X-Actor header path removed (landed 2026-11-17, entry above), the `batch_id` rename trio (above) and X5
+with the StepInfo envelope.
 - **`AlertMigration` stays in 4.0.0 (operator, MoSCoW C5 restated 2026-11-16).** No released version carries the Alert
   store (it landed on trunk 2026-10-07, after `v3.11.0`), so 4.0.0 is the first release with it and adopts a 3.x
   install's still-active ALERT objects on upgrade. `AlertMigration` / `LegacyAlertObjects` are deleted in 5.0.0, whose

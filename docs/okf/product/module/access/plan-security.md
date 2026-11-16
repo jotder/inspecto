@@ -171,11 +171,12 @@ default `mvn -o clean test` reactor **never compiles either module** — see §8
 
 Every request passes, in order (`ControlApi.dispatch`, `inspecto/src/main/java/com/gamma/control/ControlApi.java:716-717`):
 
-1. **`authenticate(ex, path)`** (`:760-783`). Skipped for `PUBLIC_PATHS` and for self-verifying public
-   routes. If an `Authenticator` is active: the `X-Actor` header is **rejected outright with
-   `403 PERMISSION_DENIED`** (`:777-780` — the SEC-7a spoof guard: identity comes from the `Subject`, never
-   from a header); a request that yields no `Subject` gets **`401 UNAUTHENTICATED`** (`:783`). With no
-   `Authenticator` (Personal) the stage is a no-op.
+1. **`authenticate(ex, path)`** (`:760-783`). First, on every edition and every matched route (static and SPA assets never reach `authenticate`): a non-blank `X-Actor`
+   header is **rejected outright with `403 PERMISSION_DENIED`** (the SEC-7a spoof guard, extended from
+   Standard to every edition when the header was removed in 4.0.0 — 2026-11-17, MoSCoW S4: identity comes
+   from the `Subject`, or on Basic is `appUser`, never from a header). Then, skipped for `PUBLIC_PATHS` and
+   self-verifying public routes: if an `Authenticator` is active, a request that yields no `Subject` gets
+   **`401 UNAUTHENTICATED`** (`:783`). With no `Authenticator` (Personal) the rest of the stage is a no-op.
 2. **`authorize(ex, method, path)`** (`:796-808`) — the ABAC route-level policy enforcement point. No-op when
    no `AccessDecider` is registered, for public paths, or for subject-less exchanges. `DENY` → `403
    PERMISSION_DENIED`; `ABSTAIN` falls through. The action verb is derived by `actionFor` (`:812-818`):
@@ -528,7 +529,6 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | Item | Board id | What remains |
 |---|---|---|
 | **Policy-authoring UX** — browser pass only | `BACKLOG.md` §3.8 *Security: policy-authoring UX*; `EDITIONS.md` SEC-05 | Guards, impact matrix and editor **SHIPPED 2026-09-25** (§3.10 *Authoring guards*); only a browser pass over the Policies-tab editor remains |
-| **`X-Actor` full removal** | `BACKLOG.md` §2 *X-Actor full removal*; `EDITIONS.md` SEC-11 | Already **rejected** on Standard/Enterprise (§3.2); the header path survives only for Personal's actor attribution. Gate: **the next MAJOR tag** (restated 2026-09-07 — the API-v1 sunset it used to cite was deleted 2026-07-25) |
 | **Vault / cloud-KMS secrets** (GAP-6 / SEC-8) | `BACKLOG.md` §3 `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` (was *Deployment topology gaps*); §6 standing note | Enterprise-only, **only when a client policy requires it**. The `SecretsProvider` SPI is the seam; nothing else is designed |
 | **Data masking / row scope by field classification** | `EDITIONS.md` SEC-08; `ProcessorCatalog` `quality.pii.mask` (DELIVERED 2026-10-06, `transform.mask`) + `quality.compliance.redact` (`Status.PLANNED`) | Enterprise-only by decision. The `mask` Step is built and gated through `EditionFeatures.PII_MASK`, which only `inspecto-policy` declares ([step catalog](../etl/spec-step-catalog.md)). Dataset-wide masking at read time is not built and has no BACKLOG row of its own. Link Analysis entity-id masking by classification is built and ships with `inspecto-geo-link` (not Enterprise-only) |
 | **SEC-INCIDENT-1 carry-forwards** | `BACKLOG.md` §2 *SEC-INCIDENT-1 carry-forwards* | Delete the off-repo pre-rewrite bundle (five cleartext secrets); confirm no reuse; internal hostnames still in-repo; a dated CC6.1 line in `compliance/controls-matrix.md` |
@@ -648,8 +648,8 @@ the logs were deleted 2026-07-26 before export).
 | Uniform `granted && !readOnly && allows` in `LensService` | the identity / lens-scoped split | §3.14 |
 | "Business lens ⇒ read-only" as a product statement | no longer true | §3.14 |
 | `rbac-abac-plan` Q4 "roles-only subjects in v1?" | both `role` and `user` shipped; `user` = opaque IdP `sub` | §3.9 |
-| `rbac-abac-plan` Q2 "fold X-Actor retirement into R2" | X-Actor is *rejected*, not removed; removal is gated on the next MAJOR | §5 |
-| The X-Actor gate "client migration with the API-v1 sunset" | the next MAJOR tag (the sunset apparatus was deleted 2026-07-25) | `BACKLOG.md` §2 |
+| `rbac-abac-plan` Q2 "fold X-Actor retirement into R2" | X-Actor was *rejected* on Standard, then removed on every edition in 4.0.0 (2026-11-17, MoSCoW S4) | §3.2 |
+| The X-Actor gate "client migration with the API-v1 sunset" | the next MAJOR tag (the sunset apparatus was deleted 2026-07-25); discharged 2026-11-17 | `api/plan-api-stability.md` §Release notes |
 | Lens Access P3's root-default-allow as contractual for roles | flagged forward-compatible only: the server default for roles may flip to deny-by-default — a security-module call, unmade | `lens-access-config-design.md` §P3 (archive) |
 | The 2026-06-19 `STAKEHOLDER_OVERVIEW.md` ("a *planned* `inspecto-oidc` module", "Enterprise (future)", "Personal localhost-bound") | shipped 2026-07-06 / 2026-07-23; binds every interface | plan §8 cluster — reconciled at step 6, not here |
 
@@ -676,7 +676,7 @@ These run in every build because they exercise the *core* seams through `Authent
 
 | Class | Proves |
 |---|---|
-| `ControlApiAuthV1Test` | the AuthN gate: `401 UNAUTHENTICATED` without a Subject, `403` on `X-Actor` with an authenticator active, public paths open |
+| `ControlApiAuthV1Test` | the AuthN gate: `401 UNAUTHENTICATED` without a Subject, `403` on `X-Actor` with or without an authenticator (`xActorHeaderIsRejectedOnBasic`), public paths open |
 | `ControlApiAuthSessionV1Test` | the BFF: `/auth/*` cookie shape, `Origin` refusal, relay-absent `503` |
 | `ControlApiAccessRolesTest` | `GET/PUT /access/roles`, the per-role overlay, `[]` revokes, fail-closed on an unreadable file |
 | `ControlApiAccessPoliciesTest` | `GET/PUT /access/policies`, `422` on a bad `when`, seed rows tagged `source` |

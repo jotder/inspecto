@@ -140,17 +140,15 @@ public final class RequestAttrs {
     /** The acting identity for the audit trail. When the security module authenticated this request
      *  (W6), the resolved {@code Subject}'s id is authoritative. Otherwise, when the request carries
      *  {@code #HEADER_AGENT_SESSION} (S6 — an agent-confirmed apply), the actor is {@code agent:<sessionId>}.
-     *  Otherwise (Basic edition, or a public route no {@code Authenticator} ran on) the actor is the
-     *  caller-supplied {@code X-Actor} header, defaulting to {@code appUser} — the historic auth-free
-     *  behaviour, unchanged. On Standard/Advanced the header never reaches here: {@code ControlApi}'s
-     *  authenticate stage rejects any {@code X-Actor} outright (SEC-7a spoof guard), so the actor is
-     *  always the authenticated {@code Subject}. */
+     *  Otherwise (Basic edition, or a public route no {@code Authenticator} ran on) the actor is the local
+     *  default {@code appUser}. The {@code X-Actor} header was removed in 4.0.0 (MoSCoW S4): it carries no
+     *  identity on any edition, and {@code ControlApi}'s authenticate stage refuses a request that still
+     *  sends it. */
     public static String actor(HttpExchange ex) {
         if (attr(ex, ATTR_SUBJECT) instanceof Subject s) return s.id();
         String agentSession = ex.getRequestHeaders().getFirst(HEADER_AGENT_SESSION);
         if (agentSession != null && !agentSession.isBlank()) return "agent:" + agentSession.trim();
-        String a = ex.getRequestHeaders().getFirst("X-Actor");
-        return (a == null || a.isBlank()) ? "appUser" : a.trim();
+        return "appUser";
     }
 
     /** The audit {@code actorType} for this request: {@code "service"} for a machine {@code Subject} (a

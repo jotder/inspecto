@@ -69,6 +69,24 @@ class ExchangeAttributeScopeTest {
                         + "never to the previous request's identity");
     }
 
+    /** X-Actor removal (MoSCoW S4, 4.0.0): the header carries no identity, even on an exchange the authenticate
+     *  stage's refusal never saw — without a Subject the actor is {@code appUser}, with one it is the Subject. */
+    @Test
+    void anXActorHeaderNeverBecomesTheActor() {
+        FakeExchange basic = new FakeExchange("/api/v1/pipelines");
+        basic.getRequestHeaders().add("X-Actor", "mallory");
+        assertEquals("appUser", ApiContext.actor(basic), "no Subject: the local default, not the header");
+
+        FakeExchange standard = new FakeExchange("/api/v1/pipelines");
+        standard.getRequestHeaders().add("X-Actor", "mallory");
+        ApiContext.attr(standard, ApiContext.ATTR_SUBJECT, new Subject("alice", Set.of()));
+        try {
+            assertEquals("alice", ApiContext.actor(standard), "a Subject: its id, not the header");
+        } finally {
+            ControlApi.clearRequestScope(standard);
+        }
+    }
+
     /**
      * THE regression this class exists for since 2026-08-19: on a pre-JDK-26 runtime every exchange of
      * a context SHARES one attribute map. Two concurrent requests must not see each other's values, and

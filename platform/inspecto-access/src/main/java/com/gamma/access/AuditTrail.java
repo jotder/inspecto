@@ -116,7 +116,7 @@ public final class AuditTrail {
 
     /** As above, naming the {@code actor} explicitly — {@code /auth/exchange} passes the Subject the minted token
      *  resolves to (or {@code unknown}), because on that public route {@code ApiContext.actor} would be the
-     *  caller-written {@code X-Actor} header, and trigger T5 keys on this row's actor. */
+     *  unauthenticated fallback, and trigger T5 keys on this row's actor. */
     public static void authentication(HttpExchange ex, String action, boolean ok, int status, String actor) {
         try {
             String path = PublicPaths.redact(ex.getRequestURI().getPath());
