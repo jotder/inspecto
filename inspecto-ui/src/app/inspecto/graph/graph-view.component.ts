@@ -836,7 +836,7 @@ function fnv(h: number, s: string): number {
 
 /**
  * A cheap content signature of the drawn graph (PERF-P2): counts plus a two-lane FNV hash over every id and every field
- * the canvas reads (node label, kind, colour, icon, the missing/held/unexpanded/highConnectivity flags, the `attrs`
+ * the canvas reads (node label and drawn label, start mark, kind, colour, icon, the missing/held/unexpanded/highConnectivity flags, the `attrs`
  * that conditional formatting reads; edge endpoints, kind, weight, simulated, attrs). Replaces a `JSON.stringify` of
  * the whole graph, which at 2,000 nodes was 1-3 MB of string per change. Equal content gives an equal signature;
  * any change of a drawn field moves it. Node order is part of the signature on purpose: it is part of the data.
@@ -861,6 +861,8 @@ export function graphSignature(data: G6GraphData | null | undefined): string {
         const d = n.data as G6Node['data'];
         add(n.id);
         add(d.label);
+        add(d.canvasLabel);
+        add(d.start);
         add(d.kind);
         add(d.color);
         add(d.iconSrc);

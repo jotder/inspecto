@@ -810,6 +810,16 @@ describe('graphSignature (PERF-P2)', () => {
         expect(graphSignature(edgeKind)).not.toBe(sig);
     });
 
+    it('moves when only the drawn label or the start mark changes (a reveal redraws, LA-FULL-CYCLE-TEST-1 phase 2)', () => {
+        const sig = graphSignature(base());
+        const drawn = base();
+        node(drawn, 0)['canvasLabel'] = 'MULE-HUB-01';
+        expect(graphSignature(drawn)).not.toBe(sig);
+        const start = base();
+        node(start, 0)['start'] = true;
+        expect(graphSignature(start)).not.toBe(sig);
+    });
+
     it('moves when only an edge provenance or a node provenance changes (the tooltips read both)', () => {
         const sig = graphSignature(base());
         const e = base();
