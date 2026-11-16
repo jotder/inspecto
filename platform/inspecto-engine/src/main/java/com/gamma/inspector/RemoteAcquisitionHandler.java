@@ -26,7 +26,8 @@ import java.util.concurrent.*;
  * Remote-source acquisition (Phase E/F) for {@link CollectorProcessor}: materialise the bytes of files
  * listed by a remote {@link CollectorConnector} (SFTP/FTP/…) into the local staging tree so the rest of
  * the engine — dedup, markers, ledger, backup — treats them exactly like local files. Covers pre-fetch
- * dedup, rate-limited (optionally parallel) fetch + integrity verification, mtime preservation,
+ * dedup, the pre-fetch byte cap (when the listing sized every file), rate-limited (optionally parallel) fetch
+ * + integrity verification, mtime preservation,
  * source-side post-actions, and dead-lettering of corrupt downloads. Observability is delegated to
  * {@link AcquisitionTelemetry}.
  *
@@ -102,6 +103,9 @@ final class RemoteAcquisitionHandler {
             toFetch.add(rf);
         }
         if (toFetch.isEmpty()) return List.of();
+        // MoSCoW C8: the per-cycle byte cap, before any bytes move, when the listing sized every file. After the
+        // dedup above, so a re-listed duplicate never spends the budget a new file needs.
+        toFetch = CollectorProcessor.capBeforeFetch(cfg, toFetch);
 
         RateLimiter limiter = fetch.rateLimited() ? RateLimiter.perSecond(fetch.rateLimitBytesPerSec()) : null;
         int parallelism = Math.max(1, Math.min(fetch.parallelFetch(), toFetch.size()));

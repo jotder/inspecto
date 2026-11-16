@@ -41,7 +41,7 @@ ends (`AutoCloseable`). Instances need not be thread-safe.
 |---|---|
 | `scheme()` | Same token as the factory. |
 | `EnumSet<Capability> capabilities()` | `STREAM`, `RANDOM_ACCESS`, `RESUMABLE`, `DELETE`, `MOVE`, `RENAME`, `TAG`, `ETAG`, `VERSIONING`. Drives retrieval planning and post-action validation. |
-| `List<RemoteFile> discover(DiscoveryContext ctx)` | List candidates after the include/exclude/depth filters in `ctx`. Not de-duplicated (the ledger does that). No destructive action; a missing source answers an empty list. |
+| `List<RemoteFile> discover(DiscoveryContext ctx)` | List candidates after the include/exclude/depth filters in `ctx`. Not de-duplicated (the ledger does that). No destructive action; a missing source answers an empty list. Fill `RemoteFile.size` when the listing returns it at no extra cost, else leave `RemoteFile.SIZE_UNKNOWN` (never guess, never stat or HEAD each file for it): when every listed file has a size, the engine applies the per-cycle byte cap before fetching (MoSCoW C8, 2026-11-17). |
 | `Readiness readiness(RemoteFile)` | `READY`, `NOT_READY` or `UNKNOWN` (engine falls back to size/mtime stabilisation). |
 | `InputStream open(RemoteFile)` | Stream from the source, no local copy. |
 | `Path fetchTo(RemoteFile, Path dest)` | Write the bytes **once** at `dest` (the final resting place, e.g. the backup dir). Never download to temp then move. |

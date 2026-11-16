@@ -145,9 +145,18 @@ discovered listing, so one tick can overshoot the mark. A per-cycle intake cap i
 name — files via `-Dingest.maxFilesPerCycle` (default `IntakeGovernor.DEFAULT_MAX_FILES_PER_CYCLE` = 500
 since 2026-10-06, `0` disables; `IntakeGovernor.capFor` read in `CollectorProcessor.collect`, per
 Pipeline `processing.intake.max_files_per_cycle`) and bytes via `-Dingest.maxBytesPerCycle` (2026-09-16,
-`20ff050d`) — but both run after listing, on local files, so they bound materialisation, not remote fetch
-bandwidth. Bounding the *fetch* would need a listing-with-sizes seam that does not exist (branch-aware
-residual (f) in `BACKLOG.md`).
+`20ff050d`) — and both run after listing, on local files. **The byte cap also bounds the fetch since
+2026-11-17** (branch-aware residual (f), MoSCoW C8): the listing-with-sizes seam is `RemoteFile.size`
+(`@PublicApi` since 4.0.0, `SIZE_UNKNOWN` = -1), which S3, GCS, Azure Blob, SFTP and FTP already fill from
+their listings. `RemoteAcquisitionHandler.materializeRemote` calls `CollectorProcessor.capBeforeFetch`
+after the pre-fetch dedup (so a re-listed duplicate never spends the budget) and before any `fetchTo`:
+oldest-first by listing mtime, the same `-Dingest.maxBytesPerCycle` policy and the same starvation guard
+(one file over the cap is fetched alone). A deferred file gets no fetch and no post-action, so it stays on
+the source and is listed again next cycle. **Only when every candidate has a size**; one `SIZE_UNKNOWN`
+(the `db` export and Kafka, which cannot know before the export or poll; the `dataset` copy, which
+delegates to the local connector that never stats at discovery) and the whole listing is fetched as
+before, capped after landing. The file-count cap is still not applied before the fetch: it is adaptive to
+ingest overrun and on by default (500), so moving it would change every remote Collector's default.
 
 ### 3.3 Phase A — discovery
 
@@ -837,7 +846,7 @@ so they are not re-proposed as new ideas; none is scheduled.
 |---|---|---|
 | Vault / KMS secret provider | `BACKLOG.md` §6 "Decided 2026-09-06" note (`GAP-6` in older docs; no open row) | Deferred by the SEC-07 decision, not blocked: only when a client policy requires it |
 | ~~"Listed-not-yet-fetched" gauge~~ | branch-aware residual **(e)** | **DROPPED (operator, 2026-10-06)** — recorded on the *Branch-aware executor residuals* row |
-| Remote-fetch bandwidth cap (was `acquire.maxFilesPerCycle`) | branch-aware residual **(f)** (P3, `hold: demand`) | The per-cycle intake caps SHIPPED (`-Dingest.maxFilesPerCycle`, `-Dingest.maxBytesPerCycle`); both run after listing on local files, so a cap on what a cycle *fetches* needs a listing-with-sizes seam that does not exist |
+| ~~Remote-fetch bandwidth cap (was `acquire.maxFilesPerCycle`)~~ | branch-aware residual **(f)** | **BUILT 2026-11-17 (MoSCoW C8)**: `-Dingest.maxBytesPerCycle` is applied before the fetch when every listed file carries `RemoteFile.size` (§3.2 above); an unsized listing keeps the cap after landing. The file-count cap stays after landing |
 | Multi-part archives | Unpack (11) | `depth: 1` is deliberate (§6.8); *multi-part* (`.z01`, split RAR) is simply unbuilt |
 | ~~Missing connection not caught until first poll~~ | — (closed) | **Now caught at save**: a remote Collector whose `collector.connection` names no profile in the Space is an ERROR finding at `/config/write` (`ConfigRoutes.unknownConnectionFindings`); a Space import with a missing connection is a WARNING that writes the dependents switched off (2026-09-25) |
 | Acquisition ledger defaults to `memory` | — (the *Completeness KPI hold* that carried it was lifted 2026-10-06) | 🔴 The default loses the ledger on restart (§3.5, §3.7). The completeness KPI no longer depends on it: `kpi.completeness` reads the consignment-output store and refuses unless that store is durable (`KpiCompletenessJob`) |

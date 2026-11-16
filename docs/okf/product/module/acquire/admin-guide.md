@@ -21,7 +21,7 @@ Module `platform/inspecto-acquire` (Base, every Edition). Collector and Connecti
 | `-Dingest.maxFilesPerCycle` | `500` | Files one poll cycle may admit; `0` turns admission control off. |
 | `-Dingest.minFilesPerCycle` | `1` | Floor the adaptive controller may halve down to. |
 | `-Dingest.backpressure.adaptive` | `true` | `false` pins the cap at `maxFilesPerCycle` (a hard cap). |
-| `-Dingest.maxBytesPerCycle` | `0` (off) | Byte cap per cycle — bytes, not files: one large file passes a count cap. |
+| `-Dingest.maxBytesPerCycle` | `0` (off) | Byte cap per cycle — bytes, not files: one large file passes a count cap. A remote Collector whose listing gives every file a size (S3, GCS, Azure Blob, SFTP, FTP) is capped **before the fetch**: the files over the cap stay on the source, unfetched, until a later cycle. A listing with any size missing (the `db` export, Kafka, the `dataset` copy) is fetched whole and capped after landing, in the inbox. Either way, a single file over the cap is taken alone rather than never. |
 
 A malformed numeric value falls back to its default. Code:
 [`AcquisitionLedgers`](../../../../../platform/inspecto-acquire/src/main/java/com/gamma/acquire/AcquisitionLedgers.java),

@@ -49,6 +49,11 @@ public interface CollectorConnector extends AutoCloseable {
      * include/exclude/depth filters in {@code ctx}. The result is <em>not</em> duplicate-filtered — markers /
      * the fingerprint ledger are an engine concern applied on top. Must perform no destructive action and,
      * for sources that don't exist yet (e.g. a missing local inbox), return an empty list and create nothing.
+     *
+     * <p>Fill {@link RemoteFile#size()} when the listing returns it at no extra cost (S3 / GCS / Azure LIST,
+     * an SFTP or FTP directory listing); the engine then applies the per-cycle byte cap before fetching.
+     * Otherwise leave {@link RemoteFile#SIZE_UNKNOWN}: never guess, and never stat or HEAD each file just
+     * for this. An unknown size keeps the cap after the fetch.
      */
     List<RemoteFile> discover(DiscoveryContext ctx) throws AcquisitionException;
 

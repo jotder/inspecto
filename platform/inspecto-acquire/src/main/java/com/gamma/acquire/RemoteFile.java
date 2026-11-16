@@ -20,6 +20,11 @@ import java.time.Instant;
  * discovery on purpose — a directory walk would have to {@code stat()} each file separately, and Phase A
  * needs none of it (batch planning stats on demand). Later phases (stability/watermark/checksum) fill these
  * when they actually need them, keeping discovery I/O at the legacy minimum.
+ *
+ * <p><b>{@code size} is the listing-with-sizes seam</b> (MoSCoW C8). When every file a remote listing offers
+ * carries a size, the engine applies the per-cycle byte cap ({@code -Dingest.maxBytesPerCycle}) <em>before</em>
+ * fetching, so the deferred files cost no bandwidth. A connector fills it only when its listing returns it;
+ * it never guesses. {@link #SIZE_UNKNOWN} on any file keeps the cap after the fetch, on the landed files.
  */
 @PublicApi(since = "4.0.0")
 public record RemoteFile(String name,

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-412 test class(es): 412 unit, 0 real-HTTP control-plane, 0 IT.
+413 test class(es): 413 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -153,6 +153,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `RefusalQuarantineTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/RefusalQuarantineTest.java` | {@code processing.refusal: restricted_quarantine}: only an author-raised, exactly-anchored reason code refuses a file — |
 | `RejectAllOrNothingTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/RejectAllOrNothingTest.java` | {@code processing.reject_mode: all_or_nothing} (X4 deferral, 2026-09-28) over the four delimited-CSV ingest |
 | `RemoteAcquisitionStagingTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/RemoteAcquisitionStagingTest.java` | B3 — <b>stage, then land</b>: {@link RemoteAcquisitionHandler} fetches into a staging tree outside the inbox |
+| `RemotePreFetchByteCapTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/RemotePreFetchByteCapTest.java` | MoSCoW C8, the branch-aware residual (f): the per-cycle byte cap ({@code -Dingest.maxBytesPerCycle}) applied |
 | `RemoteSliceFrontierRekeyTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/RemoteSliceFrontierRekeyTest.java` | KAFKA-OFFSET-REKEY-1: a remote connector stashes its slice frontier under the STAGING path it wrote, but the |
 | `ReprocessCommandTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/ReprocessCommandTest.java` |  |
 | `RouteIngestEndToEndTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/RouteIngestEndToEndTest.java` | Arming plan S2, end to end: an authored {@code route:} pipeline executes on the REAL ingest path |

@@ -121,7 +121,10 @@ reference store per branch. Decision-rule routing + `sinks>1` (no `route:`) is c
 
 Mid-branch transforms in the recipe's route verb (compiles refused: "a route branch compiles as exactly
 one sink step for now"). ~~`mode: clone` arming~~ (2026-09-06) · ~~multi-schema + route~~ (2026-09-24,
-below).
+below) · ~~the pre-fetch intake cap~~ (2026-11-17, MoSCoW C8: the byte cap runs before a remote fetch when
+the listing sizes every file; [acquisition plan](../acquire/plan-acquisition.md) §3.2). The flat homes
+(`transform.select/derive/validate/split/merge`, `sink.materialized/view` on ingest) stay refused; board §6
+*Pipelines — execution*.
 
 **The save-time arming pre-check SHIPPED 2026-08-26** — and this section's reason for deferring it
 ("arming validates at engine LOAD on both server and mock — a 422-on-save would be UX polish, not a

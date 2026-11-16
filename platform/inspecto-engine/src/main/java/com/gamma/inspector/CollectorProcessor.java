@@ -613,18 +613,53 @@ public class CollectorProcessor {
      * file is admitted ANYWAY and the overrun is logged at WARN. A cap that can stall a pipeline forever is
      * worse than a cap that is occasionally exceeded by one file.
      *
-     * <p>⚠ Known limitation, stated rather than papered over: this runs where candidate sizes are known —
-     * after listing, on local {@link File}s. For a collector that fetches remotely BEFORE this point, the
-     * saving is on materialisation, not on the fetch itself. Moving it earlier needs a listing-with-sizes
-     * seam that does not exist today.
+     * <p>This is the cap on the landed inbox. A remote collector whose listing carries a size for every file
+     * meets the same cap once earlier, before any bytes move ({@link #capBeforeFetch}); one whose listing
+     * lacks a size fetches the whole listing and is bounded here only (MoSCoW C8).
      */
     private static List<File> admitBytes(PipelineConfig cfg, List<File> ordered, long byteCap) {
+        return withinByteCap(cfg, ordered, byteCap, f -> Math.max(0L, f.length()), File::getName, "wait in the inbox");
+    }
+
+    /**
+     * The <b>pre-fetch</b> byte cap (MoSCoW C8, the branch-aware residual (f)): bound what ONE acquire cycle
+     * fetches from a remote source by the listing's sizes, so the deferred files never cost fetch bandwidth.
+     * The same {@code -Dingest.maxBytesPerCycle} policy and starvation guard as {@link #admitBytes}, applied
+     * oldest-first (by listing mtime; a file with none sorts last) over the files the pre-fetch dedup kept.
+     * A deferred file is not fetched and gets no post-action, so it stays on the source and is listed again
+     * next cycle.
+     *
+     * <p>⚠ Only when <b>every</b> candidate carries a listing size ({@link RemoteFile#hasSize()}). One unknown
+     * size and the whole listing is fetched, as it always was, and the cap applies after the fetch, on the
+     * landed files ({@link #admitBytes}). Capping only the sized part would let unsized files overtake older
+     * sized ones; guessing a size would make the cap a lie.
+     */
+    static List<RemoteFile> capBeforeFetch(PipelineConfig cfg, List<RemoteFile> toFetch) {
+        long byteCap = IntakeGovernor.shared().policyFor(cfg.identity().pipelineName()).maxBytesPerCycle();
+        if (byteCap == IntakeGovernor.Policy.UNBOUNDED_BYTES || toFetch.isEmpty()) return toFetch;
+        if (!toFetch.stream().allMatch(RemoteFile::hasSize)) {
+            log.debug("Byte cap: the listing for {} lacks a size for some file, so all {} are fetched and the cap "
+                    + "applies to the landed files", cfg.identity().pipelineName(), toFetch.size());
+            return toFetch;
+        }
+        List<RemoteFile> ordered = new ArrayList<>(toFetch);
+        ordered.sort(java.util.Comparator.comparing(RemoteFile::lastModified,
+                java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())));
+        return withinByteCap(cfg, ordered, byteCap, RemoteFile::size,
+                rf -> FileNames.safe(cfg, rf.relativePath()), "stay on the source, unfetched");
+    }
+
+    /** The byte-cap walk shared by {@link #admitBytes} and {@link #capBeforeFetch}: take oldest-first while the
+     *  total fits, and admit the oldest file ALONE when even it is over the cap (the starvation guard). */
+    private static <T> List<T> withinByteCap(PipelineConfig cfg, List<T> ordered, long byteCap,
+                                             java.util.function.ToLongFunction<T> sizeOf,
+                                             java.util.function.Function<T, String> nameOf, String deferred) {
         if (byteCap == IntakeGovernor.Policy.UNBOUNDED_BYTES || ordered.isEmpty()) return ordered;
 
-        List<File> taken = new ArrayList<>();
+        List<T> taken = new ArrayList<>();
         long total = 0;
-        for (File f : ordered) {
-            long size = Math.max(0L, f.length());
+        for (T f : ordered) {
+            long size = sizeOf.applyAsLong(f);
             if (!taken.isEmpty() && total + size > byteCap) break;
             taken.add(f);
             total += size;
@@ -633,11 +668,10 @@ public class CollectorProcessor {
             log.warn("Byte cap: '{}' is {} byte(s), over the {}-byte cap for {} — admitting it ALONE this "
                     + "cycle rather than never. A file larger than the cap fits in no cycle, and deferring "
                     + "it would starve it forever while smaller files overtake it.",
-                    taken.get(0).getName(), total, byteCap, cfg.identity().pipelineName());
+                    nameOf.apply(taken.get(0)), total, byteCap, cfg.identity().pipelineName());
         } else if (taken.size() < ordered.size()) {
-            log.info("Byte cap: taking {} of {} file(s) ({} of {} bytes) for {} this cycle; the rest wait "
-                    + "in the inbox", taken.size(), ordered.size(), total, byteCap,
-                    cfg.identity().pipelineName());
+            log.info("Byte cap: taking {} of {} file(s) ({} of {} bytes) for {} this cycle; the rest {}",
+                    taken.size(), ordered.size(), total, byteCap, cfg.identity().pipelineName(), deferred);
         }
         return taken;
     }
