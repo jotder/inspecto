@@ -78,7 +78,9 @@ import { SuggestedList, activeDomainProfileId, domainProfile } from '@inspecto/l
                     }
                 </div>
                 @if (!canWrite()) {
-                    <p class="text-secondary m-0">Read-only: changing Entity Lists needs Incident management.</p>
+                    <p class="text-secondary m-0">
+                        Read-only: changing Entity Lists needs the Manage Incidents and Cases permission.
+                    </p>
                 }
                 @if (error()) {
                     <inspecto-alert [variant]="unavailable() ? 'info' : 'error'" title="Entity Lists">{{

@@ -235,7 +235,7 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
   fork/step/rebase/promote with a held four-eyes promote on la-showcase in the la-app bundle has no recorded run or smoke probe.
 
 ### S10. Entity Lists and the identity head hash (2 min) [fm.analyst]
-* **Click:** the left rail > **Entity Lists** > `smurf-accounts` (12 members plus the `SMURF-` range and expiring `TILL-06`); the **Identity Fact log** panel.
+* **Click:** the left rail > **Entity Lists** > `smurf-accounts` (12 members plus the `SMURF-` range and expiring `TILL-06`); the **Identity history** tab.
 * **Expect:** the head (fact number and hash) and the success banner **Chain verified**. The seeded assertion `MULE-HUB-01` = `ACC-1006` appears in
   Identity resolution. Note the head hash; cutting the end of the chain leaves a shorter valid chain, so compare later. A broken chain shows **Chain NOT verified**.
 * **Proves:** the Identity Fact log is append-only and hash-chained (arch §3.5). The hash is verified on every read.

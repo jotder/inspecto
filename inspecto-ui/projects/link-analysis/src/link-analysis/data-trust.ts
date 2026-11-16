@@ -57,15 +57,6 @@ export function formatDayStart(iso: string | null | undefined): string {
     return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
-/** `2026-09-05T10:03:20Z` -> `5 Sep 2026 10:03 UTC`: the one reading of an instant in the strip (UTC for every analyst). Blank when unreadable. */
-export function formatInstant(iso: string | null | undefined): string {
-    const d = new Date(iso ?? '');
-    if (!iso || Number.isNaN(d.getTime()) || !/(Z|[+-]\d{2}:?\d{2})$/.test(iso)) return '';
-    const hh = String(d.getUTCHours()).padStart(2, '0');
-    const mm = String(d.getUTCMinutes()).padStart(2, '0');
-    return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()} ${hh}:${mm} UTC`;
-}
-
 /**
  * The window the Files themselves span: [first day 00:00Z, day after the last 00:00Z). Lets the strip judge days for an
  * Investigation that has no window of its own (the coverage read refuses an unbounded one). Null when no day is known.

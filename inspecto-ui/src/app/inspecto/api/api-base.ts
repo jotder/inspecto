@@ -42,7 +42,9 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
  */
 export const CAPABILITY_NAMES: Readonly<Record<string, string>> = {
     canAuthorWorkbench: 'Workbench author',
-    canManageIncidents: 'Incident management',
+    // The grant's name in Access configuration ("Manage Incidents and Cases"): in Link Analysis it also gates every
+    // Investigation write, where "Incident management" read as unrelated (LA-FULL-CYCLE-TEST-1 finding 27).
+    canManageIncidents: 'the Manage Incidents and Cases permission',
     canWorkIncidents: 'Incident work',
     canOperateRuns: 'Run operations',
     canAdminister: 'Administration',

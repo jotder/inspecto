@@ -2,7 +2,6 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
-import { DatePipe } from '@angular/common';
 import { RouterLink, UrlTree } from '@angular/router';
 import { firstValueFrom, forkJoin, of, catchError, map } from 'rxjs';
 import { apiErrorMessage, needsPermission } from '@inspecto/core/api';
@@ -22,6 +21,7 @@ import { NodeRiskService, ReferenceTable } from './node-risk.service';
 import { NodeReference, detailLines } from './reference-details';
 import { CaseHistoryService, EntityHistory, EntityHistoryStatus } from './case-history.service';
 import { laLimit } from './la-limits';
+import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { LinkAnalysisEntitySummaryComponent } from './link-analysis-entity-summary.component';
 
@@ -90,14 +90,7 @@ interface Membership {
     selector: 'inspecto-la-node-insight',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [
-        MatButtonModule,
-        InspectoAlertComponent,
-        ChipComponent,
-        RouterLink,
-        DatePipe,
-        LinkAnalysisEntitySummaryComponent,
-    ],
+    imports: [MatButtonModule, InspectoAlertComponent, ChipComponent, RouterLink, LinkAnalysisEntitySummaryComponent],
     template: `
         @if (maskedId()) {
             <!-- D3: the node dialog's way to the one Reveal for the nodes on screen -->
@@ -403,9 +396,7 @@ interface Membership {
                                                     @if (o.severity) {
                                                         <span class="text-secondary">{{ o.severity }}</span>
                                                     }
-                                                    <span class="text-secondary text-xs">{{
-                                                        o.createdAt | date: 'medium'
-                                                    }}</span>
+                                                    <span class="text-secondary text-xs">{{ time(o.createdAt) }}</span>
                                                     @if (o.matchedOn === 'investigation') {
                                                         <span class="text-secondary text-xs" data-testid="history-via"
                                                             >via Investigation {{ o.via }}</span
@@ -461,7 +452,7 @@ interface Membership {
                 </div>
                 @if (!ctx().canManageLists && addTargets().length) {
                     <p class="text-secondary mt-1 text-xs" data-testid="lists-forbidden">
-                        Adding to a list: needs Incident management.
+                        Adding to a list needs the Manage Incidents and Cases permission.
                     </p>
                 } @else if (memberships() && !eligibleLists().length) {
                     <p class="text-secondary mt-1 text-xs" data-testid="lists-none">
@@ -478,6 +469,9 @@ interface Membership {
 export class NodeInsightComponent implements OnInit {
     private readonly svc = inject(NodeRiskService);
     private readonly settings = inject(LinkAnalysisSettingsService);
+
+    /** A server-recorded time in the one app clock (`ledgerTime`, `DATES-ONE-ZONE-1`). */
+    protected readonly time = ledgerTime;
 
     /** Reference rows come back masked under the Space's masking mode, like every other Link Analysis read. */
     readonly maskedNote = 'Entity masking is on: identifying values are shown as aliases.';

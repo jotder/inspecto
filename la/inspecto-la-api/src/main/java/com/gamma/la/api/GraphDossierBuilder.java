@@ -389,8 +389,8 @@ final class GraphDossierBuilder {
         m.put("computedBy", "client-side (the SPA's graph algorithms); sealed into a snapshot, not recomputed here");
         m.put("tables", tables);
         if (tables.isEmpty())
-            m.put("note", "no score vectors in the evidence — include a snapshot anchored to this Investigation to "
-                    + "carry the centrality/risk scores the analyst computed");
+            m.put("note", "No centrality or risk scores in the evidence: include a snapshot taken in this Investigation to "
+                    + "carry the scores the analyst worked out.");
         return m;
     }
 
@@ -545,11 +545,26 @@ final class GraphDossierBuilder {
         return m;
     }
 
+    /**
+     * A recorded time as the renderings print it: {@code 2026-11-15 13:21:24 UTC}, to the second (LA-FULL-CYCLE-TEST-1
+     * finding 29: the steps and the method statement printed the stored nanosecond instant). A rendering is read away from
+     * the app, so it names its zone. Anything that is not an instant is printed as it is; the JSON keeps the stored value.
+     */
+    static String when(Object at) {
+        if (at == null) return "an unknown time";
+        try {
+            return java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss 'UTC'")
+                    .format(java.time.Instant.parse(String.valueOf(at)).atOffset(java.time.ZoneOffset.UTC));
+        } catch (java.time.format.DateTimeParseException notAnInstant) {
+            return String.valueOf(at);
+        }
+    }
+
     /** The reviewer's rendering: one numbered line per step — exclusions in full — then the negative space. */
     private static List<String> stepsRendering(List<Map<String, Object>> ledger, Map<String, Object> negative) {
         List<String> out = new ArrayList<>();
         for (Map<String, Object> row : ledger)
-            out.add(row.get("step") + ". [" + row.get("author") + ", " + row.get("at") + "] " + row.get("text")
+            out.add(row.get("step") + ". [" + row.get("author") + ", " + when(row.get("at")) + "] " + row.get("text")
                     + (row.get("undoneBy") != null ? " (undone by step " + row.get("undoneBy") + ")" : ""));
         out.add("Not shown in the result:");
         out.addAll(negativeLines(negative));
@@ -569,7 +584,7 @@ final class GraphDossierBuilder {
         if (header.get("purpose") != null)   // D-U5 — stated at create; an Investigation before D-U5 has none
             b.append("Stated purpose (legal basis, recorded and not enforced): ").append(header.get("purpose")).append(". ");
         else b.append("No purpose was recorded (the Investigation predates the purpose requirement). ");
-        b.append("Owner ").append(header.get("owner")).append(", created ").append(header.get("createdAt"))
+        b.append("Owner ").append(header.get("owner")).append(", created ").append(when(header.get("createdAt")))
          .append(". Dataset ").append(header.get("dataset")).append(", links read from ").append(header.get("sourceCol"))
          .append(" to ").append(header.get("targetCol"));
         if (header.get("linkKindCol") != null) b.append(", kind from ").append(header.get("linkKindCol"));
@@ -591,7 +606,7 @@ final class GraphDossierBuilder {
             Map<String, Object> e = log.get(i);
             b.append("  ").append(i + 1).append(". ").append(line(e, i + 1, removedBy, mergedBy, hidden));
             if (undoneBy.containsKey(i + 1)) b.append(" (undone by step ").append(undoneBy.get(i + 1)).append(")");
-            b.append(" — ").append(e.get("author")).append(", ").append(e.get("at")).append("\n");
+            b.append(" — ").append(e.get("author")).append(", ").append(when(e.get("at"))).append("\n");
         }
         b.append("\nResult. ").append(s.entities.size()).append(" entities and ").append(s.links.size())
          .append(" links at step ").append(in.at()).append(" (Working Set ").append(s.hash()).append(").\n");
@@ -687,7 +702,7 @@ final class GraphDossierBuilder {
                 Map<String, Object> q = castMap((Map<?, ?>) r.get("query"));
                 yield "Expanded one hop from " + frontier + " entit" + (frontier == 1 ? "y" : "ies") + " over "
                         + r.get("dataset") + InvestigationTime.rungClause(q) + " — " + r.get("rowCount")
-                        + " link rows read at " + r.get("readAt")
+                        + " link rows read at " + when(r.get("readAt"))
                         + (r.get("fanOutCapped") instanceof Number c && c.longValue() > 0
                                 ? ", " + c + " more left out by the fan-out cap" : "")
                         + (Boolean.TRUE.equals(r.get("truncated")) ? ", TRUNCATED at its budget of " + q.get("budget") : "")
@@ -722,7 +737,7 @@ final class GraphDossierBuilder {
                 List<String> seeded = strings(r.get("ids"));
                 yield "Seeded " + seeded.size() + " entit" + (seeded.size() == 1 ? "y" : "ies") + " of type "
                         + castMap((Map<?, ?>) e.get("list")).get("entityType") + " from " + InvestigationRoutes.listClause(e)
-                        + " — the values of " + r.get("dataset") + " read at " + r.get("readAt") + " whose key is a member"
+                        + " — the values of " + r.get("dataset") + " read at " + when(r.get("readAt")) + " whose key is a member"
                         + (seeded.isEmpty() ? "." : ": " + head(seeded) + ".");
             }
             default -> "Applied " + e.get("op") + ".";

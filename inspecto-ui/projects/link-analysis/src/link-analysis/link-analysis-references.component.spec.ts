@@ -87,7 +87,7 @@ describe('LinkAnalysisReferencesComponent', () => {
         ro.f.detectChanges();
         expect(addButton(ro.el).disabled).toBe(true);
         expect(ro.el.querySelector('[data-testid="references-read-only"]')?.textContent).toContain(
-            'needs Incident management',
+            'needs the Manage Incidents and Cases permission',
         );
         expect(addButton(ro.el).getAttribute('aria-describedby')).toBe('refs-read-only');
         await ro.c.add();

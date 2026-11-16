@@ -66,7 +66,9 @@ import { isUnavailable } from './link-analysis-template.dialogs';
                     }
                 </div>
                 @if (!canManage()) {
-                    <p class="text-secondary m-0">Identities need Incident management, also to read.</p>
+                    <p class="text-secondary m-0">
+                        Identities need the Manage Incidents and Cases permission, also to read.
+                    </p>
                 } @else {
                     @if (error()) {
                         <inspecto-alert [variant]="unavailable() ? 'info' : 'error'" title="Identity resolution">{{

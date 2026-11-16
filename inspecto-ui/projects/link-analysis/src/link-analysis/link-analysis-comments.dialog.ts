@@ -10,7 +10,7 @@ import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ObjectNote } from '@inspecto/core/api';
 import { NotesService } from '@inspecto/link-analysis/api/notes.service';
 import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-state.component';
-import { FmtWhenPipe } from '@inspecto/core/format';
+import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { guardDirtyClose } from '@inspecto/core/dialog-dirty-guard';
 
@@ -37,7 +37,6 @@ export interface LinkAnalysisCommentsData {
         MatInputModule,
         MatProgressSpinnerModule,
         InspectoEmptyStateComponent,
-        FmtWhenPipe,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -75,7 +74,7 @@ export interface LinkAnalysisCommentsData {
                     @for (c of comments(); track c.id) {
                         <div class="bg-card rounded-lg border p-4">
                             <div class="text-secondary mb-1 text-sm">
-                                {{ c.author || 'unknown' }} · {{ c.createdAt | fmtWhen }}
+                                {{ c.author || 'unknown' }} · {{ time(c.createdAt) }}
                             </div>
                             <div class="whitespace-pre-wrap">{{ c.body }}</div>
                         </div>
@@ -90,6 +89,10 @@ export interface LinkAnalysisCommentsData {
 })
 export class LinkAnalysisCommentsDialog {
     readonly data = inject<LinkAnalysisCommentsData>(MAT_DIALOG_DATA);
+    /** When a comment was written, in the one app clock every Link Analysis time uses (`DATES-ONE-ZONE-1`). */
+    time(ms: number): string {
+        return ms ? ledgerTime(new Date(ms).toISOString()) : '';
+    }
     private notes = inject(NotesService);
     private toastr = inject(ToastrService);
     private ref = inject(MatDialogRef<LinkAnalysisCommentsDialog>);

@@ -16,7 +16,7 @@ import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import { InvService, InvestigationListItem } from '@inspecto/link-analysis/api/inv.service';
 import { LA_LOCKED_REASON_FALLBACK, isCapabilityUnavailable } from '@inspecto/link-analysis/la-host';
-import { needsPermission } from './disabled-reasons';
+import { INCIDENTS_PERMISSION, needsPermission } from './disabled-reasons';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { LinkAnalysisService, LinkAnalysisView, SAVED_VIEW_NOT_EVIDENCE } from './link-analysis.service';
 
@@ -735,7 +735,7 @@ export class LinkAnalysisOpenDialog {
 
     /** Why this Investigation cannot be deleted here; '' = it can. */
     investigationDeleteBlock(r: OpenInvestigationRow): string {
-        if (!this.data.canDeleteInvestigations) return needsPermission('Incident management');
+        if (!this.data.canDeleteInvestigations) return needsPermission(INCIDENTS_PERMISSION);
         return r.readOnly ? 'Only the owner can delete.' : '';
     }
 

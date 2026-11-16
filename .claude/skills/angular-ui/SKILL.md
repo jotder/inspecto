@@ -784,7 +784,7 @@ in use. Look there before picking a class — do not invent a token.
   service (`LaRailService`), not in two components.
 - **Panel show/hide toggles live in the page header**, after Settings, as one Show/Hide toggle — not inside the
   panel they hide (a hidden panel cannot hold its own Show button). The rail's Collapse sits in the header before the title.
-- **Disabled controls say why** (tooltip): "Draw a graph first.", "Needs Incident management." — the permission name,
+- **Disabled controls say why** (tooltip): "Draw a graph first.", "Needs the Manage Incidents and Cases permission." — the permission by the name it is granted under,
   no "capability", no raw server text, no ticket ids. A 403 maps to a plain reason (`refusal403` in
   `link-analysis/investigation-state.ts`).
 - **Counts describe what is drawn** ("N nodes · M links on screen"), and a capped result is "Result cut short".

@@ -192,12 +192,12 @@ function requiredError(c: AbstractControl, message: string): string {
                     }
                 </div>
                 @if (caseError(); as message) {
-                    <inspecto-alert variant="warning" title="The analysis is saved — the Case step did not complete">
+                    <inspecto-alert variant="warning" title="The snapshot is saved — the Case step did not complete">
                         {{ message }}
                     </inspecto-alert>
                 }
                 @if (saveError(); as message) {
-                    <inspecto-alert variant="error" title="The analysis was not saved">
+                    <inspecto-alert variant="error" title="The snapshot was not saved">
                         {{ message }} — nothing has been sealed, so this dialog stays open with your work intact.
                     </inspecto-alert>
                 }
@@ -205,7 +205,7 @@ function requiredError(c: AbstractControl, message: string): string {
             <mat-dialog-actions align="end">
                 <button mat-button type="button" (click)="requestClose()">{{ sealed() ? 'Close' : 'Cancel' }}</button>
                 <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
-                    {{ saving() ? 'Saving…' : creatingCase() ? 'Save and create Case' : 'Save analysis' }}
+                    {{ saving() ? 'Saving…' : creatingCase() ? 'Save snapshot and create Case' : 'Save snapshot' }}
                 </button>
             </mat-dialog-actions>
         </form>
@@ -343,7 +343,7 @@ export class LinkAnalysisSnapshotDialog {
                 }));
         } catch (e: unknown) {
             this.saving.set(false);
-            this.saveError.set(e instanceof Error ? e.message : 'The analysis could not be saved.');
+            this.saveError.set(e instanceof Error ? e.message : 'The snapshot could not be saved.');
             return;
         }
         (already ? of(already) : this.store.save(snap)).subscribe({
@@ -377,10 +377,10 @@ export class LinkAnalysisSnapshotDialog {
                 // A refusal (403 missing capability, 413, 422) carries the server's own reason; say it.
                 this.saveError.set(
                     e instanceof HttpErrorResponse
-                        ? apiErrorMessage(e, 'The analysis could not be saved.')
+                        ? apiErrorMessage(e, 'The snapshot could not be saved.')
                         : e instanceof Error
                           ? e.message
-                          : 'The analysis could not be saved.',
+                          : 'The snapshot could not be saved.',
                 );
             },
         });

@@ -415,7 +415,9 @@ describe('LinkAnalysisEntityListsComponent (LA-17)', () => {
     it('without canManageIncidents the lists are read-only', async () => {
         const { el, button, settle } = create({ canWrite: false });
         await settle();
-        expect(el.textContent).toContain('Read-only: changing Entity Lists needs Incident management.');
+        expect(el.textContent).toContain(
+            'Read-only: changing Entity Lists needs the Manage Incidents and Cases permission.',
+        );
         expect(el.textContent).not.toContain('New list');
         expect(button('Retire Known mules')).toBeNull();
         expect(button('Add the selected entity to Known mules')).toBeNull();

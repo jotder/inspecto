@@ -195,11 +195,13 @@ public final class InvestigationCaseRoutes implements RouteModule {
                 : cases.get().summary(api, String.valueOf(link.get("caseRef"))).orElse(null);
         boolean open = c != null && "case".equals(c.get("kind")) && Boolean.FALSE.equals(c.get("closed"));
         out.put("sharing", open);
-        out.put("reason", link == null ? "not linked to a Case — owner-only"
-                : !ops ? "Case management (inspecto-ops) is not installed — the link is stored but grants nothing; owner-only"
-                : c == null || !"case".equals(c.get("kind")) ? "the linked Case no longer exists (or is not a Case) — it grants nothing; owner-only"
-                : !open ? "the linked Case is closed — a closed Case shares nothing; owner-only"
-                : "members (owner or assignee) of an open Case they can see get READ-ONLY access; writes stay owner-only");
+        // LA-FULL-CYCLE-TEST-1 finding 29: in words a reader can act on ("owner or assignee", "owner-only" read as code)
+        String members = "only the Investigation's own members can open it";
+        out.put("reason", link == null ? "Not linked to a Case, so " + members + "."
+                : !ops ? "Case management is not installed here, so the link shares nothing and " + members + "."
+                : c == null || !"case".equals(c.get("kind")) ? "The linked Case no longer exists, so the link shares nothing and " + members + "."
+                : !open ? "The linked Case is closed, so the link shares nothing and " + members + "."
+                : "The people working the linked Case (its owner and its assignee) can read this Investigation; only its leads change it.");
         return out;
     }
 

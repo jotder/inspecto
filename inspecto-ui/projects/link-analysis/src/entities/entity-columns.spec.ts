@@ -28,7 +28,7 @@ const headline = {
     dataAsOf: null,
     computedAt: null,
     assessed: false,
-    reason: 'not computed yet',
+    reason: 'not counted yet. Open the Entity Type to count it',
 };
 function type(id: string, classifications: string[], bindings: [string, string][] = []): EntityTypeSummary {
     return {

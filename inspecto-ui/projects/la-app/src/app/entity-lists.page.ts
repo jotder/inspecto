@@ -81,7 +81,7 @@ type ListsTab = 'lists' | 'identity';
 export class EntityListsPageComponent {
     readonly tabs: readonly { id: ListsTab; label: string }[] = [
         { id: 'lists', label: 'Entity Lists' },
-        { id: 'identity', label: 'Identity Fact log' },
+        { id: 'identity', label: 'Identity history' },
     ];
     readonly tab = signal<ListsTab>('lists');
 

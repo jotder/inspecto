@@ -56,7 +56,7 @@ describe('LinkAnalysisIdentityComponent (DR-U8)', () => {
         f.detectChanges();
         expect(inv.listIdentityGroups).toHaveBeenCalled();
         expect(el.textContent).toContain('Chain verified');
-        expect(el.querySelector('[aria-label="Identity Fact log head"]')!.textContent).toContain('sha256:abc123');
+        expect(el.querySelector('[aria-label="Identity history head"]')!.textContent).toContain('sha256:abc123');
         await expectNoA11yViolations(el);
     });
 
@@ -67,7 +67,7 @@ describe('LinkAnalysisIdentityComponent (DR-U8)', () => {
         expect(inv.listIdentityGroups).not.toHaveBeenCalled();
         expect(el.querySelector('form')).toBeNull();
         expect(el.querySelector('[data-testid="identity-read-only"]')?.textContent).toContain(
-            'need Incident management, also to read',
+            'need the Manage Incidents and Cases permission, also to read',
         );
         await expectNoA11yViolations(el);
     });
@@ -111,7 +111,7 @@ describe('LinkAnalysisIdentityComponent (DR-U8)', () => {
         });
         await f.whenStable();
         f.detectChanges();
-        expect(el.textContent).toContain('Identities need Incident management, also to read.');
+        expect(el.textContent).toContain('Identities need the Manage Incidents and Cases permission, also to read.');
         expect(el.textContent).not.toContain('Chain NOT verified');
     });
 
@@ -121,14 +121,14 @@ describe('LinkAnalysisIdentityComponent (DR-U8)', () => {
         const { f, c, el } = create({ listIdentityGroups: list });
         await f.whenStable();
         f.detectChanges();
-        expect(el.querySelector('[aria-label="Identity Fact log head"]')!.textContent).toContain('sha256:abc123');
+        expect(el.querySelector('[aria-label="Identity history head"]')!.textContent).toContain('sha256:abc123');
         c.dataset.setValue('map');
         c.aCol.setValue('msisdn');
         c.bCol.setValue('imsi');
         c.reason.setValue('SIM swap file');
         await c.import();
         f.detectChanges();
-        const head = el.querySelector('[aria-label="Identity Fact log head"]')!.textContent;
+        const head = el.querySelector('[aria-label="Identity history head"]')!.textContent;
         expect(head).toContain('sha256:def456');
         expect(head).not.toContain('sha256:abc123');
     });

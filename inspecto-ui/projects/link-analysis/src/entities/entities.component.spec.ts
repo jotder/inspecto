@@ -59,7 +59,7 @@ const IMEI: EntityTypeSummary = {
         dataAsOf: null,
         computedAt: null,
         assessed: false,
-        reason: 'not computed yet',
+        reason: 'not counted yet. Open the Entity Type to count it',
     },
 };
 
@@ -145,7 +145,7 @@ describe('EntitiesComponent', () => {
         const { el } = make(of({ items: [IMEI] }));
         const card = el.querySelector('[data-testid=entity-type-card]') as HTMLElement;
         expect(card.querySelector('[data-testid=not-assessed]')!.textContent).toContain(
-            'Not assessed: not computed yet',
+            'Not assessed: not counted yet. Open the Entity Type to count it',
         );
         expect(card.querySelector('[data-testid=distinct]')).toBeNull();
         expect(card.querySelector('[data-testid=approx]')).toBeNull();

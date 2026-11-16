@@ -198,7 +198,7 @@ describe('investigate-number - next degree', () => {
         };
         const fan = degreeOutcomeMessage({ ...held, heldFor: ['maxFanOut unbounded (threshold 2000)'] });
         expect(fan).toContain('a second person approves request p1');
-        expect(fan).toContain('four_eyes_fan_out_above');
+        expect(fan).toContain('keeps every neighbour of each entity, above the limit of 2,000');
         expect(fan).toContain(
             'Ask an approver, or use Expand with a fan-out at or below the threshold (Expand ▸ Limits).',
         );
@@ -689,18 +689,26 @@ describe('investigate-number - four-eyes clarity (LA-EXPAND-FOUREYES-CLARITY-1)'
 
     it('a blank fan-out cap or a larger one is held where a fan-out threshold is set, and says which limit', () => {
         expect(expandApproval({}, showcase).exceeded).toEqual([
-            'fan-out is unbounded, above 2,000 (four_eyes_fan_out_above)',
+            'keeps every neighbour of each entity, above the limit of 2,000',
         ]);
         expect(expandApproval({ maxFanOut: 2000 }, showcase).exceeded).toEqual([]);
-        expect(expandApproval({ maxFanOut: 2001 }, showcase).exceeded[0]).toContain('four_eyes_fan_out_above');
+        expect(expandApproval({ maxFanOut: 2001 }, showcase).exceeded).toEqual([
+            'keeps up to 2,001 neighbours of each entity, above the limit of 2,000',
+        ]);
         const b = expandApproval({ budget: 5000, maxFanOut: 10 }, { budgetAbove: 1000, fanOutAbove: 2000 });
-        expect(b.exceeded).toEqual(['row budget 5,000 is above 1,000 (four_eyes_budget_above)']);
+        expect(b.exceeded).toEqual(['reads up to 5,000 rows, above the limit of 1,000']);
+        // finding 29: no Settings key and no request field name reaches the analyst
+        expect(b.exceeded.join(' ')).not.toMatch(/four_eyes|maxFanOut|budget [0-9]/);
     });
 
-    it('a held expand names the threshold crossed and the Settings key', () => {
-        expect(thresholdWords(['budget 500 > 100', 'maxFanOut unbounded (threshold 2000)'])).toBe(
-            'budget 500 > 100, set by four_eyes_budget_above; maxFanOut unbounded (threshold 2000), set by four_eyes_fan_out_above (Settings ▸ Link Analysis)',
+    it('a held expand names the limit crossed in words and where it is set, never the key (finding 29)', () => {
+        expect(
+            thresholdWords(['budget 500 > 100', 'maxFanOut unbounded (threshold 2000)', 'maxFanOut 3000 > 2000']),
+        ).toBe(
+            'reads up to 500 rows, above the limit of 100; keeps every neighbour of each entity, above the limit of 2,000; ' +
+                'keeps up to 3,000 neighbours of each entity, above the limit of 2,000; the limits are in Settings ▸ Link Analysis',
         );
+        expect(thresholdWords(['a reason this build does not know'])).toContain('a reason this build does not know');
     });
 
     it('the waiting text from a held request carries its reasons', () => {
@@ -717,7 +725,7 @@ describe('investigate-number - four-eyes clarity (LA-EXPAND-FOUREYES-CLARITY-1)'
             ws(entity('s', 0)),
         );
         const text = degreeOutcomeMessage(r[0]);
-        expect(text).toContain('budget 500 > 100, set by four_eyes_budget_above');
+        expect(text).toContain('reads up to 500 rows, above the limit of 100');
         expect(text).toContain('Settings ▸ Link Analysis');
     });
 });

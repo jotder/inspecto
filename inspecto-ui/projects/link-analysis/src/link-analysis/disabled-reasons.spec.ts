@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DISABLED_REASON, NEEDS_TIME_COLUMN, needsPermission } from './disabled-reasons';
+import { DISABLED_REASON, INCIDENTS_PERMISSION, NEEDS_TIME_COLUMN, needsPermission } from './disabled-reasons';
 import { patternColumnRefusal } from './pattern-packs';
 
 describe('disabled-reasons (LA-UI-TEXT-PASS-1 X6, X8)', () => {
@@ -11,8 +11,8 @@ describe('disabled-reasons (LA-UI-TEXT-PASS-1 X6, X8)', () => {
     });
 
     it('names a permission plainly, never as an id or a capability', () => {
-        expect(needsPermission('Incident management')).toBe('Needs Incident management.');
-        expect(needsPermission('Incident management')).not.toMatch(/capability/i);
+        expect(needsPermission(INCIDENTS_PERMISSION)).toBe('Needs the Manage Incidents and Cases permission.');
+        expect(needsPermission(INCIDENTS_PERMISSION)).not.toMatch(/capability/i);
     });
 
     it('X8: the pattern refusal for a missing time column is the one shared sentence', () => {

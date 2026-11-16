@@ -1269,7 +1269,9 @@ describe('LinkAnalysisComponent', () => {
         session.capabilities.set([]);
         fixture.detectChanges();
         expect(btn().disabled).toBe(true);
-        expect(btn().getAttribute('aria-label')).toBe('Save snapshot: Needs Incident management.');
+        expect(btn().getAttribute('aria-label')).toBe(
+            'Save snapshot: Needs the Manage Incidents and Cases permission.',
+        );
         session.capabilities.set(['canManageIncidents']);
         fixture.detectChanges();
         expect(btn().disabled).toBe(false);
@@ -2301,6 +2303,32 @@ describe('LinkAnalysisComponent', () => {
         await c.openSnapshot();
         const data = (open.mock.calls[0] as unknown as [unknown, { data: { investigationId?: string } }])[1].data;
         expect(data.investigationId).toBe('inv-7');
+    });
+    it('finding 26: a saved snapshot is confirmed on the canvas change line, not only in a toast', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const success = vi.spyOn(TestBed.inject(ToastrService), 'success');
+        const snap = { id: 's1', title: 'Mule ring', manifestHash: 'sha256:abcdef0123456789', attachedTo: ['CASE-9'] };
+        vi.spyOn(fixture.debugElement.injector.get(MatDialog), 'open').mockReturnValueOnce({
+            afterClosed: () => of(snap),
+        } as never);
+        await c.openSnapshot();
+        const text = 'Snapshot “Mule ring” saved and sealed as evidence. Attached to CASE-9.';
+        expect(c.growExclude.lastChange()?.text).toBe(text);
+        expect(success).toHaveBeenCalledWith(text);
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('[data-testid="la-change-line"]')?.textContent).toContain(
+            'saved and sealed as evidence',
+        );
+        // a cancelled dialog confirms nothing
+        c.growExclude.lastChange.set(null);
+        vi.spyOn(fixture.debugElement.injector.get(MatDialog), 'open').mockReturnValueOnce({
+            afterClosed: () => of(undefined),
+        } as never);
+        await c.openSnapshot();
+        expect(c.growExclude.lastChange()).toBeNull();
     });
     it('evidence A1: a snapshot captures what the canvas shows — the Working Set, else the query graph', async () => {
         const { fixture } = create();
@@ -4485,7 +4513,7 @@ describe('LinkAnalysisComponent - "Merge with..." selection action (LA-17, merge
         session.authMode.set('oidc');
         session.capabilities.set([]);
         fixture.detectChanges();
-        expect(c.mergeUnavailable()).toBe('Needs Incident management.');
+        expect(c.mergeUnavailable()).toBe('Needs the Manage Incidents and Cases permission.');
         expect(merge()!.getAttribute('aria-disabled')).toBe('true');
         session.capabilities.set(['canManageIncidents']);
         fixture.detectChanges();
@@ -5422,8 +5450,8 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         const session = TestBed.inject(SessionService);
         session.authMode.set('oidc');
         session.capabilities.set([]);
-        expect(c.growContext().blocked).toBe('Needs Incident management to change the step log.');
-        expect(c.growWriteWhyNot()).toContain('Incident management');
+        expect(c.growContext().blocked).toBe('Changing the step log needs the Manage Incidents and Cases permission.');
+        expect(c.growWriteWhyNot()).toContain('Manage Incidents and Cases');
     });
 });
 
@@ -6180,6 +6208,40 @@ describe('LinkAnalysisComponent - Start from... (LA-ONBOARD-1 phase 6, OB-9; F-7
         expect(c.canRedoUnsaved()).toBe(true);
         await c.onExpand({ ctx: c.growContext(), req: { ...req, direction: 'either' }, from: 'outer' });
         expect(c.canRedoUnsaved()).toBe(false);
+    });
+
+    it('finding 26: an unsaved Expand that finds nothing new is not recorded as a step', async () => {
+        const expand = vi.fn(async (_id: string, label: string) => ring(label));
+        let admit: (id: string) => string[] = (id) => [`${id}.n`];
+        const previewUnsaved = fakeUnsaved((id) => admit(id));
+        const { fixture } = create({
+            datasets: [TRANSFERS],
+            expand,
+            inv: { previewNeighbors: preview(), previewUnsaved } as unknown as Partial<InvService>,
+        });
+        await settle(fixture);
+        const c = fixture.componentInstance;
+        await c.startUnsaved({
+            start: { kind: 'entity', datasetId: 'transfers', entityType: 'account', value: 'MULE-HUB-01' },
+            defaults: { name: 'A', purpose: 'B' },
+            timeCol: '',
+            timeColZone: '',
+            degrees: 1,
+        });
+        const steps = () => c.investigation.unsaved()!.steps.length;
+        const before = steps();
+        const drawn = c.graph();
+        admit = () => []; // the next read finds no neighbour and no link
+        const req = { direction: 'out' as const, degrees: 1, linkKinds: null, hold: true, threshold: 500 };
+        await c.onExpand({ ctx: c.growContext(), req, from: 'outer' });
+        expect(previewUnsaved).toHaveBeenCalled();
+        expect(steps()).toBe(before); // no step: nothing to read in the step log, nothing sealed on Save
+        expect(c.graph()).toBe(drawn);
+        expect(c.growExclude.lastChange()?.text).toBe('Expand found nothing new, so no step was added.');
+        // an Expand that does add is still one step
+        admit = (id) => [`${id}.m`];
+        await c.onExpand({ ctx: c.growContext(), req, from: 'outer' });
+        expect(steps()).toBe(before + 1);
     });
 
     it('LA-INVESTIGATE-UX-2: an unsaved Clean up hides on the drawn Working Set, records one hide step, and Undo / Redo take it', async () => {

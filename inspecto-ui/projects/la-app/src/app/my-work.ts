@@ -114,7 +114,7 @@ const signed = (n: number): string => `${n < 0 ? '−' : '+'}${Math.abs(n).toLoc
 
 /**
  * One Dataset's last import in words. With the entry's `lastImport` (item 7) a re-import says whether it replaced the
- * rows or added to them, and the net change: "transfers: replaced 3 Oct 2026, 2,104 → 2,300 rows (+196)", "transfers:
+ * rows or added to them, and the net change: "Dataset transfers: replaced 3 Oct 2026, 2,104 → 2,300 rows (+196)", "Dataset transfers:
  * appended 3 Oct 2026, +196 rows (now 2,300)". The run ledger (`GET /runs/{pipeline}/batches`, oldest first) gives the
  * rows set aside, and wins when its last run is not `lastImport.batch` (Run now records no `lastImport`; matched by
  * id, since the ledger's times carry no zone) or the import has no record: then a re-import says "rows loaded", never a net change. Null when the Dataset has no successful run yet.
@@ -133,16 +133,16 @@ export function lastImportLine(
     if (last && ok.length > 1 && latest['consignment_id'] === last.batch) {
         const net = last.rowsAfter - last.rowsBefore;
         const text = last.replaced
-            ? `${datasetId}: replaced ${dayLabel(last.at)}, ${last.rowsBefore.toLocaleString('en')} → ${rows(last.rowsAfter)} (${signed(net)})${aside}`
-            : `${datasetId}: appended ${dayLabel(last.at)}, ${signed(net)} ${Math.abs(net) === 1 ? 'row' : 'rows'} (now ${last.rowsAfter.toLocaleString('en')})${aside}`;
+            ? `Dataset ${datasetId}: replaced ${dayLabel(last.at)}, ${last.rowsBefore.toLocaleString('en')} → ${rows(last.rowsAfter)} (${signed(net)})${aside}`
+            : `Dataset ${datasetId}: appended ${dayLabel(last.at)}, ${signed(net)} ${Math.abs(net) === 1 ? 'row' : 'rows'} (now ${last.rowsAfter.toLocaleString('en')})${aside}`;
         return { text, at: last.at };
     }
     const day = Number.isFinite(when) ? ` ${dayLabel(when)}` : '';
     const loaded = num(latest['total_output_rows']);
     const text =
         ok.length === 1
-            ? `${datasetId}: imported${day}, +${rows(loaded)}${aside}`
-            : `${datasetId}: re-imported${day}, ${rows(loaded)} loaded${aside}`;
+            ? `Dataset ${datasetId}: imported${day}, +${rows(loaded)}${aside}`
+            : `Dataset ${datasetId}: re-imported${day}, ${rows(loaded)} loaded${aside}`;
     return { text, at: Number.isFinite(when) ? when : 0 };
 }
 

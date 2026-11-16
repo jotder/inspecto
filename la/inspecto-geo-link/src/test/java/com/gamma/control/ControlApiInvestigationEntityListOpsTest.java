@@ -250,7 +250,7 @@ class ControlApiInvestigationEntityListOpsTest {
 
             JsonNode entry = log(c, "case-a").at("/entries/2");
             assertTrue(entry.get("text").asText().startsWith(
-                    "3. Excluded 1 entity on Entity List `mules` (exclusion, 3 members, as of fact 2)"), entry.toString());
+                    "3. Excluded 1 entity on Entity List `mules` (exclusion, 3 members, as of identity history entry 2)"), entry.toString());
             assertTrue(entry.get("text").asText().contains("reason: known mules"), entry.toString());
             assertEquals(3, entry.at("/list/size").asInt());
             assertFalse(entry.get("list").has("members"), "the sealed members stay out of the log view, as rows do");
@@ -375,7 +375,7 @@ class ControlApiInvestigationEntityListOpsTest {
 
             JsonNode entry = log(c, "case-a").at("/entries/0");
             assertTrue(entry.get("text").asText().startsWith("1. Seeded 2 entities of type msisdn from Entity List "
-                    + "`watch` (watch, 3 members, as of fact 2)"), entry.toString());
+                    + "`watch` (watch, 3 members, as of identity history entry 2)"), entry.toString());
             assertFalse(entry.get("read").has("ids"), "the sealed ids stay out of the log view");
         }
     }

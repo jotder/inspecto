@@ -109,6 +109,10 @@ describe('LinkAnalysisSnapshotDialog', () => {
         const el: HTMLElement = fixture.nativeElement;
         expect(el.textContent).toContain('2 nodes · 1 links');
         expect(el.textContent).toContain('1 stranded nodes excluded');
+        // finding 26: the button says what it saves, as the File menu and the dialog title do
+        const submit = el.querySelector('button[type="submit"]')!;
+        expect(submit.textContent!.trim()).toBe('Save snapshot');
+        expect(el.textContent).not.toContain('Save analysis');
 
         await fixture.componentInstance.save(); // empty title — refused, error rendered
         fixture.detectChanges();
@@ -616,8 +620,8 @@ describe('LinkAnalysisSnapshotDialog — a failed seal keeps the work on screen'
         await fixture.componentInstance.save();
 
         expect(close).not.toHaveBeenCalled();
-        expect(fixture.componentInstance.saveError()).toContain('Needs Incident management.');
-        expect(fixture.componentInstance.saveError()).not.toBe('The analysis could not be saved.');
+        expect(fixture.componentInstance.saveError()).toContain('Needs the Manage Incidents and Cases permission.');
+        expect(fixture.componentInstance.saveError()).not.toBe('The snapshot could not be saved.');
     });
 
     it('does not close, and says why, when the seal is refused', async () => {

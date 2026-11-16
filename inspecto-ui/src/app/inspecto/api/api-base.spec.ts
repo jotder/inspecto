@@ -96,11 +96,11 @@ describe('apiErrorMessage — a capability refusal in plain words (LA-UI-TEXT-PA
             'canBuildLinkIndex',
         ]) {
             const text = plainCapabilityRefusal(`missing capability '${id}'`);
-            expect(text).toMatch(/^Needs [A-Z][a-z ]+[a-z]\.$/);
+            expect(text).toMatch(/^Needs (the )?[A-Z][A-Za-z ]+[a-z]\.$/);
             expect(text).not.toContain(id);
             expect(text).not.toMatch(/capability/i);
         }
-        expect(needsPermission('canManageIncidents')).toBe('Needs Incident management.');
+        expect(needsPermission('canManageIncidents')).toBe('Needs the Manage Incidents and Cases permission.');
     });
 
     it('keeps the owning-Space suffix and never shows an unknown id', () => {

@@ -289,7 +289,7 @@ describe('LA-10 investigation-state', () => {
         expect(investigationErrorMessage(err(404, "no investigation 'x'"), 'f')).not.toContain("no investigation 'x'");
         expect(investigationErrorMessage(err(404, "no investigation 'x'"), 'f')).not.toContain('Server:');
         expect(investigationErrorMessage(err(403, "missing capability 'canManageIncidents'"), 'f')).toBe(
-            'Needs Incident management.',
+            'Needs the Manage Incidents and Cases permission.',
         );
         const heldRead = investigationErrorMessage(
             err(
@@ -377,10 +377,10 @@ describe('refusal403: a true plain reason for every 403 (LA-UI-TEXT-PASS-1 X5 re
 
     it('a missing capability is the permission, worded by the screen where it knows better', () => {
         expect(investigationErrorMessage(e403("missing capability 'canManageIncidents'"), 'f')).toBe(
-            'Needs Incident management.',
+            'Needs the Manage Incidents and Cases permission.',
         );
         expect(identityErrorMessage(e403("missing capability 'canManageIncidents'"), 'f')).toBe(
-            'Identities need Incident management, also to read.',
+            'Identities need the Manage Incidents and Cases permission, also to read.',
         );
         // a restricted list on the identity route is still a restricted list, not the identity wording
         expect(identityErrorMessage(e403("entity list 'x' is restricted: …"), 'f')).toBe(

@@ -881,7 +881,7 @@ final class EntityProfiles {
         return h;
     }
 
-    /** The headline the list route shows for a type, or {@code assessed:false, not computed yet}. */
+    /** The headline the list route shows for a type, or {@code assessed:false, not counted yet}. */
     static Map<String, Object> headline(Path writeRoot, EntityTypes.EntityType type, EntityTypeBindings.Resolved resolved) {
         Map<String, Object> h = Cache.headline(new Cache.Key(writeRoot, type.id(), bindingSignature(resolved.of(type.id()), resolved)));
         if (h != null) return h;
@@ -892,7 +892,7 @@ final class EntityProfiles {
         m.put("dataAsOf", null);
         m.put("computedAt", null);
         m.put("assessed", false);
-        m.put("reason", "not computed yet");
+        m.put("reason", "not counted yet. Open the Entity Type to count it");   // LA-FULL-CYCLE-TEST-1 finding 33: say how
         return m;
     }
 

@@ -164,7 +164,7 @@ describe('MyWorkComponent - the home page My work (LA-ONBOARD-1 phase 7)', () =>
         expect(batches).toHaveBeenCalledTimes(1); // only the imported Dataset's Pipeline is read
         expect(batches).toHaveBeenCalledWith('transfers');
         expect(el.querySelector('[data-testid="la-changes"]')?.textContent).toContain(
-            'transfers: imported 1 Oct 2026, +2,104 rows',
+            'Dataset transfers: imported 1 Oct 2026, +2,104 rows',
         );
         await expectNoA11yViolations(el);
     });

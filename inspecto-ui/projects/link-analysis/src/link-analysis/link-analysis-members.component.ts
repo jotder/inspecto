@@ -11,7 +11,7 @@ import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
 import { limitRefusalMessage } from './limit-refusal';
-import { DISABLED_REASON, needsPermission } from './disabled-reasons';
+import { DISABLED_REASON, INCIDENTS_PERMISSION, needsPermission } from './disabled-reasons';
 import { refusal403 } from './investigation-state';
 
 const ROLES: readonly InvestigationRole[] = ['lead', 'analyst', 'reviewer'];
@@ -154,7 +154,7 @@ export class LinkAnalysisMembersComponent {
     readonly subject = signal('');
     /** Why Grant cannot run yet (X6); '' = it can. */
     readonly grantWhyNot = computed(() => (this.subject().trim() ? '' : DISABLED_REASON.fillRequired));
-    protected readonly needsIncidentManagement = needsPermission('Incident management');
+    protected readonly needsIncidentManagement = needsPermission(INCIDENTS_PERMISSION);
     readonly role = signal<InvestigationRole>('analyst');
     /** With no Subject attached (`you` null) nothing is enforced server-side, so the controls are offered. */
     readonly isLead = computed(() => {

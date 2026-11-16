@@ -71,7 +71,7 @@ export class LinkAnalysisCaseFieldComponent implements ControlValueAccessor, OnI
     readonly control = new FormControl('', { nonNullable: true });
 
     readonly caseOptions = computed(() => this.cases().map((c) => ({ value: c.id, label: `${c.id} · ${c.title}` })));
-    readonly casesHelp = 'Open Cases from the objects store.';
+    readonly casesHelp = 'The open Cases you can see.';
 
     private onChange: (v: string) => void = () => {};
     private onTouched: () => void = () => {};

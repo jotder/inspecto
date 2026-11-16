@@ -164,7 +164,7 @@ function create(
         ws?: WorkingSet;
         confirm?: () => Promise<boolean>;
         /** The caller's role the members route answers; absent = the route is not mocked (the call fails). */
-        role?: 'lead' | 'analyst' | null;
+        role?: 'lead' | 'analyst' | 'reviewer' | null;
         /** The Investigation's time column (absent = none, as LOG). */
         timeCol?: string;
         /** The ids `GET …/compare` lists under `entities.onlyB`, and whether that list was cut. */
@@ -335,7 +335,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="investigation-read-only"]')?.textContent).toContain(
-            'Read-only: changing an Investigation needs Incident management.',
+            'Read-only: changing an Investigation needs the Manage Incidents and Cases permission.',
         );
         // Mark this position sits behind More steps ▾ (§5.8 block 7)
         (fixture.debugElement.children[0].componentInstance as LinkAnalysisInvestigationComponent).moreStep.set(
@@ -358,7 +358,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', { timeout: 45_000 }, () =
         penEdit(ro.fixture, penByLabel(ro.el, 'Purpose')!, 'warrant 7');
         expect(ro.button('Start Investigation').disabled).toBe(true);
         expect(ro.el.querySelector('[data-testid="investigation-read-only"]')?.textContent).toContain(
-            'Read-only: starting an Investigation needs Incident management.',
+            'Read-only: starting an Investigation needs the Manage Incidents and Cases permission.',
         );
         expect(ro.el.querySelector('[data-testid="investigation-read-only"]')?.textContent).not.toContain(
             "Your role can't start Investigations (needs Incident management)",
@@ -1480,8 +1480,39 @@ describe('LinkAnalysisInvestigationComponent - hub visibility and override (tele
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="projected-expand"]')).toBeNull();
         expect(el.querySelector('[data-testid="expand-read-only"]')!.textContent).toContain(
-            'Needs Incident management.',
+            'Needs the Manage Incidents and Cases permission.',
         );
+    });
+
+    it('finding 27: a read-only reviewer gets no Expand form and no coaching, only why; a lead gets both', async () => {
+        const { fixture, store, el } = create({ role: 'reviewer' });
+        await openInv(store);
+        fixture.detectChanges(); // the Act panel reads the caller's role once the Investigation is open
+        await fixture.whenStable();
+        fixture.detectChanges();
+        // the reviewer holds the permission; their role on this Investigation is what makes it read-only
+        expect(el.querySelector('[data-testid="projected-expand"]')).toBeNull();
+        expect(el.querySelector('[data-testid="expand-read-only"]')!.textContent).toContain(
+            'Only a lead expands this Investigation.',
+        );
+        expect(el.querySelector('[data-testid="act-howto"]')).toBeNull();
+        expect(el.querySelector('[data-testid="act-howto-toggle"]')).toBeNull();
+        expect(el.querySelector('[data-testid="investigation-read-only"]')!.textContent).toContain(
+            'You can read it and decide approvals; only a lead changes its steps.',
+        );
+        expect(el.textContent).not.toContain('Incident management');
+        await expectNoA11yViolations(el.querySelector('[data-testid="degrees"]') as HTMLElement);
+    });
+
+    it('finding 27: a lead keeps the Expand form and the coaching', async () => {
+        const { fixture, store, el } = create({ role: 'lead' });
+        await openInv(store);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="projected-expand"]')).not.toBeNull();
+        expect(el.querySelector('[data-testid="act-howto-toggle"]')).not.toBeNull();
+        expect(el.querySelector('[data-testid="investigation-read-only"]')).toBeNull();
     });
 
     it('nothing seeded: the Expand section says why the next degree cannot run (UI test 2026-10-29)', async () => {
@@ -1790,7 +1821,7 @@ describe(
                 const s2 = part(nocap.el, 'settings');
                 expect(s2.querySelector('[data-testid="inv-settings-title"]')).toBeNull();
                 expect(s2.querySelector('[data-testid="inv-settings-details-readonly"]')!.textContent).toContain(
-                    'Needs Incident management.',
+                    'Needs the Manage Incidents and Cases permission.',
                 );
             });
         });
@@ -1966,7 +1997,7 @@ describe('LinkAnalysisInvestigationComponent - unsaved work (LA-UNSAVED-INVESTIG
         const save = el.querySelector('[data-testid="unsaved-save"]') as HTMLButtonElement;
         expect(save.getAttribute('aria-disabled')).toBe('true');
         expect(el.querySelector('[data-testid="unsaved-save-why"]')?.textContent?.trim()).toBe(
-            'Needs Incident management.',
+            'Needs the Manage Incidents and Cases permission.',
         );
         expect(save.getAttribute('aria-describedby')).toBe('unsaved-save-why');
         save.click();

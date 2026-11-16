@@ -530,7 +530,7 @@ describe('GrowExcludeStore (LA-GROW-EXCLUDE-1)', () => {
         });
         const r = await store.addToList({ id: 'vip', entityType: 'msisdn' }, ['+44'], 'x', TERMS, true);
         expect(r.ok).toBe(false);
-        expect(r.message).toBe('Needs Incident management.');
+        expect(r.message).toBe('Needs the Manage Incidents and Cases permission.');
     });
 
     it('switches a list off only when its step is the latest (the undo op), and on with excludeBy', async () => {

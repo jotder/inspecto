@@ -183,6 +183,10 @@ class ControlApiDossierTest {
                 assertTrue(rendering.contains("Hidden from display"), rendering);
                 assertTrue(rendering.contains("Coverage: NOT assessed"), rendering);
                 assertTrue(rendering.contains("Dataset version: not pinned"), rendering);
+                // LA-FULL-CYCLE-TEST-1 finding 29: a recorded time reads to the second with its zone, never the stored instant
+                assertTrue(java.util.regex.Pattern.compile("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} UTC").matcher(rendering).find(),
+                        rendering);
+                assertFalse(java.util.regex.Pattern.compile("\\d{2}:\\d{2}:\\d{2}\\.\\d+Z").matcher(rendering).find(), rendering);
             }
             assertTrue(steps.startsWith("1. ["), steps);
             assertTrue(method.contains(d.at("/manifest/root").asText()), "the method statement cites the custody hash");

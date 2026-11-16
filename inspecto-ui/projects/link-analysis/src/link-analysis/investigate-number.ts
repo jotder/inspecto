@@ -366,9 +366,6 @@ export interface DegreeOutcome {
     step?: number;
 }
 
-const BUDGET_KEY = 'four_eyes_budget_above';
-const FAN_OUT_KEY = 'four_eyes_fan_out_above';
-
 /** The Space's four-eyes thresholds (`null` = none set, the shipped default: nothing is held on that count). */
 export interface FourEyesLimits {
     budgetAbove: number | null;
@@ -390,25 +387,35 @@ export function expandApproval(
     const fanOut = rung.maxFanOut ?? null;
     const exceeded: string[] = [];
     if (limits.budgetAbove != null && budget > limits.budgetAbove)
-        exceeded.push(
-            `row budget ${budget.toLocaleString('en')} is above ${limits.budgetAbove.toLocaleString('en')} (${BUDGET_KEY})`,
-        );
+        exceeded.push(budgetWords(budget, limits.budgetAbove));
     if (limits.fanOutAbove != null && (fanOut === null || fanOut > limits.fanOutAbove))
-        exceeded.push(
-            fanOut === null
-                ? `fan-out is unbounded, above ${limits.fanOutAbove.toLocaleString('en')} (${FAN_OUT_KEY})`
-                : `fan-out cap ${fanOut.toLocaleString('en')} is above ${limits.fanOutAbove.toLocaleString('en')} (${FAN_OUT_KEY})`,
-        );
+        exceeded.push(fanOutWords(fanOut, limits.fanOutAbove));
     return { budget, fanOut, exceeded };
 }
 
-/** The held request's reasons (server wording `budget 500 > 100`) with the Settings key that controls each. */
+/** A four-eyes limit crossed, in words (LA-FULL-CYCLE-TEST-1 finding 29: never the Settings key or `maxFanOut`). */
+const budgetWords = (budget: number, limit: number): string =>
+    `reads up to ${budget.toLocaleString('en')} rows, above the limit of ${limit.toLocaleString('en')}`;
+const fanOutWords = (fanOut: number | null, limit: number): string =>
+    fanOut === null
+        ? `keeps every neighbour of each entity, above the limit of ${limit.toLocaleString('en')}`
+        : `keeps up to ${fanOut.toLocaleString('en')} neighbours of each entity, above the limit of ${limit.toLocaleString('en')}`;
+
+/**
+ * The held request's reasons in words. The server records them as `budget 500 > 100`, `maxFanOut 3000 > 2000` and
+ * `maxFanOut unbounded (threshold 2000)` (sealed in the request, so they stay as they are); a reason in any other
+ * form is shown as it came.
+ */
 export function thresholdWords(heldFor: readonly string[]): string {
-    const named = heldFor.map((r) => {
-        const key = r.startsWith('budget') ? BUDGET_KEY : r.startsWith('maxFanOut') ? FAN_OUT_KEY : null;
-        return key ? `${r}, set by ${key}` : r;
+    const words = heldFor.map((r) => {
+        const budget = /^budget (\d+) > (\d+)$/.exec(r);
+        if (budget) return budgetWords(Number(budget[1]), Number(budget[2]));
+        const open = /^maxFanOut unbounded \(threshold (\d+)\)$/.exec(r); // vocab-allow: the server's sealed wording, read here to put it into words
+        if (open) return fanOutWords(null, Number(open[1]));
+        const capped = /^maxFanOut (\d+) > (\d+)$/.exec(r);
+        return capped ? fanOutWords(Number(capped[1]), Number(capped[2])) : r;
     });
-    return `${named.join('; ')} (Settings ▸ Link Analysis)`;
+    return `${words.join('; ')}; the limits are in Settings ▸ Link Analysis`;
 }
 
 /** What a non-ladder expand named, in words: the one entity, a count, or every entity (no ids). */

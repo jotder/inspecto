@@ -71,7 +71,7 @@ export function nextSteps(s: SpaceGuideState, ctx: NextStepContext): NextStep[] 
         out.push({
             id: 'graph',
             label: 'Draw your first graph',
-            why: 'Start from one entity, grow from it, then save it as a case to come back to.',
+            why: 'Start from one entity, expand from it, then save it as a view to come back to.',
             to: '/link-analysis',
         });
     if (s.lists === 0)
@@ -85,8 +85,8 @@ export function nextSteps(s: SpaceGuideState, ctx: NextStepContext): NextStep[] 
     return [
         {
             id: 'my-work',
-            label: 'Open a case',
-            why: 'Your saved graphs are under My work on the home page; each re-reads the data when it opens.',
+            label: 'Open a saved view',
+            why: 'Your saved views are under My work on the home page; each re-reads the data when it opens.',
             to: '/',
         },
         {

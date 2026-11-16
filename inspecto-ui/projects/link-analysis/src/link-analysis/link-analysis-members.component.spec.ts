@@ -88,7 +88,7 @@ describe('LinkAnalysisMembersComponent (DR-U1)', () => {
         expect(button(el, 'Grant')).toBeUndefined();
         expect(el.querySelector('[aria-label^="Revoke"]')).toBeNull();
         expect(el.querySelector('[data-testid="members-read-only"]')?.textContent).toContain(
-            'You cannot change members. Needs Incident management.',
+            'You cannot change members. Needs the Manage Incidents and Cases permission.',
         );
         await expectNoA11yViolations(el);
     });
@@ -110,7 +110,7 @@ describe('LinkAnalysisMembersComponent (DR-U1)', () => {
         expect(grant.getAttribute('aria-disabled')).toBe('true');
         expect(grant.getAttribute('aria-describedby')).toContain('members-grant-why');
         expect(el.querySelector('[data-testid="members-grant-why"]')?.textContent?.trim()).toBe(
-            'Fill the required fields to run.',
+            'Fill in every required field first.',
         );
         grant.click();
         await f.whenStable();

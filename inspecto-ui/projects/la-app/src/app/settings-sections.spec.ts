@@ -1,3 +1,4 @@
+import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it } from 'vitest';
@@ -73,6 +74,10 @@ describe('Getting started counters in Settings (LA-ONBOARD-1 OB-13)', () => {
         expect(durationWords(3 * 86400)).toBe('3 days');
         expect(durationWords(null)).toBe('');
         expect(milestoneWords(null, null)).toBe('Not yet');
+        // finding 31: the one app clock every Link Analysis time uses, never a locale format
+        expect(milestoneWords('2026-10-22T10:04:00Z', 250)).toBe(
+            `After 4 min 10 s (${ledgerTime('2026-10-22T10:04:00Z')})`,
+        );
     });
 });
 

@@ -77,11 +77,11 @@ describe('LinkAnalysisHeldTrayComponent (LA-GROW-EXCLUDE-1 §3.2)', () => {
 
     it('says why the actions cannot run instead of a silent grey, and the clicks do nothing', () => {
         const { fixture, el, host } = create();
-        host.whyNot.set('Needs Incident management to change the step log.');
+        host.whyNot.set('Changing the step log needs the Manage Incidents and Cases permission.');
         fixture.detectChanges();
         const remove = el.querySelector('[data-testid="la-held-remove"]') as HTMLButtonElement;
         expect(remove.getAttribute('aria-disabled')).toBe('true');
-        expect(el.querySelector('[data-testid="la-held-why"]')?.textContent).toContain('Incident management');
+        expect(el.querySelector('[data-testid="la-held-why"]')?.textContent).toContain('Manage Incidents and Cases');
         remove.click();
         buttons(el, 'Expand anyway')[0].click();
         expect(host.removed).toBe(0);

@@ -312,7 +312,7 @@ export const SAVE_NEEDS = needsPermission('canManageIncidents');
                 </div>
                 @if (mode() === 'investigation' && !canWrite()) {
                     <p class="text-secondary m-0 text-xs" data-testid="new-save-needs">
-                        You can start and Expand. Saving needs Incident management.
+                        You can start and Expand. Saving needs the Manage Incidents and Cases permission.
                     </p>
                 }
             </form>

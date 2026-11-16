@@ -385,7 +385,7 @@ import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { closedBySpaceSwitchMessage, rememberOpenWork, takeClosedBySpaceSwitch } from './open-work';
 // eslint-disable-next-line no-restricted-imports -- only `actor`, so the Space-switch notice never names another user's item; LA_FEATURES carries module flags, not identity
 import { SessionService } from '@inspecto/core/api';
-import { DatePipe } from '@angular/common';
+import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import { GraphQueryCache, PUSH_FILTER_DEBOUNCE_MS } from './graph-query-cache';
 import { deepEqual } from '@inspecto/link-analysis/api/stable-json';
 import { ViewAccessContext, viewDeleteBlock, viewEditBlock, viewSaveBlock } from './view-access';
@@ -584,7 +584,6 @@ export function mergeWorkingSets(prev: WorkingSet, next: WorkingSet, seeds: read
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
-        DatePipe,
         InvestigationSettingsSections,
         FormMenuDirective,
         LinkAnalysisDiscoverComponent,
@@ -2765,6 +2764,18 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
             this.growExclude.lastChange.set({ text: 'There is nothing to expand from yet.' });
             return false;
         }
+        // LA-FULL-CYCLE-TEST-1 finding 26: an Expand that found no new entity and no new link changes nothing, so it is
+        // not a step (it would be one more line to read in the step log, and one more step sealed on Save)
+        const was = this.unsavedWs();
+        if (
+            walk.ws.entities.length <= (was?.entities.length ?? 0) &&
+            walk.ws.links.length <= (was?.links.length ?? 0)
+        ) {
+            const text = 'Expand found nothing new, so no step was added.';
+            this.growExclude.lastChange.set({ text });
+            this.drawAnnouncement.set(text);
+            return true;
+        }
         // each degree's frontier, as the server read it: Save sends exactly these lists
         const step: UnsavedStep = {
             kind: 'expand',
@@ -3811,6 +3822,10 @@ Its prior copies stay in its version history.`,
     );
     /** "As of" line for a graph served from the cache; null when the server just answered. */
     readonly cachedAsOf = signal<number | null>(null);
+    /** A time this browser recorded, in the one app clock every Link Analysis time uses (`ledgerTime`, `DATES-ONE-ZONE-1`). */
+    protected clockTime(ms: number): string {
+        return ledgerTime(new Date(ms).toISOString());
+    }
     private pushTimer: ReturnType<typeof setTimeout> | null = null;
     private pushWaiters: (() => void)[] = [];
 
@@ -4150,10 +4165,13 @@ Its prior copies stay in its version history.`,
                 .subscribe((snap) => {
                     if (snap) {
                         this.latestSnapshot.set(snap);
+                        // LA-FULL-CYCLE-TEST-1 finding 26: the confirmation stays on the canvas's change line, not only
+                        // in a toast that is gone in seconds; the fingerprint stays in the dialog and the evidence.
                         const attached = snap.attachedTo?.length ? ` Attached to ${snap.attachedTo.join(', ')}.` : '';
-                        this.toastr.success(
-                            `Snapshot “${snap.title}” saved (${snap.manifestHash.slice(0, 12)}…).${attached}`,
-                        );
+                        const text = `Snapshot “${snap.title}” saved and sealed as evidence.${attached}`;
+                        this.toastr.success(text);
+                        this.growExclude.lastChange.set({ text });
+                        this.drawAnnouncement.set(text);
                     }
                     resolve(snap ?? undefined);
                 }),
@@ -4762,7 +4780,7 @@ Its prior copies stay in its version history.`,
     private writesToInvestigation(): boolean {
         if (this.investigation.canvas() === null) return false;
         if (!this.lens.canManageIncidents()) {
-            this.toastr.info('Needs Incident management to change the step log.');
+            this.toastr.info('Changing the step log needs the Manage Incidents and Cases permission.');
             return false;
         }
         return true;
@@ -6090,7 +6108,7 @@ Its prior copies stay in its version history.`,
     /** Why an Investigation action cannot run for this user; empty = it can. */
     readonly growWriteWhyNot = computed(() =>
         this.growMode() === 'investigation' && !this.lens.canManageIncidents()
-            ? 'Needs Incident management to change the step log.'
+            ? 'Changing the step log needs the Manage Incidents and Cases permission.'
             : '',
     );
     /** The Entity Type the items on the canvas are (what an exclusion list is typed by); null = unknown. */

@@ -271,7 +271,7 @@ const REFUSALS_403: readonly [RegExp, string][] = [
  * guessed at: "This was refused." plus a short "Details:" line with the server's message.
  */
 export function refusal403(server: string, capability?: string): string {
-    if (/^Needs [A-Z]|^Your role does not have the permission/.test(server)) return capability ?? server;
+    if (/^Needs (?:the )?[A-Z]|^Your role does not have the permission/.test(server)) return capability ?? server;
     for (const [pattern, reason] of REFUSALS_403) if (pattern.test(server)) return reason || 'Refused: ' + server;
     return server.trim() ? `This was refused. Details: ${server.trim()}` : 'This was refused.';
 }
@@ -353,7 +353,7 @@ export function identityKeyOf(type: EntityTypeRef | undefined, value: string): s
  * retract of an unknown or already-retracted assertion; 422 carries the server's reason. 503 is a deployment state.
  */
 /** Identities are readable only to those who may change them (T-206). */
-export const IDENTITIES_NEED = 'Identities need Incident management, also to read.';
+export const IDENTITIES_NEED = 'Identities need the Manage Incidents and Cases permission, also to read.';
 
 export function identityErrorMessage(err: unknown, fallback: string): string {
     const limit = limitRefusalMessage(err);

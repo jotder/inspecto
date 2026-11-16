@@ -529,6 +529,19 @@ const SOURCE_RULES = [
         re: /\b(?:Personal|Professional|Enterprise)\b/g,
         msg: 'The editions are **Basic / Standard / Advanced** (GLOSSARY *Edition*; LA-EDITIONS-1 ED-2, 2026-10-17): Personal → Basic, Professional → Standard, Enterprise → Advanced. If the word is not the edition (a vendor\'s product tier, demo data), put `vocab-allow` on the line or allowlist the file.',
     },
+    {
+        // LA-FULL-CYCLE-TEST-1 phase 7 (findings 27, 29, 33): developer phrasing a user of core Link Analysis read on
+        // screen, kept out once replaced. Every entry is a PHRASE of two or more words (or a key in a sentence), so it can
+        // read the whole line with comments blanked: a phrase never forms an identifier, which is what lets the rule see
+        // the text of an inline Angular template too (a `template:` literal spans lines, so no quote is on the line).
+        // The Settings keys and the `maxFanOut` request field are matched only where a sentence names them; as bare
+        // tokens they are the contracts they are. The replacement words are in the commit that added this rule.
+        id: 'la-developer-phrasing',
+        scope: (rel) => CORE_LA_SCOPE.some((p) => rel.startsWith(p)),
+        prepare: (raw) => raw,
+        re: /\b(?:[Nn]eeds? Incident management|[Ii]nstantiat(?:e|ed|ing) (?:a|an|it|the)\b|objects store|Identity Fact log|min inclusive|max exclusive|score vectors?|Fill the required fields|Reveal rights|not computed yet|as of fact|name no event day|owner or assignee|writes stay owner-only|set by four_eyes_\w+|maxFanOut (?:unbounded|\d))/g,
+        msg: 'Developer phrasing in text a Link Analysis user reads (LA-FULL-CYCLE-TEST-1 finding 29): say it in plain words with GLOSSARY terms. A capability by the name it is granted under ("the Manage Incidents and Cases permission"), never a Settings key, a request field or a storage term. If the text really is a contract (a sealed wire value the UI puts into words), put `vocab-allow` on the line naming the contract.',
+    },
 ];
 
 /**

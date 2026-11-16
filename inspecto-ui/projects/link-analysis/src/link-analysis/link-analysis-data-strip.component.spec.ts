@@ -10,6 +10,7 @@ import { RunsService } from '@inspecto/core/api/runs.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
 import { DatasetFilesPage, InvService, InvestigationCoverage } from '@inspecto/link-analysis/api/inv.service';
+import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import { LinkAnalysisDataStripComponent } from './link-analysis-data-strip.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 
@@ -232,7 +233,7 @@ describe('LinkAnalysisDataStripComponent', () => {
         await settle(f);
         expect(q(f, '[data-test="strip-toggle"]')!.getAttribute('aria-expanded')).toBe('true');
         expect(q(f, '[data-test="fresh-asof"]')!.textContent).toContain('5 Sep 2026');
-        expect(q(f, '[data-test="fresh-ingested"]')!.textContent).toContain('2026-09-04T10:00:00Z');
+        expect(q(f, '[data-test="fresh-ingested"]')!.textContent).toContain(ledgerTime('2026-09-04T10:00:00Z'));
         expect(q(f, '[data-test="fresh-inbox"]')!.textContent).toContain('2 Files are waiting in the inbox');
         const cells = Array.from(f.nativeElement.querySelectorAll('[data-test="day-strip"] li')).map((l) =>
             (l as HTMLElement).textContent!.replace(/\s+/g, ' ').trim(),
@@ -320,7 +321,7 @@ describe('LinkAnalysisDataStripComponent', () => {
         await settle(f);
         expect(spies.coverage).not.toHaveBeenCalled();
         const reason = q(f, '[data-test="strip-days-reason"]')!.textContent!;
-        expect(reason).toContain('this Investigation sets no time window');
+        expect(reason).toContain('this Investigation has no time window');
         expect(reason).not.toContain("'from'");
     });
 
@@ -368,7 +369,8 @@ describe('LinkAnalysisDataStripComponent', () => {
         expect(row).toContain('2026-09-01');
         expect(row).toContain('a File was delivered again');
         expect(row).toContain('a.csv');
-        expect(row).toContain('2026-09-04T11:00:00Z');
+        expect(row).toContain(ledgerTime('2026-09-04T11:00:00Z')); // the one app clock, not the raw instant
+        expect(row).not.toContain('2026-09-04T11:00:00Z');
         await expectNoA11yViolations(f.nativeElement);
     });
 

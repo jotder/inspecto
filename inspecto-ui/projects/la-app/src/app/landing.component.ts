@@ -7,6 +7,7 @@ import { guideDone, setupIncomplete, SpaceGuideState } from '@inspecto/core/onbo
 import { OnboardingEventsService } from '@inspecto/core/onboarding/onboarding-events.service';
 import { SpaceGuideService } from '@inspecto/core/onboarding/space-guide.service';
 import { SessionService } from '@inspecto/core/auth/session.service';
+import { SpacesService } from '@inspecto/core/api';
 import { NgTemplateOutlet } from '@angular/common';
 import { appAreas, areaIcon, productNav, ProductNavEntry } from '@inspecto/core/product/product-host';
 import { FirstRun } from './first-run';
@@ -49,6 +50,11 @@ const card = (n: ProductNavEntry) => ({ path: n.path, label: n.label, icon: area
                         <h1 id="la-landing-title" class="text-title m-0 font-semibold">{{ product }}</h1>
                         @if (tagline) {
                             <p class="text-secondary m-0">{{ tagline }}</p>
+                        }
+                        @if (spaceName(); as space) {
+                            <p class="text-secondary m-0 text-sm" data-testid="la-landing-space">
+                                Space: <strong>{{ space }}</strong>
+                            </p>
                         }
                     </header>
                     <div
@@ -108,6 +114,11 @@ export class LandingComponent implements OnInit {
     /** The line under the Product's name (PA-5b: `brand.tagline` in products/<id>.toon). */
     protected readonly tagline = PRODUCT.brand.tagline ?? '';
     private readonly session = inject(SessionService);
+    private readonly spaces = inject(SpacesService);
+    /** The Space this home page is about (LA-FULL-CYCLE-TEST-1 finding 33); none on a single-Space server. */
+    protected readonly spaceName = computed(() =>
+        this.spaces.multiSpace() ? this.spaces.currentSpace()?.displayName || this.spaces.currentSpaceId() : null,
+    );
     private readonly guide = inject(SpaceGuideService);
     private readonly events = inject(OnboardingEventsService);
     protected readonly firstRun = inject(FirstRun);

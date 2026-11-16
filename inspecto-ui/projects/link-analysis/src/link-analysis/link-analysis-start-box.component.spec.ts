@@ -571,7 +571,9 @@ describe('LinkAnalysisStartBoxComponent - the Investigation tab start form (LA-U
         fixture.detectChanges();
         expect(box.form.enabled).toBe(true);
         expect((q(el, 'start-submit') as HTMLButtonElement).disabled).toBe(false);
-        expect(q(el, 'new-save-needs')?.textContent).toContain('Saving needs Incident management.');
+        expect(q(el, 'new-save-needs')?.textContent).toContain(
+            'Saving needs the Manage Incidents and Cases permission.',
+        );
         kind(fixture, 'dataset');
         submit(fixture);
         expect(fixture.componentInstance.creates).toHaveLength(1);

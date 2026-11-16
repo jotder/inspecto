@@ -239,7 +239,8 @@ class ControlApiInvestigationsTest {
 
             JsonNode log = data(send(c.port, "GET", "/inv/investigations/case-a/log", null, null));
             String text = log.toString();
-            assertTrue(text.contains("outside [2, 3)"), text);
+            assertTrue(text.contains("is below 2, or 3 or more; kept entities stay"), text);   // finding 29: the band in words
+            assertFalse(text.contains("min inclusive"), text);
             assertTrue(text.contains("Froze the Working Set here as \\\"before widening\\\""), text);
             JsonNode rep = replay(c, "case-a", "{}");
             assertTrue(rep.get("equivalent").asBoolean(), "replay reproduces every recorded hash");

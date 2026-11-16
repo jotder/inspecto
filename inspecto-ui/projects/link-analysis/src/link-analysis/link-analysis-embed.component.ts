@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
@@ -52,7 +53,7 @@ const FLAG_HINT = 'Embed links are turned off. Ask an administrator.';
                             <li class="flex flex-wrap items-center gap-2">
                                 <span>{{ g.label || 'Untitled link' }}</span>
                                 <inspecto-status-badge [value]="tone(g)" [label]="g.status"></inspecto-status-badge>
-                                <span class="text-secondary">expires {{ g.expiresAt }}</span>
+                                <span class="text-secondary">expires {{ time(g.expiresAt) }}</span>
                                 <span class="text-secondary">{{ g.viewCount }} views</span>
                                 <span class="text-secondary"
                                     >{{ scopeLabel(g) }}, masking {{ g.maskingMode ?? 'as the Space' }}</span
@@ -88,6 +89,8 @@ const FLAG_HINT = 'Embed links are turned off. Ask an administrator.';
     `,
 })
 export class LinkAnalysisEmbedComponent {
+    /** A server-recorded time in the one app clock every Link Analysis time uses (`ledgerTime`, `DATES-ONE-ZONE-1`). */
+    protected readonly time = ledgerTime;
     readonly investigationId = input.required<string>();
 
     protected readonly lens = inject(LensService);

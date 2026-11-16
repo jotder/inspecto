@@ -82,7 +82,7 @@ describe('My work - what changed in your data (UC-14)', () => {
             rejected_rows: rejected,
         });
         expect(lastImportLine('transfers', [run('2026-10-01T08:00:00Z', '2104')])).toEqual({
-            text: 'transfers: imported 1 Oct 2026, +2,104 rows',
+            text: 'Dataset transfers: imported 1 Oct 2026, +2,104 rows',
             at: Date.parse('2026-10-01T08:00:00Z'),
         });
         expect(
@@ -91,7 +91,7 @@ describe('My work - what changed in your data (UC-14)', () => {
                 run('2026-10-02T08:00:00Z', '99', '0', 'FAILED'),
                 run('2026-10-03T08:00:00Z', '2300', '4'),
             ])?.text,
-        ).toBe('transfers: re-imported 3 Oct 2026, 2,300 rows loaded, 4 rows set aside');
+        ).toBe('Dataset transfers: re-imported 3 Oct 2026, 2,300 rows loaded, 4 rows set aside');
         expect(lastImportLine('transfers', [run('2026-10-01T08:00:00Z', '1', '0', 'FAILED')])).toBeNull();
     });
 
@@ -109,12 +109,12 @@ describe('My work - what changed in your data (UC-14)', () => {
         const batch = 'c-2026-10-03 08:00:00';
         const replaced = { at, replaced: true, rowsBefore: 2104, rowsAfter: 2000, batch };
         expect(lastImportLine('transfers', [first, run('2026-10-03 08:00:00', '2000', '4')], replaced)).toEqual({
-            text: 'transfers: replaced 3 Oct 2026, 2,104 → 2,000 rows (−104), 4 rows set aside',
+            text: 'Dataset transfers: replaced 3 Oct 2026, 2,104 → 2,000 rows (−104), 4 rows set aside',
             at,
         });
         const appended = { at, replaced: false, rowsBefore: 2104, rowsAfter: 2300, batch };
         expect(lastImportLine('transfers', [first, run('2026-10-03 08:00:00', '196')], appended)?.text).toBe(
-            'transfers: appended 3 Oct 2026, +196 rows (now 2,300)',
+            'Dataset transfers: appended 3 Oct 2026, +196 rows (now 2,300)',
         );
         // a later Run now records no lastImport: the ledger wording wins, no stale net change
         expect(
@@ -123,10 +123,10 @@ describe('My work - what changed in your data (UC-14)', () => {
                 [first, run('2026-10-03 08:00:00', '196'), run('2026-10-05 08:00:00', '2300')],
                 appended,
             )?.text,
-        ).toBe('transfers: re-imported 5 Oct 2026, 2,300 rows loaded');
+        ).toBe('Dataset transfers: re-imported 5 Oct 2026, 2,300 rows loaded');
         // the first import keeps its own wording
         expect(lastImportLine('transfers', [first], { ...appended, rowsBefore: 0, rowsAfter: 2104 })?.text).toBe(
-            'transfers: imported 1 Oct 2026, +2,104 rows',
+            'Dataset transfers: imported 1 Oct 2026, +2,104 rows',
         );
     });
 

@@ -7,7 +7,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { apiErrorMessage, LensService } from 'app/inspecto/api';
 import { SessionService } from 'app/inspecto/auth/session.service';
-import { DataSettings } from '@inspecto/link-analysis/add-data/add-data.model';
+import { DataSettings, ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import { OnboardService } from '@inspecto/link-analysis/add-data/onboard.service';
 import { LinkAnalysisLimitsComponent } from 'app/modules/admin/settings/link-analysis-limits.component';
 import { LinkAnalysisSettingsComponent } from 'app/modules/admin/settings/link-analysis-settings.component';
@@ -100,20 +100,11 @@ export function durationWords(seconds: number | null | undefined): string {
     return `${d} ${d === 1 ? 'day' : 'days'}`;
 }
 
-/** One milestone in words: "After 4 min 10 s (22 Oct 2026, 10:04)", or "Not yet". */
+/** One milestone in words: "After 4 min 10 s (2026-10-22 10:04)", or "Not yet"; the time in the one app clock (`ledgerTime`). */
 export function milestoneWords(at: string | null | undefined, seconds: number | null | undefined): string {
     if (!at) return 'Not yet';
     const after = durationWords(seconds);
-    const when = new Date(at);
-    const stamp = Number.isNaN(when.getTime())
-        ? at
-        : when.toLocaleString('en-GB', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-          });
+    const stamp = ledgerTime(at);
     return after ? `After ${after} (${stamp})` : stamp;
 }
 

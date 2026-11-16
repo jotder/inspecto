@@ -8,6 +8,8 @@ import { LensService, apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
+import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
+import { thresholdWords } from './investigate-number';
 import { RevealedIds, refusal403 } from './investigation-state';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
 import { confirmApproveExpansion } from './expansion-decision';
@@ -67,9 +69,7 @@ export function oversightErrorMessage(err: unknown, fallback: string): string {
                             >Requested by <strong>{{ p.requestedBy ?? 'unknown' }}</strong> at
                             {{ when(p.requestedAt) }}</span
                         >
-                        <span class="text-secondary">
-                            Four-eyes threshold crossed: {{ p.sensitivity.exceeded.join('; ') }} ({{ limits(p) }})
-                        </span>
+                        <span class="text-secondary"> Held for a second person’s approval: {{ heldFor(p) }}. </span>
                         @if (p.status !== 'pending') {
                             <span class="text-secondary">
                                 {{ p.status === 'approved' ? 'Approved' : 'Denied' }} by {{ p.decidedBy ?? 'unknown' }}
@@ -176,20 +176,14 @@ export class LinkAnalysisOversightComponent {
     readonly busy = signal(false);
     readonly error = signal('');
 
-    /** A request's instant in the viewer's own zone; the raw value (nanosecond ISO) when it does not parse. */
+    /** A request's time in the one app clock (`ledgerTime`, `DATES-ONE-ZONE-1`), as the step log and File ▸ Open… show it. */
     when(iso: string | undefined): string {
-        const d = iso ? new Date(iso) : null;
-        return d && !Number.isNaN(d.getTime()) ? d.toLocaleString() : (iso ?? 'an unknown time');
+        return ledgerTime(iso) || 'an unknown time';
     }
 
-    /** The Space limits that apply, naming only the ones that are set ("—" read as a limit that was never configured). */
-    limits(p: PendingExpansion): string {
-        const s = p.sensitivity;
-        const parts = [
-            s.fourEyesBudgetAbove != null ? `budget above ${s.fourEyesBudgetAbove}` : '',
-            s.fourEyesFanOutAbove != null ? `fan-out above ${s.fourEyesFanOutAbove}` : '',
-        ].filter(Boolean);
-        return parts.length ? parts.join(', ') : 'no limit recorded';
+    /** Which four-eyes limit the request crossed, in words, each with its limit (finding 29: never `budget 500 > 100`). */
+    heldFor(p: PendingExpansion): string {
+        return thresholdWords(p.sensitivity.exceeded);
     }
 
     statusTone(p: PendingExpansion): string {

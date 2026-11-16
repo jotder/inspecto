@@ -20,7 +20,7 @@ const route = (...levels: string[][]) =>
 
 describe('entity-profile-view', () => {
     it('says "not assessed" with the reason, never a number', () => {
-        expect(notAssessedText({ assessed: false, reason: 'not computed yet' })).toBe('Not assessed: not computed yet');
+        expect(notAssessedText({ assessed: false, reason: 'not counted yet' })).toBe('Not assessed: not counted yet');
         expect(notAssessedText({ assessed: false, reason: null })).toBe('Not assessed');
         expect(notAssessedText({ assessed: false, reason: 'x' }, true)).toBe('not assessed: x');
         expect(count(null)).toBe('—');

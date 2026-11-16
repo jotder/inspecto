@@ -274,6 +274,24 @@ export class LinkAnalysisInvestigationComponent {
     // ── LA-INVESTIGATE-UX-1: how to investigate, Undo / Redo, Clean up ──
 
     readonly showHowTo = signal(!hintSeen('investigate'));
+    /**
+     * LA-FULL-CYCLE-TEST-1 finding 27: a reviewer, or a reader through the linked Case, reads the open Investigation but
+     * never changes its steps (only a lead writes the log, D7-1), so the tab offers them neither the Expand form nor the
+     * coaching on how to change it. `detailsRole` is the members route's answer; while it is unread nothing is withheld.
+     */
+    readonly readsOnly = computed(() => this.detailsRole() === 'reviewer' || this.caseReader());
+    /** May change the open Investigation's steps, as far as this screen can tell (the server stays the gate). */
+    readonly canChange = computed(() => this.canWrite() && !this.readsOnly());
+    /** Why the open Investigation is read-only here, in words; '' when it is not. */
+    readonly readOnlyReason = computed(() =>
+        !this.canWrite()
+            ? 'Read-only: changing an Investigation needs the Manage Incidents and Cases permission.'
+            : this.detailsRole() === 'reviewer'
+              ? 'Read-only: you review this Investigation. You can read it and decide approvals; only a lead changes its steps.'
+              : this.caseReader()
+                ? 'Read-only: you read this Investigation through its Case; only a lead changes its steps.'
+                : '',
+    );
     dismissHowTo(): void {
         markHintSeen('investigate');
         this.showHowTo.set(false);
@@ -499,6 +517,8 @@ export class LinkAnalysisInvestigationComponent {
     // ── Settings ▸ General: rename and restate the purpose (LA-INVESTIGATION-RENAME-1) ──
     /** The caller's role on the open Investigation (members route): null = no Subject, nothing enforced; 'reader' = not a member; undefined = not read yet. */
     private readonly detailsRole = signal<string | null | undefined>(undefined);
+    /** The members route answered 404: the caller reads the open Investigation through its linked Case, not as a member. */
+    private readonly caseReader = signal(false);
     /** Title and Purpose are editable for a lead holding `canManageIncidents` — the server's own gate. */
     readonly canEditDetails = computed(
         () => this.canWrite() && (this.detailsRole() === 'lead' || this.detailsRole() === null),
@@ -540,12 +560,16 @@ export class LinkAnalysisInvestigationComponent {
 
     private async loadDetailsRole(id: string): Promise<void> {
         let role: string | null = 'reader';
+        let caseReader = false;
         try {
             role = (await firstValueFrom(this.inv.investigationMembers(id))).you;
-        } catch {
+        } catch (err) {
             // not a member (a Case member reads 404): read-only
+            caseReader = (err as { status?: number } | null)?.status === 404;
         }
-        if (this.store.activeId() === id) this.detailsRole.set(role);
+        if (this.store.activeId() !== id) return;
+        this.detailsRole.set(role);
+        this.caseReader.set(caseReader);
     }
 
     /** Back on the tab: one instance (the Act panel) re-reads, so a decision made elsewhere shows without reopening. */
@@ -558,6 +582,7 @@ export class LinkAnalysisInvestigationComponent {
         effect(() => {
             const id = this.section() === 'settings' || this.section() === 'act' ? this.store.activeId() : null;
             this.detailsRole.set(undefined);
+            this.caseReader.set(false);
             if (id) untracked(() => void this.loadDetailsRole(id));
         });
         effect(() => {

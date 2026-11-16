@@ -1039,7 +1039,7 @@
                 <!-- the New form carries its own lock note at its top; this one serves the pending and queued starts -->
                 @if (!canWrite() && (pending() || store.queuedSeeds().length)) {
                     <inspecto-alert variant="info" title="Read-only" data-testid="investigation-read-only">
-                        Read-only: starting an Investigation needs Incident management.
+                        Read-only: starting an Investigation needs the Manage Incidents and Cases permission.
                     </inspecto-alert>
                 }
                 <p class="text-secondary m-0 text-sm">Open an existing Investigation with File ▸ Open…</p>
@@ -1089,20 +1089,23 @@
                                 </button>
                             }
                         </div>
+                        @if (canChange()) {
+                            <button
+                                mat-icon-button
+                                class="ml-auto"
+                                type="button"
+                                matTooltip="How to investigate"
+                                aria-label="How to investigate"
+                                data-testid="act-howto-toggle"
+                                [attr.aria-expanded]="showHowTo()"
+                                (click)="showHowTo.set(!showHowTo())"
+                            >
+                                <mat-icon svgIcon="heroicons_outline:question-mark-circle"></mat-icon>
+                            </button>
+                        }
                         <button
                             mat-icon-button
-                            class="ml-auto"
-                            type="button"
-                            matTooltip="How to investigate"
-                            aria-label="How to investigate"
-                            data-testid="act-howto-toggle"
-                            [attr.aria-expanded]="showHowTo()"
-                            (click)="showHowTo.set(!showHowTo())"
-                        >
-                            <mat-icon svgIcon="heroicons_outline:question-mark-circle"></mat-icon>
-                        </button>
-                        <button
-                            mat-icon-button
+                            [class.ml-auto]="!canChange()"
                             [matMenuTriggerFor]="actMenu"
                             matTooltip="Investigation actions"
                             aria-label="Investigation actions"
@@ -1172,9 +1175,9 @@
                 } @else if (!store.busy()) {
                     <button mat-stroked-button (click)="store.forget(store.activeId()!)">Remove from recent</button>
                 }
-                @if (!canWrite()) {
+                @if (readOnlyReason(); as why) {
                     <inspecto-alert variant="info" title="Read-only" data-testid="investigation-read-only">
-                        Read-only: changing an Investigation needs Incident management.
+                        {{ why }}
                     </inspecto-alert>
                 }
                 @if (store.activeDraftId(); as draft) {
@@ -1195,8 +1198,8 @@
                         <span class="text-secondary"> · {{ hubs().length }} busy held</span>
                     }
                 </p>
-                @if (showHowTo()) {
-                    <!-- LA-INVESTIGATE-UX-1: the first-run orientation; ? brings it back -->
+                @if (showHowTo() && canChange()) {
+                    <!-- LA-INVESTIGATE-UX-1: the first-run orientation; ? brings it back. Not for a reader (finding 27) -->
                     <section
                         class="rounded-md border p-2 text-sm"
                         style="border-color: var(--gamma-border)"
@@ -1392,11 +1395,13 @@
                             <inspecto-alert variant="error" title="Not decided">{{ why }}</inspecto-alert>
                         }
                     }
-                    @if (canWrite()) {
+                    @if (canChange()) {
                         <!-- the page projects the ONE Expand form (it holds the screen's start, presets and four-eyes limits) -->
                         <ng-container [ngTemplateOutlet]="expandSlot" />
                     } @else {
-                        <p class="text-secondary m-0 text-sm" data-testid="expand-read-only">{{ expandNeeds }}</p>
+                        <p class="text-secondary m-0 text-sm" data-testid="expand-read-only">
+                            {{ canWrite() ? 'Only a lead expands this Investigation.' : expandNeeds }}
+                        </p>
                     }
                 </section>
 

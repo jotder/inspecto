@@ -109,6 +109,11 @@ describe('caseMemberCandidates', () => {
         };
         expect(noCaseMemberReason(masked)).toContain('masked');
         expect(noCaseMemberReason(masked)).not.toContain('known source Dataset');
+        // finding 26: Reveal exists now and does not unmask a Case key, so the reason says what to do instead
+        expect(noCaseMemberReason(masked)).toContain(
+            'Link the Investigation to a Case instead: Investigation settings… ▸ Case.',
+        );
+        expect(noCaseMemberReason(masked)).not.toContain('Reveal rights');
         const other: G6GraphData = { nodes: [{ id: 'a', data: { label: 'a', kind: 'other' } }], edges: [] };
         expect(noCaseMemberReason(other)).toContain('known source Dataset');
     });

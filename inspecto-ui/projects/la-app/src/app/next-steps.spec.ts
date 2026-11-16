@@ -35,12 +35,16 @@ describe('nextSteps - What can I do next? (LA-ONBOARD-1 phase 8, UC-15 rule 4)',
         expect(nextSteps(space({ datasets: 1 }), OPEN)[0].to).toBe('/entities?tab=columns');
     });
 
-    it('with everything done: open a case, find something interesting, add more data', () => {
+    it('with everything done: open a saved view, find something interesting, add more data', () => {
         expect(ids(space({ datasets: 2, columnsDescribed: true, views: 3, lists: 1 }))).toEqual([
             'my-work',
             'discover',
             'add-data',
         ]);
+        // finding 33: a saved graph is a saved view, never "a case" (GLOSSARY: Saved view)
+        const done = nextSteps(space({ datasets: 2, columnsDescribed: true, views: 3, lists: 1 }), OPEN);
+        expect(done[0].label).toBe('Open a saved view');
+        expect(JSON.stringify(done)).not.toMatch(/a case/i);
     });
 
     it('every step says why in one line', () => {

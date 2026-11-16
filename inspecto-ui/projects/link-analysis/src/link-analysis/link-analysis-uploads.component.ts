@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -156,7 +157,7 @@ import { formatBytes, isBusyRefusal, uploadErrorMessage, uploadFileProblem, uplo
                                                 }
                                             </div>
                                             <div class="text-secondary tabular-nums">
-                                                {{ size(u.bytes) }}, {{ u.lines }} lines, landed {{ u.landedAt }}
+                                                {{ size(u.bytes) }}, {{ u.lines }} lines, landed {{ time(u.landedAt) }}
                                             </div>
                                         </li>
                                     }
@@ -176,6 +177,8 @@ import { formatBytes, isBusyRefusal, uploadErrorMessage, uploadFileProblem, uplo
     `,
 })
 export class LinkAnalysisUploadsComponent {
+    /** A server-recorded time in the one app clock every Link Analysis time uses (`ledgerTime`, `DATES-ONE-ZONE-1`). */
+    protected readonly time = ledgerTime;
     private inv = inject(InvService);
     private lens = inject(LensService);
     private confirm = inject(InspectoConfirmService);

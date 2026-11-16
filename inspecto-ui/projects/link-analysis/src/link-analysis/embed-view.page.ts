@@ -1,4 +1,5 @@
 import { Location } from '@angular/common';
+import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import {
     ChangeDetectionStrategy,
     Component,
@@ -89,7 +90,7 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
                             }
                             <p class="text-secondary m-0 text-sm">
                                 Read-only view at step {{ v.head.step }}. {{ maskNote() }} {{ scopeNote() }} This link
-                                expires {{ v.link.expiresAt }}.
+                                expires {{ time(v.link.expiresAt) }}.
                             </p>
                         </header>
 
@@ -375,6 +376,8 @@ export const EMBED_SCRUBBED_PATH = '/embed/inv/shared';
     `,
 })
 export class EmbedViewPageComponent {
+    /** A server-recorded time in the one app clock every Link Analysis time uses (`ledgerTime`, `DATES-ONE-ZONE-1`). */
+    protected readonly time = ledgerTime;
     /** The route's `:token`, bound by `withComponentInputBinding`. */
     readonly token = input.required<string>();
     protected readonly state = signal<'loading' | 'ready' | 'unavailable' | 'unreachable'>('loading');

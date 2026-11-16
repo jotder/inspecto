@@ -155,6 +155,17 @@ function toContent(v: LinkAnalysisView): Record<string, unknown> {
     };
 }
 
+/**
+ * A saved view's name when it states no `title`: the registry stamps `name` with the id, so a view written outside the
+ * SPA (the showcase Space Templates' `provider_money_trail`) would be titled by its id. An id-shaped name (the id itself,
+ * no spaces) reads as words: "Provider money trail" (LA-FULL-CYCLE-TEST-1 finding 33). A name a person gave is kept.
+ */
+export function readableName(name: string, id: string): string {
+    if (name !== id || /\s/.test(name) || !/[_-]/.test(name)) return name;
+    const words = name.replace(/[_-]+/g, ' ').trim();
+    return words ? words[0].toUpperCase() + words.slice(1) : name;
+}
+
 function fromContent(id: string, content: Record<string, unknown>): LinkAnalysisView {
     const c = content as {
         title?: string;
@@ -174,7 +185,7 @@ function fromContent(id: string, content: Record<string, unknown>): LinkAnalysis
     };
     return {
         id,
-        name: (typeof c.title === 'string' && c.title.trim()) || c.name || id,
+        name: (typeof c.title === 'string' && c.title.trim()) || readableName(c.name || id, id),
         description: c.description,
         sourceId: c.sourceId ?? 'lineage',
         query: c.query ?? {},

@@ -948,7 +948,7 @@ counts for more than a busy hub, and each row gives its reason as the kinds of n
 device, phone*). Clicking a pair highlights both on the canvas. It scores the graph on the canvas, not the whole
 Dataset, with the same node limit as *Predict links*. Why only 20: when it was measured, all 20 top suggestions were
 true duplicates, while below them about one suggestion in four was two people sharing an address or a home device, so
-these are suggestions: read the reason before merging. Inside an Investigation, with *Incident management*, each row has
+these are suggestions: read the reason before merging. Inside an Investigation, with *Manage Incidents and Cases*, each row has
 **Merge…**, which fills the same form as **Merge** on the canvas toolbar ([§11.7](#117-identity-resolution)); a pair that
 form would refuse (a masked alias, an entity with no type, or *Only entities in the open Investigation can be merged*)
 shows a warning instead. Nothing is written until you confirm in ⚙ Settings ▸ Identities. On a graph where every node
@@ -1078,7 +1078,7 @@ record you attach evidence to.
 
 | Other ways out | Notes |
 |---|---|
-| **Attach to Case** (canvas toolbar) | One step: seals what is on screen and attaches it to a Case — an existing one, or **create a new Case from the selected nodes**; with an Investigation open you may also link the Investigation. If a step after the seal fails, the dialog names the sealed snapshot and **Retry** never seals twice. Needs *Incident management*. A masked entity cannot become a Case member: link an Investigation instead, or ask for Reveal rights. |
+| **Attach to Case** (canvas toolbar) | One step: seals what is on screen and attaches it to a Case — an existing one, or **create a new Case from the selected nodes**; with an Investigation open you may also link the Investigation. If a step after the seal fails, the dialog names the sealed snapshot and **Retry** never seals twice. Needs *Manage Incidents and Cases*. A masked entity cannot become a Case member, and Reveal does not change that (it shows real ids on your screen only): link the Investigation to a Case instead (**Investigation settings… ▸ Case**). |
 | **Export** (tool rail) | PNG, SVG, JSON, GraphML |
 | **Widget** | A view or an Investigation's Working Set on a Dashboard ([§11.10](#1110-widgets-sharing-and-embed)) |
 
@@ -1148,8 +1148,8 @@ recorded. If a step needs a second person's approval, Save stops there and the s
 the picture: every entity is drawn where it was before you saved, even on a Space that masks values (the saved
 Investigation names entities by its own aliases).
 
-**Save** needs *Incident management*. Without it you can still start and Expand; the Save button is disabled and says
-*Needs Incident management.*
+**Save** needs the *Manage Incidents and Cases* permission. Without it you can still start and Expand; the Save button is disabled and says
+*Needs the Manage Incidents and Cases permission.*
 
 Unsaved work is kept in this browser tab only. **Close**, **File ▸ New** and **File ▸ Open…** ask *Save*, *Discard* or
 *Cancel*. Reloading or closing the browser tab asks first too; a reload loses unsaved steps. Moving to another page of
@@ -1181,7 +1181,9 @@ is recorded in the audit trail with your reason. You need *See unmasked ids* and
 and everyone else keep the aliases, the Dossier stays masked, and closing the Investigation forgets what you revealed.
 On a graph that is not saved yet the button says to save it first: a reveal is recorded against an Investigation and
 its purpose. **Investigation settings… ▸ Oversight and approvals ▸ Masked entities** lists the aliases with the same
-one **Reveal all…**. A second person approves or denies a held expand in the same section.
+one **Reveal all…**. A second person approves or denies a held expand in the same section. Each request says which
+four-eyes limit it crossed in words (*reads up to 500 rows, above the limit of 100*) and when it was made, in the same
+local `2026-11-15 13:21` form as every other recorded time in Link Analysis.
 
 Top to bottom, most important first:
 
@@ -1195,7 +1197,10 @@ Top to bottom, most important first:
 3. **Undo** / **Redo** of recorded steps, which stay at the top while the tab scrolls ([§7](#7-expand-and-clean-up-the-graph)).
 4. The **queued start entities**, when there are any.
 5. **Expand** ([§7.1](#71-expand)): the per-degree results, then ONE Expand form — From, **Expand** with its preview and
-   four-eyes line, and the **Expand filter** groups. A reader sees *Needs Incident management.* instead of the form.
+   four-eyes line, and the **Expand filter** groups. A reader sees *Needs the Manage Incidents and Cases permission.* instead of the form; a reviewer of the Investigation,
+   or someone reading it through its Case, sees *Only a lead expands this Investigation.* and no *How to investigate*
+   coaching. An Expand that finds nothing new is not recorded: the line under the canvas says *Expand found nothing new,
+   so no step was added.*
 6. **Clean up** ([§7.4](#74-clean-up)): one-press clean-ups with their counts.
 7. **Selected entity:** who it is (masked, busy, not in the Working Set), **Start from it** when it is not in the Working
    Set yet, **Expand anyway** on a busy one, **Pick neighbours…** (tick some, or **Add the 10 strongest**: one expand to
@@ -1270,13 +1275,13 @@ covered per Collector.
 
 Select two entities and **Merge** (canvas toolbar) to open ⚙ Settings ▸ **Identities** with the pair filled in; state
 that they are the same, with a reason. Keys are typed and normalised (`msisdn:+4477…`); a **mapping Dataset** imports
-many pairs at once (the import answers with counts only). The **Identity Fact log** shows its head (fact number and
+many pairs at once (the import answers with counts only). The **Identity history** tab shows its head (entry number and
 hash) and *Chain verified* (the whole chain is re-checked on every read); when the check fails it says *Chain NOT
 verified* and hides the head. The screen states what the log alone cannot show: facts cut off its end. Inside an
 Investigation the **resolve** step shows merged nodes; by default this is display only — choose **merged** on a step to
 treat a whole group as one entity. It is reversible: retract an assertion.
 
-**Merge** is on the canvas toolbar only while an Investigation's canvas is open, and needs *Incident management*. It is
+**Merge** is on the canvas toolbar only while an Investigation's canvas is open, and needs *Manage Incidents and Cases*. It is
 disabled with the reason unless exactly two entities with an Entity Type are selected and neither is a masked alias
 (the server refuses an alias too; under the default *typed* masking a masked type such as *account* therefore cannot be
 merged). It only fills the *Assert same entity* form: nothing is written until you give a reason and confirm. After the
@@ -1297,8 +1302,9 @@ exclusions are dropped and the preview says so); **Instantiate** builds a new In
 ![The Dossier section of Investigation settings after Build Dossier, showing Log intact](../../assets/la-guide-10-dossier.png)
 ***Build Dossier** is in **File ▸ Build Dossier…**, the Investigation's `⋯` menu and **Investigation settings… ▸ Dossier**. *Log intact* means every recorded step still matches the sealed log.*
 
-1. **File ▸ Save snapshot…** freezes the screen as a **snapshot** with a SHA-256 fingerprint. A *saved view*
-   re-reads live data; a *snapshot* does not change.
+1. **File ▸ Save snapshot…** freezes the screen as a **snapshot** with a SHA-256 fingerprint; the dialog's button is
+   **Save snapshot**, and the line under the canvas then confirms *Snapshot “…” saved and sealed as evidence.* A *saved
+   view* re-reads live data; a *snapshot* does not change.
 2. **Build Dossier** (**File ▸ Build Dossier…**, the Investigation's `⋯` menu, or ⚙ ▸ Investigation settings ▸
    Dossier): summary and topology, a ledger of every step with who
    and why, exclusions, score tables and a **SHA-256 manifest**. Download the *steps* and *method* statements or the
@@ -1478,7 +1484,7 @@ If a control is greyed out, hover it: it names what is missing.
 | You want to | You need |
 |---|---|
 | Explore, analyse, save a view, export | Sign-in |
-| Start an Investigation, take steps, Drafts, link or attach to a Case, add to a watch or block list | *Incident management* (`canManageIncidents`) |
+| Start an Investigation, take steps, Drafts, link or attach to a Case, add to a watch or block list | *Manage Incidents and Cases* (`canManageIncidents`) |
 | Run on the Server side of the catalogue, **Compute risk** | `canRunLinkGraphAnalysis` |
 | Build a link index | `canBuildLinkIndex` |
 | Approve or deny a held large expand (never your own) | *Approve link expansions* (`canApproveLinkExpansions`) |
@@ -1489,9 +1495,10 @@ If a control is greyed out, hover it: it names what is missing.
 | Add data with sign-in, **Upload a CSV** to a Collector | the right to upload data (`canUploadData`) |
 | See **Getting started counters** | an administrator (`canAdminister`) |
 
-**Read-only roles.** Without *Incident management* the Investigation tab says *Your role can't change Investigations
-(needs Incident management) - you can read this one*: you can open, read, replay, re-read and build, download and verify
-the Dossier; every write control is disabled with that sentence. A refusal shows the server's reason; a missing
+**Read-only roles.** Without *Manage Incidents and Cases* the Investigation tab says *Read-only: changing an Investigation needs the Manage
+Incidents and Cases permission.*: you can open, read, replay, re-read and build, download and verify the Dossier; every
+write control is disabled with that sentence. A reviewer of an Investigation, and a member of its linked Case, read it
+the same way (*Read-only: you review this Investigation…*): only a lead changes its steps, so they get no Expand form. A refusal shows the server's reason; a missing
 permission is named in words (*Your role does not have the Workbench author permission*). *Not found* on an Investigation can mean it does
 not exist, is not yours, or its Dataset is no longer shared with you — the same answer on purpose. In the
 `la-showcase` demo, *Demo RA Analyst* and *Demo Manager* are read-only; *Demo FM Analyst* holds manage-incidents,
@@ -1502,7 +1509,7 @@ graph-run, index-build and Alert Rule authoring; *Demo FM Manager* is the second
 (since 2026-11-15, `LA-FULL-CYCLE-TEST-1` D1), as `power`, the developer roles and `super` do, so the administrator
 who creates a Space can save its first view and change its settings; `operations`, `support` and `business` do not
 hold it. Without the *Workbench author* permission (`canAuthorWorkbench`) —
-a separate question from *Incident management* — Settings → Link Analysis shows its values with no Save, and File ▸
+a separate question from *Manage Incidents and Cases* — Settings → Link Analysis shows its values with no Save, and File ▸
 Save view, Save view as… and Delete view (and Rename, Duplicate and Delete in File ▸ Open…) are greyed out with the
 reason. A view shared with you to view only cannot be saved over or renamed (use Save view as… for a copy), and only
 its owner can delete a shared view.
@@ -1556,10 +1563,10 @@ longer unmasks a sensitive class; only masking mode *none* turns masking off.
 | **Truncated** | A cap cut the data. Narrow the query, or use the Server side of the catalogue |
 | *No preview on this server* in Expand… | The server is older than the preview; Expand anyway — the result line says what it added, with Undo |
 | Layered is greyed out | The graph is wide and shallow (more than 60 nodes on one rank); use Force |
-| `masked:…` everywhere | Your Space masks sensitive ids; ask for Reveal rights if you need real ids |
+| `masked:…` everywhere | Your Space masks sensitive ids; with *See unmasked ids*, save the graph as an Investigation and press **Reveal…** (see [Masked ids in an Investigation](#masked-ids-in-an-investigation)) |
 | *Waiting for approval* | The expand is above the four-eyes limit; a second approver opens the Investigation (§11.4) |
 | *Investigation is not available* / not found | It does not exist, is not yours, or its Dataset is no longer shared; ask its owner to add you |
-| *No node on this graph can become a Case member* | The entities are masked; link an Investigation to the Case, or ask for Reveal rights |
+| *No node on this graph can become a Case member* | The ids are masked, and Reveal does not unmask a Case key; link the Investigation to a Case (**Investigation settings… ▸ Case**) |
 | A tool says it needs a time column | The pattern is time-ordered; see §9 |
 | A pattern finds nothing on a big graph but should | The browser graph was truncated; switch the catalogue to Server |
 | *Every node mapping needs a Dataset and an id column* | Fill every required field in Graph model before Run query |
@@ -1703,7 +1710,7 @@ The Link Analysis page (`link-analysis.component.html/.ts`) drives the shared G6
   rendered as text, never a link; no edit or delete (append-only by design).
 - **Compare:** the `compare` op through the Investigation tab hits the same `…/ops` route; checked live against a demo
   backend (activity mode, two windows), answered with a sealed `comparison`.
-- **Identity Fact log:** `LinkAnalysisIdentityComponent` reads `GET /inv/entity-identities`; the server re-verifies the
+- **Identity history** (the Identity Fact log): `LinkAnalysisIdentityComponent` reads `GET /inv/entity-identities`; the server re-verifies the
   whole chain on every read (`EntityFactLog.read`), so a 500 renders *Chain NOT verified*. Import →
   `POST /inv/entity-identities/import` (counts only).
 - **Alert → Investigation (DR-U9) — decision:** the Alert does NOT carry the breaching entity names.

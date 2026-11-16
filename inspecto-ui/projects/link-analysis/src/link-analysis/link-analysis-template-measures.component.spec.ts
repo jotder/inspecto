@@ -66,7 +66,7 @@ describe('LinkAnalysisTemplateMeasuresComponent (LA-23)', () => {
         expect(inst.disabled).toBe(true);
         expect(inst.getAttribute('aria-describedby')).toBe('templates-read-only');
         expect(ro.el.querySelector('[data-testid="templates-read-only"]')?.textContent).toContain(
-            'needs Incident management',
+            'needs the Manage Incidents and Cases permission',
         );
         await expectNoA11yViolations(ro.el);
         TestBed.resetTestingModule();

@@ -9,6 +9,7 @@ import { InvService, InvestigationLog, PendingExpansion, WorkingSet } from '@ins
 import { LensService } from '@inspecto/core/api';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
+import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import { LinkAnalysisOversightComponent } from './link-analysis-oversight.component';
 
 const PENDING: PendingExpansion = {
@@ -96,7 +97,8 @@ describe('LinkAnalysisOversightComponent (D-U6 / D-U7)', () => {
         const { f, el, inv } = create({ approve: true, reveal: false });
         expect(el.textContent).toContain('Expand request p1');
         expect(el.textContent).toContain('analyst-1');
-        expect(el.textContent).toContain('budget 500 > 100');
+        expect(el.textContent).toContain('reads up to 500 rows, above the limit of 100');
+        expect(el.textContent).not.toContain('budget 500 > 100');
         expect(el.textContent?.toLowerCase()).toContain('pending');
         await expectNoA11yViolations(el);
         button(el, 'Approve')!.click();
@@ -130,17 +132,28 @@ describe('LinkAnalysisOversightComponent (D-U6 / D-U7)', () => {
         );
     });
 
-    it('names only the limits that are set and formats the request time, never "—" or a raw nanosecond instant', () => {
+    it('names the limit crossed in words and shows the request time in the shared app clock (finding 31)', () => {
         const { c, el } = create({ approve: true, reveal: false });
-        expect(c.limits(PENDING)).toBe('budget above 100');
-        const both = { ...PENDING, sensitivity: { ...PENDING.sensitivity, fourEyesFanOutAbove: 2000 } };
-        expect(c.limits(both)).toBe('budget above 100, fan-out above 2000');
-        const none = { ...PENDING, sensitivity: { ...PENDING.sensitivity, fourEyesBudgetAbove: null } };
-        expect(c.limits(none)).toBe('no limit recorded');
+        const both = {
+            ...PENDING,
+            sensitivity: {
+                ...PENDING.sensitivity,
+                exceeded: ['budget 500 > 100', 'maxFanOut unbounded (threshold 2000)'],
+            },
+        };
+        expect(c.heldFor(both)).toBe(
+            'reads up to 500 rows, above the limit of 100; keeps every neighbour of each entity, above the limit of 2,000; ' +
+                'the limits are in Settings ▸ Link Analysis',
+        );
         expect(el.textContent).not.toContain('—');
+        // DATES-ONE-ZONE-1: the one format every Link Analysis time uses (`2026-10-03 12:00`, local), never toLocaleString
+        expect(el.textContent).toContain(`at ${ledgerTime(PENDING.requestedAt)}`);
+        expect(ledgerTime(PENDING.requestedAt)).toMatch(/^2026-10-0[34] [0-9]{2}:[0-9]{2}$/);
         expect(el.textContent).not.toContain('2026-10-03T10:00:00Z');
+        expect(el.textContent).not.toMatch(/[AP]M/);
+        expect(c.when('2026-10-15T01:36:58.322167800Z')).toBe(ledgerTime('2026-10-15T01:36:58.322167800Z'));
         expect(c.when('2026-10-15T01:36:58.322167800Z')).not.toContain('322167800');
-        expect(c.when('not a date')).toBe('not a date');
+        expect(c.when(undefined)).toBe('an unknown time');
     });
 
     it('shows the server refusal of a self-approval in place and does not emit', async () => {

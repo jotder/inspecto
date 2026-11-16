@@ -43,12 +43,12 @@ const REAL = () => of([{ id: 'CASE-9', title: 'Real case' }]);
 const DOWN = () => throwError(() => new Error('down'));
 
 describe('LinkAnalysisCaseFieldComponent — three states, kept distinguishable', () => {
-    it('ops present: offers the real Cases from the objects store', () => {
+    it('ops present: offers the open Cases the caller can see', () => {
         const { fixture, el } = create(true, REAL);
         const field = fixture.debugElement.children[0].componentInstance as LinkAnalysisCaseFieldComponent;
         expect(field.cases()).toEqual([{ id: 'CASE-9', title: 'Real case' }]);
         expect(field.caseOptions()).toEqual([{ value: 'CASE-9', label: 'CASE-9 · Real case' }]);
-        expect(el.textContent).toContain('Open Cases from the objects store');
+        expect(el.textContent).toContain('The open Cases you can see.');
         expect(el.querySelector('inspecto-option-picker')).not.toBeNull();
     });
 

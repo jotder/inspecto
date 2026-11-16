@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Observable, of, Subject } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { SpacesService } from '@inspecto/core/api';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { NO_SPACE, SpaceGuideState } from '@inspecto/core/onboarding/space-guide';
 import { SPACE_GUIDE_COLLAPSED_KEY } from '@inspecto/core/onboarding/space-guide.component';
@@ -26,6 +27,14 @@ function create(load: Observable<SpaceGuideState>) {
             { provide: SessionService, useValue: { features: signal({}), product: signal(null) } },
             { provide: FirstRun, useValue: { openStep: vi.fn() } },
             { provide: OnboardingEventsService, useValue: { guideCompleted } },
+            {
+                provide: SpacesService,
+                useValue: {
+                    multiSpace: signal(true),
+                    currentSpaceId: signal('fraud-desk'),
+                    currentSpace: signal({ id: 'fraud-desk', displayName: 'Fraud desk' }),
+                },
+            },
         ],
     });
     // The Getting started page is covered by its own spec; here only WHICH page renders matters.
@@ -66,6 +75,10 @@ describe('LandingComponent', () => {
         const el = create(of({ hasSpace: true, datasets: 1, columnsDescribed: false, views: 0, lists: 0 }));
         expect(el.querySelector('la-app-getting-started')).toBeNull();
         expect(el.querySelector('h1')!.textContent).toContain('Inspecto LA');
+        // finding 33: the home page names the Space it is about
+        expect(el.querySelector('[data-testid="la-landing-space"]')!.textContent!.replace(/\s+/g, ' ').trim()).toBe(
+            'Space: Fraud desk',
+        );
         expect(el.querySelector('inspecto-space-guide section')).not.toBeNull();
         // My work comes after the Space guide (phase 7)
         const guide = el.querySelector('inspecto-space-guide')!;

@@ -70,4 +70,16 @@ describe('LinkAnalysisService - a case keeps its own name (LA-ONBOARD-1 phase 8)
         expect(s.fromContent('v2', { title: '  ', name: 'v2' }).name).toBe('v2');
         expect(s.fromContent('v3', {}).name).toBe('v3');
     });
+
+    it('finding 33: a view with only its id for a name is titled in words, never by the id', () => {
+        const s = service();
+        // the showcase Space Templates write `name: provider_money_trail` and no title
+        expect(s.fromContent('provider_money_trail', { name: 'provider_money_trail' }).name).toBe(
+            'Provider money trail',
+        );
+        expect(s.fromContent('mule-layering-ring', {}).name).toBe('Mule layering ring');
+        // a name a person gave stays as it is, even one with an underscore
+        expect(s.fromContent('v9', { name: 'Q3 review_final' }).name).toBe('Q3 review_final');
+        expect(s.fromContent('abc_def', { name: 'abc_def', title: 'Card ring' }).name).toBe('Card ring');
+    });
 });

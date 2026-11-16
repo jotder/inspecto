@@ -7,7 +7,7 @@ export const DISABLED_REASON = {
     pickNode: 'Pick a node first.',
     pickFromTo: 'Pick a From and a To node first.',
     selectEntities: 'Select entities first.',
-    fillRequired: 'Fill the required fields to run.',
+    fillRequired: 'Fill in every required field first.',
     setWindow: 'Set a window first.',
     searching: 'Searching…',
     openInvestigation: 'Open an Investigation first.',
@@ -23,6 +23,12 @@ export const expandOnStartCap = (cap: number): string =>
 /** The degree stepper at its top (Expand, Expand on start): the Industry pack's maximum. */
 export const mostDegrees = (max: number): string =>
     `${max} ${max === 1 ? 'degree is' : 'degrees is'} the most this Industry pack allows.`;
+
+/**
+ * The permission every Investigation, Entity List and template write needs (`canManageIncidents`), by the name an
+ * administrator grants it under: "Incident management" read as unrelated to Link Analysis (LA-FULL-CYCLE-TEST-1 finding 27).
+ */
+export const INCIDENTS_PERMISSION = 'the Manage Incidents and Cases permission';
 
 /** "Needs <permission>." (G14): the permission's plain name, never an id or the word "capability". */
 export const needsPermission = (permission: string): string => `Needs ${permission}.`;

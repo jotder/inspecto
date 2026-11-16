@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import { MatButtonModule } from '@angular/material/button';
 import { firstValueFrom } from 'rxjs';
 import { LensService } from '@inspecto/core/api';
@@ -79,9 +80,8 @@ import { standingDetectionErrorMessage } from './standing-detection';
             }
             @if (!enabled() && isEnabled()) {
                 <p class="text-secondary m-0" data-test="standing-readback">
-                    Enabled {{ initial()?.enabledAt }} — sweep principal {{ initial()?.principal }}, reading Dataset “{{
-                        initial()?.dataset
-                    }}”.
+                    Enabled {{ time(initial()?.enabledAt) }} — sweep principal {{ initial()?.principal }}, reading
+                    Dataset “{{ initial()?.dataset }}”.
                 </p>
             }
             @if (enabled(); as e) {
@@ -97,13 +97,16 @@ import { standingDetectionErrorMessage } from './standing-detection';
                                 : 'no masked columns'
                         }}.
                     </span>
-                    Enabled {{ e.enabledAt }}{{ e.replaced ? ' (re-enabled: the earlier snapshot was replaced)' : '' }}.
+                    Enabled {{ time(e.enabledAt)
+                    }}{{ e.replaced ? ' (re-enabled: the earlier snapshot was replaced)' : '' }}.
                 </inspecto-alert>
             }
         </section>
     `,
 })
 export class LinkAnalysisStandingDetectionComponent {
+    /** A server-recorded time in the one app clock every Link Analysis time uses (`ledgerTime`, `DATES-ONE-ZONE-1`). */
+    protected readonly time = ledgerTime;
     private inv = inject(InvService);
     private lens = inject(LensService);
 

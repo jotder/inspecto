@@ -84,7 +84,8 @@ export interface SaveTemplateData {
                 <inspecto-alert variant="success" title="Template saved">
                     <code>{{ t.id }}</code> — {{ t.parameters.length }}
                     {{ t.parameters.length === 1 ? 'parameter' : 'parameters' }}, {{ t.ops.length }}
-                    {{ t.ops.length === 1 ? 'step' : 'steps' }}. Instantiate it from this panel with that id.
+                    {{ t.ops.length === 1 ? 'step' : 'steps' }}. Start a new Investigation from it with
+                    <em>New Investigation from a template…</em> in this panel.
                 </inspecto-alert>
                 <ul class="m-0 pl-4 text-xs" aria-label="What the server dropped and generalised">
                     @for (d of t.dropped; track d.step) {
@@ -334,7 +335,7 @@ export function instantiateSpecs(t: InvestigationTemplate): AttributeSpec[] {
     ],
     template: `
         <div class="flex items-center" mat-dialog-title inspectoDialogResize #chrome="inspectoDialogResize">
-            <h2 class="m-0 flex-auto text-lg">Instantiate an Investigation Template</h2>
+            <h2 class="m-0 flex-auto text-lg">New Investigation from a template</h2>
             <button
                 mat-icon-button
                 (click)="chrome.toggleMaximize()"
@@ -382,7 +383,7 @@ export function instantiateSpecs(t: InvestigationTemplate): AttributeSpec[] {
                 ></inspecto-schema-form>
             }
             @if (error()) {
-                <inspecto-alert [variant]="unavailable() ? 'info' : 'error'" title="Instantiate">
+                <inspecto-alert [variant]="unavailable() ? 'info' : 'error'" title="The Investigation was not created">
                     {{ error() }}
                 </inspecto-alert>
             }

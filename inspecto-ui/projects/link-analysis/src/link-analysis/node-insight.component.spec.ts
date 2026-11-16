@@ -392,14 +392,16 @@ describe('NodeInsightComponent (telecom demo S2 UI)', () => {
         TestBed.inject(MatDialog).open = vi.fn(() => ({ afterClosed: () => of('r') })) as never;
         await c.addTo(c.addTargets()[0]);
         fixture.detectChanges();
-        expect(el.textContent).toContain('Needs Incident management.');
+        expect(el.textContent).toContain('Needs the Manage Incidents and Cases permission.');
     });
 
     it('disables list actions with the stated reason when the user cannot manage incidents; Hide closes with hide', async () => {
         const { fixture, el, close } = make({ canManageLists: false });
         await settle(fixture);
         expect(el.querySelector<HTMLButtonElement>('[data-testid=add-watch-wl]')!.disabled).toBe(true);
-        expect(el.querySelector('[data-testid=lists-forbidden]')!.textContent).toContain('needs Incident management');
+        expect(el.querySelector('[data-testid=lists-forbidden]')!.textContent).toContain(
+            'needs the Manage Incidents and Cases permission',
+        );
         el.querySelector<HTMLButtonElement>('[data-testid=hide-node]')!.click();
         expect(close).toHaveBeenCalledWith('hide');
     });

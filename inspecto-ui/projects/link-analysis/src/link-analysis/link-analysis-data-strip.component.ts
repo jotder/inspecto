@@ -28,14 +28,15 @@ import {
 } from '@inspecto/link-analysis/api/inv.service';
 import { GraphRunsService, LinkIndexSummary } from '@inspecto/link-analysis/api/graph-runs.service';
 import { KIND_TEXT, LinkAnalysisCorrectedDaysComponent } from './link-analysis-corrected-days.component';
-import { buildStrip, dayCells, DataTrustFacts, daysWindow, formatDay, formatInstant, outcomeTone } from './data-trust';
+import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
+import { buildStrip, dayCells, DataTrustFacts, daysWindow, formatDay, outcomeTone } from './data-trust';
 import { IndexRebuildComponent } from './index-rebuild.component';
 import { datasetIndexStatus } from './index-status';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 
 const PAGE = 25;
 const NO_TIME_COLUMN = 'this Investigation has no time column, so no day can be judged missing.';
-const NO_WINDOW = 'this Investigation sets no time window, and its Files name no event day.';
+const NO_WINDOW = 'this Investigation has no time window, and its Files do not say which day they hold.';
 
 /**
  * LA-DATA-TRUST-1 S2 - what data does this graph stand on? A one-line strip (how fresh, how complete, which index) with an
@@ -122,7 +123,7 @@ const NO_WINDOW = 'this Investigation sets no time window, and its Files name no
                                             <th scope="row" class="text-left font-medium tabular-nums">{{ c.day }}</th>
                                             <td>{{ kindText(c) }}</td>
                                             <td>{{ c.file ?? 'not named' }}</td>
-                                            <td class="tabular-nums">{{ c.at }}</td>
+                                            <td class="tabular-nums">{{ time(c.at) }}</td>
                                         </tr>
                                     }
                                 </tbody>
@@ -141,8 +142,8 @@ const NO_WINDOW = 'this Investigation sets no time window, and its Files name no
                         </p>
                         <p class="m-0" data-test="fresh-ingested">
                             @if (files()?.summary?.latestIngestedAt; as at) {
-                                Latest File ingested at {{ at }}. This is the Consignment's commit time, not when the
-                                File arrived.
+                                Latest File ingested at {{ time(at) }}. This is the Consignment's commit time, not when
+                                the File arrived.
                             } @else {
                                 Ingested-at not known.
                             }
@@ -321,6 +322,8 @@ export class LinkAnalysisDataStripComponent {
 
     readonly open = signal(false);
     readonly corrections = signal<DataChange[]>([]);
+    /** A server-recorded time in the one app clock (`ledgerTime`, `DATES-ONE-ZONE-1`). */
+    protected readonly time = ledgerTime;
     /** Bumped by a refresh so the corrected-day banner re-reads too. */
     readonly reloadToken = signal(0);
     readonly dataAsOf = signal<string | null>(null);
@@ -375,7 +378,7 @@ export class LinkAnalysisDataStripComponent {
             field: 'ingestedAt',
             headerName: 'Ingested at',
             minWidth: 180,
-            valueFormatter: (p) => formatInstant(p.value) || (p.value ?? ''),
+            valueFormatter: (p) => ledgerTime(p.value), // the one app clock (DATES-ONE-ZONE-1)
         },
         {
             field: 'outcome',

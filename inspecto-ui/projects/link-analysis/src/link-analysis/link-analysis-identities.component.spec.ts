@@ -187,7 +187,7 @@ describe('LinkAnalysisIdentitiesComponent (LA-17 slice 2)', () => {
         const { el, settle } = create({ listError: 403 });
         await settle();
         const alert = el.querySelector('inspecto-alert')?.textContent ?? '';
-        expect(alert).toContain('Identities need Incident management, also to read.');
+        expect(alert).toContain('Identities need the Manage Incidents and Cases permission, also to read.');
         expect(alert).not.toContain('no capability'); // X5
         await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
     });
@@ -204,7 +204,7 @@ describe('LinkAnalysisIdentitiesComponent (LA-17 slice 2)', () => {
         const { el, inv, settle } = create({ canManage: false });
         await settle();
         expect(inv.listIdentityGroups).not.toHaveBeenCalled();
-        expect(el.textContent).toContain('Identities need Incident management, also to read.');
+        expect(el.textContent).toContain('Identities need the Manage Incidents and Cases permission, also to read.');
         await expectNoA11yViolations(el); // axe, LA-A11Y-AUDIT-1
         expect(el.querySelector('form')).toBeNull();
     });

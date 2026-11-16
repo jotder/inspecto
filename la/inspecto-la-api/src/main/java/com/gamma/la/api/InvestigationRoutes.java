@@ -1991,11 +1991,11 @@ public final class InvestigationRoutes implements RouteModule {
         return out;
     }
 
-    /** {@code "Applied identity resolution as of fact 12 (3 groups, 7 member keys)."} — no key is named. */
+    /** {@code "Applied identity resolution as of identity history entry 12 (3 groups, 7 member keys)."} — no key is named. */
     static String resolveLine(Map<String, Object> e) {
         Map<String, Object> s = resolutionSummary((Map<?, ?>) e.get("resolution"));
         int g = (Integer) s.get("groups"), m = (Integer) s.get("members");
-        return "Applied identity resolution as of fact " + s.get("atSeq") + " (" + g + " group" + (g == 1 ? "" : "s") + ", "
+        return "Applied identity resolution as of identity history entry " + s.get("atSeq") + " (" + g + " group" + (g == 1 ? "" : "s") + ", "
                 + m + " member key" + (m == 1 ? "" : "s") + "): an entity whose typed key is a member shows as its merged "
                 + "node; traversal and counts are unchanged.";
     }
@@ -2186,8 +2186,8 @@ public final class InvestigationRoutes implements RouteModule {
                 return p;
             }
             if (body.get("min") == null && body.get("max") == null)
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'threshold' requires 'min' and/or 'max' - the band of the measure (default degree) to keep "
-                        + "(min inclusive, max exclusive)");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'threshold' requires 'min' and/or 'max' - the band of the measure (default degree) to keep: "
+                        + "at least min and below max");
             Object measure = body.get("measure");
             if (measure != null) {
                 if (!InvestigationEvaluator.MEASURES.contains(String.valueOf(measure)))
@@ -2623,12 +2623,12 @@ public final class InvestigationRoutes implements RouteModule {
         return b.append(" no member is admitted again.").toString();
     }
 
-    /** {@code "Entity List `known-mules` (exclusion, 40 members, as of fact 17)"} — the sealed list a list op names. */
+    /** {@code "Entity List `known-mules` (exclusion, 40 members, as of identity history entry 17)"} — the sealed list a list op names. */
     static String listClause(Map<String, Object> e) {
         Map<?, ?> l = (Map<?, ?>) e.get("list");
         int n = strings(l.get("members")).size();
         return "Entity List `" + l.get("listId") + "` (" + l.get("purpose") + ", " + n + " member" + (n == 1 ? "" : "s")
-                + ", as of fact " + l.get("atSeq") + ")";
+                + ", as of identity history entry " + l.get("atSeq") + ")";
     }
 
     /** What a {@code threshold} did, in words (the removed entities are in the step's delta, not the line). */
@@ -2638,9 +2638,18 @@ public final class InvestigationRoutes implements RouteModule {
             case "weightedDegree" -> "weighted degree (links touching it, each kind and direction once)";
             case "eventCount" -> "event count (the folded events on its links)";
             default -> "degree (distinct counterparties in the Working Set)";
-        } + " is outside "
-                + "[" + (p.get("min") == null ? "0" : p.get("min")) + ", " + (p.get("max") == null ? "unbounded" : p.get("max"))
-                + ") - min inclusive, max exclusive; kept (protected) entities stay, removed ones are not re-admitted.";
+        } + " is " + bandWords(p.get("min"), p.get("max"))
+                + "; kept entities stay, and removed ones are not admitted again.";
+    }
+
+    /**
+     * The part of a {@code threshold} band an entity was removed for, in words (LA-FULL-CYCLE-TEST-1 finding 29: the Dossier
+     * read "outside [1, unbounded) - min inclusive, max exclusive"): kept is at least {@code min} and below {@code max}.
+     */
+    static String bandWords(Object min, Object max) {
+        String below = min == null ? null : "below " + min;
+        String above = max == null ? null : max + " or more";
+        return below != null && above != null ? below + ", or " + above : below != null ? below : above != null ? above : "outside the band";
     }
 
     /** A {@code compare}'s line: the two windows and what the sealed diff found (counts only; the lists are in the entry). */
@@ -2951,7 +2960,7 @@ public final class InvestigationRoutes implements RouteModule {
             exceeded.add("budget " + budget + " > " + s.fourEyesBudgetAbove());
         Object fanOut = params.get("maxFanOut");
         if (s.fourEyesFanOutAbove() != null && (!(fanOut instanceof Number n) || n.intValue() > s.fourEyesFanOutAbove()))
-            exceeded.add(fanOut == null ? "maxFanOut unbounded (threshold " + s.fourEyesFanOutAbove() + ")"
+            exceeded.add(fanOut == null ? "maxFanOut unbounded (threshold " + s.fourEyesFanOutAbove() + ")"   // vocab-allow: sealed request wording, put in words by the SPA (thresholdWords)
                     : "maxFanOut " + fanOut + " > " + s.fourEyesFanOutAbove());
         if (exceeded.isEmpty()) return null;
         Map<String, Object> m = new LinkedHashMap<>();

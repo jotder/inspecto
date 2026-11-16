@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
 import { AbstractControl, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -319,7 +320,7 @@ export type EntityListEntriesResult = EntityListMembersResult | EntityListHeld;
                             @for (e of d.expiring; track e.entry + e.kind) {
                                 <li class="flex items-center gap-1">
                                     <span class="font-mono">{{ e.entry }}</span>
-                                    <span class="text-secondary">until {{ e.expiresAt }}</span>
+                                    <span class="text-secondary">until {{ time(e.expiresAt) }}</span>
                                     @if (e.expired) {
                                         <inspecto-status-badge value="expired" label="Expired"></inspecto-status-badge>
                                     }
@@ -385,6 +386,8 @@ export type EntityListEntriesResult = EntityListMembersResult | EntityListHeld;
     `,
 })
 export class EntityListEntriesDialog {
+    /** A server-recorded time in the one app clock every Link Analysis time uses (`ledgerTime`, `DATES-ONE-ZONE-1`). */
+    protected readonly time = ledgerTime;
     protected readonly textError = textError;
     readonly data = inject<EntityListEntriesData>(MAT_DIALOG_DATA);
     readonly ref = inject(MatDialogRef<EntityListEntriesDialog, EntityListEntriesResult | undefined>);

@@ -87,12 +87,12 @@ import {
                     [attr.aria-describedby]="canWrite() ? null : 'templates-read-only'"
                     (click)="instantiate()"
                 >
-                    Instantiate a template…
+                    New Investigation from a template…
                 </button>
             </div>
             @if (!canWrite()) {
                 <p id="templates-read-only" class="text-secondary m-0" data-testid="templates-read-only">
-                    Read-only: saving or instantiating a template needs Incident management.
+                    Read-only: saving a template or starting from one needs the Manage Incidents and Cases permission.
                 </p>
             }
         </section>

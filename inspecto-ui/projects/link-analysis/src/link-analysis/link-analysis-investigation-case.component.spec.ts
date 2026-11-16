@@ -67,7 +67,7 @@ describe('LinkAnalysisInvestigationCaseComponent (LA-24)', () => {
         ro.f.detectChanges();
         expect(btn(ro.el, 'Link to Case').disabled).toBe(true);
         expect(ro.el.querySelector('[data-testid="case-link-read-only"]')?.textContent).toContain(
-            'needs Incident management',
+            'needs the Manage Incidents and Cases permission',
         );
         await expectNoA11yViolations(ro.el);
         TestBed.resetTestingModule();

@@ -51,7 +51,7 @@ const DOSSIER: Dossier = {
         snapshots: [],
     },
     topology: { entities: 5, links: 4, degreeTotal: 5 },
-    scores: { computedBy: 'client-side', tables: [], note: 'no score vectors in the evidence' },
+    scores: { computedBy: 'client-side', tables: [], note: 'No centrality or risk scores in the evidence.' },
     ledger: [
         {
             step: 1,
@@ -147,7 +147,7 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
         expect(el.querySelectorAll('table[aria-label="Ledger"] tbody tr').length).toBe(2);
         expect(el.textContent).toContain('(read truncated)');
         expect(el.textContent).toContain('sha256:root');
-        expect(el.textContent).toContain('no score vectors');
+        expect(el.textContent).toContain('No centrality or risk scores in the evidence.');
         // LA-A11Y-AUDIT-1: a label on a role-less div is ignored by assistive tech, so each button row is a named group
         for (const name of ['Dossier scope', 'Verify a manifest', 'Export bundle']) {
             expect(el.querySelector(`div[role="group"][aria-label="${name}"]`), name).not.toBeNull();

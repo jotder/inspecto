@@ -1,15 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DatasetFilesPage } from '@inspecto/link-analysis/api/inv.service';
-import {
-    buildStrip,
-    dayCells,
-    daysWindow,
-    formatDay,
-    formatDayStart,
-    formatInstant,
-    outcomeTone,
-    splitMissing,
-} from './data-trust';
+import { buildStrip, dayCells, daysWindow, formatDay, formatDayStart, outcomeTone, splitMissing } from './data-trust';
 
 const files = (over: Partial<NonNullable<DatasetFilesPage['summary']>> = {}): DatasetFilesPage =>
     ({
@@ -147,13 +138,6 @@ describe('not delivered yet vs a real gap', () => {
             fileDays,
         );
         expect(cells.map((c) => c.state)).toEqual(['pending', 'ok', 'missing', 'ok', 'pending']);
-    });
-
-    it('states an instant in UTC and refuses a zone-less one', () => {
-        expect(formatInstant('2026-09-05T10:03:20Z')).toBe('5 Sep 2026 10:03 UTC');
-        expect(formatInstant('2026-09-05T15:33:20+05:30')).toBe('5 Sep 2026 10:03 UTC');
-        expect(formatInstant('2026-09-05 10:03:20')).toBe('');
-        expect(formatInstant(null)).toBe('');
     });
 });
 

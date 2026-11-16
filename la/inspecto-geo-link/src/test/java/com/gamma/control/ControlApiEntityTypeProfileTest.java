@@ -109,7 +109,7 @@ class ControlApiEntityTypeProfileTest {
             assertEquals("attribute", binding(imei.get("bindings"), "imei").get("role").asText(), "bound, but no link end");
             assertEquals(0, wallet.get("bindings").size(), "a type no column claims has no binding");
             assertFalse(msisdn.at("/headline/assessed").asBoolean());
-            assertEquals("not computed yet", msisdn.at("/headline/reason").asText());
+            assertEquals("not counted yet. Open the Entity Type to count it", msisdn.at("/headline/reason").asText());
 
             data(get(c, "/inv/entity-types/msisdn/profile?sections=volume", OWNER));
             JsonNode after = data(get(c, "/inv/entity-types", OWNER)).get("items");
