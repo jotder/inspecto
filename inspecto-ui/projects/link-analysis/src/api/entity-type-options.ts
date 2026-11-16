@@ -43,6 +43,15 @@ export interface RecordTypeGuide {
     roleHints?: RecordRoleHints;
 }
 
+/**
+ * The Record type picker's blank choice (LA-FULL-CYCLE-TEST-1 presentability 2): a Dataset with no record type is a
+ * complete answer, not a gap, so it reads "Any kind of record" and says what follows, never "Not set". One wording for
+ * Add data and the Data page; `value` is each form's own blank.
+ */
+export function anyRecordOption(value: string): PickerOption {
+    return { value, label: 'Any kind of record', hint: 'No record type: every Entity Type in its usual order' };
+}
+
 /** What narrows one column's choices: the Dataset's record type and the column's sampled values. */
 export interface HoldsContext {
     recordType?: RecordTypeGuide | null;

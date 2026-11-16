@@ -117,7 +117,7 @@ interface Membership {
                             [disabled]="revealing()"
                             (click)="revealNow()"
                         >
-                            Reveal the ids on screen…
+                            Reveal the masked entities on screen…
                         </button>
                     } @else if (ctx().revealWhyNot) {
                         <p class="text-secondary m-0 text-xs" data-testid="ni-reveal-why">{{ ctx().revealWhyNot }}</p>

@@ -720,8 +720,9 @@ export function degreeOutcomeMessage(o: DegreeOutcome): string {
         );
     if (o.fanOutCapped > 0)
         parts.push(
-            `${plural(o.fanOutCapped, 'weaker link was', 'weaker links were')} left out: each entity keeps its ` +
-                `${o.maxFanOut ? `${o.maxFanOut} ` : ''}strongest links.`,
+            // presentability 2: one plain sentence, what was added before what was left out
+            `Only the ${o.maxFanOut ? `${o.maxFanOut} ` : ''}strongest links of each entity were added; ` +
+                `${plural(o.fanOutCapped, 'weaker link was', 'weaker links were')} left out.`,
         );
     if (o.hubsFlagged) {
         const how = o.hubDegreeSource ? HUB_SOURCE[o.hubDegreeSource] : '';

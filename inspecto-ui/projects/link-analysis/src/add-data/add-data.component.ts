@@ -34,6 +34,7 @@ import {
     EntityTypeGuide,
     OTHER_FAMILY,
     RecordTypeGuide,
+    anyRecordOption,
     entityTypeOptions,
 } from '@inspecto/link-analysis/api/entity-type-options';
 import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
@@ -263,7 +264,7 @@ export class AddDataComponent implements OnInit {
     /** What a row of a Dataset can be, from the Space's packs (ENTITY-TYPE-CATALOG-1 P2); empty = not asked. */
     protected readonly recordTypes = signal<RecordTypeGuide[]>([]);
     protected readonly recordTypeOptions = computed<PickerOption[]>(() => [
-        { value: NONE, label: 'Not set' },
+        anyRecordOption(NONE),
         ...this.recordTypes().map((r) => ({
             value: r.id,
             label: r.label,

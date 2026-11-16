@@ -113,7 +113,7 @@ served Space (see "if it goes wrong" below).
 |---|---|
 | Sign-in page error "The server could not start a session" | The server's `/bootstrap` answered an error, so no sign-in can work. Read the server log. A frequent cause is the next row. Fix, then press "Try again". |
 | Server log/boot error "Demo User '<id>' is defined differently in Spaces '<a>' and '<b>'" | Two Spaces under `spaces\` define the same Demo User with different rosters (the picker keeps one id = one person). Remove the Space with the other roster, or align the `demo-users.toon` files. |
-| Screens say the Dataset "has no rows yet" (the Data page: "No rows yet — its Pipeline has not run") | The seed/ingest did not run: the first ingest of `mule_transfers_dataset` has not landed, or the Space was copied after the server started. Restart after copying the Space, wait for ingest, re-run the seed. |
+| Screens say the Dataset "has no rows yet" (the Data page: "Waiting for its first run") | The seed/ingest did not run: the first ingest of `mule_transfers_dataset` has not landed, or the Space was copied after the server started. Restart after copying the Space, wait for ingest, re-run the seed. |
 | Link Analysis missing from the menu / "not installed" | Not an Advanced or Preview bundle, or the Space has the module switched off (`la-showcase-off` by design). |
 
 ---

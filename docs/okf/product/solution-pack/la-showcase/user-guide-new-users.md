@@ -54,8 +54,9 @@ fourth, `utility_loss_alerts`, serves the Alert Rule.
 ### Where to see them: the Data page
 
 Open **Data** in the left menu. It lists every Dataset in the Space. Datasets a Pipeline or a Job keeps up to date
-are grouped as **Streams** and **References**; each reads *Kept up to date by a Pipeline or a Job*, so there is
-nothing to add by hand.
+are grouped as **Streams** and **References**; each reads *From a Pipeline* in the list and *Kept up to date by a
+Pipeline* in its header, so there is nothing to add by hand. One whose Pipeline has not written rows yet says *Waiting
+for its first run*.
 
 Open a Dataset to see:
 

@@ -73,6 +73,9 @@ describe('Working Set entity types on the canvas (ONB-LA-ENDPOINT-TYPE-1)', () =
         );
         const node = (raw: string) => g.nodes.find((n) => rawIdsOf(n).includes(raw))!;
         expect(node(alias).data.canvasLabel).toBe('27820000001');
+        // presentability 2: the hover text names it as the canvas draws it; an unrevealed alias has no hover name
+        expect(node(alias).data.hoverLabel).toBe('27820000001');
+        expect(node('masked:aaaabbbbccccdddd').data.hoverLabel).toBeUndefined();
         expect(node(alias).data.label).toBe(alias);
         expect(rawIdsOf(node(alias))).toEqual([alias]);
         expect(revealedIdOf(node(alias), { [alias]: '27820000001' })).toBe('27820000001');

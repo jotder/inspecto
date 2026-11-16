@@ -125,6 +125,25 @@ describe('la-app host provider set', () => {
         ]);
     });
 
+    it('LA_DATASETS names a Dataset as the Data page does: its title, and its description (presentability 2)', () => {
+        const http = TestBed.inject(HttpTestingController);
+        let got: { id: string; name: string; description?: string }[] = [];
+        TestBed.inject(LA_DATASETS)
+            .list()
+            .subscribe((rows) => (got = rows));
+        http.expectOne((r) => r.url.endsWith('/components/dataset')).flush([
+            {
+                name: 'titled',
+                content: { sourceName: 't', title: 'Card transfers', description: 'One row per transfer.' },
+            },
+            { name: 'plain', content: { sourceName: 'p' } },
+        ]);
+        expect(got.map((d) => [d.id, d.name, d.description])).toEqual([
+            ['titled', 'Card transfers', 'One row per transfer.'],
+            ['plain', 'plain', undefined],
+        ]);
+    });
+
     it('LA_DATASETS carries a Reference kind and identifying column (ONBOARDING-FIRST-RUN-1 C6a)', () => {
         const http = TestBed.inject(HttpTestingController);
         let got: { id: string; kind?: string; identifyingColumn?: string; primaryEntityType?: string }[] = [];

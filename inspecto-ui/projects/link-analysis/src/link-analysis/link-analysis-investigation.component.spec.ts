@@ -15,7 +15,7 @@ import { LensService, SessionService } from '@inspecto/core/api';
 import { MatDialog } from '@angular/material/dialog';
 import { InvestigationPanelDialog } from './investigation-panel.dialog';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
-import { LA_FEATURES, LA_WIDGETS } from '@inspecto/link-analysis/la-host';
+import { LA_FEATURES, LA_WIDGETS, LaDataset } from '@inspecto/link-analysis/la-host';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import { EntityProjection } from '@inspecto/core/graph';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from '@inspecto/core/grid';
@@ -24,6 +24,8 @@ import { InvestigationSection, LinkAnalysisInvestigationComponent } from './link
 import { By } from '@angular/platform-browser';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 import { PendingInvestigation } from './investigate-number';
+import { DegreePresets } from '@inspecto/link-analysis/graph/domain-profile';
+import { MatTooltip } from '@angular/material/tooltip';
 import { WidgetsService } from 'app/modules/admin/studio/widgets/widgets.service';
 import { Widget } from 'app/modules/admin/studio/widgets/widget-types';
 import { provideLaHostServices } from 'app/modules/admin/studio/la-host.providers';
@@ -39,7 +41,8 @@ import { configureLaLimits, resetLaLimits } from './la-limits';
             projectionIssue="Run a query first."
             [timeCol]="timeCol()"
             [pending]="pending()"
-            [degreePresets]="{ budget: 2000 }"
+            [degreePresets]="degreePresets()"
+            [datasets]="datasets()"
             [maxDegree]="4"
             (pendingDone)="pending.set(null)"
             (settingsRequested)="settingsAsked = true"
@@ -67,6 +70,8 @@ import { configureLaLimits, resetLaLimits } from './la-limits';
 class Host {
     readonly projection = signal<EntityProjection | null>({ datasetId: 'calls', sourceCol: 'A', targetCol: 'B' });
     readonly timeCol = signal('');
+    readonly degreePresets = signal<DegreePresets>({ budget: 2000 });
+    readonly datasets = signal<LaDataset[]>([]);
     readonly pending = signal<PendingInvestigation | null>(null);
     readonly sections: InvestigationSection[] = ['settings', 'oplog', 'ws-rows', 'coverage', 'annotations', 'excluded'];
     settingsAsked = false;
@@ -1062,13 +1067,68 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
         expect(host.pending()).toBeNull();
     });
 
+    it('presentability 2: the header says the Dataset and its link in words, the raw names in the tooltip', async () => {
+        const { fixture, el, store } = create();
+        await openInv(store);
+        fixture.detectChanges();
+        const line = () => el.querySelector('[data-testid="act-binding"]') as HTMLElement;
+        const tip = () => fixture.debugElement.query(By.css('[data-testid="act-binding"]')).injector.get(MatTooltip);
+        // the host lists no such Dataset: its id, and the columns as words
+        expect(line().querySelector('[data-testid="act-binding-dataset"]')!.textContent!.trim()).toBe('calls');
+        expect(line().querySelector('[data-testid="act-binding-links"]')!.textContent!.trim()).toBe(
+            'Links from a to b',
+        );
+        expect(tip().message).toBe('calls · A → B');
+        // a Dataset with a description and no title: the description's first sentence, never the id
+        const host = fixture.componentInstance as unknown as Host;
+        host.datasets.set([
+            { id: 'calls', sourceName: 'calls', name: 'calls', description: 'Voice calls between numbers. Synthetic.' },
+        ]);
+        fixture.detectChanges();
+        expect(line().querySelector('[data-testid="act-binding-dataset"]')!.textContent!.trim()).toBe(
+            'Voice calls between numbers.',
+        );
+        // a title set on it wins
+        host.datasets.set([
+            { id: 'calls', sourceName: 'calls', name: 'Call records', description: 'Voice calls between numbers.' },
+        ]);
+        fixture.detectChanges();
+        expect(line().querySelector('[data-testid="act-binding-dataset"]')!.textContent!.trim()).toBe('Call records');
+        expect(line().textContent).not.toContain('·');
+        // the recorded header is untouched: every op still names the stored Dataset and columns
+        expect(store.header()).toMatchObject({ dataset: 'calls', sourceCol: 'A', targetCol: 'B' });
+    });
+
+    it('presentability 2: the Working Set line leaves zero counts out and the window is a sentence', async () => {
+        const { fixture, el, store } = create({ timeCol: 'ts' });
+        await openInv(store);
+        fixture.detectChanges();
+        const counts = () => el.querySelector('[data-testid="act-counts"]')!.textContent!.replace(/\s+/g, ' ').trim();
+        expect(counts()).toBe('Working Set: 1 entity · 1 link · not expanded yet');
+        store.workingSet.set({
+            ...WS,
+            entities: [WS.entities[0], { ...WS.entities[0], id: 'h', hop: 1, hidden: true }],
+            excluded: [{ id: 'x' } as never],
+        });
+        fixture.detectChanges();
+        expect(counts()).toBe('Working Set: 2 entities · 1 link · 1 excluded · 1 hidden · not expanded yet');
+        expect(counts()).not.toContain('kept');
+        const host = fixture.componentInstance as unknown as Host;
+        host.degreePresets.set({ budget: 2000, windowDays: 30 });
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="degree-window"]')!.textContent!.trim()).toBe(
+            'The next Expand reads all available data.',
+        );
+    });
+
     it('the Expand section shows the degree reached and the per-degree results, with ONE Expand control', async () => {
         const { fixture, el, store } = create();
         await openInv(store);
         store.degreeOutcomes.set([]);
         fixture.detectChanges();
         // LA-INVESTIGATE-UX-1: the degree reached is on the one counts line
-        expect(el.querySelector('[data-testid="degree-label"]')?.textContent?.trim()).toBe('· degree 0 of 4');
+        // presentability 2: a phrase, not "degree 0 of 4"
+        expect(el.querySelector('[data-testid="degree-label"]')?.textContent?.trim()).toBe('· not expanded yet');
         expect(el.querySelector('[data-testid="expand-next-degree"]')).toBeNull(); // merged into the one Expand form
         store.degreeOutcomes.set([
             { degree: 1, admitted: 3, linksAdded: 4, truncated: true, fanOutCapped: 0, budget: 2000 },
@@ -1081,7 +1141,7 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
             ],
         });
         fixture.detectChanges();
-        expect(el.querySelector('[data-testid="degree-label"]')?.textContent?.trim()).toBe('· degree 4 of 4');
+        expect(el.querySelector('[data-testid="degree-label"]')?.textContent?.trim()).toBe('· expanded 4 of 4 degrees');
         expect(el.querySelector('[data-testid="degree-blocked"]')?.textContent).toContain('Degree 4 reached');
         expect(el.querySelector('[aria-label="Degree results"]')?.textContent).toContain(
             'Degree 1: 3 new entities, 4 links added. The read stopped at its budget of 2,000 rows',

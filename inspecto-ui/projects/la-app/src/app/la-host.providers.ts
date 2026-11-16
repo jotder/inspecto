@@ -106,9 +106,13 @@ export function provideLaAppHostServices(): Provider[] {
             provide: LA_DATASETS,
             useFactory: (): LaDatasets => {
                 const components = inject(ComponentsService);
+                const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
                 const toDataset = (name: string, content: Record<string, unknown>): LaDataset => ({
                     id: name,
-                    name: (content['name'] as string) ?? name,
+                    // Presentability 2: the name the Data page shows (its `title`, set by Rename or describe) and its
+                    // description, so the Investigation tab and the Start box name a Dataset as the Data page does.
+                    name: text(content['title']) || ((content['name'] as string) ?? name),
+                    ...(text(content['description']) ? { description: text(content['description']) } : {}),
                     // A shared ref spans Spaces and is not a local store name; `physicalRef` is the landed store's name.
                     sourceName:
                         (content['sourceName'] as string) ||

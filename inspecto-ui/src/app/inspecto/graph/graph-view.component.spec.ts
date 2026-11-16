@@ -34,6 +34,7 @@ import {
     graphSignature,
     stableKey,
     startBadge,
+    START_BADGE_RISE,
     nodeLabelBacking,
     UNEXPANDED_DASH,
     UNEXPANDED_LINE_WIDTH,
@@ -106,14 +107,25 @@ describe('GraphViewComponent', () => {
         for (const v of [...Object.values(container), ...Object.values(mask)]) expect(v).not.toMatch(/#|rgb/);
     });
 
-    it('the start mark sits off the top-left corner, clear of the outline and the icon', () => {
+    it('the start mark is a tab centred on the node top edge: touching the outline, clear of the icon (presentability 2)', () => {
         const b = startBadge('surface', 'kind');
-        expect(b).toMatchObject({ text: 'start', placement: 'left-top', fill: 'surface', backgroundFill: 'kind' });
-        // G6 anchors a left-top badge's top-right corner ON the node's corner and grows it left and down (2/4 px
-        // padding): moved left past its right padding and up past its own height, the whole badge is outside the node.
-        const font = b['fontSize'] as number;
-        expect(b['offsetX'] as number).toBeLessThan(-4);
-        expect(b['offsetY'] as number).toBeLessThanOrEqual(-(font + 2 + 2));
+        expect(b).toMatchObject({
+            text: 'start',
+            placement: 'top',
+            offsetX: 0,
+            fill: 'surface',
+            backgroundFill: 'kind',
+        });
+        // G6 anchors a top badge's top-centre ON the node's top-centre and grows it down (2 px top and bottom padding):
+        // lifted by less than its own height, its bottom edge overlaps the node's top edge - attached, not floating -
+        // and by more than half of it, so the icon (6 px or more below the top) stays clear.
+        const height = (b['fontSize'] as number) + 2 + 2;
+        const bottom = (b['offsetY'] as number) + height; // the badge's bottom edge, below the node's top edge
+        expect(bottom).toBeGreaterThan(0);
+        expect(bottom).toBeLessThanOrEqual(4);
+        expect(-(b['offsetY'] as number)).toBe(START_BADGE_RISE);
+        // tokens only: the colours are the ones handed in (the node surface and its kind colour), never a literal
+        expect(JSON.stringify(b)).not.toMatch(/#|rgb/);
     });
 
     it('a node label sits on a backing in the node surface token, below the outline', () => {
@@ -1006,6 +1018,31 @@ describe('dense-graph link labels (telco demo ring, 2026-09-27)', () => {
         expect(bare).toContain('High connectivity');
         expect(bare).not.toContain('contact');
         expect(comp.tooltipHtml(node({}))).not.toContain('High connectivity');
+    });
+
+    it('a node with a hover name (a revealed alias) is named by it in its own and its links hover text (presentability 2)', () => {
+        const fixture = create(null);
+        const comp = fixture.componentInstance as unknown as {
+            tooltipHtml(items: unknown[]): string;
+            data: unknown;
+        };
+        const alias = 'masked:6065a1b2c3d4e5f6';
+        const revealed = {
+            id: 'r',
+            data: { label: alias, canvasLabel: 'SMURF-01', hoverLabel: 'SMURF-01', kind: 'e' },
+        };
+        const plain = { id: 'p', data: { label: 'MULE-HUB-01', kind: 'e' } };
+        comp.data = {
+            nodes: [revealed, plain],
+            edges: [{ id: 'x', source: 'r', target: 'p', data: { kind: 'pays' } }],
+        };
+        const node = comp.tooltipHtml([revealed]);
+        expect(node).toContain('<b>SMURF-01</b>');
+        expect(node).not.toContain(alias);
+        expect(comp.tooltipHtml([plain])).toContain('<b>MULE-HUB-01</b>'); // no hover name: the label, as before
+        const link = comp.tooltipHtml([{ id: 'x', source: 'r', target: 'p', data: { kind: 'pays' } }]);
+        expect(link).toContain('SMURF-01 → MULE-HUB-01');
+        expect(link).not.toContain(alias);
     });
 
     it('draws the hover card in theme tokens and the page font, starting hidden (LA-CLIPPED-CONTROLS-1)', () => {

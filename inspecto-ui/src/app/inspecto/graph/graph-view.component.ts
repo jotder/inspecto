@@ -297,20 +297,30 @@ export const UNEXPANDED_LINE_WIDTH = 2.5;
 
 /** The "start" mark's font size; the offsets below are measured from it (9 px text + the badge's 2 px padding). */
 const START_BADGE_FONT = 9;
+/** The start badge's height: its 9 px line plus G6's 2 px top and bottom badge padding. */
+const START_BADGE_HEIGHT = START_BADGE_FONT + 2 + 2;
+/** How far the start badge overlaps the node's top edge, so it reads as a tab of the node, not a label beside it. */
+const START_BADGE_OVERLAP = 3;
+/**
+ * How far, in graph units, the start badge rises above its node's top edge (LA-FULL-CYCLE-TEST-1 presentability 2). A
+ * host that fits the graph keeps at least this much (times its largest zoom) clear at the top, so no badge is cut.
+ */
+export const START_BADGE_RISE = START_BADGE_HEIGHT - START_BADGE_OVERLAP;
 
 /**
- * An Investigation's start mark (LA-FULL-CYCLE-TEST-1 presentability): a small badge diagonally off the node's top-left
- * corner, clear of the outline and the icon. G6 anchors a `left-top` badge's top-right corner ON the node's corner (it
- * then grows left and down, over the outline); the offsets lift it by its own height and move it left by its right
- * padding plus a gap, so it sits beside and above the node instead of on it. The text stays the node surface on the
- * node's own colour, as before.
+ * An Investigation's start mark (LA-FULL-CYCLE-TEST-1 presentability 2): a small tab centred on the node's top edge, in
+ * the node's own outline colour, so it is plainly attached to that node. G6 anchors a `top` badge's top-centre ON the
+ * node's top-centre (it then grows down, over the icon); the offset lifts it by its height less a 3 px overlap, so its
+ * bottom edge sits on the (heavier) start outline and the icon stays clear. It was a badge floating off the top-left
+ * corner, which on a busy canvas read as belonging to a neighbour. The text stays the node surface on the node's own
+ * colour, as before.
  */
 export function startBadge(
     textFill: string,
     background: string,
 ): {
     text: string;
-    placement: 'left-top';
+    placement: 'top';
     fontSize: number;
     offsetX: number;
     offsetY: number;
@@ -319,11 +329,10 @@ export function startBadge(
 } {
     return {
         text: 'start',
-        placement: 'left-top',
+        placement: 'top',
         fontSize: START_BADGE_FONT,
-        // right padding (4) + 3 px gap; height ≈ 9 px line + 2 + 2 padding, + 3 px gap
-        offsetX: -7,
-        offsetY: -(START_BADGE_FONT + 2 + 2 + 3),
+        offsetX: 0,
+        offsetY: -START_BADGE_RISE,
         fill: textFill,
         backgroundFill: background,
     };
@@ -1366,6 +1375,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         if (!d) return '';
         const data = (d.data ?? {}) as {
             label?: string;
+            hoverLabel?: string;
             kind?: string;
             provenance?: string[];
             highConnectivity?: boolean;
@@ -1375,8 +1385,11 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         // LA-08: a multi-Dataset projection names the Datasets an element came from.
         const from = data.provenance?.length ? `<br/>from ${esc(data.provenance.join(', '))}` : '';
         if ('source' in d && 'target' in d) {
-            const label = (id: unknown): string =>
-                (this.data?.nodes.find((n) => n.id === id)?.data.label ?? String(id)) as string;
+            // an endpoint is named as its own hover text names it (a revealed alias as its real id)
+            const label = (id: unknown): string => {
+                const n = this.data?.nodes.find((x) => x.id === id);
+                return (n?.data.hoverLabel ?? n?.data.label ?? String(id)) as string;
+            };
             return `<b>${esc(data.kind)}</b><br/>${esc(label((d as EdgeData).source))} → ${esc(label((d as EdgeData).target))}${from}`;
         }
         const degree = this.data?.edges.filter((e) => e.source === d.id || e.target === d.id).length ?? 0;
@@ -1385,7 +1398,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             ? `<br/>High connectivity${typeof data.contacts === 'number' ? ` — ${data.contacts.toLocaleString('en')} contact${data.contacts === 1 ? '' : 's'}` : ''}`
             : '';
         const open = data.unexpanded ? '<br/>Not expanded yet' : '';
-        return `<b>${esc(data.label)}</b><br/>${esc(nodeKindLabel(data.kind ?? ''))} · ${degree} link${degree === 1 ? '' : 's'}${hub}${open}${from}`;
+        return `<b>${esc(data.hoverLabel ?? data.label)}</b><br/>${esc(nodeKindLabel(data.kind ?? ''))} · ${degree} link${degree === 1 ? '' : 's'}${hub}${open}${from}`;
     }
 
     /** Tear the live instance down, sweeping any tooltip card its own cleanup left orphaned. */

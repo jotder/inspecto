@@ -29,7 +29,12 @@ import {
     DatasetShapes,
 } from '@inspecto/link-analysis/api/dataset-columns.service';
 import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
-import { EntityFamily, RecordTypeGuide, entityTypeOptions } from '@inspecto/link-analysis/api/entity-type-options';
+import {
+    EntityFamily,
+    RecordTypeGuide,
+    anyRecordOption,
+    entityTypeOptions,
+} from '@inspecto/link-analysis/api/entity-type-options';
 import { ImportDatasetCardComponent } from '@inspecto/link-analysis/add-data/import-dataset-card.component';
 import { LinkAnalysisDatasetDiscoverComponent } from '@inspecto/link-analysis/link-analysis/link-analysis-dataset-discover.component';
 import { recordPhrase } from '@inspecto/link-analysis/api/column-roles';
@@ -181,14 +186,21 @@ import {
                                             <span class="truncate text-sm font-medium" [title]="d.name">{{
                                                 d.name
                                             }}</span>
-                                            <span class="text-secondary truncate text-xs">{{
+                                            <!-- presentability 2: the meta line wraps, never clipped mid-word -->
+                                            <span class="text-secondary break-words text-xs" data-testid="data-meta">{{
                                                 d.name !== d.id ? d.id + ' · ' + summary(d) : summary(d)
                                             }}</span>
-                                            <!-- LA-EMPTY-DATASET-WORDING-1: a Pipeline-fed Dataset whose store holds nothing yet -->
+                                            <!-- LA-EMPTY-DATASET-WORDING-1: a Pipeline-fed Dataset whose store holds nothing yet;
+                                                 a normal wait, so the secondary ink (presentability 2) -->
                                             @if (d.origin === 'other' && d.empty) {
                                                 <span
-                                                    class="text-warn truncate text-xs"
+                                                    class="text-secondary flex items-center gap-1 text-xs italic"
                                                     [attr.data-testid]="'data-empty-' + d.id"
+                                                    ><mat-icon
+                                                        class="icon-size-3"
+                                                        svgIcon="heroicons_outline:clock"
+                                                        aria-hidden="true"
+                                                    ></mat-icon
                                                     >{{ noRowsYet }}</span
                                                 >
                                             }
@@ -284,6 +296,21 @@ import {
                                         <inspecto-chip variant="outline">Time: {{ d.eventDate }}</inspecto-chip>
                                     }
                                 </div>
+                                <!-- presentability 2: the former "Kept up to date by a Pipeline or a Job" card folded in here -
+                                     the chip above says where its rows come from; only the wait for a first run adds a line -->
+                                @if (d.origin === 'other' && d.empty) {
+                                    <p
+                                        class="text-secondary m-0 flex items-center gap-1 text-sm"
+                                        data-testid="pipeline-card-empty"
+                                    >
+                                        <mat-icon
+                                            class="icon-size-4"
+                                            svgIcon="heroicons_outline:clock"
+                                            aria-hidden="true"
+                                        ></mat-icon>
+                                        {{ noRowsYet }}: there is nothing to explore until its Pipeline writes rows.
+                                    </p>
+                                }
                             </header>
                             <div class="flex flex-col gap-3">
                                 @if (d.origin === 'import') {
@@ -297,22 +324,6 @@ import {
                                             importFilter: d.importFilter,
                                         }"
                                     ></inspecto-import-dataset-card>
-                                } @else {
-                                    <div
-                                        class="bg-card flex flex-col gap-1 rounded-2xl border p-4"
-                                        data-testid="pipeline-card"
-                                    >
-                                        <p class="m-0 text-sm font-semibold">Kept up to date by a Pipeline or a Job</p>
-                                        <p class="text-secondary m-0 text-sm">
-                                            Its data is written there, not added here. What its columns hold and its
-                                            Mappings are set here.
-                                        </p>
-                                        @if (d.empty) {
-                                            <p class="text-warn m-0 text-sm" data-testid="pipeline-card-empty">
-                                                {{ noRowsYet }}: there is nothing to explore until it writes some.
-                                            </p>
-                                        }
-                                    </div>
                                 }
 
                                 <div class="bg-card flex flex-col gap-2 rounded-2xl border p-4" data-testid="columns">
@@ -642,8 +653,11 @@ export class DataPageComponent implements OnInit {
     private readonly dialog = inject(MatDialog);
 
     protected readonly addData = ADD_DATA_ROUTE;
-    /** LA-EMPTY-DATASET-WORDING-1: what a Pipeline-fed Dataset whose store holds nothing yet says. */
-    protected readonly noRowsYet = 'No rows yet — its Pipeline has not run';
+    /**
+     * LA-EMPTY-DATASET-WORDING-1: what a Pipeline-fed Dataset whose store holds nothing yet says. Presentability 2: waiting
+     * for a first run is a normal state, not a failure, so it is said calmly and drawn in the secondary ink, never red.
+     */
+    protected readonly noRowsYet = 'Waiting for its first run';
     protected readonly line = mappingLine;
     protected readonly optional = [
         { key: 'kind', label: 'Kind of link', help: 'A column naming the kind of each link', role: null },
@@ -659,7 +673,7 @@ export class DataPageComponent implements OnInit {
 
     /** What one row of a Dataset can be (ENTITY-TYPE-CATALOG-1 P2): the Space's record types, or not said. */
     protected readonly recordTypeOptions = computed<PickerOption[]>(() => [
-        { value: '', label: 'Not set' },
+        anyRecordOption(''),
         ...this.recordTypes().map((r) => ({
             value: r.id,
             label: r.label,
@@ -954,14 +968,20 @@ export class DataPageComponent implements OnInit {
         this.router.navigate([], { queryParams: { dataset: id }, queryParamsHandling: 'merge', replaceUrl: true });
     }
 
-    /** A Dataset's one line in the menu: where its data comes from, and how much is set on it. */
+    /**
+     * A Dataset's one line in the menu: where its data comes from, and how much is set on it. Presentability 2: short
+     * enough for the menu at 1440 px - "From a Pipeline" (the header says the rest), and the Mappings only once there
+     * is one; the line wraps rather than clipping when an id makes it long.
+     */
     summary(d: DataEntry): string {
         const maps = this.mappingsOf(d.id).length;
         return [
-            d.origin === 'import' ? 'Added here' : 'Kept up to date by a Pipeline',
+            d.origin === 'import' ? 'Added here' : 'From a Pipeline',
             `${d.columns.length} ${d.columns.length === 1 ? 'column' : 'columns'}`,
-            `${maps} ${maps === 1 ? 'Mapping' : 'Mappings'}`,
-        ].join(' · ');
+            maps ? `${maps} ${maps === 1 ? 'Mapping' : 'Mappings'}` : '',
+        ]
+            .filter(Boolean)
+            .join(' · ');
     }
     protected readonly drifted = driftedColumns;
     /** The open Mapping editor: its base, and the Mapping's id when editing one (null = a new one). */

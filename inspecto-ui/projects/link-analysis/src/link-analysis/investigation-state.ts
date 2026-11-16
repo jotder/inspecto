@@ -136,10 +136,11 @@ export function workingSetToGraph(
     // F-11: a `masked:<16 hex>` alias is drawn short so labels stop overlapping; the label itself stays the full alias
     // (the hover text, the Selected line, search and every op still read it). Nothing the alias hides is shown.
     // D3: an alias the lead revealed is drawn as its real id - drawn only, so every op still speaks the alias.
+    // Presentability 2: the hover text names it the same way, so the tooltip never says the alias the canvas no longer shows.
     for (const n of g.nodes) {
         const real = revealedIdOf(n, revealed);
         const short = real === null ? shortMaskedLabel(n.data.label) : null;
-        if (real !== null) n.data.canvasLabel = real;
+        if (real !== null) n.data.canvasLabel = n.data.hoverLabel = real;
         else if (short) n.data.canvasLabel = short;
     }
     const hidden = new Set(ws.entities.filter((e) => e.hidden).map((e) => e.id));

@@ -30,7 +30,7 @@ import type { ConditionGroup } from '@inspecto/core/query/query-types';
 import { GeoLinkBrushService } from '@inspecto/link-analysis/graph/geo-link-brush';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
-import { GraphViewComponent } from '@inspecto/core/graph/graph-view.component';
+import { GraphViewComponent, START_BADGE_RISE } from '@inspecto/core/graph/graph-view.component';
 import { GraphSourcesService } from './graph-sources';
 import { LinkAnalysisSettingsService } from './link-analysis-settings.service';
 import {
@@ -2398,7 +2398,7 @@ describe('LinkAnalysisComponent', () => {
         expect(c.revealOffer()).toEqual({ count: 2, why: '' });
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
-        expect(el.querySelector('[data-testid="la-reveal-offer"]')?.textContent).toContain('2 ids masked');
+        expect(el.querySelector('[data-testid="la-reveal-offer"]')?.textContent).toContain('2 entities masked');
         expect((el.querySelector('[data-testid="la-reveal"]') as HTMLButtonElement).disabled).toBe(false);
 
         const open = vi
@@ -5525,6 +5525,8 @@ describe('LinkAnalysisComponent - canvas overlays start as pills, fit clear of t
         expect(view.fitPadding).toEqual(CANVAS_FIT_PADDING);
         const [top, right, bottom, left] = CANVAS_FIT_PADDING;
         expect(top).toBeGreaterThanOrEqual(40); // the pills sit at top-2 and are about 24 px tall
+        // presentability 2: and a start badge, which rises above its node, never reaches the pills or the canvas edge
+        expect(top).toBeGreaterThanOrEqual(40 + START_BADGE_RISE);
         expect(Math.min(right, bottom, left)).toBeGreaterThanOrEqual(16);
     });
 

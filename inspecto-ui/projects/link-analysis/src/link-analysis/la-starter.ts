@@ -229,3 +229,44 @@ export function topSeeds(
     }
     return out;
 }
+
+/** A column name in plain words (LA-FULL-CYCLE-TEST-1 presentability 2): `PAYER_ACCOUNT` → `payer account`, `fromAcct` → `from acct`. */
+export function plainColumn(name: string): string {
+    const words = name
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/[_\-\s]+/g, ' ')
+        .trim()
+        .toLowerCase();
+    return words || name;
+}
+
+/** The longest description sentence the Investigation header shows before it is cut. */
+const BINDING_SENTENCE_MAX = 240;
+
+/** An Investigation's binding in the analyst's words, with the raw names kept for a tooltip. */
+export interface BindingWords {
+    /** The Dataset by its display name, else the first sentence of its description, else its id. */
+    dataset: string;
+    /** "Links from payer account to payee account". */
+    links: string;
+    /** The stored names: `mule_transfers_dataset · PAYER_ACCOUNT → PAYEE_ACCOUNT`. */
+    raw: string;
+}
+
+/**
+ * What an Investigation reads, said plainly (presentability 2): the Dataset's display name (a title set on it) or the
+ * first sentence of its description rather than its id, and the From and To columns as words. The Dataset carries no
+ * label of a column, so the words are its name's own; the raw names stay in `raw` for a tooltip.
+ */
+export function bindingWords(
+    header: { dataset: string; sourceCol: string; targetCol: string },
+    dataset?: { id: string; name?: string; description?: string } | null,
+): BindingWords {
+    const titled = dataset?.name && dataset.name !== dataset.id ? dataset.name : '';
+    return {
+        // the whole first sentence (the line wraps): the picker's 90-character cut read as unfinished here
+        dataset: titled || oneLine(dataset?.description, BINDING_SENTENCE_MAX) || header.dataset,
+        links: `Links from ${plainColumn(header.sourceCol)} to ${plainColumn(header.targetCol)}`,
+        raw: `${header.dataset} · ${header.sourceCol} → ${header.targetCol}`,
+    };
+}

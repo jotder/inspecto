@@ -67,7 +67,8 @@ import { LinkAnalysisDataStripComponent } from './link-analysis-data-strip.compo
 import { stepReadSuffix } from './index-source';
 import { expandSourceNote, idsInWorkingSet, moveStep, rawIdsOf, revealText, stepName } from './investigation-state';
 import { RELATION_NOUN, pinBinding } from './working-set-widget';
-import { LA_WIDGETS } from '@inspecto/link-analysis/la-host';
+import { LA_WIDGETS, LaDataset } from '@inspecto/link-analysis/la-host';
+import { bindingWords } from './la-starter';
 import {
     InvestigationSnapshotOpComponent,
     InvestigationThresholdOpComponent,
@@ -232,6 +233,21 @@ export class LinkAnalysisInvestigationComponent {
     readonly projection = input<EntityProjection | null>(null);
     /** Why `projection` is null, in the analyst's words. */
     readonly projectionIssue = input('');
+    /** The Space's Datasets (the host's list): the header names the Investigation's Dataset by its display name. */
+    readonly datasets = input<readonly LaDataset[]>([]);
+    /**
+     * What the open Investigation reads, in plain words (presentability 2): its Dataset by name or description and "Links
+     * from payer account to payee account"; the stored names stay in the line's tooltip. Never the recorded header itself.
+     */
+    readonly binding = computed(() => {
+        const h = this.store.header();
+        return h
+            ? bindingWords(
+                  h,
+                  this.datasets().find((d) => d.id === h.dataset),
+              )
+            : null;
+    });
     /** The canvas's time column (the time slider's), the default event time of a new Investigation. */
     readonly timeCol = input('');
     /** LA-13: the Investigation's event-time column — windows and the coverage read need one (else 422). */
@@ -930,6 +946,25 @@ export class LinkAnalysisInvestigationComponent {
             hidden: ws?.entities.filter((e) => e.hidden).length ?? 0,
             kept: ws?.entities.filter((e) => e.kept).length ?? 0,
         };
+    });
+    /** The Working Set line (presentability 2): entities and links always; excluded, hidden and kept only when some are. */
+    readonly countsLine = computed(() => {
+        const c = this.counts();
+        return [
+            `${c.entities} ${c.entities === 1 ? 'entity' : 'entities'}`,
+            `${c.links} ${c.links === 1 ? 'link' : 'links'}`,
+            c.excluded ? `${c.excluded} excluded` : '',
+            c.hidden ? `${c.hidden} hidden` : '',
+            c.kept ? `${c.kept} kept` : '',
+        ]
+            .filter(Boolean)
+            .join(' · ');
+    });
+    /** How far it has expanded, as a phrase (presentability 2): "expanded 1 of 4 degrees", never "degree 1 of 4". */
+    readonly degreeLine = computed(() => {
+        const at = this.degree().current;
+        const max = this.maxDegree();
+        return at <= 0 ? 'not expanded yet' : `expanded ${at} of ${max} ${max === 1 ? 'degree' : 'degrees'}`;
     });
 
     readonly parentRemembered = computed(() => {

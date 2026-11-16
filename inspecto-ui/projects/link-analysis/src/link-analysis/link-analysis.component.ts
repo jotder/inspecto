@@ -252,6 +252,7 @@ import {
     GraphViewComponent,
     GraphViewInteraction,
     GraphViewPlugins,
+    START_BADGE_RISE,
     baseEdgeKind,
     detailHiddenByDensity,
     edgeLabelsHiddenByDensity,
@@ -457,9 +458,11 @@ export const TOOLBOX_NARROW_PX = 1300;
 export const CANVAS_TOOLS_FOLD_PX = 1350;
 /**
  * What a fit leaves clear on the canvas (top, right, bottom, left px; LA-OVERLAYS-HIDE-GRAPH-1): the top band holds the
- * Legend and Graph counts pills, the bottom one the render-status line, and every side keeps a node off the edge.
+ * Legend and Graph counts pills, the bottom one the render-status line, and every side keeps a node off the edge. The
+ * top band also keeps room for a start badge (presentability 2): the badge rises {@link START_BADGE_RISE} above its
+ * node, so a start entity at the top of the fitted graph never has its badge under the pills or cut by the edge.
  */
-export const CANVAS_FIT_PADDING: [number, number, number, number] = [44, 24, 28, 24];
+export const CANVAS_FIT_PADDING: [number, number, number, number] = [44 + START_BADGE_RISE, 24, 28, 24];
 /** The narrowest canvas zone worth keeping beside the docks; below it a dock collapses to its rail. */
 export const CANVAS_MIN_PX = 320;
 /**
@@ -5148,7 +5151,7 @@ Its prior copies stay in its version history.`,
                 .open<EntityListReasonDialog, EntityListReasonData, string | undefined>(EntityListReasonDialog, {
                     width: '32rem',
                     data: {
-                        title: 'Reveal the ids on screen',
+                        title: 'Reveal the masked entities on screen',
                         message:
                             `Shows the real ids of ${what} on screen, to you and on this screen only. Each one is ` +
                             'recorded in the audit trail with your reason. Everyone else, and the Dossier, keep the aliases.',

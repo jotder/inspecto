@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { G6GraphData } from '@inspecto/core/graph';
 import { LinkAnalysisView } from './link-analysis.service';
-import { columnPreview, pickFollowTheMoney, rankDatasets, suggestLinkColumns, topSeeds, wordsOf } from './la-starter';
+import {
+    bindingWords,
+    columnPreview,
+    pickFollowTheMoney,
+    plainColumn,
+    rankDatasets,
+    suggestLinkColumns,
+    topSeeds,
+    wordsOf,
+} from './la-starter';
 
 const cols = (...names: string[]) => names.map((name) => ({ name }));
 
@@ -156,5 +165,35 @@ describe('la-starter - top seeds', () => {
 
     it('is empty without a graph', () => {
         expect(topSeeds(ranked, null)).toEqual([]);
+    });
+});
+
+describe('bindingWords - an Investigation binding in plain words (LA-FULL-CYCLE-TEST-1 presentability 2)', () => {
+    const h = { dataset: 'mule_transfers_dataset', sourceCol: 'PAYER_ACCOUNT', targetCol: 'PAYEE_ACCOUNT' };
+
+    it('says the columns as words, whatever their casing', () => {
+        expect(plainColumn('PAYER_ACCOUNT')).toBe('payer account');
+        expect(plainColumn('fromAccount')).toBe('from account');
+        expect(plainColumn('caller-msisdn')).toBe('caller msisdn');
+        expect(plainColumn('A')).toBe('a');
+    });
+
+    it('names the Dataset by its title, else its description, else its id; the raw names stay for the tooltip', () => {
+        const described = {
+            id: 'mule_transfers_dataset',
+            name: 'mule_transfers_dataset',
+            description:
+                'Account-to-account transfers carrying a planted money-mule layering ring - the Link Analysis showcase. Synthetic.',
+        };
+        expect(bindingWords(h, described)).toEqual({
+            // the whole first sentence, longer than the picker's 90 characters: never cut mid-word here
+            dataset:
+                'Account-to-account transfers carrying a planted money-mule layering ring - the Link Analysis showcase.',
+            links: 'Links from payer account to payee account',
+            raw: 'mule_transfers_dataset · PAYER_ACCOUNT → PAYEE_ACCOUNT',
+        });
+        expect(bindingWords(h, { ...described, name: 'Mule transfers' }).dataset).toBe('Mule transfers');
+        expect(bindingWords(h, { id: h.dataset, name: h.dataset }).dataset).toBe('mule_transfers_dataset');
+        expect(bindingWords(h, null).dataset).toBe('mule_transfers_dataset');
     });
 });

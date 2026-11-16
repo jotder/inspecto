@@ -340,7 +340,7 @@ describe('investigate-number - next degree', () => {
         });
         expect(degreeOutcomeMessage(o)).toBe(
             'Degree 2: 2 new entities, 5 links added. The read stopped at its budget of 2,000 rows — some ' +
-                'neighbours are missing. 12 weaker links were left out: each entity keeps its 50 strongest links.',
+                'neighbours are missing. Only the 50 strongest links of each entity were added; 12 weaker links were left out.',
         );
         expect(degreeOutcomeMessage({ ...o, admitted: 1, linksAdded: 1, truncated: false, fanOutCapped: 0 })).toBe(
             'Degree 2: 1 new entity, 1 link added.',

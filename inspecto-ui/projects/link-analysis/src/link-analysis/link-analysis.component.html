@@ -1907,8 +1907,8 @@
                                     <span class="flex items-center gap-1" data-testid="la-reveal-offer">
                                         {{
                                             offer.count === 1
-                                                ? '1 id masked'
-                                                : offer.count.toLocaleString('en-GB') + ' ids masked'
+                                                ? '1 entity masked'
+                                                : offer.count.toLocaleString('en-GB') + ' entities masked'
                                         }}
                                         <button
                                             mat-stroked-button
@@ -1918,12 +1918,13 @@
                                             [disabled]="!!offer.why"
                                             [disabledInteractive]="true"
                                             [matTooltip]="
-                                                offer.why || 'Show the real ids of the nodes on screen, to you only'
+                                                offer.why ||
+                                                'Show the real ids of the masked entities on screen, to you only'
                                             "
                                             [attr.aria-label]="
                                                 offer.why
-                                                    ? 'Reveal the ids on screen: ' + offer.why
-                                                    : 'Reveal the ids on screen'
+                                                    ? 'Reveal the masked entities on screen: ' + offer.why
+                                                    : 'Reveal the masked entities on screen'
                                             "
                                             (click)="revealFromCanvas()"
                                         >
@@ -2219,6 +2220,7 @@
                                         aria-labelledby="la-toolbox-tab-investigation"
                                         [projection]="investigationProjection()"
                                         [projectionIssue]="investigationIssue()"
+                                        [datasets]="datasets()"
                                         [timeCol]="investigationTimeDefault()"
                                         [pending]="pendingInvestigation()"
                                         [degreePresets]="degreePresets()"

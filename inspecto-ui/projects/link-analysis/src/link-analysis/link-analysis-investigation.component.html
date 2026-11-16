@@ -1071,9 +1071,17 @@
                                     {{ h.purpose }}
                                 </div>
                             }
-                            <div class="text-secondary text-sm">
-                                {{ h.dataset }} · {{ h.sourceCol }} → {{ h.targetCol }}
-                            </div>
+                            <!-- presentability 2: the Dataset and its link in words; the stored names in the tooltip -->
+                            @if (binding(); as b) {
+                                <div
+                                    class="text-secondary break-words text-sm"
+                                    [matTooltip]="b.raw"
+                                    data-testid="act-binding"
+                                >
+                                    <div data-testid="act-binding-dataset">{{ b.dataset }}</div>
+                                    <div data-testid="act-binding-links">{{ b.links }}</div>
+                                </div>
+                            }
                             @if (decidable().length; as n) {
                                 <!-- finding 23: an approver sees at once that a decision waits for them -->
                                 <button
@@ -1191,14 +1199,10 @@
                         >, not to the Investigation. Promote it from Drafts.
                     </inspecto-alert>
                 }
+                <!-- presentability 2: a zero count is not said, and how far it has expanded is a phrase, not "degree 1 of 4" -->
                 <p class="m-0 text-sm tabular-nums" aria-label="Working Set" data-testid="act-counts">
-                    <strong>Working Set:</strong> {{ counts().entities }}
-                    {{ counts().entities === 1 ? 'entity' : 'entities' }} · {{ counts().links }}
-                    {{ counts().links === 1 ? 'link' : 'links' }} · {{ counts().excluded }} excluded ·
-                    {{ counts().hidden }} hidden · {{ counts().kept }} kept
-                    <span class="text-secondary" data-testid="degree-label"
-                        >· degree {{ degree().current < 0 ? 0 : degree().current }} of {{ maxDegree() }}</span
-                    >
+                    <strong>Working Set:</strong> {{ countsLine() }}
+                    <span class="text-secondary" data-testid="degree-label">· {{ degreeLine() }}</span>
                     @if (hubs().length) {
                         <span class="text-secondary"> · {{ hubs().length }} busy held</span>
                     }
@@ -1310,7 +1314,9 @@
                     </div>
                     <!-- the degree notes belong to the line above (the degree reached), so they come before the form -->
                     @if (windowNote(); as w) {
-                        <p class="text-secondary m-0 text-sm" data-testid="degree-window">Window: {{ w }}</p>
+                        <p class="text-secondary m-0 text-sm" data-testid="degree-window">
+                            The next Expand reads {{ w }}.
+                        </p>
                     }
                     @if (blockedNote(); as why) {
                         <p class="text-secondary m-0 text-sm" data-testid="degree-blocked">{{ why }}</p>

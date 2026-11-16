@@ -288,7 +288,8 @@ yet* on its card.
 
 **Data** (left navigation) lists every Dataset you added with *Add data*, then every Dataset a Pipeline or a Job keeps
 up to date, grouped as **Streams** and **References**. Each group folds from its heading. Each Dataset is folded to one
-line (where its data comes from, how many columns and Mappings it has) until you open it; a Space with a single Dataset
+line (where its data comes from - *Added here* or *From a Pipeline* - how many columns, and how many Mappings once it
+has one; the line wraps rather than being cut) until you open it; a Space with a single Dataset
 shows it open. Opened, each one shows:
 
 - its card: for a Dataset you added, its facts under their own labels - **Origin**, **Filter**, **Received** (when data
@@ -301,8 +302,9 @@ shows it open. Opened, each one shows:
   muted and its Result says so), *Add a file* and
   *Run now*; under **Inbox**, *Watch this folder* imports what another system writes there on its own, checked every
   30 seconds, once the files have stopped changing (every edition); a Postgres table snapshot shows *Refresh now*
-  instead, and is copied again only when you press it; for one a Pipeline or a Job keeps up to date, *Kept up to date by a Pipeline or a Job* - its data is
-  written there, so there is nothing to add here;
+  instead, and is copied again only when you press it; one a Pipeline or a Job keeps up to date has no card: its
+  header's *Kept up to date by a Pipeline* says where its rows come from, so there is nothing to add here, and while
+  its Pipeline has not written any rows yet the header says *Waiting for its first run* (in grey: a wait, not a fault);
 - **Entities**: what each column holds, one Entity Type or *Nothing: a detail* per column - changed here, saved at once;
 - **Mappings**: how its rows are read as links. The Dataset has its own; **New mapping** saves another, under its own
   name: *From* and *To* (what each holds starts at what the Dataset says that column holds), and optionally *Kind of
@@ -683,7 +685,7 @@ its canvas actions. On an Investigation's canvas, click once to select, then cli
 dialog. Three sections look up only the entities they need on the server, so they work in a masked Space too
 (identifying values show as aliases and the section says *Entity masking is on*; numeric scores stay readable):
 
-* **Masked id** — only for a masked node: it says the name is an alias and offers **Reveal the ids on screen…** (the
+* **Masked id** — only for a masked node: it says the name is an alias and offers **Reveal the masked entities on screen…** (the
   one Reveal, see [Masked ids in an Investigation](#masked-ids-in-an-investigation)), or why you cannot. Once revealed it
   shows the real id, and the node's details, enrichment and risk factors are read again in the clear, each recorded
   with your reason. Before that, text and dates beside a masked id are masked with it; counts and scores stay readable.
@@ -1185,9 +1187,9 @@ binds `events` for you.
 
 <a id="masked-ids-in-an-investigation"></a>Masked ids show as aliases (`masked:…`) on the canvas, in the step log
 and in the Dossier, and one entity reads as the same alias everywhere in the Investigation. When ids on the canvas are
-masked, the line under it says *N ids masked* with **Reveal…**; the node details dialog has the same button under
+masked, the line under it says *N entities masked* with **Reveal…**; the node details dialog has the same button under
 **Masked id**. Reveal asks for a reason, then shows the real ids of every masked node on screen, to you and on this
-screen only: the canvas labels, the node's title and details, and the step log read the real ids. Each entity revealed
+screen only: the canvas labels, the hover text, the node's title and details, and the step log read the real ids. Each entity revealed
 is recorded in the audit trail with your reason. You need *See unmasked ids* and to lead the Investigation; reviewers
 and everyone else keep the aliases, the Dossier stays masked, and closing the Investigation forgets what you revealed.
 On a graph that is not saved yet the button says to save it first: a reveal is recorded against an Investigation and
@@ -1199,11 +1201,13 @@ local `2026-11-15 13:21` form as every other recorded time in Link Analysis.
 Top to bottom, most important first:
 
 1. **Header:** the **Name** (a lead renames it in place: label · value · ✎), purpose (it wraps to up to three lines;
-   the whole of it is in its tooltip), Dataset, the data-trust sentence and **Data details** ([§11.11](#1111-data-trust-what-data-am-i-looking-at)), a **?** that shows *How to investigate* again, and `⋯` with **Settings…** (⚙ Settings ▸
+   the whole of it is in its tooltip), the Dataset in words (its name, else the first sentence of its description) and
+   its link (*Links from payer account to payee account*; the stored names are in the line's tooltip), the data-trust sentence and **Data details** ([§11.11](#1111-data-trust-what-data-am-i-looking-at)), a **?** that shows *How to investigate* again, and `⋯` with **Settings…** (⚙ Settings ▸
    Investigation settings), **Build Dossier…**, **Members…**, **Close** and **Delete**. A person who may approve a held
    expand of someone else sees a **N to approve** badge under the Dataset line; it brings the waiting line into view
    ([§11.4](#114-large-expands-need-a-second-person-four-eyes)). Under it one counts line: *Working Set: 42 entities · 118 links ·
-   3 excluded · 2 hidden · 1 kept · degree 2 of 4 · 3 busy held*.
+   3 excluded · 2 hidden · 1 kept · expanded 2 of 4 degrees · 3 busy held*; a count of excluded, hidden or kept that is
+   zero is left out, and before the first Expand it ends *not expanded yet*.
 2. **How to investigate** — five steps, shown until you press **Got it** (remembered in this browser).
 3. **Undo** / **Redo** of recorded steps, which stay at the top while the tab scrolls ([§7](#7-expand-and-clean-up-the-graph)).
 4. The **queued start entities**, when there are any.
@@ -1902,13 +1906,14 @@ operator's delegation ("clean, CXO-presentable"); the operator may reverse any o
   layout (the layout is set after the first draw). The hints belong to the Investigation saved; a new start clears them.
 - **Start entity marked** (finding 17). `workingSetToGraph` sets `data.start` on hop-0 entities (unsaved and saved
   alike, only when some entities are not a start, so a seedless start badges nothing); the graph view draws a 3.5 px
-  outline and a *start* badge (`left-top`, beside *held* and *+n*).
+  outline and a *start* badge: a tab centred on the node's top edge (`top`, lifted `START_BADGE_RISE` = 10 px, so it
+  overlaps the outline by 3 px; presentability 2), beside *held* (`right-top`) and *+n* (`right-bottom`).
 - **Banner clears on the next step** (finding 19). An effect clears `startNotice` when `growExclude.lastChange` or
   `investigation.lastStep` gets a value: every Expand, Exclude, Clean up, Undo and recorded step (Save replays steps)
   sets one of them, and its own result line takes the banner's place. Drawing the start is not a step.
 - **The change line at the top centre** (finding 19, the "snackbar" over the minimap). The Grow / Exclude result line
   (`la-change-line`) moved from the canvas's bottom right, where it covered the minimap, to the top band every fit keeps
-  clear (`CANVAS_FIT_PADDING` top 44 px), centred in the gap between the Legend pill (6.5rem) and the Graph counts pill
+  clear (`CANVAS_FIT_PADDING` top 44 px, 54 since presentability 2), centred in the gap between the Legend pill (6.5rem) and the Graph counts pill
   (15rem), so it stays one line beside an open toolbox (a 1,000 px canvas). Tried and dropped: the bottom centre, where it covered the nodes a fit draws along the bottom.
 - **Notices at the top centre in la-app** (finding 19). `provideToastr({ positionClass: 'toast-top-center' })` after
   the shell's provider in `la-app/app.config.ts`. Bottom right covered the minimap; top right covers the page's own
@@ -1931,6 +1936,52 @@ operator's delegation ("clean, CXO-presentable"); the operator may reverse any o
   `scheme-preference.service.spec.ts`, `user.component.spec.ts` ▸ *colour scheme*. Live drive (Basic, 2026-11-16):
   labels note, notices at top centre, scheme switch, `claims_network` fit; the Investigation Save path was not driven
   live (the drive server is Basic, no Investigations).
+
+### Presentability round 2: decisions (`LA-FULL-CYCLE-TEST-1`, as built 2026-11-16)
+
+An independent review of live screenshots for a bank's executives found these; each wording or layout call and why:
+
+- **Waiting for a first run is not an error.** A Pipeline-fed Dataset whose store holds no rows yet (`empty: true`)
+  says *Waiting for its first run* in the secondary ink with a clock, on its menu row and in its header (was a red *No
+  rows yet — its Pipeline has not run*). The server reports only empty / not empty / unknown, never a failed run, so the
+  Data page has no red state to show here; a failed run is the Pipeline's own status, not this page's.
+- **The "Kept up to date by a Pipeline or a Job" card is gone.** It held one heading and one sentence: the header's
+  *Kept up to date by a Pipeline* chip already says where the rows come from, and the page's own intro already says
+  columns and Mappings are set here. A card that only repeats the header reads as unfinished; the one thing it added (the
+  wait for a first run) now sits in the header.
+- **Record type: "Any kind of record", not "Not set".** A Dataset with no record type is a complete answer (every Entity
+  Type in its usual order), so the blank choice says so, with that as its hint. One wording for Add data and the Data
+  page (`anyRecordOption` in `api/entity-type-options.ts`). The row still shows only when the Space's packs offer record
+  types.
+- **The Dataset menu line never clips.** *From a Pipeline* (the header says the rest), the Mappings only once there is
+  one (no *0 Mappings*), and the line wraps instead of `truncate`. Dropping zero beat shortening every count: it is the
+  common case for a Pipeline-fed Dataset and says nothing.
+- **Start badge as a tab on the node.** Centred on the node's top edge and overlapping the 3.5 px start outline by 3 px,
+  in the node's own colour (theme tokens via the node colour and surface, as before). Off the top-left corner it read as
+  belonging to whichever node was nearest. Fit: measured on the live build (Advanced demo, `mule-hub-case`, 1440 × 860),
+  G6's fit bounds include badges, so the badge stayed inside the 44 px band; the band now also adds the badge's rise
+  (`CANVAS_FIT_PADDING` top 54) so a start entity at the top never has its badge under the Legend / Graph counts pills.
+- **Toolbox header in words.** The Investigation tab names its Dataset by title, else the first sentence of its
+  description, else its id, and its link as *Links from payer account to payee account* (`bindingWords` in
+  `la-starter.ts`; column names as words, since a Dataset column carries no label of its own; the whole first sentence,
+  wrapped, not the Start box's 90-character cut). la-app's `LA_DATASETS` now carries the Data page's `title` (as the
+  Dataset's name) and `description`, which it dropped before, so the Start box names Datasets the same way. The stored
+  `mule_transfers_dataset · PAYER_ACCOUNT → PAYEE_ACCOUNT` stays in the line's tooltip and under ⚙ Settings ▸ General;
+  the recorded header and every op still use the stored names.
+- **Working Set line.** Zero excluded / hidden / kept counts are left out; *degree 1 of 4* became *expanded 1 of 4
+  degrees* (*not expanded yet* before the first Expand). The word stays *degree*, not *hop*: the Expand stepper, its
+  results (*Degree 1: …*) and its limits all say degree, and one concept keeps one word.
+- **Plain sentences.** *Window: all available data* → *The next Expand reads all available data.*; *12 weaker links
+  were left out: each entity keeps its 50 strongest links* → *Only the 50 strongest links of each entity were added; 12
+  weaker links were left out.* (both computed on screen, not stored in the Investigation).
+- **Reveal wording.** *Reveal the ids on screen* → *Reveal the masked entities on screen* (button, dialog title, node
+  details), and *N ids masked* → *N entities masked*. Not *identities*: in the GLOSSARY that word belongs to identity
+  resolution (**Identity Fact**); what is masked is an **Entity**, and Oversight already said *Reveal the masked entities*.
+- **Hover text after a Reveal.** A revealed node's hover card and the hover text of its links name it by its real id,
+  as its canvas label does (`hoverLabel` on the node data, set from `revealedIdOf`); every op still speaks the alias.
+- Specs: `data.page.spec.ts`, `add-data.component.spec.ts`, `graph-view.component.spec.ts` (start tab, hover name),
+  `link-analysis.component.spec.ts` (fit band), `link-analysis-investigation.component.spec.ts` (header words, counts
+  line, window sentence), `la-starter.spec.ts` (`bindingWords`), `investigation-state.spec.ts`, `investigate-number.spec.ts`.
 
 ### Search around, Merge and Possible duplicates internals
 

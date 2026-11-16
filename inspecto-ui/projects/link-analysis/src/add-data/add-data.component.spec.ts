@@ -207,8 +207,10 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         const add = fixture.debugElement.children[0].componentInstance as unknown as {
             form: { controls: { recordType: { setValue(v: string): void } } };
         };
-        add.form.controls.recordType.setValue(''); // "Not set"
+        add.form.controls.recordType.setValue(''); // "Any kind of record"
         fixture.detectChanges();
+        // presentability 2: the blank choice reads as a complete answer on the open picker, never "Not set"
+        expect(el.querySelector('[data-testid="record-type"]')!.textContent).toContain('Any kind of record');
         const req = commit(fixture, el);
         expect(bodyOf(req).recordType).toBeNull();
         req.flush(summary());

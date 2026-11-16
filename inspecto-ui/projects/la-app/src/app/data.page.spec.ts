@@ -184,7 +184,12 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         const first = q(el, 'data-toggle-transfers')!;
         expect(first.tagName).toBe('BUTTON');
         expect(first.textContent).toContain('Added here · 3 columns · 1 Mapping');
-        expect(q(el, 'data-toggle-wallet_txn')!.textContent).toContain('Kept up to date by a Pipeline');
+        expect(q(el, 'data-toggle-wallet_txn')!.textContent).toContain('From a Pipeline · 3 columns · 1 Mapping');
+        // presentability 2: the meta line wraps (never clipped), and a Dataset with no Mapping does not say "0 Mappings"
+        expect(q(first, 'data-meta')!.className).toContain('break-words');
+        expect(q(first, 'data-meta')!.className).not.toContain('truncate');
+        expect(q(el, 'data-toggle-agents')!.textContent).toContain('Added here · 2 columns');
+        expect(q(el, 'data-toggle-agents')!.textContent).not.toContain('Mapping');
 
         // the first listed is shown until another is picked; exactly one Dataset's body at a time
         expect(first.getAttribute('aria-current')).toBe('true');
@@ -289,9 +294,9 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         const { fixture, el, c } = create();
         show(fixture, 'wallet_txn');
         const pipe = q(el, 'data-wallet_txn')!;
-        expect(pipe.querySelector('[data-testid="pipeline-card"]')!.textContent).toContain(
-            'Kept up to date by a Pipeline or a Job',
-        );
+        // presentability 2: no card that only repeats the header; the header's chip says where its rows come from
+        expect(pipe.querySelector('[data-testid="pipeline-card"]')).toBeNull();
+        expect(q(pipe, 'data-facts')!.textContent).toContain('Kept up to date by a Pipeline');
         expect(pipe.querySelector('inspecto-import-dataset-card')).toBeNull(); // no Add a file, Run now or arrivals
         expect(pipe.querySelector('[data-testid="columns"]')!.textContent).toContain('src_id');
         expect(pipe.querySelector('[data-testid="mapping-by_agent"]')).not.toBeNull();
@@ -544,10 +549,10 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         const card = el.querySelector<HTMLElement>('[data-testid="columns"]')!;
         expect(card.querySelector('[data-testid="record-type"]')!.textContent).toContain('Record type');
         expect(c.recordTypeControls().get('transfers')!.value).toBe('transfer');
-        // no record type chosen reads "Not set", not "Each row is: Not said"
+        // no record type chosen is a complete answer (presentability 2): "Any kind of record", never "Not set"
         expect(
             (c as unknown as { recordTypeOptions: () => { value: string; label: string }[] }).recordTypeOptions()[0],
-        ).toEqual({ value: '', label: 'Not set' });
+        ).toMatchObject({ value: '', label: 'Any kind of record' });
         expect(
             c
                 .holdsOptions()
@@ -786,7 +791,7 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
     });
 
     it('LA-EMPTY-DATASET-WORDING-1: a Pipeline-fed Dataset whose store holds nothing yet says so on its row and card (no violations)', async () => {
-        const said = 'No rows yet — its Pipeline has not run';
+        const said = 'Waiting for its first run';
         // the server's `empty` rides beside the content on the list; an import's own card says how its files arrive
         const datasets = DATASETS.map((d) =>
             d.name === 'wallet_txn' || d.name === 'transfers' ? { ...d, empty: true } : { ...d, empty: false },
@@ -796,6 +801,13 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         expect(q(el, 'data-empty-transfers')).toBeNull();
         show(fixture, 'wallet_txn');
         expect(q(el, 'pipeline-card-empty')!.textContent).toContain(said);
+        // presentability 2: waiting for a first run is not a failure - the secondary ink, never the warn (red) one
+        for (const line of [q(el, 'data-empty-wallet_txn')!, q(el, 'pipeline-card-empty')!]) {
+            expect(line.className).toContain('text-secondary');
+            expect(line.className).not.toContain('text-warn');
+        }
+        // the line sits in the Dataset header, where the folded-in card's sentence went
+        expect(q(q(el, 'data-header')!, 'pipeline-card-empty')).not.toBeNull();
         await expectNoA11yViolations(el);
     });
 
