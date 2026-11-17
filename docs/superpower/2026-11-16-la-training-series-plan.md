@@ -272,12 +272,15 @@ hand-fed file picker), `undo`.
 - **D3** (6:01) and **F8** (5:38) match their narration. D3's S05–S10 voice was rewritten to the live tables (Betweenness
   leads with the seller P-00476, not the household; Authority is led by the burglaries); F8's S05 no longer says to tick a
   snapshot (this Investigation has none). F8's edited manifest and bundle are made off camera from real downloads.
-- **C4** (5:57): S01–S08 match; **S09 Undo does not visibly undo** (the toolbar Undo is refused, "a later change followed"),
-  and clicking a canvas node opens its details dialog instead of selecting it, so S04/S07 expand from the form's scope
-  (*nodes not expanded yet* / *whole graph*), not from a selected node.
-- **Open:** the yellow impact marks (`impact` step) report "nothing changed" on every attempt; node positions on the canvas
-  shift after each step, so a click position is read from a probe screenshot taken at that exact step. Do not record two
-  episodes at once: a parallel probe made a click step fail.
+- **C4** (5:57): all ten scenes match. The S09 Undo was never broken in the product: Ctrl+Z answers "Undone." right after
+  *Expand anyway*; the earlier run lost it because the Expand anyway click was wrapped in an `impact` diff step. Clicking a
+  canvas node opens its details dialog instead of selecting it, so S04/S07 expand from the form's scope (*nodes not expanded
+  yet* / *whole graph*), not from a selected node.
+- **Yellow marks:** the `impact` diff step cannot mark a changed node, because the layout re-fits on every expand and the
+  diff covers the whole canvas (its region had also run past the page height). Use `{"mark":"<label>","box":[x,y,w,h]}`
+  (CSS px, read from a probe screenshot) instead; C4 marks AG-39 (S05) and AG-18 held (S08) that way.
+- **Open:** node positions on the canvas shift after each step, so a click or mark position is read from a probe screenshot taken
+  at that exact step. Do not record two episodes at once: a parallel probe made a click step fail.
 
 ## 7. User-guide gaps and mismatches found (fix in the guide alongside)
 
