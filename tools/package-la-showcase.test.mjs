@@ -151,3 +151,14 @@ test('every use case may ship its own config/examples/*.md; several are joined, 
   assert.deepEqual(owner.get('config/examples/sla.md'), ['a', 'b']);
   assert.equal(joinExamples(['# A\nx\n', '# B\ny']), '# A\nx\n\n---\n\n# B\ny\n');
 });
+
+test('a packaged la.index.build Job carries its last editor, or the run authority refuses every build', async () => {
+  const { configToon } = await import('./package-la-showcase.mjs');
+  const job = 'job:\n  name: la_index_build\n  type: la.index.build\n  owner: "admin"\n  description: "x ${SPACE}"\n';
+  const out = configToon(job, 'la-utilities');
+  assert.match(out, /^ {2}updatedBy: admin$/m);
+  assert.match(out, /x la-utilities/);
+  assert.equal(configToon(out, 'la-utilities'), out, 'stamping twice changes nothing');
+  const other = 'job:\n  type: sql.template\n  owner: "admin"\n';
+  assert.equal(configToon(other, 'x'), other, 'only an index build Job is stamped');
+});

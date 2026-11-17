@@ -38,6 +38,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { stampIndexBuildOwner } from './seed-la-showcase.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TEMPLATES = 'spaces/_templates';
@@ -95,6 +96,11 @@ export function spaceToon(templateToon, id, minProduct) {
   return `display_name: ${q(name)}\ndescription: ${q(desc)}\ncreated_at: ${q(new Date().toISOString())}\n`
     + `min_product_version: ${q(minProduct)}\ndata_root: ${q(`${DATA_ROOT_PARENT}/${id}`)}\n`;
 }
+
+/** One config .toon as a Space created from the template gets it:  replaced by the id, and a la.index.build Job stamped with its
+ *  last editor. A file copy records none, and the run authority then refuses every build (\"names owner 'admin' but its last editor
+ *  '(none recorded)' does not hold canConfigureAccess\"), so a packaged install never built its link index; the seed scaffold stamps it. */
+export const configToon = (text, id) => stampIndexBuildOwner(text.replaceAll('${SPACE}', id));
 
 /** config/egress.toon as EgressAllowlist.recordEmpty writes it for a new Space: an empty allowlist. Without it the server
  *  seeds one at boot from the Space's current outbound targets, allowing them unreviewed. */
@@ -308,7 +314,7 @@ function main() {
       const target = join(spaceStage, to);
       mkdirSync(dirname(target), { recursive: true });
       const bytes = show(from);
-      writeFileSync(target, toon ? bytes.toString('utf8').replaceAll('${SPACE}', opts.id) : bytes);
+      writeFileSync(target, toon ? configToon(bytes.toString('utf8'), opts.id) : bytes);
     }
     writeFileSync(join(spaceStage, opts.id, 'space.toon'), spaceToon(templateToon, opts.id, minProduct));
     writeFileSync(join(spaceStage, opts.id, 'config', 'egress.toon'), egressToon());
