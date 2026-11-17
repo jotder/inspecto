@@ -58,7 +58,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the four tabs; mark the four choices.
 
 ### S03 · Pick the Dataset
-- Voice: Pick the Dataset first: it is the table the graph is drawn from. Choose mfs_screen_links_dataset, the links the fraud screens selected. Under it, the Data status line says what has arrived, the period it covers, and whether the graph is up to date with it. If the graph is behind the data, what you draw is behind too, and the line says so before you start.
+- Voice: Pick the Dataset first: it is the table the graph is drawn from. Choose mfs_screen_links_dataset, the links the fraud screens selected. A Space with several Datasets lists them all here, so pick the one that matches the question you are asking, because the graph shows only what that table holds.
 - Chip: Dataset · Data status
 - Action: Dataset ▸ `mfs_screen_links_dataset` ▸ hold on the *Data status:* line. [check in UI: the status line's wording for this Dataset (*graph up to date*, or files behind)]
 - Impact: mark the Data status line.
@@ -94,7 +94,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the message.
 
 ### S09 · The whole Dataset, and its warning
-- Voice: Start from Whole Dataset draws every link at once. Choose it, and before you press anything, the form warns you: this Dataset holds more entities than the canvas draws, so only the busiest thousand would be drawn, and one entity or an Entity List is usually clearer. The whole Dataset is for a small table, or for a first look at its busiest corner. The busiest corner is rarely where the story is.
+- Voice: Start from Whole Dataset draws every link at once. Choose it, and before you press anything, the form says what it would do: draw the whole of the Dataset, but only its busiest one thousand nodes. One entity or an Entity List is usually clearer. The whole Dataset is for a small table, or for a first look at its busiest corner. The busiest corner is rarely where the story is.
 - Chip: Whole Dataset
 - Action: Start from: Whole Dataset ▸ hold on the warning ▸ do not press *Draw the whole Dataset*. [check in UI: the warning shows (more distinct entities than the 1,000-node cap); if the Dataset is within the cap, the form instead says *Draws the whole of … (busiest 1,000 nodes).* and the voice says it would all fit]
 - Impact: mark the warning.

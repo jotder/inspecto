@@ -1,0 +1,13 @@
+{"scenario":"episode","edition":"Basic","base":"http://127.0.0.1:8099","steps":[
+{"scene":"S01","card":{"lines":["Inspecto LA training","B1  Start a graph"],"secs":6},"steps":[{"space":"la-telecom"},{"open":"/link-analysis?view=x","settle":3000},{"waitText":"Start from"}]},
+{"scene":"S02","steps":[{"wait":2500},{"move":[180,87],"ms":700},{"wait":900},{"move":[330,87],"ms":700},{"wait":900},{"move":[470,87],"ms":700},{"wait":900},{"move":[650,87],"ms":700},{"wait":3000},{"rightOf":"Start from"},{"wait":9000},{"escape":1},{"wait":1500}]},
+{"scene":"S03","steps":[{"rightOf":"Dataset"},{"wait":2500},{"exact":"mfs_screen_links_dataset"},{"wait":6000}]},
+{"scene":"S04","steps":[{"wait":2500},{"sel":"input[type=text],input:not([type]),input[type=search]"},{"type":"S-4"},{"wait":6000},{"sel":"[role=option],mat-option,.mat-mdc-option"},{"wait":5000},{"move":[400,458],"ms":800},{"wait":3000}]},
+{"scene":"S05","steps":[{"button":"Draw"},{"wait":7000},{"mark":"result line","box":[90,64,800,22]},{"wait":8000}]},
+{"scene":"S06","steps":[{"wait":2500},{"label":"File"},{"wait":1500},{"exact":"New"},{"wait":3000},{"rightOf":"Start from"},{"wait":1500},{"exact":"Pasted values"},{"wait":2000},{"sel":"textarea"},{"wait":800},{"type":"S-41\nS-72\nS-99"},{"wait":2500},{"button":"Start from these"},{"wait":9000}]},
+{"scene":"S07","steps":[{"mark":"S-99 is not in the Dataset","box":[100,64,850,22]},{"wait":10000}]},
+{"scene":"S08","steps":[{"label":"File"},{"wait":1200},{"exact":"New"},{"wait":2500},{"rightOf":"Start from"},{"wait":1500},{"exact":"Entity List"},{"wait":3000},{"mark":"message","box":[115,305,500,22]},{"wait":8000}]},
+{"scene":"S09","steps":[{"rightOf":"Start from"},{"wait":1500},{"exact":"Whole Dataset"},{"wait":3000},{"mark":"warning","box":[115,305,500,22]},{"wait":10000}]},
+{"scene":"S10","steps":[{"rightOf":"Start from"},{"wait":1500},{"exact":"One entity"},{"wait":3500},{"rightOf":"Start from"},{"wait":1500},{"exact":"Pasted values"},{"wait":3500},{"rightOf":"Start from"},{"wait":1500},{"exact":"Entity List"},{"wait":3500},{"rightOf":"Start from"},{"wait":1500},{"exact":"Whole Dataset"},{"wait":3500},{"move":[300,450],"ms":900},{"wait":2500},{"move":[130,630],"ms":900},{"wait":4000}]},
+{"scene":"S11","card":{"lines":["Try it","Next: B2  Preset queries and Build a question"],"secs":5},"steps":[{"wait":1000}]}
+]}
