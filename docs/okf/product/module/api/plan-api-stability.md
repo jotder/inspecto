@@ -690,6 +690,10 @@ A Step that does not pass rows on now says why in one way: the **reject outlet**
   is dropped when its graph loads, with a `RETIRED_RELATION` warning naming it (`PipelineCodec.decode`; logged by
   `fromMap`; a `pipeline_author` finding). A Consignment's outcome is the `pipeline.batch.committed`,
   `pipeline.batch.failed` or `pipeline.batch.parked` Signal.
+- **A contributed Step declares the new spellings.** A Step whose `emits()` lists a bare `dropped` (or `invalid`,
+  `duplicate`, `unmatched`) is refused `ILLEGAL_EMIT`, because its authored edge now reads `reject:dropped`. Migrate:
+  declare `PipelineRel.DROPPED` (or `"reject:<reason>"`). The Step SPI never shipped in a release.
+- The control-plane save and validate routes drop a retired edge without returning the warning; it is logged.
 - Not changed: `data` (the main outlet), `gap` (still an edge to the `gap` node), `route:<key>`, and the authored
   `*_pipeline.toon` config, which holds no relation name.
 

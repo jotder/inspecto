@@ -204,7 +204,7 @@ terminal and companion tests red.
 ✅ **The companion shape now reaches the walk (2026-09-24, `GRAPH-RAW-COMPANION-ENRICHMENT-ILLEGAL-EMIT-1`).**
 `GET /pipelines/{name}/graph/raw` joins a `*_enrich.toon` companion to the sink with a **derived display-only**
 edge `{rel: "companion", derived: true}` instead of a `data` edge (which `PipelineValidator` refuses
-`ILLEGAL_EMIT` — a sink emits only `on_commit / success / failure`). `parseAndValidateFlow`, shared by the
+`ILLEGAL_EMIT` — a sink emits nothing). `parseAndValidateFlow`, shared by the
 candidate dry run and `PUT …/graph`, drops that edge before parsing, so both answer 200; a hand-authored
 sink `data` edge is still refused. As-built in
 [editable-round-trip](spec-editable-round-trip.md) (*Derived companion edge*).

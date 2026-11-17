@@ -325,7 +325,8 @@ which is the **server-sent-events transport** (`GET /signals/stream`, `/notifica
 "stream" in `StreamWatermark`, which is **one output table** (§6-B). ⛔ A "reject stream" is prose, not an
 entity — the model's word is the **reject outlet**, `reject:<reason>`: ONE kind whose reason names the
 operator that diverted the rows (`dropped` · `invalid` · `duplicate` · `unmatched`). ⚠ Four *reasons*,
-not four relations; the `PipelineRel` constants keep their pre-token spelling until Phase 7.
+not four relations; since 4.0.0 (X5-a) the `PipelineRel` constants carry the `reject:<reason>` spelling, and
+the old bare spellings are read as aliases.
 
 **Reference** — A named external **dimension data origin**, the slow-changing counterpart to a **Stream**:
 lookup / master data (rate plans, cell sites, customer master). Its nature differs from a Stream — it is
@@ -446,7 +447,7 @@ follow the same open-registry posture **Job types** already have (`JobTypeProvid
 > §3.8 of [`okf/product/module/engine/architecture-pipeline-graph.md`](okf/product/module/engine/architecture-pipeline-graph.md)
 > makes **in-motion (Pipeline) vs at-rest (Job)** a binding line, so an at-rest operator cannot be an
 > in-motion node. The two compose as **producer/consumer over a shared store**, never by nesting: a Job
-> fires on the Pipeline's `on_commit`, or binds by store name to a `sink.view` (the designated hand-off —
+> fires on the Pipeline's commit (`on_pipeline:`), or binds by store name to a `sink.view` (the designated hand-off —
 > `BuiltinNodeType` SINK_VIEW). The reverse — a `pipeline`-type Job re-running an authored Pipeline over data
 > at rest — makes the Job the *outer* Executable, which is composition, not embedding.
 

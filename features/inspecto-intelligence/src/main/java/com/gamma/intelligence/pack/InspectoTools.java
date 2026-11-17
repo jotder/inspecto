@@ -1339,8 +1339,8 @@ final class InspectoTools {
                 "from", Map.of("type", "string", "description", "a node id in this pipeline"),
                 "to", Map.of("type", "string", "description", "a node id in this pipeline"),
                 "rel", Map.of("type", "string", "description",
-                        "data (default) | success | failure | unmatched | gap | on_commit | dropped |"
-                                + " invalid | duplicate | route:<key>")));
+                        "data (default) | reject:dropped | reject:invalid | reject:duplicate |"
+                                + " reject:unmatched | gap | route:<key>")));
         edge.put("required", List.of("from", "to"));
 
         Map<String, Object> schema = new LinkedHashMap<>();

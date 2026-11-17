@@ -173,8 +173,8 @@ by `consignment_id`, and Reprocess by batch id.
 
 **Job-lane rejects are ONE kind carrying a reason** — `reject:<reason>`, where the reason names which
 operator diverted the rows (`filter`→`dropped`, `validate`→`invalid`, `dedup`→`duplicate`,
-`merge`→`unmatched`). ⚠ They are four *reasons*, not four relations; the constants keep their
-pre-token spelling until Phase 7. Rejects are scratch unless the author **wires a sink to the reject
+`merge`→`unmatched`). ⚠ They are four *reasons*, not four relations; since 4.0.0 (X5-a) the
+constants carry the `reject:<reason>` spelling, and the old bare spellings are read as aliases. Rejects are scratch unless the author **wires a sink to the reject
 outlet** — the designed pattern ("the user never wires these, only tunes where they rest").
 `ConservationCheck` alerts on an unexplained in/out imbalance either way.
 

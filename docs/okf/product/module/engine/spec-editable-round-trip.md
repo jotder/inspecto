@@ -250,7 +250,7 @@ Full `-Pedition-advanced -fae` reactor 3458/0/0/5 at `f72f7fc8`.*
 
 `GRAPH-RAW-COMPANION-ENRICHMENT-ILLEGAL-EMIT-1` (operator decision: a derived display-only edge kind).
 `attachCompanionEnrichments` used to join each companion to the sink with a real `data` edge, and
-`PipelineValidator` refuses that `ILLEGAL_EMIT` (a sink emits only `on_commit / success / failure`), so an
+`PipelineValidator` refuses that `ILLEGAL_EMIT` (a sink emits nothing), so an
 untouched open → save and the candidate dry run of any Pipeline with a companion answered 422. The edge is
 now `{from, rel: "companion", to, derived: true}` (`PipelineGraphRoutes.COMPANION_REL`):
 
