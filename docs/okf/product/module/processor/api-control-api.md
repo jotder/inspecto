@@ -67,7 +67,7 @@ an unsafe `kind: route` binding target and a `landing` that names no leaf — se
 
 ### `GET /consignments/{consignmentId}` — one Consignment across lanes (X5 L4, 2026-11-17)
 
-`ConsignmentRoutes`; design of record `superpower/2026-11-17-x5-stepinfo-envelope-plan.md` §3.7 (D8 = a). One read
+`ConsignmentRoutes`; design of record `archived-documents/plans-archive/2026-11-17-x5-stepinfo-envelope-plan.md` §3.7 (D8 = a). One read
 joins five stores for one id: the ingest ledger row (`status`, `members` = its `/runs/{name}/files` rows, `parked`
 from the manifest), its Step Receipts (`steps`, `stepsTotal`; first 500), its registry rows (`outputs`,
 `outputsTotal`; first 200, the `/runs/{name}/outputs` row shape), the X2 run links (`upstream` = what its own job
