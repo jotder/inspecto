@@ -32,7 +32,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * connection of its own, open the store on the first schema at the same moment. All must open, the schema must end
  * migrated with every row exactly once, the second schema must keep its {@code batch_id} tables untouched, and a
  * reopen must change nothing. This is what proves {@code SchemaMigration}'s per-schema advisory lock and its
- * schema-scoped probes on Postgres — DuckDB holds its file in one process and needs neither.
+ * schema-scoped probes on Postgres — DuckDB holds its file in one process and needs neither. The same nodes opening
+ * each store on a new, EMPTY schema must all open and leave every table and index exactly once.
  *
  * <p>Schema URLs come from {@link OperationalDb#withSchema}, the {@code currentSchema} rule boot applies to a Space.
  * Enabled by {@code INSPECTO_TEST_PG_URL} / {@code -Dinspecto.test.pg.url} (user and password in the URL's query);
@@ -241,6 +242,42 @@ class PostgresBatchIdMigrationTest {
 
     private static List<String> tables(String schema) throws SQLException {
         return rows(schema, "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() ORDER BY 1");
+    }
+
+    // ── a new, empty schema ──────────────────────────────────────────────────────
+    // Nothing to migrate: what races here is the schema DDL itself. Postgres's IF NOT EXISTS is not atomic across
+    // sessions, so each store runs its DDL in one transaction under its per-schema advisory lock.
+
+    @Test
+    void statusStore_concurrentNodesCreateANewSchemaOnce() throws Exception {
+        String s = schema("status_new");
+        openConcurrently(s, DbStatusStore::new);
+        assertEquals(List.of("inspecto_status_batches", "inspecto_status_commits", "inspecto_status_files",
+                "inspecto_status_lineage", "inspecto_status_quarantine", "inspecto_status_unpack"), tables(s));
+        assertEquals(List.of("inspecto_status_batches_by_pipeline", "inspecto_status_commits_by_pipeline",
+                        "inspecto_status_files_by_pipeline", "inspecto_status_lineage_by_pipeline_consignment",
+                        "inspecto_status_quarantine_by_pipeline", "inspecto_status_unpack_by_pipeline"),
+                rows(s, "SELECT indexname FROM pg_indexes WHERE schemaname = current_schema() ORDER BY 1"));
+        assertEquals(List.of("inspecto_status_commits.consignment_id", "inspecto_status_lineage.consignment_id"),
+                statusColumns(s));
+    }
+
+    @Test
+    void provenanceStore_concurrentNodesCreateANewSchemaOnce() throws Exception {
+        String s = schema("prov_new");
+        openConcurrently(s, DbProvenanceStore::new);
+        assertEquals(List.of("inspecto_pipeline_provenance"), tables(s));
+        assertEquals(List.of("pipeline_id", "consignment_id", "node_id", "rel", "row_count", "run_ts", "simulated"),
+                provenanceColumns(s));
+    }
+
+    @Test
+    void fileStageStore_concurrentNodesCreateANewSchemaOnce() throws Exception {
+        String s = schema("stages_new");
+        openConcurrently(s, DbFileStageStore::new);
+        assertEquals(List.of("file_stages"), tables(s));
+        assertEquals(List.of("consignment_id"), fileStageColumns(s));
+        assertEquals(List.of("UNIQUE"), fileStageConstraints(s));
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────────

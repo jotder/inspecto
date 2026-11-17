@@ -486,7 +486,12 @@ them in `initSchema`. Postgres's `IF NOT EXISTS` is not atomic across sessions, 
 `pg_class_relname_nsp_index` (6 of 6 runs without the fix). `initSchema`'s DDL now runs in one transaction under the
 same lock. The lock also covers a table the schema does not have yet: the 3.x fixture has no
 `inspecto_status_unpack`, and without the lock its `CREATE TABLE IF NOT EXISTS` raced on `pg_type_typname_nsp_index`.
-DuckDB needs no lock, because one process holds the file.
+**All three stores now run their schema DDL this way** (2026-11-17). `DbProvenanceStore.initSchema` (CREATE TABLE
+and ADD COLUMN) and `DbFileStageStore.createUnderLock` (the CREATE) each run in one transaction under the store's
+own per-schema lock. That lock is the same one the store's migration takes. A new, EMPTY schema opened by 4 nodes
+at once is pinned by `PostgresBatchIdMigrationTest.*_concurrentNodesCreateANewSchemaOnce`: all nodes must open,
+and every table and index must exist exactly once. Without the three DDL locks, all three of those tests went red
+in 5 of 5 runs, on `pg_type_typname_nsp_index`. DuckDB needs no lock, because one process holds the file.
 
 ### 3.5 `inspecto_job_runs` — job-run reporting  · **A**
 File: `jobs_report.duckdb`

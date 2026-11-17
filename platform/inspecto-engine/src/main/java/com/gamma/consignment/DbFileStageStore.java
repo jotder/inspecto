@@ -85,7 +85,7 @@ public final class DbFileStageStore implements AutoCloseable, com.gamma.util.Bro
             src.run(conn -> {
                 try (Statement st = conn.createStatement()) {
                     if (needsRebuild(conn)) rebuildWithConstraint(conn, st);
-                    st.execute(CREATE);
+                    createUnderLock(conn, st);
                 }
             });
         } catch (SQLException e) {
@@ -103,6 +103,28 @@ public final class DbFileStageStore implements AutoCloseable, com.gamma.util.Bro
                 && (SchemaMigration.columnExists(conn, T, "batch_id") || !SchemaMigration.constraintExists(conn, T, "UNIQUE"));
     }
 
+    /** The per-schema advisory lock the rebuild and the CREATE serialise on ({@link SchemaMigration#lock}). */
+    private static final String MIGRATION_LOCK = "inspecto.file-stages.rebuild";
+
+    /**
+     * The CREATE in a transaction holding the schema's advisory lock (Postgres): IF NOT EXISTS is not atomic across
+     * sessions, so nodes opening a new schema at once would race on the catalog's unique index.
+     */
+    private void createUnderLock(Connection conn, Statement st) throws SQLException {
+        boolean auto = conn.getAutoCommit();
+        conn.setAutoCommit(false);
+        try {
+            SchemaMigration.lock(conn, src.isPostgres(), MIGRATION_LOCK);
+            st.execute(CREATE);
+            conn.commit();
+        } catch (SQLException e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(auto);
+        }
+    }
+
     /** Legacy (unconstrained, or pre-4.0.0 {@code batch_id}-named) table → constrained copy under the current
      *  column names, duplicates collapsed, atomically. Runs on the connection {@link #initSchema} borrowed —
      *  {@code st} is that connection's statement. On Postgres the transaction first takes the schema's advisory
@@ -113,7 +135,7 @@ public final class DbFileStageStore implements AutoCloseable, com.gamma.util.Bro
         boolean auto = conn.getAutoCommit();
         conn.setAutoCommit(false);
         try {
-            SchemaMigration.lock(conn, src.isPostgres(), "inspecto.file-stages.rebuild");
+            SchemaMigration.lock(conn, src.isPostgres(), MIGRATION_LOCK);
             if (!needsRebuild(conn)) {
                 conn.commit();
                 return;
