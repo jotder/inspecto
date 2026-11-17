@@ -434,6 +434,12 @@ closed by the last; on ship, this plan's as-built facts go to the engine hub and
 
 ## 7. Decisions for the operator
 
+**Taken 2026-11-17, as recommended**, under the operator's standing instruction for this MoSCoW run ("take
+decisions reasonably"): D1 = B · D2 = b · D3 = c · D4 = b · D5 = b · D6 = a · D7 = b · D8 = a · D9 = c · D10 = a.
+Also decided: §8's `batchId` components of `ProvenanceRow` and `ConsignmentEvent` are renamed to `consignmentId`
+before the tag (now, not 5.0.0), in a lane of their own after L2. Each is reversible until the 4.0.0 tag; the
+operator may overturn any of them, and a lane not yet pushed is then re-scoped.
+
 1. **D1 — How much of X5 lands before the 4.0.0 tag.**
    (A) all lanes L0–L6, about 14 engineer-days; (B) the MAJOR-gated vocabulary plus the receipts on every durable
    lane and the read route — L1–L4 and the release note, about 10 engineer-days — with the screen and the Step SPI
