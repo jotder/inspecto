@@ -148,6 +148,7 @@ const SCENARIOS = {
           if ('click' in st) return h.clickText(st.click);
           if ('exact' in st) return h.clickExact(st.exact, st.nth ?? 0);
           if ('label' in st) return h.clickLabel(st.label);
+          if ('hoverLabel' in st) return h.hoverLabel(st.hoverLabel);
           if ('button' in st) return h.clickButton(st.button);
           if ('sel' in st) return h.clickSel(st.sel);
           if ('rightOf' in st) return h.clickRightOf(st.rightOf);
@@ -675,6 +676,7 @@ async function main() {
       await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 }); await sleep(90);
       await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 }); await sleep(500);
     },
+    async hoverLabel(label) { const p = await h.locate(`document.querySelector('[aria-label=${JSON.stringify(label)}]')`); await h.moveTo(p.x, p.y, 700); await sleep(900); },   // the tooltip shows
     async clickLabel(label) { const p = await h.locate(`document.querySelector('[aria-label=${JSON.stringify(label)}]')`); await h.click(p.x, p.y); },
     // smallest visible element whose own text contains `text`
     // the nth visible element whose own text node contains `text` (text-node walk: finds the real label element)
