@@ -95,7 +95,8 @@ const timing = JSON.parse(readFileSync(join(work, 'timing.json'), 'utf8'));
 const takes = [{ dir: takeDir, file: join(takeDir, `${takeName}-live.mp4`) }];
 if (caseCfg?.std) { const d = join(outRoot, '_live', takeName + '_std'); takes.push({ dir: d, file: join(d, `${takeName}_std-live.mp4`) }); }
 const at = {};
-for (const t of takes) { const m = JSON.parse(readFileSync(join(t.dir, 'marks.json'), 'utf8')); for (const [k, v] of Object.entries(m)) if (scenes.some((x) => x.id === k)) at[k] = { take: t.file, start: v }; }
+const impacts = {};   // take file -> computed impact boxes (record-la-live.mjs h.impact), in take pixels
+for (const t of takes) { const m = JSON.parse(readFileSync(join(t.dir, 'marks.json'), 'utf8')); impacts[t.file] = m.impacts || []; for (const [k, v] of Object.entries(m)) if (scenes.some((x) => x.id === k)) at[k] = { take: t.file, start: v }; }
 
 // ---------- 3: cut, annotate, voice ----------
 copyFileSync('C:/Windows/Fonts/arial.ttf', join(work, 'font.ttf'));
@@ -138,7 +139,9 @@ scenes.forEach((s, i) => {
   // no long stretches without a voice
   const speed = seg > timing[s.id] + 0.6 ? Math.min(4, seg / timing[s.id]) : 1;
   const L = Math.max(timing[s.id], seg / speed);
-  const notes = s.notes.map((n) => (n.f0 !== undefined ? { ...n, t0: +(n.f0 * L).toFixed(2), t1: +(n.f1 * L).toFixed(2) } : n));
+  // computed impact marks that fall inside this scene: a yellow box on what the action changed, held 3 s (+12 px margin)
+  const computed = impacts[take].filter((m) => m.t >= start && m.t < start + L * speed).map((m) => ({ type: 'box', t0: +((m.t - start) / speed).toFixed(2), t1: +((m.t - start) / speed + 3).toFixed(2), x: Math.max(0, m.box[0] - 12), y: Math.max(0, m.box[1] - 12), w: m.box[2] + 24, h: m.box[3] + 24, label: m.text }));
+  const notes = [...computed, ...s.notes].map((n) => (n.f0 !== undefined ? { ...n, t0: +(n.f0 * L).toFixed(2), t1: +(n.f1 * L).toFixed(2) } : n));
   const { overlays, texts, zooms } = noteFilters(notes, i);
   const inputs = ['-ss', start.toFixed(3), '-t', (L * speed).toFixed(3), '-i', take, '-i', join(work, `${s.id}.wav`)];
   let fc = `[0:v]setpts=PTS/${speed.toFixed(3)},tpad=stop_mode=clone:stop_duration=${L.toFixed(2)}[b0]`; let cur = 'b0';

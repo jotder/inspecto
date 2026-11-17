@@ -191,9 +191,7 @@ Extensions this series needs, in order of value:
 1. **Declarative episode scripts.** Today a scenario is code in `tools/record-la-live.mjs`. Episodes need a step list in
    the script file (`click "Busiest nodes"`, `key G`, `select HUB-01`, `hover legend "Dotted outline"`, `wait graph`), so a
    writer can author an episode without touching the recorder. One small interpreter over the existing helpers.
-2. **Impact marks computed, not hand-placed.** Read node positions and the before/after node set from the page (the canvas
-   exposes them to the test hooks; to be confirmed, else a recorder hook in the graph view) and draw the yellow mark on
-   *what changed*. Hand-placed pixel marks do not scale to 37 episodes.
+2. **Impact marks computed, not hand-placed** (built 2026-11-17). The graph is a canvas, so node positions are not in the page; an `impact` step in an episode takes a screenshot before and after its action, `ffmpeg` subtracts them and the `bbox` filter finds the box that changed. The renderer draws that box and its label from the moment of the change, held 3 s; the author can limit the look to a `region` (such as the canvas) so side-panel changes are ignored. Hand-placed pixel marks do not scale to 40 episodes.
 3. **Before/after hold** (freeze 1 s, act, hold) and a **lower-third chip** with the control name and key.
 4. **Captions** burned in and as SRT, from the narration text (it already exists per scene).
 5. **Chapter markers** per beat in the MP4 so a viewer can jump to a tool.
@@ -241,10 +239,18 @@ Walked by the declarative `episode` scenario (`record-la-live.mjs episode`, dump
   *Cash-out through one till*; each has Actions, Load view, Tags), *Import / export saved views*, *Save the current view*, *Export the map* (off until a map is drawn).
   **Other Examples is Geo-ready** (`mule_account_locations_dataset` with LAT / LON, plus `mule_ring_legs_dataset` and `mule_cashout_legs_dataset` for routes):
   G1 and G2 record there; no new data is needed.
-- **Still to walk while scripting its episode** (the recorder reached the screens but the dump did not capture them): the *More steps* ops (Time window, Snapshot
-  marker, Threshold, Compare, Connect start entities) → F4; the *Similarity and prediction* and *Suspicion score* parameter forms (the toolbox accordion
-  rows) → D5; Propagated risk parameters → D5; the Geo map toolbox (layer manager, measure/radius/polygon/note tools, geo intelligence) after a map is
-  loaded → G1/G2; Drafts fork → rebase → promote as a sequence → F6.
+- **Walked 2026-11-17, second pass:** *More steps* (Investigation tab fold) lists **Connect** (Connect start entities), **Time** (Time window, Snapshot
+  marker), **Compare**, **Threshold**, then *Scope list (this Investigation)* (Entity ids, Include, Leave out, Add start entities…), *Open the Step log*,
+  *Investigation settings…*. **Similarity and prediction** (On screen): a *Node* picker, buttons *Find similar nodes*, *Predict links*, *Possible
+  duplicates*, hint "Pick a node first." (up to 1,000 nodes). **Suspicion score**: *Find suspicious nodes*, text "Combined score from how connected,
+  central and clustered a node is.", an optional *Risk model* name field (up to 1,000 nodes). **Geo map** loaded from a saved view (*Open saved views* ▸
+  pick ▸ *Load view <name>*): toolbar *Search points*, *Find place*, *Filter point types*, *Fit the map to the data*, *Switch to the density heatmap*,
+  *Keep only the points in the current viewport*, *Toggle the data panel*, *Toggle the geo-intelligence toolbox*, *Investigation tools (measure, radius
+  search, polygon, notes)*, *Layer manager*, *Edit the query*, *Open saved views*, *Import / export saved views*, *Save the current view*, *Export the
+  map*, zoom and fullscreen.
+- **Still to walk with their episodes** (they change state or need a loaded map): the Drafts sequence fork → work → rebase → promote (F6); Propagated risk
+  parameters (D5); the contents of the geo-intelligence toolbox and the Layer manager (G1/G2); the Time window, Snapshot marker, Threshold and Compare
+  forms as filled in (F4).
 
 ### 6.4 Known blockers found while building the case videos
 
@@ -284,7 +290,7 @@ Walked by the declarative `episode` scenario (`record-la-live.mjs episode`, dump
 | Phase | Work | Output |
 |---|---|---|
 | P0 | Approve this plan: episode list, categories, waves; decisions D-TR1…D-TR7 | signed plan |
-| P1 | Prerequisites: index-owner stamp in the packager (§6.4), a Geo-ready Space if none (§6.3), declarative script steps and computed impact marks (§6.1 items 1–2), the §6.3 UI walk | tooling + walked notes. **Status 2026-11-17: P1a (packager stamp), P1b (Geo: Other Examples), P1c steps (declarative `episode` scenario in `record-la-live.mjs`) and most of P1d done (§6.3); computed impact marks (§6.1 item 2) and the remaining walks still open** |
+| P1 | Prerequisites: index-owner stamp in the packager (§6.4), a Geo-ready Space if none (§6.3), declarative script steps and computed impact marks (§6.1 items 1–2), the §6.3 UI walk | tooling + walked notes. **Status 2026-11-17: P1a (packager stamp), P1b (Geo: Other Examples), P1c steps (declarative `episode` scenario in `record-la-live.mjs`) and P1d (§6.3) done; the computed impact marks (§6.1 item 2) are built too (below); only the four state-changing walks listed in §6.3 remain, and they are done while scripting F4, F6, D5, G1** |
 | P2 | Pilot: C4, D3, F8 scripted, recorded, reviewed | 3 episodes, method confirmed |
 | P3 | Wave 1 — the new-user path: A1–A3, B1, B4, C1, C2, C4, D1, E1, F1, F8 (12) | core course |
 | P4 | Wave 2 — depth: A4, B2, B3, C3, C5, D2–D7, E2, F2–F5, F7, F9 (19) | full analyst course |

@@ -10,6 +10,27 @@ import { mkdirSync, writeFileSync, existsSync, readdirSync, rmSync, readFileSync
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
+// ffmpeg: on PATH, else the winget Gyan.FFmpeg install
+function findFfmpeg() {
+  if (!spawnSync('ffmpeg', ['-version']).error) return 'ffmpeg';
+  const b = join(process.env.LOCALAPPDATA ?? '', 'Microsoft/WinGet/Packages');
+  for (const d of existsSync(b) ? readdirSync(b).filter((x) => x.startsWith('Gyan.FFmpeg')) : []) for (const v of readdirSync(join(b, d))) { const e = join(b, d, v, 'bin/ffmpeg.exe'); if (existsSync(e)) return e; }
+  throw new Error('ffmpeg not found');
+}
+// The bounding box [x, y, w, h] (pixels of the images) of what differs between two PNGs, or null when nothing does.
+// ffmpeg subtracts them, thresholds the difference and lets bbox find the box: no image library needed.
+export function diffBox(a, b, region) {
+  const crop = region ? `crop=${region[2]}:${region[3]}:${region[0]}:${region[1]},` : '';
+  const fc = `[0:v]${crop}format=gray[a];[1:v]${crop}format=gray[b];[a][b]blend=all_mode=difference,lut=y='if(gt(val,28),255,0)',bbox=min_val=128`;
+  const r = spawnSync(findFfmpeg(), ['-hide_banner', '-i', a, '-i', b, '-filter_complex', fc, '-f', 'null', '-'], { encoding: 'utf8' });
+  const m = [...(r.stderr || '').matchAll(/x1:(\d+) x2:(\d+) y1:(\d+) y2:(\d+)/g)].pop();
+  if (!m) return null;
+  const [x1, x2, y1, y2] = m.slice(1).map(Number);
+  const [x, y, w, h] = [x1, y1, x2 - x1 + 1, y2 - y1 + 1];
+  if (w < 8 || h < 8) return null;
+  return [x + (region ? region[0] : 0), y + (region ? region[1] : 0), w, h];
+}
+
 const argv = process.argv.slice(2);
 const opt = (n, d) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : d; };
 const scenarioName = argv[0];
@@ -101,6 +122,7 @@ const SCENARIOS = {
   //   {space:"la-showcase"} {signin:"Demo Analyst"} {open:"/link-analysis?view=x"} {wait:1500} {waitText:"Legend"}
   //   {click:"Busiest nodes"} {exact:"Open…"} {label:"Display options"} {button:"Draw"} {sel:"input[type=search]"} {rightOf:"Dataset"}
   //   {type:"HUB-01"} {key:"G"} {escape:true} {hover:"takes part"} {move:[x,y]}
+  //   {impact:"expand", steps:[...], region:[x,y,w,h], text:"label"} runs its steps and marks what changed (image diff before/after)
   //   {shot:"after-expand"} {dump:"toolbox"} (a screenshot / the visible text + buttons, saved beside the take)
   //   {scene:"S02", steps:[...]} runs its steps, then holds until the scene's narration length (--timing) has passed.
   // A verb may carry {soft:true} (a missing control is logged, not fatal) and {note:"..."} (free text, ignored).
@@ -125,6 +147,7 @@ const SCENARIOS = {
           if (st.escape) return h.escape();
           if ('hover' in st) return h.hoverText(st.hover);
           if ('move' in st) return h.moveTo(st.move[0], st.move[1], st.ms ?? 900);
+          if ('impact' in st) return h.impact(st.impact, () => run(st.steps || []), st);
           if ('shot' in st) return h.shot(st.shot);
           if ('dump' in st) return h.dump(st.dump);
           if ('note' in st) return undefined;
@@ -532,9 +555,25 @@ async function main() {
     async clickSel(sel) { const p = await h.locate(`document.querySelector(${JSON.stringify(sel)})`); await h.click(p.x, p.y); },
     mark(label) { marks[label] = +((Date.now() - startedAt) / 1000).toFixed(2); },
     async shot(label) { const r = await send('Page.captureScreenshot', { format: 'png' }); writeFileSync(join(out, `probe-${String(stepNo).padStart(2, '0')}-${label}.png`), Buffer.from(r.data, 'base64')); },
+    // Run `fn` and mark what it changed: a screenshot before, one after (cursor hidden), and the bounding box of the difference is
+    // stored in marks.impacts with the time of the 'after' (the renderer draws it as a yellow box from then on). opts: region [x,y,w,h]
+    // in CSS px to look only at the canvas (default the whole page), settle ms to wait before the 'after' (default 1400).
+    async impact(label, fn, opts = {}) {
+      const snap = async (tag) => { const r = await send('Page.captureScreenshot', { format: 'png' }); const p = join(out, `impact-${label}-${tag}.png`); writeFileSync(p, Buffer.from(r.data, 'base64')); return p; };
+      const cur = (v) => ev(`(() => { const c = document.getElementById('__cur'); if (c) c.style.visibility = '${v}'; })()`);
+      await cur('hidden'); const a = await snap('a'); await cur('visible');
+      await fn();
+      await sleep(opts.settle ?? 1400);
+      await cur('hidden'); const b = await snap('b'); const t = +((Date.now() - startedAt) / 1000).toFixed(2); await cur('visible');   // t before the diff: ffmpeg takes seconds
+      const region = opts.region ? opts.region.map((v) => Math.round(v * DPR)) : null;
+      const box = diffBox(a, b, region);
+      if (!box) { console.log(`  impact ${label}: nothing changed`); return; }
+      (marks.impacts ||= []).push({ label, t, box, text: opts.text || label });
+      console.log(`  impact ${label}: box ${box.join(',')} at ${t}s`);
+    },
     // the visible text and the visible buttons/links/tabs of the page, as JSON beside the take (for walking the UI)
     async dump(label) {
-      const d = await ev(`(() => { const R = document.querySelector('[role=dialog],mat-dialog-container,.cdk-overlay-pane') || document.body; return ({ url: location.href, scoped: R !== document.body, text: R.innerText, controls: [...R.querySelectorAll('button,a,[role=tab],[role=menuitem],input,select')].filter(b => b.offsetParent).map(b => ({ tag: b.tagName.toLowerCase(), label: (b.getAttribute('aria-label') || b.innerText || b.placeholder || '').trim().split('\\n').join(' ').split(' ').filter(Boolean).join(' ').slice(0, 90), disabled: !!b.disabled || b.getAttribute('aria-disabled') === 'true' })).filter((c) => c.label) }); })()`);
+      const d = await ev(`(() => { const R = [...document.querySelectorAll('[role=dialog],mat-dialog-container,.cdk-overlay-pane')].filter((e) => e.offsetWidth > 40 && e.offsetHeight > 40 && (e.innerText || '').trim()).pop() || document.body; return ({ url: location.href, scoped: R !== document.body, text: R.innerText, controls: [...R.querySelectorAll('button,a,[role=tab],[role=menuitem],input,select')].filter(b => b.offsetParent).map(b => ({ tag: b.tagName.toLowerCase(), label: (b.getAttribute('aria-label') || b.innerText || b.placeholder || '').trim().split('\\n').join(' ').split(' ').filter(Boolean).join(' ').slice(0, 90), disabled: !!b.disabled || b.getAttribute('aria-disabled') === 'true' })).filter((c) => c.label) }); })()`);
       writeFileSync(join(out, `dump-${label}.json`), JSON.stringify(d, null, 1));
     },
     async step(label, fn) { stepNo++; try { await fn(); } catch (e) { await h.shot('FAIL-' + label); throw e; } if (probe) { await sleep(900); await h.shot(label); } },
