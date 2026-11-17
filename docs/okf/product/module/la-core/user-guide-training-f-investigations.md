@@ -711,7 +711,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the answer.
 
 ### S05 · Build the Dossier
-- Voice: Now the Dossier. Open the Investigation's actions menu and choose Build Dossier. At step can stay blank: blank means the latest step. Include snapshots lets you add sealed snapshots, and only those anchored to this Investigation are accepted. Tick the baseline snapshot, and press Build Dossier. The summary appears: the Investigation, its Dataset, the step it was built at, and how many entities, links, excluded, hidden and kept.
+- Voice: Now the Dossier. Open the Investigation's actions menu and choose Build Dossier. At step can stay blank: blank means the latest step. Include snapshots lets you add sealed snapshots, and only those anchored to this Investigation are accepted. This Investigation has none to include, so leave it empty, and press Build Dossier. The summary appears: the Investigation, its Dataset, the step it was built at, and how many entities, links, excluded, hidden and kept.
 - Chip: Build Dossier · At step
 - Action: Investigation tab ▸ ⋯ actions ▸ Build Dossier ▸ At step blank ▸ Include snapshots… ▸ tick the snapshot ▸ Build Dossier. [check in UI: the snapshot's id as listed]
 - Impact: mark the summary line.

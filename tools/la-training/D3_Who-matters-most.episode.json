@@ -1,0 +1,23 @@
+{"scenario":"episode","edition":"Basic","base":"http://127.0.0.1:8099","steps":[
+ {"scene":"S01","card":{"lines":["Inspecto LA training","D3  Who matters most?"],"secs":6},"steps":[
+  {"space":"la-law-enforcement"},{"open":"/link-analysis?view=x","settle":3000},{"wait":1500}]},
+ {"scene":"S02","steps":[
+  {"at":[265,30]},{"wait":1500},{"at":[333,130]},{"wait":4000},{"click":"Burglary series"},{"wait":2000},{"button":"Open"},{"wait":7000}]},
+ {"scene":"S03","steps":[{"reveal":"Who matters most"},{"wait":2000}]},
+ {"scene":"S04","steps":[
+  {"reveal":"Explain node"},{"click":"Explain node"},{"wait":1500},{"at":[1354,534]},{"wait":1800},
+  {"type":"P-00476"},{"wait":1200},{"exact":"P-00476"},{"wait":1200},{"button":"Explain node"},{"wait":3500}]},
+ {"scene":"S05","steps":[
+  {"reveal":"Centrality"},{"click":"Centrality"},{"wait":1500},{"button":"Rank nodes"},{"wait":3500},{"click":"ZX 9117 X"},{"wait":3000}]},
+ {"scene":"S06","steps":[{"click":"Degree"},{"wait":1200},{"exact":"Betweenness"},{"wait":900},{"button":"Rank nodes"},{"wait":3500},{"click":"386.08"},{"wait":3000}]},
+ {"scene":"S07","steps":[{"click":"Betweenness"},{"wait":1200},{"exact":"Closeness"},{"wait":900},{"button":"Rank nodes"},{"wait":3500}]},
+ {"scene":"S08","steps":[
+  {"click":"Closeness"},{"wait":1200},{"exact":"Eigenvector"},{"wait":900},{"button":"Rank nodes"},{"wait":4000},
+  {"click":"Eigenvector"},{"wait":1200},{"exact":"PageRank"},{"wait":900},{"button":"Rank nodes"},{"wait":4000},
+  {"click":"PageRank"},{"wait":1200},{"exact":"Katz"},{"wait":900},{"button":"Rank nodes"},{"wait":4000}]},
+ {"scene":"S09","steps":[
+  {"click":"Katz"},{"wait":1200},{"exact":"Authority score (HITS)"},{"wait":900},{"button":"Rank nodes"},{"wait":4000},
+  {"click":"Authority score (HITS)"},{"wait":1200},{"exact":"Hub score (HITS)"},{"wait":900},{"button":"Rank nodes"},{"wait":4000}]},
+ {"scene":"S10","steps":[{"reveal":"Start an Investigation","soft":true},{"wait":2000}]},
+ {"scene":"S11","card":{"lines":["Try it","Next: D4  Groups and weak points"],"secs":5},"steps":[{"wait":1000}]}
+]}

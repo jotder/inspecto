@@ -36,7 +36,7 @@ function findFfmpeg() {
 const FF = findFfmpeg(), FFPROBE = FF.replace(/ffmpeg(\.exe)?$/, 'ffprobe$1');
 function run(cmd, args, cwd, inherit = false) {
   const r = spawnSync(cmd, args, { cwd, encoding: 'utf8', maxBuffer: 1 << 28, stdio: inherit ? 'inherit' : 'pipe' });
-  if (r.status !== 0) throw new Error(`${cmd} failed:\n${(r.stderr || '').split('\n').slice(-25).join('\n')}`);
+  if (r.status !== 0) throw new Error(`${cmd} failed:\n${(r.stderr || '').split('\n').slice(-60).join('\n')}`);
   return r.stdout;
 }
 const ff = (a, cwd) => run(FF, ['-y', '-hide_banner', '-loglevel', 'error', ...a], cwd);
@@ -51,7 +51,9 @@ const sec = md.slice(secs[si].index, si + 1 < secs.length ? secs[si + 1].index :
 // A section with `- Config: {...}` is a config-driven case (scenario case_demo, take named after the section);
 // without it, the hand-built scenario of --scenario (default mule_demo) is used.
 const cfgLine = sec.match(/^- Config:[ \t]*(\{.*\})$/m);
-const caseCfg = cfgLine ? JSON.parse(cfgLine[1]) : null;
+// a training episode's recording spec: tools/la-training/<name>.episode.json (--episode), else a `- Config:` line of the section
+const episodeFile = opt('--episode', null);
+const caseCfg = episodeFile ? JSON.parse(readFileSync(resolve(episodeFile), 'utf8')) : (cfgLine ? JSON.parse(cfgLine[1]) : null);
 const scenario = caseCfg ? (caseCfg.scenario || 'case_demo') : opt('--scenario', 'mule_demo');
 const takeName = caseCfg ? name : scenario;
 const hs = [...sec.matchAll(/^### (\S+) · (.+)$/gm)];
@@ -60,6 +62,7 @@ const scenes = hs.map((h, k) => {
   return {
     id: h[1], title: h[2],
     voice: (body.match(/^- Voice:[ \t]*(.*)$/m)?.[1] ?? '').trim(),
+    chip: (body.match(/^- Chip:[ \t]*(.*)$/m)?.[1] ?? '').replace(/[*`]/g, '').trim(),
     notes: [...body.matchAll(/^- Note:[ \t]*(\{.*\})$/gm)].map((m) => JSON.parse(m[1])),
   };
 });
@@ -143,6 +146,18 @@ scenes.forEach((s, i) => {
   const computed = impacts[take].filter((m) => m.t >= start && m.t < start + L * speed).map((m) => ({ type: 'box', t0: +((m.t - start) / speed).toFixed(2), t1: +((m.t - start) / speed + 3).toFixed(2), x: Math.max(0, m.box[0] - 12), y: Math.max(0, m.box[1] - 12), w: m.box[2] + 24, h: m.box[3] + 24, label: m.text }));
   const notes = [...computed, ...s.notes].map((n) => (n.f0 !== undefined ? { ...n, t0: +(n.f0 * L).toFixed(2), t1: +(n.f1 * L).toFixed(2) } : n));
   const { overlays, texts, zooms } = noteFilters(notes, i);
+  // training series look (plan section 6.2): the edition chip in the corner of every scene, the control's name and key as a lower
+  // third for the scene's first 5 s, and an intro / outro card over the scene's first seconds (the narration plays over it)
+  const clean = (t) => String(t).replace(/['"\\:%]/g, ' ').trim();
+  if (caseCfg?.edition) texts.push(`${DT}:text='${clean(caseCfg.edition)}':fontsize=30:fontcolor=white:box=1:boxcolor=0x1d4ed8@0.85:boxborderw=10:x=w-text_w-40:y=36`);
+  if (s.chip) texts.push(`${DT}:text='${clean(s.chip)}':fontsize=40:fontcolor=white:box=1:boxcolor=black@0.7:boxborderw=16:x=(w-text_w)/2:y=h-170:enable='between(t,0.6,5.6)'`);
+  const cardSpec = (caseCfg?.steps || []).find((x) => x.scene === s.id)?.card;
+  if (cardSpec) {
+    const secs = cardSpec.secs ?? 4;
+    const cardTexts = [`drawbox=x=0:y=0:w=iw:h=ih:color=0x0b0f14@1:t=fill:enable='lt(t,${secs})'`];
+    (cardSpec.lines || []).forEach((l, k) => cardTexts.push(`${DT}:text='${clean(l)}':fontsize=${k === 0 ? 84 : 46}:fontcolor=${k === 0 ? '0xffffff' : '0xa9b4c8'}:x=(w-text_w)/2:y=${400 + k * 130 + (k > 0 ? 30 : 0)}:enable='lt(t,${secs})'`));
+    texts.unshift(...cardTexts);
+  }
   const inputs = ['-ss', start.toFixed(3), '-t', (L * speed).toFixed(3), '-i', take, '-i', join(work, `${s.id}.wav`)];
   let fc = `[0:v]setpts=PTS/${speed.toFixed(3)},tpad=stop_mode=clone:stop_duration=${L.toFixed(2)}[b0]`; let cur = 'b0';
   overlays.forEach((o, k) => { inputs.push('-loop', '1', '-i', o.png); fc += `;[${cur}][${k + 2}:v]overlay=x=${o.x}:y=${o.y}:${o.en}[o${k}]`; cur = `o${k}`; });

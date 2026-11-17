@@ -6,7 +6,7 @@
 //   --probe  also saves a PNG after every step (to check the click path before a real take)
 // Scenarios live in this file (SCENARIOS). Read-only against the product: it only opens, hovers, clicks and types.
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, existsSync, readdirSync, rmSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, readdirSync, rmSync, readFileSync, copyFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -19,6 +19,15 @@ function findFfmpeg() {
 }
 // The bounding box [x, y, w, h] (pixels of the images) of what differs between two PNGs, or null when nothing does.
 // ffmpeg subtracts them, thresholds the difference and lets bbox find the box: no image library needed.
+export function brightBox(png, region, min = 165) {
+  const crop = region ? `crop=${region[2]}:${region[3]}:${region[0]}:${region[1]},` : '';
+  const fc = `[0:v]${crop}format=gray,lut=y='if(gt(val,${min}),255,0)',bbox=min_val=128`;
+  const r = spawnSync(findFfmpeg(), ['-hide_banner', '-i', png, '-filter_complex', fc, '-f', 'null', '-'], { encoding: 'utf8' });
+  const m = [...(r.stderr || '').matchAll(/x1:(\d+) x2:(\d+) y1:(\d+) y2:(\d+)/g)].pop();
+  if (!m) return null;
+  const [x1, x2, y1, y2] = m.slice(1).map(Number);
+  return [x1 + (region ? region[0] : 0), y1 + (region ? region[1] : 0), x2 - x1 + 1, y2 - y1 + 1];
+}
 export function diffBox(a, b, region) {
   const crop = region ? `crop=${region[2]}:${region[3]}:${region[0]}:${region[1]},` : '';
   const fc = `[0:v]${crop}format=gray[a];[1:v]${crop}format=gray[b];[a][b]blend=all_mode=difference,lut=y='if(gt(val,28),255,0)',bbox=min_val=128`;
@@ -145,8 +154,14 @@ const SCENARIOS = {
           if ('type' in st) return h.type(st.type, st.perChar ?? 85);
           if ('key' in st) return h.key(st.key);
           if (st.escape) return h.escape();
+          if ('reveal' in st) return h.reveal(st.reveal);
+          if ('download' in st) return h.download(st.download, st);
+          if ('upload' in st) return h.upload(st.upload, st.file);
+          if (st.undo) return h.undo();
           if ('hover' in st) return h.hoverText(st.hover);
           if ('move' in st) return h.moveTo(st.move[0], st.move[1], st.ms ?? 900);
+          if ('pick' in st) return h.pick(st.pick, st);
+          if ('at' in st) return h.at(st.at, st);
           if ('impact' in st) return h.impact(st.impact, () => run(st.steps || []), st);
           if ('shot' in st) return h.shot(st.shot);
           if ('dump' in st) return h.dump(st.dump);
@@ -526,6 +541,7 @@ async function main() {
   const h = {
     pause: sleep,
     async key(k) { const code = { Enter: 13, Escape: 27, Tab: 9, g: 71, G: 71 }[k]; const text = k.length === 1 ? k : undefined; for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: k, code: k.length === 1 ? 'Key' + k.toUpperCase() : k, windowsVirtualKeyCode: code, ...(type === 'keyDown' && text ? { text } : {}) }); },
+    async undo() { for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'z', code: 'KeyZ', windowsVirtualKeyCode: 90, modifiers: 2 }); },   // Ctrl+Z
     async escape() { for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); },
     // a narrated scene: it runs `fn`, then holds until the narration's length (timing[id], from the TTS pass) has passed
     sceneStart: 0, sceneDur: 8,
@@ -571,6 +587,58 @@ async function main() {
       (marks.impacts ||= []).push({ label, t, box, text: opts.text || label });
       console.log(`  impact ${label}: box ${box.join(',')} at ${t}s`);
     },
+    // Click a node by its label. The canvas is not DOM, so: Search nodes (everything else dims), take the bounding box of the bright
+    // pixels below the search box, and click its centre (a single or a double click). opts: dbl, region [x,y,w,h] in CSS px.
+    async pick(name, opts = {}) {
+      await h.clickLabel('Search nodes'); await sleep(500);
+      await h.type(name, 60); await h.key('Enter'); await sleep(1300);
+      const cur = (v) => ev(`(() => { const c = document.getElementById('__cur'); if (c) c.style.visibility = '${v}'; })()`);
+      await cur('hidden');
+      const r = await send('Page.captureScreenshot', { format: 'png' });
+      const p = join(out, `pick-${name.replace(/[^A-Za-z0-9]/g, '_')}.png`); writeFileSync(p, Buffer.from(r.data, 'base64'));
+      await cur('visible');
+      const reg = (opts.region || [80, 175, 1160, 660]).map((v) => Math.round(v * DPR));
+      const b = brightBox(p, reg);
+      if (!b) throw new Error('pick: ' + name + ' not found on the canvas');
+      const x = (b[0] + b[2] / 2) / DPR, y = (b[1] + b[3] / 2) / DPR;
+      await h.moveTo(x, y, 600);
+      for (let n = 1; n <= (opts.dbl ? 2 : 1); n++) {
+        await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: n }); await sleep(70);
+        await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: n }); await sleep(opts.dbl ? 90 : 500);
+      }
+      await sleep(600);
+    },
+    // Click (or double-click) the canvas at CSS-pixel [x, y]: a node of a deterministic layout, read from a probe screenshot.
+    async at(xy, opts = {}) {
+      const [x, y] = xy;
+      await h.moveTo(x, y, 600);
+      for (let n = 1; n <= (opts.dbl ? 2 : 1); n++) {
+        await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: n }); await sleep(70);
+        await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: n }); await sleep(opts.dbl ? 90 : 500);
+      }
+      await sleep(600);
+    },
+    // Press a button that downloads a file; the file lands in <out>/downloads, and a copy goes to st.as when given (an absolute path),
+    // so a later episode can edit it off camera. {download:"Download manifest", as:"C:/.../manifest.json"}
+    async download(label, opts = {}) {
+      const dir = join(out, 'downloads'); mkdirSync(dir, { recursive: true });
+      await send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: dir });
+      const before = new Set(readdirSync(dir));
+      await h.clickButton(label);
+      let got = null;
+      for (let i = 0; i < 60 && !got; i++) { await sleep(500); got = readdirSync(dir).find((n) => !before.has(n) && !n.endsWith('.crdownload')); }
+      if (!got) throw new Error('download: no file after ' + label);
+      console.log('  downloaded', got);
+      if (opts.as) { mkdirSync(resolve(opts.as, '..'), { recursive: true }); copyFileSync(join(dir, got), opts.as); }
+    },
+    // Press a button that opens the file picker and hand the picker a local file (the picker itself is intercepted, so nothing native shows).
+    async upload(label, file) {
+      await send('Page.setInterceptFileChooserDialog', { enabled: true });
+      const done = new Promise((res) => { const l = async (d) => { if (d.method !== 'Page.fileChooserOpened') return; listeners.splice(listeners.indexOf(l), 1); await send('DOM.setFileInputFiles', { files: [resolve(file)], backendNodeId: d.params.backendNodeId }); res(); }; listeners.push(l); });
+      await h.clickButton(label).catch(async () => { await h.clickText(label); });
+      await Promise.race([done, sleep(8000).then(() => { throw new Error('upload: no file chooser opened by ' + label); })]);
+      await sleep(1500);
+    },
     // the visible text and the visible buttons/links/tabs of the page, as JSON beside the take (for walking the UI)
     async dump(label) {
       const d = await ev(`(() => { const R = [...document.querySelectorAll('[role=dialog],mat-dialog-container,.cdk-overlay-pane')].filter((e) => e.offsetWidth > 40 && e.offsetHeight > 40 && (e.innerText || '').trim()).pop() || document.body; return ({ url: location.href, scoped: R !== document.body, text: R.innerText, controls: [...R.querySelectorAll('button,a,[role=tab],[role=menuitem],input,select')].filter(b => b.offsetParent).map(b => ({ tag: b.tagName.toLowerCase(), label: (b.getAttribute('aria-label') || b.innerText || b.placeholder || '').trim().split('\\n').join(' ').split(' ').filter(Boolean).join(' ').slice(0, 90), disabled: !!b.disabled || b.getAttribute('aria-disabled') === 'true' })).filter((c) => c.label) }); })()`);
@@ -607,6 +675,12 @@ async function main() {
     // smallest visible element whose own text contains `text`
     // the nth visible element whose own text node contains `text` (text-node walk: finds the real label element)
     textEl: (text, nth = 0) => `(() => { const hits = []; const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) { if (!n.nodeValue.includes(${JSON.stringify(text)})) continue; const e = n.parentElement; const b = e.getBoundingClientRect(); const cs = getComputedStyle(e); if (b.width > 8 && b.height > 8 && b.right > 0 && b.left < innerWidth && b.bottom > 0 && b.top < innerHeight && cs.visibility !== 'hidden' && cs.display !== 'none') hits.push(e); } return hits[${nth}]; })()`,
+    // scroll the first element whose text contains `text` to the middle of its scroll pane (the toolbox is longer than the screen)
+    async reveal(text) {
+      const ok = await ev(`(() => { const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) { if (n.nodeValue.includes(${JSON.stringify(text)})) { n.parentElement.scrollIntoView({ block: 'center' }); return true; } } return false; })()`);
+      if (!ok) throw new Error('reveal: ' + text + ' not found');
+      await sleep(900);
+    },
     async clickText(text) { const p = await h.locate(h.textEl(text)); await h.click(p.x, p.y); },
     async clickNthText(text, nth) { const p = await h.locate(h.textEl(text, nth)); await h.click(p.x, p.y); },
     async hoverText(text) { const p = await h.locate(h.textEl(text)); await h.moveTo(p.x, p.y, 900); },
@@ -626,7 +700,7 @@ async function main() {
   // ---------- encode: each frame held until the next ----------
   console.log(`captured ${frames.length} frames over ${((Date.now() - startedAt) / 1000).toFixed(1)} s`);
   const lines = [];
-  frames.forEach((f, i) => { const dur = i + 1 < frames.length ? Math.max(0.001, frames[i + 1].t - f.t) : 1; lines.push(`file '${f.file.replace(/\\/g, '/')}'`, `duration ${dur.toFixed(4)}`); });
+  frames.forEach((f, i) => { const dur = i + 1 < frames.length ? Math.max(0.001, frames[i + 1].t - f.t) : Math.max(1, (Date.now() - startedAt) / 1000 - f.t); lines.push(`file '${f.file.replace(/\\/g, '/')}'`, `duration ${dur.toFixed(4)}`); });
   lines.push(`file '${frames.at(-1).file.replace(/\\/g, '/')}'`);
   writeFileSync(join(out, 'frames.txt'), lines.join('\n') + '\n');
   const ffmpeg = (() => { if (!spawnSync('ffmpeg', ['-version']).error) return 'ffmpeg'; const b = join(process.env.LOCALAPPDATA, 'Microsoft/WinGet/Packages'); for (const d of readdirSync(b).filter((x) => x.startsWith('Gyan.FFmpeg'))) for (const v of readdirSync(join(b, d))) { const e = join(b, d, v, 'bin/ffmpeg.exe'); if (existsSync(e)) return e; } throw new Error('ffmpeg not found'); })();

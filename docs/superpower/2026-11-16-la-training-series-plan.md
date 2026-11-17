@@ -262,6 +262,23 @@ Walked by the declarative `episode` scenario (`record-la-live.mjs episode`, dump
 - Some Spaces' Investigations mask ids for the analyst; narration must say what the screen shows (masked) — the case video
   *Fictitious Vendor* named unmasked ids over a masked graph.
 
+### 6.5 Pilot P2 status (2026-11-17) — C4, D3, F8 rendered, awaiting operator review
+
+Recorded and rendered with `tools/render-la-demo-video.mjs <id> --episode tools/la-training/<id>.episode.json --script <guide>`
+(episode specs in `tools/la-training/`; output `C:\sandbox\la-video-out\_pilot`, outside git). Recorder verbs added for it: `at`
+(click or double-click a canvas position), `reveal` (scroll a text into view), `download` and `upload` (file capture and a
+hand-fed file picker), `undo`.
+
+- **D3** (6:01) and **F8** (5:38) match their narration. D3's S05–S10 voice was rewritten to the live tables (Betweenness
+  leads with the seller P-00476, not the household; Authority is led by the burglaries); F8's S05 no longer says to tick a
+  snapshot (this Investigation has none). F8's edited manifest and bundle are made off camera from real downloads.
+- **C4** (5:57): S01–S08 match; **S09 Undo does not visibly undo** (the toolbar Undo is refused, "a later change followed"),
+  and clicking a canvas node opens its details dialog instead of selecting it, so S04/S07 expand from the form's scope
+  (*nodes not expanded yet* / *whole graph*), not from a selected node.
+- **Open:** the yellow impact marks (`impact` step) report "nothing changed" on every attempt; node positions on the canvas
+  shift after each step, so a click position is read from a probe screenshot taken at that exact step. Do not record two
+  episodes at once: a parallel probe made a click step fail.
+
 ## 7. User-guide gaps and mismatches found (fix in the guide alongside)
 
 | Guide says | UI shows | Fix |

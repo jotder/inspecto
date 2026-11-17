@@ -246,37 +246,37 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the sentence; mark P-00476 on the canvas.
 
 ### S05 · Degree: who has the most links
-- Voice: Now rank. Under Centrality, set Rank by to Degree, and press Rank nodes. Degree is the simplest question: who has the most links? The table lists the top twenty, highest first. The plate ZX 9117 X is near the top: it was seen near eleven of the scenes. Click its row, and the graph selects it and centres on it. Degree is quick and honest, but it counts every link the same, so a busy node always wins. This saved view leaves out a taxi seen near fifty-four other scenes. On a graph that held it, Degree would rank the taxi first, and it has nothing to do with this series.
+- Voice: Now rank. Under Centrality, set Rank by to Degree, and press Rank nodes. Degree is the simplest question: who has the most links? The table lists the top twenty, highest first. The plate ZX 9117 X comes first, with fifteen links, and the seller P-00476 second, with twelve. Click a row, and the graph selects that node and centres on it. Degree is quick and honest, but it counts every link the same, so a busy node always wins.
 - Chip: Centrality · Rank by · Degree
 - Action: Centrality ▸ Rank by: Degree ▸ Rank nodes ▸ click the ZX 9117 X row. [check in UI: ZX 9117 X is in Degree's top three]
 - Impact: the ranking table appears; mark the top three rows; the canvas centres on the plate (video ring).
 
 ### S06 · Betweenness: the go-between
-- Voice: Betweenness asks a different question: who sits on the paths between the others? It finds the go-between, the node that, if you took it away, would leave parts of the network unable to reach each other. Rank by Betweenness, and watch the order change. The plate falls back: many of its links lead to a scene and stop there. What rises is the household that ties the two halves of the series together, the seller and the partner who keeps the car, at one address. That is the join the case turns on: the burglaries the stolen goods point to, and the scenes the car was seen near.
+- Voice: Betweenness asks a different question: who sits on the paths between the others? It finds the go-between, the node that, if you took it away, would leave parts of the network unable to reach each other. Rank by Betweenness, and watch the order change. The seller P-00476 now comes first, ahead of the plate, and the dealer DLR-04 moves up to third. The seller is the join the case turns on: the burglaries point to them through the stolen goods, and they lead on to the dealers and the address.
 - Chip: Centrality · Betweenness
 - Action: Rank by: Betweenness ▸ Rank nodes ▸ click the top row. [check in UI: ADR-1377, P-05167 or P-00476 lead the table and ZX 9117 X ranks lower than under Degree; reword to what the table shows]
 - Impact: before/after hold of the table: the order changes; mark the rows that moved up.
 
 ### S07 · Closeness: the centre
-- Voice: Closeness asks who can reach everyone else in the fewest steps. A high score is a node in the middle of its group, close to everything, which is not always the busiest one. Rank by Closeness, and click the top row. Use closeness when you want to know who would hear about something first, or where a message, or money, would pass soonest.
+- Voice: Closeness asks who can reach everyone else in the fewest steps. A high score is a node in the middle of its group, close to everything. Rank by Closeness, and click the top row. Here the seller P-00476 is first, with the dealer DLR-04 next, and the plate drops to ninth. Use closeness when you want to know who would hear about something first, or where a message, or money, would pass soonest.
 - Chip: Centrality · Closeness
 - Action: Rank by: Closeness ▸ Rank nodes ▸ click the top row. [check in UI: how closeness scores the small one-off pieces of this graph; if one of them tops the table, the voice says that a tiny separate piece can score high because everything in it is close]
 - Impact: mark the top row and the node.
 
 ### S08 · Eigenvector, PageRank and Katz: the company a node keeps
-- Voice: The next three ask: who is linked to the important ones? Eigenvector scores a node high not for how many links it has, but for having links to nodes that themselves score high. PageRank is a close cousin that follows the direction of the links: a node scores high when important nodes point to it. Katz is the same idea with a little credit for every node, so a node on a small, separate piece of the graph is not scored as zero. Rank by each in turn. All three lift the heart of the series and push the edges down; Katz keeps the one-off sellers in the table, where eigenvector leaves them at nothing.
+- Voice: The next three ask: who is linked to the important ones? Eigenvector scores a node high not for how many links it has, but for having links to nodes that themselves score high. PageRank is a close cousin that follows the direction of the links: a node scores high when important nodes point to it. Katz is the same idea with a little credit for every node. Rank by each in turn. Eigenvector and Katz put the plate first and the seller second. PageRank puts the seller first, then the dealers DLR-04 and DLR-09: the places the stolen goods end up.
 - Chip: Centrality · Eigenvector · PageRank · Katz
 - Action: Rank by: Eigenvector ▸ Rank nodes ▸ PageRank ▸ Rank nodes ▸ Katz ▸ Rank nodes. [check in UI: eigenvector scores the one-off pieces at or near 0 and Katz above it]
 - Impact: three table states, each held 2 s; mark the bottom rows under Eigenvector and under Katz.
 
 ### S09 · Hub and Authority: reading direction
-- Voice: The last pair reads the direction of the links. Authority score asks who is pointed to by good pointers. Here, burglaries point to the seller of their stolen item, so the seller P-00476, pointed to by nine of them, scores as an authority. Hub score asks the reverse: who points to good authorities? The plate points to eleven scenes, and it scores as a hub. Two halves of one idea, and on this graph they find the seller and the car the case is built on.
+- Voice: The last pair reads the direction of the links. Authority score asks who is pointed to by good pointers. Hub score asks the reverse: who points to good authorities? Rank by Authority score. The top of the table is a long run of burglaries, all scored the same: they are what the plate points to. Now Hub score. The plate comes first, alone, with a score of one. Two halves of one idea, reading which way the links run.
 - Chip: Centrality · Hub score (HITS) · Authority score (HITS)
 - Action: Rank by: Authority score (HITS) ▸ Rank nodes ▸ Rank by: Hub score (HITS) ▸ Rank nodes. [check in UI: P-00476 tops Authority and ZX 9117 X tops Hub; reword to what the tables show]
 - Impact: mark the top row of each table.
 
 ### S10 · So who matters most?
-- Voice: So who matters most? It depends on the question. Degree finds the busiest node. Betweenness, the go-between. Closeness, the centre. Eigenvector, PageRank and Katz, the company a node keeps. Hub and Authority, which way the links run. No single ranking is the answer, and when two rankings disagree, that is often where the case is: here, the plate is the busiest, but the household is what joins the two halves of the series. Under any ranking, Start an Investigation from the top results queues them for a recorded Investigation, in the Standard edition and above.
+- Voice: So who matters most? It depends on the question. Degree finds the busiest node. Betweenness, the go-between. Closeness, the centre. Eigenvector, PageRank and Katz, the company a node keeps. Hub and Authority, which way the links run. No single ranking is the answer, and when two rankings disagree, that is often where the case is: here, the plate is the busiest, but the seller P-00476 is the one who joins the two halves of the series. Under any ranking, Start an Investigation from the top results queues them for a recorded Investigation, in the Standard edition and above.
 - Chip: Start an Investigation from the top results
 - Action: point at *Start an Investigation from the top results* and its Basic hint. [check in UI: the hint's wording on Basic]
 - Impact: mark the hint.

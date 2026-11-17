@@ -1,0 +1,21 @@
+{"scenario":"episode","edition":"Standard","base":"http://127.0.0.1:8081","steps":[
+ {"scene":"S01","card":{"lines":["Inspecto LA training","F8  Evidence and the Dossier"],"secs":6},"steps":[
+  {"signin":"Demo Analyst"},{"space":"la-banking"},{"open":"/link-analysis?view=x","settle":3500},{"wait":1500}]},
+ {"scene":"S02","steps":[
+  {"at":[265,30]},{"wait":1500},{"at":[333,130]},{"wait":4000},{"click":"Investigations"},{"wait":2500},
+  {"click":"Compromised terminal"},{"wait":2000},{"button":"Open"},{"wait":8000},{"click":"Step log"},{"wait":2500}]},
+ {"scene":"S03","steps":[{"click":"Data details"},{"wait":3000},{"reveal":"Complete","soft":true},{"wait":3000},{"reveal":"Files","soft":true},{"wait":3000},{"reveal":"Index","soft":true},{"wait":2500}]},
+ {"scene":"S04","steps":[{"click":"Hide data details","soft":true},{"wait":800},{"click":"Coverage"},{"wait":1500},{"button":"Check coverage"},{"wait":3500}]},
+ {"scene":"S05","steps":[{"label":"Investigation actions"},{"wait":1800},{"click":"Build Dossier"},{"wait":2500},{"button":"Build Dossier"},{"wait":5000}]},
+ {"scene":"S06","steps":[{"reveal":"Log intact"},{"wait":4000},{"reveal":"Manifest root","soft":true},{"wait":4000},{"reveal":"Data state at export time"},{"wait":4000}]},
+ {"scene":"S07","steps":[{"reveal":"Download steps"},{"wait":800},{"hover":"Download steps"},{"hover":"Download method"},{"hover":"Download HTML"},{"hover":"Download manifest"},
+  {"download":"Download manifest","as":"C:/sandbox/la-video-out/_cfg/f8files/fresh-manifest.json"},{"wait":1500}]},
+ {"scene":"S08","steps":[{"button":"Verify this Dossier"},{"wait":4000},{"reveal":"Verified"},{"wait":2500}]},
+ {"scene":"S09","steps":[{"reveal":"Verify an uploaded manifest"},{"wait":800},
+  {"upload":"Verify an uploaded manifest…","file":"C:/sandbox/la-video-out/_cfg/f8files/manifest-edited.json"},{"wait":3000},{"reveal":"NOT verified"},{"wait":3000}]},
+ {"scene":"S10","steps":[{"reveal":"Download Dossier (sealed)"},{"wait":800},
+  {"download":"Download Dossier (sealed)","as":"C:/sandbox/la-video-out/_cfg/f8files/fresh-bundle.json"},{"wait":1500},
+  {"upload":"Verify a bundle…","file":"C:/sandbox/la-video-out/_cfg/f8files/fresh-bundle.json"},{"wait":3500},{"reveal":"Bundle verified","soft":true},{"wait":3000},
+  {"upload":"Verify a bundle…","file":"C:/sandbox/la-video-out/_cfg/f8files/bundle-edited.json"},{"wait":3500},{"reveal":"Bundle NOT verified"},{"wait":3000}]},
+ {"scene":"S11","card":{"lines":["Try it","Next: F9  From a finding to action"],"secs":5},"steps":[{"wait":1000}]}
+]}
