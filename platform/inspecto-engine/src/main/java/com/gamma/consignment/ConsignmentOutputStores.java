@@ -79,6 +79,25 @@ public final class ConsignmentOutputStores {
     }
 
     /**
+     * Whether Step Receipts are recorded (X5, plan §3.6): on by default, {@code -Dconsignment.steps=false} switches
+     * them off. Read on every call, so a test or an operator can flip it without a restart. A reader reports
+     * "switched off" from this, never an empty list.
+     */
+    public static boolean stepsEnabled() {
+        return !"false".equalsIgnoreCase(System.getProperty("consignment.steps", "true").trim());
+    }
+
+    /**
+     * Record one walk's Step Receipts in the calling space's registry, or do nothing when none is registered or
+     * receipts are switched off ({@link #stepsEnabled}). Never throws — the {@link #record} posture.
+     */
+    public static void recordSteps(List<com.gamma.pipeline.exec.StepReceipt> receipts) {
+        if (receipts == null || receipts.isEmpty() || !stepsEnabled()) return;
+        DbConsignmentOutputStore store = shared();
+        if (store != null) store.recordSteps(receipts);
+    }
+
+    /**
      * The live event-time range of one stream in the calling space, or empty when no registry is registered —
      * the read-side counterpart of {@link #record}, so an Expression can resolve bounds without a store being
      * threaded to it. Absence reads as <em>unknown</em>, exactly as it does for the watermark: a deployment

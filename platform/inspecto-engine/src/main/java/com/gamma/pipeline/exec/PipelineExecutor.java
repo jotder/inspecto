@@ -75,6 +75,49 @@ public final class PipelineExecutor {
         ProvenanceCollector NONE = (nodeId, rel, rowCount) -> {};
     }
 
+    /**
+     * <b>X5 — the walk's observer</b> (plan §3.5): what {@link ProvenanceCollector} reports, plus when each Step
+     * started and how it ended, so a caller can build one {@link StepReceipt} per Step. Every method is a default
+     * no-op, so the interface grows in 4.x without a MAJOR; a {@link ProvenanceCollector} is adapted onto it
+     * ({@link #of}) and sees exactly the counts it always saw.
+     *
+     * <p>Contract of the walk: {@link #stepStarted} precedes {@link #schema} and {@link #stepEnded} for a node, and
+     * every started node is ended exactly once — {@link StepReceipt.Outcome#FAILED} for the Step that threw; then
+     * {@link #notReached} names every Step the walk would still have run. A sink is started when its branch is
+     * committed, not when the walk passes it, so its time is the write's. A sink whose branch a replay finds
+     * already durable is ended {@link StepReceipt.Outcome#OK} unwritten.
+     * ⚠ Called inline on the walk's thread while the scratch relations are live; an observer must not throw.
+     */
+    public interface WalkObserver {
+        /** {@code nodeId} emitted {@code rows} on {@code rel} — the {@link ProvenanceCollector#record} call. */
+        default void counts(String nodeId, String rel, long rows) {}
+
+        /** {@code nodeId} (of type {@code kind}, at 1-based topological index {@code seq}) starts. */
+        default void stepStarted(String nodeId, String kind, int seq) {}
+
+        /** The column count and fingerprint of {@code nodeId}'s main relation. */
+        default void schema(String nodeId, int columns, String fp) {}
+
+        /** {@code nodeId} ended with {@code outcome}; {@code diag} is {@code null} when there is nothing to say. */
+        default void stepEnded(String nodeId, StepReceipt.Outcome outcome, StepReceipt.Diagnostics diag) {}
+
+        /** {@code nodeId} (of type {@code kind}, at index {@code seq}) never started: the walk failed before it. */
+        default void notReached(String nodeId, String kind, int seq) {}
+
+        /** Observes nothing. */
+        WalkObserver NONE = new WalkObserver() {};
+
+        /** {@code prov} as an observer: counts only. */
+        static WalkObserver of(ProvenanceCollector prov) {
+            return prov == null || prov == ProvenanceCollector.NONE ? NONE : new CountsOnly(prov);
+        }
+    }
+
+    /** {@link WalkObserver#of}'s adapter — a distinct type so the walk can skip the schema probe for it. */
+    private record CountsOnly(ProvenanceCollector prov) implements WalkObserver {
+        @Override public void counts(String nodeId, String rel, long rows) { prov.record(nodeId, rel, rows); }
+    }
+
     /** What the run produced: every node's named relations + which sinks fed which table + the commit outcome. */
     public record ExecResult(Map<String, Map<String, String>> produced,
                              Map<String, String> sinkInputs,
@@ -190,11 +233,29 @@ public final class PipelineExecutor {
                                      RowShaper.ReferenceResolver references,
                                      ParkWriter parkWriter,
                                      RowShaper.ExecutionContext ctx) throws Exception {
+        return execute(conn, g, seeds, batchId, coordinator, sinkWriter, sourceFinalize, WalkObserver.of(prov),
+                references, parkWriter, ctx);
+    }
+
+    /**
+     * As the {@link RowShaper.ExecutionContext} overload, observed by a {@link WalkObserver} instead of a bare
+     * {@link ProvenanceCollector} (X5): the counts, plus each Step's start, schema and outcome — FAILED at the
+     * Step that threw and NOT_REACHED below it — from which the caller builds the Consignment's
+     * {@link StepReceipt}s. The walk's behaviour is unchanged: a failure still propagates exactly as before.
+     */
+    public static ExecResult execute(Connection conn, PipelineGraph g, Map<String, String> seeds,
+                                     String batchId, BranchCommitCoordinator coordinator,
+                                     SinkWriter sinkWriter,
+                                     BranchCommitCoordinator.SourceFinalize sourceFinalize,
+                                     WalkObserver observer,
+                                     RowShaper.ReferenceResolver references,
+                                     ParkWriter parkWriter,
+                                     RowShaper.ExecutionContext ctx) throws Exception {
         // S2-0: pin every pack whose node type this graph uses for the whole walk (validation included —
         // it calls the pack's descriptor), so an unload defers closing its classloader until we finish.
         try (PackRunLeases.Lease lease = PackRunLeases.acquire(g)) {
-            return walk(conn, g, seeds, batchId, coordinator, sinkWriter, sourceFinalize, prov, references,
-                    parkWriter, ctx);
+            return walk(conn, g, seeds, batchId, coordinator, sinkWriter, sourceFinalize,
+                    observer == null ? WalkObserver.NONE : observer, references, parkWriter, ctx);
         }
     }
 
@@ -202,7 +263,7 @@ public final class PipelineExecutor {
                                    String batchId, BranchCommitCoordinator coordinator,
                                    SinkWriter sinkWriter,
                                    BranchCommitCoordinator.SourceFinalize sourceFinalize,
-                                   ProvenanceCollector prov,
+                                   WalkObserver obs,
                                    RowShaper.ReferenceResolver references,
                                    ParkWriter parkWriter,
                                    RowShaper.ExecutionContext ctx) throws Exception {
@@ -214,24 +275,36 @@ public final class PipelineExecutor {
         Map<String, String> sinkInputs = new LinkedHashMap<>();
         // Each seed's data relation is the pipeline's recordsIn at that source/parse node.
         for (Map.Entry<String, String> seed : seeds.entrySet())
-            prov.record(seed.getKey(), PipelineRel.DATA, count(conn, seed.getValue()));
+            obs.counts(seed.getKey(), PipelineRel.DATA, count(conn, seed.getValue()));
 
         List<String> order = topoOrder(g);
+        Trail trail = new Trail(obs, conn, order, byId, seeds.keySet());
         int step = 0;
         try {
         for (String nodeId : order) {
             // Live step gauge (G6/S7): where this Consignment is in the walk — in-memory only,
             // poll-read via the control plane; never a Signal, never persisted (see StepProgress).
             StepProgress.track(g.name(), batchId, nodeId, ++step, order.size());
-            if (seeds.containsKey(nodeId)) continue;       // pre-seeded source/parse relation
+            trail.visited = step;
+            if (seeds.containsKey(nodeId)) {               // pre-seeded source/parse relation
+                trail.start(nodeId);
+                trail.schema(nodeId, seeds.get(nodeId));
+                trail.end(nodeId, StepReceipt.Outcome.OK, null);
+                continue;
+            }
             PipelineNode node = byId.get(nodeId);
             if (!node.enabled()) {                         // disabled node (§3.6) — produces nothing; downstream inert
+                List<PipelineEdge> liveIn = liveInbound(g, nodeId, produced);
+                if (liveIn.isEmpty()) continue;            // not reached: no receipt
                 // At-rest park (S4b): a disabled sink's branch relation is already materialised at
                 // this point — hand it to the park hook so the rows survive durably instead of
                 // vanishing with the bypass. Scratch paths pass no hook and keep the bypass.
+                trail.start(nodeId);
                 if (parkWriter != null && PipelineNodeTypes.isCategory(node.type(), NodeCategory.SINK)) {
-                    List<PipelineEdge> parkedIn = liveInbound(g, nodeId, produced);
-                    if (!parkedIn.isEmpty()) parkWriter.park(node, tableOf(parkedIn.get(0), produced));
+                    parkWriter.park(node, tableOf(liveIn.get(0), produced));
+                    trail.end(nodeId, StepReceipt.Outcome.PARKED, null);
+                } else {
+                    trail.end(nodeId, StepReceipt.Outcome.SKIPPED, null);
                 }
                 continue;
             }
@@ -241,19 +314,25 @@ public final class PipelineExecutor {
             if (PipelineNodeTypes.isCategory(node.type(), NodeCategory.SINK)) {
                 String in = tableOf(inbound.get(0), produced);
                 sinkInputs.put(nodeId, in);                 // a sink consumes one relation
-                prov.record(nodeId, PipelineRel.DATA, count(conn, in));   // recordsIn at the (terminal) sink
+                obs.counts(nodeId, PipelineRel.DATA, count(conn, in));   // recordsIn at the (terminal) sink
             } else if (BuiltinNodeType.TRANSFORM_MERGE.type().equals(node.type())) {
+                trail.start(nodeId);
                 List<String> inputs = new ArrayList<>();
                 for (PipelineEdge e : inbound) inputs.add(tableOf(e, produced));
                 Map<String, String> rels = index(RowShaper.merge(conn, node, inputs, nodeId));
                 produced.put(nodeId, rels);
-                recordCounts(conn, prov, nodeId, rels);
+                recordCounts(conn, obs, nodeId, rels);
+                trail.schema(nodeId, main(rels));
+                trail.end(nodeId, StepReceipt.Outcome.OK, null);
             } else if (isShapeable(node.type())) {
+                trail.start(nodeId);
                 Map<String, String> rels = index(RowShaper.shape(conn, node, tableOf(inbound.get(0), produced),
                         nodeId, references, ctx));
                 produced.put(nodeId, rels);
-                recordCounts(conn, prov, nodeId, rels);
+                recordCounts(conn, obs, nodeId, rels);
                 emitDedupDropped(conn, g, node, batchId, rels);
+                trail.schema(nodeId, main(rels));
+                trail.end(nodeId, StepReceipt.Outcome.OK, null);
             }
             // control terminals (gap/alert/event) consume but produce no data relation — nothing to route on
         }
@@ -262,11 +341,113 @@ public final class PipelineExecutor {
             throw new IllegalStateException("pipeline '" + g.name() + "' produced no sink branches downstream of " + seeds.keySet());
 
         BranchCommitCoordinator.Result commit = coordinator.commit(batchId, new LinkedHashSet<>(sinkInputs.keySet()),
-                branch -> sinkWriter.write(byId.get(branch), sinkInputs.get(branch)),
+                branch -> {
+                    trail.start(branch);
+                    trail.schema(branch, sinkInputs.get(branch));
+                    sinkWriter.write(byId.get(branch), sinkInputs.get(branch));
+                    trail.end(branch, StepReceipt.Outcome.OK, null);
+                },
                 sourceFinalize);
+        // A replay finds a branch already durable and does not call it: the sink's work is done, so it is OK.
+        for (String sink : sinkInputs.keySet())
+            if (!trail.ended(sink)) {
+                trail.start(sink);
+                trail.end(sink, StepReceipt.Outcome.OK, null);
+            }
         return new ExecResult(produced, sinkInputs, commit);
+        } catch (Throwable t) {
+            trail.fail(t, sinkInputs.keySet());
+            throw t;
         } finally {
             StepProgress.clear(g.name());   // a snapshot must never outlive the run — success or failure alike
+        }
+    }
+
+    /** The relation a Step's schema is read from: its {@code data} outlet, else its first. */
+    private static String main(Map<String, String> rels) {
+        String data = rels.get(PipelineRel.DATA);
+        return data != null || rels.isEmpty() ? data : rels.values().iterator().next();
+    }
+
+    /**
+     * The walk's side of the {@link WalkObserver} contract: sequence numbers, the started/ended bookkeeping that
+     * makes every started Step end exactly once, the failure sweep, and the schema probe — which is skipped for an
+     * observer that cannot use it, and which never fails the walk (observability must not break a run).
+     */
+    private static final class Trail {
+        private final WalkObserver obs;
+        private final Connection conn;
+        private final List<String> order;
+        private final Map<String, PipelineNode> byId;
+        private final Set<String> seeds;
+        private final boolean probe;
+        private final Map<String, Integer> seq = new LinkedHashMap<>();
+        private final Set<String> started = new LinkedHashSet<>();
+        private final Set<String> ended = new LinkedHashSet<>();
+        /** How far the walk got: the 1-based index of the last node it visited. */
+        int visited;
+
+        Trail(WalkObserver obs, Connection conn, List<String> order, Map<String, PipelineNode> byId, Set<String> seeds) {
+            this.obs = obs;
+            this.conn = conn;
+            this.order = order;
+            this.byId = byId;
+            this.seeds = seeds;
+            this.probe = obs != WalkObserver.NONE && !(obs instanceof CountsOnly);
+            for (int i = 0; i < order.size(); i++) seq.put(order.get(i), i + 1);
+        }
+
+        void start(String nodeId) {
+            if (started.add(nodeId)) obs.stepStarted(nodeId, byId.get(nodeId).type(), seq.get(nodeId));
+        }
+
+        void end(String nodeId, StepReceipt.Outcome outcome, StepReceipt.Diagnostics diag) {
+            if (ended.add(nodeId)) obs.stepEnded(nodeId, outcome, diag);
+        }
+
+        boolean ended(String nodeId) {
+            return ended.contains(nodeId);
+        }
+
+        void schema(String nodeId, String table) {
+            if (!probe || table == null) return;
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT * FROM " + SqlIdent.q(table) + " LIMIT 0")) {
+                java.sql.ResultSetMetaData md = rs.getMetaData();
+                List<List<String>> cols = new ArrayList<>();
+                for (int i = 1; i <= md.getColumnCount(); i++)
+                    cols.add(List.of(md.getColumnName(i), String.valueOf(md.getColumnTypeName(i))));
+                obs.schema(nodeId, cols.size(), com.gamma.util.CanonicalHash.sha256(cols).substring(0, 12));
+            } catch (SQLException | RuntimeException e) {
+                // unknown schema: the receipt says so (null), the walk goes on
+            }
+        }
+
+        /**
+         * The walk threw: the Step that was running ends FAILED with {@code t}'s diagnosis; every Step the walk
+         * would still have run — an enabled, executable node past the point it reached, or a sink whose branch was
+         * not committed — ends NOT_REACHED.
+         */
+        void fail(Throwable t, Set<String> sinks) {
+            for (String nodeId : started)
+                if (!ended.contains(nodeId)) end(nodeId, StepReceipt.Outcome.FAILED, StepReceipt.Diagnostics.of(t));
+            for (int i = visited; i < order.size(); i++) {
+                String nodeId = order.get(i);
+                if (!started.contains(nodeId) && executable(byId.get(nodeId))) notReached(nodeId);
+            }
+            for (String sink : sinks)
+                if (!started.contains(sink)) notReached(sink);
+        }
+
+        private void notReached(String nodeId) {
+            if (ended.add(nodeId)) obs.notReached(nodeId, byId.get(nodeId).type(), seq.get(nodeId));
+        }
+
+        private boolean executable(PipelineNode n) {
+            if (!n.enabled()) return false;
+            String t = n.type();
+            return seeds.contains(n.id()) || PipelineNodeTypes.isCategory(t, NodeCategory.SINK)
+                    || BuiltinNodeType.TRANSFORM_MERGE.type().equals(t) || isShapeable(t);
         }
     }
 
@@ -429,10 +610,10 @@ public final class PipelineExecutor {
                 .attr("dropped", dropped));
     }
 
-    private static void recordCounts(Connection conn, ProvenanceCollector prov, String nodeId,
+    private static void recordCounts(Connection conn, WalkObserver obs, String nodeId,
                                      Map<String, String> rels) throws SQLException {
         for (Map.Entry<String, String> e : rels.entrySet())
-            prov.record(nodeId, e.getKey(), count(conn, e.getValue()));
+            obs.counts(nodeId, e.getKey(), count(conn, e.getValue()));
     }
 
     /** Row count of a live scratch relation (long-precision; used for provenance counts). */

@@ -828,6 +828,93 @@ class DbConsignmentOutputStoreTest {
         }
     }
 
+    // ── X5 Step Receipts (consignment_steps) ─────────────────────────────────
+
+    private static com.gamma.pipeline.exec.StepReceipt step(String consignment, String runId, String lane, int seq,
+                                                            String step, long in) {
+        return new com.gamma.pipeline.exec.StepReceipt(com.gamma.pipeline.exec.StepReceipt.VERSION, consignment,
+                "cdr_voice", lane, runId, seq, step, "transform.filter",
+                com.gamma.pipeline.exec.StepReceipt.Outcome.OK, in,
+                List.of(new com.gamma.pipeline.exec.StepReceipt.Outlet("data", in - 1),
+                        new com.gamma.pipeline.exec.StepReceipt.Outlet("dropped", 1)),
+                null, null, null, "2026-11-17T10:15:02.114Z", 3, false, false);
+    }
+
+    @Test
+    void stepReceiptsRoundTripInWalkOrderAcrossRuns() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            var a = step("c1", "run-1", "job", 2, "flt", 10);
+            var b = step("c1", "run-1", "job", 1, "src", 10);
+            db.recordSteps(List.of(a, b));
+            db.recordSteps(List.of(step("c1", "run-2", "job", 1, "src", 20)));
+            db.recordSteps(List.of(step("other", "run-1", "job", 1, "src", 5)));
+
+            List<com.gamma.pipeline.exec.StepReceipt> trail = db.steps("c1");
+            assertEquals(3, trail.size(), "one Consignment's receipts only, every run");
+            assertEquals(List.of("src", "flt", "src"), trail.stream().map(com.gamma.pipeline.exec.StepReceipt::step).toList(),
+                    "ordered by flush, then run, lane and seq");
+            assertEquals(a, trail.get(1), "the stored receipt reads back whole");
+            assertEquals("reject:dropped", trail.get(1).outlets().get(1).outlet(), "outlets stored canonical");
+            assertTrue(db.steps("unknown").isEmpty());
+        }
+    }
+
+    /**
+     * 🔴 The ingest lanes have no run id. Stored as {@code NULL} it would exempt every row from the UNIQUE key
+     * ({@code NULL ≠ NULL}) and a re-flush would duplicate a Consignment's trail; stored as {@code ''} the key
+     * holds, and a receipt is immutable — the first one stays.
+     */
+    @Test
+    void anIngestReceiptsEmptyRunIdIsPartOfTheKeySoAReflushAddsNothing() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.recordSteps(List.of(step("c1", null, "ingest-graph", 1, "parse", 10)));
+            db.recordSteps(List.of(step("c1", "", "ingest-graph", 1, "parse", 99)));
+            List<com.gamma.pipeline.exec.StepReceipt> trail = db.steps("c1");
+            assertEquals(1, trail.size(), "(consignment, '', lane, seq) is one receipt");
+            assertEquals(10L, trail.get(0).in(), "written once, never updated");
+            assertEquals("", trail.get(0).runId());
+            db.browseSource().run(raw -> {
+                try (Statement st = raw.createStatement();
+                     java.sql.ResultSet rs = st.executeQuery("SELECT count(*) FROM consignment_steps WHERE run_id IS NULL")) {
+                    assertTrue(rs.next());
+                    assertEquals(0, rs.getInt(1), "no NULL run id is ever stored");
+                }
+            });
+
+            db.recordSteps(List.of(step("c1", "", "drain", 1, "parse", 7)));
+            assertEquals(2, db.steps("c1").size(), "another lane is another receipt");
+        }
+    }
+
+    @Test
+    void retentionDeletesOnlyReceiptsRecordedBeforeTheCutoff() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.recordSteps(List.of(step("c1", "run-1", "job", 1, "src", 10)));
+            assertEquals(0, db.pruneSteps(java.time.Instant.now().minus(java.time.Duration.ofDays(1))),
+                    "a fresh receipt is inside the window");
+            assertEquals(1, db.steps("c1").size());
+            assertEquals(1, db.pruneSteps(java.time.Instant.now().plus(java.time.Duration.ofDays(1))),
+                    "older than the cutoff: gone");
+            assertTrue(db.steps("c1").isEmpty());
+        }
+    }
+
+    @Test
+    void dbMaintenancePrunesByTheRetentionProperty() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.recordSteps(List.of(step("c1", "run-1", "job", 1, "src", 10)));
+            db.maintenance();
+            assertEquals(1, db.steps("c1").size(), "default 30 days keeps a fresh receipt");
+            db.browseSource().run(raw -> {
+                try (Statement st = raw.createStatement()) {
+                    st.execute("UPDATE consignment_steps SET recorded_at = '2000-01-01T00:00:00.000Z'");
+                }
+            });
+            db.maintenance();
+            assertTrue(db.steps("c1").isEmpty(), "older than 30 days: pruned by db_maintenance");
+        }
+    }
+
     /** As {@link #out} but naming the Run - the key column these tests are about. */
     private static ConsignmentOutput withRun(String consignment, String runId, String path, long rows,
                                              State state) {

@@ -35,6 +35,8 @@ import com.gamma.pipeline.exec.PipelineWatermarkStore;
 import com.gamma.pipeline.exec.ProvenanceRow;
 import com.gamma.pipeline.exec.RowShaper;
 import com.gamma.pipeline.exec.SourceStoreReader;
+import com.gamma.pipeline.exec.StepReceipt;
+import com.gamma.pipeline.exec.StepReceiptRecorder;
 import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.query.ViewReaderSql;
 import com.gamma.sql.SqlViews;
@@ -352,6 +354,7 @@ public final class PipelineJobRunner implements Job {
         }
         File dryRunBranchLog = null;
         SnapshotSwapLock.Held seedsPinned = null;
+        StepReceiptRecorder receipts = null;   // X5: this run's Step Receipts, flushed in the finally below
         final List<Path> storeDirs;
         try {
             storeDirs = storeDirs(g, seeds, dir);
@@ -429,11 +432,16 @@ public final class PipelineJobRunner implements Job {
                     : (nodeId, rel, rowCount) -> provRows.add(
                             new ProvenanceRow(pipelineId, batchId, nodeId, rel, rowCount, runTs, dryRun));
 
+            // X5: the walk is observed for Step Receipts; the provenance collector still sees every count.
+            receipts = new StepReceiptRecorder(g, batchId, pipelineId, StepReceipt.LANE_JOB,
+                    ctx == null ? null : ctx.runId(), dryRun, collector);
+
             // D-9: the at-rest run is the one path with real run context — pipeline id (the ledger's
             // stable key, rename-proof like the watermark's producer), this run's batch id, and the
             // space's dedup ledger — so a windowed transform.dedup can claim keys durably here.
-            PipelineExecutor.execute(conn, g, seedViews, batchId, coordinator, writer, () -> {}, collector,
+            PipelineExecutor.execute(conn, g, seedViews, batchId, coordinator, writer, () -> {}, receipts,
                     refs, null, RowShaper.ExecutionContext.forRun(pipelineId, batchId));
+            annotateReceipts(receipts, g, realWriter);
 
             if (provenance != null) {
                 provenance.record(provRows);
@@ -466,6 +474,9 @@ public final class PipelineJobRunner implements Job {
             return JobResult.ok(realWriter.outputs().size() + " file(s), " + realWriter.totalRows()
                     + " row(s) → store(s) " + PipelineStores.produced(g), ms);
         } finally {
+            // X5 (plan §3.5): success or failure, the receipts leave once — a failed run's trail is the one that
+            // matters most, and it is the one a flush after the walk would lose.
+            if (receipts != null) flushReceipts(receipts);
             if (seedsPinned != null) seedsPinned.close();   // a dry run or a failure ends the run early
             if (dryRunBranchLog != null) DuckDbUtil.deleteTempDb(dryRunBranchLog);
             DuckDbUtil.deleteTempDb(db);
@@ -797,6 +808,37 @@ public final class PipelineJobRunner implements Job {
             }
         } catch (RuntimeException e) {
             log.warn("[PIPELINEJOB] conservation check failed for pipeline '{}': {}", pipelineId, e.getMessage());
+        }
+    }
+
+    /**
+     * X5 — after a walk that completed: each conservation imbalance onto its Step's {@code diag} (receipts are on
+     * by default, so this does not wait for the provenance store the alert needs), and each on-disk sink's
+     * {@code outputs} pointer — the store and the number of files this run wrote to it ({@code null} writer: a dry
+     * run, which rests nothing). Never throws: it annotates a run that already succeeded.
+     */
+    static void annotateReceipts(StepReceiptRecorder receipts, PipelineGraph g, PartitionSinkWriter writer) {
+        try {
+            receipts.conservation(ConservationCheck.imbalances(g, receipts.counts()));
+            if (writer == null) return;
+            Map<String, List<PartitionOutput>> byStore = writer.outputsByStore();
+            for (PipelineStores.Produced p : PipelineStores.producedStores(g)) {
+                if (!p.restsOnDisk()) continue;
+                List<PartitionOutput> outs = byStore.get(p.store());
+                receipts.pointer(p.node(), new StepReceipt.Pointer(StepReceipt.Pointer.OUTPUTS, p.store(), null,
+                        outs == null ? 0 : outs.size()));
+            }
+        } catch (RuntimeException e) {
+            log.warn("[PIPELINEJOB] could not annotate the Step Receipts: {}", e.getMessage());
+        }
+    }
+
+    /** X5 — write the run's receipts to the Consignment registry; never throws into the run's own outcome. */
+    private static void flushReceipts(StepReceiptRecorder receipts) {
+        try {
+            com.gamma.consignment.ConsignmentOutputStores.recordSteps(receipts.receipts());
+        } catch (RuntimeException e) {
+            log.warn("[PIPELINEJOB] could not record the Step Receipts: {}", e.getMessage());
         }
     }
 

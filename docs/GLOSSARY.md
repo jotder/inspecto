@@ -456,6 +456,16 @@ follow the same open-registry posture **Job types** already have (`JobTypeProvid
 `BuiltinNodeType` set; the platform-services plan's stage 2 opens them to registration
 (`StepTypeProvider`, execution modes `LOWERED` / `EXECUTED`).
 
+**Step Receipt** *(added 2026-11-17, X5 D7)* — The record one **Step** leaves for one **Consignment**, on one lane,
+in one attempt: rows in, rows per **outlet** (`data` · `reject:<reason>` · `route:<key>`, always the canonical
+spelling), where the data rests durably, a schema fingerprint, the outcome (`OK` · `FAILED` · `SKIPPED` · `PARKED` ·
+`NOT_REACHED`) and bounded diagnostics — at most 1 KB. Written once, never updated; a Consignment's **trail** is
+the ordered set of its receipts. Type/Instance: *Step Receipt* is the shape (`StepReceipt`), each stored row
+(`consignment_steps`) is one receipt. ⛔ *StepInfo envelope* is the retired working name — **envelope** already
+names the v1 response envelope, the `Signal` record and a component's sharing envelope; ⛔ *Step Record* — a
+**record** is a data row. Design: `superpower/2026-11-17-x5-stepinfo-envelope-plan.md`; as built:
+`okf/product/module/engine/spec-execution-lanes.md`.
+
 **Parser** — Reads a raw file of a given format (CSV, fixed-width, XML, JSON, EDI, ASN.1, …) into rows/columns
 — or, for tree-shaped formats, into records that must be flattened before they load into Tables. Two engines
 sit behind one self-describing contract (`ParserPlugin`, served by `GET /parsers`): DuckDB-native reads for the

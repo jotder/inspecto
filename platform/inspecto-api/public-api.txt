@@ -543,9 +543,11 @@ com.gamma.consignment.ConsignmentOutput.State | constant SUPERSEDED
 com.gamma.consignment.ConsignmentOutput.State | public enum State
 com.gamma.consignment.ConsignmentOutputStores | public final class ConsignmentOutputStores
 com.gamma.consignment.ConsignmentOutputStores | public static DbConsignmentOutputStore shared()
+com.gamma.consignment.ConsignmentOutputStores | public static boolean stepsEnabled()
 com.gamma.consignment.ConsignmentOutputStores | public static java.util.Optional<EventTimeBounds> bounds(String)
 com.gamma.consignment.ConsignmentOutputStores | public static void markCompactedAway(List<String>)
 com.gamma.consignment.ConsignmentOutputStores | public static void record(List<ConsignmentOutput>)
+com.gamma.consignment.ConsignmentOutputStores | public static void recordSteps(List<com.gamma.pipeline.exec.StepReceipt>)
 com.gamma.consignment.ConsignmentOutputStores | public static void register(String, DbConsignmentOutputStore)
 com.gamma.consignment.ConsignmentOutputStores | public static void unregister(String)
 com.gamma.consignment.ConsignmentOutputStores | public static void use(DbConsignmentOutputStore)
@@ -591,18 +593,22 @@ com.gamma.consignment.DbConsignmentOutputStore | public List<DailyVolume> dailyV
 com.gamma.consignment.DbConsignmentOutputStore | public List<ProducerHighWater> producerHighWater(String)
 com.gamma.consignment.DbConsignmentOutputStore | public List<String> browseTables()
 com.gamma.consignment.DbConsignmentOutputStore | public List<String> unreadablePaths()
+com.gamma.consignment.DbConsignmentOutputStore | public List<com.gamma.pipeline.exec.StepReceipt> steps(String)
 com.gamma.consignment.DbConsignmentOutputStore | public Optional<EventTimeBounds> bounds(String)
 com.gamma.consignment.DbConsignmentOutputStore | public String browseId()
 com.gamma.consignment.DbConsignmentOutputStore | public String browseLabel()
 com.gamma.consignment.DbConsignmentOutputStore | public boolean isReadable(String)
 com.gamma.consignment.DbConsignmentOutputStore | public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.util.BrowsableStore
 com.gamma.consignment.DbConsignmentOutputStore | public int markCompactedAway(List<String>)
+com.gamma.consignment.DbConsignmentOutputStore | public int pruneSteps(java.time.Instant)
 com.gamma.consignment.DbConsignmentOutputStore | public int supersede(String)
 com.gamma.consignment.DbConsignmentOutputStore | public int supersedeOtherRevisions(String, String)
 com.gamma.consignment.DbConsignmentOutputStore | public static DbConsignmentOutputStore open(String) throws SQLException
+com.gamma.consignment.DbConsignmentOutputStore | public static final int DEFAULT_STEPS_RETENTION_DAYS
 com.gamma.consignment.DbConsignmentOutputStore | public void close()
 com.gamma.consignment.DbConsignmentOutputStore | public void maintenance()
 com.gamma.consignment.DbConsignmentOutputStore | public void record(List<ConsignmentOutput>)
+com.gamma.consignment.DbConsignmentOutputStore | public void recordSteps(List<com.gamma.pipeline.exec.StepReceipt>)
 com.gamma.consignment.DbConsignmentOutputStore.DailyVolume | public record DailyVolume(String recordDay, long files, long rows)
 com.gamma.consignment.DbDedupLedger | public DbDedupLedger(Connection) throws SQLException
 com.gamma.consignment.DbDedupLedger | public DbDedupLedger(ConnectionSource) throws SQLException
@@ -2269,6 +2275,7 @@ com.gamma.pipeline.exec.PipelineExecutor | public static ExecResult execute(Conn
 com.gamma.pipeline.exec.PipelineExecutor | public static ExecResult execute(Connection, PipelineGraph, Map<String, String>, String, BranchCommitCoordinator, SinkWriter, BranchCommitCoordinator.SourceFinalize, ProvenanceCollector, RowShaper.ReferenceResolver) throws Exception
 com.gamma.pipeline.exec.PipelineExecutor | public static ExecResult execute(Connection, PipelineGraph, Map<String, String>, String, BranchCommitCoordinator, SinkWriter, BranchCommitCoordinator.SourceFinalize, ProvenanceCollector, RowShaper.ReferenceResolver, ParkWriter) throws Exception
 com.gamma.pipeline.exec.PipelineExecutor | public static ExecResult execute(Connection, PipelineGraph, Map<String, String>, String, BranchCommitCoordinator, SinkWriter, BranchCommitCoordinator.SourceFinalize, ProvenanceCollector, RowShaper.ReferenceResolver, ParkWriter, RowShaper.ExecutionContext) throws Exception
+com.gamma.pipeline.exec.PipelineExecutor | public static ExecResult execute(Connection, PipelineGraph, Map<String, String>, String, BranchCommitCoordinator, SinkWriter, BranchCommitCoordinator.SourceFinalize, WalkObserver, RowShaper.ReferenceResolver, ParkWriter, RowShaper.ExecutionContext) throws Exception
 com.gamma.pipeline.exec.PipelineExecutor | public static ExecResult execute(Connection, PipelineGraph, String, String, String, BranchCommitCoordinator, SinkWriter, BranchCommitCoordinator.SourceFinalize) throws Exception
 com.gamma.pipeline.exec.PipelineExecutor.DryRunResult | public record DryRunResult(Map<String, Map<String, String>> produced, Map<String, String> sinkInputs, Map<String, String> notExecuted)
 com.gamma.pipeline.exec.PipelineExecutor.ExecResult | public record ExecResult(Map<String, Map<String, String>> produced, Map<String, String> sinkInputs, BranchCommitCoordinator.Result commit)
@@ -2279,6 +2286,14 @@ com.gamma.pipeline.exec.PipelineExecutor.ProvenanceCollector | public interface 
 com.gamma.pipeline.exec.PipelineExecutor.ProvenanceCollector | void record(String, String, long)
 com.gamma.pipeline.exec.PipelineExecutor.SinkWriter | public interface SinkWriter
 com.gamma.pipeline.exec.PipelineExecutor.SinkWriter | void write(PipelineNode, String) throws Exception
+com.gamma.pipeline.exec.PipelineExecutor.WalkObserver | WalkObserver NONE
+com.gamma.pipeline.exec.PipelineExecutor.WalkObserver | default void counts(String, String, long)
+com.gamma.pipeline.exec.PipelineExecutor.WalkObserver | default void notReached(String, String, int)
+com.gamma.pipeline.exec.PipelineExecutor.WalkObserver | default void schema(String, int, String)
+com.gamma.pipeline.exec.PipelineExecutor.WalkObserver | default void stepEnded(String, StepReceipt.Outcome, StepReceipt.Diagnostics)
+com.gamma.pipeline.exec.PipelineExecutor.WalkObserver | default void stepStarted(String, String, int)
+com.gamma.pipeline.exec.PipelineExecutor.WalkObserver | public interface WalkObserver
+com.gamma.pipeline.exec.PipelineExecutor.WalkObserver | static WalkObserver of(ProvenanceCollector)
 com.gamma.pipeline.exec.PipelineNodeExecutor | List<RowShaper.Relation> shape(Connection, PipelineNode, String, String, RowShaper.ReferenceResolver) throws SQLException
 com.gamma.pipeline.exec.PipelineNodeExecutor | String type()
 com.gamma.pipeline.exec.PipelineNodeExecutor | public interface PipelineNodeExecutor
@@ -2381,6 +2396,44 @@ com.gamma.pipeline.exec.StepOutput | StepOutput endRow() throws SQLException
 com.gamma.pipeline.exec.StepOutput | String rel()
 com.gamma.pipeline.exec.StepOutput | java.util.List<TypeFlow.Column> columns()
 com.gamma.pipeline.exec.StepOutput | public interface StepOutput
+com.gamma.pipeline.exec.StepReceipt | public String toJson()
+com.gamma.pipeline.exec.StepReceipt | public record StepReceipt(int v, String consignmentId, String pipeline, String lane, String runId, int seq, String step, String kind, Outcome outcome, long in, List<Outlet> outlets, Pointer ref, Schema schema, Diagnostics diag, String startedAt, long ms, boolean simulated, boolean truncated)
+com.gamma.pipeline.exec.StepReceipt | public static StepReceipt fromJson(String)
+com.gamma.pipeline.exec.StepReceipt | public static final String CONSERVATION_AMPLIFICATION
+com.gamma.pipeline.exec.StepReceipt | public static final String CONSERVATION_LOSS
+com.gamma.pipeline.exec.StepReceipt | public static final String FOLDED_OUTLET
+com.gamma.pipeline.exec.StepReceipt | public static final String IO_ERROR
+com.gamma.pipeline.exec.StepReceipt | public static final String LANE_DRAIN
+com.gamma.pipeline.exec.StepReceipt | public static final String LANE_FLAT
+com.gamma.pipeline.exec.StepReceipt | public static final String LANE_INGEST_FLAT
+com.gamma.pipeline.exec.StepReceipt | public static final String LANE_INGEST_GRAPH
+com.gamma.pipeline.exec.StepReceipt | public static final String LANE_JOB
+com.gamma.pipeline.exec.StepReceipt | public static final String SQL_ERROR
+com.gamma.pipeline.exec.StepReceipt | public static final String STEP_DISABLED
+com.gamma.pipeline.exec.StepReceipt | public static final String STEP_FAILED
+com.gamma.pipeline.exec.StepReceipt | public static final String STEP_TIMEOUT
+com.gamma.pipeline.exec.StepReceipt | public static final int MAX_BYTES
+com.gamma.pipeline.exec.StepReceipt | public static final int MAX_COUNTS
+com.gamma.pipeline.exec.StepReceipt | public static final int MAX_ID
+com.gamma.pipeline.exec.StepReceipt | public static final int MAX_MSG
+com.gamma.pipeline.exec.StepReceipt | public static final int MAX_OUTLETS
+com.gamma.pipeline.exec.StepReceipt | public static final int VERSION
+com.gamma.pipeline.exec.StepReceipt.Diagnostics | public record Diagnostics(String code, String msg, Map<String, Long> counts)
+com.gamma.pipeline.exec.StepReceipt.Diagnostics | public static Diagnostics of(Throwable)
+com.gamma.pipeline.exec.StepReceipt.Diagnostics | public static final Diagnostics NONE
+com.gamma.pipeline.exec.StepReceipt.Outcome | constant FAILED
+com.gamma.pipeline.exec.StepReceipt.Outcome | constant NOT_REACHED
+com.gamma.pipeline.exec.StepReceipt.Outcome | constant OK
+com.gamma.pipeline.exec.StepReceipt.Outcome | constant PARKED
+com.gamma.pipeline.exec.StepReceipt.Outcome | constant SKIPPED
+com.gamma.pipeline.exec.StepReceipt.Outcome | public enum Outcome
+com.gamma.pipeline.exec.StepReceipt.Outlet | public record Outlet(String outlet, long rows)
+com.gamma.pipeline.exec.StepReceipt.Pointer | public record Pointer(String kind, String table, String path, long files)
+com.gamma.pipeline.exec.StepReceipt.Pointer | public static final String OUTPUTS
+com.gamma.pipeline.exec.StepReceipt.Pointer | public static final String PARK
+com.gamma.pipeline.exec.StepReceipt.Pointer | public static final String REJECTS
+com.gamma.pipeline.exec.StepReceipt.Pointer | public static final String STORE
+com.gamma.pipeline.exec.StepReceipt.Schema | public record Schema(int columns, String fp)
 com.gamma.pipeline.exec.TriggerCoalescer | public final class TriggerCoalescer
 com.gamma.pipeline.exec.TriggerCoalescer | public long runCount()
 com.gamma.pipeline.exec.TriggerCoalescer | public long signalCount()

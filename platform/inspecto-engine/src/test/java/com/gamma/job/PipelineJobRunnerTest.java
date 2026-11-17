@@ -2131,4 +2131,189 @@ class PipelineJobRunnerTest {
         assertTrue(boom.getMessage().contains("DuckLake registration failed"),
                 "and must fail at the ATTACH instead, which is D10's fatal branch: " + boom.getMessage());
     }
+
+    // ── X5 Step Receipts (the job lane) ──────────────────────────────────────
+
+    /** Runs {@code body} with an in-memory Consignment registry installed for this thread's space. */
+    private static void withRegistry(ThrowingConsumer<com.gamma.consignment.DbConsignmentOutputStore> body) throws Exception {
+        try (var registry = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            com.gamma.consignment.ConsignmentOutputStores.use(registry);
+            body.accept(registry);
+        } finally {
+            com.gamma.consignment.ConsignmentOutputStores.use(null);
+        }
+    }
+
+    @FunctionalInterface
+    private interface ThrowingConsumer<T> { void accept(T t) throws Exception; }
+
+    private static com.gamma.pipeline.exec.StepReceipt receiptOf(List<com.gamma.pipeline.exec.StepReceipt> trail,
+                                                                  String step) {
+        return trail.stream().filter(r -> r.step().equals(step)).findFirst()
+                .orElseThrow(() -> new AssertionError("no receipt for " + step + " in " + trail));
+    }
+
+    private static long outlet(com.gamma.pipeline.exec.StepReceipt r, String outlet) {
+        return r.outlets().stream().filter(o -> o.outlet().equals(outlet)).findFirst()
+                .orElseThrow(() -> new AssertionError("no outlet " + outlet + " on " + r)).rows();
+    }
+
+    @Test
+    void aFilterStepsReceiptCountsItsKeptAndRejectedRowsAgainstWhatCameIn() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
+        PipelineStore store = new PipelineStore(tmp.resolve("flows"));
+        store.write("rcpt_flow", new PipelineGraph("rcpt_flow", true,
+                List.of(PipelineNode.of("src", "acquisition", Map.of("source_store", "events")),
+                        PipelineNode.of("flt", "transform.filter", Map.of("where", "amt >= 100")),
+                        new PipelineNode("out", "sink.persistent", "Rollup", null, Map.of("store", "rollup"), null)),
+                List.of(PipelineEdge.data("src", "flt"), PipelineEdge.data("flt", "out"))));
+        JobConfig cfg = new JobConfig("rcptjob", JobType.PIPELINE, null, null, true, false,
+                Map.of("flow", "rcpt_flow", "data_dir", dataDir, "consignment_id", "rcpt-1"));
+
+        withRegistry(registry -> {
+            assertTrue(new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir,
+                    tmp.resolve("audit").toString()).run(new CapturingJobContext()).success());
+
+            List<com.gamma.pipeline.exec.StepReceipt> trail = registry.steps("rcpt-1");
+            assertEquals(List.of("src", "flt", "out"), trail.stream().map(com.gamma.pipeline.exec.StepReceipt::step).toList(),
+                    "one receipt per walked Step, the source_store seed included, in walk order");
+            var flt = receiptOf(trail, "flt");
+            assertEquals(com.gamma.pipeline.exec.StepReceipt.Outcome.OK, flt.outcome());
+            assertEquals(3L, flt.in(), "in = what the seed passed on");
+            assertEquals(2L, outlet(flt, "data"));
+            assertEquals(1L, outlet(flt, "reject:dropped"), "the reject outlet is named canonically");
+            assertEquals(flt.in(), outlet(flt, "data") + outlet(flt, "reject:dropped"), "N + M = in");
+            assertEquals("job", flt.lane());
+            assertEquals("run-1", flt.runId(), "the job lane names its run");
+            assertEquals("rcpt_flow", flt.pipeline());
+            assertNotNull(flt.schema(), "the data outlet's shape is fingerprinted");
+            assertEquals(2, flt.schema().columns());
+            assertNull(flt.diag().code(), "a balanced filter has nothing to say");
+
+            var out = receiptOf(trail, "out");
+            assertEquals(2L, out.in(), "the sink consumed the kept rows");
+            assertNotNull(out.ref(), "a sink points at where its rows rest");
+            assertEquals("outputs", out.ref().kind());
+            assertEquals("rollup", out.ref().table());
+            assertEquals(1L, out.ref().files());
+            assertEquals(3L, receiptOf(trail, "src").in(), "a seed's in is its own count");
+        });
+    }
+
+    /**
+     * 🔴 The failure the receipt exists for. A contributed Step throws mid-walk: the run still fails exactly as
+     * before, and its trail names the Step — every Step above it OK, its own FAILED with the StepFailure code, every
+     * Step below it NOT_REACHED. Flushed in a {@code finally}: a flush after the walk would record nothing here.
+     */
+    @Test
+    void aStepThatThrowsIsNamedOnItsReceiptAndTheStepsBelowItAreNotReached() throws Exception {
+        String owner = "x5-receipts.test.jar";
+        String boomType = "transform.x5_boom";
+        com.gamma.pipeline.PipelineNodeTypes.register(new com.gamma.pipeline.PipelineNodeType() {
+            @Override public String type() { return boomType; }
+            @Override public java.util.Optional<com.gamma.pipeline.ExecutionMode> mode() {
+                return java.util.Optional.of(com.gamma.pipeline.ExecutionMode.EXECUTED);
+            }
+        }, owner);
+        com.gamma.pipeline.exec.StepExecutors.register(new com.gamma.pipeline.exec.StepExecutor() {
+            @Override public String type() { return boomType; }
+            @Override public void execute(com.gamma.pipeline.exec.StepContext ctx) {
+                throw new IllegalStateException("scoring service unavailable");
+            }
+        }, owner, com.gamma.pipeline.exec.StepExecutors.Grant.NONE);
+        try {
+            String dataDir = tmp.resolve("data").toString();
+            seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
+            PipelineStore store = new PipelineStore(tmp.resolve("flows"));
+            store.write("boom_flow", new PipelineGraph("boom_flow", true,
+                    List.of(PipelineNode.of("src", "acquisition", Map.of("source_store", "events")),
+                            PipelineNode.of("flt", "transform.filter", Map.of("where", "amt >= 100")),
+                            PipelineNode.of("boom", boomType, Map.of()),
+                            PipelineNode.of("sel", "transform.select", Map.of("columns", List.of("id"))),
+                            new PipelineNode("out", "sink.persistent", "O", null, Map.of("store", "boomed"), null)),
+                    List.of(PipelineEdge.data("src", "flt"), PipelineEdge.data("flt", "boom"),
+                            PipelineEdge.data("boom", "sel"), PipelineEdge.data("sel", "out"))));
+            JobConfig cfg = new JobConfig("boomjob", JobType.PIPELINE, null, null, true, false,
+                    Map.of("flow", "boom_flow", "data_dir", dataDir, "consignment_id", "boom-1"));
+
+            withRegistry(registry -> {
+                PipelineJobRunner runner = new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir,
+                        tmp.resolve("audit").toString());
+                Exception thrown = assertThrows(Exception.class, () -> runner.run(new CapturingJobContext()));
+                assertTrue(String.valueOf(thrown.getMessage()).contains("STEP_FAILED"),
+                        "the run fails as it always did: " + thrown.getMessage());
+
+                List<com.gamma.pipeline.exec.StepReceipt> trail = registry.steps("boom-1");
+                assertEquals(List.of("src", "flt", "boom", "sel", "out"),
+                        trail.stream().map(com.gamma.pipeline.exec.StepReceipt::step).toList(), "the whole trail: " + trail);
+                assertEquals(com.gamma.pipeline.exec.StepReceipt.Outcome.OK, receiptOf(trail, "src").outcome());
+                assertEquals(com.gamma.pipeline.exec.StepReceipt.Outcome.OK, receiptOf(trail, "flt").outcome());
+                var boom = receiptOf(trail, "boom");
+                assertEquals(com.gamma.pipeline.exec.StepReceipt.Outcome.FAILED, boom.outcome());
+                assertEquals(com.gamma.pipeline.exec.StepReceipt.STEP_FAILED, boom.diag().code());
+                assertTrue(boom.diag().msg().contains("scoring service unavailable"), boom.diag().msg());
+                assertEquals(2L, boom.in(), "it was handed the filter's kept rows");
+                assertEquals(com.gamma.pipeline.exec.StepReceipt.Outcome.NOT_REACHED, receiptOf(trail, "sel").outcome());
+                assertEquals(com.gamma.pipeline.exec.StepReceipt.Outcome.NOT_REACHED, receiptOf(trail, "out").outcome());
+                assertNull(receiptOf(trail, "out").startedAt(), "a Step that never started has no start time");
+            });
+        } finally {
+            com.gamma.pipeline.exec.StepExecutors.deregister(owner);
+            com.gamma.pipeline.PipelineNodeTypes.deregister(owner);
+        }
+    }
+
+    /**
+     * A conservation imbalance is written onto the Step it concerns. As with {@code reportConservation}, a clean run
+     * conserves by construction, so the counts are injected: a filter that took 3 and accounted for 2.
+     */
+    @Test
+    void anInjectedConservationImbalanceLandsOnTheStepsDiag() {
+        PipelineGraph g = new PipelineGraph("loss_flow", true,
+                List.of(PipelineNode.of("src", "parser"),
+                        PipelineNode.of("flt", "transform.filter", Map.of("where", "amt >= 100")),
+                        PipelineNode.of("out", "sink.persistent", Map.of("store", "o"))),
+                List.of(PipelineEdge.data("src", "flt"), PipelineEdge.data("flt", "out")));
+        var rec = new com.gamma.pipeline.exec.StepReceiptRecorder(g, "b-1", "loss_flow",
+                com.gamma.pipeline.exec.StepReceipt.LANE_JOB, "run-1", false, null);
+        rec.counts("src", PipelineRel.DATA, 3);
+        rec.stepStarted("src", "parser", 1);
+        rec.stepEnded("src", com.gamma.pipeline.exec.StepReceipt.Outcome.OK, null);
+        rec.stepStarted("flt", "transform.filter", 2);
+        rec.counts("flt", PipelineRel.DATA, 2);
+        rec.counts("flt", PipelineRel.DROPPED, 0);
+        rec.stepEnded("flt", com.gamma.pipeline.exec.StepReceipt.Outcome.OK, null);
+
+        PipelineJobRunner.annotateReceipts(rec, g, null);
+
+        var flt = receiptOf(rec.receipts(), "flt");
+        assertEquals(com.gamma.pipeline.exec.StepReceipt.CONSERVATION_LOSS, flt.diag().code());
+        assertEquals(Map.of("in", 3L, "out", 2L), flt.diag().counts());
+        assertNull(receiptOf(rec.receipts(), "src").diag().code(), "only the Step it concerns");
+    }
+
+    @Test
+    void switchedOffNoReceiptIsRecorded() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        seedParquet(dataDir, "events", "(1,150)");
+        PipelineStore store = new PipelineStore(tmp.resolve("flows"));
+        store.write("off_flow", new PipelineGraph("off_flow", true,
+                List.of(PipelineNode.of("src", "acquisition", Map.of("source_store", "events")),
+                        new PipelineNode("out", "sink.persistent", "O", null, Map.of("store", "off_out"), null)),
+                List.of(PipelineEdge.data("src", "out"))));
+        JobConfig cfg = new JobConfig("offjob", JobType.PIPELINE, null, null, true, false,
+                Map.of("flow", "off_flow", "data_dir", dataDir, "consignment_id", "off-1"));
+        System.setProperty("consignment.steps", "false");
+        try {
+            withRegistry(registry -> {
+                assertTrue(new PipelineJobRunner(cfg, new ConsignmentEventBus(), store, dataDir,
+                        tmp.resolve("audit").toString()).run(new CapturingJobContext()).success());
+                assertTrue(registry.steps("off-1").isEmpty(), "-Dconsignment.steps=false records nothing");
+                assertEquals(1, registry.outputs("off-1").size(), "the output registry is untouched by the switch");
+            });
+        } finally {
+            System.clearProperty("consignment.steps");
+        }
+    }
 }

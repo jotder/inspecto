@@ -126,12 +126,32 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
             + "event_time_spread_ms BIGINT, producer VARCHAR, "
             + "UNIQUE (consignment_id, path, run_id))";
 
+    /** X5 Step Receipts (plan §3.6): one row per (Consignment, run, lane, Step). {@code run_id} is {@code ''} on
+     *  the ingest lanes, never {@code NULL} — a {@code NULL} in the UNIQUE key would exempt the row from it. */
+    private static final String STEPS = "consignment_steps";
+    private static final String CREATE_STEPS = "CREATE TABLE IF NOT EXISTS " + STEPS + " ("
+            + "consignment_id VARCHAR, run_id VARCHAR, pipeline VARCHAR, lane VARCHAR, seq INTEGER, "
+            + "step VARCHAR, kind VARCHAR, outcome VARCHAR, rows_in BIGINT, receipt VARCHAR, "
+            + "recorded_at VARCHAR, simulated BOOLEAN, "
+            + "UNIQUE (consignment_id, run_id, lane, seq))";
+
+    /** {@code recorded_at}'s fixed-width UTC form: its text order IS its time order, so retention compares text on
+     *  every backend ({@code Instant.toString()} varies its fraction digits, so its text order is not). */
+    private static final java.time.format.DateTimeFormatter RECORDED_AT =
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(java.time.ZoneOffset.UTC);
+
+    /** Default retention of Step Receipts, in days ({@code -Dconsignment.steps.retentionDays}). */
+    public static final int DEFAULT_STEPS_RETENTION_DAYS = 30;
+
     private void initSchema() {
         try {
             // ⚠ The whole DDL + migration is ONE borrow: rebuildWithConstraint runs a transaction, so every
             // statement here has to land on the same connection.
             src.run(conn -> {
                 try (Statement st = conn.createStatement()) {
+                    st.execute(CREATE_STEPS);
+                    st.execute("CREATE INDEX IF NOT EXISTS consignment_steps_by_consignment ON " + STEPS
+                            + " (consignment_id)");
                     st.execute(CREATE);
                     // §3.4.3 additive migration: CREATE TABLE IF NOT EXISTS never widens a pre-existing table, so a
                     // registry created before the column existed gets it added here; existing rows read back NULL.
@@ -203,9 +223,13 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
         }
     }
 
-    /** CHECKPOINT + VACUUM over the live connection, each best-effort — the {@code db_maintenance} task.
-     *  DuckDB is single-writer, so maintenance must ride this store's own connection, never a second one. */
+    /** Step-Receipt retention then CHECKPOINT + VACUUM over the live connection, each best-effort — the
+     *  {@code db_maintenance} task. DuckDB is single-writer, so maintenance must ride this store's own connection,
+     *  never a second one. Retention is {@code -Dconsignment.steps.retentionDays} (default
+     *  {@value #DEFAULT_STEPS_RETENTION_DAYS}); a value below 1 keeps every receipt. */
     public void maintenance() {
+        int days = Integer.getInteger("consignment.steps.retentionDays", DEFAULT_STEPS_RETENTION_DAYS);
+        if (days > 0) pruneSteps(java.time.Instant.now().minus(java.time.Duration.ofDays(days)));
         for (String stmt : new String[]{"CHECKPOINT", "VACUUM"}) {
             try {
                 src.run(conn -> {
@@ -217,6 +241,84 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
                 log.warn("consignment-outputs maintenance: {} failed (continuing): {}", stmt, e.getMessage());
             }
         }
+    }
+
+    /**
+     * Record one walk's Step Receipts (X5, plan §3.6) — one batched insert per Consignment, never one per Step.
+     * A receipt is immutable: a row already held for its {@code (consignment_id, run_id, lane, seq)} is kept
+     * ({@code DO NOTHING}). <b>Best-effort, like {@link #record}</b>: a failure is logged, never thrown, because a
+     * receipt is a record of the run, never a reason to fail it.
+     */
+    public void recordSteps(List<com.gamma.pipeline.exec.StepReceipt> receipts) {
+        if (receipts == null || receipts.isEmpty()) return;
+        String now = RECORDED_AT.format(java.time.Instant.now());
+        try {
+            src.run(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement("INSERT INTO " + STEPS
+                        + " (consignment_id, run_id, pipeline, lane, seq, step, kind, outcome, rows_in, receipt, "
+                        + "recorded_at, simulated) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) "
+                        + "ON CONFLICT (consignment_id, run_id, lane, seq) DO NOTHING")) {
+                    for (com.gamma.pipeline.exec.StepReceipt r : receipts) {
+                        ps.setString(1, r.consignmentId());
+                        ps.setString(2, r.runId());
+                        ps.setString(3, r.pipeline());
+                        ps.setString(4, r.lane());
+                        ps.setInt(5, r.seq());
+                        ps.setString(6, r.step());
+                        ps.setString(7, r.kind());
+                        ps.setString(8, r.outcome().name());
+                        ps.setLong(9, r.in());
+                        ps.setString(10, r.toJson());
+                        ps.setString(11, now);
+                        ps.setBoolean(12, r.simulated());
+                        ps.addBatch();
+                    }
+                    ps.executeBatch();
+                }
+            });
+        } catch (SQLException | RuntimeException e) {
+            log.warn("Could not record {} Step Receipt(s) for consignment {}: {}",
+                    receipts.size(), receipts.get(0).consignmentId(), e.getMessage());
+        }
+    }
+
+    /**
+     * One Consignment's Step Receipts across every lane and run, oldest flush first, then by run, lane and
+     * {@code seq}. A row whose receipt this build cannot read is skipped with a warning.
+     *
+     * @throws IllegalStateException when the read fails — ⛔ never an empty list for "could not read", which a
+     *                               caller would report as "no Steps"
+     */
+    public List<com.gamma.pipeline.exec.StepReceipt> steps(String consignmentId) {
+        List<com.gamma.pipeline.exec.StepReceipt> out = new ArrayList<>();
+        try {
+            src.run(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement("SELECT receipt FROM " + STEPS
+                        + " WHERE consignment_id = ? ORDER BY recorded_at, run_id, lane, seq")) {
+                    ps.setString(1, consignmentId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            try {
+                                out.add(com.gamma.pipeline.exec.StepReceipt.fromJson(rs.getString(1)));
+                            } catch (RuntimeException unreadable) {
+                                log.warn("consignment {}: skipping an unreadable Step Receipt: {}",
+                                        consignmentId, unreadable.getMessage());
+                            }
+                        }
+                    }
+                }
+            });
+        } catch (SQLException e) {
+            throw new IllegalStateException("consignment-steps query failed for " + consignmentId + ": "
+                    + e.getMessage(), e);
+        }
+        return out;
+    }
+
+    /** Delete the Step Receipts recorded before {@code cutoff}; returns how many went. Best-effort. */
+    public int pruneSteps(java.time.Instant cutoff) {
+        return update("DELETE FROM " + STEPS + " WHERE recorded_at < ?", RECORDED_AT.format(cutoff),
+                "prune Step Receipts before " + cutoff);
     }
 
     /**

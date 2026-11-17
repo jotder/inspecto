@@ -161,6 +161,7 @@ unaffected because the database, not the monitor, decides them.
 | Pipeline-run provenance (per-edge counts) | *(class is the API)* | [`DbProvenanceStore`](../../../../../platform/inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java) | `provenance.backend=none\|duckdb\|postgres` | `none` |
 | Acquisition / dedup ledger + export watermark | `acquire/AcquisitionLedger` | [`DbAcquisitionLedger`](../../../../../platform/inspecto-acquire/src/main/java/com/gamma/acquire/DbAcquisitionLedger.java) | `acquire.ledger.backend=memory\|db` *(via `AcquisitionLedgers`, not `ServiceStores`)* | `memory` |
 | Consignment output-file registry | *(class is the API)* | [`DbConsignmentOutputStore`](../../../../../platform/inspecto-engine/src/main/java/com/gamma/consignment/DbConsignmentOutputStore.java) | `consignment.outputs.backend=none\|duckdb\|postgres` | **`duckdb`** — the only default-on store; see below |
+| Step Receipts (X5, `consignment_steps`, 2026-11-17) | *(class is the API: `recordSteps` / `steps` on the registry)* | [`DbConsignmentOutputStore`](../../../../../platform/inspecto-engine/src/main/java/com/gamma/consignment/DbConsignmentOutputStore.java) — same file as the row above | rides `consignment.outputs.backend`; `-Dconsignment.steps=false` stops the writes | **on** with the registry; 30-day retention (§3.9-a) |
 | Per-file stage-progression registry (Phase 4 §2.4) | *(class is the API)* | [`DbFileStageStore`](../../../../../platform/inspecto-engine/src/main/java/com/gamma/consignment/DbFileStageStore.java) | `file.stages.backend=none\|duckdb\|postgres` | `none` |
 | Windowed record-dedup ledger (D-9) | *(class is the API)* | [`DbDedupLedger`](../../../../../platform/inspecto-engine/src/main/java/com/gamma/consignment/DbDedupLedger.java) | `dedup.ledger.backend=none\|duckdb\|postgres` | **`duckdb`** — default-on like `consignment_outputs`: a default-off dedup ledger silently emits the duplicates it was configured to drop; costs nothing while no pipeline declares `scope: window(...)` |
 | Fleet-wide inbox registry (`INBOX-REGISTRY-CROSS-POD-1`) | *(class is the API)* | [`DbInboxRegistry`](../../../../../inspecto/src/main/java/com/gamma/service/DbInboxRegistry.java) | `inbox.registry.backend=none\|duckdb\|postgres\|jdbc:…` | `none` — off, the inbox audit compares only the Spaces this pod hosts, exactly as before |
@@ -875,6 +876,36 @@ the caller's own spelling, relative or absolute** — `record()` deliberately do
 absolutising at write time would make the row depend on the writing process's working directory. Matching
 therefore normalises *both sides in Java*; a two-spelling SQL `WHERE` cannot do it, since an already-absolute
 probe normalises to itself.
+
+### 3.9-a `consignment_steps` — Step Receipts (X5)  · **A**
+File: `inspecto-consignment-outputs.db` — the same file and the same `ConnectionSource` as `consignment_outputs`
+(DuckDB is single-writer per file), so it is **on by default** with that registry (X5 D3 = c, 2026-11-17).
+
+```sql
+CREATE TABLE IF NOT EXISTS consignment_steps (
+  consignment_id VARCHAR, run_id VARCHAR, pipeline VARCHAR, lane VARCHAR, seq INTEGER, step VARCHAR, kind VARCHAR, outcome VARCHAR, rows_in BIGINT, receipt VARCHAR, recorded_at VARCHAR, simulated BOOLEAN, UNIQUE (consignment_id, run_id, lane, seq)
+);
+CREATE INDEX IF NOT EXISTS consignment_steps_by_consignment ON consignment_steps (consignment_id);
+```
+
+One row per **Step Receipt** (GLOSSARY): one Step, one Consignment, one lane, one run. `receipt` is the receipt's
+JSON (`StepReceipt.toJson()`, at most 1024 bytes, enforced by the record); the scalar columns beside it are for
+filtering. Written by `recordSteps` — one batched insert per Consignment, never one per Step, best-effort (a
+failure is a WARN, never thrown into the run) — and read by `steps(consignmentId)`, oldest flush first, then by
+run, lane and `seq` (a failed read throws: an empty list must never stand for "could not read").
+
+- **`run_id` is `''` on the ingest lanes, never `NULL`** — the `StepReceipt` record normalises it. A `NULL` in a
+  UNIQUE key exempts the row from it (`NULL ≠ NULL`), and a re-flush would duplicate a trail.
+- **Immutable: `ON CONFLICT … DO NOTHING`.** A receipt is written once; a re-run of a pinned job-lane Consignment
+  appends under its own `run_id`.
+- **`recorded_at`** is fixed-width UTC (`yyyy-MM-dd'T'HH:mm:ss.SSS'Z'`), so its text order is its time order and
+  retention compares text on DuckDB and Postgres alike.
+- **Switch:** `-Dconsignment.steps=false` records nothing (`ConsignmentOutputStores.stepsEnabled()`, read per call);
+  the table is still created. **Retention:** `db_maintenance` deletes rows older than
+  `-Dconsignment.steps.retentionDays` (default 30; below 1 keeps everything) before its CHECKPOINT / VACUUM.
+- **Writers today:** the at-rest job lane (`PipelineJobRunner`, lane `job`). The ingest lanes, park and drain are
+  X5 lane L3; the read route `GET /consignments/{consignmentId}` is L4. Not listed in the raw table browser
+  (`browseTables()` names `consignment_outputs` only).
 
 ### 3.10 `file_stages` — per-file stage-progression registry  · **M**
 File: `inspecto-file-stages.db`

@@ -256,11 +256,36 @@ gauges, ledgers, quarantine, audit drill-down.)
 | Identity | `batchId` = `TS_slug_seq`; `ConsignmentManifest` authoritative per file | `runId`; `batchId` on provenance rows | none durable — the scratch root is deleted | the parked `batchId` (the drain resumes it) |
 | Terminal status | `SUCCESS`/`FAILED`/`EMPTY` + per-file `QUARANTINED_*` → three CSV ledgers + `CommitLog` (`ConsignmentAuditWriter`) | `JobRun` → `DbJobRunStore` | the `PipelineRunResult` response | `PARKED` (neither committed nor failed) until drained |
 | Per-step counts | `ConsignmentIngestor.recordProvenance` → `parse`/`sink` rows (SUCCESS only) | `PipelineExecutor` records one row per node, flushed with the commit | `relations[]` in the response (seeded sample) | branch commits in `BranchCommitLog` (kept as the drain's resume record) |
+| Step Receipts (X5) | not yet — lane L3 | one per walked Step (seeds and sinks included) → `consignment_steps`, flushed in a `finally`, success or failure | none | not yet — lane L3 |
 | Live position | `IngestProgress` (which FILE) + `StepProgress` (which STEP) | `StepProgress` (which node of the walk) | n/a (bounded, synchronous) | n/a (durably at rest) |
 | Terminal event | `ConsignmentEvent` on the sync `ConsignmentEventBus` **and** the `pipeline.batch.committed\|failed` Signal | `ConsignmentEvent` published by `PipelineJobRunner` | none | `pipeline.batch.parked` Signal; the drain's commit emits the ordinary terminal event |
 
 Both provenance-writing lanes share **one** `DbProvenanceStore` per space (`ProvenanceStores` —
 DuckDB is single-writer). Default-off (`-Dprovenance.backend=duckdb`).
+
+**Step Receipts on the at-rest job lane (X5 L1, 2026-11-17).** `PipelineJobRunner` walks the graph with a
+`StepReceiptRecorder` — a `PipelineExecutor.WalkObserver` that forwards every count to the provenance collector it
+wraps, so the provenance rows and the conservation alert are unchanged — and writes the Consignment's receipts to
+the default-ON registry (`consignment_steps`, [db-layer §3.9-a](spec-db-layer.md)) **in the run's `finally`**, once,
+success or failure. That is the point: a failed run's provenance rows are lost (they are written after the walk
+returns), its receipts are not. Lane `job`, `runId` = the job run, `seq` = the node's topological index.
+
+- **What a receipt holds:** rows in (a seed's own count; a sink's consumed count; else the sum over its live inbound
+  edges), rows per outlet named canonically (`PipelineRel.canonical`: `dropped` → `reject:dropped`, so either
+  spelling of the reject relations reads the same), a 12-hex fingerprint of the main relation's columns, and for an
+  on-disk sink an `outputs` pointer (the store, and how many files this run wrote to it). A dry run's receipts are
+  `simulated` and point at nothing.
+- **Failure:** the Step that threw is `FAILED` with a code (`STEP_FAILED` / `STEP_TIMEOUT` / `STEP_DISABLED` from a
+  contributed Step's `StepFailure`, else `SQL_ERROR` / `IO_ERROR` from the cause, else `STEP_FAILED`) and the
+  message; every Step the walk would still have run is `NOT_REACHED`. A sink is timed and judged at its branch
+  commit, not when the walk passes it; a branch a replay finds already durable is `OK`. The run still fails exactly
+  as before.
+- **Conservation:** after a completed walk, each `ConservationCheck` imbalance is written onto that Step's `diag`
+  (`CONSERVATION_LOSS` / `CONSERVATION_AMPLIFICATION`, with `in` / `out` counts) whether or not the provenance store
+  is on; the `PIPELINE_CONSERVATION_IMBALANCE` event is still raised only with the provenance store, as before.
+- ⚠ **Not built in L1:** a failed job-lane run still raises no `pipeline.batch.failed` Signal (X5 D9 = c), and that
+  Signal does not yet carry `failedStep` / `code` (plan §3.4); the ingest lanes, park and drain write no receipts
+  (L3); nothing serves them over HTTP (L4, `GET /consignments/{consignmentId}`).
 
 **Across the lanes (X2, 2026-09-02):** the at-rest lane records which ingest-lane Consignments it READ
 — `inspecto_job_run_sources` beside the run row, fed from the files the Consignment selector kept and
