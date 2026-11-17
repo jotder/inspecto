@@ -986,7 +986,7 @@ describe('PipelineEditorComponent', () => {
                         label: 'Parser',
                         description: '',
                         accepts: ['data'],
-                        emits: ['data', 'unmatched'],
+                        emits: ['data', 'reject:unmatched'],
                         emitsNamedRoutes: true,
                         lowerable: true,
                         authorable: false,
@@ -997,7 +997,7 @@ describe('PipelineEditorComponent', () => {
                         label: 'Delimited',
                         description: '',
                         accepts: ['data'],
-                        emits: ['data', 'unmatched'],
+                        emits: ['data', 'reject:unmatched'],
                         emitsNamedRoutes: true,
                         lowerable: true,
                         authorable: true,
@@ -2938,6 +2938,26 @@ describe('PipelineEditorComponent', () => {
         expect(m.nodes.find((n) => n.id === 'src')).toBeUndefined();
         expect(m.edges).toHaveLength(0);
         expect(canvasOf(c).removeElement).toHaveBeenCalledWith('src');
+    });
+
+    // X5-a: a parser's unmatched rows arrive as `reject:unmatched`; that node is marked rejects (✕), the rest tested.
+    it('marks a node whose run sent rows to reject:unmatched as rejects and the others tested', () => {
+        const c = make();
+        c.model.set(structuredClone(FLOW));
+        c['applyRunOutcomes']({
+            seedNode: 'src',
+            toNode: 'flt',
+            files: [],
+            relations: [
+                { node: 'src', rel: 'data', rowCount: 3, rows: [] },
+                { node: 'flt', rel: 'data', rowCount: 1, rows: [] },
+                { node: 'flt', rel: 'reject:unmatched', rowCount: 2, rows: [] },
+            ],
+            output: null,
+            warnings: [],
+        });
+        expect(c['testedStatus']().get('src')).toBe('tested');
+        expect(c['testedStatus']().get('flt')).toBe('rejects');
     });
 
     it('renameSelected patches name/description into the model without invalidating a test outcome', () => {

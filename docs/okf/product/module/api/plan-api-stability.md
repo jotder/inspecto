@@ -672,8 +672,30 @@ or is read under both names.
   run, reprocess, drain and lineage routes, and the `batch_max_*` keys (those mean grouping, not a Consignment).
   None of them is part of the trio decided on 2026-09-06.
 
+**Breaking — one word for rejected rows (X5-a, 2026-11-17, MoSCoW S4)**
+
+A Step that does not pass rows on now says why in one way: the **reject outlet** `reject:<reason>`
+([`spec-node-types.md`](../engine/spec-node-types.md) § *The token model*).
+- **Reject relations are `reject:dropped`, `reject:invalid`, `reject:duplicate` and `reject:unmatched`**, replacing
+  `dropped`, `invalid`, `duplicate` and `unmatched` in `GET /pipelines/node-types` (`emits`), `GET /provenance`
+  (`rel`), a Pipeline graph's edges (the lifted parse → quarantine edge reads `reject:unmatched`), a dry run's and a
+  run-to-here's `relations[]`. Saved Pipeline graphs and stored provenance rows are read under both names; a graph is
+  saved with the new names the next time it is saved, and no file or stored row is rewritten. ⚠ A client or BI query
+  that matches the old values must change. The `PipelineRel` constants keep their names (`PipelineRel.DROPPED` is
+  now `"reject:dropped"`); new `PipelineRel.canonical(rel)` maps an old spelling to the new one and
+  `PipelineRel.reason(rel)` reads the reason. `ConservationCheck.RelCount` gains `reason`.
+- **The `success`, `failure` and `on_commit` relations are removed.** Nothing produced them. `PipelineRel.SUCCESS`,
+  `FAILURE` and `ON_COMMIT` and `PipelineValidator.ON_COMMIT_SAME_GRAPH` are deleted; the sinks and `acquisition`
+  no longer list them in `emits`, and `enrichment` no longer lists `on_commit` in `accepts`. An edge that names one
+  is dropped when its graph loads, with a `RETIRED_RELATION` warning naming it (`PipelineCodec.decode`; logged by
+  `fromMap`; a `pipeline_author` finding). A Consignment's outcome is the `pipeline.batch.committed`,
+  `pipeline.batch.failed` or `pipeline.batch.parked` Signal.
+- Not changed: `data` (the main outlet), `gap` (still an edge to the `gap` node), `route:<key>`, and the authored
+  `*_pipeline.toon` config, which holds no relation name.
+
 **Deferred to this same release by decision:** the token *runtime* model (D2 —
-[`node-types.md`](../engine/spec-node-types.md) § *The token model*), and X5's cross-lane StepInfo envelope.
+[`node-types.md`](../engine/spec-node-types.md) § *The token model*), and X5's Step Receipt and cross-lane
+drill-down (X5-b, X5-c). X5-a, the token vocabulary, landed (entry above).
 
 **Deferred pending the operator (2026-11-17): the ELT Phase 6 deletion of the flat read path** (BACKLOG §2 Row 15,
 MoSCoW S3). The operator decided 2026-11-16 to delete it in 4.0.0 itself; on 2026-11-17 that was found infeasible,
@@ -696,7 +718,7 @@ the MoSCoW run, reversible):** 4.0.0 keeps both lanes and `-Dingest.lane`, and s
 
 **Decided 2026-11-16 to land before the tag (operator, MoSCoW S4 / C5; each adds its own entry above when it
 lands):** the X-Actor header path removed (landed 2026-11-17, entry above), the `batch_id` rename trio (landed
-2026-11-17, entry above) and X5 with the StepInfo envelope.
+2026-11-17, entry above) and X5 with the StepInfo envelope (X5-a landed 2026-11-17, entry above).
 - **`AlertMigration` stays in 4.0.0 (operator, MoSCoW C5 restated 2026-11-16).** No released version carries the Alert
   store (it landed on trunk 2026-10-07, after `v3.11.0`), so 4.0.0 is the first release with it and adopts a 3.x
   install's still-active ALERT objects on upgrade. `AlertMigration` / `LegacyAlertObjects` are deleted in 5.0.0, whose

@@ -113,7 +113,7 @@ class ControlApiComponentsTest {
             int data = 0, dropped = 0;
             for (JsonNode rel : rels) {
                 if ("data".equals(rel.get("rel").asText())) data = rel.get("rowCount").asInt();
-                if ("dropped".equals(rel.get("rel").asText())) dropped = rel.get("rowCount").asInt();
+                if ("reject:dropped".equals(rel.get("rel").asText())) dropped = rel.get("rowCount").asInt();
             }
             assertEquals(1, data, body.toString());        // id 1 (amt 150) kept
             assertEquals(1, dropped);                       // id 2 (amt 50) dropped
@@ -302,7 +302,7 @@ class ControlApiComponentsTest {
             int data = 0, dropped = 0;
             for (JsonNode rel : json(t).get("relations")) {
                 if ("data".equals(rel.get("rel").asText())) data = rel.get("rowCount").asInt();
-                if ("dropped".equals(rel.get("rel").asText())) dropped = rel.get("rowCount").asInt();
+                if ("reject:dropped".equals(rel.get("rel").asText())) dropped = rel.get("rowCount").asInt();
             }
             assertEquals(1, data, t.body());
             assertEquals(1, dropped, t.body());

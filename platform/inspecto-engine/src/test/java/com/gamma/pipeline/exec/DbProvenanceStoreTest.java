@@ -41,6 +41,36 @@ class DbProvenanceStoreTest {
     }
 
     /**
+     * X5-a read alias: rows written before 4.0.0 under the bare reject spellings read as {@code reject:<reason>};
+     * a canonical row, the trunk and a route pass through. The stored values are not rewritten.
+     */
+    @Test
+    void legacyRejectSpellingsReadCanonicalAndNothingIsRewritten() throws Exception {
+        try (DbProvenanceStore store = DbProvenanceStore.open("jdbc:duckdb:")) {
+            List<ProvenanceRow> rows = new ArrayList<>();
+            for (String rel : List.of("dropped", "invalid", "duplicate", "unmatched", "data", "route:hi", "reject:bad_score"))
+                rows.add(new ProvenanceRow("p", "c-1", "n_" + rel, rel, 1, "2026-08-01T10:00:00Z"));
+            store.record(rows);
+
+            Map<String, String> relByNode = new java.util.TreeMap<>();
+            for (Map<String, Object> r : store.query("p", "c-1")) relByNode.put((String) r.get("nodeId"), (String) r.get("rel"));
+            assertEquals(Map.of("n_dropped", "reject:dropped", "n_invalid", "reject:invalid",
+                    "n_duplicate", "reject:duplicate", "n_unmatched", "reject:unmatched", "n_data", "data",
+                    "n_route:hi", "route:hi", "n_reject:bad_score", "reject:bad_score"), relByNode);
+
+            List<String> stored = store.browseSource().with(conn -> {
+                List<String> out = new ArrayList<>();
+                try (Statement st = conn.createStatement();
+                     ResultSet rs = st.executeQuery("SELECT rel FROM inspecto_pipeline_provenance WHERE node_id = 'n_dropped'")) {
+                    while (rs.next()) out.add(rs.getString(1));
+                }
+                return out;
+            });
+            assertEquals(List.of("dropped"), stored, "the read maps; the stored row keeps its old spelling");
+        }
+    }
+
+    /**
      * D-12 (MoSCoW S4): the API field is {@code consignmentId}; {@code batchId} rides along as its deprecated
      * alias until 5.0.0, carrying the same value. And a new store names the column {@code consignment_id}.
      */

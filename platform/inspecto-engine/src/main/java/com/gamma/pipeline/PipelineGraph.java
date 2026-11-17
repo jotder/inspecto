@@ -59,7 +59,7 @@ public record PipelineGraph(String name, boolean active, List<PipelineNode> node
      * Entry (trigger) nodes: nodes with <em>no inbound edge of any relationship</em> — typically the
      * {@code acquisition} node a poll cycle / trigger starts from. Note this is stricter than "no
      * inbound {@code data} edge": a node reached only by a control edge (e.g. a quarantine {@code sink}
-     * via {@code unmatched}/{@code failure}) is <b>not</b> a trigger and is excluded. Returns nodes in
+     * via {@code reject:unmatched}) is <b>not</b> a trigger and is excluded. Returns nodes in
      * declaration order.
      */
     public List<PipelineNode> entryNodes() {

@@ -313,7 +313,7 @@ public final class PipelineDryRun {
         while (!todo.isEmpty()) {
             String cur = todo.poll();
             for (PipelineEdge edge : g.edgesFrom(cur))
-                if (!PipelineRel.ON_COMMIT.equals(edge.rel()) && seen.add(edge.to())) todo.add(edge.to());
+                if (seen.add(edge.to())) todo.add(edge.to());
         }
         seen.removeIf(n -> !g.byId().containsKey(n)
                 || dr.produced().containsKey(n) || dr.sinkInputs().containsKey(n));

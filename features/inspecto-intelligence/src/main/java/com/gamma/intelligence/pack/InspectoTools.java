@@ -1517,12 +1517,13 @@ final class InspectoTools {
         return new FunctionTool(spec, call -> {
             Map<String, Object> pipeline = mapArg(call, "pipeline");
             if (pipeline == null) return error("pipeline is required and must be an object");
-            PipelineGraph g;
+            PipelineCodec.Decoded decoded;
             try {
-                g = PipelineCodec.fromMap(pipeline);
+                decoded = PipelineCodec.decode(pipeline);
             } catch (IllegalArgumentException e) {
                 return error("invalid pipeline: " + e.getMessage());
             }
+            PipelineGraph g = decoded.graph();
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("name", g.name());
             // The PARSED graph, not just its name (AGT-6a A5.3). This is what the caller applies, so it
@@ -1534,7 +1535,7 @@ final class InspectoTools {
             // Structural validation (A5.3). `PipelineValidator` already produces coded, structured issues,
             // so a graph draft has the same anchored-findings substrate a component draft has — which is
             // what lets the repair loop converge on a topology rather than only on a field.
-            List<Map<String, Object>> findings = validationFindings(g);
+            List<Map<String, Object>> findings = validationFindings(decoded);
             boolean clean = findings.isEmpty();
             result.put("clean", clean);
             result.put("findings", findings);
@@ -1588,8 +1589,10 @@ final class InspectoTools {
      * by node/edge <i>id</i> (already in the message) and inventing an index here would anchor a repair turn
      * to a position that shifts the moment the model reorders the list.
      */
-    private static List<Map<String, Object>> validationFindings(PipelineGraph g) {
-        return PipelineValidator.validate(g).issues().stream().map(i -> {
+    private static List<Map<String, Object>> validationFindings(PipelineCodec.Decoded d) {
+        List<PipelineValidator.Issue> issues = new ArrayList<>(d.warnings());   // RETIRED_RELATION: edges decode dropped
+        issues.addAll(PipelineValidator.validate(d.graph()).issues());
+        return issues.stream().map(i -> {
             Map<String, Object> f = new LinkedHashMap<>();
             f.put("severity", i.severity().name());
             f.put("code", i.code());
@@ -1597,7 +1600,7 @@ final class InspectoTools {
                 case PipelineValidator.DUPLICATE_NODE, PipelineValidator.UNKNOWN_TYPE -> "nodes";
                 case PipelineValidator.DANGLING_FROM, PipelineValidator.DANGLING_TO,
                      PipelineValidator.ILLEGAL_EMIT, PipelineValidator.ILLEGAL_ACCEPT,
-                     PipelineValidator.ON_COMMIT_SAME_GRAPH -> "edges";
+                     PipelineValidator.RETIRED_RELATION -> "edges";
                 default -> "pipeline";   // EMPTY_GRAPH, NO_ENTRY, CYCLE — properties of the whole graph
             });
             f.put("message", i.message());

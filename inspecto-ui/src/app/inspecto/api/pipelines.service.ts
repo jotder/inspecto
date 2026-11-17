@@ -319,7 +319,7 @@ export interface PipelineDryRunResult {
 
 // ── Run-to-here (the in-editor build-and-test loop) ──
 
-/** One relationship a node produced during a run-to-here (success/unmatched/kept/dropped/route:<key>). */
+/** One relationship a node produced during a run-to-here (`data`, `reject:<reason>`, `route:<key>`). */
 export interface PipelineRunRelation {
     node: string;
     rel: string;

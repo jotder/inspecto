@@ -2807,7 +2807,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     private applyRunOutcomes(r: PipelineRunResult): void {
         const inRun = new Set(r.relations.map((rel) => rel.node));
         const rejected = new Set(
-            r.relations.filter((rel) => rel.rel === 'unmatched' && rel.rowCount > 0).map((rel) => rel.node),
+            r.relations.filter((rel) => rel.rel === 'reject:unmatched' && rel.rowCount > 0).map((rel) => rel.node),
         );
         const next = new Map(this.testedStatus());
         for (const id of inRun) next.set(id, rejected.has(id) ? 'rejects' : 'tested');

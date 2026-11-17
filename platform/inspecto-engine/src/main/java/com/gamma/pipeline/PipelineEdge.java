@@ -7,7 +7,7 @@ import java.util.Objects;
 /**
  * A directed edge between two {@link PipelineNode}s, carrying a relationship ({@link PipelineRel}).
  * {@code rel} defaults to {@link PipelineRel#DATA} — the normal record-set flow; control and split
- * relationships make side-paths (failure / unmatched / gap / on_commit / dropped / …) first-class
+ * relationships make side-paths (reject:unmatched / reject:dropped / gap / route:* / …) first-class
  * instead of buried flags.
  *
  * @param from source node id

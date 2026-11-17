@@ -35,6 +35,32 @@ class PipelineProjectionTest {
     }
 
     /**
+     * X5-a: the palette's {@code emits} (what {@code GET /pipelines/node-types} serves) speaks the token model's
+     * outlets — {@code data}, {@code reject:<reason>}, {@code gap} — and no longer the retired outcome relations
+     * {@code success} / {@code failure} / {@code on_commit}, which nothing produced.
+     */
+    @Test
+    void theCatalogEmitsCanonicalOutletsOnly() {
+        List<Map<String, Object>> cat = PipelineProjection.catalog();
+        assertEquals(List.of("data", "reject:dropped"), sorted(byType(cat, "transform.filter").get("emits")));
+        assertEquals(List.of("data", "reject:invalid"), sorted(byType(cat, "transform.validate").get("emits")));
+        assertEquals(List.of("data", "reject:duplicate"), sorted(byType(cat, "transform.dedup").get("emits")));
+        assertEquals(List.of("data", "reject:unmatched"), sorted(byType(cat, "parser").get("emits")));
+        assertEquals(List.of("data", "gap"), sorted(byType(cat, "acquisition").get("emits")));
+        assertEquals(List.of(), sorted(byType(cat, "sink.persistent").get("emits")));
+        assertEquals(List.of("data"), sorted(byType(cat, "enrichment").get("accepts")));
+        for (Map<String, Object> t : cat)
+            for (String key : List.of("emits", "accepts"))
+                for (Object rel : (List<?>) t.get(key))
+                    assertFalse(List.of("success", "failure", "on_commit", "dropped", "invalid", "duplicate", "unmatched")
+                            .contains(rel), t.get("type") + " " + key + " still names '" + rel + "'");
+    }
+
+    private static List<String> sorted(Object rels) {
+        return ((List<?>) rels).stream().map(String::valueOf).sorted().toList();
+    }
+
+    /**
      * P5-a: {@code authorable} is published separately from {@code lowerable} because the two
      * genuinely diverged. ⚠ If the palette filtered on lowerability, this type would force a choice
      * between offering a node nothing should create and refusing to save a graph that still has one.
@@ -98,7 +124,7 @@ class PipelineProjectionTest {
         List<Map<String, Object>> edges = (List<Map<String, Object>>) proj.get("edges");
         assertTrue(edges.stream().anyMatch(x -> "data".equals(x.get("kind"))
                 && "parse".equals(x.get("from")) && "v".equals(x.get("to"))));
-        assertTrue(edges.stream().anyMatch(x -> "control".equals(x.get("kind")) && "unmatched".equals(x.get("rel"))));
+        assertTrue(edges.stream().anyMatch(x -> "control".equals(x.get("kind")) && "reject:unmatched".equals(x.get("rel"))));
         Map<String, Object> route = edges.stream().filter(x -> "route".equals(x.get("kind"))).findFirst().orElseThrow();
         assertEquals("emea", route.get("routeKey"));
     }

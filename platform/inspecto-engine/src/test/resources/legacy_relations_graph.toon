@@ -1,0 +1,28 @@
+name: legacy_relations
+active: true
+nodes[5]:
+  - id: parse
+    type: parser
+  - id: flt
+    type: transform.filter
+    config:
+      where: amt >= 100
+  - id: out
+    type: sink.persistent
+    config:
+      store: kept
+  - id: rejects
+    type: sink.persistent
+    config:
+      store: rejected
+  - id: quarantine
+    type: sink.persistent
+    config:
+      store: quarantine
+edges[6]{from,rel,to}:
+  parse,data,flt
+  parse,unmatched,quarantine
+  flt,data,out
+  flt,dropped,rejects
+  out,success,rejects
+  out,on_commit,downstream_flow

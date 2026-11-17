@@ -105,8 +105,9 @@ a graph that legitimately still carries one."* Exactly **two** types differ toda
 This is the table to consult before proposing that any of them merge. The second relation is the whole
 story: **a plain `SELECT` emits one relation.**
 
-⚠ **`accepts`/`emits` is the pre-token DATA vocabulary, and the facts below are still real** — each row
-names the DuckDB relations the lift wires and `RowShaper` produces.
+⚠ **`accepts`/`emits` is token vocabulary, and the facts below are still real** — each row names the
+DuckDB relations the lift wires and `RowShaper` produces. The `PipelineRel` constant names below (`DROPPED`, …)
+predate 4.0.0; their values are the `reject:<reason>` outlets (X5-a, below).
 
 ### The token model — the design of record
 
@@ -119,48 +120,53 @@ the outlet a token continues on.** The token is
 `{ consignmentId, runId, attributes{…}, dataRefs[{ store, table, partition, path, rows }] }`, and ⛔
 **`dataRefs` is a reference, never a payload.**
 
-**Three outlets replace ten relations:** `main` (the token continues) · `reject:<reason>` (one reject kind
-carrying its reason — `unmatched` · `dropped` · `invalid` · `duplicate`) · `route:<key>` (content demux).
+**Three outlets replace ten relations:** `data` (the main outlet: the token continues) · `reject:<reason>`
+(one reject kind carrying its reason — `unmatched` · `dropped` · `invalid` · `duplicate`, or a contributed
+Step's own) · `route:<key>` (content demux). ⚠ **Amended 2026-11-17 (X5 decision D4): the main outlet is spelled
+`data`, not `main`.** `data` is the default when an edge omits `rel` and is in every saved graph; renaming it
+would change every edge for no operator gain. `gap` stays as the one control edge (below).
 
 🔴 **Why: the ten relations were doing four unrelated jobs, and were never the same kind of thing.** One
 was the edge itself (`data`); one was content demux (`route:*`); four were a single reject kind differing only
 in *reason*; and four were **Signals, not edges at all** (`success` · `failure` · `on_commit` · `gap`).
 Reading that list as one vocabulary is what made the type system contradict the engine.
 
-⚠ **Recounted 2026-09-13: the non-edge set is FOUR, not five.** The sentence below said "five" in both
-its homes (here and `BACKLOG.md`'s `TOKEN-VOCAB-STEPS-1`) and matched neither measurement: §above names
-**four** Signals (`success` · `failure` · `on_commit` · `gap`), while `PipelineRel.java` names a
-**different** set of **six** that never appear as a lifted edge (those four minus `gap`, plus `dropped` /
-`invalid` / `duplicate`). ⛔ Do not merge the two sets — "not a Signal" and "not lifted" are different
-properties, which is why one number could never serve both.
+**As built (X5-a, 4.0.0 — [`plan-api-stability.md`](../api/plan-api-stability.md) § Release notes).**
 
-⛔ **What the token model does NOT fix**, so nobody scopes it wrongly: it does **not** make the config
-non-flat (lift/lower stays); fan-in still needs its own decision; and it **breaks two committed contracts**
-plus `BuiltinNodeType`'s declared sets. ⚠ **`ConservationCheck` must keep working across the change** — loss
-accounting moves from "these four relations are loss" to "a `reject:` outlet is loss, and its reason names
-which kind". That migration is real work, tracked as X5 on [`BACKLOG.md`](../../../../BACKLOG.md).
+- **The rejects are collapsed.** `PipelineRel.UNMATCHED` / `DROPPED` / `INVALID` / `DUPLICATE` keep their constant
+  **names**; their **values** are `reject:unmatched` … `reject:duplicate`. `RowShaper` emits them, the lift draws
+  `parse → reject:unmatched → quarantine`, and `GET /pipelines/node-types`, `GET /provenance`, a graph's edges and a
+  dry run's `relations[]` all carry them. The scratch table name sanitises the colon (`<node>__reject_dropped`).
+- **Read aliases, never a rewrite.** `PipelineRel.canonical(rel)` maps a pre-4.0.0 bare spelling to its
+  `reject:` form and passes everything else through. `PipelineCodec` decodes every authored edge through it (a
+  graph saved before 4.0.0 loads, validates and runs; the next save writes the new names), and
+  `DbProvenanceStore.query` maps stored `rel` values in SQL (`CASE rel WHEN 'dropped' THEN 'reject:dropped' …`). No
+  file or stored row is rewritten in place.
+- **`success`, `failure` and `on_commit` are retired** (X5 decision D5 = b). Nothing produced them: the sinks and
+  `acquisition` no longer declare them, `enrichment` no longer accepts `on_commit`, and the executor, dry run and
+  validator lost their `on_commit` skips (and `ON_COMMIT_SAME_GRAPH` with them). An authored edge naming one is
+  **dropped on decode** with a `RETIRED_RELATION` warning (`PipelineCodec.decode` returns it; `fromMap` logs it;
+  the `pipeline_author` tool reports it as a finding). A Consignment's outcome is the `pipeline.batch.*` Signal.
+- **`gap` stays an edge** to its CONTROL node in 4.0.0 (D5 = b). Moving it to the `SEQUENCE_GAP` Signal and
+  deleting the node is the remaining part of step 2, and after the tag it costs a 5.0.0.
+- **`ConservationCheck` reads the reason.** `relCounts` canonicalises each relation, tags it diverted by
+  `PipelineRel.isReject` alone (the bare-spelling set is deleted) and fills `RelCount.reason`. `imbalances`
+  never looked at relation names, so loss accounting did not change.
 
-⚠ **Today the constants keep their pre-token spelling deliberately** (renaming breaks the two committed
-contracts): `DATA` = the token continues; `DROPPED`/`INVALID`/`DUPLICATE`/`route:*` = a token whose
-`dataRefs` point at that side-relation. The runtime converges at **Phase 7** — the vocabulary is adopted now,
-the runtime later.
+**The sequence, restated here as the current-tier copy of record** (the archived
+`pipeline-spec.md` §11.5 copy says "five non-edges"; the number is four, and this copy is the one to cite).
 
-**The sequence, restated here as the current-tier copy of record.** ⚠ It previously lived ONLY in
-`archived-documents/plans-archive/pipeline-spec.md` §11.5 — a tier that is never maintained — while this,
-the design of record, merely pointed at it. That archived copy still says "delete the **five** non-edges";
-**the number is four**, and this copy is the one to cite.
+1. **Say it before building it** — ✅ done: `BuiltinNodeType` and this page describe `accepts`/`emits` as tokens.
+2. **Delete the non-edges** — ⚠ three of four done in 4.0.0 (`success` / `failure` / `on_commit` retired, X5-a);
+   `gap` stays an edge (D5 = b).
+3. **Collapse the rejects** into `reject:<reason>`; teach `ConservationCheck` to read the reason — ✅ done (X5-a).
+4. **Open the Step SPI** — ✅ landed differently: `ExecutionMode` `LOWERED`/`EXECUTED`, `StepExecutor` /
+   `StepContext` (Platform Services Stage 2), a row reader rather than the `ConsignmentProcessor` shape.
+5. Only then revisit **fan-in** and the authoring shape — not started, and not X5.
 
-1. **Say it before building it** — correct `BuiltinNodeType`'s doc and this page so `accepts`/`emits`
-   describe *tokens*, and stop describing `data` as a record flow. Costs nothing, ends the contradiction.
-2. **Delete the four non-edges** — move `success` / `failure` / `on_commit` / `gap` to **Signals**, which
-   they effectively already are. No runtime change.
-3. **Collapse the rejects** into `reject:<reason>` (`unmatched` · `dropped` · `invalid` · `duplicate`);
-   teach `ConservationCheck` to read the reason.
-4. **Open the Step SPI** on the `ConsignmentProcessor` shape, with the `LOWERED`/`EXECUTED` mode from D0-B.
-5. Only then revisit **fan-in** and the authoring shape.
-
-**Steps 1–3 are documentation and vocabulary and can land before any redesign is agreed**; steps 4 and 5
-need the runtime decision (tracked as X5 on [`BACKLOG.md`](../../../../BACKLOG.md)).
+⚠ Step 3 was **not** "documentation and vocabulary" as this page used to say: it changed wire and persisted
+values, which is why it needed the 4.0.0 MAJOR. The rest of X5 (Step Receipts, the cross-lane drill-down) is
+tracked on [`BACKLOG.md`](../../../../BACKLOG.md) §2 *X5*.
 
 | Type | emits | Authorable? |
 |---|---|---|
@@ -193,7 +199,7 @@ need the runtime decision (tracked as X5 on [`BACKLOG.md`](../../../../BACKLOG.m
 | `transform.entity.link` (2026-10-17) | `DATA` — every inbound row plus its resolution group (exact match keys within a block, closed transitively; `EntityLinkStep` → the Analytics Kernel's `EntityGroupingSql`) and, with `candidate_by`, a similarity review that never joins a group (D-M1). Catalog `enrichment.entity.link` | ✅ (verb `entity_link`) |
 | `transform.split` | `DATA` | ❌ |
 | `transform.merge` | `DATA` (multi-**input**) | ❌ |
-| `enrichment` | accepts/emits `DATA`; fires the **`on_commit` Signal** (⚠ spelled `ON_COMMIT` in `PipelineRel` until Phase 7 — a Signal, not an edge, per the token model above) | ✅ |
+| `enrichment` | accepts/emits `DATA`; fires on the **commit Signal** (`on_commit` was never an edge; the relation was retired in 4.0.0, X5-a) | ✅ |
 
 ## Can the transform family fold into one SQL node?
 
@@ -222,8 +228,8 @@ over a DuckDB relation, so they operate on the previous node's output metadata, 
   (`UNNEST`, `UNION ALL BY NAME`/join, `GROUP BY`) — but **`RowShaper` contains zero references to
   enrichment**. Enrichment is not a graph verb: it runs on its own engine, registered via
   `POST /enrichment`, as a partition-scoped per-batch recompute, and it fires on the **`on_commit`
-  Signal** — *"a batch committed … **cross-flow only**"*. (⚠ `PipelineRel.ON_COMMIT` keeps that
-  spelling until Phase 7; it is a Signal, not an edge.) Folding in-batch operators into it would
+  Signal** — *"a batch committed … **cross-flow only**"*. (`PipelineRel.ON_COMMIT` was retired in 4.0.0, X5-a;
+  it was always a Signal, not an edge.) Folding in-batch operators into it would
   move them from *inside* the batch to *after commit*, and from same-pipeline to cross-pipeline.
   `merge` is fan-in, which enrichment has no concept of; `summarize` changes cardinality that later
   same-batch Steps depend on. **It is a change of execution moment, not a rename.**

@@ -29,15 +29,15 @@ class ConservationCheckTest {
 
     @Test
     void balancedFilterHasNoImbalance() {
-        // src=3 -> filter splits into data 2 + dropped 1 (== 3 in) -> sink 2
-        Map<String, Long> counts = Map.of("src|data", 3L, "flt|data", 2L, "flt|dropped", 1L, "out|data", 2L);
+        // src=3 -> filter splits into data 2 + reject:dropped 1 (== 3 in) -> sink 2
+        Map<String, Long> counts = Map.of("src|data", 3L, "flt|data", 2L, "flt|reject:dropped", 1L, "out|data", 2L);
         assertTrue(ConservationCheck.imbalances(filterFlow(), counts).isEmpty());
     }
 
     @Test
     void recordsLostAtAConservingNodeIsFlaggedAsLoss() {
         // filter consumed 3 but only accounted for 2 (data 2, dropped 0) — one record vanished
-        Map<String, Long> counts = Map.of("src|data", 3L, "flt|data", 2L, "flt|dropped", 0L, "out|data", 2L);
+        Map<String, Long> counts = Map.of("src|data", 3L, "flt|data", 2L, "flt|reject:dropped", 0L, "out|data", 2L);
         List<ConservationCheck.Imbalance> im = ConservationCheck.imbalances(filterFlow(), counts);
         assertEquals(1, im.size());
         assertEquals("flt", im.get(0).node());
@@ -48,7 +48,7 @@ class ConservationCheckTest {
 
     @Test
     void recordsMultipliedAtAConservingNodeIsFlaggedAsAmplification() {
-        Map<String, Long> counts = Map.of("src|data", 3L, "flt|data", 5L, "flt|dropped", 0L, "out|data", 5L);
+        Map<String, Long> counts = Map.of("src|data", 3L, "flt|data", 5L, "flt|reject:dropped", 0L, "out|data", 5L);
         List<ConservationCheck.Imbalance> im = ConservationCheck.imbalances(filterFlow(), counts);
         assertEquals(1, im.size());
         assertEquals("AMPLIFICATION", im.get(0).kind());
@@ -68,10 +68,10 @@ class ConservationCheckTest {
 
     @Test
     void caseRouteConservesButCloneRouteIsSkipped() {
-        // case route: in 3 == route:hi 1 + route:lo 1 + dropped 1 → balanced
+        // case route: in 3 == route:hi 1 + route:lo 1 + reject:dropped 1 → balanced
         PipelineGraph caseG = routeFlow("case");
         Map<String, Long> caseCounts = Map.of("src|data", 3L,
-                "r|route:hi", 1L, "r|route:lo", 1L, "r|dropped", 1L);
+                "r|route:hi", 1L, "r|route:lo", 1L, "r|reject:dropped", 1L);
         assertTrue(ConservationCheck.imbalances(caseG, caseCounts).isEmpty());
 
         // clone route amplifies by design (same row to several branches) — skipped, so no flag despite in≠out
@@ -84,19 +84,39 @@ class ConservationCheckTest {
     @Test
     void relCountsTagsRejectStreamsAsDivertedAndLeavesTrunkAndRouteBranchesAlone() {
         Map<String, Long> counts = Map.of(
-                "src|data", 3L, "flt|data", 2L, "flt|dropped", 1L,
-                "r|route:hi", 1L, "r|route:lo", 1L, "r|dropped", 1L);
+                "src|data", 3L, "flt|data", 2L, "flt|reject:dropped", 1L,
+                "r|route:hi", 1L, "r|route:lo", 1L, "r|reject:dropped", 1L);
         List<ConservationCheck.RelCount> rels = ConservationCheck.relCounts(counts);
         assertEquals(6, rels.size());
 
-        assertTrue(rels.stream().anyMatch(f -> f.node().equals("flt") && f.rel().equals("dropped")
-                && f.records() == 1L && f.diverted()), "filter's dropped rel is a reject stream");
+        assertTrue(rels.stream().anyMatch(f -> f.node().equals("flt") && f.rel().equals("reject:dropped")
+                && f.records() == 1L && f.diverted() && "dropped".equals(f.reason())), "filter's dropped rel is a reject stream");
         assertTrue(rels.stream().anyMatch(f -> f.node().equals("flt") && f.rel().equals("data")
-                && !f.diverted()), "the main trunk edge is never diverted");
+                && !f.diverted() && f.reason() == null), "the main trunk edge is never diverted");
         assertTrue(rels.stream().anyMatch(f -> f.node().equals("r") && f.rel().equals("route:hi")
                 && !f.diverted()), "a named route branch is ordinary content-routing, not a reject stream");
-        assertTrue(rels.stream().anyMatch(f -> f.node().equals("r") && f.rel().equals("dropped")
+        assertTrue(rels.stream().anyMatch(f -> f.node().equals("r") && f.rel().equals("reject:dropped")
                 && f.diverted()), "a route's own dropped (no branch matched, no default) is still a reject stream");
+    }
+
+    /**
+     * X5-a: a {@link ConservationCheck.RelCount} reports the reject REASON, and a count recorded under a
+     * pre-4.0.0 bare spelling (an old provenance row) reads canonical — tagged diverted through
+     * {@link PipelineRel#isReject} alone, now that the bare-spelling set is gone.
+     */
+    @Test
+    void relCountsReportTheReasonAndReadLegacySpellingsCanonically() {
+        Map<String, Long> counts = Map.of("v|invalid", 2L, "d|reject:duplicate", 1L, "p|unmatched", 4L,
+                "s|reject:bad_score", 5L, "r|route:hi", 1L);
+        Map<String, ConservationCheck.RelCount> byNode = new java.util.HashMap<>();
+        for (ConservationCheck.RelCount c : ConservationCheck.relCounts(counts)) byNode.put(c.node(), c);
+
+        assertEquals(new ConservationCheck.RelCount("v", "reject:invalid", 2L, true, "invalid"), byNode.get("v"));
+        assertEquals(new ConservationCheck.RelCount("d", "reject:duplicate", 1L, true, "duplicate"), byNode.get("d"));
+        assertEquals(new ConservationCheck.RelCount("p", "reject:unmatched", 4L, true, "unmatched"), byNode.get("p"));
+        assertEquals(new ConservationCheck.RelCount("s", "reject:bad_score", 5L, true, "bad_score"), byNode.get("s"),
+                "a contributed Step's own reason");
+        assertEquals(new ConservationCheck.RelCount("r", "route:hi", 1L, false, null), byNode.get("r"));
     }
 
     private static PipelineGraph routeFlow(String mode) {

@@ -193,14 +193,14 @@ class PipelineExecutorTest {
 
         assertEquals(3L, counts.get("parse|data"));        // recordsIn
         assertEquals(2L, counts.get("f|data"));            // amt>=100 keeps {150,200}
-        assertEquals(1L, counts.get("f|dropped"));         // {50} diverted
+        assertEquals(1L, counts.get("f|reject:dropped"));         // {50} diverted
         assertEquals(1L, counts.get("r|route:hi"));        // {200}
         assertEquals(1L, counts.get("r|route:lo"));        // {150}
         assertEquals(1L, counts.get("sink_hi|data"));      // recordsIn at the terminal sink
         assertEquals(1L, counts.get("sink_lo|data"));
 
         // conservation at the filter (non-amplifying): in == out + dropped
-        assertEquals(counts.get("parse|data"), counts.get("f|data") + counts.get("f|dropped"));
+        assertEquals(counts.get("parse|data"), counts.get("f|data") + counts.get("f|reject:dropped"));
     }
 
     /**

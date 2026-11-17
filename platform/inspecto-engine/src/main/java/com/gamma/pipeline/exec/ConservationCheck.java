@@ -36,15 +36,17 @@ public final class ConservationCheck {
     /**
      * Phase 4 §2.4 — one recorded {@code (node, rel)} count at edge grain: the count a
      * {@link PipelineExecutor.ProvenanceCollector} recorded on that relationship, and whether it is a
-     * <b>reject stream</b> (§2.6 — {@code dropped}/{@code invalid}/{@code duplicate}/{@code unmatched}: the
-     * user never wires these, only tunes where they rest) rather than the main trunk or a named
-     * {@code route:*} branch, which are ordinary content-routing, not diversion.
+     * <b>reject outlet</b> ({@code reject:<reason>} — §2.6: {@code reject:dropped}/{@code reject:invalid}/
+     * {@code reject:duplicate}/{@code reject:unmatched} or a contributed Step's own) rather than the main trunk or
+     * a named {@code route:*} branch, which are ordinary content-routing, not diversion.
+     *
+     * @param rel      the relationship, canonical ({@link PipelineRel#canonical}: a pre-4.0.0 {@code dropped} reads
+     *                 {@code reject:dropped})
+     * @param diverted whether {@code rel} is a reject outlet
+     * @param reason   the reject reason ({@code dropped}, …, or the contributed Step's own), {@code null} when not
+     *                 diverted (X5-a)
      */
-    public record RelCount(String node, String rel, long records, boolean diverted) {}
-
-    /** §2.6's reject-stream vocabulary: the diverted side of a record operator, never a user-wired edge. */
-    private static final Set<String> REJECT_RELS = Set.of(
-            PipelineRel.DROPPED, PipelineRel.INVALID, PipelineRel.DUPLICATE, PipelineRel.UNMATCHED);
+    public record RelCount(String node, String rel, long records, boolean diverted, String reason) {}
 
     private static final Set<String> CONSERVING_EXACT = Set.of(
             "transform.filter", "transform.select", "transform.derive", "transform.validate");
@@ -100,9 +102,8 @@ public final class ConservationCheck {
             int i = e.getKey().indexOf('|');
             if (i < 0) continue;
             String node = e.getKey().substring(0, i);
-            String rel = e.getKey().substring(i + 1);
-            out.add(new RelCount(node, rel, e.getValue(),
-                    REJECT_RELS.contains(rel) || PipelineRel.isReject(rel)));   // S2-3: a Step's reject:<reason>
+            String rel = PipelineRel.canonical(e.getKey().substring(i + 1));
+            out.add(new RelCount(node, rel, e.getValue(), PipelineRel.isReject(rel), PipelineRel.reason(rel)));
         }
         return out;
     }

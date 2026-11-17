@@ -1955,10 +1955,12 @@ com.gamma.pipeline.NodeCategory | constant SOURCE
 com.gamma.pipeline.NodeCategory | constant TRANSFORM
 com.gamma.pipeline.NodeCategory | public enum NodeCategory
 com.gamma.pipeline.PipelineCodec | public final class PipelineCodec
+com.gamma.pipeline.PipelineCodec | public static Decoded decode(Map<String, Object>)
 com.gamma.pipeline.PipelineCodec | public static Map<String, Object> toMap(PipelineGraph)
 com.gamma.pipeline.PipelineCodec | public static PipelineEdge edgeFromMap(Map<String, Object>)
 com.gamma.pipeline.PipelineCodec | public static PipelineGraph fromMap(Map<String, Object>)
 com.gamma.pipeline.PipelineCodec | public static PipelineNode nodeFromMap(Map<String, Object>)
+com.gamma.pipeline.PipelineCodec.Decoded | public record Decoded(PipelineGraph graph, List<PipelineValidator.Issue> warnings)
 com.gamma.pipeline.PipelineCompileException | public List<Refusal> refusals()
 com.gamma.pipeline.PipelineCompileException | public PipelineCompileException(List<Refusal>)
 com.gamma.pipeline.PipelineCompileException | public class PipelineCompileException extends RuntimeException
@@ -2052,6 +2054,8 @@ com.gamma.pipeline.PipelineReferences | public static Map<String, String> uses(P
 com.gamma.pipeline.PipelineReferences | public static Set<String> referencedComponents(PipelineGraph)
 com.gamma.pipeline.PipelineReferences | public static boolean isReferenced(String, Collection<PipelineGraph>)
 com.gamma.pipeline.PipelineRel | public final class PipelineRel
+com.gamma.pipeline.PipelineRel | public static String canonical(String)
+com.gamma.pipeline.PipelineRel | public static String reason(String)
 com.gamma.pipeline.PipelineRel | public static String reject(String)
 com.gamma.pipeline.PipelineRel | public static String route(String)
 com.gamma.pipeline.PipelineRel | public static String routeKey(String)
@@ -2060,13 +2064,10 @@ com.gamma.pipeline.PipelineRel | public static boolean isRoute(String)
 com.gamma.pipeline.PipelineRel | public static final String DATA
 com.gamma.pipeline.PipelineRel | public static final String DROPPED
 com.gamma.pipeline.PipelineRel | public static final String DUPLICATE
-com.gamma.pipeline.PipelineRel | public static final String FAILURE
 com.gamma.pipeline.PipelineRel | public static final String GAP
 com.gamma.pipeline.PipelineRel | public static final String INVALID
-com.gamma.pipeline.PipelineRel | public static final String ON_COMMIT
 com.gamma.pipeline.PipelineRel | public static final String REJECT_PREFIX
 com.gamma.pipeline.PipelineRel | public static final String ROUTE_PREFIX
-com.gamma.pipeline.PipelineRel | public static final String SUCCESS
 com.gamma.pipeline.PipelineRel | public static final String UNMATCHED
 com.gamma.pipeline.PipelineStore | public List<PipelineGraph> list()
 com.gamma.pipeline.PipelineStore | public Optional<PipelineGraph> get(String)
@@ -2121,7 +2122,7 @@ com.gamma.pipeline.PipelineValidator | public static final String JOIN_ON_MISSIN
 com.gamma.pipeline.PipelineValidator | public static final String JOIN_REFERENCE_MISSING
 com.gamma.pipeline.PipelineValidator | public static final String NODE_MODE_UNDECLARED
 com.gamma.pipeline.PipelineValidator | public static final String NO_ENTRY
-com.gamma.pipeline.PipelineValidator | public static final String ON_COMMIT_SAME_GRAPH
+com.gamma.pipeline.PipelineValidator | public static final String RETIRED_RELATION
 com.gamma.pipeline.PipelineValidator | public static final String SQL_STEP_UNAUDITED
 com.gamma.pipeline.PipelineValidator | public static final String UNKNOWN_TYPE
 com.gamma.pipeline.PipelineValidator | public static final String UNKNOWN_USE_KIND
@@ -2200,7 +2201,7 @@ com.gamma.pipeline.exec.ConservationCheck | public final class ConservationCheck
 com.gamma.pipeline.exec.ConservationCheck | public static List<Imbalance> imbalances(PipelineGraph, Map<String, Long>)
 com.gamma.pipeline.exec.ConservationCheck | public static List<RelCount> relCounts(Map<String, Long>)
 com.gamma.pipeline.exec.ConservationCheck.Imbalance | public record Imbalance(String node, long recordsIn, long recordsOut, String kind)
-com.gamma.pipeline.exec.ConservationCheck.RelCount | public record RelCount(String node, String rel, long records, boolean diverted)
+com.gamma.pipeline.exec.ConservationCheck.RelCount | public record RelCount(String node, String rel, long records, boolean diverted, String reason)
 com.gamma.pipeline.exec.ConsignmentGraphRunner | public final class ConsignmentGraphRunner
 com.gamma.pipeline.exec.ConsignmentGraphRunner | public static PipelineExecutor.ExecResult run(Input, PipelineExecutor.SinkWriter, BranchCommitCoordinator.SourceFinalize) throws Exception
 com.gamma.pipeline.exec.ConsignmentGraphRunner | public static PipelineExecutor.ExecResult run(Input, PipelineExecutor.SinkWriter, BranchCommitCoordinator.SourceFinalize, PipelineExecutor.ParkWriter) throws Exception

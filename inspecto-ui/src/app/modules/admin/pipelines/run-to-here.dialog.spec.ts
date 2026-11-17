@@ -21,8 +21,8 @@ const RUN_RESULT: PipelineRunResult = {
     toNode: 'parse',
     files: ['inbox/feed_001.csv.gz'],
     relations: [
-        { node: 'parse', rel: 'success', rowCount: 3, rows: [{ id: 1 }, { id: 2 }, { id: 3 }] },
-        { node: 'parse', rel: 'unmatched', rowCount: 1, rows: [{ line: 7 }] },
+        { node: 'parse', rel: 'data', rowCount: 3, rows: [{ id: 1 }, { id: 2 }, { id: 3 }] },
+        { node: 'parse', rel: 'reject:unmatched', rowCount: 1, rows: [{ line: 7 }] },
     ],
     output: {
         store: 'Parse CSV',
@@ -83,7 +83,21 @@ describe('RunToHereDialog', () => {
         const c = create().componentInstance;
         c.run();
         expect(c.result()?.output?.rowCount).toBe(3);
-        expect(c.result()?.relations.map((r) => `${r.node}/${r.rel}`)).toEqual(['parse/success', 'parse/unmatched']);
+        expect(c.result()?.relations.map((r) => `${r.node}/${r.rel}`)).toEqual([
+            'parse/data',
+            'parse/reject:unmatched',
+        ]);
+    });
+
+    // X5-a: rejects arrive as `reject:<reason>`; the reject chip is dimmed, the main outlet is not.
+    it('dims the reject outlet and leaves the main outlet at full strength', () => {
+        const fixture = create();
+        fixture.componentInstance.run();
+        fixture.detectChanges();
+        const chips = Array.from(fixture.nativeElement.querySelectorAll('span.uppercase') as NodeListOf<HTMLElement>);
+        const chip = (rel: string) => chips.find((s) => s.textContent?.trim() === rel);
+        expect(chip('reject:unmatched')?.classList.contains('opacity-70')).toBe(true);
+        expect(chip('data')?.classList.contains('opacity-70')).toBe(false);
     });
 
     // TESTRUN-FAILED-BATCH-REPORTED-EMPTY-1: a FAILED batch answers 422 carrying the batch's own error; the

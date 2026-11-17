@@ -25,12 +25,8 @@ import java.util.Set;
  *   <li><b>DAG over {@code data} edges</b> — a cycle in the record-set subgraph is rejected; flows
  *       are DAGs so the topological walk terminates (B7 / D10). Control + split + {@code route:*}
  *       edges are excluded from the cycle check, matching the executor's walk.</li>
- *   <li><b>No same-graph {@code on_commit}</b> (R5) — {@code on_commit} is <em>cross-pipeline only</em>
- *       (it triggers a downstream pipeline); an {@code on_commit} edge whose target is a node in this
- *       same graph would be a cycle the data-edge check can't see, so it is rejected here.</li>
- *   <li><b>No dangling endpoints</b> — every edge's {@code from} must be a node in the graph, and so
- *       must its {@code to} <em>unless</em> the edge is {@code on_commit} (whose {@code to} names
- *       another pipeline, not a local node).</li>
+ *   <li><b>No dangling endpoints</b> — every edge's {@code from} and {@code to} must be a node in the graph.
+ *       (The cross-pipeline {@code on_commit} exemption went with the relation, retired in 4.0.0 — X5-a.)</li>
  *   <li><b>No duplicate node ids</b> and <b>at least one entry (trigger) node</b> for a non-empty
  *       graph (nothing can start a pipeline in which every node has an inbound edge).</li>
  *   <li><b>Relationship wiring against the node-output contract</b> (T9): an edge's relationship must
@@ -38,7 +34,7 @@ import java.util.Set;
  *       when it {@link PipelineNodeType#emitsNamedRoutes() emits named routes}); a {@code data} edge's
  *       target must {@link PipelineNodeType#accepts() accept} {@code data}; and an outcome/route edge's
  *       target must accept the relationship <em>or</em> accept {@code data} (A6 — the handler exemption:
- *       a control/split outcome ({@code failure}/{@code unmatched}/{@code gap}) routed to a row-consumer
+ *       a reject or control outlet ({@code reject:unmatched}/{@code gap}) routed to a row-consumer
  *       (sink/alert) is rows, so handlers need not list every inbound outcome; only a target that can
  *       take neither refuses, with {@link #ILLEGAL_PAIRING}). An unregistered node type is flagged
  *       (warning) and its wiring left unchecked.</li>
@@ -63,7 +59,6 @@ public final class PipelineValidator {
     public static final String DUPLICATE_NODE = "DUPLICATE_NODE";
     public static final String DANGLING_FROM = "DANGLING_FROM";
     public static final String DANGLING_TO = "DANGLING_TO";
-    public static final String ON_COMMIT_SAME_GRAPH = "ON_COMMIT_SAME_GRAPH";
     public static final String CYCLE = "CYCLE";
     public static final String NO_ENTRY = "NO_ENTRY";
     public static final String ILLEGAL_EMIT = "ILLEGAL_EMIT";
@@ -77,6 +72,12 @@ public final class PipelineValidator {
      */
     public static final String ILLEGAL_PAIRING = "ILLEGAL_PAIRING";
     public static final String UNKNOWN_TYPE = "UNKNOWN_TYPE";
+    /**
+     * An authored edge named a relation retired in 4.0.0 ({@code success}, {@code failure}, {@code on_commit} —
+     * X5-a) and was dropped when its graph was decoded ({@link PipelineCodec#decode}). WARNING only: nothing
+     * ever produced those relations, so the walk never followed such an edge and the run is unchanged.
+     */
+    public static final String RETIRED_RELATION = "RETIRED_RELATION";
     /**
      * A node whose registered (contributed) type declares no {@link PipelineNodeType#mode() mode} (S2-1).
      * ERROR, so the graph is refused at arming ({@code validateOrThrow} in {@code PipelineExecutor.execute}
@@ -206,22 +207,14 @@ public final class PipelineValidator {
         return ids;
     }
 
-    /** Every edge endpoint must resolve to a local node — except an {@code on_commit} target (cross-pipeline). */
+    /** Every edge endpoint must resolve to a local node. */
     private static void checkEdgeEndpoints(PipelineGraph g, Set<String> ids, List<Issue> issues) {
         for (PipelineEdge e : g.edges()) {
             if (!ids.contains(e.from())) {
                 issues.add(new Issue(Severity.ERROR, DANGLING_FROM,
                         "Edge '" + e.rel() + "' from unknown node '" + e.from() + "'."));
             }
-            boolean onCommit = PipelineRel.ON_COMMIT.equals(e.rel());
-            if (onCommit) {
-                // on_commit is cross-pipeline only: a local target is a hidden cycle (R5).
-                if (ids.contains(e.to())) {
-                    issues.add(new Issue(Severity.ERROR, ON_COMMIT_SAME_GRAPH,
-                            "on_commit edge from '" + e.from() + "' targets node '" + e.to()
-                                    + "' in the same pipeline — on_commit is cross-pipeline only; link a downstream pipeline instead."));
-                }
-            } else if (!ids.contains(e.to())) {
+            if (!ids.contains(e.to())) {
                 issues.add(new Issue(Severity.ERROR, DANGLING_TO,
                         "Edge '" + e.rel() + "' from '" + e.from() + "' to unknown node '" + e.to() + "'."));
             }
@@ -364,10 +357,10 @@ public final class PipelineValidator {
                         }
                     });
                 }
-            } else if (!PipelineRel.ON_COMMIT.equals(e.rel())) {
-                // Neighbour pairing for an outcome/route edge (A6): the target must accept the
+            } else {
+                // Neighbour pairing for a reject/control/route edge (A6): the target must accept the
                 // relationship, or accept data (the handler exemption — a reject/route stream is
-                // rows to a row-consumer). on_commit is cross-pipeline, its target is not a local node.
+                // rows to a row-consumer).
                 PipelineNode to = byId.get(e.to());
                 if (to != null) {
                     PipelineNodeTypes.get(to.type()).ifPresent(dst -> {

@@ -1,6 +1,7 @@
 package com.gamma.pipeline.exec;
 
 import com.gamma.api.PublicApi;
+import com.gamma.pipeline.PipelineRel;
 import com.gamma.util.ConnectionSource;
 import com.gamma.util.JdbcDrivers;
 import com.gamma.util.JdbcRows;
@@ -145,13 +146,26 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
         }
     }
 
+    /** {@code rel} under its canonical spelling: the SQL twin of {@link PipelineRel#canonical}. */
+    private static final String CANONICAL_REL = "CASE rel"
+            + " WHEN 'dropped' THEN '" + PipelineRel.DROPPED + "'"
+            + " WHEN 'invalid' THEN '" + PipelineRel.INVALID + "'"
+            + " WHEN 'duplicate' THEN '" + PipelineRel.DUPLICATE + "'"
+            + " WHEN 'unmatched' THEN '" + PipelineRel.UNMATCHED + "'"
+            + " ELSE rel END";
+
     /**
      * The per-(node, relationship) counts of one run, keyed by {@code (pipelineId, batchId)}. Column labels are
      * camelCase to match the rest of the JSON API (the frontend consumes them verbatim, mapping each
      * {@code (nodeId, rel)} onto its outgoing {@code PipelineGraph} edge as the Sankey weight).
+     *
+     * <p><b>Read alias (X5-a, 4.0.0).</b> A row written before 4.0.0 with a bare reject spelling ({@code dropped},
+     * {@code invalid}, {@code duplicate}, {@code unmatched}) reads as its {@code reject:<reason>} form, the
+     * spelling the graph's edges now carry ({@link PipelineRel#canonical}). No stored row is
+     * rewritten.
      */
     public List<Map<String, Object>> query(String pipelineId, String batchId) {
-        String sql = "SELECT node_id AS \"nodeId\", rel, row_count AS \"rowCount\", "
+        String sql = "SELECT node_id AS \"nodeId\", " + CANONICAL_REL + " AS rel, row_count AS \"rowCount\", "
                 + "coalesce(simulated, FALSE) AS \"simulated\""
                 + " FROM " + T + " WHERE pipeline_id = ? AND consignment_id = ? ORDER BY node_id, rel";
         try {

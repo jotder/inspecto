@@ -78,7 +78,7 @@ class PipelineExecutorDedupWindowTest {
                     batchId, coordinator, (sink, table) -> {}, () -> {},
                     PipelineExecutor.ProvenanceCollector.NONE, RowShaper.ReferenceResolver.NONE, null, ctx);
             return new Batch(col(conn, res.sinkInputs().get("sink"), "msisdn"),
-                    col(conn, res.produced().get("d").get("duplicate"), "msisdn"));
+                    col(conn, res.produced().get("d").get("reject:duplicate"), "msisdn"));
         } finally {
             DuckDbUtil.deleteTempDb(db);
         }

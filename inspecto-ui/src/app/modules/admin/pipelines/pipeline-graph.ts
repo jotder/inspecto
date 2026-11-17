@@ -724,20 +724,20 @@ export interface StepBranch {
 }
 
 /**
- * Guarantee side-relationships (§2.4/§2.6): a `gap`/`unmatched` edge to a LEAF node is housekeeping
+ * Guarantee side-relationships (§2.4/§2.6): a `gap`/`reject:unmatched` edge to a LEAF node is housekeeping
  * hanging off the trunk (the gap-watch node, the quarantine sink) — never a Step, never a branch.
  * The chain walk skips these (the Guarantees panel renders them instead), and {@link insertStepAfter}
  * rewires around them.
  */
 function isGuaranteeSideEdge(e: AuthoredEdge, outBy: Map<string, AuthoredEdge[]>): boolean {
-    return (e.rel === 'gap' || e.rel === 'unmatched') && (outBy.get(e.to) ?? []).length === 0;
+    return (e.rel === 'gap' || e.rel === 'reject:unmatched') && (outBy.get(e.to) ?? []).length === 0;
 }
 
 /**
  * Detect the linear-chain/tree shape the recipe view renders (UI plan §1): walk from the single entry
  * node (no incoming edges) via `data` edges; a node whose only outgoing edges are all named
  * `route:<key>` branches into one {@link StepBranch} per edge — the one user-visible branching
- * construct (§2.6). Guarantee side-nodes (a `gap`/`unmatched` edge to a leaf — gap watch, the
+ * construct (§2.6). Guarantee side-nodes (a `gap`/`reject:unmatched` edge to a leaf — gap watch, the
  * quarantine sink) are tolerated and skipped: they are housekeeping, not Steps, and forcing Canvas
  * over them would contradict the Guarantees doctrine (§2.4). Returns `null` when the graph is
  * genuinely not expressible: no single entry, fan-in (`merge`), or a fan-out mixing `data` with other
@@ -1169,12 +1169,11 @@ export interface EdgeRules {
  *
  * <p>⚠ The mirror must be exact in BOTH directions. Looser and the canvas builds a graph the save
  * refuses; stricter and it greys out work the backend would happily store — the same class of bug
- * pointing the other way. Three details carry that:
+ * pointing the other way. Two details carry that:
  * <ul>
  *   <li>an <b>unknown type</b> is exempt, because the server's checks sit inside
  *       `PipelineNodeTypes.get(...).ifPresent(...)` — a served or plugin type this map has not seen
  *       must not be refused here;</li>
- *   <li><b>`on_commit` is exempt</b> — it is a cross-pipeline trigger whose target is not a local node;</li>
  *   <li>an outcome/route edge passes if the target accepts that rel <b>or accepts `data`</b> (the
  *       handler exemption: a reject or route stream is rows to a row-consumer).</li>
  * </ul>
@@ -1202,11 +1201,15 @@ export function edgeRefusal(
         return dstRules.accepts.includes('data')
             ? null
             : `${dst?.type} does not accept data — it accepts ${dstRules.accepts.join(', ') || 'nothing'}.`;
-    if (rel === 'on_commit') return null;
     return dstRules.accepts.includes(rel) || dstRules.accepts.includes('data')
         ? null
         : `${dst?.type} cannot be wired after '${from}' via '${rel}' — it accepts ` +
               `${dstRules.accepts.join(', ') || 'nothing'} and does not consume rows.`;
+}
+
+/** Whether `rel` is a reject outlet (`reject:<reason>`, e.g. `reject:dropped`), mirroring `PipelineRel.isReject`. */
+export function isRejectRel(rel: string): boolean {
+    return rel.startsWith('reject:') && rel.length > 'reject:'.length;
 }
 
 /** Whether `rel` is an operator-defined content route (`route:<key>`), mirroring `PipelineRel.isRoute`. */

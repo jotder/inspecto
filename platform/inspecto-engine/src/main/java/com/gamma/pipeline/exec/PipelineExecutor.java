@@ -450,19 +450,13 @@ public final class PipelineExecutor {
     /**
      * {@code stopAt} plus every node that can reach it, walking edges backwards — the set a run-to-here may
      * execute. {@code null} in, {@code null} out, meaning "no cutoff"; that is the production shape.
-     *
-     * <p>{@code on_commit} edges are skipped for the same reason {@link #topoOrder} skips them: they are
-     * cross-pipeline triggers, not within-graph data dependencies, so an upstream pipeline is not an ancestor here.
      */
     private static Set<String> ancestorsOf(PipelineGraph g, String stopAt, Map<String, PipelineNode> byId) {
         if (stopAt == null || stopAt.isBlank()) return null;
         if (!byId.containsKey(stopAt))
             throw new IllegalArgumentException("pipeline '" + g.name() + "' has no node '" + stopAt + "' to stop at");
         Map<String, List<String>> incoming = new LinkedHashMap<>();
-        for (PipelineEdge e : g.edges()) {
-            if (PipelineRel.ON_COMMIT.equals(e.rel())) continue;
-            incoming.computeIfAbsent(e.to(), k -> new ArrayList<>()).add(e.from());
-        }
+        for (PipelineEdge e : g.edges()) incoming.computeIfAbsent(e.to(), k -> new ArrayList<>()).add(e.from());
         Set<String> keep = new LinkedHashSet<>();
         Deque<String> stack = new ArrayDeque<>(List.of(stopAt));
         while (!stack.isEmpty()) {
@@ -474,8 +468,8 @@ public final class PipelineExecutor {
     }
 
     /**
-     * Kahn topological order over all edges except cross-pipeline {@code on_commit}. The graph is a DAG over
-     * data edges (the validator guarantees it); forward control/route edges keep the full order acyclic.
+     * Kahn topological order over all edges. The graph is a DAG over data edges (the validator guarantees it);
+     * forward reject/control/route edges keep the full order acyclic.
      */
     private static List<String> topoOrder(PipelineGraph g) {
         Map<String, Integer> indegree = new LinkedHashMap<>();
@@ -485,7 +479,6 @@ public final class PipelineExecutor {
             adj.put(n.id(), new ArrayList<>());
         }
         for (PipelineEdge e : g.edges()) {
-            if (PipelineRel.ON_COMMIT.equals(e.rel())) continue;     // cross-pipeline trigger, not a within-graph edge
             adj.get(e.from()).add(e.to());
             indegree.merge(e.to(), 1, Integer::sum);
         }

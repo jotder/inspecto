@@ -759,7 +759,7 @@ class PipelineJobRunnerTest {
 
             assertEquals(3L, counts.get("src|data"), "seed recordsIn");
             assertEquals(2L, counts.get("flt|data"), "amt>=100 keeps id1(150), id3(200)");
-            assertEquals(1L, counts.get("flt|dropped"), "id2(50) diverted");
+            assertEquals(1L, counts.get("flt|reject:dropped"), "id2(50) diverted");
             assertEquals(2L, counts.get("out|data"), "the sink received both surviving rows");
             // the run is discoverable
             assertEquals(1, prov.batches("prov_flow", 10).size());

@@ -689,6 +689,27 @@ class InspectoToolsTest {
                 && "edges".equals(f.get("fieldPath"))), findings.toString());
     }
 
+    /** X5-a: a draft naming a retired relation is not broken — the edge is dropped and the finding says so. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void pipelineAuthorReportsADroppedRetiredEdgeAsAWarningFinding() {
+        Map<String, Object> pipeline = new java.util.LinkedHashMap<>(filterFlowMap());
+        pipeline.put("edges", List.of(
+                Map.of("from", "acq", "to", "flt"),
+                Map.of("from", "flt", "to", "sink"),
+                Map.of("from", "sink", "rel", "on_commit", "to", "downstream_flow")));
+        Map<String, Object> out = invoke(authorTool(), pipelineArg(pipeline));
+
+        List<Map<String, Object>> findings = (List<Map<String, Object>>) out.get("findings");
+        assertEquals(1, findings.size(), findings.toString());
+        assertEquals("RETIRED_RELATION", findings.get(0).get("code"));
+        assertEquals("WARNING", findings.get(0).get("severity"));
+        assertEquals("edges", findings.get(0).get("fieldPath"));
+        assertTrue(String.valueOf(findings.get(0).get("message")).contains("on_commit"), findings.toString());
+        assertEquals(2, ((List<Object>) ((Map<String, Object>) out.get("pipeline")).get("edges")).size(),
+                "the echoed graph no longer carries the retired edge");
+    }
+
     private static Map<String, Object> pipelineArg(Map<String, Object> f) {
         return Map.of("pipeline", f);
     }

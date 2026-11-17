@@ -1,7 +1,12 @@
 package com.gamma.control;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
+import com.gamma.job.JobConfig;
+import com.gamma.job.JobType;
+import com.gamma.pipeline.exec.DbProvenanceStore;
+import com.gamma.pipeline.exec.ProvenanceRow;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -13,9 +18,13 @@ import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -64,6 +73,50 @@ class ControlApiProvenanceTest {
             assertEquals(400, get(c.port, "/provenance?pipeline=f").statusCode());
             assertEquals(404, get(c.port, "/provenance?pipeline=f&consignment=b").statusCode());
         }
+    }
+
+    /**
+     * X5-a read alias: a provenance row written before 4.0.0 under a bare reject spelling ({@code dropped}) answers
+     * {@code GET /provenance} as {@code reject:dropped}, the spelling the graph's edges now carry — so the Sankey
+     * still lands its count on the filter's reject edge. The stored row is not rewritten.
+     */
+    @Test
+    void aPre400RejectRowAnswersUnderItsCanonicalSpelling(@TempDir Path dir) throws Exception {
+        String url = "jdbc:duckdb:" + dir.resolve("provenance.duckdb").toString().replace('\\', '/');
+        try (DbProvenanceStore seed = DbProvenanceStore.open(url)) {
+            seed.record(List.of(
+                    new ProvenanceRow("p", "c-1", "flt", "data", 2, "2026-08-01T10:00:00Z"),
+                    new ProvenanceRow("p", "c-1", "flt", "dropped", 1, "2026-08-01T10:00:00Z")));
+        }
+        List<String> touched = List.of("provenance.backend", "provenance.db.url", "jobs.audit.dir");
+        Map<String, String> before = new HashMap<>();
+        touched.forEach(k -> before.put(k, System.getProperty(k)));
+        System.setProperty("provenance.backend", "duckdb");
+        System.setProperty("provenance.db.url", url);
+        System.setProperty("jobs.audit.dir", dir.resolve("jobs_audit").toString());
+        Path toon = TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema()).write();
+        JobConfig hb = new JobConfig("hb", JobType.MAINTENANCE, null, null, true, false, Map.of("task", "heartbeat"));
+        CollectorService svc = new CollectorService(List.of(toon), List.of(), List.of(hb), 3600, 1, null);
+        ControlApi api = new ControlApi(svc, 0);
+        try (Ctx c = new Ctx(svc, api, startAndPort(api))) {
+            HttpResponse<String> r = get(c.port, "/provenance?pipeline=p&consignment=c-1");
+            assertEquals(200, r.statusCode(), r.body());
+            List<String> rels = new ArrayList<>();
+            for (JsonNode row : V1Body.envelope(r.body()).get("data")) rels.add(row.get("rel").asText());
+            assertTrue(rels.contains("reject:dropped"), "the legacy row reads canonical: " + rels);
+            assertFalse(rels.contains("dropped"), "no row answers under the retired spelling: " + rels);
+            assertTrue(rels.contains("data"), "a non-legacy rel passes through: " + rels);
+        } finally {
+            touched.forEach(k -> {
+                String v = before.get(k);
+                if (v == null) System.clearProperty(k); else System.setProperty(k, v);
+            });
+        }
+    }
+
+    private static int startAndPort(ControlApi api) {
+        api.start();
+        return api.port();
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {

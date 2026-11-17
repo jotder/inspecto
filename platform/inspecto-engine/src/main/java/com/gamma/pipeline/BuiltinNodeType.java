@@ -34,7 +34,7 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // category this node sits under already renders "Collector". "Source" is banned outright.
     ACQUISITION("acquisition", NodeCategory.SOURCE, "Collect",
             "Collects files (poll/listing); the pipeline entry.",
-            Set.of(), Set.of(PipelineRel.DATA, PipelineRel.GAP, PipelineRel.FAILURE), false, FlatHome.BLOCK),
+            Set.of(), Set.of(PipelineRel.DATA, PipelineRel.GAP), false, FlatHome.BLOCK),
 
     // ── parse ────────────────────────────────────────────────────────────────────
     // A parser may be a plain reader (data) or a selector/segment dispatcher (named routes + unmatched).
@@ -254,31 +254,31 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // ── enrich ─────────────────────────────────────────────────────────────────────
     ENRICHMENT("enrichment", NodeCategory.TRANSFORM, "Enrichment",
             "Joins against reference data (post-commit stage-2 join).",
-            Set.of(PipelineRel.DATA, PipelineRel.ON_COMMIT), Set.of(PipelineRel.DATA, PipelineRel.ON_COMMIT), false, FlatHome.BLOCK),
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false, FlatHome.BLOCK),
 
     // ── sink family — where data may rest, materialise, or be exposed (§3.1) ────────
     SINK_PERSISTENT("sink.persistent", NodeCategory.SINK, "Sink (persistent)",
             "Writes the batch to a resting store — a Parquet file / DuckDB table.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.SUCCESS, PipelineRel.FAILURE, PipelineRel.ON_COMMIT), false, FlatHome.BLOCK),
+            Set.of(PipelineRel.DATA), Set.of(), false, FlatHome.BLOCK),
     SINK_MATERIALIZED("sink.materialized", NodeCategory.SINK, "Sink (materialized)",
             "Maintains a managed/temp table, upserted per batch — an incremental rollup / summary.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.SUCCESS, PipelineRel.FAILURE, PipelineRel.ON_COMMIT), false),
+            Set.of(PipelineRel.DATA), Set.of(), false),
     SINK_VIEW("sink.view", NodeCategory.SINK, "Sink (view)",
             "A non-persistent logical store; jobs / KPI / report / alert APIs bind to it by store name.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.ON_COMMIT), false),
+            Set.of(PipelineRel.DATA), Set.of(), false),
     // Outbound webhook (catalog `sink.api.webhook`, operator pick 2026-09-23). Flat home: the top-level
     // webhook: block {connection, batch_size, retry}. Writes no bytes and declares no store — it is a
     // commit BRANCH beside the output_store: sink on the at-rest lane (PipelineLift.stageTwo), executed by
     // WebhookSink through the WebhookSinkTransport SPI that only Standard+ bundles provide.
     SINK_WEBHOOK("sink.webhook", NodeCategory.SINK, "Webhook",
             "POSTs the batch's rows as JSON to an https Connection, batch_size rows per request.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.SUCCESS, PipelineRel.FAILURE), false, FlatHome.BLOCK),
+            Set.of(PipelineRel.DATA), Set.of(), false, FlatHome.BLOCK),
     // Excel workbook (catalog `sink.file.excel`, operator 2026-10-06). Flat home: the top-level excel: block
     // {path, sheets, max_rows}. A commit BRANCH beside the output_store: sink on the at-rest lane, exactly like
     // sink.webhook; executed by ExcelSink through XlsxWorkbook, the report job's sealed workbook writer.
     SINK_EXCEL("sink.excel", NodeCategory.SINK, "Excel workbook",
             "Writes the rows as named sheets of one .xlsx under the Space's data root, one read-only SELECT per sheet.",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.SUCCESS, PipelineRel.FAILURE), false, FlatHome.BLOCK),
+            Set.of(PipelineRel.DATA), Set.of(), false, FlatHome.BLOCK),
 
     // ── reporting / notification ────────────────────────────────────────────────────
     GAP("gap", NodeCategory.CONTROL, "Gap detection",

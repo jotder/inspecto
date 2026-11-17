@@ -37,16 +37,21 @@ token vocabulary now; the remaining runtime pieces converge with the amendment p
 corrected model and its migration are [`node-types.md`](spec-node-types.md) § *The token model*.
 Everything else here — IR, lift, validator, registry, commit model — stands as built.
 
-**The three outlets (the token vocabulary, and what the constants below mean).** `main` — the token
-continues · `reject:<reason>` — one reject kind carrying its reason · `route:<key>` — content demux.
+**The three outlets (the token vocabulary, and what the constants below mean).** `data` — the token
+continues (the token model wrote `main`; X5 decision D4 keeps `data`) · `reject:<reason>` — one reject kind
+carrying its reason · `route:<key>` — content demux. **As built in 4.0.0 (X5-a)** — the history below explains
+why; the membership of record is [`spec-node-types.md`](spec-node-types.md) § *The token model*.
 
 🔴 **The ten `PipelineRel` constants are NOT one vocabulary, and the old control/split grouping is the
 conflation being removed.** They split **four and four** around the edge itself:
 
 * `data` — the edge; the token continues (default when an edge omits `rel`).
-* **Four are Signals, not edges at all** — `success` · `failure` · `on_commit` · `gap`.
-* **Four are one reject kind differing only in reason** — `unmatched` · `dropped` · `invalid` ·
-  `duplicate` → `reject:<reason>`.
+* **Four were Signals, not edges at all** — `success` · `failure` · `on_commit` · `gap`. The first three were
+  **retired in 4.0.0** (no producer; an authored edge naming one is dropped on decode with a `RETIRED_RELATION`
+  warning); `gap` stays an edge to its CONTROL node.
+* **Four are one reject kind differing only in reason** — `UNMATCHED` · `DROPPED` · `INVALID` · `DUPLICATE`,
+  whose values are `reject:unmatched` … `reject:duplicate` since 4.0.0; `PipelineRel.canonical` reads the old
+  bare spellings (authored graphs, stored provenance).
 * `route:*` — operator-named content demux; survives the token model unchanged.
 
 ⛔ **`unmatched` is a reject, not a control relationship.** An earlier revision of this line grouped it
@@ -56,13 +61,8 @@ reintroduce it. The membership of record is
 [`node-types.md`](spec-node-types.md) § *The token model*.
 
 ⚠ Two SEPARATE properties, easy to merge and wrong to: "is not a Signal" and "is not lifted".
-`PipelineLift` builds only `data`, `unmatched`, `gap` and `route:*` — so `dropped`/`invalid`/`duplicate`
-are real at runtime yet never drawn as edges, while `success`/`failure`/`on_commit` have no producer at
-all. A same-graph `on_commit` is rejected (cross-flow ONLY), since the data-edge-only DAG check cannot
-see the cycle it would create.
-
-⚠ The constants keep their pre-token spelling deliberately until **Phase 7** — renaming them breaks two
-committed contracts.
+`PipelineLift` builds only `data`, `reject:unmatched`, `gap` and `route:*` — so `reject:dropped`/`reject:invalid`/
+`reject:duplicate` are real at runtime yet never drawn as edges.
 
 ## 2. Two graphs — keep them distinct
 
@@ -124,7 +124,7 @@ default and must not retype deployed files on a read) — full rules in
 `PipelineValidator.validate(g)` returns typed `Issue`s (ERROR/WARNING, stable codes);
 `validateOrThrow` gates execution, and the save path 422s on ERRORs. Checks: DAG over `data` edges
 (`CYCLE`, names the path; control/`route:*` edges excluded, matching the walk), dangling endpoints
-(`on_commit` `to` exempt — cross-flow), duplicate ids, no-entry-node, `ON_COMMIT_SAME_GRAPH`,
+(no exemption since `on_commit` was retired in 4.0.0), duplicate ids, no-entry-node,
 emit/accept wiring against the type contract (`ILLEGAL_EMIT`/`ILLEGAL_ACCEPT` — handlers needn't
 list every inbound outcome; the emitter governs), **pairing** (`ILLEGAL_PAIRING` — an outcome or route
 edge's target must accept that relation **or** accept `data`, deliberately so that anything consuming rows
@@ -157,7 +157,7 @@ by [spec-execution-lanes.md](spec-execution-lanes.md); the branch-aware ingest f
   writes are idempotent (deterministic partition filenames). Cross-branch all-or-nothing is
   deliberately out of scope.
 - **`PipelineExecutor`** (the at-rest/authored lane) validates, walks `data` edges topologically
-  (Kahn; cross-flow `on_commit` excluded), compiles transforms via `RowShaper` (multi-named-relation
+  (Kahn), compiles transforms via `RowShaper` (multi-named-relation
   SQL: filter/validate/route case+clone/dedup/split/map/select/derive/merge — one `shape` per node in
   order; the `fuse()` chain-fusion was deleted 2026-09-06), routes each produced relation along its edge, and drives the
   coordinator at sinks. ⚠ Under the token rule (§1) this SQL-relation walk is the **at-rest lane's
@@ -243,7 +243,7 @@ Review risks R1–R6 (2026-06-16): all resolved — R1 (row-shaping machinery) b
 R2 (`(batch, branch)` commit) built as `BranchCommitLog`/`Coordinator`; R3 (branch executor)
 **CLOSED 2026-08-26**, armed on the ingest path at the `writeAndTrace` choke point
 ([branch-aware-ingest.md](spec-branch-aware-ingest.md)); R4 (fan-out lift) built; R5
-(`on_commit` cross-flow rule) enforced; R6 (`ingest` job type) deleted.
+(`on_commit` cross-flow rule) enforced until the relation was retired in 4.0.0 (X5-a); R6 (`ingest` job type) deleted.
 
 ## 11. Route branches and arming (pointer)
 

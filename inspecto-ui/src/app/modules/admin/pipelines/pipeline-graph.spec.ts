@@ -34,6 +34,7 @@ import {
     flattenStepChain,
     groupByCategory,
     insertStepAfter,
+    isRejectRel,
     moveStepInChain,
     nodeConfigEntries,
     nodeDisplayLabel,
@@ -142,7 +143,7 @@ describe('authoredToG6 last-run overlay (T17)', () => {
         ],
         edges: [
             { from: 'acq', to: 'sink', rel: 'data' },
-            { from: 'acq', to: 'sink', rel: 'dropped' },
+            { from: 'acq', to: 'sink', rel: 'reject:dropped' },
         ],
     };
     const typeCat = new Map([
@@ -154,12 +155,12 @@ describe('authoredToG6 last-run overlay (T17)', () => {
         const counts = provenanceCounts([{ nodeId: 'acq', rel: 'data', rowCount: 42, simulated: false }]);
         const { edges } = authoredToG6(pipeline, typeCat, undefined, undefined, counts);
         expect(edges[0].data).toEqual({ kind: 'data · 42', weight: 42 });
-        expect(edges[1].data).toEqual({ kind: 'dropped' });
+        expect(edges[1].data).toEqual({ kind: 'reject:dropped' });
     });
 
     it('leaves edges plain when no counts are supplied (no run yet / provenance backend unset)', () => {
         const { edges } = authoredToG6(pipeline, typeCat);
-        expect(edges.map((e) => e.data.kind)).toEqual(['data', 'dropped']);
+        expect(edges.map((e) => e.data.kind)).toEqual(['data', 'reject:dropped']);
         expect(edges.every((e) => !('weight' in e.data))).toBe(true);
     });
 });
@@ -189,7 +190,7 @@ describe('nodeLastRunTotal', () => {
     it('sums every relationship a node emitted in the run', () => {
         const counts = provenanceCounts([
             { nodeId: 'acq', rel: 'data', rowCount: 40, simulated: false },
-            { nodeId: 'acq', rel: 'dropped', rowCount: 2, simulated: false },
+            { nodeId: 'acq', rel: 'reject:dropped', rowCount: 2, simulated: false },
             { nodeId: 'sink', rel: 'data', rowCount: 40, simulated: false },
         ]);
         expect(nodeLastRunTotal('acq', counts)).toBe(42);
@@ -531,12 +532,12 @@ describe('authored-model reducers', () => {
     });
 
     it('setEdgeRelInModel relabels, and returns null when unchanged or colliding', () => {
-        const next = setEdgeRelInModel(base, 'a', 'b', 'data', 'dropped');
-        expect(next?.edges[0].rel).toBe('dropped');
+        const next = setEdgeRelInModel(base, 'a', 'b', 'data', 'reject:dropped');
+        expect(next?.edges[0].rel).toBe('reject:dropped');
         expect(setEdgeRelInModel(base, 'a', 'b', 'data', 'data')).toBeNull(); // unchanged
         // The collision case needs the TARGET rel to already exist on the same pair.
-        const withTwo = { ...base, edges: [...base.edges, { from: 'a', rel: 'dropped', to: 'b' }] };
-        expect(setEdgeRelInModel(withTwo, 'a', 'b', 'data', 'dropped')).toBeNull(); // would collide
+        const withTwo = { ...base, edges: [...base.edges, { from: 'a', rel: 'reject:dropped', to: 'b' }] };
+        expect(setEdgeRelInModel(withTwo, 'a', 'b', 'data', 'reject:dropped')).toBeNull(); // would collide
     });
 
     it('applyNodePatchInModel replaces a node by id', () => {
@@ -557,9 +558,9 @@ describe('candidateRelsFor', () => {
             ],
             edges: [],
         };
-        const emits = new Map([['transform.filter', ['kept', 'dropped']]]);
+        const emits = new Map([['transform.filter', ['kept', 'reject:dropped']]]);
         const id = encodeEdgeId('a', 'b', 'kept');
-        expect(candidateRelsFor(model, id, emits)).toEqual(['data', 'kept', 'dropped']);
+        expect(candidateRelsFor(model, id, emits)).toEqual(['data', 'kept', 'reject:dropped']);
     });
 
     it('returns an empty list for a malformed edge id', () => {
@@ -576,15 +577,15 @@ describe('candidateRelsFor', () => {
             ],
             edges: [],
         };
-        const emits = new Map([['transform.filter', ['dropped']]]);
+        const emits = new Map([['transform.filter', ['reject:dropped']]]);
         const rules = new Map<string, EdgeRules>([
-            ['transform.filter', { accepts: ['data'], emits: ['data', 'dropped'], emitsNamedRoutes: false }],
-            // a gap node takes only `gap` — neither `data` nor `dropped`
+            ['transform.filter', { accepts: ['data'], emits: ['data', 'reject:dropped'], emitsNamedRoutes: false }],
+            // a gap node takes only `gap` — neither `data` nor `reject:dropped`
             ['gap', { accepts: ['gap'], emits: [], emitsNamedRoutes: false }],
         ]);
         const id = encodeEdgeId('a', 'b', 'gap');
         // without rules the picker offers everything the source emits — the old, looser behaviour
-        expect(candidateRelsFor(model, id, emits)).toEqual(['data', 'dropped', 'gap']);
+        expect(candidateRelsFor(model, id, emits)).toEqual(['data', 'reject:dropped', 'gap']);
         // with them, only the current rel survives: the target accepts neither of the others
         expect(candidateRelsFor(model, id, emits, rules)).toEqual(['gap']);
     });
@@ -595,6 +596,24 @@ describe('candidateRelsFor', () => {
  * looser and the canvas builds a graph the save 422s; stricter and it greys out work the backend
  * would happily store.
  */
+describe('isRejectRel (mirrors PipelineRel.isReject)', () => {
+    it('is true for a reject outlet with a reason, built-in or contributed', () => {
+        for (const rel of [
+            'reject:unmatched',
+            'reject:dropped',
+            'reject:invalid',
+            'reject:duplicate',
+            'reject:bad_score',
+        ])
+            expect(isRejectRel(rel), rel).toBe(true);
+    });
+
+    it('is false for the main outlet, a route, an empty reason and the retired bare spellings', () => {
+        for (const rel of ['data', 'gap', 'route:emea', 'reject:', 'unmatched', 'dropped'])
+            expect(isRejectRel(rel), rel).toBe(false);
+    });
+});
+
 describe('edgeRefusal (mirrors PipelineValidator)', () => {
     const model: AuthoredPipeline = {
         name: 'f',
@@ -608,7 +627,7 @@ describe('edgeRefusal (mirrors PipelineValidator)', () => {
         edges: [],
     };
     const rules = new Map<string, EdgeRules>([
-        ['transform.filter', { accepts: ['data'], emits: ['data', 'dropped'], emitsNamedRoutes: false }],
+        ['transform.filter', { accepts: ['data'], emits: ['data', 'reject:dropped'], emitsNamedRoutes: false }],
         ['sink.persistent', { accepts: ['data'], emits: [], emitsNamedRoutes: false }],
         ['gap', { accepts: ['gap'], emits: ['gap'], emitsNamedRoutes: false }],
         ['router', { accepts: ['data'], emits: ['data'], emitsNamedRoutes: true }],
@@ -619,7 +638,7 @@ describe('edgeRefusal (mirrors PipelineValidator)', () => {
     });
 
     it('refuses a rel the source does not emit (ILLEGAL_EMIT)', () => {
-        expect(edgeRefusal(model, 'src', 'sink', 'invalid', rules)).toContain('does not emit');
+        expect(edgeRefusal(model, 'src', 'sink', 'reject:invalid', rules)).toContain('does not emit');
     });
 
     it('refuses a data edge into a target that does not accept data (ILLEGAL_ACCEPT)', () => {
@@ -629,25 +648,28 @@ describe('edgeRefusal (mirrors PipelineValidator)', () => {
     });
 
     it('accepts an outcome edge when the target accepts data — the handler exemption', () => {
-        // sink accepts only `data`, yet a `dropped` stream is rows to a row-consumer
-        expect(edgeRefusal(model, 'src', 'sink', 'dropped', rules)).toBeNull();
+        // sink accepts only `data`, yet a `reject:dropped` stream is rows to a row-consumer
+        expect(edgeRefusal(model, 'src', 'sink', 'reject:dropped', rules)).toBeNull();
     });
 
     it('refuses an outcome edge the target neither names nor consumes as rows (ILLEGAL_PAIRING)', () => {
         const gapOnly = new Map(rules);
         gapOnly.set('sink.persistent', { accepts: ['gap'], emits: [], emitsNamedRoutes: false });
-        expect(edgeRefusal(model, 'src', 'sink', 'dropped', gapOnly)).toContain('does not consume rows');
+        expect(edgeRefusal(model, 'src', 'sink', 'reject:dropped', gapOnly)).toContain('does not consume rows');
     });
 
-    it('exempts on_commit — a cross-pipeline trigger whose target is not a local node', () => {
-        const withOnCommit = new Map(rules);
-        withOnCommit.set('transform.filter', {
+    it('no longer exempts on_commit — the relation was retired in 4.0.0 (X5-a), as on the server', () => {
+        // no node type emits it any more, so the server refuses it as ILLEGAL_EMIT …
+        expect(edgeRefusal(model, 'src', 'sink', 'on_commit', rules)).toContain('does not emit');
+        // … and even a stale catalog that still lists it gets the ordinary pairing check, not a pass
+        const stale = new Map(rules);
+        stale.set('transform.filter', {
             accepts: ['data'],
-            emits: ['data', 'dropped', 'on_commit'],
+            emits: ['data', 'reject:dropped', 'on_commit'],
             emitsNamedRoutes: false,
         });
-        withOnCommit.set('sink.persistent', { accepts: ['gap'], emits: [], emitsNamedRoutes: false });
-        expect(edgeRefusal(model, 'src', 'sink', 'on_commit', withOnCommit)).toBeNull();
+        stale.set('sink.persistent', { accepts: ['gap'], emits: [], emitsNamedRoutes: false });
+        expect(edgeRefusal(model, 'src', 'sink', 'on_commit', stale)).toContain('does not consume rows');
     });
 
     it('⚠ exempts an UNKNOWN type, exactly as the server does inside ifPresent', () => {
@@ -752,7 +774,7 @@ describe('detectStepChain', () => {
     });
 
     it('returns null for a mixed fan-out (data alongside a non-route, non-guarantee relationship)', () => {
-        // `failure` is a control edge with no Guarantee semantics — unlike `gap`/`unmatched`
+        // a filter's `reject:dropped` has no Guarantee semantics — unlike `gap`/`reject:unmatched`
         // (which S2 tolerates as housekeeping side-nodes), this stays Canvas-only.
         const model: AuthoredPipeline = {
             name: 'p',
@@ -760,7 +782,7 @@ describe('detectStepChain', () => {
             nodes: [an('a'), an('b'), an('c')],
             edges: [
                 { from: 'a', rel: 'data', to: 'b' },
-                { from: 'a', rel: 'failure', to: 'c' },
+                { from: 'a', rel: 'reject:dropped', to: 'c' },
             ],
         };
         expect(detectStepChain(model)).toBeNull();
@@ -780,6 +802,27 @@ describe('flattenStepChain', () => {
             edges: [
                 { from: 'acq', rel: 'gap', to: 'gap' },
                 { from: 'acq', rel: 'data', to: 'parse' },
+                { from: 'parse', rel: 'data', to: 'sink' },
+            ],
+        };
+        const chain = detectStepChain(model);
+        expect(chain).not.toBeNull();
+        expect(chain!.trunk.map((n) => n.id)).toEqual(['acq', 'parse', 'sink']);
+    });
+
+    it("tolerates the parser's reject:unmatched quarantine leaf as a guarantee side-node (X5-a spelling)", () => {
+        const model: AuthoredPipeline = {
+            name: 'p',
+            active: false,
+            nodes: [
+                an('acq', 'acquisition'),
+                an('parse', 'parser'),
+                an('quarantine', 'sink.persistent'),
+                an('sink', 'sink.persistent'),
+            ],
+            edges: [
+                { from: 'acq', rel: 'data', to: 'parse' },
+                { from: 'parse', rel: 'reject:unmatched', to: 'quarantine' },
                 { from: 'parse', rel: 'data', to: 'sink' },
             ],
         };

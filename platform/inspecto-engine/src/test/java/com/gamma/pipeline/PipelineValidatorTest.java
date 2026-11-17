@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * {@link PipelineValidator} (T14): the structural gate over the Flow IR — DAG over {@code data} edges,
- * no dangling endpoints, no duplicate ids, no same-graph {@code on_commit}, at least one entry node.
+ * no dangling endpoints, no duplicate ids, at least one entry node.
  */
 class PipelineValidatorTest {
 
@@ -59,31 +59,31 @@ class PipelineValidatorTest {
 
     @Test
     void controlEdgesAreExcludedFromTheCycleCheck() {
-        // a failure-> b, b failure-> a : a control cycle, NOT a data cycle — must not be flagged CYCLE
-        // (acquisition emits failure, per the node-output contract)
+        // a gap-> b, b gap-> a : a control cycle, NOT a data cycle — must not be flagged CYCLE
+        // (acquisition emits gap, per the node-output contract)
         PipelineGraph g = new PipelineGraph("ctrl", true,
                 List.of(PipelineNode.of("a", "acquisition"), PipelineNode.of("b", "acquisition")),
-                List.of(new PipelineEdge("a", PipelineRel.FAILURE, "b"), new PipelineEdge("b", PipelineRel.FAILURE, "a")));
+                List.of(new PipelineEdge("a", PipelineRel.GAP, "b"), new PipelineEdge("b", PipelineRel.GAP, "a")));
         PipelineValidator.Result r = PipelineValidator.validate(g);
         assertFalse(codes(r).contains(PipelineValidator.CYCLE));
         // ...but with no inbound-free node, it has no trigger
         assertTrue(codes(r).contains(PipelineValidator.NO_ENTRY));
     }
 
+    /**
+     * X5-a: {@code on_commit} was retired in 4.0.0 with its cross-pipeline exemption. An edge built in code that
+     * still names it (decode drops an authored one before it gets here) is an ordinary unknown relation: no sink
+     * emits it, and its target must be a local node like any other edge's.
+     */
     @Test
-    void rejectsSameGraphOnCommitButAllowsCrossFlowTarget() {
-        // on_commit to a LOCAL node -> rejected (cross-pipeline only)
-        PipelineGraph local = new PipelineGraph("f", true,
-                List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("sink", "sink.persistent")),
-                List.of(PipelineEdge.data("acq", "sink"), new PipelineEdge("sink", PipelineRel.ON_COMMIT, "acq")));
-        assertTrue(codes(PipelineValidator.validate(local)).contains(PipelineValidator.ON_COMMIT_SAME_GRAPH));
-
-        // on_commit to ANOTHER pipeline (not a local node) -> fine, and not a dangling-to error
+    void aRetiredOnCommitEdgeHasNoExemptionLeft() {
         PipelineGraph cross = new PipelineGraph("f", true,
                 List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("sink", "sink.persistent")),
-                List.of(PipelineEdge.data("acq", "sink"), new PipelineEdge("sink", PipelineRel.ON_COMMIT, "downstream_flow")));
+                List.of(PipelineEdge.data("acq", "sink"), new PipelineEdge("sink", "on_commit", "downstream_flow")));
         PipelineValidator.Result r = PipelineValidator.validate(cross);
-        assertTrue(r.ok(), () -> "cross-pipeline on_commit should be valid, got " + r.issues());
+        assertFalse(r.ok());
+        assertTrue(codes(r).containsAll(Set.of(PipelineValidator.ILLEGAL_EMIT, PipelineValidator.DANGLING_TO)),
+                () -> "" + r.issues());
     }
 
     @Test
@@ -173,18 +173,18 @@ class PipelineValidatorTest {
 
     @Test
     void anOutcomeEdgeIntoTheEntryNodeRefusesWithIllegalPairing() {
-        // acquisition emits failure, so the emit side is legal — but the second acquisition node
-        // accepts NOTHING inbound; wiring a failure stream into a pipeline entry is nonsense.
+        // acquisition emits gap, so the emit side is legal — but the second acquisition node
+        // accepts NOTHING inbound; wiring a gap stream into a pipeline entry is nonsense.
         PipelineGraph g = new PipelineGraph("pairing", true,
                 List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("acq2", "acquisition"),
                         PipelineNode.of("sink", "sink.persistent")),
                 List.of(PipelineEdge.data("acq", "sink"),
-                        new PipelineEdge("acq", PipelineRel.FAILURE, "acq2")));
+                        new PipelineEdge("acq", PipelineRel.GAP, "acq2")));
         PipelineValidator.Result r = PipelineValidator.validate(g);
         assertFalse(r.ok());
         assertTrue(codes(r).contains(PipelineValidator.ILLEGAL_PAIRING));
         assertTrue(r.errors().stream().anyMatch(i -> i.message().contains("acq2")
-                        && i.message().contains(PipelineRel.FAILURE)),
+                        && i.message().contains(PipelineRel.GAP)),
                 () -> "" + r.issues());
     }
 
@@ -201,7 +201,7 @@ class PipelineValidatorTest {
 
     @Test
     void theHandlerExemptionSurvives_outcomesIntoRowConsumersAndDeclaredAcceptorsPass() {
-        // gap → gap node (declared acceptor), failure → sink (row consumer), unmatched → sink (row
+        // gap → gap node (declared acceptor), gap → sink (row consumer), reject:unmatched → sink (row
         // consumer, already in linearValid): all legal pairings.
         PipelineGraph g = new PipelineGraph("handlers", true,
                 List.of(PipelineNode.of("acq", "acquisition"),
@@ -209,7 +209,7 @@ class PipelineValidatorTest {
                         PipelineNode.of("sink", "sink.persistent")),
                 List.of(PipelineEdge.data("acq", "sink"),
                         new PipelineEdge("acq", PipelineRel.GAP, "gd"),
-                        new PipelineEdge("acq", PipelineRel.FAILURE, "q")));
+                        new PipelineEdge("acq", PipelineRel.GAP, "q")));
         PipelineValidator.Result r = PipelineValidator.validate(g);
         assertTrue(r.ok(), () -> "" + r.issues());
         assertTrue(PipelineValidator.validate(linearValid()).ok());

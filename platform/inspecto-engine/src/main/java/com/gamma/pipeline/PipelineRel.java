@@ -2,46 +2,39 @@ package com.gamma.pipeline;
 
 import com.gamma.api.PublicApi;
 
+import java.util.Map;
+
 /**
- * Edge relationship vocabulary for the {@link PipelineGraph}. An edge's {@code rel} is a plain
- * string so the set stays open (a {@code transform.route} emits operator-defined branch
- * names), but the well-known control + split relationships are named here so the lift, the
- * validator and the visualiser agree on spelling.
+ * Edge relationship vocabulary for the {@link PipelineGraph} — the token model's three outlet kinds (X5-a,
+ * 2026-11-17). An edge's {@code rel} is a plain string so the set stays open (a {@code transform.route} emits
+ * operator-defined branch names, a contributed Step declares its own reject reasons), but the well-known
+ * relationships are named here so the lift, the validator and the visualiser agree on spelling.
  *
  * <p><b>An edge carries a TOKEN, not rows</b> (pipeline spec §11, decision D2, 2026-08-31). What
  * travels between two nodes is control information naming where the data rests — a Consignment id and
  * its registered outputs — exactly what {@code ProcessorContext} offers a third-party Step: no row
- * stream, {@code read()} resolves by reference. ⚠ The constant below is still spelled {@code "data"}
- * and stays so: renaming it breaks the committed node-attributes contract and belongs to
- * the major-bump window with the Step SPI. Only the MEANING is corrected here — do not read
- * {@code DATA} as "records flow along this edge", because nothing in the runtime does that.
+ * stream, {@code read()} resolves by reference. Do not read {@link #DATA} as "records flow along this edge",
+ * because nothing in the runtime does that.
  *
- * <p>🔴 <b>The ten constants split FOUR and FOUR around the edge</b>, not into a control set and a
- * split set. {@link #DATA} is the edge itself (the downstream token, and the default when an edge omits
- * {@code rel}). Four are <b>Signals, not edges at all</b> — {@link #SUCCESS} / {@link #FAILURE} /
- * {@link #ON_COMMIT} / {@link #GAP}. Four are <b>one reject kind differing only in reason</b> —
- * {@link #UNMATCHED} / {@link #DROPPED} / {@link #INVALID} / {@link #DUPLICATE}, i.e.
- * {@code reject:<reason>}. Operator-defined content routes use the {@link #ROUTE_PREFIX}
- * ({@code route:emea}) and survive the token model unchanged.
- *
- * <p>⛔ <b>{@link #UNMATCHED} is a reject, not a control relationship.</b> An earlier revision of this
- * javadoc grouped it with the outcome set, a 5/3 split against the design of record's 4/4. Do not
- * reintroduce it. ⚠ "Is not a Signal" and "is not lifted" are DIFFERENT properties — see the note
- * below, which is about lifting and correctly names a different set.
- *
- * <p>🔴 <b>Six of the ten never appear as a LIFTED edge</b>, and they are not one group.
- * {@code PipelineLift} builds only {@link #DATA}, {@link #UNMATCHED} (parse → quarantine),
- * {@link #GAP} (acquisition → gap) and {@code route:*}. {@link #DROPPED} / {@link #INVALID} /
- * {@link #DUPLICATE} are real at RUNTIME — {@code RowShaper} returns them as named relations and
- * {@code ConservationCheck} balances against them — they simply are not edges a lift draws.
- * {@link #SUCCESS} / {@link #FAILURE} / {@link #ON_COMMIT} are constructed nowhere: {@code ON_COMMIT}
- * is only ever READ (the executor and validator skip it as a cross-pipeline trigger), and the other two
- * are declared vocabulary with no producer at all. D2 moves that outcome set to Signals.
+ * <p><b>Three outlet kinds</b>:
+ * <ul>
+ *   <li>{@link #DATA} — the main outlet: the token continues (the default when an edge omits {@code rel}).
+ *       The token model first wrote it {@code main}; it is spelled {@code data} (X5 decision D4).</li>
+ *   <li>{@code reject:<reason>} — rows a Step did not pass on. The built-in reasons are {@link #UNMATCHED},
+ *       {@link #DROPPED}, {@link #INVALID} and {@link #DUPLICATE}; a contributed Step declares its own
+ *       ({@link #reject(String)}). Until 4.0.0 the four built-ins were spelled bare ({@code dropped}, …):
+ *       {@link #canonical(String)} maps those legacy spellings, and every persisted reader goes through it.</li>
+ *   <li>{@code route:<key>} — content demux ({@link #route(String)}).</li>
+ * </ul>
+ * {@link #GAP} is the one remaining control edge (acquisition → its {@code gap} CONTROL node, X5 decision D5).
+ * The outcome relations {@code success}, {@code failure} and {@code on_commit} were retired in 4.0.0: nothing
+ * produced them, and a Consignment's outcome is a Signal ({@code pipeline.batch.committed} /
+ * {@code .failed} / {@code .parked}). {@link PipelineCodec} drops an authored edge that still names one, with a
+ * {@link PipelineValidator#RETIRED_RELATION} warning.
  *
  * <p>See {@code docs/okf/product/module/engine/spec-node-types.md} (the token model — the design of record) and
  * {@code docs/okf/product/module/engine/architecture-pipeline-graph.md} §1 (the token rule and the relation
- * inventory) — ⚠ an earlier citation named §3.2 and §15, neither of which exists in that file.
- * Provenance only, not maintained:
+ * inventory). Provenance only, not maintained:
  * {@code docs/archived-documents/plans-archive/pipeline-spec.md} §11.
  */
 @PublicApi(since = "4.0.0")
@@ -50,47 +43,58 @@ public final class PipelineRel {
     private PipelineRel() {}
 
     /**
-     * The normal downstream token (the default when an edge omits {@code rel}). ⚠ Despite the spelling,
-     * this does NOT mean records flow along the edge — see the token note on the class.
+     * The main outlet: the normal downstream token (the default when an edge omits {@code rel}). ⚠ Despite
+     * the spelling, this does NOT mean records flow along the edge — see the token note on the class.
      */
     public static final String DATA = "data";
 
-    // ── control relationships (route a batch on an outcome) ──────────────────────
-    /** Terminal batch success. */
-    public static final String SUCCESS = "success";
-    /** Terminal batch failure (→ quarantine / dead-letter). */
-    public static final String FAILURE = "failure";
-    /** Parser could not match a schema/column-count (→ quarantine or a fallback parser). */
-    public static final String UNMATCHED = "unmatched";
-    /** A sequence gap was detected (→ {@code gap}/{@code alert} node). */
+    /** A sequence gap was detected (acquisition → its {@code gap} CONTROL node). */
     public static final String GAP = "gap";
-    /** A batch committed (→ {@code enrichment} / a downstream pipeline trigger). Cross-pipeline only. */
-    public static final String ON_COMMIT = "on_commit";
-
-    // ── split relationships (the diverted side of a record operator) ─────────────
-    /** Records dropped by {@code transform.filter}. */
-    public static final String DROPPED = "dropped";
-    /** Records failing {@code transform.validate}. */
-    public static final String INVALID = "invalid";
-    /** Records dropped by {@code transform.dedup.*}. */
-    public static final String DUPLICATE = "duplicate";
 
     /**
-     * Prefix for a contributed Step's declared reject streams, e.g. {@code reject:bad_score} (S2-3). An
-     * {@code EXECUTED} Step rejects rows by emitting them to a {@code reject:<reason>} relation it declares
-     * in {@link PipelineNodeType#emits()}, never by throwing — and {@code ConservationCheck} tags the
-     * relation as diverted, as it does the four built-in reject reasons above.
+     * Prefix of a reject outlet, e.g. {@code reject:dropped} or a contributed Step's {@code reject:bad_score}
+     * (S2-3). A Step rejects rows by emitting them to a {@code reject:<reason>} relation it declares in
+     * {@link PipelineNodeType#emits()}, never by throwing — and {@code ConservationCheck} tags the relation
+     * as diverted and reports its reason.
      */
     public static final String REJECT_PREFIX = "reject:";
+
+    // ── the built-in reject reasons (the constant NAMES predate X5-a; their values are canonical) ──────
+    /** Rows a parser could not match to a schema/column count (→ the quarantine sink). */
+    public static final String UNMATCHED = REJECT_PREFIX + "unmatched";
+    /** Rows {@code transform.filter} did not keep. */
+    public static final String DROPPED = REJECT_PREFIX + "dropped";
+    /** Rows failing {@code transform.validate}. */
+    public static final String INVALID = REJECT_PREFIX + "invalid";
+    /** Rows {@code transform.dedup.*} found to be duplicates. */
+    public static final String DUPLICATE = REJECT_PREFIX + "duplicate";
+
+    /** Pre-4.0.0 spelling → canonical spelling: the read alias for authored graphs and stored provenance. */
+    private static final Map<String, String> LEGACY = Map.of(
+            "unmatched", UNMATCHED, "dropped", DROPPED, "invalid", INVALID, "duplicate", DUPLICATE);
 
     /** Build a named reject relationship: {@code reject("bad_score")} → {@code "reject:bad_score"}. */
     public static String reject(String reason) {
         return REJECT_PREFIX + reason;
     }
 
-    /** Whether {@code rel} is a named reject stream ({@code reject:*}). */
+    /** Whether {@code rel} is a named reject stream ({@code reject:*}). A legacy bare spelling is not — map it first. */
     public static boolean isReject(String rel) {
         return rel != null && rel.startsWith(REJECT_PREFIX) && rel.length() > REJECT_PREFIX.length();
+    }
+
+    /** The reason of a reject outlet ({@code reject:dropped} → {@code dropped}), or {@code null} if {@code rel} is not one. */
+    public static String reason(String rel) {
+        return isReject(rel) ? rel.substring(REJECT_PREFIX.length()) : null;
+    }
+
+    /**
+     * The canonical spelling of {@code rel}: a pre-4.0.0 reject spelling ({@code dropped}, {@code invalid},
+     * {@code duplicate}, {@code unmatched}) maps to its {@code reject:<reason>} form; anything else — canonical
+     * already, a route, a contributed Step's own relation, or {@code null} — passes through unchanged.
+     */
+    public static String canonical(String rel) {
+        return rel == null ? null : LEGACY.getOrDefault(rel, rel);
     }
 
     /** Prefix for operator-defined content-routing branches, e.g. {@code route:emea}. */

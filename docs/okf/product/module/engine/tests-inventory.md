@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-413 test class(es): 413 unit, 0 real-HTTP control-plane, 0 IT.
+414 test class(es): 414 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -322,6 +322,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `MappingRulesTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/MappingRulesTest.java` | {@link MappingRules} — the authoring-time gate for a mapping component's rules (S6b). |
 | `NodeAttributesContractTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/NodeAttributesContractTest.java` | The §3.1 cross-language contract: the node cfg vocabulary this server publishes must equal the table the |
 | `NodeConfigNameContractTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/NodeConfigNameContractTest.java` | The name-contract check described in {@code docs/okf/product/module/config/spec-pipeline-config-keys.md} |
+| `PipelineCodecLegacyRelationsTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/PipelineCodecLegacyRelationsTest.java` | X5-a read alias, end to end, over a graph authored before 4.0.0 ({@code src/test/resources/legacy_relations_graph.toon}): |
 | `PipelineCodecTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/PipelineCodecTest.java` | {@link PipelineCodec}: lossless PipelineGraph ↔ map round-trip for authored {@code *_flow.toon} (T19). |
 | `PipelineCompilerTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/PipelineCompilerTest.java` | The Phase-1 parity gate: a {@code lift → compile} round-trip recovers every execution input the |
 | `PipelineDocumentTest` | `com.gamma.pipeline` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/PipelineDocumentTest.java` | {@link PipelineDocument} (ELT amendment §5.1) — the document is a projection of config that a |

@@ -1,6 +1,6 @@
 # X5 — one Consignment across lanes, and the Step Receipt (the board's "StepInfo envelope")
 
-Status: **DESIGN — nothing built. Decisions D1–D10 (§7) are open.** Opened 2026-11-17 for MoSCoW S4's last
+Status: **IN BUILD — L2 (X5-a, the token vocabulary) built 2026-11-17; L1, L3, L4 open. Decisions D1–D10 taken (§7).** Opened 2026-11-17 for MoSCoW S4's last
 item ([`plan-architecture-moscow.md`](../okf/product/layer/platform/plan-architecture-moscow.md) §8 S4: build X5
 before the 4.0.0 tag, with a release-notes entry). Board row: [`BACKLOG.md`](../BACKLOG.md) §2 *X5 cross-lane
 drill-down + StepInfo envelope*. Items: `module.engine`, `module.api`, `layer.product`. Every code fact below was

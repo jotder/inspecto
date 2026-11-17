@@ -199,6 +199,8 @@ class PostgresStateStoreTest {
 
             List<Map<String, Object>> rows = store.query("flow-1", "batch-1");
             assertEquals(2, rows.size(), "both provenance cells read back from Postgres");
+            assertTrue(rows.stream().anyMatch(r -> "reject:invalid".equals(r.get("rel"))),
+                    "X5-a: a legacy 'invalid' row reads as reject:invalid on Postgres too: " + rows);
             assertFalse(store.batches("flow-1", 10).isEmpty(), "batch summary (max/sum/group by) works on Postgres");
         }
     }

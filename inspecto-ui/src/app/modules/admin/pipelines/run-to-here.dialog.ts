@@ -19,6 +19,7 @@ import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-re
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { ConnectionTreeComponent } from 'app/modules/admin/connections/connection-tree.component';
+import { isRejectRel } from './pipeline-graph';
 
 /** Dialog data: which authored pipeline + which node to run up to, plus the source's bound connection (if any). */
 export interface RunToHereData {
@@ -31,7 +32,7 @@ export interface RunToHereData {
 /**
  * Run-to-here (the editor's build-and-test loop). Picks files from the source's inbox (reusing the
  * connection "Explore" tree), runs the authored subgraph up to {@link RunToHereData.node} over them, and
- * shows the per-relation counts (success / unmatched / kept / dropped) + a bounded sample + the scratch
+ * shows the per-relation counts (`data`, `reject:<reason>`, `route:<key>`) + a bounded sample + the scratch
  * Parquet the run landed. No production write — mock-backed via {@code POST …/run?to=}.
  */
 @Component({
@@ -441,9 +442,9 @@ export class RunToHereDialog implements OnInit {
         });
     }
 
-    /** Reject relationships (unmatched / dropped) render dimmed so the matched output reads first. */
+    /** Reject outlets (`reject:unmatched`, `reject:dropped`, …) render dimmed so the matched output reads first. */
     isReject(rel: string): boolean {
-        return rel === 'unmatched' || rel === 'dropped';
+        return isRejectRel(rel);
     }
 
     columnsOf(rows: Record<string, unknown>[]): string[] {

@@ -21,7 +21,7 @@ import java.util.Map;
  * <ul>
  *   <li><b>single schema</b> → linear {@code acq → [dedup] → parse → [filter] → map → sink}.</li>
  *   <li><b>selector</b> (multi-schema {@code schemas[]}) → one {@code parser} dispatcher emitting
- *       {@code route:<table>} branches to per-schema {@code map → sink}, plus {@code unmatched →
+ *       {@code route:<table>} branches to per-schema {@code map → sink}, plus {@code reject:unmatched →
  *       quarantine}. The {@link SchemaSelector} (with its column-count / file_pattern priority) is
  *       carried on the parser node, so the route metadata (G3) is preserved.</li>
  *   <li><b>segments</b> (plugin ingester) → a plugin {@code parser} ({@code use: ingester/<fqcn>})
