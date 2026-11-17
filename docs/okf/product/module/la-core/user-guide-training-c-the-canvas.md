@@ -56,43 +56,43 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the ring's group, then the family (CL-0103, CL-0217, CL-0218, CL-0249).
 
 ### S03 · Pan, zoom and the keyboard
-- Voice: The Canvas mode decides what a drag on empty canvas does, one mode at a time. Pan is the start: drag to move the view, and scroll to zoom. With the graph focused, the arrow keys move it, and plus and minus zoom. Dragging a node moves the node, and the whole selection with it. When you are lost, Fit to screen brings everything back into view.
+- Voice: The Canvas mode decides what a drag on empty canvas does, one mode at a time. Pan is the start: drag to move the view, and scroll to zoom. With the graph focused, the arrow keys move it, and plus and minus zoom. When you are lost, Fit to screen brings everything back into view.
 - Chip: Pan · arrows · + / −
 - Action: hover Pan (*Pan: drag to pan, Shift+drag to lasso (Esc)*) ▸ drag the canvas ▸ scroll in ▸ click the canvas background ▸ arrow keys ▸ `+` and `−` ▸ drag one node ▸ Fit to screen.
 - Impact: before/after hold of each move; mark the Pan tooltip.
 
 ### S04 · The hover card
-- Voice: Rest the pointer on a node. A hover card names it, its Entity Type, and how many links it has on this graph, and says Not expanded yet when nothing has followed its links. Rest it on a link instead: the card names its kind, and its two ends, from and to. The hover card answers what is this, without a click.
+- Voice: Rest the pointer on a node. A hover card names it, its Entity Type, and how many links it has on this graph. Hover a link instead, and the card names its kind and its two ends. The hover card answers what is this, without a click.
 - Chip: Hover card
 - Action: hover CL-0134 ▸ hold ▸ hover one `shares_phone` link ▸ hold. [check in UI: the card's lines under this view]
 - Impact: mark both cards.
 
 ### S05 · A node's details
-- Voice: Click a node for everything about it. Click CL-0134. The dialog shows its id, its links in and out, its neighbours, and whether it has been expanded. Its Summary reads the node's links in the Dataset the graph was drawn from: links in and out, distinct counterparts, first and last seen, and activity per day. Press Summarise. CL-0134 is a passenger on six claims, with six different drivers, in under seven months.
+- Voice: Click a node for everything about it. Click one of the family, CL-0249. The dialog shows its id, its links in and out, and its neighbours: the other three of the family. Its Summary reads the node's links in the Dataset the graph was drawn from. Press Summarise to see them. Risk and Entity Lists have nothing for this pack, and the Actions are below.
 - Chip: Node details · Summary
 - Action: click CL-0134 ▸ hold on ID, Links, Neighbours, Expansion ▸ Summary ▸ *Summarise its links in claims_links_dataset* ▸ hold. [check in UI: the Summary's counterparts show the six claims (ground truth: passenger on 6 claims with 6 drivers)]
 - Impact: mark the Links row and the Summary's counterparts.
 
 ### S06 · What the dialog can do
-- Voice: At the foot of the dialog, Focus centres the canvas on the node. Expand from here adds its neighbours, and Collapse branch folds the ones that link to nothing else into it. Under Actions, Hide on canvas takes it off this picture only. Case history, the Entity page and Risk come with the Standard edition.
+- Voice: At the foot of the dialog, Expand from here adds the node's neighbours, and Focus centres the canvas on the node. Under Actions, Hide on canvas takes it off this picture only. Case history and the Entity page come with the Standard edition.
 - Chip: Focus · Expand from here · Hide on canvas
 - Action: point at Focus, Expand from here, Collapse branch (if offered), Actions ▸ Hide on canvas ▸ press Focus.
 - Impact: before/after hold: the canvas centres on CL-0134.
 
 ### S07 · Shift and click
-- Voice: Now selection. Shift and click a node to add it to the selection, and Shift and click it again to take it out. The count beside the selection tools says how many are picked, and the picked nodes are marked on the canvas. Pick CL-0134, then Shift and click two of the claimants it shares a phone with.
-- Chip: Shift+click · selection count
+- Voice: Now selection. A plain click opens the details, so you pick nodes by drawing a loop with Lasso. The count beside the selection tools says how many are picked, and the picked nodes are marked on the canvas.
+- Chip: Lasso · selection count
 - Action: Shift+click CL-0134 ▸ Shift+click two `shares_phone` neighbours ▸ Shift+click one again to drop it ▸ zoom on the count chip. [check in UI: whether a plain click also selects; if it does, the voice says "click picks one; Shift and click adds"]
 - Impact: mark the count chip changing 1 → 3 → 2.
 
 ### S08 · Lasso
-- Voice: To pick a whole group, draw around it. Press L for Lasso, and drag a loop around the ring. Everything inside is selected, and the count jumps. In Pan, Shift and drag does the same, so with a mouse you rarely need to switch; on a touchpad, Lasso is easier.
+- Voice: To pick a whole group, draw around it. Press L for Lasso, and drag a loop around the family of four. Everything inside is selected, and the count appears. In Pan, Shift and drag does the same, so with a mouse you rarely need to switch; on a touchpad, Lasso is easier.
 - Chip: Lasso · L
 - Action: L ▸ drag a loop around the ring ▸ hold on the count ▸ Esc (back to Pan) ▸ Shift+drag a loop round the same group.
 - Impact: before/after hold: the ring selected; mark the count.
 
 ### S09 · Build on a selection
-- Voice: The selection tools build on what you picked. Select neighbours adds everything linked to the selection: one press, and the ring's whole circle of contacts is in. Invert the selection swaps picked and unpicked, so you can act on everything else. Select all, or Control A, picks everything. And Clear the selection, or Escape, empties it. Each changes only the selection; the graph stays as it is.
+- Voice: The selection tools build on what you picked. Select neighbours adds everything linked to the selection: one press, and everything linked to your pick is in. Invert the selection swaps picked and unpicked, so you can act on everything else. Select all, or Control A, picks everything. And Clear the selection, or Escape, empties it. Each changes only the selection; the graph stays as it is.
 - Chip: Select neighbours · Invert the selection · Select all · Clear the selection
 - Action: Select neighbours ▸ hold ▸ Invert the selection ▸ hold ▸ Select all ▸ hold ▸ Clear the selection.
 - Impact: four before/after holds; mark the count each time.

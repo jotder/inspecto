@@ -157,6 +157,8 @@ const SCENARIOS = {
           if (st.selectAll) { await h.ev('document.activeElement && document.activeElement.select && document.activeElement.select()'); return; }   // select the focused field's text before typing over it
           if ('type' in st) return h.type(st.type, st.perChar ?? 85);
           if ('key' in st) return h.key(st.key);
+          if ('kb' in st) return h.kb(st.kb, st.mod ?? 0, st.repeat ?? 1);   // a key with modifiers (2 = Ctrl, 8 = Shift), e.g. ArrowLeft, +, a
+          if ('drag' in st) return h.drag(st.drag, st.shift ? 8 : 0);       // press at the first CSS point, move through the rest, release
           if (st.escape) return h.escape();
           if ('reveal' in st) return h.reveal(st.reveal);
           if ('download' in st) return h.download(st.download, st);
@@ -546,6 +548,8 @@ async function main() {
   const h = {
     pause: sleep,
     async key(k) { const code = { Enter: 13, Escape: 27, Tab: 9, g: 71, G: 71 }[k]; const text = k.length === 1 ? k : undefined; for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: k, code: k.length === 1 ? 'Key' + k.toUpperCase() : k, windowsVirtualKeyCode: code, ...(type === 'keyDown' && text ? { text } : {}) }); },
+    async kb(k, mod = 0, repeat = 1) { const vk = { ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, '+': 187, '-': 189, '=': 187 }[k] ?? k.toUpperCase().charCodeAt(0); for (let i = 0; i < repeat; i++) { for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: k, code: k.length === 1 ? (/[a-z]/i.test(k) ? 'Key' + k.toUpperCase() : k) : k, windowsVirtualKeyCode: vk, modifiers: mod, ...(type === 'keyDown' && k.length === 1 && !(mod & 2) ? { text: k } : {}) }); await sleep(220); } },
+    async drag(pts, mod = 0) { await h.moveTo(pts[0][0], pts[0][1], 600); await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: pts[0][0], y: pts[0][1], button: 'left', clickCount: 1, modifiers: mod }); await sleep(120); for (const p of pts.slice(1)) { const n = 14; for (let i = 1; i <= n; i++) { const x = mx + (p[0] - mx) * i / n, y = my + (p[1] - my) * i / n; await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y, button: 'left', buttons: 1, modifiers: mod }); await sleep(35); } mx = p[0]; my = p[1]; } await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: mx, y: my, button: 'left', clickCount: 1, modifiers: mod }); await sleep(900); },
     async undo() { for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'z', code: 'KeyZ', windowsVirtualKeyCode: 90, modifiers: 2 }); },   // Ctrl+Z
     async escape() { for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); },
     // a narrated scene: it runs `fn`, then holds until the narration's length (timing[id], from the TTS pass) has passed
@@ -611,8 +615,9 @@ async function main() {
       const x = (b[0] + b[2] / 2) / DPR, y = (b[1] + b[3] / 2) / DPR;
       await h.moveTo(x, y, 600);
       for (let n = 1; n <= (opts.dbl ? 2 : 1); n++) {
-        await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: n }); await sleep(70);
-        await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: n }); await sleep(opts.dbl ? 90 : 500);
+        const modifiers = opts.shift ? 8 : 0;
+        await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: n, modifiers }); await sleep(70);
+        await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: n, modifiers }); await sleep(opts.dbl ? 90 : 500);
       }
       await sleep(600);
     },

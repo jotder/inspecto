@@ -1,0 +1,14 @@
+{"scenario":"episode","edition":"Basic","base":"http://127.0.0.1:8099","steps":[
+{"scene":"S01","card":{"lines":["Inspecto LA training","C1  Moving around and selecting"],"secs":6},"steps":[{"space":"la-insurance"},{"open":"/link-analysis?view=x","settle":4500},{"wait":2500},{"label":"File"},{"wait":900},{"exact":"Open…"},{"wait":2500},{"waitText":"Claimant ring shared identity"},{"click":"Claimant ring shared identity"},{"wait":1500},{"button":"Open"},{"wait":8000}]},
+{"scene":"S02","steps":[{"wait":3000},{"mark":"the family","box":[340,570,115,100]},{"wait":3000},{"mark":"the ring","box":[560,700,170,100]},{"wait":6000}]},
+{"scene":"S03","steps":[{"hoverLabel":"Pan"},{"wait":4000},{"drag":[[1100,200],[1030,240]]},{"wait":3000},{"drag":[[1030,240],[1100,170]]},{"wait":2500},{"label":"Fit to screen"},{"wait":5000}]},
+{"scene":"S04","steps":[{"move":[414,577],"ms":900},{"wait":6000},{"move":[1000,300],"ms":900},{"wait":2000}]},
+{"scene":"S05","steps":[{"at":[374,593]},{"wait":5000},{"click":"Summarise its links"},{"wait":8000}]},
+{"scene":"S06","steps":[{"wait":3000},{"hoverLabel":"Hide on canvas","soft":true},{"wait":6000},{"button":"Close"},{"wait":3000}]},
+{"scene":"S07","steps":[{"wait":2000},{"hoverLabel":"Lasso"},{"wait":6000},{"move":[1000,250],"ms":800},{"wait":3000}]},
+{"scene":"S08","steps":[{"at":[1100,150]},{"kb":"l"},{"wait":1500},{"drag":[[335,565],[445,565],[445,665],[335,665],[335,565]]},{"wait":8000},{"escape":1},{"wait":3000}]},
+{"scene":"S09","steps":[{"label":"Select neighbours"},{"wait":5000},{"label":"Invert the selection"},{"wait":5000},{"label":"Select all"},{"wait":5000},{"label":"Clear the selection"},{"wait":5000}]},
+{"scene":"S10","steps":[{"at":[1100,150]},{"kb":"f"},{"wait":1500},{"move":[620,380],"ms":900},{"wait":3000},{"move":[680,470],"ms":1000},{"wait":4000},{"move":[1050,200],"ms":900},{"wait":3500}]},
+{"scene":"S11","steps":[{"label":"Link filter"},{"wait":2000},{"move":[500,620],"ms":900},{"wait":3000},{"move":[600,700],"ms":1000},{"wait":4000},{"escape":1},{"wait":4000}]},
+{"scene":"S12","card":{"lines":["Try it","Next: C2  Layouts, legend, counts and minimap"],"secs":5},"steps":[{"wait":1000}]}
+]}
