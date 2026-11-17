@@ -14,17 +14,18 @@ slice of it. Layer overview: [layer/la architecture](../../layer/la/architecture
 
 ## How it plugs in
 
-- **ServiceLoader.** `la/inspecto-la-api/src/main/resources/META-INF/services/com.gamma.spi.http.RouteModule` lists 25
+- **ServiceLoader.** `la/inspecto-la-api/src/main/resources/META-INF/services/com.gamma.spi.http.RouteModule` lists 32
   route modules; the host `ControlApi` discovers them at boot. There is no LA main class.
 - **Manifest.** `la/inspecto-la-api/src/main/resources/META-INF/inspecto/module.toon`: `buildRole: implementation`,
-  `offeringRole: optional`, features `geoLink` and `investigations`, requires `la-core` and `la-storage`. When the jar is
+  `offeringRole: optional`, features `geoLink`, `investigations`, `geoMap` and `entityPages`, requires `la-core` and `la-storage`. When the jar is
   absent the host answers its routes with the manifest's `absentMessage` (503 `CAPABILITY_UNAVAILABLE`).
 - **OpenAPI.** `la/inspecto-la-api/src/main/resources/META-INF/inspecto/openapi.fragment.json` merges into the host
   contract.
-- **Editions.** Staged from Basic (`offerings/basic.toon`). The explorer route modules (`InvRoutes`, `GeoRoutes`,
+- **Editions.** Staged from Basic (`offerings/basic.toon`). The explorer route modules (`InvRoutes`,
   `PatternRoutes`, `ValueMeasureRoutes`, `EntityIdentityRoutes`, `EntityProfileRoutes`) own `geoLink` only; the
-  Investigation route modules also name `investigations`, which only `inspecto-ops` declares, so on Basic they answer 503
-  "available in Standard and above" ([la-core architecture](../la-core/architecture.md) §8).
+  Investigation route modules also name `investigations`, `GeoRoutes` names `geoMap` and `EntityPageRoutes` names
+  `entityPages` (D-LAE5, D-LAE4) — edition features only `inspecto-ops` declares — so on Basic they answer 503
+  `CAPABILITY_UNAVAILABLE` naming Standard and above ([la-core architecture](../la-core/architecture.md) §8).
 
 ## Composition
 

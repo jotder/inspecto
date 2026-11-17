@@ -18,7 +18,7 @@ timestamp: 2026-08-22T00:00:00Z
 
 ## 1. Where it sits, and why that is the whole trick
 
-`CollectorProcessor.run` expands the **mutable candidate list** at `:117`, immediately before
+`CollectorProcessor.run` expands the **mutable candidate list**, immediately before
 `ConsignmentPlanner.plan` freezes it. Every expanded file is therefore an ordinary Consignment member
 *from birth* — planner sizing, batching, schema selection, both engine lanes, audit and finalize all
 work unchanged, with **zero** modification to the Consignment model.

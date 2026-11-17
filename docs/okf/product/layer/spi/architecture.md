@@ -36,7 +36,7 @@ Two discovery disciplines, both in `inspecto-auth-spi`:
 | Helper | Rule | Used for |
 |---|---|---|
 | `com.gamma.spi.OptionalSpi` (`first`, `all`) | **Fail-soft.** A provider that cannot load is skipped with one WARN; the rest of the product boots. | Optional modules: `RouteModule`, host boot hooks, component hooks. |
-| `com.gamma.spi.auth.SpiSlot` | At most one provider, first found wins, cached. With `failClosed`, a registered-but-unloadable provider refuses boot. | `Authenticator` and `AccessDecider` (fail-closed); `TokenRelay`, `GeoCountryResolver`, `PrincipalDirectory`. |
+| `com.gamma.spi.auth.SpiSlot` | At most one provider, first found wins, cached. With `failClosed`, a registered-but-unloadable provider refuses boot. | `Authenticator`, `AccessDecider` and la-core's `InvestigationStoreProvider` (fail-closed); `TokenRelay`, `GeoCountryResolver`, `PrincipalDirectory`. |
 | `EventSink.current()` | First provider; none ⇒ logged no-op; present-but-broken ⇒ `IllegalStateException`. | Audit and event emission. |
 
 The rule of thumb: absence may cost a feature (route answers 503, flag off) but must never open the system. That
@@ -55,21 +55,22 @@ Read from the git-tracked `META-INF/services` files (main sources only).
 | `com.gamma.spi.auth.GeoCountryResolver` | `MaxMindGeoCountryResolver` | [geo-country](../../module/geo-country/index.md) |
 | `com.gamma.auth.secrets.SecretsProvider` | `FileKeystoreSecretsProvider` | [secrets](../../module/secrets/index.md) |
 | `com.gamma.spi.auth.PrincipalDirectory` | none registered | — |
-| `com.gamma.spi.http.ComponentKindValidator` | `AnomalyKindValidator` · `ReconKindValidator` · `RiskScoreKindValidator` | [anomaly](../../module/anomaly/index.md) · [reconciliation](../../module/reconciliation/index.md) · [scoring](../../module/scoring/index.md) |
+| `com.gamma.spi.http.ComponentKindValidator` | `AnomalyKindValidator` · `SegmentationKindValidator`, `ChurnKindValidator`, `ForecastKindValidator` · `ReconKindValidator` · `RiskScoreKindValidator` | [anomaly](../../module/anomaly/index.md) · [predictive](../../module/predictive/index.md) · [reconciliation](../../module/reconciliation/index.md) · [scoring](../../module/scoring/index.md) |
 | `com.gamma.spi.http.ComponentDeleteHook` | `ReconComponentDeleteHook` | [reconciliation](../../module/reconciliation/index.md) |
 | `com.gamma.spi.http.GovernableKindProvider` | `EntityListGovernableKinds` | [entity-list](../../module/entity-list/index.md) |
-| `com.gamma.spi.http.RouteModule` | `ActionRequestRoutes` | [action-requests](../../module/action-requests/index.md) |
+| `com.gamma.spi.http.RouteModule` | `ActionRequestRoutes`, `IncidentBriefRoutes` | [action-requests](../../module/action-requests/index.md) |
 | | `AnomalyScoreRoutes` | [anomaly](../../module/anomaly/index.md) |
 | | `CaseRoutes` | [case-management](../../module/case-management/index.md) |
 | | `EntityListRoutes` | [entity-list](../../module/entity-list/index.md) |
 | | `ExchangeRoutes` | [exchange](../../module/exchange/index.md) |
 | | `MetricsRoutes`, `EventRoutes` | [observability](../../module/observability/index.md) |
 | | `ObjectRoutes`, `NoteRoutes`, `TagRoutes` | [ops](../../module/ops/index.md) |
+| | `PredictionRoutes` | [predictive](../../module/predictive/index.md) |
 | | `ReconRoutes` | [reconciliation](../../module/reconciliation/index.md) |
 | | `RegulatoryReportRoutes` | [regulatory-reporting](../../module/regulatory-reporting/index.md) |
 | | `RiskScoreRoutes` | [scoring](../../module/scoring/index.md) |
 | | `ScreeningRoutes` | [screening](../../module/screening/index.md) |
-| | 25 route classes (`InvestigationRoutes`, `GraphRunRoutes`, ...) | [la-api](../../module/la-api/index.md) |
+| | 32 route classes (`InvestigationRoutes`, `GraphRunRoutes`, ...) | [la-api](../../module/la-api/index.md) |
 | | 4 classes (`InvestigationMeasureRoutes`, `IntegrationWebhooks`, ...) | [geo-link](../../module/geo-link/index.md) |
 
 `EventStore` is not discovered: the event module selects its backend. `ApiContext` has exactly one

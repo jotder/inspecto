@@ -241,17 +241,16 @@ and `processing.csv_settings` are aliases, `parsing:` keys win) and reuses the e
 `raw.fields[]` / `mapping.rules[]` / `partitions[]` backend verbatim. A config with no `parsing:` block
 parses exactly as before. An unknown `parsing.frontend` is rejected at load.
 
-⚠ **The plugin ingester has a THREE-tier config home, not two** (`PipelineConfigParser.parsePlugin`,
-`:1078-1105`). One block is chosen **whole**, then each key falls back to the legacy triple:
+⚠ **The plugin ingester has a THREE-tier config home, not two** (`PipelineConfigParser.parsePlugin`). One block is chosen **whole**, then each key falls back to the legacy triple:
 1. inline `parsing.plugin.{ingester,ingester_config,segments}`;
 2. else the referenced Grammar component's own top-level `plugin:` map — reachable only when that
-   grammar file is *block-shaped* (`isParsingBlock`, `:1923-1926`: it carries a `delimited:` or a
+   grammar file is *block-shaped* (`isParsingBlock`: it carries a `delimited:` or a
    `plugin:` map), because a Grammar component is just an extracted `parsing:` block;
 3. else the legacy `processing.ingester` / `processing.ingester_config` / `processing.segments` triple.
 Tiers 1 and 2 are never merged. A fourth spelling, `frontend: asn1`, **synthesizes** the block from the
-`asn1:` map and **refuses** a co-present `parsing.plugin` / `processing.ingester` (`:1091-1094`).
-A plugin ingester with no `segments` is refused at config load (`:1106-1109`), and `frontend: plugin`
-with no `ingester` anywhere is refused (`:1129-1131`).
+`asn1:` map and **refuses** a co-present `parsing.plugin` / `processing.ingester`.
+A plugin ingester with no `segments` is refused at config load, and `frontend: plugin`
+with no `ingester` anywhere is refused.
 
 ```yaml
 parsing:

@@ -38,7 +38,7 @@ Layer overview: [layer/la architecture](../../layer/la/architecture.md). Store c
 | Half-finished promote | impossible: one transaction |
 | Tenancy | one schema per Space, validated name |
 | Tamper resistance | append-only triggers on sealed rows |
-| Pool | one HikariCP pool per (URL, user), shared by every Space |
+| Pool | one connection source per (URL, user), shared by every Space: a view over the process's one shared HikariCP pool per server and user, capped per family at `-Ddb.pool.size` |
 
 The two-JVM race harness proved the filesystem store had real cross-process races (fixed with an OS lock) and that
 this store had none (`LA-INVESTIGATION-STORE-DESIGN-1`, S7).

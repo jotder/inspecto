@@ -71,9 +71,9 @@ matrix is authoritative for the Edition column**; this table mirrors it.
 
 **Corrections this table makes to its predecessor and the concept pages**, each verified against source:
 
-- **`ING-2` names three frontends; `PipelineConfigParser.FRONTENDS` (`:1590-1591`) accepts **10**<!--count:parsing-frontend-tokens--> tokens for
+- **`ING-2` names three frontends; `PipelineConfigParser.FRONTENDS` accepts **10**<!--count:parsing-frontend-tokens--> tokens for
   eight formats** — `delimited`, `fixedwidth`/`fixed_width`, `json`, `text_regex`, `xlsx`/`excel`, `parquet`,
-  `asn1`, `plugin` — and `BuiltinParsers.IDS` (`:29`) serves **6**<!--count:builtin-parsers--> DuckDB-native built-ins including **`parquet`**,
+  `asn1`, `plugin` — and `BuiltinParsers.IDS` serves **6**<!--count:builtin-parsers--> DuckDB-native built-ins including **`parquet`**,
   which appears on **no** board row, no `step-catalog.md` row and no `EDITIONS.md` `SP-PRS-*` row. The
   documentation states the count as three, five, six, seven and ten in six places; the code says ten tokens,
   eight formats, six built-ins.
@@ -110,7 +110,7 @@ file inside a `FAILED` Consignment is normal), and collapsing them loses the que
 
 `CollectorProcessor.ingest(cfg, onCommit)` (`platform/inspecto-engine/src/main/java/com/gamma/inspector/CollectorProcessor.java`)
 scans the local inbox — a remote-fetched file, once landed, is discovered exactly like a locally-pushed one —
-expands Archives through **Unpack** (§3.5, at `:117`, *before* planning), then **`ConsignmentPlanner`**
+expands Archives through **Unpack** (§3.5,, *before* planning), then **`ConsignmentPlanner`**
 (`platform/inspecto-etl/src/main/java/com/gamma/etl/ConsignmentPlanner.java`) cuts the candidate list into Consignments
 bounded by **`collector.consignment: {max_files, max_bytes, order}`** — the canonical home since 2026-09-02
 (CONSIGNMENT-HOME-1; `processing.batch.*` is dual-read and healed on save, nothing writes it), with `order`
@@ -150,11 +150,11 @@ idempotent for already-committed Entries. Since 2026-08-11 **record dedup is not
 
 ### 3.3 One `parsing:` block, ten tokens, eight formats, three frontends
 
-`PipelineConfigParser.parseParsing` (`:927`) reads the **`parsing:`** block into a private `Grammar` record
+`PipelineConfigParser.parseParsing` reads the **`parsing:`** block into a private `Grammar` record
 (the split is by *state*, not size — `toon-config.md`); `parsing.delimited` and the legacy
 `processing.csv_settings` are aliases and **`parsing:` wins**; ⚠ an unknown `delimited.*` key is **not**
 rejected at load (`mergeParsing` flattens with no key allow-list, only its scalar siblings are allow-listed).
-`FRONTENDS` (`:1590-1591`) = `delimited · fixedwidth | fixed_width · json · text_regex · xlsx | excel · parquet ·
+`FRONTENDS` = `delimited · fixedwidth | fixed_width · json · text_regex · xlsx | excel · parquet ·
 asn1 · plugin`. Three engines sit behind them:
 
 | Frontend | Engine | Notes |

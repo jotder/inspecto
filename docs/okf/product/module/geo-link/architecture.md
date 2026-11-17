@@ -25,6 +25,7 @@ the object store and the outbound machinery, and holds the routes that need both
 | `com.gamma.la.core.UploadLandingPort` | `HostUploadLandingPort` | Pipelines whose Collector sets `collector.accepts_upload: true` and polls a local directory |
 | `com.gamma.linkindex.LinkIndexBuilder` | `ScheduledLinkIndexBuilder` | binds the `link-index` Platform Service to la-core's `ScheduledIndexBuild` |
 | `com.gamma.alert.InvestigationMeasureProbe` | `WorkingSetMeasures` | evaluates an Alert Rule's Measure over an Investigation's Working Set |
+| `com.gamma.onboard.ImportFollowOn` | `LinkIndexFollowOn` | builds a Dataset's link index inside an import's own run (step `index`; SKIPPED without a link mapping) |
 | `com.gamma.spi.http.RouteModule` | `InvestigationMeasureRoutes`, `InvestigationDataChangesRoutes`, `IntegrationWebhooks`, `EmbedExpirySweepModule` | routes and background hooks started with the API |
 
 Files: `la/inspecto-geo-link/src/main/resources/META-INF/services/`. Manifest:

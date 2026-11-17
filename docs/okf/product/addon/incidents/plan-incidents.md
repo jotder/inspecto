@@ -280,10 +280,10 @@ tests `MeasureAlertTest`, `PerEntityAlertTest`, `ControlApiAlertRuleWriteTest`. 
 (`inspecto-ops`, the real workflow).
 
 **Evaluation.** `AlertService` polls on a window-derived floor of 1 min, default 10 min
-(`AlertService.java:411-413`); a breach emits `EventType.ALERT_FIRED` (`:227`) and the canonical
-`alert-rule.fired` Signal (`:243`), and appends to a **bounded in-memory ring** the feed reads
+(`AlertService.java`); a breach emits `EventType.ALERT_FIRED` and the canonical
+`alert-rule.fired` Signal, and appends to a **bounded in-memory ring** the feed reads
 (`GET /alerts`). `POST /alerts/evaluate` runs a sweep on demand. **The engine does not hot-load
-the registry**: `POST/PUT/DELETE /alerts/rules[/{name}]` (`AlertRoutes.java:44-48`, gated
+the registry**: `POST/PUT/DELETE /alerts/rules[/{name}]` (`AlertRoutes.java`, gated
 `canAuthorAlertRules`, fail-closed gate order, `ConfigCodec` + `AtomicFiles`) arm the rule in the running
 `AlertService` in-process; a restart re-arms from the files. Since 2026-08-10 an `alerts` Platform Service
 exists so `alert.evaluate` holds a real grant, and its dry-run stand-in must report "nothing was evaluated".
@@ -320,7 +320,7 @@ degrades to "no object".
 
 | Path | Where | Rule |
 |---|---|---|
-| **Severity promotion** | `AlertService.promoteToIncident` (`:304-334`) | a `CRITICAL` (or `error`) rule opens a deduped `INCIDENT` — one open Incident per rule + pipeline (a `by` rule: one per rule + key, §3.2) — beside the `ALERT`; lower severities stay alerts. Since 2026-08-10 the Incident carries an **`ESCALATED_FROM` link to the ALERT** (actor `alert-rule:<name>`). ⚠ A *suppressed* promotion adds no edge |
+| **Severity promotion** | `AlertService.promoteToIncident` | a `CRITICAL` (or `error`) rule opens a deduped `INCIDENT` — one open Incident per rule + pipeline (a `by` rule: one per rule + key, §3.2) — beside the `ALERT`; lower severities stay alerts. Since 2026-08-10 the Incident carries an **`ESCALATED_FROM` link to the ALERT** (actor `alert-rule:<name>`). ⚠ A *suppressed* promotion adds no edge |
 | **Decision-Rule consequences** | `decision-rules.md` | `create-alert` records a signal **and** opens an object (2026-07-19); `create-incident` opens an Incident at any severity with no Alert Rule, deduped per rule (2026-07-24) |
 | **Expectation breach** | `ExpectationRoutes` | the original signal → Incident dedup + open pattern the others reuse |
 | **Reconciliation breach** | `ReconRunJob` (`jobs.md`) | same pattern, at **run** granularity — ONE aggregate Incident per reconciliation (scope = the reconciliation id), carrying only break counts |
@@ -410,15 +410,15 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
 ### 3.4 Incidents — the operational-objects domain
 
 `ObjectType` = `INCIDENT | CASE | TASK` (the `ALERT` value was retired 2026-10-08: an Alert is a record of the Alert store, `AlertLifecycle` holds its `OPEN → ACKNOWLEDGED → RESOLVED`; a stored legacy `ALERT` row, or a row of any type this build does not know, loads **inert** — listed by `GET /objects` with `inert:true` + a diagnostic, readable by id, every write on it a `409` naming the type, skipped by the SLA sweep / analytics / purge, never rewritten or dropped), one table `inspecto_ops_objects` when durable, else
-`InMemoryObjectStore` (`OpsEngineProvider.java:94-124` picks per store on `durable()`).
+`InMemoryObjectStore` (`OpsEngineProvider.java` picks per store on `durable()`).
 Updates are **optimistic** (2026-10-04): every object carries a monotonic `version`, a stale write fails with `ObjectVersionConflictException`, `ObjectService` retries pure read-modify-writes and the edge answers a persistent loss as `409 CONFLICT_STALE_VERSION` — see `backend/engine/db-layer.md` §3.1. No client change is needed for server-side races; `PATCH /objects/{id}` does not yet accept an expected `version` (deferred — a client editing a whole object from a stale read still merges, it does not fail).
 
-- **Workflows** (`platform/inspecto-workflow/src/main/java/com/gamma/workflow/Workflow.java:150-192`): **INCIDENT `IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED`**, `reopen`
+- **Workflows** (`platform/inspecto-workflow/src/main/java/com/gamma/workflow/Workflow.java`): **INCIDENT `IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED`**, `reopen`
   from `RESOLVED|ARCHIVED → DIAGNOSING`, only `ARCHIVED` terminal; CASE `OPEN → INVESTIGATING → ESCALATED →
   RESOLVED → CLOSED`. `GET /workflows/{type}` serves the BFS-ordered states so a TOON-overridden workflow
   (`*_workflow.toon`, a boot-time scan) drives the same panes; `assign` **does not move status** (no
   `ASSIGNED` state); `POST /objects/{id}/ack` has no action on any object type since the ALERT retirement (it answers the ordinary 422; Alerts are acknowledged on `POST /alerts/{id}/ack`).
-- **Categorization** is a 3-layer `attributes.category` path `L1/L2/L3` (`ObjectService.java:368-371`),
+- **Categorization** is a 3-layer `attributes.category` path `L1/L2/L3` (the `PUT /objects/{id}/category` route),
   enforced by the UI at latest on *Accept* (the `CategorizeDialog` is forced before the transition).
   **Priority** `CRITICAL · MAJOR · MINOR · LOW`. One **assignee** (the Incident Commander), optional at
   creation, set at triage — assignment is **direct**; queue-based routing at creation was deferred
@@ -429,7 +429,7 @@ Updates are **optimistic** (2026-10-04): every object carries a monotonic `versi
   `CONTAINS · ESCALATED_FROM · CAUSED_BY · RELATED_TO · MERGED_INTO · SPLIT_FROM`; the correlation graph is
   served depth-1.
 - **The resolution pattern is a hard gate server-side** (I1, 2026-07-24): `ObjectService.commit`
-  (`:1311-1316`) rejects `INCIDENT → RESOLVED` unless `attributes.postmortem` holds a non-blank **timeline**
+  (through `incidentResolutionGaps`) rejects `INCIDENT → RESOLVED` unless `attributes.postmortem` holds a non-blank **timeline**
   entry, a **cause analysis** entry (`causeAnalysis[]` + `causeMethod`, "5 Whys" default), a **corrective
   action**, `dueAt` is set, **and `attributes.disposition` holds a ladder value** (WS-10, 2026-09-26)
   (`incidentResolutionGaps`). The Disposition rides the resolve itself — `POST /objects/{id}/resolve` or
@@ -453,7 +453,7 @@ Updates are **optimistic** (2026-10-04): every object carries a monotonic `versi
   is a *mirror* of the same four checks, not the gate. ⚠ `objects.md` and the archived design still call
   the backend gate "a follow-up"; it shipped.
 - **SLA and escalation.** `dueAt` / `dueInMinutes` at creation; the sweep (`sweepIncidentSla`,
-  `ObjectService.java:830-905`, cadence `-Dobjects.sla.sweep.seconds`, default 60, `0` disables) stamps
+  `ObjectService.java`, cadence `-Dobjects.sla.sweep.seconds`, default 60, `0` disables) stamps
   `slaBreachedAt` once and emits `OBJECT_SLA_BREACH`. **The clock stops at `RESOLVED` and at every terminal
   state of the Incident's registered workflow** (`IMPORT-RESIDUALS-1` (4), 2026-09-28) — the resolution gate's
   set (`decidesIncident`) **plus** `ARCHIVED`: the gate exempts `ARCHIVED` because archiving records no outcome,
@@ -629,8 +629,8 @@ reaching the browser — see the Link Analysis module concept.
 
 A Case's **Contents** are the Incidents it `CONTAINS` — links, never an `attributes.caseId` (refused, §6).
 **Merge** moves members, tags and watchers to the survivor and closes the absorbed Cases with a
-`MERGED_INTO` link and marker (`ObjectService.java:993-1021`); **Split** carves members into a new Case tied
-back by `SPLIT_FROM` (`:1052-1083`). Comments and attachments stay where they happened. A **Team** is
+`MERGED_INTO` link and marker (`CaseOperations.mergeCases`, module case-management); **Split** carves members into a new Case tied
+back by `SPLIT_FROM` (`CaseOperations.splitCase`). Comments and attachments stay where they happened. A **Team** is
 `attributes.assignees` (the lead stays `assignee`); **Findings** = **Disposition** (`confirmed ·
 false-positive · recovered · written-off · inconclusive · duplicate · accepted-risk` —
 `FindingsSpec.DISPOSITIONS`, the ladder Incidents resolve with too) + impact + summary, with a *soft* no-disposition
@@ -784,7 +784,7 @@ Shipped 2026-06-29 as an **in-process MVP**, deliberately without a broker: `Not
 
 ### 3.9 Diagnosis
 
-`FailureReactor` (`features/inspecto-agent/src/main/java/com/gamma/agent/diagnose/FailureReactor.java:17-33`)
+`FailureReactor` (`features/inspecto-agent/src/main/java/com/gamma/agent/diagnose/FailureReactor.java`)
 subscribes to the `ConsignmentEventBus` for FAILED consignments and diagnoses them off-thread (bounded
 queue + virtual threads) through `HeuristicDiagnoser` and, when a model is configured, `ModelDiagnoser`;
 results land in `DiagnosisStore`, a **ring of 256**, and are served read-only by `GET /assist/diagnoses`.
@@ -801,11 +801,11 @@ Incident" is unbuilt (§2, §5).
 the module's `RouteModule`, `JobTypeProvider` and `MaintenanceTaskProvider` registrations, is the whole switch. Because the objects domain was **constructed by mandatory core**, cell 7
 also needed a host-declared `ObjectEngineProvider` handle beside the seam — opening the stores needs
 `SpaceRoot` / `OperationalDb` from the module above the engine. With the module absent:
-`AbsentModuleRoutes` answers **49 paths `503`** naming the module; `BootstrapRoutes` sets `features.ops =
-api.hasRoute("POST", "/objects")` (`:82`) — derived from what registered, not declared; the SPA drops the
+`AbsentModuleRoutes` answers **49 paths `503`** naming the module; `BootstrapRoutes` sets `features.ops` from the
+registered features (installed, enabled in the Space and entitled) — derived from what registered, not declared; the SPA drops the
 `incidents`, `cases`, `tags` nav ids and the Incidents / Case Manager / Incident-detail panes render an
 explained `<inspecto-alert>` ("Operational objects not installed"), never a toast; `DecisionRoutes`
-(`:193-253`) splits its outcome three ways so an absent module is never reported as "Incident already open"
+splits its outcome three ways so an absent module is never reported as "Incident already open"
 — the defect verification caught. Three ops Job Types leave with the module (§2). ⛔ `/alerts*` stays.
 
 ### 3.11 The UI seam

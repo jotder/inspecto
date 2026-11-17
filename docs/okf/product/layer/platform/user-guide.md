@@ -32,8 +32,8 @@ lifecycle*) and the walkthrough [file to dashboard](../product/user-guide-journe
 ## Spaces
 
 A Space is an isolated project: its own Connections, Collectors, Pipelines, Datasets, dashboards and
-menus. The **Space switcher** in the top bar appears only when the server hosts more than one Space;
-switching reloads the app in the new Space. Details: [Spaces](../product/user-guide-spaces.md).
+menus. The **Space switcher** in the top bar appears only when the server runs with hosted Spaces
+(`/spaces/_meta` `multiSpace`) and you can see a Space or may create one; switching reloads the app in the new Space. Details: [Spaces](../product/user-guide-spaces.md).
 
 ## Getting around
 

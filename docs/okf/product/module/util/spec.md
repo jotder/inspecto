@@ -15,7 +15,7 @@ Module `platform/inspecto-util` (manifest `platform/inspecto-util/src/main/resou
 
 | Class | Role |
 |---|---|
-| `DuckDbUtil` | Every recurring DuckDB pattern: open, settings, spill directory (`<java.io.tmpdir>/.duckdb_tmp` by default), temp DB cleanup, global `processing.duckdb.*` fallbacks |
+| `DuckDbUtil` | Every recurring DuckDB pattern: open, settings, spill directory (`<data root>/.duckdb_tmp`, `java.io.tmpdir` without a data root), temp DB cleanup, global `processing.duckdb.*` fallbacks |
 | `ConnectionSource`, `SingleConnectionSource`, `SharedPoolConnectionSource` | Where a DB-backed store borrows a connection for one operation |
 | `JdbcDrivers` | Driver loading and the shared PostgreSQL pool |
 | `AbstractJdbcStore`, `BrowsableStore`, `StoreHealth` | Store base class; what each store family resolved to per Space (feeds `GET /health/details`) |
@@ -39,10 +39,11 @@ resolves which modules are ACTIVE or INERT (a missing required module or contrac
 
 | Property | Default | Class |
 |---|---|---|
-| `processing.duckdb.memory_limit` / `.temp_directory` / `.max_temp_directory_size` / `.threads` | unset (DuckDB default) | `DuckDbUtil` — per-config value wins, then the flag |
+| `processing.duckdb.memory_limit` | code default: 40 % of visible RAM ÷ 4, floored at 1 GiB (`defaultMemoryLimit`) | `DuckDbUtil.memoryLimit` — per-config value wins, then the server configuration's installed value, then the flag |
+| `processing.duckdb.temp_directory` / `.max_temp_directory_size` / `.threads` | unset (DuckDB default) | `DuckDbUtil` — per-config value wins, then the flag |
 | `db.pool.size` | `10` | `JdbcDrivers` — per-family borrow cap |
 | `db.pool.process.size` | `20` | `JdbcDrivers` — connections in the one shared pool per process per server |
-| `db.pool.timeoutMs` | built-in, min 250 ms | `JdbcDrivers` — borrow wait before failing |
+| `db.pool.timeoutMs` | `30000`, min 250 ms | `JdbcDrivers` — borrow wait before failing |
 | `inspecto.topology` | `single` | `Topology` — `single` or `partitioned`; anything else throws |
 | `inspecto.ducklake.catalog` + `inspecto.ducklake.data` | unset | `LakehouseCatalog` — both or neither |
 | `ops.timezone` | JVM default | `OperationsZone` — IANA id; unresolvable throws |

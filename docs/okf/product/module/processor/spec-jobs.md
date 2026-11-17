@@ -503,7 +503,7 @@ It replaced the hardcoded `$`-vocabulary described in the *Parameters* bullet ab
 ### The operations zone (`-Dops.timezone`, shipped 2026-08-15)
 
 `com.gamma.util.OperationsZone` resolves the one zone that governs **both** cron firing
-(`PipelineScheduler:117` → the `cronDue` comparison at `:373-375`; `JobService:246` → `scheduler.cron`,
+(`PipelineScheduler` → the `cronDue` comparison; `JobService` → `scheduler.cron`,
 next-fire and `ZonedDateTime.now`) **and** the `$today`/`$yesterday`/`$day(-1)` family
 (`JobService` → `ExpressionContext.zone` → `BuiltinExpressions.fireDate` = `LocalDate.ofInstant(fireTime,
 ctx.zone())`). One zone for both deliberately: a job that fires at 00:30 ops-local and then resolves
@@ -520,22 +520,22 @@ ctx.zone())`). One zone for both deliberately: a job that fires at 00:30 ops-loc
   event-time cut (§5.6/§10.1) — while this one is what the **operator's schedule** is expressed in. They
   routinely differ (data in UTC, a 06:00 `Asia/Kolkata` run). Wiring the catalog note into the scheduler
   would also have made firing depend on **directory scan order**: a space holds any number of
-  `*_meta.toon` files and `MetadataGraphService:155` merges them last-non-blank-wins. Full reasoning:
+  `*_meta.toon` files and `MetadataGraphService` merges them last-non-blank-wins. Full reasoning:
   [`domain-timezone-behaviour-plan.md`](../../../../archived-documents/plans-archive/domain-timezone-behaviour-plan.md).
 - **Two more sites adopted it 2026-08-15**, because neither was a judgement once grounded:
   - `EventRoutes.epochMillis` — a bare `yyyy-MM-dd[ HH:mm:ss]` bound on `/events` is an **operator's wall
     clock**, typed into a console beside a schedule that already fires in this zone. ⚠ The resolve happens
     **outside** the parse's `catch (RuntimeException)`: inside it, a misconfigured `-Dops.timezone` would be
     caught and returned as a **400 blaming the query the operator just typed**.
-  - `PackTestHarness:164` — its production counterpart `JobService:250` had **already** moved, so the
+  - `PackTestHarness` — its production counterpart `JobService` had **already** moved, so the
     harness was dry-running `$today` in a different zone than the real run. That is not a display choice, it
     is a harness that can go green for the wrong date; the whole point of the harness is that a pack green
     here is a pack the engine accepts.
 - ✅ **Three sites stay on `systemDefault()`, to match their writers — DECIDED 2026-08-15. The sweep is
-  CLOSED; this is the end state, not a deferral.** `AlertService:374` (cutoff vs. the ledger's
-  `end_time`/`start_time`, written by `ConsignmentIngestor:298/360/375/386`), `ReferenceCompactor:142` (literal vs.
-  the `__valid_from` column, written by `ConsignmentIngestStrategy:215`), `InspectoTools:385` (parse vs. the audit
-  CSV, written by `JobService:714…1010`). Each is the **read half of a write/read pair** over a **zone-naive**
+  CLOSED; this is the end state, not a deferral.** `AlertService` (cutoff vs. the ledger's
+  `end_time`/`start_time`, written by `ConsignmentIngestor`), `ReferenceCompactor` (literal vs.
+  the `__valid_from` column, written by `ConsignmentIngestStrategy`), `InspectoTools` (parse vs. the audit
+  CSV, written by `JobService`). Each is the **read half of a write/read pair** over a **zone-naive**
   stored string, self-consistent precisely because both halves use `systemDefault()`. The operations zone
   answers "when does the operator's schedule fire"; **none of these three is an operator-facing clock** — they
   are internal round-trips over the platform's own timestamps, so there is nothing for `-Dops.timezone` to
@@ -1022,7 +1022,7 @@ committed configs.
   `JOB-PATH-SINGLE-TENANT-GATE-BASE-1` below. Pinned by `PipelineJobRunnerPathJailTest`.
 - ~~**`JOB-PATH-COMPACTOR-UNJAILED-1`**~~ ✅ **SHIPPED 2026-09-16** — both compactors now use the job rule,
   matching the three `MaintenanceJob` siblings. ⛔ `ReferenceCompactor.compact(Path,long)` stays unjailed
-  on purpose: `CollectorService:1276` feeds it a pipeline's own resolved dirs, not an authored value.
+  on purpose: `CollectorService` feeds it a pipeline's own resolved dirs, not an authored value.
 - ~~**`JOB-PATH-PATCH-ROUTE-WRONG-BASE-1`**~~ ✅ **SHIPPED 2026-09-16, and the defect was not the one the
   row named.** `ConfigWriteRoutes.safetyBase` (now `safetyFindings`) dispatches on TYPE, because `configDir` legitimately means
   two different things: a pipeline/schema resolves its `schema_file`/`grammar` refs against the config
@@ -1034,7 +1034,7 @@ committed configs.
   VALUES to `ConfigSafetyValidator`, unlike its sibling `JobRoutes.parseJob`; it now runs
   `ConfigSafetyValidator.checkJob` too. ⇒ Every job-config producer runs the same gate.
 - ~~**`JOB-PATH-GATE-BLIND-KEYS-1`**~~ ✅ **CLOSED 2026-09-16 (`8773cc471`) — one third SHIPPED, one third
-  REFUTED, one third re-filed (and since discharged).** `archive_dir` is now in `JOB_PATH_KEYS` (seven keys): `CleanupTask:47` already resolved it
+  REFUTED, one third re-filed (and since discharged).** `archive_dir` is now in `JOB_PATH_KEYS` (seven keys): `CleanupTask` already resolved it
   through `requireJobPathUnderAny` against the Space root, so the gate and the jail agreed on the rule and
   only the gate was not looking — and **no committed job config carries the key**, so listing it refuses
   nothing that exists. 🔴 **The dotted-path half is REFUTED as a reachable defect.** `RawConfig.str` does
@@ -1048,7 +1048,7 @@ committed configs.
   Widening `checkJob` to `job.params.*` would refuse nothing any route can accept. ⚠ **`out_dir` was held
   OUT deliberately** — `ReportJob` jailed it with the plain `PathJail.requireUnderAny` (containment only,
   working-directory-relative), so listing it would have *manufactured* a gate/runtime split — **and the
-  row missed a second key of the same shape: `config` (`EnrichJob:59`) reached `EnrichmentConfig.load`
+  row missed a second key of the same shape: `config` (`EnrichJob`) reached `EnrichmentConfig.load`
   with no jail at all.** ✅ **Both were discharged the same day by `JOB-PATH-REPORT-ENRICH-SPLIT-1`,
   reader first and only then the list** — see that section below. ⇒ `JOB_PATH_KEYS` is now **nine**:
   the seven after `archive_dir` joined, plus `out_dir` and `config`.
@@ -1114,7 +1114,7 @@ from the deployed column alone called `maintenance_report_job.toon` a refusal, a
 ⚠ When judging a value's blast radius, read the column that matches the tree you are on, and check
 `Files.exists` on the CWD-relative path — that single predicate is what picks the column.
 
-- **`FENCE-STORE-SILENTLY-INERT-1`** — `DeletionFence.check` (`:67`) `continue`s past a target store with
+- **`FENCE-STORE-SILENTLY-INERT-1`** — `DeletionFence.check` `continue`s past a target store with
   no resting producer, so a job's `store:` naming nothing disarms the fence with **no error, no warning
   and no event**. ⛔ It shipped that way: `compact_job.toon` carried a miscopied `store: out/database` from
   2026-07-08 until `819e597b` while the only produced store was `sales`, and the example's `probes.txt`
@@ -1129,10 +1129,10 @@ from the deployed column alone called `maintenance_report_job.toon` a refusal, a
   descriptor is known, and must WARN rather than refuse — built-in jobs read params their own descriptors
   do not declare, so a descriptor is a UI/API contract, not the read set.
 
-- **`COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1`** — `PartitionCompactor:69` returns
+- **`COMPACT-SUCCEEDS-ON-A-MISSING-DIR-1`** — `PartitionCompactor` returns
   `JobResult.ok("directory not present, nothing to do")` when `dir` is absent, so on a tree where the
   directory does not exist a **broken** config reports SUCCESS. Today's regression surfaced only because
-  `serve-example.sh:52` pre-creates the directory. ⛔ The fix is not simply "throw" — a compactor with
+  `serve-example.sh` pre-creates the directory. ⛔ The fix is not simply "throw" — a compactor with
   nothing to compact is a legitimate no-op; the question is whether an UNRESOLVABLE dir is distinguishable
   from an EMPTY one, and it is.
 

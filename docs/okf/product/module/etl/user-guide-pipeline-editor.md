@@ -684,7 +684,7 @@ database; the lift rebuilds pairing from the stamp.
   all and looks identical to any unconfigured Step.
 - 🔴 **A round-trip test that configures the artifact under test tests nothing** — the original spec
   set `database` by hand and passed the whole time.
-- 🔴 **Single-slot kinds** — *corrected 2026-09-09: `MULTI_JOIN` DOES NOT EXIST.* Only **two** “too many of a kind” constants are live, `MULTI_PARSER` and `MULTI_MAP_CONFIG` (`PipelineEditable.java:58,65`) — *five since 2026-09-23, with `MULTI_ACQUISITION` / `MULTI_GAP` / `MULTI_MARKER`*; the join/dedup/route/summarize codes were deleted with the ordered `steps:` chain and survive only inside a `PipelineCompileException` Javadoc paragraph explaining their own removal. §Multiplicity below already says this — this bullet contradicted it. (`processing.join` is last-one-wins; `recordDedup`,
+- 🔴 **Single-slot kinds** — *corrected 2026-09-09: `MULTI_JOIN` DOES NOT EXIST.* Only **two** “too many of a kind” constants are live, `MULTI_PARSER` and `MULTI_MAP_CONFIG` (`PipelineEditable.java`) — *five since 2026-09-23, with `MULTI_ACQUISITION` / `MULTI_GAP` / `MULTI_MARKER`*; the join/dedup/route/summarize codes were deleted with the ordered `steps:` chain and survive only inside a `PipelineCompileException` Javadoc paragraph explaining their own removal. §Multiplicity below already says this — this bullet contradicted it. (`processing.join` is last-one-wins; `recordDedup`,
   `routeNode`, `summarizeNode` are last-one-wins, silently): the discard behavior is PINNED per
   slot in `PipelineEditableTest`; inverting it is an operator call (BACKLOG §4). Mid-branch
   `steps:` sub-chains are refused by both authoring surfaces — design:
@@ -969,7 +969,7 @@ each fix live). Genuinely open:
   both open a palette narrowed to `BRANCH_STEP_TYPES` (filter / dedup / summarize — the client mirror
   of `RouteArming.BRANCH_STEP_KINDS`, so it front-runs the 422 rather than offering `join`/`route`).
   ⚠ **The refusal toast is RENDERED from `BRANCH_STEP_TYPES`** (`branchStepTypesLabel()`, 2026-09-13),
-  never hand-listed — the same discipline the Java authority always had (`RouteArming:180` renders
+  never hand-listed — the same discipline the Java authority always had (`RouteArming` renders
   `new TreeSet<>(BRANCH_STEP_KINDS)`), which is exactly why the server side never drifted. Pinned by three
   specs asserting the label names every member of the set.
   Remove/move inside a branch stay canvas work. Backend:

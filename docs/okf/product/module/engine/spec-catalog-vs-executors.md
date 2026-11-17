@@ -98,25 +98,25 @@ batch; and `SchemaCompatibility`'s BACKWARD contract needs a stable schema to di
 As built:
 
 * **Node type:** `BuiltinNodeType.TRANSFORM_SQL("transform.sql", TRANSFORM, "SQL")`
-  (`BuiltinNodeType.java:118`) — `DATA` in, `DATA` out, single-input; a `project()`-class verb like
+  (`BuiltinNodeType.java`) — `DATA` in, `DATA` out, single-input; a `project()`-class verb like
   `map`/`select`/`derive`, never a split. ⛔ **Filtering stays `transform.filter`** (operator D3): a `WHERE`
   buried in free SQL would discard rows silently, where `transform.filter` emits them as `DROPPED` for
   quarantine/audit. There is deliberately no `where` attribute on this node.
-* **Attributes:** exactly one — `sql` (`multiline`, required; `NodeAttributes.java:374-379`, mirrored in
-  `node-attributes.ts:347-353`, pinned by `NodeAttributesContractTest`). Help text pins the convention: the
+* **Attributes:** exactly one — `sql` (`multiline`, required; `NodeAttributes.TRANSFORM_SQL`, mirrored in
+  `node-attributes.ts`, pinned by `NodeAttributesContractTest`). Help text pins the convention: the
   input relation is addressed by the fixed alias **`input`** (`FROM input`); no DDL/DML, no multiple
   statements. The Angular pane also stores a `fields[]` block beside `sql` (the Simple-mode rows that
   *generated* the SQL) — an **authoring artifact, not an engine contract**: the engine reads only `sql`,
   and a node without `fields[]` is a hand-written ("locked") one. See
   [pipeline-editor.md](../etl/user-guide-pipeline-editor.md) for the pane.
-* **Executor:** `RowShaper.shape()` gains one branch (`RowShaper.java:174`) → `sql(conn, node, input,
-  outPrefix)` (`:494-512`): the statement passes `SqlGuard.check` (allow-list — anything that is not a
+* **Executor:** `RowShaper.shape()` gains one branch (`RowShaper.java`) → `sql(conn, node, input,
+  outPrefix)`: the statement passes `SqlGuard.check` (allow-list — anything that is not a
   single `SELECT` throws naming the node), then `CREATE OR REPLACE TEMP VIEW input AS SELECT * FROM <in>`
   binds the alias, `CREATE TABLE <out> AS <sql>` materializes exactly one relation (`PipelineRel.DATA`),
   and the view is dropped in a `finally`. It runs on the same sealed [`SqlSandbox`](spec-duckdb.md) connection
   `EXPR` uses — no file/network access, no extension autoload.
 * **Derived output schema without execution:** `TypeFlow.describe(List<Column> inputColumns, String sql)`
-  (`platform/inspecto-etl/.../TypeFlow.java:92-111`) generalizes `transformedColumns`: an in-memory connection, a
+  (`platform/inspecto-etl/.../TypeFlow.java`) generalizes `transformedColumns`: an in-memory connection, a
   scratch table literally named `input` shaped by the **upstream Step's typed schema**, then `DESCRIBE
   <sql>` → `[{name, type}]`. A binder/parse failure surfaces as `IllegalArgumentException` carrying
   DuckDB's message verbatim (it names the offending column — that IS the validation). No rows are ever
@@ -173,7 +173,7 @@ As built:
   apart, so the distinction is load-bearing.
 * **Audit honesty at the boundary:** `transform.sql` is, by construction, outside the cast-failure audit
   (the same reason `EXPR` is). `PipelineValidator.validate` emits one WARNING `SQL_STEP_UNAUDITED`
-  (`PipelineValidator.java:86, 263-267`) per `transform.sql` node, naming the node id and its `sql`
+  (`PipelineValidator.java`) per `transform.sql` node, naming the node id and its `sql`
   attribute. Unlike the 2026-08-29 `EXPR` fix, **no `clean`/gate bug was found alongside it**:
   `PipelineValidator.Result.ok()` and `PipelineGraphRoutes.saveGraph`'s findings gate already keyed off
   `Severity.ERROR` only — proven, not trusted, by `PipelineValidatorTest`
@@ -223,9 +223,9 @@ registry that do not exist. **Parked on demand (operator 2026-10-04)** until a n
   `columns`, a lift-derived `schema`, or a mapping component's `rules`; `RowShaper.isProjection` sends any of
   those through `project()` (compiled by `RecordTransform`), and only a HAND-WRITTEN `sql` key takes the
   opaque-SQL path. `RowShaper.MAP_NODE_CONFIG_KEYS` pins the vocabulary.
-* **Engine:** `DataTransformer.materialize()` (`platform/inspecto-etl/.../DataTransformer.java:50`) builds the
+* **Engine:** `DataTransformer.materialize()` (`platform/inspecto-etl/.../DataTransformer.java`) builds the
   transformed table. Type coercion is `TRY_CAST`; a failed cast is counted + WARN-logged and the row is
-  **kept with NULL** (`DataTransformer.java:202-204`) — it is NOT routed to quarantine, despite the catalog
+  **kept with NULL** (`DataTransformer.java`) — it is NOT routed to quarantine, despite the catalog
   note for `quality.schema.validator` implying a reject path.
 * **Legacy rule kinds** (`transformType` — `DIRECT`, `EXPR`, `CONCAT_DT`, `FILENAME_DATE`) no longer
   compile anywhere: `RecordTransform.fromMappingRules` converts them to catalog functions at read time.
@@ -238,29 +238,29 @@ registry that do not exist. **Parked on demand (operator 2026-10-04)** until a n
   named a *bespoke* `app-pipeline-load-definition` component, which does not exist and appears nowhere in
   the UI — a deleted component named as the current mapping UI. Its replacement is also not bespoke: the
   dialog edits `rules[{targetColumn, sourceExpression, transformType}]` over the **shared**
-  `<inspecto-editable-grid>` (`mapping-editor.dialog.ts:30,121-128`).
+  `<inspecto-editable-grid>` (`mapping-editor.dialog.ts`).
 * **Persistence:** rules save as a sidecar CSV next to the schema file — `x_schema.toon` → `x_mapping.csv`
-  — via `MappingCsv.siblingFor()` (`platform/inspecto-util/.../MappingCsv.java:34-42`), pushed through
+  — via `MappingCsv.siblingFor()` (`platform/inspecto-util/.../MappingCsv.java`), pushed through
   `PUT /pipelines/{name}/graph`.
-* **Dispatch:** hardcoded in `RowShaper.shape()` (`RowShaper.java:171-173`) → `project(...)`, after the
-  optional `PipelineNodeExecutor` SPI seam (`RowShaper.java:162-163`) is checked and found empty.
+* **Dispatch:** hardcoded in `RowShaper.shape()` (`RowShaper.java`) → `project(...)`, after the
+  optional `PipelineNodeExecutor` SPI seam (`RowShaper.java`) is checked and found empty.
 
 ## `transform.join` (the 5th — "Lookup & Static Map Transcoder")
 
 * 🔴 **The inline-static-map half is no longer missing.** It shipped 2026-09-06 as its own node type,
-  `transform.lookup` (`BuiltinNodeType.java:109-111`, `RowShaper.lookup`), which compiles an author
+  `transform.lookup` (`BuiltinNodeType.TRANSFORM_LOOKUP`, `RowShaper.lookup`), which compiles an author
   `key=value` list to a `CASE` — no join, no stored relation. Pick `lookup` for a fixed code table,
   `join` for a Reference dataset that changes over time.
 * **Config schema exists and is real** (unlike the map group):
-  `NodeAttributes.TRANSFORM_JOIN` (`NodeAttributes.java:361-366`) — `reference` (autocomplete, required,
+  `NodeAttributes.TRANSFORM_JOIN` (`NodeAttributes.java`) — `reference` (autocomplete, required,
   points at a registered `reference/<id>` component) and `on` (list, required, join key columns).
-  Registered at `NodeAttributes.java:384`; kept in sync with the Angular mirror
-  (`node-attributes.ts:326-343,357-359`) by `NodeAttributesContractTest`.
-* **Engine:** `RowShaper.join()` (`RowShaper.java:442`, LEFT JOIN semantics doc'd at lines 46-49) resolves
+  Registered at `NodeAttributes.java`; kept in sync with the Angular mirror
+  (`node-attributes.ts`) by `NodeAttributesContractTest`.
+* **Engine:** `RowShaper.join()` (LEFT JOIN semantics in the `RowShaper` class Javadoc) resolves
   the reference via a `ReferenceResolver` seam, throwing if unresolvable or if `on` is missing
-  (`RowShaper.java:97,455`).
+  (`RowShaper.java`).
 * **Authoring-only / at-rest gated** — refused mid-branch, since no reference resolver exists on the
-  ingest lane (`BuiltinNodeType.java:137-141`).
+  ingest lane (`BuiltinNodeType.TRANSFORM_JOIN`).
 * **UI:** the generic path — `app-pipeline-config-definition` rendering `<inspecto-schema-form>` off the
   server-published `AttributeSpec[]` (`GET /pipelines/node-types`).
 * **Dispatch:** `RowShaper.shape():164`, before the `transform.map` branch.
@@ -275,7 +275,7 @@ the actual execution:
   generated `SELECT`. There is no Java-side type-checking pass. This is also *why* a failed cast can't be
   routed to quarantine: `TRY_CAST` returns SQL `NULL` inline, in the same query, with no per-row branch
   point for Java to intercept — the NULL count is only measured after the query returns
-  (`DataTransformer.java:202-204`).
+  (`DataTransformer.java`).
 * **Sanitizing, casting, renaming and computing** — all four of the acts now folded into
   `transform.record` — are SQL fragments in the generated column list: `TRIM(col)`,
   `TRY_CAST(col AS …)`, `expr AS target_col`, any scalar expression. DuckDB parses and runs them like
@@ -296,17 +296,17 @@ naturally expressible as a join against a stored relation.
 ## Cross-cutting
 
 * **The measure shorthand has ONE home:** `MeasureCompiler.splitShorthand`
-  (`MeasureCompiler.java:66-76`), which all three production call sites reach (`MaterializeTask:143`,
-  `ReportJob:164`, `RowShaper:468`). ⛔ `RecipeVerbParityTest` deliberately still hand-rolls the split and
+  (`MeasureCompiler.java`), which every production call site reaches (`MaterializeTask`, `ReportJob`,
+  `RowShaper`, `PivotStep`, `TimeSeriesStep`, `KpiDefinition`). ⛔ `RecipeVerbParityTest` deliberately still hand-rolls the split and
   **must keep doing so**: it exists to prove the recipe path produces byte-compatible measures, and a
   parity test that calls the thing it is checking proves nothing. That copy is independent verification,
-  not duplication. The rationale lives in that javadoc and in `DatasetMeasureProbe.java:30-36`.
-* **Dispatch architecture:** `RowShaper.shape()` (`RowShaper.java:155-183`) — SPI seam
+  not duplication. The rationale lives in that javadoc and in `DatasetMeasureProbe.java`.
+* **Dispatch architecture:** `RowShaper.shape()` (`RowShaper.java`) — SPI seam
   (`PipelineNodeExecutors.get(type)`) first, then a hardcoded `if (BuiltinNodeType.X.equals(type))` chain
-  (`transform.sql` at `:174`), else throws. No per-catalog-id branch exists; several catalog ids fan into
+  (`transform.sql` among them), else throws. No per-catalog-id branch exists; several catalog ids fan into
   the same `transform.map` or `transform.sql` branch.
 * **Palette activity is gated on `Status.PLANNED` only** — `DELIVERED` and `PARTIAL` both render as
-  active in the palette (`ProcessorCatalog.java:12-14`), so `transform.lookup` looks fully live despite
+  active in the palette (`ProcessorCatalog.java`), so `transform.lookup` looks fully live despite
   being a partial implementation. ⚠ *Addable* is a separate flag, computed from
   `PipelineEditable.isAuthorable(nodeType)`: `quality.schema.validator` is DELIVERED but **not addable**,
   because it now points at `parser` (a capability of the Parse Step, not a step you add).
@@ -340,14 +340,14 @@ code rather than by a human, and it used to write no `columns` at all.
   real relation, so describing what was actually written is truthful where a statically-derived shape is
   only a prediction. `TypeFlow.Column` stays `(name, type)` for this reason — ⚠ a board row demanded a
   `role` carry-through here for months, and the design rejects it.
-* **One coarse-type vocabulary, one role heuristic, both pinned.** `ResultSetDescriptor.columnType`
-  (`:54-73`) maps a DuckDB type name to the coarse vocabulary; `roleFor` (`inspecto/viz/result-set.ts:49`)
+* **One coarse-type vocabulary, one role heuristic, both pinned.** `ResultSetDescriptor.columnType(String)`
+  maps a DuckDB type name to the coarse vocabulary; `roleFor` (`inspecto/viz/result-set.ts`)
   owns the role heuristic and the Studio copy delegates to it. Pinned across both languages by
   `column-role.contract.json` + `ColumnRoleContractTest` + `column-role.spec.ts`.
 * **Deliberate calls:** several date columns ⇒ derive `temporal` for **NONE** (an ambiguous tie-break is
   worse than none); `INTERVAL` and composite types (`STRUCT`, `MAP`, arrays) ⇒ `string`; a stored column
   the derivation stops producing ⇒ marked `hidden`, never deleted.
-* **Refresh MERGES keys by owner** (`MaterializeTask.mergeColumns`, `:218-250`): the stored document is
+* **Refresh MERGES keys by owner** (`MaterializeTask.mergeColumns`): the stored document is
   seeded first and only the job-owned keys are restated, so hand-authored roles and labels ride through a
   refresh untouched. The code carries that rule as a comment precisely so a future field list cannot
   silently start dropping keys.
@@ -358,7 +358,7 @@ declaration itself — so the contract looked whole from the board while coverin
 Half a pin and a whole pin are indistinguishable until something reads the key.
 
 ⚠ **Two accepted limitations, stated rather than papered over.** Hidden columns accumulate with no pruning
-story. And `query/query-columns.ts:60` `dbColumnType` is a **second** client-side interpreter of the same
+story. And `query/query-columns.ts` `dbColumnType` is a **second** client-side interpreter of the same
 DuckDB spellings that disagrees on four (`BIGINT[]`/`STRUCT`/`MAP` → `number`, `LOGICAL` → `string`); it
 serves the query builder rather than stored Datasets, so it is pinned as a **documented exclusion** — see
 `COLUMN-TYPE-SECOND-INTERPRETER-1`.

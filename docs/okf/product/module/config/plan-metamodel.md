@@ -151,11 +151,11 @@ is not a Java class. ⚠ `ConfigSpecs` has **no `mapping()` spec**; `TYPES` omit
 
 `ComponentRoutes` (`inspecto/src/main/java/com/gamma/control/ComponentRoutes.java`): `GET /components/{type}`
 · `GET /components/{type}/{id}` · `POST /components/{type}` (`409` if it exists) · `PUT /components/{type}/{id}`
-· `DELETE /components/{type}/{id}` · `GET …/{id}/versions` · `POST …/{id}/versions/{v}/restore` (`:43-51`);
+· `DELETE /components/{type}/{id}` · `GET …/{id}/versions` · `POST …/{id}/versions/{v}/restore`;
 every mutation gated `canAuthorWorkbench`, then write-root `503`. **Concurrency:** `ContentHash`
 (`inspecto/src/main/java/com/gamma/control/ContentHash.java`, SHA-256 over key-sorted JSON, parity-pinned
 with the SPA's `content-hash.ts` by `ContentHashTest`) is the ETag; reads honour `If-None-Match` → `304`;
-a `PUT` with a stale `If-Match` is **`409 CONFLICT_STALE_VERSION`** (`:252-266`); an absent header passes.
+a `PUT` with a stale `If-Match` is **`409 CONFLICT_STALE_VERSION`**; an absent header passes.
 **History (MET-5):** every write archives the prior copy to `<typeDir>/.history/<id>.v<N>.toon` — a
 sub-directory, so the registry scan never mis-reads it as a duplicate — keep-N `-Dcomponents.history.keep`
 (default 10, min 1; `ComponentStore.java`); restore is itself a versioned write. Preview:
@@ -164,10 +164,10 @@ DuckDB (`ComponentPreview`); the schema cast check is `POST /config/preview/sche
 
 ### 3.3 Per-kind write hooks
 
-`ComponentRoutes.writeComponent` (`:537-553`) → `validateKind` (`:561-628`): `findings-spec` (id ↔
+`ComponentRoutes.writeComponent` → `validateKind`: `findings-spec` (id ↔
 `objectType`, section vocabulary, `422`); `schema` (re-runs `ConfigLoader.validate` +
 `ConfigSafetyValidator` — the same gate as `/config/write` — plus the **schema-compatibility gate**
-(`:289-310`): a narrowing change is `422` with cell-anchored findings unless `?compatibility=none` is
+: a narrowing change is `422` with cell-anchored findings unless `?compatibility=none` is
 confirmed, with drift detected by `SchemaMappingDrift`); `mapping` (`MappingRules.validate`). ⚠ The SPA's
 schema editor therefore writes through the **gated `POST /config/write type=schema`**, while the mapping
 editor writes through plain component CRUD plus `POST /components/mapping/validate` — two paths for two
@@ -245,11 +245,11 @@ All of the above is covered by `MetadataGraphStudioLayerTest`
 (`platform/inspecto-engine/src/test/java/com/gamma/catalog/MetadataGraphStudioLayerTest.java`).
 
 `CatalogRoutes` (`inspecto/src/main/java/com/gamma/control/CatalogRoutes.java`): `GET /catalog` (tables) ·
-`/catalog/streams` (`:30`, **per-Collector** data-origin nodes shaped to the UI `MetadataNode` contract —
-MET-4) · `/catalog/references` (`:32`, `REFERENCE_DATASET` nodes, 2026-07-14) · `/catalog/kpis` (`:33`) ·
-`/catalog/graph` (`:34`; `from / depth / direction / kinds / edgeKinds / overlay`) · `/catalog/resolve?table=|pipeline=`
-(`:44`; **unique match only** — zero and several both `404`, a blank `output_table` batch resolves by
-pipeline since 2026-09-06) · `/catalog/tables/{id}` (`:45`, node + depth-2 neighbours; its `(.+)` is greedy,
+`/catalog/streams` (**per-Collector** data-origin nodes shaped to the UI `MetadataNode` contract —
+MET-4) · `/catalog/references` (`REFERENCE_DATASET` nodes, 2026-07-14) · `/catalog/kpis` ·
+`/catalog/graph` (`from / depth / direction / kinds / edgeKinds / overlay`) · `/catalog/resolve?table=|pipeline=`
+(**unique match only** — zero and several both `404`, a blank `output_table` batch resolves by
+pipeline since 2026-09-06) · `/catalog/tables/{id}` (node + depth-2 neighbours; its `(.+)` is greedy,
 so no sub-paths). There is no `/catalog/search`, `/catalog/lineage` or `/catalog/schemas`. **Stream grouping**
 (2026-07-24): pipelines sharing a `stream:` membership key collapse under one `stream:<logical>` node in
 `MetadataGraphBuilder` — the glossary's "one sub-system = one Stream"; `/catalog/streams` is a separate

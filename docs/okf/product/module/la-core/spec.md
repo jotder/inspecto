@@ -30,7 +30,7 @@ it defines the SPIs other modules register. Narrative design: [architecture](arc
 | Size limits | `WorkingSetSizeLimit` (per set), `InvestigationSetBudget` (per Investigation total) |
 | Drafts | `DraftStore`, `DraftLifecycle`, `DraftCheckpoints`, `DraftIndex` |
 | Graph Run | `GraphRunService`, `GraphEngine`, `InMemoryGraphEngine`, `GraphInput`, `WorkingSetGraphInput`, `GraphResult`, `GraphBudget`, `Algorithm`, `GraphRunException`, `InvalidGraphRequest`, `IndexCapExceeded`, `InputFingerprint`, `FingerprintBudget` |
-| Patterns | `PatternQueryCompiler` (stage parsing; the matcher lives in `platform/inspecto-graph`) |
+| Patterns | `PatternQueryCompiler` (stage parsing; the matcher lives in `platform/inspecto-graph`), `TemporalCut` (the DuckDB pre-cut of a temporal pattern scan before `LinkTemporalDetector`) |
 | Ports (+ holder) | `DatasetProvider`/`DatasetProviders`, `CasePort`/`CasePorts`, `CollectorCoveragePort`/`CollectorCoveragePorts`, `OutboundPort`/`OutboundPorts`, `UploadLandingPort`/`UploadLandingPorts` |
 
 ## Ports

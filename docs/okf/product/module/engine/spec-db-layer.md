@@ -666,8 +666,8 @@ writing one path in one Run is **one file**, and `record` is
 `INSERT … ON CONFLICT (consignment_id, path, run_id) DO UPDATE SET <every non-key column> = excluded.…`.
 
 🔴 **`DO UPDATE`, not `DO NOTHING`, and that is the whole decision.** One Run can legitimately write one
-`path` twice: two sinks may target one store (`PartitionSinkWriter:115` sums `rowsByStore`) and
-`PartitionWriter:171,226` reveals each partition under a stable `<baseName>_out.<ext>` with
+`path` twice: two sinks may target one store (`PartitionSinkWriter` sums `rowsByStore`) and
+`PartitionWriter` reveals each partition under a stable `<baseName>_out.<ext>` with
 `OVERWRITE_OR_IGNORE`, so the second write carries a **different `row_count` for the same path**. The file on
 disk really was overwritten, so last-writer-wins matches the filesystem while `DO NOTHING` would keep a count
 for content that no longer exists. ⚠ This is the **opposite** choice from `file_stages` (§3.10),
@@ -1185,26 +1185,26 @@ the house idiom, not an outlier, and "bypasses `OperationalDb.resolve()`" is the
 signature** — it describes all fifteen:
 
 - `OperationalDb.resolve(Family, SpaceRoot)` / `resolveAll(SpaceRoot)` have **exactly one caller
-  repo-wide**: the diagnostic [`OperationalDbReport.java:47`](../../../../../inspecto/src/main/java/com/gamma/service/OperationalDbReport.java).
-  **No store opener calls either**, and [`ServiceStores.java:62`](../../../../../inspecto/src/main/java/com/gamma/service/ServiceStores.java)
+  repo-wide**: the diagnostic [`OperationalDbReport.java`](../../../../../inspecto/src/main/java/com/gamma/service/OperationalDbReport.java).
+  **No store opener calls either**, and [`ServiceStores.java`](../../../../../inspecto/src/main/java/com/gamma/service/ServiceStores.java)
   says so outright — *"Mirrors OperationalDb.resolve"*. ⛔ Read `resolve()` as a **mirror of the openers
   for reporting**, never as their implementation; changing it changes what the report says, not what the
   service opens.
 - **The shared seam that IS load-bearing is `OperationalDb.urlFor(Family, default)`** — the URL half.
   Every family goes through it, the acquisition ledger included
-  ([`SpaceBootstrap.java:37-39`](../../../../../inspecto/src/main/java/com/gamma/service/SpaceBootstrap.java),
-  and `ServiceBootstrap.java:113` since `ACQUIRE-LEDGER-SHARED-URL-1`). ⚠ So "one source of truth" already
+  ([`SpaceBootstrap.java`](../../../../../inspecto/src/main/java/com/gamma/service/SpaceBootstrap.java),
+  and `ServiceBootstrap.java` since `ACQUIRE-LEDGER-SHARED-URL-1`). ⚠ So "one source of truth" already
   holds for URLs and does **not** hold for backends — they are separate questions, and only the second is open.
 - ⛔ **`resolve()` is public but unusable outside `com.gamma.service`**: it returns
-  `record Resolved` ([`OperationalDb.java:209`](../../../../../inspecto/src/main/java/com/gamma/service/OperationalDb.java)),
+  `record Resolved` ([`OperationalDb.java`](../../../../../inspecto/src/main/java/com/gamma/service/OperationalDb.java)),
   which is **package-private** (`OperationalDb` is a `public final class`, so nested members are not
   implicitly public the way an interface's would be).
 - ⛔ **Routing a leaf module's backend read through `OperationalDb` is a MODULE CYCLE.** `inspecto-acquire`
-  is a deliberate leaf; `inspecto/pom.xml:96` depends **on it**, and `OperationalDb.java:3` imports
+  is a deliberate leaf; `inspecto/pom.xml` depends **on it**, and `OperationalDb.java` imports
   `com.gamma.auth.secrets.SecretResolver`. `Family` is invisible from the leaf and cannot be made visible
   without inverting that dependency.
 - ⚠ **`Resolved` is not value-identical to what an opener needs**: it discards the raw backend string, and
-  [`AcquisitionLedgers.java:152-156`](../../../../../platform/inspecto-acquire/src/main/java/com/gamma/acquire/AcquisitionLedgers.java)
+  [`AcquisitionLedgers.java`](../../../../../platform/inspecto-acquire/src/main/java/com/gamma/acquire/AcquisitionLedgers.java)
   needs it **verbatim** for its `StoreHealth` message. Substituting it — even inside the package — would
   change an invalid-value message.
 - ⇒ **What a real de-duplication would cost:** a public, `SpaceRoot`-free accessor (e.g.
@@ -1218,7 +1218,7 @@ signature** — it describes all fifteen:
 
 🔴 **The standing lesson: "X bypasses the central helper" is only a defect if the other N sites do not.**
 Count the sites before filing. This row was filed three times — first as *"not a `Family` member at all"*
-(false: `OperationalDb.java:147` declares it), then as *"duplicated resolution bypassing `resolve()`"*
+(false: `OperationalDb.java` declares it), then as *"duplicated resolution bypassing `resolve()`"*
 (true but not a defect), and only the site count settled it.
 
 ### 5.0-c Schema-per-space (2026-10-04, BACKLOG "Postgres multi-user" P3)
@@ -1433,10 +1433,10 @@ two being the gap DAT-6's own coverage claim had), plus the run lease since B1 a
 ✅ **The roster is sixteen families and COVERAGE IS NOW COMPLETE** (re-measured 2026-09-16). ⚠ This
 paragraph used to claim **thirteen** store classes, put the roster one short, and name the acquisition
 ledger as the one still uncovered — three numbers and a named gap, all stale: it is round-tripped at
-`PostgresStateStoreTest:292`, and `INBOX_REGISTRY` had joined the enum without this paragraph moving.
+`PostgresStateStoreTest`, and `INBOX_REGISTRY` had joined the enum without this paragraph moving.
 🔴 **Do not re-open that "gap" — measure before believing it.** ⛔ And measure with a probe that can
 return a hit: a count of `Db*.open(` call sites reports **fourteen** and drops `DbDedupLedger`, which is
-built with `new DbDedupLedger(conn)` at `:479`. The two idioms are the whole discrepancy, and a probe
+built with `new DbDedupLedger(conn)`. The two idioms are the whole discrepancy, and a probe
 matching only one of them reports an absence that is not there.
 
 ⚠ **That count is mirrored in nine places** and was missed by hand twice in two shifts, so

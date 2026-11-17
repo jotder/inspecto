@@ -196,7 +196,7 @@ describe a state that has since shipped.
    (`onboarding.md`) is marked retired. Line numbers were wrong where sampled (`AgentRoutes`, `JobService`,
    `ConsignmentIngestor`). ⏸ Still open: `access/plan-security` (23, with the access lane) and about 150 in
    docs not touched yet — the same rule, on their next touch. ✅ **`access/` done 2026-11-17 (batch 4)** — item 9;
-   the ~150 in untouched docs stay open.
+   the ~150 in untouched docs stay open. ✅ **Those done 2026-11-17 (batch 5)** — item 10.
 6. **Dangling BACKLOG pointers**: ✅ **FIXED 2026-11-01 (batch 2):** `CLIENT-HALVES-1` (×4 — row closed),
    `OPENAPI-GEN-1` (shipped 2026-09-15), `SEC-INCIDENT-1` (`plan-compliance` §5.2 said the carry-forwards were
    not done; the controls matrix CC6.1 records both done), `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` in
@@ -295,6 +295,64 @@ describe a state that has since shipped.
    - **Found in code, not docs:** the `AccessPolicies` Javadoc cites `{@value #FILE}`, a constant that moved to
      `AccessPolicyStore`; the `Authenticators` Javadoc says its slot is "the only one" that is fail-closed, but
      `AccessDeciders` and `InvestigationStores` are too.
+   - ✅ **The 70 and the ~150 line numbers: done 2026-11-17 (batch 5)** — item 10.
+10. **Batch 5 (2026-11-17, MoSCoW S16) — the rest of item 9 (c) and item 5's line numbers**, every changed claim
+   re-verified against code first:
+   - **Item (c): all 70 remaining docs checked**, about 780 claims, **45 fixed** in 30 docs; the other 40 docs were
+     right as written. About half the fixes are lists that missed members added after 2026-10-19 (new modules,
+     route modules, industry-pack sizes); the rest are wrong facts. By hub:
+     - **Module hubs.** `case-management/spec` (`-Dobjects.backend` also takes `memory`); `intelligence/spec`
+       (Triage Runs and approvals are durable `DurableJsonlRing` files under `<assist.write.root>/agent/`, not
+       in-memory; only the autonomy ledger is); `graph/spec` (`shortestPath` and k-core live in `GraphAlgorithms`,
+       not `GraphPaths` / `GraphStructure`; `UnionFind` also serves `GraphPaths` and `EntityGrouping` — 3);
+       `sql/architecture` (the guard and sandbox also serve Consignment readers, Reconciliation, the BI, query,
+       rule and save gates and the agent's SQL skills); `util/spec` · `architecture` (the spill directory is
+       `<data root>/.duckdb_tmp`; `memory_limit` is never left to DuckDB — server value, flag, then the
+       `defaultMemoryLimit` code default; `db.pool.timeoutMs` defaults to 30000 — 4); `etl/user-guide-parsing-ingest`
+       (Run detail has seven tabs, not five); `entity-list/user-guide` (Refresh is open to every reader, and the
+       category attributes need `canManageExclusionCategories` — 2); `api/architecture` (the `@PublicApi` surface
+       IS held, by `tools/check-public-api.mjs` since 2026-11-12); `geo-link/architecture` · `spec` (the
+       `ImportFollowOn` registration `LinkIndexFollowOn` was missing — 2); `la-store-pg/spec` · `architecture` (the
+       connections are a view over the process's one shared HikariCP pool, capped per family by `db.pool.size` —
+       2); `la-storage/spec` · `architecture` (it also depends on `inspecto-sql` and `inspecto-analytics` — 2);
+       `la-api/architecture` (32 route modules, not 25; four features; `GeoRoutes` and `EntityPageRoutes` are
+       gated by `geoMap` / `entityPages`, not explorer-open — 3); `la-core/spec` (`TemporalCut` was missing).
+     - **`layer/*` pages.** `features/architecture` (no rows for `predictive` and `realtime`; `realtime` also needs
+       `ops` — 2); `la/architecture` (104 routes and 32 route modules, not 87 / 25; the Geo map and Entity pages are
+       Standard-and-up too — 3); `platform/user-guide` (the Space switcher follows `multiSpace` hosting, not "more
+       than one Space"); `spi/architecture` (the predictive validators and `PredictionRoutes`, `IncidentBriefRoutes`,
+       32 la-api route classes, and la-core's `InvestigationStoreProvider` as a third fail-closed slot — 5).
+       `providers/architecture`: right.
+     - **Solution packs (23 pages).** `industry-mobile-money/architecture` (26 terms not 16, 13 Entity Types not 3,
+       the optional `industry-pack-record-types.toon`, the wider fail-closed rule — 4) and its user guide (1);
+       `industry-telecom/architecture` (33 terms not 20, 14 Entity Types not 6, record types, fail-closed — 4);
+       `la-mobile-money/architecture` (an `la.index.build` Job CAN start on another Job's output: `sql.template`
+       emits `job.dataset.produced`, which `la-audit` and `la-claims` use; the cron is the template's choice).
+       Right as written: `aml`, `business-assurance`, `la-audit` (2), `la-claims` (2), `la-daily-feed` (2),
+       `la-showcase`, `la-showcase-off`, `mobile-money`, `orders-starter` (2), `payment-fraud`, `telco-fraud`,
+       `telco-ra` (2) — every Job, schedule, Alert Rule, severity, threshold, Dataset and file name checked
+       against `spaces/_templates/`.
+     - **Right as written (module hubs):** `case-management/user-guide`, `intelligence/user-guide`,
+       `graph/user-guide`, `sql/spec`, `workflow/spec` and both user guides, both `scoring` user guides,
+       `addon/incidents/user-guide-incidents`, `action-requests`, `analytics`, `anomaly`, `config/user-guide-spaces`,
+       `entity-store/user-guide-storage`, `exchange`, `observability`, `regulatory-reporting`,
+       `backup/architecture`, `notify-channels/spec`, `geo-country/architecture`, `asn-decoders/spec` ·
+       `architecture`, `telecom-asn1/spec` · `user-guide`.
+   - **Item 5 / (d): every `file:line` citation left in `docs/okf/product` is gone** — about 320 line numbers in
+     41 docs: 146 `File.ext:N`, about 55 `Class:N` / `ci.yml:N` / `pom.xml:N` forms and 120 orphan `` `:N` ``
+     shorthands that batch 3 had left after a named symbol (`plan-spaces`, `plan-metamodel`, `plan-control-api`
+     among them). Each cited file was checked to exist first; one does not (`pipeline-load-definition.component.ts`,
+     the Load pane deleted 2026-09-05 — now said so). Where the file alone said too little, the symbol replaced the
+     number (`ControlApi.bindAddress`, `ControlApi.correlation` … in the middleware table, `CaseOperations.mergeCases`,
+     `BuiltinNodeType.TRANSFORM_JOIN`). Kept on purpose: ports (`:8080` …), quoted guard output, and the
+     `NoSuch.java:1` example in `tests-operator-mutation-checklist`. Three claims found stale on the way were fixed:
+     `plan-incidents` (merge and split live in `CaseOperations`, not `ObjectService`; `features.ops` is the
+     registered feature, not `hasRoute("POST", "/objects")`) and `spec-catalog-vs-executors` (six call sites reach
+     `MeasureCompiler.splitShorthand`, not three).
+   - **Found in code, not docs:** the `la-mobile-money` template's `la_index_build_job.toon` description still says
+     the Job type "only fires on a clock or a pipeline commit, never on a Job's output".
+   - **Left:** nothing of the row's scope. As with every batch, the depth is one pass per doc against code; prose
+     opinions and measured numbers (the la-core performance section) were not re-measured.
 
 ### Verified correct — do not "fix"
 

@@ -35,8 +35,8 @@ sheets, and the analysis rule that converts observations into tier assignments.
    It used to read *"`required` (top, always visible) vs `optional` (second disclosure) vs `advanced`
    (collapsed)"*. On the Parse pane **tier no longer controls disclosure at all — only ORDER**: the pane
    renders `<inspecto-schema-form [flat]="true">` per section
-   (`grammar-editor.component.html:141-148`), and *"every tier renders in one single column, in tier
-   order"* (`schema-form.component.ts:79-80`). **All three tiers are always visible**; the only
+   (`grammar-editor.component.html`), and *"every tier renders in one single column, in tier
+   order"* (`schema-form.component.ts`). **All three tiers are always visible**; the only
    collapsing is the section accordion. The tiered, non-flat path survives in job/alert dialogs only.
    ⇒ the session still decides ORDER and grouping, and ⚠ the analysis rule's *"advanced tier: never
    touched"* bucket now scores a field the participant **can always see** — score it as written, and
@@ -44,9 +44,9 @@ sheets, and the analysis rule that converts observations into tier assignments.
 2. **What "required" means** — 🔴 **RESTATED 2026-09-16; the 2026-08-28 grounding was REFUTED.**
    It claimed *"every `tier:'required'` field carries `required: false` validators … the lone hard
    default is `transform.route`'s `mode`"*. The derivation is
-   `return spec.required ?? spec.tier === 'required';` (`attribute-spec.ts:131`) — so an **omitted**
+   `return spec.required ?? spec.tier === 'required';` (`attribute-spec.ts`) — so an **omitted**
    `required:` key means **validator-ENFORCED**, and several fields omit it:
-   **`text_regex__pattern`** (`parsing-attributes.ts:689-695`) among the parser fields, and **nine node
+   **`text_regex__pattern`** (`parsing-attributes.ts`) among the parser fields, and **nine node
    attributes** (`transform.sql.sql`, `transform.route.mode`, `transform.dedup.keys`,
    `transform.summarize.group_by`/`measures`, `transform.join.reference`/`on`,
    `transform.lookup.column`/`mappings`). ⇒ **"required" today means enforced for SOME fields and
@@ -71,9 +71,9 @@ sheets, and the analysis rule that converts observations into tier assignments.
   Build → Test is the journey of record, `okf/product/module/engine/spec-pipeline-test-run.md`):
   1. Onboard the **csv** sample (delimited lane — the richest field set).
      🔴 **RE-GROUNDED: "4 tabs" is wrong.** The pane shows **three collapsible sections**, the first
-     expanded (`grammar-editor.component.ts:236-248`), labelled *"How the file is written" / "How values
-     are understood" / "When a row looks wrong"* (`parsing-attributes.ts:100-104`). The only real tabs
-     left are **Sample | Parsed** (`grammar-editor.component.html:47-98`) — a different control the kit
+     expanded (`grammar-editor.component.ts`), labelled *"How the file is written" / "How values
+     are understood" / "When a row looks wrong"* (`parsing-attributes.ts`). The only real tabs
+     left are **Sample | Parsed** (`grammar-editor.component.html`) — a different control the kit
      never mentioned. Per-format first sections: xlsx *"Sheet & range"*, json *"Format & records"*,
      fixedwidth *"Record layout"*.
   2. Onboard the **fixedwidth** sample (slice table + robustness defaults differ).
@@ -82,12 +82,12 @@ sheets, and the analysis rule that converts observations into tier assignments.
   5. (Stretch) point the csv feed at a *deliberately dirty* copy (a junk header line +
      one short row) — this is what exercises the *"When a row looks wrong"* section for real.
      ⚠ **Confound to note, not remove:** that section now carries an inline `inspecto-alert`
-     (`grammar-editor.component.html:155-162`) telling the user rejected rows land in the rejects
+     (`grammar-editor.component.html`) telling the user rejected rows land in the rejects
      ledger. It may itself change behaviour; log whether the participant reads it.
 - **Recording:** one capture sheet per lane (below); mark each field the first time each
   applies. 🔴 **RE-GROUNDED: there are no tab switches to timestamp.** The equivalent observable events
   are **section open/close** and the per-section **"N changed" badge**
-  (`grammar-editor.component.html:126-136`). Note every hesitation > ~5 s on a visible field.
+  (`grammar-editor.component.html`). Note every hesitation > ~5 s on a visible field.
   ⚠ **The pane's dominant surface has no capture row and needs one:** the single *"Columns that come
   out"* table (`schema-fields-editor.component.html`) — Use · # · Name · Type · Sample value · Also
   known as, plus a search box and a *"Detect column types"* property. Much of a 60–90 min session will
@@ -117,7 +117,7 @@ is unchanged in meaning.
 
 ## Field inventory (the served truth to score against)
 
-Grounded 2026-08-28 from `parsing-attributes.ts:1-637` (the five built-in lanes; UI-owned) and
+Grounded 2026-08-28 from `parsing-attributes.ts` (the five built-in lanes; UI-owned) and
 `node-attributes.ts` (fallback mirror of `GET /pipelines/node-types`). ⚠ For plugin lanes
 (ASN.1 etc.) the form renders from the **served** `GET /parsers` `grammarSchema` — score those
 against the live payload, not any file. ⚠ Three fields deliberately have **no default**
@@ -148,7 +148,7 @@ are `delimited__*`-prefixed (the kit wrote them bare), and **nine defaults** wer
 
 🔴 **`where` (pre-parse SQL) is GONE** — deleted by `d012f721` (D3: *"the row filter property is gone …
 `transform.filter` is the Step"*). Do not score it.
-🔴 **`source_timezone` is on ALL FOUR scripted lanes** (`parsing-attributes.ts:268, :429, :546, :658`)
+🔴 **`source_timezone` is on ALL FOUR scripted lanes** (`parsing-attributes.ts, :429, :546, :658`)
 and the kit never mentioned it — the largest single inventory gap. A session that never shows it
 observes nothing about it.
 ⚠ **Where the dissolved `files` section's content went:** `encoding` and `compression` moved into the

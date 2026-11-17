@@ -6,7 +6,9 @@ The `la-mobile-money` Space Template (`spaces/_templates/la-mobile-money/templat
 
 1. Three Collectors and Pipelines land `wallet_txn` (14 daily files), `wallet_master` and `agent_master`. Staged next-day files in `data/staged/wallet_txn` are copied into `data/inbox/wallet_txn` by hand.
 2. The `mm_links` Job (every 10 minutes) folds them into one link Dataset: 5 777 rows (5 732 transactions plus 45 shared pairs).
-3. `la_index_build` runs on a cron five minutes after `mm_links` (the index-build Job type fires on a clock or a Pipeline commit, not on another Job's output); `la_detect` runs the standing detection.
+3. `la_index_build` runs on a cron five minutes after `mm_links`; `la_detect` runs the standing detection. (The cron is
+   this template's choice: an `sql.template` Job such as `mm_links` emits `job.dataset.produced`, which `la-audit` and
+   `la-claims` use to start their index build. The Job's own description still says otherwise.)
 4. Investigations, members, Entity Lists, a Case and the bound `mm-structuring` Alert Rule are runtime state from `node tools/seed-la-mm.mjs --apply`.
 
 ## Datasets

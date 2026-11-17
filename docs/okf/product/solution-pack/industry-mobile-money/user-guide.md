@@ -11,7 +11,7 @@ timestamp: 2026-10-19T00:00:00Z
 The pack has no screens, Pipelines or dashboards of its own. Once a Space's domain profile is `mobile-money`, Link Analysis in that Space:
 
 - names concepts in wallet and agent terms;
-- normalises and masks wallet, agent and MSISDN identifiers (see [architecture](architecture.md));
+- normalises and masks wallet, agent, MSISDN and the pack's other identifiers (13 Entity Types; see [architecture](architecture.md));
 - offers the five money-flow pattern packs and the suggested tools scoring, pattern and flow;
 - reads amount and booking-time columns using the pack's hints.
 

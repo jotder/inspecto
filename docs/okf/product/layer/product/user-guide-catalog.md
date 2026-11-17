@@ -53,9 +53,9 @@ the row's `schema_name` is `raw.name`, which is a different thing — so the id 
 ⛔ **Zero matches and several matches both 404, and the dialog then renders no link** — that is the
 contract, not a limitation to be relaxed. Only `MetadataGraphBuilder`'s selector branch records a
 `table` attr — and that mirrors runtime truth rather than lagging it: for the segments and
-single-schema shapes `batch.table()` is **null** at ingest too (`CollectorProcessor.java:113-115`), so
+single-schema shapes `batch.table()` is **null** at ingest too (`CollectorProcessor.java`), so
 those pipelines write straight to `dirs.database` with no table-named subdirectory
-(`ConsignmentIngestStrategy.databaseDir:291-296`) and their ledger rows carry a blank `output_table`. Such a
+(`ConsignmentIngestStrategy.databaseDir`) and their ledger rows carry a blank `output_table`. Such a
 batch names no store, the dialog asks the catalog nothing, and no link renders — correctly, because no
 distinct store node exists to point at. ⛔ Do not "complete" this by backfilling a synthetic table name
 from `dirs.database` or the pipeline name (refuted 2026-08-14, `BACKLOG.md` §4). Widening the match to labels or prefixes would "fix" the

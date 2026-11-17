@@ -12,7 +12,7 @@ timestamp: 2026-10-19T00:00:00Z
 ## Model
 
 There is no Case-specific record: a Case is an `OperationalObject` of `ObjectType.CASE`, stored by
-`ObjectStore` (`InMemoryObjectStore` / `DbObjectStore`, `-Dobjects.backend=db|postgres`) and changed by
+`ObjectStore` (`InMemoryObjectStore` / `DbObjectStore`, `-Dobjects.backend=db|postgres|memory`, default `db`) and changed by
 `ObjectService` in module `ops`; members join by `CONTAINS` links (`LinkStore`). Writes carry an optimistic
 `version` (`409 CONFLICT_STALE_VERSION` on a stale write; [DB layer](../engine/spec-db-layer.md) §3.1).
 

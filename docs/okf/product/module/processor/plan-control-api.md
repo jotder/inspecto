@@ -140,16 +140,16 @@ context on `/`. The pipeline is a composed middleware `Chain`, outermost first:
 
 | Stage | What it does | Where |
 |---|---|---|
-| `correlation` | reads or mints `Correlation-ID` (`UUID.randomUUID()`), echoes it as a response header, puts it on the SLF4J MDC | `:552-566` |
-| `cors` | only when `-Dcontrol.cors` is set; answers `OPTIONS` preflight | `:242-243` |
-| `errorBoundary` | `ApiException` → its status + `errorCode`; any other exception **or `Error`** → `500 INTERNAL` in the envelope with a generic message + the correlation id (§4 `ERR-500-GENERIC`), logged at ERROR with the `Correlation-ID` and the stack (client disconnects excepted; an `OutOfMemoryError`/`InternalError` is then rethrown, §4 2026-09-28) | `:720-766` |
-| `normalizePath` | `/api/v1/…` → strips the prefix, stamps `ATTR_SELF_PATH`; **any other `/api/…` → JSON `404 "unknown API version"`**; a bare path passes unmarked | `:627-641` |
+| `correlation` | reads or mints `Correlation-ID` (`UUID.randomUUID()`), echoes it as a response header, puts it on the SLF4J MDC | `ControlApi.correlation` |
+| `cors` | only when `-Dcontrol.cors` is set; answers `OPTIONS` preflight | `ControlApi.cors` |
+| `errorBoundary` | `ApiException` → its status + `errorCode`; any other exception **or `Error`** → `500 INTERNAL` in the envelope with a generic message + the correlation id (§4 `ERR-500-GENERIC`), logged at ERROR with the `Correlation-ID` and the stack (client disconnects excepted; an `OutOfMemoryError`/`InternalError` is then rethrown, §4 2026-09-28) | `ControlApi.errorBoundary` |
+| `normalizePath` | `/api/v1/…` → strips the prefix, stamps `ATTR_SELF_PATH`; **any other `/api/…` → JSON `404 "unknown API version"`**; a bare path passes unmarked | `ControlApi.normalizePath` |
 | `idempotency` | `Idempotency-Key` replay for `POST/PUT/DELETE` (§3.5) | `Idempotency.java` |
 | `bindSpace` | the `/spaces/{id}/…` seam — validate, rewrite, bind the `space` MDC | `multi-space.md` |
-| `routeDispatch` | first-match over the route table; **`authenticate` → `authorize` → handler** per matched route; a non-v1, non-infra `GET` falls to `serveStatic`; any other unmatched request → JSON `404`/`405` | `:701-735` |
+| `routeDispatch` | first-match over the route table; **`authenticate` → `authorize` → handler** per matched route; a non-v1, non-infra `GET` falls to `serveStatic`; any other unmatched request → JSON `404`/`405` | `ControlApi.routeDispatch` |
 
 **The prefix rule (API-5, 2026-07-25).** `/api/v1` is the *only* business surface. The allow-list of routes
-that stay unversioned is `isInfraRoute` (`:1119-1122`): `/health`, `/ready`, `/metrics`,
+that stay unversioned is `isInfraRoute`: `/health`, `/ready`, `/metrics`,
 `/metrics/acquisition` — they have no v1 semantics. A bare `GET /objects` is a **SPA deep link** and gets
 `index.html`; a bare `POST /objects` gets a JSON 404. The whole sunset apparatus — `Deprecation` / `Sunset`
 headers, `-Dapi.legacy.routes` (removed), `inspecto_legacy_api_requests_total`, the 30-day-at-zero soak — is
@@ -207,7 +207,7 @@ no wire change; the `ReconRoutes` / `AgentRoutes` / `JobRoutes` / `RunRoutes` + 
 before it was 130 sites, likewise all defaults; the earlier `InvestigationRoutes` + `InvRoutes` slice's four-eyes
 403s are `PERMISSION_DENIED`, not the defaulted `PATH_JAIL_VIOLATION`). Re-derive with
 `git grep -nP 'new ApiException\([^,()]+,(?!\s*(\w+\.)?[A-Z][A-Z_]+\s*,)' -- '*/src/main/**.java' | wc -l`.
-Bodies ≥ 1024 bytes are gzipped when the client accepts it (`ApiContext.maybeGzip`, `:370-393`).
+Bodies ≥ 1024 bytes are gzipped when the client accepts it (`ApiContext.maybeGzip`).
 `permissions[]` on an authenticated envelope is `subject.capabilities() ∩ applicable` when a route declares
 `resourcePermissions` — an affordance signal, never the security boundary (`SEC` §3.14).
 **`HEAD` is answered with headers only** (`HEAD-RESPONSE-STREAM-CLOSED-1`, 2026-09-24): `respondJson` sends
@@ -241,11 +241,11 @@ intelligence module's `ControlPlaneClient`; the SPA's `v1Interceptor` unwraps at
 `ApiContext` (`@PublicApi`, 413 lines) is what a route module sees: `get/post/put/patch/delete`, `hasRoute`,
 `stub`, `withCapability` (wraps a handler in `requireCapability` → `403 PERMISSION_DENIED`),
 `resourcePermissions`, `pagination`, `respondJson`. Routes are registered by **61 built-in `RouteModule`s**
-(~332 registrations, "0 duplicates" per the census at `:1086`), then by **`ServiceLoader`-discovered
-modules**, appended strictly after the built-ins (`:458-461`), then by the five **absent-module stub
-groups** (`:466-470`) that answer `503` for a family the bundle lacks. `RouteModule` became a **public SPI
+(~332 registrations, "0 duplicates" per the census), then by **`ServiceLoader`-discovered
+modules**, appended strictly after the built-ins, then by the five **absent-module stub
+groups** that answer `503` for a family the bundle lacks. `RouteModule` became a **public SPI
 on 2026-09-07** (EDG-01 cell 3a) together with `Handler`, `ApiException`, `WriteGates` and `ApiContext`, all
-`@PublicApi(since = "4.0.0")`. **A colliding `(method, pattern)` fails boot** (`register`, `:1102-1110`) —
+`@PublicApi(since = "4.0.0")`. **A colliding `(method, pattern)` fails boot** (`register`) —
 first-match dispatch means a duplicate would otherwise never fail, only shadow. ⚠ **Registration order is
 load-bearing**: `/config/spec/…` must register before the generic two-segment read; `GET /jobs/expressions`
 before the `/jobs/{name}` regex. Shared plumbing lives in `RouteErrors` (the domain-exception → status
@@ -274,7 +274,7 @@ is bounded with a `truncated` flag that reports the *true* total.
   ⛔ **The config write family does not participate**: `ConfigWriteRoutes.java` (`POST /config/write`,
   `POST /config/patch`) contains no `ETags`, no `If-Match` and no `ContentHash`. Its concurrency story is a
   different one by design — `write` gates on an existence check plus an `overwrite` flag, and `patch`
-  merges **server-side against the file as it is now** (`:264-269`), chosen explicitly *instead of* a
+  merges **server-side against the file as it is now**, chosen explicitly *instead of* a
   client-held-version check. ⇒ **`API-3`'s signed "the SPA adopts `If-Match` in both writing panes" is not
   achievable without a server change**, because the routes those panes call could not read the header.
   ✅ **RESOLVED 2026-09-11 — the operator granted the server change (option A).** `POST /config/write` now
@@ -353,7 +353,7 @@ only on reported truncation pain. ⚠ The SPA consumes none of it (§3.15).
 
 One ETag'd document (`BootstrapRoutes.java`), every value **derived from what registered, never declared**
 (contrast `authMode`, which is `-Dauth.mode` — `SEC` §2): `edition` · `features.{authoring, multiSpace,
-exchange, geoLink, events, ops, authMode}` (`:58-85`; the module flags are `api.hasRoute(...)`) ·
+exchange, geoLink, events, ops, authMode}` (the module flags are `api.hasRoute(...)`) ·
 `configSpecs` (every `ConfigSpecs.TYPES`) · `enumerations.{severities, attributeTypes, outputFormats}` ·
 `spaces` (id + display name) · `session.{authenticated, actor, capabilities}`. `/bootstrap` is in
 `PUBLIC_PATHS`; a Standard SPA re-reads it with a bearer to obtain effective capabilities.
@@ -402,11 +402,11 @@ cached), and a concurrent probe against the *shipped* runtime.
 
 ### 3.10 Static SPA serving
 
-`serveStatic` (`:889-901`) serves `-Dui.dir`: a path with an extension gets its MIME type, an extensionless
+`serveStatic` serves `-Dui.dir`: a path with an extension gets its MIME type, an extensionless
 deep link gets `index.html`, and the target is jailed by `startsWith(uiDir)`. It is reached only for a request
 OUTSIDE `/api/v1`: an unmatched `/api/v1/…` GET is a JSON `404` in the v1 error envelope, never the shell
 (LA-ONBOARD-FIXES-1 F-13 — `GET /api/v1/spaces/{id}/datasets`, a route that does not exist, used to answer 200 `text/html`), so the SPA and
-its assets live at the root only. `writeFile` (`:921-949`) sets
+its assets live at the root only. `writeFile` sets
 `Cache-Control: no-cache` plus a size/mtime/name ETag on **every** asset and honours `If-None-Match` — the
 deliberate cost of a stale-chunk bug that long-lived caching once caused. `-Dui.static.log=DEBUG` logs
 `served=<file>` beside the URL so a crossed pairing (§3.9) is visible in one grep. Routing `serveStatic`
@@ -590,7 +590,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | **No `@PublicApi` surface guard** | no japicmp, no scanning test | `API-7` is policy in prose; a MINOR that removes a marked member passes the build |
 | **The gateway blueprints are untested documentation** | no reference in `src/`; README's own caveat | `API-6` is a Must (S); the WSO2 definition also omits the `503` stubs and the optional-module paths |
 | **Idempotency replay is per instance** | `Idempotency.java` | A second instance behind a gateway replays nothing; fine today (single instance), a trap for E1 |
-| **`error.interceptor.ts` comment is stale** | `:14-16` "fully open, no 401 handling" | A reader editing the chain would place 401 handling in the wrong file |
+| **`error.interceptor.ts` comment is stale** | "fully open, no 401 handling" | A reader editing the chain would place 401 handling in the wrong file |
 
 ## 6. Refused & superseded
 

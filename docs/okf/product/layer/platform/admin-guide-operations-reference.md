@@ -415,7 +415,7 @@ day. The rollup (counts, percentiles, first/last time) is computed over just the
 identically over the file and DB backends.
 
 > **Where `$TOKEN` comes from, once:** an access token issued by your IdP. `Authorization` is enforced by
-> the **Standard/Advanced security module** (`ControlApi:356`) — configured through `AUTH_OIDC_*` — so on
+> the **Standard/Advanced security module** (`Authenticators.active()`, a `ServiceLoader` slot) — configured through `AUTH_OIDC_*` — so on
 > **Basic** there is nothing to send and the header is simply ignored. ⛔ It is *not* produced by
 > `CONTROL_TOKEN` or `-Dcontrol.token`: those have no readers and never authenticated anything. Every curl
 > below uses the same `$TOKEN`.
@@ -619,7 +619,7 @@ Nothing schedules `incident_purge` for you. Standing up the job is an operator a
 
 The audit queries above (`commits`/`batches`/`files`/`lineage`/`quarantine`) and the
 observability gauges read through a pluggable **`StatusStore`**. ⚠ **The default is `db`, not
-`file`** — it flipped on 2026-08-31 (`OperationalDb.java:132` declares `STATUS("Status",
+`file`** — it flipped on 2026-08-31 (`OperationalDb.java` declares `STATUS("Status",
 "status.backend", "db", …)`); this section previously said the opposite. The service projects the
 audit into a database and serves queries from it — durable and SQL-queryable — while ingest keeps
 writing the file audit unchanged (it stays the write-time source of truth and survives a DB
@@ -804,7 +804,7 @@ curl -s -H "Authorization: Bearer $TOKEN" "localhost:8080/api/v1/objects/<id>/at
 
 ### Observability — metrics & structured events
 
-`GET /metrics` serves **Prometheus text format** from a zero-dependency in-process registry — no extra agent or sidecar process. ⚠ **Since EDG-01 cell 5 the exposition lives in the optional `inspecto-observability` module** (`pom.xml:93`/`:121`, Standard+Advanced only): on **Basic the path answers `503`** naming the module, with no `# HELP` in the body (`AbsentModuleRoutes.java:18-25`). Instrumentation still runs everywhere — `MetricRegistry` stays in core; only the HTTP read-out is edition-gated. The path stays in `PUBLIC_PATHS` either way (a scraper carries no token).
+`GET /metrics` serves **Prometheus text format** from a zero-dependency in-process registry — no extra agent or sidecar process. ⚠ **Since EDG-01 cell 5 the exposition lives in the optional `inspecto-observability` module** (root `pom.xml` `edition-standard` / `edition-advanced` profiles, Standard+Advanced only): on **Basic the path answers `503`** naming the module, with no `# HELP` in the body (`AbsentModuleRoutes.java`). Instrumentation still runs everywhere — `MetricRegistry` stays in core; only the HTTP read-out is edition-gated. The path stays in `PUBLIC_PATHS` either way (a scraper carries no token).
 
 ```bash
 curl -s localhost:8080/metrics

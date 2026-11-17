@@ -22,5 +22,7 @@ inspecto-api  (one annotation, no deps)
 Design choices:
 
 - **Annotation only, `CLASS` retention.** Marking costs nothing at runtime and needs no reflection.
-- **Intent, not a gate.** Nothing enforces the marker in the build; whether a change is breaking is decided
-  against the newest released tag, as [plan-api-stability](plan-api-stability.md) describes.
+- **Held by a guard, not by the compiler.** Since 2026-11-12 (`PUBLIC-API-SURFACE-1`) `tools/check-public-api.mjs`
+  (CI `guards` job and the pre-commit hook) compares every `@PublicApi` signature with the committed baseline
+  `platform/inspecto-api/public-api.txt`, and refuses a `since` that is not a real version; whether a change is
+  breaking is decided against the newest released tag, as [plan-api-stability](plan-api-stability.md) describes.

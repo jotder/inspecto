@@ -43,4 +43,3 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `UI-PICKER-OPTIONS-1` | P3 | feature | <inspecto-option-picker> gains nested options (a parent that opens to its children), a disabled option with its reason, and a per-picker… | demand |
 | `UI-SCHEMA-FORM-EDITOR-1` | P3 | feature | <inspecto-schema-form>'s in-row editor is still a dense boxed Material field, kept with form-allow (the lint:forms allow-list is empty si… | demand |
 | `PACK-SALES-MARKETING-1` | P3 | feature | Sales & Marketing BI pack: sales, commissions, marketing and churn analytics | operator |
-| `DOCS-AGENT-WRITTEN-REVIEW-1` | P3 | chore | ~200 hub docs were written by agents on 2026-10-19 (PRODUCT-DOCS-HUB-1) | — |

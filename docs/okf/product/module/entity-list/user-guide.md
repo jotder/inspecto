@@ -32,13 +32,15 @@ The Risk Scores side is in the [scoring user guide](../scoring/user-guide-scorin
 - **Retire** — a retired list matches nothing and keeps its history.
 - **Register as Dataset** — after a confirm, creates Dataset `entity_list_<id>` over the list's Parquet sidecar.
   ⚠ The Dataset reads raw values: masking does not apply. Needs `canAuthorWorkbench`.
-- **Refresh** — re-reads the lists; disabled without `canManageIncidents`.
+- **Refresh** — re-reads the lists; open to every reader. Without `canManageIncidents` the section is read-only:
+  it says so and hides **New list…** and the write actions.
 
 ## Things to know
 
 - Under an approval policy for `entity-list`, member edits and retire report *held for approval as `<pc-id>`*
   and apply only when a second person approves. An add whose every entry expires within 24 h applies at once.
 - An expiring add never shortens a permanent entry; remove it and add it again.
-- Writes need `canManageIncidents`; reading needs Space access only.
+- Writes need `canManageIncidents` (an exclusion list's category attributes need `canManageExclusionCategories`);
+  reading needs Space access only.
 
 The rules behind each behaviour: [spec](spec.md).

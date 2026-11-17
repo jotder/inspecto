@@ -186,7 +186,7 @@ are date expressions; the two mapping `custom` expressions are `DOUBLE`.
   returns `null`, no `scheduler.toon` ships, and the committed corpus sets the key to `""`. 2GB was the
   MEASURED recommendation (§below), never an installed default — BACKLOG GAP-4 is still open. Both are
   owned by the server
-  configuration.** ⚠ **Only `maxConcurrentRuns` defaults on in code** (`JobService.java:184`); `DuckDbUtil.memoryLimit`
+  configuration.** ⚠ **Only `maxConcurrentRuns` defaults on in code** (`JobService.java`); `DuckDbUtil.memoryLimit`
   falls through config → served `scheduler.toon` → `-Dprocessing.duckdb.memory_limit` → **DuckDB's own default**, and no
   `scheduler.toon` ships — `BACKLOG.md` GAP-4 is open. *(This line said "both on by default" until 2026-09-08.)* They are surfaced in the UI at **Settings ▸ Scheduler ▸ Resource
   caps**, persisted in `scheduler.toon`, and served with provenance (`file` | `property` | `default`) by
@@ -271,8 +271,8 @@ are date expressions; the two mapping `custom` expressions are `DOUBLE`.
   `duckdb_extensions()` reported **icu installed: true, loaded: true**. The widespread "DuckDB defaults to
   UTC" belief holds only for an **ICU-less** build, and this is not one. Consequently a SQL-side
   `now()::TIMESTAMP` writer and a Java-side `LocalDateTime.ofInstant(…, ZoneId.systemDefault())` reader are
-  **the same wall clock** and agree — e.g. `ConsignmentIngestStrategy:215`'s `__valid_from` and
-  `ReferenceCompactor:142`'s retention cutoff are a genuine matched pair, *not* the off-by-the-UTC-offset
+  **the same wall clock** and agree — e.g. `ConsignmentIngestStrategy`'s `__valid_from` and
+  `ReferenceCompactor`'s retention cutoff are a genuine matched pair, *not* the off-by-the-UTC-offset
   bug they resemble. ⛔ "Fixing" that reader to UTC would **create** the skew and drop rows outside `keep`.
   ⚠ Note the asymmetry: DuckDB follows `systemDefault()` but is **blind to `-Dops.timezone`** — nothing in
   the repo issues `SET TimeZone` and `DuckDbUtil` has no setter — so moving such a pair onto
@@ -588,7 +588,7 @@ time, so a value stops depending on which box processed it.
     not exist in the **host's** zone is silently moved forward (Berlin `2026-03-29 02:30:00` → `03:30`
     on a mixed list, `02:30` on a plain-only one). The ambiguous fall-back case (`2026-10-25 02:30:00`)
     is an identity.
-  * ⚠ **Nothing validates a format string.** `ConfigValidator:84` only *warns* on an empty
+  * ⚠ **Nothing validates a format string.** `ConfigValidator` only *warns* on an empty
     `timestamp_formats`; `%z` is unvalidated free text, offered by no UI list and refused by nothing.
   * **Still latent:** no `.toon` under `spaces/` uses `%z` (the only grep hits are binary parquet).
   * 🔴 **There are exactly TWO offending directives, not one: `%z` (numeric offset) AND `%Z` (zone
@@ -636,7 +636,7 @@ time, so a value stops depending on which box processed it.
   * ⚠ **Only the `delimited:` block is checked** for formats — a list authored at `parsing:` level is
     not read by `mergeParsing` at all, so refusing one there would 422 on something inert.
 * **Dead code flagged, not touched:** `SqlBuilder.buildPartitionExpr` has no production caller (only
-  `buildCastExpr` at `TransformCompiler:209` does).
+  `buildCastExpr` at `TransformCompiler` does).
 
 Output is written via DuckDB `COPY` — see [output & sinks](spec-output-sinks.md).
 

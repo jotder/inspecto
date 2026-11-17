@@ -137,7 +137,7 @@ SQL every consumer runs against: a `view` Dataset renders its `sink.view` defini
 `@PublicApi`); a `physicalRef` Dataset reads the store through **`SqlViews`** — the one owner of read
 options (`union_by_name=true`; `hive_partitioning` deliberately **off**, since turning it on would surface
 partition segments as columns on every existing Dataset); `calculated[]` wraps `SELECT *, (expr) AS "name"
-FROM (<base>) AS __base` after `ExpressionGuard.check` (`:161`); `temporalColumn()` picks the `role:
+FROM (<base>) AS __base` after `ExpressionGuard.check`; `temporalColumn()` picks the `role:
 temporal` column, degrading on absence and refusing on ambiguity. A bad name or expression is **`422` at every
 route, fail-closed**, because the wrap happens at relation-build time and every consumer — `/bi/query`,
 `/queries/{id}/run`, reports, measure alerts, materialization, shares — inherits it.

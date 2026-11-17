@@ -23,7 +23,7 @@ neither can drift from the other. It only stops the id following the name, which
 pure one-field edit rather than a stamp-then-edit.
 
 The stamped value is `pipelineId()` — `derivedPipelineId()` (the faithful mirror of
-`PipelineConfigParser.java:81`) **narrowed into the spec's alphabet**: anything outside `[a-z0-9_]`
+`PipelineConfigParser.java`) **narrowed into the spec's alphabet**: anything outside `[a-z0-9_]`
 becomes `_`, and a leading non-alphanumeric is prefixed (`"My-Pipe!"` → `my_pipe_`, `"café"` → `caf_`).
 So the stamp is byte-identical to the derivation for any name that already slugs cleanly, and legal for
 every other name the create form accepts.

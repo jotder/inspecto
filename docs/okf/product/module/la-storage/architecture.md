@@ -22,7 +22,8 @@ Full as-built detail: [la-core architecture](../la-core/architecture.md) §4. La
                                          └──Materialised──> la-core InMemoryGraphEngine
 ```
 
-la-storage depends on la-core only (it implements la-core's `GraphEngine`), never on la-api, the host or a Subject.
+Of the Link Analysis modules la-storage depends on la-core only (it implements la-core's `GraphEngine`); beyond it only
+the platform libraries `inspecto-sql` and `inspecto-analytics` and DuckDB — never la-api, the host or a Subject.
 Gates, staleness decisions and the choice of flat versus index belong to la-api. It ships in every edition
 (`offerings/basic.toon`).
 

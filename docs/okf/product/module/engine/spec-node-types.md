@@ -129,7 +129,7 @@ Reading that list as one vocabulary is what made the type system contradict the 
 
 ⚠ **Recounted 2026-09-13: the non-edge set is FOUR, not five.** The sentence below said "five" in both
 its homes (here and `BACKLOG.md`'s `TOKEN-VOCAB-STEPS-1`) and matched neither measurement: §above names
-**four** Signals (`success` · `failure` · `on_commit` · `gap`), while `PipelineRel.java:24` names a
+**four** Signals (`success` · `failure` · `on_commit` · `gap`), while `PipelineRel.java` names a
 **different** set of **six** that never appear as a lifted edge (those four minus `gap`, plus `dropped` /
 `invalid` / `duplicate`). ⛔ Do not merge the two sets — "not a Signal" and "not lifted" are different
 properties, which is why one number could never serve both.
@@ -203,7 +203,7 @@ over a DuckDB relation, so they operate on the previous node's output metadata, 
 
 * ✅ **The fold has since happened for the projection half — as an ADDITIVE node, not a merge
   (2026-09-04).** `transform.sql` is one author `SELECT` over the typed input (`RowShaper.sql`,
-  `RowShaper.java:494-512`); `map`/`select`/`derive` were NOT retired (their type strings are a committed
+  `RowShaper.java`); `map`/`select`/`derive` were NOT retired (their type strings are a committed
   contract in stored `*_pipeline.toon`, see below). Typing stays declarative on Parse because the raw
   relation is all-VARCHAR — the split and its reasons live in
   [spec-catalog-vs-executors.md](spec-catalog-vs-executors.md).

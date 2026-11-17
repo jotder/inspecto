@@ -84,10 +84,10 @@ No general rule engine (a second language, a large dependency, a poor fit for se
 
 ## Workflow & SLA slice 2 step 2 - research memo (2026-10-11, read-only) - revisit playbook (step 2 DECLINED 2026-10-11)
 Declined by the operator 2026-10-11 (no demand; promote-to-Incident covers Breaks). The memo below is kept as the playbook **if revisited**; precondition to revisit: a named consumer wants an SLA on unpromoted Breaks. The archived plan's "P7 Workflow & SLA slice 2 as built" note is never edited; its stale claims are corrected here.
-- **Corrections to the stated blockers.** *Priority* is not needed (`SlaPolicy`'s `"*"` fallback, `SlaPolicy.java:33,39`;
-  `SlaDecisions.java:65-67`). A *per-row version* is not needed (`ReconStateStore` serialises on a static JVM `LOCK`; the
+- **Corrections to the stated blockers.** *Priority* is not needed (`SlaPolicy`'s `"*"` fallback;
+  `SlaDecisions.deadlineStamp`). A *per-row version* is not needed (`ReconStateStore` serialises on a static JVM `LOCK`; the
   store is plain JSON via `AtomicFiles`, not signed). **A missed blocker:** `Workflow` is keyed by `ObjectType` too
-  (`Workflow.java:35`, `fromComponent` :263-271; `GovernanceRegistry.Snapshot` :43,124; `SlaDecisions` :50,83), so a `kind`
+  (`Workflow.fromComponent`, `GovernanceRegistry.Snapshot`, `SlaDecisions`), so a `kind`
   key change alone is not enough; the cheaper fix is a small `Lifecycle { initialState(); isTerminal(s) }` interface that
   `Workflow` implements.
 - **Why demand was the question (answered: none).** A Break already gets a per-Break SLA through `POST /recon/promote` (`BREAK-INCIDENT-1`):
@@ -96,7 +96,7 @@ Declined by the operator 2026-10-11 (no demand; promote-to-Incident covers Break
   optional `sla` attribute map; zero migration; no new module edge (recon already imports `com.gamma.workflow`; recon, ops
   and workflow are not in `check-module-deps` `ALLOWED`). *Investigation* - immutable header, so it needs a state machine
   and a compare-and-set in the FS and Pg stores; a provider in the governed `inspecto-la-api` would FAIL `check-module-deps`
-  (`ALLOWED['inspecto-la-api']` lacks `inspecto-workflow`, `check-module-deps.mjs:38`): L, high risk. *Entity List entries* -
+  (`ALLOWED['inspecto-la-api']` lacks `inspecto-workflow`, `check-module-deps.mjs`): L, high risk. *Entity List entries* -
   not viable (a canonical-string set, no per-entry record).
 - **Outcome.** Closed as declined 2026-10-11 (a docs-only fix). If revisited (demand exists), Breaks in five
   steps (~1.5 shifts): (1) re-key plus the `Lifecycle` seam (S); (2) a batch-shaped `GovernedItemProvider` SPI, a sweep via
@@ -105,7 +105,7 @@ Declined by the operator 2026-10-11 (no demand; promote-to-Incident covers Break
 - **Calls if revisited (Q1-Q6).** Q1 (demand for an SLA on unpromoted Breaks) was answered "no" 2026-10-11; Q2 which source; Q3 the known-kind set and
   the absent-module policy (inert, per P4e); Q4 event identity (reuse `OBJECT_SLA_BREACH` / `OBJECT_ESCALATED` with
   `objectType=<kind>`?); Q5 flood control (one recon run can open 50,000 Breaks; escalations are capped at 500 per sweep but
-  breaches are uncapped, `ObjectService.java:81`); Q6 a batch SPI (a per-item update would rewrite a file of up to 200,000
+  breaches are uncapped, `ObjectService.MAX_ESCALATIONS_PER_SWEEP`); Q6 a batch SPI (a per-item update would rewrite a file of up to 200,000
   Breaks once per Break).
 
 ## Deliberate exceptions and behaviour changes

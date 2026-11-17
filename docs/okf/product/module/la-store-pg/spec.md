@@ -51,8 +51,9 @@ those triggers carry a `WHEN`. A trigger rather than a `REVOKE`, because the app
 - **Sizes:** the per-set limit and per-Investigation budget suppliers are read per write; over either is 413 before any
   write.
 - **Failure:** an unreachable database is an `IOException` from `open` (the selector answers 503); nothing is cached on
-  failure, so the next request retries. The pool is HikariCP via `JdbcDrivers.source`, pool name `la-investigations`,
-  sized by `-Ddb.pool.size`.
+  failure, so the next request retries. The connections come through `JdbcDrivers.source` under the family label
+  `la-investigations`: a view over the process's one shared HikariCP pool per server and user (`-Ddb.pool.process.size`,
+  default 20), capped at `-Ddb.pool.size` (default 10) concurrent borrows.
 
 ## Tests
 

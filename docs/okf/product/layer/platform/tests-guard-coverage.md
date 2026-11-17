@@ -158,7 +158,7 @@ down. Four modules do that here (~800 lines, immaterial) — but it is why a cov
 measure of *"how much code has tests"*, only of *"how much measured code was executed"*.
 
 ✅ **A fourth instance, 2026-09-13 — the vocabulary guard could not reach the file it was supposed to
-police.** `tools/check-vocabulary.mjs`'s `SOURCE_RULES` (`:359`, applied at `:724`) held exactly **two**
+police.** `tools/check-vocabulary.mjs`'s `SOURCE_RULES` (applied) held exactly **two**
 rules, `flow-identifier` and `flow-message`, both Flow→Pipeline. <!-- vocab-allow: names the rename the two rule ids exist for --> **There was no Collector rule over source
 files at all** — the Source→Collector rule is a *prose* rule and never ran over `.java`. ⛔ So the
 offending author-facing message was never in the guard's reach, and no amount of tightening the existing
@@ -390,7 +390,7 @@ was refused by the pre-push citation guard:
 SESSION_STATUS.local.md:20  path does not resolve:  platform/inspecto-event/EventType.java
 ```
 
-`SESSION_STATUS.local.md` is **untracked and gitignored** (`.gitignore:124`, `*.local.md`) and is
+`SESSION_STATUS.local.md` is **untracked and gitignored** (`.gitignore`, `*.local.md`) and is
 rewritten by a stop hook on every session, so it exists in every working tree and in no checkout — the
 same file class as `.claude/sessions/snapshot.md`, which does not exist in a fresh checkout and which
 `tools/tracked-paths.mjs`'s own header already names. A peer's in-flight note, about work unrelated to the push, blocked the push.
@@ -398,7 +398,7 @@ same file class as `.claude/sessions/snapshot.md`, which does not exist in a fre
 **The rule had already been applied to half of each guard.** `tracked-paths.mjs` (`LINKGUARD-CASE-1`,
 2026-09-14) moved the **target** side to `git ls-files` precisely because "the working tree is not the
 artifact". The **subject** side — the set of markdown files the guard reads *from* — still walks the
-tree: `check-doc-citations.mjs:227` uses `readdirSync` with a `SKIP_DIRS` deny-list, and nothing in that
+tree: `check-doc-citations.mjs` uses `readdirSync` with a `SKIP_DIRS` deny-list, and nothing in that
 list excludes files git would not hand you.
 
 Measured 2026-09-22 by writing a gitignored `PROBE.local.md` at the repo root and running each guard:
@@ -461,11 +461,11 @@ silently.
 known failure. It was not one failure. It was three, stacked, each invisible until the one above it
 was cleared:
 
-1. `ci.yml:64` — the Step Processors board was stale against its contract (a shipped feature the board
+1. `ci.yml` — the Step Processors board was stale against its contract (a shipped feature the board
    had not caught up with). Cheap guard, trivial fix.
-2. `ci.yml:163` — the route-gating evidence carried the 63 phantom citations above. **Never ran** while
+2. `ci.yml` — the route-gating evidence carried the 63 phantom citations above. **Never ran** while
    step 1 was red.
-3. `ci.yml:291` — `Run tests (all editions)`. **The reactor had not executed a single test all day.**
+3. `ci.yml` — `Run tests (all editions)`. **The reactor had not executed a single test all day.**
    When it finally did, it surfaced a real failure: `PipelineDocumentXlsxTest.writesARealWorkbook`
    erroring because DuckDB's `excel` extension cannot load on a clean runner — which in turn falsified
    the premise `D-8` had been closed on the day before.

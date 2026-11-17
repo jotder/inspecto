@@ -111,7 +111,7 @@ further needed. The all-`SUCCESS` case renders no banner.
 ⚠ **The row shapes are the server's, and the mock that had to mirror them is deleted.** Corrected
 2026-09-09: `mock/handlers/demo.handler.ts` and `demo.handler.spec.ts` went with the offline mock backend
 on **2026-08-31**, so the pinning this paragraph described no longer exists — the authority is now
-`ConsignmentAuditWriter.java:48`, whose header is
+`ConsignmentAuditWriter.java`, whose header is
 `consignment_id,pipeline,schema_name,output_table,start_time,end_time,status,…`. The drift history is kept
 because it names the failure class: before 2026-08-13 the mock had invented
 `file_name`/`quarantined_at`/`PROCESSED` spellings, which also made the offline Files tab always show

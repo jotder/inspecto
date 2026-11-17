@@ -13,6 +13,6 @@ Screens for Parsing and ingest. Design and internals: [Parsing and ingest archit
 - **Pipeline editor, Parse definition** (`inspecto-ui/src/app/modules/admin/pipelines/pipeline-parse-definition.component.ts`):
   frontend choice, grammar form rendered from the parser's served `grammarSchema`, and a sample preview.
 - **Run detail** (`inspecto-ui/src/app/modules/admin/run-detail/run-detail.component.ts`): tabs
-  Batches, Files, Lineage, Quarantine and Commits, plus "View the rejected rows".
+  Batches, Files, Lineage, Quarantine, Commits, Commit retries and Report, plus "View the rejected rows".
 - **Processing status** (`inspecto-ui/src/app/modules/admin/processing-status/processing-status.component.ts`):
   problem files per Pipeline.

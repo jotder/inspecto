@@ -25,15 +25,15 @@ All algorithms are `public static` methods on final utility classes:
 
 | Class | Notes |
 |---|---|
-| `GraphAlgorithms` | degree, connected components, triangles, neighbourhood; owns the shared records |
-| `GraphPaths` | `shortestPath`, `weightedShortestPath`, `allPaths(g, from, to, limit, maxHops, …)`, `maxFlow`, `egoNetwork`, `maximumSpanningForest` |
+| `GraphAlgorithms` | degree, connected components, triangles, neighbourhood, `shortestPath`, k-core; owns the shared records |
+| `GraphPaths` | `weightedShortestPath`, `allPaths(g, from, to, limit, maxHops, …)`, `maxFlow`, `egoNetwork`, `maximumSpanningForest` |
 | `GraphCentrality` | betweenness (Brandes), closeness, Jaccard, link prediction |
 | `GraphIterative` | PageRank, eigenvector, Katz, HITS, `detectCommunities`, Louvain |
-| `GraphStructure` | k-core, bridges, articulation points, cliques, cycles |
+| `GraphStructure` | bridges, articulation points, cliques, cycles, forest test, descendants |
 | `GraphPropagation` | `propagatedRisk(g, own, seeds, weights, …)`; at most `FACTOR_LIMIT` (5) explanation factors per node |
 | `GraphSuspicion` | `suspicionScore` blend |
 | `TemporalMotifMatcher` | `match(stages, legsByStage, limit)`; `WORK_BUDGET` = 500,000 leg examinations, then `truncated` |
-| `UnionFind` | deterministic disjoint sets, used by `EntityRegistry` in `platform/inspecto-entity-store` |
+| `UnionFind` | deterministic disjoint sets, used by `GraphPaths`, `EntityRegistry` in `platform/inspecto-entity-store` and `EntityGrouping` in `platform/inspecto-analytics` |
 
 ## Run control seam
 

@@ -569,7 +569,7 @@ this file is a claim, checked by `tools/check-backlog-homes.mjs`.
 - ~~**`EDITION-GATED-TESTS-IN-WRONG-HOME-1`**~~ ✅ **CLOSED 2026-09-25 (this commit)** — test classes that
   guarded CORE behaviour from inside `inspecto-ops`, which the default reactor never builds
   (`mvn -o -pl :inspecto-ops -am test` does not even resolve without `-Pedition-standard`). Severity was LOW:
-  `ci.yml:364` runs `-Pedition-advanced` with tests, so CI always ran them — the exposure was the local
+  `ci.yml` runs `-Pedition-advanced` with tests, so CI always ran them — the exposure was the local
   `mvn -o clean test` loop only. `RepoSpacesConfigValidationTest` moved to `inspecto`; `ControlApiDbBrowserTest`,
   `ControlApiDecisionRulesTest` and `PostgresStateStoreTest` SPLIT (ops siblings `ControlApiDbBrowserOpsTablesTest`,
   `ControlApiDecisionRuleApplyTest`, `PostgresOpsStoreTest`); `ControlApiReconPromoteTest` moved (`2f0b181f9`);
@@ -626,7 +626,7 @@ inside a fence is scanned as a live assertion. Found by hitting it while writing
 fixed, never the guard. ⛔ Widening the scope to the whole repo widened this trap to every markdown file in it,
 so documenting markers by example is now impossible anywhere.
 
-**`README-VOCAB-SCOPE-1`** — `check-vocabulary.mjs`'s `USER_FACING` list (`:66`) holds only
+**`README-VOCAB-SCOPE-1`** — `check-vocabulary.mjs`'s `USER_FACING` list holds only
 `docs/USER_GUIDE.md`, and its tree scan covers `docs/**` plus the root canon, **not module READMEs**. So
 `inspecto/README.md` — the file `package.ps1` copies to the bundle root as the customer's FIRST page — is
 unchecked for banned synonyms. ⚠ The sixth guard-scope blind spot in three days, and the same family as

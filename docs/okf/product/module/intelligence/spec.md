@@ -47,7 +47,10 @@ masking, gotchas) is [Embedded intelligence](architecture-embedded-intelligence.
 ## Storage
 
 - Autonomy policy: `<assist.write.root>/agent/policy.json` (durable).
-- Triage Run feedback: durable. Triage Runs and the autonomy ledger: in-memory rings.
+- Triage Runs, Triage Run feedback, approvals and runbook runs: durable JSON-lines rings (`DurableJsonlRing`) under
+  `<assist.write.root>/agent/` (`triage-runs.jsonl`, `feedback.jsonl`, `approvals.jsonl`, `runbook-runs.jsonl`);
+  in-memory only without a write root. The autonomy ledger (`AutonomyLog`): an in-memory ring by design — the
+  `AuditTrail` is the system of record.
 
 ## Tests
 

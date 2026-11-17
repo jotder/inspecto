@@ -66,7 +66,7 @@ deferred knob (`acquire.maxFilesPerCycle`, BACKLOG §6).
   fingerprint SPI: `find`/`record` per `(sourceId, relativePath)`, `highWatermark(sourceId)` for incremental
   discovery, `dbWatermark` for row-level DB export. Implementations: `InMemoryAcquisitionLedger` (default,
   lost on restart) and `DbAcquisitionLedger` (durable DuckDB/Postgres, via `-Dacquire.ledger.backend=db`).
-  `DuplicatePolicy` is **three** enums, not one list (`DuplicatePolicy.java:17,38,56`) — ⚠ conflating
+  `DuplicatePolicy` is **three** enums, not one list (`DuplicatePolicy.java`) — ⚠ conflating
   them is how this line came to name four tokens that do not exist:
   · **`Mode`** (how a file already seen at the same path is judged) — `PATH`, `METADATA`, `CHECKSUM`,
     `ETAG`; unknown input falls back to `PATH`, and `ETAG` degrades to `METADATA` when neither side

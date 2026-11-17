@@ -53,7 +53,7 @@ From a blank install (P1, CSV file, Basic). ✋ = a manual step the user must kn
 
 | # | Step | Where | What the user must decide or do |
 |---|---|---|---|
-| 1 | Open the console | `/` → `/home` (`menu-landing.ts`) | Nothing. Home shows a first-run panel with three cards when there are **zero Runs**: *Onboard a Stream*, *Author a Pipeline*, *Query it in Studio* (`home.component.html:22, 49-95`) |
+| 1 | Open the console | `/` → `/home` (`menu-landing.ts`) | Nothing. Home shows a first-run panel with three cards when there are **zero Runs**: *Onboard a Stream*, *Author a Pipeline*, *Query it in Studio* (`home.component.html`) |
 | 2 | ✋ Have a Space | Spaces pane | On a multi-space server with none: *New space* or *New from template* (gallery; a template the edition cannot run shows `missingFeatures`). On a single-tenant server there is nothing to do |
 | 3 | ✋ Start onboarding | Home card → `/catalog?onboard=stream` | Choose Stream or Reference, type a unique name, an optional description; inbox and output folders under *Advanced* |
 | 4 | ✋ Collect stage | Guided editor `/pipelines?guided=1` | Accept the local inbox (default) |

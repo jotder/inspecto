@@ -12,7 +12,7 @@ timestamp: 2026-07-07T00:00:00Z
 Components are the `use:`-referenced building blocks of authored [Pipelines](../engine/architecture-pipeline-graph.md). They
 live under `<write-root>/registry/<type>/` as TOON files, addressed by `<type>/<name>`.
 
-* **Types**: `ComponentStore.WRITABLE_TYPES` is **24 kinds** (`ComponentStore.java:55-102`) — `grammar`, **`schema`**,
+* **Types**: `ComponentStore.WRITABLE_TYPES` is **24 kinds** (`ComponentStore.java`) — `grammar`, **`schema`**,
   **`mapping`** (a CSV kind), `transform`, `sink`, the Studio kinds, the access/notification/findings kinds, `pattern-pack`,
   `rule-template`, `kpi` (a KPI definition — [Studio](../../layer/product/plan-studio.md) §3.6); `connection` is deliberately excluded (its own secret-aware CRUD). ⚠ **`schema` IS a component
   again** — the 2026-07-31 retirement (unification W1) was **reversed on 2026-08-05** by the ELT amendment (Schema =

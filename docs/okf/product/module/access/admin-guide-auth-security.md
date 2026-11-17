@@ -636,7 +636,7 @@ boundary** at both route and row level, letting a subject bound to one Space add
 `PolicyEngine` takes no configuration, so no typo can break it — only a packaging fault or `LinkageError`,
 which is exactly what PKG-5 chose to make non-fatal. ⛔ The judgement: a tenancy boundary is not a feature,
 so losing it silently is worse than refusing to boot. (`TokenRelays` needs nothing: absence already yields
-a 503 at `AuthRoutes:86`, which is fail-safe.)
+a 503 at `AuthRoutes`, which is fail-safe.)
 
 ## A Space's config cannot name another Space's directory (`CROSS-SPACE-JAIL-1`, 2026-09-24)
 

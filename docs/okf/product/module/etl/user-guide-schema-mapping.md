@@ -31,7 +31,7 @@ timestamp: 2026-09-04T00:00:00Z
 
 `PipelineTransformSqlDefinitionComponent` (`pipeline-transform-sql-definition.component.ts`), a bespoke
 pane reached from the editor's routing arm for `dn.type === 'transform.sql'`
-(`pipeline-editor.component.html:755-767`).
+(`pipeline-editor.component.html`).
 
 🔴 **This surface flipped twice on 2026-09-04. The SQL-only middle state is NOT current.** The Step
 shipped SQL-only that morning (`24171333`, which deleted the 2026-09-03 fields grid), and the operator
@@ -182,13 +182,13 @@ catalog and by persisting `fields[]`.
 > 2026-09-04: the Parse pane's own columns table ("Columns that come out"), its sections and defaults are
 > in [../config/user-guide-grammar-config.md](../config/user-guide-grammar-config.md); the standalone `SchemaEditorDialog` below is unchanged.
 
-- **Component:** `SchemaEditorDialog` (`schema-editor.dialog.ts:48-118`) — a flat grid over
+- **Component:** `SchemaEditorDialog` (`schema-editor.dialog.ts`) — a flat grid over
   `<inspecto-editable-grid>` with columns name / selector / **type** / description / unit / classification
-  (`:28-37`). Type is a **free-text DuckDB SQL type**, deliberately not a dropdown (comment `:31-32`).
-- **Both hand-typed and inferred**: rows can be typed directly, or "Suggest from sample" (`:102-107`) calls
+ . Type is a **free-text DuckDB SQL type**, deliberately not a dropdown (comment).
+- **Both hand-typed and inferred**: rows can be typed directly, or "Suggest from sample" calls
   `ConfigService.suggestSchema()` (`POST /config/suggest/schema`, TRY_CAST voting) against `data.sampleRows`
-  captured by an earlier Test-Parse (`:20-21,175-204`). Inference only fills the grid as a draft — nothing
-  persists until Save (`:181-183`). A suggested DATE fills the **Date format** column (`raw.fields[].format`,
+  captured by an earlier Test-Parse. Inference only fills the grid as a draft — nothing
+  persists until Save. A suggested DATE fills the **Date format** column (`raw.fields[].format`,
   a strptime pattern such as `%B %d,%Y`) — without it a non-ISO date lands NULL; see
   [ingestion §3.8](plan-ingestion.md). For a column holding an epoch count (`1700000000`, with `0` for none),
   declare the type `TIMESTAMP` and type `epoch` (seconds) or `epoch_ms` (milliseconds) in **Date format**: it
@@ -210,10 +210,10 @@ catalog and by persisting `fields[]`.
   (`schema_file` or `schemas[].schema_file`, resolved beside that Pipeline, a draft whose schema does not exist
   yet included) is refused `ERR_SELECTOR_NOT_INDEX` when a selector is a name — judged by loading each such
   Pipeline against the candidate schema (`SaveGate.referencedSchemaSelectorFindings`), before the BACKWARD gate.
-- **Inference (a separate, upstream endpoint):** `POST /parsers/{id}/preview` (`ParserRoutes.java:34,58-71`)
-  runs a DuckDB `auto_detect` sniff and returns per-column types (`ParserRoutes.java:111-113`). Stateless —
+- **Inference (a separate, upstream endpoint):** `POST /parsers/{id}/preview` (`ParserRoutes.java`)
+  runs a DuckDB `auto_detect` sniff and returns per-column types (`ParserRoutes.java`). Stateless —
   writes nothing.
-- **Save:** `ConfigService.write('schema', config, {overwrite:true, ...compatibility})` (`:249-253`) →
+- **Save:** `ConfigService.write('schema', config, {overwrite:true, ...compatibility})` →
   `POST /config/write type=schema`, persisted as `<name>.toon` (the typed Name — ⚠ **not** `<name>_schema.toon`,
   and nothing points the parse node's `schema_file` at it: this onward link "saves itself, node untouched",
   so a Draft Schema… named anything but the node's referenced file is a file no pipeline loads; the Parse
@@ -224,18 +224,18 @@ catalog and by persisting `fields[]`.
   both merged back on read so the UI always sees the conflated document. A field with a key the CSV cannot hold
   (`timezone`, `partitions`, …) keeps the whole list inline; the sibling is then removed.
 - **Editing an existing schema is real and gated:** a backward-compatibility diff,
-  `SchemaCompatibility.check(existing, draft)` (`platform/inspecto-config/.../safety/SchemaCompatibility.java:48-82`),
+  `SchemaCompatibility.check(existing, draft)` (`platform/inspecto-config/.../safety/SchemaCompatibility.java`),
   flags removed fields, non-widening type changes, and moved selectors as ERROR findings, mapped back onto
-  grid cells by field name (`schema-editor.dialog.ts:145-161,279-285`) with an inline alert and a "Save
-  anyway (skip compatibility check)" escape hatch (`:108-111,218-225`, `compatibility:"none"` param,
-  `ConfigWriteRoutes.java:195-197`).
+  grid cells by field name (`schema-editor.dialog.ts`) with an inline alert and a "Save
+  anyway (skip compatibility check)" escape hatch (`compatibility:"none"` param,
+  `ConfigWriteRoutes.java`).
 - **This gate protects the schema file only — it never reads the sibling mapping CSV.** Its own comment
   cites "referencing Mappings" as the rationale for blocking a field removal, but `SchemaCompatibility`
   operates purely on `raw.fields` diffs; it does not cross-check `MappingCsv`'s `targetColumn`/
   `sourceExpression` values against the new field set. It only prevents the schema-side edit that *would*
   orphan a mapping rule — and that protection is fully bypassable via `compatibility:"none"`.
 - **The only downstream-staleness warning found anywhere** is generic prose in the Parse-definition pane
-  when a parse's produced columns no longer match the saved output schema (`pipeline-parse-definition.component.ts:407-424`,
+  when a parse's produced columns no longer match the saved output schema (`pipeline-parse-definition.component.ts`,
   "anything downstream that expects the old columns will need updating" + a "Replace the output schema"
   button). This fires on a *parser format* change, never on a manual edit made through `SchemaEditorDialog`,
   and never names which mapping rules would break.
@@ -278,43 +278,43 @@ so mid-edit it shows the schema before the current edit. A test pins each direct
   legacy `columns: [{name, expr}]` projection read as DIRECT rules (2026-09-04 — before that a
   columns-authored node showed an EMPTY grid, so the operator saw no mapping where the engine ran one),
   else one straight-through identity rule per schema field, auto-seeded as a pending "proposal" that
-  arms Apply (`:483-546`). This is the only auto-map-by-name behavior; it is not a re-invocable action.
+  arms Apply. This is the only auto-map-by-name behavior; it is not a re-invocable action.
 - ⚠ **Applying rules REPLACES `columns`.** `MAP_AUTHORED` holds both keys and `RowShaper.columnsOf` returns
   `columns` before it looks at rules, so a node keeping both would execute the old projection over the
   operator's saved edit — a write that is real and dead at once. `submit()` therefore deletes `columns`
   whenever it writes a non-empty `rules` (pinned by `emits rules and drops the columns key they replace`).
   An empty grid deletes nothing: a stray Apply must not wipe an authored projection.
 - **Per row:**
-  - Target column: free-text input, pattern-validated (`:127-133`).
+  - Target column: free-text input, pattern-validated.
   - Rule: `mat-select` of `transformType` (`DIRECT` / `EXPR` / `CONCAT_DT` / `FILENAME_DATE`, from
-    `TRANSFORM_TYPES`) (`:135-142`).
-  - The from-column control varies by type — `DIRECT`: dropdown of schema field names (`:145-152`); `CONCAT_DT`: Date +
-    Time column dropdowns (`:153-180`); `FILENAME_DATE`: filename-column dropdown + free-text Prefix +
-    free-text Format, placeholder `%Y%m%d` (`:181-216`); anything else (i.e. `EXPR`) — **a single free-text
+    `TRANSFORM_TYPES`).
+  - The from-column control varies by type — `DIRECT`: dropdown of schema field names; `CONCAT_DT`: Date +
+    Time column dropdowns; `FILENAME_DATE`: filename-column dropdown + free-text Prefix +
+    free-text Format, placeholder `%Y%m%d`; anything else (i.e. `EXPR`) — **a single free-text
     `sourceExpression` input**, tooltip: "A per-row scalar expression, emitted verbatim — you own any
-    explicit cast" (`:217-225`).
+    explicit cast".
 - **`EXPR` is pure free text.** No syntax check, no autocomplete, no column picker. Confirmed by reading the
   whole component — the only aid is a static caption telling the author to hand-write `TRY_CAST(...)`
-  themselves (`:235-239`). The engine emits it **verbatim** into the compiled SQL
-  (`TransformCompiler.java:128`, dispatch table `:54`) — unparsed until DuckDB actually runs it.
+  themselves. The engine emits it **verbatim** into the compiled SQL
+  (`TransformCompiler.java`, dispatch table) — unparsed until DuckDB actually runs it.
 - **Silent stale-reference fallback (backend):** even a `DIRECT` rule that names a column no longer in the
   schema doesn't error at mapping-save time — `TransformCompiler`'s `direct()` does
-  `fieldTypes.getOrDefault(source, VARCHAR)` (`TransformCompiler.java:122`), silently defaulting the cast.
+  `fieldTypes.getOrDefault(source, VARCHAR)` (`TransformCompiler.java`), silently defaulting the cast.
   The mismatch only surfaces as a DuckDB "unknown column in `raw_input`" error at execution time.
-- **Preview exists but is opt-in and server-round-trip, not live-as-you-type:** "Test mapping" (`:248-254`)
+- **Preview exists but is opt-in and server-round-trip, not live-as-you-type:** "Test mapping"
   posts the current rules + the Parse tab's captured sample rows to `POST /config/preview/schema`
-  (`:573-598`), rendering a capped result table (`MAX_PREVIEW_ROWS=20`, `:46,374`, `:262-297`). Any rule
-  edit invalidates the prior preview (`invalidateMapping()`, `:407-408,600-613`) — it does **not**
+ , rendering a capped result table (`MAX_PREVIEW_ROWS=20`). Any rule
+  edit invalidates the prior preview (`invalidateMapping()`) — it does **not**
   auto-rerun.
 - **No drag-and-drop** field mapping anywhere in this component.
 - **No dedicated whitespace-trim affordance** — only achievable by hand-typing `TRIM(col)` into the `EXPR`
   free-text box, per [`catalog-vs-executors.md`](../engine/spec-catalog-vs-executors.md).
 - **Client-side `ruleProblem()`** only structurally validates `CONCAT_DT`/`FILENAME_DATE` arity, mirroring
-  the engine's `MappingRules` (`:465-481`) — `DIRECT`/`EXPR` rows get no inline semantic check beyond
+  the engine's `MappingRules` — `DIRECT`/`EXPR` rows get no inline semantic check beyond
   required/pattern.
 - **Mapping CSV save itself validates shape only:** `MappingCsv.parse` checks required headers and row
   width, never that `targetColumn` exists in the schema or that `sourceExpression` is valid SQL
-  (`MappingCsv.java:48-84`); the write path (`ConfigWriteRoutes.java:199-226`, `splitMapping`) does the same
+  (`MappingCsv.java`); the write path (`ConfigWriteRoutes.java`, `splitMapping`) does the same
   — no target-existence or expression validation on save.
 
 ## 3. Expression building
@@ -333,25 +333,25 @@ so mid-edit it shows the schema before the current edit. A test pins each direct
 ## 4. Lookup/join authoring (generic `AttributeSpec` form — `transform.join`)
 
 - Rendered by the shared `PipelineConfigDefinitionComponent` + `InspectoSchemaFormComponent`, driven by
-  `NodeAttributes.TRANSFORM_JOIN`'s spec (`node-attributes.ts:325-343`, mirroring
-  `NodeAttributes.java:356-366`): `reference` (`autocomplete`, required, placeholder `reference/rates`) and
+  `NodeAttributes.TRANSFORM_JOIN`'s spec (`node-attributes.ts`, mirroring
+  `NodeAttributes.java`): `reference` (`autocomplete`, required, placeholder `reference/rates`) and
   `on` (`list`, required, join key columns).
 - **`reference` is autocomplete with real suggestions, never a hard constraint:**
-  `referenceOptionLoader()` (`entity-option-loaders.ts:72-79`) calls `CatalogService.references()`
-  (backed by `GET /catalog/references`, `CatalogRoutes.java:32,84-85`) and maps results to
-  `reference/<label>` options, wired via `[optionLoaders]` (`pipeline-config-definition.component.ts:141,265`).
-  Per the shared form's own doc comment (`schema-form.component.ts:27-32`): "suggestions assist, they never
+  `referenceOptionLoader()` (`entity-option-loaders.ts`) calls `CatalogService.references()`
+  (backed by `GET /catalog/references`, `CatalogRoutes.java`) and maps results to
+  `reference/<label>` options, wired via `[optionLoaders]` (`pipeline-config-definition.component.ts`).
+  Per the shared form's own doc comment (`schema-form.component.ts`): "suggestions assist, they never
   constrain — free text stays valid."
 - **No pre-save existence check** ties the typed `reference` value back to the `/catalog/references` list,
   and no validator exists for `on` (unlike `transform.summarize`, whose `measures`/`group_by` DO have
-  dedicated `configValidators` — `pipeline-config-definition.component.ts:271-274`). Neither
+  dedicated `configValidators` — `pipeline-config-definition.component.ts`). Neither
   `ConfigSafetyValidator` nor the pipeline-graph save routes cross-check a join node's `reference`/`on`
   against the catalog or the reference dataset's real columns.
 - **No dedicated join-result preview.** The closest thing is the generic, opt-in "Test this Step" button
   available to any `transform.*` node (`ComponentsService.previewFamilyFor`, matches `type.startsWith('transform.')`,
-  `components.service.ts:217-221,229-234`) — posts the on-screen config + the tab's already-captured sample
+  `components.service.ts`) — posts the on-screen config + the tab's already-captured sample
   rows to `POST /components/transform/preview`, rendering `<inspecto-step-preview-result>`
-  (`pipeline-config-definition.component.ts:177-201`). It only works if the tab already has sample rows
+  (`pipeline-config-definition.component.ts`). It only works if the tab already has sample rows
   from a prior Test-Parse, and is a manual click, not automatic feedback while typing `reference`/`on`.
 
 ## 5. Save / validation feedback loop
@@ -395,7 +395,7 @@ verbatim) instead of defaulting to VARCHAR; the `DIRECT`-rule fallback itself is
 path.
 
 1. **No live/as-you-type validation or preview for `EXPR`** — a bare `<input matInput>` with zero syntax
-   checking (`pipeline-load-definition.component.ts:218-225`).
+   checking (`pipeline-load-definition.component.ts`, the Load pane deleted 2026-09-05 — see §2).
 2. **No expression-builder UI anywhere** — no function picker, no column picker, no autocomplete for
    `EXPR`; CodeMirror exists in the codebase but is never wired to this field.
 3. **No reference-existence or `on`-column-existence validation** before saving a `transform.join` node —

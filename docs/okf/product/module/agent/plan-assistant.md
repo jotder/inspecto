@@ -626,7 +626,7 @@ One archived plan also cites a reflex-layer history file that **does not exist**
 
 ### `MODELPROFILE-DUPLICATE-TIERS-1` (open, filed 2026-09-17)
 
-`ModelProfile.CPU_ONLY` and `DEV_LAPTOP` (`:40-45`) carry the **same** tier map (`qwen2.5:3b` / `7b` / `7b`)
+`ModelProfile.CPU_ONLY` and `DEV_LAPTOP` carry the **same** tier map (`qwen2.5:3b` / `7b` / `7b`)
 despite distinct javadoc rationales, so declaring one rather than the other changes nothing an operator can
 observe. Possibly intended — a 4GB GPU cannot hold a 7B either — possibly a copy-paste. Either way the
 operator-facing choice is a distinction without a difference today; one should become a documented alias of

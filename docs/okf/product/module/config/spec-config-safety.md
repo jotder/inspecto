@@ -748,14 +748,14 @@ hypothetical; each of these has confirmed undeclared-but-engine-read keys:
 | Type | Undeclared keys the engine reads | Blocker |
 |---|---|---|
 | `job` | `on_signal`, `when`, `catch_up`, `coalesce`, `args`, `bind` | `JobConfig.fromMap` also funnels **any** other key into an open `params` bag — a census needs a job-type registry, not a parser walk |
-| `expectation` | `when` (required for `kind: condition`; ⚠ the spec's `kind` enum omitted `condition` entirely until 2026-09-17) | ⛔ **a census here is close to a no-op too**: expectations are authored through `/expectations*` (`ExpectationRoutes`), not `/config/write`, and the persisted content carries `lastResult` / `createdAt` / `updatedAt` bookkeeping (`ExpectationRoutes.java:105-117`) that no `ConfigSpec` declares — the same shape that struck `widget`/`dashboard` |
-| `schema` | `mapping.fields`, `mapping.rules[].targetColumn`, `partitions[]` | ⛔ **there is no single schema parser to census.** Its blocks are navigated by a dozen classes across `inspecto-etl` — `Identifiers.validateSchema:124-170`, `DataTransformer:96,169,239,267`, `PartitionDef:95`, `ParserSpec:28`, `SourceZones:84`, `TypeFlow:125`, `BoundaryScanner:115`, `SchemaMappingDrift:74,84`, `DuckDbCsvIngester:698`, `ConsignmentPlanner:152`, `PipelineConfigParser:1262-1884` — so "the reads" are not enumerable from one source file and the ratchet idiom cannot be written |
+| `expectation` | `when` (required for `kind: condition`; ⚠ the spec's `kind` enum omitted `condition` entirely until 2026-09-17) | ⛔ **a census here is close to a no-op too**: expectations are authored through `/expectations*` (`ExpectationRoutes`), not `/config/write`, and the persisted content carries `lastResult` / `createdAt` / `updatedAt` bookkeeping (`ExpectationRoutes.java`) that no `ConfigSpec` declares — the same shape that struck `widget`/`dashboard` |
+| `schema` | `mapping.fields`, `mapping.rules[].targetColumn`, `partitions[]` | ⛔ **there is no single schema parser to census.** Its blocks are navigated by a dozen classes across `inspecto-etl` — `Identifiers.validateSchema`, `DataTransformer`, `PartitionDef`, `ParserSpec`, `SourceZones`, `TypeFlow`, `BoundaryScanner`, `SchemaMappingDrift`, `DuckDbCsvIngester`, `ConsignmentPlanner`, `PipelineConfigParser` — so "the reads" are not enumerable from one source file and the ratchet idiom cannot be written |
 | `widget`, `dashboard` | none found in a Java reader | ⛔ **a census here would be a no-op**: neither type is ever written through `/config/write`. The UI saves both through the component-store routes (`POST`/`PUT /components/{kind}`), which never call this class. A gate belongs in `ComponentRoutes` — and it is not a table away, because the persisted body also carries `name`, `owner` and `shares`, which no `ConfigSpec` declares |
 
 ⇒ **A type earns a census only when its parser's reads can be PROVEN from source**, and the proof is a
 ratchet test that fails when the two authorities drift.
 
-**`alert` earned one (2026-09-16).** `AlertRule.fromMap` (`platform/inspecto-engine/.../alert/AlertRule.java:115-128`)
+**`alert` earned one (2026-09-16).** `AlertRule.fromMap` (`platform/inspecto-engine/.../alert/AlertRule.java`)
 is the easiest case in the codebase: one flat block of literal `alert.get("…")` calls, no dynamic key
 access, no nested sub-parsers. Seven of its ten keys are declared by `ConfigSpecs.alert()`; the other
 three are `AcceptedConfigKeys.ALERT_PARSER_ONLY` — `alert.dataset`, `alert.measure` (the BI-5
@@ -769,7 +769,7 @@ and the checker descends one level into it. `censusedParents(type)` is per-type 
 
 **`meta` earned one (2026-09-16), and it is the case that shows the test is about GRANULARITY, not
 about the word `entrySet`.** The one reader of a `*_meta.toon` is `SemanticModel.load`
-(`platform/inspecto-engine/.../catalog/SemanticModel.java:95-138`; its only caller is `ServiceBootstrap:154`),
+(`platform/inspecto-engine/.../catalog/SemanticModel.java`; its only caller is `ServiceBootstrap`),
 and at the level the census works — the **top level** — it is five literal `raw.get("…")` reads:
 `name`, `tables`, `kpis`, `reports`, `domain`. All five are declared by `ConfigSpecs.meta()`, so
 **`meta` has no parser-only list at all** — five reads, five accounted for.
@@ -788,12 +788,12 @@ carry exactly the six declared keys, so nothing on disk regresses — pinned, no
 top-level block is undeclared — `references` — and that is the whole of
 `AcceptedConfigKeys.ENRICHMENT_PARSER_ONLY`.
 
-`EnrichmentConfig` (`platform/inspecto-engine/.../enrich/EnrichmentConfig.java:143-236`) reaches the root map
+`EnrichmentConfig` (`platform/inspecto-engine/.../enrich/EnrichmentConfig.java`) reaches the root map
 through seven literal reads — `name`, `transform`, `transform_file`, `references`, `triggers`, and
 `ToonHelper.requireSection(raw, "input"|"output")` — with no `keySet`/`entrySet`/`forEach` over the
 root. Seven reads, seven accounted for. Every **other** component that reads a `*_enrich.toon` map
-reads a subset of the same declared blocks: `PipelineGraphRoutes:349-352`,
-`PipelineBundleRoutes:539-560` + `:608-612`, `PipelineRenameRoutes:505-515`.
+reads a subset of the same declared blocks: `PipelineGraphRoutes`,
+`PipelineBundleRoutes`, `PipelineRenameRoutes`.
 
 ⚠ **`input`, `output` and `triggers` are censused parents**, and unlike `alert` that is about value
 rather than necessity: an enrichment's real settings live one level down, so a top-level-only census

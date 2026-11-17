@@ -740,7 +740,7 @@ definition of "done" for every unbuilt script. Board row: *Deployment topology l
 | `SCR-10` | Bundle-docs ACL fix | — | thirteen files under `archived-documents/plans-archive/` carry a broken deny-ACL and are **silently skipped from every bundle**; needs an Administrator `takeown` + `icacls` pass |
 | ~~`SCR-2`~~ | ~~Launcher `lib/` support~~ | — | ✅ **SUPERSEDED by PG-1**: `postgresql.jar` is staged into every Standard and Advanced bundle and auto-detected |
 | ~~`SCR-8`~~ | ~~`package.ps1 -Edition Advanced`~~ | — | ✅ **SHIPPED as EDG-01.** The row named a blocker that was already gone |
-| ~~`SCR-11`~~ | ~~Container image~~ | — | ✅ **SHIPPED as PKG-3** — the Dockerfile is generated at `package.ps1:1041-1065`. Kubernetes is in scope for Advanced only since D1′ (signed 2026-09-10, §6 *Orchestration platform support*) |
+| ~~`SCR-11`~~ | ~~Container image~~ | — | ✅ **SHIPPED as PKG-3** — the Dockerfile is generated at `package.ps1`. Kubernetes is in scope for Advanced only since D1′ (signed 2026-09-10, §6 *Orchestration platform support*) |
 * **The Standard runtime not re-verified against the token library** — skip-runtime until confirmed.
 * **Multi-user relational deployment** — park lifted 2026-09-15 (a multi-operator install exists); the buildable part is done and the two-host run is ⏸ postponed 2026-10-23 (board row *Postgres multi-user*, hold: operator).
 * **Step-processor gaps** — eighteen partial and sixty-seven planned rows on the board.
@@ -784,7 +784,7 @@ citations elsewhere in this spec still resolve.
    and `inspecto-policy` jars refreshed in `~/.m2`.
    ⛔ **Do not "fix" a recurrence by narrowing the scope filter**: the failure is in **resolution**, which
    precedes filtering.
-   ⛔ `release.yml` does **not** invoke the generator — `package.ps1:555` does, after staging — so there is
+   ⛔ `release.yml` does **not** invoke the generator — `package.ps1` does, after staging — so there is
    no second staging gap here; that was checked and refuted.
    ⚠ A truly clean BEFORE could not be reproduced on the sandbox (a prior build had primed `~/.m2`); the
    clean-runner failure is the one recorded when the row was filed.
@@ -981,7 +981,7 @@ class names against `git ls-files` and the module tree.
 The work-queue family was retired on 2026-09-14 (created `a5b89a89`, moved to `inspecto-ops` `e8d98918`,
 deleted `519673a7`), and EDG-01 cell 7 is now **three** route families, not four. Three shipped strings still
 promise it, and none is test-asserted: `AbsentModuleRoutes.java` — the Basic-edition **503 body** — plus
-`inspecto-ui/.../admin/objects/object-mail.component.html:4` and `.../admin/tags/tags.component.html:4`, each
+`inspecto-ui/.../admin/objects/object-mail.component.html` and `inspecto-ui/.../admin/tags/tags.component.html`, each
 reading "notes, links, tags **and queues** are provided by the…".
 
 ⚠ A 503 telling an operator that a deleted feature is available in Standard is a small but real defect. It was

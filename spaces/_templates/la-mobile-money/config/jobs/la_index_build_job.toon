@@ -1,7 +1,7 @@
 job:
   name: la_index_build
   type: la.index.build
-  description: "Builds or refreshes the Link Analysis Index of mm_links five minutes after each mm_links run (the index build only fires on a clock or a pipeline commit, never on a Job's output, so it follows the mm_links cron). The first build is a full build (allow_full), every later one is the append the server itself advises."
+  description: "Builds or refreshes the Link Analysis Index of mm_links five minutes after each mm_links run (it follows the mm_links cron; an index build can also start on a Job's job.dataset.produced Signal, which la-audit and la-claims use). The first build is a full build (allow_full), every later one is the append the server itself advises."
   cron: "5,15,25,35,45,55 * * * *"
   dataset: mm_links_dataset
   source_col: src

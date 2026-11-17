@@ -598,7 +598,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - Packaging: `tools/bundle-modules.mjs` stages `inspecto-agent.jar` from Standard and `inspecto-intelligence.jar` from Advanced.
   - Tests (inventories): agent 28 classes (25 unit, 3 real-HTTP), intelligence 35 classes (all unit, 0 HTTP), agent-hosted 2. UI: about 15
     assist/ai specs.
-  - `pom.xml:292` pins `<eoiagent.version>0.2.0-SNAPSHOT</eoiagent.version>`. CI rebuilds the upstream from a branch head
+  - `pom.xml` pins `<eoiagent.version>0.2.0-SNAPSHOT</eoiagent.version>`. CI rebuilds the upstream from a branch head
     (plan-assistant §2 EOI-7), so the runtime dependency is unpublished.
   - Open: P2 `AGENTIC-INVESTIGATION-1` (competitive gap AA), P2 AGT-5 per-tool dry-run seam (BLOCKED-EXTERNAL, BACKLOG line 552) and P3
     `AGT-SEGMENT-1`.

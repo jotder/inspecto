@@ -37,16 +37,16 @@ this is what renders now, and why. Grounding: `grammar-editor.component.{ts,html
 `parsing-attributes.ts`, `schema-form.component.ts`, `schema-fields-editor.component.{ts,html}`.
 
 - **Sections, not tabs.** `AttributeSpec.tab` is renamed `section` (frontend-only,
-  `attribute-spec.ts:87-92`). The grammar editor renders one `<mat-expansion-panel>` per section, each
+  `attribute-spec.ts`). The grammar editor renders one `<mat-expansion-panel>` per section, each
   hosting ONE `<inspecto-schema-form [flat]>`. 🔴 **The R9 `[hidden]`-panels-outside-tab-bodies hack is
   deleted** — panels stay mounted, so a value typed into a never-opened section is visible to `value()`.
-  ⛔ Deleted with a proof, never on the assumption: `grammar-editor.component.spec.ts:425` ("a value typed
+  ⛔ Deleted with a proof, never on the assumption: `grammar-editor.component.spec.ts` ("a value typed
   into a COLLAPSED, never-opened section survives value() and a save round-trip") is the exact defect R9
   existed to prevent. The "steer to the first failing tab" logic went with it; an invalid section shows a
   warn dot and the header counts "N changed". Panel content is mounted directly — never
   `matExpansionPanelContent` (lazy), which would reintroduce R9.
 - **Plain language** (R12): section ids keep their engine-facing names, labels take the approved mockup's
-  vocabulary (`parsing-attributes.ts:101-103`): `dialect` = **How the file is written** (Column separator ·
+  vocabulary (`parsing-attributes.ts`): `dialect` = **How the file is written** (Column separator ·
   Text quote · Escape character · First row is the header · Skip lines at the top · Ignore lines starting
   with · Text encoding · Compression), `types` = **How values are understood** (Detect column types · Date
   formats to try · Timestamp formats to try · Source time zone · Words that mean "no value"), `robustness` <!-- vocab-allow: quotes the existing UI label "Source time zone" (the data-origin zone sense, not the acquisition entity) -->
@@ -69,17 +69,17 @@ this is what renders now, and why. Grounding: `grammar-editor.component.{ts,html
   alone; DuckDB's sniff is the engine's own reading (header, quote, escape, skip, date formats), so the
   line cannot disagree with what Test parse then does. Advisory like `columnTypes`: a failed sniff, an old
   server or a non-delimited format simply shows no line.
-- **Compact flat rows** (R10): `<inspecto-schema-form [flat]>` (`schema-form.component.ts:748`) renders
+- **Compact flat rows** (R10): `<inspecto-schema-form [flat]>` (`schema-form.component.ts`) renders
   label · current value · pencil on one ~32px line; help becomes an info-icon tooltip; the row shows the
   real default for an untouched grammar as text and the pencil opens the dense inline control (booleans
   keep their toggle, selects use the option picker inline). **Two columns when the form's OWN measured
-  width ≥ 560px** (`TWO_COLUMN_MIN_WIDTH`, ResizeObserver, `:615-629`) — the drawer's "Full width" button
+  width ≥ 560px** (`TWO_COLUMN_MIN_WIDTH`, ResizeObserver) — the drawer's "Full width" button
   makes the host wide; ⛔ Tailwind `sm:` prefixes key on the VIEWPORT and are wrong inside a ~300px
   drawer (R3). The tiered (non-flat) path used by jobs/alert dialogs is byte-identical.
   ⚠ `<inspecto-property-rows>` (the first build's per-property wrapper) is **deleted** — mounting every
   property in its own schema-form produced seven separate "Optional settings (1)" toggles and broke
   cross-spec `dependsOn` (R1); its dead sample column and per-row reset went with it (R2).
-- **Grounded defaults** (R4, against `PipelineConfigParser.java:955-1043` + `DuckDbCsvIngester.java`; every
+- **Grounded defaults** (R4, against `PipelineConfigParser.java` + `DuckDbCsvIngester.java`; every
   option reaches `read_csv` ONLY when set, so "absent" = DuckDB's own default). A suggestion that IS the
   engine default became a real `default` — writing it is a no-op: `quote` `"` · `encoding` `utf-8` ·
   `compression` `auto` · `skip_header_lines`/`skip_junk_lines`/`skip_tail_lines`/`skip_tail_columns` `0` ·
@@ -89,7 +89,7 @@ this is what renders now, and why. Grounding: `grammar-editor.component.{ts,html
   (absent = no comment skipping; `#` would newly drop lines) · `date_formats`/`timestamp_formats` (absent =
   flexible `TRY_CAST`; a list RESTRICTS to `TRY_STRPTIME` of exactly those) · `null_strings` (absent = only
   `""` is null). Left alone deliberately: `escape` (engine auto-fills escape = quote), `strict_mode`
-  (tri-state), `engine` (blank = `auto`, recorded code decision — `parsing-attributes.ts:301`),
+  (tri-state), `engine` (blank = `auto`, recorded code decision — `parsing-attributes.ts`),
   `rejects_limit`.
 - **Sample | Parsed — the ONLY tabs** (`grammar-editor.component.html`): paste and upload merge into
   one textarea (typing clears captured bytes — the xlsx `sample.b64` rule kept); Import/Export (the Grammar
@@ -118,7 +118,7 @@ this is what renders now, and why. Grounding: `grammar-editor.component.{ts,html
   `<inspecto-schema-metadata-grid>` (description / unit / classification) is gone from Parse (D2: it
   belongs to the Transform Step once the backend carries it — BACKLOG). The old save merged those three
   keys FROM the grid; without it a hydrated schema's metadata would have been dropped on Apply. Now
-  `value()` rebuilds each output row over its original seed (`schema-fields-editor.component.ts:563-587`),
+  `value()` rebuilds each output row over its original seed (`schema-fields-editor.component.ts`),
   so `description`/`unit`/`classification`/`timezone_column` **carry through by selector** from the loaded
   schema, invisibly, and Apply + the Grammar CSV export never drop them (specs prove both).
 - **Files & metadata dissolved** (D2/D4/R5): `compression`/`encoding` joined the first section for every
@@ -137,13 +137,13 @@ this is what renders now, and why. Grounding: `grammar-editor.component.{ts,html
   design).
 - **One disclosure idiom across Parser · Map · Sink** (R6): uppercase section header → fields, single
   column; Sink's schema-forms went `flat` and its "Additional config" is a plain header, no chevron
-  (`pipeline-config-definition.component.ts:154-160`). The Collector pane still has its own chevron —
+  (`pipeline-config-definition.component.ts`). The Collector pane still has its own chevron —
   left as is, flagged in BACKLOG, not decided here.
 - **Name + Description** (D1): NOT re-added to the pane — found already shipped 2026-08-22 one layer up:
   `<app-pipeline-inspector [compact]>` above every definition pane, routing through `renameSelected`
   (never `applyNodePatch`, so a rename never invalidates a green test outcome). A second identity editor
   inside the pane would have conflicted with it.
-- **Dialog custody unchanged** (R7): `openNodeConfig` (`pipeline-editor.component.ts:2126-2154`) already
+- **Dialog custody unchanged** (R7): `openNodeConfig` (`pipeline-editor.component.ts`) already
   sends every drawer-capable delimited node to the drawer. ⚠ **Superseded since:** `GrammarEditorDialog`
   now remains ONLY for **binary fixed-width** and a **generic `parser` that maps to no frontend**
   (`isDrawerParse`). A grammar-**bound** per-format node opens the drawer as an inline COPY (D4), and a

@@ -111,7 +111,7 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   directory, so it keeps the CWD reading.
   ⚠ **`dirs.*` is still CWD-only** — it was not part of W1b. *(Corrected 2026-09-08: this line used to say
   `grammar` was CWD-only too. It is not — `resolveGrammarRef` delegates to `resolveSchemaRef(ref, configDir,
-  "grammar")` (`PipelineConfigParser.java:1181-1185`), so a `grammar` ref takes the same config-relative-first
+  "grammar")` (`PipelineConfigParser.java`), so a `grammar` ref takes the same config-relative-first
   branch as `schema_file`, including the `grammar:<id>` registry form.)*
   *(Superseded 2026-09-23: `../` now resolves from the config's directory and the one jail judges it.)*
   ⚠ The config-relative branch was contained (a `../` escape was skipped, not resolved); the CWD branch was

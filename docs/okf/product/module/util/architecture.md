@@ -21,7 +21,9 @@ layering: [architecture-modules](../../layer/platform/architecture-modules.md).
   borrows from the one PostgreSQL pool per process that `JdbcDrivers` holds. `StoreHealth` records what each
   store family actually resolved to, so a silent in-memory fallback shows on `GET /health/details`.
 - **DuckDB caps.** Each config's own value wins; when blank, the `-Dprocessing.duckdb.*` flag applies; when
-  neither is set DuckDB's own default stays. Engine detail: [engine spec-duckdb](../engine/spec-duckdb.md).
+  neither is set DuckDB's own default stays — except `memory_limit`, which is never left unset: the server
+  configuration's installed value comes before the flag, and the code default (`DuckDbUtil.defaultMemoryLimit`)
+  ends the chain. Engine detail: [engine spec-duckdb](../engine/spec-duckdb.md).
 - **Fail-closed switches.** `Topology`, `LakehouseCatalog` and `OperationsZone` resolve a JVM property and
   refuse to guess: an unknown topology, a half-configured catalog pair or an unknown zone stops the boot.
   In `partitioned` mode a store that cannot open its backend fails the boot instead of degrading to memory.

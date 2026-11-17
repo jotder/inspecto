@@ -116,7 +116,7 @@ the semantic reasons in fact 3, not effort.
 ## The object-store lane, ACCEPTED against a live MinIO (2026-09-15)
 
 `AIRGAP-S3-EXTENSIONS-1` closed on this run. `PartitionWriter.writeToObjectStore` opens with
-`DuckDbExtension.ensureLoaded(conn, "httpfs", …)` (`PartitionWriter.java:280`), and `PartitionWriterObjectStoreTest`
+`DuckDbExtension.ensureLoaded(conn, "httpfs", …)` (`PartitionWriter.java`), and `PartitionWriterObjectStoreTest`
 (**4/4 green, 1.15 s**) drove that method against the sandbox's MinIO (`127.0.0.1:9000`, bucket
 `inspecto-lakehouse`) with the explicit load in place — the acceptance the row refused to take from a green
 reactor, because all four tests `assumeTrue`-skip without an endpoint and had never entered the method since

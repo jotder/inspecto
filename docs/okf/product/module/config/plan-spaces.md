@@ -123,8 +123,8 @@ lock-free. Committed Spaces: `default`, `demo`, `ucc` (complete) and
 
 `SpaceMigrator` (`…/service/SpaceMigrator.java`) turns the flat layout into a Space directory: `configDir →
 config/`, `database/ → data/`, `jobs_audit/ → audit/`, `inspecto-events/ → data/events/`, `*.duckdb` /
-`*.db` (+ `.wal`) `→ duckdb/` (`plan`, `:69-81`); idempotent (source-exists-and-target-absent gate), `--dry-run`
-first, writes `space.toon`. **It is a CLI, run once by the operator** (`:155-176`) — no boot path invokes it,
+`*.db` (+ `.wal`) `→ duckdb/` (`plan`); idempotent (source-exists-and-target-absent gate), `--dry-run`
+first, writes `space.toon`. **It is a CLI, run once by the operator** — no boot path invokes it,
 and there is **no flat fallback** for a discovered server (design lock: migration required). ⚠ Absolute
 `schema_file` references are not rewritten (`configuration.md`). `SpaceLayoutContract` pins the convention
 directories and tolerates both `flows/` and `pipelines/` (Tier 3, 2026-08-04 — dual-read, no on-disk move).
@@ -134,7 +134,7 @@ directories and tolerates both `flows/` and `pipelines/` (Tier 3, 2026-08-04 —
 `ControlApi.dispatch` matches `SPACE_PREFIX` `^/spaces/([a-z0-9][a-z0-9-]{0,62})(/.*)$` (`ControlApi.java`)
 **after** stripping `/api/v1` — the Space segment sits after the version: `/api/v1/spaces/<id>/…`. The id is
 validated, the path rewritten, and the `space` **SLF4J MDC** key bound for the request and cleared in
-`finally` (`:665-688`); an un-prefixed path binds `spaces.current()` (`boundSpace`, `:1038-1043`). Five
+`finally`; an un-prefixed path binds `spaces.current()` (`boundSpace`). Five
 process-wide singletons resolve per Space by reading `EventLog.currentSpaceId()` — `EventLog`,
 `MetricRegistry` (its `space` label), `ConnectionRegistry`, `StabilityGate`, `AcquisitionLedgers` — plus the
 static per-Space maps `SpaceManager` cleans on delete (`DecisionRules`, `ConsignmentOutputStores`,
@@ -143,14 +143,14 @@ stays label-free. 🔴 **The MDC does not cross thread-pool boundaries**: every 
 path copies it onto its worker (`gotchas/cross-cutting.md`). `EventLog.currentSpaceId()` never returns null,
 so `env.space` is always bound for ABAC (`SEC` §3.10).
 
-**Space CRUD is server-global and un-prefixed** (`SpaceRoutes.java`): `GET /spaces` (`:45`) ·
-`GET /spaces/_meta → {multiSpace}` (`:52`, **the** capability probe — never infer mode from list length; a
-fresh discover server lists `[]`) · `GET /spaces/templates` (`:56`, empty — not 409 — on a single-tenant
-server) · `POST /spaces {id, display_name?, description?, template?}` (`:58`) · `POST /spaces/import` (`:60`,
-seed a **new** Space from a zip) · `PUT /spaces/{id}` (`:62`, rename / re-describe; `default` refused) ·
-`DELETE /spaces/{id}?purge=` (`:64`). **`DELETE` has two distinct 409s:** every CRUD verb on a single-tenant
+**Space CRUD is server-global and un-prefixed** (`SpaceRoutes.java`): `GET /spaces` ·
+`GET /spaces/_meta → {multiSpace}` (**the** capability probe — never infer mode from list length; a
+fresh discover server lists `[]`) · `GET /spaces/templates` (empty — not 409 — on a single-tenant
+server) · `POST /spaces {id, display_name?, description?, template?}` · `POST /spaces/import` (seed a
+**new** Space from a zip) · `PUT /spaces/{id}` (rename / re-describe; `default` refused) ·
+`DELETE /spaces/{id}?purge=`. **`DELETE` has two distinct 409s:** every CRUD verb on a single-tenant
 server (`requireMultiSpace`), and — **only with `?purge=true`** — the **last Space directory on disk**
-(`:120-127`, `isLastOnDisk`), because `main()` refuses to boot an empty root; deregister-only on the last
+(`isLastOnDisk`), because `main()` refuses to boot an empty root; deregister-only on the last
 Space stays allowed. The eight paths the SPA never prefixes are `SERVER_GLOBAL`: `/health`, `/ready`,
 `/metrics`, `/spaces*`, `/bootstrap`, `/auth`, `/public`, `/exchange`.
 
@@ -177,7 +177,7 @@ and every Reference Dataset it joins by name travels as its `produces: reference
 schemas, indexed in the manifest's `references` map; an import into a Space that already hosts that Reference
 keeps the target's copy and names it in `referencesKept` rather than 409ing — see
 [editable round-trip §22](../engine/spec-editable-round-trip.md). `BundleImporter`
-**jails every zip entry** — an entry resolving outside `configDir` throws (`:84-104`, the zip-slip pin, tested
+**jails every zip entry** — an entry resolving outside `configDir` throws (the zip-slip pin, tested
 with a re-packed archive) — and **rebases** `spaces/<source>/…` path prefixes to the target Space (W3).
 `POST /spaces/import` reuses the same importer to seed a brand-new Space. ⚠ `multi-space.md` enumerates the
 seven CRUD routes and omits the export routes; corrected with this spec.
@@ -961,15 +961,15 @@ promotion** (staging → production). v2 (R6, 2026-07-06) adds `items[].refs` (e
 top-level `requires` (the deduped external refs — the bundle's contract with the target); v1 files stay
 importable. `BundleRoutes` (`inspecto/src/main/java/com/gamma/control/BundleRoutes.java`):
 
-- **`POST /bundle/export`** (`:115`) — real content + real `contentHash`; each resolvable `requires` ref is
+- **`POST /bundle/export`** — real content + real `contentHash`; each resolvable `requires` ref is
   stamped with an `originHash`; an unsupported kind is a **422** — an honest boundary, never a silent
   omission. Since 2026-08-31 the UI seeds an authored pipeline's closure from `GET /pipelines/{name}/related`,
   because the client derived edges from `nodes[].use` alone and a grammar bound by config key travelled
   nowhere.
-- **`POST /bundle/preview`** (`:116`) — the read-only **fit-check**: per item `new | unchanged | drifted |
+- **`POST /bundle/preview`** — the read-only **fit-check**: per item `new | unchanged | drifted |
   unsupported`; per `requires` entry `satisfied | different | missing` (`different` = present at another
   version).
-- **`POST /bundle/import`** (`:118`) — `canAuthorWorkbench` → write-root 503 → **integrity pre-check 422**
+- **`POST /bundle/import`** — `canAuthorWorkbench` → write-root 503 → **integrity pre-check 422**
   (MNT-16: only findings the import would *introduce*) → sequential upsert in `APPLY_ORDER` (a referenced
   kind precedes its referencer: `connection, grammar, mapping, schema, transform, sink, dataset, query,
   widget, dashboard, reconciliation, pipeline, authored-pipeline, enrichment, job, saved-view` — an
@@ -1003,7 +1003,7 @@ advertised a Share button that 404'd. Mechanism: `exchange-sharing.md`.
 Everything under a `SpaceContext` is per Space: `OperationalDb`, `EventStore`, `StatusStore`,
 `ComponentStore` / registry, `JobService` (the scheduler). The per-Space **settings documents** live under
 the Space's config root and are bound by `Roles.ATTR_CONFIG_ROOT`, stamped pre-auth by `ControlApi`
-(`:767`): `roles.toon`, `access-policies.toon` (both **fail closed** when unreadable — `SEC` §3.6, §3.10),
+: `roles.toon`, `access-policies.toon` (both **fail closed** when unreadable — `SEC` §3.6, §3.10),
 `branding.toon`, `geo.toon`, `icon-map.toon`, `nav-menus.toon` (missing ⇒ shipped defaults), `modules.toon` (`disabled: [feature ids]`, `GET|PUT /settings/modules`, `canAdminister`; missing ⇒ every installed module enabled — the per-Space Enabled gate, MODULE-REORG-1 P2b, see [module-taxonomy](../../layer/platform/architecture-modules.md)). Store
 **backends** are process-global `-D` flags (`-Dinspecto.db=duckdb|postgres`, `-Dstatus.backend`, …) — the
 selection, not the files, is shared, and an unhonourable `postgres` **fails at boot** (`verifySelectable`,

@@ -802,7 +802,7 @@ percentile per dialect — DuckDB `quantile_cont(col, p)` vs PostgreSQL `percent
 
 Found 2026-09-17 by **driving** `migrate-configs` on a copy of `spaces/demo`, not by reading it.
 
-🔴 **The schema split silently drops every `mapping:` block.** `ConfigMigrator.java:185` does
+🔴 **The schema split silently drops every `mapping:` block.** `ConfigMigrator.java` does
 `schema.remove("mapping")` unconditionally, then writes the Mapping CSV only when `mapping.rules[]` is a
 non-empty list. **All four committed demo schemas carry `mapping.fields[]`; none carries `rules`** —
 `MappingCsv.encode` reads `targetColumn`/`sourceExpression`/`transformType` while the corpus authors
@@ -814,7 +814,7 @@ refusal. ⛔ The class javadoc says *"Refuses rather than loses."*
 using `mapping.rules[]`. The unit test agrees with itself, not with the space — so any fix must be pinned
 against a **committed** schema, not a fixture.
 
-🔴 **The documented `--apply` form writes to a directory named `--apply`.** `MainApp.java:55-62` strips
+🔴 **The documented `--apply` form writes to a directory named `--apply`.** `MainApp.java` strips
 `--dry-run` only, so `--apply` falls into the positional list and becomes `outRoot`. The tool's own usage text
 prints this form; it still reports success and still archives the originals.
 

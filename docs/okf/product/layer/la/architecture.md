@@ -20,7 +20,7 @@ there is no LA main class and no LA server. The deep as-built design is
 |---|---|---|---|---|
 | [la-core](../../module/la-core/index.md) | `la/inspecto-la-core/` | Domain: Investigation op log and evaluator, `InvestigationStore` port + filesystem store, Drafts, Graph Run, the ports | defines the SPIs (`InvestigationStoreProvider`, `DatasetProvider`, `CasePort`, `CollectorCoveragePort`, `OutboundPort`, `UploadLandingPort`); no registrations | all (`offerings/basic.toon`) |
 | [la-storage](../../module/la-storage/index.md) | `la/inspecto-la-storage/` | Versioned Parquet link index: build, read, index-backed graph engine | a library called by la-api; implements la-core's `GraphEngine` | all |
-| [la-api](../../module/la-api/index.md) | `la/inspecto-la-api/` | HTTP surface: 87 `/inv` and `/geo` routes, gates, masking, Draft orchestration, indexed reads | `META-INF/services/com.gamma.spi.http.RouteModule` (25 route modules) | all; Investigation routes Standard and above |
+| [la-api](../../module/la-api/index.md) | `la/inspecto-la-api/` | HTTP surface: 104 `/inv`, `/geo` and `/public` routes (manifest count), gates, masking, Draft orchestration, indexed reads | `META-INF/services/com.gamma.spi.http.RouteModule` (32 route modules) | all; Investigation routes, the Geo map and Entity profile pages Standard and above |
 | [geo-link](../../module/geo-link/index.md) | `la/inspecto-geo-link/` | Bridge to the host: implements la-core's ports over engine services; scheduled index builds, measures, Alert Rules, standing detection | `RouteModule`, the la-core ports, `LinkIndexBuilder`, `InvestigationMeasureProbe` | all |
 | [la-store-pg](../../module/la-store-pg/index.md) | `la/inspecto-la-store-pg/` | PostgreSQL Investigation store for multi-pod deployments | `META-INF/services/com.gamma.la.core.InvestigationStoreProvider`, selected by `-Dinvestigations.backend=db` | Advanced, Preview (`offerings/advanced.toon`) |
 
@@ -37,7 +37,7 @@ Platform modules the layer builds on (not part of it): `platform/inspecto-graph`
       │
       ├── la-storage ──> la-core
       ▼
-   la-core ──> platform graph, entity-store
+   la-core ──> platform graph, entity-store (and the sql, analytics, util, config and SPI libraries)
    la-store-pg ──> la-core          (found by la-core's InvestigationStores, never named)
 ```
 
@@ -51,7 +51,8 @@ Platform modules the layer builds on (not part of it): `platform/inspecto-graph`
 
 Installed (jar staged by the edition) → Enabled (feature `geoLink` per Space in `modules.toon`) → Permitted
 (capability, Investigation membership, Dataset visibility, Advanced PDP). The Investigation surface additionally needs
-the `investigations` edition feature, which only `inspecto-ops` declares, so Basic is the Link Analysis explorer only
+the `investigations` edition feature (the Geo map `geoMap`, the Entity profile pages `entityPages`), which only
+`inspecto-ops` declares, so Basic is the Link Analysis explorer only
 ([la-core architecture](../../module/la-core/architecture.md) §8).
 
 ## A request end to end

@@ -38,7 +38,9 @@ candidate SQL ──► SqlGuard (lexical + DuckDB parse tree) ──finding─�
 
 Per [BACKLOG](../../../../BACKLOG.md): Enrichment `transformSql` (run and preview), the Pipeline dry run's
 scratch connection, virtual Dataset rename (`renameBaseTable`), persisted queries, and the Link Analysis
-recursive-paths walk (`traversalThreads`). DuckDB connection handling in general:
+recursive-paths walk (`traversalThreads`, read by `InvRoutes`). The guard and sandbox also serve the Consignment
+readers, Reconciliation, the control plane's query / BI / rule / save gates (`SaveGate`, `QueryRoutes`, `BiRoutes`)
+and the agent's SQL skills (`SqlOracleTool`, `ReportSqlSkill`, `KpiToSqlSkill`). DuckDB connection handling in general:
 [engine spec-duckdb](../engine/spec-duckdb.md).
 
 Details: [spec](spec.md).

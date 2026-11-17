@@ -44,6 +44,8 @@ not bundle; the core keeps no `if (edition)` branch. Modules whose Product Map I
 | [screening](../../module/screening/index.md) | `features/inspecto-screening` | `/screening*`, `screening.run` | entity-list, ops | edition profiles | Standard |
 | [scoring](../../module/scoring/index.md) | `features/inspecto-scoring` | `risk-score` kind, `risk.score`, `/risk-scores*` | entity-list | edition profiles | Standard |
 | [anomaly](../../module/anomaly/index.md) | `features/inspecto-anomaly` | `anomaly-model` kind, `anomaly.score`, `/anomaly-scores*` | entity-list | edition profiles | Standard |
+| [predictive](../../module/predictive/index.md) | `features/inspecto-predictive` | `segmentation-model`, `churn-model`, `forecast-model` kinds; `predict.segment` / `.churn` / `.forecast`; `GET /predictions/*` | — | edition profiles | Standard (add-on `predictiveAnalytics`) |
+| [realtime](../../module/realtime/index.md) | `features/inspecto-realtime` | windowed and Pattern Alert Rules evaluated on each Stream commit (`RealtimeDetection`) | ops | edition profiles | Standard (add-on `realtimeDetection`) |
 | [reconciliation](../../module/reconciliation/index.md) | `features/inspecto-reconciliation` | `reconciliation` kind, `recon.run`, `/recon/*` | — | edition profiles | Standard |
 | [exchange](../../module/exchange/index.md) | `features/inspecto-exchange` | cross-Space offers, grants, `/exchange/*` | — | edition profiles | Standard |
 | [observability](../../module/observability/index.md) | `features/inspecto-observability` | `GET /metrics`, `/events*` read API (recording stays core) | — | edition profiles | Standard |
@@ -57,7 +59,7 @@ must be kept in step by hand (comment in the root `pom.xml`).
 ## Dependencies between features
 
 Each manifest declares its `requires.modules`; `GET /modules` reports every module with its `requires`,
-`state` and `reasons`. The chain worth knowing: case-management, regulatory-reporting and screening need
+`state` and `reasons`. The chain worth knowing: case-management, regulatory-reporting, screening and realtime need
 `ops`; scoring, anomaly and screening need `entity-list`; action-requests needs the `notify-channels`
 provider ([providers layer](../providers/architecture.md)).
 

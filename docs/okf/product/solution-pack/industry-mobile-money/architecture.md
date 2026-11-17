@@ -16,10 +16,11 @@ Under `platform/inspecto-entity-store/src/main/resources/META-INF/inspecto/indus
 
 | File | Carries |
 |---|---|
-| `industry-pack.toon` | manifest: name, description, `space_templates` (`la-mobile-money`, `mobile-money`), `pattern_packs`, `profile` |
-| `industry-pack-terms.toon` | 16 terms that relabel Link Analysis concepts |
-| `industry-pack-entity-types.toon` | 3 Entity Types: `wallet`, `agent`, `msisdn`, each with a normaliser and a masking flag |
+| `industry-pack.toon` | manifest: name, description, `space_templates` (`la-mobile-money`, `mobile-money`), `pattern_packs`, `profile` (with two `suggested_lists`: Merchants to exclude, Wallets to watch) |
+| `industry-pack-terms.toon` | 26 terms that relabel Link Analysis concepts |
+| `industry-pack-entity-types.toon` | 13 Entity Types — `subscriber`, `wallet`, `msisdn`, `agent`, `account`, `merchant`, `biller`, `bank_account`, `card`, `id_document`, `imei`, `email`, `ip_address` — each with a normaliser and a masking flag |
 | `industry-pack-link-kinds.toon` | 6 link kinds: `p2p`, `cash_in`, `cash_out`, `merchant_pay`, `shared_device`, `shared_id` |
+| `industry-pack-record-types.toon` | optional: 8 record types (what a row of a Dataset can be, e.g. `transfer`) with their likely Entity Types |
 
 ## Profile
 
@@ -34,7 +35,7 @@ Space link-analysis.toon: domain_profile: mobile-money
    --> Link Analysis reads terms, Entity Types, link kinds, pattern packs, hints
 ```
 
-Discovery is fail closed (`IndustryPacks.java`): a pack with a missing or unparseable file, or an id two jars declare, is refused whole. A Space naming a refused or absent pack reads the neutral vocabulary.
+Discovery is fail closed (`IndustryPacks.java`): a pack with a missing or unparseable file, an id two jars declare, or an Entity Type that does not read together with an installed pack's, is refused whole. A Space naming a refused or absent pack reads the neutral vocabulary.
 
 ## Modules used
 

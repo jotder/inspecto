@@ -11,7 +11,8 @@ timestamp: 2026-10-19T00:00:00Z
 
 Package `com.gamma.la.storage` in `la/inspecto-la-storage/`. Manifest
 `la/inspecto-la-storage/src/main/resources/META-INF/inspecto/module.toon`: `buildRole: implementation`,
-`offeringRole: optional`, requires `la-core`. Depends on DuckDB JDBC. No routes and no ServiceLoader registrations: it
+`offeringRole: optional`, requires `la-core`. Depends on la-core, `inspecto-sql`, `inspecto-analytics`, Jackson and
+DuckDB JDBC. No routes and no ServiceLoader registrations: it
 is a library that [la-api](../la-api/spec.md) calls.
 
 ## Classes
