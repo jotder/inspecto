@@ -463,7 +463,7 @@ spelling), where the data rests durably, a schema fingerprint, the outcome (`OK`
 the ordered set of its receipts. Type/Instance: *Step Receipt* is the shape (`StepReceipt`), each stored row
 (`consignment_steps`) is one receipt. ⛔ *StepInfo envelope* is the retired working name — **envelope** already
 names the v1 response envelope, the `Signal` record and a component's sharing envelope; ⛔ *Step Record* — a
-**record** is a data row. Design: `superpower/2026-11-17-x5-stepinfo-envelope-plan.md`; as built:
+**record** is a data row. Design: `archived-documents/plans-archive/2026-11-17-x5-stepinfo-envelope-plan.md`; as built:
 `okf/product/module/engine/spec-execution-lanes.md`.
 
 **Parser** — Reads a raw file of a given format (CSV, fixed-width, XML, JSON, EDI, ASN.1, …) into rows/columns
