@@ -17,8 +17,8 @@ class ConsignmentEventBusTest {
     void fansOutToAllSubscribers() {
         ConsignmentEventBus bus = new ConsignmentEventBus();
         List<String> a = new ArrayList<>(), b = new ArrayList<>();
-        bus.subscribe(e -> a.add(e.batchId()));
-        bus.subscribe(e -> b.add(e.batchId()));
+        bus.subscribe(e -> a.add(e.consignmentId()));
+        bus.subscribe(e -> b.add(e.consignmentId()));
         assertEquals(2, bus.listenerCount());
 
         bus.publish(evt("b1"));
@@ -31,7 +31,7 @@ class ConsignmentEventBusTest {
         ConsignmentEventBus bus = new ConsignmentEventBus();
         List<String> received = new ArrayList<>();
         bus.subscribe(e -> { throw new RuntimeException("boom"); });
-        bus.subscribe(e -> received.add(e.batchId()));
+        bus.subscribe(e -> received.add(e.consignmentId()));
 
         assertDoesNotThrow(() -> bus.publish(evt("b2")));
         assertEquals(List.of("b2"), received, "second listener still receives despite first throwing");
@@ -41,7 +41,7 @@ class ConsignmentEventBusTest {
     void sinkPublishes() {
         ConsignmentEventBus bus = new ConsignmentEventBus();
         List<String> received = new ArrayList<>();
-        bus.subscribe(e -> received.add(e.batchId()));
+        bus.subscribe(e -> received.add(e.consignmentId()));
         bus.sink().accept(evt("b3"));
         assertEquals(List.of("b3"), received);
     }

@@ -69,7 +69,7 @@ public final class ModelDiagnoser implements FailureReactor.Diagnoser {
             String prose = model.generate(ModelRequest.text(TIER, SYSTEM, prompt(e, heuristic))).text().trim();
             if (prose.isBlank()) return heuristic;
             // Model enriches the prose; severity stays the deterministic heuristic's.
-            return new Diagnosis(e.batchId(), e.pipeline(), heuristic.severity(), prose,
+            return new Diagnosis(e.consignmentId(), e.pipeline(), heuristic.severity(), prose,
                     null, /* heuristicOnly */ false, now, citations);
         } catch (RuntimeException modelDown) {
             return heuristic;   // never let a model failure lose the diagnosis
@@ -79,7 +79,7 @@ public final class ModelDiagnoser implements FailureReactor.Diagnoser {
     private String prompt(ConsignmentEvent e, Diagnosis heuristic) {
         return "FAILED BATCH\n"
                 + "  pipeline:       " + e.pipeline() + "\n"
-                + "  batch id:       " + e.batchId() + "\n"
+                + "  batch id:       " + e.consignmentId() + "\n"
                 + "  error:          " + (e.error() == null ? "(none recorded)" : e.error()) + "\n"
                 + "  offending file: " + (e.offendingFile() == null ? "(unknown)" : e.offendingFile()) + "\n"
                 + "  rows failed:    " + e.errorRows() + "\n"

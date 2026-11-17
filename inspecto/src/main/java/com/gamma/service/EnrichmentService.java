@@ -179,7 +179,7 @@ public final class EnrichmentService implements AutoCloseable {
         // not write, which is the exact fail-open shape the flag exists to prevent.
         if (event.dryRun()) {
             log.info("dry run: would dispatch simulated consignment {} of '{}' to any enrichment job "
-                    + "listening on it — no recompute scheduled", event.batchId(), event.pipeline());
+                    + "listening on it — no recompute scheduled", event.consignmentId(), event.pipeline());
             return;
         }
         for (EnrichmentConfig job : jobs) {

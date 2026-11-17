@@ -731,6 +731,14 @@ or is read under both names.
 - Cosmetic, nothing to migrate: a new `BranchCommitLog` CSV gets the header `recorded_at,consignment_id,branch,phase`.
   An existing one keeps `batch_id`, because rows are read by position. The ingest ledgers and the manifest were renamed
   in 2026-08 with a read alias (`Csv.LEGACY_HEADERS`, `@SerializedName(alternate)`), and that alias stays.
+- **Java records `ProvenanceRow` and `ConsignmentEvent`: component `batchId` → `consignmentId`** (MoSCoW S4, decided
+  with X5 D1–D10). The accessors are `ProvenanceRow.consignmentId()` and `ConsignmentEvent.consignmentId()`; the
+  constructors keep their argument order. Both records are `@PublicApi` since 4.0.0 and were not public in 3.12.0
+  (`ConsignmentEvent` was the internal `BatchEvent`), so no released API changes. Neither record is serialised whole,
+  so no wire field moves with it: `GET /provenance/batches` keeps its deprecated `batchId` alias (it comes from the
+  store's SQL), and the `pipeline.commit` Signal payload, the `BATCH_COMMITTED` / `BATCH_FAILED` event attribute and
+  the record-replay claim file keep their `batchId` key, because `$signal.batchId` binds (`ConsignmentProcessJobType`
+  among them) and the ledgers already written read that name.
 - ⚠ **Not renamed:** the route paths `/runs/{n}/batches` and `/provenance/batches`, the `batchId` fields of the
   run, reprocess, drain and lineage routes, and the `batch_max_*` keys (those mean grouping, not a Consignment).
   None of them is part of the trio decided on 2026-09-06.

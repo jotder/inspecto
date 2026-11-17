@@ -360,7 +360,7 @@ store-level upper bound, G3 a record-level exemption within it. Both are true at
 ### 3.4 Provenance & conservation
 
 During an at-rest Pipeline run, `PipelineJobRunner` (`platform/inspecto-engine/src/main/java/com/gamma/job/PipelineJobRunner.java`)
-collects one `ProvenanceRow(pipelineId, batchId, nodeId, rel, rowCount, runTs)` per (node, relationship)
+collects one `ProvenanceRow(pipelineId, consignmentId, nodeId, rel, rowCount, runTs)` per (node, relationship)
 through `PipelineExecutor.ProvenanceCollector` **while the scratch relations are live**, persists them via
 `DbProvenanceStore` (`platform/inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java`, per
 space through `ProvenanceStores`), then runs `ConservationCheck.imbalances(graph, counts)`

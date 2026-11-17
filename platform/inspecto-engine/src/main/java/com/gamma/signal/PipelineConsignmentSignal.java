@@ -78,7 +78,7 @@ public final class PipelineConsignmentSignal {
 
         Signal signal = new Signal(null, type, Instant.now(), success ? Severity.INFO : Severity.WARN,
                 Ref.of("pipeline", event.pipeline()), Ref.of("pipeline", event.pipeline()),
-                event.batchId(), null, null, null, type, payload, 1);
+                event.consignmentId(), null, null, null, type, payload, 1);
         try {
             EventLog.current().emit(signal.toEvent());
         } catch (RuntimeException ignored) {

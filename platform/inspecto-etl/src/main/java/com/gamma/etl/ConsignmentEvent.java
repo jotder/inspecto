@@ -26,8 +26,12 @@ import java.util.List;
  * Stage-2 enrichment emitters, which only ever announce {@code SUCCESS}) defaults them to
  * {@code null}/{@code null}/{@code 0}.
  *
+ * <p>The Consignment component was {@code batchId} until 4.0.0 (MoSCoW S4, 2026-11-17). The record is never
+ * serialised as a whole; the Signal and event payloads built from it ({@code pipeline.commit}'s {@code
+ * $signal.batchId}, the {@code BATCH_COMMITTED} event's {@code batchId} attribute) keep their {@code batchId} key.
+ *
  * @param pipeline      pipeline name
- * @param batchId       committed batch id
+ * @param consignmentId the committed Consignment's id
  * @param status        batch status ({@code SUCCESS} or {@code FAILED})
  * @param partitions    distinct output partition paths this batch wrote (from lineage),
  *                      e.g. {@code event_type=CALL/year=2020/month=04/day=03} — exactly
@@ -55,7 +59,7 @@ import java.util.List;
  *                      this Consignment's rows needs (PRODUCT-ASSEMBLY-1 PA-9d: the Real-time Detection commit hook)
  */
 @PublicApi(since = "4.0.0")
-public record ConsignmentEvent(String pipeline, String batchId, String status,
+public record ConsignmentEvent(String pipeline, String consignmentId, String status,
                          List<String> partitions, long outputRows,
                          long durationMs, int rejectedCount,
                          String error, String offendingFile, long errorRows,
@@ -66,11 +70,11 @@ public record ConsignmentEvent(String pipeline, String batchId, String status,
     }
 
     /** The pre-PA-9d shape: no committed output files named (the emitters other than the ingest audit writer). */
-    public ConsignmentEvent(String pipeline, String batchId, String status,
+    public ConsignmentEvent(String pipeline, String consignmentId, String status,
                       List<String> partitions, long outputRows,
                       long durationMs, int rejectedCount,
                       String error, String offendingFile, long errorRows, boolean dryRun) {
-        this(pipeline, batchId, status, partitions, outputRows, durationMs, rejectedCount,
+        this(pipeline, consignmentId, status, partitions, outputRows, durationMs, rejectedCount,
                 error, offendingFile, errorRows, dryRun, List.of());
     }
 
@@ -82,10 +86,10 @@ public record ConsignmentEvent(String pipeline, String batchId, String status,
      * <p>⚠ Unrelated to {@link #dryRun()}: these emitters have no dry-run mode of their own, so a real
      * enrichment commit is exactly what they announce.
      */
-    public ConsignmentEvent(String pipeline, String batchId, String status,
+    public ConsignmentEvent(String pipeline, String consignmentId, String status,
                       List<String> partitions, long outputRows,
                       long durationMs, int rejectedCount) {
-        this(pipeline, batchId, status, partitions, outputRows, durationMs, rejectedCount,
+        this(pipeline, consignmentId, status, partitions, outputRows, durationMs, rejectedCount,
                 null, null, 0L, false);
     }
 }

@@ -105,7 +105,7 @@ public final class FailureReactor implements AutoCloseable {
         if (event == null || !"FAILED".equalsIgnoreCase(event.status())) return;
         if (!queue.offer(event)) {
             log.warn("diagnosis queue full; dropped FAILED event for batch {} (total dropped={})",
-                    event.batchId(), dropped.incrementAndGet());
+                    event.consignmentId(), dropped.incrementAndGet());
             return;
         }
         try {
@@ -126,7 +126,7 @@ public final class FailureReactor implements AutoCloseable {
                 if (onDiagnosed != null) onDiagnosed.accept(d);
             }
         } catch (Exception ex) {
-            log.warn("failure diagnosis errored for batch {} (pipeline {})", e.batchId(), e.pipeline(), ex);
+            log.warn("failure diagnosis errored for batch {} (pipeline {})", e.consignmentId(), e.pipeline(), ex);
         }
     }
 

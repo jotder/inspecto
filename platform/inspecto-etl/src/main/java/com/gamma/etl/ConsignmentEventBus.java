@@ -40,7 +40,7 @@ public final class ConsignmentEventBus {
                 l.accept(event);
             } catch (Exception e) {
                 log.error("Consignment-event listener failed for batch {} (pipeline {})",
-                        event.batchId(), event.pipeline(), e);
+                        event.consignmentId(), event.pipeline(), e);
             }
         }
     }

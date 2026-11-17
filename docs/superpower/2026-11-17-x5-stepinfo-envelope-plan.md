@@ -437,7 +437,7 @@ closed by the last; on ship, this plan's as-built facts go to the engine hub and
 **Taken 2026-11-17, as recommended**, under the operator's standing instruction for this MoSCoW run ("take
 decisions reasonably"): D1 = B · D2 = b · D3 = c · D4 = b · D5 = b · D6 = a · D7 = b · D8 = a · D9 = c · D10 = a.
 Also decided: §8's `batchId` components of `ProvenanceRow` and `ConsignmentEvent` are renamed to `consignmentId`
-before the tag (now, not 5.0.0), in a lane of their own after L2. Each is reversible until the 4.0.0 tag; the
+before the tag (now, not 5.0.0), in a lane of their own after L2 (built 2026-11-17, §8). Each is reversible until the 4.0.0 tag; the
 operator may overturn any of them, and a lane not yet pushed is then re-scoped.
 
 1. **D1 — How much of X5 lands before the 4.0.0 tag.**
@@ -486,9 +486,12 @@ operator may overturn any of them, and a lane not yet pushed is then re-scoped.
 
 ## 8. Adjacent findings (not X5; noted, not changed)
 
-- `ProvenanceRow` and `ConsignmentEvent` still name their Consignment component `batchId`
-  (`ProvenanceRow.java:29`; `public-api.txt`, `com.gamma.etl.ConsignmentEvent`). Both are public records first
-  released in 4.0.0, so after the tag the name is fixed until 5.0.0. Worth a decision of its own before the tag.
+- ~~`ProvenanceRow` and `ConsignmentEvent` still name their Consignment component `batchId`~~ — **renamed to
+  `consignmentId` 2026-11-17** (decided with §7; components and accessors, `public-api.txt` regenerated). Neither
+  was public in 3.12.0, so nothing released breaks. No wire field moved: the `pipeline.commit` Signal payload, the
+  `BATCH_COMMITTED` event attribute and the replay claim file keep their `batchId` key (`$signal.batchId` binds read
+  it), and `GET /provenance/batches` keeps its deprecated `batchId` alias. Release note:
+  [`plan-api-stability.md`](../okf/product/module/api/plan-api-stability.md) § *the `batch_id` rename trio*.
 - The GLOSSARY *Step* entry says plugin Steps use the `ConsignmentProcessor` SPI; the pack Step SPI that runs in a
   Pipeline is `StepExecutor` (S2-3). `ConsignmentProcessor` is the post-sync Job SPI.
 - [`spec-node-types.md`](../okf/product/module/engine/spec-node-types.md) says steps 1–3 "are documentation and

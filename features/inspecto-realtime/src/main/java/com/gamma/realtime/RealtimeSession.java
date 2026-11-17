@@ -157,7 +157,7 @@ final class RealtimeSession implements RealtimeDetection.Session {
                 observe(g, o, false);
             } catch (Exception ex) {
                 log.error("Real-time Detection: evaluating consignment {} of '{}' over dataset '{}' failed",
-                        e.batchId(), e.pipeline(), g.dataset(), ex);
+                        e.consignmentId(), e.pipeline(), g.dataset(), ex);
             }
         }
     }

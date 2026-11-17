@@ -1222,7 +1222,7 @@ public final class JobService implements AutoCloseable {
      *  is unchanged — the two coexist (no double-fire; different config keys). */
     private void mirrorPipelineCommit(ConsignmentEvent be) {
         emitSignal(SignalType.PIPELINE_COMMIT, "SUCCESS".equals(be.status()) ? Severity.INFO : Severity.WARN,
-                be.batchId(), null, Ref.of("pipeline", be.pipeline()), commitPayload(be));
+                be.consignmentId(), null, Ref.of("pipeline", be.pipeline()), commitPayload(be));
     }
 
     /** The commit fields both event surfaces speak — {@code bind:} resolves {@code $signal.<field>}
@@ -1233,7 +1233,7 @@ public final class JobService implements AutoCloseable {
         // (mirrorPipelineCommit → onSignalEvent) inherits the flag too, not only the on_pipeline path.
         payload.put("dryRun", be.dryRun());
         payload.put("pipeline", be.pipeline());
-        payload.put("batchId", be.batchId());
+        payload.put("batchId", be.consignmentId());
         payload.put("status", be.status());
         payload.put("rows", be.outputRows());
         payload.put("ms", be.durationMs());

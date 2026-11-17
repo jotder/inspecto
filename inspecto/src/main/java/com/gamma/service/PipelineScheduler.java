@@ -576,7 +576,7 @@ final class PipelineScheduler {
         if (event.dryRun()) {
             log.info("dry run: would trigger every event-triggered pipeline whose `from` names '{}' "
                     + "(simulated consignment {}) — no downstream run started", event.pipeline(),
-                    event.batchId());
+                    event.consignmentId());
             return;
         }
         for (Path p : registry) {

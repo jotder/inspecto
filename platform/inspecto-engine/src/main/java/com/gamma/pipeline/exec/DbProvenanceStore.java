@@ -142,7 +142,7 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
                         + " (pipeline_id, consignment_id, node_id, rel, row_count, run_ts, simulated) VALUES (?,?,?,?,?,?,?)")) {
                     for (ProvenanceRow r : rows) {
                         ps.setString(1, r.pipelineId());
-                        ps.setString(2, r.batchId());
+                        ps.setString(2, r.consignmentId());
                         ps.setString(3, r.nodeId());
                         ps.setString(4, r.rel());
                         ps.setLong(5, r.rowCount());
@@ -155,7 +155,7 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
             });
         } catch (SQLException e) {
             log.warn("Could not project provenance for pipeline {} batch {}: {}",
-                    rows.get(0).pipelineId(), rows.get(0).batchId(), e.getMessage());
+                    rows.get(0).pipelineId(), rows.get(0).consignmentId(), e.getMessage());
         }
     }
 
