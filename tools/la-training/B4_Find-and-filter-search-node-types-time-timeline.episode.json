@@ -1,0 +1,14 @@
+{"scenario":"episode","edition":"Basic","base":"http://127.0.0.1:8099","steps":[
+{"scene":"S01","card":{"lines":["Inspecto LA training","B4  Find and filter"],"secs":6},"steps":[{"space":"la-showcase"},{"open":"/link-analysis?view=x","settle":4500},{"wait":2500},{"label":"File"},{"wait":900},{"exact":"Open…"},{"wait":2000},{"click":"Structuring into one account"},{"wait":1500},{"button":"Open"},{"wait":7000}]},
+{"scene":"S02","steps":[{"wait":2500},{"move":[665,30],"ms":800},{"wait":2500},{"move":[587,30],"ms":800},{"wait":2500},{"move":[652,30],"ms":800},{"wait":2500},{"move":[895,30],"ms":900},{"wait":3500}]},
+{"scene":"S03","steps":[{"label":"Search nodes"},{"wait":900},{"type":"SMURF"},{"wait":9000},{"escape":1},{"wait":3000}]},
+{"scene":"S04","steps":[{"label":"Filter node types"},{"wait":2500},{"mark":"one kind","box":[575,55,150,40]},{"wait":6000},{"escape":1},{"wait":1500},{"label":"Clear search and filters"},{"wait":6000}]},
+{"scene":"S05","steps":[{"label":"Filter links by time"},{"wait":1500},{"rightOf":"Time column"},{"wait":1200},{"exact":"BOOKED_AT"},{"wait":3000},{"mark":"Up to line","box":[655,127,310,22]},{"wait":3000},{"at":[790,158]},{"wait":5000},{"at":[960,158]},{"wait":4000},{"escape":1},{"wait":1500}]},
+{"scene":"S06","steps":[{"wait":4000},{"label":"Play"},{"wait":7000},{"label":"Pause"},{"wait":2000},{"label":"Next slice"},{"wait":2000},{"label":"Next slice"},{"wait":2000},{"label":"Previous slice"},{"wait":2500},{"at":[300,127]},{"wait":4000}]},
+{"scene":"S07","steps":[{"log":"(()=>{const s=document.querySelector('select');s.value='From the start';const o=[...s.options].find(o=>o.textContent==='From the start');s.value=o.value;s.dispatchEvent(new Event('change',{bubbles:true}));return s.value})()"},{"wait":2500},{"label":"Play"},{"wait":14000},{"label":"Pause"},{"wait":3000},{"button":"Reset"},{"wait":3500}]},
+{"scene":"S08","steps":[{"label":"Show the table"},{"wait":3000},{"button":"Filter"},{"wait":1500},{"button":"Condition"},{"wait":1500},{"at":[204,821]},{"wait":1200},{"exact":"AMOUNT"},{"wait":1200},{"at":[393,821]},{"wait":1200},{"exact":"≥"},{"wait":1200},{"at":[744,821]},{"wait":400},{"type":"5000"},{"wait":1500},{"reveal":"Apply locally","soft":true},{"wait":1200},{"label":"Apply the predicate locally"},{"wait":9000}]},
+{"scene":"S09","steps":[{"wait":3000},{"label":"Push the predicate to the server"},{"wait":9000},{"move":[500,300],"ms":900},{"wait":6000}]},
+{"scene":"S10","steps":[{"label":"Clear the predicate"},{"wait":3000},{"label":"Push the predicate to the server"},{"wait":9000}]},
+{"scene":"S11","steps":[{"button":"Group"},{"wait":3000},{"wait":9000}]},
+{"scene":"S12","card":{"lines":["Try it","Next: C1  Moving around and selecting"],"secs":5},"steps":[{"wait":1000}]}
+]}

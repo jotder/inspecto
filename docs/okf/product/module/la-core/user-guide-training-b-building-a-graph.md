@@ -313,13 +313,13 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: none.
 
 ### S02 · How much is on screen
-- Voice: Every transfer is here, each with its date and amount: twelve accounts paying cash deposits just under a thousand into one hub account, among the ordinary traffic. Open the Graph counts pill at the top right. Its first line says how many entities and links are on screen; its tiles give nodes and links shown out of loaded, the folded rows behind them, and the total amount. The scale icon in its corner, Limits, says how big a graph this canvas draws, and how big the on-screen tools take.
+- Voice: Every transfer is here, each with its date and amount: twelve accounts paying cash deposits just under a thousand into one hub account, among the ordinary traffic. Along the top of the canvas sit the tools for this episode: Search nodes, Filter node types, Filter links by time, and, once something is searched or filtered, a cross to clear it all. Beneath the graph, the table holds every link as a row.
 - Chip: Graph counts · Limits
 - Action: Graph counts pill ▸ hold on the line *N entities · M links on screen* and the tiles ▸ Limits ▸ hold (*Graph drawn: up to 1,000 nodes*, *On screen tools: up to 2,500 nodes*) ▸ Escape. [check in UI: the tiles' labels under the telecom pack]
 - Impact: mark the first line, the tiles and the Limits list.
 
 ### S03 · Fast at any size; Search nodes
-- Voice: Search and filter stay fast on millions of records, because the graph draws only what you ask for. When a limit does cut what you asked for, the card says cut short, and a notice says what to do: never a silent gap. Now the rail's Search nodes. Type SMURF. The matching accounts glow, and nothing else moves. Search finds; it removes nothing. Open the table, and its rows are narrowed to the matches too.
+- Voice: Search and filter stay fast on millions of records, because the graph draws only what you ask for. When a limit does cut what you asked for, the card says cut short, and a notice says what to do: never a silent gap. Now the rail's Search nodes. Type SMURF. The matching accounts glow, and everything else dims. Search finds; it removes nothing.
 - Chip: Search nodes
 - Action: Search nodes ▸ type `SMURF` ▸ hold ▸ Show the table ▸ Nodes ▸ hold ▸ Hide the table.
 - Impact: before/after hold: the twelve SMURF accounts glow; mark them.
@@ -343,7 +343,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the lit links and the status line *Slice n of 20: … N links active.*
 
 ### S07 · Window and Age fade
-- Voice: Window chooses how much each step shows: This slice, Last day, Last 7 days, Last 30 days, or From the start, which builds the picture up as it goes. Choose From the start and play again: the deposits gather in the hub, and the money leaves through the relays within hours. Age fade dims each link by its age, so the newest shine brightest. Reset ends the playback.
+- Voice: Window chooses how much each step shows: This slice, Last day, Last 7 days, Last 30 days, or From the start, which builds the picture up as it goes. Choose From the start and play again: the picture builds up as the days pass. Age fade is on by default: it dims each link by its age, so the newest shine brightest. Reset ends the playback.
 - Chip: Window · Age fade · Reset
 - Action: Window: From the start ▸ Play ▸ hold on the hub filling up, then the relays lighting ▸ tick Age fade ▸ Reset. [check in UI: the hub's deposits come before the onward payments in the playback]
 - Impact: mark MULE-HUB-01, then RELAY-01 and RELAY-02 as they light.
@@ -355,7 +355,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: before/after hold: the canvas keeps only the large transfers; mark the stage-1 count.
 
 ### S09 · Stage two, and the trap
-- Voice: Press Push to server. Stage two sends the same condition to the Dataset itself, so it applies before the rows fold into links, and counts stay right on large data. The graph is redrawn, and look at what is gone: every small deposit, all twelve accounts, the whole structuring ring. Only the hub's wires to the relays, and the relays' payments offshore, remain. Deposits kept just under the limit slip under any amount threshold. That is what structuring is for.
+- Voice: Look at the canvas: every small deposit is gone, all twelve accounts, the whole structuring ring. Only the hub's wires to the relays, the relays' payments offshore, and a small shell group remain. Push to server sends the same condition to the Dataset itself, so it applies before the rows fold into links, and counts stay right on large data. Deposits kept just under the limit slip under any amount threshold. That is what structuring is for.
 - Chip: Push to server
 - Action: Push to server ▸ wait ▸ hold on *Stage 2 · pushdown (Dataset)* (*N links · complete*) ▸ hold on the canvas.
 - Impact: before/after hold: the ring → hub, relays and OFFSHORE-77 only; mark where the SMURF accounts were.
@@ -367,7 +367,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: before/after hold: the ring returns.
 
 ### S11 · A group that finds the shape
-- Voice: A filter can find the shape instead of hiding it. Add a group, and in it two conditions joined by AND: AMOUNT at least nine hundred, and AMOUNT less than one thousand. Apply it locally. What is left is the band just under the limit: the twelve accounts paying into the hub, and very little else. A second group, joined by OR, would add another band beside it. Every condition lives inside a group, so the logic is always written out.
+- Voice: A filter can find the shape instead of hiding it. Group adds a nested group of conditions: with AMOUNT at least nine hundred, and AMOUNT less than one thousand, joined by AND, it would keep only the band just under the limit. A second group, joined by OR, would add another band beside it. Every condition lives inside a group, so the logic is always written out.
 - Chip: + Group · AND · OR
 - Action: + Group ▸ in it: + Condition `AMOUNT ≥ 900`, + Condition `AMOUNT < 1000`, operator AND ▸ Apply locally ▸ hold ▸ Clear the predicate. [check in UI: how many ordinary transfers fall in the 900-999 band; reword "very little else" to what the stage-1 count shows]
 - Impact: before/after hold: the twelve SMURF links into MULE-HUB-01 stand out; mark the stage-1 count.
