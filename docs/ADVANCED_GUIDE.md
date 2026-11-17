@@ -355,9 +355,9 @@ per-route latency/count). Add metrics here when you instrument these — and upd
 | File | Columns (header) | Writer |
 |---|---|---|
 | `<jobs.audit.dir>/jobs_runs.csv` | run_id,job,type,trigger,start_time,end_time,status,duration_ms,message | JobService |
-| `<status_dir>/<pipeline>_status_<ts>.csv` | start_time,end_time,filename,status,parsed_rows,error_rows,output_paths,output_sizes_bytes,duration_ms,error,batch_id | ConsignmentAuditWriter |
-| `<status_dir>/<pipeline>_batches_<ts>.csv` | batch_id,pipeline,schema_name,output_table,start/end_time,status,member_count,rejected_count,total_input_rows,total_output_rows,output_file_count,total_output_bytes,duration_ms,error | ConsignmentAuditWriter |
-| `<status_dir>/<pipeline>_lineage_<ts>.csv` | batch_id,src_id,input_file,output_file,partition,row_count | ConsignmentAuditWriter |
+| `<status_dir>/<pipeline>_status_<ts>.csv` | start_time,end_time,filename,status,parsed_rows,error_rows,output_paths,output_sizes_bytes,duration_ms,error,consignment_id,origin,logical_name | ConsignmentAuditWriter |
+| `<status_dir>/<pipeline>_batches_<ts>.csv` | consignment_id,pipeline,schema_name,output_table,start/end_time,status,member_count,rejected_count,total_input_rows,total_output_rows,output_file_count,total_output_bytes,duration_ms,error | ConsignmentAuditWriter |
+| `<status_dir>/<pipeline>_lineage_<ts>.csv` | consignment_id,src_id,input_file,output_file,partition,row_count | ConsignmentAuditWriter |
 | `<output.database>_audit/<job>_enrich_runs.csv` | run_id,job,trigger,reason,scope,input_partition_count,start/end_time,status,output_partition_count,output_file_count,total_output_rows,total_output_bytes,duration_ms,error | EnrichmentAuditWriter |
 | `<output.database>_audit/<job>_enrich_lineage.csv` | run_id,job,partition,output_file,bytes | EnrichmentAuditWriter |
 

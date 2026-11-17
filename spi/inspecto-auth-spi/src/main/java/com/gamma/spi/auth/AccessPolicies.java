@@ -9,7 +9,7 @@ import java.util.Set;
 /**
  * Access Policies — authorable allow/deny statements over subject/resource/environment attributes
  * (ABAC A2, {@code docs/superpower/rbac-abac-plan.md} §4; vocabulary {@code docs/GLOSSARY.md} §1-A —
- * ⛔ never bare "Rule"). Authored as a per-space settings doc {@value #FILE} (same discipline as
+ * ⛔ never bare "Rule"). Authored as a per-space settings doc {@code access-policies.toon} (same discipline as
  * {@code roles.toon}): each policy is {@code {name, effect: allow|deny, target: {actions?,
  * resourceKinds?}, when?}} where {@code when} is a {@link Conditions} expression over
  * {@code subject.* / resource.* / env.*} attribute maps.

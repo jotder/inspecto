@@ -8,7 +8,7 @@ import java.util.Optional;
  * {@link #active()} is empty and {@link ControlApi#dispatch} skips authentication entirely. Typed
  * facade over a {@link SpiSlot}, which owns the caching/first-wins semantics.
  *
- * <p>🔴 <b>This slot is fail-CLOSED, and it is the only one that is.</b> "Absent ⇒ no-op wins" is safe
+ * <p>🔴 <b>This slot is fail-CLOSED; it was the first, and {@link AccessDeciders} followed (2026-09-13).</b> "Absent ⇒ no-op wins" is safe
  * for a feature module, whose own routes then answer 503. It is not safe here: an absent Authenticator
  * means <em>every</em> route serves unauthenticated. Until 2026-09-12 this slot shared the fail-soft path,
  * so a Standard deployment with a mistyped {@code -Dauth.oidc.jwksUri} booted wide open while
