@@ -1,0 +1,11 @@
+{"scenario":"episode","edition":"Standard","base":"http://127.0.0.1:8081","steps":[{"scene":"S01","card":{"lines":["Inspecto LA training","F1  Signing in, roles and your first Investigation"],"secs":6},"steps":[{"open":"/sign-in","settle":3500},{"waitText":"Choose a user"},{"wait":2000}]},
+{"scene":"S02","steps":[{"wait":4000},{"mark":"Local sign-in","box":[745,340,360,45]},{"wait":5000},{"move":[925,437],"ms":800},{"wait":3500},{"move":[925,486],"ms":700},{"wait":3500},{"move":[925,535],"ms":700},{"wait":3500},{"move":[925,585],"ms":700},{"wait":3500},{"move":[925,633],"ms":700},{"wait":4000}]},
+{"scene":"S03","steps":[{"wait":15000},{"signin":"Demo Analyst"},{"wait":3000}]},
+{"scene":"S04","steps":[{"space":"la-showcase"},{"open":"/link-analysis?view=x","settle":4500},{"wait":2500},{"label":"User menu"},{"wait":5000},{"move":[83,698],"ms":800},{"wait":2500},{"move":[83,746],"ms":700},{"wait":2500},{"move":[97,813],"ms":700},{"wait":3000},{"escape":1},{"wait":1500}]},
+{"scene":"S05","steps":[{"at":[1515,96]},{"wait":4000},{"mark":"first line","box":[1263,150,310,55]},{"wait":4000},{"at":[1456,288]},{"wait":2500},{"exact":"telecom_links_dataset"},{"wait":3500}]},
+{"scene":"S06","steps":[{"at":[1466,343]},{"wait":2000},{"exact":"MSISDN"},{"wait":2000},{"at":[1420,438]},{"wait":500},{"type":"99979100001"},{"wait":3000},{"button":"Start"},{"wait":10000}]},
+{"scene":"S07","steps":[{"wait":6000},{"mark":"Unsaved","box":[1263,205,290,40]},{"wait":8000},{"wait":6000}]},
+{"scene":"S08","steps":[{"button":"Steps"},{"wait":6000},{"mark":"two steps","box":[115,655,400,40]},{"wait":12000}]},
+{"scene":"S09","steps":[{"button":"Save…"},{"wait":5000},{"at":[1024,493]},{"wait":600},{"selectAll":1},{"type":"Missed-call bursts from one number: who called back, and where the calls went"},{"key":"Enter"},{"wait":3000},{"at":[1017,584]},{"wait":8000}]},
+{"scene":"S10","steps":[{"wait":4000},{"button":"Got it","soft":true},{"wait":3000},{"button":"Open the Step log","soft":true},{"wait":10000}]},
+{"scene":"S11","card":{"lines":["Try it","Next: F2  Expand with intent"],"secs":5},"steps":[{"wait":1000}]}]}

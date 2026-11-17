@@ -83,7 +83,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the first line, then the data line.
 
 ### S06 · Start from one number
-- Voice: Entity Type: MSISDN, a phone number. Type the suspect number from four missed-call reports, 99979100001, and pick it from the suggestions. Time column stays blank, which means the Dataset's own; it is what time windows and the coverage check will read. Time zone is for a column that has none. Degrees: one, the number and everything linked to it directly. Press Start.
+- Voice: Entity Type: MSISDN, a phone number. Type the suspect number from four missed-call reports, 99979100001, in full: this Entity Type is masked, so there are no suggestions. Time column stays blank, which means the Dataset's own; it is what time windows and the coverage check will read. Time zone is for a column that has none. Degrees: one, the number and everything linked to it directly. Press Start.
 - Chip: Entity Type · Time column · Degrees · Start
 - Action: Entity Type *MSISDN* ▸ value `99979100001` ▸ pick the suggestion ▸ Time column blank ▸ Time zone as offered ▸ Degrees `1` ▸ Start. [check in UI: the Entity Type's label and the suggestion line]
 - Impact: before/after hold: the empty canvas → the number and its ring.
