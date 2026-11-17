@@ -29,21 +29,23 @@ per-Feature explanation that can be recomputed; authored as an **Anomaly Model**
   unsaved-content preview, the telco-fraud dashboard tile.
 - `ANOMALY-PEER-GROUPING-1` (closed 2026-10-11): grouped peer side, 200k entities in about 1–1.6 s (D-AD9).
 - `ANOMALY-UI-FINDINGS-1` items (a)–(j) shipped 2026-10-14 to 2026-10-17 ((g) only partly).
-- `ANOMALY-ML-SCORING-1`: `method: isolation_forest` on the model, built 2026-10-18 (see
-  [analytics spec](../analytics/spec.md)).
+- `ANOMALY-ML-SCORING-1` (closed 2026-10-20): `method: isolation_forest` on the model, built 2026-10-18 (see
+  [analytics spec](../analytics/spec.md)). The form authors `method` / `forest` (D-AN29: a selector, and only for the
+  isolation forest its `trees` / `sampleSize` / `seed`; a stored model round-trips both keys verbatim); the AML pack
+  model `aml_account_transfers` ships on `method: isolation_forest`, proven by `PackFraudAmlAnomalyPropertyTest`.
 
 ## Left
 
 - `ANOMALY-UI-FINDINGS-1`: a live check of the sign-in return path under a real token lapse.
-- `ANOMALY-ML-SCORING-1`: nothing code-side. The form authors `method` / `forest` (D-AN29, closed 2026-10-20: a
-  selector, and only for the isolation forest its `trees` / `sampleSize` / `seed`; a stored model round-trips both
-  keys verbatim); the AML pack model `aml_account_transfers` ships on `method: isolation_forest`, proven by
-  `PackFraudAmlAnomalyPropertyTest`. The telco-fraud and mobile-money models stay on the robust scorer: one steady
-  Feature spike (telco) or a Peer Group (mobile-money) gives the forest no clear separation to prove.
-- The isolation forest has no preview by design (W7): the preview box says so instead of scoring with the robust method.
+- `ANOMALY-SCORE-MEMORY-LIMIT-1`: whether production gives the anomaly bucket query enough DuckDB memory (it ran out
+  at about 20k entities × 29 days under the 1 GB sandbox default; [spec](spec-anomaly-scores.md), D-AD9 closure).
 
 ## Refused or deferred
 
 - Hour buckets: deferred until a pack or customer needs sub-day scoring (BACKLOG §6, 2026-10-18).
 - A Risk Score factor type instead of a new kind: refused (D-AD3).
+- The isolation forest in the telco-fraud and mobile-money models: not used. One steady Feature spike (telco) or a
+  Peer Group (mobile-money) gives the forest no clear separation to prove, so they stay on the robust scorer.
+- A preview for the isolation forest: none by design (W7); the preview box says so instead of scoring with the
+  robust method.
 - The Link Analysis anomaly panel appearing only once a Risk Score model is named: LA's design call (BACKLOG §6).
