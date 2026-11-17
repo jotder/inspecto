@@ -339,7 +339,14 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
         migrateBatchIdColumns();
         try {
             src.run(conn -> {
+                // ⚠ One transaction holding the schema's advisory lock (Postgres). migrateBatchIdColumns drops two
+                // indexes, so every node opening a 3.x schema at once recreates them here, and Postgres's
+                // IF NOT EXISTS is not atomic across sessions: two creators both pass the check and one fails on
+                // pg_class_relname_nsp_index (PostgresBatchIdMigrationTest). Under the lock the later one sees it.
+                boolean autoCommit = conn.getAutoCommit();
+                conn.setAutoCommit(false);
                 try (Statement st = conn.createStatement()) {
+                    SchemaMigration.lock(conn, src.isPostgres(), MIGRATION_LOCK);
                     st.execute("CREATE TABLE IF NOT EXISTS " + T_COMMITS
                             + " (pipeline VARCHAR, consignment_id VARCHAR)");
                     st.execute("CREATE TABLE IF NOT EXISTS " + T_BATCHES
@@ -375,6 +382,12 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
                     st.execute("CREATE INDEX IF NOT EXISTS " + T_LINEAGE + "_by_pipeline_consignment ON " + T_LINEAGE + " (pipeline, consignment_id, seq)");
                     st.execute("CREATE INDEX IF NOT EXISTS " + T_QUARANTINE + "_by_pipeline ON " + T_QUARANTINE + " (pipeline, seq)");
                     st.execute("CREATE INDEX IF NOT EXISTS " + T_UNPACK + "_by_pipeline ON " + T_UNPACK + " (pipeline, seq)");
+                    conn.commit();
+                } catch (SQLException e) {
+                    try { conn.rollback(); } catch (SQLException ignore) { /* best effort */ }
+                    throw e;
+                } finally {
+                    try { conn.setAutoCommit(autoCommit); } catch (SQLException ignore) { /* best effort */ }
                 }
             });
         } catch (SQLException e) {
@@ -469,7 +482,7 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
         }
     }
 
-    /** The advisory-lock name {@link #migrateBatchIdColumns} serialises on (per schema — {@link SchemaMigration#lock}). */
+    /** The advisory-lock name {@link #migrateBatchIdColumns} and {@link #initSchema}'s DDL serialise on (per schema — {@link SchemaMigration#lock}). */
     private static final String MIGRATION_LOCK = "inspecto.status.batch_id-rename";
 
     /** Whether this schema's commits or lineage table still has a {@code batch_id} column (never another schema's). */

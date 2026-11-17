@@ -470,8 +470,23 @@ not one transaction: DuckDB 2.0 failed the payload `UPDATE` placed after the dro
 `information_schema` probe. On Postgres every Space is a schema of one database, so an unscoped probe saw another
 Space's `batch_id` and made a migrated or new store fail to open; a review caught it (`*anotherSchemas*` tests in
 the three store test classes). On Postgres each migration transaction also takes a per-schema
-`pg_advisory_xact_lock` and re-probes under it, so two nodes opening one schema at once do not both migrate. ⚠ That
-lock is **unproven**: no Postgres run covers it. DuckDB needs no lock, because one process holds the file.
+`pg_advisory_xact_lock` and re-probes under it, so two nodes opening one schema at once do not both migrate. The
+lock and the schema scoping are **proven on PostgreSQL 18** (2026-11-17) by `PostgresBatchIdMigrationTest`
+(`inspecto`, `com.gamma.service`; runs with `INSPECTO_TEST_PG_URL` / `-Dinspecto.test.pg.url`, skips without it).
+Per store, two schemas hold 3.x tables, and 4 nodes, each with its own connection, open the store on the first at
+once. All must open, every row must be there exactly once, the second schema's `batch_id` tables must stay
+untouched, and a reopen must change nothing. Falsified 2026-11-17: with `SchemaMigration.lock` a no-op, all three
+stores went red in 5 of 5 runs. With the schema filter emptied, all three went red in 3 of 3 runs, at the open
+(`column "batch_id" does not exist`). The probe saw the other schema's `batch_id`, but the unqualified DDL can only
+act on its own schema. ⚠ The status store's migration does not depend on its lock. It stayed green in 3 of 3
+runs with only the `batch_id` locks removed: `DROP INDEX` waits on the table lock, and the per-table
+`columnExists` re-probe after it sees the committed rename. Its lock is what keeps `initSchema`'s DDL safe.
+⚠ The first Postgres run found a defect: `migrateBatchIdColumns` drops two indexes, so every node then recreated
+them in `initSchema`. Postgres's `IF NOT EXISTS` is not atomic across sessions, so one node failed on
+`pg_class_relname_nsp_index` (6 of 6 runs without the fix). `initSchema`'s DDL now runs in one transaction under the
+same lock. The lock also covers a table the schema does not have yet: the 3.x fixture has no
+`inspecto_status_unpack`, and without the lock its `CREATE TABLE IF NOT EXISTS` raced on `pg_type_typname_nsp_index`.
+DuckDB needs no lock, because one process holds the file.
 
 ### 3.5 `inspecto_job_runs` — job-run reporting  · **A**
 File: `jobs_report.duckdb`
