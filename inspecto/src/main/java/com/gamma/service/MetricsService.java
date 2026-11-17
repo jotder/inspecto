@@ -59,7 +59,7 @@ public final class MetricsService {
         // structured, correlatable event line (run/batch id, status, rows, duration)
         events.info("{\"event\":\"batch\",\"pipeline\":\"{}\",\"batch_id\":\"{}\",\"status\":\"{}\","
                 + "\"rows\":{},\"partitions\":{},\"rejected\":{},\"duration_ms\":{}}",
-                e.pipeline(), e.batchId(), e.status(), e.outputRows(),
+                e.pipeline(), e.consignmentId(), e.status(), e.outputRows(),
                 e.partitions().size(), e.rejectedCount(), e.durationMs());
     }
 

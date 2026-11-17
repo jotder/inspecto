@@ -139,6 +139,22 @@ class OpsMonitorTest {
         }
     }
 
+    /** X5 D9: batch_rerun reacts to the ingest lane only — a failed job run (source job:) recovers by its own retries. */
+    @Test
+    void ignoresAFailedJobRunsBatchFailedSignal() {
+        EventLog bus = EventLog.create();
+        RecordingRemediator rem = new RecordingRemediator();
+        try (OpsMonitor m = monitor(engineWith(Mode.AUTO), new AutonomyLog(), rem)) {
+            m.attach(bus);
+            bus.emit(new Signal(null, OpsMonitor.TRIGGER_BATCH_FAILED, Instant.now(), Severity.WARN,
+                    Ref.of("job", "rollup_job"), Ref.of("pipeline", "rollup"), "rollup_job-1", null, null, null,
+                    "batch failed", Map.of("status", "FAILED"), 1).toEvent());
+            assertEquals(0, rem.calls.get(), "a job run's failure is not an ingest batch to rerun");
+            bus.emit(batchFailed("orders", "batch-7"));
+            assertEquals(1, rem.calls.get(), "an ingest batch still is");
+        }
+    }
+
     @Test
     void ignoresNonTriggerAndAgentSignals() {
         EventLog bus = EventLog.create();

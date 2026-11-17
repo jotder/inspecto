@@ -1222,7 +1222,7 @@ public final class JobService implements AutoCloseable {
      *  is unchanged — the two coexist (no double-fire; different config keys). */
     private void mirrorPipelineCommit(ConsignmentEvent be) {
         emitSignal(SignalType.PIPELINE_COMMIT, "SUCCESS".equals(be.status()) ? Severity.INFO : Severity.WARN,
-                be.batchId(), null, Ref.of("pipeline", be.pipeline()), commitPayload(be));
+                be.consignmentId(), null, Ref.of("pipeline", be.pipeline()), commitPayload(be));
     }
 
     /** The commit fields both event surfaces speak — {@code bind:} resolves {@code $signal.<field>}
@@ -1233,7 +1233,7 @@ public final class JobService implements AutoCloseable {
         // (mirrorPipelineCommit → onSignalEvent) inherits the flag too, not only the on_pipeline path.
         payload.put("dryRun", be.dryRun());
         payload.put("pipeline", be.pipeline());
-        payload.put("batchId", be.batchId());
+        payload.put("batchId", be.consignmentId());
         payload.put("status", be.status());
         payload.put("rows", be.outputRows());
         payload.put("ms", be.durationMs());
@@ -2008,6 +2008,11 @@ public final class JobService implements AutoCloseable {
                 LocalDateTime.now().format(TS), res.status(), res.durationMs(), res.message());
         record(run);
         if ("FAILED".equals(res.status())) raiseFailureAlarm(name, job.type(), runId, trigger, res.message());
+        // X5 D9 = c: a pipeline job's Run that ENDED FAILED raises pipeline.batch.failed once, with its final attempt's
+        // facts. A CANCELLED Run (a cancel, a switched-off module, a closing Space) and an attempt a retry recovered
+        // raise nothing: the decision is the Run's recorded status, not the exception an attempt threw.
+        Runnable batchFailed = ctx.takePipelineBatchFailed();
+        if (batchFailed != null && "FAILED".equals(res.status())) batchFailed.run();
         // X2: the Consignments this run READ, beside its row. Only the DB projection carries it (the
         // CSV ledger is the nine-column record of the run); nothing to write when the job said nothing.
         runStore().ifPresent(rs -> rs.recordSources(runId, ctx.consignmentsRead()));

@@ -186,8 +186,10 @@ public final class PipelineTestRun {
             try {
                 // EventLog.CONTAINED: the schema-drift Signal and every other ambient emitter inside
                 // strategy.ingest land in a throwaway log, never on the space's ledger.
+                // X5 L3: a throwaway Step Receipt trail — a workbench run never records into a real pass's.
                 outcome = ScopedValue.where(DataTransformer.RAW_INPUT, capture)
                         .where(com.gamma.event.EventLog.CONTAINED, com.gamma.event.EventLog.create())
+                        .where(IngestTrail.CURRENT, new IngestTrail.Trail())
                         .call(() -> strategy.ingest(batch, scratch));
             } finally {
                 // Mirrors ConsignmentIngestor.process — a progress snapshot must never outlive the batch.

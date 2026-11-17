@@ -13,6 +13,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -282,6 +283,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
         }
     }
 
+
     /**
      * One Consignment's Step Receipts across every lane and run, oldest flush first, then by run, lane and
      * {@code seq}. A row whose receipt this build cannot read is skipped with a warning.
@@ -290,12 +292,23 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      *                               caller would report as "no Steps"
      */
     public List<com.gamma.pipeline.exec.StepReceipt> steps(String consignmentId) {
+        return steps(consignmentId, Integer.MAX_VALUE);
+    }
+
+    /**
+     * As {@link #steps(String)}, at most {@code limit} rows, cut in the database ({@code LIMIT}) — a bounded read for
+     * a route. {@link #stepCount} gives the true total.
+     *
+     * @throws IllegalStateException when the read fails
+     */
+    public List<com.gamma.pipeline.exec.StepReceipt> steps(String consignmentId, int limit) {
         List<com.gamma.pipeline.exec.StepReceipt> out = new ArrayList<>();
         try {
             src.run(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement("SELECT receipt FROM " + STEPS
-                        + " WHERE consignment_id = ? ORDER BY recorded_at, run_id, lane, seq")) {
+                        + " WHERE consignment_id = ? ORDER BY recorded_at, run_id, lane, seq LIMIT ?")) {
                     ps.setString(1, consignmentId);
+                    ps.setInt(2, Math.max(0, limit));
                     try (ResultSet rs = ps.executeQuery()) {
                         while (rs.next()) {
                             try {
@@ -314,6 +327,81 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
         }
         return out;
     }
+
+    /** How many Step Receipts one Consignment has. @throws IllegalStateException when the read fails */
+    public long stepCount(String consignmentId) {
+        return count("SELECT count(*) FROM " + STEPS + " WHERE consignment_id = ?", consignmentId);
+    }
+
+    /** How many output rows one Consignment has registered. @throws IllegalStateException when the read fails */
+    public long outputCount(String consignmentId) {
+        return count("SELECT count(*) FROM " + T + " WHERE consignment_id = ?", consignmentId);
+    }
+
+    private long count(String sql, String param) {
+        try {
+            return src.with(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, param);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        return rs.next() ? rs.getLong(1) : 0L;
+                    }
+                }
+            });
+        } catch (SQLException e) {
+            throw new IllegalStateException("consignment count failed for " + param + ": " + e.getMessage(), e);
+        }
+    }
+
+    /** Run ids bound per {@code IN} list in {@link #consignmentsOfRuns}: well under PostgreSQL's 65 535 bind
+     *  parameters per statement. */
+    static final int IN_CHUNK = 1000;
+
+    /**
+     * The Consignment each of {@code runIds} wrote — the {@code run_id} join of X5's {@code GET /consignments/{id}}
+     * (plan §3.7), which closes the gap that a job run row does not name its own Consignment. One query per table and
+     * per {@value #IN_CHUNK} runs, never one per run: the runs' Step Receipts answer first ({@code consignment_steps.run_id}); a run that left none
+     * is answered by {@code consignment_outputs.run_id}. When a run wrote more than one, the oldest wins. A run that
+     * wrote nothing has no entry; {@code null} and blank ids (an ingest lane's {@code ''} is not a run) are ignored.
+     *
+     * @return run id → Consignment id, in the order of {@code runIds}
+     * @throws IllegalStateException when the read fails — never an empty map for "could not read"
+     */
+    public Map<String, String> consignmentsOfRuns(java.util.Collection<String> runIds) {
+        List<String> wanted = new ArrayList<>(new java.util.LinkedHashSet<>(runIds == null ? List.<String>of() : runIds));
+        wanted.removeIf(r -> r == null || r.isBlank());
+        Map<String, String> found = new java.util.HashMap<>();
+        if (wanted.isEmpty()) return new java.util.LinkedHashMap<>();
+        try {
+            src.run(conn -> {
+                for (String[] q : new String[][]{{STEPS, "recorded_at"}, {T, "written_at"}}) {
+                    List<String> open = wanted.stream().filter(r -> !found.containsKey(r)).toList();
+                    if (open.isEmpty()) return;
+                    // Chunked: PostgreSQL caps one statement at 65 535 bind parameters.
+                    for (int from = 0; from < open.size(); from += IN_CHUNK) {
+                        List<String> chunk = open.subList(from, Math.min(open.size(), from + IN_CHUNK));
+                        String sql = "SELECT run_id, consignment_id FROM " + q[0] + " WHERE run_id IN ("
+                                + String.join(",", java.util.Collections.nCopies(chunk.size(), "?")) + ")"
+                                + " AND consignment_id IS NOT NULL GROUP BY run_id, consignment_id"
+                                + " ORDER BY run_id, min(" + q[1] + "), consignment_id";
+                        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                            for (int i = 0; i < chunk.size(); i++) ps.setString(i + 1, chunk.get(i));
+                            try (ResultSet rs = ps.executeQuery()) {
+                                while (rs.next()) found.putIfAbsent(rs.getString(1), rs.getString(2));
+                            }
+                        }
+                    }
+                }
+            });
+        } catch (SQLException e) {
+            throw new IllegalStateException("consignment lookup failed for " + wanted.size() + " run(s): "
+                    + e.getMessage(), e);
+        }
+        Map<String, String> out = new java.util.LinkedHashMap<>();
+        for (String r : wanted) if (found.containsKey(r)) out.put(r, found.get(r));
+        return out;
+    }
+
 
     /** Delete the Step Receipts recorded before {@code cutoff}; returns how many went. Best-effort. */
     public int pruneSteps(java.time.Instant cutoff) {
@@ -441,13 +529,20 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
     }
 
     public List<ConsignmentOutput> outputs(String consignmentId) {
+        return outputs(consignmentId, Integer.MAX_VALUE);
+    }
+
+    /** As {@link #outputs(String)}, at most {@code limit} rows, cut in the database ({@code LIMIT}); best-effort like
+     *  it. {@link #outputCount} gives the true total. */
+    public List<ConsignmentOutput> outputs(String consignmentId, int limit) {
         String sql = "SELECT " + COLS + " FROM " + T
-                + " WHERE consignment_id = ? ORDER BY written_at DESC, path";
+                + " WHERE consignment_id = ? ORDER BY written_at DESC, path LIMIT ?";
         List<ConsignmentOutput> out = new ArrayList<>();
         try {
             src.run(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
                     ps.setString(1, consignmentId);
+                    ps.setInt(2, Math.max(0, limit));
                     try (ResultSet rs = ps.executeQuery()) {
                         while (rs.next()) out.add(map(rs));
                     }

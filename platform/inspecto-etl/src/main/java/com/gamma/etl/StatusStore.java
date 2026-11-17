@@ -54,4 +54,46 @@ public interface StatusStore {
     default List<Map<String, String>> unpack(PipelineConfig cfg) {
         return List.of();
     }
+
+    /**
+     * One Consignment's ledger row in {@code cfg}'s pipeline — the NEWEST one — or empty (X5
+     * {@code GET /consignments/{id}}). A Consignment can own several rows: a drain appends its SUCCESS after the
+     * PARKED row, so the latest row is its state. {@code default} takes the last match of {@link #batches} (oldest
+     * first); a database-backed store answers by a query instead of loading the pipeline's whole ledger.
+     */
+    default java.util.Optional<Map<String, String>> consignment(PipelineConfig cfg, String consignmentId) {
+        if (consignmentId == null) return java.util.Optional.empty();
+        Map<String, String> last = null;
+        for (Map<String, String> r : batches(cfg)) if (consignmentId.equals(r.get("consignment_id"))) last = r;
+        return java.util.Optional.ofNullable(last);
+    }
+
+    /**
+     * One Consignment's member files: the newest row of each file (a file retried within the Consignment has a later
+     * row), at most {@code limit}, in ledger order. {@code default} filters {@link #files}; a database-backed store
+     * answers by a query.
+     */
+    default List<Map<String, String>> consignmentFiles(PipelineConfig cfg, String consignmentId, int limit) {
+        if (consignmentId == null) return List.of();
+        List<Map<String, String>> newestFirst = new java.util.ArrayList<>(
+                files(cfg).stream().filter(r -> consignmentId.equals(r.get("consignment_id"))).toList());
+        java.util.Collections.reverse(newestFirst);
+        return latestPerFile(newestFirst, limit);
+    }
+
+    /**
+     * Member-file rows given NEWEST FIRST → the first (newest) row of each {@code filename}, at most {@code limit},
+     * returned in ledger (oldest-first) order. A row with no filename is kept as it stands.
+     */
+    static List<Map<String, String>> latestPerFile(List<Map<String, String>> newestFirst, int limit) {
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        List<Map<String, String>> out = new java.util.ArrayList<>();
+        for (Map<String, String> r : newestFirst) {
+            if (out.size() >= Math.max(0, limit)) break;
+            String file = r.get("filename");
+            if (file == null || seen.add(file)) out.add(r);
+        }
+        java.util.Collections.reverse(out);
+        return out;
+    }
 }

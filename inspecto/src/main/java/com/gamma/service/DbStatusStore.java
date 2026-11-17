@@ -162,6 +162,63 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
         return readRows(T_UNPACK, name(cfg), null);
     }
 
+    /** The NEWEST ledger row of the id: a drain or a retry appends a later row for the same Consignment (a PARKED
+     *  row, then the drain's SUCCESS), and the latest one is its state. */
+    @Override
+    public java.util.Optional<Map<String, String>> consignment(PipelineConfig cfg, String consignmentId) {
+        List<Map<String, String>> rows = rowsOf(T_BATCHES, name(cfg), consignmentId, 1);
+        return rows.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(rows.get(0));
+    }
+
+    /** The newest row of each member file (a file retried in the same Consignment has a later row), at most
+     *  {@code limit}, back in ledger order — {@link StatusStore#latestPerFile}. */
+    @Override
+    public List<Map<String, String>> consignmentFiles(PipelineConfig cfg, String consignmentId, int limit) {
+        return StatusStore.latestPerFile(rowsOf(T_FILES, name(cfg), consignmentId, limit), limit);
+    }
+
+    /**
+     * At most {@code limit} payload rows of one Consignment, NEWEST FIRST, found in SQL (X5 L4): the batches and files
+     * tables keep the id only inside the JSON payload, so the query matches the payload's own rendering of
+     * {@code "consignment_id":<id as JSON>} — portable (no JSON functions, DuckDB and PostgreSQL alike) and exact,
+     * since a quote inside any value is escaped in the payload. {@code !} escapes the LIKE wildcards; every row is
+     * checked again after parsing. Best-effort like {@link #readRows}.
+     */
+    private List<Map<String, String>> rowsOf(String table, String pipeline, String consignmentId, int limit) {
+        List<Map<String, String>> out = new ArrayList<>();
+        if (consignmentId == null || limit <= 0) return out;
+        String pattern;
+        try {
+            pattern = "%" + likeEscape("\"consignment_id\":" + JSON.writeValueAsString(consignmentId)) + "%";
+        } catch (Exception e) {
+            return out;
+        }
+        String sql = "SELECT payload FROM " + table + " WHERE pipeline = ? AND payload LIKE ? ESCAPE '!'"
+                + " ORDER BY seq DESC LIMIT ?";
+        try {
+            src.run(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, pipeline);
+                    ps.setString(2, pattern);
+                    ps.setInt(3, limit);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            Map<String, String> row = parse(rs.getString(1));
+                            if (consignmentId.equals(row.get("consignment_id"))) out.add(row);
+                        }
+                    }
+                }
+            });
+        } catch (SQLException e) {
+            log.warn("{} query failed for {} / {}: {}", table, pipeline, consignmentId, e.getMessage());
+        }
+        return out;
+    }
+
+    private static String likeEscape(String s) {
+        return s.replace("!", "!!").replace("%", "!%").replace("_", "!_");
+    }
+
     /** Read a table's payload rows for one pipeline (ordered by seq), optionally filtered by consignment_id. */
     private List<Map<String, String>> readRows(String table, String pipeline, String batchId) {
         List<Map<String, String>> out = new ArrayList<>();

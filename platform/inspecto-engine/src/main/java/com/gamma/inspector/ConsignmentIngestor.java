@@ -91,8 +91,12 @@ public final class ConsignmentIngestor {
                 : new StreamingPluginIngestStrategy();
 
         IngestOutcome outcome;
+        // X5 L3: this pass's Step Receipt trail, carried in the call context for exactly this pass (never keyed by the
+        // Consignment id, which another Pipeline, Space or attempt can mint too); the binding ends with the pass.
+        IngestTrail.Trail trail = new IngestTrail.Trail();
         if (dryRun) {
-            PipelineTestRun.DryIngest dry = PipelineTestRun.dryIngest(batch, cfg);
+            PipelineTestRun.DryIngest dry = ScopedValue.where(IngestTrail.CURRENT, trail)
+                    .call(() -> PipelineTestRun.dryIngest(batch, cfg));
             outcome = dry.outcome();
             log.info("dry run: consignment {} parsed {} member(s) via {} into table '{}' — {}: {} row(s) "
                             + "parsed, {} would land (partition writes, quarantine moves and the branch commit "
@@ -125,7 +129,7 @@ public final class ConsignmentIngestor {
             // HA-GRACEFUL-STOP-LEASE-RELEASE-1: a closing host cancels before this batch starts writing outputs.
             CommitFence.checkpoint(CommitFence.Scope.RUN, cfg.identity().pipelineName());
             try {
-                outcome = strategy.ingest(batch, cfg);
+                outcome = ScopedValue.where(IngestTrail.CURRENT, trail).call(() -> strategy.ingest(batch, cfg));
             } finally {
                 // The strategies report per-member/per-step progress; a snapshot must never outlive the batch.
                 IngestProgress.clear(cfg.identity().pipelineName());
@@ -202,11 +206,21 @@ public final class ConsignmentIngestor {
         // offending cell (DuckDB: "Could not convert string '...'") or echoes the line ("Original Line: ..."). This is
         // the one gate before the batch ledger, the retry record and the event: quoted literals become fingerprints.
         error = com.gamma.etl.FailureText.scrub(error, cfg);
+        // X5 L3 (plan §3.5): the Consignment's Step Receipts, built once its status is final — for EVERY status — from
+        // what the pass gathered. The Step a FAILED Consignment failed at also rides its pipeline.batch.failed Signal
+        // (§3.4), which the audit flush below emits.
+        List<com.gamma.pipeline.exec.StepReceipt> receipts = stepReceipts(trail, batch, cfg, outcome, error, runId, dryRun);
+        com.gamma.pipeline.exec.StepReceipt failedStep = "FAILED".equals(status) ? IngestTrail.failedStep(receipts) : null;
+        final String finalStatus = status, finalError = error;
         try {   // audit is always written — even when commit failed above
-            writeAudit(batch, cfg, audit, outcome, status, error);
+            com.gamma.signal.PipelineConsignmentSignal.attributing(
+                    failedStep == null ? null : failedStep.step(), failedStep == null ? null : failedStep.diag().code())
+                    .run(() -> writeAudit(batch, cfg, audit, outcome, finalStatus, finalError));
         } catch (Exception e) {
             log.error("Consignment {} failed during audit", batch.batchId(), e);
         }
+        // Best effort and switchable (-Dconsignment.steps): a receipt never changes the Consignment's outcome.
+        com.gamma.consignment.ConsignmentOutputStores.recordSteps(receipts);
         // DRYRUN-INVISIBLE-ON-FLAT-LANE-1 (a), operator decision 2026-09-23: the ONE durable write a flat-lane
         // dry run makes — the same parse/sink rows a real run records, marked simulated (as the graph lane's
         // PipelineJobRunner marks its own), so the run picker and overlay show the dry run. The counts are the
@@ -225,6 +239,26 @@ public final class ConsignmentIngestor {
         // INGEST-COMMIT-LEASE-LOST-OUTCOME-1: a cancel stays CANCELLED in CollectorProcessor; a genuine lease loss is
         // counted as a failed batch there (onBatchThrown spends no attempt), so the run is never reported SUCCESS.
         if (leaseLostAtCommit != null) throw leaseLostAtCommit;
+    }
+
+    // ── X5 Step Receipts (L3 — the ingest lanes) ──────────────────────────────
+
+    /**
+     * This Consignment's Step Receipts ({@link IngestTrail#receipts}), from its pass's trail and its outcome. Lane
+     * {@code ingest-flat} / {@code ingest-graph}, {@code runId} = the ingest Run (the {@code run_id} its
+     * {@code consignment_outputs} rows carry), so a retried Consignment's attempts each keep their own trail.
+     * Never throws: a receipt that cannot be built is logged and left out — never a reason to change the outcome.
+     */
+    static List<com.gamma.pipeline.exec.StepReceipt> stepReceipts(IngestTrail.Trail trail, Consignment batch,
+                                                                 PipelineConfig cfg, IngestOutcome outcome,
+                                                                 String error, String runId, boolean dryRun) {
+        try {
+            return IngestTrail.receipts(trail, batch.batchId(), cfg.identity().pipelineName(), runId, outcome, error,
+                    cfg.sinks() == null ? 1 : cfg.sinks().size(), batch.table(), dryRun);
+        } catch (RuntimeException e) {
+            log.warn("Consignment {}: could not build its Step Receipts: {}", batch.batchId(), e.getMessage());
+            return List.of();
+        }
     }
 
     // ── data-plane provenance (T21 — consignment-chain-plan.md S3) ─────────────

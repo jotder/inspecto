@@ -9,6 +9,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -912,6 +913,63 @@ class DbConsignmentOutputStoreTest {
             });
             db.maintenance();
             assertTrue(db.steps("c1").isEmpty(), "older than 30 days: pruned by db_maintenance");
+        }
+    }
+
+    /**
+     * X5 L4 — the {@code run_id} join: a job run's own Consignment comes from its Step Receipts first, from the
+     * output registry when it left none, and an ingest lane's {@code ''} run id joins nothing.
+     */
+    @Test
+    void aRunsOwnConsignmentComesFromItsReceiptsThenFromTheRegistry() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.recordSteps(List.of(step("job-c", "run-7", "job", 1, "src", 10)));
+            db.record(List.of(withRun("written-c", "run-7", "/out/a.parquet", 3, State.LIVE),
+                    withRun("only-c", "run-8", "/out/b.parquet", 3, State.LIVE)));
+            db.recordSteps(List.of(step("ingest-c", "", "ingest-graph", 1, "parse", 10)));
+
+            assertEquals(Map.of("run-7", "job-c", "run-8", "only-c"),
+                    db.consignmentsOfRuns(java.util.Arrays.asList("run-7", "run-8", "", null, "run-unknown")),
+                    "the receipts answer first, else the registry's run_id; '' and an unknown run join nothing");
+            assertEquals(List.of("run-8", "run-7"),
+                    List.copyOf(db.consignmentsOfRuns(List.of("run-8", "run-7")).keySet()), "in the asked order");
+            assertTrue(db.consignmentsOfRuns(List.of()).isEmpty());
+            assertTrue(db.consignmentsOfRuns(null).isEmpty());
+        }
+    }
+
+    /** The {@code IN} list is chunked (PostgreSQL caps a statement at 65 535 parameters): runs past the first chunk
+     *  are still joined, by both tables. */
+    @Test
+    void theRunIdJoinChunksALongRunList() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            int n = DbConsignmentOutputStore.IN_CHUNK * 2 + 500;
+            List<String> runs = new java.util.ArrayList<>();
+            for (int i = 0; i < n; i++) runs.add("run-" + i);
+            db.recordSteps(List.of(step("c-first", "run-0", "job", 1, "src", 1),
+                    step("c-last", "run-" + (n - 1), "job", 1, "src", 1)));
+            db.record(List.of(withRun("c-mid", "run-" + (DbConsignmentOutputStore.IN_CHUNK + 7), "/o/m", 1, State.LIVE)));
+
+            Map<String, String> found = db.consignmentsOfRuns(runs);
+            assertEquals(Map.of("run-0", "c-first", "run-" + (n - 1), "c-last",
+                    "run-" + (DbConsignmentOutputStore.IN_CHUNK + 7), "c-mid"), found);
+        }
+    }
+
+    /** X5 L4 bounds: the route's reads are cut in SQL, and the counts give the true totals. */
+    @Test
+    void boundedReadsCutInTheQueryAndCountTheRest() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.recordSteps(List.of(step("c1", "run-1", "job", 1, "a", 10), step("c1", "run-1", "job", 2, "b", 10),
+                    step("c1", "run-1", "job", 3, "c", 10)));
+            db.record(List.of(withRun("c1", "run-1", "/o/1", 1, State.LIVE), withRun("c1", "run-1", "/o/2", 1, State.LIVE)));
+
+            assertEquals(List.of("a", "b"), db.steps("c1", 2).stream().map(com.gamma.pipeline.exec.StepReceipt::step).toList());
+            assertEquals(3, db.stepCount("c1"));
+            assertEquals(3, db.steps("c1").size(), "the unbounded read is unchanged");
+            assertEquals(1, db.outputs("c1", 1).size());
+            assertEquals(2, db.outputCount("c1"));
+            assertEquals(0, db.stepCount("nope"));
         }
     }
 

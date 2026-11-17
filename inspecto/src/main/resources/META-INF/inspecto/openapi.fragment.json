@@ -9282,6 +9282,49 @@
           }
         }
       }
+    },
+    "/consignments/{consignmentId}" : {
+      "get" : {
+        "tags" : [ "Execution & Scheduling" ],
+        "summary" : "One Consignment across every lane",
+        "description" : "X5 (plan 2026-11-17 section 3.7): the drill-down read of one Consignment, wherever it ran. Joins the ingest ledger row (status, member files, park detail; looked up by id), its Step Receipts (consignment_steps, ordered by flush, run, lane, seq; first 500 + stepsTotal), its registered outputs (consignment_outputs, first 200 + outputsTotal), the job runs that read it (downstream, each with its OWN consignmentId through the run_id join of the receipts, else of the registry) and what its own job run read (upstream), and its newest 50 Signals (correlationId = the id). A store that cannot say leaves its key ABSENT and known.<store> false: with Step Receipts switched off (-Dconsignment.steps=false) steps is absent and known.steps is false, never []. Signal messages are served as GET /signals serves them; a receipt's diag.msg has its quoted literals and secrets masked. Every collection is cut in its read and reports its true total (stepsTotal, outputsTotal, membersTotal, upstreamTotal, downstreamTotal). An open read under Space admission, like GET /runs/{name}/batches. 404 when no store knows the id.",
+        "operationId" : "getConsignment",
+        "x-probe" : {
+          "path" : "/api/v1/consignments/__contract_probe_absent__",
+          "status" : 404
+        },
+        "parameters" : [ {
+          "name" : "consignmentId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The Consignment's trail across lanes.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "$ref" : "#/components/schemas/ConsignmentTrail"
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          }
+        }
+      }
     }
   },
   "components" : {
@@ -9372,6 +9415,139 @@
       }
     },
     "schemas" : {
+      "ConsignmentTrail" : {
+        "type" : "object",
+        "description" : "One Consignment across every lane (X5, GET /consignments/{consignmentId}). A key a store cannot answer is ABSENT, and known says which stores could: members only with an ingest ledger row, steps only while Step Receipts are on, outputs only with the Consignment registry, upstream and downstream only with the job-run store.",
+        "required" : [ "consignmentId", "lanes", "signals", "known" ],
+        "properties" : {
+          "consignmentId" : { "type" : "string" },
+          "pipeline" : { "type" : [ "string", "null" ], "description" : "The ingest ledger's Pipeline, else the receipts' or the registry's producer." },
+          "status" : { "type" : [ "string", "null" ], "description" : "The ingest ledger row's status, else the newest live job run's status, else null." },
+          "lanes" : { "type" : "array", "items" : { "type" : "string", "enum" : [ "ingest-flat", "ingest-graph", "job", "drain" ] }, "description" : "The lanes its Step Receipts name, in trail order; ABSENT with steps." },
+          "members" : { "type" : "array", "items" : { "type" : "object" }, "description" : "Its member-file ledger rows, as GET /runs/{name}/files serves them; first 200." },
+          "membersTotal" : { "type" : "integer" },
+          "steps" : { "type" : "array", "items" : { "$ref" : "#/components/schemas/StepReceipt" }, "description" : "Its Step Receipts; first 500. ABSENT when switched off, never []." },
+          "stepsTotal" : { "type" : "integer" },
+          "outputs" : { "type" : "array", "items" : { "type" : "object" }, "description" : "Its consignment_outputs rows, as GET /runs/{name}/outputs serves them; first 200." },
+          "outputsTotal" : { "type" : "integer" },
+          "upstream" : {
+            "type" : "array",
+            "description" : "The Consignments its own job runs (the newest 20) read (X2 sources), each once; first 50.",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "consignmentId" : { "type" : "string" },
+                "pipeline" : { "type" : [ "string", "null" ] },
+                "tableName" : { "type" : [ "string", "null" ] },
+                "runId" : { "type" : "string", "description" : "The run of this Consignment that read it." }
+              }
+            }
+          },
+          "downstream" : {
+            "type" : "array",
+            "description" : "The job runs that read it, newest first, each with the Consignment that run wrote (null when it left no receipt and no output); first 50.",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "runId" : { "type" : "string" },
+                "job" : { "type" : [ "string", "null" ] },
+                "status" : { "type" : [ "string", "null" ] },
+                "consignmentId" : { "type" : [ "string", "null" ] }
+              }
+            }
+          },
+          "upstreamTotal" : { "type" : "integer" },
+          "downstreamTotal" : { "type" : "integer" },
+          "parked" : {
+            "type" : "object",
+            "description" : "Present only for a PARKED ingest Consignment: the disabled sinks it parked at and their park tables.",
+            "properties" : {
+              "at" : { "type" : [ "array", "null" ], "items" : { "type" : "string" } },
+              "tables" : { "type" : [ "object", "null" ] }
+            }
+          },
+          "signals" : {
+            "type" : "array",
+            "description" : "Its newest 50 Signals (correlationId = the id).",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "type" : { "type" : "string" },
+                "at" : { "type" : "string" },
+                "severity" : { "type" : "string" },
+                "message" : { "type" : [ "string", "null" ] }
+              }
+            }
+          },
+          "known" : {
+            "type" : "object",
+            "description" : "Which stores could answer; false means this install cannot say.",
+            "required" : [ "steps", "runs", "outputs" ],
+            "properties" : {
+              "steps" : { "type" : "boolean" },
+              "runs" : { "type" : "boolean" },
+              "outputs" : { "type" : "boolean" }
+            }
+          }
+        }
+      },
+      "StepReceipt" : {
+        "type" : "object",
+        "description" : "The record one Step leaves for one Consignment on one lane in one attempt (GLOSSARY Step Receipt; X5). At most 1024 bytes of UTF-8 as stored; truncated says something was cut to fit.",
+        "required" : [ "v", "consignmentId", "lane", "runId", "seq", "step", "outcome", "in", "outlets" ],
+        "properties" : {
+          "v" : { "type" : "integer", "description" : "Shape version, 1." },
+          "consignmentId" : { "type" : "string" },
+          "pipeline" : { "type" : [ "string", "null" ] },
+          "lane" : { "type" : "string", "enum" : [ "ingest-flat", "ingest-graph", "job", "drain" ] },
+          "runId" : { "type" : "string", "description" : "The job run; empty on the ingest lanes, never null." },
+          "seq" : { "type" : "integer", "description" : "Order within (Consignment, run, lane)." },
+          "step" : { "type" : "string", "description" : "Node id, or the phase on the flat lane." },
+          "kind" : { "type" : [ "string", "null" ], "description" : "Node type, or phase." },
+          "outcome" : { "type" : "string", "enum" : [ "OK", "FAILED", "SKIPPED", "PARKED", "NOT_REACHED" ] },
+          "in" : { "type" : "integer", "description" : "Rows entering." },
+          "outlets" : {
+            "type" : "array",
+            "description" : "Rows leaving per outlet: data, reject:<reason>, route:<key>; at most 16.",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "outlet" : { "type" : "string" },
+                "rows" : { "type" : "integer" }
+              }
+            }
+          },
+          "ref" : {
+            "type" : [ "object", "null" ],
+            "description" : "Where the data rests durably: kind outputs, park, rejects or store.",
+            "properties" : {
+              "kind" : { "type" : "string" },
+              "table" : { "type" : [ "string", "null" ] },
+              "path" : { "type" : [ "string", "null" ] },
+              "files" : { "type" : "integer" }
+            }
+          },
+          "schema" : {
+            "type" : [ "object", "null" ],
+            "properties" : {
+              "columns" : { "type" : "integer" },
+              "fp" : { "type" : [ "string", "null" ], "description" : "12-hex fingerprint of the data outlet's (name, type) list." }
+            }
+          },
+          "diag" : {
+            "type" : "object",
+            "properties" : {
+              "code" : { "type" : [ "string", "null" ], "enum" : [ "STEP_FAILED", "STEP_TIMEOUT", "STEP_DISABLED", "SQL_ERROR", "IO_ERROR", "CONSERVATION_LOSS", "CONSERVATION_AMPLIFICATION", "LANE_FLAT", null ] },
+              "msg" : { "type" : [ "string", "null" ], "description" : "At most 240 chars; masked on read." },
+              "counts" : { "type" : "object", "additionalProperties" : { "type" : "integer" } }
+            }
+          },
+          "startedAt" : { "type" : [ "string", "null" ] },
+          "ms" : { "type" : "integer" },
+          "simulated" : { "type" : "boolean" },
+          "truncated" : { "type" : "boolean" }
+        }
+      },
       "AuthExchangeRequest" : {
         "type" : "object",
         "description" : "The browser-side PKCE artifacts (W6d). The code is one-time; the verifier proves this client started the flow; the redirectUri must equal the one used on the authorize request.",

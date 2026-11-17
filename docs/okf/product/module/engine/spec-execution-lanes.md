@@ -256,9 +256,9 @@ gauges, ledgers, quarantine, audit drill-down.)
 | Identity | `batchId` = `TS_slug_seq`; `ConsignmentManifest` authoritative per file | `runId`; `batchId` on provenance rows | none durable — the scratch root is deleted | the parked `batchId` (the drain resumes it) |
 | Terminal status | `SUCCESS`/`FAILED`/`EMPTY` + per-file `QUARANTINED_*` → three CSV ledgers + `CommitLog` (`ConsignmentAuditWriter`) | `JobRun` → `DbJobRunStore` | the `PipelineRunResult` response | `PARKED` (neither committed nor failed) until drained |
 | Per-step counts | `ConsignmentIngestor.recordProvenance` → `parse`/`sink` rows (SUCCESS only) | `PipelineExecutor` records one row per node, flushed with the commit | `relations[]` in the response (seeded sample) | branch commits in `BranchCommitLog` (kept as the drain's resume record) |
-| Step Receipts (X5) | not yet — lane L3 | one per walked Step (seeds and sinks included) → `consignment_steps`, flushed in a `finally`, success or failure | none | not yet — lane L3 |
+| Step Receipts (X5) | flat: three phases (`parse`, `transform`, `sink:<n>` per destination); graph fork: the two phases then one per walked Step — every status, flushed at the status-final point (L3) | one per walked Step (seeds and sinks included) → `consignment_steps`, flushed in a `finally`, success or failure | none | the parked sink `PARKED` with a `park` pointer; then one `drain` receipt per parked sink (L3) |
 | Live position | `IngestProgress` (which FILE) + `StepProgress` (which STEP) | `StepProgress` (which node of the walk) | n/a (bounded, synchronous) | n/a (durably at rest) |
-| Terminal event | `ConsignmentEvent` on the sync `ConsignmentEventBus` **and** the `pipeline.batch.committed\|failed` Signal | `ConsignmentEvent` published by `PipelineJobRunner` | none | `pipeline.batch.parked` Signal; the drain's commit emits the ordinary terminal event |
+| Terminal event | `ConsignmentEvent` on the sync `ConsignmentEventBus` **and** the `pipeline.batch.committed\|failed` Signal | `ConsignmentEvent` published by `PipelineJobRunner` on SUCCESS; on failure the `pipeline.batch.failed` Signal alone (X5 D9 = c) | none | `pipeline.batch.parked` Signal; the drain's commit emits the ordinary terminal event |
 
 Both provenance-writing lanes share **one** `DbProvenanceStore` per space (`ProvenanceStores` —
 DuckDB is single-writer). Default-off (`-Dprovenance.backend=duckdb`).
@@ -285,14 +285,84 @@ returns), its receipts are not. Lane `job`, `runId` = the job run, `seq` = the n
   finalisation) is no Step's: every receipt stays as it was and the run's own record carries the failure. A code a
   contributed Step invents is mapped onto the closed set (`STEP_FAILED`, the raw code at the head of the message).
   The run still fails exactly as before.
-- **Without a receipt observer** (`WalkObserver.NONE`, a plain `ProvenanceCollector`: the graph-fork ingest lane, every
-  pre-X5 caller) the walk's Step bookkeeping is inert — no schema probe, no diagnosis, nothing on failure.
+- **Without a receipt observer** (`WalkObserver.NONE`, a plain `ProvenanceCollector`: every pre-X5 caller, and the
+  `ConsignmentGraphRunner.run` overloads that take none) the walk's Step bookkeeping is inert — no schema probe, no
+  diagnosis, nothing on failure.
 - **Conservation:** after a completed walk, each `ConservationCheck` imbalance is written onto that Step's `diag`
   (`CONSERVATION_LOSS` / `CONSERVATION_AMPLIFICATION`, with `in` / `out` counts) whether or not the provenance store
   is on; the `PIPELINE_CONSERVATION_IMBALANCE` event is still raised only with the provenance store, as before.
-- ⚠ **Not built in L1:** a failed job-lane run still raises no `pipeline.batch.failed` Signal (X5 D9 = c), and that
-  Signal does not yet carry `failedStep` / `code` (plan §3.4); the ingest lanes, park and drain write no receipts
-  (L3); nothing serves them over HTTP (L4, `GET /consignments/{consignmentId}`).
+- **A failed run raises `pipeline.batch.failed` ALONE (X5 D9 = c, L3, 2026-11-17).** Never a `ConsignmentEvent`:
+  `JobService.mirrorPipelineCommit` turns every such event into a `pipeline.commit` Signal, so `on_signal:
+  pipeline.commit` Jobs see no change. `PipelineConsignmentSignal.emitJobFailed`: WARN, subject the Pipeline (id),
+  source the Job, correlation the Consignment; payload `dryRun`, `status: FAILED`, `durationMs`, `error` (quoted
+  values fingerprinted, at most 240 chars) and — when a Step owns the failure — `failedStep` / `code` from its FAILED
+  receipt (none for a refusal before the walk — a missing pipeline, a jail error — which raises it too; subject then
+  the authored `pipeline:`, else the Job). **Exactly one per Run that ENDS FAILED** (L3 review): each attempt hands
+  the Signal it would raise to its `RunContext` (a retry replaces or clears it) and `JobService` raises it after
+  recording the Run, only when the recorded status is `FAILED` — so a CANCELLED Run (a cancel, a switched-off module,
+  a closing Space, `interruptRuns`) and an attempt a retry recovered raise nothing; a Run whose every attempt failed
+  raises one, with the final attempt's facts. A Job run directly (the CLI's standalone context) raises none.
+  OpsMonitor's `batch_rerun` ignores it (source `job:`): a job run recovers by its own `retries`. Pinned by
+  `PipelineJobBatchFailedSignalTest` (failed, recovered retry, every attempt failed, cancelled, refused) and
+  `OpsMonitorTest.ignoresAFailedJobRunsBatchFailedSignal`.
+- **Never store values (L3 review):** `StepReceipt.Diagnostics` scrubs its message in its constructor — the one door
+  every diagnosis enters by, on every lane — with `FailureText.scrub`, the scrub the failure Signals use: a quoted
+  literal or echoed line becomes `<redacted>` (no Space salt is known there), while a text the ingest lane already
+  scrubbed under its Space keeps its `<fp:…>` tokens (`FailureText.scrub` is idempotent on its own tokens, so a
+  read-back changes nothing). Pinned on the three paths: `RouteIngestEndToEndTest` (graph fork, drain) and
+  `PipelineJobRunnerTest.aFailedStepsQuotedValueNeverReachesTheReceiptTable`, each reading the raw column.
+
+**Step Receipts on the ingest lanes, park and drain (X5 L3, 2026-11-17).** The flat lane runs no Steps, so it is
+told in PHASES; the graph fork tells the same phases and then every Step it walks. Collected while the pass runs in
+an `IngestTrail` carried in the CALL CONTEXT (`IngestTrail.CURRENT`, a `ScopedValue` that
+`ConsignmentIngestor.process` binds around exactly one pass — never a map keyed by the Consignment id, which two
+Pipelines, Spaces or attempts can mint alike; a workbench test run binds a throwaway, and the binding ends with the
+pass whatever it throws) and flushed once at the status-final point — **for every status** (SUCCESS,
+EMPTY, FAILED, PARKED) — best effort, never changing the outcome.
+
+- **Phases:** `parse` (`in` = rows read + sidecar rejects; `data` = rows read, `reject:unmatched` = the parser's
+  sidecar rows and a `rejects` pointer counting the members that have one; `castFailures` in `diag.counts`;
+  `LANE_FLAT` with the reason when the write stayed flat — the kill switch by name, else `flatReason`),
+  `transform` (`in` = rows meeting the Decision Rules; outlets `data` = what went on, plus one per rule that moved
+  rows — **`route:<rule>`** for a route, `reject:quarantined` / `reject:dropped` for a quarantine / drop, one count
+  per matched row, from `DecisionRuleApplier.Result.moved`), then on the flat lane one **`sink:<n>`** per `sinks[]`
+  entry (`n` = the 0-based index, the lift's `__d<n>`; `in` = rows written there, an `outputs` pointer with its
+  file count). An `EMPTY` pass has `parse` alone. Kind `phase`; `ms` from the phase marks.
+- **Graph fork:** `ConsignmentGraphRunner.run(…, observer)` walks with a `StepReceiptRecorder` (lane
+  `ingest-graph`); its receipts reach the trail in a `finally`, so a throwing walk keeps them. Each sink gets an
+  `outputs` pointer (files that branch wrote). A Consignment written in several calls (chunks, segments) merges a
+  Step met again into one receipt (rows summed, worst outcome kept). The phases are told on `ingest-graph` when every
+  write took the fork, else on `ingest-flat`; each lane numbers its own `seq`.
+- **Identity:** `runId` = the ingest Run — the `run_id` its `consignment_outputs` rows carry — not `''` (a plan §2.5
+  deviation, below). A dry run's receipts are `simulated`, point at nothing, and are the Consignment's (the suffixed
+  dry pass is re-keyed); a workbench test run leaves none.
+- **Failure (plan §3.4):** a pass that failed names the Step it failed at — a walked Step that threw (its own
+  diagnosis: `SQL_ERROR` / `IO_ERROR` / `STEP_FAILED`…), else the furthest phase it reached (`STEP_FAILED`, the
+  scrubbed error text), or on the flat write tail the destination being written — FAILED, everything after it
+  NOT_REACHED. A failure no Step owns (the commit tail after a pass that succeeded, a park, a lease loss, a lane
+  refusal between phases) marks nothing FAILED. ⚠ On the native and plugin readers parse and transform are one
+  statement, so a failure before the write tail reads `parse`; the plugin lane's generation mode writes outside the
+  fork, so its sink counts come from the outcome and a failure there also reads `parse`.
+- **`pipeline.batch.failed` carries the same `failedStep` / `code`** (`PipelineConsignmentSignal.attributing` binds
+  them around the audit flush; the `ConsignmentEvent` record itself is unchanged). Absent when no Step owns it.
+- **Park:** the parked sink is `PARKED`, `in` = the rows on its live inbound edge, pointer `park` with `path` =
+  `parked/<consignment>__<step>.parquet` under `dirs.backup`; the live branches commit as OK.
+- **Drain** (`DrainCommand`, the body of `POST /runs/{name}/drain`): one lane-`drain` receipt per parked sink under
+  the drain's own Run (also passed to the commit tail, so its registry rows carry the same `run_id`): OK with the
+  rows and files it wrote, FAILED for the write that threw, NOT_REACHED after it; a sink already durable from an
+  interrupted drain is OK with nothing written. Recorded in a `finally`. The park receipt stays: receipts are never
+  rewritten.
+- Pinned by `FlatVsGraphLaneParityTest.bothLanesLeaveTheSameSinkRowsOnTheirStepReceiptTrails`,
+  `RouteIngestEndToEndTest.aStepThatThrowsOnTheGraphForkIsNamedOnItsReceiptAndOnTheFailedSignal` /
+  `aParkedConsignmentsTrailShowsTheParkThenTheDrain`, `DecisionRuleWiringTest.theTransformReceiptCountsWhatEachRuleMovedAndWhatWentOn`;
+  the trail's isolation by `FlatVsGraphLaneParityTest.twoConcurrentSameIdConsignmentsInDifferentPipelinesKeepSeparateTrails`
+  and `aWorkbenchTestRunNeverTouchesTheTrailOfThePassAroundIt`.
+- **Deviation from plan §2.5 item 6 / §3.2:** ingest receipts carry the ingest Run id, not `''`. The plan's premise
+  ("ingest-lane receipts have no run id") was wrong — `ConsignmentIngestor.process` has one — and with `''` a retried
+  Consignment (same members, same id) would have its second attempt dropped by `ON CONFLICT DO NOTHING`, so the
+  trail would show the first failure and never the success.
+- ⚠ **Not built:** nothing serves the receipts over HTTP yet (L4, `GET /consignments/{consignmentId}`); a drain
+  failure raises no Signal (unchanged — the route answers the error).
 
 **Across the lanes (X2, 2026-09-02):** the at-rest lane records which ingest-lane Consignments it READ
 — `inspecto_job_run_sources` beside the run row, fed from the files the Consignment selector kept and

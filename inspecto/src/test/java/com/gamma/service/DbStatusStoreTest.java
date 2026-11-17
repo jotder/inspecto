@@ -2,6 +2,7 @@ package com.gamma.service;
 
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
+import com.gamma.etl.StatusStore;
 import com.gamma.etl.TestConfigs;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -242,6 +243,86 @@ class DbStatusStoreTest {
                          "SELECT 1 FROM information_schema.tables WHERE table_name = 'ucc_status_commits'")) {
                 assertFalse(rs.next(), "legacy table gone after rename");
             }
+        }
+    }
+
+    /** X5 L4: one Consignment's ledger row and member files by query — the same rows the whole-ledger reads hold. */
+    @Test
+    void readsOneConsignmentsRowAndFilesById(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = runOnePipeline(dir);
+        FileStatusStore file = new FileStatusStore();
+        db.sync(file, List.of(cfg));
+
+        String id = db.committedBatches(cfg).iterator().next();
+        Map<String, String> expected = db.batches(cfg).stream()
+                .filter(r -> id.equals(r.get("consignment_id"))).findFirst().orElseThrow();
+        assertEquals(expected, db.consignment(cfg, id).orElseThrow(), "the row the ledger holds");
+        assertEquals(file.consignment(cfg, id).orElseThrow(), db.consignment(cfg, id).orElseThrow(),
+                "the DB query and the file store's default agree");
+        List<Map<String, String>> members = db.consignmentFiles(cfg, id, 10);
+        assertEquals(1, members.size(), members.toString());
+        assertEquals(file.consignmentFiles(cfg, id, 10), members, "the DB query and the file store's default agree");
+        try (var st = conn.createStatement()) {   // a second member file of the same Consignment
+            st.execute("INSERT INTO inspecto_status_files SELECT pipeline, seq + 1000, "
+                    + "replace(payload, '.csv\"', '-2.csv\"') FROM inspecto_status_files");
+        }
+        assertEquals(2, db.consignmentFiles(cfg, id, 10).size());
+        assertEquals(1, db.consignmentFiles(cfg, id, 1).size(), "LIMIT applies");
+        assertTrue(db.consignment(cfg, "no-such").isEmpty());
+        assertTrue(db.consignment(cfg, id.substring(0, id.length() - 1) + "%").isEmpty(),
+                "a LIKE wildcard in the id is a literal");
+        assertTrue(db.consignmentFiles(cfg, "no-such", 10).isEmpty());
+    }
+
+    /**
+     * X5 L4 re-review: a drain appends a SUCCESS row after the PARKED row of the same Consignment
+     * ({@code DrainCommand.writeDrainAudit}), and a retried member file a later row. The by-id reads answer with the
+     * NEWEST row — on the DB store and on the file store's default alike.
+     */
+    @Test
+    void aDrainedConsignmentReadsItsNewestRowAndEachFileItsNewestRow(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema()).load();
+        String p = cfg.identity().pipelineName();
+        List<Map<String, String>> batches = List.of(
+                Map.of("consignment_id", "c-d", "status", "PARKED"),
+                Map.of("consignment_id", "other", "status", "SUCCESS"),
+                Map.of("consignment_id", "c-d", "status", "SUCCESS"));
+        List<Map<String, String>> files = List.of(
+                Map.of("consignment_id", "c-d", "filename", "a.csv", "status", "FAILED"),
+                Map.of("consignment_id", "c-d", "filename", "b.csv", "status", "SUCCESS"),
+                Map.of("consignment_id", "c-d", "filename", "a.csv", "status", "SUCCESS"));
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        try (var ps = conn.prepareStatement("INSERT INTO inspecto_status_batches VALUES (?, ?, ?)")) {
+            for (int i = 0; i < batches.size(); i++) {
+                ps.setString(1, p);
+                ps.setLong(2, i);
+                ps.setString(3, mapper.writeValueAsString(new java.util.TreeMap<>(batches.get(i))));
+                ps.executeUpdate();
+            }
+        }
+        try (var ps = conn.prepareStatement("INSERT INTO inspecto_status_files VALUES (?, ?, ?)")) {
+            for (int i = 0; i < files.size(); i++) {
+                ps.setString(1, p);
+                ps.setLong(2, i);
+                ps.setString(3, mapper.writeValueAsString(new java.util.TreeMap<>(files.get(i))));
+                ps.executeUpdate();
+            }
+        }
+        StatusStore byDefault = new StatusStore() {   // the file store's path: the interface defaults over the rows
+            public Set<String> committedBatches(PipelineConfig c) { return Set.of(); }
+            public List<Map<String, String>> batches(PipelineConfig c) { return batches; }
+            public List<Map<String, String>> files(PipelineConfig c) { return files; }
+            public List<Map<String, String>> lineage(PipelineConfig c, String b) { return List.of(); }
+            public List<Map<String, String>> quarantine(PipelineConfig c) { return List.of(); }
+        };
+        for (StatusStore s : List.of(db, byDefault)) {
+            String which = s == db ? "DB store" : "default";
+            assertEquals("SUCCESS", s.consignment(cfg, "c-d").orElseThrow().get("status"),
+                    which + ": the drain's SUCCESS row, not the stale PARKED one");
+            List<Map<String, String>> m = s.consignmentFiles(cfg, "c-d", 10);
+            assertEquals(List.of("b.csv", "a.csv"), m.stream().map(r -> r.get("filename")).toList(),
+                    which + ": one row per file, in ledger order");
+            assertEquals("SUCCESS", m.get(1).get("status"), which + ": a.csv's newest row");
         }
     }
 

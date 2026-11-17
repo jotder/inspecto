@@ -25,6 +25,30 @@ public final class PipelineConsignmentSignal {
     private PipelineConsignmentSignal() {
     }
 
+    /**
+     * X5 (plan §3.4): the Step a failed Consignment failed at and its diagnostic code — the additive
+     * {@code failedStep} / {@code code} keys of {@code pipeline.batch.failed}. Either may be {@code null}; a
+     * {@code null} is left out of the payload (a failure no Step owns names none, never a guess).
+     */
+    public record FailedStep(String step, String code) {}
+
+    private static final ScopedValue<FailedStep> FAILED_STEP = ScopedValue.newInstance();
+
+    /**
+     * Bind the failed Step for whatever {@link #emit} runs inside the returned carrier — the ingest lane wraps its
+     * audit flush in it, because the {@link ConsignmentEvent} the flush builds (a foundation-layer record) has no
+     * room for a Step. Read only for a FAILED event.
+     */
+    public static ScopedValue.Carrier attributing(String failedStep, String code) {
+        return ScopedValue.where(FAILED_STEP, new FailedStep(failedStep, code));
+    }
+
+    private static void putFailedStep(Map<String, Object> payload, FailedStep f) {
+        if (f == null) return;
+        if (f.step() != null) payload.put("failedStep", f.step());
+        if (f.code() != null) payload.put("code", f.code());
+    }
+
     /** Build the canonical Signal from a terminal {@link ConsignmentEvent} and emit it onto the current ledger. */
     public static void emit(ConsignmentEvent event) {
         boolean success = "SUCCESS".equals(event.status());
@@ -50,14 +74,44 @@ public final class PipelineConsignmentSignal {
         if (event.error() != null && !event.error().isBlank()) payload.put("error", event.error());
         if (event.offendingFile() != null) payload.put("offendingFile", event.offendingFile());
         payload.put("errorRows", event.errorRows());
+        if (!success && !"PARKED".equals(event.status()) && FAILED_STEP.isBound()) putFailedStep(payload, FAILED_STEP.get());
 
         Signal signal = new Signal(null, type, Instant.now(), success ? Severity.INFO : Severity.WARN,
                 Ref.of("pipeline", event.pipeline()), Ref.of("pipeline", event.pipeline()),
-                event.batchId(), null, null, null, type, payload, 1);
+                event.consignmentId(), null, null, null, type, payload, 1);
         try {
             EventLog.current().emit(signal.toEvent());
         } catch (RuntimeException ignored) {
             // an observability sink must never break the batch commit it is announcing
+        }
+    }
+
+    /**
+     * <b>X5 D9 = c</b> — a failed run on the at-rest job lane raises {@code pipeline.batch.failed} ALONE. It is
+     * deliberately not a {@link ConsignmentEvent}: {@code JobService.mirrorPipelineCommit} turns every such event
+     * into a {@code pipeline.commit} Signal, so publishing one would fire {@code on_signal: pipeline.commit} Jobs on
+     * a failure. The payload is the ingest lane's failure shape minus the counts this lane does not hold:
+     * {@code dryRun}, {@code status}, {@code durationMs}, {@code error} (when known) and, per plan §3.4,
+     * {@code failedStep} / {@code code} when a Step owns the failure. Subject: the Pipeline (the Job when a refusal
+     * came before the Pipeline was known); source: the Job; correlation: the Consignment. Raised by
+     * {@code JobService} once per Run that ENDS FAILED — never for a cancelled Run or a retried attempt. Never throws.
+     */
+    public static void emitJobFailed(String job, String pipeline, String consignmentId, String error, long durationMs,
+                                     boolean dryRun, FailedStep failed) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("dryRun", dryRun);
+        payload.put("status", "FAILED");
+        payload.put("durationMs", durationMs);
+        if (error != null && !error.isBlank()) payload.put("error", error);
+        putFailedStep(payload, failed);
+        String type = "pipeline.batch.failed";
+        Signal signal = new Signal(null, type, Instant.now(), Severity.WARN,
+                Ref.of("job", job), pipeline != null ? Ref.of("pipeline", pipeline) : Ref.of("job", job),
+                consignmentId, null, null, null, type, payload, 1);
+        try {
+            EventLog.current().emit(signal.toEvent());
+        } catch (RuntimeException ignored) {
+            // an observability sink must never change the outcome of the run it is announcing
         }
     }
 

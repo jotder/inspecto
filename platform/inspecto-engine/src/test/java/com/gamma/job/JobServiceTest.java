@@ -1173,6 +1173,33 @@ class JobServiceTest {
         }
     }
 
+    /**
+     * MoSCoW S4 (2026-11-17): {@code ConsignmentEvent.batchId} became {@code consignmentId}, but the
+     * {@code pipeline.commit} Signal built from it keeps its {@code batchId} payload key. That key is persisted in
+     * the Signal ledger and read by name — {@code $signal.batchId} in a user's {@code bind:} and in
+     * {@code ConsignmentProcessJobType}'s {@code deduce}. Renaming the record must not rename what they read.
+     */
+    @Test
+    void thePipelineCommitSignalKeepsItsBatchIdKeyAfterTheRecordRename(@TempDir Path dir) throws Exception {
+        JobConfig greeter = new JobConfig("greeter", "sample.hello", null, null, true, false,
+                Map.of("raise_alert", "false"), "pipeline.commit", null, Map.of(),
+                Map.of("audience", "$signal.batchId"));
+        ConsignmentEventBus bus = new ConsignmentEventBus();
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(greeter), bus, s, null,
+                     dir.resolve("audit").toString())) {
+            js.eventLog(com.gamma.event.EventLog.create());
+            js.start();
+            ConsignmentEvent committed =
+                    new ConsignmentEvent("UPSTREAM", "c_2026_0043", "SUCCESS", List.of("p=1"), 1L, 1L, 0);
+            bus.publish(committed);
+            JobRun run = await(() -> js.lastRunOf("greeter").orElse(null));
+            assertEquals("SUCCESS", run.status(), run.message());
+            assertTrue(run.message().contains(committed.consignmentId()),
+                    "the pipeline.commit Signal's batchId key must carry the Consignment id: " + run.message());
+        }
+    }
+
     @Test
     void aChainedOnPipelineFiringInheritsTheUpstreamBatchesDryRunFlag(@TempDir Path root, @TempDir Path dir)
             throws Exception {

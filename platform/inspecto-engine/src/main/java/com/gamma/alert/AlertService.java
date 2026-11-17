@@ -527,14 +527,14 @@ public final class AlertService {
         // this consumer REFUSES loudly for the same reason.
         if (event.dryRun()) {
             log.info("dry run: would evaluate '{}'s Alert Rules after simulated consignment {} — "
-                    + "nothing was checked", event.pipeline(), event.batchId());
+                    + "nothing was checked", event.pipeline(), event.consignmentId());
             return;
         }
         try {
             evaluate(event.pipeline(), System.currentTimeMillis());
         } catch (RuntimeException e) {
             // Alerting must never disturb ingest: log and move on.
-            log.warn("alert evaluation failed after batch {}: {}", event.batchId(), e.getMessage());
+            log.warn("alert evaluation failed after batch {}: {}", event.consignmentId(), e.getMessage());
         }
     }
 

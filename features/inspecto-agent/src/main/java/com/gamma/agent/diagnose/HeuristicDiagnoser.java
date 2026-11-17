@@ -32,7 +32,7 @@ public final class HeuristicDiagnoser {
     public static Diagnosis diagnose(ConsignmentEvent e, long epochMillis, List<AssistResult.Citation> citations) {
         Diagnosis.Severity severity = severityOf(e);
         String rootCause = rootCauseOf(e);
-        return new Diagnosis(e.batchId(), e.pipeline(), severity, rootCause,
+        return new Diagnosis(e.consignmentId(), e.pipeline(), severity, rootCause,
                 null, /* heuristicOnly */ true, epochMillis, citations);
     }
 

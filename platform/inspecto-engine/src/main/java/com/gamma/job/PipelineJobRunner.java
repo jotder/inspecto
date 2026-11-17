@@ -240,7 +240,7 @@ public final class PipelineJobRunner implements Job {
      */
     @Override
     public JobResult run() throws Exception {
-        return execute(StandaloneRunContext.forJob(cfg.name()));
+        return execute(StandaloneRunContext.forJob(cfg.name()), new Attempt());
     }
 
     /**
@@ -252,7 +252,26 @@ public final class PipelineJobRunner implements Job {
      */
     @Override
     public JobResult run(JobContext ctx) throws Exception {
-        return execute(ctx);
+        // X5 D9 = c: each attempt leaves the framework the pipeline.batch.failed it would raise, and a later attempt
+        // (a retry) replaces or clears it — JobService raises it only once the Run's FINAL status is FAILED, so a
+        // cancelled Run and a transient attempt a retry recovered raise nothing.
+        RunContext run = ctx instanceof RunContext rc ? rc : null;
+        if (run != null) run.pipelineBatchFailed(null);
+        Attempt attempt = new Attempt();
+        try {
+            return execute(ctx, attempt);
+        } catch (Throwable t) {
+            if (run != null) run.pipelineBatchFailed(batchFailed(attempt, t, ctx));
+            throw t;
+        }
+    }
+
+    /** What one attempt knew when it failed — every field may still be unset (a config refusal before the walk). */
+    private static final class Attempt {
+        final long t0 = System.nanoTime();
+        String pipelineId;
+        String consignmentId;
+        StepReceiptRecorder receipts;
     }
 
     /** @param artifacts where to record this run's produced stores, or {@code null} to record none. */
@@ -269,8 +288,11 @@ public final class PipelineJobRunner implements Job {
         ctx.readConsignments(registry.sourcesForPaths(store, read));
     }
 
-    private JobResult execute(JobContext ctx) throws Exception {
+    private JobResult execute(JobContext ctx, Attempt attempt) throws Exception {
         ArtifactRecorder artifacts = ctx == null ? null : ctx.artifacts();
+        // Minted first, so even a run refused before the walk names the Consignment it would have been (X5 D9).
+        String batchId = consignmentId(cfg);
+        attempt.consignmentId = batchId;
         // A5-at-rest slice 2: `pipeline_config:` names the flat *_pipeline.toon file (a path, like the
         // enrich job's `config:`); the Stage-2 remainder is lifted at RUN time (PipelineLift.stageTwo),
         // so the flat file stays the single truth — no derived graph is persisted to the pipeline store.
@@ -326,8 +348,8 @@ public final class PipelineJobRunner implements Job {
                     "job.data_dir");
             if (!resolved.equals(Path.of(dir.trim()).toAbsolutePath().normalize())) dir = resolved.toString();
         }
+        attempt.pipelineId = pipelineId;
         requireTopLevelSinks(g, dir);
-        String batchId = consignmentId(cfg);
         List<Seed> seeds = seedsOf(g);
         String incCol = cfg.opt("incremental_column", "").trim();   // T32 Phase C — opt-in incremental re-run
         // Spliced as a quoted identifier into the view predicate and max() query, on a connection that is not yet
@@ -435,6 +457,7 @@ public final class PipelineJobRunner implements Job {
             // X5: the walk is observed for Step Receipts; the provenance collector still sees every count.
             receipts = new StepReceiptRecorder(g, batchId, pipelineId, StepReceipt.LANE_JOB,
                     ctx == null ? null : ctx.runId(), dryRun, collector);
+            attempt.receipts = receipts;
 
             // D-9: the at-rest run is the one path with real run context — pipeline id (the ledger's
             // stable key, rename-proof like the watermark's producer), this run's batch id, and the
@@ -830,6 +853,39 @@ public final class PipelineJobRunner implements Job {
             }
         } catch (RuntimeException e) {
             log.warn("[PIPELINEJOB] could not annotate the Step Receipts: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * X5 D9 = c — the {@code pipeline.batch.failed} this failed attempt would raise, built now (the facts are this
+     * attempt's) and raised by {@code JobService} only if the Run ends FAILED. ALONE, never a {@link ConsignmentEvent}:
+     * {@code JobService.mirrorPipelineCommit} would turn one into a {@code pipeline.commit} Signal, so
+     * {@code on_signal: pipeline.commit} Jobs see no change. It names the Step that failed and its code when one did
+     * (plan §3.4) — none for a failure before the walk; the message is scrubbed of quoted values and bounded like a
+     * receipt's. Never throws.
+     */
+    private Runnable batchFailed(Attempt attempt, Throwable t, JobContext ctx) {
+        try {
+            StepReceipt failed = null;
+            if (attempt.receipts != null)
+                for (StepReceipt r : attempt.receipts.receipts())
+                    if (r.outcome() == StepReceipt.Outcome.FAILED) { failed = r; break; }
+            String msg = com.gamma.etl.FailureText.scrub(
+                    t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName(), null);
+            if (msg != null && msg.length() > StepReceipt.MAX_MSG) msg = msg.substring(0, StepReceipt.MAX_MSG);
+            String error = msg;
+            String pipeline = attempt.pipelineId != null ? attempt.pipelineId
+                    : cfg.opt("pipeline", cfg.opt("flow", null));
+            long ms = (System.nanoTime() - attempt.t0) / 1_000_000L;
+            boolean dryRun = ctx != null && ctx.dryRun();
+            com.gamma.signal.PipelineConsignmentSignal.FailedStep step = failed == null ? null
+                    : new com.gamma.signal.PipelineConsignmentSignal.FailedStep(failed.step(), failed.diag().code());
+            return () -> com.gamma.signal.PipelineConsignmentSignal.emitJobFailed(cfg.name(), pipeline,
+                    attempt.consignmentId, error, ms, dryRun, step);
+        } catch (RuntimeException e) {
+            log.warn("[PIPELINEJOB] could not prepare pipeline.batch.failed for {}: {}", attempt.consignmentId,
+                    e.getMessage());
+            return null;
         }
     }
 

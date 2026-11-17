@@ -181,6 +181,49 @@ class DecisionRuleWiringTest {
         }
     }
 
+    /**
+     * X5 L3 — the Decision Rule {@code route:} counts, grounded: the ingest lane's {@code transform} Step Receipt
+     * carries one outlet per rule that moved rows — {@code route:<rule>} for a route, {@code reject:dropped} for a
+     * drop — and {@code data} for what went on to the write, so {@code in} = the sum of its outlets.
+     */
+    @Test
+    void theTransformReceiptCountsWhatEachRuleMovedAndWhatWentOn(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = config(dir);
+        writeRule(dir, "route_cheap", Map.of(
+                "name", "route_cheap", "targetType", "pipeline", "target", "TEST_ETL",
+                "when", when("cost", "<", "100"), "priority", 10, "enabled", true,
+                "consequences", List.of(Map.of("action", "route", "destination", "review"))));
+        writeRule(dir, "drop_expensive", Map.of(
+                "name", "drop_expensive", "targetType", "pipeline", "target", "TEST_ETL",
+                "when", when("cost", ">", "500"), "priority", 20, "enabled", true,
+                "consequences", List.of(Map.of("action", "drop", "destination", ""))));
+        File db = DuckDbUtil.tempDbFile("drw_receipt_");
+        try (Connection conn = openWithTable(db)) {
+            IngestTrail.Trail trail = new IngestTrail.Trail();
+            System.setProperty(ConsignmentIngestStrategy.LANE_PROPERTY, "flat");   // the flat lane's phase receipts
+            ConsignmentIngestStrategy.Written written;
+            try {
+                written = ScopedValue.where(IngestTrail.CURRENT, trail).call(() -> run(conn, cfg));
+            } finally {
+                System.clearProperty(ConsignmentIngestStrategy.LANE_PROPERTY);
+            }
+            IngestOutcome outcome = new IngestOutcome(java.time.LocalDateTime.now(), "SUCCESS", "", List.of(),
+                    List.of(), written.outputs(), written.lineage(), 4, "mini");
+            var receipts = IngestTrail.receipts(trail, "B1", "TEST_ETL", "run-1", outcome, "",
+                    cfg.sinks().size(), "mini", false);
+            var transform = receipts.stream().filter(r -> r.step().equals("transform")).findFirst().orElseThrow();
+            Map<String, Long> outlets = new java.util.LinkedHashMap<>();
+            transform.outlets().forEach(o -> outlets.put(o.outlet(), o.rows()));
+            assertEquals(Map.of("data", 2L, "route:route_cheap", 1L, "reject:dropped", 1L), outlets,
+                    "bob routed, carol dropped, alice and dave went on: " + transform);
+            assertEquals(4L, transform.in());
+            var sink = receipts.stream().filter(r -> r.step().equals("sink:0")).findFirst().orElseThrow();
+            assertEquals(2L, sink.in(), "the write took what the rules left: " + receipts);
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
     // ── route + sinks>1: routed rows REPLICATE to every destination (operator, 2026-10-06) ──────
 
     /** The {@link #config} pipeline with two parquet destinations, hot and cold. */

@@ -1,6 +1,7 @@
 package com.gamma.inspector;
 
 import com.gamma.etl.PipelineConfig;
+import com.gamma.pipeline.exec.StepReceipt;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -423,6 +424,194 @@ class RouteIngestEndToEndTest {
         assertEquals(List.of("E1,1.0,2020-04-03"), emea, "the emea branch got exactly the E row");
         assertEquals(List.of("A2,2.0,2020-04-03", "X3,3.0,2020-04-03"), apac,
                 "apac got its own row AND the unmatched row via default:");
+    }
+
+    // ── X5 L3: Step Receipts on the graph fork, park and drain ──────────────────
+
+    /**
+     * 🔴 The failure a receipt exists for, on the ingest graph fork: a branch Step throws mid-walk. The Consignment
+     * still fails exactly as before; its trail names the Step — the phases and every Step above it OK, its own
+     * FAILED with a code, every sink below it NOT_REACHED — and its {@code pipeline.batch.failed} Signal carries
+     * the same {@code failedStep} and {@code code} (plan §3.4).
+     */
+    @Test
+    void aStepThatThrowsOnTheGraphForkIsNamedOnItsReceiptAndOnTheFailedSignal(@TempDir Path dir) throws Exception {
+        String d = dir.toString().replace("\\", "/");
+        Path schema = dir.resolve("mini_schema.toon");
+        Files.writeString(schema, com.gamma.etl.PipelineConfigBatchTest.miniSchema());
+        Map<String, Object> cfgMap = new java.util.LinkedHashMap<>();
+        cfgMap.put("name", "ROUTE_BOOM");
+        cfgMap.put("active", true);
+        cfgMap.put("dirs", new java.util.LinkedHashMap<>(Map.of(
+                "poll", d + "/inbox", "database", d + "/db", "backup", d + "/backup", "temp", d + "/temp",
+                "quarantine", d + "/quarantine", "markers", d + "/markers", "status_dir", d + "/status")));
+        cfgMap.put("output", Map.of("format", "CSV"));
+        cfgMap.put("sinks", List.of(Map.of("database", d + "/db_emea", "format", "CSV"),
+                Map.of("database", d + "/db_apac", "format", "CSV")));
+        Map<String, Object> emea = new java.util.LinkedHashMap<>(Map.of("key", "emea", "where", "ID LIKE 'E%'",
+                "database", d + "/db_emea"));
+        // 'E1' cannot be an INTEGER: the branch's sql Step fails at run time, on the walk, never at load.
+        emea.put("steps", List.of(Map.of("sql", Map.of("sql", "SELECT *, CAST(ID AS INTEGER) AS N FROM input"))));
+        cfgMap.put("route", new java.util.LinkedHashMap<>(Map.of("mode", "case", "default", "apac",
+                "branches", List.of(emea, Map.of("key", "apac", "where", "ID LIKE 'A%'", "database", d + "/db_apac")))));
+        cfgMap.put("processing", new java.util.LinkedHashMap<>(Map.of("threads", 1,
+                "schema_file", schema.toString().replace("\\", "/"),
+                "csv_settings", new java.util.LinkedHashMap<>(Map.of("delimiter", ",", "skip_header_lines", 0,
+                        "date_formats", List.of("%Y-%m-%d"), "timestamp_formats", List.of("%Y-%m-%d"))))));
+        Path toon = dir.resolve("route_boom_pipeline.toon");
+        Files.writeString(toon, com.gamma.config.io.ConfigCodec.toToon(cfgMap));
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Files.writeString(Files.createDirectories(Path.of(cfg.dirs().poll())).resolve("feed.csv"),
+                "ID,AMT,EVENT_DATE\nE1,1.0,2020-04-03\nA2,2.0,2020-04-03\n");
+
+        withSpaceAndRegistry((log, registry) -> {
+            CollectorProcessor.run(cfg);
+
+            List<com.gamma.signal.Signal> failed = com.gamma.signal.Signals.query(log.store(), "pipeline.batch.failed",
+                    null, null, null, null, 10);
+            assertEquals(1, failed.size(), "the Consignment fails as it always did");
+            String batchId = failed.get(0).correlationId();
+
+            List<StepReceipt> trail = registry.steps(batchId);
+            assertEquals(StepReceipt.Outcome.OK, receiptOf(trail, "parse").outcome(), trail.toString());
+            assertEquals(StepReceipt.Outcome.OK, receiptOf(trail, "transform").outcome());
+            assertEquals(StepReceipt.Outcome.OK, receiptOf(trail, "route").outcome(), "the Step above it ran");
+            StepReceipt boom = receiptOf(trail, "sql__emea");
+            assertEquals(StepReceipt.Outcome.FAILED, boom.outcome(), trail.toString());
+            assertEquals(StepReceipt.LANE_INGEST_GRAPH, boom.lane());
+            assertNotNull(boom.diag().code(), "a FAILED receipt carries its code");
+            assertEquals(1L, boom.in(), "it was handed the emea branch's one row");
+            assertEquals(StepReceipt.Outcome.NOT_REACHED, receiptOf(trail, "sink__d0").outcome());
+            assertEquals(StepReceipt.Outcome.NOT_REACHED, receiptOf(trail, "sink__d1").outcome());
+
+            Map<String, Object> payload = failed.get(0).payload();
+            assertEquals("sql__emea", payload.get("failedStep"), "the Signal names the Step: " + payload);
+            assertEquals(boom.diag().code(), payload.get("code"));
+
+            // Never store values: DuckDB's error quotes the cell ('E1'); what reached consignment_steps holds a
+            // fingerprint token in its place — read from the raw column, not through the scrubbing reader.
+            List<String> stored = com.gamma.consignment.StepReceiptRows.storedMessages(registry, batchId);
+            assertFalse(stored.isEmpty(), "the FAILED receipts carry a message");
+            assertTrue(stored.stream().noneMatch(m -> m.contains("E1")
+                    || com.gamma.consignment.StepReceiptRows.quotesAValue(m)), "a value reached the table: " + stored);
+        });
+    }
+
+    /**
+     * Never store values, on the drain: a parked branch whose drain write fails on a value (here a member id the
+     * lineage read cannot turn into a number) leaves a FAILED {@code drain} receipt whose stored message holds a
+     * fingerprint token, never the value.
+     */
+    @Test
+    void aDrainWriteThatFailsOnAValueStoresATokenNotTheValue(@TempDir Path dir) throws Exception {
+        Path toon = dir.resolve("park_pipeline.toon");
+        Files.writeString(toon, parkFixture(dir, true));
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Files.writeString(Files.createDirectories(Path.of(cfg.dirs().poll())).resolve("feed.csv"),
+                "ID,AMT,EVENT_DATE\nE1,1.0,2020-04-03\nA2,2.0,2020-04-03\nX3,3.0,2020-04-03\n");
+
+        withSpaceAndRegistry((log, registry) -> {
+            CollectorProcessor.run(cfg);
+            String batchId = parkedBatchId(dir);
+            // Corrupt the park table's member id with a value: the drain's lineage read fails on it.
+            Path park = dir.resolve("backup").resolve("parked").resolve(batchId + "__sink__d1.parquet");
+            Path tmp = dir.resolve("park_tmp.parquet");
+            java.io.File db = com.gamma.util.DuckDbUtil.tempDbFile("x5_park_");
+            try (var c = com.gamma.util.DuckDbUtil.openConnection(db); var st = c.createStatement()) {
+                st.execute("COPY (SELECT * EXCLUDE (__src_id), 'SECRET_9' AS __src_id FROM read_parquet('"
+                        + park.toString().replace('\\', '/') + "')) TO '" + tmp.toString().replace('\\', '/')
+                        + "' (FORMAT parquet)");
+            } finally {
+                com.gamma.util.DuckDbUtil.deleteTempDb(db);
+            }
+            Files.move(tmp, park, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+            Files.writeString(toon, parkFixture(dir, false));
+            assertThrows(Exception.class, () -> DrainCommand.run(toon.toString(), batchId));
+
+            StepReceipt failed = registry.steps(batchId).stream()
+                    .filter(r -> StepReceipt.LANE_DRAIN.equals(r.lane())).findFirst()
+                    .orElseThrow(() -> new AssertionError("no drain receipt: " + registry.steps(batchId)));
+            assertEquals(StepReceipt.Outcome.FAILED, failed.outcome(), failed.toString());
+            List<String> stored = com.gamma.consignment.StepReceiptRows.storedMessages(registry, batchId);
+            assertFalse(stored.isEmpty(), "the FAILED drain receipt carries a message");
+            assertTrue(stored.stream().noneMatch(m -> m.contains("SECRET_9")
+                    || com.gamma.consignment.StepReceiptRows.quotesAValue(m)), "a value reached the table: " + stored);
+        });
+    }
+
+    /**
+     * A parked Consignment's trail shows the parked sink PARKED, with the rows it was handed and the park pointer;
+     * after the drain (the body of {@code POST /runs/{name}/drain}) the trail gains a {@code drain} receipt for that
+     * sink, under the drain's own Run, pointing at the outputs it wrote.
+     */
+    @Test
+    void aParkedConsignmentsTrailShowsTheParkThenTheDrain(@TempDir Path dir) throws Exception {
+        Path toon = dir.resolve("park_pipeline.toon");
+        Files.writeString(toon, parkFixture(dir, true));
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Files.writeString(Files.createDirectories(Path.of(cfg.dirs().poll())).resolve("feed.csv"),
+                "ID,AMT,EVENT_DATE\nE1,1.0,2020-04-03\nA2,2.0,2020-04-03\nX3,3.0,2020-04-03\n");
+
+        withSpaceAndRegistry((log, registry) -> {
+            CollectorProcessor.run(cfg);
+            String batchId = parkedBatchId(dir);
+
+            List<StepReceipt> trail = registry.steps(batchId);
+            StepReceipt parked = receiptOf(trail, "sink__d1");
+            assertEquals(StepReceipt.Outcome.PARKED, parked.outcome(), trail.toString());
+            assertEquals(2L, parked.in(), "A2 + X3 (via default:) were parked");
+            assertNotNull(parked.ref(), "the park pointer");
+            assertEquals(StepReceipt.Pointer.PARK, parked.ref().kind());
+            assertEquals("parked/" + batchId + "__sink__d1.parquet", parked.ref().path());
+            StepReceipt live = receiptOf(trail, "sink__d0");
+            assertEquals(StepReceipt.Outcome.OK, live.outcome(), "the live branch committed");
+            assertEquals(1L, live.in());
+            assertEquals(StepReceipt.Pointer.OUTPUTS, live.ref().kind());
+            assertTrue(trail.stream().noneMatch(r -> StepReceipt.LANE_DRAIN.equals(r.lane())), "nothing drained yet");
+
+            Files.writeString(toon, parkFixture(dir, false));
+            DrainCommand.run(toon.toString(), batchId);
+
+            List<StepReceipt> drained = registry.steps(batchId).stream()
+                    .filter(r -> StepReceipt.LANE_DRAIN.equals(r.lane())).toList();
+            assertEquals(1, drained.size(), "one drain receipt per parked sink: " + drained);
+            StepReceipt dr = drained.get(0);
+            assertEquals("sink__d1", dr.step());
+            assertEquals(StepReceipt.Outcome.OK, dr.outcome());
+            assertEquals(2L, dr.in(), "the drain wrote the parked rows");
+            assertFalse(dr.runId().isEmpty(), "under the drain's own Run");
+            assertEquals(StepReceipt.Pointer.OUTPUTS, dr.ref().kind());
+            assertTrue(dr.ref().files() > 0, dr.toString());
+            assertEquals(StepReceipt.Outcome.PARKED, receiptOf(registry.steps(batchId), "sink__d1").outcome(),
+                    "a receipt is never rewritten: the park stays on the trail");
+        });
+    }
+
+    @FunctionalInterface
+    private interface SpaceBody {
+        void run(com.gamma.event.EventLog log, com.gamma.consignment.DbConsignmentOutputStore registry) throws Exception;
+    }
+
+    /** Runs {@code body} in a fresh space with its own Signal ledger and an in-memory Consignment registry. */
+    private static void withSpaceAndRegistry(SpaceBody body) throws Exception {
+        String space = "x5-l3-" + java.util.UUID.randomUUID();
+        com.gamma.event.EventLog log = com.gamma.event.EventLog.create();
+        com.gamma.event.EventLog.register(space, log);
+        org.slf4j.MDC.put(com.gamma.event.EventLog.SPACE_MDC_KEY, space);
+        try (var registry = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            com.gamma.consignment.ConsignmentOutputStores.use(registry);
+            body.run(log, registry);
+        } finally {
+            com.gamma.consignment.ConsignmentOutputStores.use(null);
+            org.slf4j.MDC.remove(com.gamma.event.EventLog.SPACE_MDC_KEY);
+            com.gamma.event.EventLog.unregister(space);
+        }
+    }
+
+    private static StepReceipt receiptOf(List<StepReceipt> trail, String step) {
+        return trail.stream().filter(r -> r.step().equals(step)).findFirst()
+                .orElseThrow(() -> new AssertionError("no receipt for " + step + " in " + trail));
     }
 
     /** The routed fixture of {@link #aRoutePipelineWritesEachBranchToItsPairedDestination}, as a string. */

@@ -60,6 +60,23 @@ class FailureTextTest {
         }
     }
 
+    /**
+     * X5 L3 review: scrubbing is idempotent — a text scrubbed under its Space keeps its {@code <fp:…>} tokens through
+     * a later salt-less pass (a Step Receipt's {@code Diagnostics} scrubs every message it is given, and again when it
+     * is read back), and a salt-less {@code <redacted>} stays itself.
+     */
+    @Test
+    void scrubbingAScrubbedTextChangesNothing(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
+        for (String raw : duckDbErrors(dir)) {
+            String once = FailureText.scrub(raw, cfg);
+            assertEquals(once, FailureText.scrub(once, cfg), "again under the same Space: " + once);
+            assertEquals(once, FailureText.scrub(once, null), "again with no salt: " + once);
+            String bare = FailureText.scrub(raw, null);
+            assertEquals(bare, FailureText.scrub(bare, null), "a <redacted> stays itself: " + bare);
+        }
+    }
+
     @Test
     void theFingerprintIsStablePerSpaceSaltedAndNotTheValue(@TempDir Path dir) throws Exception {
         PipelineConfig a = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(Files.createDirectories(dir.resolve("a")), "").toString());

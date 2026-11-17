@@ -1,6 +1,6 @@
 # C12 — upstream report drafts (MoSCoW C12)
 
-**Status: DRAFTS, NOT FILED.** The operator decided on 2026-11-16 (MoSCoW §8 C12) that these three reports are filed before the
+**Status: FILED 2026-11-17** (operator go-ahead, as drafted; the DuckDB environment line names only the platform it was reproduced on): DuckDB [#28947](https://github.com/duckdb/duckdb/issues/28947), CodeGraph [colbymchenry/codegraph#3320](https://github.com/colbymchenry/codegraph/issues/3320) (the repository of the installed `@colbymchenry/codegraph` 1.6.0), eoiagent [jotder/inspect-agent#1](https://github.com/jotder/inspect-agent/issues/1). Archived; the links are on the board rows. Originally: **DRAFTS, NOT FILED.** The operator decided on 2026-11-16 (MoSCoW §8 C12) that these three reports are filed before the
 4.0.0 tag. Filing one publishes text outside this repo, so each needs the operator's go-ahead on its final wording
 and target. When all three are filed, record each link on its board row, then `git mv` this page to
 `archived-documents/plans-archive/`.

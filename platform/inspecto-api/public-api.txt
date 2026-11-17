@@ -588,12 +588,15 @@ com.gamma.consignment.DbConsignmentOutputStore | public ConnectionSource browseS
 com.gamma.consignment.DbConsignmentOutputStore | public DbConsignmentOutputStore(Connection)
 com.gamma.consignment.DbConsignmentOutputStore | public DbConsignmentOutputStore(ConnectionSource)
 com.gamma.consignment.DbConsignmentOutputStore | public List<ConsignmentOutput> outputs(String)
+com.gamma.consignment.DbConsignmentOutputStore | public List<ConsignmentOutput> outputs(String, int)
 com.gamma.consignment.DbConsignmentOutputStore | public List<ConsignmentSource> sourcesForPaths(String, java.util.Collection<String>)
 com.gamma.consignment.DbConsignmentOutputStore | public List<DailyVolume> dailyVolume(String, String, String)
 com.gamma.consignment.DbConsignmentOutputStore | public List<ProducerHighWater> producerHighWater(String)
 com.gamma.consignment.DbConsignmentOutputStore | public List<String> browseTables()
 com.gamma.consignment.DbConsignmentOutputStore | public List<String> unreadablePaths()
 com.gamma.consignment.DbConsignmentOutputStore | public List<com.gamma.pipeline.exec.StepReceipt> steps(String)
+com.gamma.consignment.DbConsignmentOutputStore | public List<com.gamma.pipeline.exec.StepReceipt> steps(String, int)
+com.gamma.consignment.DbConsignmentOutputStore | public Map<String, String> consignmentsOfRuns(java.util.Collection<String>)
 com.gamma.consignment.DbConsignmentOutputStore | public Optional<EventTimeBounds> bounds(String)
 com.gamma.consignment.DbConsignmentOutputStore | public String browseId()
 com.gamma.consignment.DbConsignmentOutputStore | public String browseLabel()
@@ -603,6 +606,8 @@ com.gamma.consignment.DbConsignmentOutputStore | public int markCompactedAway(Li
 com.gamma.consignment.DbConsignmentOutputStore | public int pruneSteps(java.time.Instant)
 com.gamma.consignment.DbConsignmentOutputStore | public int supersede(String)
 com.gamma.consignment.DbConsignmentOutputStore | public int supersedeOtherRevisions(String, String)
+com.gamma.consignment.DbConsignmentOutputStore | public long outputCount(String)
+com.gamma.consignment.DbConsignmentOutputStore | public long stepCount(String)
 com.gamma.consignment.DbConsignmentOutputStore | public static DbConsignmentOutputStore open(String) throws SQLException
 com.gamma.consignment.DbConsignmentOutputStore | public static final int DEFAULT_STEPS_RETENTION_DAYS
 com.gamma.consignment.DbConsignmentOutputStore | public void close()
@@ -817,7 +822,7 @@ com.gamma.enrich.ReferenceReader | public static EnrichmentConfig.Reference pars
 com.gamma.enrich.ReferenceReader | public static String sqlFor(EnrichmentConfig.Reference, List<PipelineConfig>)
 com.gamma.etl.ConsignmentEvent | public ConsignmentEvent(String, String, String, List<String>, long, long, int)
 com.gamma.etl.ConsignmentEvent | public ConsignmentEvent(String, String, String, List<String>, long, long, int, String, String, long, boolean)
-com.gamma.etl.ConsignmentEvent | public record ConsignmentEvent(String pipeline, String batchId, String status, List<String> partitions, long outputRows, long durationMs, int rejectedCount, String error, String offendingFile, long errorRows, boolean dryRun, List<String> outputFiles)
+com.gamma.etl.ConsignmentEvent | public record ConsignmentEvent(String pipeline, String consignmentId, String status, List<String> partitions, long outputRows, long durationMs, int rejectedCount, String error, String offendingFile, long errorRows, boolean dryRun, List<String> outputFiles)
 com.gamma.etl.EditionFeatureProvider | Set<String> features()
 com.gamma.etl.EditionFeatureProvider | public interface EditionFeatureProvider
 com.gamma.etl.IngestResult | public record IngestResult(long parsedRows, long errorRows, long junkCandidateRows)
@@ -1047,8 +1052,11 @@ com.gamma.etl.StatusStore | List<Map<String, String>> files(PipelineConfig)
 com.gamma.etl.StatusStore | List<Map<String, String>> lineage(PipelineConfig, String)
 com.gamma.etl.StatusStore | List<Map<String, String>> quarantine(PipelineConfig)
 com.gamma.etl.StatusStore | Set<String> committedBatches(PipelineConfig)
+com.gamma.etl.StatusStore | default List<Map<String, String>> consignmentFiles(PipelineConfig, String, int)
 com.gamma.etl.StatusStore | default List<Map<String, String>> unpack(PipelineConfig)
+com.gamma.etl.StatusStore | default java.util.Optional<Map<String, String>> consignment(PipelineConfig, String)
 com.gamma.etl.StatusStore | public interface StatusStore
+com.gamma.etl.StatusStore | static List<Map<String, String>> latestPerFile(List<Map<String, String>>, int)
 com.gamma.etl.StreamingFileIngester | public interface StreamingFileIngester
 com.gamma.etl.StreamingFileIngester | void ingest(File, RecordSink, int, PipelineConfig) throws Exception
 com.gamma.event.DbEventStore | public DbEventStore(Connection)
@@ -1211,7 +1219,9 @@ com.gamma.job.DbJobRunStore | public List<Map<String, Object>> failureTrend(int)
 com.gamma.job.DbJobRunStore | public List<Map<String, Object>> recentRuns(int, String)
 com.gamma.job.DbJobRunStore | public List<Map<String, Object>> recentRuns(int, String, String, String)
 com.gamma.job.DbJobRunStore | public List<Map<String, Object>> runsDerivedFrom(String)
+com.gamma.job.DbJobRunStore | public List<Map<String, Object>> runsDerivedFrom(String, int)
 com.gamma.job.DbJobRunStore | public Map<String, Object> metrics(String)
+com.gamma.job.DbJobRunStore | public Optional<Map<String, Object>> run(String)
 com.gamma.job.DbJobRunStore | public String browseId()
 com.gamma.job.DbJobRunStore | public String browseLabel()
 com.gamma.job.DbJobRunStore | public final class DbJobRunStore implements AutoCloseable, com.gamma.util.BrowsableStore
@@ -1219,6 +1229,7 @@ com.gamma.job.DbJobRunStore | public int countPrunable(String)
 com.gamma.job.DbJobRunStore | public int prune(String)
 com.gamma.job.DbJobRunStore | public java.util.List<String> browseTables()
 com.gamma.job.DbJobRunStore | public long countRuns(String)
+com.gamma.job.DbJobRunStore | public long countRunsDerivedFrom(String)
 com.gamma.job.DbJobRunStore | public static DbJobRunStore open(String) throws SQLException
 com.gamma.job.DbJobRunStore | public void close()
 com.gamma.job.DbJobRunStore | public void maintenance()
@@ -2211,6 +2222,7 @@ com.gamma.pipeline.exec.ConservationCheck.RelCount | public record RelCount(Stri
 com.gamma.pipeline.exec.ConsignmentGraphRunner | public final class ConsignmentGraphRunner
 com.gamma.pipeline.exec.ConsignmentGraphRunner | public static PipelineExecutor.ExecResult run(Input, PipelineExecutor.SinkWriter, BranchCommitCoordinator.SourceFinalize) throws Exception
 com.gamma.pipeline.exec.ConsignmentGraphRunner | public static PipelineExecutor.ExecResult run(Input, PipelineExecutor.SinkWriter, BranchCommitCoordinator.SourceFinalize, PipelineExecutor.ParkWriter) throws Exception
+com.gamma.pipeline.exec.ConsignmentGraphRunner | public static PipelineExecutor.ExecResult run(Input, PipelineExecutor.SinkWriter, BranchCommitCoordinator.SourceFinalize, PipelineExecutor.ParkWriter, PipelineExecutor.WalkObserver) throws Exception
 com.gamma.pipeline.exec.ConsignmentGraphRunner | public static Result run(Input, SourceFinalizer) throws Exception
 com.gamma.pipeline.exec.ConsignmentGraphRunner | public static boolean engages(PipelineGraph)
 com.gamma.pipeline.exec.ConsignmentGraphRunner | public static boolean hasRouteFedChain(PipelineGraph)
@@ -2305,7 +2317,7 @@ com.gamma.pipeline.exec.PipelineWatermarkStore | public PipelineWatermarkStore(P
 com.gamma.pipeline.exec.PipelineWatermarkStore | public final class PipelineWatermarkStore
 com.gamma.pipeline.exec.PipelineWatermarkStore | public void put(String, String, String) throws IOException
 com.gamma.pipeline.exec.ProvenanceRow | public ProvenanceRow(String, String, String, String, long, String)
-com.gamma.pipeline.exec.ProvenanceRow | public record ProvenanceRow(String pipelineId, String batchId, String nodeId, String rel, long rowCount, String runTs, boolean simulated)
+com.gamma.pipeline.exec.ProvenanceRow | public record ProvenanceRow(String pipelineId, String consignmentId, String nodeId, String rel, long rowCount, String runTs, boolean simulated)
 com.gamma.pipeline.exec.ProvenanceStores | public final class ProvenanceStores
 com.gamma.pipeline.exec.ProvenanceStores | public static DbProvenanceStore shared()
 com.gamma.pipeline.exec.ProvenanceStores | public static void record(List<ProvenanceRow>)
@@ -2595,6 +2607,7 @@ com.gamma.service.DbStatusStore | public ConnectionSource browseSource()
 com.gamma.service.DbStatusStore | public DbStatusStore(Connection)
 com.gamma.service.DbStatusStore | public DbStatusStore(ConnectionSource)
 com.gamma.service.DbStatusStore | public List<Map<String, String>> batches(PipelineConfig)
+com.gamma.service.DbStatusStore | public List<Map<String, String>> consignmentFiles(PipelineConfig, String, int)
 com.gamma.service.DbStatusStore | public List<Map<String, String>> files(PipelineConfig)
 com.gamma.service.DbStatusStore | public List<Map<String, String>> lineage(PipelineConfig, String)
 com.gamma.service.DbStatusStore | public List<Map<String, String>> quarantine(PipelineConfig)
@@ -2604,6 +2617,7 @@ com.gamma.service.DbStatusStore | public String browseId()
 com.gamma.service.DbStatusStore | public String browseLabel()
 com.gamma.service.DbStatusStore | public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamma.util.BrowsableStore
 com.gamma.service.DbStatusStore | public java.util.List<String> browseTables()
+com.gamma.service.DbStatusStore | public java.util.Optional<Map<String, String>> consignment(PipelineConfig, String)
 com.gamma.service.DbStatusStore | public static DbStatusStore open(String, String, String) throws SQLException
 com.gamma.service.DbStatusStore | public void close()
 com.gamma.service.DbStatusStore | public void renamePipeline(String, String)

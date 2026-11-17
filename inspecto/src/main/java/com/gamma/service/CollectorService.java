@@ -1113,7 +1113,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // still visible: PipelineConsignmentSignal emits its pipeline.batch.* Signal marked dryRun.
         if (e.dryRun()) {
             log.info("dry run: would record a BATCH_{} event for simulated consignment {}/{} — not recorded",
-                    "SUCCESS".equalsIgnoreCase(e.status()) ? "COMMITTED" : "FAILED", e.pipeline(), e.batchId());
+                    "SUCCESS".equalsIgnoreCase(e.status()) ? "COMMITTED" : "FAILED", e.pipeline(), e.consignmentId());
             return;
         }
         boolean ok = "SUCCESS".equalsIgnoreCase(e.status());
@@ -1121,9 +1121,9 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                 .level(ok ? EventLevel.INFO : EventLevel.ERROR)
                 .source(CollectorService.class.getName())
                 .pipeline(e.pipeline())
-                .correlationId(e.batchId())
-                .message((ok ? "Consignment committed: " : "Consignment failed: ") + e.pipeline() + "/" + e.batchId())
-                .attr("batchId", e.batchId())
+                .correlationId(e.consignmentId())
+                .message((ok ? "Consignment committed: " : "Consignment failed: ") + e.pipeline() + "/" + e.consignmentId())
+                .attr("batchId", e.consignmentId())
                 .attr("outputRows", e.outputRows())
                 .attr("durationMs", e.durationMs())
                 .attr("rejectedCount", e.rejectedCount())

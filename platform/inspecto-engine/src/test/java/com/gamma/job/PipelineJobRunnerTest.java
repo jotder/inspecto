@@ -2265,6 +2265,55 @@ class PipelineJobRunnerTest {
     }
 
     /**
+     * X5 L3 review — never store values, on the job lane: a Step whose failure message quotes a value leaves a FAILED
+     * receipt whose message, AS STORED in {@code consignment_steps}, holds a fingerprint token instead of the value.
+     */
+    @Test
+    void aFailedStepsQuotedValueNeverReachesTheReceiptTable() throws Exception {
+        String owner = "x5-scrub.test.jar";
+        String boomType = "transform.x5_scrub_boom";
+        com.gamma.pipeline.PipelineNodeTypes.register(new com.gamma.pipeline.PipelineNodeType() {
+            @Override public String type() { return boomType; }
+            @Override public java.util.Optional<com.gamma.pipeline.ExecutionMode> mode() {
+                return java.util.Optional.of(com.gamma.pipeline.ExecutionMode.EXECUTED);
+            }
+        }, owner);
+        com.gamma.pipeline.exec.StepExecutors.register(new com.gamma.pipeline.exec.StepExecutor() {
+            @Override public String type() { return boomType; }
+            @Override public void execute(com.gamma.pipeline.exec.StepContext ctx) {
+                throw new IllegalStateException("Could not convert string 'SECRET_7' to INT32");
+            }
+        }, owner, com.gamma.pipeline.exec.StepExecutors.Grant.NONE);
+        try {
+            String dataDir = tmp.resolve("data").toString();
+            seedParquet(dataDir, "events", "(1,150),(2,50)");
+            PipelineStore store = new PipelineStore(tmp.resolve("flows"));
+            store.write("scrub_flow", new PipelineGraph("scrub_flow", true,
+                    List.of(PipelineNode.of("src", "acquisition", Map.of("source_store", "events")),
+                            PipelineNode.of("boom", boomType, Map.of()),
+                            new PipelineNode("out", "sink.persistent", "O", null, Map.of("store", "scrub_out"), null)),
+                    List.of(PipelineEdge.data("src", "boom"), PipelineEdge.data("boom", "out"))));
+            JobConfig cfg = new JobConfig("scrubjob", JobType.PIPELINE, null, null, true, false,
+                    Map.of("flow", "scrub_flow", "data_dir", dataDir, "consignment_id", "scrub-1"));
+
+            withRegistry(registry -> {
+                assertThrows(Exception.class, () -> new PipelineJobRunner(cfg, new ConsignmentEventBus(), store,
+                        dataDir, tmp.resolve("audit").toString()).run(new CapturingJobContext()));
+                assertEquals(com.gamma.pipeline.exec.StepReceipt.Outcome.FAILED,
+                        receiptOf(registry.steps("scrub-1"), "boom").outcome());
+                List<String> stored = com.gamma.consignment.StepReceiptRows.storedMessages(registry, "scrub-1");
+                assertFalse(stored.isEmpty(), "the FAILED receipt carries a message");
+                assertTrue(stored.stream().noneMatch(m -> m.contains("SECRET_7")
+                        || com.gamma.consignment.StepReceiptRows.quotesAValue(m)), "a value reached the table: " + stored);
+                assertTrue(stored.get(0).contains("to INT32"), "the unquoted diagnosis survives: " + stored);
+            });
+        } finally {
+            com.gamma.pipeline.exec.StepExecutors.deregister(owner);
+            com.gamma.pipeline.PipelineNodeTypes.deregister(owner);
+        }
+    }
+
+    /**
      * A conservation imbalance is written onto the Step it concerns. As with {@code reportConservation}, a clean run
      * conserves by construction, so the counts are injected: a filter that took 3 and accounted for 2.
      */

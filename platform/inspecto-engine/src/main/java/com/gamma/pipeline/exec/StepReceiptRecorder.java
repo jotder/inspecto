@@ -155,8 +155,10 @@ public final class StepReceiptRecorder implements PipelineExecutor.WalkObserver 
                     if (c.getKey().startsWith(prefix))
                         outlets.add(new StepReceipt.Outlet(c.getKey().substring(prefix.length()), c.getValue()));
             }
+            // A parked sink never consumed its rows: what came in is what its live inbound edge carried (X5 L3).
+            long in = ran ? rowsIn(nodeId, sink) : outcome == StepReceipt.Outcome.PARKED ? rowsIn(nodeId, false) : 0L;
             out.add(new StepReceipt(StepReceipt.VERSION, consignmentId, pipeline, lane, runId, e.seq, nodeId, e.kind,
-                    outcome, ran ? rowsIn(nodeId, sink) : 0L, outlets, e.ref, e.schema, e.diag, e.startedAt,
+                    outcome, in, outlets, e.ref, e.schema, e.diag, e.startedAt,
                     e.startedAt == null ? 0L : e.ms, simulated, false));
         }
         return out;

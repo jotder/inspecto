@@ -195,18 +195,18 @@ public final class RecordReplay {
             String why = thrown != null ? com.gamma.etl.FailureText.render(thrown, cfg)
                     : ev == null ? "the replay Consignment reported no terminal status" : ev.error();
             log.warn("[REPLAY] {} — replay of {} record(s) did not complete; claim released: {}", file, lines.size(), why);
-            return new Result(file, replayName, ev == null ? null : ev.batchId(), "FAILED", lines.size(),
+            return new Result(file, replayName, ev == null ? null : ev.consignmentId(), "FAILED", lines.size(),
                     0, 0, why, null);
         }
 
-        record.put("batchId", ev.batchId());
+        record.put("batchId", ev.consignmentId());
         record.put("status", ev.status());
         record.put("outputRows", ev.outputRows());
         record.put("errorRows", ev.errorRows());
         writeRecord(claim, record);
         log.info("[REPLAY] {} — {} record(s) replayed as {} ({}): {} landed, {} still rejected",
-                file, lines.size(), ev.batchId(), ev.status(), ev.outputRows(), ev.errorRows());
-        return new Result(file, replayName, ev.batchId(), ev.status(), lines.size(), ev.outputRows(),
+                file, lines.size(), ev.consignmentId(), ev.status(), ev.outputRows(), ev.errorRows());
+        return new Result(file, replayName, ev.consignmentId(), ev.status(), lines.size(), ev.outputRows(),
                 ev.errorRows(), ev.error(), claim.toString());
     }
 

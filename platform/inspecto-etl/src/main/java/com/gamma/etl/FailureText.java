@@ -82,21 +82,21 @@ public final class FailureText {
         StringBuilder sb = new StringBuilder();
         while (ol.find()) {
             String line = text.substring(ol.end(1), ol.end()).trim();
-            ol.appendReplacement(sb, Matcher.quoteReplacement(ol.group(1) + " <" + fp(salt, line) + ">"));
+            ol.appendReplacement(sb, Matcher.quoteReplacement(ol.group(1) + " " + mask(salt, line)));
         }
         ol.appendTail(sb);
         Matcher se = SOURCE_ECHO.matcher(sb.toString());
         sb = new StringBuilder();
         while (se.find()) {
             String line = se.group().substring(se.end(1) - se.start()).trim();
-            se.appendReplacement(sb, Matcher.quoteReplacement(se.group(1) + " <" + fp(salt, line) + ">"));
+            se.appendReplacement(sb, Matcher.quoteReplacement(se.group(1) + " " + mask(salt, line)));
         }
         se.appendTail(sb);
         // An UNQUOTED echo of the value, pointed at by a caret line under it (strptime: "SECRETVAL\n^").
         Matcher ca = CARET_ECHO.matcher(sb.toString());
         sb = new StringBuilder();
         while (ca.find())
-            ca.appendReplacement(sb, Matcher.quoteReplacement("<" + fp(salt, ca.group(1)) + ">" + ca.group(2)));
+            ca.appendReplacement(sb, Matcher.quoteReplacement(mask(salt, ca.group(1)) + ca.group(2)));
         ca.appendTail(sb);
         String s = sb.toString();
         Matcher q = QUOTED.matcher(s);
@@ -105,7 +105,7 @@ public final class FailureText {
             String lit = q.group();
             char c = lit.charAt(0);
             String inner = lit.substring(1, lit.length() - 1).replace("" + c + c, "" + c);
-            q.appendReplacement(sb, Matcher.quoteReplacement(c + "<" + fp(salt, inner) + ">" + c));
+            q.appendReplacement(sb, Matcher.quoteReplacement(c + mask(salt, inner) + c));
         }
         q.appendTail(sb);
         s = sb.toString();
@@ -117,6 +117,18 @@ public final class FailureText {
             if (at >= 0) s = s.substring(0, at) + "<" + fp(salt, s.substring(at + 1)) + ">";
         }
         return s;
+    }
+
+    /** A fingerprint token as {@link #scrub} writes it: {@code <fp:16 hex>}, or {@code <redacted>} with no salt. */
+    private static final Pattern TOKEN = Pattern.compile("<(fp:[0-9a-f]{16}|redacted)>");
+
+    /**
+     * {@code value} as its fingerprint token — or unchanged when it already IS one, so {@link #scrub} is idempotent:
+     * a text scrubbed once (a Step Receipt's message, X5) is never re-fingerprinted when it is built again or read
+     * back, and a salted {@code <fp:…>} survives a later salt-less pass.
+     */
+    private static String mask(byte[] salt, String value) {
+        return TOKEN.matcher(value.trim()).matches() ? value.trim() : "<" + fp(salt, value) + ">";
     }
 
     /** The salted fingerprint of one value under {@code cfg}'s Space: {@code fp:<16 hex>}. */

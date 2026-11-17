@@ -54,7 +54,7 @@ class PipelineConsignmentSignalTest {
             ConsignmentEvent ev = seen.get();
             assertNotNull(ev, "the pre-existing ConsignmentEvent path must still fire");
             assertEquals("SUCCESS", ev.status());
-            assertEquals(batchId, ev.batchId());
+            assertEquals(batchId, ev.consignmentId());
 
             // new path: a queryable pipeline.batch.committed Signal on the ledger
             List<Signal> signals = Signals.query(log.store(), "pipeline.batch.*",

@@ -117,12 +117,26 @@ public final class ConsignmentGraphRunner {
                                                   BranchCommitCoordinator.SourceFinalize onAllBranchesDurable,
                                                   PipelineExecutor.ParkWriter parkWriter)
             throws Exception {
+        return run(in, writer, onAllBranchesDurable, parkWriter, PipelineExecutor.WalkObserver.NONE);
+    }
+
+    /**
+     * As above, with the walk observed (X5 L3): {@code observer} sees every count and each Step's start, schema
+     * and outcome — FAILED at the Step that threw, NOT_REACHED below it, PARKED at a parked sink — so the ingest
+     * lane can leave a {@link StepReceipt} per walked Step. {@code null} observes nothing. The walk itself is
+     * unchanged: a failure propagates exactly as before.
+     */
+    public static PipelineExecutor.ExecResult run(Input in, PipelineExecutor.SinkWriter writer,
+                                                  BranchCommitCoordinator.SourceFinalize onAllBranchesDurable,
+                                                  PipelineExecutor.ParkWriter parkWriter,
+                                                  PipelineExecutor.WalkObserver observer)
+            throws Exception {
         BranchCommitCoordinator coordinator = new BranchCommitCoordinator(
                 new BranchCommitLog(in.branchCommitLog().toString()), in.writeScope());
         return PipelineExecutor.execute(
                 in.conn(), in.graph(), java.util.Map.of(in.seedNodeId(), in.seedTable()), in.batchId(),
                 coordinator, writer, onAllBranchesDurable,
-                PipelineExecutor.ProvenanceCollector.NONE, RowShaper.ReferenceResolver.NONE, parkWriter);
+                observer, RowShaper.ReferenceResolver.NONE, parkWriter, RowShaper.ExecutionContext.NONE);
     }
 
     /**

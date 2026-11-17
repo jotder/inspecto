@@ -65,6 +65,43 @@ an unsafe `kind: route` binding target and a `landing` that names no leaf — se
 `POST /queries/{id}/run` (the `com.gamma.query` catalog, W4), and async run polling
 (`GET /jobs/runs/{runId}`, `GET /runs/runs/{runId}`).
 
+### `GET /consignments/{consignmentId}` — one Consignment across lanes (X5 L4, 2026-11-17)
+
+`ConsignmentRoutes`; design of record `superpower/2026-11-17-x5-stepinfo-envelope-plan.md` §3.7 (D8 = a). One read
+joins five stores for one id: the ingest ledger row (`status`, `members` = its `/runs/{name}/files` rows, `parked`
+from the manifest), its Step Receipts (`steps`, `stepsTotal`; first 500), its registry rows (`outputs`,
+`outputsTotal`; first 200, the `/runs/{name}/outputs` row shape), the X2 run links (`upstream` = what its own job
+run read, `downstream` = the runs that read it, each with **its own** `consignmentId`), and its newest 50 Signals.
+
+- **Absent ≠ empty.** A store that cannot answer leaves its key ABSENT and `known.{steps,runs,outputs}` false.
+  With `-Dconsignment.steps=false`, `steps` and `lanes` are absent — never `[]`; with no Consignment registry (a
+  Basic-like install) `outputs` and `steps` are absent and `known.outputs` is false. 404 only when no store knows
+  the id (ledger, registry, receipts, run sources).
+- **The `run_id` join** (`DbConsignmentOutputStore.consignmentsOfRuns`, one query per table per 1 000 runs — PostgreSQL caps a statement at 65 535 parameters): a job run
+  row does not name its own Consignment, so `downstream[].consignmentId` comes from the run's receipts, else from
+  `consignment_outputs.run_id`; `upstream` comes from the receipts'/outputs' `run_id` (the newest 20 runs) through
+  the run store's sources. Ingest → job → back is one hop each way.
+- **Bounded.** Every collection is cut in its read (`LIMIT`) and carries its true total: `steps` 500
+  (`stepCount`, always the stored count: a receipt this build cannot read is skipped from the page, not the total), `outputs` 200 (`outputCount`), `members` 200 (`StatusStore.consignmentFiles`; the total is the
+  ledger row's `member_count` when cut), `upstream` / `downstream` 50 (`runsDerivedFrom(id, limit)`,
+  `countRunsDerivedFrom`), Signals 50. The ledger row is found by id (`StatusStore.consignment`) and is the NEWEST row of the id — a drain appends its
+  SUCCESS after the PARKED row, so the oldest would serve a drained Consignment as PARKED; `members` are the newest
+  row of each member file. The hint Pipeline (the receipts' or registry's producer) is asked first, every other
+  Pipeline once; `DbStatusStore` answers both by a query
+  on the payload's `"consignment_id":<id>` text (LIKE, wildcards escaped, exact match re-checked), the file store
+  by filtering its rows.
+- **Status** is the ledger row's; for a job-lane Consignment the newest run's, from the live-run registry, else
+  from `DbJobRunStore.run(runId)` (after a restart).
+- **Masking.** Signal messages as `GET /signals` serves them (scrubbed at emit; `SecretScrubber` again on read). A
+  receipt's `diag.msg` is the raw exception text on the job lane, so it is masked on read with `FailureText.scrub`
+  (quoted literals and echoed lines → `<redacted>`; no Space salt is read, since reading it may create it) and then
+  `SecretScrubber`.
+- **Open read** under Space admission, like its siblings `/runs/{name}/batches`, `/files`, `/outputs`, `/errors`
+  (operator decision on the L4 review, 2026-11-17; no `CapabilityManifest` entry).
+- Tests: `ControlApiConsignmentTrailTest` (open read + 404, receipts off, no registry, the hop both ways, the
+  run-store status fallback, the output cap, masking); `DbConsignmentOutputStoreTest`, `DbJobRunStoreTest`,
+  `DbStatusStoreTest.readsOneConsignmentsRowAndFilesById`.
+
 ## Shared route plumbing (as-built 2026-08-27)
 
 Consolidated by the Phase-1 simplification arc (plan archived at

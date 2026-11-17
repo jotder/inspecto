@@ -894,8 +894,11 @@ filtering. Written by `recordSteps` — one batched insert per Consignment, neve
 failure is a WARN, never thrown into the run) — and read by `steps(consignmentId)`, oldest flush first, then by
 run, lane and `seq` (a failed read throws: an empty list must never stand for "could not read").
 
-- **`run_id` is `''` on the ingest lanes, never `NULL`** — the `StepReceipt` record normalises it. A `NULL` in a
-  UNIQUE key exempts the row from it (`NULL ≠ NULL`), and a re-flush would duplicate a trail.
+- **`run_id` is never `NULL`** — the `StepReceipt` record normalises a missing one to `''`. A `NULL` in a UNIQUE
+  key exempts the row from it (`NULL ≠ NULL`), and a re-flush would duplicate a trail. Every lane writes a real one
+  (X5 L3): the job run on `job`, the ingest Run (the `run_id` of the Consignment's `consignment_outputs` rows) on
+  `ingest-flat` / `ingest-graph`, the drain's own Run on `drain` — so a retried ingest Consignment (same members,
+  same id) keeps each attempt's trail instead of losing the second to `DO NOTHING`.
 - **Immutable: `ON CONFLICT … DO NOTHING`.** A receipt is written once; a re-run of a pinned job-lane Consignment
   appends under its own `run_id`.
 - **`recorded_at`** is fixed-width UTC (`yyyy-MM-dd'T'HH:mm:ss.SSS'Z'`), so its text order is its time order and
@@ -903,9 +906,23 @@ run, lane and `seq` (a failed read throws: an empty list must never stand for "c
 - **Switch:** `-Dconsignment.steps=false` records nothing (`ConsignmentOutputStores.stepsEnabled()`, read per call);
   the table is still created. **Retention:** `db_maintenance` deletes rows older than
   `-Dconsignment.steps.retentionDays` (default 30; below 1 keeps everything) before its CHECKPOINT / VACUUM.
-- **Writers today:** the at-rest job lane (`PipelineJobRunner`, lane `job`). The ingest lanes, park and drain are
-  X5 lane L3; the read route `GET /consignments/{consignmentId}` is L4. Not listed in the raw table browser
+- **Writers today:** the at-rest job lane (`PipelineJobRunner`, lane `job`), the ingest lanes
+  (`ConsignmentIngestor`, lanes `ingest-flat` / `ingest-graph`, park included) and the drain (`DrainCommand`, lane
+  `drain`) — X5 L1 and L3, [execution lanes](spec-execution-lanes.md). The read route
+  `GET /consignments/{consignmentId}` is L4. Not listed in the raw table browser
   (`browseTables()` names `consignment_outputs` only).
+- **Reader (X5 L4, 2026-11-17):** `GET /consignments/{consignmentId}` (`ConsignmentRoutes`) reads
+  `steps(id, limit)` / `stepCount(id)` and `outputs(id, limit)` / `outputCount(id)` (cut by `LIMIT` in SQL, the
+  count only when cut; `stepsTotal` is always `stepCount`) and, for the cross-lane hop, `consignmentsOfRuns(runIds)` — the **`run_id` join** that names
+  each job run's own Consignment, which the run row does not: an `IN` query on this table's `run_id`, then one on
+  `consignment_outputs.run_id` for the runs that left no receipt, each chunked at 1 000 ids (PostgreSQL caps a
+  statement at 65 535 bind parameters); the oldest Consignment wins per run; a `''` or
+  `NULL` run id joins nothing; a failed read throws. Beside it the route reads `DbJobRunStore.runsDerivedFrom(id,
+  limit)`, `countRunsDerivedFrom(id)` and `run(runId)` (a run's status after a restart), and `DbStatusStore`
+  answers `consignment(cfg, id)` / `consignmentFiles(cfg, id, limit)` with a `LIKE` on the payload's
+  `"consignment_id":<id>` text (`!`-escaped wildcards, exact match re-checked, `ORDER BY seq DESC`: the NEWEST row of the id, since a drain
+  appends its SUCCESS after the PARKED row; member files keep the newest row per `filename`) — the batches and files tables hold
+  the id only inside the JSON payload, and no index or column is added.
 
 ### 3.10 `file_stages` — per-file stage-progression registry  · **M**
 File: `inspecto-file-stages.db`

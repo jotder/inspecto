@@ -235,7 +235,8 @@ second pilot class (alert triage) and a periodic state-watch trigger are deferre
 - **ops_monitor loop (slice 2)** — `OpsMonitor` is the L3 driver: a live `EventLog` subscriber
   (same run-claim-safe type-check→bounded-offer→daemon-vthread-handoff as `TriageQueue`; opt-in
   `-Dintelligence.opsmonitor.enabled`) that watches for a `pipeline.batch.failed` Signal (pilot action
-  class `batch_rerun`), extracts pipeline (subject) + batchId (correlationId), dedupes per batch, and
+  class `batch_rerun`) from the ingest lane — one sourced `job:` (a failed at-rest job run, X5 D9) is ignored, since
+  a job run recovers by its own `retries` — extracts pipeline (subject) + batchId (correlationId), dedupes per batch, and
   calls `AutonomyPolicyEngine.authorize("batch_rerun")`: **DENY** → record SKIPPED + do nothing;
   **SHADOW** → record SHADOWED ("would rerun …"), never execute; **ALLOW** → `Remediator` replays the
   batch via the same audited `pipeline_rerun` path an operator's approval would (actor

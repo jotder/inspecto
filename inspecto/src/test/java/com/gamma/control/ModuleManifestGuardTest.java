@@ -52,7 +52,10 @@ class ModuleManifestGuardTest {
             "inspecto-ops:geoMap", "a route feature la-api lists; Standard and up whatever the Add-ons (D-LAE5)",
             "inspecto-ops:entityPages", "a route feature la-api lists; Standard and up whatever the Add-ons (D-LAE4)",
             "inspecto-ops:laWidgets", "a UI flag reported only while geoLink is on; Standard and up whatever the Add-ons (D-LAE2)",
-            "inspecto-ops:pipeline.automation", "a Standard edition feature (DT-5) ops only marks; Standard without the Incidents Add-on keeps it");
+            "inspecto-ops:pipeline.automation", "a Standard edition feature (DT-5) ops only marks; Standard without the Incidents Add-on keeps it",
+            "inspecto-ops:pipeline.transform", "a Standard edition screen gate (DATA-TIERS-1 P2) ops only marks, like pipeline.automation",
+            "inspecto-ops:pipeline.egress", "a Standard edition screen gate (DATA-TIERS-1 P2) ops only marks, like pipeline.automation",
+            "inspecto-ops:collector.remote", "a Standard edition screen gate (DATA-TIERS-1 P2) ops only marks, like pipeline.automation");
 
     private static Path repoRoot() throws IOException {
         return ReactorModules.root();
