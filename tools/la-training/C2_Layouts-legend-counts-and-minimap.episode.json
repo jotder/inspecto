@@ -1,0 +1,14 @@
+{"scenario":"episode","edition":"Basic","base":"http://127.0.0.1:8099","steps":[
+{"scene":"S01","card":{"lines":["Inspecto LA training","C2  Layouts, legend, counts and minimap"],"secs":6},"steps":[{"space":"la-public-sector"},{"open":"/link-analysis?view=x","settle":4500},{"wait":2500},{"label":"File"},{"wait":900},{"exact":"Open…"},{"wait":2500},{"waitText":"Bid rotation"},{"click":"Bid rotation"},{"wait":1500},{"button":"Open"},{"wait":8000}]},
+{"scene":"S02","steps":[{"wait":3000},{"drag":[[1200,130],[1120,190]]},{"wait":3500},{"label":"Fit to screen"},{"wait":8000}]},
+{"scene":"S03","steps":[{"label":"Layout"},{"wait":6000},{"move":[690,330],"ms":900},{"wait":3500},{"move":[700,620],"ms":900},{"wait":3500},{"move":[700,905],"ms":900},{"wait":4000},{"escape":1},{"wait":1500}]},
+{"scene":"S04","steps":[{"label":"Layout"},{"wait":1500},{"at":[606,466]},{"wait":9000},{"label":"Layout"},{"wait":1500},{"move":[650,272],"ms":800},{"wait":4000},{"escape":1},{"wait":2000}]},
+{"scene":"S05","steps":[{"label":"Layout"},{"wait":1500},{"move":[650,99],"ms":800},{"wait":6000},{"escape":1},{"wait":2000}]},
+{"scene":"S06","steps":[{"label":"Layout"},{"wait":1500},{"at":[565,130]},{"wait":6000},{"label":"Layout"},{"wait":1500},{"at":[580,370]},{"wait":6000},{"label":"Layout"},{"wait":1500},{"at":[610,322]},{"wait":7000}]},
+{"scene":"S07","steps":[{"label":"Layout"},{"wait":1500},{"move":[650,329],"ms":800},{"wait":4000},{"move":[650,502],"ms":800},{"wait":5000},{"escape":1},{"wait":2000}]},
+{"scene":"S08","steps":[{"label":"Layout"},{"wait":1500},{"move":[650,617],"ms":800},{"wait":4000},{"move":[650,675],"ms":600},{"wait":4000},{"move":[650,905],"ms":800},{"wait":5000},{"escape":1},{"wait":1500},{"label":"Layout"},{"wait":1500},{"at":[570,178]},{"wait":5000}]},
+{"scene":"S09","steps":[{"label":"Show the legend"},{"wait":6000},{"click":"won"},{"wait":6000},{"click":"won"},{"wait":5000},{"mark":"the note","box":[105,205,330,40]},{"wait":5000}]},
+{"scene":"S10","steps":[{"wait":9000},{"mark":"entity count","box":[105,120,360,22]},{"wait":8000}]},
+{"scene":"S11","steps":[{"label":"Hide the minimap","soft":true},{"wait":5000},{"label":"Show the minimap","soft":true},{"wait":7000}]},
+{"scene":"S12","card":{"lines":["Try it","Next: C3  Display options and Display rules"],"secs":5},"steps":[{"wait":1000}]}
+]}

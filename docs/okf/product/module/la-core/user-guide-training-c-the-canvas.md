@@ -157,13 +157,13 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the two greyed reasons and the Reduce item.
 
 ### S04 · The force family
-- Voice: The force layouts treat links as springs: linked nodes pull together, unlinked ones push apart, so groups show as clumps. Force is the start. Force, spread, keeps more even gaps, so a dense clump opens up. Clustering force pulls each group tighter still, to show where one group ends and the next begins. Choose it: the northern block stands apart, four firms and their twenty-four tenders.
+- Voice: The force layouts treat links as springs: linked nodes pull together, unlinked ones push apart, so groups show as clumps. Force is the start. Force, spread, keeps more even gaps, so a dense clump opens up. Clustering force pulls each group tighter still, but it is greyed here: it needs at most two hundred nodes, and this graph has five hundred and twelve. Choose Force, spread, and the clumps open up.
 - Chip: Force · Force (spread) · Clustering force
 - Action: Layout ▸ Force (spread) ▸ hold ▸ Layout ▸ Clustering force ▸ hold. [check in UI: Clustering force is available (≤ 200 nodes); if greyed, say so and stay on Force (spread)]
 - Impact: before/after holds; mark the northern block.
 
 ### S05 · Layered, and too wide
-- Voice: Layered sets nodes in rows by the direction of their links, so a chain of payments or approvals reads from top to bottom. On a wide, shallow graph it is greyed as too wide, because more than sixty nodes would share one row and the picture would be a sliver. A market of bids is wide; a chain of transfers is where Layered is the clearest layout there is.
+- Voice: Layered sets nodes in rows by the direction of their links, so a chain of payments or approvals reads from top to bottom. On a wide, shallow graph it is greyed as too wide, because too many nodes would share one row and the picture would be a sliver. It is greyed here, and the menu says why when you point at it. A market of bids is wide; a chain of transfers is where Layered is the clearest layout there is.
 - Chip: Layered
 - Action: Layout ▸ hover or choose Layered. [check in UI: whether Layered is greyed *too wide (N nodes in one row, max 60)* on this view; if it runs, hold on it and the voice says "here it runs, and the tenders sit in one long row"]
 - Impact: mark the reason, or the layered drawing.
@@ -181,7 +181,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the reason or the drawing.
 
 ### S08 · The tree layouts
-- Voice: The last five are for trees, where every node has one way back to a root: Mind map, Organisation chart, Radial tree, Dendrogram and Fishbone. To see one, cut the graph down to a tree. Select the director P-00001 and press Select neighbours: it, and the two firms it directs. Clean up, Keep only selected. Now Organisation chart is offered: one director, two companies, rivals on paper. Undo display change puts the rest back.
+- Voice: The last five are for trees, where every node has one way back to a root: Mind map, Organisation chart, Radial tree, Dendrogram and Fishbone. Here they are all greyed, because this market is not a tree. To use one, cut the graph down to a tree first: select a director and its firms, and Clean up can keep only the selection. The Reduce the graph to use more layouts entry at the foot of the menu lists the ways.
 - Chip: Organisation chart · Mind map
 - Action: Search nodes `P-00001` ▸ Shift+click it ▸ Select neighbours ▸ Clean up ▸ Keep only selected ▸ Apply ▸ Layout ▸ Organisation chart ▸ hold ▸ Mind map ▸ hold ▸ Undo display change (Ctrl+Z) until the whole graph is back ▸ Layout ▸ Force. [check in UI: P-00001's neighbours on this view are CO-0242 and CO-0561 only, so the kept graph is a tree]
 - Impact: before/after holds: three nodes as an organisation chart, then a mind map.
@@ -193,13 +193,13 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: before/after hold: win links hidden; mark the struck-through chip and the note.
 
 ### S10 · Graph counts and Limits
-- Voice: The Graph counts pill, top right, says what is on screen in entities and links, and its tiles give the totals behind it: nodes and links shown out of loaded, and the rows folded into the links. When the server cuts a result, the card says cut short. Its Limits icon lists the node limits in force. Minimise either card, and this browser remembers.
+- Voice: The legend you just opened is also the quickest count: it lists how many entities are on screen, here five hundred and twelve. The Graph counts card goes further, with links shown out of loaded and the node limits in force. When a limit cuts a result, the card says cut short, and a notice says what to do: never a silent gap.
 - Chip: Graph counts · Limits
 - Action: Graph counts pill ▸ hold on the first line and tiles ▸ Limits ▸ hold ▸ Esc ▸ Minimise graph counts.
 - Impact: mark the on-screen line, the *Nodes* and *Links* tiles and the Limits list.
 
 ### S11 · The minimap
-- Voice: On a big graph, the minimap keeps you oriented. Display options, Minimap, offers one on this canvas. It starts folded to a small button at the right end of the line under the graph: Show the minimap. The frame inside it is your view; drag the frame, and the canvas follows. Hide the minimap folds it away again, clear of every label.
+- Voice: On a big graph, the minimap keeps you oriented. Display options, Minimap, offers one on this canvas. Here it sits at the lower right of the canvas. The frame inside it is your view, so you can see where you are in the whole. Hide the minimap folds it away, clear of every label, and Show the minimap brings it back.
 - Chip: Minimap · Show the minimap
 - Action: Display options ▸ confirm Minimap is ticked ▸ close ▸ Show the minimap ▸ drag its frame ▸ Hide the minimap.
 - Impact: mark the button; before/after hold as the view follows the frame.
