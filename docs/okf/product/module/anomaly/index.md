@@ -34,4 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `ANOMALY-SCORE-MEMORY-LIMIT-1` | P3 | chore | nobody has checked whether a production install gives the anomaly.score bucket query enough DuckDB memory (filed 2026-11-17 from the Anom… | — |
 | `ANOMALY-UI-FINDINGS-1` | P3 | chore | small defects and rough edges found driving the Anomaly Detection UI in a running demo build (2026-10-13; live-verification lane over the… | operator |
