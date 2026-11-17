@@ -74,21 +74,31 @@ from the manifest), its Step Receipts (`steps`, `stepsTotal`; first 500), its re
 run read, `downstream` = the runs that read it, each with **its own** `consignmentId`), and its newest 50 Signals.
 
 - **Absent ≠ empty.** A store that cannot answer leaves its key ABSENT and `known.{steps,runs,outputs}` false.
-  With `-Dconsignment.steps=false`, `steps` is absent — never `[]`. 404 only when no store knows the id (ledger,
-  registry, receipts, run sources).
-- **The `run_id` join** (`DbConsignmentOutputStore.consignmentsOfRun`): a job run row does not name its own
-  Consignment, so `downstream[].consignmentId` comes from the run's receipts, else from `consignment_outputs.run_id`;
-  `upstream` comes from the receipts'/outputs' `run_id` through the run store's sources. Ingest → job → back is one
-  hop each way.
+  With `-Dconsignment.steps=false`, `steps` and `lanes` are absent — never `[]`; with no Consignment registry (a
+  Basic-like install) `outputs` and `steps` are absent and `known.outputs` is false. 404 only when no store knows
+  the id (ledger, registry, receipts, run sources).
+- **The `run_id` join** (`DbConsignmentOutputStore.consignmentsOfRuns`, two queries for all the readers): a job run
+  row does not name its own Consignment, so `downstream[].consignmentId` comes from the run's receipts, else from
+  `consignment_outputs.run_id`; `upstream` comes from the receipts'/outputs' `run_id` (the newest 20 runs) through
+  the run store's sources. Ingest → job → back is one hop each way.
+- **Bounded.** Every collection is cut in its read (`LIMIT`) and carries its true total: `steps` 500
+  (`stepCount`), `outputs` 200 (`outputCount`), `members` 200 (`StatusStore.consignmentFiles`; the total is the
+  ledger row's `member_count` when cut), `upstream` / `downstream` 50 (`runsDerivedFrom(id, limit)`,
+  `countRunsDerivedFrom`), Signals 50. The ledger row is found by id (`StatusStore.consignment`): the hint Pipeline
+  (the receipts' or registry's producer) first, every other Pipeline once; `DbStatusStore` answers both by a query
+  on the payload's `"consignment_id":<id>` text (LIKE, wildcards escaped, exact match re-checked), the file store
+  by filtering its rows.
+- **Status** is the ledger row's; for a job-lane Consignment the newest run's, from the live-run registry, else
+  from `DbJobRunStore.run(runId)` (after a restart).
 - **Masking.** Signal messages as `GET /signals` serves them (scrubbed at emit; `SecretScrubber` again on read). A
   receipt's `diag.msg` is the raw exception text on the job lane, so it is masked on read with `FailureText.scrub`
   (quoted literals and echoed lines → `<redacted>`; no Space salt is read, since reading it may create it) and then
   `SecretScrubber`.
-- **Gate: `canOperateRuns`** (literal at the registration site, `CapabilityManifest` entry), the capability of
-  `/runs/{name}/drain` and `/reprocess`. ⚠ Plan §3.7 sketched it as an open read like `/runs/{name}/batches`; it is
-  gated because a trail carries diagnostics and the cross-lane graph of one Consignment.
-- Tests: `ControlApiConsignmentTrailTest` (401 / 403 / 200 / 404, receipts off, the hop both ways, masking);
-  `DbConsignmentOutputStoreTest.aRunsOwnConsignmentComesFromItsReceiptsThenFromTheRegistry`.
+- **Open read** under Space admission, like its siblings `/runs/{name}/batches`, `/files`, `/outputs`, `/errors`
+  (operator decision on the L4 review, 2026-11-17; no `CapabilityManifest` entry).
+- Tests: `ControlApiConsignmentTrailTest` (open read + 404, receipts off, no registry, the hop both ways, the
+  run-store status fallback, the output cap, masking); `DbConsignmentOutputStoreTest`, `DbJobRunStoreTest`,
+  `DbStatusStoreTest.readsOneConsignmentsRowAndFilesById`.
 
 ## Shared route plumbing (as-built 2026-08-27)
 

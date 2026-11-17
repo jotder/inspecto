@@ -905,10 +905,16 @@ run, lane and `seq` (a failed read throws: an empty list must never stand for "c
   `-Dconsignment.steps.retentionDays` (default 30; below 1 keeps everything) before its CHECKPOINT / VACUUM.
 - **Writers today:** the at-rest job lane (`PipelineJobRunner`, lane `job`). The ingest lanes, park and drain are
   X5 lane L3. Not listed in the raw table browser (`browseTables()` names `consignment_outputs` only).
-- **Reader (X5 L4, 2026-11-17):** `GET /consignments/{consignmentId}` (`ConsignmentRoutes`) reads `steps(id)` and,
-  for the cross-lane hop, `consignmentsOfRun(runId)` — the **`run_id` join** that names a job run's own
-  Consignment, which the run row does not: this table's `run_id` first, then `consignment_outputs.run_id` when the
-  run left no receipt. Distinct, oldest first; a `''` or `NULL` run id joins nothing; a failed read throws.
+- **Reader (X5 L4, 2026-11-17):** `GET /consignments/{consignmentId}` (`ConsignmentRoutes`) reads
+  `steps(id, limit)` / `stepCount(id)` and `outputs(id, limit)` / `outputCount(id)` (cut by `LIMIT` in SQL, the
+  count only when cut) and, for the cross-lane hop, `consignmentsOfRuns(runIds)` — the **`run_id` join** that names
+  each job run's own Consignment, which the run row does not: one `IN` query on this table's `run_id`, then one on
+  `consignment_outputs.run_id` for the runs that left no receipt; the oldest Consignment wins per run; a `''` or
+  `NULL` run id joins nothing; a failed read throws. Beside it the route reads `DbJobRunStore.runsDerivedFrom(id,
+  limit)`, `countRunsDerivedFrom(id)` and `run(runId)` (a run's status after a restart), and `DbStatusStore`
+  answers `consignment(cfg, id)` / `consignmentFiles(cfg, id, limit)` with a `LIKE` on the payload's
+  `"consignment_id":<id>` text (`!`-escaped wildcards, exact match re-checked) — the batches and files tables hold
+  the id only inside the JSON payload, and no index or column is added.
 
 ### 3.10 `file_stages` — per-file stage-progression registry  · **M**
 File: `inspecto-file-stages.db`

@@ -251,6 +251,33 @@ class DbStatusStoreTest {
      * (table → columns) set means adding a predicate without an index, or an index without a predicate,
      * both fail here.
      */
+    /** X5 L4: one Consignment's ledger row and member files by query — the same rows the whole-ledger reads hold. */
+    @Test
+    void readsOneConsignmentsRowAndFilesById(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = runOnePipeline(dir);
+        FileStatusStore file = new FileStatusStore();
+        db.sync(file, List.of(cfg));
+
+        String id = db.committedBatches(cfg).iterator().next();
+        Map<String, String> expected = db.batches(cfg).stream()
+                .filter(r -> id.equals(r.get("consignment_id"))).findFirst().orElseThrow();
+        assertEquals(expected, db.consignment(cfg, id).orElseThrow(), "the row the ledger holds");
+        assertEquals(file.consignment(cfg, id).orElseThrow(), db.consignment(cfg, id).orElseThrow(),
+                "the DB query and the file store's default agree");
+        List<Map<String, String>> members = db.consignmentFiles(cfg, id, 10);
+        assertFalse(members.isEmpty());
+        assertEquals(file.consignmentFiles(cfg, id, 10), members, "the DB query and the file store's default agree");
+        try (var st = conn.createStatement()) {   // a second member row for the same Consignment
+            st.execute("INSERT INTO inspecto_status_files SELECT * FROM inspecto_status_files");
+        }
+        assertEquals(2 * members.size(), db.consignmentFiles(cfg, id, 10).size());
+        assertEquals(1, db.consignmentFiles(cfg, id, 1).size(), "LIMIT applies");
+        assertTrue(db.consignment(cfg, "no-such").isEmpty());
+        assertTrue(db.consignment(cfg, id.substring(0, id.length() - 1) + "%").isEmpty(),
+                "a LIKE wildcard in the id is a literal");
+        assertTrue(db.consignmentFiles(cfg, "no-such", 10).isEmpty());
+    }
+
     @Test
     void everyListPredicateHasABackingIndexOnTheColumnsItFilters() throws Exception {
         Map<String, String> byTable = new java.util.TreeMap<>();

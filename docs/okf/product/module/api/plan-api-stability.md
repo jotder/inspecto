@@ -706,11 +706,16 @@ Additive: nothing existing changes shape.
   default (`-Dconsignment.steps=false` switches the writes off); kept 30 days (`-Dconsignment.steps.retentionDays`,
   pruned by `db_maintenance`). Written today by the at-rest job lane, success or failure; the ingest lanes, park and
   drain are X5 lane L3. Java: `com.gamma.pipeline.exec.StepReceipt` (`@PublicApi` 4.0.0),
-  `PipelineExecutor.WalkObserver`, and `DbConsignmentOutputStore.recordSteps` / `steps` / `consignmentsOfRun`.
+  `PipelineExecutor.WalkObserver`, and `DbConsignmentOutputStore.recordSteps` / `steps` / `stepCount` /
+  `outputCount` / `consignmentsOfRuns`; beside them `DbJobRunStore.run` / `countRunsDerivedFrom` and the bounded
+  overloads `outputs(id, limit)`, `steps(id, limit)`, `runsDerivedFrom(id, limit)`, and two default methods on the
+  `StatusStore` SPI, `consignment(cfg, id)` and `consignmentFiles(cfg, id, limit)` (additive: an existing
+  implementation inherits them).
 - **New: `GET /consignments/{consignmentId}`** returns one Consignment across lanes — status, member files, its
   Step Receipts, outputs, the job runs that read it (each with the Consignment that run wrote), what its own run read,
   and its Signals; `known.{steps,runs,outputs}` says which stores could answer, and a store that cannot leaves its
-  key absent (receipts off ⇒ no `steps`, never `[]`). Requires `canOperateRuns`. OpenAPI: `ConsignmentTrail`,
+  key absent (receipts off ⇒ no `steps`, never `[]`). Every list is capped with its true total beside it. An open
+  read, like `GET /runs/{name}/batches`. OpenAPI: `ConsignmentTrail`,
   `StepReceipt`.
 
 **Deferred to this same release by decision:** the token *runtime* model (D2 —

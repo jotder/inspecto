@@ -9287,7 +9287,7 @@
       "get" : {
         "tags" : [ "Execution & Scheduling" ],
         "summary" : "One Consignment across every lane",
-        "description" : "X5 (plan 2026-11-17 section 3.7): the drill-down read of one Consignment, wherever it ran. Joins the ingest ledger row (status, member files, park detail), its Step Receipts (consignment_steps, ordered by flush, run, lane, seq), its registered outputs (consignment_outputs, first 200 + outputsTotal), the job runs that read it (downstream, each with its OWN consignmentId through the run_id join of the receipts, else of the registry) and what its own job run read (upstream), and its newest 50 Signals (correlationId = the id). A store that cannot say leaves its key ABSENT and known.<store> false: with Step Receipts switched off (-Dconsignment.steps=false) steps is absent and known.steps is false, never []. Signal messages are served as GET /signals serves them; a receipt's diag.msg has its quoted literals and secrets masked. Requires canOperateRuns. 404 when no store knows the id.",
+        "description" : "X5 (plan 2026-11-17 section 3.7): the drill-down read of one Consignment, wherever it ran. Joins the ingest ledger row (status, member files, park detail; looked up by id), its Step Receipts (consignment_steps, ordered by flush, run, lane, seq; first 500 + stepsTotal), its registered outputs (consignment_outputs, first 200 + outputsTotal), the job runs that read it (downstream, each with its OWN consignmentId through the run_id join of the receipts, else of the registry) and what its own job run read (upstream), and its newest 50 Signals (correlationId = the id). A store that cannot say leaves its key ABSENT and known.<store> false: with Step Receipts switched off (-Dconsignment.steps=false) steps is absent and known.steps is false, never []. Signal messages are served as GET /signals serves them; a receipt's diag.msg has its quoted literals and secrets masked. Every collection is cut in its read and reports its true total (stepsTotal, outputsTotal, membersTotal, upstreamTotal, downstreamTotal). An open read under Space admission, like GET /runs/{name}/batches. 404 when no store knows the id.",
         "operationId" : "getConsignment",
         "x-probe" : {
           "path" : "/api/v1/consignments/__contract_probe_absent__",
@@ -9319,12 +9319,6 @@
                 }
               }
             }
-          },
-          "401" : {
-            "$ref" : "#/components/responses/Unauthenticated"
-          },
-          "403" : {
-            "description" : "The caller lacks canOperateRuns."
           },
           "404" : {
             "$ref" : "#/components/responses/NotFound"
@@ -9429,7 +9423,7 @@
           "consignmentId" : { "type" : "string" },
           "pipeline" : { "type" : [ "string", "null" ], "description" : "The ingest ledger's Pipeline, else the receipts' or the registry's producer." },
           "status" : { "type" : [ "string", "null" ], "description" : "The ingest ledger row's status, else the newest live job run's status, else null." },
-          "lanes" : { "type" : "array", "items" : { "type" : "string", "enum" : [ "ingest-flat", "ingest-graph", "job", "drain" ] }, "description" : "The lanes its Step Receipts name, in trail order." },
+          "lanes" : { "type" : "array", "items" : { "type" : "string", "enum" : [ "ingest-flat", "ingest-graph", "job", "drain" ] }, "description" : "The lanes its Step Receipts name, in trail order; ABSENT with steps." },
           "members" : { "type" : "array", "items" : { "type" : "object" }, "description" : "Its member-file ledger rows, as GET /runs/{name}/files serves them; first 200." },
           "membersTotal" : { "type" : "integer" },
           "steps" : { "type" : "array", "items" : { "$ref" : "#/components/schemas/StepReceipt" }, "description" : "Its Step Receipts; first 500. ABSENT when switched off, never []." },
@@ -9438,7 +9432,7 @@
           "outputsTotal" : { "type" : "integer" },
           "upstream" : {
             "type" : "array",
-            "description" : "The Consignments its own job run read (X2 sources), each once.",
+            "description" : "The Consignments its own job runs (the newest 20) read (X2 sources), each once; first 50.",
             "items" : {
               "type" : "object",
               "properties" : {
@@ -9451,7 +9445,7 @@
           },
           "downstream" : {
             "type" : "array",
-            "description" : "The job runs that read it, newest first, each with the Consignment that run wrote (null when it left no receipt and no output).",
+            "description" : "The job runs that read it, newest first, each with the Consignment that run wrote (null when it left no receipt and no output); first 50.",
             "items" : {
               "type" : "object",
               "properties" : {
@@ -9462,6 +9456,8 @@
               }
             }
           },
+          "upstreamTotal" : { "type" : "integer" },
+          "downstreamTotal" : { "type" : "integer" },
           "parked" : {
             "type" : "object",
             "description" : "Present only for a PARKED ingest Consignment: the disabled sinks it parked at and their park tables.",

@@ -153,6 +153,15 @@ class DbJobRunStoreTest {
             assertEquals(1, db.runsDerivedFrom("c-a").size());
             assertEquals(List.of(), db.runsDerivedFrom("  "));
 
+            // X5 L4: the bounded read is cut in SQL, the count is the true total, a run reads back by id
+            assertEquals(List.of("r2"), db.runsDerivedFrom("c-b", 1).stream().map(m -> m.get("runId")).toList());
+            assertEquals(2, db.countRunsDerivedFrom("c-b"));
+            assertEquals(0, db.countRunsDerivedFrom("never-read"));
+            assertEquals("SUCCESS", db.run("r1").orElseThrow().get("status"));
+            assertEquals("rollup", db.run("r1").orElseThrow().get("job"));
+            assertTrue(db.run("never-ran").isEmpty());
+            assertTrue(db.run(null).isEmpty());
+
             // empty/null inputs are no-ops, not rows
             db.recordSources("r1", List.of());
             db.recordSources(null, List.of(new com.gamma.consignment.ConsignmentSource("x", null, "cdr")));

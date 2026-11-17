@@ -148,7 +148,7 @@ tags: [api, routes, generated]
 | GET | `/connections/{connectionId}/sample` | Sample a file through a Connection | connections | — | `inspecto/src/main/java/com/gamma/control/ConnectionRoutes.java` |
 | POST | `/connections/{id}/test` | Test a Connection's reachability | Acquisition | `canOnboardConnections` | `inspecto/src/main/java/com/gamma/control/ConnectionRoutes.java` |
 | POST | `/connections/test` | Test an unsaved Connection profile | connections | `canOnboardConnections` | `inspecto/src/main/java/com/gamma/control/ConnectionRoutes.java` |
-| GET | `/consignments/{consignmentId}` | One Consignment across every lane | Execution & Scheduling | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/ConsignmentRoutes.java` |
+| GET | `/consignments/{consignmentId}` | One Consignment across every lane | Execution & Scheduling | — | `inspecto/src/main/java/com/gamma/control/ConsignmentRoutes.java` |
 | POST | `/dashboards/{dashboardId}/share` | Create a public share link for a Dashboard | dashboards | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ShareRoutes.java` |
 | GET | `/datasets/{datasetId}/arrivals` | Arrivals of an Add data Dataset | datasets | — | `inspecto/src/main/java/com/gamma/control/DatasetRoutes.java` |
 | PUT | `/datasets/{datasetId}/columns/{columnId}` | Change which Entity Type one Dataset column holds | datasets | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java` |

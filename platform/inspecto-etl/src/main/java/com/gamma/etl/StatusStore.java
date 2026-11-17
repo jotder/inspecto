@@ -54,4 +54,24 @@ public interface StatusStore {
     default List<Map<String, String>> unpack(PipelineConfig cfg) {
         return List.of();
     }
+
+    /**
+     * One Consignment's ledger row in {@code cfg}'s pipeline, or empty (X5 {@code GET /consignments/{id}}).
+     * {@code default} filters {@link #batches}; a database-backed store answers by a query instead of loading the
+     * pipeline's whole ledger.
+     */
+    default java.util.Optional<Map<String, String>> consignment(PipelineConfig cfg, String consignmentId) {
+        if (consignmentId == null) return java.util.Optional.empty();
+        return batches(cfg).stream().filter(r -> consignmentId.equals(r.get("consignment_id"))).findFirst();
+    }
+
+    /**
+     * At most {@code limit} of one Consignment's member-file rows, in ledger order — the rows {@link #files} holds
+     * for it. {@code default} filters {@link #files}; a database-backed store answers by a query.
+     */
+    default List<Map<String, String>> consignmentFiles(PipelineConfig cfg, String consignmentId, int limit) {
+        if (consignmentId == null) return List.of();
+        return files(cfg).stream().filter(r -> consignmentId.equals(r.get("consignment_id")))
+                .limit(Math.max(0, limit)).toList();
+    }
 }

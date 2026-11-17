@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Database-backed projection of {@link JobRun}s into a DuckDB table for job-execution reporting (T27,
@@ -150,21 +151,70 @@ public final class DbJobRunStore implements AutoCloseable, com.gamma.util.Browsa
 
     /** The reverse link: every run that read {@code consignmentId}, newest first — the same projection as {@link #recentRuns}. */
     public List<Map<String, Object>> runsDerivedFrom(String consignmentId) {
+        return runsDerivedFrom(consignmentId, Integer.MAX_VALUE);
+    }
+
+    /** As {@link #runsDerivedFrom(String)}, at most {@code limit} runs, cut in the database; best-effort like it.
+     *  {@link #countRunsDerivedFrom} gives the true total. */
+    public List<Map<String, Object>> runsDerivedFrom(String consignmentId, int limit) {
         if (consignmentId == null || consignmentId.isBlank()) return new ArrayList<>();
         String sql = "SELECT r.run_id AS \"runId\", r.job, r.type, r.\"trigger\", r.start_time AS \"startTime\","
                 + " r.end_time AS \"endTime\", r.status, r.duration_ms AS \"durationMs\", r.message"
                 + " FROM " + T_SOURCES + " s JOIN " + T_RUNS + " r ON r.run_id = s.run_id"
-                + " WHERE s.consignment_id = ? ORDER BY r.start_time DESC, r.run_id DESC";
+                + " WHERE s.consignment_id = ? ORDER BY r.start_time DESC, r.run_id DESC LIMIT ?";
         try {
             return src.with(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
                     ps.setString(1, consignmentId);
+                    ps.setInt(2, Math.max(0, limit));
                     return JdbcRows.query(ps);   // materialises before the borrow ends
                 }
             });
         } catch (SQLException e) {
             log.warn("runs-derived-from query failed for {}: {}", consignmentId, e.getMessage());
             return new ArrayList<>();
+        }
+    }
+
+    /** How many runs read {@code consignmentId} — the total beside a cut {@link #runsDerivedFrom(String, int)};
+     *  0 when the read fails (best-effort, like the list). */
+    public long countRunsDerivedFrom(String consignmentId) {
+        if (consignmentId == null || consignmentId.isBlank()) return 0;
+        String sql = "SELECT count(*) FROM " + T_SOURCES + " s JOIN " + T_RUNS + " r ON r.run_id = s.run_id"
+                + " WHERE s.consignment_id = ?";
+        try {
+            return src.with(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, consignmentId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        return rs.next() ? rs.getLong(1) : 0L;
+                    }
+                }
+            });
+        } catch (SQLException e) {
+            log.warn("runs-derived-from count failed for {}: {}", consignmentId, e.getMessage());
+            return 0;
+        }
+    }
+
+    /** One recorded run by id, durable across restarts — the {@link #recentRuns} projection; empty when unknown or
+     *  the read fails. */
+    public Optional<Map<String, Object>> run(String runId) {
+        if (runId == null || runId.isBlank()) return Optional.empty();
+        String sql = "SELECT run_id AS \"runId\", job, type, \"trigger\", start_time AS \"startTime\","
+                + " end_time AS \"endTime\", status, duration_ms AS \"durationMs\", message"
+                + " FROM " + T_RUNS + " WHERE run_id = ? ORDER BY start_time DESC LIMIT 1";
+        try {
+            List<Map<String, Object>> rows = src.with(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, runId);
+                    return JdbcRows.query(ps);
+                }
+            });
+            return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+        } catch (SQLException e) {
+            log.warn("job run query failed for {}: {}", runId, e.getMessage());
+            return Optional.empty();
         }
     }
 

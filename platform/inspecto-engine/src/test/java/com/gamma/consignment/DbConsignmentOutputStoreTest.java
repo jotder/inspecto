@@ -9,6 +9,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -927,11 +928,30 @@ class DbConsignmentOutputStoreTest {
                     withRun("only-c", "run-8", "/out/b.parquet", 3, State.LIVE)));
             db.recordSteps(List.of(step("ingest-c", "", "ingest-graph", 1, "parse", 10)));
 
-            assertEquals(List.of("job-c"), db.consignmentsOfRun("run-7"), "the receipts answer first");
-            assertEquals(List.of("only-c"), db.consignmentsOfRun("run-8"), "else the registry's run_id");
-            assertTrue(db.consignmentsOfRun("").isEmpty(), "an ingest lane's '' is not a run");
-            assertTrue(db.consignmentsOfRun(null).isEmpty());
-            assertTrue(db.consignmentsOfRun("run-unknown").isEmpty());
+            assertEquals(Map.of("run-7", "job-c", "run-8", "only-c"),
+                    db.consignmentsOfRuns(java.util.Arrays.asList("run-7", "run-8", "", null, "run-unknown")),
+                    "the receipts answer first, else the registry's run_id; '' and an unknown run join nothing");
+            assertEquals(List.of("run-8", "run-7"),
+                    List.copyOf(db.consignmentsOfRuns(List.of("run-8", "run-7")).keySet()), "in the asked order");
+            assertTrue(db.consignmentsOfRuns(List.of()).isEmpty());
+            assertTrue(db.consignmentsOfRuns(null).isEmpty());
+        }
+    }
+
+    /** X5 L4 bounds: the route's reads are cut in SQL, and the counts give the true totals. */
+    @Test
+    void boundedReadsCutInTheQueryAndCountTheRest() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.recordSteps(List.of(step("c1", "run-1", "job", 1, "a", 10), step("c1", "run-1", "job", 2, "b", 10),
+                    step("c1", "run-1", "job", 3, "c", 10)));
+            db.record(List.of(withRun("c1", "run-1", "/o/1", 1, State.LIVE), withRun("c1", "run-1", "/o/2", 1, State.LIVE)));
+
+            assertEquals(List.of("a", "b"), db.steps("c1", 2).stream().map(com.gamma.pipeline.exec.StepReceipt::step).toList());
+            assertEquals(3, db.stepCount("c1"));
+            assertEquals(3, db.steps("c1").size(), "the unbounded read is unchanged");
+            assertEquals(1, db.outputs("c1", 1).size());
+            assertEquals(2, db.outputCount("c1"));
+            assertEquals(0, db.stepCount("nope"));
         }
     }
 

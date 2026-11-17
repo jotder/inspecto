@@ -40,11 +40,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Real-HTTP tests for {@code GET /consignments/{consignmentId}} (X5 L4, plan
- * {@code docs/superpower/2026-11-17-x5-stepinfo-envelope-plan.md} §3.7): the {@code canOperateRuns} gate through the
- * real capability chain (401 without a credential, 403 for a Subject lacking it — without a Subject
- * {@code withCapability} is a no-op and would prove nothing), 404 for an id no store knows, receipts switched off
- * as an ABSENT {@code steps} with {@code known.steps=false}, the ingest → job hop both ways through the
- * {@code run_id} join, and masked text staying masked.
+ * {@code docs/superpower/2026-11-17-x5-stepinfo-envelope-plan.md} §3.7): an open read (an armed Subject with no
+ * run capability reads it), 404 for an id no store knows, receipts switched off as an ABSENT {@code steps} and
+ * {@code lanes} with {@code known.steps=false}, no Consignment registry at all, the ingest → job hop both ways
+ * through the {@code run_id} join, the run-store status fallback, the output cap with its true total, and masked
+ * text staying masked.
  *
  * <p>The stores are seeded directly: the receipt and source writers are pinned by {@code PipelineJobRunnerTest},
  * {@code DbConsignmentOutputStoreTest} and {@code DbJobRunStoreTest}; what is under test here is the route.
@@ -141,14 +141,15 @@ class ControlApiConsignmentTrailTest {
         return fail("run " + runId + " did not finish within 10s");
     }
 
+    /** An open read like its siblings {@code /runs/{name}/batches|files|outputs|errors}: a Subject with no run
+     *  capability reads it. */
     @Test
-    void theTrailIsGatedOnCanOperateRunsAndAnUnknownIdIs404(@TempDir Path dir) throws Exception {
+    void theTrailIsAnOpenReadAndAnUnknownIdIs404(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             c.store.record(List.of(output("c-known", "ing-1", "cdr", "cdr_etl")));
 
-            assertEquals(401, get(c.port, "/consignments/c-known", null).statusCode(), "no credential");
-            HttpResponse<String> denied = get(c.port, "/consignments/c-known", "plain");
-            assertEquals(403, denied.statusCode(), "a Subject without canOperateRuns: " + denied.body());
+            HttpResponse<String> plain = get(c.port, "/consignments/c-known", "plain");
+            assertEquals(200, plain.statusCode(), "a Subject without run capabilities reads it: " + plain.body());
 
             JsonNode body = trail(c.port, "c-known");
             assertEquals("c-known", body.get("consignmentId").asText());
@@ -175,6 +176,7 @@ class ControlApiConsignmentTrailTest {
             JsonNode off = trail(c.port, "c-off");
             assertFalse(off.has("steps"), "switched off: steps ABSENT, never []: " + off);
             assertFalse(off.has("stepsTotal"), off.toString());
+            assertFalse(off.has("lanes"), "lanes come from the receipts: absent too, never []: " + off);
             assertFalse(off.get("known").get("steps").asBoolean(), off.toString());
             assertTrue(off.get("known").get("outputs").asBoolean(), "the other stores still answer");
 
@@ -221,6 +223,58 @@ class ControlApiConsignmentTrailTest {
             assertEquals(2, job.get("steps").size());
             assertEquals("cdr_rollup", job.get("pipeline").asText());
             assertFalse(job.get("status").isNull(), "a job-lane Consignment's status is its run's: " + job);
+        }
+    }
+
+    /** Basic-like: no Consignment registry. A Consignment the run store knows reads 200 with every registry-backed key
+     *  absent and {@code known.outputs=false}; an unknown one is a 404, never a 500. */
+    @Test
+    void withNoConsignmentRegistryTheTrailSaysSoInsteadOfFailing(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            ConsignmentOutputStores.use(null);
+            String runId = finishedRun(c);
+            c.svc.jobService().orElseThrow().runStore().orElseThrow()
+                    .recordSources(runId, List.of(new ConsignmentSource("c-basic", "test_etl", "cdr")));
+
+            JsonNode body = trail(c.port, "c-basic");
+            assertFalse(body.get("known").get("outputs").asBoolean(), body.toString());
+            assertFalse(body.get("known").get("steps").asBoolean(), "no registry, no receipts: " + body);
+            for (String k : List.of("outputs", "outputsTotal", "steps", "lanes"))
+                assertFalse(body.has(k), k + " is absent, never []: " + body);
+            assertEquals(runId, body.get("downstream").get(0).get("runId").asText());
+            assertTrue(body.get("downstream").get(0).get("consignmentId").isNull(), "no registry: the hop cannot be named");
+
+            assertEquals(404, get(c.port, "/consignments/c-nowhere", "operator").statusCode());
+        }
+    }
+
+    /** After a restart the live-run registry is empty: a job-lane Consignment's status comes from the run store. */
+    @Test
+    void aJobConsignmentsStatusFallsBackToTheRunStore(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            c.svc.jobService().orElseThrow().runStore().orElseThrow().record(new com.gamma.job.JobRun("before-restart",
+                    "rollup", "PIPELINE", "schedule", "2026-11-17T09:00:00Z", "2026-11-17T09:00:05Z", "FAILED", 5000,
+                    "boom"));
+            c.store.recordSteps(List.of(receipt("c-old", "before-restart", 1, "src", null)));
+
+            JsonNode body = trail(c.port, "c-old");
+            assertEquals("FAILED", body.get("status").asText(), "the durable run row answers: " + body);
+        }
+    }
+
+    /** Collections are cut, and the total beside each is the true one. */
+    @Test
+    void outputsAreCutAndTheTotalIsTrue(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            List<ConsignmentOutput> many = new java.util.ArrayList<>();
+            for (int i = 0; i < ConsignmentRoutes.MAX_OUTPUTS + 5; i++)
+                many.add(new ConsignmentOutput("c-many", "run-many", "cdr", "p=" + i, null, "/out/many-" + i + ".parquet",
+                        1, 10, "2026-11-17T10:00:00Z", ConsignmentOutput.State.LIVE, null, null, "cdr_rollup"));
+            c.store.record(many);
+
+            JsonNode body = trail(c.port, "c-many");
+            assertEquals(ConsignmentRoutes.MAX_OUTPUTS, body.get("outputs").size());
+            assertEquals(ConsignmentRoutes.MAX_OUTPUTS + 5, body.get("outputsTotal").asInt());
         }
     }
 
