@@ -149,6 +149,8 @@ const SCENARIOS = {
           if ('exact' in st) return h.clickExact(st.exact, st.nth ?? 0);
           if ('label' in st) return h.clickLabel(st.label);
           if ('hoverLabel' in st) return h.hoverLabel(st.hoverLabel);
+          if ('hoverSel' in st) return h.hoverSel(st.hoverSel);
+          if ('log' in st) { console.log('LOG', JSON.stringify(await h.ev(st.log))); return; }   // print a page expression (to find selectors)
           if ('button' in st) return h.clickButton(st.button);
           if ('sel' in st) return h.clickSel(st.sel);
           if ('rightOf' in st) return h.clickRightOf(st.rightOf);
@@ -676,8 +678,9 @@ async function main() {
       await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 }); await sleep(90);
       await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 }); await sleep(500);
     },
-    async hoverLabel(label) { const p = await h.locate(`document.querySelector('[aria-label=${JSON.stringify(label)}]')`); await h.moveTo(p.x, p.y, 700); await sleep(900); },   // the tooltip shows
-    async clickLabel(label) { const p = await h.locate(`document.querySelector('[aria-label=${JSON.stringify(label)}]')`); await h.click(p.x, p.y); },
+    async hoverSel(sel) { const p = await h.locate(`document.querySelector(${JSON.stringify(sel)})`); await h.moveTo(p.x, p.y, 700); await sleep(900); },
+    async hoverLabel(label) { const p = await h.locate(`[...document.querySelectorAll('[aria-label=${JSON.stringify(label)}]')].find((e) => e.offsetParent && e.getBoundingClientRect().width > 0)`); await h.moveTo(p.x, p.y, 700); await sleep(900); },   // the tooltip shows
+    async clickLabel(label) { const p = await h.locate(`[...document.querySelectorAll('[aria-label=${JSON.stringify(label)}]')].find((e) => e.offsetParent && e.getBoundingClientRect().width > 0)`); await h.click(p.x, p.y); },
     // smallest visible element whose own text contains `text`
     // the nth visible element whose own text node contains `text` (text-node walk: finds the real label element)
     textEl: (text, nth = 0) => `(() => { const hits = []; const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) { if (!n.nodeValue.includes(${JSON.stringify(text)})) continue; const e = n.parentElement; const b = e.getBoundingClientRect(); const cs = getComputedStyle(e); if (b.width > 8 && b.height > 8 && b.right > 0 && b.left < innerWidth && b.bottom > 0 && b.top < innerHeight && cs.visibility !== 'hidden' && cs.display !== 'none') hits.push(e); } return hits[${nth}]; })()`,
