@@ -49,3 +49,7 @@ per-Feature explanation that can be recomputed; authored as an **Anomaly Model**
 - A preview for the isolation forest: none by design (W7); the preview box says so instead of scoring with the
   robust method.
 - The Link Analysis anomaly panel appearing only once a Risk Score model is named: LA's design call (BACKLOG §6).
+- Ratio Features (one Measure divided by another): not built. A Feature's `measure` is `count` or one `agg(field)`
+  (named in the design's lane S1 "not built" list and never picked up); deferred until a pack or customer needs one.
+- A cohort shift per `peers.by` column: not built. With several `by` columns the shift is computed for the combined
+  cohort only (design §16.2); deferred until a model needs it.
