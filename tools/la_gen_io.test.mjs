@@ -18,8 +18,14 @@ function py(body) {
   try {
     const code = ['import os, sys, time', 'from pathlib import Path', 'sys.path.insert(0, sys.argv[1])', 'import la_gen_io',
       'la_gen_io.PAUSE = 0.01', 'dir = Path(sys.argv[2])', body].join('\n');
-    const r = spawnSync(python, ['-c', code, TOOLS, dir], { encoding: 'utf8' });
-    assert.equal(r.status, 0, r.stderr);
+    // On Windows `python3` can be the Store app-execution alias, whose spawn is refused with EACCES now and then under
+    // load (seen in the pre-commit guard step, 2026-11-17); that refusal is transient, so try again before failing.
+    let r = spawnSync(python, ['-c', code, TOOLS, dir], { encoding: 'utf8' });
+    for (let i = 0; i < 5 && r.error && r.error.code === 'EACCES'; i++) {
+      spawnSync(process.execPath, ['-e', 'setTimeout(()=>{},200)']);
+      r = spawnSync(python, ['-c', code, TOOLS, dir], { encoding: 'utf8' });
+    }
+    assert.equal(r.status, 0, r.error ? String(r.error) : r.stderr);
     return r.stdout.trim().split(/\r?\n/);
   } finally {
     rmSync(dir, { recursive: true, force: true });

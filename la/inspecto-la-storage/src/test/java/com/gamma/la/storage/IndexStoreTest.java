@@ -49,6 +49,40 @@ class IndexStoreTest {
         assertTrue(new IndexStore(root, "ds", "abc").current().isEmpty());
     }
 
+    /**
+     * On Windows an open handle inside the stage makes renaming it to vNNNNNN fail with AccessDeniedException; a handle
+     * released a moment later must not fail the publish (an intermittent IndexBuildException in the full gate, 2026-11-17).
+     */
+    @Test
+    @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
+    void aHandleBrieflyOpenInsideTheStageDoesNotFailThePublish(@TempDir Path root) throws Exception {
+        IndexStore s = new IndexStore(root, "ds", "abc");
+        Path st = stageWithFile(s);
+        Path inside;
+        try (java.util.stream.Stream<Path> files = Files.list(st)) {
+            inside = files.findFirst().orElseThrow();
+        }
+        java.nio.channels.FileChannel held = java.nio.channels.FileChannel.open(inside, java.nio.file.StandardOpenOption.READ);
+        Thread release = new Thread(() -> {
+            try {
+                Thread.sleep(150);
+                held.close();
+            } catch (Exception ignored) {
+                // the test fails on the publish, not here
+            }
+        });
+        release.start();
+        Path v;
+        try {
+            v = s.publish(st);
+        } finally {
+            release.join();
+            held.close();
+        }
+        assertEquals("v000001", v.getFileName().toString());
+        assertEquals(v, s.current().orElseThrow());
+    }
+
     @Test
     void stagePublishResolvesCurrent(@TempDir Path root) throws Exception {
         IndexStore s = new IndexStore(root, "ds", "abc");

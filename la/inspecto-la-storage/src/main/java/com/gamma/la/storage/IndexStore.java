@@ -188,7 +188,7 @@ public final class IndexStore {
                     throw new IllegalStateException("refusing to publish v" + String.format("%06d", number)
                             + ": CURRENT is already at v" + String.format("%06d", live) + " (a later stage was published first)");
                 if (Files.exists(target)) throw new IllegalStateException("version already published: " + target.getFileName());
-                Files.move(s, target, StandardCopyOption.ATOMIC_MOVE);
+                moveRetrying(s, target);
                 Path ptr = dir.resolve(CURRENT + ".tmp-" + m.group(1));
                 try (FileChannel ch = FileChannel.open(ptr, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
                     ch.write(ByteBuffer.wrap((target.getFileName() + "\n").getBytes(StandardCharsets.UTF_8)));
@@ -215,9 +215,20 @@ public final class IndexStore {
      * milliseconds while a reader has CURRENT open; that is transient, so retry briefly before giving up.
      */
     private void moveCurrent(Path ptr) throws IOException {
+        moveRetrying(ptr, dir.resolve(CURRENT), StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    /**
+     * ATOMIC_MOVE that rides out the same transient Windows refusal: renaming the stage directory to {@code vNNNNNN} is
+     * refused with AccessDeniedException while any handle is open inside it - a file the build's own DuckDB is still
+     * releasing, an indexer, a virus scanner (seen intermittently in {@code ControlApiFullCycleIndexStatusTest}, 2026-11-17).
+     */
+    private static void moveRetrying(Path from, Path to, StandardCopyOption... extra) throws IOException {
+        StandardCopyOption[] opts = java.util.Arrays.copyOf(extra, extra.length + 1);
+        opts[extra.length] = StandardCopyOption.ATOMIC_MOVE;
         for (int attempt = 0; ; attempt++) {
             try {
-                Files.move(ptr, dir.resolve(CURRENT), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                Files.move(from, to, opts);
                 return;
             } catch (AccessDeniedException e) {
                 if (attempt >= 200) throw e;
