@@ -168,12 +168,9 @@ Reading that list as one vocabulary is what made the type system contradict the 
 values, which is why it needed the 4.0.0 MAJOR. The rest of X5 (Step Receipts, the cross-lane drill-down) is
 tracked on [`BACKLOG.md`](../../../../BACKLOG.md) §2 *X5*.
 
-**The canonical spelling, before the values change (X5 L1, 2026-11-17).** `PipelineRel.canonical(rel)` maps each
-legacy reject spelling to its token-model form (`dropped` → `reject:dropped`, likewise `invalid`, `duplicate`,
-`unmatched`) and returns every other value unchanged, matching the old spellings as literals so the answer is the
-same whichever value the constants hold. Every **Step Receipt** (GLOSSARY) names its outlets through it, so a
-receipt says `reject:dropped` whether the Step emitted `dropped` (today's built-ins) or `reject:dropped` (a
-contributed Step, or the built-ins once step 3 lands). The receipt is the durable record of one hop of the token:
+**Step Receipts name outlets canonically (X5 L1, 2026-11-17).** Every **Step Receipt** (GLOSSARY) names its
+outlets through `PipelineRel.canonical(rel)`, so a receipt says `reject:dropped` even for a relation still spelled
+`dropped` (a stored graph or a contributed Step written before 4.0.0). The receipt is the durable record of one hop of the token:
 rows in, rows per outlet, where the data rests, a schema fingerprint and bounded diagnostics, at most 1024 bytes
 (`StepReceipt`; lanes in [spec-execution-lanes.md](spec-execution-lanes.md)). The main outlet stays spelled `data`
 (X5 D4 = b).

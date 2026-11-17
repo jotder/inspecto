@@ -276,10 +276,17 @@ returns), its receipts are not. Lane `job`, `runId` = the job run, `seq` = the n
   on-disk sink an `outputs` pointer (the store, and how many files this run wrote to it). A dry run's receipts are
   `simulated` and point at nothing.
 - **Failure:** the Step that threw is `FAILED` with a code (`STEP_FAILED` / `STEP_TIMEOUT` / `STEP_DISABLED` from a
-  contributed Step's `StepFailure`, else `SQL_ERROR` / `IO_ERROR` from the cause, else `STEP_FAILED`) and the
-  message; every Step the walk would still have run is `NOT_REACHED`. A sink is timed and judged at its branch
-  commit, not when the walk passes it; a branch a replay finds already durable is `OK`. The run still fails exactly
-  as before.
+  contributed Step's `StepFailure`, else `SQL_ERROR` / `IO_ERROR` from the cause, else `STEP_FAILED`; the cause chain
+  is walked by identity, at most 32 deep, so a cyclic chain cannot hang the walk) and the message; every Step the
+  walk would still have run is `NOT_REACHED`. A throw while a node is being worked on before it starts (a seed's or
+  a sink's row count) is that node's failure. A sink is timed and judged at its branch commit, and is `OK` only once
+  the coordinator has recorded its branch durable: a failed write or a failed branch record is the sink's `FAILED`.
+  A branch a replay finds already durable is `OK`. A throw between Steps (the "no sink branches" refusal, the source
+  finalisation) is no Step's: every receipt stays as it was and the run's own record carries the failure. A code a
+  contributed Step invents is mapped onto the closed set (`STEP_FAILED`, the raw code at the head of the message).
+  The run still fails exactly as before.
+- **Without a receipt observer** (`WalkObserver.NONE`, a plain `ProvenanceCollector`: the graph-fork ingest lane, every
+  pre-X5 caller) the walk's Step bookkeeping is inert — no schema probe, no diagnosis, nothing on failure.
 - **Conservation:** after a completed walk, each `ConservationCheck` imbalance is written onto that Step's `diag`
   (`CONSERVATION_LOSS` / `CONSERVATION_AMPLIFICATION`, with `in` / `out` counts) whether or not the provenance store
   is on; the `PIPELINE_CONSERVATION_IMBALANCE` event is still raised only with the provenance store, as before.

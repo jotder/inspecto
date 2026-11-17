@@ -273,19 +273,21 @@ public final class PipelineExecutor {
         Map<String, Map<String, String>> produced = new LinkedHashMap<>();
         seeds.forEach((nodeId, table) -> produced.put(nodeId, new LinkedHashMap<>(Map.of(PipelineRel.DATA, table))));
         Map<String, String> sinkInputs = new LinkedHashMap<>();
-        // Each seed's data relation is the pipeline's recordsIn at that source/parse node.
-        for (Map.Entry<String, String> seed : seeds.entrySet())
-            obs.counts(seed.getKey(), PipelineRel.DATA, count(conn, seed.getValue()));
-
         List<String> order = topoOrder(g);
         Trail trail = new Trail(obs, conn, order, byId, seeds.keySet());
         int step = 0;
         try {
+        // Each seed's data relation is the pipeline's recordsIn at that source/parse node.
+        for (Map.Entry<String, String> seed : seeds.entrySet()) {
+            trail.current = seed.getKey();                 // a failed count is that seed's failure
+            obs.counts(seed.getKey(), PipelineRel.DATA, count(conn, seed.getValue()));
+        }
         for (String nodeId : order) {
             // Live step gauge (G6/S7): where this Consignment is in the walk — in-memory only,
             // poll-read via the control plane; never a Signal, never persisted (see StepProgress).
             StepProgress.track(g.name(), batchId, nodeId, ++step, order.size());
             trail.visited = step;
+            trail.current = nodeId;
             if (seeds.containsKey(nodeId)) {               // pre-seeded source/parse relation
                 trail.start(nodeId);
                 trail.schema(nodeId, seeds.get(nodeId));
@@ -336,18 +338,29 @@ public final class PipelineExecutor {
             }
             // control terminals (gap/alert/event) consume but produce no data relation — nothing to route on
         }
+        trail.current = null;                              // past the walk: no node is running
 
         if (sinkInputs.isEmpty())
             throw new IllegalStateException("pipeline '" + g.name() + "' produced no sink branches downstream of " + seeds.keySet());
 
+        // A sink is OK only once its branch is durable: the coordinator records the branch AFTER the write returns,
+        // so the sink stays open until the coordinator moves to the next branch (or to the source finalisation, or
+        // returns). A failed write or a failed branch record is therefore that sink's failure.
         BranchCommitCoordinator.Result commit = coordinator.commit(batchId, new LinkedHashSet<>(sinkInputs.keySet()),
                 branch -> {
+                    trail.closeOpenSink();
+                    trail.current = branch;
                     trail.start(branch);
                     trail.schema(branch, sinkInputs.get(branch));
                     sinkWriter.write(byId.get(branch), sinkInputs.get(branch));
-                    trail.end(branch, StepReceipt.Outcome.OK, null);
+                    trail.openSink = branch;
                 },
-                sourceFinalize);
+                () -> {
+                    trail.closeOpenSink();
+                    trail.current = null;
+                    sourceFinalize.finalizeSource();       // a failure here is no Step's: every Step stays OK
+                });
+        trail.closeOpenSink();
         // A replay finds a branch already durable and does not call it: the sink's work is done, so it is OK.
         for (String sink : sinkInputs.keySet())
             if (!trail.ended(sink)) {
@@ -371,8 +384,11 @@ public final class PipelineExecutor {
 
     /**
      * The walk's side of the {@link WalkObserver} contract: sequence numbers, the started/ended bookkeeping that
-     * makes every started Step end exactly once, the failure sweep, and the schema probe — which is skipped for an
-     * observer that cannot use it, and which never fails the walk (observability must not break a run).
+     * makes every started Step end exactly once, the failure sweep, and the schema probe. ⚠ <b>Inert for an observer
+     * that cannot use it</b> — {@link WalkObserver#NONE} and a plain {@link ProvenanceCollector} — so every caller
+     * of the pre-X5 overloads runs exactly the walk it always ran: no bookkeeping, no probe, no diagnosis. Never
+     * fails the walk (observability must not break a run): an observer that throws is not this class's to absorb,
+     * but nothing here throws or loops on its own.
      */
     private static final class Trail {
         private final WalkObserver obs;
@@ -380,12 +396,17 @@ public final class PipelineExecutor {
         private final List<String> order;
         private final Map<String, PipelineNode> byId;
         private final Set<String> seeds;
-        private final boolean probe;
+        /** Whether anyone listens for Steps (not {@code NONE}, not a counts-only provenance adapter). */
+        private final boolean active;
         private final Map<String, Integer> seq = new LinkedHashMap<>();
         private final Set<String> started = new LinkedHashSet<>();
         private final Set<String> ended = new LinkedHashSet<>();
         /** How far the walk got: the 1-based index of the last node it visited. */
         int visited;
+        /** The node the walk is working on, or {@code null} between nodes — a throw now is that node's failure. */
+        String current;
+        /** A sink whose write returned but whose branch the coordinator has not yet recorded durable. */
+        String openSink;
 
         Trail(WalkObserver obs, Connection conn, List<String> order, Map<String, PipelineNode> byId, Set<String> seeds) {
             this.obs = obs;
@@ -393,24 +414,30 @@ public final class PipelineExecutor {
             this.order = order;
             this.byId = byId;
             this.seeds = seeds;
-            this.probe = obs != WalkObserver.NONE && !(obs instanceof CountsOnly);
-            for (int i = 0; i < order.size(); i++) seq.put(order.get(i), i + 1);
+            this.active = obs != WalkObserver.NONE && !(obs instanceof CountsOnly);
+            if (active) for (int i = 0; i < order.size(); i++) seq.put(order.get(i), i + 1);
         }
 
         void start(String nodeId) {
-            if (started.add(nodeId)) obs.stepStarted(nodeId, byId.get(nodeId).type(), seq.get(nodeId));
+            if (active && started.add(nodeId)) obs.stepStarted(nodeId, byId.get(nodeId).type(), seq.get(nodeId));
         }
 
         void end(String nodeId, StepReceipt.Outcome outcome, StepReceipt.Diagnostics diag) {
-            if (ended.add(nodeId)) obs.stepEnded(nodeId, outcome, diag);
+            if (active && ended.add(nodeId)) obs.stepEnded(nodeId, outcome, diag);
         }
 
         boolean ended(String nodeId) {
-            return ended.contains(nodeId);
+            return !active || ended.contains(nodeId);
+        }
+
+        /** The coordinator moved on from the open sink, so its branch is durable: the sink is OK. */
+        void closeOpenSink() {
+            if (openSink != null) end(openSink, StepReceipt.Outcome.OK, null);
+            openSink = null;
         }
 
         void schema(String nodeId, String table) {
-            if (!probe || table == null) return;
+            if (!active || table == null) return;
             try (Statement st = conn.createStatement();
                  ResultSet rs = st.executeQuery("SELECT * FROM " + SqlIdent.q(table) + " LIMIT 0")) {
                 java.sql.ResultSetMetaData md = rs.getMetaData();
@@ -424,13 +451,18 @@ public final class PipelineExecutor {
         }
 
         /**
-         * The walk threw: the Step that was running ends FAILED with {@code t}'s diagnosis; every Step the walk
-         * would still have run — an enabled, executable node past the point it reached, or a sink whose branch was
-         * not committed — ends NOT_REACHED.
+         * The walk threw: the Step that was running — started, or the node being worked on before it started (a
+         * seed's or a sink's count) — ends FAILED with {@code t}'s diagnosis; every Step the walk would still have
+         * run — an enabled, executable node past the point it reached, or a sink whose branch was not committed —
+         * ends NOT_REACHED. A throw between nodes (the source finalisation, the "no sink branches" refusal) is no
+         * Step's: nothing is marked FAILED, and the run's own record carries the failure.
          */
         void fail(Throwable t, Set<String> sinks) {
-            for (String nodeId : started)
-                if (!ended.contains(nodeId)) end(nodeId, StepReceipt.Outcome.FAILED, StepReceipt.Diagnostics.of(t));
+            if (!active) return;
+            StepReceipt.Diagnostics diag = StepReceipt.Diagnostics.of(t);
+            if (current != null && !ended.contains(current) && executable(byId.get(current))) start(current);
+            for (String nodeId : List.copyOf(started))
+                if (!ended.contains(nodeId)) end(nodeId, StepReceipt.Outcome.FAILED, diag);
             for (int i = visited; i < order.size(); i++) {
                 String nodeId = order.get(i);
                 if (!started.contains(nodeId) && executable(byId.get(nodeId))) notReached(nodeId);
@@ -444,7 +476,7 @@ public final class PipelineExecutor {
         }
 
         private boolean executable(PipelineNode n) {
-            if (!n.enabled()) return false;
+            if (n == null || !n.enabled()) return false;
             String t = n.type();
             return seeds.contains(n.id()) || PipelineNodeTypes.isCategory(t, NodeCategory.SINK)
                     || BuiltinNodeType.TRANSFORM_MERGE.type().equals(t) || isShapeable(t);

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-414 test class(es): 414 unit, 0 real-HTTP control-plane, 0 IT.
+416 test class(es): 416 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -374,6 +374,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `PartitionSinkWriterBoundsTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/PartitionSinkWriterBoundsTest.java` | Event-time bounds and {@code producer} on the <b>Pipeline-sink</b> write path (consignment addressing §3.1, |
 | `PipelineDryRunTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/PipelineDryRunTest.java` | {@link PipelineDryRun} (T18): a bounded sample through a pipeline's transform→sink subgraph, scratch-only. |
 | `PipelineExecutorDedupWindowTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/PipelineExecutorDedupWindowTest.java` | D-9 — windowed record dedup through the {@link RowShaper.ExecutionContext} seam, end-to-end over |
+| `PipelineExecutorReceiptTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/PipelineExecutorReceiptTest.java` | X5 — what the walk tells a {@link PipelineExecutor.WalkObserver} when it fails, at the grain the job lane's |
 | `PipelineExecutorTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/PipelineExecutorTest.java` | T12 — {@link PipelineExecutor} end-to-end over embedded DuckDB: a {@code parse → filter → route → 2 sinks} |
 | `PipelineNodeExecutorTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/PipelineNodeExecutorTest.java` | The node-type plugin seam's EXECUTION half: a contributed type must actually run. |
 | `PipelineWatermarkStoreTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/PipelineWatermarkStoreTest.java` | WATERMARK-ATOMIC-1 (2026-09-17): the watermark was the ONE store still written in place, so a crash mid-write |

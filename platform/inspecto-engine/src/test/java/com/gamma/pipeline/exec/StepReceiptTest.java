@@ -101,4 +101,105 @@ class StepReceiptTest {
         assertEquals("route:emea", PipelineRel.canonical("route:emea"));
         assertNull(PipelineRel.canonical(null));
     }
+
+    // ── the bound holds for ANY input (X5 L1 review) ─────────────────────────
+
+    /** Adversarial text: control characters (6-byte escapes), 4-byte UTF-8, lone surrogates, quotes, backslashes. */
+    private static String nasty(java.util.Random rnd, int maxLen) {
+        int len = rnd.nextInt(maxLen + 1);
+        StringBuilder sb = new StringBuilder(len);
+        while (sb.length() < len) {
+            switch (rnd.nextInt(7)) {
+                case 0 -> sb.append((char) rnd.nextInt(0x20));              // control: a 6-byte JSON escape
+                case 1 -> sb.appendCodePoint(0x1F600 + rnd.nextInt(64));   // 4-byte UTF-8
+                case 2 -> sb.append((char) (0xD800 + rnd.nextInt(0x800)));  // lone surrogate: escaped
+                case 3 -> sb.append(rnd.nextBoolean() ? '"' : '\\');
+                case 4 -> sb.append('€');                             // 3-byte UTF-8
+                default -> sb.append((char) ('a' + rnd.nextInt(26)));
+            }
+        }
+        return sb.toString();
+    }
+
+    private static String maybeNull(java.util.Random rnd, String s) {
+        return rnd.nextInt(10) == 0 ? null : s;
+    }
+
+    @Test
+    void randomAdversarialTextInEveryFieldNeverBreaksTheBound() {
+        java.util.Random rnd = new java.util.Random(20261117L);
+        StepReceipt.Outcome[] outcomes = StepReceipt.Outcome.values();
+        for (int i = 0; i < 1000; i++) {
+            int big = rnd.nextBoolean() ? 2000 : 200;
+            List<StepReceipt.Outlet> outlets = new ArrayList<>();
+            for (int o = rnd.nextInt(40); o > 0; o--) outlets.add(new StepReceipt.Outlet(nasty(rnd, big), rnd.nextLong()));
+            Map<String, Long> counts = new LinkedHashMap<>();
+            for (int c = rnd.nextInt(20); c > 0; c--) counts.put(nasty(rnd, big), rnd.nextLong());
+            StepReceipt r = new StepReceipt(rnd.nextInt(), maybeNull(rnd, nasty(rnd, big)), maybeNull(rnd, nasty(rnd, big)),
+                    maybeNull(rnd, nasty(rnd, big)), maybeNull(rnd, nasty(rnd, big)), rnd.nextInt(),
+                    maybeNull(rnd, nasty(rnd, big)), maybeNull(rnd, nasty(rnd, big)),
+                    outcomes[rnd.nextInt(outcomes.length)], rnd.nextLong(), outlets,
+                    rnd.nextBoolean() ? null : new StepReceipt.Pointer(nasty(rnd, big), maybeNull(rnd, nasty(rnd, big)),
+                            maybeNull(rnd, nasty(rnd, big)), rnd.nextLong()),
+                    rnd.nextBoolean() ? null : new StepReceipt.Schema(rnd.nextInt(), maybeNull(rnd, nasty(rnd, big))),
+                    rnd.nextBoolean() ? null : new StepReceipt.Diagnostics(maybeNull(rnd, nasty(rnd, big)),
+                            maybeNull(rnd, nasty(rnd, big)), counts),
+                    maybeNull(rnd, nasty(rnd, big)), rnd.nextLong(), rnd.nextBoolean(), false);
+            assertTrue(bytes(r) <= 1024, "case " + i + ": " + bytes(r) + " bytes");
+            StepReceipt back = StepReceipt.fromJson(r.toJson());
+            assertTrue(bytes(back) <= 1024, "case " + i + " read back: " + bytes(back) + " bytes");
+        }
+    }
+
+    @Test
+    void longFieldsAtTheirCapsInEveryFieldStillFitByTheLastFallback() {
+        String ctl = "\u0001".repeat(4000);
+        StepReceipt r = new StepReceipt(StepReceipt.VERSION, ctl, ctl, ctl, ctl, 1, ctl, ctl, StepReceipt.Outcome.FAILED,
+                Long.MIN_VALUE, List.of(new StepReceipt.Outlet(ctl, Long.MIN_VALUE)),
+                new StepReceipt.Pointer(ctl, ctl, ctl, Long.MIN_VALUE), new StepReceipt.Schema(Integer.MIN_VALUE, ctl),
+                new StepReceipt.Diagnostics(ctl, ctl, Map.of(ctl, 1L)), ctl, Long.MIN_VALUE, true, false);
+        assertTrue(bytes(r) <= 1024, bytes(r) + " bytes");
+        assertTrue(r.truncated());
+    }
+
+    /** The reviewer's repro: a contributed Step's StepFailure code of 200 control characters. */
+    @Test
+    void anUnknownCodeIsMappedOntoTheClosedSetAndKeptInTheMessage() {
+        StepReceipt r = receipt("flt", List.of(), null,
+                new StepReceipt.Diagnostics("\u0002".repeat(200), "boom", Map.of()));
+        assertTrue(bytes(r) <= 1024, bytes(r) + " bytes");
+        assertEquals(StepReceipt.STEP_FAILED, r.diag().code(), "a code outside the closed set reads STEP_FAILED");
+        assertTrue(r.truncated());
+
+        StepReceipt named = receipt("flt", List.of(), null, new StepReceipt.Diagnostics("ACME_SCORE_DOWN", "boom", Map.of()));
+        assertEquals(StepReceipt.STEP_FAILED, named.diag().code());
+        assertEquals("[ACME_SCORE_DOWN] boom", named.diag().msg(), "the raw code survives in the message");
+
+        StepReceipt known = receipt("flt", List.of(), null, new StepReceipt.Diagnostics(StepReceipt.SQL_ERROR, "x", Map.of()));
+        assertEquals(StepReceipt.SQL_ERROR, known.diag().code());
+        assertFalse(known.truncated(), "a closed-set code is untouched");
+    }
+
+    @Test
+    void aLongFingerprintIsCutAndSaysSo() {
+        StepReceipt r = new StepReceipt(StepReceipt.VERSION, "c", "p", StepReceipt.LANE_JOB, "", 1, "s", "k",
+                StepReceipt.Outcome.OK, 1, List.of(), null, new StepReceipt.Schema(3, "f".repeat(100)), null, null, 0,
+                false, false);
+        assertTrue(r.schema().fp().length() <= 16, r.schema().fp());
+        assertTrue(r.truncated(), "a cut fingerprint sets truncated");
+    }
+
+    /** A cause chain A → B → A: the diagnosis terminates (it runs inside the walk's failure handler). */
+    @Test
+    @org.junit.jupiter.api.Timeout(value = 5, unit = java.util.concurrent.TimeUnit.SECONDS,
+            threadMode = org.junit.jupiter.api.Timeout.ThreadMode.SEPARATE_THREAD)
+    void aCyclicCauseChainIsDiagnosedWithoutLooping() {
+        RuntimeException a = new IllegalStateException("a");
+        RuntimeException b = new RuntimeException("b");
+        a.initCause(b);
+        b.initCause(a);
+        assertEquals(StepReceipt.STEP_FAILED, StepReceipt.Diagnostics.of(a).code());
+        RuntimeException c = new RuntimeException("c", new java.io.UncheckedIOException(new java.io.IOException("io")));
+        assertEquals(StepReceipt.IO_ERROR, StepReceipt.Diagnostics.of(c).code());
+    }
 }

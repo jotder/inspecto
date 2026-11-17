@@ -145,11 +145,7 @@ public record StepReceipt(int v, String consignmentId, String pipeline, String l
     }
 
     /** The main relation's column count and a 12-hex {@code CanonicalHash} of its {@code (name, type)} list. */
-    public record Schema(int columns, String fp) {
-        public Schema {
-            if (fp != null && fp.length() > 64) fp = fp.substring(0, 64);
-        }
-    }
+    public record Schema(int columns, String fp) {}
 
     /**
      * Bounded diagnostics.
@@ -172,26 +168,32 @@ public record StepReceipt(int v, String consignmentId, String pipeline, String l
          * message is the thrown one (bounded when the receipt is built).
          */
         public static Diagnostics of(Throwable t) {
+            // The chain is walked once, by identity and at most MAX_CAUSES deep: a cause chain can be cyclic
+            // (A -> B -> A), and this runs inside the walk's failure handler, where a loop is a hung run.
+            List<Throwable> chain = new ArrayList<>();
+            java.util.Set<Throwable> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+            for (Throwable c = t; c != null && chain.size() < MAX_CAUSES && seen.add(c); c = c.getCause()) chain.add(c);
             String code = null;
-            for (Throwable c = t; c != null && code == null; c = c.getCause() == c ? null : c.getCause()) {
-                if (c instanceof StepFailure sf) code = sf.code();
-            }
-            if (code == null) {
-                for (Throwable c = t; c != null && code == null; c = c.getCause() == c ? null : c.getCause()) {
-                    if (c instanceof SQLException) code = SQL_ERROR;
-                    else if (c instanceof IOException || c instanceof UncheckedIOException) code = IO_ERROR;
-                }
+            for (Throwable c : chain) if (code == null && c instanceof StepFailure sf) code = sf.code();
+            for (Throwable c : chain) {
+                if (code != null) break;
+                if (c instanceof SQLException) code = SQL_ERROR;
+                else if (c instanceof IOException || c instanceof UncheckedIOException) code = IO_ERROR;
             }
             String msg = t == null ? null : (t.getMessage() != null ? t.getMessage() : t.getClass().getName());
             return new Diagnostics(code == null ? STEP_FAILED : code, msg, Map.of());
         }
+
+        /** How deep {@link #of} follows a cause chain. */
+        static final int MAX_CAUSES = 32;
     }
 
     public StepReceipt {
         Objects.requireNonNull(outcome, "outcome");
         Fit f = new Fit(consignmentId, pipeline, lane, runId == null ? "" : runId, step, kind,
-                outlets == null ? List.of() : outlets, ref, diag == null ? Diagnostics.NONE : diag, startedAt);
-        f.fit(v, seq, outcome, in, schema, ms, simulated);
+                outlets == null ? List.of() : outlets, ref, diag == null ? Diagnostics.NONE : diag, startedAt, schema);
+        f.fit(v, seq, outcome, in, ms, simulated);
+        schema = f.schema;
         consignmentId = f.consignmentId;
         pipeline = f.pipeline;
         lane = f.lane;
@@ -251,16 +253,30 @@ public record StepReceipt(int v, String consignmentId, String pipeline, String l
 
     // ── the size bound ──────────────────────────────────────────────────────────────────────────────
 
-    /** The mutable working copy the canonical constructor cuts down until it fits. */
+    /** The diagnostic codes a receipt may carry (plan §3.2's closed set); anything else is mapped onto it. */
+    private static final java.util.Set<String> CODES = java.util.Set.of(STEP_FAILED, STEP_TIMEOUT, STEP_DISABLED,
+            SQL_ERROR, IO_ERROR, CONSERVATION_LOSS, CONSERVATION_AMPLIFICATION, LANE_FLAT);
+    /** Tight bounds on the fields that are short by nature. */
+    private static final int MAX_LANE = 16, MAX_KIND = 64, MAX_FP = 16, MAX_STARTED_AT = 40, MAX_REF_KIND = 16;
+    /** The last fallback's bound on every remaining text field, in chars. */
+    private static final int MIN_TEXT = 8;
+
+    /**
+     * The mutable working copy the canonical constructor cuts down until it fits. Three passes: the table's
+     * per-field bounds (always); the plan's cut order while it is still too big; and a last fallback that keeps
+     * only identity and counts, each text field at most {@link #MIN_TEXT} chars — whose worst case (every char a
+     * 6-byte JSON escape) is about 600 bytes, so the bound holds for ANY input.
+     */
     private static final class Fit {
         String consignmentId, pipeline, lane, runId, step, kind, startedAt;
         List<Outlet> outlets;
         Pointer ref;
         Diagnostics diag;
+        Schema schema;
         boolean cut;
 
         Fit(String consignmentId, String pipeline, String lane, String runId, String step, String kind,
-            List<Outlet> outlets, Pointer ref, Diagnostics diag, String startedAt) {
+            List<Outlet> outlets, Pointer ref, Diagnostics diag, String startedAt, Schema schema) {
             this.consignmentId = consignmentId;
             this.pipeline = pipeline;
             this.lane = lane;
@@ -271,17 +287,18 @@ public record StepReceipt(int v, String consignmentId, String pipeline, String l
             this.ref = ref;
             this.diag = diag;
             this.startedAt = startedAt;
+            this.schema = schema;
         }
 
-        void fit(int v, int seq, Outcome outcome, long in, Schema schema, long ms, boolean simulated) {
+        void fit(int v, int seq, Outcome outcome, long in, long ms, boolean simulated) {
             // 1. The table's bounds, always.
             consignmentId = head(consignmentId, MAX_ID);
             pipeline = head(pipeline, MAX_ID);
-            lane = head(lane, MAX_ID);
+            lane = head(lane, MAX_LANE);
             runId = head(runId, MAX_ID);
             step = head(step, MAX_ID);
-            kind = head(kind, MAX_ID);
-            startedAt = head(startedAt, 40);
+            kind = head(kind, MAX_KIND);
+            startedAt = head(startedAt, MAX_STARTED_AT);
             List<Outlet> named = new ArrayList<>(outlets.size());
             for (Outlet o : outlets) {
                 String name = head(o.outlet(), MAX_ID);
@@ -289,25 +306,17 @@ public record StepReceipt(int v, String consignmentId, String pipeline, String l
             }
             outlets = named;
             if (outlets.size() > MAX_OUTLETS) fold(MAX_OUTLETS);
-            boolean before = cut;
-            cut = false;
-            String code = head(diag.code(), MAX_ID);
-            String msg = head(diag.msg(), MAX_MSG);
-            Map<String, Long> counts = new LinkedHashMap<>();
-            for (Map.Entry<String, Long> e : diag.counts().entrySet()) {
-                if (counts.size() == MAX_COUNTS) { cut = true; break; }
-                counts.put(head(e.getKey(), MAX_ID), e.getValue());
-            }
-            if (cut) diag = new Diagnostics(code, msg, counts);
-            cut |= before;
+            if (schema != null && schema.fp() != null && schema.fp().length() > MAX_FP)
+                schema = new Schema(schema.columns(), head(schema.fp(), MAX_FP));
+            diag = boundedDiag(diag);
             if (ref != null) {
-                Pointer p = new Pointer(head(ref.kind(), 16), head(ref.table(), MAX_ID), tail(ref.path(), MAX_ID),
-                        ref.files());
+                Pointer p = new Pointer(head(ref.kind(), MAX_REF_KIND), head(ref.table(), MAX_ID),
+                        tail(ref.path(), MAX_ID), ref.files());
                 if (!p.equals(ref)) ref = p;
             }
 
             // 2. Still too big: cut further, in the plan's order, until it fits.
-            while (bytes(v, seq, outcome, in, schema, ms, simulated) > MAX_BYTES) {
+            while (bytes(v, seq, outcome, in, ms, simulated) > MAX_BYTES) {
                 cut = true;
                 if (diag.msg() != null) {
                     String m = diag.msg();
@@ -322,9 +331,53 @@ public record StepReceipt(int v, String consignmentId, String pipeline, String l
                     Outlet o = outlets.get(0);
                     outlets = new ArrayList<>(List.of(new Outlet(head(o.outlet(), o.outlet().length() / 2), o.rows())));
                 } else if (!shortenLongestIdentity()) {
-                    break;   // nothing left to cut: unreachable with the bounds above
+                    break;
                 }
             }
+
+            // 3. The last fallback, a guaranteed-small receipt: identity and counts only.
+            if (bytes(v, seq, outcome, in, ms, simulated) > MAX_BYTES) {
+                cut = true;
+                consignmentId = head(consignmentId, MIN_TEXT);
+                pipeline = head(pipeline, MIN_TEXT);
+                lane = head(lane, MIN_TEXT);
+                runId = head(runId, MIN_TEXT);
+                step = head(step, MIN_TEXT);
+                kind = head(kind, MIN_TEXT);
+                startedAt = null;
+                schema = null;
+                ref = null;
+                diag = new Diagnostics(diag.code(), null, Map.of());
+                if (!outlets.isEmpty())
+                    outlets = new ArrayList<>(List.of(new Outlet(head(outlets.get(0).outlet(), MIN_TEXT),
+                            outlets.stream().mapToLong(Outlet::rows).sum())));
+            }
+        }
+
+        /**
+         * {@code d} within the table's bounds: the code on the closed set (an unknown one becomes
+         * {@link #STEP_FAILED}, its raw value kept at the head of the message), the message at most
+         * {@link #MAX_MSG} chars, at most {@link #MAX_COUNTS} counts with names at most {@link #MAX_ID} chars.
+         */
+        private Diagnostics boundedDiag(Diagnostics d) {
+            String code = d.code();
+            String msg = d.msg();
+            boolean changed = false;
+            if (code != null && !CODES.contains(code)) {
+                msg = "[" + head(code, 32) + "] " + (msg == null ? "" : msg);
+                code = STEP_FAILED;
+                changed = cut = true;
+            }
+            String m = head(msg, MAX_MSG);
+            changed |= !Objects.equals(m, msg);
+            Map<String, Long> counts = new LinkedHashMap<>();
+            for (Map.Entry<String, Long> e : d.counts().entrySet()) {
+                if (counts.size() == MAX_COUNTS) { cut = changed = true; break; }
+                String name = head(e.getKey(), MAX_ID);
+                changed |= !name.equals(e.getKey());
+                counts.put(name, e.getValue());
+            }
+            return changed ? new Diagnostics(code, m, counts) : d;
         }
 
         /** Fold every outlet beyond {@code keep - 1} into one {@link #FOLDED_OUTLET} carrying their sum; the
@@ -359,7 +412,7 @@ public record StepReceipt(int v, String consignmentId, String pipeline, String l
             return true;
         }
 
-        private int bytes(int v, int seq, Outcome outcome, long in, Schema schema, long ms, boolean simulated) {
+        private int bytes(int v, int seq, Outcome outcome, long in, long ms, boolean simulated) {
             return json(v, consignmentId, pipeline, lane, runId, seq, step, kind, outcome, in, outlets, ref, schema,
                     diag, startedAt, ms, simulated, false).getBytes(StandardCharsets.UTF_8).length;   // "false" is the longer
         }
