@@ -1,0 +1,14 @@
+{"scenario":"episode","edition":"Basic","base":"http://127.0.0.1:8099","steps":[
+{"scene":"S01","card":{"lines":["Inspecto LA training","E1  Saving, opening and exporting"],"secs":6},"steps":[{"space":"la-utilities"},{"open":"/link-analysis?view=x","settle":4500},{"wait":2500}]},
+{"scene":"S02","steps":[{"wait":2000},{"label":"File"},{"wait":9000},{"move":[330,350],"ms":900},{"wait":4000},{"move":[330,440],"ms":900},{"wait":6000}]},
+{"scene":"S03","steps":[{"exact":"Open…"},{"wait":3000},{"waitText":"Search name or id"},{"at":[467,376]},{"wait":500},{"type":"meter"},{"wait":3000},{"click":"Meter tampering contractor"},{"wait":1500},{"click":"Meter tampering contractor"},{"wait":6000},{"button":"Open"},{"wait":9000}]},
+{"scene":"S04","steps":[{"label":"Search nodes"},{"wait":800},{"type":"C-14"},{"wait":5000},{"wait":8000}]},
+{"scene":"S05","steps":[{"escape":1},{"wait":800},{"label":"File"},{"wait":1200},{"click":"Save view as"},{"wait":2500},{"at":[1154,358]},{"wait":600},{"type":"Contractor C-14"},{"key":"Enter"},{"wait":1200},{"at":[1154,395]},{"wait":600},{"type":"Why I kept it: the premises C-14 visited"},{"key":"Enter"},{"wait":2500},{"mark":"Not evidence line","box":[800,440,380,40]},{"wait":3500},{"at":[997,501]},{"wait":5000},{"mark":"saved-view chip","box":[255,18,215,24]},{"wait":3000}]},
+{"scene":"S06","steps":[{"label":"Layout"},{"wait":1500},{"exact":"Grid","soft":true},{"wait":4000},{"label":"File"},{"wait":1500},{"exact":"Save view"},{"wait":7000}]},
+{"scene":"S07","steps":[{"label":"File"},{"wait":1200},{"click":"Save snapshot"},{"wait":3000},{"at":[1060,306]},{"wait":600},{"type":"C-14 premises, as found"},{"key":"Enter"},{"wait":1500},{"at":[1060,352]},{"wait":600},{"type":"The premises C-14 visited, frozen"},{"key":"Enter"},{"wait":3000},{"mark":"Fingerprint","box":[525,505,470,30]},{"wait":5000},{"mark":"new Case off","box":[530,640,400,50]},{"wait":5000},{"at":[1015,771]},{"wait":7000}]},
+{"scene":"S08","steps":[{"mark":"saved-view chip","box":[255,18,215,24]},{"wait":8000},{"wait":8000}]},
+{"scene":"S09","steps":[{"label":"Export"},{"wait":3000},{"move":[906,82],"ms":800},{"wait":2500},{"move":[910,130],"ms":700},{"wait":2500},{"move":[905,178],"ms":700},{"wait":2500},{"move":[910,226],"ms":700},{"wait":3500},{"escape":1},{"wait":1500}]},
+{"scene":"S10","steps":[{"label":"File"},{"wait":900},{"exact":"Open…"},{"wait":3000},{"waitText":"Search name or id"},{"at":[500,473]},{"wait":5000},{"button":"Version history","soft":true},{"wait":5000},{"button":"Close","soft":true},{"wait":1500},{"escape":1},{"wait":1500},{"label":"File"},{"wait":1500},{"click":"Import or export"},{"wait":6000}]},
+{"scene":"S11","steps":[{"click":"Delete…"},{"wait":6000},{"button":"Cancel","soft":true},{"wait":1500},{"label":"File"},{"wait":1200},{"exact":"Close"},{"wait":5000}]},
+{"scene":"S12","card":{"lines":["Try it","Next: E2  Entity Lists and Identity Facts"],"secs":5},"steps":[{"wait":1000}]}
+]}

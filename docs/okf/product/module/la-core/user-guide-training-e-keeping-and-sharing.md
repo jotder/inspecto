@@ -61,7 +61,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the search box, the filters, then the preview.
 
 ### S04 · A view is a start, read again
-- Voice: The view draws premises and the contractors who visited them or closed their orders. Search for the contractor C-14, and the canvas centres on it: thirty-six premises, an ordinary workload. What a saved view keeps is the recipe: the Dataset and mapping, the start, the layout, the display options, the filters and any Entity Lists it uses. Opening it tomorrow draws the recipe again, over the data as it is then. That is useful, and it is why a view is not evidence.
+- Voice: The view draws premises and the contractors who visited them or closed their orders. Search for the contractor C-14 to find it among the many nodes drawn. The orange notice says the result was cut short at the canvas limit, never a silent gap. What a saved view keeps is the recipe: the Dataset and mapping, the start, the layout, the display options, the filters and any Entity Lists it uses. Opening it tomorrow draws the recipe again, over the data as it is then. That is useful, and it is why a view is not evidence.
 - Chip: Saved view · re-reads live data
 - Action: Search nodes `C-14` ▸ wait for the canvas to centre. [check in UI: whether the view is cut short at the canvas limit, and that C-14 shows 36 premises]
 - Impact: mark C-14 and its premises.
@@ -79,7 +79,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the confirmation.
 
 ### S07 · Save snapshot
-- Voice: Now evidence. A snapshot is a frozen copy of what is on screen, sealed with a fingerprint, and it never changes. Choose Save snapshot. Give it a Title and a description. The dialog lists exactly what it will freeze: the subgraph, the filter, where it came from, the layout, and the fingerprint. It can attach to a Case, in the Standard edition. Press Save snapshot. The line under the canvas confirms it is saved and sealed as evidence.
+- Voice: Now evidence. A snapshot is a frozen copy of what is on screen, sealed with a fingerprint, and it never changes. Choose Save snapshot. Give it a Title and a description. The dialog lists exactly what it will freeze: the subgraph, with its count of nodes and links, the filter, where it came from, the layout, and the fingerprint, computed on save. Attaching it to a new Case is off here, with its reason: Cases come with the Standard edition. Press Save snapshot.
 - Chip: File · Save snapshot… · Fingerprint
 - Action: File ▸ Save snapshot… ▸ Title `C-14 premises, as found` ▸ Description ▸ hold on *Frozen content* ▸ point at *A new Case, from graph nodes* (off, with its reason) ▸ Save snapshot ▸ hold on the line under the canvas.
 - Impact: mark *Fingerprint*, then the confirmation *Snapshot “…” saved and sealed as evidence.*.
@@ -103,7 +103,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the bottom bar's buttons, then the Import or export menu.
 
 ### S11 · Close and Delete
-- Voice: Close puts the canvas back to the start, and forgets the open view, so a reload does not reopen it. Open the duplicate, then choose Delete. It names what it will delete, and asks first. Confirm. The duplicate is gone; the original stays.
+- Voice: Close puts the canvas back to the start, and forgets the open view, so a reload does not reopen it. Delete names what it will delete, here the view Meter tampering contractor, and asks first. We will not confirm: a deletion is for a view you no longer need.
 - Chip: File · Close · Delete…
 - Action: File ▸ Close ▸ File ▸ Open… ▸ the duplicate ▸ Open ▸ File ▸ Delete… ▸ hold on the question ▸ confirm.
 - Impact: mark the question naming the view.
