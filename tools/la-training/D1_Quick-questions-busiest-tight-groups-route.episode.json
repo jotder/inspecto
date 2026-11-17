@@ -1,0 +1,13 @@
+{"scenario":"episode","edition":"Basic","base":"http://127.0.0.1:8099","steps":[
+{"scene":"S01","card":{"lines":["Inspecto LA training","D1  Quick questions"],"secs":6},"steps":[{"space":"la-showcase"},{"open":"/link-analysis?view=x","settle":4500},{"wait":2500},{"label":"File"},{"wait":900},{"exact":"Open…"},{"wait":2500},{"waitText":"Structuring into one account"},{"click":"Structuring into one account"},{"wait":1500},{"button":"Open"},{"wait":8000}]},
+{"scene":"S02","steps":[{"wait":3000},{"mark":"MULE-HUB-01 group","box":[330,160,300,170]},{"wait":3000},{"mark":"ordinary accounts","box":[470,380,620,370]},{"wait":8000}]},
+{"scene":"S03","steps":[{"move":[1390,200],"ms":900},{"wait":5000},{"mark":"three buttons","box":[1260,180,300,85]},{"wait":3000},{"button":"Busiest nodes"},{"wait":3000}]},
+{"scene":"S04","steps":[{"wait":10000},{"move":[1420,340],"ms":900},{"wait":8000}]},
+{"scene":"S05","steps":[{"move":[1420,450],"ms":900},{"wait":6000},{"mark":"the hint","box":[1270,435,300,40]},{"wait":14000}]},
+{"scene":"S06","steps":[{"at":[1343,697]},{"wait":10000}]},
+{"scene":"S07","steps":[{"button":"Tight groups"},{"wait":6000},{"shot":"tight"},{"wait":10000}]},
+{"scene":"S08","steps":[{"button":"Route from A to B"},{"wait":3000},{"rightOf":"From"},{"wait":1500},{"type":"MULE-HUB-02"},{"wait":1500},{"sel":"[role=option]"},{"wait":2500},{"rightOf":"To"},{"wait":1500},{"type":"TILL-06"},{"wait":1500},{"sel":"[role=option]"},{"wait":2500},{"button":"Find route"},{"wait":9000}]},
+{"scene":"S09","steps":[{"button":"Busiest nodes"},{"wait":3500},{"at":[1492,697]},{"wait":12000}]},
+{"scene":"S10","steps":[{"button":"Busiest nodes"},{"wait":3500},{"button":"Add to a list"},{"wait":3500},{"at":[1006,437]},{"wait":800},{"type":"Tills to review"},{"key":"Enter"},{"wait":1500},{"at":[1006,528]},{"wait":800},{"selectAll":1},{"type":"One till serves only one ring"},{"key":"Enter"},{"wait":2500},{"button":"Add to the list"},{"wait":4000},{"button":"Results","soft":true},{"wait":8000}]},
+{"scene":"S11","card":{"lines":["Try it","Next: D2  How are they connected?"],"secs":5},"steps":[{"wait":1000}]}
+]}
