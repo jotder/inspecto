@@ -676,21 +676,24 @@ final class RunRoutes implements RouteModule {
         }
 
         List<Map<String, Object>> rows = new ArrayList<>();
-        for (ConsignmentOutput o : store.outputs(consignmentId)) {
-            Map<String, Object> r = new LinkedHashMap<>();
-            r.put("tableName", o.tableName());
-            r.put("partitionKey", o.partitionKey());
-            r.put("recordDay", o.recordDay());
-            r.put("rows", o.rows());
-            r.put("bytes", o.bytes());
-            r.put("state", o.state() == null ? null : o.state().name());
-            r.put("producer", o.producer());
-            r.put("writtenAt", o.writtenAt());
-            r.put("path", o.path());
-            rows.add(r);
-        }
+        for (ConsignmentOutput o : store.outputs(consignmentId)) rows.add(outputRow(o));
         page.put("outputs", rows);
         return page;
+    }
+
+    /** One registered output as the read routes serve it — this page and {@code GET /consignments/{id}} alike. */
+    static Map<String, Object> outputRow(ConsignmentOutput o) {
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("tableName", o.tableName());
+        r.put("partitionKey", o.partitionKey());
+        r.put("recordDay", o.recordDay());
+        r.put("rows", o.rows());
+        r.put("bytes", o.bytes());
+        r.put("state", o.state() == null ? null : o.state().name());
+        r.put("producer", o.producer());
+        r.put("writtenAt", o.writtenAt());
+        r.put("path", o.path());
+        return r;
     }
 
     private static ApiException notFound(String name) {

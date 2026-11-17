@@ -915,6 +915,26 @@ class DbConsignmentOutputStoreTest {
         }
     }
 
+    /**
+     * X5 L4 — the {@code run_id} join: a job run's own Consignment comes from its Step Receipts first, from the
+     * output registry when it left none, and an ingest lane's {@code ''} run id joins nothing.
+     */
+    @Test
+    void aRunsOwnConsignmentComesFromItsReceiptsThenFromTheRegistry() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.recordSteps(List.of(step("job-c", "run-7", "job", 1, "src", 10)));
+            db.record(List.of(withRun("written-c", "run-7", "/out/a.parquet", 3, State.LIVE),
+                    withRun("only-c", "run-8", "/out/b.parquet", 3, State.LIVE)));
+            db.recordSteps(List.of(step("ingest-c", "", "ingest-graph", 1, "parse", 10)));
+
+            assertEquals(List.of("job-c"), db.consignmentsOfRun("run-7"), "the receipts answer first");
+            assertEquals(List.of("only-c"), db.consignmentsOfRun("run-8"), "else the registry's run_id");
+            assertTrue(db.consignmentsOfRun("").isEmpty(), "an ingest lane's '' is not a run");
+            assertTrue(db.consignmentsOfRun(null).isEmpty());
+            assertTrue(db.consignmentsOfRun("run-unknown").isEmpty());
+        }
+    }
+
     /** As {@link #out} but naming the Run - the key column these tests are about. */
     private static ConsignmentOutput withRun(String consignment, String runId, String path, long rows,
                                              State state) {

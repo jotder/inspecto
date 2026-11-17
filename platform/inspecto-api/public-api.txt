@@ -592,6 +592,7 @@ com.gamma.consignment.DbConsignmentOutputStore | public List<ConsignmentSource> 
 com.gamma.consignment.DbConsignmentOutputStore | public List<DailyVolume> dailyVolume(String, String, String)
 com.gamma.consignment.DbConsignmentOutputStore | public List<ProducerHighWater> producerHighWater(String)
 com.gamma.consignment.DbConsignmentOutputStore | public List<String> browseTables()
+com.gamma.consignment.DbConsignmentOutputStore | public List<String> consignmentsOfRun(String)
 com.gamma.consignment.DbConsignmentOutputStore | public List<String> unreadablePaths()
 com.gamma.consignment.DbConsignmentOutputStore | public List<com.gamma.pipeline.exec.StepReceipt> steps(String)
 com.gamma.consignment.DbConsignmentOutputStore | public Optional<EventTimeBounds> bounds(String)

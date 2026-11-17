@@ -65,6 +65,31 @@ an unsafe `kind: route` binding target and a `landing` that names no leaf — se
 `POST /queries/{id}/run` (the `com.gamma.query` catalog, W4), and async run polling
 (`GET /jobs/runs/{runId}`, `GET /runs/runs/{runId}`).
 
+### `GET /consignments/{consignmentId}` — one Consignment across lanes (X5 L4, 2026-11-17)
+
+`ConsignmentRoutes`; design of record `superpower/2026-11-17-x5-stepinfo-envelope-plan.md` §3.7 (D8 = a). One read
+joins five stores for one id: the ingest ledger row (`status`, `members` = its `/runs/{name}/files` rows, `parked`
+from the manifest), its Step Receipts (`steps`, `stepsTotal`; first 500), its registry rows (`outputs`,
+`outputsTotal`; first 200, the `/runs/{name}/outputs` row shape), the X2 run links (`upstream` = what its own job
+run read, `downstream` = the runs that read it, each with **its own** `consignmentId`), and its newest 50 Signals.
+
+- **Absent ≠ empty.** A store that cannot answer leaves its key ABSENT and `known.{steps,runs,outputs}` false.
+  With `-Dconsignment.steps=false`, `steps` is absent — never `[]`. 404 only when no store knows the id (ledger,
+  registry, receipts, run sources).
+- **The `run_id` join** (`DbConsignmentOutputStore.consignmentsOfRun`): a job run row does not name its own
+  Consignment, so `downstream[].consignmentId` comes from the run's receipts, else from `consignment_outputs.run_id`;
+  `upstream` comes from the receipts'/outputs' `run_id` through the run store's sources. Ingest → job → back is one
+  hop each way.
+- **Masking.** Signal messages as `GET /signals` serves them (scrubbed at emit; `SecretScrubber` again on read). A
+  receipt's `diag.msg` is the raw exception text on the job lane, so it is masked on read with `FailureText.scrub`
+  (quoted literals and echoed lines → `<redacted>`; no Space salt is read, since reading it may create it) and then
+  `SecretScrubber`.
+- **Gate: `canOperateRuns`** (literal at the registration site, `CapabilityManifest` entry), the capability of
+  `/runs/{name}/drain` and `/reprocess`. ⚠ Plan §3.7 sketched it as an open read like `/runs/{name}/batches`; it is
+  gated because a trail carries diagnostics and the cross-lane graph of one Consignment.
+- Tests: `ControlApiConsignmentTrailTest` (401 / 403 / 200 / 404, receipts off, the hop both ways, masking);
+  `DbConsignmentOutputStoreTest.aRunsOwnConsignmentComesFromItsReceiptsThenFromTheRegistry`.
+
 ## Shared route plumbing (as-built 2026-08-27)
 
 Consolidated by the Phase-1 simplification arc (plan archived at

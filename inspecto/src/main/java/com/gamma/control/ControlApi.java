@@ -112,6 +112,7 @@ import com.gamma.access.AuditTrail;
  *   GET  /runs/{name}/lineage[?batchId=] input→output lineage rows
  *   GET  /runs/{name}/quarantine         quarantined inputs + reason
  *   POST /runs/{name}/reprocess          body {"batchId":"…"} — replay a batch
+ *   GET  /consignments/{consignmentId}        one Consignment across lanes: Step Receipts, outputs, hops (X5)
  *   POST /trigger                             run all pipelines once
  *   POST /validate                            body {"configPath":"…"} or {"type":…,"config":{…}} — findings
  *   GET  /status                              live status snapshot (all pipelines)        [v2.8.0]
@@ -654,7 +655,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
         for (RouteModule module : List.of(
                 new BootstrapRoutes(), new AuthRoutes(),
                 new SpaceRoutes(), new DataSourceRoutes(),   // ExchangeRoutes moved to inspecto-exchange (EDG-01 cell 4)
-                new RunRoutes(),
+                new RunRoutes(), new ConsignmentRoutes(),
                 new ConnectionRoutes(), new ViewRoutes(), new PipelineListRoutes(), new PipelineGraphRoutes(), new PipelineInboxRoutes(), new PipelineSettingsRoutes(), new PipelineRenameRoutes(), new PipelineHistoryRoutes(), new PipelineRelatedRoutes(), new SpaceTestRoutes(), new SpaceIntegrityRoutes(), new SpaceOriginRoutes(), new SpacePromotionRoutes(), new PipelineBundleRoutes(), new ComponentRoutes(), new ClassificationRoutes(), new BundleRoutes(),
                 new CatalogRoutes(), new ConfigPreviewRoutes(), new ConfigWriteRoutes(), new ConfigReadRoutes(), new ParserRoutes(),   // EventRoutes -> inspecto-observability (cell 6); Object/Note/TagRoutes -> inspecto-ops (cell 7; QueueRoutes retired by RETIRE-HALVES-1)
                 new QueryRoutes(), new DatasetRoutes(), new OnboardRoutes(), new SpaceComparisonRoutes(), new BiRoutes(), new KpiRoutes(), new DbBrowserRoutes(), new ShareRoutes(),   // InvRoutes + GeoRoutes moved to inspecto-geo-link (EDG-01 cell 3b); ReconRoutes to inspecto-reconciliation (P7)

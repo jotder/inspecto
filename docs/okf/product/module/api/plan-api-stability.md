@@ -697,9 +697,26 @@ A Step that does not pass rows on now says why in one way: the **reject outlet**
 - Not changed: `data` (the main outlet), `gap` (still an edge to the `gap` node), `route:<key>`, and the authored
   `*_pipeline.toon` config, which holds no relation name.
 
+**Added — a record of every Step, and one read for one Consignment (X5-b / X5-c, 2026-11-17, MoSCoW S4)**
+
+Additive: nothing existing changes shape.
+- **New: a Step Receipt for every Step a Consignment passes through** (GLOSSARY *Step Receipt*): rows in, rows per
+  outlet, where the data rests, a schema fingerprint and, when it failed, the Step and its code. At most 1 KB each,
+  in the new `consignment_steps` table beside `consignment_outputs` in the default-on Consignment registry. On by
+  default (`-Dconsignment.steps=false` switches the writes off); kept 30 days (`-Dconsignment.steps.retentionDays`,
+  pruned by `db_maintenance`). Written today by the at-rest job lane, success or failure; the ingest lanes, park and
+  drain are X5 lane L3. Java: `com.gamma.pipeline.exec.StepReceipt` (`@PublicApi` 4.0.0),
+  `PipelineExecutor.WalkObserver`, and `DbConsignmentOutputStore.recordSteps` / `steps` / `consignmentsOfRun`.
+- **New: `GET /consignments/{consignmentId}`** returns one Consignment across lanes — status, member files, its
+  Step Receipts, outputs, the job runs that read it (each with the Consignment that run wrote), what its own run read,
+  and its Signals; `known.{steps,runs,outputs}` says which stores could answer, and a store that cannot leaves its
+  key absent (receipts off ⇒ no `steps`, never `[]`). Requires `canOperateRuns`. OpenAPI: `ConsignmentTrail`,
+  `StepReceipt`.
+
 **Deferred to this same release by decision:** the token *runtime* model (D2 —
-[`node-types.md`](../engine/spec-node-types.md) § *The token model*), and X5's Step Receipt and cross-lane
-drill-down (X5-b, X5-c). X5-a, the token vocabulary, landed (entry above).
+[`node-types.md`](../engine/spec-node-types.md) § *The token model*), and the rest of X5's Step Receipt (lane L3:
+the ingest lanes, park and drain, and D9's `pipeline.batch.failed` for a failed job-lane run). X5-a, the token
+vocabulary, and X5-b / X5-c on the job lane with the read route landed (entries above).
 
 **Deferred pending the operator (2026-11-17): the ELT Phase 6 deletion of the flat read path** (BACKLOG §2 Row 15,
 MoSCoW S3). The operator decided 2026-11-16 to delete it in 4.0.0 itself; on 2026-11-17 that was found infeasible,

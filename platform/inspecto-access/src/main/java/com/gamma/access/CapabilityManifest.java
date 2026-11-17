@@ -204,6 +204,9 @@ public final class CapabilityManifest {
             new Entry("POST", "/connections/test", Roles.CAN_ONBOARD_CONNECTIONS),
             new Entry("PUT", "/connections/([^/]+)", Roles.CAN_ONBOARD_CONNECTIONS),
             new Entry("DELETE", "/connections/([^/]+)", Roles.CAN_ONBOARD_CONNECTIONS),
+            // ConsignmentRoutes (X5 L4) - one Consignment's trail across lanes: its Step Receipts, diagnostics and the
+            // runs that read it. Run operations, as the drain and reprocess of /runs/{name} are.
+            new Entry("GET", "/consignments/([^/]+)", Roles.CAN_OPERATE_RUNS),
             // DataSourceRoutes — gated 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1`, grounded). Import writes config
             // and hot-registers what it unpacked, exactly like /bundle/import and /pipelines/import above and
             // below; it was the one of the three left open, with no comment defending it and no test at all.

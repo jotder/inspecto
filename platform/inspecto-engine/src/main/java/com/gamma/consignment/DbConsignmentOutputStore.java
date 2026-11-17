@@ -315,6 +315,39 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
         return out;
     }
 
+    /**
+     * The Consignment(s) one job run wrote — the {@code run_id} join of X5's {@code GET /consignments/{id}} (plan §3.7),
+     * which closes the gap that a job run row does not name its own Consignment. The run's Step Receipts answer first
+     * ({@code consignment_steps.run_id}); only when it left none does {@code consignment_outputs.run_id} answer.
+     * Oldest first, distinct; empty for a {@code null} or blank run id (an ingest lane's {@code ''} is not a run).
+     *
+     * @throws IllegalStateException when the read fails — never an empty list for "could not read"
+     */
+    public List<String> consignmentsOfRun(String runId) {
+        List<String> out = new ArrayList<>();
+        if (runId == null || runId.isBlank()) return out;
+        try {
+            src.run(conn -> {
+                for (String sql : new String[]{
+                        "SELECT consignment_id FROM " + STEPS + " WHERE run_id = ? "
+                                + "GROUP BY consignment_id ORDER BY min(recorded_at), consignment_id",
+                        "SELECT consignment_id FROM " + T + " WHERE run_id = ? "
+                                + "GROUP BY consignment_id ORDER BY min(written_at), consignment_id"}) {
+                    try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                        ps.setString(1, runId);
+                        try (ResultSet rs = ps.executeQuery()) {
+                            while (rs.next()) if (rs.getString(1) != null) out.add(rs.getString(1));
+                        }
+                    }
+                    if (!out.isEmpty()) return;
+                }
+            });
+        } catch (SQLException e) {
+            throw new IllegalStateException("consignment lookup failed for run " + runId + ": " + e.getMessage(), e);
+        }
+        return out;
+    }
+
     /** Delete the Step Receipts recorded before {@code cutoff}; returns how many went. Best-effort. */
     public int pruneSteps(java.time.Instant cutoff) {
         return update("DELETE FROM " + STEPS + " WHERE recorded_at < ?", RECORDED_AT.format(cutoff),

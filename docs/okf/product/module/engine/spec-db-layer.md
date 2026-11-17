@@ -904,8 +904,11 @@ run, lane and `seq` (a failed read throws: an empty list must never stand for "c
   the table is still created. **Retention:** `db_maintenance` deletes rows older than
   `-Dconsignment.steps.retentionDays` (default 30; below 1 keeps everything) before its CHECKPOINT / VACUUM.
 - **Writers today:** the at-rest job lane (`PipelineJobRunner`, lane `job`). The ingest lanes, park and drain are
-  X5 lane L3; the read route `GET /consignments/{consignmentId}` is L4. Not listed in the raw table browser
-  (`browseTables()` names `consignment_outputs` only).
+  X5 lane L3. Not listed in the raw table browser (`browseTables()` names `consignment_outputs` only).
+- **Reader (X5 L4, 2026-11-17):** `GET /consignments/{consignmentId}` (`ConsignmentRoutes`) reads `steps(id)` and,
+  for the cross-lane hop, `consignmentsOfRun(runId)` — the **`run_id` join** that names a job run's own
+  Consignment, which the run row does not: this table's `run_id` first, then `consignment_outputs.run_id` when the
+  run left no receipt. Distinct, oldest first; a `''` or `NULL` run id joins nothing; a failed read throws.
 
 ### 3.10 `file_stages` — per-file stage-progression registry  · **M**
 File: `inspecto-file-stages.db`
