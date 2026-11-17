@@ -262,6 +262,17 @@ Walked by the declarative `episode` scenario (`record-la-live.mjs episode`, dump
 - Some Spaces' Investigations mask ids for the analyst; narration must say what the screen shows (masked) — the case video
   *Fictitious Vendor* named unmasked ids over a masked graph.
 
+### 6.6 Wave 1 status (2026-11-18) — all twelve episodes rendered and pushed
+
+A1, A2, A3, B1, B4, C1, C2, C4, D1, E1, F1 and F8 are rendered (`C:\sandbox\la-video-out\_wave1`, outside git), with their
+episode specs in `tools/la-training/`. Recorder verbs added in Wave 1: `selectAll`, `kb` (key with modifiers), `drag`, and
+`shift` on `at`. Voice was rewritten wherever the live screen differed: B4 (no Graph counts pill drawn; Filter rows stage
+two), C1 (a click opens details, selection is by Lasso), C2 (512 nodes grey out five layouts), E1 (cut-short notice, no
+exact counts), F1 (masked MSISDN has no suggestions). Open gaps: A1 colour-scheme demo; the A3 guide's References group;
+A2 "Try the sample" greyed on Basic; the Graph counts pill is in the DOM but not drawn (a product defect to check).
+Install state left behind: Scratch Space, "Card authorisations" rename, list "Tills to review", views "Contractor C-14",
+a C-14 snapshot, and a saved F1 Investigation. Next: P4/P5 waves.
+
 ### 6.5 Pilot P2 status (2026-11-17) — C4, D3, F8 rendered, awaiting operator review
 
 Recorded and rendered with `tools/render-la-demo-video.mjs <id> --episode tools/la-training/<id>.episode.json --script <guide>`
