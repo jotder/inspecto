@@ -45,6 +45,14 @@ diagnostic context, AG-UI streaming, A2UI inline artifacts — and finally to a 
 * **`ConsignmentAuditWriter`** additively emits `pipeline.batch.committed|failed` Signals alongside the
   pre-existing `ConsignmentEvent` fan-out (both fire; `ConsignmentEventBus` itself is untouched — see the
   run-claim hand-off note below for why a full bus migration was deliberately not attempted).
+  **`pipeline.batch.failed` names the failed Step (X5 L3, 2026-11-17):** two additive payload keys, `failedStep`
+  (the Step or phase whose Step Receipt is FAILED — a node id on the graph fork, `parse` / `transform` /
+  `sink:<n>` on the flat lane) and `code` (that receipt's `diag.code`: `STEP_FAILED`, `STEP_TIMEOUT`,
+  `STEP_DISABLED`, `SQL_ERROR`, `IO_ERROR`). Both are absent — never null, never a guess — when no Step owns the
+  failure (the commit tail, a park, a lease loss). The at-rest job lane raises the same Signal on a failed run, alone
+  and not from a `ConsignmentEvent` (X5 D9 = c): source `job:<name>`, subject the Pipeline, payload `dryRun`,
+  `status`, `durationMs`, `error`, `failedStep`, `code` — so `on_signal: pipeline.commit` Jobs see no change.
+  Detail: [execution lanes](../engine/spec-execution-lanes.md).
 * **`DottedPath`** (`platform/inspecto-util/src/main/java/com/gamma/util/DottedPath.java`) — one shared `a.b.c`
   resolver now used by `{{template}}` interpolation (`NotificationTemplate`), `$signal.<path>` job
   binds (`ParameterResolver`), and `when:` guards (`WhenGuard`) — replacing three independently

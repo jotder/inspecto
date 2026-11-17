@@ -7,6 +7,7 @@ import com.gamma.etl.PartitionWriter;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.event.EventLog;
 import com.gamma.pipeline.DecisionRules;
+import com.gamma.pipeline.PipelineRel;
 import com.gamma.signal.Ref;
 import com.gamma.signal.Severity;
 import com.gamma.signal.Signal;
@@ -83,9 +84,25 @@ public final class DecisionRuleApplier {
     private DecisionRuleApplier() {
     }
 
-    /** Routed-row output files + lineage produced while applying rules (empty when no rule matched). */
-    public record Result(List<PartitionOutput> outputs, List<LineageRow> lineage) {
+    /**
+     * Routed-row output files + lineage produced while applying rules (empty when no rule matched), and how many
+     * rows each rule MOVED out of the table ({@code moved}), keyed by the outlet the rows left on — X5 L3, the
+     * ingest lane's {@code transform} Step Receipt: {@code route:<rule>} for a rule that routed, else
+     * {@code reject:quarantined} (a quarantine) or {@code reject:dropped} (a drop). One matched row counts once
+     * per rule, whatever copies its consequences made; a tag-only rule moves nothing. Summed across rules that
+     * share an outlet.
+     */
+    public record Result(List<PartitionOutput> outputs, List<LineageRow> lineage, Map<String, Long> moved) {
         public static final Result NONE = new Result(List.of(), List.of());
+
+        public Result {
+            moved = moved == null ? Map.of() : java.util.Collections.unmodifiableMap(new LinkedHashMap<>(moved));
+        }
+
+        /** Outputs and lineage only — a route sink's own write, which moves nothing by itself. */
+        public Result(List<PartitionOutput> outputs, List<LineageRow> lineage) {
+            this(outputs, lineage, Map.of());
+        }
     }
 
     /**
@@ -188,24 +205,26 @@ public final class DecisionRuleApplier {
 
         List<PartitionOutput> outputs = new ArrayList<>();
         List<LineageRow> lineage = new ArrayList<>();
+        Map<String, Long> moved = new LinkedHashMap<>();
         for (Map<String, Object> rule : rules) {
             String name = String.valueOf(rule.get("name"));
             try {
                 applyRule(conn, table, subject, rule, name, quarantineRoot, baseName, routeSink,
-                        outputs, lineage);
+                        outputs, lineage, moved);
             } catch (Exception e) {
                 log.warn("[DECISION] rule '{}' failed on {} — skipped: {}",
                         name, subject.runId(), e.getMessage());
             }
         }
-        return new Result(List.copyOf(outputs), List.copyOf(lineage));
+        return new Result(List.copyOf(outputs), List.copyOf(lineage), moved);
     }
 
     @SuppressWarnings("unchecked")
     private static void applyRule(Connection conn, String table, Subject subject,
                                   Map<String, Object> rule, String ruleName,
                                   String quarantineRoot, String baseName, RouteSink routeSink,
-                                  List<PartitionOutput> outputs, List<LineageRow> lineage) throws Exception {
+                                  List<PartitionOutput> outputs, List<LineageRow> lineage,
+                                  Map<String, Long> moved) throws Exception {
         ConditionSql.Bound pred = ConditionSql.predicateBound(rule.get("when"));
         String t = SqlIdent.q(table);
         long matched;
@@ -264,6 +283,10 @@ public final class DecisionRuleApplier {
             try (PreparedStatement ps = prepare(conn, "DELETE FROM " + t + " WHERE " + pred.sql(), List.of(), pred)) {
                 ps.execute();
             }
+            // X5 L3: the outlet these rows left on — a route wins over a quarantine over a drop (one count per row).
+            String outlet = applied.stream().anyMatch(a -> a.startsWith("route:")) ? PipelineRel.route(ruleName)
+                    : applied.contains("quarantine") ? PipelineRel.reject("quarantined") : PipelineRel.DROPPED;
+            moved.merge(outlet, matched, Long::sum);
         }
         log.info("[DECISION] [{}] rule '{}' matched {} row(s): {}",
                 subject.runId(), ruleName, matched, applied);

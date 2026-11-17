@@ -213,8 +213,12 @@ interface ConsignmentIngestStrategy {
         // pipeline flat, because the graph lane does not implement rule-routed outputs (it refuses
         // them). Whether rules exist is a property of the space registry, not of the config, so this
         // is the only place the answer is knowable.
+        // X5 L3: the pass reached the write tail; the rows meeting the Decision Rules are the transform phase's in.
+        IngestTrail.phase(batchId, IngestTrail.TRANSFORM);
+        long rowsIn = IngestTrail.rows(conn, table);
         DecisionRuleApplier.Result applied = DecisionRuleApplier.apply(
                 conn, table, cfg, dbDir, baseName, partCols, batchId, srcIdToFile);
+        IngestTrail.phase(batchId, IngestTrail.SINK);   // a lane refusal from here on is the write's, no phase's
 
         // A multi-schema batch reaches here ONCE PER SEGMENT (UnionModeIngester), each call holding that
         // segment's own materialised table and writing under database/<segKey>. So the admission must ask
@@ -228,6 +232,7 @@ interface ConsignmentIngestStrategy {
         String segKey = segmentWrite(cfg, writeScope);
         if (segKey == null && cfg.routeConfig() != null) segKey = selectorWrite(cfg, selectedTable);
         com.gamma.pipeline.PipelineGraph lifted = admittedLift(cfg, applied, segKey);
+        IngestTrail.fork(batchId, rowsIn, applied.moved(), lifted != null ? null : laneFlatReason(cfg, applied, segKey));
         return lifted != null
                 ? graphWriteAndTrace(conn, table, partCols, cfg, dbDir, baseName, batchId, srcIdToFile,
                         lifted, applied, writeScope, segKey)
@@ -288,6 +293,20 @@ interface ConsignmentIngestStrategy {
             default -> throw new IllegalArgumentException("-D" + LANE_PROPERTY + " must be auto | graph | flat, got '"
                     + mode + "'");
         };
+    }
+
+    /**
+     * X5 L3 — why THIS write stayed flat, for the {@code parse} receipt's {@code LANE_FLAT} diagnosis: the kill
+     * switch by name, else {@link #flatReason}. Never throws (it explains a write that is already happening).
+     */
+    static String laneFlatReason(PipelineConfig cfg, DecisionRuleApplier.Result applied, String segKey) {
+        if ("flat".equals(System.getProperty(LANE_PROPERTY, "auto").trim().toLowerCase(java.util.Locale.ROOT)))
+            return "-D" + LANE_PROPERTY + "=flat keeps every write on the legacy lane";
+        try {
+            return flatReason(cfg, applied, segKey);
+        } catch (RuntimeException e) {
+            return "the graph lane does not carry this write";
+        }
     }
 
     /** Why the admission kept this write FLAT — the message a {@code graph}-only run refuses with. */
@@ -374,17 +393,21 @@ interface ConsignmentIngestStrategy {
         Map<String, EventTimeBounds> byPartition = ConsignmentOutputs.boundsByPartition(conn, writeTable, partCols);
         Map<String, EventTimeBounds> bounds = new java.util.HashMap<>();
 
-        for (PipelineConfig.Sink dest : sinks) {
+        for (int d = 0; d < sinks.size(); d++) {
+            PipelineConfig.Sink dest = sinks.get(d);
             // HA-GRACEFUL-STOP-LEASE-RELEASE-1: the shared output-write choke point — a cancelled run writes no more.
             CommitFence.checkpoint(CommitFence.Scope.RUN, cfg.identity().pipelineName());
             String destDir = fanOut ? Paths.get(dest.database()).resolve(rel).toString() : dbDir;
+            IngestTrail.sinkStarted(batchId, d);   // X5 L3: a throw from here to sinkWritten is this destination's
             // B4: dest.filenameColumn() (null = byte-identical) translates __src_id into a source-file
             // column via the same map the lineage ledger uses.
             List<PartitionOutput> outs = PartitionWriter.write(conn, writeTable, destDir,
                     dest.format(), dest.compression(), writeBase, partCols,
                     dest.filenameColumn(), srcIdToFile);
             outputs.addAll(outs);
-            lineage.addAll(LineageCollector.collect(conn, writeTable, batchId, srcIdToFile, outs, partCols));
+            List<LineageRow> destLineage = LineageCollector.collect(conn, writeTable, batchId, srcIdToFile, outs, partCols);
+            lineage.addAll(destLineage);
+            IngestTrail.sinkWritten(batchId, d, destLineage.stream().mapToLong(LineageRow::rowCount).sum(), outs.size());
             // Re-key onto files, and only these files: applied.outputs() came from a different relation.
             for (PartitionOutput o : outs) {
                 EventTimeBounds b = byPartition.get(o.partition());
@@ -461,10 +484,22 @@ interface ConsignmentIngestStrategy {
         java.nio.file.Path commitLog =
                 branchCommitLogPath(cfg, batchId);
         java.nio.file.Files.createDirectories(commitLog.getParent());
+        // X5 L3: the walk is observed for Step Receipts — FAILED at a Step that throws, NOT_REACHED below it, PARKED
+        // at a parked sink — and handed to the Consignment's trail whether the walk returns or throws.
+        com.gamma.pipeline.exec.StepReceiptRecorder receipts = new com.gamma.pipeline.exec.StepReceiptRecorder(
+                lifted, batchId, cfg.identity().pipelineName(), com.gamma.pipeline.exec.StepReceipt.LANE_INGEST_GRAPH,
+                "", false, null);
+        try {
         com.gamma.pipeline.exec.ConsignmentGraphRunner.run(
                 new com.gamma.pipeline.exec.ConsignmentGraphRunner.Input(
                         conn, lifted, seedNodeId, seedTable, batchId, dbDir, writeBase, commitLog, writeScope),
-                writer,
+                (node, inputTable) -> {
+                    int before = writer.outputs().size();
+                    writer.write(node, inputTable);
+                    receipts.pointer(node.id(), new com.gamma.pipeline.exec.StepReceipt.Pointer(
+                            com.gamma.pipeline.exec.StepReceipt.Pointer.OUTPUTS, tableOf(node), null,
+                            writer.outputs().size() - before));
+                },
                 () -> { /* finalisation is ConsignmentIngestor.commit's, once the outcome returns */ },
                 // Park hook (S4b): a disabled route-branch sink's rows are materialised to a durable
                 // Parquet under the park home (a sibling of backup, never under a database dir a
@@ -479,7 +514,15 @@ interface ConsignmentIngestStrategy {
                                 + " (FORMAT parquet)");
                     }
                     ParkedBranches.record(batchId, node.id(), parkTable);
-                });
+                    // The park pointer: the table's path under dirs.backup (the park home is <backup>/parked).
+                    receipts.pointer(node.id(), new com.gamma.pipeline.exec.StepReceipt.Pointer(
+                            com.gamma.pipeline.exec.StepReceipt.Pointer.PARK, tableOf(node),
+                            "parked/" + parkTable.getFileName(), 1));
+                },
+                receipts);
+        } finally {
+            IngestTrail.walked(batchId, receipts);
+        }
         // The routed rows were written above the fork; carry their outputs and lineage out with this write's,
         // in the flat path's order (routed first), so IngestOutcome sees one batch either lane it took.
         List<PartitionOutput> outputs = new java.util.ArrayList<>(applied.outputs());
@@ -487,6 +530,16 @@ interface ConsignmentIngestStrategy {
         List<LineageRow> lineage = new java.util.ArrayList<>(applied.lineage());
         lineage.addAll(writer.lineage());
         return new Written(outputs, lineage, writer.bounds());
+    }
+
+    /**
+     * X5 L3 — the table a sink node writes (its lift config's {@code table}): the {@code table_name} the
+     * Consignment registry gives these rows, so a receipt's pointer joins {@code consignment_outputs}. {@code null}
+     * for a single {@code schema_file} pipeline, whose registry rows carry none either.
+     */
+    static String tableOf(com.gamma.pipeline.PipelineNode node) {
+        Object table = node == null ? null : node.cfg("table");
+        return table == null ? null : String.valueOf(table);
     }
 
     /**

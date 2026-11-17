@@ -15,6 +15,7 @@ import com.gamma.pipeline.PipelineLift;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.exec.BranchCommitCoordinator;
 import com.gamma.pipeline.exec.BranchCommitLog;
+import com.gamma.pipeline.exec.StepReceipt;
 import com.gamma.sql.SqlViews;
 import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
@@ -159,6 +160,11 @@ public final class DrainCommand {
         LocalDateTime start = LocalDateTime.now();
         Map<String, IngestSinkWriter> writers = new LinkedHashMap<>();   // per schema home, in first-use order
         BranchCommitCoordinator.Result committed;
+        // X5 L3: one `drain` Step Receipt per parked sink, under this drain's own Run (also the run_id of the
+        // registry rows its commit tail writes), recorded in the finally — success or failure.
+        String runId = com.gamma.job.RunIds.next(cfg.identity().pipelineName());
+        DrainReceipts receipts = new DrainReceipts(batchId, cfg.identity().pipelineName(), runId, m.parkedAt, byId);
+        Throwable failure = null;
         File tempDb = ConsignmentIngestStrategy.openTempDb(cfg, "drain_");
         try (Connection conn = DuckDbUtil.openConnection(tempDb)) {
             ConsignmentIngestStrategy.configure(conn, cfg, tempDb,
@@ -198,7 +204,15 @@ public final class DrainCommand {
             // that IS meaningful — the durable, idempotent per-BRANCH skip — and runs the real commit
             // tail itself right after, exactly as ConsignmentIngestor.commit does when the runner returns.
             committed = new BranchCommitCoordinator(commitLog).commit(batchId, expected,
-                    branch -> writerFor.apply(byId.get(branch)).write(byId.get(branch), seeded.get(branch)),
+                    branch -> {
+                        IngestSinkWriter w = writerFor.apply(byId.get(branch));
+                        int files = w.outputs().size();
+                        long rows = w.lineage().stream().mapToLong(LineageRow::rowCount).sum();
+                        receipts.started(branch);
+                        w.write(byId.get(branch), seeded.get(branch));
+                        receipts.written(branch, w.lineage().stream().mapToLong(LineageRow::rowCount).sum() - rows,
+                                w.outputs().size() - files);
+                    },
                     () -> { });
 
             Set<String> nowCommitted = commitLog.committedBranches(batchId);
@@ -207,8 +221,12 @@ public final class DrainCommand {
                         + "expected " + expected + ", durable " + nowCommitted
                         + ". Nothing was lost; the park tables are untouched.");
             restoreOriginalsToInbox(m, poll);
-            finalizeWholeBatch(batch, cfg, survivors, pending, writers.values());
+            finalizeWholeBatch(batch, cfg, survivors, pending, writers.values(), runId);
+        } catch (Throwable t) {
+            failure = t;
+            throw t;
         } finally {
+            receipts.flush(failure);
             DuckDbUtil.deleteTempDb(tempDb);
         }
 
@@ -337,7 +355,8 @@ public final class DrainCommand {
      * drain just wrote — one register, one manifest, one §11.3 registration for the whole Consignment.
      */
     private static void finalizeWholeBatch(Consignment batch, PipelineConfig cfg, List<Consignment.Member> survivors,
-                                           ParkedCommit pending, java.util.Collection<IngestSinkWriter> writers)
+                                           ParkedCommit pending, java.util.Collection<IngestSinkWriter> writers,
+                                           String runId)
             throws java.io.IOException {
         List<PartitionOutput> outputs = new ArrayList<>(pending.outputs());
         List<LineageRow> lineage = new ArrayList<>(pending.lineage());
@@ -349,7 +368,65 @@ public final class DrainCommand {
             lineage.addAll(writer.lineage());
             bounds.putAll(writer.bounds());
         }
-        ConsignmentIngestor.finalizeSource(batch, cfg, survivors, outputs, lineage, bounds);
+        ConsignmentIngestor.finalizeSource(batch, cfg, survivors, outputs, lineage, bounds, List.of(), runId);
+    }
+
+    /**
+     * X5 L3 — the drain's Step Receipts: one per parked sink, lane {@code drain}, in park order. A sink the drain
+     * wrote is OK with the rows and files it wrote ({@code outputs} pointer); the one whose write threw is FAILED;
+     * a sink the coordinator found already durable (an interrupted earlier drain) is OK with nothing written; the
+     * rest of a failed drain are NOT_REACHED. A throw between the writes (seeding, the commit tail) is no Step's.
+     * Recorded once, best effort: a receipt never changes the drain's outcome.
+     */
+    private static final class DrainReceipts {
+        private final String batchId, pipeline, runId;
+        private final List<String> parked;
+        private final Map<String, PipelineNode> byId;
+        private final Map<String, long[]> written = new LinkedHashMap<>();   // node → {rows, files, ms}
+        private final Map<String, java.time.Instant> startedAt = new LinkedHashMap<>();
+
+        DrainReceipts(String batchId, String pipeline, String runId, List<String> parked, Map<String, PipelineNode> byId) {
+            this.batchId = batchId;
+            this.pipeline = pipeline;
+            this.runId = runId;
+            this.parked = parked;
+            this.byId = byId;
+        }
+
+        void started(String node) {
+            startedAt.put(node, java.time.Instant.now());
+        }
+
+        void written(String node, long rows, long files) {
+            java.time.Instant at = startedAt.get(node);
+            written.put(node, new long[]{rows, files,
+                    at == null ? 0 : java.time.Duration.between(at, java.time.Instant.now()).toMillis()});
+        }
+
+        void flush(Throwable failure) {
+            try {
+                List<StepReceipt> out = new ArrayList<>();
+                for (int i = 0; i < parked.size(); i++) {
+                    String node = parked.get(i);
+                    PipelineNode n = byId.get(node);
+                    long[] w = written.get(node);
+                    java.time.Instant at = startedAt.get(node);
+                    StepReceipt.Outcome outcome = w != null ? StepReceipt.Outcome.OK
+                            : at != null ? StepReceipt.Outcome.FAILED
+                            : failure == null ? StepReceipt.Outcome.OK : StepReceipt.Outcome.NOT_REACHED;
+                    out.add(new StepReceipt(StepReceipt.VERSION, batchId, pipeline, StepReceipt.LANE_DRAIN, runId, i + 1,
+                            node, n == null ? null : n.type(), outcome, w == null ? 0 : w[0], List.of(),
+                            w == null ? null : new StepReceipt.Pointer(StepReceipt.Pointer.OUTPUTS,
+                                    ConsignmentIngestStrategy.tableOf(n), null, w[1]),
+                            null, outcome == StepReceipt.Outcome.FAILED ? StepReceipt.Diagnostics.of(failure)
+                                    : StepReceipt.Diagnostics.NONE,
+                            at == null ? null : at.toString(), w == null ? 0 : w[2], false, false));
+                }
+                com.gamma.consignment.ConsignmentOutputStores.recordSteps(out);
+            } catch (RuntimeException e) {
+                log.warn("[DRAIN] {}: could not record the Step Receipts: {}", batchId, e.getMessage());
+            }
+        }
     }
 
     /**

@@ -2222,6 +2222,7 @@ com.gamma.pipeline.exec.ConservationCheck.RelCount | public record RelCount(Stri
 com.gamma.pipeline.exec.ConsignmentGraphRunner | public final class ConsignmentGraphRunner
 com.gamma.pipeline.exec.ConsignmentGraphRunner | public static PipelineExecutor.ExecResult run(Input, PipelineExecutor.SinkWriter, BranchCommitCoordinator.SourceFinalize) throws Exception
 com.gamma.pipeline.exec.ConsignmentGraphRunner | public static PipelineExecutor.ExecResult run(Input, PipelineExecutor.SinkWriter, BranchCommitCoordinator.SourceFinalize, PipelineExecutor.ParkWriter) throws Exception
+com.gamma.pipeline.exec.ConsignmentGraphRunner | public static PipelineExecutor.ExecResult run(Input, PipelineExecutor.SinkWriter, BranchCommitCoordinator.SourceFinalize, PipelineExecutor.ParkWriter, PipelineExecutor.WalkObserver) throws Exception
 com.gamma.pipeline.exec.ConsignmentGraphRunner | public static Result run(Input, SourceFinalizer) throws Exception
 com.gamma.pipeline.exec.ConsignmentGraphRunner | public static boolean engages(PipelineGraph)
 com.gamma.pipeline.exec.ConsignmentGraphRunner | public static boolean hasRouteFedChain(PipelineGraph)

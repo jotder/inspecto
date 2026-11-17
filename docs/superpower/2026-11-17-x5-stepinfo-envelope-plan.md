@@ -1,6 +1,6 @@
 # X5 — one Consignment across lanes, and the Step Receipt (the board's "StepInfo envelope")
 
-Status: **IN BUILD — L2 (X5-a, the token vocabulary) built 2026-11-17; L1, L3, L4 open. Decisions D1–D10 taken (§7).** Opened 2026-11-17 for MoSCoW S4's last
+Status: **IN BUILD — L2 (X5-a, the token vocabulary), L1 (the Step Receipt, job lane) and L3 (ingest lanes, park, drain, and D9) built 2026-11-17; L4 open. Decisions D1–D10 taken (§7).** ⚠ L3 deviates from §2.5 item 6 / §3.2: ingest receipts carry the ingest Run id, not `''` (a retried Consignment would otherwise lose its second attempt's trail to `DO NOTHING`); as built in [`spec-execution-lanes.md`](../okf/product/module/engine/spec-execution-lanes.md). Opened 2026-11-17 for MoSCoW S4's last
 item ([`plan-architecture-moscow.md`](../okf/product/layer/platform/plan-architecture-moscow.md) §8 S4: build X5
 before the 4.0.0 tag, with a release-notes entry). Board row: [`BACKLOG.md`](../BACKLOG.md) §2 *X5 cross-lane
 drill-down + StepInfo envelope*. Items: `module.engine`, `module.api`, `layer.product`. Every code fact below was

@@ -473,6 +473,9 @@ public final class PipelineJobRunner implements Job {
                     PipelineStores.produced(g));
             return JobResult.ok(realWriter.outputs().size() + " file(s), " + realWriter.totalRows()
                     + " row(s) → store(s) " + PipelineStores.produced(g), ms);
+        } catch (Throwable t) {
+            raiseFailed(pipelineId, batchId, t, receipts, (System.nanoTime() - t0) / 1_000_000L, ctx);
+            throw t;
         } finally {
             // X5 (plan §3.5): success or failure, the receipts leave once — a failed run's trail is the one that
             // matters most, and it is the one a flush after the walk would lose.
@@ -830,6 +833,33 @@ public final class PipelineJobRunner implements Job {
             }
         } catch (RuntimeException e) {
             log.warn("[PIPELINEJOB] could not annotate the Step Receipts: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * X5 D9 = c — a failed run raises {@code pipeline.batch.failed} ALONE: never a {@link ConsignmentEvent}, which
+     * {@code JobService.mirrorPipelineCommit} would turn into a {@code pipeline.commit} Signal, so
+     * {@code on_signal: pipeline.commit} Jobs see no change. It names the Step that failed and its code when one did
+     * (plan §3.4); the message is scrubbed of quoted values and bounded like a receipt's. A cancel is a planned stop,
+     * not a failure. Never throws into the run's own outcome.
+     */
+    private void raiseFailed(String pipelineId, String batchId, Throwable t, StepReceiptRecorder receipts, long ms,
+                             JobContext ctx) {
+        if (t instanceof com.gamma.inspector.CommitFence.RunCancelledException) return;
+        try {
+            StepReceipt failed = null;
+            if (receipts != null)
+                for (StepReceipt r : receipts.receipts())
+                    if (r.outcome() == StepReceipt.Outcome.FAILED) { failed = r; break; }
+            String msg = com.gamma.etl.FailureText.scrub(
+                    t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName(), null);
+            if (msg != null && msg.length() > StepReceipt.MAX_MSG) msg = msg.substring(0, StepReceipt.MAX_MSG);
+            com.gamma.signal.PipelineConsignmentSignal.emitJobFailed(cfg.name(), pipelineId, batchId, msg, ms,
+                    ctx != null && ctx.dryRun(),
+                    failed == null ? null : new com.gamma.signal.PipelineConsignmentSignal.FailedStep(
+                            failed.step(), failed.diag().code()));
+        } catch (RuntimeException e) {
+            log.warn("[PIPELINEJOB] could not raise pipeline.batch.failed for {}: {}", batchId, e.getMessage());
         }
     }
 

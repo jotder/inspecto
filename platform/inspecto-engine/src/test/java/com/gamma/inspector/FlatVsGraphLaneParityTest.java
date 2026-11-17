@@ -1,6 +1,7 @@
 package com.gamma.inspector;
 
 import com.gamma.etl.PipelineConfig;
+import com.gamma.pipeline.exec.StepReceipt;
 import com.gamma.util.DuckDbUtil;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -295,6 +296,79 @@ class FlatVsGraphLaneParityTest {
                 timestamp_formats[1]: "%%Y-%%m-%%d"
             """.formatted(d, o, schema.toString().replace("\\", "/")));
         return PipelineConfig.load(toon.toString());
+    }
+
+    /**
+     * X5 L3 — the same input through the flat lane ({@code -Dingest.lane=flat}) and through the graph fork leaves the
+     * same sink rows on both Consignments' Step Receipt trails. End to end on the real ingest path: the flat lane is
+     * told in phases ({@code parse}, {@code transform}, {@code sink:0}) with the reason it stayed flat on
+     * {@code parse}; the graph fork tells the same phases and then every walked Step, its sink included. Both trails
+     * are flushed to the default-on Consignment registry.
+     */
+    @Test
+    void bothLanesLeaveTheSameSinkRowsOnTheirStepReceiptTrails(@TempDir Path dir) throws Exception {
+        PipelineConfig flatCfg = config(dir.resolve("flat"), dir.resolve("db_flat").toString());
+        PipelineConfig graphCfg = config(dir.resolve("graph"), dir.resolve("db_graph").toString());
+        String feed = "ID,AMT,EVENT_DATE\nE1,1.0,2020-04-03\nA2,2.0,2020-04-03\nX3,3.0,2020-04-04\n";
+        for (PipelineConfig c : List.of(flatCfg, graphCfg))
+            Files.writeString(Files.createDirectories(Path.of(c.dirs().poll())).resolve("feed.csv"), feed);
+
+        try (var registry = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            com.gamma.consignment.ConsignmentOutputStores.use(registry);
+            System.setProperty(ConsignmentIngestStrategy.LANE_PROPERTY, "flat");
+            try {
+                CollectorProcessor.run(flatCfg);
+            } finally {
+                System.clearProperty(ConsignmentIngestStrategy.LANE_PROPERTY);
+            }
+            CollectorProcessor.run(graphCfg);
+
+            // The same members mint the same Consignment id, so both runs' receipts sit on ONE trail — each under its
+            // own Run, which is what keeps an identical re-ingest from being dropped as a duplicate of the first.
+            String id = consignmentOf(dir.resolve("flat"));
+            assertEquals(id, consignmentOf(dir.resolve("graph")), "same members, same Consignment id");
+            List<StepReceipt> all = registry.steps(id);
+            List<StepReceipt> flat = all.stream().filter(r -> StepReceipt.LANE_INGEST_FLAT.equals(r.lane())).toList();
+            List<StepReceipt> graph = all.stream().filter(r -> StepReceipt.LANE_INGEST_GRAPH.equals(r.lane())).toList();
+            assertNotEquals(flat.get(0).runId(), graph.get(0).runId(), "each run keeps its own trail: " + all);
+
+            assertEquals(List.of("parse", "transform", "sink:0"), flat.stream().map(StepReceipt::step).toList(),
+                    "the flat lane is told in phases: " + flat);
+            assertTrue(flat.stream().allMatch(r -> r.outcome() == StepReceipt.Outcome.OK), flat.toString());
+            StepReceipt parse = flat.get(0);
+            assertEquals(StepReceipt.LANE_FLAT, parse.diag().code(), "the parse receipt says why it stayed flat");
+            assertTrue(parse.diag().msg().contains("-Dingest.lane=flat"), parse.diag().msg());
+            assertEquals(3L, parse.outlets().get(0).rows(), "parse: three rows read");
+
+            assertEquals(List.of("parse", "transform"), graph.subList(0, 2).stream().map(StepReceipt::step).toList(),
+                    "the graph fork tells the same phases first: " + graph);
+            assertNull(graph.get(0).diag().code(), "a write that took the graph fork has no LANE_FLAT reason");
+            assertTrue(graph.size() > 3, "then every walked Step, below the seed: " + graph);
+
+            List<StepReceipt> flatSinks = flat.stream().filter(r -> r.step().startsWith("sink:")).toList();
+            List<StepReceipt> graphSinks = graph.stream().filter(r -> "sink.persistent".equals(r.kind())).toList();
+            assertEquals(1, graphSinks.size(), graph.toString());
+            assertEquals(flatSinks.stream().map(StepReceipt::in).toList(), graphSinks.stream().map(StepReceipt::in).toList(),
+                    "the same sink rows on both trails");
+            assertEquals(3L, graphSinks.get(0).in(), "every input row reached the sink");
+            for (StepReceipt s : List.of(flatSinks.get(0), graphSinks.get(0))) {
+                assertNotNull(s.ref(), "a sink points at where its rows rest: " + s);
+                assertEquals(StepReceipt.Pointer.OUTPUTS, s.ref().kind());
+                assertTrue(s.ref().files() > 0, s.toString());
+            }
+            assertEquals(flatSinks.get(0).ref().files(), graphSinks.get(0).ref().files(), "the same files written");
+        } finally {
+            com.gamma.consignment.ConsignmentOutputStores.use(null);
+        }
+    }
+
+    /** The one Consignment a config's run committed — its manifest's name under {@code <cfgDir>/status}. */
+    private static String consignmentOf(Path cfgDir) throws Exception {
+        try (Stream<Path> w = Files.walk(cfgDir.resolve("status"))) {
+            String name = w.filter(p -> p.getFileName().toString().endsWith(".json")).findFirst()
+                    .orElseThrow(() -> new AssertionError("no manifest under " + cfgDir)).getFileName().toString();
+            return name.substring(0, name.length() - ".json".length());
+        }
     }
 
     /** All non-header data lines across every output file under {@code root}, sorted. */

@@ -2265,6 +2265,71 @@ class PipelineJobRunnerTest {
     }
 
     /**
+     * X5 D9 = c: a failed job-lane run raises {@code pipeline.batch.failed} ALONE — naming the Step that failed and
+     * its code (plan §3.4) — and publishes no {@code ConsignmentEvent}, so nothing reaches
+     * {@code JobService.mirrorPipelineCommit} and no {@code pipeline.commit} Signal fires an
+     * {@code on_signal: pipeline.commit} Job.
+     */
+    @Test
+    void aFailedRunRaisesPipelineBatchFailedNamingTheStepAndNoConsignmentEvent() throws Exception {
+        String owner = "x5-d9.test.jar";
+        String boomType = "transform.x5_d9_boom";
+        com.gamma.pipeline.PipelineNodeTypes.register(new com.gamma.pipeline.PipelineNodeType() {
+            @Override public String type() { return boomType; }
+            @Override public java.util.Optional<com.gamma.pipeline.ExecutionMode> mode() {
+                return java.util.Optional.of(com.gamma.pipeline.ExecutionMode.EXECUTED);
+            }
+        }, owner);
+        com.gamma.pipeline.exec.StepExecutors.register(new com.gamma.pipeline.exec.StepExecutor() {
+            @Override public String type() { return boomType; }
+            @Override public void execute(com.gamma.pipeline.exec.StepContext ctx) {
+                throw new IllegalStateException("scoring service unavailable");
+            }
+        }, owner, com.gamma.pipeline.exec.StepExecutors.Grant.NONE);
+        String space = "x5-d9-" + java.util.UUID.randomUUID();
+        EventLog ledger = EventLog.create();
+        EventLog.register(space, ledger);
+        org.slf4j.MDC.put(EventLog.SPACE_MDC_KEY, space);
+        try {
+            String dataDir = tmp.resolve("data").toString();
+            seedParquet(dataDir, "events", "(1,150),(2,50)");
+            PipelineStore store = new PipelineStore(tmp.resolve("flows"));
+            store.write("d9_flow", new PipelineGraph("d9_flow", true,
+                    List.of(PipelineNode.of("src", "acquisition", Map.of("source_store", "events")),
+                            PipelineNode.of("boom", boomType, Map.of()),
+                            new PipelineNode("out", "sink.persistent", "O", null, Map.of("store", "d9_out"), null)),
+                    List.of(PipelineEdge.data("src", "boom"), PipelineEdge.data("boom", "out"))));
+            JobConfig cfg = new JobConfig("d9job", JobType.PIPELINE, null, null, true, false,
+                    Map.of("flow", "d9_flow", "data_dir", dataDir, "consignment_id", "d9-1"));
+            ConsignmentEventBus bus = new ConsignmentEventBus();
+            List<com.gamma.etl.ConsignmentEvent> published = new CopyOnWriteArrayList<>();
+            bus.subscribe(published::add);
+
+            withRegistry(registry -> assertThrows(Exception.class, () -> new PipelineJobRunner(cfg, bus, store,
+                    dataDir, tmp.resolve("audit").toString()).run(new CapturingJobContext())));
+
+            List<com.gamma.signal.Signal> failed = com.gamma.signal.Signals.query(ledger.store(),
+                    "pipeline.batch.failed", null, null, null, "d9-1", 10);
+            assertEquals(1, failed.size(), "the failure is visible as pipeline.batch.failed");
+            com.gamma.signal.Signal sig = failed.get(0);
+            assertEquals("boom", sig.payload().get("failedStep"), "it names the Step: " + sig.payload());
+            assertEquals(com.gamma.pipeline.exec.StepReceipt.STEP_FAILED, sig.payload().get("code"));
+            assertEquals("FAILED", sig.payload().get("status"));
+            assertTrue(String.valueOf(sig.payload().get("error")).contains("scoring service unavailable"),
+                    sig.payload().toString());
+            assertEquals("d9_flow", sig.subject().id(), "subject: the Pipeline");
+            assertEquals("d9job", sig.source().id(), "source: the Job");
+            // mirrorPipelineCommit turns every bus event into pipeline.commit: no event, no pipeline.commit.
+            assertTrue(published.isEmpty(), "no ConsignmentEvent on a failure: " + published);
+        } finally {
+            org.slf4j.MDC.remove(EventLog.SPACE_MDC_KEY);
+            EventLog.unregister(space);
+            com.gamma.pipeline.exec.StepExecutors.deregister(owner);
+            com.gamma.pipeline.PipelineNodeTypes.deregister(owner);
+        }
+    }
+
+    /**
      * A conservation imbalance is written onto the Step it concerns. As with {@code reportConservation}, a clean run
      * conserves by construction, so the counts are injected: a filter that took 3 and accounted for 2.
      */
