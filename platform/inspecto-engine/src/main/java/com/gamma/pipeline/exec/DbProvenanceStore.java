@@ -34,6 +34,8 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
 
     private static final Logger log = LoggerFactory.getLogger(DbProvenanceStore.class);
     private static final String T = "inspecto_pipeline_provenance";
+    /** The per-schema advisory lock the rename and the schema DDL serialise on ({@link SchemaMigration#lock}). */
+    private static final String MIGRATION_LOCK = "inspecto.provenance.batch_id-rename";
 
     private final ConnectionSource src;
 
@@ -68,7 +70,12 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
                 // schema's advisory lock on Postgres and re-probes under it, so a node that opened the same schema
                 // at the same moment waits and then finds nothing to do.
                 if (SchemaMigration.columnExists(conn, T, "batch_id")) renameBatchIdColumn(conn);
+                // ⚠ One transaction holding the schema's advisory lock (Postgres): IF NOT EXISTS is not atomic
+                // across sessions, so nodes opening a new schema at once would race on the catalog's unique index.
+                boolean autoCommit = conn.getAutoCommit();
+                conn.setAutoCommit(false);
                 try (Statement st = conn.createStatement()) {
+                    SchemaMigration.lock(conn, src.isPostgres(), MIGRATION_LOCK);
                     st.execute("CREATE TABLE IF NOT EXISTS " + T + " ("
                             + "pipeline_id VARCHAR, consignment_id VARCHAR, node_id VARCHAR, rel VARCHAR, "
                             + "row_count BIGINT, run_ts VARCHAR)");
@@ -76,6 +83,12 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
                     // CREATE TABLE IF NOT EXISTS never widens a pre-existing table, and a row written before
                     // this column existed reads back NULL/false (a real run, not a dry one).
                     st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS simulated BOOLEAN DEFAULT FALSE");
+                    conn.commit();
+                } catch (SQLException e) {
+                    try { conn.rollback(); } catch (SQLException ignore) { /* best effort */ }
+                    throw e;
+                } finally {
+                    try { conn.setAutoCommit(autoCommit); } catch (SQLException ignore) { /* best effort */ }
                 }
             });
         } catch (SQLException e) {
@@ -87,7 +100,7 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
         boolean autoCommit = conn.getAutoCommit();
         conn.setAutoCommit(false);
         try (Statement st = conn.createStatement()) {
-            SchemaMigration.lock(conn, src.isPostgres(), "inspecto.provenance.batch_id-rename");
+            SchemaMigration.lock(conn, src.isPostgres(), MIGRATION_LOCK);
             if (SchemaMigration.columnExists(conn, T, "batch_id")) {
                 st.execute("ALTER TABLE " + T + " RENAME COLUMN batch_id TO consignment_id");
                 log.info("Provenance DB: renamed column batch_id -> consignment_id");

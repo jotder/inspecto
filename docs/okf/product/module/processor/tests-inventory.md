@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-453 test class(es): 183 unit, 270 real-HTTP control-plane, 0 IT.
+454 test class(es): 184 unit, 270 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -440,6 +440,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `OperationalDbTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/OperationalDbTest.java` | The one operational-database selection: DuckDB for Basic, PostgreSQL for Standard. |
 | `OptionalSpiTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/OptionalSpiTest.java` | {@link OptionalSpi} — the optional-module absence contract must survive a jar that is <b>present but |
 | `PipelineSchedulerEventTriggerTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/PipelineSchedulerEventTriggerTest.java` | {@link PipelineScheduler}'s event-trigger FILTERS, driven directly — the last of |
+| `PostgresBatchIdMigrationTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/PostgresBatchIdMigrationTest.java` | The {@code batch_id} → {@code consignment_id} open-time migrations (D-12, MoSCoW S4) on <b>real PostgreSQL</b>, |
 | `PostgresRunLeaseSchemaPerSpaceTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/PostgresRunLeaseSchemaPerSpaceTest.java` | The run lease (cross-process exclusion) on <b>real PostgreSQL</b>, schema-per-space, with many racing "pods" |
 | `PostgresSchemaPerSpaceStoresTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/PostgresSchemaPerSpaceStoresTest.java` | Two-Space probe on <b>real PostgreSQL</b>, schema-per-space, for the families the "Postgres multi-user" row still |
 | `PostgresSchemaPerSpaceTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/PostgresSchemaPerSpaceTest.java` | Schema-per-space wiring (BACKLOG "Postgres multi-user" P3): the URL derivation and fail-closed rules always run; |
