@@ -679,8 +679,20 @@ or is read under both names.
 MoSCoW S3). The operator decided 2026-11-16 to delete it in 4.0.0 itself; on 2026-11-17 that was found infeasible,
 and nothing was deleted. The parity gate is red since D-11 (2026-10-04): 31 shipped `output_store:` + step-chain
 Pipelines still write on the flat lane. And `inspecto migrate-configs` writes `pipelines/*.toon` recipes that no
-runtime loads. Until the operator re-scopes it, 4.0.0 keeps both lanes and `-Dingest.lane`, and this list carries
-no entry for the deletion.
+runtime loads. **Re-scoped 2026-11-17 (option 3, a deprecation note only; taken under the operator's instruction for
+the MoSCoW run, reversible):** 4.0.0 keeps both lanes and `-Dingest.lane`, and ships this entry:
+
+**Deprecated in 4.0.0, removal planned for 5.0.0 — the flat ingest write lane (`-Dingest.lane=flat`)**
+- Nothing changes in 4.0.0: every Pipeline writes as it did in 3.x, and `-Dingest.lane` keeps `auto`, `flat` and
+  `graph`.
+- In a later MAJOR the graph lane becomes the only ingest write lane. It will land only after three prerequisites
+  (board §2 *Row 15*): the graph lane carries an `output_store:` Pipeline's raw write; configs without a scratch
+  directory (`dirs.temp`) get a durable home for the branch-commit ledger; and a graph-only run of the whole test
+  suite is green.
+- Prepare: give each Pipeline config a `dirs.temp`. A Pipeline written for `-Dingest.lane=flat` behaviour should be
+  tested with `-Dingest.lane=graph`.
+- Not deprecated: `*_pipeline.toon` config files. Deleting that reader needs a runtime for `pipelines/*.toon`
+  recipes, and none is planned.
 
 **Decided 2026-11-16 to land before the tag (operator, MoSCoW S4 / C5; each adds its own entry above when it
 lands):** the X-Actor header path removed (landed 2026-11-17, entry above), the `batch_id` rename trio (landed
