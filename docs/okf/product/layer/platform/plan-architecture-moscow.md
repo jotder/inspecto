@@ -6,7 +6,9 @@
 > `ARCH-MOSCOW-UNTRACKED-1` owns checking each one and either filing or refusing it.
 > Re-rank when the next MAJOR is tagged or a first customer deployment is scheduled.
 > **Refreshed 2026-11-16:** the operator decided every Should and Could item in an interview (§8); the Must items
-> were postponed, unchanged. C14 moved to Won't. **Refreshed 2026-11-15:** the nightly CI and UI workflows are green on Linux again (CI at `47c5dc33f`, UI at
+> were postponed, unchanged. C14 moved to Won't. **Refreshed 2026-11-17:** the Must table checked against the board
+> and code — M1, M2, M3, M6 and M8 closed, M4 complete (release notes re-audited against `v3.12.0`), M5 and M7
+> operator-held. **Refreshed 2026-11-15:** the nightly CI and UI workflows are green on Linux again (CI at `47c5dc33f`, UI at
 > `16d259204`; red since 2026-11-11 and at least 2026-10-10), and every snapshot reader and writer now takes the swap
 > lock (M8 follow-up). **Refreshed 2026-11-14:** M1, M3, M6 and M8 are closed, as are S5, S13 and the layout half of S14; the
 > tables mark each with the date. The ranking itself was not redone.
@@ -42,17 +44,18 @@ Module-level architecture pages were not read for this ranking, so observability
 | # | Item | What is open | Why it is a Must | Waits on |
 |---|---|---|---|---|
 | M1 | `IMPORT-LOADER-CASE-TOON-1` and `SPACE-TEST-SUITE-RED-1` | Three tests of `inspecto-processor` are red on master, all around the `space.test` Job Type of SE-6a: a loader reads the fixed name `case.toon`, which is neither reserved nor allow-listed; `space.test` reports `classpath` where a test expects `builtin`; and one test fails only inside the full suite. | Master is red, and an import could plant the file. | The SE-6a owner: reserve or allow, and which provenance is right. **Closed:** both rows closed on the board by 2026-11-14. |
-| M2 | `ARCH-MOSCOW-UNTRACKED-1` item 1 *(no row of its own)* | Two records of 2026-11-12 disagree on whether master is green. The product-assembly plan records a green full Advanced reactor gate over `6a7d8c20b` plus PA-9b. A run of the whole `inspecto-processor` suite on `fe87aa121` (2,733 tests) had the three failures of M1, and two of them fail alone on `e45b25f9d`. **Settled 2026-11-12:** one full Advanced reactor gate on `f0aa137da` built 57 of 57 modules and ran 12,188 tests with 3 failures, 0 errors and 149 skipped (94 of them Postgres-backed). The failures are exactly the three of M1. | Master is red by M1 only. The gate has to be repeated daily, as the lane workflow says, or this answer goes stale. | Done; M1 remains. |
-| M3 | `JOB-SIGNAL-OVERLAP-SKIP-1` | An `on_signal` Job loses the last landing when a signal arrives while it runs. | A Dataset missed a month of data until another commit; three packs carry a cron workaround. | Nothing. |
-| M4 | Release notes for the next MAJOR (§2 of the board) | Breaking route removals are typed `docs:` in git, so a `feat!:` scan misses them; every `since = "4.0.0"` type is unpublished. | The release notes are generated from commit types; they would be wrong. | The MAJOR tag. **Audited 2026-11-15:** every change since `v3.11.0` checked against the route table, flags, main classes, public types and config keys, not commit types alone; 35 entries added, 2 corrected. Kept current from here as changes land. |
-| M5 | `RELEASE-PIPELINE-UNRUN-1` (was untracked item 2) and `MODULE-REORG-P3-THIN-JARS` | `release.yml` signing, SBOM and scan have never run on a tag; the keystore, secrets and TSA URL are owed. | Supply-chain claims are unproven and jars would ship unsigned. | Operator: keys and a release date. |
+| M2 | `ARCH-MOSCOW-UNTRACKED-1` item 1 *(no row of its own)* | Two records of 2026-11-12 disagree on whether master is green. The product-assembly plan records a green full Advanced reactor gate over `6a7d8c20b` plus PA-9b. A run of the whole `inspecto-processor` suite on `fe87aa121` (2,733 tests) had the three failures of M1, and two of them fail alone on `e45b25f9d`. **Settled 2026-11-12:** one full Advanced reactor gate on `f0aa137da` built 57 of 57 modules and ran 12,188 tests with 3 failures, 0 errors and 149 skipped (94 of them Postgres-backed). The failures are exactly the three of M1. | Master is red by M1 only. The gate has to be repeated daily, as the lane workflow says, or this answer goes stale. | **Settled 2026-11-12**, and M1 is closed since; nothing left. |
+| M3 | `JOB-SIGNAL-OVERLAP-SKIP-1` | An `on_signal` Job loses the last landing when a signal arrives while it runs. | A Dataset missed a month of data until another commit; three packs carry a cron workaround. | **Closed 2026-11-13** (board row closed): a coalesced Signal follow-up now waits for the Run in flight. |
+| M4 | Release notes for the next MAJOR (§2 of the board) | Breaking route removals are typed `docs:` in git, so a `feat!:` scan misses them; every `since = "4.0.0"` type is unpublished. | The release notes are generated from commit types; they would be wrong. | The MAJOR tag. **Audited 2026-11-15:** every change since `v3.11.0` checked against the route table, flags, main classes, public types and config keys, not commit types alone; 35 entries added, 2 corrected. **Complete 2026-11-17:** re-audited against `v3.12.0`, the newest tag (everything it shipped is on `master`): seven breaking entries and one deprecation added, and `since = "4.0.0"` types stated as new, not breaking. The §2 row stays open only to take further entries and to be pasted at the tag. |
+| M5 | `RELEASE-PIPELINE-UNRUN-1` (was untracked item 2) and `MODULE-REORG-P3-THIN-JARS` | `release.yml` signing, SBOM and scan have never run on a tag; the keystore, secrets and TSA URL are owed. | Supply-chain claims are unproven and jars would ship unsigned. | Operator: keys and a release date. **Open, operator-held** (2026-11-17). |
 | M6 | `ARCH-MOSCOW-UNTRACKED-1` item 3 *(no row of its own)* | Columns classed `CONFIDENTIAL` (for example AML `account_id`, `wallet_id`, `msisdn`) sit outside `ColumnClassification.SENSITIVE`, so they are not masked. **Confirmed in code and fixed for the shipped templates 2026-11-14** (`TEMPLATE-CONFIDENTIAL-UNMASKED-1`: eight identifier columns of `aml`, `mobile-money` and `telco-fraud` reclassified). **Closed 2026-11-14** (`CLASSIFICATION-UNMASKED-CLASS-1`): a save now refuses a class the Space does not know, and no shipped template holds `CONFIDENTIAL`. The two masking sets became one rule the same day (`MASKING-TWO-VOCABULARIES-1`, operator-confirmed: fail closed), and the bulk importers refuse an unknown class too (`CLASSIFICATION-BULK-IMPORT-UNGATED-1`). | Exposure of personal data; the maturity assessment calls it a due-diligence finding and sizes it in days. | Done. |
-| M7 | `ASSURE-OPERABILITY-1`, Deployment topology live validation, `DEPLOY-SERVICE-WRAPPER-1` | No recorded restore drill, RPO and RTO unmeasured, the kill -9 and reboot acceptance of the service wrapper unrun, the chart never installed. | The wrapper is the recovery mechanism; recovery that was never exercised is a claim, not a property. | Operator: targets and host access. |
+| M7 | `ASSURE-OPERABILITY-1`, Deployment topology live validation, `DEPLOY-SERVICE-WRAPPER-1` | No recorded restore drill, RPO and RTO unmeasured, the kill -9 and reboot acceptance of the service wrapper unrun, the chart never installed. | The wrapper is the recovery mechanism; recovery that was never exercised is a claim, not a property. | Operator: targets and host access. **Open, operator-held** (2026-11-17). |
 | M8 | `JOB-SNAPSHOT-SWAP-READER-RACE-1` | `SqlTemplateJob.swapIn` deletes the old snapshot while a running reader still reads it. | A dependent Job fails all its retries (seen in `la-banking`). | **Closed 2026-11-14:** the swap RENAMES the pinned file (deletion was not the cause); a per-store `SnapshotSwapLock` makes a publish wait for a `sql.template` reader. Other readers: `SNAPSHOT-SWAP-UNLOCKED-READERS-1` (P3). |
 
 Done: M1, M2 (2026-11-12), M3 (2026-11-13: a coalesced Signal follow-up now waits for the Run in flight), M6 and
-M8 (2026-11-14). Left: M4 (release notes, kept current as changes land), M5 and M7 — both wait on operator input
-(keys and a release date; targets and host access).
+M8 (2026-11-14), and M4 (2026-11-17: the 4.0.0 release notes are complete; entries are still added as changes land,
+and the section is pasted at the tag). Left: M5 and M7 — both wait on operator input (keys and a release date;
+targets and host access).
 
 ## 3. Should — 16 items
 
@@ -116,8 +119,9 @@ M8 (2026-11-14). Left: M4 (release notes, kept current as changes land), M5 and 
 1. **Master is green on CI again.** The tests red on 2026-11-12 (M1) and on 2026-11-13 are fixed, and on 2026-11-15
    both GitHub workflows passed every job on Linux, including the 31 modules that a failed module had kept from
    running for two weeks. No full reactor gate ran on this host since 2026-11-12; the nightly CI is the daily gate.
-2. **The release path is the largest unproven piece.** M4, M5 and M7 are all "it exists and has never
-   run": the release workflow, the recovery drill, the service wrapper acceptance. None needs design; each
+2. **The release path is the largest unproven piece.** M5 and M7 are both "it exists and has never
+   run": the release workflow, the recovery drill, the service wrapper acceptance (M4, the release notes, is
+   complete since 2026-11-17). None needs design; each
    needs an operator input and one execution.
 3. **The plain-engineering Musts are done** (M3, M6, M8, 2026-11-13/14). What is left needs the operator or a release.
 4. **Structure is in good shape.** No Must is about module boundaries: the split-package count is 0, the

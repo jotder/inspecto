@@ -41,9 +41,10 @@ Two consequences, and they govern every relocation and rename question on this c
 1. **`since()` is informational, and a value above 3.x means "will become public API in 4.0.0" —
    not "has been public API since".** Every `@PublicApi` element introduced after 3.x therefore
    carries `since = "4.0.0"`. Values of 4.1.0 … 5.8.0 were previously written against versions that
-   never existed; they were corrected to `4.0.0` in one sweep (200 sites). ⚠ Three written since then
-   still carry a version that never existed — `MailAttachment` and `DbEventStore` (`"5.0.0"`) and
-   `AcceptedConfigKeys` (`"5.2.0"`); read them as `4.0.0` (checked 2026-11-15).
+   never existed; they were corrected to `4.0.0` in one sweep (200 sites). Three written after that sweep
+   — `MailAttachment` and `DbEventStore` (`"5.0.0"`) and `AcceptedConfigKeys` (`"5.2.0"`) — were corrected
+   to `4.0.0` on 2026-11-16 (`PUBLICAPI-SINCE-VERSIONS-1`); no mark names a version above 4.0.0 now
+   (checked 2026-11-17). *(This item said the three were still wrong until 2026-11-17.)*
 2. **An element whose `since` is `4.0.0` has never been published in any release, so it may still be
    moved, renamed, or changed freely** — the stability promise binds *within a released major*, and
    4.0.0 is not released. ⛔ **`@PublicApi` alone does not make a change breaking.** Check whether the
@@ -79,6 +80,21 @@ relative to `v3.11.0`, the newest ancestor release. The list is the BACKLOG §2 
 MAJOR" row, moved here so it accrues in one place; add a line in the same commit as any further `feat!:`.
 The GitHub release is cut by `.github/workflows/release.yml` with `--generate-notes`; paste this section
 above the generated commit list.
+
+**Which release 4.0.0 follows.** The newest tag is `v3.12.0` (2026-06-05). It is one version-bump commit on top of
+`070778aa0`, which is on `master`'s history, so `v3.12.0` is not itself an ancestor but everything it shipped is:
+its six 3.12 performance commits (the auto-derived `duckdb_threads`, the parallel duplicate-check scan and partition
+reveal, the plugin `UNION ALL` view, the `sources.max` guidance) are still on `master`. These notes therefore cover
+an upgrade from `v3.11.0` or `v3.12.0` alike. Neither tag has `docs/api/openapi-v1.json` or `public-api.txt`; the
+3.x HTTP surface is the 32 routes of `ControlApi.registerRoutes`, and every one is still served under `/api/v1`
+(the `/pipelines/{name}/…` run routes as `/runs/{name}/…`, below). Re-audited 2026-11-17 against `v3.12.0`'s tree.
+
+**`@PublicApi(since = "4.0.0")` types are new in 4.0.0, not breaking changes.** About 220 marks carry `since =
+"4.0.0"`; none of those elements was in a release, so they are additions in this MAJOR, and a change made to one
+before the tag (a rename, a moved package, a new record component) needs no entry of its own. Where an entry
+below names one, it is because the route, file or behaviour it serves changed for users of trunk builds. What
+binds from 4.0.0 on is `platform/inspecto-api/public-api.txt` at the tag: within 4.x only additions are allowed.
+The breaking Java entries are those for the 17 types marked in `v3.12.0` (the first two groups below).
 
 **Breaking — surfaces that shipped in `v3.11.0` (M4 audit, 2026-11-15)**
 *Found by diffing the `v3.11.0` route table, `-D` reads, `main()` classes and `@PublicApi` types against `master`.
@@ -120,6 +136,53 @@ Most of these commits are not marked `!`, so a commit-type scan misses them.*
   `AssistAgent.init(SourceService)` → `init(ReadModel)` (`c23489da`); `AssistResult.confidence` `String` → <!-- vocab-allow: names the rename itself -->
   `double` (`0052240a`); `JobConfig.type()` returns `String`, not `JobType` (two deprecated `JobType`
   constructors remain) (`1826905b`).
+
+**Breaking — more surfaces that shipped in `v3.12.0` (M4 re-audit, 2026-11-17)**
+*Found by diffing `v3.12.0`'s tree: its `-D` reads, Job task parameters, `@PublicApi` signatures, `pom.xml` and bundle
+scripts. None of these commits is marked `!` except `757add5e`.*
+- **Java 27.** The core compiles at `maven.compiler.release=27`; 3.x targeted Java 24 (`ec49b7bd`, an unmarked commit
+  titled as an Edition rename, 2026-09-18). Bundles embed a Java 27 runtime unless `package.ps1 -NoRuntime` is used, and
+  then the host must provide Java 27 or later. An embedder must run on Java 27; a plugin jar built for an older
+  release still loads.
+- **DuckDB 2.0** (`2.0.0.0`; 3.x shipped `1.5.2.1`; `35e8def1`, 2026-10-22, `DUCKDB-2-MIGRATION-1`). SQL a user wrote
+  (a Dataset, a `sql.template` Job, a View, a calculated column) that uses the arrow lambda `x -> …` fails with a
+  Binder error: write `lambda x: …`. A stored `a ± b` of two `DECIMAL(18,s)` columns is now `DECIMAL(19,s)`, which
+  changes a sink's Parquet column type; `CAST` it back where the stored type matters. Values are unchanged. Parquet
+  files 1.5 wrote read the same on 2.0. Detail: [DuckDB integration](../engine/spec-duckdb.md).
+- **Job task paths are jailed** (`86c0306f`, 2026-08-14, unmarked; `b1556b75`). A path a Job task writes or deletes
+  under — the `cleanup` task's `dir` and `archive_dir`, `backup` / `backup_verify` / `restore` paths, `storage_report`
+  `dir`, a report's `out_dir` — must lie under `-Dassist.safety.roots` or the Space's own folder or data root, or the
+  Run fails. A 3.x `maintenance` Job whose `cleanup` `dir` is an absolute path elsewhere (`/mnt/…`) must have that
+  root added to `-Dassist.safety.roots`. No Job path may name a `*.secrets` directory. Relative paths: see the
+  config-root entry above.
+- **The 3.x bundle layout.** `run.sh <adapter>` / `run.bat` moved to `bin/` and look for
+  `spaces/*/config/<adapter>/*_pipeline.toon`, not `config/<adapter>/`, and the server launcher starts from `spaces/`.
+  Move a 3.x flat install into a Space once with `java -cp … com.gamma.service.SpaceMigrator [--dry-run] <configDir>`
+  ([configuration reference](../config/admin-guide-configuration-reference.md), *Migrating a flat deployment*); a
+  config that names a schema by an absolute path keeps pointing at the old place. Starting `ControlApi` with config
+  arguments and no `-Dspaces.root` still runs the 3.x single-tenant layout unchanged.
+- **The status ledgers are served from a database by default** (`757add5e`, 2026-08-31). `-Dstatus.backend` defaults
+  to `db`, not `file`: the status, batches and lineage reads come from a DuckDB projection (`inspecto_status_*`),
+  refreshed after every Run, and `/db/catalog` lists it as an `ops:` group. The CSV ledgers stay the durable record.
+  `-Dstatus.backend=file` keeps the 3.x behaviour.
+- **`POST /validate`** (`57432516`, 2026-09-23; `ccda98a8`). A `configPath` outside the allowed roots is **403** and a
+  path that is not a file **404**; a relative one resolves against the write root, not the working directory; a
+  config that does not load is **422**. A draft (`type` + `config`) always runs the full save gate: the `safety` flag
+  is ignored and `safetyChecked` is always `true`, so a draft 3.x reported clean can now carry findings.
+- **Java, the other `v3.12.0` `@PublicApi` types.** `ControlApi(SourceService, int, String)` and `(SourceService, int, <!-- vocab-allow: names the 3.x type -->
+  Tokens)` → `ControlApi(CollectorService, int)` and `ControlApi(SpaceManager, int)`; the nested `Tokens` and `Scope`
+  are removed. `ReportService(SourceService)` → `ReportService(ReadModel)`; <!-- vocab-allow: names the 3.x type -->
+  `ReportService.BatchAuditReport` → `ConsignmentAuditReport`, same components, so the `/runs/{name}/report` JSON is
+  unchanged. `JobService` and
+  `EnrichmentService` constructors take a `ConsignmentEventBus`, not a `BatchEventBus` (`ff33246a`). Records gained
+  components, so their canonical constructors changed while every 3.x accessor stays: `JobService.JobView` (`onSignal`
+  after `onPipeline`, five at the end) and `PipelineConfig.Dirs`, `.Processing`, `.CsvSettings`, `.Output` and
+  `.Schemas`. Unchanged: the plugin SPI `StreamingFileIngester`, `RecordSink` and `IngestResult`, `AssistRequest`,
+  `Diagnosis`, `DbStatusStore` (members added only) and `EnrichmentService.JobView`.
+
+**Deprecated, still read — 3.x config keys**
+- `processing.batch.{max_files, max_bytes}` → `collector.consignment.{max_files, max_bytes, order}` (`6478737b`,
+  2026-09-02). The old block is still read when the new one is absent, and a save through the editor moves it.
 
 **Security fixes — behaviour an integrator can see (SEC review, 2026-09-24)**
 - `POST /public/delivery-status/{adapterId}` refuses a body over **256 KiB** with **413
@@ -465,7 +528,7 @@ Most of these commits are not marked `!`, so a commit-type scan misses them.*
   (`7eab72d4`). `CollectorService.objects()` returns `Optional<ObjectAccess>`, because operational objects moved
   to the optional `inspecto-ops` module (`e8d98918`). `ConsignmentOutput` loses its `generation` component and
   every constructor's `int generation` parameter (`09740d56`). For the types that did ship in `v3.11.0`, see the
-  first group above.
+  first two groups above.
 
 **Operator-visible behaviour**
 - **Behaviour change (2026-10-25, `DATASET-CALC-NAME-COLLISION-1`):** a Dataset's `calculated` column may not reuse a
