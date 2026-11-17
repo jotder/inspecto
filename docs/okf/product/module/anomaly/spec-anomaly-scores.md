@@ -267,8 +267,10 @@ limit (`table.plugin.ts`), so `/bi/query` returns, and masks, only the top rows;
 `_latest` store holds one row per entity. ⚠ The golden run does not execute `anomaly.score` (no anomaly module in that test),
 so the tile reads an absent store until the Job's first run; its masking and top-N are pinned over real HTTP by
 `ControlApiBiQueryMaskingTest.anAnomalyTopTenTileIsMaskedOrderedAndLimitedForAViewer`. Retired to BACKLOG §6: hour buckets;
-the LA panel's Risk Score model gate. The pack goldens are property tests (2026-10-12). Later: an ML scorer behind the same explanation
-shape (D-AD2). (Shipped 2026-10-11 and removed from this list: refusing a classified cohort column at save;
+the LA panel's Risk Score model gate. The pack goldens are property tests (2026-10-12). The ML scorer is BUILT (`ANOMALY-ML-SCORING-1`,
+2026-10-18, form closed 2026-10-20): `method: isolation_forest` on the model (`AnomalyForestScorer`; the form authors
+`method` and the forest's `trees` / `sampleSize` / `seed`); the AML pack model `aml_account_transfers` ships on it, while
+telco-fraud and mobile-money stay on the robust scorer. Facts: [plan](plan.md), [analytics spec](../analytics/spec.md). (Shipped 2026-10-11 and removed from this list: refusing a classified cohort column at save;
 Feature `filters` / `unit` fields; unsaved-content preview; NULL as its own `peers.by` cohort value with a
 collision-free key.)
 
