@@ -1056,6 +1056,7 @@ com.gamma.etl.StatusStore | default List<Map<String, String>> consignmentFiles(P
 com.gamma.etl.StatusStore | default List<Map<String, String>> unpack(PipelineConfig)
 com.gamma.etl.StatusStore | default java.util.Optional<Map<String, String>> consignment(PipelineConfig, String)
 com.gamma.etl.StatusStore | public interface StatusStore
+com.gamma.etl.StatusStore | static List<Map<String, String>> latestPerFile(List<Map<String, String>>, int)
 com.gamma.etl.StreamingFileIngester | public interface StreamingFileIngester
 com.gamma.etl.StreamingFileIngester | void ingest(File, RecordSink, int, PipelineConfig) throws Exception
 com.gamma.event.DbEventStore | public DbEventStore(Connection)

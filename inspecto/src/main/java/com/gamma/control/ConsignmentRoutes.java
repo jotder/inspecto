@@ -109,7 +109,9 @@ final class ConsignmentRoutes implements RouteModule {
             List<Map<String, Object>> rows = new ArrayList<>();
             for (StepReceipt r : steps) rows.add(stepView(r));
             out.put("steps", rows);
-            out.put("stepsTotal", steps.size() < MAX_STEPS ? steps.size() : store.stepCount(id));
+            // The stored count, always: the page can be short of it below the cap too, when a receipt this build
+            // cannot read was skipped.
+            out.put("stepsTotal", store.stepCount(id));
         }
         if (store != null) {
             List<Map<String, Object>> rows = new ArrayList<>();

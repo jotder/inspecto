@@ -353,10 +353,14 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
         }
     }
 
+    /** Run ids bound per {@code IN} list in {@link #consignmentsOfRuns}: well under PostgreSQL's 65 535 bind
+     *  parameters per statement. */
+    static final int IN_CHUNK = 1000;
+
     /**
      * The Consignment each of {@code runIds} wrote — the {@code run_id} join of X5's {@code GET /consignments/{id}}
-     * (plan §3.7), which closes the gap that a job run row does not name its own Consignment. Two queries whatever
-     * the number of runs: the runs' Step Receipts answer first ({@code consignment_steps.run_id}); a run that left none
+     * (plan §3.7), which closes the gap that a job run row does not name its own Consignment. One query per table and
+     * per {@value #IN_CHUNK} runs, never one per run: the runs' Step Receipts answer first ({@code consignment_steps.run_id}); a run that left none
      * is answered by {@code consignment_outputs.run_id}. When a run wrote more than one, the oldest wins. A run that
      * wrote nothing has no entry; {@code null} and blank ids (an ingest lane's {@code ''} is not a run) are ignored.
      *
@@ -373,14 +377,18 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
                 for (String[] q : new String[][]{{STEPS, "recorded_at"}, {T, "written_at"}}) {
                     List<String> open = wanted.stream().filter(r -> !found.containsKey(r)).toList();
                     if (open.isEmpty()) return;
-                    String sql = "SELECT run_id, consignment_id FROM " + q[0] + " WHERE run_id IN ("
-                            + String.join(",", java.util.Collections.nCopies(open.size(), "?")) + ")"
-                            + " AND consignment_id IS NOT NULL GROUP BY run_id, consignment_id"
-                            + " ORDER BY run_id, min(" + q[1] + "), consignment_id";
-                    try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                        for (int i = 0; i < open.size(); i++) ps.setString(i + 1, open.get(i));
-                        try (ResultSet rs = ps.executeQuery()) {
-                            while (rs.next()) found.putIfAbsent(rs.getString(1), rs.getString(2));
+                    // Chunked: PostgreSQL caps one statement at 65 535 bind parameters.
+                    for (int from = 0; from < open.size(); from += IN_CHUNK) {
+                        List<String> chunk = open.subList(from, Math.min(open.size(), from + IN_CHUNK));
+                        String sql = "SELECT run_id, consignment_id FROM " + q[0] + " WHERE run_id IN ("
+                                + String.join(",", java.util.Collections.nCopies(chunk.size(), "?")) + ")"
+                                + " AND consignment_id IS NOT NULL GROUP BY run_id, consignment_id"
+                                + " ORDER BY run_id, min(" + q[1] + "), consignment_id";
+                        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                            for (int i = 0; i < chunk.size(); i++) ps.setString(i + 1, chunk.get(i));
+                            try (ResultSet rs = ps.executeQuery()) {
+                                while (rs.next()) found.putIfAbsent(rs.getString(1), rs.getString(2));
+                            }
                         }
                     }
                 }

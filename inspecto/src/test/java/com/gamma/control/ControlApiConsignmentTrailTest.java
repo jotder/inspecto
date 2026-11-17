@@ -5,7 +5,11 @@ import com.gamma.consignment.ConsignmentOutput;
 import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.consignment.ConsignmentSource;
 import com.gamma.consignment.DbConsignmentOutputStore;
+import com.gamma.etl.ConsignmentManifest;
+import com.gamma.etl.ManifestStore;
+import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
+import com.gamma.etl.StatusStore;
 import com.gamma.etl.TestConfigs;
 import com.gamma.job.JobConfig;
 import com.gamma.job.JobType;
@@ -86,11 +90,16 @@ class ControlApiConsignmentTrailTest {
 
     /** One seeded pipeline, a heartbeat Job, a run store, and an in-memory Consignment registry over real HTTP. */
     private Ctx open(Path dir) throws Exception {
+        return open(dir, null);
+    }
+
+    /** As {@link #open(Path)} over the given status store ({@code null} = the file-backed one). */
+    private Ctx open(Path dir, StatusStore status) throws Exception {
         Path toon = TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema()).write();
         Files.createDirectories(dir.resolve("inbox"));
         JobConfig hb = new JobConfig("hb", JobType.MAINTENANCE, null, null, true, false, Map.of("task", "heartbeat"));
         System.setProperty("jobs.audit.dir", dir.resolve("jobs_audit").toString());
-        CollectorService svc = new CollectorService(List.of(toon), List.of(), List.of(hb), 3600, 1, null);
+        CollectorService svc = new CollectorService(List.of(toon), List.of(), List.of(hb), 3600, 1, status);
         DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:");
         ConsignmentOutputStores.use(store);
         ControlApi api = new ControlApi(svc, 0);
@@ -275,6 +284,119 @@ class ControlApiConsignmentTrailTest {
             JsonNode body = trail(c.port, "c-many");
             assertEquals(ConsignmentRoutes.MAX_OUTPUTS, body.get("outputs").size());
             assertEquals(ConsignmentRoutes.MAX_OUTPUTS + 5, body.get("outputsTotal").asInt());
+        }
+    }
+
+    /**
+     * A status store whose ledger is what the test puts in it, read through the interface's default by-id methods (the
+     * file-backed store's path), counting how often each Pipeline is asked for a Consignment.
+     */
+    private static final class ListStatusStore implements StatusStore {
+        final List<Map<String, String>> batches = new java.util.concurrent.CopyOnWriteArrayList<>();
+        final Map<String, Integer> asked = new java.util.concurrent.ConcurrentHashMap<>();
+        public Set<String> committedBatches(PipelineConfig cfg) { return Set.of(); }
+        public List<Map<String, String>> batches(PipelineConfig cfg) { return List.copyOf(batches); }
+        public List<Map<String, String>> files(PipelineConfig cfg) { return List.of(); }
+        public List<Map<String, String>> lineage(PipelineConfig cfg, String b) { return List.of(); }
+        public List<Map<String, String>> quarantine(PipelineConfig cfg) { return List.of(); }
+        @Override
+        public Optional<Map<String, String>> consignment(PipelineConfig cfg, String id) {
+            asked.merge(cfg.identity().pipelineName(), 1, Integer::sum);
+            return StatusStore.super.consignment(cfg, id);
+        }
+    }
+
+    /** The parked manifest of {@code id}, so a PARKED ledger row has a {@code parked} block to serve. */
+    private static PipelineConfig parkManifest(Ctx c, String id) throws Exception {
+        PipelineConfig cfg = c.svc.loadedPipelines().get(0);
+        assertNotNull(cfg.dirs().manifestsDir(), "the test pipeline keeps manifests");
+        ConsignmentManifest m = new ConsignmentManifest();
+        m.batchId = id;
+        m.pipeline = cfg.identity().pipelineName();
+        m.members = List.of();
+        m.parkedAt = List.of("sink_b");
+        m.parkedTables = Map.of("sink_b", "park/" + id + "_sink_b");
+        ManifestStore.write(cfg.dirs().manifestsDir(), m);
+        return cfg;
+    }
+
+    /**
+     * Re-review: a drain appends the SUCCESS row after the PARKED row of one Consignment. The trail is served from
+     * the NEWEST row — through the default by-id read (the file-backed store's path).
+     */
+    @Test
+    void aDrainedConsignmentIsServedByItsNewestLedgerRow_storeDefault(@TempDir Path dir) throws Exception {
+        ListStatusStore ledger = new ListStatusStore();
+        try (Ctx c = open(dir, ledger)) {
+            parkManifest(c, "c-drained");
+            ledger.batches.add(Map.of("consignment_id", "c-drained", "status", "PARKED"));
+            JsonNode parked = trail(c.port, "c-drained");
+            assertEquals("PARKED", parked.get("status").asText(), parked.toString());
+            assertEquals("sink_b", parked.get("parked").get("at").get(0).asText(), "the setup serves a parked block");
+
+            ledger.batches.add(Map.of("consignment_id", "c-drained", "status", "SUCCESS"));
+            JsonNode drained = trail(c.port, "c-drained");
+            assertEquals("SUCCESS", drained.get("status").asText(), "the drain's row, not the stale PARKED one: " + drained);
+            assertFalse(drained.has("parked"), drained.toString());
+        }
+    }
+
+    /** As above, through {@code DbStatusStore}'s by-id query. */
+    @Test
+    void aDrainedConsignmentIsServedByItsNewestLedgerRow_dbStore(@TempDir Path dir) throws Exception {
+        java.sql.Connection conn = java.sql.DriverManager.getConnection("jdbc:duckdb:");
+        try (Ctx c = open(dir, new com.gamma.service.DbStatusStore(conn))) {
+            PipelineConfig cfg = parkManifest(c, "c-drained");
+            var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            String insert = "INSERT INTO inspecto_status_batches VALUES (?, ?, ?)";
+            try (var ps = conn.prepareStatement(insert)) {
+                ps.setString(1, cfg.identity().pipelineName());
+                ps.setLong(2, 1);
+                ps.setString(3, mapper.writeValueAsString(Map.of("consignment_id", "c-drained", "status", "PARKED")));
+                ps.executeUpdate();
+            }
+            JsonNode parked = trail(c.port, "c-drained");
+            assertEquals("PARKED", parked.get("status").asText(), parked.toString());
+            assertTrue(parked.has("parked"), "the setup serves a parked block: " + parked);
+
+            try (var ps = conn.prepareStatement(insert)) {
+                ps.setString(1, cfg.identity().pipelineName());
+                ps.setLong(2, 2);
+                ps.setString(3, mapper.writeValueAsString(Map.of("consignment_id", "c-drained", "status", "SUCCESS")));
+                ps.executeUpdate();
+            }
+            JsonNode drained = trail(c.port, "c-drained");
+            assertEquals("SUCCESS", drained.get("status").asText(), "the drain's row, not the stale PARKED one: " + drained);
+            assertFalse(drained.has("parked"), drained.toString());
+        }
+    }
+
+    /** {@code stepsTotal} is the stored count: a receipt this build cannot read is skipped from the page, not the total. */
+    @Test
+    void stepsTotalCountsAnUnreadableReceipt(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            c.store.recordSteps(List.of(receipt("c-bad", "run-b", 1, "src", null)));
+            c.store.browseSource().run(conn -> {
+                try (var st = conn.createStatement()) {
+                    st.execute("INSERT INTO consignment_steps (consignment_id, run_id, pipeline, lane, seq, receipt) "
+                            + "VALUES ('c-bad', 'run-b', 'cdr_rollup', 'job', 2, 'not a receipt')");
+                }
+            });
+            JsonNode body = trail(c.port, "c-bad");
+            assertEquals(1, body.get("steps").size(), body.toString());
+            assertEquals(2, body.get("stepsTotal").asInt(), "the stored count, not the parsed page: " + body);
+        }
+    }
+
+    /** The hint Pipeline (the registry's producer) is asked for the ledger row once, never again in the scan. */
+    @Test
+    void theHintPipelineIsAskedOnce(@TempDir Path dir) throws Exception {
+        ListStatusStore ledger = new ListStatusStore();
+        try (Ctx c = open(dir, ledger)) {
+            String name = c.svc.loadedPipelines().get(0).identity().pipelineName();
+            c.store.record(List.of(output("c-hinted", "run-h", "cdr", name)));
+            trail(c.port, "c-hinted");
+            assertEquals(Map.of(name, 1), ledger.asked, "asked once, though it is both the hint and registered");
         }
     }
 

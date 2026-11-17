@@ -77,15 +77,17 @@ run read, `downstream` = the runs that read it, each with **its own** `consignme
   With `-Dconsignment.steps=false`, `steps` and `lanes` are absent — never `[]`; with no Consignment registry (a
   Basic-like install) `outputs` and `steps` are absent and `known.outputs` is false. 404 only when no store knows
   the id (ledger, registry, receipts, run sources).
-- **The `run_id` join** (`DbConsignmentOutputStore.consignmentsOfRuns`, two queries for all the readers): a job run
+- **The `run_id` join** (`DbConsignmentOutputStore.consignmentsOfRuns`, one query per table per 1 000 runs — PostgreSQL caps a statement at 65 535 parameters): a job run
   row does not name its own Consignment, so `downstream[].consignmentId` comes from the run's receipts, else from
   `consignment_outputs.run_id`; `upstream` comes from the receipts'/outputs' `run_id` (the newest 20 runs) through
   the run store's sources. Ingest → job → back is one hop each way.
 - **Bounded.** Every collection is cut in its read (`LIMIT`) and carries its true total: `steps` 500
-  (`stepCount`), `outputs` 200 (`outputCount`), `members` 200 (`StatusStore.consignmentFiles`; the total is the
+  (`stepCount`, always the stored count: a receipt this build cannot read is skipped from the page, not the total), `outputs` 200 (`outputCount`), `members` 200 (`StatusStore.consignmentFiles`; the total is the
   ledger row's `member_count` when cut), `upstream` / `downstream` 50 (`runsDerivedFrom(id, limit)`,
-  `countRunsDerivedFrom`), Signals 50. The ledger row is found by id (`StatusStore.consignment`): the hint Pipeline
-  (the receipts' or registry's producer) first, every other Pipeline once; `DbStatusStore` answers both by a query
+  `countRunsDerivedFrom`), Signals 50. The ledger row is found by id (`StatusStore.consignment`) and is the NEWEST row of the id — a drain appends its
+  SUCCESS after the PARKED row, so the oldest would serve a drained Consignment as PARKED; `members` are the newest
+  row of each member file. The hint Pipeline (the receipts' or registry's producer) is asked first, every other
+  Pipeline once; `DbStatusStore` answers both by a query
   on the payload's `"consignment_id":<id>` text (LIKE, wildcards escaped, exact match re-checked), the file store
   by filtering its rows.
 - **Status** is the ledger row's; for a job-lane Consignment the newest run's, from the live-run registry, else

@@ -938,6 +938,24 @@ class DbConsignmentOutputStoreTest {
         }
     }
 
+    /** The {@code IN} list is chunked (PostgreSQL caps a statement at 65 535 parameters): runs past the first chunk
+     *  are still joined, by both tables. */
+    @Test
+    void theRunIdJoinChunksALongRunList() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            int n = DbConsignmentOutputStore.IN_CHUNK * 2 + 500;
+            List<String> runs = new java.util.ArrayList<>();
+            for (int i = 0; i < n; i++) runs.add("run-" + i);
+            db.recordSteps(List.of(step("c-first", "run-0", "job", 1, "src", 1),
+                    step("c-last", "run-" + (n - 1), "job", 1, "src", 1)));
+            db.record(List.of(withRun("c-mid", "run-" + (DbConsignmentOutputStore.IN_CHUNK + 7), "/o/m", 1, State.LIVE)));
+
+            Map<String, String> found = db.consignmentsOfRuns(runs);
+            assertEquals(Map.of("run-0", "c-first", "run-" + (n - 1), "c-last",
+                    "run-" + (DbConsignmentOutputStore.IN_CHUNK + 7), "c-mid"), found);
+        }
+    }
+
     /** X5 L4 bounds: the route's reads are cut in SQL, and the counts give the true totals. */
     @Test
     void boundedReadsCutInTheQueryAndCountTheRest() throws Exception {

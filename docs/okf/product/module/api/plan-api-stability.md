@@ -709,8 +709,9 @@ Additive: nothing existing changes shape.
   `PipelineExecutor.WalkObserver`, and `DbConsignmentOutputStore.recordSteps` / `steps` / `stepCount` /
   `outputCount` / `consignmentsOfRuns`; beside them `DbJobRunStore.run` / `countRunsDerivedFrom` and the bounded
   overloads `outputs(id, limit)`, `steps(id, limit)`, `runsDerivedFrom(id, limit)`, and two default methods on the
-  `StatusStore` SPI, `consignment(cfg, id)` and `consignmentFiles(cfg, id, limit)` (additive: an existing
-  implementation inherits them).
+  `StatusStore` SPI, `consignment(cfg, id)` (the newest ledger row of the id) and `consignmentFiles(cfg, id, limit)` (the newest row per
+  member file), with the static helper `StatusStore.latestPerFile` (additive: an existing implementation inherits
+  them).
 - **New: `GET /consignments/{consignmentId}`** returns one Consignment across lanes — status, member files, its
   Step Receipts, outputs, the job runs that read it (each with the Consignment that run wrote), what its own run read,
   and its Signals; `known.{steps,runs,outputs}` says which stores could answer, and a store that cannot leaves its

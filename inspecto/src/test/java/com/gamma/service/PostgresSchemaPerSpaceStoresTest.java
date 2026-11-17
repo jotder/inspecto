@@ -272,4 +272,44 @@ class PostgresSchemaPerSpaceStoresTest {
             return rs.getInt(1);
         }
     }
+
+    /** X5 L4 re-review on PostgreSQL: a drained Consignment's newest ledger row (the drain's SUCCESS after PARKED)
+     *  is the one the by-id read returns, and each member file reads its newest row. */
+    @Test
+    void status_byIdReadsTheNewestRow(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema()).name("x5_drain").load();
+        StatusStore source = new StatusStore() {
+            @Override public Set<String> committedBatches(PipelineConfig c) { return Set.of("c-d"); }
+            @Override public List<Map<String, String>> batches(PipelineConfig c) {
+                return List.of(Map.of("consignment_id", "c-d", "status", "PARKED"),
+                        Map.of("consignment_id", "c-d", "status", "SUCCESS"));
+            }
+            @Override public List<Map<String, String>> files(PipelineConfig c) {
+                return List.of(Map.of("consignment_id", "c-d", "filename", "a.csv", "status", "FAILED"),
+                        Map.of("consignment_id", "c-d", "filename", "a.csv", "status", "SUCCESS"));
+            }
+            @Override public List<Map<String, String>> lineage(PipelineConfig c, String b) { return List.of(); }
+            @Override public List<Map<String, String>> quarantine(PipelineConfig c) { return List.of(); }
+        };
+        try (DbStatusStore db = DbStatusStore.open(urlA, null, null)) {
+            db.sync(source, List.of(cfg));
+            assertEquals("SUCCESS", db.consignment(cfg, "c-d").orElseThrow().get("status"));
+            List<Map<String, String>> files = db.consignmentFiles(cfg, "c-d", 10);
+            assertEquals(1, files.size(), files.toString());
+            assertEquals("SUCCESS", files.get(0).get("status"));
+            assertTrue(db.consignment(cfg, "c-%").isEmpty(), "a LIKE wildcard in the id is a literal");
+        }
+    }
+
+    /** X5 L4 re-review on PostgreSQL: the run_id join binds more run ids than one statement may (65 535). */
+    @Test
+    void consignmentOutputs_runIdJoinPastThePostgresParameterCap() throws Exception {
+        try (DbConsignmentOutputStore st = DbConsignmentOutputStore.open(urlA)) {
+            st.record(List.of(new ConsignmentOutput("c-far", "run-69999", "cdr", "p", null, "/o/far", 1, 1,
+                    "2026-11-17T00:00:00Z", ConsignmentOutput.State.LIVE, null, null, "x")));
+            List<String> runs = new java.util.ArrayList<>();
+            for (int i = 0; i < 70_000; i++) runs.add("run-" + i);
+            assertEquals(Map.of("run-69999", "c-far"), st.consignmentsOfRuns(runs));
+        }
+    }
 }
