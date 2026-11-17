@@ -6,6 +6,7 @@ Add a lesson as a new file here + one line below, in the same change. Personal o
 ## Build & test traps
 - [Stale sibling jar](stale-sibling-jar-trap.md) — `-pl` without `-am` or `-rf` tests the stale ~/.m2 jar; find the symbol's owning module first; parallel lanes overwrite the shared repo mid-run → private `-Dmaven.repo.local` + `maven.repo.local.tail`
 - [Maven verdict traps](maven-verdict-traps.md) — `-Dsurefire.failIfNoSpecifiedTests=false`, per-class `Tests run:`, WARNING summaries, stale reports, System.exit, -DargLine
+- [Flaky test diagnosis](flaky-test-diagnosis.md) — capture the real exception before bisecting a ~1-in-3 failure; Windows: directory rename refused while a handle is open, `python3` Store alias EACCES → bounded retry
 - [Editions & toolchain](editions-and-toolchain.md) — Basic/Standard/Advanced/Preview profiles; default Standard; JAVA_HOME must be JDK 27
 - [Falsify negative tests](falsify-negative-tests.md) — probe must succeed without the guard; whole-feature mutants; classifier refuses guard edits
 - [CI gates beyond the reactor](ci-gates-beyond-the-reactor.md) — CI is nightly/on-demand; run ci.yml guards locally before every push
