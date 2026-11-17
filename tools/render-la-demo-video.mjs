@@ -122,10 +122,10 @@ function noteFilters(notes, sceneIdx) {
   notes.forEach((nt, k) => {
     if (nt.type === 'ring') {
       overlays.push({ png: ringPng(nt.r), x: nt.x - nt.r - 6, y: nt.y - nt.r - 6, en: en(nt.t0, nt.t1) });
-      if (nt.label) texts.push(`${DT}:text='${nt.label.replace(/'/g, '')}':fontsize=44:fontcolor=white:box=1:boxcolor=black@0.7:boxborderw=12:x=${nt.x + nt.r + 14}:y=${nt.y - 24}:${en(nt.t0, nt.t1)}`);
+      if (nt.label) texts.push(`${DT}:text='${String(nt.label).replace(/['"\:%]/g, ' ').trim()}':fontsize=44:fontcolor=white:box=1:boxcolor=black@0.7:boxborderw=12:x=${nt.x + nt.r + 14}:y=${nt.y - 24}:${en(nt.t0, nt.t1)}`);
     } else if (nt.type === 'box') {
       texts.push(`drawbox=x=${nt.x}:y=${nt.y}:w=${nt.w}:h=${nt.h}:color=0xffd60a@0.95:t=6:${en(nt.t0, nt.t1)}`);
-      if (nt.label) texts.push(`${DT}:text='${nt.label.replace(/'/g, '')}':fontsize=44:fontcolor=white:box=1:boxcolor=black@0.7:boxborderw=12:x=${nt.x}:y=${nt.ly ?? Math.max(10, nt.y - 70)}:${en(nt.t0, nt.t1)}`);
+      if (nt.label) texts.push(`${DT}:text='${String(nt.label).replace(/['"\:%]/g, ' ').trim()}':fontsize=44:fontcolor=white:box=1:boxcolor=black@0.7:boxborderw=12:x=${nt.x}:y=${nt.ly ?? Math.max(10, nt.y - 70)}:${en(nt.t0, nt.t1)}`);
     } else if (nt.type === 'zoom') zooms.push(nt);
   });
   return { overlays, texts, zooms };

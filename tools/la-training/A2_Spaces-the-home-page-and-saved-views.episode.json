@@ -1,0 +1,14 @@
+{"scenario":"episode","edition":"Basic","base":"http://127.0.0.1:8099","steps":[
+{"scene":"S01","card":{"lines":["Inspecto LA training","A2  Spaces, the home page and saved views"],"secs":6},"steps":[{"space":"la-telecom"},{"open":"/","settle":3000},{"wait":1500}]},
+{"scene":"S02","steps":[{"wait":1500},{"label":"Telecom, switch Space"},{"wait":6000},{"exact":"Telecom","soft":true},{"wait":3500},{"mark":"Space: Telecom","box":[215,98,112,18]}]},
+{"scene":"S03","steps":[{"wait":2500},{"mark":"Space line","box":[215,98,112,18]},{"move":[310,705],"ms":900},{"wait":2500},{"move":[519,705],"ms":900},{"wait":2500},{"move":[729,705],"ms":900},{"wait":2500}]},
+{"scene":"S04","steps":[{"wait":2500},{"move":[900,290],"ms":900},{"wait":6000},{"label":"Next page of saved views","soft":true},{"wait":4000},{"mark":"1 of 6","box":[1290,355,150,40]},{"label":"Previous page of saved views","soft":true},{"wait":2500},{"log":"(()=>{const s=document.querySelector('select');if(!s)return 'no select';s.value='10';s.dispatchEvent(new Event('change',{bubbles:true}));return s.value})()"},{"wait":4000}]},
+{"scene":"S05","steps":[{"label":"Search saved views"},{"wait":800},{"type":"sim swap"},{"wait":6000},{"mark":"description","box":[240,255,420,70]},{"sel":"button[aria-label*=\"lear\"]","soft":true},{"wait":3000}]},
+{"scene":"S06","steps":[{"wait":2000},{"move":[1250,500],"ms":900},{"wait":8000}]},
+{"scene":"S07","steps":[{"click":"Mfs sim swap bursts"},{"wait":8000},{"move":[300,30],"ms":900},{"wait":5000},{"mark":"saved view chip","box":[244,18,208,24]}]},
+{"scene":"S08","steps":[{"at":[350,30]},{"wait":3000},{"mark":"facts","box":[540,430,335,146]},{"wait":4000},{"mark":"Generic","box":[540,492,175,22]},{"wait":8000}]},
+{"scene":"S09","steps":[{"at":[1042,270]},{"wait":800},{"selectAll":1},{"type":"SIM swap bursts, staff logins"},{"wait":1500},{"button":"Save"},{"wait":5000}]},
+{"scene":"S10","steps":[{"at":[350,30]},{"wait":2500},{"button":"Version history"},{"wait":3500},{"mark":"newest row","box":[518,433,562,35]},{"wait":5000},{"button":"Close"},{"wait":1500}]},
+{"scene":"S11","steps":[{"at":[1042,270]},{"wait":600},{"selectAll":1},{"type":"Mfs sim swap bursts"},{"wait":500},{"button":"Save"},{"wait":2500},{"label":"Telecom, switch Space"},{"wait":1500},{"exact":"New Space…"},{"wait":2500},{"type":"Scratch"},{"wait":1500},{"exact":"Generic","soft":true},{"wait":1500},{"button":"Create"},{"wait":5000},{"label":"Inspecto LA home","soft":true},{"wait":5000},{"mark":"Getting started","box":[215,200,1250,400]},{"wait":3000},{"button":"Try the sample","soft":true},{"wait":12000}]},
+{"scene":"S12","card":{"lines":["Try it","Next: A3  Your data"],"secs":5},"steps":[{"wait":1000}]}
+]}

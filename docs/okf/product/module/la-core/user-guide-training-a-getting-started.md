@@ -164,7 +164,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: before/after hold: page 1 → page 2 (one card) → all six on one page; mark the counter.
 
 ### S05 · Search saved views
-- Voice: With many views, search instead. Type sim in Search saved views: the list narrows to the matching views, here the SIM-swap view. Its description says what it keeps: every swap by a staff login that made fifteen or more within ten days, and what followed. A good description is what makes a saved view findable months later. Clear the box to see them all again.
+- Voice: With many views, search instead. Type sim swap in Search saved views: the list narrows to the matching view, here the SIM-swap view. Its description says what it keeps: every swap by a staff login that made fifteen or more within ten days, and what followed. A good description is what makes a saved view findable months later. Clear the box to see them all again.
 - Chip: Search saved views
 - Action: type `sim` in *Search saved views* ▸ hold on `mfs_sim_swap_bursts` ▸ clear the box. [check in UI: what the search matches (name only, or name and description); if `sim` also matches other descriptions, type `swap`]
 - Impact: before/after hold: six cards → one; mark its description.
@@ -194,7 +194,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: before/after hold: the chip's name changes; the graph does not move.
 
 ### S10 · Version history
-- Voice: Open the dialog again and press Version history. Each saved version of the view is listed, newest first, so a rename or a changed graph can be traced back. That is a record of what the view was. It is still not evidence: opening any version re-reads live data.
+- Voice: Open the dialog again and press Version history. Each saved version of the view is listed, newest first, with when it was saved and a Restore button, so a rename or a changed graph can be traced back. That is a record of what the view was. It is still not evidence: opening any version re-reads live data.
 - Chip: Version history
 - Action: click the chip ▸ Version history ▸ hold ▸ close. [check in UI: what the history lists (a row per save, with who and when), and that the rename from S09 is its newest row; reword to what it shows]
 - Impact: mark the newest row.

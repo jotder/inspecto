@@ -154,6 +154,7 @@ const SCENARIOS = {
           if ('button' in st) return h.clickButton(st.button);
           if ('sel' in st) return h.clickSel(st.sel);
           if ('rightOf' in st) return h.clickRightOf(st.rightOf);
+          if (st.selectAll) { await h.ev('document.activeElement && document.activeElement.select && document.activeElement.select()'); return; }   // select the focused field's text before typing over it
           if ('type' in st) return h.type(st.type, st.perChar ?? 85);
           if ('key' in st) return h.key(st.key);
           if (st.escape) return h.escape();
