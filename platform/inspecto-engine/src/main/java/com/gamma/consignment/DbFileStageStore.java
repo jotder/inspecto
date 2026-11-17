@@ -118,10 +118,10 @@ public final class DbFileStageStore implements AutoCloseable, com.gamma.util.Bro
             st.execute(CREATE);
             conn.commit();
         } catch (SQLException e) {
-            conn.rollback();
+            try { conn.rollback(); } catch (SQLException ignore) { /* best effort */ }
             throw e;
         } finally {
-            conn.setAutoCommit(auto);
+            try { conn.setAutoCommit(auto); } catch (SQLException ignore) { /* best effort */ }
         }
     }
 
