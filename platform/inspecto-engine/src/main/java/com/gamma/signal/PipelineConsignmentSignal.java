@@ -92,8 +92,9 @@ public final class PipelineConsignmentSignal {
      * into a {@code pipeline.commit} Signal, so publishing one would fire {@code on_signal: pipeline.commit} Jobs on
      * a failure. The payload is the ingest lane's failure shape minus the counts this lane does not hold:
      * {@code dryRun}, {@code status}, {@code durationMs}, {@code error} (when known) and, per plan §3.4,
-     * {@code failedStep} / {@code code} when a Step owns the failure. Subject: the Pipeline; source: the Job;
-     * correlation: the Consignment. Never throws.
+     * {@code failedStep} / {@code code} when a Step owns the failure. Subject: the Pipeline (the Job when a refusal
+     * came before the Pipeline was known); source: the Job; correlation: the Consignment. Raised by
+     * {@code JobService} once per Run that ENDS FAILED — never for a cancelled Run or a retried attempt. Never throws.
      */
     public static void emitJobFailed(String job, String pipeline, String consignmentId, String error, long durationMs,
                                      boolean dryRun, FailedStep failed) {
@@ -105,7 +106,7 @@ public final class PipelineConsignmentSignal {
         putFailedStep(payload, failed);
         String type = "pipeline.batch.failed";
         Signal signal = new Signal(null, type, Instant.now(), Severity.WARN,
-                Ref.of("job", job), Ref.of("pipeline", pipeline),
+                Ref.of("job", job), pipeline != null ? Ref.of("pipeline", pipeline) : Ref.of("job", job),
                 consignmentId, null, null, null, type, payload, 1);
         try {
             EventLog.current().emit(signal.toEvent());

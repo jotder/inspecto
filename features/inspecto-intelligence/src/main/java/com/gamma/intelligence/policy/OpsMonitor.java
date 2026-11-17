@@ -201,6 +201,9 @@ public final class OpsMonitor implements AutoCloseable {
             Signal s = Signal.fromEvent(e);
             if (s.type() != null && s.type().startsWith("agent.")) return;   // never chase own telemetry
             if (!TRIGGER_BATCH_FAILED.equals(s.type())) return;              // pilot trigger only
+            // X5 D9: a failed at-rest JOB run raises the same type (source job:<name>); its recovery is the Job's own
+            // `retries`, and a pipeline_rerun of its Consignment id would name an ingest batch that does not exist.
+            if (s.source() != null && "job".equals(s.source().kind())) return;
             String pipeline = s.subject() != null ? s.subject().id() : null;
             String batchId = s.correlationId();                             // ConsignmentAuditWriter sets this
             if (pipeline == null || pipeline.isBlank() || batchId == null || batchId.isBlank()) return;

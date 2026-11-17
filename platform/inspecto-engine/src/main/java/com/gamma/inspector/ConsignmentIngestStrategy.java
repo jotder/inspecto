@@ -214,11 +214,11 @@ interface ConsignmentIngestStrategy {
         // them). Whether rules exist is a property of the space registry, not of the config, so this
         // is the only place the answer is knowable.
         // X5 L3: the pass reached the write tail; the rows meeting the Decision Rules are the transform phase's in.
-        IngestTrail.phase(batchId, IngestTrail.TRANSFORM);
+        IngestTrail.phase(IngestTrail.TRANSFORM);
         long rowsIn = IngestTrail.rows(conn, table);
         DecisionRuleApplier.Result applied = DecisionRuleApplier.apply(
                 conn, table, cfg, dbDir, baseName, partCols, batchId, srcIdToFile);
-        IngestTrail.phase(batchId, IngestTrail.SINK);   // a lane refusal from here on is the write's, no phase's
+        IngestTrail.phase(IngestTrail.SINK);   // a lane refusal from here on is the write's, no phase's
 
         // A multi-schema batch reaches here ONCE PER SEGMENT (UnionModeIngester), each call holding that
         // segment's own materialised table and writing under database/<segKey>. So the admission must ask
@@ -232,7 +232,7 @@ interface ConsignmentIngestStrategy {
         String segKey = segmentWrite(cfg, writeScope);
         if (segKey == null && cfg.routeConfig() != null) segKey = selectorWrite(cfg, selectedTable);
         com.gamma.pipeline.PipelineGraph lifted = admittedLift(cfg, applied, segKey);
-        IngestTrail.fork(batchId, rowsIn, applied.moved(), lifted != null ? null : laneFlatReason(cfg, applied, segKey));
+        IngestTrail.fork(rowsIn, applied.moved(), lifted != null ? null : laneFlatReason(cfg, applied, segKey));
         return lifted != null
                 ? graphWriteAndTrace(conn, table, partCols, cfg, dbDir, baseName, batchId, srcIdToFile,
                         lifted, applied, writeScope, segKey)
@@ -398,7 +398,7 @@ interface ConsignmentIngestStrategy {
             // HA-GRACEFUL-STOP-LEASE-RELEASE-1: the shared output-write choke point — a cancelled run writes no more.
             CommitFence.checkpoint(CommitFence.Scope.RUN, cfg.identity().pipelineName());
             String destDir = fanOut ? Paths.get(dest.database()).resolve(rel).toString() : dbDir;
-            IngestTrail.sinkStarted(batchId, d);   // X5 L3: a throw from here to sinkWritten is this destination's
+            IngestTrail.sinkStarted(d);   // X5 L3: a throw from here to sinkWritten is this destination's
             // B4: dest.filenameColumn() (null = byte-identical) translates __src_id into a source-file
             // column via the same map the lineage ledger uses.
             List<PartitionOutput> outs = PartitionWriter.write(conn, writeTable, destDir,
@@ -407,7 +407,7 @@ interface ConsignmentIngestStrategy {
             outputs.addAll(outs);
             List<LineageRow> destLineage = LineageCollector.collect(conn, writeTable, batchId, srcIdToFile, outs, partCols);
             lineage.addAll(destLineage);
-            IngestTrail.sinkWritten(batchId, d, destLineage.stream().mapToLong(LineageRow::rowCount).sum(), outs.size());
+            IngestTrail.sinkWritten(d, destLineage.stream().mapToLong(LineageRow::rowCount).sum(), outs.size());
             // Re-key onto files, and only these files: applied.outputs() came from a different relation.
             for (PartitionOutput o : outs) {
                 EventTimeBounds b = byPartition.get(o.partition());

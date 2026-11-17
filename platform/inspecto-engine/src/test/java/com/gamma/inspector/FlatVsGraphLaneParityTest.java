@@ -362,6 +362,65 @@ class FlatVsGraphLaneParityTest {
         }
     }
 
+    /**
+     * X5 L3 review — a trail belongs to ONE pass. Two Pipelines writing a Consignment with the same id at the same
+     * time each keep their own counts: the trail travels in the call context, never in a map keyed by the id.
+     */
+    @Test
+    void twoConcurrentSameIdConsignmentsInDifferentPipelinesKeepSeparateTrails(@TempDir Path dir) throws Exception {
+        PipelineConfig a = config(dir.resolve("a"), dir.resolve("db_a").toString());
+        PipelineConfig b = config(dir.resolve("b"), dir.resolve("db_b").toString());
+        java.util.concurrent.CyclicBarrier written = new java.util.concurrent.CyclicBarrier(2);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var fa = pool.submit(() -> sinkRowsOfOnePass(a, "(VALUES ('E1', 1.0, DATE '2020-04-03', 0), "
+                    + "('A2', 2.0, DATE '2020-04-03', 0), ('X3', 3.0, DATE '2020-04-04', 1))", written));
+            var fb = pool.submit(() -> sinkRowsOfOnePass(b, "(VALUES ('B1', 1.0, DATE '2020-04-03', 0), "
+                    + "('B2', 2.0, DATE '2020-04-03', 0))", written));
+            assertEquals(3L, fa.get(60, java.util.concurrent.TimeUnit.SECONDS), "pipeline a's own three rows");
+            assertEquals(2L, fb.get(60, java.util.concurrent.TimeUnit.SECONDS), "pipeline b's own two rows");
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    /** One pass of {@code cfg} over {@code values} under Consignment id {@code SAME}, in its own trail; the sink rows
+     *  its receipts report, read after BOTH passes have written (the barrier), so a shared trail would show both. */
+    private static long sinkRowsOfOnePass(PipelineConfig cfg, String values,
+                                          java.util.concurrent.CyclicBarrier written) throws Exception {
+        IngestTrail.Trail trail = new IngestTrail.Trail();
+        File db = ConsignmentIngestStrategy.openTempDb(cfg, "trail_");
+        try (Connection conn = DuckDbUtil.openConnection(db)) {
+            try (Statement st = conn.createStatement()) {
+                st.execute("CREATE TABLE transformed AS SELECT * FROM " + values + " AS t(ID, AMT, EVENT_DATE, __src_id)");
+            }
+            ScopedValue.where(IngestTrail.CURRENT, trail).call(() -> ConsignmentIngestStrategy.writeAndTrace(conn,
+                    "transformed", List.of(), cfg, cfg.dirs().database(), "feed", "SAME",
+                    Map.of(0, "feed.csv", 1, "feed.csv"), ""));
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+        written.await(30, java.util.concurrent.TimeUnit.SECONDS);
+        IngestOutcome outcome = new IngestOutcome(java.time.LocalDateTime.now(), "SUCCESS", "", List.of(), List.of(),
+                List.of(), List.of(), 0, "mini");
+        return IngestTrail.receipts(trail, "SAME", cfg.identity().pipelineName(), "run", outcome, "", 1, null, false)
+                .stream().filter(r -> "sink.persistent".equals(r.kind()) || r.step().startsWith("sink:"))
+                .mapToLong(StepReceipt::in).sum();
+    }
+
+    /** A workbench test run records into a throwaway trail — never into the pass bound around it. */
+    @Test
+    void aWorkbenchTestRunNeverTouchesTheTrailOfThePassAroundIt(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = config(dir.resolve("wb"), dir.resolve("db_wb").toString());
+        Path feed = Files.createDirectories(Path.of(cfg.dirs().poll())).resolve("feed.csv");
+        Files.writeString(feed, "ID,AMT,EVENT_DATE\nE1,1.0,2020-04-03\nA2,2.0,2020-04-03\n");
+        IngestTrail.Trail real = new IngestTrail.Trail();
+        PipelineTestRun.Result r = ScopedValue.where(IngestTrail.CURRENT, real)
+                .call(() -> PipelineTestRun.run(cfg, List.of(feed), dir.resolve("scratch")));
+        assertEquals("SUCCESS", r.status(), r.error());
+        assertFalse(real.recorded(), "the test run wrote nothing into the real pass's trail");
+    }
+
     /** The one Consignment a config's run committed — its manifest's name under {@code <cfgDir>/status}. */
     private static String consignmentOf(Path cfgDir) throws Exception {
         try (Stream<Path> w = Files.walk(cfgDir.resolve("status"))) {

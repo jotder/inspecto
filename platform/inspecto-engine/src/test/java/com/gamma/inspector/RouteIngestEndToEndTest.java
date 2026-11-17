@@ -487,6 +487,56 @@ class RouteIngestEndToEndTest {
             Map<String, Object> payload = failed.get(0).payload();
             assertEquals("sql__emea", payload.get("failedStep"), "the Signal names the Step: " + payload);
             assertEquals(boom.diag().code(), payload.get("code"));
+
+            // Never store values: DuckDB's error quotes the cell ('E1'); what reached consignment_steps holds a
+            // fingerprint token in its place — read from the raw column, not through the scrubbing reader.
+            List<String> stored = com.gamma.consignment.StepReceiptRows.storedMessages(registry, batchId);
+            assertFalse(stored.isEmpty(), "the FAILED receipts carry a message");
+            assertTrue(stored.stream().noneMatch(m -> m.contains("E1")
+                    || com.gamma.consignment.StepReceiptRows.quotesAValue(m)), "a value reached the table: " + stored);
+        });
+    }
+
+    /**
+     * Never store values, on the drain: a parked branch whose drain write fails on a value (here a member id the
+     * lineage read cannot turn into a number) leaves a FAILED {@code drain} receipt whose stored message holds a
+     * fingerprint token, never the value.
+     */
+    @Test
+    void aDrainWriteThatFailsOnAValueStoresATokenNotTheValue(@TempDir Path dir) throws Exception {
+        Path toon = dir.resolve("park_pipeline.toon");
+        Files.writeString(toon, parkFixture(dir, true));
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Files.writeString(Files.createDirectories(Path.of(cfg.dirs().poll())).resolve("feed.csv"),
+                "ID,AMT,EVENT_DATE\nE1,1.0,2020-04-03\nA2,2.0,2020-04-03\nX3,3.0,2020-04-03\n");
+
+        withSpaceAndRegistry((log, registry) -> {
+            CollectorProcessor.run(cfg);
+            String batchId = parkedBatchId(dir);
+            // Corrupt the park table's member id with a value: the drain's lineage read fails on it.
+            Path park = dir.resolve("backup").resolve("parked").resolve(batchId + "__sink__d1.parquet");
+            Path tmp = dir.resolve("park_tmp.parquet");
+            java.io.File db = com.gamma.util.DuckDbUtil.tempDbFile("x5_park_");
+            try (var c = com.gamma.util.DuckDbUtil.openConnection(db); var st = c.createStatement()) {
+                st.execute("COPY (SELECT * EXCLUDE (__src_id), 'SECRET_9' AS __src_id FROM read_parquet('"
+                        + park.toString().replace('\\', '/') + "')) TO '" + tmp.toString().replace('\\', '/')
+                        + "' (FORMAT parquet)");
+            } finally {
+                com.gamma.util.DuckDbUtil.deleteTempDb(db);
+            }
+            Files.move(tmp, park, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+            Files.writeString(toon, parkFixture(dir, false));
+            assertThrows(Exception.class, () -> DrainCommand.run(toon.toString(), batchId));
+
+            StepReceipt failed = registry.steps(batchId).stream()
+                    .filter(r -> StepReceipt.LANE_DRAIN.equals(r.lane())).findFirst()
+                    .orElseThrow(() -> new AssertionError("no drain receipt: " + registry.steps(batchId)));
+            assertEquals(StepReceipt.Outcome.FAILED, failed.outcome(), failed.toString());
+            List<String> stored = com.gamma.consignment.StepReceiptRows.storedMessages(registry, batchId);
+            assertFalse(stored.isEmpty(), "the FAILED drain receipt carries a message");
+            assertTrue(stored.stream().noneMatch(m -> m.contains("SECRET_9")
+                    || com.gamma.consignment.StepReceiptRows.quotesAValue(m)), "a value reached the table: " + stored);
         });
     }
 

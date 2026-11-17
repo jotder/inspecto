@@ -225,7 +225,7 @@ final class CsvIngestStrategy implements ConsignmentIngestStrategy {
                 } else {
                     Map<String, Object> schema = batch.members().get(0).selection().schema();
                     StepProgress.track(cfg.identity().pipelineName(), batch.batchId(), "transform", 2, 3);
-                    IngestTrail.phase(batch.batchId(), IngestTrail.TRANSFORM);   // X5 L3: a throw now is transform's
+                    IngestTrail.phase(IngestTrail.TRANSFORM);   // X5 L3: a throw now is transform's
                     DataTransformer.materialize(conn, schema, cfg);
                     // A failed coercion nulls its value and KEEPS the row, so count what was lost —
                     // parse rejects have _errors.csv, this stage had no audit trail at all.

@@ -296,13 +296,28 @@ returns), its receipts are not. Lane `job`, `runId` = the job run, `seq` = the n
   pipeline.commit` Jobs see no change. `PipelineConsignmentSignal.emitJobFailed`: WARN, subject the Pipeline (id),
   source the Job, correlation the Consignment; payload `dryRun`, `status: FAILED`, `durationMs`, `error` (quoted
   values fingerprinted, at most 240 chars) and — when a Step owns the failure — `failedStep` / `code` from its FAILED
-  receipt. A cancel (`RunCancelledException`) is a planned stop and raises nothing. Pinned by
-  `PipelineJobRunnerTest.aFailedRunRaisesPipelineBatchFailedNamingTheStepAndNoConsignmentEvent`.
+  receipt (none for a refusal before the walk — a missing pipeline, a jail error — which raises it too; subject then
+  the authored `pipeline:`, else the Job). **Exactly one per Run that ENDS FAILED** (L3 review): each attempt hands
+  the Signal it would raise to its `RunContext` (a retry replaces or clears it) and `JobService` raises it after
+  recording the Run, only when the recorded status is `FAILED` — so a CANCELLED Run (a cancel, a switched-off module,
+  a closing Space, `interruptRuns`) and an attempt a retry recovered raise nothing; a Run whose every attempt failed
+  raises one, with the final attempt's facts. A Job run directly (the CLI's standalone context) raises none.
+  OpsMonitor's `batch_rerun` ignores it (source `job:`): a job run recovers by its own `retries`. Pinned by
+  `PipelineJobBatchFailedSignalTest` (failed, recovered retry, every attempt failed, cancelled, refused) and
+  `OpsMonitorTest.ignoresAFailedJobRunsBatchFailedSignal`.
+- **Never store values (L3 review):** `StepReceipt.Diagnostics` scrubs its message in its constructor — the one door
+  every diagnosis enters by, on every lane — with `FailureText.scrub`, the scrub the failure Signals use: a quoted
+  literal or echoed line becomes `<redacted>` (no Space salt is known there), while a text the ingest lane already
+  scrubbed under its Space keeps its `<fp:…>` tokens (`FailureText.scrub` is idempotent on its own tokens, so a
+  read-back changes nothing). Pinned on the three paths: `RouteIngestEndToEndTest` (graph fork, drain) and
+  `PipelineJobRunnerTest.aFailedStepsQuotedValueNeverReachesTheReceiptTable`, each reading the raw column.
 
 **Step Receipts on the ingest lanes, park and drain (X5 L3, 2026-11-17).** The flat lane runs no Steps, so it is
 told in PHASES; the graph fork tells the same phases and then every Step it walks. Collected while the pass runs in
-`IngestTrail` (the `ParkedBranches` idiom: keyed by Consignment id, drained once by `ConsignmentIngestor.process`,
-reset at the start of every attempt) and flushed once at the status-final point — **for every status** (SUCCESS,
+an `IngestTrail` carried in the CALL CONTEXT (`IngestTrail.CURRENT`, a `ScopedValue` that
+`ConsignmentIngestor.process` binds around exactly one pass — never a map keyed by the Consignment id, which two
+Pipelines, Spaces or attempts can mint alike; a workbench test run binds a throwaway, and the binding ends with the
+pass whatever it throws) and flushed once at the status-final point — **for every status** (SUCCESS,
 EMPTY, FAILED, PARKED) — best effort, never changing the outcome.
 
 - **Phases:** `parse` (`in` = rows read + sidecar rejects; `data` = rows read, `reject:unmatched` = the parser's
@@ -339,7 +354,9 @@ EMPTY, FAILED, PARKED) — best effort, never changing the outcome.
   rewritten.
 - Pinned by `FlatVsGraphLaneParityTest.bothLanesLeaveTheSameSinkRowsOnTheirStepReceiptTrails`,
   `RouteIngestEndToEndTest.aStepThatThrowsOnTheGraphForkIsNamedOnItsReceiptAndOnTheFailedSignal` /
-  `aParkedConsignmentsTrailShowsTheParkThenTheDrain`, `DecisionRuleWiringTest.theTransformReceiptCountsWhatEachRuleMovedAndWhatWentOn`.
+  `aParkedConsignmentsTrailShowsTheParkThenTheDrain`, `DecisionRuleWiringTest.theTransformReceiptCountsWhatEachRuleMovedAndWhatWentOn`;
+  the trail's isolation by `FlatVsGraphLaneParityTest.twoConcurrentSameIdConsignmentsInDifferentPipelinesKeepSeparateTrails`
+  and `aWorkbenchTestRunNeverTouchesTheTrailOfThePassAroundIt`.
 - **Deviation from plan §2.5 item 6 / §3.2:** ingest receipts carry the ingest Run id, not `''`. The plan's premise
   ("ingest-lane receipts have no run id") was wrong — `ConsignmentIngestor.process` has one — and with `''` a retried
   Consignment (same members, same id) would have its second attempt dropped by `ON CONFLICT DO NOTHING`, so the

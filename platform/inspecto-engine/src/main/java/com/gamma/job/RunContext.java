@@ -72,6 +72,19 @@ final class RunContext implements JobContext {
         return java.util.List.copyOf(consignmentsRead);
     }
 
+    /** X5 D9: the {@code pipeline.batch.failed} a pipeline job's latest attempt left to raise, or {@code null}. */
+    private volatile Runnable pipelineBatchFailed;
+
+    /** A pipeline job's attempt sets (or, starting again, clears) the Signal its failure would raise. */
+    void pipelineBatchFailed(Runnable raise) { this.pipelineBatchFailed = raise; }
+
+    /** The pending {@code pipeline.batch.failed}, once — {@code JobService} raises it only for a FAILED Run. */
+    Runnable takePipelineBatchFailed() {
+        Runnable r = pipelineBatchFailed;
+        pipelineBatchFailed = null;
+        return r;
+    }
+
     /** The framework installs the resolved Parameter Context (§7.2) just before {@code Job.run(ctx)}. */
     void params(Map<String, String> resolved) { this.params = Map.copyOf(resolved); }
 

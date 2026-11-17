@@ -52,7 +52,8 @@ diagnostic context, AG-UI streaming, A2UI inline artifacts — and finally to a 
   failure (the commit tail, a park, a lease loss). The at-rest job lane raises the same Signal on a failed run, alone
   and not from a `ConsignmentEvent` (X5 D9 = c): source `job:<name>`, subject the Pipeline, payload `dryRun`,
   `status`, `durationMs`, `error`, `failedStep`, `code` — so `on_signal: pipeline.commit` Jobs see no change.
-  Detail: [execution lanes](../engine/spec-execution-lanes.md).
+  Exactly one per Run whose recorded status is FAILED: none for a CANCELLED Run or an attempt a retry recovered.
+  OpsMonitor's `batch_rerun` ignores a `job:`-sourced one. Detail: [execution lanes](../engine/spec-execution-lanes.md).
 * **`DottedPath`** (`platform/inspecto-util/src/main/java/com/gamma/util/DottedPath.java`) — one shared `a.b.c`
   resolver now used by `{{template}}` interpolation (`NotificationTemplate`), `$signal.<path>` job
   binds (`ParameterResolver`), and `when:` guards (`WhenGuard`) — replacing three independently

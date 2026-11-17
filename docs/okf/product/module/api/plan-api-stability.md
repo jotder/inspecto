@@ -704,8 +704,9 @@ Additive: nothing existing changes shape.
   outlet, where the data rests, a schema fingerprint and, when it failed, the Step and its code. At most 1 KB each,
   in the new `consignment_steps` table beside `consignment_outputs` in the default-on Consignment registry. On by
   default (`-Dconsignment.steps=false` switches the writes off); kept 30 days (`-Dconsignment.steps.retentionDays`,
-  pruned by `db_maintenance`). Written today by the at-rest job lane, success or failure; the ingest lanes, park and
-  drain are X5 lane L3. Java: `com.gamma.pipeline.exec.StepReceipt` (`@PublicApi` 4.0.0),
+  pruned by `db_maintenance`). Written by every durable lane, success or failure: the at-rest job lane, the ingest
+  lanes (flat as phases, the graph fork per Step), park and drain. A receipt never stores a cell value: its message is
+  scrubbed as failure Signals are (`FailureText`). Java: `com.gamma.pipeline.exec.StepReceipt` (`@PublicApi` 4.0.0),
   `PipelineExecutor.WalkObserver`, and `DbConsignmentOutputStore.recordSteps` / `steps` / `stepCount` /
   `outputCount` / `consignmentsOfRuns`; beside them `DbJobRunStore.run` / `countRunsDerivedFrom` and the bounded
   overloads `outputs(id, limit)`, `steps(id, limit)`, `runsDerivedFrom(id, limit)`, and two default methods on the
@@ -718,11 +719,16 @@ Additive: nothing existing changes shape.
   key absent (receipts off ⇒ no `steps`, never `[]`). Every list is capped with its true total beside it. An open
   read, like `GET /runs/{name}/batches`. OpenAPI: `ConsignmentTrail`,
   `StepReceipt`.
+- **Changed: `pipeline.batch.failed` names the failing Step, and a failed at-rest job run raises it.** The Signal
+  gains `failedStep` and `code` when a Step owns the failure. A `type: pipeline` Job Run that ends FAILED now raises
+  exactly one `pipeline.batch.failed` (source `job:<name>`; not for a cancelled Run, nor for an attempt a retry
+  recovered) and no `ConsignmentEvent`, so `on_signal: pipeline.commit` Jobs see nothing new. ⚠ An `on_signal:
+  pipeline.batch.failed` Job or Alert Rule now also fires for job-lane failures; filter on `source` to keep the old
+  behaviour. OpsMonitor's `batch_rerun` skips them.
 
 **Deferred to this same release by decision:** the token *runtime* model (D2 —
-[`node-types.md`](../engine/spec-node-types.md) § *The token model*), and the rest of X5's Step Receipt (lane L3:
-the ingest lanes, park and drain, and D9's `pipeline.batch.failed` for a failed job-lane run). X5-a, the token
-vocabulary, and X5-b / X5-c on the job lane with the read route landed (entries above).
+[`node-types.md`](../engine/spec-node-types.md) § *The token model*). X5-a, the token vocabulary, and X5-b / X5-c
+(Step Receipts on every durable lane and the read route) landed (entries above).
 
 **Deferred pending the operator (2026-11-17): the ELT Phase 6 deletion of the flat read path** (BACKLOG §2 Row 15,
 MoSCoW S3). The operator decided 2026-11-16 to delete it in 4.0.0 itself; on 2026-11-17 that was found infeasible,

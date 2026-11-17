@@ -186,14 +186,15 @@ public final class PipelineTestRun {
             try {
                 // EventLog.CONTAINED: the schema-drift Signal and every other ambient emitter inside
                 // strategy.ingest land in a throwaway log, never on the space's ledger.
+                // X5 L3: a throwaway Step Receipt trail — a workbench run never records into a real pass's.
                 outcome = ScopedValue.where(DataTransformer.RAW_INPUT, capture)
                         .where(com.gamma.event.EventLog.CONTAINED, com.gamma.event.EventLog.create())
+                        .where(IngestTrail.CURRENT, new IngestTrail.Trail())
                         .call(() -> strategy.ingest(batch, scratch));
             } finally {
                 // Mirrors ConsignmentIngestor.process — a progress snapshot must never outlive the batch.
                 IngestProgress.clear(scratch.identity().pipelineName());
                 StepProgress.clear(scratch.identity().pipelineName());
-                IngestTrail.drain(batch.batchId());   // X5 L3: a test run leaves no Step Receipts (the scratch lane)
             }
             // ⚠ DELIBERATELY NOT CALLED: commit(...) / writeAudit(...) / recordProvenance(...).
             // Those three are the entire production side-effect surface — see the class javadoc.
@@ -353,7 +354,6 @@ public final class PipelineTestRun {
             IngestProgress.clear(cfg.identity().pipelineName());
             StepProgress.clear(cfg.identity().pipelineName());
             ParkedBranches.drain(dryId);
-            IngestTrail.rekey(dryId, batch.batchId());   // X5 L3: the dry run's receipts are the Consignment's, simulated
             if (scratch != null) {
                 try {
                     Files.deleteIfExists(ConsignmentIngestStrategy.branchCommitLogPath(scratch, dryId));

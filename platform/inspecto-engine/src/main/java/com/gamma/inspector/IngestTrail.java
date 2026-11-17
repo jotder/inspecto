@@ -14,7 +14,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * <b>X5 L3 — what one ingest Consignment's pass did, gathered while it runs</b>, turned into its
@@ -25,10 +24,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * got, why the write stayed flat, what the Decision Rules moved, each destination's rows and files, and on the graph
  * fork every walked Step's receipt.
  *
- * <p>Same idiom as {@link ParkedBranches}: keyed by batch id, written and drained within one batch's processing; a
- * crash loses it and nothing with it. Threading these facts through {@code IngestOutcome}'s construction sites was
- * the rejected alternative there too. Collection never throws and never changes the pass; only the flush is
- * switchable ({@code -Dconsignment.steps}).
+ * <p>The trail travels in the CALL CONTEXT ({@link #CURRENT}, a {@link ScopedValue} bound by
+ * {@code ConsignmentIngestor.process} around the one pass it belongs to), never in a static map: a Consignment id
+ * is not unique across Pipelines, Spaces or attempts, so a map keyed by it mixed the trails of two passes minting
+ * the same id (X5 L3 review). A pass runs on one thread, so every recording call sees its own pass's trail; with
+ * nothing bound (a workbench test run, a direct {@code writeAndTrace}) each call records into a throwaway. The
+ * binding ends with the pass, whatever it throws, so nothing outlives it. Collection never throws and never
+ * changes the pass; only the flush is switchable ({@code -Dconsignment.steps}).
  */
 final class IngestTrail {
 
@@ -39,7 +41,9 @@ final class IngestTrail {
     static final String PHASE_KIND = "phase";
 
     private static final Logger log = LoggerFactory.getLogger(IngestTrail.class);
-    private static final Map<String, Trail> TRAILS = new ConcurrentHashMap<>();
+
+    /** The trail of the pass running on this thread; unbound ⇒ nothing is recorded anywhere. */
+    static final ScopedValue<Trail> CURRENT = ScopedValue.newInstance();
 
     private IngestTrail() {}
 
@@ -57,6 +61,12 @@ final class IngestTrail {
         private Instant sinkOpenAt;
         private final Map<String, StepReceipt> walked = new LinkedHashMap<>();
 
+        /** Whether any pass has recorded into this trail. */
+        synchronized boolean recorded() {
+            return phase > 0 || graph || flatReason != null || transformIn >= 0 || !sinks.isEmpty()
+                    || sinkOpen != null || !walked.isEmpty();
+        }
+
         synchronized void phase(String p) {
             int i = PARSE.equals(p) ? 0 : TRANSFORM.equals(p) ? 1 : 2;
             if (phaseAt[i] == null) phaseAt[i] = Instant.now();
@@ -64,23 +74,23 @@ final class IngestTrail {
         }
     }
 
-    private static Trail of(String batchId) {
-        return TRAILS.computeIfAbsent(batchId == null ? "" : batchId, k -> new Trail());
+    private static Trail current() {
+        return CURRENT.isBound() ? CURRENT.get() : new Trail();
     }
 
     // ── collection (the pass) ───────────────────────────────────────────────────────────────────────
 
     /** The pass reached {@code phase} ({@link #TRANSFORM} / {@link #SINK}); a phase never goes back. */
-    static void phase(String batchId, String phase) {
-        of(batchId).phase(phase);
+    static void phase(String phase) {
+        current().phase(phase);
     }
 
     /**
      * One write reached the lane fork: {@code rowsIn} rows met the Decision Rules, which moved {@code moved}
      * out (outlet → rows); {@code flatReason} says why it stayed flat, {@code null} when it took the graph fork.
      */
-    static void fork(String batchId, long rowsIn, Map<String, Long> moved, String flatReason) {
-        Trail t = of(batchId);
+    static void fork(long rowsIn, Map<String, Long> moved, String flatReason) {
+        Trail t = current();
         synchronized (t) {
             if (rowsIn >= 0) t.transformIn = Math.max(t.transformIn, 0) + rowsIn;
             if (moved != null) moved.forEach((k, v) -> t.moved.merge(k, v, Long::sum));
@@ -91,8 +101,8 @@ final class IngestTrail {
     }
 
     /** The flat lane starts writing destination {@code dest}. */
-    static void sinkStarted(String batchId, int dest) {
-        Trail t = of(batchId);
+    static void sinkStarted(int dest) {
+        Trail t = current();
         synchronized (t) {
             t.sinkOpen = dest;
             t.sinkOpenAt = Instant.now();
@@ -101,8 +111,8 @@ final class IngestTrail {
     }
 
     /** The flat lane wrote {@code rows} rows in {@code files} files to destination {@code dest}. */
-    static void sinkWritten(String batchId, int dest, long rows, long files) {
-        Trail t = of(batchId);
+    static void sinkWritten(int dest, long rows, long files) {
+        Trail t = current();
         synchronized (t) {
             long ms = t.sinkOpenAt == null ? 0 : Duration.between(t.sinkOpenAt, Instant.now()).toMillis();
             long[] s = t.sinks.computeIfAbsent(dest, k -> new long[3]);
@@ -122,7 +132,7 @@ final class IngestTrail {
     static void walked(String batchId, com.gamma.pipeline.exec.StepReceiptRecorder recorder) {
         try {
             List<StepReceipt> receipts = recorder.receipts();
-            Trail t = of(batchId);
+            Trail t = current();
             synchronized (t) {
                 for (StepReceipt r : receipts) t.walked.merge(r.step(), r, IngestTrail::merge);
             }
@@ -140,18 +150,6 @@ final class IngestTrail {
         } catch (java.sql.SQLException | RuntimeException e) {
             return -1;
         }
-    }
-
-    /** Move {@code from}'s trail to {@code to} — a dry run's pass runs under a suffixed id. */
-    static void rekey(String from, String to) {
-        Trail t = TRAILS.remove(from);
-        if (t != null && to != null) TRAILS.put(to, t);
-    }
-
-    /** Drain {@code batchId}'s trail — returned once; an empty trail when nothing was recorded. */
-    static Trail drain(String batchId) {
-        Trail t = TRAILS.remove(batchId == null ? "" : batchId);
-        return t != null ? t : new Trail();
     }
 
     private static StepReceipt merge(StepReceipt a, StepReceipt b) {

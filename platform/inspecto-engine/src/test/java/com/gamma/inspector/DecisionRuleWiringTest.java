@@ -199,17 +199,17 @@ class DecisionRuleWiringTest {
                 "consequences", List.of(Map.of("action", "drop", "destination", ""))));
         File db = DuckDbUtil.tempDbFile("drw_receipt_");
         try (Connection conn = openWithTable(db)) {
-            IngestTrail.drain("B1");
+            IngestTrail.Trail trail = new IngestTrail.Trail();
             System.setProperty(ConsignmentIngestStrategy.LANE_PROPERTY, "flat");   // the flat lane's phase receipts
             ConsignmentIngestStrategy.Written written;
             try {
-                written = run(conn, cfg);
+                written = ScopedValue.where(IngestTrail.CURRENT, trail).call(() -> run(conn, cfg));
             } finally {
                 System.clearProperty(ConsignmentIngestStrategy.LANE_PROPERTY);
             }
             IngestOutcome outcome = new IngestOutcome(java.time.LocalDateTime.now(), "SUCCESS", "", List.of(),
                     List.of(), written.outputs(), written.lineage(), 4, "mini");
-            var receipts = IngestTrail.receipts(IngestTrail.drain("B1"), "B1", "TEST_ETL", "run-1", outcome, "",
+            var receipts = IngestTrail.receipts(trail, "B1", "TEST_ETL", "run-1", outcome, "",
                     cfg.sinks().size(), "mini", false);
             var transform = receipts.stream().filter(r -> r.step().equals("transform")).findFirst().orElseThrow();
             Map<String, Long> outlets = new java.util.LinkedHashMap<>();

@@ -158,7 +158,17 @@ public record StepReceipt(int v, String consignmentId, String pipeline, String l
         /** No diagnosis. */
         public static final Diagnostics NONE = new Diagnostics(null, null, Map.of());
 
+        /**
+         * 🔴 <b>Never store values</b> ({@code INGEST-FAILURE-TEXT-QUOTES-VALUE-1}): {@code msg} is scrubbed HERE, the
+         * one door every diagnosis enters by, with the same {@link com.gamma.etl.FailureText#scrub} the failure
+         * Signals use — every quoted literal and echoed line becomes a fingerprint token, so an engine error that
+         * quotes a cell ({@code Could not convert string '…'}) never reaches {@code consignment_steps}. No Space salt
+         * is known here, so a raw value becomes {@code <redacted>}; a text the caller already scrubbed under its
+         * Space keeps its {@code <fp:…>} tokens (the scrub is idempotent), which is also why reading a receipt back
+         * changes nothing.
+         */
         public Diagnostics {
+            msg = msg == null ? null : com.gamma.etl.FailureText.scrub(msg, null);
             counts = counts == null ? Map.of() : java.util.Collections.unmodifiableMap(new LinkedHashMap<>(counts));
         }
 
