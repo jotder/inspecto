@@ -217,21 +217,41 @@ copyrighted track), only under the intro and outro cards, never under narration.
 
 **Language (D-TR5):** English, voice and captions.
 
-### 6.3 Must be walked in the UI before scripting (the inventory could not read them fully)
+### 6.3 UI walk (P1d, 2026-11-17) — what was walked live on the Standard demo build, and what is still open
 
-- Settings page ▸ Link Analysis drawer body (masking, index, risk weights, embed links).
-- Investigation settings folds: Oversight and approvals, Drafts, Measures and templates, Share and embed, References.
-- More steps ops: Time window, Snapshot marker, Threshold, Compare, Connect start entities.
-- Similarity and Suspicion score parameters; Propagated risk parameters.
-- Geo: which shipped Space has coordinate columns to project (G1/G2 need one; if none, a small Geo sample must be added to a
-  showcase template first — a prerequisite row).
-- Drafts fork/rebase/promote flow as a user sees it (F6).
+Walked by the declarative `episode` scenario (`record-la-live.mjs episode`, dump steps) on Preview as Demo Admin / Demo Analyst, Space *Other Examples*:
+
+- **Settings page** (`/settings/<drawer>`): the nav lists *My browser, Investigation access* (My settings); *Link Analysis, Analysis limits, Add data,
+  Access* (This Space); *Host resources, Getting started counters* (This server). **Link Analysis** drawer: *Masking* (Masking mode: inherit the default /
+  typed / all / none, each with its one-line meaning; *Entity Types in force* listed with how each is compared and whether masked), *Propagated risk: per-hop
+  weights*, *Classifications that may not be shared by link*, *Sites that may frame the viewer page*, *Save Link Analysis settings*, and a *category list*
+  block (New category list, Create category list). **Analysis limits**: groups Canvas, Browser algorithms, Display, Investigation, Connect, Traversal,
+  Neighbours, Snapshots, Files, Working set, Pattern, Measures, Comparison, Reference, Case history, Dossier, Identity, Upload, Import, Entity profile,
+  Input, Index, Graph run, Drafts, Embed, each limit blank = shipped default. **Access**: the role list with *Show all capabilities*, *New role*, per-role
+  *Edit role* / *Revert role … to its built-in default*. **Investigation access**: each Investigation with *You: lead* and its members and *Revoke*.
+- **Investigation settings folds** (File ▸ Open ▸ an Investigation ▸ Investigation actions ▸ Settings…, a dialog; folds in order): *General* (Name,
+  Purpose, Dataset, Link columns, Time column, Copied from, Industry pack, Delete…), *Case* (Linked to Case …, Unlink; who can read it), *Members*
+  (list, Revoke, User + Role + Grant), *Share and embed* (embed links off unless the host enables them: "Embed links are turned off. Ask an
+  administrator."; Create link), *Drafts* (Fork a Draft; per Draft: Work on this Draft, Working Set, Conflicts, Rebase, Promote, Discard),
+  *Replay and drift* (Compare with current data, Replay), *Oversight and approvals* (pending Expand request with who and when and why it is held;
+  *Masked entities*: Reveal all N…), *Measures and templates* (Entities, Links, Events, Excluded, Furthest degree, Identities, each with Watch; At step N;
+  Save as template…; New Investigation from a template…), *Dossier*, *References* (Load references).
+- **Geo** (P1b): the route is `/geo-map` (rail item *Geo*); the page opens on the query form (a form whose first field is labelled "Source" <!-- vocab-allow: the Geo page's own field label --> with the value Locations (from a Dataset), then Dataset, Latitude column,
+  Longitude column, Optional columns, Run) with *Open saved views* (the Space's three saved maps: *Where the accounts are*, *The ring across Europe*,
+  *Cash-out through one till*; each has Actions, Load view, Tags), *Import / export saved views*, *Save the current view*, *Export the map* (off until a map is drawn).
+  **Other Examples is Geo-ready** (`mule_account_locations_dataset` with LAT / LON, plus `mule_ring_legs_dataset` and `mule_cashout_legs_dataset` for routes):
+  G1 and G2 record there; no new data is needed.
+- **Still to walk while scripting its episode** (the recorder reached the screens but the dump did not capture them): the *More steps* ops (Time window, Snapshot
+  marker, Threshold, Compare, Connect start entities) → F4; the *Similarity and prediction* and *Suspicion score* parameter forms (the toolbox accordion
+  rows) → D5; Propagated risk parameters → D5; the Geo map toolbox (layer manager, measure/radius/polygon/note tools, geo intelligence) after a map is
+  loaded → G1/G2; Drafts fork → rebase → promote as a sequence → F6.
 
 ### 6.4 Known blockers found while building the case videos
 
-- **Index builds are refused on packaged installs** (the packaged `la_index_build` Jobs carry no last editor; every run logs
-  "names owner 'admin' but its last editor '(none recorded)' does not hold canConfigureAccess"). D8 and H1 cannot show the
-  link index until `tools/package-la-showcase.mjs` stamps the owner as the seed scaffold does. Prerequisite.
+- **Index builds were refused on packaged installs** (the packaged `la_index_build` Jobs carried no last editor; every run logged "names owner
+  'admin' but its last editor '(none recorded)' does not hold canConfigureAccess"). **Fixed in P1a (2026-11-17):** `tools/package-la-showcase.mjs`
+  now stamps `updatedBy` (`configToon`, tested) as the seed scaffold does. A reinstalled Space needs the new package; the existing zips and
+  demo installs built before the fix still refuse the build.
 - On Standard the empty canvas has no *Start a graph* launchpad (that is Basic); B-category episodes must record on Basic.
 - Some Spaces' Investigations mask ids for the analyst; narration must say what the screen shows (masked) — the case video
   *Fictitious Vendor* named unmasked ids over a masked graph.
@@ -264,7 +284,7 @@ copyrighted track), only under the intro and outro cards, never under narration.
 | Phase | Work | Output |
 |---|---|---|
 | P0 | Approve this plan: episode list, categories, waves; decisions D-TR1…D-TR7 | signed plan |
-| P1 | Prerequisites: index-owner stamp in the packager (§6.4), a Geo-ready Space if none (§6.3), declarative script steps and computed impact marks (§6.1 items 1–2), the §6.3 UI walk | tooling + walked notes |
+| P1 | Prerequisites: index-owner stamp in the packager (§6.4), a Geo-ready Space if none (§6.3), declarative script steps and computed impact marks (§6.1 items 1–2), the §6.3 UI walk | tooling + walked notes. **Status 2026-11-17: P1a (packager stamp), P1b (Geo: Other Examples), P1c steps (declarative `episode` scenario in `record-la-live.mjs`) and most of P1d done (§6.3); computed impact marks (§6.1 item 2) and the remaining walks still open** |
 | P2 | Pilot: C4, D3, F8 scripted, recorded, reviewed | 3 episodes, method confirmed |
 | P3 | Wave 1 — the new-user path: A1–A3, B1, B4, C1, C2, C4, D1, E1, F1, F8 (12) | core course |
 | P4 | Wave 2 — depth: A4, B2, B3, C3, C5, D2–D7, E2, F2–F5, F7, F9 (19) | full analyst course |

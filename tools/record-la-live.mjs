@@ -96,6 +96,48 @@ const SCENARIOS = {
   },
   // The Standard part of a combined Basic + Standard video (render-la-demo-video.mjs records it as a second take).
   std_ext: async (h) => SCENARIOS.case_demo_std(h, { signInOnly: true }),
+  // A declarative episode (training series, LA-TRAINING-SERIES-1): --config {steps:[...]} (docs: tools/record-la-live.mjs header).
+  // Steps run in order. A step is one object with one verb:
+  //   {space:"la-showcase"} {signin:"Demo Analyst"} {open:"/link-analysis?view=x"} {wait:1500} {waitText:"Legend"}
+  //   {click:"Busiest nodes"} {exact:"Open…"} {label:"Display options"} {button:"Draw"} {sel:"input[type=search]"} {rightOf:"Dataset"}
+  //   {type:"HUB-01"} {key:"G"} {escape:true} {hover:"takes part"} {move:[x,y]}
+  //   {shot:"after-expand"} {dump:"toolbox"} (a screenshot / the visible text + buttons, saved beside the take)
+  //   {scene:"S02", steps:[...]} runs its steps, then holds until the scene's narration length (--timing) has passed.
+  // A verb may carry {soft:true} (a missing control is logged, not fatal) and {note:"..."} (free text, ignored).
+  episode: async (h) => {
+    const run = async (steps) => {
+      for (const st of steps) {
+        const go = async () => {
+          if (st.scene) return h.scene(st.scene, () => run(st.steps || []));
+          if ('space' in st) return h.setSpace(st.space);
+          if ('signin' in st) { await h.goto('/sign-in'); await h.waitText('Choose a user'); await h.clickExact(st.signin); return h.pause(2500); }
+          if ('open' in st) { await h.goto(st.open); return h.pause(st.settle ?? 1200); }
+          if ('wait' in st) return h.pause(st.wait);
+          if ('waitText' in st) return h.waitText(st.waitText);
+          if ('click' in st) return h.clickText(st.click);
+          if ('exact' in st) return h.clickExact(st.exact, st.nth ?? 0);
+          if ('label' in st) return h.clickLabel(st.label);
+          if ('button' in st) return h.clickButton(st.button);
+          if ('sel' in st) return h.clickSel(st.sel);
+          if ('rightOf' in st) return h.clickRightOf(st.rightOf);
+          if ('type' in st) return h.type(st.type, st.perChar ?? 85);
+          if ('key' in st) return h.key(st.key);
+          if (st.escape) return h.escape();
+          if ('hover' in st) return h.hoverText(st.hover);
+          if ('move' in st) return h.moveTo(st.move[0], st.move[1], st.ms ?? 900);
+          if ('shot' in st) return h.shot(st.shot);
+          if ('dump' in st) return h.dump(st.dump);
+          if ('note' in st) return undefined;
+          throw new Error('unknown episode step: ' + JSON.stringify(st).slice(0, 80));
+        };
+        try { await go(); } catch (e) {
+          if (!st.soft) { await h.shot('FAIL').catch(() => {}); throw new Error(`step ${JSON.stringify(st).slice(0, 100)}: ${e.message}`); }
+          console.log('  skipped:', JSON.stringify(st).slice(0, 80), String(e.message).slice(0, 80));
+        }
+      }
+    };
+    await run(cfg.steps || []);
+  },
   // Standard / Preview (demo build, fake login): sign in, the Basic intro (S01..S05), then the analyst's Investigation:
   // the start, the sealed step log, the rows, members and four-eyes, the Dossier (build, verify, download), the Entity List.
   // --config adds {user, invTitle, listTitle}.
@@ -490,6 +532,11 @@ async function main() {
     async clickSel(sel) { const p = await h.locate(`document.querySelector(${JSON.stringify(sel)})`); await h.click(p.x, p.y); },
     mark(label) { marks[label] = +((Date.now() - startedAt) / 1000).toFixed(2); },
     async shot(label) { const r = await send('Page.captureScreenshot', { format: 'png' }); writeFileSync(join(out, `probe-${String(stepNo).padStart(2, '0')}-${label}.png`), Buffer.from(r.data, 'base64')); },
+    // the visible text and the visible buttons/links/tabs of the page, as JSON beside the take (for walking the UI)
+    async dump(label) {
+      const d = await ev(`(() => { const R = document.querySelector('[role=dialog],mat-dialog-container,.cdk-overlay-pane') || document.body; return ({ url: location.href, scoped: R !== document.body, text: R.innerText, controls: [...R.querySelectorAll('button,a,[role=tab],[role=menuitem],input,select')].filter(b => b.offsetParent).map(b => ({ tag: b.tagName.toLowerCase(), label: (b.getAttribute('aria-label') || b.innerText || b.placeholder || '').trim().split('\\n').join(' ').split(' ').filter(Boolean).join(' ').slice(0, 90), disabled: !!b.disabled || b.getAttribute('aria-disabled') === 'true' })).filter((c) => c.label) }); })()`);
+      writeFileSync(join(out, `dump-${label}.json`), JSON.stringify(d, null, 1));
+    },
     async step(label, fn) { stepNo++; try { await fn(); } catch (e) { await h.shot('FAIL-' + label); throw e; } if (probe) { await sleep(900); await h.shot(label); } },
     async openSpaceView(space, view) {
       await send('Page.navigate', { url: `${base}/` }); await sleep(1500);
