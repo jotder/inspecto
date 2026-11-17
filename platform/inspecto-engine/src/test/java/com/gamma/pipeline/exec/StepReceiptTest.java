@@ -180,6 +180,19 @@ class StepReceiptTest {
         assertFalse(known.truncated(), "a closed-set code is untouched");
     }
 
+    /** A count with a null name or value is dropped and marked cut, never a NullPointerException that loses the Run's receipts. */
+    @Test
+    void aNullCountNameOrValueIsDroppedNotThrown() {
+        Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        counts.put(null, 1L);
+        counts.put("rows", null);
+        counts.put("kept", 2L);
+        StepReceipt r = receipt("flt", List.of(), null, new StepReceipt.Diagnostics(StepReceipt.SQL_ERROR, "x", counts));
+        assertEquals(Map.of("kept", 2L), r.diag().counts());
+        assertTrue(r.truncated());
+        assertTrue(bytes(r) <= 1024);
+    }
+
     @Test
     void aLongFingerprintIsCutAndSaysSo() {
         StepReceipt r = new StepReceipt(StepReceipt.VERSION, "c", "p", StepReceipt.LANE_JOB, "", 1, "s", "k",

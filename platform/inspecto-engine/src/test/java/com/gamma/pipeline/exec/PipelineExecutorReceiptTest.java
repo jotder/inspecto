@@ -128,8 +128,17 @@ class PipelineExecutorReceiptTest {
         assertEquals(StepReceipt.Outcome.FAILED, receipt(rec, "n").outcome());
         assertEquals(StepReceipt.STEP_FAILED, receipt(rec, "n").diag().code());
 
-        assertThrows(Exception.class, () -> PipelineExecutor.execute(conn, g, "parse", "parsed", "b2",
-                coordinator(work.resolve("c2.csv")), (s, t) -> {}, () -> {}), "the pre-X5 overload fails too");
+        // a fresh connection, so the old overload fails on the cycling Step, not on the first walk's relations
+        try (Connection fresh = DriverManager.getConnection("jdbc:duckdb:"); Statement st = fresh.createStatement()) {
+            st.execute("CREATE TABLE parsed AS SELECT * FROM (VALUES (1, 150), (2, 50), (3, 200)) t(id, amt)");
+            Exception e = assertThrows(Exception.class, () -> PipelineExecutor.execute(fresh, g, "parse", "parsed",
+                    "b2", coordinator(work.resolve("c2.csv")), (s, t) -> {}, () -> {}), "the pre-X5 overload fails too");
+            Throwable root = e;
+            while (root != a && root != b && root.getCause() != null && root.getCause() != root) root = root.getCause();
+            assertTrue(root == a || root == b, "it fails on the cycling Step, not on something else: " + e);
+        } catch (java.sql.SQLException e) {
+            fail(e);
+        }
         assertEquals(StepReceipt.STEP_FAILED, StepReceipt.Diagnostics.of(a).code(), "and the diagnosis terminates");
     }
 

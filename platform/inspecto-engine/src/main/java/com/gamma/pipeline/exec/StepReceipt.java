@@ -373,6 +373,7 @@ public record StepReceipt(int v, String consignmentId, String pipeline, String l
             Map<String, Long> counts = new LinkedHashMap<>();
             for (Map.Entry<String, Long> e : d.counts().entrySet()) {
                 if (counts.size() == MAX_COUNTS) { cut = changed = true; break; }
+                if (e.getKey() == null || e.getValue() == null) { cut = changed = true; continue; }
                 String name = head(e.getKey(), MAX_ID);
                 changed |= !name.equals(e.getKey());
                 counts.put(name, e.getValue());
