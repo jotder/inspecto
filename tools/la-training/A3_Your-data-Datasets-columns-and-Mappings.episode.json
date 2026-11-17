@@ -1,0 +1,13 @@
+{"scenario":"episode","edition":"Basic","base":"http://127.0.0.1:8099","steps":[
+{"scene":"S01","card":{"lines":["Inspecto LA training","A3  Your data: Datasets, columns and Mappings"],"secs":6},"steps":[{"space":"la-banking"},{"open":"/","settle":3000},{"wait":1500}]},
+{"scene":"S02","steps":[{"wait":1500},{"sel":"a[href=\"/data\"]"},{"wait":4000},{"move":[380,640],"ms":900},{"wait":6000},{"sel":"input[aria-label^=\"Find a Dataset\"]"},{"wait":500},{"type":"card_auth"},{"wait":2500},{"click":"card_auth_dataset"},{"wait":3000}]},
+{"scene":"S03","steps":[{"wait":6000},{"button":"Rename or describe"},{"wait":2500},{"at":[1060,314]},{"wait":500},{"selectAll":1},{"type":"Card authorisations"},{"wait":1500},{"button":"Save"},{"wait":4000}]},
+{"scene":"S04","steps":[{"wait":3000},{"at":[1492,487]},{"wait":9000},{"escape":1},{"wait":2500},{"move":[1300,430],"ms":900},{"wait":4000}]},
+{"scene":"S05","steps":[{"at":[1490,519]},{"wait":800},{"selectAll":1},{"type":"GBP"},{"key":"Enter"},{"wait":3500},{"at":[1492,568]},{"wait":7000},{"escape":1},{"wait":2000}]},
+{"scene":"S06","steps":[{"wait":1500},{"button":"Show what is in it"},{"wait":6000},{"reveal":"Kinds of link","soft":true},{"wait":5000},{"reveal":"Measures","soft":true},{"wait":5000},{"reveal":"Reached by most","soft":true},{"wait":8000}]},
+{"scene":"S07","steps":[{"button":"Hide","soft":true},{"wait":1500},{"reveal":"New mapping"},{"wait":9000}]},
+{"scene":"S08","steps":[{"button":"New mapping"},{"wait":1500},{"reveal":"Save Mapping"},{"wait":2500},{"at":[971,522]},{"wait":500},{"type":"card_device"},{"wait":500},{"at":[1100,520]},{"wait":1500},{"at":[972,628]},{"wait":1200},{"type":"device_id"},{"wait":900},{"sel":"[role=option],mat-option,.mat-mdc-option"},{"wait":2500},{"at":[1492,628]},{"wait":3000},{"escape":1},{"wait":1200},{"at":[1492,718]},{"wait":1200},{"exact":"None"},{"wait":3000},{"button":"Save Mapping"},{"wait":5000}]},
+{"scene":"S09","steps":[{"reveal":"Explore","soft":true},{"wait":1000},{"label":"Explore the Mapping card_device"},{"wait":5000},{"click":"Explore the Dataset"},{"wait":2500},{"button":"Show what is in it"},{"wait":7000},{"reveal":"Reached by most","soft":true},{"wait":8000}]},
+{"scene":"S10","steps":[{"open":"/data","settle":3500},{"click":"Card authorisations"},{"wait":2500},{"reveal":"Explore","soft":true},{"wait":2500},{"hoverLabel":"Edit the Mapping card_device","soft":true},{"wait":3500},{"hoverLabel":"Delete the Mapping card_device","soft":true},{"wait":4000},{"reveal":"Other Datasets","soft":true},{"wait":6000}]},
+{"scene":"S11","card":{"lines":["Try it","Next: A4  Entities and Entity Types"],"secs":5},"steps":[{"wait":1000}]}
+]}
