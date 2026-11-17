@@ -103,7 +103,9 @@ final class ConsignmentRoutes implements RouteModule {
         if (ledger != null) {
             List<Map<String, String>> members = svc.statusStore().consignmentFiles(ledger.cfg(), id, MAX_MEMBERS);
             out.put("members", members);
-            out.put("membersTotal", members.size() < MAX_MEMBERS ? members.size() : memberCount(ledger.row(), members.size()));
+            // always the ledger's member_count when it has one: the DB read dedupes retried rows AFTER its LIMIT,
+            // so a short page does not mean the page holds every member
+            out.put("membersTotal", memberCount(ledger.row(), members.size()));
         }
         if (stepsKnown) {
             List<Map<String, Object>> rows = new ArrayList<>();
@@ -170,7 +172,7 @@ final class ConsignmentRoutes implements RouteModule {
         return all.size() > MAX_OWN_RUNS ? all.subList(all.size() - MAX_OWN_RUNS, all.size()) : all;
     }
 
-    /** {@code member_count} of the ledger row when the member rows were cut, else what was read. */
+    /** {@code member_count} of the ledger row (never less than what was read), else what was read. */
     private static long memberCount(Map<String, String> row, int read) {
         try {
             return Math.max(read, Long.parseLong(row.getOrDefault("member_count", "").trim()));
