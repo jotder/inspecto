@@ -1087,5 +1087,5 @@ compressed spelling of that logical name has been processed.
 | The Kafka connector, its fence and stream lane | [connectors-kafka/spec.md](../connectors-kafka/spec.md) |
 | Operator runbook: profile YAML, host-key table, FTPS, bastion, db-export | [connectors/admin-guide-connectors-runbook.md](../connectors/admin-guide-connectors-runbook.md) |
 | Module boundary + dependency confinement of the connectors jar | [connectors/architecture.md](../connectors/architecture.md) |
-| Consignments, the ingest strategies and commit order that consume the landed inbox | [engine/spec-consignments.md](spec-ingest.md) · [engine/spec-ingest.md](spec-ingest.md) |
+| Consignments, the ingest strategies and commit order that consume the landed inbox | [spec-ingest.md](spec-ingest.md) (Part I ingest, Part II Consignments) |
 | Screens and the Collector configuration surface | [user-guide.md](user-guide.md) |

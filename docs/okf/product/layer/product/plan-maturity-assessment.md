@@ -232,8 +232,8 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **Gaps vs market / RFP risk:**
   - Outbound writes are thin: no JDBC/SQL sink, no Iceberg/Delta write, and the multi-destination `sinks:` executor is not wired (`module/connectors/plan-warehouse-targets.md` §2, §7). **No BACKLOG row** (EXPORT-1 closed 2026-09-24, covering only object-store export).
   - 51 of 119 catalogued processors are planned, not built (EDITIONS board). Planned work has rows only by family. The processor-catalog item in the module.elt hub has no row id.
-  - Record-level replay from quarantine is deliberately not built without a driver (engine plan §5.2). Run replay is in-memory: **no row**.
-  - Single-node execution. Distributed scheduler coordination has **no BACKLOG row** (engine plan §5.1). Only the Postgres run lease exists, for active/passive.
+  - Record-level replay from quarantine is deliberately not built without a driver (ELT plan §EXE.5.2). Run replay is in-memory: **no row**.
+  - Single-node execution. Distributed scheduler coordination has **no BACKLOG row** (ELT plan §EXE.5.1). Only the Postgres run lease exists, for active/passive.
 - **RFP stance on the 5 most-asked requirements:**
 
 | Requirement | Stance | Evidence or caveat |
@@ -314,7 +314,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **Scores:** F 3 · B 4 · Q 4 · E 3 · R 3 → **Level L3 (Pilot-ready)**
 - **Evidence:**
   - Control API v1 (JDK HttpServer, envelope, ETag/If-Match, idempotency keys; EDITIONS CP-01). module.processor registers **343 routes, all 343 in the OpenAPI contract** (`module/processor/api-routes.md`).
-  - Jobs: 12 Job Types, 23 maintenance tasks. Triggers are cron, `on_pipeline`, `on_signal` with guards, catch-up and manual (EDITIONS JOB-01..04; engine plan §2.2). Concurrency defaults to 4 and the intake cap to 500 files per cycle.
+  - Jobs: 12 Job Types, 23 maintenance tasks. Triggers are cron, `on_pipeline`, `on_signal` with guards, catch-up and manual (EDITIONS JOB-01..04; ELT plan §EXE.2.2). Concurrency defaults to 4 and the intake cap to 500 files per cycle.
   - Tests: processor **350 classes (221 real-HTTP)**, observability 8 (5 real-HTTP), backup 10 (1 real-HTTP), event 8. That adds up to 405 test classes across the repo that drive a real `ControlApi`.
   - Backup: per-file and archive SHA-256 sidecar, fail-closed restore into a new Space, a `maintenance_backups` catalog, and secrets excluded (`module/backup/plan.md`; `BackupTaskSecretExclusionTest`). Standard and up only (OPS-06).
   - **No restore drill recorded** (`compliance/evidence/rto-rpo-statement.md` §4: "none recorded yet"). The RTO/RPO targets are operator-fill fields.
@@ -334,7 +334,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 | Requirement | Stance | Evidence or caveat |
 |---|---|---|
 | Monitoring integration (Prometheus/SNMP/APM) | Partial | Prometheus `/metrics` (Standard and up). No tracing, no SNMP. |
-| Job scheduling with dependencies and retries | Comply | JOB-01..04. Retry is per Job, and a per-Pipeline retry block is deferred (engine plan §5.2). |
+| Job scheduling with dependencies and retries | Comply | JOB-01..04. Retry is per Job, and a per-Pipeline retry block is deferred (ELT plan §EXE.5.2). |
 | Backup/restore with verification | Comply (capability) / Partial (proof) | OPS-06, hash-verified, but no drill recorded |
 | Alerting/notification to email/webhook | Comply (Standard and up) | CP-12/CP-15 (CP-15 🟡) |
 | Documented REST API | Comply | OpenAPI 3.1, 468 paths. 430 of 559 operations still carry generated-skeleton summaries. |

@@ -1455,7 +1455,7 @@ They compose; neither replaces the other.
 - **Broker** — *how many Consignments may execute right now* (instantaneous slots).
 - **IntakeGovernor** — *how many files one poll cycle may admit* (backlog fairness across time),
   halving a pipeline's cap while its runs overrun the poll interval and restoring it when they fit
-  (defaults and flags: [architecture.md](architecture.md) §4.8).
+  (defaults and flags: [architecture.md](architecture.md) §E4.8).
 
 The governor's signal is **cycle overrun, not inbox lag**: admitting fewer files cannot reduce inbox
 age or pending depth, so throttling on those is positive feedback that pins a healthy-but-backlogged

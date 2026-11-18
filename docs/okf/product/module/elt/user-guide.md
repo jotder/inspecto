@@ -2368,7 +2368,7 @@ run-now, pause and history actions. Clicking a row opens **Run Detail**, which s
 Consignments (batches), files, lineage, quarantined files, commits, files waiting on a commit retry and a
 report, and lets an operator reprocess a batch, drain a parked one, replay rejected records or act on a
 waiting retry. How these runs execute underneath is [spec-pipeline.md](spec-pipeline.md).
-*(Merged from the engine hub's user guide on 2026-11-18; §16 is the short summary.)*
+*(Merged from the engine hub's user guide on 2026-11-18; *Runs and processing status* above is the short summary.)*
 
 ### 22.1 Runs (Operations)
 
@@ -2404,7 +2404,7 @@ Route `/runs/:name` (carries a list→name [breadcrumb](../../layer/product/spec
 [data-tables](../../layer/product/spec-ds-data-table.md); a row opens the **batch-detail dialog** (mini/single-select
 grids inside). Backed by `RunsService`. A `PARKED` row on the Batches tab carries a **Drain** action and the
 batch-detail dialog a *Parked at* table (see *Per-Step `enabled` — park and drain* in
-[spec-pipeline-execution.md](spec-pipeline.md)).
+[spec-pipeline.md](spec-pipeline.md), Part II).
 
 **Registered outputs on the batch-detail dialog (shipped 2026-08-29).** `GET /runs/{name}/outputs?consignmentId=`
 returns one Consignment's registered outputs — sync's own files **and** whatever a post-sync step derived

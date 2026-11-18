@@ -2740,7 +2740,7 @@ eventual fix, not scheduled. Build: `DrainCommand.refuseExpansionMembers` + test
 also *retracts that Consignment's dedup-ledger claims*, or re-ingested rows would be permanently
 suppressed; a parked Consignment has **drain**, which does not re-walk but registers the park tables and
 runs the real finalisation; the at-rest lane has **replay** — ⚠ backed by an in-memory, capped map, so a
-replay of an evicted run, or of any run after a restart, is a 404 ([plan.md](plan.md) §2.3).
+replay of an evicted run, or of any run after a restart, is a 404 ([plan.md](plan.md) §EXE.2.3).
 
 ⚠ **Reprocess is whole-batch only**, stated verbatim in the source. Record-level replay of one file's
 rejected rows is the separate `POST /runs/{name}/replay-rejects` route, with `processing.reject_mode: eject |
@@ -3021,12 +3021,12 @@ a single global setting.
 
 The PIP spec's as-built pointer table ("§" references below are [plan.md](plan.md) sections).
 ⚠ **Cite the symbol, not the line** — and in this area, **check the symbol still exists**: twenty-plus
-current citations named classes the 2026-08-31 rename removed (plan §5.3 item 7).
+current citations named classes the 2026-08-31 rename removed (plan §EXE.5.3 item 7).
 
 | Concern | Where it lives | Gap |
 |---|---|---|
-| The Job engine | `JobService` | 🔴 Javadoc contradicts its own default (§2.5) |
-| The Job type registry | `JobTypeProvider` / `JobTypeRegistry` / `JobTypeDescriptor` | The maintenance descriptor was wrong both ways (§2.2) — ✅ fixed 2026-09-09 (§5.3 item 2) |
+| The Job engine | `JobService` | 🔴 Javadoc contradicts its own default (§EXE.2.5) |
+| The Job type registry | `JobTypeProvider` / `JobTypeRegistry` / `JobTypeDescriptor` | The maintenance descriptor was wrong both ways (§EXE.2.2) — ✅ fixed 2026-09-09 (§EXE.5.3 item 2) |
 | The legacy type enum | `JobType` | Deprecated; 4 constants; ⚠ its javadoc names a retired file and key |
 | Job config and templates | `JobConfig`, `JobTemplate` | ⚠ The config javadoc omits two recognised trigger keys |
 | The Run bound | `JobService.DEFAULT_MAX_CONCURRENT_RUNS`, the permit holder | Deliberately not a semaphore ([spec-ingest.md](spec-ingest.md#part-b--concurrency-the-four-layer-hierarchy)) |
@@ -3037,21 +3037,21 @@ current citations named classes the 2026-08-31 rename removed (plan §5.3 item 7
 | The commit bus | `ConsignmentEventBus` | ⚠ Cited under its **old** name in a concept page |
 | The lane fork | `ConsignmentIngestStrategy.admittedLift` / `flatReason` | — |
 | The whole-pipeline dry run | `RunRoutes.triggerPipeline`, `CollectorProcessor.run`/`ingest`, `ConsignmentIngestor.process`, `PipelineTestRun.dryIngest`, `EventLog.CONTAINED`, `ConsignmentAuditWriter` | *Whole-pipeline dry run* above — `strategy.ingest` runs contained (member copies, scratch root, throwaway event log), so parsing IS re-validated and reported per member |
-| The graph runner | `ConsignmentGraphRunner` — `engages`, `run`, `dataFedSinkCount` | 🔴 The backlog names a **non-existent** class and denies its callers (§2.3) |
+| The graph runner | `ConsignmentGraphRunner` — `engages`, `run`, `dataFedSinkCount` | 🔴 The backlog names a **non-existent** class and denies its callers (§EXE.2.3) |
 | Route arming | `RouteArming.refusals` | One statement, two callers |
 | The two lifts | `PipelineLift.lift` / `.stageTwo` | ⚠ Both live; see *The at-rest runner, and the two lifts* above before citing either |
 | The at-rest runner | `PipelineJobRunner` | — |
-| Maintenance dispatch | `MaintenanceJob` (`BUILT_IN_TASKS`, 23 ids since 2026-11-15) | Seven were unadvertised (§2.2) — ✅ fixed 2026-09-09 (§5.3 item 2) |
+| Maintenance dispatch | `MaintenanceJob` (`BUILT_IN_TASKS`, 23 ids since 2026-11-15) | Seven were unadvertised (§EXE.2.2) — ✅ fixed 2026-09-09 (§EXE.5.3 item 2) |
 | Contributed tasks | `MaintenanceTaskProvider` + the backup and operations modules | — |
 | Compaction | `PartitionCompactor` | — |
 | The bounded retry | `CommitRetry` | 🔴 No transient/fatal classifier; the zero escape hatch is now stated under *Caps and the bounded retry* |
-| The memory resolver | `DuckDbUtil.memoryLimit` | ✅ Falls back to `DuckDbUtil.defaultMemoryLimit` since 2026-09-26 (§2.4) |
+| The memory resolver | `DuckDbUtil.memoryLimit` | ✅ Falls back to `DuckDbUtil.defaultMemoryLimit` since 2026-09-26 (§EXE.2.4) |
 | Quarantine | `QuarantineManager` | — |
 | Reprocess and drain | `ReprocessCommand`, `DrainCommand` | Whole-batch only, verbatim |
 | The commit log | `CommitLog` | No day column, by design |
 | The run ledger | `JobRunLedger` (+ an optional projection) | ⚠ The lane table names only the default-off projection |
 | Idempotency | `Idempotency` | — |
-| Execution routes | `RunRoutes`, `JobRoutes` | 🔴 Replay's in-memory lookup (§2.3) |
+| Execution routes | `RunRoutes`, `JobRoutes` | 🔴 Replay's in-memory lookup (§EXE.2.3) |
 | The declared lane owner | *Execution lanes* (this page) | The orphan-gate self-contradiction was corrected 2026-09-09; the post-sync lane is now named beside the five |
 | The Job concept page | [`jobs.md`](../processor/spec-jobs.md) | ⚠ Dead class citations, by line |
 | The boundary page | [`job-vs-step.md`](../processor/architecture.md) | ⚠ A fifth wrong node-type count |

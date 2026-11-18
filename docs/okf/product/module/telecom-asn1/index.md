@@ -22,7 +22,7 @@ tags: [product-item, module]
 | feature-db | current | [Telecom ASN.1 decoder — feature database](feature-db.md) |
 | user-guide | current | [Telecom ASN.1 decoder — user guide](user-guide.md) |
 | admin-guide | current | [Telecom ASN.1 decoder — admin guide](admin-guide.md) |
-| api | n/a | implements the ParserPlugin contract owned by the engine (documented in module.engine spec-parsing.md); the preview route POST /parsers/{id}/preview is an engine route, and the library API is in module.asn-decoders api.md |
+| api | n/a | implements the ParserPlugin contract owned by the engine (documented in module.elt spec-ingest.md, Part III Parsing); the preview route POST /parsers/{id}/preview is an engine route, and the library API is in module.asn-decoders api.md |
 | tests | current | [Telecom ASN.1 decoder — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

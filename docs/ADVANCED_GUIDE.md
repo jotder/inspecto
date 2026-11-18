@@ -198,10 +198,10 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
 - ⚠ **The `*_flow.toon` authoring surface is RETIRED**
   ([`pipeline-graph-design.md`](okf/product/module/elt/architecture.md) §16):
   grandfathered flows stay readable/runnable/deletable, never newly written.
-- **Deep dives (design of record):** the [`module.engine` hub](okf/product/module/engine/index.md)
-  — `architecture.md`, `spec-pipeline-model.md`, `spec-pipeline-execution.md` (views,
+- **Deep dives (design of record):** the [`module.elt` hub](okf/product/module/elt/index.md)
+  — `architecture.md`, `spec-pipeline.md` (Part I the model, Part II execution: views,
   provenance, incremental watermarks, failure modes, park and drain); plus
-  `architecture.md` (part *Multi-location ingest*) in the [`module.acquire` hub](okf/product/module/acquire/index.md).
+  `architecture.md` (part *Multi-location ingest*) in the same hub.
   Reusable `use:` components (`ComponentStore`/`ComponentRegistry`) →
   [`component-registry.md`](okf/product/module/processor/spec-component-registry.md).
 

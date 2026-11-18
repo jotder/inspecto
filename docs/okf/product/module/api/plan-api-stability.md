@@ -746,7 +746,7 @@ or is read under both names.
 **Breaking — one word for rejected rows (X5-a, 2026-11-17, MoSCoW S4)**
 
 A Step that does not pass rows on now says why in one way: the **reject outlet** `reject:<reason>`
-([`spec-pipeline-model.md`](../elt/spec-pipeline.md) § *The token model*).
+([`spec-pipeline.md`](../elt/spec-pipeline.md) § *The token model*).
 - **Reject relations are `reject:dropped`, `reject:invalid`, `reject:duplicate` and `reject:unmatched`**, replacing
   `dropped`, `invalid`, `duplicate` and `unmatched` in `GET /pipelines/node-types` (`emits`), `GET /provenance`
   (`rel`), a Pipeline graph's edges (the lifted parse → quarantine edge reads `reject:unmatched`), a dry run's and a
