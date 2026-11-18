@@ -78,7 +78,7 @@ ingested until you copy them into the inbox (used live only if you choose the dr
 
 Every Link Analysis demo Space signs in these same five Demo Users, and each kind means the same in every Space
 (`tools/la-demo-roster.test.mjs`). Every LA scaffolder (`tools/seed-la-*.mjs --scaffold`) and the showcase packager
-(`tools/package-la-showcase.mjs`) write the Space **closed** (`admission: closed` in `space.toon`): it admits an
+(`tools/package-la-showcase.mjs`), and the preview bake for `la-daily-feed` (`scripts/preview-la/bake-all.ps1`), write the Space **closed** (`admission: closed` in `space.toon`): it admits an
 administrator and a holder of a role its own `roles.toon` defines, and answers anyone else as if it did not exist (404,
 and it is left out of the Space lists). So `outsider` signs in and sees, on the la-app home page, *You have no access to
 any Space* / *Ask your administrator to give you access to a Space.*, with nothing to press. A Space laid down before
@@ -98,7 +98,7 @@ served Space (see "if it goes wrong" below).
 | `la-mobile-money` | [mobile-money runbook](../../solution-pack/la-mobile-money/admin-guide-showcase-runbook.md) | `tools/seed-la-mm.mjs --scaffold` / `--apply` | `admin`, `analyst`, `manager`, `reviewer`, `outsider` |
 | `la-audit` | [audit runbook](../../solution-pack/la-audit/admin-guide-showcase-runbook.md) | `tools/seed-la-audit.mjs --scaffold` / `--apply` | `admin`, `analyst`, `manager`, `reviewer`, `outsider` |
 | `la-claims` | [claims runbook](../../solution-pack/la-claims/admin-guide-showcase-runbook.md) | `tools/seed-la-claims.mjs --scaffold` / `--apply` | `admin`, `analyst`, `manager`, `reviewer`, `outsider` |
-| `la-daily-feed` | the reusable daily-feed shape (one telecom XDR CSV per UTC day; Pipeline, Collector, Dataset, freshness and index-lag Alert Rules, `la_index_build` Job); no persona demo | copy a sample day from `data/samples` into `data/inbox/daily_xdr` | none |
+| `la-daily-feed` | the reusable daily-feed shape (one telecom XDR CSV per UTC day; Pipeline, Collector, Dataset, freshness and index-lag Alert Rules, `la_index_build` Job); no persona demo | copy a sample day from `data/samples` into `data/inbox/daily_xdr` | the same five (so the closed Space admits them and not `outsider`) |
 | `la-sample` | first-run sample of *Getting started* (every edition, no personas, no Jobs) | created by the app: `POST /spaces {template: "la-sample", loadSamples: true}` | none |
 
 ## 1. Day-of checklist

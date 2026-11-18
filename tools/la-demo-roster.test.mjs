@@ -88,4 +88,7 @@ test('every LA scaffolder and the showcase packager write a closed Space', () =>
     assert.ok(lines.length >= 1, `${f} writes no space.toon`);
     for (const l of lines) assert.ok(l.includes('admission: closed'), `${f}: its space.toon is not closed`);
   }
+  // la-daily-feed has no seeder: the preview bake writes its space.toon itself
+  const bake = fs.readFileSync(path.join(root, 'scripts', 'preview-la', 'bake-all.ps1'), 'utf8').split('\n').filter((l) => l.includes("'space.toon'"));
+  assert.ok(bake.length >= 1 && bake.every((l) => l.includes('admission: closed')), 'bake-all.ps1 writes la-daily-feed open');
 });

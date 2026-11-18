@@ -25,6 +25,7 @@ import {
 } from './la-shell.component';
 import { LandingComponent } from './landing.component';
 import { PRODUCT } from './product.generated';
+import { SpacesService } from '@inspecto/core/api';
 
 /** The Product's areas as the generated host data declares them (PRODUCT-ASSEMBLY-1 PA-4: apps/link-analysis/app.toon). */
 const LA_NAV = PRODUCT.nav;
@@ -40,6 +41,7 @@ describe('la-app shell and landing page', () => {
     async function render(
         features: Record<string, boolean> = { geoMap: true, investigations: true, entityPages: true },
         product: BootstrapProduct | null = null,
+        authMode: 'none' | 'oidc' = 'none',
     ) {
         TestBed.configureTestingModule({
             providers: [
@@ -48,12 +50,16 @@ describe('la-app shell and landing page', () => {
                 provideNoopAnimations(),
                 {
                     provide: LensService,
-                    useValue: { canAuthorWorkbench: signal(false), canManageIncidents: signal(false) },
+                    useValue: {
+                        canAuthorWorkbench: signal(false),
+                        canManageIncidents: signal(false),
+                        canAdminister: signal(false),
+                    },
                 },
                 {
                     provide: SessionService,
                     useValue: {
-                        authMode: signal('none'),
+                        authMode: signal(authMode),
                         actorName: signal(''),
                         loginRequired: signal(false),
                         actor: signal(null),
@@ -302,5 +308,31 @@ describe('la-app shell and landing page', () => {
             ShortcutsHelpDialog,
             expect.objectContaining({ data: { shortcuts: LA_APP_SHORTCUTS } }),
         );
+    });
+    // Operator 2026-11-18: the demo outsider signs in but no Space admits it (bootstrap spaces: []); everything is hidden
+    // except the no-access page and the user menu.
+    it('a signed-in user admitted to no Space sees only the no-access page and the user menu (no violations)', async () => {
+        const el = await render(undefined, null, 'oidc');
+        expect(el.querySelector('nav[aria-label="Areas"]'), 'areas shown while the Space list loads').toBeTruthy();
+        const spaces = TestBed.inject(SpacesService);
+        spaces.multiSpace.set(true);
+        spaces.availableSpaces.set([]);
+        harness.detectChanges();
+        expect(el.querySelector('nav[aria-label="Areas"]')).toBeNull();
+        expect(el.querySelector('[data-testid="la-next-steps-open"]')).toBeNull();
+        expect(el.querySelector('inspecto-space-switcher')).toBeNull();
+        expect(el.querySelector('la-app-landing')).toBeNull();
+        expect(el.querySelector('user')).toBeTruthy();
+        const empty = el.querySelector('[data-testid="la-no-access"]');
+        expect(empty?.textContent).toContain('You have no access to any Space');
+        expect(empty?.textContent).toContain('Ask your administrator');
+        expect(el.querySelectorAll('h1').length).toBe(1);
+        await expectNoA11yViolations(el);
+
+        // admitted to a Space again: the rail and the pages come back
+        spaces.availableSpaces.set([{ id: 'alpha', displayName: 'Alpha', description: '', createdAt: '' }]);
+        harness.detectChanges();
+        expect(el.querySelector('nav[aria-label="Areas"]')).toBeTruthy();
+        expect(el.querySelector('[data-testid="la-no-access"]')).toBeNull();
     });
 });
