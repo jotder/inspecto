@@ -230,37 +230,37 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the title; the panel fills.
 
 ### S03 · One panel, before any drawing
-- Voice: One panel answers what this Dataset holds. How many link rows, and the period its Time column covers. About how many premises and contractors, and in which columns. The kinds of link with their counts, here the visit types. Every Measure's total and median, or, as here, the reason there is none. A part the Dataset cannot answer says why, never a zero nobody counted. The answer is kept until a new file arrives, so a second look is instant.
+- Voice: One panel answers what this Dataset holds. About how many premises and contractors, and in which columns. The kinds of link with their counts, here the visit types: meter readings, inspections, fault repairs, safety checks, and a few with no type at all. Every Measure's total and median, or, as here, the reason there is none: no column of this Dataset is a Measure. A part the Dataset cannot answer says why, never a zero nobody counted. The answer is kept until a new file arrives, so a second look is instant.
 - Chip: Entities · Kinds of link · Measures
 - Action: scroll the panel: the summary line ▸ Entities ▸ Kinds of link ▸ Measures. [check in UI: the Measures line for a Dataset with no Measure column (*Not totalled: …*), and the visit types listed]
 - Impact: mark each part as the voice names it.
 
 ### S04 · The busiest, and one entity's summary
-- Voice: Then the Busiest: two tables, the entities that link to the most others, and those reached by the most. The contractors reached by the most premises are C-27 and C-21. Click a row, and that entity's summary opens: its links in and out, its distinct counterparts, when it was first and last seen, and its activity per day. Its Draw it starts a graph from that one entity.
+- Voice: Then the Busiest: two tables, the entities that link to the most others, and those reached by the most. The contractors reached by the most premises are C-27 and C-21. Click a row, and that entity's summary opens: its links in and out, its distinct counterparts, the dates it was first and last seen, its activity per day, and who it links with most. Close it when you have read it.
 - Chip: Busiest · Draw it
 - Action: Busiest ▸ hold on both tables ▸ click the C-27 row ▸ hold on the summary ▸ close (do not press Draw it). [check in UI: C-27 and C-21 head the *reached by* table]
 - Impact: mark the two rows; mark the summary's per-day chart.
 
 ### S05 · Draw these, and the lesson
-- Voice: Draw these starts a graph from the busiest at once. Press it. The busy contractors fill the screen, and that is the lesson of this tab: busiest is where the work is, not where the fraud is. The contractor in this story, C-14, is nowhere near the top. Explore the Dataset shows you what is ordinary, so that you recognise what is not.
+- Voice: Draw these starts a graph from the busiest at once. Press it. The page says what it drew: twenty entities and their linked nodes. The busy contractors fill the screen, and that is the lesson of this tab: busiest is where the work is, not where the fraud is. The contractor in this story, C-14, is only fifth in the table, an ordinary busy contractor. Explore the Dataset shows you what is ordinary, so that you recognise what is not.
 - Chip: Draw these
 - Action: Draw these ▸ wait for the draw ▸ hold. [check in UI: C-14 is not among the busiest drawn]
 - Impact: before/after hold: empty canvas → the busiest contractors and their premises.
 
 ### S06 · File, Explore Dataset
-- Voice: Now draw a table yourself. From the File menu, choose Explore Dataset…. It opens Settings at the Graph model, the place that says how rows become a graph. Its first line shows the Space's Industry pack, here the Generic words, and a badge says whether masking is on. Graph built from stays at Entity/Link, from a Dataset. The Dataset list puts the tables that look like links first, each with one line saying why.
+- Voice: Now draw a table yourself. From the File menu, choose Explore Dataset…. A list of the Space's Datasets opens, the tables that look like links first, each with one line saying why, and the others under Not link-shaped. Pick one and Inspecto draws it for you, reading the two ends of each link from its columns. The place that says how rows become a graph is Settings, Graph model, and that is where we look next.
 - Chip: File · Explore Dataset… · Graph model
 - Action: File ▸ Explore Dataset… ▸ hold on *Industry pack: Generic graph* and the masking badge ▸ open Dataset ▸ hold on the first entries and their reasons. [check in UI: the badge reads *Masking off* on Basic]
 - Impact: mark the Industry pack line, the badge and one reason line.
 
 ### S07 · Which column is which
-- Voice: Choose field_visit_dataset. The two entity columns are filled in, because they look like the two ends of a link: From column premise_id, To column contractor_id. Change them if the link runs the other way. Link kind column, optional, gives each kind a colour and a filter: choose visit_type. Attribute columns ride on each link and feed the timeline and the tools: add visit_at. Add another mapping would stack a second pair of columns into the same graph. Derive mapping drafts all of this with the assistant, if you may author configuration.
+- Voice: Choose field_visit_dataset. Inspecto reads its columns and draws it at once. Now open Settings, Graph model to see how. Its first line shows the Space's Industry pack, here the Generic words. Graph built from is Entity/Link, from a Dataset, and the Dataset is field_visit_dataset. From column premise_id and To column contractor_id are the two ends of a visit. Link kind column visit_type gives each kind a colour and a filter. Attribute columns ride on each link and feed the timeline and the tools. Add another mapping would stack a second pair of columns into the same graph. Derive mapping drafts all of this with the assistant, if you may author configuration. Change either column if the link should run the other way.
 - Chip: From column · To column · Link kind column
 - Action: Dataset `field_visit_dataset` ▸ check From column `premise_id`, To column `contractor_id` ▸ Link kind column `visit_type` ▸ Attribute columns `visit_at` ▸ hover Add another mapping and Derive mapping. [check in UI: the two columns are prefilled]
 - Impact: mark the two prefilled columns.
 
 ### S08 · Run
-- Voice: Press Run. Settings closes and the graph is drawn. A year of visits is more than one canvas holds, so the canvas draws its busiest part, and the Graph counts card says how many entities and links are on screen. When a limit cuts the result, a notice says so, Result cut short, never a silent gap. Narrow it, or start from one entity instead.
+- Voice: Close Settings. The graph is drawn: a year of visits, premises round the contractors who visited them. When a limit cuts the result, a notice says so, Result cut short, never a silent gap; this one fits whole. If a table is too big, narrow it, or start from one entity instead.
 - Chip: Run · Result cut short
 - Action: Run ▸ wait ▸ open the Graph counts pill ▸ hold on the *Result cut short* notice if shown. [check in UI: whether the drawn graph is cut; if it is not, the voice says "this one fits whole, and the Graph counts card says how many entities and links"]
 - Impact: mark the notice and the counts.
