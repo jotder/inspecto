@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.analytics` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `BI-INSIGHTS-1` | P2 | feature | advanced insights on business data in Widgets and Dashboards — what happened, why it moved, what is unusual, what comes next, who is at r… | — |

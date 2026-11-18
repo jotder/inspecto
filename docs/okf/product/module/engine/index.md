@@ -37,6 +37,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P2 | feature | SPACE-LINK-CENSUS-1 the link census: the default flip and the plan scope not built | — |
 | — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
 | `LEGAL-HOLD-SCOPE-1` | P3 | feature | a legal hold does not reach a Pipeline's data partitions, and has no screen (narrowed 2026-11-17; filed 2026-11-15 from ARCH-MOSCOW-UNTRA… | — |
+| `BI-INSIGHTS-1` | P2 | feature | advanced insights on business data in Widgets and Dashboards — what happened, why it moved, what is unusual, what comes next, who is at r… | — |
 | `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` | P3 | defect | a multi-file Consignment re-planned after a failover can write a second, differently named output, even on a shared output tree. | operator |
 | — | P2 | feature | Postgres multi-user | operator |
 | `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` | P3 | chore | report DuckDB 2.0.0's window_self_join hive-pruning defect upstream, then drop the workaround when it is fixed. | — |
