@@ -51,13 +51,13 @@ DuckDB does not create parent directories. `LegacySpaceRoot` is the flat working
 pipeline-shaped store is read at its mapped output, `<store>/database/**`, so `backup/` and
 `quarantine/` never leak into reads (`SqlViews.storeReadRoot`). `SqlViews` owns every `read_*(`
 option; nothing concatenates its own. Writes are staged and revealed by atomic rename
-([output-sinks](../engine/spec-output-sinks.md)).
+([output-sinks](../engine/spec-sinks.md)).
 
 **Sinks.** A Pipeline has one `output:` plus `dirs.database`, or a `sinks:` list of
 `{database, format, compression, ducklake}` entries. `ConfigSafetyValidator.checkSink` path-jails
 each `database` and allow-lists format and compression. Format is `PARQUET` or `CSV`
 (`OutputFormat`). Optional DuckLake registration runs in the commit
-([object-storage-export](../engine/spec-object-storage-export.md) covers pushing a store out).
+([object-storage-export](../engine/spec-sinks.md) covers pushing a store out).
 
 **Configuration and history.** Components are TOON files written through `ComponentStore`; every
 write archives the prior copy to `<typeDir>/.history/<id>.v<N>.toon` (keep

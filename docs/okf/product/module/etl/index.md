@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Ingestion & parsing (ING)](plan-ingestion.md) · [Parser field tiers — interview #2 observation-session kit (D13)](plan-parser-field-tiers-interview.md) · [Pipeline authoring (PIP) — capability spec](plan-pipeline-authoring.md) |
-| spec | current | [Console first-time user use cases (blank slate to a queryable Dataset)](spec-first-time-user-use-cases.md) · [Step catalog — every Step kind, delivered and pending](spec-step-catalog.md) |
+| plan | current | [Parser field tiers — interview #2 observation-session kit (D13)](plan-parser-field-tiers-interview.md) · [Ingestion, parsing and Pipeline authoring (ING, PIP) — plan](plan.md) |
+| spec | current | [Step catalog — every Step kind, delivered and pending](spec-step-catalog.md) |
 | architecture | current | [Pipelines, Steps and ingest](architecture.md) |
-| features | current | [Parsing and ingest — features](features-parsing-ingest.md) · [Pipelines and Steps — features](features-pipelines-steps.md) |
+| features | current | [Pipelines, parsing and ingest — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Enrichment](user-guide-enrichment.md) · [Parsing and ingest — screens](user-guide-parsing-ingest.md) · [Pipeline Editor](user-guide-pipeline-editor.md) · [Pipelines (Authoring) — MOVED](user-guide-pipelines.md) · [Schema, Mapping & Transformation Authoring](user-guide-schema-mapping.md) |
+| user-guide | current | [Pipelines — user guide](user-guide.md) |
 | admin-guide | current | [ETL model and step registry — admin guide](admin-guide.md) |
-| api | current | [Parsing and ingest — API](api-parsing-ingest.md) · [Pipelines and Steps — API](api-pipelines-steps.md) |
+| api | current | [Pipelines, parsing and ingest — API](api.md) |
 | tests | current | [ETL model and step registry — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

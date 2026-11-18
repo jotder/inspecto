@@ -1,13 +1,29 @@
 ---
 type: Concept
 title: Output & Sinks
-description: The OutputFormat strategy, partitioned vs single-file writers, and quarantine outcomes.
+description: Where a Pipeline's rows land — the OutputFormat strategy, partitioned vs single-file writers, the store-layout contract, multi-destination sinks with the output default layer and per-sink DuckLake, an object-store dirs.database, quarantine outcomes, and the objectstore.export push post-action.
 resource: platform/inspecto-etl/src/main/java/com/gamma/etl/PartitionWriter.java
-tags: [engine, output, sink, partition, quarantine]
-timestamp: 2026-06-28T00:00:00Z
+tags: [engine, output, sink, partition, quarantine, ducklake, export, object-storage, s3, hdfs, job-type, post-action]
+timestamp: 2026-11-18T00:00:00Z
 ---
 
 # Output & Sinks
+
+## What this covers
+
+Where a Pipeline's output goes once it has been parsed and shaped. It covers the file formats and writers,
+the rule that keeps every store a top-level directory so reads never double-count, writing one Pipeline to
+several destinations (with shared defaults and one DuckLake catalog per destination), writing straight into
+an S3-compatible bucket, what happens to files that cannot be ingested, and the `objectstore.export` Job Type
+that pushes committed output to S3 after a successful run.
+
+## Contents
+
+1. Writers, store layout and destinations — `OutputFormat` and the writers, the store-layout contract,
+   multi-destination `sinks:`, object-store `dirs.database`, quarantine outcomes
+2. Object-storage export (S3 / HDFS) — the push post-action and its posture
+
+## Writers, store layout and destinations
 
 * **`OutputFormat`** (`platform/inspecto-etl/src/main/java/com/gamma/etl/OutputFormat.java`) — an enum-as-strategy with
   `PARQUET` (compressible) and `CSV`. Each constant carries its own `copyToken()`/`extension()`/
@@ -17,18 +33,18 @@ timestamp: 2026-06-28T00:00:00Z
   (default `["year","month","day"]`), excludes the internal `__src_id` column, uses a two-step atomic rename,
   and parallelises rename fan-out above 16 partitions.
 * **`PartitionSinkWriter`** (`platform/inspecto-engine/src/main/java/com/gamma/pipeline/exec/PartitionSinkWriter.java`) — the
-  [pipeline-engine](spec-live-execution.md) sink writer: delegates to `PartitionWriter` when partitions are
+  [pipeline-engine](spec-pipeline-execution.md) sink writer: delegates to `PartitionWriter` when partitions are
   declared, else writes a **single unpartitioned file**. (`sink.view` subtypes write no bytes — they register
   a view definition instead.)
 
-## Store-layout contract (decided 2026-07-18 — closes the UAT double-count)
+### Store-layout contract (decided 2026-07-18 — closes the UAT double-count)
 
 One store-layout contract governs where sink bytes land and what reads sweep (root cause of the
-UAT-proven +72% double-count: a flow job's `data_dir` pointed inside the `orders` store, its sink
+UAT-proven +72% double-count: a Pipeline Job's `data_dir` pointed inside the `orders` store, its sink
 nested at `orders/rollup/`, and the dataset's recursive glob counted both):
 
 * **Write side** — a persistent store is a **top-level directory under the space data root**.
-  `PipelineJobRunner.requireTopLevelSinks` fails a flow run closed *before any bytes are written*
+  `PipelineJobRunner.requireTopLevelSinks` fails a Pipeline Job run closed *before any bytes are written*
   when a sink would resolve deeper (a `data_dir` pointed inside another store's tree, or a slashed
   `store` name). A `data_dir` fully **outside** the data root stays allowed (external export). Job
   configs bypass `ConfigSafetyValidator`, so this is enforced at run time.
@@ -36,7 +52,7 @@ nested at `orders/rollup/`, and the dataset's recursive glob counted both):
   `database/` subtree) is read at its *mapped output* (`<store>/database/**`), so `backup/`,
   `quarantine/` (incl. Decision-Rule record quarantine) and any stray nested trees never leak into
   reads. A flat snapshot store (no `database/`) reads unchanged. Applied by `DatasetRelation`
-  (`physicalRef` datasets), `SourceStoreReader` (flow seeds + `sql.template` sources — a flow can
+  (`physicalRef` datasets), `SourceStoreReader` (Pipeline Job seeds + `sql.template` sources — a Pipeline Job can
   now seed straight from an ingest pipeline's store by name, no `data_dir` hack),
   `PipelineJobRunner.deriveViewSql`, and `ExpectationEvaluator`. An **explicit deeper ref**
   (`orders/database`, `orders/backup`) is honoured as written; `shared/…` Exchange refs are exempt.
@@ -47,7 +63,7 @@ Tests: `DatasetRelationTest.physicalRefWithDatabaseSubtreeReadsMappedOutputOnly`
 `sinkNestedInsideAnotherStoreFailsClosed`, `slashedSinkStoreNameFailsClosed`,
 `externalDataDirStaysAllowed`).
 
-## Multi-destination `sinks:` (shipped 2026-08-02 — `0cdc9dff` + `79dcb3e6`)
+### Multi-destination `sinks:` (shipped 2026-08-02 — `0cdc9dff` + `79dcb3e6`)
 
 A `*_pipeline.toon` may declare a top-level plural **`sinks:`** list — one `{database, format,
 compression, ducklake}` tuple per destination. The single `output:` + `dirs.database` pair is the
@@ -79,7 +95,9 @@ one-element shorthand; `PipelineConfig.sinks()` is never empty (it synthesises t
   multi-schema batch. A single destination is byte-for-byte the legacy write. **Direct fan-out, not
   `ConsignmentGraphRunner`** — the ingest commit model is already "write everything, finalise once," and
   `finalizeSource` (backup / markers-LAST / ledger) is per-source-file, so it runs exactly once
-  regardless of destination count. `ConsignmentGraphRunner` stays the flow-job executor, unused by ingest.
+  regardless of destination count. `ConsignmentGraphRunner` is not used by this fan-out. (⚠ When written, 2026-08-02, this line called it "the
+  flow-job executor, unused by ingest"; since 2026-08-29 it drives the ingest graph fork — see
+  [spec-ingest.md](spec-ingest.md).)
 * **Bypass guards** — paths that skip `writeAndTrace` (native single-member `streamingIngest`/
   `chunkedIngest`; plugin `GenerationModeIngester`) materialise via the union path when `sinks>1`
   (`CsvIngestStrategy`, `StreamingPluginIngestStrategy`).
@@ -193,7 +211,7 @@ Tests: `DuckLakeRegistrarPerSinkTest` (7), `SinkDuckLakeSharedTableTest` (8, `pr
 read `lake_a → A=3`, `lake_out → B=5` after the fix; it is not in the reactor, for the network-INSTALL
 reason `DuckLakeRegistrarTest` records.
 
-## Object-store `dirs.database` (shipped 2026-11-01 — `SCALEOUT-OBJSTORE-DATABASE-DIR-1`)
+### Object-store `dirs.database` (shipped 2026-11-01 — `SCALEOUT-OBJSTORE-DATABASE-DIR-1`)
 
 The ingest lane writes Stage-1 output to an `s3://bucket/prefix` `dirs.database` that lies under the operator
 allow-list `-Dassist.safety.object_roots` (containment rule: module.config `spec-config-safety.md`
@@ -258,9 +276,138 @@ when the per-file containment check is removed; both run live 2026-11-01 against
 shared Postgres catalog under `partitioned` was not run live; SKIPS without `INSPECTO_TEST_S3_ENDPOINT`/`_KEY`/`_SECRET`, and a skip is not a pass),
 `ConfigSafetyValidatorTest.outputConnectionIsRequiredForAnObjectStoreDatabaseAndRefusedForALocalOne`.
 
-## Quarantine outcomes
+### Quarantine outcomes
 
 * `QUARANTINED_UNREADABLE` — the ingester threw (file unreadable/undecodable).
 * `QUARANTINED_MISMATCH` — the ingester emitted **zero** rows (parsed, but nothing came out).
 * `SinkFlushException` — a framework/schema error during a generation flush → **fail the batch** (not
-  quarantine). Audit is always written regardless (see [ingestion](spec-ingestion.md)).
+  quarantine). Audit is always written regardless (see [ingestion](spec-ingest.md)).
+
+## Object-storage export (S3 / HDFS) — the push post-action and its posture
+
+**Status:** the push post-action **SHIPPED 2026-09-24** (`EXPORT-1`, built on the operator's request by
+name that day; the row is closed). Discussed 2026-08-28; the options analysis below is kept as the record
+of why this shape and not another.
+**Related:** [jobs](../processor/spec-jobs.md) (the Job framework it runs in) · [dataset consumption / the `dataset` connector](../acquire/spec.md)
+(the inbound mirror of this question) · [connectors](../connectors/spec-connectors.md) ·
+[operations reference](../../layer/platform/admin-guide-operations-reference.md).
+
+### As built (2026-09-24) — `objectstore.export`
+
+A built-in **Job Type**, not a pipeline key: a Job with `on_pipeline: <name>` fires on that Pipeline's
+batch COMMIT and never on a failed run, which is exactly "after a successful run" — so the pipeline TOON
+learns nothing about exports.
+
+```toon
+job:
+  name: push_orders
+  type: objectstore.export
+  on_pipeline: orders
+  connection: lake
+  local_path: orders/database
+```
+
+| Param | | Meaning |
+|---|---|---|
+| `connection` | required | Id of an `s3` Connection (`*_connection.toon`). Its `base_path` = `bucket[/prefix]` is the export root; `username` / `password` are the access key and a `${ENV:…}`-style secret reference, resolved at signing time. ⛔ Credentials never appear in a pipeline or job TOON. |
+| `local_path` | required | A directory under the **Space data root** — a store's `database/`, or one Dataset's output directory. |
+| `remote_prefix` | optional | Key prefix under the Connection's `base_path`; default = `local_path`. A `.`/`..` segment is refused. |
+| `retries` | optional, `3` | Retries per request (0–10), exponential backoff with full jitter (`RetryPolicy`). |
+
+**The seams.**
+
+| Piece | Where | Note |
+|---|---|---|
+| `ExportConnector` / `ExportConnectorFactory` | `inspecto-acquire` `com.gamma.acquire` | The outbound mirror of `CollectorConnector` / `CollectorConnectorFactory`; `forProfile` is the `ServiceLoader` lookup by `connection.connector`. |
+| `S3Connector` implements `ExportConnector` too | `inspecto-connectors` | ONE class serves both directions, so `AwsSigV4` signing and the endpoint/`base_path` rules cannot drift. `stat` = HeadObject, `put` = PutObject streamed from disk with a signed `Content-MD5`. `S3ConnectorFactory` is listed in `META-INF/services/com.gamma.acquire.ExportConnectorFactory`. |
+| `ObjectStoreExportJobType` | `inspecto-engine` `com.gamma.job` | Registered as a built-in by `JobService` with the Space `dataDir`. |
+
+**The contract** (pinned by `ObjectStoreExportJobTest` in `inspecto-connectors`, against a JDK
+`HttpServer` fake S3 that re-computes each PUT's SigV4 signature and checks the body against the signed
+SHA-256 and `Content-MD5`):
+
+- **Idempotent.** A file is skipped when the remote object's size AND ETag equal the local size and MD5.
+  A single-part PUT's ETag is the body's MD5; any other ETag shape (multipart, SSE-KMS) never matches, so
+  the file is re-sent — the conservative answer, never a false skip.
+- **Upload, then manifest.** `_inspecto_export_manifest.json` (job, run id, time, every key + size + MD5)
+  is written at the export prefix LAST. A consumer that keys on the manifest never reads a half-delivered
+  export.
+- **Failure is failure.** A request that still fails after `retries` returns the run `FAILED` and the
+  manifest is not written. Files already sent stay (object stores have no transaction); the next run
+  skips them.
+- **Path-jailed local reads.** `local_path` is contained in the data root by `PathJail.require`; every
+  file is re-checked with `PathJail.contains`; a symlink anywhere in the tree refuses the run. All
+  refusals fire in the planning pass, before any byte is sent.
+- **Skipped locally:** hidden files and `*.tmp` (in-flight atomic writes).
+- **Dry run** (`POST /jobs/{name}/trigger?dryRun=true`) stats the remote side and reports what would be
+  uploaded; nothing is PUT, no manifest.
+
+**Deliberate limits.**
+
+- ⚠ **Single-part PUT only** — a file over 5 GiB refuses the run up front. Multipart upload is not built;
+  engine-written Parquet partitions sit far below it.
+- ⚠ A Connection that declares a `tunnel` or `proxy` is **refused**, as `WebhookSink` does: the export
+  transport does not dial through either, and silently bypassing an administrator's proxy is worse.
+- ⚠ **`local_path` is not in `ConfigSafetyValidator.JOB_PATH_KEYS`.** That list is for keys resolved
+  against `SpaceConfigRoot.jobPathBase`; this key resolves against the Space DATA root, so adding it
+  there would manufacture the gate/runtime split the list's own javadoc warns about. It is jailed at run
+  time. No pipeline key was added, so `ConfigSpecs` / `AcceptedConfigKeys` / the contract JSONs are
+  untouched.
+- Only `s3` has a transport. GCS (interoperability mode) and HDFS reach it through an S3-compatible
+  endpoint; ⛔ never `hadoop-client`.
+
+### The grounded facts (2026-08-28)
+
+1. **Nothing pushed outbound before `objectstore.export`.** Every connector in `inspecto-connectors`
+   (S3, GCS, Azure, SFTP, FTP, Kafka, DB-export) was *acquisition-side* — they fetch **in**. Outputs are
+   local parquet written by `PartitionWriter`.
+2. **`output.ducklake` registers, it does not relocate.** `DuckLakeRegistrar` ATTACHes a DuckLake
+   catalog (`DATA_PATH` from config) and registers already-written *local* paths — bytes stay put.
+3. **The engine is deliberately local-filesystem-shaped.** Atomic temp+rename writes
+   (`AtomicFiles`), marker files, path jails, DuckDB file databases, config-registry directory
+   scans, poll-dir semantics. S3 has no atomic rename and no real directories, so a whole *space*
+   on S3 (natively or via a FUSE mount) silently changes the meaning of the crash-safe commit
+   ordering. **Posture: space (config + working state) local; data tier exported.**
+4. Reusable plumbing already in-repo for an outbound build: `AwsSigV4`,
+   `AbstractHttpObjectStoreConnector`, and the object-store workbench family.
+
+### Options, by ambition
+
+| Option | Effort | What it gets |
+|---|---|---|
+| **Operator sync** — `aws s3 sync` / rclone of `data/<store>/database/` on a schedule | zero code, works today | outputs mirrored to S3; consumers read via DuckDB `httpfs` |
+| **Push post-action / upload task** — an outbound mirror of the connector SPI: a post-commit uploader (job task or sink option) reusing `AwsSigV4` + the object-store HTTP plumbing | small–medium build | product-managed, per-pipeline "also deliver committed outputs to `s3://…`", audited |
+| **DuckLake `DATA_PATH 's3://…'`** — DuckDB writes parquet straight to S3 via `httpfs` | medium — a real re-plumb: `PartitionWriter` owns the local write + swap today | the data tier *lives* on S3, catalog-managed; the space stays local |
+| **HDFS directly** | the expensive one — DuckDB has no HDFS support; `hadoop-client` is a huge dependency tree colliding with the lean-SBOM / framework-free non-negotiable; WebHDFS-over-REST is buildable like the other HTTP connectors but only if mandated | — |
+
+### Recommendation of record
+
+If the Hadoop cluster exposes an **S3-compatible gateway** (Ozone S3, MinIO, or the org's object
+store), everything reduces to the S3 column — reuse `AwsSigV4`, never take a Hadoop dependency.
+Sequence of record was **operator sync first** to prove the consumption pattern, then the **push
+post-action** only on demand — the operator asked for it by name 2026-09-24 and it shipped the same day
+(§*As built*). `aws s3 sync` / rclone remains a valid zero-code alternative. The full-space-on-S3 idea is recommended *against* for
+the semantic reasons in fact 3, not effort.
+
+### The object-store lane, ACCEPTED against a live MinIO (2026-09-15)
+
+`AIRGAP-S3-EXTENSIONS-1` closed on this run. `PartitionWriter.writeToObjectStore` opens with
+`DuckDbExtension.ensureLoaded(conn, "httpfs", …)` (`PartitionWriter.java`), and `PartitionWriterObjectStoreTest`
+(**4/4 green, 1.15 s**) drove that method against the sandbox's MinIO (`127.0.0.1:9000`, bucket
+`inspecto-lakehouse`) with the explicit load in place — the acceptance the row refused to take from a green
+reactor, because all four tests `assumeTrue`-skip without an endpoint and had never entered the method since
+the load call was added.
+
+* ⚠ **`INSPECTO_TEST_S3_ENDPOINT` is `host:port`, NOT a URL.** The test feeds it straight into
+  `SET s3_endpoint=…` and derives `s3_use_ssl` from a `https` prefix; passing `http://127.0.0.1:9000` produced
+  `Could not resolve hostname … 'http://http://127.0.0.1%3A9000/…'` and **four 45-second timeouts** that read
+  like a dead MinIO. The first run of the day was red for exactly this reason; the code was never at fault.
+* What the run does NOT prove: that an **air-gapped** bundle loads `httpfs` from `duckdb-extensions/<plat>/`.
+  On this box `ensureLoaded`'s first step (`LOAD httpfs`) succeeds from the developer cache, so the flat-file
+  fallback (`-Dduckdb.extension.dir`) was not exercised. That half is packaging's, measured separately
+  (`AIRGAP-EXTENSIONS-CI-1`, the staged 10 files; autoload over the flat dir FAILS, explicit `LOAD '<file>'` WORKS).
+* Still open, and NOT this row's: there is **no S3 credential/endpoint config surface in `src/main`** — the five
+  `SET s3_*` statements live only in the test. Scale-out phase C §5.4 bullet 6 owns it, and its eager-vs-deferred
+  resolution posture is a §1 operator call (`BACKLOG.md`). ⚠ As of 2026-09-15. Since 2026-11-01 the ingest
+  lane has one — `output.connection` for an object-store `dirs.database` (*Object-store `dirs.database`* above,
+  credentials route (a)).

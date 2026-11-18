@@ -95,7 +95,7 @@ cap (unbounded job concurrency defeats a `RAM/N` per-instance cap — see [DuckD
 triggering is fire-and-forget via `workers.submit`).
 
 `JobType` includes `ENRICH`, `REPORT`, `MAINTENANCE`, and **`PIPELINE`** (authored-Pipeline execution — see
-[pipeline live execution](../engine/spec-live-execution.md)).
+[pipeline live execution](../engine/spec-pipeline-execution.md)).
 
 ## The Job Framework (P0–P3, shipped 2026-07-09; `feat!` → 5.0)
 
@@ -141,7 +141,7 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   the allowlist is inside the packs dir or under a control-plane write root. Refused jars show as
   `state: "rejected"` rows with a cause. The gate is the same for every pack kind: Job Types, expression
   tokens, node types, node executors, and (since 2026-09-25) **parsers**, the fifth kind. Details:
-  [parser-plugins.md](../engine/spec-parser-plugins.md), *Drop-in parser jars*.
+  [parser-plugins.md](../engine/spec-parsing.md), *Drop-in parser jars*.
   **2026-09-25: the staged copies live under a server-owned dir** (trust design slice P0), not the system
   temp dir that any local process can write: `<auditDir>/job-packs-staging` (the Space's own audit dir), or
   `-Djobs.packs.stagingDir` when set, one unique `job-packs-*` dir per manager inside it. A staging root
@@ -488,7 +488,7 @@ It replaced the hardcoded `$`-vocabulary described in the *Parameters* bullet ab
   `ConsignmentProcessJobType.fromServiceLoader`, so the catalog cannot disagree with the lookup that
   resolves an id at run time; a provider the classpath cannot produce is **counted and skipped, and the scan
   continues past it** — a stale services entry throws from `hasNext()`, so stopping there would silently drop
-  every provider listed after it. → [post-sync-step-chains](../engine/spec-post-sync-step-chains.md)
+  every provider listed after it. → [post-sync-step-chains](../engine/spec-pipeline-execution.md)
 * **`mail.send` + the `mail` Platform Service** are the reference generic Job Type (§9 verbatim): it
   reuses the `NotificationChannel` seam rather than opening a second SMTP client, and declares
   `requires: [mail]` because a Job that mails outward must declare that reach. ⚠ A built-in with an
@@ -498,7 +498,7 @@ It replaced the hardcoded `$`-vocabulary described in the *Parameters* bullet ab
   event-time attrs resolve **live** against the Consignment output registry keyed by the artifact's `ref`,
   which is why they replaced the single `time_range` attr no consumer could use — one opaque
   `"<min>..<max>"` string that `SqlParamScanner` substitutes as one SQL literal and nothing split. See
-  [`consignment-addressing.md`](../engine/spec-consignment-addressing.md).
+  [`consignment-addressing.md`](../engine/spec-consignments.md).
 
 ### The operations zone (`-Dops.timezone`, shipped 2026-08-15)
 
@@ -888,7 +888,7 @@ an S3-compatible Connection (`connection`) — armed with `on_pipeline:` so it r
 Skip-unchanged by size + ETag, manifest written last, `FAILED` with no manifest when any object still
 fails after `retries`. The transport is the `ExportConnector` SPI (`inspecto-acquire`), implemented by
 `S3Connector`. As-built contract and limits:
-[`okf/product/module/engine/spec-object-storage-export.md`](../engine/spec-object-storage-export.md).
+[`okf/product/module/engine/spec-sinks.md`](../engine/spec-sinks.md).
 
 ## `consignment.process` — the third-party Consignment SPI (shipped 2026-08-04)
 
@@ -994,7 +994,7 @@ signal-type constants class; the type is a string the emitter owns.
 
 **`ProcessorContext` withholds more than the connection.** Beyond the writable `Connection` and `job()`, it
 also does not expose `PipelineConfig` (a processor must read the **pinned** manifest values, not live config —
-see the partition-drift rule in [consignment-addressing](../engine/spec-consignment-addressing.md)), the path
+see the partition-drift rule in [consignment-addressing](../engine/spec-consignments.md)), the path
 builders, or `Batch`/`PipelineNode`. Each omission is a decision, not an oversight.
 
 *Distilled 2026-09-07 from `consignment-elt-architecture.md` when that plan was archived ([archive copy](../../../../archived-documents/plans-archive/consignment-elt-architecture.md)).*

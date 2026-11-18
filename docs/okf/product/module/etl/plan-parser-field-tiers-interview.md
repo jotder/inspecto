@@ -68,7 +68,7 @@ sheets, and the analysis rule that converts observations into tier assignments.
 - **Facilitator rule:** think-aloud, no steering. Answer a direct question only after logging
   it as an **ASKED** mark (the ask itself is data).
 - **Tasks** (each starts from the Pipelines list, ends at a green test run —
-  Build → Test is the journey of record, `okf/product/module/engine/spec-pipeline-test-run.md`):
+  Build → Test is the journey of record, `okf/product/module/engine/spec-pipeline-execution.md`):
   1. Onboard the **csv** sample (delimited lane — the richest field set).
      🔴 **RE-GROUNDED: "4 tabs" is wrong.** The pane shows **three collapsible sections**, the first
      expanded (`grammar-editor.component.ts`), labelled *"How the file is written" / "How values

@@ -31,12 +31,12 @@ live in its `product/<id>` hub). All hubs are listed in `docs/okf/product/index.
 
 | Slot | Answers | Example |
 |---|---|---|
-| `plan` | why / decisions / roadmap of the item | `docs/okf/product/module/etl/plan-pipeline-authoring.md` |
+| `plan` | why / decisions / roadmap of the item | `docs/okf/product/module/etl/plan.md` |
 | `spec` | exact behaviour, contracts, config keys | `docs/okf/product/module/config/spec-config-safety.md` |
-| `architecture` | how it is built, seams, classes — every hub's entry page is `architecture.md`; all of them are listed in the map at the end of `docs/okf/product/layer/platform/architecture.md` | `docs/okf/product/module/engine/architecture-pipeline-graph.md` |
+| `architecture` | how it is built, seams, classes — every hub's entry page is `architecture.md`; all of them are listed in the map at the end of `docs/okf/product/layer/platform/architecture.md` | `docs/okf/product/module/engine/architecture.md` |
 | `features` | what it can do (feature list) | — |
 | `feature-db` | feature rows / inventory data | — |
-| `user-guide` | how a user does a task in the UI | `docs/okf/product/module/etl/user-guide-pipelines.md` |
+| `user-guide` | how a user does a task in the UI | `docs/okf/product/module/etl/user-guide.md` |
 | `admin-guide` | operate, configure, deploy, flags | `docs/okf/product/layer/platform/admin-guide-launch-flags.md` |
 | `api` | HTTP / integration surface | `docs/okf/product/layer/platform/api-integrations-ducklake.md` |
 | `tests` | test strategy, coverage, QA scripts | `docs/okf/product/layer/platform/tests-testing-guide.md` |

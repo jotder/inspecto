@@ -9,7 +9,7 @@ timestamp: 2026-10-19T00:00:00Z
 # Acquisition and collectors — admin guide
 
 Module `platform/inspecto-acquire` (Base, every Edition). Collector and Connection authoring is in
-[user-guide-collector-config](user-guide-collector-config.md); routes are in [api-collectors](api-collectors.md).
+[user-guide-collector-config](user-guide.md); routes are in [api-collectors](api-collectors.md).
 
 ## JVM flags
 

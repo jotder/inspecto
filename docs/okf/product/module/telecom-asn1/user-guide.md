@@ -66,4 +66,4 @@ matches a declared segment is quarantined as a mismatch. Check the Pipeline's qu
 ## References
 
 - [spec](spec.md) — every key and limit
-- [engine spec-parsing-options](../engine/spec-parsing-options.md) — the full `parsing:` block
+- [engine spec-parsing-options](../engine/spec-parsing.md) — the full `parsing:` block

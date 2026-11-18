@@ -17,7 +17,7 @@
 >
 > **Method.** Read on 2026-10-18: matrix rows U, F, X, A, P; the `PACK-5G-IOT-ASSURANCE-1` row; `docs/GLOSSARY.md`; the
 > `telco-ra`, `telco-fraud` and `business-assurance` Space Templates (Pipelines, Schemas, Jobs, KPIs, Alert Rules, the
-> `anomaly-models/tf_subscriber_usage.toon` model); `okf/product/module/engine/spec-parser-plugins.md`; `okf/product/module/anomaly/spec-anomaly-scores.md`;
+> `anomaly-models/tf_subscriber_usage.toon` model); `okf/product/module/engine/spec-parsing.md`; `okf/product/module/anomaly/spec-anomaly-scores.md`;
 > the two earlier plans; and the git-excluded MVNO RFP working set (`docs/superpower/rfp-mvno-assurance/`: the
 > `compliance-matrix.xlsx` Compliance Matrix sheet, `gap-register.md`, `build-plan.md`, `assurance-content-catalog.xlsx`).
 > Where this plan says "exists", a file was read; where it says "not run", it was read, not executed.
@@ -310,7 +310,7 @@ recommended (D-5G6 is still decided at U6 and D-5G10 stays the operator's call a
 
 - Matrix: [`okf/product/layer/product/brochure-competitive-matrix.md`](../../layer/product/brochure-competitive-matrix.md) rows U, F, X, A, P.
 - Earlier plans: [`rerating-tariff-validation-plan.md`](../../../../archived-documents/plans-archive/rerating-tariff-validation-plan.md), [`partner-settlement-wholesale-plan.md`](../../../../archived-documents/plans-archive/partner-settlement-wholesale-plan.md).
-- Parsers: [`okf/product/module/engine/spec-parser-plugins.md`](../../module/engine/spec-parser-plugins.md). Anomaly Detection: [`okf/product/module/anomaly/spec-anomaly-scores.md`](../../module/anomaly/spec-anomaly-scores.md).
+- Parsers: [`okf/product/module/engine/spec-parsing.md`](../../module/engine/spec-parsing.md). Anomaly Detection: [`okf/product/module/anomaly/spec-anomaly-scores.md`](../../module/anomaly/spec-anomaly-scores.md).
 - Canonical vocabulary: [`GLOSSARY.md`](../../../../GLOSSARY.md) (the single source of truth).
 - RFP working set (git-excluded, this checkout only): `docs/superpower/rfp-mvno-assurance/` (`compliance-matrix.xlsx`, `gap-register.md`, `build-plan.md`, `assurance-content-catalog.xlsx`).
 

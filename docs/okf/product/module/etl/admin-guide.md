@@ -11,7 +11,7 @@ timestamp: 2026-10-19T00:00:00Z
 `platform/inspecto-etl` holds the Pipeline config model (`PipelineConfig`, `PipelineConfigParser`),
 the step registry and the per-file machinery (ingest, partition writing, quarantine, markers,
 ledgers). It runs inside the engine; it has no service or route of its own. Authoring is in the
-[pipelines user guide](user-guide-pipelines.md).
+[pipelines user guide](user-guide.md).
 
 ## Directories (`dirs` section of a Pipeline config)
 
@@ -58,7 +58,7 @@ means "already processed" and the file is skipped. `duplicate_check.retention_da
 less deletes every marker on the next cleanup. A same-name re-delivery with changed content is skipped
 too (the engine emits a `DUPLICATE_SKIPPED` delivery anomaly); deliver corrections under a new name, or state
 `collector.duplicate: {mode: checksum, algorithm: SHA256, on_change: reprocess}` so a changed same-name file is
-re-ingested and replaces its partition (the shipped `la-daily-feed` template does; [plan-ingestion](plan-ingestion.md)
+re-ingested and replaces its partition (the shipped `la-daily-feed` template does; [plan-ingestion](plan.md)
 §*Corrected same-name day*).
 
 ## Start-up warnings (`ConfigValidator`)

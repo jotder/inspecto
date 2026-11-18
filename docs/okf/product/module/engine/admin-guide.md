@@ -28,7 +28,7 @@ the per-Space DuckDB settings are in [admin-guide-operations-reference](../../la
 | `-Dingest.retry.max` | `5` | COMMIT attempts per Consignment before the file is quarantined `retry_exhausted`; `0` = unbounded (`CommitRetry`). |
 | `-Dingest.retry.backoff.initialMs` | `60000` | First retry delay, doubling per attempt. |
 | `-Dingest.retry.backoff.maxMs` | `3600000` | Backoff cap. |
-| `-Dingest.lane` | `auto` | `auto` = lane admission as designed; `graph` disables the flat lane (a write it cannot carry fails loudly); `flat` never diverts. Any other value is refused ([spec-execution-lanes](spec-execution-lanes.md)). |
+| `-Dingest.lane` | `auto` | `auto` = lane admission as designed; `graph` disables the flat lane (a write it cannot carry fails loudly); `flat` never diverts. Any other value is refused ([spec-execution-lanes](spec-pipeline-execution.md)). |
 | `-Dsources.max` | number of Pipelines | Concurrent Collectors in the `MultiCollectorProcessor` CLI. |
 
 ## Jobs and steps
@@ -64,7 +64,7 @@ the per-Space DuckDB settings are in [admin-guide-operations-reference](../../la
 | Symptom | Cause | Fix |
 |---|---|---|
 | `no allowed roots configured for '<field>'` | no `-Dassist.safety.roots` and no hosted Space | declare the roots at launch |
-| file quarantined `retry_exhausted` | COMMIT failed `ingest.retry.max` times | fix the cause, then reprocess or replay from the Runs screen ([user-guide-runs](user-guide-runs.md)) |
+| file quarantined `retry_exhausted` | COMMIT failed `ingest.retry.max` times | fix the cause, then reprocess or replay from the Runs screen ([user-guide-runs](user-guide.md)) |
 | Runs queue instead of starting | `jobs.maxConcurrentRuns` reached | raise it with care: each Run's DuckDB `memory_limit` multiplies by it |
 | Run recorded `FAILED` at its deadline | Job or step deadline expired | raise the Job's deadline within the ceiling, or the ceiling flag |
 | boot fails naming the pack allowlist | allowlist file is in a writable root | move it outside every writable root |

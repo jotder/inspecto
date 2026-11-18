@@ -98,10 +98,10 @@ AI-driven autonomy without redesign.
 
 | Area | IDs | Requirement of record |
 |---|---|---|
-| `ACQ` — **Acquisition & connectivity** | `ACQ-1` … `ACQ-7` | [`acquisition/acquisition.md`](okf/product/module/acquire/plan-acquisition.md) §2 |
-| `ING` — **Ingestion & parsing** | `ING-1` … `ING-6` | [`ingestion/ingestion.md`](okf/product/module/etl/plan-ingestion.md) §2 |
-| `PIP` — **Pipeline authoring** | `PIP-1` | [`pipeline-authoring/pipeline-authoring.md`](okf/product/module/etl/plan-pipeline-authoring.md) §2 |
-| `PIP` — **Pipeline execution** | `PIP-2` … `PIP-7` | [`pipeline-execution/pipeline-execution.md`](okf/product/module/engine/plan-pipeline-execution.md) §2 |
+| `ACQ` — **Acquisition & connectivity** | `ACQ-1` … `ACQ-7` | [`acquisition/acquisition.md`](okf/product/module/acquire/plan.md) §2 |
+| `ING` — **Ingestion & parsing** | `ING-1` … `ING-6` | [`ingestion/ingestion.md`](okf/product/module/etl/plan.md) §2 |
+| `PIP` — **Pipeline authoring** | `PIP-1` | [`pipeline-authoring/pipeline-authoring.md`](okf/product/module/etl/plan.md) §2 |
+| `PIP` — **Pipeline execution** | `PIP-2` … `PIP-7` | [`pipeline-execution/pipeline-execution.md`](okf/product/module/engine/plan.md) §2 |
 | `DAT` — **Data plane** | `DAT-1` … `DAT-6` | [`data-plane/data-plane.md`](okf/product/layer/platform/plan-data-plane.md) §2 |
 | `BI · INV` — **Studio** | `BI-1` … `BI-8` · `INV-1` … `INV-4` | [`studio/studio.md`](okf/product/layer/product/plan-studio.md) §2 |
 | `OPS` — **Observability & maintenance** | `OPS-1` … `OPS-6` | [`observability/observability.md`](okf/product/module/observability/plan-observability.md) §2 |

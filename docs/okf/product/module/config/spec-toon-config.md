@@ -73,7 +73,7 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   see a failure, so nothing can schedule, run or count it (`POST /runs/<stem>/trigger` and
   `GET /pipelines/<stem>/graph` are 404). No new route. In the SPA, `PipelinesService.list()` drops broken
   rows for every picker/count consumer; only the Pipelines editor reads `listWithBroken()` and shows them
-  in its Open dialog ([pipeline editor](../etl/user-guide-pipeline-editor.md)). Pinned by
+  in its Open dialog ([pipeline editor](../etl/user-guide.md)). Pinned by
   `ControlApiPipelineLoadErrorTest` (real HTTP, an unquoted `DECIMAL(18,2)` schema row) +
   `ConfigRegistryTest`. ⚠ The file/line split reads the message TEXT: a loader that changes the
   `readToon`/`ConfigCodec` prefix silently degrades `file` to the pipeline path (the message is still

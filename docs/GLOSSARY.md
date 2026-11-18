@@ -341,7 +341,7 @@ own flat output Schema. A single source file holding several record kinds (an XM
 multi-layout fixed-width file) is decomposed into one Segment per kind, and each Segment becomes **one output
 table** and **one Catalog node**. Authored as `parsing.plugin.segments` (legacy `processing.segments`);
 `PipelineConfig.Schemas.segments` is `@PublicApi since 2.0.0`. As built:
-`okf/product/module/etl/plan-ingestion.md`, `okf/product/module/engine/spec-parser-plugins.md`. ⛔ Not a path token, not a
+`okf/product/module/etl/plan.md`, `okf/product/module/engine/spec-parsing.md`. ⛔ Not a path token, not a
 time slice, and ⛔ unrelated to the *market* segment in the brochures — an accidental homonym.
 
 **Field Classification** *(defined 2026-09-10 — `SPEC-GLOSSARY-1`; rewritten 2026-11-14,
@@ -444,7 +444,7 @@ follow the same open-registry posture **Job types** already have (`JobTypeProvid
 
 > ⚠ **An embedded Job and a sub-Pipeline are NOT Steps** *(corrected 2026-08-02 — this entry asserted they
 > were; no `job` or sub-pipeline id has ever existed in `BuiltinNodeType`).* This is not an oversight:
-> §3.8 of [`okf/product/module/engine/architecture-pipeline-graph.md`](okf/product/module/engine/architecture-pipeline-graph.md)
+> §3.8 of [`okf/product/module/engine/architecture.md`](okf/product/module/engine/architecture.md)
 > makes **in-motion (Pipeline) vs at-rest (Job)** a binding line, so an at-rest operator cannot be an
 > in-motion node. The two compose as **producer/consumer over a shared store**, never by nesting: a Job
 > fires on the Pipeline's commit (`on_pipeline:`), or binds by store name to a `sink.view` (the designated hand-off —
@@ -464,7 +464,7 @@ the ordered set of its receipts. Type/Instance: *Step Receipt* is the shape (`St
 (`consignment_steps`) is one receipt. ⛔ *StepInfo envelope* is the retired working name — **envelope** already
 names the v1 response envelope, the `Signal` record and a component's sharing envelope; ⛔ *Step Record* — a
 **record** is a data row. Design: `archived-documents/plans-archive/2026-11-17-x5-stepinfo-envelope-plan.md`; as built:
-`okf/product/module/engine/spec-execution-lanes.md`.
+`okf/product/module/engine/spec-pipeline-execution.md`.
 
 **Parser** — Reads a raw file of a given format (CSV, fixed-width, XML, JSON, EDI, ASN.1, …) into rows/columns
 — or, for tree-shaped formats, into records that must be flattened before they load into Tables. Two engines
@@ -485,7 +485,7 @@ Grammar inline and untouched, and later edits to the template reach nothing that
 component and bound the Step via `use: grammar/<id>`. That `use:` form stays **read-supported** in the
 engine (a hand-authored file may still carry it) but is **never authored**, and opening such a Step in the
 editor migrates it to an independent inline copy on save. As built:
-[`okf/product/module/engine/spec-editable-round-trip.md`](okf/product/module/engine/spec-editable-round-trip.md)
+[`okf/product/module/engine/spec-pipeline-model.md`](okf/product/module/engine/spec-pipeline-model.md)
 (the read path that must not be tidied away as dead code) and
 [`okf/product/module/config/user-guide-grammar-config.md`](okf/product/module/config/user-guide-grammar-config.md). *(Provenance:
 `archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`, not maintained.)*
@@ -512,7 +512,7 @@ of repeating it. Unlike a **Grammar Template** it is **referenced, not copied**:
 reaches every Pipeline that names it. A key the Pipeline sets wins over the profile, and `segments` is
 replaced whole, never merged (D5). Not a registry kind and not a transform language: it holds no transforms.
 ⛔ not *Access Profile* (a different concept, §1-A) · ⛔ not *transform config* / *tx config*. As built:
-[`okf/product/module/engine/spec-parser-plugins.md`](okf/product/module/engine/spec-parser-plugins.md).
+[`okf/product/module/engine/spec-parsing.md`](okf/product/module/engine/spec-parsing.md).
 
 **Transform** — Reshapes/derives/aggregates (cubes) data. When it materializes output it produces a **Derived
 Table**. **Amendment v1.0 (D-4):** the `transform` Step verb covers filter / derive / **reference join**
@@ -555,8 +555,8 @@ is read. ⛔ There is no `mode: streaming` value; it is a block, not an enum.
 **Sink** — Writes processed records to a destination. The lakehouse Sink writes **Parquet into a Table**.
 
 **Load** *(added 2026-08-13 — operator decision; as built:
-[`okf/product/module/etl/user-guide-pipeline-editor.md`](okf/product/module/etl/user-guide-pipeline-editor.md) ·
-[`okf/product/module/etl/user-guide-schema-mapping.md`](okf/product/module/etl/user-guide-schema-mapping.md).
+[`okf/product/module/etl/user-guide.md`](okf/product/module/etl/user-guide.md) ·
+[`okf/product/module/etl/user-guide.md`](okf/product/module/etl/user-guide.md).
 Provenance: `archived-documents/plans-archive/definition-surface-unification-plan.md` §4b)* —
 The third **definition stage/drawer** in the unified pipeline editor (**Collector → Parse → Load**): create
 the **Schema** (derive from the parsed sample or import), author the **Mapping** (per-field rules incl.
@@ -572,7 +572,7 @@ Transformer instance named **"Shape &lt;table&gt;"**, or **"Shape records"** whe
 `processing.map.fields[]` and runs at ingest. A Record Transformer added from the palette is a separate chain
 Step that runs after Load, at rest, writing the Pipeline's `output_store:`.)*
 
-**Trigger** — The start condition of a run. ⚠ **There are TWO models** (corrected 2026-09-09; this entry listed four values, omitted `on_signal` entirely, and counted `event`/`on-pipeline` as two names for one mechanism). **Job triggers:** `cron` \| `on_pipeline` \| `on_signal` (+ a `when` guard) \| `manual`, with `catch_up`. **Pipeline triggers** (`PipelineTrigger.Kind`): `SCHEDULE_INTERVAL` \| `SCHEDULE_CRON` \| `EVENT` (`on: commit` or `on: dataset`) \| `MANUAL` \| `DEFAULT_POLL` \| `STREAM` (the continuous lane, `trigger: {type: stream}` — ⚠ it names how a Pipeline is driven, not a Catalog **Stream**), with coalescing and **no** `catch_up`. See `okf/product/module/engine/plan-pipeline-execution.md` §3.2. Owned by the
+**Trigger** — The start condition of a run. ⚠ **There are TWO models** (corrected 2026-09-09; this entry listed four values, omitted `on_signal` entirely, and counted `event`/`on-pipeline` as two names for one mechanism). **Job triggers:** `cron` \| `on_pipeline` \| `on_signal` (+ a `when` guard) \| `manual`, with `catch_up`. **Pipeline triggers** (`PipelineTrigger.Kind`): `SCHEDULE_INTERVAL` \| `SCHEDULE_CRON` \| `EVENT` (`on: commit` or `on: dataset`) \| `MANUAL` \| `DEFAULT_POLL` \| `STREAM` (the continuous lane, `trigger: {type: stream}` — ⚠ it names how a Pipeline is driven, not a Catalog **Stream**), with coalescing and **no** `catch_up`. See `okf/product/module/engine/plan.md` §3.2. Owned by the
 **Scheduler**.
 
 ---
@@ -607,7 +607,7 @@ defines *when*, not *what*.
 *(Was `Run ⊇ Batch ⊇ File` until 2026-08-03; see the Consignment entry in §2 and the §13 row. Identity is
 `(consignment_id, run_id)` — the run is the attempt, so a reprocess is a new Run over the same Consignment.)*
 
-**Archive** *(added 2026-08-26; as-built in `okf/product/module/acquire/spec-unpack-stage.md`)* — A **container file** the
+**Archive** *(added 2026-08-26; as-built in `okf/product/module/acquire/spec.md`)* — A **container file** the
 operator drops in the inbox that holds many inner files: `.zip`, `.tar`, `.tar.gz`. Expanded by the **Unpack**
 stage at the Collector *before* Consignments are planned, so its contents become ordinary Files from birth. An
 Archive is **not** a Consignment and can outlive one (500 entries at `collector.consignment.max_files: 100` plans five), which
@@ -646,7 +646,7 @@ mutating service defines its dry-run behaviour (record, don't act — MNT-1 exte
 that word is RBAC's (`CapabilityManifest` route gates → `Roles.KNOWN_CAPABILITIES`); ⛔ not *Controller
 Service* — NiFi's term implies user-instantiated enable/disable resources, deliberately that plan's stage 3.
 
-**Execution pool** *(added 2026-09-24; as-built in [`okf/product/module/engine/spec-consignment-concurrency.md`](okf/product/module/engine/spec-consignment-concurrency.md) §2a)* —
+**Execution pool** *(added 2026-09-24; as-built in [`okf/product/module/engine/spec-consignments.md`](okf/product/module/engine/spec-consignments.md) §2a)* —
 A named, server-defined admission tier for **Consignments** (`scheduler.toon` `pools:`), chosen by a Pipeline
 with `processing.pool`. It answers only "may this start now" and never widens a thread or memory cap; an
 unknown name runs in the always-present `default` pool. ⛔ not *queue* (waiting is a state of an admission,

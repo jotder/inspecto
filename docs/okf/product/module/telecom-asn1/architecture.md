@@ -54,5 +54,5 @@ only (`tools/bundle-modules.mjs` `from: 'standard'`; `offerings/standard.toon` a
 ## References
 
 - [spec](spec.md) · [admin-guide](admin-guide.md) · [user-guide](user-guide.md) · [plan](plan.md)
-- [engine spec-parser-plugins](../engine/spec-parser-plugins.md) — the parser-plugin framework, as built
+- [engine spec-parser-plugins](../engine/spec-parsing.md) — the parser-plugin framework, as built
 - [telecomIndustryPack](../../addon/telecomIndustryPack/index.md)

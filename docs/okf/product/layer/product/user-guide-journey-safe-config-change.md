@@ -80,5 +80,5 @@ Script: `tools/doc-diagrams/journey-safe-config-change.py`.
 [spaces](../../module/config/architecture.md) ·
 [observability-backup](../../module/observability/architecture.md)
 
-Concepts: [pipeline authoring](../../module/etl/plan-pipeline-authoring.md) ·
+Concepts: [pipeline authoring](../../module/etl/plan.md) ·
 [security](../../module/access/plan-security.md)

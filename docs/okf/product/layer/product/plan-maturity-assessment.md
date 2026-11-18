@@ -151,7 +151,7 @@ Group letters match §6. Scores are the assessor's; levels are calibrated (§2).
 
 ### 4.4 Docs that had drifted from the code (verified 2026-10-20 in code)
 - `layer/product/plan-studio.md` says 13 Visualization Types — `BUILTIN_VIZ_PLUGINS` registers **20**.
-- `module/etl/plan-ingestion.md` says Expectations have no UI — the `expectations` route exists in `app.routes.ts`.
+- `module/etl/plan.md` says Expectations have no UI — the `expectations` route exists in `app.routes.ts`.
 - `docs/EDITIONS.md` SEC-09 says the audit log is not tamper-evident — the hash chain (`AuditAnchors`, `/audit/verify`) shipped.
 - Assessors also report stale claims in `addon/incidents/plan-incidents.md` and `module/agent/plan-assistant.md` (§6 B).
   A docs-only review of these is tracked by `DOCS-AGENT-WRITTEN-REVIEW-1`.
@@ -187,7 +187,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **What it is (customer view):** Connections and Collectors that pull files and records from local or NFS directories, SFTP/FTP/FTPS, JDBC databases, S3/GCS/Azure Blob and Kafka into Pipelines. They come with dedup, watermarks, gap detection, retry and decompression.
 - **Scores:** F 3 · B 4 · Q 3 · E 3 · R 3 → **Level L3 (Pilot-ready)**
 - **Evidence:**
-  - Seven requirements of record. ACQ-1/2/3/5/6/7 are shipped. ACQ-4 (a Must) is **partial**: object storage is shipped, NFS/SMB network share was refused by design (`module/acquire/plan-acquisition.md` §2, §6.1).
+  - Seven requirements of record. ACQ-1/2/3/5/6/7 are shipped. ACQ-4 (a Must) is **partial**: object storage is shipped, NFS/SMB network share was refused by design (`module/acquire/plan.md` §2, §6.1).
   - Connector factories in code: Sftp, Ftp, Ftps, DbExport (JDBC), S3, GCS, AzureBlob, Kafka (`providers/inspecto-connectors/src/main/java/com/gamma/connect/`), plus the local file system and a Dataset-entry collector.
   - Step Processor board, ACQ family: 4 delivered on every edition (SP-ACQ-01..04). 4 are partial: S3/GCS have no proven end-to-end acquisition-node run, ADLS Gen2 is unproven, Kafka is unproven against a real broker, Excel is one sheet per file. 11 are planned: Pulsar, Kinesis, SQS, RabbitMQ, MQTT, Debezium CDC, Delta, Iceberg, Snowflake/BigQuery readers, a REST poller and a webhook receiver/gRPC (`docs/EDITIONS.md` SP-ACQ-*; plan §5).
   - Tests: 26 + 36 + 6 = **68 unit test classes**, 0 real-HTTP in these hubs (the HTTP routes are tested under module.processor). `KafkaRealBrokerTest` is opt-in and skips unless a broker is supplied; CI has none (`module/connectors-kafka/plan.md`).
@@ -218,14 +218,14 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **What it is (customer view):** Visual and TOON-authored Pipelines that parse many formats, then cast, validate (Expectations), transform, enrich, route (Decision Rules) and write partitioned Parquet. They are validated before save, can be dry-run or test-run, and are scheduled as Jobs.
 - **Scores:** F 4 · B 4 · Q 4 · E 3 · R 4 → **Level L3 (Pilot-ready)**, capped by E and by the platform baseline
 - **Evidence:**
-  - 46 built-in node types. 10 parser frontend tokens across 8 formats: delimited, fixed-width, JSON, text-regex, xlsx, Parquet, ASN.1, plugin (`module/etl/plan-ingestion.md` §2; `module/etl/plan-pipeline-authoring.md` §2.2).
+  - 46 built-in node types. 10 parser frontend tokens across 8 formats: delimited, fixed-width, JSON, text-regex, xlsx, Parquet, ASN.1, plugin (`module/etl/plan.md` §2; `module/etl/plan.md` §2.2).
   - Step Processor board: **119 processors, 51 delivered, 17 partial, 51 planned** on the Advanced column (`docs/EDITIONS.md` §Step Processors, generated from `ProcessorCatalog`). The planned share is heaviest in parsers (9), transforms (10), enrichment (7) and sinks (6).
   - Requirements of record ING-1..6 and PIP-1..7 are recorded as shipped (plans §2). The Expectations UI exists now (`inspecto-ui/src/app/inspecto/api/expectations.service.ts`, routed in `app.routes.ts`). That makes the plan's "ING-6 has no UI" claim stale.
   - Tests: engine **369**, etl **104**, config **22** unit test classes. 18 test classes reference golden fixtures (for example the `asn-golden` `SyntheticCorpusTest`). The nightly CI benchmark floors run `PluginIngestBenchmark` at 1M rows (floor 50,000 rows/s) and `MixedLoadBenchmark` (floor 30,000 rows/s, p95 ceiling 5 s). Both were green on the GitHub runner on 2026-10-08, 10-09 and 10-10 (`.github/workflows/nightly-perf.yml`; BACKLOG `ASSURE-OPERABILITY-1`).
   - Measured throughput: native DuckDB ingest of 2M rows × 12 columns in about 3.5 s, and 1.0–1.4M rows/s for transform and write (`layer/platform/tests-performance.md`).
   - Config safety: `ConfigSafetyValidator`, path jail, fail-closed schema types (`module/config/spec-config-safety.md`). Config writes can be held for maker-checker (item 6).
   - Open rows: P2 `AUTHORING-REDESIGN-1` (remaining letters parked on demand), P2 "Postgres multi-user", P2 `SCALEOUT-OBJSTORE-DATABASE-DIR-1` (operator hold), P3 defect `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` (a duplicate output after failover re-plan; operator hold).
-  - Replay is bounded. `JobService` resolves runs from an in-memory map capped at `LIVE_RUN_CAP = 1000` (`JobService.java`), so replay after a restart or eviction returns 404 (`module/engine/plan-pipeline-execution.md` §2.3).
+  - Replay is bounded. `JobService` resolves runs from an in-memory map capped at `LIVE_RUN_CAP = 1000` (`JobService.java`), so replay after a restart or eviction returns 404 (`module/engine/plan.md` §2.3).
 - **Strengths vs market:**
   - A full ingest → Pipeline → data-quality → lineage platform under the assurance controls. The competitive matrix (§3) names this as something none of the six vendors shows publicly.
   - The authoring loop (validate → dry-run → test-run to a node → arm) is fail-closed, and save-time safety checks are pinned by tests.

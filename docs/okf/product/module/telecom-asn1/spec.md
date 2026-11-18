@@ -11,7 +11,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 Package `com.gamma.telecom.asn1` (module-owned since MODULE-REORG-1 P3g). The as-built narrative of the
 parser framework, including the ASN.1 history and decisions, is
-[engine spec-parser-plugins](../engine/spec-parser-plugins.md); this page is the per-class map.
+[engine spec-parser-plugins](../engine/spec-parsing.md); this page is the per-class map.
 
 ## Classes
 
@@ -66,4 +66,4 @@ ingester (plain, derive, child) and step-kind manifest tests; see [tests-invento
 ## References
 
 - [architecture](architecture.md) · [asn-decoders api](../asn-decoders/api.md)
-- [engine spec-parsing-options](../engine/spec-parsing-options.md)
+- [engine spec-parsing-options](../engine/spec-parsing.md)

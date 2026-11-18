@@ -26,15 +26,15 @@ Two vocabularies describe Steps:
 
 - **Step kinds** — the node types the engine executes (`BuiltinNodeType`, served with their
   attribute specs by `GET /pipelines/node-types`). Plugins add more through the `PipelineNodeType`
-  `ServiceLoader` seam ([node-types](../engine/spec-node-types.md)).
+  `ServiceLoader` seam ([node-types](../engine/spec-pipeline-model.md)).
 - **Step Processors** — the 119-entry product taxonomy the palette lists in eight families
   (`ProcessorCatalog`, `GET /pipelines/processor-catalog`). A processor is a label over a Step kind or
   an engine capability, not a class of its own; planned entries show as "Not yet available".
 
 The as-built references are the [pipeline-graph bundle](../../index.md) and the
 [step catalog](spec-step-catalog.md); the capability specs are
-[pipeline-authoring](plan-pipeline-authoring.md) and
-[pipeline-execution](../engine/plan-pipeline-execution.md).
+[pipeline-authoring](plan.md) and
+[pipeline-execution](../engine/plan.md).
 
 ### 2. Who uses it
 
@@ -59,7 +59,7 @@ on the [scheduler](../processor/architecture.md). Code homes:
 
 ![Pipelines and Steps](../../assets/pipelines-steps.svg)
 
-**Two lanes.** Every Step executes in exactly one lane ([execution-lanes](../engine/spec-execution-lanes.md)):
+**Two lanes.** Every Step executes in exactly one lane ([execution-lanes](../engine/spec-pipeline-execution.md)):
 
 | Lane | Steps | How it runs |
 |---|---|---|
@@ -84,7 +84,7 @@ one's keys, refusals and a runnable example.
 section; `lower` writes those sections back. A present node owns its section; keys the graph does not
 model travel through a save untouched. A graph the flat file cannot express is refused with a named
 code (`UNSUPPORTED_NODE`, `UNSUPPORTED_BINDING` and others) rather than truncated
-([editable-round-trip](../engine/spec-editable-round-trip.md)).
+([editable-round-trip](../engine/spec-pipeline-model.md)).
 
 **Validation.** `PipelineValidator` rejects an edge whose relationship is not in the source node
 type's `emits()`. Saves also pass `ConfigSafetyValidator` (path jail and allow-lists).
@@ -92,11 +92,11 @@ type's `emits()`. Saves also pass `ConfigSafetyValidator` (path jail and allow-l
 **At-rest execution.** `PipelineJobRunner` loads the graph, registers a DuckDB view per
 `source_store` seed (at least one is required), walks the graph with `PipelineExecutor`, writes sinks
 through `PartitionSinkWriter`, optionally records provenance and runs `ConservationCheck`, then
-publishes a Consignment event ([live-execution](../engine/spec-live-execution.md)).
+publishes a Consignment event ([live-execution](../engine/spec-pipeline-execution.md)).
 
 **Park and drain.** Switching off a route-branch sink parks its Consignments durably;
 `POST /runs/{name}/drain` completes them through the real commit tail
-([step-park-drain](../engine/spec-step-park-drain.md)).
+([step-park-drain](../engine/spec-pipeline-execution.md)).
 
 ### 5. Configuration
 
@@ -114,11 +114,11 @@ The census of every block is [pipeline-config-keys](../config/spec-pipeline-conf
 
 ### 6. Screens
 
-Moved to [the user guide](user-guide-pipelines.md#screens).
+Moved to [the user guide](user-guide.md).
 
 ### 7. API
 
-Moved to [Pipelines and Steps — API](api-pipelines-steps.md).
+Moved to [Pipelines and Steps — API](api.md).
 
 ### 8. Interactions
 
@@ -151,8 +151,8 @@ casts the columns to the declared Schema, writes partitioned Parquet, and commit
 Consignment atomically. A file that cannot be read goes to the **quarantine** tree; rows that fail
 parsing go to a reject file beside it.
 
-The capability spec of record is [ingestion.md](plan-ingestion.md); the design is
-[architecture-stage1.md](../engine/architecture-stage1.md). This part is the module summary.
+The capability spec of record is [ingestion.md](plan.md); the design is
+[engine architecture](../engine/architecture.md). This part is the module summary.
 
 Code homes:
 
@@ -171,7 +171,7 @@ Code homes:
 - **Operators** watch Consignments land, read the quarantine tree and the rejected rows, and
   reprocess or replay.
 - **Plugin authors** add a format through the `StreamingFileIngester` wrap-SPI
-  ([ingest-wrap-spi](../engine/spec-ingest-wrap-spi.md)).
+  ([ingest-wrap-spi](../engine/spec-ingest.md)).
 
 ### 3. Where it sits
 
@@ -187,7 +187,7 @@ JVM under `MultiCollectorProcessor`.
 
 1. **Scan and Unpack.** `CollectorProcessor.ingest` scans the inbox and expands Archives and
    compressed streams through the Unpack stage (`UnpackStage`, `UnpackLimits`) before planning, so an
-   Entry is an ordinary file from then on ([unpack-stage](../acquire/spec-unpack-stage.md)).
+   Entry is an ordinary file from then on ([unpack-stage](../acquire/spec.md)).
 2. **Plan.** `ConsignmentPlanner` cuts the candidate list into Consignments bounded by
    `collector.consignment: {max_files, max_bytes, order}` (`order` is `mtime` by default, or `name`).
 3. **Parse.** `ConsignmentIngestor` picks a strategy: `CsvIngestStrategy` for the DuckDB-native
@@ -224,7 +224,7 @@ whole (mapping `INGEST_REFUSE:<CODE>`, or the card-number scan) and moved to
 ### 5. Configuration
 
 All keys live in the Pipeline's `*_pipeline.toon`; the full list is
-[parsing-options-reference.md](../engine/spec-parsing-options.md).
+[parsing-options-reference.md](../engine/spec-parsing.md).
 
 | Key | Meaning |
 |---|---|
@@ -240,11 +240,11 @@ All keys live in the Pipeline's `*_pipeline.toon`; the full list is
 
 ### 6. Screens
 
-Moved to [Parsing and ingest — screens](user-guide-parsing-ingest.md).
+Moved to [Parsing and ingest — screens](user-guide.md).
 
 ### 7. API
 
-Moved to [Parsing and ingest — API](api-parsing-ingest.md).
+Moved to [Parsing and ingest — API](api.md).
 
 ### 8. Interactions
 

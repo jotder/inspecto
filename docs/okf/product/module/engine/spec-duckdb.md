@@ -638,7 +638,7 @@ time, so a value stops depending on which box processed it.
 * **Dead code flagged, not touched:** `SqlBuilder.buildPartitionExpr` has no production caller (only
   `buildCastExpr` at `TransformCompiler` does).
 
-Output is written via DuckDB `COPY` — see [output & sinks](spec-output-sinks.md).
+Output is written via DuckDB `COPY` — see [output & sinks](spec-sinks.md).
 
 ## Aggregate state cannot be persisted and restored (§7.5 probe)
 

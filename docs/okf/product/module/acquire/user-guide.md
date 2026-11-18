@@ -1,15 +1,50 @@
 ---
 type: Feature
-title: Collector configuration (the one surface)
-description: The single shared surface and single store behind both collector-authoring screens.
-resource: inspecto-ui/src/app/inspecto/collector/collector-config.component.ts
+title: Collectors and Collector configuration
+description: The Collectors and Connections screens, and the one shared surface, spec table and write route behind configuring a Pipeline's collector block (the acquisition Step).
+resource: inspecto-ui/src/app/modules/admin/collectors/collectors.routes.ts, inspecto-ui/src/app/inspecto/collector/collector-config.component.ts
 tags: [feature, collectors, acquisition, onboarding, pipelines, connections]
-timestamp: 2026-08-04T00:00:00Z
+timestamp: 2026-11-18T00:00:00Z
 ---
 
-# Collector configuration
+# Collectors and Collector configuration
 
-One surface authors a pipeline's `collector:` block: the [pipeline editor](../etl/user-guide-pipeline-editor.md)'s
+**What this covers.** How a person works with Collectors in the console: the **Collectors** screen that
+lists every configured collection task, the **Connections** screen where endpoints and credentials are
+kept, and the one form used to configure what a Collector does (local inbox, a Connection, or another
+Pipeline's Dataset). It also records the rules that form follows, so the next change to it does not
+re-break them. The engine side is in [the acquisition spec](spec.md) and [architecture](architecture.md).
+
+**Contents**
+
+1. [The screens](#the-screens)
+2. [Configuring a Collector — the one surface](#configuring-a-collector--the-one-surface)
+3. [One store, one spec table](#one-store-one-spec-table)
+4. [One component — `<inspecto-collector-config>`](#one-component--inspecto-collector-config)
+5. [Dataset mode — consuming another Pipeline's output](#dataset-mode--consuming-another-pipelines-output)
+6. [One write route — `POST /config/patch`](#one-write-route--post-configpatch)
+7. [Dedup belongs to acquisition](#dedup-belongs-to-acquisition)
+8. [At rest](#at-rest)
+
+## The screens
+
+Route `/collectors` (Workbench nav group). Lists configured collection tasks in a **standard**
+[data-table](../../layer/product/spec-ds-data-table.md) (`autoHeight`). Backed by `CollectorsService`.
+Design and internals: [Collectors architecture](architecture.md).
+
+- **Collectors** — route `collectors`, `inspecto-ui/src/app/modules/admin/collectors/collectors.component.ts`,
+  with the detail drawer `collector-detail.dialog.ts`.
+- **Connections** — route `settings/connections` (the old `connections` path redirects),
+  `inspecto-ui/src/app/modules/admin/connections/connections.component.ts`, plus the graded probe /
+  explore / sample view `connection-workbench.component.ts`.
+
+*(Renamed from "Sources" per the Source→Collector glossary flip, GLOSSARY §2/§3. <!-- vocab-allow: names the rename itself -->
+The route, folder and service had already moved; the old screen doc had not — it still claimed `/sources`,
+`SourcesService` and an "Acquisition" nav group.)*
+
+## Configuring a Collector — the one surface
+
+One surface authors a pipeline's `collector:` block: the [pipeline editor](../etl/user-guide.md)'s
 **`acquisition`** Step definition drawer (also reached through guided mode's Collect chip — the
 onboarding stage-rail shell that used to host a second screen was deleted 2026-08-16, see
 [Onboarding](../../layer/product/user-guide-onboarding.md)).
@@ -54,12 +89,12 @@ persisted shapes genuinely differ: a `collector:` block vs. a node's raw config 
   Reassigning `<inspecto-schema-form>`'s `specs` rebuilds every control from its declared default,
   so the mode toggle silently wiped the form until this component started re-seeding.
 
-## Dataset mode — consuming another Pipeline's output (UI-S7, 2026-08-28)
+## Dataset mode — consuming another Pipeline's output
 
-The third mode authors the **dataset entry** the engine shipped in ELT Phase 3 S3c-2: `collector:
+*(UI-S7, 2026-08-28.)* The third mode authors the **dataset entry** the engine shipped in ELT Phase 3 S3c-2: `collector:
 {connector: dataset, dataset: <id>}`, resolved to the producer's snapshot dir fresh at every acquire
 cycle by the `dataset` connector scheme, which copies new parquet snapshots into this pipeline's
-inbox. See [Pipelines](../etl/user-guide-pipeline-editor.md) and `okf/backend/engine/`'s S3 concepts.
+inbox. See [Pipelines](../etl/user-guide.md) and the [`dataset` scheme](spec.md#the-connector-spi-and-the-resolvable-schemes).
 
 - The mode owns its field the same way Connection does: `dataset` is asked **only** in Dataset mode,
   `connection` only in Connection mode, and `connector` stays **derived** (Dataset mode ⇒ `dataset`).
@@ -100,14 +135,14 @@ existing)` — deliberately **not** rerouted, which would put two writers on one
 ⚠ TS delete markers must be `null` on the wire (`nullifyDeletes` in `component-model/flat-keys.ts`) —
 JSON drops `undefined`.
 
-## Dedup belongs to acquisition (the `transform.dedup.fingerprint` removal)
+## Dedup belongs to acquisition
 
-File duplicate detection executes **inside the `CollectorProcessor` poll cycle** — `ledgerFilter`
-reads `collector.duplicate` before a file is ever collected. `transform.dedup.fingerprint` therefore
-never had a runtime of its own: `PipelineLift` synthesized it, `lower()` dissolved it back into
-`collector:`, and `PipelineCompiler` emitted no step for it. Modelling it as a transform told the
-operator the check happens *after* collection, and its node overlay silently beat a `duplicate.mode`
-typed on the acquisition node (the D9 tripwire).
+*(The `transform.dedup.fingerprint` removal.)* File duplicate detection executes **inside the
+`CollectorProcessor` poll cycle** — `ledgerFilter` reads `collector.duplicate` before a file is ever
+collected. `transform.dedup.fingerprint` therefore never had a runtime of its own: `PipelineLift`
+synthesized it, `lower()` dissolved it back into `collector:`, and `PipelineCompiler` emitted no step for
+it. Modelling it as a transform told the operator the check happens *after* collection, and its node
+overlay silently beat a `duplicate.mode` typed on the acquisition node (the D9 tripwire).
 
 It was removed 2026-08-04. `duplicate` and `incremental` ride the acquisition node, where the engine
 reads them; a stored graph carrying a fingerprint node is refused at save with `UNSUPPORTED_NODE`.

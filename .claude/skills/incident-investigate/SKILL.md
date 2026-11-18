@@ -22,7 +22,7 @@ Routes below are in `docs/api/openapi-v1.json` or the cited hub doc; confirm the
 | Objects (Incident/Case store, workflows, findings) | `module/ops/user-guide-objects.md` |
 | Events, signals | `module/event/architecture.md`, `module/event/spec-events-metrics.md`, `module/event/spec-signal-backbone.md`, `module/event/user-guide-events.md` |
 | Observability / backup | `module/observability/architecture.md` |
-| Runs and run detail | `module/engine/user-guide-runs.md`, `module/engine/user-guide-run-detail.md`, `module/engine/spec-step-park-drain.md` |
+| Runs and run detail | `module/engine/user-guide.md`, `module/engine/user-guide.md`, `module/engine/spec-pipeline-execution.md` |
 | Known failure modes | `layer/platform/admin-guide-troubleshooting.md`, `layer/platform/admin-guide-gotchas.md` |
 | Operating, flags | `layer/platform/admin-guide-operations-reference.md`, `layer/platform/admin-guide-launch-flags.md` |
 
@@ -51,7 +51,7 @@ Recovery and transition routes mutate state — confirm with the operator before
 
 | Symptom | Start at |
 |---|---|
-| Run FAILED / stuck / parked | `module/engine/user-guide-run-detail.md`, `module/engine/spec-step-park-drain.md` |
+| Run FAILED / stuck / parked | `module/engine/user-guide.md`, `module/engine/spec-pipeline-execution.md` |
 | File quarantined, wrong schema, parsed=0 | `layer/platform/admin-guide-troubleshooting.md`, `module/etl/architecture.md` |
 | Output in `year=NULL/...` partitions | `layer/platform/admin-guide-troubleshooting.md` |
 | Collector picks nothing up / re-pick | `module/acquire/architecture.md`; troubleshooting (`.processed` markers) |

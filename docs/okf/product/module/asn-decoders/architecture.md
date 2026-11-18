@@ -58,4 +58,4 @@ The library carries no edition gate of its own; it reaches a bundle only through
 
 - [plan](plan.md) · [spec](spec.md) · [api](api.md) · [features](features.md)
 - `providers/asn-parser/docs/MIGRATION_STATUS.md` — what is proven against the corpus
-- [engine spec-parser-plugins](../engine/spec-parser-plugins.md) — the parser-plugin seam it sits under
+- [engine spec-parser-plugins](../engine/spec-parsing.md) — the parser-plugin seam it sits under

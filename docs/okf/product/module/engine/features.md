@@ -20,16 +20,16 @@ Pipeline authors, operators watching runs, and auditors tracing a failed file or
 
 ## Key capabilities
 
-- Every way a Pipeline executes — ingest, graph fork, at-rest job, park-then-drain — [spec-execution-lanes](spec-execution-lanes.md)
+- Every way a Pipeline executes — ingest, graph fork, at-rest job, park-then-drain — [spec-execution-lanes](spec-pipeline-execution.md)
 - Consignment status, provenance and live gauges for audit — [architecture](architecture.md)
-- Bounded concurrency per Pipeline, Space and server with fair priority — [spec-consignment-concurrency](spec-consignment-concurrency.md)
-- Partitioned or single-file outputs with quarantine outcomes — [spec-output-sinks](spec-output-sinks.md)
-- Test-run a Pipeline before it goes live — [spec-pipeline-test-run](spec-pipeline-test-run.md)
-- Runs list and run detail screens — [user-guide-runs](user-guide-runs.md) · [user-guide-run-detail](user-guide-run-detail.md)
+- Bounded concurrency per Pipeline, Space and server with fair priority — [spec-consignment-concurrency](spec-consignments.md)
+- Partitioned or single-file outputs with quarantine outcomes — [spec-output-sinks](spec-sinks.md)
+- Test-run a Pipeline before it goes live — [spec-pipeline-test-run](spec-pipeline-execution.md)
+- Runs list and run detail screens — [user-guide-runs](user-guide.md) · [user-guide-run-detail](user-guide.md)
 - Processor catalog of decoders, ingests and sinks — [feature-db](feature-db.md)
 
 ## Related hubs
 
 [etl](../../module/etl/index.md) · [acquire](../../module/acquire/index.md) · [processor](../../module/processor/index.md) · [config](../../module/config/index.md)
 
-More in this hub: [architecture](architecture.md) · [architecture-pipeline-graph](architecture-pipeline-graph.md) · [architecture-stage1](architecture-stage1.md) · [feature-db](feature-db.md) · [plan-pipeline-execution](plan-pipeline-execution.md) · [spec-branch-aware-ingest](spec-branch-aware-ingest.md) · [spec-catalog-vs-executors](spec-catalog-vs-executors.md) · [spec-consignment-addressing](spec-consignment-addressing.md) · [spec-consignment-concurrency](spec-consignment-concurrency.md) · [spec-db-layer](spec-db-layer.md) · [spec-duckdb](spec-duckdb.md) · [spec-editable-round-trip](spec-editable-round-trip.md) · [spec-execution-lanes](spec-execution-lanes.md) · [spec-ingest-wrap-spi](spec-ingest-wrap-spi.md) · [spec-ingestion](spec-ingestion.md) · [spec-live-execution](spec-live-execution.md) · [spec-node-types](spec-node-types.md) · [spec-object-storage-export](spec-object-storage-export.md) · [spec-output-sinks](spec-output-sinks.md) · [spec-parser-plugins](spec-parser-plugins.md) · [spec-parsing-grammar](spec-parsing-grammar.md) · [spec-parsing-options](spec-parsing-options.md) · [spec-pipeline-test-run](spec-pipeline-test-run.md) · [spec-plugin-ingester](spec-plugin-ingester.md) · [spec-post-sync-step-chains](spec-post-sync-step-chains.md) · [spec-step-park-drain](spec-step-park-drain.md) · [spec-transforms-seams](spec-transforms-seams.md) · [user-guide-run-detail](user-guide-run-detail.md) · [user-guide-runs](user-guide-runs.md)
+More in this hub: [architecture](architecture.md) · [architecture-pipeline-graph](architecture.md) · [architecture-stage1](architecture.md) · [feature-db](feature-db.md) · [plan-pipeline-execution](plan.md) · [spec-branch-aware-ingest](spec-ingest.md) · [spec-catalog-vs-executors](spec-pipeline-model.md) · [spec-consignment-addressing](spec-consignments.md) · [spec-consignment-concurrency](spec-consignments.md) · [spec-db-layer](spec-db-layer.md) · [spec-duckdb](spec-duckdb.md) · [spec-editable-round-trip](spec-pipeline-model.md) · [spec-execution-lanes](spec-pipeline-execution.md) · [spec-ingest-wrap-spi](spec-ingest.md) · [spec-ingestion](spec-ingest.md) · [spec-live-execution](spec-pipeline-execution.md) · [spec-node-types](spec-pipeline-model.md) · [spec-object-storage-export](spec-sinks.md) · [spec-output-sinks](spec-sinks.md) · [spec-parser-plugins](spec-parsing.md) · [spec-parsing-grammar](spec-parsing.md) · [spec-parsing-options](spec-parsing.md) · [spec-pipeline-test-run](spec-pipeline-execution.md) · [spec-plugin-ingester](spec-ingest.md) · [spec-post-sync-step-chains](spec-pipeline-execution.md) · [spec-step-park-drain](spec-pipeline-execution.md) · [spec-transforms-seams](spec-pipeline-model.md) · [user-guide-run-detail](user-guide.md) · [user-guide-runs](user-guide.md)

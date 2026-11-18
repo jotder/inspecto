@@ -11,7 +11,7 @@ timestamp: 2026-09-08T00:00:00Z
 > **Deep reference — the detail tier.** Start at [Connectors](spec-connectors.md) for the summary (the SPI, the
 > schemes, profiles and secrets); this page is the copy-pasteable long form it points to. For what was
 > *required*, *left* and *refused*, read the capability spec
-> [Acquisition & connectivity (`ACQ`)](../acquire/plan-acquisition.md).
+> [Acquisition & connectivity (`ACQ`)](../acquire/plan.md).
 > *(Split out of `integrations.md` 2026-09-08 — that file is now the DuckLake / warehouse doc. The
 > `source.*` spellings the text carried were corrected to `collector.*` in the move: the parser reads only
 > the `collector:` block.)*

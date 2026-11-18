@@ -1,19 +1,62 @@
 ---
 type: Feature
-title: Run Detail
-description: One running Pipeline's batches, files, lineage, quarantine, commits, commit retries and report tabs, with a batch-detail dialog. Carries a breadcrumb.
-resource: inspecto-ui/src/app/modules/admin/run-detail/run-detail.routes.ts
-tags: [feature, runs, detail, breadcrumb]
-timestamp: 2026-09-25T00:00:00Z
+title: Runs and Run Detail
+description: The ingest-operations list — one row per running Pipeline, with run-now/pause/history actions — and the Run Detail pane it opens, with batches, files, lineage, quarantine, commits, commit retries and report tabs, with a batch-detail dialog and a breadcrumb.
+resource: inspecto-ui/src/app/modules/admin/runs/runs.routes.ts
+tags: [feature, runs, operations, workbench, detail, breadcrumb]
+timestamp: 2026-11-18T00:00:00Z
 ---
 
-# Run Detail
+# Runs and Run Detail
+
+## What this covers
+
+The two operator screens for Pipelines that are running. **Runs** lists every running Pipeline with
+run-now, pause and history actions. Clicking a row opens **Run Detail**, which shows one Pipeline's
+Consignments (batches), files, lineage, quarantined files, commits, files waiting on a commit retry and a
+report, and lets an operator reprocess a batch, drain a parked one, replay rejected records or act on a
+waiting retry. How these runs execute underneath is [spec-pipeline-execution.md](spec-pipeline-execution.md).
+
+## Contents
+
+1. Runs (Operations) — route `/runs`
+2. Run Detail — route `/runs/:name`
+
+## Runs (Operations)
+
+Route `/runs` (Workbench nav group), dir `modules/admin/runs/`. The operations view over executing
+Pipelines: a **standard** [data-table](../../layer/product/spec-ds-data-table.md) (`autoHeight`) of the `RunView` /
+`RunResult` / `RunStatus` models with per-row run-now/pause/history actions; row-click opens
+Run Detail (below, `/runs/:name`). Backed by `RunsService`.
+
+**Run now** follows the v1 async contract (W5b): the trigger returns `202` + `{runId, …}` and the pane shows
+a `Run "<name>" started.` toast. The 202 arrives while the run is still going, so the immediate list re-fetch
+races it (a run that finished in 0.3 s still showed `Committed 0` until a manual refresh — fixed 2026-09-25).
+The pane therefore also polls `GET /runs/runs/{runId}` via `RunsService.awaitRun` — backoff
+`RUN_POLL_BACKOFF_MS` (500 ms, 1 s, 2 s, 4 s, then every 5 s), capped at `RUN_POLL_MAX` = 60 polls — and
+re-fetches the list once the run leaves `RUNNING` (or a poll fails: 404 = evicted/unknown, or the cap is
+hit). This runs whether or not *Auto* is on. Poll delays use `visibleDelay`, so a hidden tab stops polling
+and resumes on return; the poll is torn down with the pane (`takeUntilDestroyed`).
+
+**Auto** (toggle, on by default) re-fetches the list every `DEFAULT_REFRESH_MS` = **15 s** via
+`visibleInterval` — paused while the tab is hidden, and skipped while the reprocess dialog is open. Grounded
+2026-09-25: this clock was working; the stale row came from the trigger race above, not from Auto. Neither
+refresh is a server push — there is no SSE on this pane.
+
+**Business lens is read-only observe here** (product decision 2026-07-03): trigger/pause/resume/reprocess
+are hidden *and* method-guarded on `lens.readOnly()` (defense-in-depth) — a deliberate pane-specific
+exception to the Jobs precedent, where run-now/enable stay operational in every lens. New panes default to
+the Jobs heuristic unless the plan says "read-only observe" this explicitly.
+
+## Run Detail
 
 Route `/runs/:name` (carries a list→name [breadcrumb](../../layer/product/spec-routing-navigation.md)), dir
 `modules/admin/run-detail/`. Drills into one running Pipeline across tabs — batches / files / lineage
 (filterable by batch id) / quarantine / commits / commit retries / report — in **standard**
 [data-tables](../../layer/product/spec-ds-data-table.md); a row opens the **batch-detail dialog** (mini/single-select
-grids inside). Backed by `RunsService`.
+grids inside). Backed by `RunsService`. A `PARKED` row on the Batches tab carries a **Drain** action and the
+batch-detail dialog a *Parked at* table (see *Per-Step `enabled` — park and drain* in
+[spec-pipeline-execution.md](spec-pipeline-execution.md)).
 
 **Registered outputs on the batch-detail dialog (shipped 2026-08-29).** `GET /runs/{name}/outputs?consignmentId=`
 returns one Consignment's registered outputs — sync's own files **and** whatever a post-sync step derived
@@ -43,7 +86,7 @@ action needs an explicit step, unlike the read-only tabs.
 **Record-level replay (X4, shipped in the UI 2026-09-25).** The **rejected-rows dialog** (`rejected-rows.dialog.ts`
 — opened by *View the rejected rows* on a Files row with `error_rows > 0` and on every Quarantine row) carries a
 **Replay rejected records** action → `RunsService.replayRejects` → `POST /runs/{name}/replay-rejects {file}`
-(backend: [execution-lanes](spec-execution-lanes.md) X4). Rules it follows:
+(backend: [execution-lanes](spec-pipeline-execution.md) X4). Rules it follows:
 
 - Offered only once the reject file loaded with `rowCount > 0` — never on the 404 empty state or a load error.
 - Always asks `InspectoConfirmService.confirm()` first; the text says it replays **only the rejected lines, as a
@@ -66,7 +109,7 @@ action needs an explicit step, unlike the read-only tabs.
 
 **Commit retries tab (X1 UI, shipped 2026-09-25).** `CommitRetriesPanelComponent`
 (`commit-retries.panel.ts`) lists `GET /runs/{name}/retries` — the files of THIS pipeline waiting on a bounded
-COMMIT retry (backend: [execution-lanes](spec-execution-lanes.md) § *The COMMIT retry
+COMMIT retry (backend: [execution-lanes](spec-pipeline-execution.md) § *The COMMIT retry
 affordance*). The panel loads itself when the tab opens and reloads when the bound pipeline changes; Run Detail's
 own `loadTab()` skips it. Rules it follows:
 

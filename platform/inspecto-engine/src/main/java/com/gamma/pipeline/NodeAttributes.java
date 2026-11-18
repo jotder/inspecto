@@ -11,7 +11,7 @@ import java.util.stream.Stream;
  * SERVER half of the same vocabulary {@code inspecto-ui/.../pipelines/node-attributes.ts} declares. The
  * served copy is the source; the client table is the fallback the drawer uses when the route has not
  * answered yet. Current knowledge: {@code docs/okf/product/module/config/spec-pipeline-config-keys.md} and
- * {@code docs/okf/product/module/etl/user-guide-pipeline-editor.md}. Provenance only, not maintained: §3.1 of
+ * {@code docs/okf/product/module/etl/user-guide.md}. Provenance only, not maintained: §3.1 of
  * {@code docs/archived-documents/plans-archive/vocabulary-and-config-contract-plan.md}.
  *
  * <p>⚠ <b>These two tables must stay identical, and a test enforces it rather than a comment.</b>

@@ -344,7 +344,7 @@ The architecture choices translate directly into cost-of-ownership advantages th
 | Auth-free common core (edition realignment) | **In mainline** | Core is auth-free; security becomes an edition module |
 | Standard edition security (`inspecto-oidc`, formerly `inspecto-security`) | **Shipped** | OIDC resource-server + RBAC/ABAC behind an SPI — delivered 2026-07-24 as the `inspecto-security` module, assembled into Standard by a Maven profile (`../platform/plan-roadmap.md` §3.1) |
 | Object-storage connectors (S3 / GCS / Azure / MinIO) | **Shipped** | On the connector SPI, SDK-free — S3/MinIO 2026-07-08, Azure 2026-07-08, GCS 2026-07-22 |
-| Network-share (NFS / SMB) access | **Not a connector — by decision** | ⛔ **Refused as an SPI connector**; the supported pattern is an **OS-mounted share** read as a local path, and a UNC path stays jail-rejected. `ACQ-4` is therefore PARTIAL, not shipped (`okf/product/module/acquire/plan-acquisition.md` §2/§6.1) |
+| Network-share (NFS / SMB) access | **Not a connector — by decision** | ⛔ **Refused as an SPI connector**; the supported pattern is an **OS-mounted share** read as a local path, and a UNC path stays jail-rejected. `ACQ-4` is therefore PARTIAL, not shipped (`okf/product/module/acquire/plan.md` §2/§6.1) |
 | Unified `parsing:` grammar (JSON / regex frontends) | **Shipped** | Additional thin frontends over the shared backend — delivered 2026-07-07 (`ING-5`) |
 | Enterprise distributed tier | **Future** | Shared-state backends + distributed scheduler |
 
@@ -437,7 +437,7 @@ Pipelines & config authoring · Jobs & schedules (+ run reporting) · Collectors
 
 ### 12.4 Reference documents
 
-This overview synthesizes: the consolidated reference set (`docs/consolidated/`), the editions model (`docs/EDITIONS.md`), the branching/release policy (`docs/BRANCHING.md`), the flow-graph design (`docs/okf/product/module/engine/architecture-pipeline-graph.md`), the data-acquisition framework notes, and the operations source-of-truth (`docs/ADVANCED_GUIDE.md`).
+This overview synthesizes: the consolidated reference set (`docs/consolidated/`), the editions model (`docs/EDITIONS.md`), the branching/release policy (`docs/BRANCHING.md`), the flow-graph design (`docs/okf/product/module/engine/architecture.md`), the data-acquisition framework notes, and the operations source-of-truth (`docs/ADVANCED_GUIDE.md`).
 
 ---
 

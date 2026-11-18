@@ -241,7 +241,7 @@ No Schema sharing (a Dataset's own Result Set is self-describing). No sharing of
 Jobs, Queries, Expectations — cross-instance/staging transport for those stays [Metadata Bundles](../processor/spec-metadata-bundle.md)
 (copy semantics), or the per-data-source zip bundle, whose closure carries a Pipeline's bound components and
 — since 2026-09-24 — the Reference Datasets it reads, as their producing Pipelines
-([editable round-trip §22](../engine/spec-editable-round-trip.md)). Neither is sharing: a Reference that
+([editable round-trip §22](../engine/spec-pipeline-model.md)). Neither is sharing: a Reference that
 travels in a bundle is copied into the target Space, never granted. A connection is the one dependency a
 bundle may leave behind: since 2026-09-25 importing one that names a connection the target lacks **succeeds**,
 lands each Pipeline/job needing it disabled (`active: false` / `job.enabled: false`), and returns a

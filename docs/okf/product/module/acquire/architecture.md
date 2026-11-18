@@ -12,7 +12,7 @@ timestamp: 2026-06-28T00:00:00Z  # the Data Acquisition Framework part; the mult
 The architecture of the `acquire` hub, in three parts: the acquisition engine's cycle and its phases A to F,
 the Collector and Connection module summary, and the composition pattern for ingesting one logical feed
 from several locations. The parts keep their own status lines and decision dates; the capability spec is
-[Acquisition & connectivity (`ACQ`)](plan-acquisition.md).
+[Acquisition & connectivity (`ACQ`)](plan.md).
 
 **On this page**
 
@@ -31,8 +31,8 @@ like any local push. In the one-shot CLI/`reprocess`/manual path, `CollectorProc
 `dispatchAcquireCycle()` fetches under `acquire.pollSeconds` / `acquire.maxConcurrent`, guarded per-pipeline by
 a dedicated `acquireGuard`, so a slow fetch neither blocks nor is blocked by ingest, and two acquisitions of
 one pipeline never overlap. `acquire` is a no-op for a `local` collector. For what was *required* and what was *refused*, start at the capability spec
-[**Acquisition & connectivity (`ACQ`)**](plan-acquisition.md); this part is the
-mechanism tier for the cycle. *(It used to name `spec-framework-design.md` as "authoritative" — a
+[**Acquisition & connectivity (`ACQ`)**](plan.md); this part is the
+mechanism tier for the cycle. *(It used to name `spec.md` as "authoritative" — a
 chain that ended in the never-maintained archive tier.)*
 
 > **Gotcha — manual run vs. background acquisition.** The manual "run now" acquires inline under the *ingest*
@@ -96,7 +96,7 @@ A **Collector** is a configured collection task bound to one **Connection** (a n
 credentials). It reaches a remote system, decides which files are new and complete, fetches them once,
 and lands them in the Pipeline's inbox (`dirs.poll`). Everything after landing is ingest's job
 ([parsing-ingest](../etl/architecture.md)). The capability spec of record is
-[acquisition.md](plan-acquisition.md); this part is the module summary.
+[acquisition.md](plan.md); this part is the module summary.
 
 Code homes:
 
@@ -197,7 +197,7 @@ JVM switches: `-Dacquire.ledger.backend` (`memory` | `db`), `-Dacquire.pollSecon
 
 ### 6. Screens
 
-Moved to [the user guide](user-guide-collectors.md#screens).
+Moved to [the user guide](user-guide.md).
 
 ### 7. API
 
@@ -286,7 +286,7 @@ author a freshness Expectation / Alert Rule per landed store.
 
 ### Related
 
-- [`../engine/spec-live-execution.md`](../engine/spec-live-execution.md) — T32 flow jobs, multi-source seeding, incremental mode.
-- [`../engine/architecture-pipeline-graph.md`](../engine/architecture-pipeline-graph.md) — graph model, `transform.merge`.
+- [`../engine/spec-pipeline-execution.md`](../engine/spec-pipeline-execution.md) — T32 flow jobs, multi-source seeding, incremental mode.
+- [`../engine/architecture.md`](../engine/architecture.md) — graph model, `transform.merge`.
 - `docs/archived-documents/plans-archive/pipeline-multiplicity-plan.md` Part B — provenance only; the
   refutation it recorded is restated in full at the top of this part (the plan shipped and was archived 2026-08-11).

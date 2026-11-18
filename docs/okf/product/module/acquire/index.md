@@ -15,12 +15,12 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Acquisition & connectivity (ACQ)](plan-acquisition.md) |
-| spec | current | [Data acquisition — the original requirement](spec-framework-design.md) · [Unpack stage — decompression at the Collector](spec-unpack-stage.md) |
+| plan | current | [Acquisition & connectivity (ACQ) — plan](plan.md) |
+| spec | current | [Acquisition — specification](spec.md) |
 | architecture | current | [Acquisition](architecture.md) |
 | features | current | [Collectors — features](features-collectors.md) |
 | feature-db | current | [Acquisition and collectors — feature database](feature-db.md) |
-| user-guide | current | [Collector configuration (the one surface)](user-guide-collector-config.md) · [Collectors](user-guide-collectors.md) |
+| user-guide | current | [Collectors and Collector configuration](user-guide.md) |
 | admin-guide | current | [Acquisition and collectors — admin guide](admin-guide.md) |
 | api | current | [Collectors — API](api-collectors.md) |
 | tests | current | [Acquisition and collectors — tests inventory](tests-inventory.md) |
