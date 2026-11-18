@@ -872,7 +872,7 @@ Two audiences depend on the framework from outside:
 ### Agent-consumed core surface (frozen for the pending 4.0.0, M3)
 
 The optional `inspecto-agent` (and `-intelligence`) modules are an L5 consumer that, per
-[architecture-api.md](../../layer/platform/architecture-platform.md), must touch core **only through SPI interfaces +
+[architecture-platform.md](../../layer/platform/architecture-platform.md), must touch core **only through SPI interfaces +
 `@PublicApi` types**. The read-only surface they actually consume — captured once in
 `UccAgentContext` and reached by the capabilities/skills — is now `@PublicApi`-frozen `since = "4.0.0"`
 so this contract can't drift silently. It is deliberately a *freeze*, not a wrapping facade: a parallel

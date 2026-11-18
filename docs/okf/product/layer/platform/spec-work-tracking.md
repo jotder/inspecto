@@ -85,9 +85,9 @@ only the backticked `→` pointer list, and the count markers (`check-doc-counts
   relative to `docs/` or to a hub (`okf/product/…`, `module/<name>/…`) needs a plain text replace, and the citation
   guard names the ones that are left.
 - **Section numbers in a merged page restart in each part** (two "§6" in `module/elt/architecture-elt.md`). Cite the
-  part: link its anchor (`architecture-platform.md#parsing-and-ingest`) and then give the number.
+  part: link its anchor (`module/elt/architecture-elt.md#parsing-and-ingest`) and then give the number.
 - **Splitting or merging a page keeps its section numbers.** `module/la-core/architecture-la-core.md` (about 2,500
   lines) was split on 2026-11-12 (`ARCH-DOCS-RESIDUALS-1`) into five pages; on 2026-11-15 the hub was
-  consolidated again into `architecture-platform.md` (§1-§10, masking at §3.4), `architecture-http-and-ui.md` (§6.1 to §6.9,
+  consolidated again into `architecture-la-core.md` (§1-§10, masking at §3.4), `architecture-http-and-ui.md` (§6.1 to §6.9,
   §6.14) and `architecture-data-onboarding.md` (§6.10 to §6.13, §6.15 to §6.20). Every heading kept its number,
-  so an old "§6.15" citation still names the right section; `architecture-platform.md` §6 holds a table from section to page.
+  so an old "§6.15" citation still names the right section; `architecture-la-core.md` §6 holds a table from section to page.

@@ -157,8 +157,8 @@ section to its new home), so this part stays a short list of commitments and ope
 > of record**, one declared single-owner concept page, and exactly **one** practice-typed page — the
 > smallest file in the set; the operator-facing procedure lived in a 71 KB *reference*, typed as a lookup
 > table rather than a procedure. Since 2026-11-18 the execution documents are
-> [spec-sinks.md](spec-sinks.md) (the Pipeline model, execution and sinks) and [user-guide-elt.md](user-guide-elt.md),
-> beside [spec-parsing.md](spec-parsing.md) (ingest, Consignments and parsing) and [architecture-elt.md](architecture-elt.md).
+> [spec-pipeline-model.md](spec-pipeline-model.md), [spec-pipeline-execution.md](spec-pipeline-execution.md) and [spec-sinks.md](spec-sinks.md) (the Pipeline model, execution and sinks) and [user-guide-elt.md](user-guide-elt.md),
+> beside [spec-ingest.md](spec-ingest.md), [spec-consignments.md](spec-consignments.md) and [spec-parsing.md](spec-parsing.md) (ingest, Consignments and parsing) and [architecture-elt.md](architecture-elt.md).
 >
 > 🔴 **The loudest finding is a release gate resting on a class that does not exist** (§EXE.2.3).
 
@@ -437,7 +437,7 @@ now lives once, in its owner:
 |---|---|
 | Consignment planning, `collector.consignment`, the run budget (`sources.max × processing.threads × duckdb_threads`) | [ingest spec — Consignments and ingest](spec-ingest.md) |
 | `ConsignmentIngestor`, the two strategies, union vs generation mode (`large_file_bytes`, `flush_records`), staged write and reveal, the crash-safe commit order, unkeyed → flat store (E1) | [ingest spec](spec-ingest.md) |
-| `route:` on the poll path and `-Dingest.lane` | [ingest spec](spec-parsing.md) · [Pipeline spec — execution](spec-pipeline-execution.md) |
+| `route:` on the poll path and `-Dingest.lane` | [ingest spec](spec-ingest.md) · [Pipeline spec — execution](spec-pipeline-execution.md) |
 | The `parsing:` block, the frontends and their engines, `ParserPlugin` / `Parsers`, ASN.1, the XML bridge, every parsing key and its refusals | [ingest spec — parsing](spec-parsing.md) |
 | The wrap-SPI (`StreamingFileIngester`, `RecordSink`, `DuckDbRecordSink`, the Appender), segments, the two `partitions[]` readers | [ingest spec](spec-ingest.md) |
 | Unpack — placement, caps, verdict, ledger, identity | [acquisition spec Part 3](spec-acquisition.md#part-3--the-unpack-stage) |
@@ -1564,11 +1564,11 @@ against `git ls-files` and the module tree — and in this area, that check woul
 | The Step catalog | [step-catalog](spec-step-catalog.md) | counts agree with code |
 | The config contract | [pipeline-config-keys](../config/spec-pipeline-config-keys.md) | 🔴 the `fields[]` contradiction |
 | Pipeline execution (PIP-2..7) | [§EXE.1](#exe1-pipeline-execution-pip-2--pip-7) – [§EXE.8](#exe8-pipeline-execution--verification) (this file) | formerly the engine hub's plan |
-| The archived active plans | `plans-archive/pipeline-spec.md`, `plans-archive/pipeline-waves-drain-plan.md` (archived 2026-09-10) | D1–D10 are §4.3 here and the [Pipeline spec — model](spec-pipeline-execution.md); the plans are provenance |
+| The archived active plans | `plans-archive/pipeline-spec.md`, `plans-archive/pipeline-waves-drain-plan.md` (archived 2026-09-10) | D1–D10 are §4.3 here and the [Pipeline spec — model](spec-pipeline-model.md); the plans are provenance |
 
 ## Parked: parser field tiers interview kit (D13)
 
-Folded in 2026-11-18 (`DOCS-ELT-CONSOLIDATE-1`) from `plan-elt.md`; its content is
+Folded in 2026-11-18 (`DOCS-ELT-CONSOLIDATE-1`) from `plan-parser-field-tiers-interview.md`; its content is
 unchanged below. Board row of record: see §5.1 (*D13 parser field tiers*).
 
 > ⏸ **PARKED 2026-10-22 — design only, demand-gated; not in flight.** To resume: move it back to docs/superpower/ and rank its BACKLOG row.

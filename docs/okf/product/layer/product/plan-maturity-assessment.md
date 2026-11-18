@@ -691,7 +691,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
     `ExchangeSnapshotMultiPodTest` and the end-to-end `CrossSpaceFraudIncidentAcceptanceTest`. UI: about 6 sharing specs.
   - Gating (grep of the module source): `canRequestShares`, `canOfferDatasets`, `canOfferSignals`, `canRender*`.
   - Open: only P3 `IMPORT-WHOLE-SPACE-SPLIT-1` (demand hold) and the "load as draft" browser pass.
-  - Known limits (`architecture-product.md` §9): Signals cross only within one Pod and are never queued. Duplicate `EXCHANGE_REFRESHED`
+  - Known limits (`architecture.md` §9): Signals cross only within one Pod and are never queued. Duplicate `EXCHANGE_REFRESHED`
     events are possible from two pods.
 - **Strengths vs market:**
   - The matrix says no RAFM peer shows a multi-entity / group-regulator model on its public pages. Here sharing fails closed and masks under
@@ -880,7 +880,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - The add-on holds one module, `notify-channels` (`offerings/standard.toon`). The code is 5 classes in `providers/inspecto-notify-channels/src/main/java/com/gamma/notify/channel/`: `SmtpEmailChannel`, `WebhookChannel`, `HttpWebhookSinkTransport`, `PinnedHttp` and `WebhookEgress`.
   - `plan.md`: email and webhook are built only under Standard and above, with digest batching, receipts, bounce suppression and per-Space destinations. `WEBHOOK-EGRESS-POLICY-1` gives a pinned connect, and channel and notification-rule writes go through maker-checker (`ASSURE-MAKER-CHECKER-RESIDUALS-1`). No open rows.
   - Module tests: 9 unit classes, including two channel TCKs, `SmtpEmailChannelStarttlsRequiredTest`, `SmtpEmailChannelTlsIdentityTest` and `PinnedHttpTlsTest`. The core holds 5 real-HTTP notification tests (`inspecto/src/test/java/com/gamma/control/ControlApiNotification*Test`, `NotificationContentMaskingTest`).
-  - Known limits (`architecture-product.md` §9): no retry inside a channel except the soft-bounce retry, and suppression applies only to persisted destinations.
+  - Known limits (`architecture.md` §9): no retry inside a channel except the soft-bounce retry, and suppression applies only to persisted destinations.
   - There is no feature-db row (`addon/integrationDelivery/index.md`: "no feature rows derive to this item").
   - No HMAC or signature code exists in `providers/inspecto-notify-channels` (grep `signature|hmac`). Signing of notification webhooks is unverified. Link Analysis has its own signed webhooks (`IntegrationWebhooksTest`).
 - **Strengths vs market:**
@@ -949,7 +949,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
     - `IndexScaleBench`: about 21 ms one-key p50 from 10^6 to 10^8 edges.
     - Daily append at 10^8 takes 30.6 s against 929 s for a full rebuild.
     - A production-scale day (132M records, 39.4M links) was indexed in 5.3 min. This is a single run on private data.
-    - Live axe passes, real WSO2 OIDC sign-in, a Data Trust live drive, a think-aloud script and a stakeholder Q&A are recorded in `module/la-core/tests-*.md` and `admin-guide-product.md`.
+    - Live axe passes, real WSO2 OIDC sign-in, a Data Trust live drive, a think-aloud script and a stakeholder Q&A are recorded in `module/la-core/tests-*.md` and `admin-guide.md`.
   - Governance proven by named tests: seven-gate order, strict 404 for non-members, keyed masking with anti-oracle, four-eyes on sensitive expansion, per-entity audited reveal, Dossier tamper detection (`ControlApiDossierTest`) and replay determinism.
   - Open work: P2 `LA-DAILY-INGEST-1` follow-ups (Hive/Kerberos deferred by D-ING5, SCD2 deferred by D-ING4), six P3 rows, and the P3 defect row `LA-CASE-HISTORY-UPLOAD-FOLLOWUPS-1`. Items (1)–(6) of that defect row are done; only the alias-book scan check remains.
   - Stated NOT YET items (whitepaper §7): retention purge and legal hold (declined, D-U8), the multi-host HA two-host drill (`ASSURE-OPERABILITY-1`), 5×10^8 and 10^9 edge builds (`LA-INDEX-SCALE-MEASURE-1`), machine-to-machine trust, and full WCAG 2.2 AA (`LA-A11Y-AUDIT-1`). The Postgres store tests do not run on the shared profile (`TEST-ENV-PG-ASN-UNRUN-1`).
@@ -1077,7 +1077,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - Live evidence: a demo rehearsal on an Enterprise (today Advanced) Demo Auth bundle on 2026-10-14 (the 2026-10-14 ⬆ count note in `docs/BACKLOG.md`'s header). The live bundle run on the same day exercised the Expectation Job and the offender export (row `TELCO-FRAUD-STORY-GAPS-1`).
   - Masking: `TELCO-FRAUD-MASKED-DASHBOARD-1` was closed 2026-10-18. 10 of the 14 sink Datasets classify `msisdn`/`caller` `MSISDN` and `id_doc` `PII`, and a viewer without `canRevealLinkEntities` gets masked bars over real HTTP (BACKLOG line 54).
   - Open rows (hub `index.md`): defect `ANOMALY-TF-STORE-CLASH-1` (P3: `AnomalyTemplateModelsTest...[1]` ERRORS on clean master; the pack's `tf_subscriber_anomaly_latest` Dataset clashes with the model's store), `TELCO-FRAUD-STORY-GAPS-1` (P3 remainder), `ASSURE-PACK-TELCO-FRAUD-RESIDUALS-1` (P3, demand), `PACK-IRSF-WANGIRI-1` (P3, plan only), `TELCO-BYPASS-SIMBOX-1` (P3, B0 measurement done 2026-10-20, nothing built).
-  - The SIM-box check is a single heuristic (`fraud_simbox_job.toon`: no MT calls, no SMS, ≤ 1 cell, ≥ 10 distinct targets). The IRSF check is a static prefix list (`irsf_prefixes: "882,883,8818"`). Detection is daily batch at 02:00; only the Decision Rules act at ingest (`architecture-product.md` "Limits").
+  - The SIM-box check is a single heuristic (`fraud_simbox_job.toon`: no MT calls, no SMS, ≤ 1 cell, ≥ 10 distinct targets). The IRSF check is a static prefix list (`irsf_prefixes: "882,883,8818"`). Detection is daily batch at 02:00; only the Decision Rules act at ingest (`architecture.md` "Limits").
   - Competitive matrix: D = **Y**, E bypass = **P**, F signalling = **N**, G test call = **N**, H interconnect fraud = **P**.
 - **Strengths vs market:**
   - Each typology has a runbook, a per-offender Incident with a masked key, a Case per offender and a dashboard tile, all proven by a golden corpus with look-alikes. Detection, case handling and evidence are tested together.
@@ -1114,7 +1114,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - **Detection models: 2** (revenue forecast with 3 flags: outside band, regime change, drift; and margin erosion with a data-quality status). In Basic edition `contentPacks` (`offerings/basic.toon`).
   - `platform/inspecto-engine/src/test/java/com/gamma/alert/BusinessAssurancePackGoldenTest.java` (11 tests): planted detections with no false positive, level shift, ramp, slow-ramp absorbed, a second corpus, bad margin input flagged, SqlGuard on each Job. Also `BusinessAssuranceSinkDatasetTest` (1) and `ForecastTemplateGoldenTest` (2, template vs analytics kernel parity).
   - `ASSURE-PACK-BUSINESS-ASSURANCE-1` was closed 2026-10-10 after a **live drive** (*Evaluate now* fired `ba_revenue_outside_band` CRITICAL and `ba_margin_erosion` 11.25 pp). An independently built second corpus passed with the shipped constants (`docs/BACKLOG.md` line 133). The hub has no open rows.
-  - Limits (`architecture-product.md`): no ingest; model parameters are SQL literals, not config keys; one weekly season; no holiday calendar; fixed 28-day windows. No column classification (grep: 0 hits).
+  - Limits (`architecture.md`): no ingest; model parameters are SQL literals, not config keys; one weekly season; no holiday calendar; fixed 28-day windows. No column classification (grep: 0 hits).
   - Competitive matrix row P = **Y** (all six vendors Y/P).
 - **Strengths vs market:**
   - Explainable statistical forecasting in plain SQL with honest look-alike tests and a second-corpus check, with no data-science dependency. It ships in the Basic edition.
@@ -1200,7 +1200,7 @@ Not verified: vendor control and typology counts (general-market). Also not veri
 - **Scores:** F 2 · B 4 · Q 4 · E 3 · R 3 → **Level L3 (Pilot-ready)**
 - **Evidence:**
   - Typology count: **4 rule scenarios** as `sql.template` Jobs + per-account CRITICAL Alert Rules — structuring, threshold crossing, smurfing fan-in, high-risk-jurisdiction wires (`spaces/_templates/aml/config/jobs/aml_{structuring,threshold,fan_in,high_risk_traffic}_job.toon`, `config/registry/alert-rules/*.toon`, 4 files); **2 model-based detectors** — Risk Score `aml_account` (3 weighted, capped factors, high ≥ 60; `registry/risk-scores/aml_account.toon`) and Anomaly Model `aml_account_transfers` (`method: isolation_forest`, 28-day weekday-seasonal baseline; `registry/anomaly-models/aml_account_transfers.toon`), each with a pending Alert Rule (`config/pending/alert-rules/`, 2 files); **4 investigative pattern packs** (circular flow, inbound collector, layering chain with 48 h hop ordering, pass-through) + 1 Link Analysis view.
-  - Screening: `aml_screening` Job (`screening.run`, threshold 0.85, lists `aml_sanctions,aml_pep`) ships `enabled: false`; Entity Lists are not shipped (`config/jobs/aml_screening_job.toon`; architecture-product.md "Limits"). No vendor list-feed loader (OFAC / UN / World-Check) found — grep of `module/screening` docs and `features/inspecto-screening/src/main` returns nothing.
+  - Screening: `aml_screening` Job (`screening.run`, threshold 0.85, lists `aml_sanctions,aml_pep`) ships `enabled: false`; Entity Lists are not shipped (`config/jobs/aml_screening_job.toon`; architecture.md "Limits"). No vendor list-feed loader (OFAC / UN / World-Check) found — grep of `module/screening` docs and `features/inspecto-screening/src/main` returns nothing.
   - SAR/STR: `regulatory-report-templates/aml-str.toon` — 17-field XML, file-drop delivery, explicitly "follows no real regulator's schema"; engine is four-eyes (`docs/okf/product/module/regulatory-reporting/spec-regulatory-reporting.md`); regulator formats are open P3 `REGULATORY-SAR-STR-TEMPLATES-1` (hold: demand).
   - Tests: `AmlPackGoldenTest` 4 (committed corpus = seeded generator output; golden corpus raises exactly the planted accounts per typology), `AmlScreeningGoldenTest` 2 (hits exactly the planted parties, no look-alike; STR template loads), `PackFraudAmlAnomalyPropertyTest` 3 of 5 on AML (forest ranks and explains the planted account), plus `ControlApiSpaceTemplateSeedGateTest` 12 (real-HTTP apply of every shipped template, capability refusal, pending-rule gating).
   - Live evidence: screening demo rehearsal 2026-10-14 recorded with 11 beats PASS, re-driven on an Enterprise (today Advanced) Demo Auth bundle (`docs/BACKLOG.md` row `SCREENING-1`; `docs/okf/product/module/screening/spec-screening.md` § *Demo script and rehearsal*; `tools/seed-screening-demo.mjs` builds the Space from the `aml` template).
@@ -1223,7 +1223,7 @@ Not verified: vendor control and typology counts (general-market). Also not veri
 | Sanctions / PEP screening | Comply (with caveat) | `screening.run` + fuzzy/phonetic matcher, four-eyes, Case linkage, rehearsal PASS; customer must load lists — no vendor feed connector |
 | SAR / STR filing | Partial | four-eyes Report Template engine + file drop; shipped template is illustrative, regulator schema is P3 `REGULATORY-SAR-STR-TEMPLATES-1` |
 | Model governance | Partial | Risk Score versions + approval policy (`module/scoring/spec-risk-scores.md` ~l.272), explainable factors and anomaly contributions; no model validation / backtest / champion-challenger record found |
-| Real-time scoring / interdiction | Not offered | daily batch (architecture-product.md Limits); `REALTIME-DECISIONING-1` P3 roadmap |
+| Real-time scoring / interdiction | Not offered | daily batch (architecture.md Limits); `REALTIME-DECISIONING-1` P3 roadmap |
 
 - **To reach the next level:** (1) ship a sanctions/PEP list-feed Collector (UN / OFAC / EU consolidated, delta + version) and file a row for it; (2) author one real regulator STR/SAR template (goAML) under `REGULATORY-SAR-STR-TEMPLATES-1` and classify `account_id` / `counterparty_id` as `ACCOUNT`; (3) widen the scenario library (CTR, rapid in-out, dormant reactivation, peer-segment) with golden tests.
 
@@ -1276,7 +1276,7 @@ Not verified: vendor control and typology counts (general-market). Also not veri
   - No screening, no STR template and no Link Analysis view inside the pack (LA is the separate `la-mobile-money` template) — a mobile-money AML RFP needs the `aml` pack alongside — no row.
   - Daily batch; no real-time agent/wallet blocking — `REALTIME-DECISIONING-1` (P3).
   - MSISDN / wallet ids were stored unmasked (`CONFIDENTIAL` not a masked class) — reclassified 2026-11-14 (`TEMPLATE-CONFIDENTIAL-UNMASKED-1`, pinned by `TemplateIdentifierClassificationTest`).
-  - Pending score Alert Rules must be created by hand after the first run (architecture-product.md Limits) — accepted design (`TEMPLATE-RISK-SCORE-ALERT-RULE-1` closed).
+  - Pending score Alert Rules must be created by hand after the first run (architecture.md Limits) — accepted design (`TEMPLATE-RISK-SCORE-ALERT-RULE-1` closed).
 - **RFP stance on the 5 most-asked requirements for this category:**
 
 | Requirement | Stance | Evidence or caveat |
@@ -1321,7 +1321,7 @@ Not verified: vendor control and typology counts (general-market). Also not veri
 - **Scores:** F 1 · B 4 · Q 2 · E 2 · R 1 → **Level L2 (Prototype)** — by design an onboarding sample, not a commerce solution.
 - **Evidence:**
   - Contents: 1 Pipeline + schema (derived `GROSS`, gap detection, duplicate check), 1 Expectation (`orders_id_non_null`), 1 Dataset, 2 Widgets, 1 Dashboard, 3 sample files of 12 rows each (`spaces/_templates/orders-starter/`, 245 lines total).
-  - No Jobs, Alert Rules, scores or typologies ("a starter to copy for a first feed" — architecture-product.md Limits).
+  - No Jobs, Alert Rules, scores or typologies ("a starter to copy for a first feed" — architecture.md Limits).
   - Tests: no golden test; only `ControlApiSpaceTemplateSeedGateTest#everyShippedTemplateApplies` plus use as a fixture in `RefusalQuarantineTest` and `ConfigMigratorTest`.
   - Schema columns classified `INTERNAL` or blank; no masking need on the sample.
   - Yet it is a **billable** Product Map Item with order code `INS-SP-ORDERS-STARTER` (`product-map/solution-pack/orders-starter.toon`) and in Basic `contentPacks` (`offerings/basic.toon`).
@@ -1489,7 +1489,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Live drive on 2026-10-14 (`module/la-core/tests-live-drives.md#data-trust-drive-la-data-trust-1-s10-2026-10-14`): 8 steps, 1 FAIL (corrected day, since fixed by `f3a90e6a3`). At that time the template shipped no index Job; the Jobs were added later and are pinned by `theTemplateShipsTheJobsThatIndexAndEvaluateOnEveryCommit`.
   - **Edition mismatch.** The pack ships Alert Rules, but the Alert Rule dispatcher (`alert.dispatch`, declared by `inspecto-ops`) is Standard and up (`layer/platform/architecture-editions.md` §28; `OFFERING-DECLARATION-DRIFT-1` D1, closed 2026-10-20). The template has no `minEdition`, so the `tools/check-offerings.mjs` check 5 guard cannot catch it.
   - The index Job runs as `owner: admin` (`config/jobs/la_index_build_job.toon`), but Basic ships no Authenticator. By code read (2026-10-23, `LA-DAILY-INGEST-1`): on an open server the run authority is skipped (`JobAuthority.runAuthority`) and the template's Dataset has no `shares`, so `ComponentAccess.canViewAs` allows `admin`; with an Authenticator, `TemplateSeedGate.stampJobs` re-stamps the owner to the applier unless the applier holds `canConfigureAccess`. `LaIndexBuildJob` and `ScheduledLinkIndexBuilder` consult no edition feature (`platform/inspecto-engine/.../LaIndexBuildJob.java`, `la/inspecto-geo-link/.../ScheduledLinkIndexBuilder.java`), so the index probably builds on Basic while every index-consuming Investigation route is 503 there (unverified live).
-  - The row-band Expectation "does not judge a day until 3 prior days exist" (`admin-guide-product.md`), and only 2 sample days ship. The out-of-box verify cannot show the band working.
+  - The row-band Expectation "does not judge a day until 3 prior days exist" (`admin-guide.md`), and only 2 sample days ship. The out-of-box verify cannot show the band working.
 - **Strengths vs market:**
   - The ingestion is measured to 10^8 rows a day with append-only index refresh and data-trust signals (freshness, gaps, quarantine, index lag). Neo4j Bloom and Linkurious leave this to customer ETL (general market).
   - The feed contract (stable name, one event date per file, gap detection by `{seq}`/date template) is documented for database exports too.
@@ -1518,7 +1518,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Live evidence:
     - analyst coverage on 2026-10-15: 11 use cases, axe 0 violations (`tests-live-drives.md`);
     - data trust drive on 2026-10-14;
-    - real OIDC sign-in against WSO2 IS 7.3.0 on 2026-10-13 (`admin-guide-product.md`);
+    - real OIDC sign-in against WSO2 IS 7.3.0 on 2026-10-13 (`admin-guide.md`);
     - Postgres store on 2026-10-13;
     - stakeholder Q&A with 22 PROVEN-tagged answers and 16 NOT YET mentions (`admin-guide-demo.md`).
   - Edition placement is gated in code: Basic is the explorer; the Investigation surface answers 503 via `EditionFeatures.INVESTIGATIONS` (`ControlApiBasicEditionLinkAnalysisTest`, 2 tests, real HTTP).

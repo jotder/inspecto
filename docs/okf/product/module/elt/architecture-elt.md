@@ -678,7 +678,7 @@ These keep the data path lean while making formats, ingest paths, transforms, an
 > the joins/aggregations listed below as Stage-1 non-goals; the service + control plane; **authored
 > Pipelines** (`com.gamma.pipeline` — [§E4](#e4-the-pipeline-graph--the-backend-model)); multi-space tenancy;
 > the Component metamodel; editions as build flavors; and the optional assist agent. The package-level
-> **layer map** lives in [`architecture-elt.md`](../../layer/platform/architecture-platform.md) (layer/platform). The
+> **layer map** lives in [`architecture-platform.md`](../../layer/platform/architecture-platform.md) (layer/platform). The
 > non-goals below are **still correct for Stage-1** — they are what keep each batch embarrassingly
 > parallel and crash-isolated.
 

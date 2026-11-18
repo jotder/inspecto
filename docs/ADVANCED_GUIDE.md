@@ -538,7 +538,7 @@ are computed at scrape time by `MetricsService`'s collector. Confirm the service
 ## 13. Cross-references
 - Config authoring & all TOON keys → [`configuration.md`](okf/product/module/config/admin-guide-configuration-reference.md)
 - Acquisition feature depth (connectors, watermark, retry/circuit/post-actions, bastion) → [`data-acquisition-framework.md`](okf/product/module/elt/spec-acquisition.md)
-- Pipeline engine design (IR, lift, validator, executor, T32 live-exec) → [`pipeline-graph-design.md`](okf/product/module/elt/architecture-elt.md), [`live-execution.md`](okf/product/module/elt/spec-pipeline-model.md)
+- Pipeline engine design (IR, lift, validator, executor, T32 live-exec) → [`pipeline-graph-design.md`](okf/product/module/elt/architecture-elt.md), [`spec-pipeline-execution.md`](okf/product/module/elt/spec-pipeline-execution.md)
 - Editions / build flavors → [`EDITIONS.md`](EDITIONS.md) · Branch & release policy → [`BRANCHING.md`](BRANCHING.md)
 - Architecture overview → [`engine/architecture.md`](okf/product/module/elt/architecture-elt.md) · Operator console → [`operator-console.md`](archived-documents/operator-console.md)
 - Short fixes (DuckDB/PG view quirks, partition extraction) → [`troubleshooting.md`](okf/product/layer/platform/admin-guide-troubleshooting.md)

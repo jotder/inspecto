@@ -9,7 +9,7 @@ timestamp: 2026-11-18T00:00:00Z
 
 # Consignments — addressing and concurrency
 
-> One of the ELT spec files, split out on 2026-11-18 (DOCS-HUB-NAMES-1); section numbers are unchanged. [spec-consignments.md](spec-consignments.md) · **spec-consignments.md** · [spec-parsing.md](spec-parsing.md)
+> One of the ELT spec files, split out on 2026-11-18 (DOCS-HUB-NAMES-1); section numbers are unchanged. [spec-ingest.md](spec-ingest.md) · **spec-consignments.md** · [spec-parsing.md](spec-parsing.md)
 
 **Contents**
 

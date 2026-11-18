@@ -9,7 +9,7 @@ timestamp: 2026-11-18T00:00:00Z
 
 # Sinks — writers, store layout, destinations and object-storage export
 
-> One of the ELT spec files, split out on 2026-11-18 (DOCS-HUB-NAMES-1); section numbers are unchanged. [spec-sinks.md](spec-sinks.md) · [spec-pipeline-execution.md](spec-pipeline-execution.md) · **spec-sinks.md**
+> One of the ELT spec files, split out on 2026-11-18 (DOCS-HUB-NAMES-1); section numbers are unchanged. [spec-pipeline-model.md](spec-pipeline-model.md) · [spec-pipeline-execution.md](spec-pipeline-execution.md) · **spec-sinks.md**
 
 **Contents**
 

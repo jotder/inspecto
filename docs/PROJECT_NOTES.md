@@ -1021,7 +1021,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents
   event-time column and both had to take the local route instead: ingest uses the schema's date `PartitionDef`,
   Pipeline sinks use their own `partitions[].source`. This is why `DatasetRelation.temporalColumn` has **no
   caller** despite being built for exactly that job — see
-  [`okf/product/module/elt/spec-ingest.md`](okf/product/module/elt/spec-consignments.md) §A.2.
+  [`okf/product/module/elt/spec-consignments.md`](okf/product/module/elt/spec-consignments.md) §A.2.
 
 - **Removing a component from a record that is persisted as JSON breaks reading the history.** A bare
   `new ObjectMapper()` fails on unknown properties by default, and every append-only JSONL store here uses one
