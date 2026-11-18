@@ -80,7 +80,7 @@ Every Link Analysis demo Space signs in these same five Demo Users, and each kin
 (`tools/la-demo-roster.test.mjs`). Every LA scaffolder (`tools/seed-la-*.mjs --scaffold`) and the showcase packager
 (`tools/package-la-showcase.mjs`), and the preview bake for `la-daily-feed` (`scripts/preview-la/bake-all.ps1`), write the Space **closed** (`admission: closed` in `space.toon`): it admits an
 administrator and a holder of a role its own `roles.toon` defines, and answers anyone else as if it did not exist (404,
-and it is left out of the Space lists). So `outsider` signs in and sees, on the la-app home page, *You have no access to
+and it is left out of the Space lists). So `outsider` signs in and sees, in place of every page, *You have no access to
 any Space* / *Ask your administrator to give you access to a Space.*, with nothing to press. A Space laid down before
 2026-11-18 stays open until you add `admission: closed` to its `space.toon` and restart.
 
