@@ -219,43 +219,43 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the two tabs and one server-only row.
 
 ### S03 · Run on server
-- Voice: Pick a question, say who matters most, and press Run on server. The run is queued and runs on the server; you can cancel it. Its answer comes back as a table in the Results dock, the top rows first, and you choose what to show on the graph. If the answer is larger than the server will return, it says over the limit, no result, and asks you to narrow, rather than hand you a part that looks whole.
+- Voice: Pick a question, say who matters most, open Degree centrality, and press Run on server. The run is queued and runs on the server; the answer comes back summarised in words, with the ranked lines under it, and Highlight on canvas shows them where they sit. A bigger run, past a tool's instant size, is queued as a job you can cancel. And if the answer is larger than the server will return, it says over the limit, no result, and asks you to narrow, rather than hand you a part that looks whole.
 - Chip: Run on server · Results
 - Action: Whole Dataset ▸ *Who matters most?* ▸ a centrality ▸ Run on server ▸ hold on the progress ▸ dock ▸ Results ▸ Show on graph. [check in UI: the tool and button labels on this tab, and the result table's actions]
 - Impact: mark the progress line; then the Results table.
 
 ### S04 · The link index
-- Voice: Under How are they connected, open Link index. Serving is on for this Space: a read is answered from a fresh link index, and from the Dataset otherwise. Each mapping says which: link index, with its version, or Dataset only. The index is what makes an expand or a path search over millions of links answer in moments: search and filter stay fast on millions of records. If it is out of date, the reads fall back to the Dataset, slower but the same answer.
+- Voice: Under How are they connected, open Link index. Serving is on for this Space: a read is answered from a fresh link index, and from the Dataset otherwise. This Space has no link index yet, so the panel asks which Dataset and which columns to index; a new mapping is always built in full. Once built, each mapping says which it is, link index with its version, or Dataset only. The index is what makes an expand or a path search over millions of links answer in moments: search and filter stay fast on millions of records. If it is out of date, the reads fall back to the Dataset, slower but the same answer.
 - Chip: Link index · Link index serving is on
 - Action: Whole Dataset ▸ *How are they connected?* ▸ Link index ▸ hold on *Link index serving is on* ▸ zoom on the chip and *mule_transfers_dataset: version N*. [check in UI: the version line and whether deltas are shown]
 - Impact: mark the serving line, the chip and the version.
 
 ### S05 · Full, Append, Compact
-- Voice: The panel suggests what to build, and why. Three modes. Full rebuilds the index from the whole Dataset. Append indexes only the files added since the live version: the everyday choice when a new day lands. Compact merges the appended pieces into one sorted index, when many days have piled up. Choose Append and press Build link index. It reports each phase, can be cancelled, and ends with the new version.
+- Voice: Once an index exists, the panel suggests what to build, and why. Three modes. Full rebuilds the index from the whole Dataset. Append indexes only the files added since the live version: the everyday choice when a new day lands. Compact merges the appended pieces into one sorted index, when many days have piled up. Pressing Build link index reports each phase, can be cancelled, and ends with the new version. We do not build here: this packaged install has no index owner stamped on its index Job yet, so a build would be refused.
 - Chip: Build mode · Full · Append · Compact
 - Action: Link index ▸ Suggested ▸ Build mode: Full, Append, Compact (read each help line) ▸ Append ▸ Build link index ▸ hold to *Built version N…*. [check in UI: the Suggested line on a fresh unzip; if it reads *nothing to do*, build nothing and hold on the modes]
 - Impact: mark each mode's help line; then *Built version N*.
 
 ### S06 · A new day arrives
-- Voice: In production nobody presses that button. The data arrives by itself: a Collector picks up each day's file, a Pipeline lands it in a daily Dataset, and when the delivery is committed, a Job appends the link index. Here, the file for the fourth of September is placed in the feed's inbox. Within a poll it is picked up, landed, and indexed. Back in Link index, the version has moved on, with one more appended piece.
+- Voice: In production nobody presses that button. The data arrives by itself: a Collector picks up each day's file, a Pipeline lands it in a daily Dataset, and when the delivery is committed, a Job appends the link index. On this install the feed has already run up to the fourth of September, and the fifth and sixth wait in a staged folder, so we leave the feed as it is and read what it has delivered.
 - Chip: Collector · Pipeline · link index Job
 - Action: off camera: copy `TRANSFERS_20260904.csv` from `data/staged/mule_transfers` to `data/inbox/mule_transfers` ▸ on camera: wait for the next poll ▸ Link index ▸ hold. [check in UI: the version line after the append]
 - Impact: before/after hold: the version number and the appended count.
 
 ### S07 · The data strip knows
-- Voice: Open the Investigation Mule hub: six feeder accounts and a relay out, and look at the data strip above it: how current the data is, and how complete. Open Data details. Files lists each delivered file with its day, rows, outcome, and its index state: the new file reads indexed, with the version. You do not have to trust that the feed ran. The screen shows it.
+- Voice: Open the Investigation Delivery gap check, and look at the data strip above it: how current the data is, and how complete. It says the data is current to the fourth of September, four of five days, and one day not delivered yet. Open Data details. It lists each delivered day with its rows. You do not have to trust that the feed ran. The screen shows it.
 - Chip: Data strip · Data details · Files
 - Action: File ▸ Open… ▸ *Mule hub: six feeder accounts and a relay out* ▸ Data details ▸ Files ▸ the `TRANSFERS_20260904.csv` row. [check in UI: the strip's sentence and the file's index state *INDEXED vN*]
 - Impact: mark the strip's sentence; then the new Files row.
 
 ### S08 · A missing day
-- Voice: Now the sixth of September arrives, but the fifth never came. Open the Investigation Delivery gap check, whose window covers those days. The strip turns to Check data, and its sentence says one day is missing. In the Coverage tab, Check coverage names it. That is the difference between no activity and no data, and at scale it is the question that matters most.
+- Voice: Open the Coverage tab and press Check coverage. It names the missing day: four of five days are covered, and the fifth of September never arrived. Zero rows on that day say nothing about activity. That is the difference between no activity and no data, and at scale it is the question that matters most.
 - Chip: Check data · Coverage
 - Action: off camera: copy `TRANSFERS_20260906.csv` into the inbox ▸ wait for the poll ▸ File ▸ Open… ▸ *Delivery gap check* ▸ hold on the strip ▸ dock ▸ Coverage ▸ Check coverage. [check in UI: the strip's missing-day sentence and *Days with no data* naming 2026-09-05]
 - Impact: mark the badge, the sentence and the missing day.
 
 ### S09 · When the index falls behind
-- Voice: If a delivery lands and the index has not caught up, three places say so with one judgement: the strip adds that the link index is out of date, the Data page's graph says out of date, and an expand says it was answered from the Dataset because the link index is out of date. Nothing is wrong with the answer; it is slower. Rebuild, beside the words, builds it again the way the server advises, for someone allowed to build the index.
+- Voice: If a delivery lands and the index has not caught up, three places say so with one judgement: the strip adds that the link index is out of date, the Data page's graph says out of date, and an expand says it was answered from the Dataset because the link index is out of date. Nothing is wrong with the answer; it is slower. Rebuild, beside the words, builds it again the way the server advises, for someone allowed to build the index. This install has no index yet, so we only describe it.
 - Chip: Link index out of date · Rebuild
 - Action: point at the strip's index sentence and Rebuild, if shown. [check in UI: whether an out-of-date state can be shown on camera, for example by pausing the index Job before a delivery; else a still from the guide]
 - Impact: mark the out-of-date sentence and Rebuild.
@@ -267,6 +267,6 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the two rows.
 
 ### S11 · Try it
-- Voice: So: when the question is bigger than the screen, run it on the server; keep the link index fresh with Append; and let daily ingestion feed both, while the data strip and Coverage tell you what arrived. Your turn. Bring in the sixth of September, open Delivery gap check, and read the data strip. What does it say, and which day does Coverage name? The answer is in the description. Next, in category J, the worked cases: twenty stories, from the first question to the Dossier.
+- Voice: So: when the question is bigger than the screen, run it on the server; keep the link index fresh with Append; and let daily ingestion feed both, while the data strip and Coverage tell you what arrived. Your turn. Open Delivery gap check, and read the data strip. What does it say, and which day does Coverage name? The answer is in the description. Next, in category J, the worked cases: twenty stories, from the first question to the Dossier.
 - Action: outro card: *Try it* and *Next: J · Worked cases*.
 - Impact: none.

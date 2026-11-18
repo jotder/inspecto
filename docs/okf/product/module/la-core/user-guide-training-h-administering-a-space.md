@@ -183,7 +183,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the result's first line.
 
 ### S08 · A second reading, and the other upload
-- Voice: Open Data. Your two Datasets are there, added here. One file can be read more than one way: press New mapping on transfers, name it transfers_by_channel, From from_account, To channel, and Save Mapping. Now the same rows also say which accounts use which channel, without copying anything. One more door is easy to confuse with this one: Settings, Add data, Upload a CSV, hands a file to a Pipeline's own Collector. Add data, which you used, makes a Dataset of its own.
+- Voice: Open Data. The first Dataset is there, added here, with its columns, its time column and its Mappings: the ways its rows are read as links. A Mapping is a Dataset of its own over the same data, so one file can be read more than one way, without copying anything. One more door is easy to confuse with this one: Settings, Add data, Upload a CSV, hands a file to a Pipeline's own Collector. Add data, which you used, makes a Dataset of its own.
 - Chip: New mapping · Upload a CSV
 - Action: Data ▸ `transfers` ▸ New mapping ▸ Mapping name `transfers_by_channel` ▸ From `from_account` (holds Account) ▸ To `channel` (holds Nothing: a detail) ▸ Save Mapping ▸ Link Analysis ▸ Settings ▸ Add data ▸ hold on Upload a CSV. [check in UI: To holds may be left as a detail; and what Upload a CSV says in a Space with no Collector that accepts uploads]
 - Impact: mark the new Mapping line; mark the Upload a CSV section.
@@ -195,7 +195,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: before/after holds: the hub and its ring; then the second ring.
 
 ### S10 · A first question, answered
-- Voice: The busy merchant, MERCH-001, has arrived with them: a hundred and twenty accounts pay it, and it only gets in the way. Right-click it, choose Exclude…, and Hide from this graph. Now the first question. In the toolbox, Quick questions, Route from A to B: from ACC-1001, where the money starts, to ACC-1030, where it is cashed out. Find route. One sentence answers: ACC-1001 reaches ACC-1030 through a layer account and the hub. Show on graph lights the chain. That is your first finding.
+- Voice: The busy merchant, MERCH-001, has arrived with them: fifteen accounts pay it, and it only gets in the way. Click it, and its details open. Under Actions, press Hide on canvas. Now the first question. In the toolbox, Quick questions, Route from A to B: from ACC-1001, where the money starts, to ACC-1030, where it is cashed out. Press Find route. One sentence answers: how ACC-1001 reaches ACC-1030. Show on graph lights the chain. That is your first finding.
 - Chip: Route from A to B · Find route · Show on graph
 - Action: right-click MERCH-001 ▸ Exclude… ▸ Hide from this graph ▸ Exclude ▸ toolbox ▸ On screen ▸ Route from A to B ▸ From `ACC-1001` ▸ To `ACC-1030` ▸ Find route ▸ hold on the sentence ▸ Show on graph. [check in UI: MERCH-001 is drawn after the expand; the route sentence (*ACC-1001 reaches ACC-1030 in 3 links: …*); if ACC-1001 is not on the graph, expand once more first]
 - Impact: mark the sentence; the chain glows.
