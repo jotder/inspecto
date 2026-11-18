@@ -41,9 +41,11 @@ framework that lets a new format be deployed and configured with no UI change.
 > As a **registered `ParserPlugin` id** there are six built-ins (`BuiltinParsers.IDS`) plus any
 > `ServiceLoader` providers, plus parsers from allowlisted Job Packs (2026-09-25; §P.11). Read "exactly three" as a mechanism claim, never as a config constraint.
 > How the parsed rows are written (the ingest SPI, union/generation modes, segments) is
-> [Part I](spec-parsing.md) above. Authoring Grammars in the UI is
-> [grammar-config](../config/user-guide-grammar-config.md); the requirement of record is the ING
-> capability spec in [the ELT plan](plan-elt.md) (§3.3, §3.9).
+> [spec-ingest.md](spec-ingest.md). Authoring Grammars in the UI is
+> [grammar-config](../config/user-guide-grammar-config.md) and the Parse pane is
+> [the ELT user guide](user-guide-elt.md#61-a-parse-step-is-three-things-and-the-drawer-is-its-one-home-decision-2026-09-06) §6.1;
+> the requirement of record is ING in [the ELT plan](plan-elt.md#21-ingestion) §2.1. (The plan's old
+> §3.3 *one `parsing:` block* is §P.5 here; its old §3.9 *Parse pane* is that user-guide §6.1.)
 
 **Status legend** used throughout:
 `[LIVE]` = exposed by the engine today · `[NATIVE]` = DuckDB can do it, engine doesn't surface it
