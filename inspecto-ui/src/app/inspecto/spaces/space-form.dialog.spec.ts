@@ -19,6 +19,8 @@ function create(
     tzSave = vi.fn(() => of({ timezone: null, effectiveTimezone: 'UTC' })),
     /** Under OIDC, the subject's effective capabilities; omitted = no sign-in (every capability). */
     capabilities?: string[],
+    /** A multi-Space server (SPACE-LOCATIONS-1: offers Advanced: folders) and its folder check. */
+    folders: { multi?: boolean; checkLocation?: () => Observable<unknown> } = {},
 ) {
     const close = vi.fn();
     const getFor = vi.fn(() => of(NO_BRANDING));
@@ -40,6 +42,9 @@ function create(
                     create: spaceSave,
                     update: spaceSave,
                     setDomainProfile: domainSave,
+                    multiSpace: signal(folders.multi ?? false),
+                    locationsDisabled: signal(false),
+                    checkLocation: vi.fn(folders.checkLocation ?? (() => of({ ok: true, checks: [] }))),
                 },
             },
             { provide: BrandingService, useValue: { getFor, saveFor } },
@@ -303,5 +308,58 @@ describe('SpaceFormDialog', () => {
         penEdit(fixture, fieldOf(el, 'form', 'id'), 'my-own-id');
         penEdit(fixture, penByLabel(el, 'Display name')!, 'Second name');
         expect(c.form.get('id')!.value).toBe('my-own-id');
+    });
+
+    // ── SPACE-LOCATIONS-1 D6: Advanced: folders ──────────────────────────────────
+
+    it('offers Advanced: folders on a multi-Space create only, never on edit or a single-Space server', () => {
+        const q = '[data-testid="folders-toggle"]';
+        expect(
+            (create(null, undefined, undefined, { multi: true }).fixture.nativeElement as HTMLElement).querySelector(q),
+        ).not.toBeNull();
+        TestBed.resetTestingModule();
+        expect((create().fixture.nativeElement as HTMLElement).querySelector(q)).toBeNull();
+        TestBed.resetTestingModule();
+        const space: Space = { id: 'beta', displayName: 'Beta', description: '', createdAt: '' };
+        expect(
+            (
+                create({ space }, undefined, undefined, { multi: true }).fixture.nativeElement as HTMLElement
+            ).querySelector(q),
+        ).toBeNull();
+    });
+
+    it('keeps Create disabled until a given folder passed its check, then sends it', async () => {
+        const { fixture, spaceSave } = create(null, undefined, undefined, { multi: true });
+        const el = fixture.nativeElement as HTMLElement;
+        const createBtn = () => el.querySelector('button[type="submit"]') as HTMLButtonElement;
+        penEdit(fixture, penByLabel(el, 'Display name')!, 'Delta');
+        (el.querySelector('[data-testid="folders-toggle"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        penEdit(fixture, penByLabel(el, 'Space folder')!, '/srv/spaces/delta');
+        expect(createBtn().disabled).toBe(true);
+        (el.querySelector('[data-testid="folders-check"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(createBtn().disabled).toBe(false);
+        await expectNoA11yViolations(el);
+        createBtn().click();
+        fixture.detectChanges();
+        expect(spaceSave).toHaveBeenCalledWith(expect.objectContaining({ id: 'delta', path: '/srv/spaces/delta' }));
+    });
+
+    it('a failed folder check keeps Create disabled', () => {
+        const { fixture, spaceSave } = create(null, undefined, undefined, {
+            multi: true,
+            checkLocation: () => of({ ok: false, checks: [{ check: 'content', ok: false, reason: 'Holds files.' }] }),
+        });
+        const el = fixture.nativeElement as HTMLElement;
+        penEdit(fixture, penByLabel(el, 'Display name')!, 'Delta');
+        (el.querySelector('[data-testid="folders-toggle"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        penEdit(fixture, penByLabel(el, 'Data folder')!, '/srv/data/full');
+        (el.querySelector('[data-testid="folders-check"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect((el.querySelector('button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
+        fixture.componentInstance.submit();
+        expect(spaceSave).not.toHaveBeenCalled();
     });
 });

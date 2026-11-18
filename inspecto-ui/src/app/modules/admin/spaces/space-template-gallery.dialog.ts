@@ -4,7 +4,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, SampleSpace, Space, SpacesService, SpaceTemplateInfo } from 'app/inspecto/api';
+import { apiErrorMessage, LensService, SampleSpace, Space, SpacesService, SpaceTemplateInfo } from 'app/inspecto/api';
+import { SpaceFolderChoice, SpaceFoldersComponent } from 'app/inspecto/spaces/space-folders.component';
 import { failedSampleRuns } from 'app/inspecto/spaces/sample-space.dialog';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
@@ -50,6 +51,7 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
         InspectoEmptyStateComponent,
         InspectoSkeletonComponent,
         PenFieldComponent,
+        SpaceFoldersComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -130,11 +132,19 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                     ></inspecto-pen-field>
                     <inspecto-pen-field label="Display name" formControlName="display_name"></inspecto-pen-field>
                     <inspecto-pen-field label="Description" formControlName="description"></inspecto-pen-field>
+                    @if (showFolders) {
+                        <app-space-folders [spaceId]="form.get('id')?.value ?? ''" (changed)="folders.set($event)" />
+                    }
                 </mat-dialog-content>
                 <mat-dialog-actions align="end">
                     <button type="button" mat-button (click)="back()">Back</button>
                     <button type="button" mat-button (click)="requestClose()">Cancel</button>
-                    <button type="submit" mat-flat-button color="primary" [disabled]="form.invalid || saving()">
+                    <button
+                        type="submit"
+                        mat-flat-button
+                        color="primary"
+                        [disabled]="form.invalid || saving() || !folders().ready"
+                    >
                         Create space
                     </button>
                 </mat-dialog-actions>
@@ -157,6 +167,10 @@ export class SpaceTemplateGalleryDialog {
     readonly templates = signal<SpaceTemplateInfo[]>([]);
     readonly selected = signal<SpaceTemplateInfo | null>(null);
     readonly saving = signal(false);
+    /** **Advanced: folders** (SPACE-LOCATIONS-1 D6): an administrator's choice, on a server that hosts many Spaces. */
+    readonly showFolders = inject(LensService).canAdminister() && this.api.multiSpace();
+    /** The chosen Space folder and Data folder; Create waits until each given folder passed its check. */
+    readonly folders = signal<SpaceFolderChoice>({ ready: true });
 
     form: FormGroup = this.fb.group({
         id: [
@@ -209,6 +223,8 @@ export class SpaceTemplateGalleryDialog {
             this.form.markAllAsTouched();
             return;
         }
+        const folders = this.showFolders ? this.folders() : { ready: true };
+        if (!folders.ready) return;
         const v = this.form.getRawValue();
         const t = this.selected()!;
         this.saving.set(true);
@@ -221,6 +237,8 @@ export class SpaceTemplateGalleryDialog {
                 // LA-SAMPLE-EMPTY-DATASET-1: a template's samples sit in data/samples, not the inbox, and a Basic Pipeline
                 // never polls on its own - created without them, its Datasets stay empty. Load them and run once.
                 ...(t.samples ? { loadSamples: true } : {}),
+                ...(folders.path ? { path: folders.path } : {}),
+                ...(folders.dataRoot ? { dataRoot: folders.dataRoot } : {}),
             })
             .subscribe({
                 next: (space) => {
@@ -237,7 +255,7 @@ export class SpaceTemplateGalleryDialog {
                 error: (e) => {
                     this.saving.set(false);
                     const msg =
-                        e?.status === 409
+                        e?.status === 409 && !folders.path && !folders.dataRoot
                             ? `A space "${v.id}" already exists.`
                             : apiErrorMessage(e, `Could not create "${v.id}".`);
                     this.toastr.error(msg);

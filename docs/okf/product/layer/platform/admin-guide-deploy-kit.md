@@ -75,6 +75,9 @@ Settings are read the way `serve.sh` / `serve.bat` read them: `PORT`, `SPACES_RO
 `SPACES_DATA_ROOT`, `HTTPS_KEYSTORE`, `INSPECTO_JAVA_OPTS` (or `EXTRA_JAVA_OPTS`; the last `-D` of a name wins, as in the
 JVM), `AUTH_OIDC_*`, `INSPECTO_DB_URL`. `preflight.sh` reads them from the environment and then from `inspecto.env`
 when it exists (`KEY=VALUE` lines, never executed), because the systemd service reads that file and not your shell.
+`SPACES_ALLOWED_ROOTS` (the folders Settings ▸ Spaces may put a Space folder or data folder under,
+[launch flags](admin-guide-launch-flags.md)) goes in `inspecto.env` the same way; the preflight does not check it, and
+the server applies the same `MIN_FREE_GB` rule to each folder it is given there.
 
 | Check | FAIL when |
 |---|---|

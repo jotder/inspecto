@@ -6,11 +6,13 @@ import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.http.RouteModule;
 import com.gamma.service.SpaceContext;
 import com.gamma.service.SpaceId;
+import com.gamma.service.SpaceLocations;
 import com.gamma.service.SpaceManager;
 import com.gamma.service.SpaceSamples;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -27,7 +29,18 @@ import java.util.Map;
  *   PUT    /spaces/{id}            body {display_name?, description?} — rename/re-describe a space  [v4.10.0]
  *   DELETE /spaces/{id}[?purge=]   deregister + drain a space; ?purge=true also deletes its files  [v4.7.0]
  *                                  (409 when ?purge=true would remove the last space dir on disk)
+ *   POST   /spaces/_locations/check  body {path, kind: space|data, id?} - check a folder, write nothing
+ *   POST   /spaces/attach          body {path, id?} - attach a Space folder kept elsewhere, live
+ *   POST   /spaces/{id}/detach     stop a Space booted through its &lt;id&gt;.ref and drop the reference; files stay
+ *   PUT    /spaces/{id}/data-root  body {path|null} - point a Space that holds no data at a data folder
  * </pre>
+ *
+ * <p>Space locations ({@code SPACE-LOCATIONS-1}): every route that takes a folder is {@code canAdminister} (403), needs
+ * the multi-Space server (409), the launch setting {@code spaces.allowed.roots} (409 {@code SPACE_LOCATIONS_DISABLED}),
+ * a well-formed body (422), then passes {@link SpaceLocations}' checks (403 outside the allowed folders, 409 otherwise).
+ * {@code POST /spaces} takes the same {@code path} and {@code dataRoot}. {@code _locations} is an underscore sentinel
+ * like {@code _meta}, because {@code /spaces/locations/check} would be taken for the Space {@code locations}; the
+ * {@code /detach} and {@code /data-root} tails are kept server-global by {@code ControlApi.SPACE_PREFIX}.
  *
  * <p>{@code _meta} is a non-{@link SpaceId} sentinel (underscore is outside the id charset), so the
  * capability probe never collides with a real space. The UI reads it once at startup to decide whether to
@@ -57,13 +70,15 @@ final class SpaceRoutes implements RouteModule {
             return HostContext.of(api).spaces().all().stream()
                     .filter(c -> SpaceAdmission.admits(e, c))   // a closed Space is listed only to the people it admits
                     .sorted(java.util.Comparator.comparing(c -> c.id().value()))
-                    .map(c -> withIntegrity(e, c, manifest(c)))
+                    .map(c -> withLocation(api, e, c, withIntegrity(e, c, manifest(c))))
                     .toList();
         });
 
         // Server capability probe — lets the UI distinguish the discover (CRUD-capable) runtime from a
         // single-tenant server without inferring it from the (possibly empty) space list. See class javadoc.
-        api.get("/spaces/_meta", (e, m) -> Map.of("multiSpace", HostContext.of(api).spaces().supportsCrud()));
+        // locationsEnabled (SPACE-LOCATIONS-1): the launch setting spaces.allowed.roots is set, so the folder routes work.
+        api.get("/spaces/_meta", (e, m) -> Map.of("multiSpace", HostContext.of(api).spaces().supportsCrud(),
+                "locationsEnabled", !SpaceLocations.allowedRoots().isEmpty()));
 
         // The shipped-template gallery. Empty (not 409) on a single-tenant server — the UI hides the
         // gallery there, and an empty list is the honest capability answer either way.
@@ -82,6 +97,133 @@ final class SpaceRoutes implements RouteModule {
 
         api.delete("/spaces/([^/]+)", ApiContext.withCapability("canAdminister",
                 (e, m) -> deleteSpace(api, e, ApiContext.name(m))));
+
+        // SPACE-LOCATIONS-1 (plan D3-D7): where a Space folder and its data folder are kept.
+        api.post("/spaces/_locations/check", ApiContext.withCapability("canAdminister",
+                (e, m) -> checkLocation(api, api.body(e))));
+
+        api.post("/spaces/attach", ApiContext.withCapability("canAdminister",
+                (e, m) -> attachSpace(api, e, api.body(e))));
+
+        api.post("/spaces/([^/]+)/detach", ApiContext.withCapability("canAdminister",
+                (e, m) -> detachSpace(api, ApiContext.name(m))));
+
+        api.put("/spaces/([^/]+)/data-root", ApiContext.withCapability("canAdminister",
+                (e, m) -> changeDataRoot(api, e, api.body(e), ApiContext.name(m))));
+    }
+
+    /** {@code {path, kind: "space"|"data", id?}}: every check with a plain reason; nothing is written. */
+    private Object checkLocation(ApiContext api, Map<String, Object> body) {
+        requireLocations(api);
+        String kind = ApiContext.str(body, "kind");
+        if (!"space".equals(kind) && !"data".equals(kind))
+            throw unprocessable("'kind' must be \"space\" (a Space folder) or \"data\" (a data folder)");
+        String id = optionalId(body);
+        Path path = folder(body, "path");
+        var checks = HostContext.of(api).spaces().checkLocation(path,
+                "space".equals(kind) ? SpaceLocations.Use.SPACE : SpaceLocations.Use.DATA, id);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("path", path.toString());
+        out.put("kind", kind);
+        out.put("ok", checks.stream().allMatch(SpaceLocations.Check::ok));
+        out.put("checks", checks.stream().map(SpaceLocations.Check::toMap).toList());
+        return out;
+    }
+
+    /** {@code {path, id?}}: attach the Space folder at {@code path} (its name is the id) and start it. */
+    private Object attachSpace(ApiContext api, HttpExchange e, Map<String, Object> body) throws IOException {
+        requireLocations(api);
+        String id = optionalId(body);
+        Path path = folder(body, "path");
+        if (id != null && !id.equals(String.valueOf(path.getFileName())))
+            throw unprocessable("the Space folder's name '" + path.getFileName() + "' must be the Space id '" + id + "'");
+        try {
+            SpaceContext ctx = HostContext.of(api).spaces().attach(path);
+            return withLocation(api, e, ctx, manifest(ctx));
+        } catch (SpaceLocations.Refused r) {
+            throw refused(r);
+        }
+    }
+
+    /** Stop a Space booted through its {@code <id>.ref} and drop the reference; its folders stay on disk. */
+    private Object detachSpace(ApiContext api, String id) throws IOException {
+        requireLocations(api);
+        if (!SpaceId.isValid(id)) throw unprocessable("invalid Space id '" + id + "'");
+        try {
+            if (!HostContext.of(api).spaces().detach(SpaceId.of(id)))
+                throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + id + "'");
+        } catch (IllegalStateException inSpacesRoot) {
+            throw new ApiException(409, ErrorCodes.CONFLICT, inSpacesRoot.getMessage());
+        }
+        return Map.of("id", id, "detached", true);
+    }
+
+    /** {@code {path}}: point a Space that holds no data at a data folder; {@code {path: null}} puts it back under its Space folder. */
+    private Object changeDataRoot(ApiContext api, HttpExchange e, Map<String, Object> body, String id) throws IOException {
+        requireLocations(api);
+        if (!SpaceId.isValid(id)) throw unprocessable("invalid Space id '" + id + "'");
+        if (body == null || !body.containsKey("path"))
+            throw unprocessable("body must include 'path': a data folder, or null to keep the data under the Space folder");
+        Path path = body.get("path") == null ? null : folder(body, "path");
+        try {
+            SpaceContext ctx = HostContext.of(api).spaces().changeDataRoot(SpaceId.of(id), path);
+            if (ctx == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + id + "'");
+            return withLocation(api, e, ctx, manifest(ctx));
+        } catch (SpaceLocations.Refused r) {
+            throw refused(r);
+        }
+    }
+
+    /** The gates every folder-taking route shares after {@code canAdminister}: the multi-Space server, then the setting. */
+    private static void requireLocations(ApiContext api) {
+        requireMultiSpace(api);
+        try {
+            SpaceLocations.requireEnabled();
+        } catch (SpaceLocations.Refused r) {
+            throw refused(r);
+        }
+    }
+
+    /** {@code field} of the body as a folder path (absolute, or relative to the app root); 422 when it is not one. */
+    private static Path folder(Map<String, Object> body, String field) {
+        Object v = body == null ? null : body.get(field);
+        if (!(v instanceof String s)) throw unprocessable("'" + field + "' must be a folder path");
+        try {
+            return SpaceLocations.parse(s, field);
+        } catch (IllegalArgumentException bad) {
+            throw unprocessable(bad.getMessage());
+        }
+    }
+
+    private static String optionalId(Map<String, Object> body) {
+        Object v = body == null ? null : body.get("id");
+        if (v == null) return null;
+        if (!(v instanceof String s) || !SpaceId.isValid(s))
+            throw unprocessable("'id' must be a valid Space id ([a-z0-9-], 1-63 chars, not starting with '-')");
+        return s;
+    }
+
+    private static ApiException unprocessable(String message) {
+        return new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, message);
+    }
+
+    private static ApiException refused(SpaceLocations.Refused r) {
+        return new ApiException(r.status(), r.code(), r.getMessage());
+    }
+
+    /**
+     * D8: {@code location {spaceFolder, dataFolder, referenced, holdsData}} on a Space row, only for a caller who may see
+     * where things are on the server's disk ({@link ServerPaths#administers}); anyone else gets no paths.
+     */
+    private static Map<String, Object> withLocation(ApiContext api, HttpExchange e, SpaceContext ctx, Map<String, Object> m) {
+        if (!ServerPaths.administers(e)) return m;
+        Map<String, Object> loc = new LinkedHashMap<>();
+        loc.put("spaceFolder", ctx.root().base().toString());
+        loc.put("dataFolder", ctx.root().dataRoot().toString());
+        loc.put("referenced", HostContext.of(api).spaces().isReferenced(ctx));
+        loc.put("holdsData", SpaceManager.holdsData(ctx));
+        m.put("location", loc);
+        return m;
     }
 
     /** Create + boot a new space seeded from an uploaded bundle zip; the new id comes from {@code ?id=}. */
@@ -116,14 +258,25 @@ final class SpaceRoutes implements RouteModule {
         String template = ApiContext.str(body, "template");
         boolean loadSamples = Boolean.TRUE.equals(body.get("loadSamples"));
         if (loadSamples) requireSamples(api, template);   // refused before anything is created
+        // SPACE-LOCATIONS-1 D6: optional chosen folders, under the same gates as the other folder-taking routes
+        Path folder = null, dataRoot = null;
+        if (body.get("path") != null || body.get("dataRoot") != null) {
+            requireLocations(api);
+            if (body.get("path") != null) folder = folder(body, "path");
+            if (body.get("dataRoot") != null) dataRoot = folder(body, "dataRoot");
+            if (folder != null && !id.equals(String.valueOf(folder.getFileName())))
+                throw unprocessable("the Space folder's name '" + folder.getFileName() + "' must be the Space id '" + id + "'");
+        }
         try {
             SpaceContext ctx = template == null
                     ? HostContext.of(api).spaces().create(SpaceId.of(id),
-                            ApiContext.str(body, "display_name"), ApiContext.str(body, "description"), creator(e))
+                            ApiContext.str(body, "display_name"), ApiContext.str(body, "description"), creator(e),
+                            folder, dataRoot)
                     : HostContext.of(api).spaces().createFromTemplate(SpaceId.of(id),
                             ApiContext.str(body, "display_name"), ApiContext.str(body, "description"), template,
                             base -> TemplateSeedGate.require(e, base,   // every seeded kind meets its own route
-                                    HostContext.of(api).spaces().templateHasBasicTier(template)), creator(e));
+                                    HostContext.of(api).spaces().templateHasBasicTier(template)), creator(e),
+                            folder, dataRoot);
             Map<String, Object> out = manifest(ctx);
             com.gamma.util.OnboardingCounters.record(com.gamma.util.OnboardingCounters.Event.SPACE_CREATED);   // OB-13
             // OB-12: load the template's samples and run each Pipeline that received files, once. The Space stays
@@ -131,6 +284,8 @@ final class SpaceRoutes implements RouteModule {
             if (loadSamples)
                 out.put("samples", Map.of("pipelines", SpaceSamples.load(ctx).stream().map(SpaceSamples.PipelineLoad::toMap).toList()));
             return out;
+        } catch (SpaceLocations.Refused r) {   // a chosen folder failed its checks
+            throw refused(r);
         } catch (IllegalArgumentException badTemplate) { // unknown template id
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, badTemplate.getMessage());
         } catch (IllegalStateException conflict) {   // already exists (single-mode was rejected above)

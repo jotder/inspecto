@@ -20,6 +20,7 @@ import {
 import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
+import { SpaceFolderChoice, SpaceFoldersComponent } from './space-folders.component';
 
 /** Rejects a value (case-insensitive, trimmed) already present in `taken` → `{ duplicate: true }`. */
 function uniqueNameValidator(taken: string[]): ValidatorFn {
@@ -122,7 +123,15 @@ export const DATA_KIND_OPTIONS: readonly DataKindOption[] = [
 @Component({
     selector: 'app-space-form-dialog',
     standalone: true,
-    imports: [ReactiveFormsModule, MatDialogModule, MatButtonModule, MatIconModule, MatRadioModule, PenFieldComponent],
+    imports: [
+        ReactiveFormsModule,
+        MatDialogModule,
+        MatButtonModule,
+        MatIconModule,
+        MatRadioModule,
+        PenFieldComponent,
+        SpaceFoldersComponent,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>{{ editMode ? 'Edit space' : dataKind ? 'Create a Space' : 'New space' }}</h2>
@@ -188,6 +197,10 @@ export const DATA_KIND_OPTIONS: readonly DataKindOption[] = [
                 } @else {
                     <inspecto-pen-field label="Description" formControlName="description"></inspecto-pen-field>
 
+                    @if (showFolders) {
+                        <app-space-folders [spaceId]="form.get('id')?.value ?? ''" (changed)="folders.set($event)" />
+                    }
+
                     @if (!canSaveSettings()) {
                         <p class="text-secondary m-0 border-t pt-3 text-sm">
                             Logo, caption, footer and default timezone are not offered: saving them needs the
@@ -250,7 +263,12 @@ export const DATA_KIND_OPTIONS: readonly DataKindOption[] = [
             </mat-dialog-content>
             <mat-dialog-actions align="end">
                 <button type="button" mat-button (click)="requestClose()">Cancel</button>
-                <button type="submit" mat-flat-button color="primary" [disabled]="form.invalid || saving()">
+                <button
+                    type="submit"
+                    mat-flat-button
+                    color="primary"
+                    [disabled]="form.invalid || saving() || !folders().ready"
+                >
                     {{ editMode ? 'Save' : 'Create' }}
                 </button>
             </mat-dialog-actions>
@@ -267,6 +285,8 @@ export class SpaceFormDialog {
     private confirm = inject(InspectoConfirmService);
     /** Branding and timezone are offered (and sent) only to a caller the server lets save them. */
     readonly canSaveSettings = inject(LensService).canSaveSpaceSettings;
+    /** Folder choices (SPACE-LOCATIONS-1 D6) are an administrator's, on a server that hosts many Spaces. */
+    private readonly canAdminister = inject(LensService).canAdminister;
 
     /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
@@ -279,6 +299,10 @@ export class SpaceFormDialog {
     readonly defaultLogo = environment.appLogo;
 
     readonly saving = signal(false);
+    /** The console create offers **Advanced: folders**; the edit and the Inspecto LA create do not. */
+    readonly showFolders = !this.editMode && !this.dataKind && this.canAdminister() && this.api.multiSpace();
+    /** The chosen Space folder and Data folder; Create waits until each given folder passed its check. */
+    readonly folders = signal<SpaceFolderChoice>({ ready: true });
     /** Whether the id field is being shown/overridden manually (create mode only). */
     readonly editId = signal(false);
     idManual = false;
@@ -392,6 +416,8 @@ export class SpaceFormDialog {
             this.form.markAllAsTouched();
             return;
         }
+        const folders = this.showFolders ? this.folders() : { ready: true };
+        if (!folders.ready) return;
         const v = this.form.getRawValue();
         const branding: Branding = {
             logoDataUrl: this.logoDataUrl(),
@@ -410,6 +436,8 @@ export class SpaceFormDialog {
                   id: v.id,
                   display_name: v.display_name || undefined,
                   description: v.description || undefined,
+                  ...(folders.path ? { path: folders.path } : {}),
+                  ...(folders.dataRoot ? { dataRoot: folders.dataRoot } : {}),
               });
         // UC-02: the chosen kind of data selects the new Space's Domain Profile; generic leaves it unset.
         const pack = this.dataKind ? (DATA_KIND_OPTIONS.find((k) => k.id === v.dataKind)?.pack ?? null) : null;
@@ -476,7 +504,7 @@ export class SpaceFormDialog {
                     this.saving.set(false);
                     const id = existing?.id ?? v.id;
                     const msg =
-                        e?.status === 409
+                        e?.status === 409 && !folders.path && !folders.dataRoot
                             ? `A space "${id}" already exists.`
                             : apiErrorMessage(e, `Could not ${existing ? 'update' : 'create'} "${id}".`);
                     this.toastr.error(msg);

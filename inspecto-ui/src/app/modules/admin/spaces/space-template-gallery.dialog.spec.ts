@@ -1,3 +1,4 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -6,7 +7,7 @@ import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { CreateSpaceRequest, Space, SpacesService, SpaceTemplateInfo } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { penByLabel, penError, refresh } from 'app/inspecto/testing/pen-field';
+import { penByLabel, penEdit, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { SpaceTemplateGalleryDialog } from './space-template-gallery.dialog';
 
 const TEMPLATES: SpaceTemplateInfo[] = [
@@ -28,7 +29,7 @@ const TEMPLATES: SpaceTemplateInfo[] = [
     },
 ];
 
-function create(existingIds: string[] = ['default'], templates: SpaceTemplateInfo[] = TEMPLATES) {
+function create(existingIds: string[] = ['default'], templates: SpaceTemplateInfo[] = TEMPLATES, multi = false) {
     const created = vi.fn((req: CreateSpaceRequest) =>
         of({
             id: req.id,
@@ -44,7 +45,18 @@ function create(existingIds: string[] = ['default'], templates: SpaceTemplateInf
             provideNoopAnimations(),
             { provide: MatDialogRef, useValue: { close: closed } },
             { provide: MAT_DIALOG_DATA, useValue: { existingIds } },
-            { provide: SpacesService, useValue: { templates: () => of(templates), create: created } },
+            {
+                provide: SpacesService,
+                useValue: {
+                    templates: () => of(templates),
+                    create: created,
+                    // SPACE-LOCATIONS-1: a multi-Space server offers Advanced: folders
+                    multiSpace: signal(multi),
+                    currentSpaceId: signal<string | null>(null),
+                    locationsDisabled: signal(false),
+                    checkLocation: () => of({ ok: true, checks: [] }),
+                },
+            },
             { provide: ToastrService, useValue: { success: () => {}, error: () => {} } },
         ],
     });
@@ -165,5 +177,33 @@ describe('SpaceTemplateGalleryDialog', () => {
         refresh(fixture);
         expect(penError(field)).toBe('Use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.');
         expect(created).not.toHaveBeenCalled();
+    });
+
+    it('creates from a template into a checked Data folder (SPACE-LOCATIONS-1 D6)', async () => {
+        const { fixture, created } = create(['default'], TEMPLATES, true);
+        const c = fixture.componentInstance;
+        c.choose(TEMPLATES[1]);
+        refresh(fixture);
+        const el = fixture.nativeElement as HTMLElement;
+        const createBtn = () => el.querySelector('button[type="submit"]') as HTMLButtonElement;
+        (el.querySelector('[data-testid="folders-toggle"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        penEdit(fixture, penByLabel(el, 'Data folder')!, '/srv/data/fraud');
+        expect(createBtn().disabled).toBe(true);
+        (el.querySelector('[data-testid="folders-check"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(createBtn().disabled).toBe(false);
+        await expectNoA11yViolations(el);
+        createBtn().click();
+        expect(created).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 'fraud-mgmt', template: 'fraud-mgmt', dataRoot: '/srv/data/fraud' }),
+        );
+    });
+
+    it('offers no folders on a single-Space server', () => {
+        const { fixture } = create();
+        fixture.componentInstance.choose(TEMPLATES[0]);
+        refresh(fixture);
+        expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="folders-toggle"]')).toBeNull();
     });
 });

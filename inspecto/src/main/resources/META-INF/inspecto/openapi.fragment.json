@@ -26,6 +26,10 @@
     "/spaces/templates",
     "/spaces/import",
     "/spaces/{spaceId}",
+    "/spaces/_locations/check",
+    "/spaces/attach",
+    "/spaces/{spaceId}/detach",
+    "/spaces/{spaceId}/data-root",
     "/datasources",
     "/datasources/{datasourceId}/export",
     "/export",
@@ -576,7 +580,7 @@
         "tags" : [ "spaces" ],
         "summary" : "Create a Space, optionally seeded from a Space Template",
         "operationId" : "postSpaces",
-        "description" : "Body {id, display_name?, description?, template?, loadSamples?}. loadSamples: true (LA-ONBOARD-1 OB-12) copies the template's data/samples/<pipeline>/ files into that Pipeline's inbox and runs every Pipeline that then has files waiting, once, and answers samples.pipelines[] = {pipeline, sampleFiles, status: loaded|failed, filesLoaded, filesQuarantined, error?} beside the manifest; the Space stays created whatever a run answers. loadSamples without a template, or with a template that ships no samples (GET /spaces/templates samples: false), is refused 422 and nothing is created. Requires canAdminister, the zero-Space recovery create included (there the IdP admin role resolves through the seeded roles; TEMPLATE-RECOVERY-IMPORT-GATE-1). A template's carried kinds meet the same capability table as /spaces/import; a KPI pack (config/registry/kpis/) also needs canAuthorWorkbench, and each KPI meets the /components/kpi save gate against the template's own Datasets; the first refusal creates no Space (ASSURE-KPI-DEFINITIONS-RESIDUALS-1). A signed-in caller is recorded as the Space's creator and the Space is created closed (answer: admission closed, createdBy): every route under /spaces/{id}/ then answers 404 'no such space' to anyone but the creator, a holder of canAdminister and a holder of a role the Space's own role table defines (PUT /access/roles in that Space admits a role). With no sign-in nothing is recorded and the Space is open.",
+        "description" : "Body {id, display_name?, description?, template?, loadSamples?, path?, dataRoot?}. path (SPACE-LOCATIONS-1) is a Space folder named <id>, absent or empty, kept outside the Spaces root: the Space is created there and <spaces root>/<id>.ref written; dataRoot is a data folder, absent or empty, written as data_root before the Space starts (a template's samples go there). Either needs the launch setting spaces.allowed.roots (409 SPACE_LOCATIONS_DISABLED), is 422 when malformed or path is not named <id>, 403 outside the allowed folders, 409 when a check of POST /spaces/_locations/check fails. loadSamples: true (LA-ONBOARD-1 OB-12) copies the template's data/samples/<pipeline>/ files into that Pipeline's inbox and runs every Pipeline that then has files waiting, once, and answers samples.pipelines[] = {pipeline, sampleFiles, status: loaded|failed, filesLoaded, filesQuarantined, error?} beside the manifest; the Space stays created whatever a run answers. loadSamples without a template, or with a template that ships no samples (GET /spaces/templates samples: false), is refused 422 and nothing is created. Requires canAdminister, the zero-Space recovery create included (there the IdP admin role resolves through the seeded roles; TEMPLATE-RECOVERY-IMPORT-GATE-1). A template's carried kinds meet the same capability table as /spaces/import; a KPI pack (config/registry/kpis/) also needs canAuthorWorkbench, and each KPI meets the /components/kpi save gate against the template's own Datasets; the first refusal creates no Space (ASSURE-KPI-DEFINITIONS-RESIDUALS-1). A signed-in caller is recorded as the Space's creator and the Space is created closed (answer: admission closed, createdBy): every route under /spaces/{id}/ then answers 404 'no such space' to anyone but the creator, a holder of canAdminister and a holder of a role the Space's own role table defines (PUT /access/roles in that Space admits a role). With no sign-in nothing is recorded and the Space is open.",
         "responses" : {
           "200" : {
             "description" : "The created Space manifest (id, displayName, description)."
@@ -1785,7 +1789,7 @@
         "tags" : [ "spaces" ],
         "summary" : "Multi-Space capability probe",
         "operationId" : "getSpacesMeta",
-        "description" : "Answers {multiSpace}: whether this server can create, edit and delete Spaces, so the UI need not infer it from the Space list. No capability gate.",
+        "description" : "Answers {multiSpace, locationsEnabled}: whether this server can create, edit and delete Spaces, so the UI need not infer it from the Space list; and whether the launch setting spaces.allowed.roots is set, so the Space folder and data folder routes work (SPACE-LOCATIONS-1). No capability gate.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -1848,6 +1852,78 @@
         "summary" : "Deregister a Space",
         "operationId" : "deleteSpacesBySpaceId",
         "description" : "Deregisters and drains a Space; ?purge=true also deletes its directory tree. Gated on canAdminister. 409 on a single-Space server or when purging the last Space on disk; 400 for an invalid id; 404 for an unknown Space.",
+        "parameters" : [ {
+          "name" : "spaceId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/spaces/_locations/check" : {
+      "post" : {
+        "tags" : [ "spaces" ],
+        "summary" : "Check a Space folder or data folder",
+        "operationId" : "postSpacesLocationsCheck",
+        "description" : "Body {path, kind: space|data, id?}; path is absolute or relative to the app root. Writes nothing. Answers {path, kind, ok, checks: [{check, ok, reason}]}, the checks in order: allowed, install, overlap, name (kind space), reachable, writable, free-space (the deploy kit MIN_FREE_GB rule, default 5), stamp (kind data), content (kind space: holds a Space or is empty; kind data: empty or already this Space). id names the Space a data folder is for. Gated on canAdminister (403); 409 on a single-Space server; 409 SPACE_LOCATIONS_DISABLED while the launch setting spaces.allowed.roots (env SPACES_ALLOWED_ROOTS) is unset; 422 for a malformed body; 403 PATH_JAIL_VIOLATION for a folder outside the allowed folders (judged after .. and links are resolved); 409 CONFLICT when a check fails (SPACE-LOCATIONS-1).",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/spaces/attach" : {
+      "post" : {
+        "tags" : [ "spaces" ],
+        "summary" : "Attach a Space folder kept outside the Spaces root",
+        "operationId" : "postSpacesAttach",
+        "description" : "Body {path, id?}: the folder name is the Space id (id, when given, must equal it). Writes <spaces root>/<id>.ref (relative to the app root when the folder is under it) and starts the Space at once; it is started again at every restart and keeps the admission its space.toon says. Answers the Space row with location. 409 when the folder is not a Space, the id is taken, or it overlaps another Space; 422 when the Space does not start (the reference is removed). Gated on canAdminister (403); 409 on a single-Space server; 409 SPACE_LOCATIONS_DISABLED while the launch setting spaces.allowed.roots (env SPACES_ALLOWED_ROOTS) is unset; 422 for a malformed body; 403 PATH_JAIL_VIOLATION for a folder outside the allowed folders (judged after .. and links are resolved); 409 CONFLICT when a check fails (SPACE-LOCATIONS-1).",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/spaces/{spaceId}/detach" : {
+      "post" : {
+        "tags" : [ "spaces" ],
+        "summary" : "Detach a Space kept outside the Spaces root",
+        "operationId" : "postSpacesDetachBySpaceId",
+        "description" : "Stops a Space started through its <id>.ref and deletes the reference; its Space folder and data folder stay on disk and can be attached again. Answers {id, detached: true}. 404 for an unknown Space; 409 for a Space inside the Spaces root (remove it with DELETE /spaces/{id}). Gated on canAdminister (403); 409 on a single-Space server; 409 SPACE_LOCATIONS_DISABLED while the launch setting spaces.allowed.roots (env SPACES_ALLOWED_ROOTS) is unset; 422 for a malformed body; 403 PATH_JAIL_VIOLATION for a folder outside the allowed folders (judged after .. and links are resolved); 409 CONFLICT when a check fails (SPACE-LOCATIONS-1).",
+        "parameters" : [ {
+          "name" : "spaceId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/spaces/{spaceId}/data-root" : {
+      "put" : {
+        "tags" : [ "spaces" ],
+        "summary" : "Change the data folder of a Space that holds no data",
+        "operationId" : "putSpacesDataRootBySpaceId",
+        "description" : "Body {path} (null: back under the Space folder). Only while the Space keeps no files in data/ or audit/; its stores (duckdb/) move with it. The Space is stopped, space.toon gets data_root (relative to the app root when under it), and it is started again, which stamps the folder. Answers the Space row with location. 404 for an unknown Space; 409 SPACE_HOLDS_DATA when it holds data; 409 when the folder is not empty or belongs to another Space; 422 when it does not start (the Space is put back as it was). Gated on canAdminister (403); 409 on a single-Space server; 409 SPACE_LOCATIONS_DISABLED while the launch setting spaces.allowed.roots (env SPACES_ALLOWED_ROOTS) is unset; 422 for a malformed body; 403 PATH_JAIL_VIOLATION for a folder outside the allowed folders (judged after .. and links are resolved); 409 CONFLICT when a check fails (SPACE-LOCATIONS-1).",
         "parameters" : [ {
           "name" : "spaceId",
           "in" : "path",
@@ -9862,6 +9938,24 @@
           "createdBy" : {
             "type" : "string",
             "description" : "The Subject id of the signed-in person who created a closed Space. Present only beside admission."
+          },
+          "location" : {
+            "type" : "object",
+            "description" : "Only for a caller holding canAdminister (or with no sign-in): where the Space lives (SPACE-LOCATIONS-1). spaceFolder and dataFolder are absolute; referenced is true for a Space started through <spaces root>/<id>.ref; holdsData is true when its data folder keeps files in data/ or audit/.",
+            "properties" : {
+              "spaceFolder" : {
+                "type" : "string"
+              },
+              "dataFolder" : {
+                "type" : "string"
+              },
+              "referenced" : {
+                "type" : "boolean"
+              },
+              "holdsData" : {
+                "type" : "boolean"
+              }
+            }
           },
           "integrity" : {
             "type" : "object",

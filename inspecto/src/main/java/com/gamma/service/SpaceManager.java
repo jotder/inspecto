@@ -431,11 +431,12 @@ public final class SpaceManager implements AutoCloseable {
      * (see {@link #bootQuietly}), deregistering again on any failure. The shared tail of the three
      * runtime create paths.
      */
-    private static SpaceContext bootStarted(Path base) throws IOException {
+    private static SpaceContext bootStarted(Path base, boolean created) throws IOException {
         SpaceRoot root = SpaceRoot.under(base);
         DiscoveredRoots.register(root.id(), root.base());
         try {
-            SpaceDataRoot.adoptSeeded(root);   // a new Space's seeded data/ goes to its data_root (SPACE-DATA-ROOT-1)
+            // a new Space's seeded data/ goes to its data_root (SPACE-DATA-ROOT-1); a Space already made never moves at boot
+            if (created) SpaceDataRoot.adoptSeeded(root);
             SpaceContext ctx = loadAsSpace(root);
             try {
                 ctx.start();
@@ -503,21 +504,35 @@ public final class SpaceManager implements AutoCloseable {
      * request only the people it admits may use it. {@code null} (no sign-in) records nothing: the Space is open.
      */
     public SpaceContext create(SpaceId id, String displayName, String description, String createdBy) throws IOException {
+        return create(id, displayName, description, createdBy, null, null);
+    }
+
+    /**
+     * {@link #create(SpaceId, String, String, String)} into chosen folders ({@code SPACE-LOCATIONS-1} D6): {@code folder}
+     * (a Space folder named {@code <id>}, absent or empty) instead of {@code <spaces root>/<id>}, with a {@code <id>.ref}
+     * written once it boots; {@code dataRoot} (absent or empty) written as {@code data_root:} before it boots. Either may
+     * be null. Both are checked ({@link SpaceLocations}) before anything is made.
+     */
+    public SpaceContext create(SpaceId id, String displayName, String description, String createdBy,
+                               Path folder, Path dataRoot) throws IOException {
         if (spacesRoot == null)
             throw new IllegalStateException("This server hosts a single space; set -Dspaces.root to manage many");
         synchronized (lifecycleLock) {
             if (spaces.containsKey(id))
                 throw new IllegalStateException("Space already exists: " + id.value());
-            Path base = spacesRoot.resolve(id.value());
+            Path base = folder == null ? spacesRoot.resolve(id.value()) : folder.toAbsolutePath().normalize();
             if (takenOnDisk(id))
-                throw new IllegalStateException("Space directory already exists: " + base);
+                throw new IllegalStateException("Space directory already exists: " + spacesRoot.resolve(id.value()));
+            requireFolders(id, folder, dataRoot, base);
             for (String sub : SPACE_SUBDIRS) Files.createDirectories(base.resolve(sub));
             String name = (displayName == null || displayName.isBlank()) ? id.value() : displayName.trim();
-            new SpaceContext.SpaceManifest(name, description == null ? "" : description.trim(), Instant.now().toString(), "",
+            new SpaceContext.SpaceManifest(name, description == null ? "" : description.trim(), Instant.now().toString(),
+                    dataRoot == null ? "" : SpaceLocations.written(dataRoot),
                     createdBy, admissionFor(createdBy)).write(base.resolve("space.toon"));
 
             com.gamma.pipeline.exec.EgressAllowlist.recordEmpty(base.resolve("config"));   // a NEW Space is never seeded
-            SpaceContext ctx = bootStarted(base);
+            SpaceContext ctx = bootStarted(base, true);
+            if (folder != null) writeRef(id.value(), base);
             spaces.put(id, ctx);
             wire(ctx);
             publishHosted();
@@ -587,7 +602,7 @@ public final class SpaceManager implements AutoCloseable {
                     createdBy, admissionFor(createdBy)).write(manifest);
 
             com.gamma.pipeline.exec.EgressAllowlist.recordEmpty(base.resolve("config"));   // a NEW Space is never seeded
-            SpaceContext ctx = bootStarted(base);
+            SpaceContext ctx = bootStarted(base, true);
             spaces.put(id, ctx);
             wire(ctx);
             publishHosted();
@@ -807,6 +822,15 @@ public final class SpaceManager implements AutoCloseable {
     public SpaceContext createFromTemplate(SpaceId id, String displayName, String description,
                                            String templateId, java.util.function.Consumer<Path> seedGate, String createdBy)
             throws IOException {
+        return createFromTemplate(id, displayName, description, templateId, seedGate, createdBy, null, null);
+    }
+
+    /** {@link #createFromTemplate(SpaceId, String, String, String, java.util.function.Consumer, String)} into chosen
+     *  folders, as {@link #create(SpaceId, String, String, String, Path, Path)} does; the template's seeded data goes
+     *  to {@code dataRoot}. */
+    public SpaceContext createFromTemplate(SpaceId id, String displayName, String description, String templateId,
+                                           java.util.function.Consumer<Path> seedGate, String createdBy,
+                                           Path folder, Path dataRoot) throws IOException {
         if (spacesRoot == null)
             throw new IllegalStateException("This server hosts a single space; set -Dspaces.root to manage many");
         Path tpl = templatesRoot().resolve(templateId);
@@ -817,9 +841,10 @@ public final class SpaceManager implements AutoCloseable {
         synchronized (lifecycleLock) {
             if (spaces.containsKey(id))
                 throw new IllegalStateException("Space already exists: " + id.value());
-            Path base = spacesRoot.resolve(id.value());
+            Path base = folder == null ? spacesRoot.resolve(id.value()) : folder.toAbsolutePath().normalize();
             if (takenOnDisk(id))
-                throw new IllegalStateException("Space directory already exists: " + base);
+                throw new IllegalStateException("Space directory already exists: " + spacesRoot.resolve(id.value()));
+            requireFolders(id, folder, dataRoot, base);
             // Seeded and gated in a unique staging dir under the `_staging` sentinel (discovery boots only a
             // `<root>/<id>/config`, so it never admits one), then renamed into place. A refusal whose cleanup
             // fails (a Windows lock) leaves only that staging dir: it never blocks the id and never boots.
@@ -838,16 +863,21 @@ public final class SpaceManager implements AutoCloseable {
                 }
                 throw refused;                    // the refusal stays the answer, never the cleanup failure
             }
-            Files.move(staging, base);
+            if (folder == null) Files.move(staging, base);
+            else {   // a chosen folder may exist (empty, checked) and is usually on another volume: copy, then delete
+                SpaceDataRoot.moveTree(staging, base);
+            }
             String name = (displayName == null || displayName.isBlank())
                     ? com.gamma.util.ToonHelper.opt(tplMeta, "name", id.value()) : displayName.trim();
             String desc = (description == null || description.isBlank())
                     ? com.gamma.util.ToonHelper.opt(tplMeta, "tagline", "") : description.trim();
-            new SpaceContext.SpaceManifest(name, desc, Instant.now().toString(), "", createdBy, admissionFor(createdBy))
+            new SpaceContext.SpaceManifest(name, desc, Instant.now().toString(),
+                    dataRoot == null ? "" : SpaceLocations.written(dataRoot), createdBy, admissionFor(createdBy))
                     .write(base.resolve("space.toon"));
             com.gamma.pipeline.exec.EgressAllowlist.recordEmpty(base.resolve("config"));   // a NEW Space is never seeded
             recordProvenance(tpl, base, templateId);   // after every file the server writes at creation, so the hashes are the created state
-            SpaceContext ctx = bootStarted(base);
+            SpaceContext ctx = bootStarted(base, true);
+            if (folder != null) writeRef(id.value(), base);
             spaces.put(id, ctx);
             wire(ctx);
             publishHosted();
@@ -1020,6 +1050,195 @@ public final class SpaceManager implements AutoCloseable {
             log.info("Deleted space '{}' (files left on disk)", id.value());
         }
         return true;
+    }
+
+    // ── Space locations (SPACE-LOCATIONS-1): attach, detach, change data folder, create into folders ─────────
+
+    private void requireCrud() {
+        if (spacesRoot == null)
+            throw new IllegalStateException("This server hosts a single space; set -Dspaces.root to manage many");
+    }
+
+    /** Every hosted Space: id to {Space folder, data folder}. */
+    private Map<String, Path[]> hostedAreas() {
+        Map<String, Path[]> out = new LinkedHashMap<>();
+        spaces.forEach((id, ctx) -> out.put(id.value(), new Path[]{ctx.root().base(), ctx.root().dataRoot()}));
+        return out;
+    }
+
+    /** Whether {@code name} is hosted, or taken on disk by a folder or a {@code <id>.ref}. */
+    private boolean idTaken(String name) {
+        return SpaceId.isValid(name) && (spaces.containsKey(SpaceId.of(name)) || takenOnDisk(SpaceId.of(name)));
+    }
+
+    /**
+     * The checks {@code POST /spaces/_locations/check} reports for {@code path} ({@link SpaceLocations}); nothing is
+     * written. {@code id} names the Space a data folder is for (a hosted one: its stamp may already name it).
+     */
+    public List<SpaceLocations.Check> checkLocation(Path path, SpaceLocations.Use use, String id) {
+        requireCrud();
+        SpaceContext ctx = id == null || !SpaceId.isValid(id) ? null : spaces.get(SpaceId.of(id));
+        Path base = use == SpaceLocations.Use.DATA && ctx != null ? ctx.root().base() : null;
+        return SpaceLocations.checks(path, use, spacesRoot, hostedAreas(), id, base, this::idTaken);
+    }
+
+    private void requireLocation(Path path, SpaceLocations.Use use, String id, Path base) {
+        SpaceLocations.refuseFirst(SpaceLocations.checks(path, use, spacesRoot, hostedAreas(), id, base, this::idTaken));
+    }
+
+    /** D6: the chosen folders of a Space being created, checked before anything is made. */
+    private void requireFolders(SpaceId id, Path folder, Path dataRoot, Path base) {
+        if (folder != null) requireLocation(folder, SpaceLocations.Use.CREATE, id.value(), null);
+        if (dataRoot != null) requireLocation(dataRoot, SpaceLocations.Use.DATA, id.value(), base);
+    }
+
+    /** Write {@code <spaces root>/<id>.ref} naming {@code folder}: relative to the app root when it lies under it. */
+    private void writeRef(String id, Path folder) throws IOException {
+        com.gamma.util.AtomicFiles.write(spacesRoot.resolve(id + REF_SUFFIX),
+                (SpaceLocations.written(folder) + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8), ".ref-");
+    }
+
+    /** Whether {@code ctx} was booted through a {@code <id>.ref}: its folder is not {@code <spaces root>/<id>}. */
+    public boolean isReferenced(SpaceContext ctx) {
+        return spacesRoot != null && !ctx.root().base().equals(spacesRoot.resolve(ctx.id().value()));
+    }
+
+    /** Whether {@code ctx} keeps files in its data folder's {@code data/} or {@code audit/} (D5). */
+    public static boolean holdsData(SpaceContext ctx) {
+        try {
+            return SpaceDataRoot.holdsData(ctx.root().dataRoot());
+        } catch (IOException unreadable) {
+            return true;   // unknown counts as holding data: never moved on a guess
+        }
+    }
+
+    /**
+     * D3: attach the Space in {@code folder}, kept outside the Spaces root, live: write {@code <id>.ref} (the folder name
+     * is the id), then boot it as {@link #create} does, so it is booted again at every restart. The folder and the data
+     * folder its {@code space.toon} names are checked first ({@link SpaceLocations}). The Space keeps the admission its
+     * {@code space.toon} says.
+     *
+     * @throws SpaceLocations.Refused a check failed (403/409), or the Space did not boot (422: its reference is removed)
+     */
+    public SpaceContext attach(Path folder) throws IOException {
+        requireCrud();
+        synchronized (lifecycleLock) {
+            requireLocation(folder, SpaceLocations.Use.ATTACH, null, null);
+            Path base = folder.toAbsolutePath().normalize();
+            String id = base.getFileName().toString();
+            Path data = SpaceRoot.dataRootFor(base);
+            if (!data.equals(base)) requireLocation(data, SpaceLocations.Use.ATTACHED_DATA, id, base);
+            writeRef(id, base);
+            SpaceContext ctx;
+            try {
+                com.gamma.pipeline.exec.EgressAllowlist.migrate(base.resolve("config"));   // as discover does at boot
+                ctx = bootStarted(base, false);
+            } catch (IOException | RuntimeException e) {
+                Files.deleteIfExists(spacesRoot.resolve(id + REF_SUFFIX));
+                throw new SpaceLocations.Refused(422, "CONFIG_VALIDATION_FAILED", "the Space in " + base
+                        + " did not start: " + e.getMessage() + " - nothing was attached");
+            }
+            spaces.put(ctx.id(), ctx);
+            skipped.remove(id);
+            wire(ctx);
+            publishHosted();
+            log.info("Attached space '{}' from {}", id, base);
+            return ctx;
+        }
+    }
+
+    /**
+     * D4: stop a Space booted through a {@code <id>.ref} and delete the reference - the same teardown as
+     * {@link #delete delete(id, false)}. Its Space folder and data folder stay on disk and can be attached again.
+     *
+     * @return {@code false} when no such Space is hosted
+     * @throws IllegalStateException the Space lives inside the Spaces root (removed with {@code DELETE} instead)
+     */
+    public boolean detach(SpaceId id) throws IOException {
+        requireCrud();
+        synchronized (lifecycleLock) {
+            SpaceContext ctx = spaces.get(id);
+            if (ctx == null) return false;
+            Path ref = spacesRoot.resolve(id.value() + REF_SUFFIX);
+            if (!isReferenced(ctx) || !Files.isRegularFile(ref))
+                throw new IllegalStateException("Space '" + id.value() + "' lives inside the Spaces root, not in a Space "
+                        + "folder kept elsewhere - remove it with DELETE /spaces/" + id.value() + " instead");
+            delete(id, false);
+            Files.delete(ref);
+            log.info("Detached space '{}' - its folder {} and data folder {} stay on disk",
+                    id.value(), ctx.root().base(), ctx.root().dataRoot());
+            return true;
+        }
+    }
+
+    /**
+     * D5: point a Space that holds no data yet at {@code dataRoot} ({@code null}: back under its Space folder). The
+     * Space is stopped, {@code space.toon} gets {@code data_root:} (relative to the app root when under it), the stores
+     * every boot opens ({@code duckdb/}) move with it, and it is booted again, which claims and stamps the folder. On a
+     * failure the Space is put back as it was.
+     *
+     * @return the Space as booted, or {@code null} when no such Space is hosted
+     * @throws SpaceLocations.Refused {@code SPACE_HOLDS_DATA} (409), a check failed (403/409), or it did not start (422)
+     */
+    public SpaceContext changeDataRoot(SpaceId id, Path dataRoot) throws IOException {
+        requireCrud();
+        synchronized (lifecycleLock) {
+            SpaceContext ctx = spaces.get(id);
+            if (ctx == null) return null;
+            Path base = ctx.root().base();
+            Path before = ctx.root().dataRoot();
+            if (holdsData(ctx))
+                throw new SpaceLocations.Refused(409, SpaceLocations.HOLDS_DATA, "Space '" + id.value() + "' holds data in "
+                        + before + ", so its data folder cannot be changed here - move it by hand with the server stopped "
+                        + "(see the Space anatomy guide, Config tree vs data root) and set data_root in space.toon");
+            if (dataRoot != null) requireLocation(dataRoot, SpaceLocations.Use.DATA, id.value(), base);
+            SpaceContext.SpaceManifest old = ctx.manifest();
+            SpaceContext.SpaceManifest next = new SpaceContext.SpaceManifest(old.displayName(), old.description(),
+                    old.createdAt(), dataRoot == null ? "" : SpaceLocations.written(dataRoot), old.createdBy(), old.admission());
+            Path manifest = base.resolve("space.toon");
+            delete(id, false);   // stopped with the same teardown as DELETE without purge; nothing is removed from disk
+            Path after = null;
+            boolean staked = false;
+            try {
+                next.write(manifest);
+                SpaceRoot r = SpaceRoot.under(base);
+                after = r.dataRoot();
+                if (!after.equals(base) && !Files.exists(after.resolve(SpaceDataRoot.STAMP))) {
+                    SpaceDataRoot.stake(r, next);
+                    staked = true;
+                }
+                SpaceDataRoot.moveState(before, after);
+                SpaceContext booted = bootStarted(base, false);
+                if (!before.equals(base) && !before.equals(after)) Files.deleteIfExists(before.resolve(SpaceDataRoot.STAMP));
+                spaces.put(id, booted);
+                wire(booted);
+                publishHosted();
+                log.info("Space '{}' now keeps its data in {} (was {})", id.value(), after, before);
+                return booted;
+            } catch (IOException | RuntimeException e) {
+                putBack(id, old, manifest, before, after, staked, e);
+                throw new SpaceLocations.Refused(422, "CONFIG_VALIDATION_FAILED", "the data folder of Space '" + id.value()
+                        + "' could not be changed: " + e.getMessage() + " - the Space was put back as it was");
+            }
+        }
+    }
+
+    /** {@link #changeDataRoot}'s undo: the old {@code space.toon}, the stores moved back, the new stamp removed, booted. */
+    private void putBack(SpaceId id, SpaceContext.SpaceManifest old, Path manifest, Path before, Path after, boolean staked,
+                         Exception cause) {
+        try {
+            old.write(manifest);
+            if (after != null) SpaceDataRoot.moveState(after, before);
+            if (staked) Files.deleteIfExists(after.resolve(SpaceDataRoot.STAMP));
+            SpaceContext again = bootStarted(manifest.getParent(), false);
+            spaces.put(id, again);
+            wire(again);
+        } catch (IOException | RuntimeException undo) {
+            cause.addSuppressed(undo);
+            log.error("Space '{}' could not be put back after a failed data folder change: {}", id.value(), undo.toString());
+            skipped.put(id.value(), new SkippedSpace(id.value(), "SPACE_BOOT_FAILED", "the Space failed to load - see the boot log"));
+        }
+        publishHosted();
     }
 
     /** Recursively delete {@code dir} (deepest entries first). */
