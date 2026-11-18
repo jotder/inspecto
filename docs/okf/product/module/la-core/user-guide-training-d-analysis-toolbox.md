@@ -673,18 +673,18 @@ timestamp: 2026-11-16T00:00:00Z
   pack, in the Other Examples Space, reads risk data). S05 changes a My browser limit and S11 puts it back.
 
 ### S01 · What fits, and what does not
-- Voice: This is Inspecto LA training, episode D8: on screen against the whole Dataset. A screen can draw a thousand nodes. A Dataset can hold millions of records. Every tool in Inspecto LA has to be honest about which of the two it is looking at. In this episode you will see the two tabs of the toolbox, read the limits, follow a tool past the screen's limit to the server, and meet the link index. We start in the Basic edition, then move to Standard, in the Telecom Space.
+- Voice: This is Inspecto LA training, episode D8: on screen against the whole Dataset. A screen can draw a thousand nodes. A Dataset can hold millions of records. Every tool in Inspecto LA has to be honest about which of the two it is looking at. In this episode you will see the two tabs of the toolbox, read the limits, follow a tool past the screen's limit to the server, and meet the link index. We are in the Standard edition, in the Other Examples Space, which holds the telecom link Dataset.
 - Action: intro card.
 - Impact: none.
 
 ### S02 · One tab, then two
-- Voice: In the Basic edition the toolbox has one tab: On screen. Every tool there runs in your browser, over the graph you have drawn, and nothing else. In the Standard edition, two more tabs appear. Whole Dataset runs tools on the server, over the whole Dataset or over an open Investigation's Working Set, whatever its size. The Investigation tab is for recorded work, the F episodes. Same questions, two places to answer them.
+- Voice: In the Basic edition the toolbox has one tab: On screen. Every tool there runs in your browser, over the graph you have drawn, and nothing else. Here, in the Standard edition, two more tabs appear. Whole Dataset runs tools on the server, over the whole Dataset or over an open Investigation's Working Set, whatever its size. The Investigation tab is for recorded work, the F episodes. Same questions, two places to answer them.
 - Chip: Toolbox · On screen · Whole Dataset
 - Action: inset from `la-basic.zip`: the toolbox shows only On screen ▸ cut to Standard, signed in as Demo Analyst: the three tabs.
 - Impact: mark the one tab, then the three.
 
 ### S03 · Draw more than fits
-- Voice: Draw something large. From the File menu, choose Explore Dataset, pick the revenue-assurance link Dataset, its from and to columns, and run it. The server returns its share and says the result was cut short: never a silent partial answer. Open the Graph counts card, and the Limits icon at its corner. Graph drawn: up to a thousand nodes. On screen tools: up to two thousand five hundred. Whole Dataset tools: far more. Each is a setting, and the card says the one in force.
+- Voice: Draw something large. From the File menu, choose Explore Dataset, and pick the telecom link Dataset. The server returns its share and says the result was cut short: never a silent partial answer. The banner says the graph reached the node cap of a thousand, and to narrow the Dataset or add a filter. Graph drawn: up to a thousand nodes; the tools on the screen take up to two thousand five hundred, and the Whole Dataset tools far more. Each is a setting, and the pages that follow show the one in force.
 - Chip: File · Explore Dataset… · Limits
 - Action: File ▸ Explore Dataset… ▸ Dataset `telco_ra_links_dataset` ▸ From `src` ▸ To `dst` ▸ run ▸ wait for the draw ▸ Graph counts ▸ Limits. [check in UI: the run button's label in Graph model, the cut-short wording on the canvas, and the three lines' numbers]
 - Impact: mark the cut-short line, then the three Limits lines.
@@ -696,42 +696,42 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark each chip as the voice names it.
 
 ### S05 · Past the limit
-- Voice: To see what happens at the limit, lower it, for this browser only. In Settings, under Link Analysis, the My browser section holds your own limits, never above the Space's. Set the analysis node limit to five hundred, and save. Back on the canvas, the On screen tab now says this graph has a thousand nodes, too big to answer on screen, use the Whole Dataset tab. That sentence is the hand-off.
+- Voice: To see what happens at the limit, lower it, for this browser only. In Settings, under My settings, My browser holds your own limits, never above the Space's. Open Browser algorithms, set the Analysis node cap to five hundred, and keep it in this browser. Back on the canvas, draw the Dataset again, open a row, and the On screen tab now says this graph has a thousand nodes, too big to answer on screen, limit five hundred, use the Whole Dataset tab. That sentence is the hand-off.
 - Chip: Settings · My browser · Analysis node cap
 - Action: Settings ▸ Link Analysis ▸ My browser ▸ the analysis node limit `500` ▸ save ▸ back to Link Analysis ▸ hold on the On screen tab's line. [check in UI: the item's label (`analysis_node_cap`, *Analysis node cap* in the config spec) and the exact sentence]
 - Impact: mark the line *… too big to answer on screen …*.
 
 ### S06 · The hand-off, and a cut graph
-- Voice: Switch to the Whole Dataset tab. The tool that cannot run on screen is listed here with the same settings, and a Run on server button. Press it, and it waits with its reason: Whole Dataset tools run on an open Investigation. One more server tool needs no Investigation. On a graph that was cut short, a branching pattern offers Search whole Dataset, because the small links it needs may never have been drawn. Load layering network, and press it. The answer counts the matches in the whole Dataset, or says there are none.
+- Voice: Switch to the Whole Dataset tab. The tool that cannot run on screen is listed here with the same settings, and a Run on server button. With no Investigation open it waits, and says why: Whole Dataset tools run on an open Investigation. Open or start one first. A tool is never silently skipped; it tells you what it needs.
 - Chip: Run on server · Search whole Dataset
 - Action: Whole Dataset tab ▸ the handed-over row ▸ Run on server ▸ hold on the reason ▸ Pattern match ▸ *Layering network (split and merge)* ▸ hold on *This graph was cut short …* ▸ Search whole Dataset. [check in UI: which rows hand over at a limit of 500; the pattern's answer line, *… in the whole Dataset* or *No matches in the whole Dataset*]
 - Impact: mark the reason, then the answer line.
 
 ### S07 · Open an Investigation
-- Voice: From the File menu, Open, choose the Investigation SIM-swap wallet takeover. Now the Whole Dataset tab has something to run on: the Working Set. Under each question, the server's rows are listed with a size of their own: instant up to a hundred thousand nodes, for example. Above that, a run is not refused. It is queued as a job, and the row shows it running. A row with a twin on screen is chipped Also on screen.
+- Voice: From the File menu, Open, choose an Investigation: here, the mule hub with six feeder accounts. Now the Whole Dataset tab has something to run on: the Working Set. Under each question, the server's rows are listed with a size of their own: instant up to a hundred thousand nodes, for example. Above that, a run is not refused. It is queued as a job, and the row shows it running. A row with a twin on screen is chipped Also on screen.
 - Chip: File · Open… · Investigations
 - Action: File ▸ Open… ▸ Investigations ▸ *SIM-swap wallet takeover* ▸ Open ▸ the Whole Dataset tab ▸ zoom on a row's *Instant up to … nodes* and *Also on screen* chips.
 - Impact: mark the chips.
 
 ### S08 · A server answer, and the dock
-- Voice: Open Degree centrality: rank nodes by how many links they have. Press Run on server. The answer comes back summarised in words, with the ranked lines under it. Highlight on canvas shows them where they sit. A long answer gets Open in dock: press it, and the dock's Results tab holds the whole table, with the headline above it, ready to sort and export. That is where long answers go, so the toolbox stays readable.
+- Voice: Open Degree centrality: rank nodes by how many links they have. Press Run on server. The answer comes back summarised in words, with the ranked lines under it: here nine nodes were scored, and one hub leads with seven. Highlight on canvas shows them where they sit. A long answer gets Open in dock, and the dock's Results tab holds the whole table, ready to sort and export. That is where long answers go, so the toolbox stays readable.
 - Chip: Degree centrality · Run on server · Open in dock
 - Action: Who matters most? ▸ *Degree centrality* ▸ Run on server ▸ Highlight on canvas ▸ Open in dock ▸ the dock's Results tab. [check in UI: the headline, that S-41 ranks near the top, and that the answer is long enough to offer Open in dock]
 - Impact: before/after hold: the dock opens on Results; mark the headline and the table.
 
 ### S09 · Propagated risk
-- Voice: Under What looks unusual, open Propagated risk: who is close to the risky ones? It spreads risk from scored nodes to the nodes linked to them, a share at each hop: Weight per hop. Risk origins limits which nodes pass risk on. Risk scores are read from the Industry pack's own data with Use risk scores. Here it is off, and says why: no risk data for this Industry pack. A tool that cannot run says so, once, in words.
+- Voice: Under What looks unusual, Propagated risk asks who is close to the risky ones. It spreads risk from scored nodes to the nodes linked to them, a share at each hop: Weight per hop. Risk origins limits which nodes pass risk on. Risk scores are read from the Industry pack's own data. Where there is no such data, the tool says so, once, in words.
 - Chip: Propagated risk · Weight per hop · Risk origins
 - Action: What looks unusual? ▸ *Propagated risk* ▸ point at Risk scores (*Use risk scores*, disabled), Risk origins, Weight per hop, Direction ▸ hold on *No risk data for this Industry pack.*.
 - Impact: mark the reason.
 
 ### S10 · The link index
-- Voice: Last, the link index. Searching a whole Dataset row by row gets slow as it grows. The link index is a ready-made map of who links to whom, built ahead of time, so search and filter stay fast on millions of records. Open Link index. It says whether serving is on for this Space. Build mode: Full rebuilds from the whole Dataset, Append adds the files that arrived since, Compact merges them. Every server read then says where it was answered: from the link index, or from the Dataset, and why.
+- Voice: Last, the link index. Searching a whole Dataset row by row gets slow as it grows. The link index is a ready-made map of who links to whom, built ahead of time, so search and filter stay fast on millions of records. Open Link index on the Whole Dataset tab: it says whether serving is on for this Space, and offers a build mode: Full rebuilds from the whole Dataset, Append adds the files that arrived since, Compact merges them. Builds are refused on a packaged install, so we only read the form. Every server read then says where it was answered: from the link index, or from the Dataset, and why.
 - Chip: Link index · Full · Append · Compact
 - Action: How are they connected? ▸ *Link index* ▸ hold on the serving line ▸ Build mode: Full ▸ Append ▸ Compact ▸ Build link index ▸ hold on the build's state. [check in UI: blocked on packaged installs (plan §6.4): record this scene after the packager fix; until then stop before Build link index]
 - Impact: mark the serving line, then each mode as the voice names it.
 
 ### S11 · Try it
-- Voice: The screen for what you can see, the server for everything else, and every limit said out loud. Before you go, set the My browser limit back with Reset to Space value. Your turn. In the SIM-swap Investigation, run the Whole Dataset row Connected components. How many parts does the Working Set fall into, and is the login S-41 in the largest? The answer is in the description. Next, in E1, keeping your work: saving, opening and exporting.
+- Voice: The screen for what you can see, the server for everything else, and every limit said out loud. Before you go, set the My browser limit back to the Space value; it only ever applied to this browser. Your turn. Open an Investigation, run the Whole Dataset row Connected components, and read how many parts the Working Set falls into. The answer is in the description. Next, in E1, keeping your work: saving, opening and exporting.
 - Action: Settings ▸ Link Analysis ▸ My browser ▸ Reset to Space value ▸ outro card: *Try it* and *Next: E1 · Saving, opening and exporting*. [check in UI: the *Reset to Space value* label]
 - Impact: none.

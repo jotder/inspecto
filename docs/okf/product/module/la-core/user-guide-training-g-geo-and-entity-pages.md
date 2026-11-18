@@ -63,13 +63,13 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark each field as the voice names it.
 
 ### S04 · Reading the points
-- Voice: Narrow it by kind. Filter point types: untick everything but the rural branches. Now click one point. Its details give the coordinates and what is nearby. Search points finds an account by name, Find place flies to a city, and Fit to data brings everything back into view. The Data button opens the table under the map: one row per point, and clicking a row finds it on the map.
+- Voice: Narrow it by kind. Filter point types lists the kinds in this Dataset: atm, metro branch, offshore, online, rural branch and till. Tick only the rural branches, and the map keeps just those. Click a point and its details give the coordinates and what is nearby. Search points finds an account by name, Find place flies to a city, and Fit to data brings everything back into view. The Data button opens the table under the map: one row per point, and clicking a row finds it on the map.
 - Chip: Filter point types · Search points · Fit to data · Data
 - Action: Filter point types ▸ keep the rural branch kind ▸ click a point ▸ close ▸ Search points ▸ type an account ▸ Find place `Paris` ▸ Fit to data ▸ Data ▸ click a row. [check in UI: the site-type values in the filter]
 - Impact: before/after hold: only the rural branches remain; mark the point's details, then the row it found.
 
 ### S05 · Density and the view
-- Voice: Hundreds of points on top of each other are hard to read. Press Heatmap: the map shows density instead of dots, so the busiest places glow. Press it again for markers. Now zoom to the Low Countries and press Filter to view: only the points inside the screen are kept, in the map and in the table. Clear search and filters undoes every narrowing at once.
+- Voice: Hundreds of points on top of each other are hard to read. Press Heatmap: the map shows density instead of dots, so the busiest places glow. Press it again for markers. Now zoom in to the area you care about and press Filter to view: only the points inside the screen are kept, in the map and in the table. Clear search and filters undoes every narrowing at once.
 - Chip: Heatmap · Filter to view · Clear search & filters
 - Action: Heatmap ▸ hold ▸ Heatmap ▸ zoom to the Netherlands and Belgium ▸ Filter to view ▸ hold ▸ Clear search & filters.
 - Impact: before/after hold: markers → heatmap; then the region filter; mark the table's shorter count.
@@ -99,7 +99,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the converging star.
 
 ### S10 · Save, share and export
-- Voice: A map worth keeping is saved. Press Save view, give it a name and a description, and save. It joins the list under Saved views, for everyone in this Space who can read the Dataset. Import or export saved views moves them between Spaces as a file. And Export gives you the map itself: a PNG image for a report, or GeoJSON, the points and routes as data, for another tool.
+- Voice: A map worth keeping is saved. Press Save view, give it a name and a description, and save. It joins the list under Saved views, for everyone in this Space who can read the Dataset. We leave this dialog unsent here, so the Space's three maps stay as they are. Import or export saved views moves them between Spaces as a file. And Export gives you the map itself: a PNG image for a report, or GeoJSON, the points and routes as data, for another tool.
 - Chip: Save view · Export · PNG image · GeoJSON
 - Action: Save view ▸ Name `ring_iberia` ▸ Description ▸ Save view ▸ Saved views (the new entry) ▸ point at Import / export saved views ▸ Export ▸ PNG image. [check in UI: who else sees a saved Geo view]
 - Impact: mark the new saved view; then the export menu.
@@ -140,7 +140,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: none.
 
 ### S02 · A junction at night
-- Voice: Open Geo, and load the saved map of the staged accident junction. It shows accidents between two and four in the morning with no police report. There are only fourteen, and eleven of them sit on top of each other, at one junction on the edge of Derby. The other three are in Exeter. Nine of the eleven are the claims of the ring from C1. Zoom in on the stack.
+- Voice: Open Geo, and start from the Dataset of unreported night accidents: accidents between two and four in the morning with no police report. The Space ships no saved map for it, so pick the Dataset, its latitude and longitude columns, and press Run. There are only fourteen, and eleven of them sit on top of each other, at one junction on the edge of Derby. The other three are in Exeter. Nine of the eleven are the claims of the ring from C1.
 - Chip: Saved views · Load view
 - Action: Geo ▸ Saved views ▸ *staged_accident_junction_map* ▸ Load view ▸ zoom on Derby. [check in UI: 14 points, 11 at the junction; the voice drops the numbers if the map differs]
 - Impact: mark the stack of eleven, then the three in Exeter.
@@ -158,7 +158,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the points appearing night by night; then the slider range.
 
 ### S05 · Frequent locations
-- Voice: The first question: where does one thing keep turning up? Choose Frequent locations, a radius of four hundred metres, and press Analyze. For each entity, here each city, it groups the sightings within the radius and lists the places seen more than once, busiest first. Derby comes first: one spot, again and again. Click it, and the map selects those points. For a phone or a vehicle, this is where it sleeps, works, or meets.
+- Voice: The first question: where does one thing keep turning up? Choose Frequent locations, a radius of four hundred metres, and press Analyze. For each entity, here each city, it groups the sightings within the radius and lists the places seen more than once, busiest first. Derby comes first, nine sightings at one spot, and a second Derby spot with two. For a phone or a vehicle, this is where it sleeps, works, or meets.
 - Chip: Frequent locations · Radius (m) · Analyze
 - Action: Frequent locations ▸ Radius (m) `400` ▸ Analyze ▸ click the Derby row. [check in UI: the row *Derby · N sightings at 52.95…, -1.52…*; the voice may name N]
 - Impact: mark the Derby row and the selected stack.
@@ -170,13 +170,13 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the empty answer.
 
 ### S07 · Co-location
-- Voice: The third question: who was in the same place at the same time? Co-location pairs two different entities seen within the radius and within a window of minutes. With a one hour window, Analyze finds nothing: these accidents happened on different nights. Widen the window to two weeks, twenty thousand one hundred and sixty minutes, and Analyze again. One pair appears: two accidents at the junction, eight days apart, in March. The question has changed to accidents at the same spot within a fortnight, and you set it on purpose. With phones or vehicles you would keep the window short, minutes, because together means at the same moment.
+- Voice: The third question: who was in the same place at the same time? Co-location pairs two different entities seen within the radius and within a window of minutes. With a one hour window, Analyze finds nothing: the answer says no co-locations in the current radius and window, because these accidents happened on different nights. Widen the window to weeks and the question changes: accidents at the same spot within a fortnight, which you would set on purpose. With phones or vehicles you would keep the window short, minutes, because together means at the same moment.
 - Chip: Co-location · Window (min)
 - Action: Co-location ▸ Radius (m) `400` ▸ Window (min) `60` ▸ Analyze ▸ hold ▸ Window (min) `20160` ▸ Analyze. [check in UI: *No co-locations in the current radius/window.*; then one pair *ACC-0011 ↔ ACC-0005 · met 1×, first …*]
 - Impact: mark the empty answer, then the pair.
 
 ### S08 · From the map to a graph
-- Voice: Pairs are links, so they can be drawn as a graph. Press View as graph. Who met whom: the entities linked when they were co-located, drawn by the same renderer as Link Analysis. With phones or vehicles, this is where a convoy, a meeting, or a gang that travels together shows up as a group. Close it to return to the map.
+- Voice: Pairs are links, so they can be drawn as a graph. When Co-location finds pairs, a View as graph button appears, and Who met whom draws the entities linked when they were co-located, with the same renderer as Link Analysis. With phones or vehicles, this is where a convoy, a meeting, or a gang that travels together shows up as a group. On this map there are no pairs at one hour, so the button does not appear.
 - Chip: View as graph · Who met whom
 - Action: View as graph ▸ hold on the dialog ▸ Close.
 - Impact: mark the dialog's graph.
@@ -217,30 +217,30 @@ timestamp: 2026-11-16T00:00:00Z
   and says so; this Space masks nothing.
 
 ### S01 · One entity, all of it
-- Voice: This is Inspecto LA training, episode G3: Entity profiles. A graph shows an entity among others. Sometimes you want the opposite: one entity, and everything the data says about it, across every Dataset, without drawing anything. That is its profile. In this episode you will open one, read it section by section, compare it with a look-alike, and start an Investigation from it. We are in the Standard edition, in the Banking and finance Space, on the compromised fuel station of F8.
+- Voice: This is Inspecto LA training, episode G3: Entity profiles. A graph shows an entity among others. Sometimes you want the opposite: one entity, and everything the data says about it, across every Dataset, without drawing anything. That is its profile. In this episode you will open one, read it section by section, compare it with a busier look-alike, and start an Investigation from it. We are in the Standard edition, in the Banking and finance Space, on the fuel station M-317.
 - Action: intro card.
 - Impact: none.
 
 ### S02 · Two ways in
-- Voice: In the rail, open Entities. The Entity Types tab lists the kinds of thing in your data. Open Card entity, the type the card story is drawn as. Its page has a box: Open an Entity. Type M-317, the fuel station, and press Open. The other way in is from the graph: in any node's details, Open the Entity page takes you to the same place.
+- Voice: In the rail, open Entities. The Entity Types tab lists the kinds of thing in your data. Open Merchant, the type that holds the stations and shops. Its page has a box: Open an Entity. Type M-317, the fuel station, and press Open. The other way in is from the graph: in any node's details, Open the Entity page takes you to the same place.
 - Chip: Entities · Open an Entity
 - Action: rail ▸ Entities ▸ Entity Types ▸ *Card entity* ▸ Open an Entity `M-317` ▸ Open. [check in UI: the type's label and that M-317 is found under it]
 - Impact: mark the Open an Entity box; then the profile's header.
 
 ### S03 · Seen
-- Voice: The header names the entity, with a link back to its type, and one button, Investigate. The first section is Seen: the first and last day it appears in the data, how many days it was active, and a calendar of rows per day. A fuel station is busy every day of the year, so the calendar alone does not raise a flag. That is exactly why the rest of the profile matters.
+- Voice: The header names the entity, with a link back to its type, and one button, Investigate. The first section is Seen: the first and last day it appears in the data, how many days it was active, and a calendar of rows per day. This station was active on two hundred and twenty-one days of the year, and the calendar shows its quiet stretches. That alone raises no flag, and the rest of the profile matters.
 - Chip: Seen · Rows per day
 - Action: hold on the header ▸ the Seen section: First seen, Last seen, Active days ▸ zoom on Rows per day.
 - Impact: mark the four tiles; then the calendar.
 
 ### S04 · Where, and Measures
-- Voice: Where lists the Datasets that name this entity, and how many rows each. Measures shows the figures those Datasets carry for it, such as the money that passed through it. When a profile is opened from a link with a time window, a line at the top says it is scoped to that window, and Show the whole history removes it.
+- Voice: Where lists the Datasets that name this entity, the column, and how many rows each: here the card authorisations, four hundred and fifty-one rows, and the merchant record itself. A profile opened from a link with a time window carries a line at the top saying it is scoped to that window, and Show the whole history removes it.
 - Chip: Where · Measures
 - Action: open Where ▸ open Measures. [check in UI: which Datasets and Measures M-317 shows]
 - Impact: mark the Where table and the Measures table.
 
 ### S05 · Links, against its peers
-- Voice: Links gives its degree: how many distinct entities it links to. Beside it, Among its type says where that number sits among all entities of the same type. A big number means little until you know whether every fuel station has it. Link kinds breaks the links down by kind. Here is the one that matters: cards that paid at this station and were defrauded weeks later.
+- Voice: Links gives its degree: how many distinct entities it links to, a hundred and twenty here. Beside it, Among its type says where that number sits among all merchants: the ninety-eighth percentile. A big number means little until you know whether every merchant has it. Link kinds breaks the links down by kind: here, only approved authorisations.
 - Chip: Links · Degree · Among its type · Link kinds
 - Action: open Links ▸ zoom on Degree and Among its type ▸ the Links by kind bars. [check in UI: the link kind `visited_before_fraud` and its label in the bars]
 - Impact: mark Among its type; then the fraud link kind's bar.
@@ -252,7 +252,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the section, then the profile it led to.
 
 ### S07 · Lists, Cases and risk
-- Voice: Lists and groups gathers what people and rules have already said about it. Its identity group: here, in no group, it resolves to itself. The Entity Lists it is on. And Case history: every Incident and Case that names it. There it is: Compromised terminal at M-317, opened when the analyst found this station. Anyone who opens this profile now sees that it has been looked at, and by which Case.
+- Voice: Lists and groups gathers what people and rules have already said about it. Its identity group: here, in no group, it resolves to itself. Risk says there is no risk data for this Industry pack. Enrichment lists the Entity Lists it is on: none for this type. And Case history, when you open it, lists every Incident and Case that names the entity. Anyone who opens a profile sees at once whether it has been looked at.
 - Chip: Lists and groups · Case history
 - Action: open Lists and groups ▸ hold on Identity group ▸ Case history ▸ Show: all. [check in UI: *in no group (resolves to itself)* and the Case title]
 - Impact: mark the identity line, then the Case row.
@@ -264,13 +264,13 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the data-as-of line and its badge.
 
 ### S09 · Busy is not suspicious
-- Voice: Now compare. Open the supermarket M-052. About nine hundred cards paid there, far more than at the fuel station, and Among its type puts it near the top. But no link kind says fraud followed, it is on no list, and its Case history is empty. The profile tells a busy entity from a suspicious one at a glance, which is the question every alert really asks.
+- Voice: Now compare. Open the supermarket M-052. It has more than five thousand authorisation rows, a degree of nine hundred and twenty-eight, and Among its type puts it at the very top. Its Link kinds include declined as well as approved. But it is on no list, and its Case history is empty. A big number is not a verdict: the profile tells a busy entity from a suspicious one, which is the question every alert really asks.
 - Chip: Open an Entity · M-052
 - Action: Card entity ▸ Open an Entity `M-052` ▸ Open ▸ Links ▸ Lists and groups ▸ Case history. [check in UI: M-052's degree is far above M-317's; no Case]
 - Impact: before/after hold: the two Links sections side by side (video split); mark the empty Case history.
 
 ### S10 · Investigate from a profile
-- Voice: Back on M-317, press Investigate. Link Analysis opens with a card: Investigate M-317. It will create an Investigation over the card Dataset, start from the station, and expand one degree. It asks for a name and a purpose: why you are investigating, which the Dossier shows. Here an Investigation already exists, so press Cancel; in your own work, this is how a profile becomes a case.
+- Voice: Back on a profile, press Investigate. Link Analysis opens with a card: it will create an Investigation over the card Dataset, start from the entity, and expand one degree. It asks for a name and a purpose: why you are investigating, which the Dossier shows. Here we only look, so press Cancel; in your own work, this is how a profile becomes a case.
 - Chip: Investigate
 - Action: Back ▸ M-317 ▸ Investigate ▸ hold on the card (Name, Purpose) ▸ Cancel. [check in UI: the card's sentence *Creates an Investigation over card_links_dataset …*]
 - Impact: mark the card's sentence and the Purpose field.

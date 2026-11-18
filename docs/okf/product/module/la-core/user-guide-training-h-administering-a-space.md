@@ -59,7 +59,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the three group titles.
 
 ### S03 · My browser
-- Voice: Start with My browser. These are your own limits, for this browser only: how many nodes the canvas draws, how many labels, which layouts run on how large a graph. Blank means the Space's value. You can set a lower one, say on a slow laptop, but never a higher one. Reset to Space value clears yours. Nobody else sees them, and the server never relies on them.
+- Voice: Start with My browser. These are your own limits, for this browser only: how many nodes the canvas draws, which browser algorithms run on how large a graph, how labels are shown. Each field shows the Space value, and blank means the Space value. You can set a lower one, say on a slow laptop, but never a higher one, and Keep in this browser saves it. Reset to Space value clears yours. Nobody else sees them, and the server never relies on them. We leave them as they are.
 - Chip: My settings · My browser · Reset to Space value
 - Action: My browser ▸ open one group ▸ type a lower value in one field ▸ Save ▸ Reset to Space value. [check in UI: the Save button's label in this section]
 - Impact: mark *Space value* in the placeholder; then the reset.
@@ -77,7 +77,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the store line; then the pack in force, Telecom.
 
 ### S06 · Every limit is a setting
-- Voice: Analysis limits holds this Space's caps and budgets, the ones the server enforces. Each says its default, its range, and the value in force. The busy limit is here as Hub threshold. The four-eyes limit is here, two thousand in this Space. So are expand budgets, path depth, Draft limits, and how long a shared link may live. A value outside its range is refused, with the range. Blank means the shipped default.
+- Voice: Analysis limits holds this Space's caps and budgets, the ones the server enforces, in groups: Canvas, Browser algorithms, Display, Investigation, Connect, Traversal, and more. Each field says its default and the value in force. The busy limit and the four-eyes limit live here, among the Investigation limits, as do expand budgets, path depth and Draft limits. A value outside its range is refused, with the range. Blank means the shipped default. We change nothing on camera.
 - Chip: Analysis limits · Hub threshold
 - Action: Analysis limits ▸ open the group holding Hub threshold ▸ zoom on one field (default, range, In force) ▸ type a value above its range ▸ Save Analysis limits ▸ hold on the refusal ▸ clear the field. [check in UI: the labels *Hub threshold* and *Four eyes fan out above*, and the refusal's wording]
 - Impact: mark the field's *In force* line; then the refusal naming the range.
@@ -89,7 +89,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the toggle and its sentence.
 
 ### S08 · Who can do what
-- Voice: Access shows what each role may do in this Space. Each role is a card with its permissions in plain words: see unmasked ids, approve large expansions, run server algorithms, create and edit Investigations, author Alert Rules, set up Datasets and saved views. Who holds a role is set in the identity provider, not here. Built-in roles come with the product; authored ones are this Space's own, and New role adds one. The analyst here may work and share; the manager may approve; the reviewer and the outsider may only read.
+- Voice: Access shows what each role may do in this Space. Each role is a card with its permissions in plain words: set up Datasets, author Alert Rules, build the link index, create and edit Investigations, run server algorithms, upload data, acknowledge and resolve Alerts. Who holds a role is set in the identity provider, not here. Built-in roles come with the product; authored ones are this Space's own, and New role adds one. Show all capabilities lists every capability a role holds or lacks.
 - Chip: This Space · Access
 - Action: Access ▸ scroll the role cards (la-analyst, la-manager, la-viewer, la-settings, admin) ▸ Show all capabilities ▸ point at New role. [check in UI: the role cards' capability chips match `roles.toon`]
 - Impact: mark the capability chips on la-analyst and la-manager.
@@ -253,25 +253,25 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the greyed item and its tooltip.
 
 ### S04 · Result cut short
-- Voice: Open File, Explore Dataset, and draw the whole link Dataset of the dealer story. A yellow banner says Result cut short: some nodes are not shown, because the graph reached the node cap. It names the cap, and the next step: narrow the Dataset or add a filter. The Graph counts card has a Limits button that lists the caps in force. A cut graph is not wrong, but it is incomplete, and any count you read from it is a floor.
+- Voice: Open File, Explore Dataset, and draw the whole telecom link Dataset. A yellow banner says Result cut short: some nodes are not shown, because the graph reached the node cap, a thousand. It names the cap, and the next step: narrow the Dataset or add a filter. The Graph counts card has a Limits button that lists the caps in force. A cut graph is not wrong, but it is incomplete, and any count you read from it is a floor.
 - Chip: Result cut short · Limits
 - Action: File ▸ Explore Dataset… ▸ `telco_ra_screen_links_dataset` ▸ draw the whole Dataset ▸ hold on the banner ▸ Graph counts ▸ Limits. [check in UI: which start reaches the cap in this Space, and the banner's sentence *Some nodes are not shown: the graph reached the node cap (N). Narrow the Dataset or add a filter.*]
 - Impact: mark the banner and the Limits list.
 
 ### S05 · Layered, greyed; a pattern that finds nothing
-- Voice: On that wide graph, open Layout. Layered is greyed: one row of it would be too wide to read, and the tooltip says how many nodes against the maximum. Choose Force instead. And beware the quiet no: a pattern run on a cut graph can find nothing, because the matching links were never drawn. When a tool finds nothing on a big graph, switch the toolbox to Whole Dataset, where it runs on the server over everything.
+- Voice: On that wide graph, open Layout. Layered is greyed, and so are several others, with their reasons in the tooltip: they need a smaller graph, and the menu offers to reduce the graph to use more layouts. Force and Grid stay available. And beware the quiet no: a pattern run on a cut graph can find nothing, because the matching links were never drawn. When a tool finds nothing on a big graph, switch the toolbox to Whole Dataset, where it runs on the server over everything.
 - Chip: Layout · Layered · Whole Dataset
 - Action: Layout ▸ hover Layered ▸ Force ▸ toolbox ▸ Whole Dataset tab. [check in UI: Layered's reason *too wide (N nodes in one row, max 60)* or its node-cap reason on this graph]
 - Impact: mark Layered's reason; then the Whole Dataset tab.
 
 ### S06 · Masked ids
-- Voice: In a Space that masks personal data, ids read masked, then a code. It is not a fault. The same code always stands for the same entity, so you can still work. To see a real value you need the right to see unmasked ids, and a saved Investigation to record the reveal against, with your reason. Episode F7 shows it end to end.
+- Voice: This Space masks its subscriber numbers, so the line under the canvas says a thousand entities masked, beside a Reveal button. Masked ids read masked, then a code. It is not a fault. The same code always stands for the same entity, so you can still work. To see a real value you need the right to see unmasked ids, and a saved Investigation to record the reveal against, with your reason. Episode F7 shows it end to end.
 - Chip: masked:…
 - Action: cut-in from F7 (Mobile Money): the masked canvas and *N entities masked · Reveal…*.
 - Impact: mark two aliases.
 
 ### S07 · Waiting for approval
-- Voice: Back in Telecom, open the Investigation SIM-swap wallet takeover. One line in the Expand section says waiting for approval. Nothing is broken: that expand is above the Space's four-eyes limit, so it runs only when a second person approves it. Ask an approver, or take a smaller step under the limit. Episode F5 is the approver's side.
+- Voice: In the Utilities Space, open the Investigation Meter tampering after one contractor's visits. One line in the Expand section says waiting for approval. Nothing is broken: that expand is above the Space's four-eyes limit, so it runs only when a second person approves it. Ask an approver, or take a smaller step under the limit. Episode F5 is the approver's side.
 - Chip: waiting for approval
 - Action: File ▸ Open… ▸ *SIM-swap wallet takeover* ▸ Investigation tab ▸ Expand ▸ zoom on the held line.
 - Impact: mark *waiting for approval*.

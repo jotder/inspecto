@@ -575,7 +575,7 @@ async function main() {
     },
     async hoverNth(text, nth) { const p = await h.locate(h.textEl(text, nth)); await h.moveTo(p.x, p.y, 900); },
     async setSpace(space) { await send('Page.navigate', { url: `${base}/` }); await sleep(1500); await ev(`localStorage.setItem('inspecto.currentSpace', ${JSON.stringify(space)})`); },
-    async goto(path) { await send('Page.navigate', { url: `${base}${path}` }); await sleep(1800); },
+    async goto(path) { await send('Page.navigate', { url: /^https?:/.test(path) ? path : `${base}${path}` }); await sleep(1800); },
     async clickButton(label) { const p = await h.locate(`[...document.querySelectorAll('button')].find(b => b.offsetParent && b.innerText.trim() === ${JSON.stringify(label)})`); await h.click(p.x, p.y); },
     async clickSel(sel) { const p = await h.locate(`document.querySelector(${JSON.stringify(sel)})`); await h.click(p.x, p.y); },
     mark(label) { marks[label] = +((Date.now() - startedAt) / 1000).toFixed(2); },
