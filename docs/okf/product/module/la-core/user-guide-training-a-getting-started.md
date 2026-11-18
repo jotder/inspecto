@@ -302,23 +302,22 @@ timestamp: 2026-11-16T00:00:00Z
 ## A4_Entities-and-Entity-Types
 
 > **A4 · Entities and Entity Types** · Standard (plan: Basic) · Banking and finance Space · the card compromise, and
-> phones nobody joined · 6 min · user guide §3.3, §4.1
+> a column nobody typed · 6 min · user guide §3.3, §4.1
 
 - **Objectives:** say what an Entity Type is and why two columns join only on the same one; read the Entity Types your
   data holds; set what a column holds and add an Entity Type; open one entity's profile.
 - **Before:** a fresh unzip of `la-standard.zip`, the Banking and finance Space, signed in as **Demo Admin** (Workbench
-  author: adding a type and setting what a column holds need it). Copy one `phone` value from the online accounts file
-  before recording.
+  author: adding a type needs it). The shipped Banking data has no phone column, so the episode adds a demonstration
+  type *Phone number* and leaves every column as it is; delete that type after recording (Settings ▸ Entity Types).
 - **Covers (plan §5):** 5.5 Entities page (Entity Types tab: cards, Primary in, approx., freshness badge, Not in your
   data; Columns tab: Holds, Not set, Show every column, primary Entity Type), New Entity Type (Name, Example value,
   Compare values as, Add Entity Type), Entity Type Profile, Open an Entity, Entity Profile; 5.4 ⚙ Settings ▸ Entity
   Types (list, New Entity Type, Delete and its refusal).
-- **Try it:** on the Columns tab, find the `email` columns of the online accounts and the cardholders; make an Entity
-  Type for them and set both. Which *Compare values as* fits an e-mail address, and why? *Answer: Case ignored: two
-  spellings of one address differ only by letter case or stray spaces.*
-- **Check:** why does setting both `phone` columns to Phone number change the graph? *Answer: columns join only when they
-  hold the same Entity Type; now the same number in both files is one entity, so the account and the cardholder link
-  through it.*
+- **Try it:** on the Columns tab, find a column that is Not set, and decide what it holds. Which *Compare values as*
+  would fit an e-mail address, and why? *Answer: Case ignored: two spellings of one address differ only by letter case
+  or stray spaces.*
+- **Check:** why would two phone columns holding Phone number change the graph? *Answer: columns join only when they
+  hold the same Entity Type; then the same number in both files is one entity, so the rows link through it.*
 - **Gotchas:** **edition changed to Standard.** On Basic the Entities area is not in the left menu and the two profile
   pages answer 503 (`entityPages` is Standard and up); the Entities page itself is reached on Basic only through the
   Space guide's *What the columns hold* step, which a shipped Space has already ticked. The voice says this once (S03).
@@ -331,60 +330,60 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: none.
 
 ### S02 · Entity Types, card by card
-- Voice: An Entity Type is the kind of thing a column holds: a payment card, a merchant, a device. Every value in such a column is an Entity of that type. Open Entities in the left menu. The Entity Types tab has one card per type that some column of this Space's data holds, with how many distinct entities, in how many Datasets, and the date its data runs to. A Dataset's primary type is chipped Primary in, with the Dataset's name. A count that is estimated says approx.
+- Voice: An Entity Type is the kind of thing a column holds: a payment card, a merchant, a device. Every value in such a column is an Entity of that type. Open Entities in the left menu. The Entity Types tab has one card per type this Space knows: Bank customer, Company, Payment card, Merchant, Online account and more. A card says in how many Datasets the type appears, and a Dataset's primary type is chipped Primary in, with the Dataset's name. The count of distinct entities waits until you open the type: until then the card reads Not assessed.
 - Chip: Entities · Entity Types
 - Action: left menu ▸ Entities ▸ Entity Types tab ▸ hover the Merchant card's freshness badge ▸ zoom on a *Primary in …* chip.
 - Impact: mark Distinct, Datasets and Data as of on one card; mark the chip.
 
 ### S03 · Not in your data, and Basic
-- Voice: Types that are defined but held by no column wait at the bottom, folded under Not in your data. One note on editions: in Basic, this page has no place in the left menu, and the profiles you will open in a moment are Standard. The Columns tab, next, is still where the Space guide's What the columns hold step lands, in every edition.
+- Voice: One note on editions: in Basic, this page has no place in the left menu, and the profiles you will open in a moment are Standard. The Columns tab, next, is still where the Space guide's What the columns hold step lands, in every edition.
 - Chip: Not in your data
 - Action: scroll to *Not in your data (n)* ▸ open it ▸ close it.
 - Impact: mark the folded panel.
 
 ### S04 · Columns: who holds what
-- Voice: Open the Columns tab. It answers the question the other way round: for each Dataset, each column that looks like an identifier, and what it holds. In the online accounts Dataset, account_id holds Online account and card_id holds Payment card, but phone says Not set. In the cardholders Dataset, phone is Not set too. So a cardholder and an online account with the same phone number never meet on a graph: nothing says the two columns hold the same kind of thing.
+- Voice: Open the Columns tab. It answers the question the other way round: for each Dataset, each column that looks like an identifier, and what it holds. In the payments Dataset, from_customer holds Bank customer and to_company holds Company, so a payment links a customer to a company. But payment_id says Not set: nothing says what kind of thing it is, so it joins nothing. In the online accounts Dataset, account_id holds Online account, card_id holds Payment card and device_id holds Device. Two columns join up only when they hold the same type.
 - Chip: Columns · Holds
 - Action: Columns tab ▸ scroll to `online_account_dataset` ▸ hold on its rows ▸ scroll to `cardholder_dataset`. [check in UI: `phone` is listed as an identifier-like column with *Not set*; if not, tick *Show every column* first and say so]
 - Impact: mark the two *Not set* values.
 
 ### S05 · New Entity Type
-- Voice: There is no phone type in this Space yet, so make one. Press New Entity Type. Name: Phone number. Example value: paste one phone from the data. Compare values as says when two spellings count as one value: Upper case, spaces trimmed; Digits only; Phone number; or Case ignored. Choose Digits only, and the line under the example shows how the value will be kept, every space and dash dropped. Press Add Entity Type. A name the Space already has is refused before anything is written.
+- Voice: Say your data had a phone number column, and no type for it yet. Press New Entity Type. Name: Phone number. Example value: type one phone, plus 44 7700 900123. Compare values as says when two spellings count as one value: Upper case, spaces trimmed; Digits only; Phone number; or Case ignored. Choose Digits only, and the line under the example shows how the value will be kept, every space and dash dropped. Press Add Entity Type. A name the Space already has is refused before anything is written.
 - Chip: New Entity Type · Compare values as
 - Action: New Entity Type ▸ Name *Phone number* ▸ Example value: paste the copied phone ▸ Compare values as ▸ hover the four choices' hints ▸ Digits only ▸ hold on *Kept as …* ▸ Add Entity Type. [check in UI: the *Kept as* line for the pasted value]
 - Impact: mark the *Kept as* line; then the new type in the page's result line.
 
 ### S06 · Say what a column holds
-- Voice: Back in Columns, set phone in the online accounts Dataset to hold Phone number. The page says in one line what changed. Do the same for phone in the cardholders Dataset. Now both columns hold one Entity Type, so the same number in both files is one entity, and a graph links the account and the cardholder through it. Show every column lists the columns that do not look like identifiers, and the picker beside each Dataset's name sets its primary Entity Type: the type its graph leads with.
+- Voice: Back in Columns, each column has a Holds picker. Open it on payment_id: it lists every Entity Type of the Space, and choosing one would say what that column holds, with one line telling you what changed. We leave it alone here, because a payment's own number is not something to join on. In your own data you would pick Phone number for every phone column, and the same number in two files would then be one entity. The picker beside each Dataset's name sets its primary Entity Type: the type its graph leads with.
 - Chip: Holds · Show every column · Primary Entity Type
 - Action: `online_account_dataset` ▸ phone ▸ Holds: Phone number ▸ hold on the result line (*"phone" in online_account_dataset now holds Phone number.*) ▸ same for `cardholder_dataset` ▸ tick Show every column ▸ untick ▸ hover a primary picker. [check in UI: the result line's exact wording]
 - Impact: before/after hold: *Not set* → *Phone number*, twice; mark the result line.
 
 ### S07 · The Entity Type Profile
-- Voice: On Entity Types, a Phone number card has appeared. Open the Merchant card instead: its Entity Type Profile gathers what every Dataset says about merchants. Identity, with how values are compared and whether the type is masked. Where it appears, its lineage, volume and quality, the shapes its values take, time, links and relationships. And last, What is not here: a section the server could not read is named there, with its reason, never left out quietly.
+- Voice: Now open the Merchant card: its Entity Type Profile gathers what every Dataset says about merchants. Identity, with how values are compared and whether the type is masked. Where it appears, its lineage, volume and quality, the shapes its values take, time, links, relationships and measures. And last, What is not here: a section the server could not read is named there, with its reason, never left out quietly.
 - Chip: Entity Type Profile
 - Action: Entity Types ▸ Merchant ▸ scroll the sections ▸ hold on *What is not here*. [check in UI: the Phone number card may read *Not assessed: not computed yet*; if so the voice adds "not profiled yet, and it says so"]
 - Impact: mark each section heading as the voice names it.
 
 ### S08 · Open an Entity
-- Voice: On a type's page you can open one entity. In Open an Entity, type M-317, the fuel station of the card compromise, and press Enter. The Entity Profile opens: when it was first and last seen, its rows per day, where it appears, its links and related identifiers, the lists it is on, and how fresh the data is. A profile tells you what the data says about one entity before you draw a single link.
+- Voice: On a type's page you can open one entity. In Open an Entity, type M-317, the fuel station of the card compromise, and press Enter. The Entity Profile opens with what the data says about that one entity: when it was first and last seen, where it appears, its links and the lists it is on. A profile tells you what the data says about one entity before you draw a single link.
 - Chip: Open an Entity
 - Action: Merchant page ▸ Open an Entity: `M-317` ▸ Enter ▸ scroll the Entity Profile. [check in UI: where the Open an Entity field sits on the Entity Type page, and the profile's section names]
 - Impact: mark the first and last seen line and the rows per day chart.
 
 ### S09 · The same types in Link Analysis
-- Voice: The same types are in Link Analysis, under the gear: Settings, Entity Types. Each type in force is listed with its id, how its values are compared, and whether it is masked. New Entity Type is here too, so you can add one without leaving the graph.
+- Voice: The same types are in Link Analysis, under the gear: Settings, Entity Types. Each type in force is listed with its id, how its values are compared, and whether it is masked. The Phone number type we just added is on the list, and New Entity Type is here too, so you can add one without leaving the graph.
 - Chip: Settings · Entity Types
 - Action: Link Analysis ▸ Settings ▸ Entity Types ▸ hold on the list ▸ point at New Entity Type.
 - Impact: mark the Phone number row (*phone_number · Digits only*).
 
 ### S10 · Delete, and why it is refused
-- Voice: Delete removes a type nothing uses, after a confirmation that names it, and it cannot be undone. Try it on Merchant. It is refused, and the message says what still uses it: the Dataset columns that hold it. A type that an Entity List or an Investigation names is kept the same way: change or retire those first. And the last Entity Type of a Space can never be deleted.
+- Voice: Delete removes a type nothing uses, after a confirmation that names it, and it cannot be undone. Try it on Merchant. It is refused, and the message says what still uses it: the Dataset columns that hold it. A type that an Entity List or an Investigation names is kept the same way: change or retire those first. And the last Entity Type of a Space can never be deleted. We keep Phone number out of this: it is only a demonstration type.
 - Chip: Delete · Not changed
 - Action: Merchant ▸ Delete ▸ confirm (*Delete Entity Type*) ▸ hold on the refusal. [check in UI: the refusal box (*Not changed* title) names the columns that hold Merchant; never press Delete on Phone number or any unused type]
 - Impact: mark the refusal and the columns it names.
 
 ### S11 · Try it
-- Voice: Your turn. On the Columns tab, find the email columns of the online accounts and the cardholders. Make an Entity Type for them, choose how to compare its values, and set both. Which comparison fits an email address best, and why? The answer is in the description. Next, in B1, start a graph.
+- Voice: Your turn. On the Columns tab, find a column that is Not set. Decide what it holds, make an Entity Type for it if none fits, and choose how to compare its values. Which comparison fits an email address best, and why? The answer is in the description. Next, in B1, start a graph.
 - Action: outro card: *Try it* and *Next: B1 · Start a graph*.
 - Impact: none.
