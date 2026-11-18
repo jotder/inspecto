@@ -16,6 +16,12 @@ the graph round-trip, the two execution lanes), and the execution engine interna
 the M..N multiplexer, the Pipeline graph model, Consignment status, graceful stop, directory layout). Each
 part keeps its own status line and the date it was checked against the code.
 
+**How it relates to the platform architecture.** The [platform architecture](../../layer/platform/architecture.md)
+is the whole-system view: modules, tech stack, extension points, the five-step data path, storage, events,
+security. This page zooms into steps 1–3 of that data path (*Collect*, *Parse and ingest*, *Shape*) and
+does not restate module layout or packaging — where the two seem to differ, the platform page is the
+reference for those, and this page for how the ELT layer behaves.
+
 **Contents**
 
 - **Acquire**
@@ -579,53 +585,29 @@ Space stops cleanly, and how a Space's files are laid out on disk.
 
 ## E1. Where the engine's code lives
 
-### Core Module (`inspecto/`)
+The module layout, the package map and the packaging model are owned by the
+[platform architecture](../../layer/platform/architecture.md) (§3 *Shape of the system*, *Where the packages
+are*, §4 *Packaging*) and the [module taxonomy](../../layer/platform/architecture-modules.md); this page
+does not restate them. The ELT code sits in three platform modules:
 
-The **composition root** (artifactId `inspecto-processor`, jar `inspecto.jar`) — the module that wires
-the object graph together and shades the single deployable fat JAR. It keeps **zero network/AI
-dependencies**: remote protocols live in [connectors](../connectors/architecture.md), hosted models in
-[agent-hosted](../agent-hosted/architecture.md).
+| Module | ELT packages under `com.gamma` | Covered here |
+|---|---|---|
+| `platform/inspecto-acquire` | `acquire` — connectors contract, ledger, stability gate, retry | [Collectors](#collectors), [spec-acquisition.md](spec-acquisition.md) |
+| `platform/inspecto-etl` | `etl` — the Stage-1 config model (`PipelineConfig`), ingesters, batch planning, quarantine, lineage, partitioned output, `ConsignmentEventBus` | [Parsing and ingest](#parsing-and-ingest), [spec-ingest.md](spec-ingest.md) |
+| `platform/inspecto-engine` | `inspector` (Collector poll cycle, ingest strategies, the command-line entry points `CollectorProcessor` and `MainApp`), `pipeline` (Pipeline graph, component registry, executor), `consignment`, `parse`, `ingester`, `enrich`, `job`, and the rest of the engine | [§E4](#e4-the-pipeline-graph--the-backend-model), [spec-pipeline.md](spec-pipeline.md) |
 
-> **Not the engine anymore.** Before the WS-D reactor split (2026-07-22) `inspecto/` held the whole
-> engine; the engine was then extracted into the sibling modules below, and `inspecto/` now depends
-> *down* on them. Authoritative build order, version management, and the extraction playbook live in
-> [../../layer/platform/architecture-modules.md](../../layer/platform/architecture-modules.md).
-
-What lives here now — `inspecto/src/main/java/com/gamma/`: `service` (the always-on host — `CollectorService`, the
-[control API](../processor/api-control-api.md) wiring, [`SpaceManager`](../processor/architecture.md)),
-`control` (the ~50 HTTP routes), `report`, `assist` (the assist SPI — [interface only](../agent/spec-assist-agent.md)),
-`exchange`, `expectation`, `intelligence`, and `model`.
-
-### Extracted engine modules (WS-D) — `inspecto/` depends down on these
-
-The concept docs are unchanged by the move; only the home module changed:
-
-- **`inspecto-engine`** (`inspecto-engine`) — the engine cluster: `signal`, `query`,
-  [`pipeline` / pipeline-graph](#e4-the-pipeline-graph--the-backend-model), `inspector` ([DuckDB](../engine/spec-duckdb.md) sinks
-  plus the fat-jar entry points `CollectorProcessor` and `MainApp`), `ingester`, `ops`,
-  [`job`](../processor/spec-jobs.md), `enrich`, `alert`, `notify`, `catalog`.
-- **`inspecto-etl`** (`inspecto-etl`) — [`etl`](spec-ingest.md): `PipelineConfig`, the
-  ingesters, batch planning, quarantine, lineage, [partitioned Parquet output](spec-pipeline.md).
-- **`inspecto-event`** (`inspecto-event`) — [`event` + `metrics`](../event/spec-events-metrics.md):
-  the Operational-Intelligence event store + metric registry; owns `logback.xml`.
-- **`inspecto-acquire`** (`inspecto-acquire`) — the [acquisition framework](#data-acquisition-framework):
-  connectors, connection profiles/registry/workbench, the fingerprint ledger, stability gate,
-  retry/circuit-breaker/rate-limit policies.
-- Foundation leaves **`inspecto-api`** (`@PublicApi`), **`inspecto-util`** (DuckDB access + CSV/file/tar
-  helpers), **`inspecto-config`** ([TOON config](../config/spec-toon-config.md) — spec/io/safety), and
-  **`inspecto-sql`** (the sandboxed read-only DuckDB SQL surface).
-
-Modularization is reactor-internal — the single `inspecto.jar` is unchanged (shade has no
-include-list, so the sibling modules' classes and resources bundle automatically).
-
-Build/run: see [build & test](../../layer/platform/spec-build-test.md).
+Two corrections to older text, verified against the code on 2026-11-18: `com.gamma.ops` (Incidents,
+Cases) is the optional `features/inspecto-ops` module, not the engine; and there is no single fat jar —
+a bundle is thin first-party jars plus `inspecto.jar` (the processor and third-party code; the `inspecto/`
+shade plugin excludes the first-party modules), on a `jlink` runtime. Build and run:
+[build & test](../../layer/platform/spec-build-test.md).
 
 ### Ingest package structure
 
 ```
 com.gamma
   inspector/
-    CollectorProcessor          — single-Pipeline ELT runner; virtual-thread + semaphore batch fan-out
+    CollectorProcessor          — single-Pipeline ELT runner; virtual threads + the shared ConcurrencyBroker (batch fan-out)
     MultiCollectorProcessor     — runs many Pipelines concurrently in one JVM (outer M..N orchestrator)
     ConsignmentIngestor           — thin per-batch coordinator: selects a ConsignmentIngestStrategy, then drives the shared commit → audit tail
     ConsignmentIngestStrategy      — ingest+transform+write seam (delimited-text vs plugin); returns a typed IngestOutcome (+ shared dropTable/msg helpers)

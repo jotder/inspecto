@@ -154,7 +154,7 @@ module layer; a split-package guard (`tools/check-module-architecture.mjs`) hold
 The contracts a jar can implement include: Collector connectors (`CollectorConnectorFactory`,
 [spec](../../module/connectors/spec-connectors.md)), parser plugins (`ParserPlugin`,
 [spec](../../module/elt/spec-ingest.md)), Pipeline node types (`PipelineNodeType`,
-`PipelineNodeExecutor`, `StepExecutor`; [Pipeline graph](../../module/elt/architecture.md)),
+`PipelineNodeExecutor`, `StepExecutor`; [Pipeline graph](../../module/elt/architecture.md#e4-the-pipeline-graph--the-backend-model)),
 HTTP routes (`RouteModule`), Job Types and maintenance tasks (`JobTypeProvider`,
 `MaintenanceTaskProvider`), Platform Services contributed by a pack (`ServiceProvider`), Decision Rule
 Consequences (`ConsequenceProvider`), operational store families (`StoreFamilyProvider`), boot-time
@@ -183,14 +183,14 @@ Three facts about discovery are worth knowing before adding one:
 
 1. **Collect.** Collectors pull from local directories, SFTP, FTP and FTPS, databases, object stores
    (S3, Azure Blob, GCS) and Kafka, with deduplication and watermark ledgers and a stability gate.
-   See the [acquisition framework](../../module/elt/architecture.md).
+   See the [acquisition framework](../../module/elt/architecture.md#data-acquisition-framework).
 2. **Parse and ingest.** Stage-1 parsing (M files to N record types) writes typed Parquet into the
-   lakehouse; bad rows are quarantined. See [Stage-1](../../module/elt/architecture.md) and
+   lakehouse; bad rows are quarantined. See [Stage-1](../../module/elt/architecture.md#e2-design-philosophy--scope) and
    [ingestion](../../module/elt/spec-ingest.md).
 3. **Shape.** Pipelines of Steps: enrichment, deduplication, joins, time-series and analytics Steps,
    then partitioned [output](../../module/elt/spec-pipeline.md). The authored Pipeline graph and
    its executor are layered on the engine; see
-   [Pipeline graph](../../module/elt/architecture.md) and
+   [Pipeline graph](../../module/elt/architecture.md#e4-the-pipeline-graph--the-backend-model) and
    [live execution](../../module/elt/spec-pipeline.md).
 4. **Analyse.** Measures and KPIs in Studio and BI; scores and baselines through the Analytics Kernel.
 5. **Act.** Alerts, Decision Rules (the Decision Kernel and its condition tree), Incidents, Cases and
