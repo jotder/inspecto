@@ -646,7 +646,7 @@ mutating service defines its dry-run behaviour (record, don't act — MNT-1 exte
 that word is RBAC's (`CapabilityManifest` route gates → `Roles.KNOWN_CAPABILITIES`); ⛔ not *Controller
 Service* — NiFi's term implies user-instantiated enable/disable resources, deliberately that plan's stage 3.
 
-**Execution pool** *(added 2026-09-24; as-built in [`okf/product/module/engine/spec-consignments.md`](okf/product/module/engine/spec-consignments.md) §2a)* —
+**Execution pool** *(added 2026-09-24; as-built in [`okf/product/module/engine/spec-consignments.md`](okf/product/module/engine/spec-consignments.md) §B.2a)* —
 A named, server-defined admission tier for **Consignments** (`scheduler.toon` `pools:`), chosen by a Pipeline
 with `processing.pool`. It answers only "may this start now" and never widens a thread or memory cap; an
 unknown name runs in the always-present `default` pool. ⛔ not *queue* (waiting is a state of an admission,

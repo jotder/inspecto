@@ -33,7 +33,7 @@ import java.util.Map;
  * {@link PipelineValidator#RETIRED_RELATION} warning.
  *
  * <p>See {@code docs/okf/product/module/engine/spec-pipeline-model.md} (the token model — the design of record) and
- * {@code docs/okf/product/module/engine/architecture.md} §1 (the token rule and the relation
+ * {@code docs/okf/product/module/engine/architecture.md} §4.1 (the token rule and the relation
  * inventory). Provenance only, not maintained:
  * {@code docs/archived-documents/plans-archive/pipeline-spec.md} §11.
  */

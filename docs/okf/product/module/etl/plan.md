@@ -392,18 +392,21 @@ what belongs to **one**.
    page** (§2.4). Code says executable; correcting the reference is the actual fix for the drift row.
 3. 🔴 **Counts stated several ways** (§2.3) — node types, recipe entries, processors, transform functions.
 4. 🔴 **Two current documents cited refusals that do not exist** — a second join and a second sink.
-5. 🔴 **Current documents still named the deleted map type or the superseded simple grid as current**,
-   including one index line stale in three ways at once.
+5. 🔴 **Eight current documents still name the deleted map type or the superseded simple grid as
+   current**, including one index line stale in three ways at once. (Not re-checked after the 2026-11-18
+   consolidation, which merged several of them.)
 6. ⚠ **Whether a degraded palette should also fire the alert component** — the three host error arms are
    tested (2026-09-09, `pipeline-editor.component.spec.ts`; ⚠ `null`-vs-`[]` is the load-bearing distinction),
    but by this project's convention a degraded palette should alert, and nothing fires it today. A product
    decision, deliberately not encoded in a test.
 7. ⚠ **`A6` was an orphan decision** — it appeared once in the current document set; §4.3 is now its second home.
-8. ⚠ **Executor line-number citations were wrong, and so was the package path** — the class moved into an
-   execution sub-package. **Cite the symbol, not the line.**
-9. ⚠ **A deleted component was cited as the current mapping UI** in a concept page.
-10. ⚠ **An identity page said "nothing open" four lines above citing a board row that does not exist** — the
+8. ⚠ **Every executor line-number citation in the authoring documents is wrong, and so is its package
+   path** — the class moved into an execution sub-package. **Cite the symbol, not the line.**
+9. ⚠ **A deleted component is cited as the current mapping UI** in a concept page.
+10. ⚠ **An identity page says "nothing open" four lines above citing a board row that does not exist** — the
     citation that caused a phantom row to be filed and then deleted unbuilt.
+10a. ⚠ **A plan states a sibling document's size as 144 KB; it is 18 KB** — the figure predates a split the
+    same list describes.
 11. ⚠ **Two notes point at the wrong backlog section** for the authoring row.
 12. ⚠ **One editor pane is undocumented anywhere in the frontend tier** — a guarantees checklist panel whose
     own docblock cites a plan that is not among its page's cross-links.

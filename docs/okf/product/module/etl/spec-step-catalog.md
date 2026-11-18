@@ -1003,7 +1003,7 @@ execution-free DESCRIBE); only a DuckDB binder 422 blocks Apply. In the editor t
 views — a **Fields** grid over the function catalog and the **SQL** — with the bounded reconciler
 (projections only, catalog templates matched in reverse and re-compiled to prove the round-trip, the
 rest kept verbatim as custom rows; a `WHERE`/`JOIN` disables the Fields tab with the reason)
-([schema-mapping-authoring](user-guide.md) §0).
+([ETL user guide](user-guide.md) §8.2).
 
 **Configuration.**
 

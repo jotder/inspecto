@@ -442,7 +442,7 @@ defaults when the block is present (`PipelineConfigParser.parseCollector`). `alg
 which is JDK-only (`MessageDigest`/`CRC32`), streams in 64 KB chunks, returns lowercase hex, and accepts
 `MD5`, `SHA1`, `SHA256` (default), `SHA512`, `CRC32` with or without the dash. A feed that must let a
 corrected same-name file land uses `mode: checksum` + `on_change: reprocess` (worked example: the daily feed in
-[the ETL user guide](../etl/user-guide.md#daily-feeds-the-template-the-export-contract-and-delivery-checks)).
+[the ETL user guide](../etl/user-guide.md#113-daily-feeds--the-template-the-export-contract-and-delivery-checks)).
 
 **Collection guarantee.** `collector.guarantee` → `BEST_EFFORT` (default) | `AT_LEAST_ONCE` |
 `EXACTLY_ONCE` (`PipelineConfig.Guarantee`; both dash and underscore spellings parse). `requiresLedger()`
@@ -510,7 +510,7 @@ Two optional keys beside it (operator, 2026-10-06) — `file_template` (one date
 e.g. `CDR_{yyyyMMddHH}_{seq}_*`, or date-only `XDR_{yyyyMMdd}.csv` = one expected file per date bucket) and
 `seq_scope` (`PER_BUCKET` | `CONTINUOUS`, required when the template holds `{seq}`, refused when it does not;
 operator, 2026-10-06) — are read by the `kpi.completeness` job to count missing files and by the delivery check
-(per-day manifest + windowed `SEQUENCE_GAP`, [the ETL user guide](../etl/user-guide.md#daily-feeds-the-template-the-export-contract-and-delivery-checks)).
+(per-day manifest + windowed `SEQUENCE_GAP`, [the ETL user guide](../etl/user-guide.md#113-daily-feeds--the-template-the-export-contract-and-delivery-checks)).
 `sequence` and `GapDetector` are unchanged. See [observability §3.9](../observability/plan-observability.md).
 
 ## Phase E — retrieval: plan once, stage, then land
