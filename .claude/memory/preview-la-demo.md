@@ -11,6 +11,11 @@ repo junction `spaces\inspecto-mfs` -> `C:\sandbox\inspecto-mfs-root\inspecto-mf
 `mfs-demo` (IMS, 16 GB) and `la-mobile-money`. Each install boots them through `spaces\<id>.ref` files (one absolute path):
 - **Preview** `C:\sandbox\inspecto-preview\inspecto-la` on :8080, built `-Edition Preview -DemoAuth -Ui la-app -NoBakeDemo` *(removed 2026-11-10 by `PRODUCT-ASSEMBLY-1` PA-2; today `-Edition Preview -Product la -Distribution demo -NoBakeDemo`)*
   (demo sign-in); also holds the synthetic LA showcases (la-showcase, la-claims, la-audit, la-daily-feed, ...).
+  **Since 2026-11-18** it runs from `start-preview.ps1` against `C:\sandbox\spaces-preview`; its `la-mobile-money` is the
+  BAKED copy in that root (the `.ref` is parked), so only MFS and IMS are still shared with Basic. Every Space there is
+  `admission: closed` and carries the one five-user roster (admin, analyst, manager, reviewer, outsider; MFS also keeps
+  fm.analyst, bi.analyst, data.engineer): the outsider signs in and is admitted nowhere. A re-bake parks EVERY folder in
+  the target, `sample` included: copy `sample` back and re-close the shared Spaces after it.
   Start `& C:\sandbox\inspecto-preview\inspecto-la\start-la-preview.ps1`.
 - **Basic** `C:\sandbox\ims-mfs-demo` on :8098, built `-Edition Basic -Product la` (no sign-in, loopback), only the
   three refs. Start `& C:\sandbox\ims-mfs-demo\start-la-basic.ps1`. Basic is the LA explorer: Investigations and index

@@ -79,7 +79,7 @@ Exchange forwarder under that grant's allowlist and chain-depth cut. Malformed c
 
 `apply` executes real platform consequences on demand (`emit-signal`, `start-job`,
 `trigger-pipeline`; stub signals for `render-widget`/`generate-report`; `invoke-api` proposes a pending
-[Action Request](../action-requests/spec.md) on the rule's Incident — never a direct call). `start-job` on a
+[Action Request](../action-requests/spec-action-requests.md) on the rule's Incident — never a direct call). `start-job` on a
 **disabled** job depends on **how the rule was applied** (operator, 2026-09-25; disabled means "not scheduled",
 [jobs](spec-jobs.md)): a **person's** `POST /decision-rules/{name}/apply` (the SPA's *Apply*) runs it like *Run now*
 (`executed`, the entry carries its `runId`, the run's trigger is `manual:<actor>` from `ApiContext.actor`); an

@@ -11,17 +11,17 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.screening`](../../../../../product-map/module/screening.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Screening — plan](plan.md) |
-| spec | current | [Screening — Match Scores against Entity Lists and the review of Screening Hits](spec.md) |
-| architecture | current | [Screening](architecture.md) |
+| plan | current | [Screening — plan](plan-screening.md) |
+| spec | current | [Screening — Match Scores against Entity Lists and the review of Screening Hits](spec-screening.md) |
+| architecture | current | [Screening](architecture-screening.md) |
 | features | current | [Screening — features](features-screening.md) |
 | feature-db | current | [Screening — feature database](feature-db.md) |
 | user-guide | current | [Screening — screens](user-guide-screening.md) |
-| admin-guide | current | [Screening — admin guide](admin-guide.md) |
+| admin-guide | current | [Screening — admin guide](admin-guide-screening.md) |
 | api | current | [HTTP routes — module.screening](api-routes.md) · [Screening — API](api-screening.md) |
 | tests | current | [Screening — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

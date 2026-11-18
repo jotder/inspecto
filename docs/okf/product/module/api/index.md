@@ -11,14 +11,14 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.api`](../../../../../product-map/module/api.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [API stability policy](plan-api-stability.md) |
-| spec | current | [Public API annotations — spec](spec.md) |
-| architecture | current | [Public API annotations — architecture](architecture.md) |
-| features | current | [Public API annotations — features](features.md) |
+| spec | current | [Public API annotations — spec](spec-api.md) |
+| architecture | current | [Public API annotations — architecture](architecture-api.md) |
+| features | current | [Public API annotations — features](features-api.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | n/a | a single compile-time annotation with no screens and no user configuration |
 | admin-guide | n/a | nothing to install, configure or operate; no flags, files or runtime state |

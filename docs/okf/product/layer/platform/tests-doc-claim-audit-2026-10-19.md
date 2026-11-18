@@ -40,48 +40,48 @@ BACKLOG". The coordinator re-checked it and found `LA-19` in `docs/BACKLOG.md`, 
 
 | Doc (`docs/okf/product/…`) | Slot | Claims | Wrong |
 |---|---|---|---|
-| `module/case-management/admin-guide.md` | admin-guide | 22 | 0 |
-| `module/secrets/admin-guide.md` | admin-guide | 14 | 0 |
-| `module/agent-hosted/admin-guide.md` | admin-guide | 24 | 0 |
-| `layer/product/admin-guide.md` | admin-guide | 24 | 1 |
-| `solution-pack/la-daily-feed/admin-guide.md` | admin-guide | 12 | 0 |
-| `solution-pack/telco-ra/admin-guide.md` | admin-guide | 18 | 1 |
-| `solution-pack/orders-starter/admin-guide.md` | admin-guide | 12 | 0 |
-| `module/la-store-pg/admin-guide.md` | admin-guide | 20 | 0 |
-| `module/connectors-kafka/admin-guide.md` | admin-guide | 34 | 0 |
-| `module/oidc/admin-guide.md` | admin-guide | 30 | 2 |
-| `module/notify-channels/plan.md` | plan | 13 | 0 |
-| `module/anomaly/plan.md` | plan | 16 | 1 |
-| `module/entity-store/plan.md` | plan | 22 | 1 |
-| `module/la-core/plan.md` | plan | 28 | 0 |
-| `module/geo-link/plan.md` | plan | 14 | 0 |
-| `module/la-store-pg/plan.md` | plan | 18 | 0 |
-| `module/la-storage/plan.md` | plan | 22 | 0 |
-| `module/reconciliation/plan.md` | plan | 20 | 0 |
-| `module/api/spec.md` | spec | 9 | 0 |
-| `module/backup/spec.md` | spec | 30 | 1 |
-| `module/secrets/spec.md` | spec | 16 | 0 |
-| `module/la-api/spec.md` | spec | 52 | 0 |
-| `module/geo-country/spec.md` | spec | 24 | 0 |
+| `module/case-management/admin-guide-case-management.md` | admin-guide | 22 | 0 |
+| `module/secrets/admin-guide-secrets.md` | admin-guide | 14 | 0 |
+| `module/agent-hosted/admin-guide-agent-hosted.md` | admin-guide | 24 | 0 |
+| `layer/product/admin-guide-product.md` | admin-guide | 24 | 1 |
+| `solution-pack/la-daily-feed/admin-guide-la-daily-feed.md` | admin-guide | 12 | 0 |
+| `solution-pack/telco-ra/admin-guide-telco-ra.md` | admin-guide | 18 | 1 |
+| `solution-pack/orders-starter/admin-guide-orders-starter.md` | admin-guide | 12 | 0 |
+| `module/la-store-pg/admin-guide-la-store-pg.md` | admin-guide | 20 | 0 |
+| `module/connectors-kafka/admin-guide-connectors-kafka.md` | admin-guide | 34 | 0 |
+| `module/oidc/admin-guide-oidc.md` | admin-guide | 30 | 2 |
+| `module/notify-channels/plan-notify-channels.md` | plan | 13 | 0 |
+| `module/anomaly/plan-anomaly.md` | plan | 16 | 1 |
+| `module/entity-store/plan-entity-store.md` | plan | 22 | 1 |
+| `module/la-core/plan-la-core.md` | plan | 28 | 0 |
+| `module/geo-link/plan-geo-link.md` | plan | 14 | 0 |
+| `module/la-store-pg/plan-la-store-pg.md` | plan | 18 | 0 |
+| `module/la-storage/plan-la-storage.md` | plan | 22 | 0 |
+| `module/reconciliation/plan-reconciliation.md` | plan | 20 | 0 |
+| `module/api/spec-api.md` | spec | 9 | 0 |
+| `module/backup/spec-backup.md` | spec | 30 | 1 |
+| `module/secrets/spec-secrets.md` | spec | 16 | 0 |
+| `module/la-api/spec-la-api.md` | spec | 52 | 0 |
+| `module/geo-country/spec-geo-country.md` | spec | 24 | 0 |
 | `module/notify-channels/user-guide-notifications.md` | user-guide | 6 | 0 |
-| `solution-pack/la-showcase-off/user-guide.md` | user-guide | 4 | 0 |
-| `module/demo-auth/user-guide.md` | user-guide | 9 | 0 |
+| `solution-pack/la-showcase-off/user-guide-la-showcase-off.md` | user-guide | 4 | 0 |
+| `module/demo-auth/user-guide-demo-auth.md` | user-guide | 9 | 0 |
 | `module/screening/user-guide-screening.md` | user-guide | 5 | 0 |
-| `module/telecom-asn1/architecture.md` | architecture | 24 | 0 |
-| `module/entity-list/architecture.md` | architecture | 16 | 0 |
-| `module/la-core/features.md` | features | 22 | 0 |
+| `module/telecom-asn1/architecture-telecom-asn1.md` | architecture | 24 | 0 |
+| `module/entity-list/architecture-entity-list.md` | architecture | 16 | 0 |
+| `module/la-core/features-la-core.md` | features | 22 | 0 |
 
 ## Wrong claims and corrections (all fixed in place)
 
 | Doc | As written | Correction | Evidence |
 |---|---|---|---|
-| `layer/product/admin-guide.md` | `-DemoAuth` *(removed 2026-11-10 by `PRODUCT-ASSEMBLY-1` PA-2; today `-Distribution demo`)* requires `-Edition Advanced` | Accepts `-Edition Advanced` **or** `-Edition Preview` | `inspecto/package.ps1` (`-DemoAuth` guard, LA-EDITIONS-1 ED-3) |
-| `solution-pack/telco-ra/admin-guide.md` | Job `ra_switch_kpi_completeness_job` | That is the file name; the Job is `ra_switch_kpi_completeness` | the pack's `*_job.toon` |
-| `module/oidc/admin-guide.md` | `auth.oidc.tokenEndpoint` is never derived for `generic` / `wso2` | Discovery fills it for every provider; only the built-in URL paths are Keycloak-only | `OidcConfig.java` |
-| `module/oidc/admin-guide.md` | `auth.oidc.scopes` default "from discovery / preset" | No default; read only when set | `OidcTokenRelay.java` |
-| `module/anomaly/plan.md` | `ANOMALY-UI-FINDINGS-1` (a)–(j) all shipped 2026-10-14 | Shipped 2026-10-14 to 2026-10-17; (g) only partly | `docs/BACKLOG.md`, git log |
-| `module/entity-store/plan.md` | `ASSURE-ENTITY-LISTS-RESIDUALS-1` still open | Closed 2026-10-18; its rest moved to BACKLOG §6 | `docs/BACKLOG.md` |
-| `module/backup/spec.md` | Allowed roots = `-Dassist.safety.roots` plus every hosted Space base | Plus the calling Space's own base only (`CROSS-SPACE-JAIL-1`) | `SafetyPolicy.defaultPolicy()` |
+| `layer/product/admin-guide-product.md` | `-DemoAuth` *(removed 2026-11-10 by `PRODUCT-ASSEMBLY-1` PA-2; today `-Distribution demo`)* requires `-Edition Advanced` | Accepts `-Edition Advanced` **or** `-Edition Preview` | `inspecto/package.ps1` (`-DemoAuth` guard, LA-EDITIONS-1 ED-3) |
+| `solution-pack/telco-ra/admin-guide-telco-ra.md` | Job `ra_switch_kpi_completeness_job` | That is the file name; the Job is `ra_switch_kpi_completeness` | the pack's `*_job.toon` |
+| `module/oidc/admin-guide-oidc.md` | `auth.oidc.tokenEndpoint` is never derived for `generic` / `wso2` | Discovery fills it for every provider; only the built-in URL paths are Keycloak-only | `OidcConfig.java` |
+| `module/oidc/admin-guide-oidc.md` | `auth.oidc.scopes` default "from discovery / preset" | No default; read only when set | `OidcTokenRelay.java` |
+| `module/anomaly/plan-anomaly.md` | `ANOMALY-UI-FINDINGS-1` (a)–(j) all shipped 2026-10-14 | Shipped 2026-10-14 to 2026-10-17; (g) only partly | `docs/BACKLOG.md`, git log |
+| `module/entity-store/plan-entity-store.md` | `ASSURE-ENTITY-LISTS-RESIDUALS-1` still open | Closed 2026-10-18; its rest moved to BACKLOG §6 | `docs/BACKLOG.md` |
+| `module/backup/spec-backup.md` | Allowed roots = `-Dassist.safety.roots` plus every hosted Space base | Plus the calling Space's own base only (`CROSS-SPACE-JAIL-1`) | `SafetyPolicy.defaultPolicy()` |
 
 The `backup/spec.md` row for `maintenance.restore.completed` also had a blank severity. It now says
 `INFO`.

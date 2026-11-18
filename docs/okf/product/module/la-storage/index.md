@@ -11,17 +11,17 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.la-storage`](../../../../../product-map/module/la-storage.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Link analysis storage - plan of record](plan.md) |
-| spec | current | [Link analysis storage - spec](spec.md) |
-| architecture | current | [Link analysis storage - architecture](architecture.md) |
-| features | current | [Link analysis storage — features](features.md) |
+| plan | current | [Link analysis storage - plan of record](plan-la-storage.md) |
+| spec | current | [Link analysis storage - spec](spec-la-storage.md) |
+| architecture | current | [Link analysis storage - architecture](architecture-la-storage.md) |
+| features | current | [Link analysis storage — features](features-la-storage.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | n/a | no screens of its own - the index tool and staleness badges are documented in the la-core user guide (la-core/user-guide.md) |
-| admin-guide | current | [Link analysis storage - admin guide](admin-guide.md) |
+| user-guide | n/a | no screens of its own - the index tool and staleness badges are documented in the la-core user guide (la-core/user-guide-la-core.md) |
+| admin-guide | current | [Link analysis storage - admin guide](admin-guide-la-storage.md) |
 | api | n/a | no HTTP routes and no SPI - an internal library called only by la-api, whose index routes are in la-api/api-routes.md |
 | tests | current | [Link Analysis edge index — 10^9 scale run plan (clause 3 of `LA-INDEX-SCALE-MEASURE-1`)](tests-index-scale-run.md) · [Link Analysis storage — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

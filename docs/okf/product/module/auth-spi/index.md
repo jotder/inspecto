@@ -11,18 +11,18 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.auth-spi`](../../../../../product-map/module/auth-spi.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
 | plan | n/a | a contract module carved out by MODULE-REORG-1; its requirement of record is decision D-MR1 in layer/platform spec-module-reorg-decisions.md, and security requirements are planned in module.access plan-security.md |
-| spec | n/a | the contract's invariants are stated per interface in api.md and the discovery design in architecture.md; implementations are specified in their provider hubs |
-| architecture | current | [Authentication and capability contract — architecture](architecture.md) |
-| features | current | [Authentication and capability contract — features](features.md) |
+| spec | n/a | the contract's invariants are stated per interface in api-auth-spi.md and the discovery design in architecture-auth-spi.md; implementations are specified in their provider hubs |
+| architecture | current | [Authentication and capability contract — architecture](architecture-auth-spi.md) |
+| features | current | [Authentication and capability contract — features](features-auth-spi.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | n/a | a pure Java contract with no screens; sign-in and access screens are documented in module.access user-guide-access.md |
 | admin-guide | n/a | nothing to configure in this jar; the providers' keys and flags are in module.access admin-guide-auth-security.md and each provider hub |
-| api | current | [Authentication and capability contract — Java API](api.md) |
+| api | current | [Authentication and capability contract — Java API](api-auth-spi.md) |
 | tests | current | [Authentication and capability contract — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

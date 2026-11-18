@@ -11,17 +11,17 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.la-api`](../../../../../product-map/module/la-api.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Link analysis and geo routes - plan of record](plan.md) |
-| spec | current | [LA server profile — N7 / N8 / N9 (LA-PERF-SERVER-1, 2026-11-12)](spec-server-profile.md) · [Link analysis and geo routes - spec](spec.md) |
-| architecture | current | [Link analysis and geo routes - architecture](architecture.md) |
-| features | current | [Link analysis and geo routes — features](features.md) |
+| plan | current | [Link analysis and geo routes - plan of record](plan-la-api.md) |
+| spec | current | [Link analysis and geo routes - spec](spec-la-api.md) · [LA server profile — N7 / N8 / N9 (LA-PERF-SERVER-1, 2026-11-12)](spec-server-profile.md) |
+| architecture | current | [Link analysis and geo routes - architecture](architecture-la-api.md) |
+| features | current | [Link analysis and geo routes — features](features-la-api.md) |
 | feature-db | current | [Link Analysis and geo routes — feature database](feature-db.md) |
-| user-guide | n/a | no screens of its own - the Link Analysis screens these routes serve are documented in the la-core hub (la-core/user-guide.md) |
-| admin-guide | current | [Link analysis and geo routes - admin guide](admin-guide.md) |
+| user-guide | n/a | no screens of its own - the Link Analysis screens these routes serve are documented in the la-core hub (la-core/user-guide-la-core.md) |
+| admin-guide | current | [Link analysis and geo routes - admin guide](admin-guide-la-api.md) |
 | api | current | [HTTP routes — module.la-api](api-routes.md) |
 | tests | current | [Link Analysis and geo routes — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

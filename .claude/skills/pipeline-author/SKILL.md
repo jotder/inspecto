@@ -16,15 +16,15 @@ Vocabulary (`docs/GLOSSARY.md`): **Pipeline**, **Collector** (acquisition entity
 
 | Need | Hub / slot file |
 |---|---|
-| Pipeline model, editor, steps | `module/elt/architecture.md`, `module/elt/spec-step-catalog.md`, `module/elt/user-guide.md`, `module/elt/user-guide.md` |
-| Parsing / schema mapping / enrichment | `module/elt/architecture.md`, `module/elt/user-guide.md`, `module/elt/user-guide.md` |
-| Execution: graph, node types, lanes | `module/elt/architecture.md`, `module/elt/spec-pipeline.md`, `module/elt/spec-pipeline.md` |
-| Test run / dry run | `module/elt/spec-pipeline.md` |
-| Sinks, grammar, parser options | `module/elt/spec-pipeline.md`, `module/elt/spec-ingest.md`, `module/elt/spec-ingest.md` |
+| Pipeline model, editor, steps | `module/elt/architecture-elt.md`, `module/elt/spec-step-catalog.md`, `module/elt/user-guide-elt.md`, `module/elt/user-guide-elt.md` |
+| Parsing / schema mapping / enrichment | `module/elt/architecture-elt.md`, `module/elt/user-guide-elt.md`, `module/elt/user-guide-elt.md` |
+| Execution: graph, node types, lanes | `module/elt/architecture-elt.md`, `module/elt/spec-pipeline-execution.md`, `module/elt/spec-pipeline-execution.md` |
+| Test run / dry run | `module/elt/spec-pipeline-execution.md` |
+| Sinks, grammar, parser options | `module/elt/spec-pipeline-execution.md`, `module/elt/spec-parsing.md`, `module/elt/spec-parsing.md` |
 | TOON syntax + keys | `module/config/spec-toon-config.md`, `module/config/spec-pipeline-config-keys.md`, `module/config/admin-guide-configuration-reference.md` |
 | Safety gates | `module/config/spec-config-safety.md` |
-| Collectors (acquisition) | `module/elt/architecture.md`, `module/elt/user-guide.md` |
-| Spaces (where config lives) | `module/config/architecture.md` |
+| Collectors (acquisition) | `module/elt/architecture-elt.md`, `module/elt/user-guide-elt.md` |
+| Spaces (where config lives) | `module/config/architecture-config.md` |
 
 ## Config-safety rules (from `spec-config-safety.md`)
 
@@ -68,6 +68,6 @@ Live probing: use the `smoke` skill (it boots ControlApi and always stops it).
 - [ ] Hub files read (table above); every key exists in `spec-pipeline-config-keys.md`.
 - [ ] Canonical terms only (Pipeline, Collector, Dataset, Expectation).
 - [ ] `POST /validate` reports no ERROR; dry-run returns the expected rows and rejects.
-- [ ] New node type? It also needs a flat-config home and a `module/elt/spec-pipeline.md` entry.
+- [ ] New node type? It also needs a flat-config home and a `module/elt/spec-pipeline-execution.md` entry.
 - [ ] New route? Use the `endpoint` skill (openapi-v1.json entry + every gate tested).
 - [ ] Relevant unit tests green; the owning hub slot file updated.

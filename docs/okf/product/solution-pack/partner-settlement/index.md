@@ -11,20 +11,20 @@ tags: [product-item, solution-pack]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`solution-pack.partner-settlement`](../../../../../product-map/solution-pack/partner-settlement.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [Partner settlement — decisions and as-built record](plan-as-built.md) |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| architecture | current | [Partner settlement](architecture.md) |
-| features | current | [Partner settlement — features](features.md) |
+| architecture | current | [Partner settlement](architecture-partner-settlement.md) |
+| features | current | [Partner settlement — features](features-partner-settlement.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Partner settlement — user guide](user-guide.md) |
-| admin-guide | current | [Partner settlement — admin guide](admin-guide.md) |
+| user-guide | current | [Partner settlement — user guide](user-guide-partner-settlement.md) |
+| admin-guide | current | [Partner settlement — admin guide](admin-guide-partner-settlement.md) |
 | api | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | tests | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| brochure | current | [Partner settlement — brochure](brochure.md) |
+| brochure | current | [Partner settlement — brochure](brochure-partner-settlement.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
 

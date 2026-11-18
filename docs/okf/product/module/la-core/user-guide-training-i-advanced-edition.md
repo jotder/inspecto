@@ -46,7 +46,7 @@ timestamp: 2026-11-16T00:00:00Z
 - **Gotchas:** the sample is illustrative and inert outside Advanced; the repository's own test denies by Dataset, not by
   person (`access-policy-deny-persona.md`), so confirm the deny before recording. Preview impact evaluates roles by their
   capabilities and name only: a condition on a person shows no change there, by design. The denied person gets the same
-  "not available" answer as an outsider. Delete the policy at the end: it applies to the whole Space.
+  "not available" answer as someone who is not a member. Delete the policy at the end: it applies to the whole Space.
 
 ### S01 · Roles say what; policies say when not
 - Voice: This is Inspecto LA training, episode I1: Access Policies. Roles say what each kind of user may do: read, investigate, approve, reveal. Some rules do not fit a role. This reviewer must not see these Investigations. Nobody outside the head office may open that Dataset. An Access Policy is a condition on who, what and where, and it can only narrow what the roles already allow. Nothing a policy says can grant more. We are in the Advanced edition, in the Banking and finance Space, signed in as the administrator.

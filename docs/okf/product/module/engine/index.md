@@ -11,18 +11,18 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | n/a | documented in the ELT hub module/elt plan.md (part EXE), merged 2026-11-18 (DOCS-ELT-CONSOLIDATE-1) |
+| plan | n/a | documented in the ELT hub module/elt plan-elt.md (part EXE), merged 2026-11-18 (DOCS-ELT-CONSOLIDATE-1) |
 | spec | current | [Database / persistence layer](spec-db-layer.md) · [DuckDB Integration](spec-duckdb.md) |
-| architecture | n/a | documented in the ELT hub module/elt architecture.md (Execution engine internals, sections E1-E7), merged 2026-11-18 |
-| features | n/a | documented in the ELT hub module/elt features.md (Execution engine), merged 2026-11-18 |
+| architecture | n/a | documented in the ELT hub module/elt architecture-elt.md (Execution engine internals, sections E1-E7), merged 2026-11-18 |
+| features | n/a | documented in the ELT hub module/elt features-elt.md (Execution engine), merged 2026-11-18 |
 | feature-db | current | [Execution engine — feature database](feature-db.md) |
-| user-guide | n/a | documented in the ELT hub module/elt user-guide.md section 22 (Runs and Run Detail), merged 2026-11-18 |
-| admin-guide | n/a | documented in the ELT hub module/elt admin-guide.md, merged 2026-11-18 |
-| api | n/a | the engine registers no HTTP routes; the Pipeline, Run and Job routes it serves are documented in module/processor api-routes and api-jobs-scheduler and module/elt api.md |
+| user-guide | n/a | documented in the ELT hub module/elt user-guide-elt.md section 22 (Runs and Run Detail), merged 2026-11-18 |
+| admin-guide | n/a | documented in the ELT hub module/elt admin-guide-elt.md, merged 2026-11-18 |
+| api | n/a | the engine registers no HTTP routes; the Pipeline, Run and Job routes it serves are documented in module/processor api-routes and api-jobs-scheduler and module/elt api-elt.md |
 | tests | current | [Execution engine — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

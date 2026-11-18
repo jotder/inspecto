@@ -11,7 +11,7 @@ tags: [product-item, solution-pack]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`solution-pack.la-telco-ra`](../../../../../product-map/solution-pack/la-telco-ra.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
@@ -20,11 +20,11 @@ tags: [product-item, solution-pack]
 | architecture | missing | |
 | features | missing | |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Link Analysis telecom revenue assurance showcase — user guide](user-guide.md) |
+| user-guide | current | [Link Analysis telecom revenue assurance showcase — user guide](user-guide-la-telco-ra.md) |
 | admin-guide | current | [Link Analysis telecom revenue assurance showcase — install](admin-guide-install.md) |
 | api | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | tests | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| brochure | current | [Link Analysis telecom revenue assurance showcase — brochure](brochure.md) |
+| brochure | current | [Link Analysis telecom revenue assurance showcase — brochure](brochure-la-telco-ra.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
 

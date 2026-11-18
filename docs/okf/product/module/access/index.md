@@ -11,13 +11,13 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.access`](../../../../../product-map/module/access.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [Security (SEC)](plan-security.md) |
-| spec | current | [Access policy — spec](spec.md) |
-| architecture | current | [Identity and Access](architecture.md) |
+| spec | current | [Access policy — spec](spec-access.md) |
+| architecture | current | [Identity and Access](architecture-access.md) |
 | features | current | [Identity and Access — features](features-access.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Identity and Access — screens](user-guide-access.md) |

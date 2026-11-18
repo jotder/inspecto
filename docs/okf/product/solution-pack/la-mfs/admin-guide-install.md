@@ -10,7 +10,7 @@ timestamp: 2026-11-08T00:00:00Z
 
 The showcase ships as three downloads that unzip **side by side** into one folder you choose (`<parent>`), so the
 product can be upgraded without touching the Space or its data. It runs on every edition, Basic included. Layout
-and seams: [showcase distribution and install layout](../la-showcase/architecture.md#distribution-and-install-layout)
+and seams: [showcase distribution and install layout](../la-showcase/architecture-la-showcase.md#distribution-and-install-layout)
 and the [configuration reference](../../module/config/admin-guide-configuration-reference.md) (`spaces.ref`, `data_root`).
 
 | Download | File | Unzip into |
@@ -58,7 +58,7 @@ minute or two:
 - `inspecto-la-data/la-mfs/data/mfs_links/` holds the link Dataset (about 47 000 rows, seven kinds);
   `mfs_screen_links/` holds the three fraud screens the saved views read.
 - In Link Analysis, **File ▸ Open… ▸ Saved views** lists `mfs_sim_swap_bursts`, `mfs_split_deposits` and
-  `mfs_merchant_quick_pay`. The [user guide](user-guide.md) has the tour and the exercises.
+  `mfs_merchant_quick_pay`. The [user guide](user-guide-la-mfs.md) has the tour and the exercises.
 
 The Space folder holds only configuration; all runtime state (`data/`, `audit/`, `duckdb/`) is written under
 `inspecto-la-data/la-mfs/`.
@@ -110,7 +110,7 @@ a second person, and one open Draft. To lay the Space out offline instead of unz
 | `analyst` | `la-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
 | `manager` | `la-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
 | `reviewer` | `la-viewer`, member as reviewer | reads `sim-swap-takeover`; any change is refused (403) |
-| `outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `outsider` | `no-access`, admitted to no Space | nothing: signs in, but no Space is listed and every read answers 404 |
 | `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
 
 **The Alert Rule.** `mfs_wallet_drained_after_sim_swap` (WARNING) reads the one row of `mfs_swap_drain_counts`: a

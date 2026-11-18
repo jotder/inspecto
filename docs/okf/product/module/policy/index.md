@@ -11,17 +11,17 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.policy`](../../../../../product-map/module/policy.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Attribute-based access policy — plan of record](plan.md) |
-| spec | current | [Attribute-based access policy — implementation spec](spec.md) |
-| architecture | current | [Attribute-based access policy — architecture](architecture.md) |
-| features | current | [Attribute-based access policy — features](features.md) |
+| plan | current | [Attribute-based access policy — plan of record](plan-policy.md) |
+| spec | current | [Attribute-based access policy — implementation spec](spec-policy.md) |
+| architecture | current | [Attribute-based access policy — architecture](architecture-policy.md) |
+| features | current | [Attribute-based access policy — features](features-policy.md) |
 | feature-db | current | [Attribute-based access policy — feature database](feature-db.md) |
-| user-guide | current | [Attribute-based access policy — user guide](user-guide.md) |
-| admin-guide | current | [Attribute-based access policy — admin guide](admin-guide.md) |
+| user-guide | current | [Attribute-based access policy — user guide](user-guide-policy.md) |
+| admin-guide | current | [Attribute-based access policy — admin guide](admin-guide-policy.md) |
 | api | n/a | implements the AccessDecider and EditionFeatureProvider contracts owned by module.auth-spi and the core; the /access/policies routes are core routes documented in module.access api-access.md |
 | tests | current | [Attribute-based access policy — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

@@ -36,7 +36,7 @@ class DocsSearchTest {
     @Test
     void onlyUserFacingDocsAreSearched(@TempDir Path docs) throws IOException {
         for (String p : List.of("GLOSSARY.md", "USER_GUIDE.md", "ADVANCED_GUIDE.md",
-                "okf/product/module/la-core/user-guide-link-analysis.md", "okf/product/layer/product/admin-guide.md",
+                "okf/product/module/la-core/user-guide-link-analysis.md", "okf/product/layer/product/admin-guide-product.md",
                 "okf/product/module/access/api-access.md", "okf/product/module/access/api.md",
                 // never:
                 "api/deployment/README.md", "README.md", "BACKLOG.md", "archived-documents/USER_GUIDE.md",
@@ -51,7 +51,7 @@ class DocsSearchTest {
         List<Object> files = InspectoTools.search(docs, "ZEBRA").stream().map(h -> h.get("file"))
                 .map(f -> (Object) f.toString().replace('\\', '/')).toList();
         assertEquals(List.of("GLOSSARY.md", "USER_GUIDE.md", "ADVANCED_GUIDE.md",
-                "okf/product/layer/product/admin-guide.md", "okf/product/module/access/api-access.md",
+                "okf/product/layer/product/admin-guide-product.md", "okf/product/module/access/api-access.md",
                 "okf/product/module/access/api.md", "okf/product/module/la-core/user-guide-link-analysis.md"), files);
     }
 }

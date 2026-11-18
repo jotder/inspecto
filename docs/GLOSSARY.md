@@ -4,7 +4,7 @@
 > names, API paths, docs, and conversation must all use the **canonical term** below. The rename rolls out
 > **UI → model → backend** (the migration map is §13). The rules that make this file binding are §0; how the
 > concepts relate to one another is §10 (Component metamodel) and §11 (Graphs & Relationships), with the
-> platform-wide shape in [`okf/product/layer/platform/architecture.md`](okf/product/layer/platform/architecture.md) and the
+> platform-wide shape in [`okf/product/layer/platform/architecture-platform.md`](okf/product/layer/platform/architecture-platform.md) and the
 > per-area spine in §14.
 >
 > *Provenance, not authority (2026-09-10):* the two pre-lock analyses this vocabulary was derived from —
@@ -342,7 +342,7 @@ own flat output Schema. A single source file holding several record kinds (an XM
 multi-layout fixed-width file) is decomposed into one Segment per kind, and each Segment becomes **one output
 table** and **one Catalog node**. Authored as `parsing.plugin.segments` (legacy `processing.segments`);
 `PipelineConfig.Schemas.segments` is `@PublicApi since 2.0.0`. As built:
-`okf/product/module/elt/plan.md`, `okf/product/module/elt/spec-ingest.md`. ⛔ Not a path token, not a
+`okf/product/module/elt/plan-elt.md`, `okf/product/module/elt/spec-ingest.md`. ⛔ Not a path token, not a
 time slice, and ⛔ unrelated to the *market* segment in the brochures — an accidental homonym.
 
 **Field Classification** *(defined 2026-09-10 — `SPEC-GLOSSARY-1`; rewritten 2026-11-14,
@@ -445,7 +445,7 @@ follow the same open-registry posture **Job types** already have (`JobTypeProvid
 
 > ⚠ **An embedded Job and a sub-Pipeline are NOT Steps** *(corrected 2026-08-02 — this entry asserted they
 > were; no `job` or sub-pipeline id has ever existed in `BuiltinNodeType`).* This is not an oversight:
-> §3.8 of [`okf/product/module/elt/architecture.md`](okf/product/module/elt/architecture.md)
+> §3.8 of [`okf/product/module/elt/architecture-elt.md`](okf/product/module/elt/architecture-elt.md)
 > makes **in-motion (Pipeline) vs at-rest (Job)** a binding line, so an at-rest operator cannot be an
 > in-motion node. The two compose as **producer/consumer over a shared store**, never by nesting: a Job
 > fires on the Pipeline's commit (`on_pipeline:`), or binds by store name to a `sink.view` (the designated hand-off —
@@ -465,7 +465,7 @@ the ordered set of its receipts. Type/Instance: *Step Receipt* is the shape (`St
 (`consignment_steps`) is one receipt. ⛔ *StepInfo envelope* is the retired working name — **envelope** already
 names the v1 response envelope, the `Signal` record and a component's sharing envelope; ⛔ *Step Record* — a
 **record** is a data row. Design: `archived-documents/plans-archive/2026-11-17-x5-stepinfo-envelope-plan.md`; as built:
-`okf/product/module/elt/spec-pipeline.md`.
+`okf/product/module/elt/spec-pipeline-model.md`.
 
 **Parser** — Reads a raw file of a given format (CSV, fixed-width, XML, JSON, EDI, ASN.1, …) into rows/columns
 — or, for tree-shaped formats, into records that must be flattened before they load into Tables. Two engines
@@ -486,7 +486,7 @@ Grammar inline and untouched, and later edits to the template reach nothing that
 component and bound the Step via `use: grammar/<id>`. That `use:` form stays **read-supported** in the
 engine (a hand-authored file may still carry it) but is **never authored**, and opening such a Step in the
 editor migrates it to an independent inline copy on save. As built:
-[`okf/product/module/elt/spec-pipeline.md`](okf/product/module/elt/spec-pipeline.md)
+[`okf/product/module/elt/spec-pipeline-model.md`](okf/product/module/elt/spec-pipeline-model.md)
 (the read path that must not be tidied away as dead code) and
 [`okf/product/module/config/user-guide-grammar-config.md`](okf/product/module/config/user-guide-grammar-config.md). *(Provenance:
 `archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`, not maintained.)*
@@ -556,8 +556,8 @@ is read. ⛔ There is no `mode: streaming` value; it is a block, not an enum.
 **Sink** — Writes processed records to a destination. The lakehouse Sink writes **Parquet into a Table**.
 
 **Load** *(added 2026-08-13 — operator decision; as built:
-[`okf/product/module/elt/user-guide.md`](okf/product/module/elt/user-guide.md) ·
-[`okf/product/module/elt/user-guide.md`](okf/product/module/elt/user-guide.md).
+[`okf/product/module/elt/user-guide-elt.md`](okf/product/module/elt/user-guide-elt.md) ·
+[`okf/product/module/elt/user-guide-elt.md`](okf/product/module/elt/user-guide-elt.md).
 Provenance: `archived-documents/plans-archive/definition-surface-unification-plan.md` §4b)* —
 The third **definition stage/drawer** in the unified pipeline editor (**Collector → Parse → Load**): create
 the **Schema** (derive from the parsed sample or import), author the **Mapping** (per-field rules incl.
@@ -573,7 +573,7 @@ Transformer instance named **"Shape &lt;table&gt;"**, or **"Shape records"** whe
 `processing.map.fields[]` and runs at ingest. A Record Transformer added from the palette is a separate chain
 Step that runs after Load, at rest, writing the Pipeline's `output_store:`.)*
 
-**Trigger** — The start condition of a run. ⚠ **There are TWO models** (corrected 2026-09-09; this entry listed four values, omitted `on_signal` entirely, and counted `event`/`on-pipeline` as two names for one mechanism). **Job triggers:** `cron` \| `on_pipeline` \| `on_signal` (+ a `when` guard) \| `manual`, with `catch_up`. **Pipeline triggers** (`PipelineTrigger.Kind`): `SCHEDULE_INTERVAL` \| `SCHEDULE_CRON` \| `EVENT` (`on: commit` or `on: dataset`) \| `MANUAL` \| `DEFAULT_POLL` \| `STREAM` (the continuous lane, `trigger: {type: stream}` — ⚠ it names how a Pipeline is driven, not a Catalog **Stream**), with coalescing and **no** `catch_up`. See `okf/product/module/elt/plan.md` §EXE.3.2. Owned by the
+**Trigger** — The start condition of a run. ⚠ **There are TWO models** (corrected 2026-09-09; this entry listed four values, omitted `on_signal` entirely, and counted `event`/`on-pipeline` as two names for one mechanism). **Job triggers:** `cron` \| `on_pipeline` \| `on_signal` (+ a `when` guard) \| `manual`, with `catch_up`. **Pipeline triggers** (`PipelineTrigger.Kind`): `SCHEDULE_INTERVAL` \| `SCHEDULE_CRON` \| `EVENT` (`on: commit` or `on: dataset`) \| `MANUAL` \| `DEFAULT_POLL` \| `STREAM` (the continuous lane, `trigger: {type: stream}` — ⚠ it names how a Pipeline is driven, not a Catalog **Stream**), with coalescing and **no** `catch_up`. See `okf/product/module/elt/plan-elt.md` §EXE.3.2. Owned by the
 **Scheduler**.
 
 ---
@@ -647,7 +647,7 @@ mutating service defines its dry-run behaviour (record, don't act — MNT-1 exte
 that word is RBAC's (`CapabilityManifest` route gates → `Roles.KNOWN_CAPABILITIES`); ⛔ not *Controller
 Service* — NiFi's term implies user-instantiated enable/disable resources, deliberately that plan's stage 3.
 
-**Execution pool** *(added 2026-09-24; as-built in [`okf/product/module/elt/spec-ingest.md`](okf/product/module/elt/spec-ingest.md) §B.2a)* —
+**Execution pool** *(added 2026-09-24; as-built in [`okf/product/module/elt/spec-consignments.md`](okf/product/module/elt/spec-consignments.md) §B.2a)* —
 A named, server-defined admission tier for **Consignments** (`scheduler.toon` `pools:`), chosen by a Pipeline
 with `processing.pool`. It answers only "may this start now" and never widens a thread or memory cap; an
 unknown name runs in the always-present `default` pool. ⛔ not *queue* (waiting is a state of an admission,
@@ -834,7 +834,7 @@ Breaks can raise **Incidents** (future). *(Lifecycle locked with the product own
 C9 — `archived-documents/superpower-reviews/reconciliation.md`.)*
 
 **Partner settlement terms** *(the `partner-settlement` Space Template, `PACK-PARTNER-SETTLEMENT-1`, added at slice S8
-2026-11-01; as built: `okf/product/solution-pack/partner-settlement/architecture.md`)*:
+2026-11-01; as built: `okf/product/solution-pack/partner-settlement/architecture-partner-settlement.md`)*:
 
 **Settlement Agreement** — The effective-dated commercial terms with one partner for one service. A **Reference**.
 ⛔ never *Contract* in UI text; ⛔ not *Rate card* (the price list, which belongs to re-rating).
@@ -1072,7 +1072,7 @@ Rule's `invoke-api` consequence) and held for a second person's approval before 
 **Connection**, the method, the payload rendered at creation, an idempotency key, and its delivery — attempts and
 the last response. Approved / declined four-eyes (`canApproveChanges`), then sent with bounded retries; a failed
 one can be retried under the same key. *(Added 2026-09-27, operator decision D-P1, `ASSURE-ACTION-REQUESTS-1`; as
-built: [`okf/product/module/action-requests/spec.md`](okf/product/module/action-requests/spec.md).)* ⛔ never
+built: [`okf/product/module/action-requests/spec-action-requests.md`](okf/product/module/action-requests/spec-action-requests.md).)* ⛔ never
 "webhook call" or "outbound action" for this — a **webhook** is the `sink.webhook` Step or a notification
 channel, neither of which is approved. ⛔ Not a **Pending Change**: that holds a config change; this holds a call.
 
@@ -1082,7 +1082,7 @@ its maker types (the narrative), rendered ONCE from a **Report Template** and fi
 *draft → pending → approved → submitted | failed*, plus *declined* (the checker refused it) and *expired*; a
 different person (`canApproveChanges`) approves it, and approving **submits** it. ⛔ *rejected* is reserved for a
 regulator's refusal — never the checker's (that is *declined*). *(Added 2026-10-09, `REGULATORY-REPORTING-1`; as built:
-[`okf/product/module/regulatory-reporting/spec.md`](okf/product/module/regulatory-reporting/spec.md).)* ⛔ Not a
+[`okf/product/module/regulatory-reporting/spec-regulatory-reporting.md`](okf/product/module/regulatory-reporting/spec-regulatory-reporting.md).)* ⛔ Not a
 **Report** Job (a scheduled table export) and not a **Pending Change** (that holds config).
 
 **Report Template** — The definition of one regulator format: its output **fields** (each a source path into the
@@ -1099,7 +1099,7 @@ template.
 names and CIDR ranges an **Action Request** may reach although the egress policy denies their address class by
 default (loopback, link-local, private, CGNAT, this host…). A host entry lifts only the private classes; a CIDR lifts
 its range. Default empty. *(Added 2026-09-27, `ASSURE-ACTION-REQUESTS-1`; as built:
-[`okf/product/module/action-requests/spec.md`](okf/product/module/action-requests/spec.md) §*The egress policy*.)*
+[`okf/product/module/action-requests/spec-action-requests.md`](okf/product/module/action-requests/spec-action-requests.md) §*The egress policy*.)*
 ⛔ Not an Access Profile or an access policy: it governs where a call may go, not who may make it.
 
 **Approval Policy** — The per-Space, per-kind setting (`approval.toon`, `GET|PUT /settings/approval`) that
@@ -1153,7 +1153,7 @@ Never use Entity/Link for artifacts (Component/Part) or assets (Asset/Lineage).
 Entity/Link graph: column → source Entity, column → target Entity, optional columns → Link type/attributes.
 Built **frontend-first in the Link Analysis Studio** (C5, 2026-07-04); the backend projection + schema
 relationships shipped later — V1 is complete, V2+ is open backlog. As built:
-[`okf/product/module/la-core/user-guide.md`](okf/product/module/la-core/user-guide.md). *(Provenance:
+[`okf/product/module/la-core/user-guide-la-core.md`](okf/product/module/la-core/user-guide-la-core.md). *(Provenance:
 `archived-documents/plans-archive/link-analysis-and-graphsource.md` and the two studio plans, not maintained.)*
 
 **Inspecto LA** *(the product; named by operator decision `ED-1`, `LA-EDITIONS-1`, 2026-10-17)* — The **product** that
@@ -1215,7 +1215,7 @@ industry word (AC-09). Further packs whose Entity Types and Record types join th
 means one Entity Type in every pack); the Domain Profile alone gives the vocabulary. ⛔ Not a *Persona lens* (§1-A, a UI annotation of a person's role) and not the **Entity Type Profile** /
 **Entity Profile** pages below (facts about the data). ⛔ Never bare *pack* for it: *pack* alone is ambiguous (pattern
 pack, Job Pack, Solution pack); say *Industry pack* (§15). As built:
-[`okf/product/module/la-core/architecture.md`](okf/product/module/la-core/architecture.md) §3.6.
+[`okf/product/module/la-core/architecture-la-core.md`](okf/product/module/la-core/architecture-la-core.md) §3.6.
 
 **Entity Type Profile** *(Link Analysis, decided 2026-10-15, D-EP1; plan [`archived-documents/plans-archive/la-entity-profile-plan.md`](archived-documents/plans-archive/la-entity-profile-plan.md))* — What the Space's Datasets say about one **Entity Type**, computed on demand and cached until a new File lands: the Dataset columns bound to it, volume and fill rate, sentinel values, value shapes, time span and per-day timeline, freshness, lineage, link and relationship statistics. Aggregates only: it never names an identifier. Read by `GET /inv/entity-types/{id}/profile`; shown on the **Entities** page. ⛔ Not an *Access Profile* or a *Decode Profile* (different concepts); ⛔ not a Dataset profile (it spans every Dataset the type appears in).
 
@@ -1372,7 +1372,7 @@ routes' `?pipeline=`/`?flow=` query param). **Message tier DONE 2026-08-26** —
 | *(no old term)* | **Core** (`@inspecto/core`) · **Link Analysis library** (`@inspecto/link-analysis`) · **gamma** · **la-app** | ✅ **Named 2026-10-02 (D-5 step 6, signed Decision 4)**, in-workspace code only (no npm package, no ng-packagr). **Core** = `inspecto-ui/src/app/inspecto/*`, imported as `@inspecto/core/*` (design system, API clients, OIDC client code, the host-service contracts' dependencies). **Link Analysis library** = `inspecto-ui/projects/link-analysis`, whose only eager surface is `@inspecto/link-analysis` (`public-api.ts`). **gamma** = the Inspecto console, the Angular application at the repository root (name kept; renaming it is not a D-5 job). **la-app** = the Link Analysis application, `inspecto-ui/projects/la-app`: its own shell and routes over the same Core and library. These are code and build names, not product concepts for a user to learn: the UI says *Link Analysis*, never *la-app*. ⛔ The application a bundle ships is its **Product**'s `host` (§15; `package.ps1 -Product inspecto|la` since `PRODUCT-ASSEMBLY-1` PA-2 replaced the `-Ui` flavor), never an **edition** (EDITIONS.md): every edition can ship either application. |
 | *(no old term)* | **Inspecto LA** *(product)* vs **Link Analysis** *(capability)* | ✅ **Named 2026-10-17 (`ED-1`, `LA-EDITIONS-1`)**. Product name only: `la-app` index title, shell brand, landing heading and the shared sign-in screen (through `AppEnvironment.productName`, which the console leaves unset and so still reads "Inspecto"); user docs `docs/ui/link-analysis-*.md`, `docs/ops/la-*-runbook.md`, the two Link Analysis OKF concepts. Routes, keys, modules, packages and nav labels keep **Link Analysis** — no code rename. Whitepaper done 2026-10-18 (version 1.1); `TECHNICAL_ARCHITECTURE.md` carries no old naming. |
 | *(no old term)* · ~~kernel~~ *(the always-present layer, in the first plan draft)* | **Product** (**Domain product** · **Platform product**) · **App** · **Industry** · **Suite** · **Distribution** · **Entitlement** · **Assembly Plan** · **Product lock** · **Composed Space Template** (PA-5: `space:`, `tools/compose-space.mjs`) · **Base** modules | ⏳ **Named 2026-11-10 (`PRODUCT-ASSEMBLY-1` PA-0; §15 *Product assembly*)**. Docs only so far. Touchpoints arrive with the phases: model and guards in PA-1 (`products/`, `apps/`, `industries/`), the assembler in PA-2, `/bootstrap` in PA-3, the shell in PA-4, the Product Map kinds `industry` · `app` · `product` in PA-10. Existing code names stay: `la-app`, gamma, `industry-packs/`. |
-| ~~Lenses & selection~~ *(LA Studio toolbar group)* · ~~Save as a case~~ *(LA saved view)* | **Canvas mode** · **Save view** / **Save view as…** | ✅ **UI DONE 2026-10-27 (`LA-STUDIO-UI-REORG-1` P1a, P3a)**: second toolbar "Canvas mode" group; File ▸ Save view / Save view as… / Open…. The model keeps `link-analysis-view` and the `?view=` param (no rename needed). Docs: `okf/product/module/la-core/user-guide.md` §4–§6. |
+| ~~Lenses & selection~~ *(LA Studio toolbar group)* · ~~Save as a case~~ *(LA saved view)* | **Canvas mode** · **Save view** / **Save view as…** | ✅ **UI DONE 2026-10-27 (`LA-STUDIO-UI-REORG-1` P1a, P3a)**: second toolbar "Canvas mode" group; File ▸ Save view / Save view as… / Open…. The model keeps `link-analysis-view` and the `?view=` param (no rename needed). Docs: `okf/product/module/la-core/user-guide-la-core.md` §4–§6. |
 | ~~Sandbox~~ *(per-analyst working copy; the option-D placeholder)* | **Draft** | Vocabulary only (2026-10-03, `D16`); no code yet. Touchpoints for `D-7`: SPA labels/routes, `Draft*` model types, `/inv/investigations/{id}/drafts*` routes, per-Draft DuckDB file naming, audit action `draft.*`. Never touch `SqlSandboxPolicy` (the SQL sandbox keeps its word); never confuse with Pipeline draft / *Import as draft* (§11 *Draft*). |
 
 **Migration underway** (the *2b* coordinated breaking change, toward the pending **4.0.0** — one term per

@@ -9,9 +9,9 @@ timestamp: 2026-11-15T00:00:00Z
 # Link Analysis — as-built reference and design records
 
 For engineers, support and power users. Each fact is dated where it was built. Where this page and the
-[user guide](user-guide.md) differ on a control's name, the user guide (today's Studio) is right; the dated records
+[user guide](user-guide-la-core.md) differ on a control's name, the user guide (today's Studio) is right; the dated records
 describe the behaviour, not the current layout. Module structure, op log, store port, index layout, Graph Run
-budgets, route table, editions and the limits catalogue are in [architecture.md](architecture.md); gates, embed
+budgets, route table, editions and the limits catalogue are in [architecture-la-core.md](architecture-la-core.md); gates, embed
 links and the Investigation UI are in [architecture-http-and-ui.md](architecture-http-and-ui.md). This page keeps what
 only it says: measurements with their numbers, decisions with their reasons, limits with their consequences.
 
@@ -38,7 +38,7 @@ What is where:
   The sign-in screen is the core's, shared with the console; it reads `AppEnvironment.productName`, which each host sets
   from its Product's `brand` (`products/<id>.toon` → the host's `product.generated.ts`).
 * **Editions.** Routes live in `inspecto-geo-link`, in every edition since LA-EDITIONS-1 phase 3; placement, the
-  `investigations` feature and the add-on: [architecture.md](architecture.md) §8. SPA side: `LA_FEATURES.investigations`
+  `investigations` feature and the add-on: [architecture-la-core.md](architecture-la-core.md) §8. SPA side: `LA_FEATURES.investigations`
   (`SessionService.investigationsEnabled`, `/bootstrap` `features.investigations`) hides the Investigation tab, buttons,
   deep-link openers, Graph Run controls and the `/open` page's actions; `SessionService.geoLinkEnabled` mirrors
   `features.geoLink` and hides the nav entry and the Menu-Builder widget offer; a deep link that still reaches the page
@@ -94,7 +94,7 @@ What is where:
     Link-Analysis View · Dataset · Widget) and V2 (c) per-Space pattern packs. **2026-07-27** V2 (d)'s authoring half —
     V2 complete.
 * **Investigation pivot** (2026-07-20): a node resolving an `objectRef` offers "View on map"; shared contract in the
-  [user guide](user-guide.md).
+  [user guide](user-guide-la-core.md).
 * **Geo scene of the `la-showcase` demo** (2026-10-12; SYNTHETIC, cities only). `mule_account_locations` (113 accounts,
   city centroid + deterministic jitter, `SITE_TYPE`) and `mule_geo_legs` (planted legs, both ends geocoded); Datasets
   `mule_account_locations_dataset`, `mule_ring_legs_dataset`, `mule_cashout_legs_dataset`; Geo Views
@@ -112,7 +112,7 @@ What is where:
   It brushes across routes (root-scoped); split-pane mode and graph-path → map-route tracing are deferred.
 * **V2 decisions of record (2026-07-25, BACKLOG D9 / D10 / D16)** — all three generalised an existing seam:
   * **D9 sharing — shipped 2026-07-26.** The Exchange `kind` axis carries `link-analysis-view`; as-built is
-    [exchange spec](../exchange/spec.md) (authoritative). LA side: "Offer for sharing" in the per-view menu, gated on
+    [exchange spec](../exchange/spec-exchange.md) (authoritative). LA side: "Offer for sharing" in the per-view menu, gated on
     `exchangeEnabled() && canOfferDatasets()` and source `entity-projection`. ⚠ A view's Datasets are its projection
     mappings (`query.projections[].datasetId`, else `query.projection.datasetId`), *not* `query.roots`/`query.from`
     (the lineage shape) — reading roots/from 422'd every shipped view while hand-written tests passed.
@@ -214,7 +214,7 @@ every link type.
 - **Override:** *All link labels* (Display menu and View toolbox; disabled while *Link labels* is off), saved as
   `display.allEdgeLabels: true` (omitted when off); undo/redo snapshots it. Covered by vitest only.
 - **Large-graph detail above 1,000 links** (`LA-PERF-N4-1`, 2026-11-13: arrowheads and node labels, state `detailed`,
-  override `display.allDetail`) with its measurements: [spec.md](spec.md) (performance seams).
+  override `display.allDetail`) with its measurements: [spec-la-core.md](spec-la-core.md) (performance seams).
 
 ## Grounded limits and consequences
 
@@ -224,7 +224,7 @@ every link type.
 ### Limits in force
 
 **Every limit is configuration (`LA-CONFIG-LIMITS-1`, 2026-10-15)** — catalogue, layers, routes and hot apply:
-[architecture.md](architecture.md) §9. SPA side: `LaLimitsService` (`la-limits.service.ts`) loads
+[architecture-la-core.md](architecture-la-core.md) §9. SPA side: `LaLimitsService` (`la-limits.service.ts`) loads
 `GET /settings/link-analysis/limits` per Space into the `laLimit(key)` store (`la-limits.ts`); code reads `laLimit(key)`
 (the analyst's own value for `browser:true` items, else the Space value). `LA_LIMIT_FALLBACKS` is the ONE fallback table
 (before the GET answers, after it fails, or in the embed viewer), pinned by `LaLimitCatalogueParityTest`. Personal values:
@@ -241,14 +241,14 @@ every link type.
   limit is `display.geo_point_cap`.
 * **Connect** sends `connect.default_hops` (3); `connect.max_hops` (6) is only the ceiling the analyst may pick.
 * `MAX_CASE_MEMBERS` (100) stays an SPA constant (server `CaseRoutes.MAX_CASE_ENTITIES`). The dashboard link and geo
-  widgets: [architecture.md](architecture.md) §9 *SPA loading*.
+  widgets: [architecture-la-core.md](architecture-la-core.md) §9 *SPA loading*.
 
 | Limit | Default | Where | At the edge |
 |---|---|---|---|
 | `projection_node_cap` | 1,000 | `projectionNodeCapValue()` (`entity-projection.ts`) | truncates; the 4,000-row read cap often binds first (465–767 nodes) and the notice says which cap cut it |
 | `analysis_node_cap` | 2,500 | `analysisNodeCapValue()` | ⚠ throws on super-linear algorithms (caught, see below) |
 | `traversal.rows_default` / `rows_max` | 4,000 / 40,000 rows | `LaLimit.java` | clamps, `truncated: true` |
-| Render | none | `graph-view.component.ts` | no virtualisation, culling or WebGL (WebGL measured and refused: [spec.md](spec.md)) |
+| Render | none | `graph-view.component.ts` | no virtualisation, culling or WebGL (WebGL measured and refused: [spec-la-core.md](spec-la-core.md)) |
 
 * **Measured-defaults caveat:** the shipped caps came from one host, one browser, one synthetic shape; a denser graph or
   slower laptop moves them.
@@ -404,7 +404,7 @@ every link type.
   (`branching-parity.fixture.json` asserted by both sides). **Run on server** shows only when the graph is truncated and
   an edge mapping is loaded; the answer merges onto the working set (`branchingResultToGraph`). Deliberate differences:
   no node cap server-side; a `nodeKind` other than `entity` matches nothing. The motif matcher's platform split:
-  [architecture.md](architecture.md) §5.
+  [architecture-la-core.md](architecture-la-core.md) §5.
 
 ### Value Measures and standing detection
 
@@ -430,7 +430,7 @@ every link type.
   (`POST …/standing-detection {rule}`, `canAuthorAlertRules`, owner only, bound value-measure rule only). Enable records
   the owner's authority under `standing` (id, capabilities, data scopes, IdP attributes, Dataset, masking snapshot);
   `StandingDetection` re-decides before every read (principal, refusal codes and the `la.detect` Job:
-  [architecture.md](architecture.md) §7): owner id or a **`user`** share still grants view on the Dataset's CURRENT
+  [architecture-la-core.md](architecture-la-core.md) §7): owner id or a **`user`** share still grants view on the Dataset's CURRENT
   envelope (`ComponentAccess.canViewAs`; **a role share cannot be re-resolved off a request, so role-only is refused**;
   `canConfigureAccess` never honoured), owner still a lead, masking not **tightened**, PDP (synthetic Subject,
   `RowScope.visibleAs`) does not DENY. Every refusal is an EMPTY `Reading` with a code and an audit event
@@ -545,7 +545,7 @@ every link type.
   (optionally to `targetNode`), with `direction`, `weightCol`, a validated `filter`, `temporalConstraint`. Every fence is
   INSIDE the recursion: depth a bound `?`, cycles refused by `list_contains`, edge yield a bound `LIMIT` per level
   (`edgeYieldCapped` + `truncated`), a route-local `SqlSandboxPolicy` timeout via `QueryExecutor.run(Request, policy)`.
-  Current depth / timeout / path defaults are configuration ([architecture.md](architecture.md) §9; the 2026-09-23
+  Current depth / timeout / path defaults are configuration ([architecture-la-core.md](architecture-la-core.md) §9; the 2026-09-23
   defaults were depth 6 / cap 10 / 5 s). Audited `LINK_TRAVERSED`. Body names `dataset`/`sourceCol`/`targetCol`. SPA
   *Find paths (server)*: From (required), To (blank = any), max hops, direction; sends the node's FIRST RAW SPELLING (the
   server compares `CAST(col AS VARCHAR)` exactly) plus the pushed `filter`; `recursivePathsToGraph` mints hops through
@@ -574,7 +574,7 @@ every link type.
   `crypto.subtle` needs a secure context — elsewhere the dialog refuses to seal (never a weaker digest). A snapshot sealed
   while an Investigation is open carries its `investigationId` (outside `manifestHash`).
 * **An Investigation is a server-side append-only op log** (LA-10, 2026-09-23; model and hashing:
-  [architecture.md](architecture.md) §3.1). `POST /inv/investigations` binds a Dataset + mapping; `/{id}/ops` answers the
+  [architecture-la-core.md](architecture-la-core.md) §3.1). `POST /inv/investigations` binds a Dataset + mapping; `/{id}/ops` answers the
   Working Set **delta** + `truncated`; `/{id}/undo` is a recorded log edit (state after = state before the undone op);
   `/{id}/replay` re-evaluates; `GET /{id}/log` renders plain-language lines. ⚠ Replay uses PREFIX semantics (position k
   honours only undos at or before k). ⛔ **Nothing is pinned** (D-E3): `datasetVersion` is `null`; each `expand` SEALS its
@@ -630,7 +630,7 @@ every link type.
   `direction`, rung `window`, `linkKinds` (comma list ≤ 100; server 422s without a link-kind column), `minEvents`,
   `minDistinctDays`, `candidateDegreeMin/Max` (min ≤ max), `maxFanOut`. The *Time window* form
   (`investigation-window-op.component`) and the rung override share `investigation-window-fields.component`; bounds in
-  `investigation-rung-form.ts`; a server 422 renders verbatim. (Current expand budget bounds: [architecture.md](architecture.md) §9.)
+  `investigation-rung-form.ts`; a server 422 renders verbatim. (Current expand budget bounds: [architecture-la-core.md](architecture-la-core.md) §9.)
 * **The Investigation tab drives it** (LA-10 SPA, 2026-09-23; `link-analysis-investigation.component` over the
   pane-provided `InvestigationSessionStore`). Start binds Dataset + columns; ⚠ the query's `filter` is not sent (the
   create route takes none). While one is open a canvas click picks the entity and the canvas draws the **Working Set**.
@@ -692,7 +692,7 @@ every link type.
   with it. Per-Collector coverage: [decisions of record](#decisions-of-record).
 * **Purpose, masking, four-eyes** (D-U5/U6/U7, 2026-09-24): Start and Instantiate REQUIRE a *Purpose / legal basis*
   (422 without), sealed and shown in the Dossier, never enforced. Ids may arrive as `masked:<16 hex>` per `maskingMode`
-  (default `typed`; rules: [architecture.md](architecture.md) §3.4). Since 2026-10-04 (`ASSURE-CLASSIFICATION-PROPAGATION-1`)
+  (default `typed`; rules: [architecture-la-core.md](architecture-la-core.md) §3.4). Since 2026-10-04 (`ASSURE-CLASSIFICATION-PROPAGATION-1`)
   column classification also comes from the pipeline schema's `raw.fields[].classification` followed through its mapping
   by `DatasetProvider.schemaClassification` (shared with `publish.postgres` and Risk Score evidence): strictest-wins on a
   computed column; untraceable lineage of a masked class masks every id. A pseudonym may be sent back in an op's `ids`.
@@ -747,7 +747,7 @@ every link type.
 *Server-side graph analysis, as built 2026-10-01 (LA separation D-4; GLOSSARY "Graph Run").* One execution of one of the
 29 algorithms on the SERVER over an Investigation's Working Set — the way past the browser caps; both implementations
 held equal by parity fixtures. Modules, input routing, budgets, pool, cache, `propagatedRisk`, the motif and temporal
-platform split: [architecture.md](architecture.md) §5. Below: what only this page states.
+platform split: [architecture-la-core.md](architecture-la-core.md) §5. Below: what only this page states.
 
 * **Modules.** `inspecto-graph` (pure JDK, `platform/` since D-AN2 2026-10-17): the six `Graph*` classes plus `RunControl` /
   `GraphAborted`; old signatures delegate with a no-op `RunControl`. 17 algorithms are instrumented; the 11 without a
@@ -983,13 +983,13 @@ where a later bullet supersedes them.
   Entity Lists / Access, Settings > Link Analysis, Investigation tab sections, all-algorithms group, Installed modules,
   canvas, Alerts grid, data tables) clean in jsdom axe; `color-contrast` and dark scheme are real-browser steps.
 * **Still open** (`docs/BACKLOG.md` §3.12): `LA-A11Y-AUDIT-1` (manual items above). The la-app OIDC run against a real IAM
-  closed 2026-10-13 ([admin guide](admin-guide.md)).
+  closed 2026-10-13 ([admin guide](admin-guide-la-core.md)).
 
 ## Index
 
 *D-3, as built 2026-10-02 to 2026-10-06.* The edge/node index of a Dataset — Parquet under `<Space write root>/la-index`,
 built by `IndexBuildService` (`inspecto-la-storage`), exposed by `IndexRoutes` (`inspecto-la-api`). Layout, bucket,
-build memory, modes, staleness, build service, reader, served routes and the age gate: [architecture.md](architecture.md)
+build memory, modes, staleness, build service, reader, served routes and the age gate: [architecture-la-core.md](architecture-la-core.md)
 §4; reasons and measurements: [Index design record](#index-design-record). Below: route contracts and SPA.
 
 * `IndexBuildService.close()` records every cancel BEFORE interrupting the pool, so a builder that throws on interrupt still
@@ -1065,7 +1065,7 @@ build memory, modes, staleness, build service, reader, served routes and the age
   `Answered from the link index vN` / `Answered from the Dataset because <words>`, `FALLBACK_REASON_TEXT` in
   `index-source.ts`) also shows under *Find paths (server)* and after a canvas neighbour expand. ⚠ The log step line adds
   `read from link index vN` only when the log view carries `read.index`, which today it strips. Not driven live.
-* **Scheduled build** (`la.index.build`, LA-DAILY-INGEST-1 T5, 2026-10-06; wiring: [architecture.md](architecture.md)
+* **Scheduled build** (`la.index.build`, LA-DAILY-INGEST-1 T5, 2026-10-06; wiring: [architecture-la-core.md](architecture-la-core.md)
   §4, §7): triggered by `pipeline.commit` (`job.dataset.produced` is emitted only by the `sql.template` Job); `attr_cols`
   must be a comma string (a TOON array fails closed `MAPPING_INVALID`); runs only the mode `plan` recommends (`append`;
   `compact` then `append` at the 8-delta cap; `full` only with `allow_full`); a server refusal is one recorded `REFUSED`,
@@ -1225,7 +1225,7 @@ out 24, in 25, nodes 9.7, statistics 13), the replaced statement OOMs (60.9/61.0
 At 3x10^7 (4 GB, 8 threads): 276 s (nodes 112, statistics 66) old vs 153 s (nodes 14.8, statistics 40) new. `nodes` now
 costs ~0.35-0.5 µs per edge at 3x10^7 and 10^8 (old 3.7 and 4.2-7.0). Peak working set follows the cap (1.4 / 2.4 / 8.1 GB
 at 1 / 2 / 8 GB: DuckDB fills what it is given), so it is no measure of need — the lowest cap that completed is. Entity
-cardinality and the production `index.build_memory_pct`: [architecture.md](architecture.md) §9, §10.
+cardinality and the production `index.build_memory_pct`: [architecture-la-core.md](architecture-la-core.md) §9, §10.
 
 **Not measured.** Any build above 10^8 edges; the `out` / `in` sorts and the statistics' other global steps beyond 10^8; a
 corpus with a realistic node count; APPEND, COMPACT and read latency at these caps.
@@ -1242,7 +1242,7 @@ corpus with a realistic node count; APPEND, COMPACT and read latency at these ca
   access (only `PUT …/case` shares). `url` absolute `http`/`https`, a host, no credentials, else 422. Audited
   `LINK_INVESTIGATION_REFERENCE_ADDED`.
 * **Investigation members** (D7-1, D19 amending D-E7; `InvestigationMembers`, `InvestigationMemberStore`,
-  `InvestigationMemberRoutes`). Roles and fold: [architecture.md](architecture.md) §3.1. The creator is the implicit first
+  `InvestigationMemberRoutes`). Roles and fold: [architecture-la-core.md](architecture-la-core.md) §3.1. The creator is the implicit first
   lead, so an Investigation with NO `members.jsonl` behaves as owner-only (nothing migrated). `GET …/members` (any member),
   `POST …/members {subject, role}` and `POST …/members/revoke {subject}` (lead; `canManageIncidents`; non-lead 403,
   non-member 404); last lead 422; audited `LINK_INV_MEMBER_GRANTED` / `_REVOKED`. **The gate** is `InvestigationRoutes.open*`:
@@ -1252,7 +1252,7 @@ corpus with a realistic node count; APPEND, COMPACT and read latency at these ca
   holder before). R3 and the PDP judge every member and only narrow: the PDP resource carries `members`, a DENY hides the
   Investigation even from a lead and its 403s are withheld behind it.
 * **Drafts** (D-7; D7-3 to D7-6, D16-D21; `DraftStore`, `DraftRoutes`; shape and states:
-  [architecture.md](architecture.md) §3.3). ONE live Draft per member (D17: a second fork is 409 naming the first). The
+  [architecture-la-core.md](architecture-la-core.md) §3.3). ONE live Draft per member (D17: a second fork is 409 naming the first). The
   writer is the main log's (`SnapshotStore.appendStepAt`); steps CONTINUE the numbering. **Base-state rule:** state = the
   evaluator over main entries 1..k + the Draft's own — nothing copied, so a later main step never changes it (`behind` /
   `stale` report how far main moved); `baseLogHash` fails a Draft CLOSED (409) if the main prefix was rewritten. Routes
@@ -1377,7 +1377,7 @@ Retired design and edge-classification companion
   reload resumes via `/auth/refresh`, sign-out clears `inspecto.session.resumable`. Not driven: token expiry and the
   401-then-refresh retry (`auth.interceptor.spec.ts`); no la-app browser e2e harness exists (backend half `DemoAuthHttpTest`).
 * **Real WSO2** (2026-10-05 / 10-09 / 10-10; closed 2026-10-13 as `LA-APP-REAL-SIGNIN-1`, setup and limits in the
-  [admin guide](admin-guide.md)): gotchas — `groups` must be an access-token attribute; the post-logout URL must be a
+  [admin guide](admin-guide-la-core.md)): gotchas — `groups` must be an access-token attribute; the post-logout URL must be a
   registered callback; `serve.bat` does not wire `tokenEndpoint`/`rolesClaim` from env; the built-in browser cannot pass a
   self-signed certificate page. Fixed 2026-10-10: an unconfigured OIDC build shows "Single sign-on isn't set up" and does not
   redirect; the authorize request carries a one-shot `nonce` that `/auth/exchange` forwards and `OidcTokenRelay` checks
@@ -1415,7 +1415,7 @@ installation trusts another; a live call (and so trust relationship I1) is neede
 longer needs `inspecto-processor`, `-etl` or `-engine`. Design
 [archived](../../../../archived-documents/plans-archive/la-separation-d1-design.md); execution order in
 [`la-separation-execution-plan.md`](../../../../archived-documents/plans-archive/la-separation-execution-plan.md). Today's
-module map: [architecture.md](architecture.md) §2.
+module map: [architecture-la-core.md](architecture-la-core.md) §2.
 
 | Module | Holds |
 |---|---|
@@ -1461,7 +1461,7 @@ remainder is on `docs/BACKLOG.md` §3.12. This section keeps what no other secti
 
 One host, one browser, one synthetic shape (2026-09-22). The default `dagre` layout has a **cliff between 500 and 750
 nodes** (0.9 s → 10.7 s; 16.2 s at 1,000; force ~2.4x dearer at 500) — the reason the projection cap was set at 500; it has
-since risen to 1,000 (`LA-CONFIG-LIMITS-1`) and every layout is now capped where it reaches G6 ([spec.md](spec.md)).
+since risen to 1,000 (`LA-CONFIG-LIMITS-1`) and every layout is now capped where it reaches G6 ([spec-la-core.md](spec-la-core.md)).
 Analysis is not the constraint except **betweenness** (425 ms / 2.9 s / 9.8 s at 500 / 1,000 / 2,000 nodes; the other 26
 algorithms ~129 ms total at 2,000). 🔴 Suspicion score was first blamed because it was the only thing measured that called
 betweenness; the sweep timed only the centrality control's default — **time every option a control offers**. Suspicion
@@ -1474,7 +1474,7 @@ trip plus worker build config does not repay one slow algorithm; reconfirmed by 
 
 The Investigation is the program, the Working Set its derived state, the Artifact immutable and anchored to a log position.
 The op vocabulary is **closed — no new op without a decision entry** (today's evaluable set:
-[architecture.md](architecture.md) §3.1); reasons: the backend is safe because it is narrow (`SAFE_IDENT` + bind
+[architecture-la-core.md](architecture-la-core.md) §3.1); reasons: the backend is safe because it is narrow (`SAFE_IDENT` + bind
 parameters), a closed set renders mechanically as numbered plain-language steps for a court, and every open query language
 converges on SQL. `undo` is a recorded log edit, not an op; `resolve` (LA-17) and `connect` came under their own decisions;
 an op outside the vocabulary answers 422 *"unknown"*. The log is **ordered and non-commutative** (`exclude → expand` ≠
@@ -1575,7 +1575,7 @@ such a Dataset a sealed window can sit an offset away from the highlight.
   **`temporalConstraint.maxGapHours`** (positive; 422 without `monotonic: true`); flat CTE and index walk both apply it
   (`ControlApiInvIndexedTraversalTest`). It only removes paths; gates unchanged.
 * **`POST /inv/pattern/temporal`** (`PatternRoutes`; maths in `LinkTemporalDetector`; the DuckDB cut and current row cap:
-  [architecture.md](architecture.md) §5): `{dataset, sourceCol, targetCol, timeCol, mode, series?, filter?, limit?,
+  [architecture-la-core.md](architecture-la-core.md) §5): `{dataset, sourceCol, targetCol, timeCol, mode, series?, filter?, limit?,
   windowSeconds?, minEvents?, maxCv?}`. Series = event times of one directed link as spelled (not normalised). *Burst:* a
   `windowSeconds` window (default 60, 1–86,400) holding ≥ `minEvents` (default 5, 2–1,000), overlapping windows merged,
   edge inclusive. *Periodicity:* ≥ `minEvents` (default 5, min 3) with gap CV (population σ / mean) ≤ `maxCv` (default 0.1,
@@ -1622,7 +1622,7 @@ the sealed `linkAnnotations` render, and the Dossier stamps `linkId` on its link
   `physicalRef`/`sourceName`, attributed to `collector().id()`. The Dataset-filename join was **rejected** (lineage `src_id`
   is a member index; the ledger / `file_stages` are opt-in with no list-by-file read; `file_name` optional; basenames
   collide). No evidence ⇒ `assessed:false`, never "no gaps". The Dossier does not seal live coverage. Residuals:
-  never-delivering Collectors are invisible ([architecture.md](architecture.md) §10); partition days use the Pipeline's
+  never-delivering Collectors are invisible ([architecture-la-core.md](architecture-la-core.md) §10); partition days use the Pipeline's
   pinned zone. `HostCollectorCoveragePort.day()` is pinned for `year=/month=/day=` and `dt=` forms. SPA: a table
   (Collector · days covered of expected · missing days); `assessed:false` prints "Per-Collector coverage is not assessed
   for this Dataset." plus the server's note.
@@ -1666,7 +1666,7 @@ Design (archived): [`link-analysis-and-graphsource.md`](../../../../archived-doc
 
 ## InvestigationStore port
 
-*S0 + S1, as built 2026-10-04; backends compared in [architecture.md](architecture.md) §3.2.* Sidecar records sit behind
+*S0 + S1, as built 2026-10-04; backends compared in [architecture-la-core.md](architecture-la-core.md) §3.2.* Sidecar records sit behind
 `InvestigationStore` (la-core), keyed by id and `Scope(investigationId, draftId|null)`, never a Path;
 `InvestigationStores.of(writeRoot)` is the one place a backend is chosen. Writers carry the version they read
 (`append(scope, expectedVersion, …)`, `appendMember(expectedCount)`); a lost race is
@@ -1764,8 +1764,8 @@ Carried over 2026-10-05 when eight LA plan / design docs were archived into the
 
 ### Entity model and live detection
 
-*Entity List storage and the fact chain are outlined in [entity-list spec](../entity-list/spec.md) and
-[architecture.md](architecture.md) §3.5.*
+*Entity List storage and the fact chain are outlined in [entity-list spec](../entity-list/spec-entity-list.md) and
+[architecture-la-core.md](architecture-la-core.md) §3.5.*
 
 * **Entity Types:** normaliser closed enum `default | digits | e164 | upper-trim`, Java and TS identical via
   `entity-normaliser-parity.fixture.json` (`entity-key.spec.ts`, `EntityTypesTest`). "Whitespace" = the JavaScript `\s` set

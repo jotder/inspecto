@@ -28,7 +28,7 @@ Three convictions anchor every requirement:
 3. **Operable by design** — every Run is crash-isolated and idempotent; everything is captured as
    Signals, Metrics, audit, and managed objects.
 
-The north star ([`okf/product/layer/platform/architecture.md`](okf/product/layer/platform/architecture.md))
+The north star ([`okf/product/layer/platform/architecture-platform.md`](okf/product/layer/platform/architecture-platform.md))
 frames the platform as **seven cooperating networks over one Component metamodel** (Data · Signal ·
 Decision · Execution · Metadata · Presentation · Security), so it can evolve from deterministic rules to
 AI-driven autonomy without redesign.
@@ -98,10 +98,10 @@ AI-driven autonomy without redesign.
 
 | Area | IDs | Requirement of record |
 |---|---|---|
-| `ACQ` — **Acquisition & connectivity** | `ACQ-1` … `ACQ-7` | [`acquisition/acquisition.md`](okf/product/module/elt/plan.md) §ACQ.2 |
-| `ING` — **Ingestion & parsing** | `ING-1` … `ING-6` | [`ingestion/ingestion.md`](okf/product/module/elt/plan.md) §2 |
-| `PIP` — **Pipeline authoring** | `PIP-1` | [`pipeline-authoring/pipeline-authoring.md`](okf/product/module/elt/plan.md) §2 |
-| `PIP` — **Pipeline execution** | `PIP-2` … `PIP-7` | [`pipeline-execution/pipeline-execution.md`](okf/product/module/elt/plan.md) §EXE.2 |
+| `ACQ` — **Acquisition & connectivity** | `ACQ-1` … `ACQ-7` | [`acquisition/acquisition.md`](okf/product/module/elt/plan-elt.md) §ACQ.2 |
+| `ING` — **Ingestion & parsing** | `ING-1` … `ING-6` | [`ingestion/ingestion.md`](okf/product/module/elt/plan-elt.md) §2 |
+| `PIP` — **Pipeline authoring** | `PIP-1` | [`pipeline-authoring/pipeline-authoring.md`](okf/product/module/elt/plan-elt.md) §2 |
+| `PIP` — **Pipeline execution** | `PIP-2` … `PIP-7` | [`pipeline-execution/pipeline-execution.md`](okf/product/module/elt/plan-elt.md) §EXE.2 |
 | `DAT` — **Data plane** | `DAT-1` … `DAT-6` | [`data-plane/data-plane.md`](okf/product/layer/platform/plan-data-plane.md) §2 |
 | `BI · INV` — **Studio** | `BI-1` … `BI-8` · `INV-1` … `INV-4` | [`studio/studio.md`](okf/product/layer/product/plan-studio.md) §2 |
 | `OPS` — **Observability & maintenance** | `OPS-1` … `OPS-6` | [`observability/observability.md`](okf/product/module/observability/plan-observability.md) §2 |
@@ -285,7 +285,7 @@ template gallery + apply).*
 | Document | What it grounds |
 |---|---|
 | [`api/README.md`](api/README.md) · [`okf/product/module/processor/api-v1.md`](okf/product/module/processor/api-v1.md) | The `/api/v1` contract as built — envelope, error catalog, OpenAPI, ETag concurrency, `/bootstrap` (API-1…5) |
-| [`okf/product/layer/platform/architecture.md`](okf/product/layer/platform/architecture.md) | Seven-network north star (the R1–R6 rework shipped 2026-07-06; plan archived 2026-09-07) |
+| [`okf/product/layer/platform/architecture-platform.md`](okf/product/layer/platform/architecture-platform.md) | Seven-network north star (the R1–R6 rework shipped 2026-07-06; plan archived 2026-09-07) |
 | [`BACKLOG.md`](BACKLOG.md) | Every open row, ranked; §6 the standing refusals; §7 the duplicate map |
 | [`okf/product/module/intelligence/architecture-embedded-intelligence.md`](okf/product/module/intelligence/architecture-embedded-intelligence.md) | The Assistant's autonomy ladder and tool surface as built (AGT-5, complete 2026-07-21) |
 | [`okf/product/layer/platform/plan-roadmap.md`](okf/product/layer/platform/plan-roadmap.md) · [`okf/product/layer/product/brochure-stakeholder-overview.md`](okf/product/layer/product/brochure-stakeholder-overview.md) | Horizons; value proposition; maturity |

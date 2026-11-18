@@ -11,7 +11,7 @@ description: >
 
 # Link Analysis showcase Spaces — how they are built
 
-Canonical facts: `docs/okf/product/solution-pack/la-showcase/architecture.md` (pattern,
+Canonical facts: `docs/okf/product/solution-pack/la-showcase/architecture-la-showcase.md` (pattern,
 data generation, gotchas) and each Space's own hub `docs/okf/product/solution-pack/la-<id>/`. Read the
 catalogue before changing a pattern; update it (and the Space hub) in the same change. Demo installs and
 redeploys: `.claude/memory/preview-la-demo.md`.
@@ -26,7 +26,7 @@ redeploys: `.claude/memory/preview-la-demo.md`.
 | Data test | `tools/gen-la-<id>-data.test.mjs` (planted facts in the files) |
 | Java tests | `<X>LinksJobGoldenTest` (real Pipelines + Jobs) and `La<X>TemplateTest`; `ControlApiSpaceTemplatesTest` counts templates |
 | Seed | `tools/seed-la-<id>.mjs` + `.test.mjs` (`--scaffold`, dry run by default, `--apply`, idempotent) |
-| Docs | hub `brochure.md`, `user-guide.md`, `admin-guide-install.md`; catalogue `user-guide-showcase-catalogue.md` |
+| Docs | hub `brochure-la-<id>.md`, `user-guide-la-<id>.md`, `admin-guide-install.md`; catalogue `user-guide-showcase-catalogue.md` |
 
 ## Rules learned the hard way
 
@@ -42,7 +42,7 @@ redeploys: `.claude/memory/preview-la-demo.md`.
 - **Link Jobs also carry `cron: "*/5 * * * *"`** — a `pipeline.commit` during a running Job is skipped, not queued
   (`JOB-SIGNAL-OVERLAP-SKIP-1`). A Job judging a month waits until every side of that month has landed.
 - **Advanced tier, inert on Basic:** personas `<prefix>.analyst` (lead), `.manager` (second approver), `.reviewer`
-  (read-only), `.outsider` (not a member) + shared `admin`; `four_eyes_fan_out_above: 2000` and the shared Drafts
+  (read-only), `.outsider` + shared `admin`. Since 2026-11-18 every LA Space signs in the five shared `admin`, `analyst`, `manager`, `reviewer`, `outsider` (role `no-access`, admitted to no Space), the four kinds grant the same capabilities everywhere and every scaffold writes `admission: closed` (`tools/la-demo-roster.test.mjs`); `four_eyes_fan_out_above: 2000` and the shared Drafts
   limits in `link-analysis.toon`.
 - **One roster across Spaces:** `admin` and the `fraud-analyst` / `la-viewer` / `la-settings` roles must be
   byte-identical to the other showcases, or one server refuses the second Space with 409 `ROSTER_CONFLICT`. Copy

@@ -26,9 +26,9 @@ A **Sink** is where a Pipeline writes business data. The capability spec of reco
 
 ## Where it fits
 
-Everything else sits on it: [parsing-ingest](../elt/architecture.md) and [Pipelines](../elt/architecture.md)
+Everything else sits on it: [parsing-ingest](../elt/architecture-elt.md) and [Pipelines](../elt/architecture-elt.md)
 write business data; [Studio](../../layer/product/architecture-studio-bi.md) reads it through Datasets; every add-on keeps its
-records in the operational stores; [Spaces](../config/architecture.md) decide where each Space's roots are. Code homes:
+records in the operational stores; [Spaces](../config/architecture-config.md) decide where each Space's roots are. Code homes:
 
 - Space roots: `inspecto/src/main/java/com/gamma/service/SpaceRoot.java` (`DirSpaceRoot`,
   `LegacySpaceRoot`).
@@ -39,4 +39,4 @@ records in the operational stores; [Spaces](../config/architecture.md) decide wh
 - Writes: `platform/inspecto-etl/src/main/java/com/gamma/etl/PartitionWriter.java`.
 - Configuration history: `ComponentStore` and `inspecto/src/main/java/com/gamma/control/PipelineHistory.java`.
 
-More: [screens](user-guide-storage.md) · [API](api-storage.md) · [architecture](architecture.md).
+More: [screens](user-guide-storage.md) · [API](api-storage.md) · [architecture](architecture-entity-store.md).

@@ -9,7 +9,7 @@ timestamp: 2026-11-07T00:00:00Z
 
 # Assist Agent
 
-The assist surface is an SPI in the core, implemented by the optional [agent module](architecture.md).
+The assist surface is an SPI in the core, implemented by the optional [agent module](architecture-agent.md).
 
 > **Which bundles ship it (corrected 2026-11-07).** Standard and every higher edition: `offerings/standard.toon` lists
 > `agent` (add-on `aiAssist`), and `package.ps1` stages the shaded sidecar as `lib/inspecto-agent.jar` (`PKG-5`). A Basic
@@ -54,7 +54,7 @@ interpretation before applying it.
 
 The write-back routes are governed by the `-Dassist.write.root` gate (`503` when unset — see
 [auth & security](../access/admin-guide-auth-security.md)). Hosted model backends come from
-[agent-hosted](../agent-hosted/spec.md).
+[agent-hosted](../agent-hosted/spec-agent-hosted.md).
 
 ### Model endpoint allowlist (2026-10-01)
 

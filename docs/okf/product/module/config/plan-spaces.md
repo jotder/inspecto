@@ -176,7 +176,7 @@ reads are (2026-09-24, `DataSourceBundleResolver.findReferencesFor`): its `*_enr
 and every Reference Dataset it joins by name travels as its `produces: reference` Pipeline + connection +
 schemas, indexed in the manifest's `references` map; an import into a Space that already hosts that Reference
 keeps the target's copy and names it in `referencesKept` rather than 409ing — see
-[editable round-trip §22](../elt/spec-pipeline.md). `BundleImporter`
+[editable round-trip §22](../elt/spec-pipeline-model.md). `BundleImporter`
 **jails every zip entry** — an entry resolving outside `configDir` throws (the zip-slip pin, tested
 with a re-packed archive) — and **rebases** `spaces/<source>/…` path prefixes to the target Space (W3).
 `POST /spaces/import` reuses the same importer to seed a brand-new Space. ⚠ `multi-space.md` enumerates the
@@ -566,10 +566,10 @@ Step Processor and no new route.
   sha256, reason and retention, never its content. To investigate a refusal, use that event and the
   `ingest.refused` event inside the window, then fix the file at its origin and resend it. Never copy a restricted
   file out of the store. Nothing replays from the store, so a deletion costs no replay
-  ([Ingestion §3.6](../elt/plan.md)).
+  ([Ingestion §3.6](../elt/plan-elt.md)).
 - **Card-number scan at ingest (WS-40): what it covers, exactly.** The three Pipelines set
   `processing.refusal: restricted_quarantine`, `refusal_scan: card_number` and `refusal_retention_days: 30` (the
-  maximum). The scan is the platform's (`RefusalQuarantine.cardScanSql`, [Ingestion §3.6](../elt/plan.md)). The schemas carry
+  maximum). The scan is the platform's (`RefusalQuarantine.cardScanSql`, [Ingestion §3.6](../elt/plan-elt.md)). The schemas carry
   no scan expression.
   - **What it reads:** every raw cell except the `refusal_scan_exempt` columns (default: none), before anything is
     written.
@@ -581,7 +581,7 @@ Step Processor and no new route.
   - **The scan fails CLOSED.** If it cannot run (a read or SQL error), the file is restricted with
     `INGEST_REFUSE:SCAN_FAILED`, never landed. Restricting is chosen over failing the batch because a failed batch
     leaves the unscanned file in the inbox, re-polled every cycle. (The batch error text no longer quotes cell
-    values since 2026-10-03: [Ingestion](../elt/plan.md).)
+    values since 2026-10-03: [Ingestion](../elt/plan-elt.md).)
   - **The exempt list cannot switch the scan off.** A list covering every raw field is refused at load. A name that
     is no raw field is warned. Every control-plane write that changes a refusal key emits `pipeline.refusal.changed`
     (AUDIT, before / after).
@@ -924,8 +924,9 @@ Two templates: **`la-showcase`** (the demo) and **`la-showcase-off`** (an empty 
   $signal.status == SUCCESS`, `allow_full: "true"`, `owner` is re-stamped to the applier by `TemplateSeedGate`) and `la_detect` (`*/5 * * * *`).
 - **Personas** (`demo-users.toon` + `roles.toon`; an authored role REPLACES a seed role of the same name): `admin` (`admin;fraud-analyst`: Reveal),
   `analyst` (`la-analyst`: Manage Incidents, Run Link Graph Analysis, Build Link Index, Author Alert Rules, Work Incidents),
-  `manager` (`la-manager`: Approve Link Expansions, Manage Incidents, Work Incidents - the second approver), `reviewer` and `outsider`
-  (`la-viewer`: no capability at all). The Dataset carries explicit `user` shares for all five (standing detection refuses a role-only share).
+  `manager` (`la-manager`: Approve Link Expansions, Manage Incidents, Work Incidents - the second approver), `reviewer`
+  (`la-viewer`: no capability at all) and `outsider` (`no-access`, defined by no `roles.toon`: since 2026-11-18 it signs in and is
+  admitted to no Space, every LA demo Space being closed). The Dataset carries explicit `user` shares for all five (standing detection refuses a role-only share).
 - **Data tuning (DR-S10).** The ordinary traffic is acyclic and triangle-free (first half of the accounts pays the second half) and small, so the Suspicion
   score ranks `MULE-HUB-01` first (top 3 asserted) and `SHELL-A->B->C->D->A` is the only directed cycle. Pinned by `LaShowcaseGoldenTest`
   (inspecto-graph, reads the shipped CSVs); regenerate with `tools/gen-la-showcase-data.py`. Trade-off: the ordinary traffic is less realistic than the
@@ -1218,9 +1219,9 @@ import was refused too: the bundle covers component kinds, the zip covers the wh
 
 | Mechanism | Owning file | `resource:` | Read it for |
 |---|---|---|---|
-| `SpaceManager` / `SpaceContext` / `SpaceMigrator`, MDC isolation, the seven CRUD routes and the two 409s | `docs/okf/product/module/processor/architecture.md` (`Concept`) | `SpaceManager.java` | §3.1–§3.3 |
+| `SpaceManager` / `SpaceContext` / `SpaceMigrator`, MDC isolation, the seven CRUD routes and the two 409s | `docs/okf/product/module/processor/architecture-processor.md` (`Concept`) | `SpaceManager.java` | §3.1–§3.3 |
 | Bundle v2 end to end — endpoints, apply order, the boundary, `connection` and `enrichment` | `docs/okf/product/module/processor/spec-metadata-bundle.md` (`Concept`) | `BundleRoutes.java` | §3.6 |
-| Offers, grants, snapshots, `_shared/`, D9 | `docs/okf/product/module/exchange/spec.md` (`Concept`) | `features/inspecto-exchange/` | §3.7 |
+| Offers, grants, snapshots, `_shared/`, D9 | `docs/okf/product/module/exchange/spec-exchange.md` (`Concept`) | `features/inspecto-exchange/` | §3.7 |
 | Per-Space file topology, `OperationalDb`, PG-1, the CWD traps | `docs/okf/product/module/engine/spec-db-layer.md` (`Reference`) §4–§5 | `inspecto-engine` | §3.8 |
 | The Space-root jail: `PathJail`, declared ∪ discovered roots | `docs/okf/product/module/config/spec-config-safety.md` (`Concept`) | `platform/inspecto-config/` | §3.8, §6.6 |
 | The Spaces layout and the migrator CLI | `docs/okf/product/module/config/admin-guide-configuration-reference.md` (`Reference`) §Spaces | — | §3.2 |

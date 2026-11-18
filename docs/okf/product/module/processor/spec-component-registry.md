@@ -9,7 +9,7 @@ timestamp: 2026-07-07T00:00:00Z
 
 # Component Registry
 
-Components are the `use:`-referenced building blocks of authored [Pipelines](../elt/architecture.md). They
+Components are the `use:`-referenced building blocks of authored [Pipelines](../elt/architecture-elt.md). They
 live under `<write-root>/registry/<type>/` as TOON files, addressed by `<type>/<name>`.
 
 * **Types**: `ComponentStore.WRITABLE_TYPES` is **24 kinds** (`ComponentStore.java`) — `grammar`, **`schema`**,
@@ -49,7 +49,7 @@ live under `<write-root>/registry/<type>/` as TOON files, addressed by `<type>/<
   (lifted pipelines), `GET /pipelines/node-types` (the editor palette catalog; the sibling `GET /pipelines/step-types` was retired 2026-09-24, `GLOSSARY.md` §13), `GET /pipelines/combined` (the
   store-joined pipeline+job topology). Authoring goes through the graph round-trip — `PUT
   /pipelines/{name}/graph` (+ `GET …/graph/raw`) — owned by the
-  [pipeline-graph bundle](../elt/spec-pipeline.md); the old `/pipelines/authored/*`
+  [pipeline-graph bundle](../elt/spec-pipeline-model.md); the old `/pipelines/authored/*`
   CRUD surface is retired (grandfathered flows stay readable/runnable/deletable). The
   store superimposition (`PipelineStores.superimpose`) joins consumer `source_store` names to producer `store`
   names — no `on_pipeline` name-coupling — and a `DeletionFence` guards store deletion.
@@ -66,4 +66,4 @@ wiring editor nor a storage unification. Adoption (D0→P4) completed 2026-06-28
 `docs/archived-documents/plans-archive/component-model.md` and its adoption plan, not maintained.)*
 
 The UI counterparts are the [components](../../layer/product/spec-components.md) and
-[Pipelines](../elt/user-guide.md) features in the frontend bundle.
+[Pipelines](../elt/user-guide-elt.md) features in the frontend bundle.

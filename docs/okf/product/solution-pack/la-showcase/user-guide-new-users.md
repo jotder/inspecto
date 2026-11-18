@@ -9,7 +9,7 @@ timestamp: 2026-11-15T00:00:00Z
 # Link Analysis showcase Spaces — new-user guide
 
 This page is for your first hour with a Link Analysis showcase Space. It does not repeat the screens: those are in the
-[Link Analysis user guide](../../module/la-core/user-guide.md). To pick a Space, use the
+[Link Analysis user guide](../../module/la-core/user-guide-la-core.md). To pick a Space, use the
 [showcase catalogue](user-guide-showcase-catalogue.md).
 
 ## What a showcase Space is
@@ -348,7 +348,7 @@ two industries and is listed under both.
    4. The ordinary transfers are the contrast: they stay outside the ring's group.
 
 For the full exercise on the same data, with figures, see *Find a money-mule ring* in the
-[Link Analysis user guide](../../module/la-core/user-guide.md#13-worked-examples) (it uses
+[Link Analysis user guide](../../module/la-core/user-guide-la-core.md#13-worked-examples) (it uses
 `la-showcase`, which carries the same corpus).
 
 ### Worked example: `la-utility` (Utilities)
@@ -385,31 +385,31 @@ Electricity revenue protection: energy leaves a transformer but is not paid for.
    - an unbounded expand by `analyst` is held; sign in as `manager` to approve it.
 
 The other four `la-utility` stories (illegal reconnections, account churn, commercial load, prepaid tokens) are
-exercises 2–5 in the [`la-utility` user guide](../la-utility/user-guide.md#exercises).
+exercises 2–5 in the [`la-utility` user guide](../la-utility/user-guide-la-utility.md#exercises).
 
 ## References
 
 - [Link Analysis showcase catalogue](user-guide-showcase-catalogue.md): pick a Space, install, editions, sizes.
-- [Link Analysis user guide](../../module/la-core/user-guide.md): every screen and control named here.
+- [Link Analysis user guide](../../module/la-core/user-guide-la-core.md): every screen and control named here.
 - Each Space's user guide:
-  [`la-audit`](../la-audit/user-guide.md) ·
-  [`la-benefits`](../la-benefits/user-guide.md) ·
-  [`la-card`](../la-card/user-guide.md) ·
-  [`la-claims`](../la-claims/user-guide.md) ·
-  [`la-crypto`](../la-crypto/user-guide.md) ·
-  [`la-health`](../la-health/user-guide.md) ·
-  [`la-insider`](../la-insider/user-guide.md) ·
-  [`la-logistics`](../la-logistics/user-guide.md) ·
-  [`la-mfs`](../la-mfs/user-guide.md) ·
-  [`la-mobile-money`](../la-mobile-money/user-guide.md) ·
-  [`la-ownership`](../la-ownership/user-guide.md) ·
-  [`la-police`](../la-police/user-guide.md) ·
-  [`la-procurement`](../la-procurement/user-guide.md) ·
-  [`la-sample`](../la-sample/user-guide.md) ·
-  [`la-showcase`](user-guide.md) ·
-  [`la-telco-ra`](../la-telco-ra/user-guide.md) ·
-  [`la-trade`](../la-trade/user-guide.md) ·
-  [`la-utility`](../la-utility/user-guide.md)
+  [`la-audit`](../la-audit/user-guide-la-audit.md) ·
+  [`la-benefits`](../la-benefits/user-guide-la-benefits.md) ·
+  [`la-card`](../la-card/user-guide-la-card.md) ·
+  [`la-claims`](../la-claims/user-guide-la-claims.md) ·
+  [`la-crypto`](../la-crypto/user-guide-la-crypto.md) ·
+  [`la-health`](../la-health/user-guide-la-health.md) ·
+  [`la-insider`](../la-insider/user-guide-la-insider.md) ·
+  [`la-logistics`](../la-logistics/user-guide-la-logistics.md) ·
+  [`la-mfs`](../la-mfs/user-guide-la-mfs.md) ·
+  [`la-mobile-money`](../la-mobile-money/user-guide-la-mobile-money.md) ·
+  [`la-ownership`](../la-ownership/user-guide-la-ownership.md) ·
+  [`la-police`](../la-police/user-guide-la-police.md) ·
+  [`la-procurement`](../la-procurement/user-guide-la-procurement.md) ·
+  [`la-sample`](../la-sample/user-guide-la-sample.md) ·
+  [`la-showcase`](user-guide-la-showcase.md) ·
+  [`la-telco-ra`](../la-telco-ra/user-guide-la-telco-ra.md) ·
+  [`la-trade`](../la-trade/user-guide-la-trade.md) ·
+  [`la-utility`](../la-utility/user-guide-la-utility.md)
 - Install guides:
   [`la-benefits`](../la-benefits/admin-guide-install.md) ·
   [`la-card`](../la-card/admin-guide-install.md) ·

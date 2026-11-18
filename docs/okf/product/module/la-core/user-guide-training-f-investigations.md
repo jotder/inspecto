@@ -479,9 +479,9 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the Read-only banner, the greyed Undo and *Replay matches*.
 
 ### S10 · The outsider's view
-- Voice: Last, the outsider: signed in, but not a member. In File, Open, the Investigation is not even listed. Open its link directly, and the answer is one sentence: this Investigation is not available: it does not exist, is not yours, or its Dataset is no longer shared with you. The answer is the same for all three on purpose. An outsider cannot even learn that it exists. To let them in, a lead grants them a role, as you saw at the start.
-- Chip: Not available
-- Action: sign out ▸ Demo Outsider ▸ File ▸ Open… (no such Investigation) ▸ open `/link-analysis?investigation=sim-swap-takeover` in the address bar. [check in UI: the sentence appears in the Investigation tab or as the page's alert]
+- Voice: Last, the outsider: signed in, but admitted to no Space. The home page says so in one sentence: you have no access to any Space; ask your administrator. No Space is listed, and a link into this one answers as if it did not exist, so an outsider cannot even learn that the Investigation exists. To let them in, an administrator gives them a role this Space defines; a lead then grants them a role in the Investigation, as you saw at the start.
+- Chip: No access
+- Action: sign out ▸ Demo Outsider ▸ hold on the home page ▸ open `/link-analysis?investigation=sim-swap-takeover` in the address bar. [check in UI: the home page shows *You have no access to any Space*]
 - Impact: mark the sentence.
 
 ### S11 · Try it

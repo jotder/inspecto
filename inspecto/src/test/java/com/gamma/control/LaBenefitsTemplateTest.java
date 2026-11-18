@@ -86,9 +86,10 @@ class LaBenefitsTemplateTest {
         assertTrue(admin.containsAll(Set.of(Roles.CAN_REVEAL_LINK_ENTITIES, Roles.CAN_RUN_LINK_GRAPH_ANALYSIS, Roles.CAN_AUTHOR_WORKBENCH)), admin.toString());
         // every role a persona names resolves here
         Map<String, Roles.Def> table = Roles.effective(CFG);
+        // the outsider holds no-access, which no roles.toon defines: a closed LA Space admits it nowhere (operator 2026-11-18)
         for (Map<String, Object> u : users)
             for (String r : String.valueOf(u.get("roles")).split(";"))
-                assertTrue(table.containsKey(r.trim().toLowerCase()), u.get("id") + ": role " + r + " is not defined");
+                assertEquals(!"outsider".equals(u.get("id")), table.containsKey(r.trim().toLowerCase()), u.get("id") + ": role " + r);
         for (String id : List.of("analyst", "manager", "reviewer", "outsider"))
             assertFalse(caps.get(id).contains(Roles.CAN_AUTHOR_WORKBENCH), id + " does not author");
         for (String id : List.of("reviewer", "outsider")) assertEquals(Set.of(), caps.get(id), id + " holds no capability of its own");

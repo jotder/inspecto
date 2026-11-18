@@ -124,7 +124,7 @@ Most of these commits are not marked `!`, so a commit-type scan misses them.*
 - **The assistant:** `POST /assist/{intent}` returns `confidence` as a number in [0, 1], not the string `"local"`
   (`0052240a`, 2026-06-05). Removed, no longer read: `-Dassist.enabled`, `-Dassist.profile`, `-Dassist.ollama.baseUrl`
   (`6b0f8418`). The model is set in the file named by `-Dassist.settings.file` ([agent admin
-  guide](../agent/admin-guide.md)), and its host must be on the Space's model endpoint allowlist (`7e113110`, below).
+  guide](../agent/admin-guide-agent.md)), and its host must be on the Space's model endpoint allowlist (`7e113110`, below).
 - **CLI:** the processor jar has no `Main-Class`, so `java -jar` on it no longer runs (`f13479dc`, 2026-10-08); run
   `com.gamma.inspector.CollectorProcessor` on the bundle's classpath, as the bundle's run scripts do. The URA File
   Management Suite (ura.sh / ura.bat — `search`, `copy`, `organize`, `copy-tars`, `extract`, `backup`,
@@ -246,7 +246,7 @@ scripts. None of these commits is marked `!` except `757add5e`.*
   (`{base64}` for non-UTF-8 bytes). `POST /bundle/import` writes `closure` alone through the
   `POST /pipelines/import` core (same gates, same `<write-root>/<id>/` layout, always `active: false`,
   registered); an existing id is skipped unless `actions` says `overwrite`; a refusal fails that item.
-  [metadata-bundle](../processor/spec-metadata-bundle.md) · [editable round-trip §21](../elt/spec-pipeline.md).
+  [metadata-bundle](../processor/spec-metadata-bundle.md) · [editable round-trip §21](../elt/spec-pipeline-model.md).
 - **Breaking:** `POST /bundle/import` **422s** (`CONFIG_VALIDATION_FAILED`, before any write) when the
   envelope carries any **`authored-pipeline`** item — the kind is export-only (W5: grandfathered
   `PipelineStore` graphs are never newly written). Bundles saved by the SPA before this change carry their
@@ -307,7 +307,7 @@ scripts. None of these commits is marked `!` except `757add5e`.*
   several Pipelines share. Pipeline keys win; `segments` is replaced whole. `GET /parsers` serves the field
   in the ASN.1 `grammarSchema`, `POST /parsers/asn1/preview` honours it (403 on an escaping ref), and a
   Pipeline bundle carries the profile as its own satellite. See
-  [parser-plugins.md](../elt/spec-ingest.md), *Decode Profile*.
+  [parser-plugins.md](../elt/spec-parsing.md), *Decode Profile*.
 
 **Parsers from Job Packs (2026-09-25, parser-plugins trust design slices P2–P4)**
 - A `ParserPlugin` in an allowlisted Job Pack now registers (the fifth pack kind). It appears in
@@ -571,7 +571,7 @@ scripts. None of these commits is marked `!` except `757add5e`.*
 - **New route (additive, 2026-09-25, EXECUTION-RESIDUALS X4):** `POST /runs/{name}/replay-rejects {file}`
   (`canOperateRuns`) replays ONE file's rejected records from its reject sidecar as a new Consignment,
   without re-ingesting the file's good records; a second replay of the same sidecar is **409**.
-  [execution-lanes](../elt/spec-pipeline.md)
+  [execution-lanes](../elt/spec-pipeline-execution.md)
 - **New routes (additive, 2026-09-25, X1 deferrals — the COMMIT retry affordance):**
   `GET /runs/{name}/retries[?limit=]` (open read) lists the files waiting on a bounded COMMIT retry, by
   poll-relative path, with `keepsRetryState: false` when the pipeline has no `dirs.status_dir` (no retry
@@ -580,25 +580,25 @@ scripts. None of these commits is marked `!` except `757add5e`.*
   **only — the attempt count is kept** (the response says so); cancel **quarantines the file now under the
   new reason `retry_cancelled`**. A file already quarantined, a pipeline with no retry state, or a pipeline
   mid-cycle is a **409** that says so; no record / not in the inbox is **404**.
-  [execution-lanes](../elt/spec-pipeline.md)
+  [execution-lanes](../elt/spec-pipeline-execution.md)
 - **New config block (additive, 2026-09-25, X1 deferral):** a Pipeline's `processing.retry:
   {max_attempts, initial_backoff, max_backoff}` overrides the `-Dingest.retry.*` COMMIT-retry globals per
   key; unset keys (and an absent block) inherit them, so existing configs behave exactly as before.
   `max_attempts` outside `[0, 1000]` or a negative/non-duration backoff is a **422** at `/config/write`.
   The `sink.persistent` node advertises `retry__max_attempts` / `retry__initial_backoff` /
   `retry__max_backoff` in `node-attributes.contract.json`.
-  [execution-lanes](../elt/spec-pipeline.md)
+  [execution-lanes](../elt/spec-pipeline-execution.md)
 - **New config key (additive, 2026-09-28, X4 deferral):** `processing.reject_mode: eject | all_or_nothing`
   (absent = `eject`, today's behaviour). Any other value is a **422** at `/config/write`. Under
   `all_or_nothing` a file with a rejected record is quarantined whole under the new reason
   `rejects_all_or_nothing`, and `POST /runs/{name}/replay-rejects` for it is a **422**.
-  [execution-lanes](../elt/spec-pipeline.md)
+  [execution-lanes](../elt/spec-pipeline-execution.md)
 - **Breaking — the reject sidecar no longer holds `raw_line`** (2026-10-03, never store values): its columns are
   `line_number,columns,reason,value_fingerprint,source_file,source_size,source_sha256`, so
   `GET /runs/{name}/errors?file=` rows carry a fingerprint, not the line; `line_number` is now the PHYSICAL start
   line on both engines. `POST /runs/{name}/replay-rejects` re-reads the source and adds **410** (source gone)
   and a second **409** cause (source changed). Ledger / retry / event failure text fingerprints every quoted
-  value. [execution-lanes](../elt/spec-pipeline.md)
+  value. [execution-lanes](../elt/spec-pipeline-execution.md)
 - **Behaviour change — the reject sidecar's `raw_line` is now byte-exact** (2026-09-25, superseded 2026-10-03): both CSV ingesters
   escape an embedded `"` RFC-4180-style (`""`) in `<errors>/<file>_errors.csv` instead of rewriting it to
   `'`, so `GET /runs/{name}/errors?file=` now shows the line's real quotes. A reader that split the column
@@ -611,7 +611,7 @@ scripts. None of these commits is marked `!` except `757add5e`.*
   disabled: [{kind, name, file}]}]`. `POST /spaces/{id}/import/preview` agrees: the finding is a **WARNING**
   (`valid` stays `true`) and the same `connectionWarnings` is returned. A client that treated the 422 as
   "nothing imported" must now read `connectionWarnings` instead.
-  [editable round-trip §22](../elt/spec-pipeline.md)
+  [editable round-trip §22](../elt/spec-pipeline-model.md)
 - `DELETE /spaces/{id}?purge=true` answers **409** when it would remove the **last Space directory on disk** (D4); deregister-only on the last Space stays allowed. *(This line stated the rule backwards — "409 unless `?purge=true`" — until 2026-09-08; `SpaceRoutes.java`.)*
 - Full recomputes write a sibling `<pipeline>_<batchId>` table and supersede the old revision in the
   catalog; **nothing deletes the bytes** until a `retire_superseded` maintenance job is configured. 3.x
@@ -746,7 +746,7 @@ or is read under both names.
 **Breaking — one word for rejected rows (X5-a, 2026-11-17, MoSCoW S4)**
 
 A Step that does not pass rows on now says why in one way: the **reject outlet** `reject:<reason>`
-([`spec-pipeline.md`](../elt/spec-pipeline.md) § *The token model*).
+([`spec-pipeline-model.md`](../elt/spec-pipeline-model.md) § *The token model*).
 - **Reject relations are `reject:dropped`, `reject:invalid`, `reject:duplicate` and `reject:unmatched`**, replacing
   `dropped`, `invalid`, `duplicate` and `unmatched` in `GET /pipelines/node-types` (`emits`), `GET /provenance`
   (`rel`), a Pipeline graph's edges (the lifted parse → quarantine edge reads `reject:unmatched`), a dry run's and a
@@ -798,7 +798,7 @@ Additive: nothing existing changes shape.
   behaviour. OpsMonitor's `batch_rerun` skips them.
 
 **Deferred to this same release by decision:** the token *runtime* model (D2 —
-[`node-types.md`](../elt/spec-pipeline.md) § *The token model*). X5-a, the token vocabulary, and X5-b / X5-c
+[`node-types.md`](../elt/spec-pipeline-model.md) § *The token model*). X5-a, the token vocabulary, and X5-b / X5-c
 (Step Receipts on every durable lane and the read route) landed (entries above).
 
 **Deferred pending the operator (2026-11-17): the ELT Phase 6 deletion of the flat read path** (BACKLOG §2 Row 15,
@@ -872,7 +872,7 @@ Two audiences depend on the framework from outside:
 ### Agent-consumed core surface (frozen for the pending 4.0.0, M3)
 
 The optional `inspecto-agent` (and `-intelligence`) modules are an L5 consumer that, per
-[architecture.md](../../layer/platform/architecture.md), must touch core **only through SPI interfaces +
+[architecture-platform.md](../../layer/platform/architecture-platform.md), must touch core **only through SPI interfaces +
 `@PublicApi` types**. The read-only surface they actually consume — captured once in
 `UccAgentContext` and reached by the capabilities/skills — is now `@PublicApi`-frozen `since = "4.0.0"`
 so this contract can't drift silently. It is deliberately a *freeze*, not a wrapping facade: a parallel

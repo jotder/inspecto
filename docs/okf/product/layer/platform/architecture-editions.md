@@ -62,7 +62,7 @@ Assembly mechanisms:
   in no edition's Offering. What an edition ships is decided by its Offering (`offerings/<edition>.toon`), which
   `tools/check-offerings.mjs` holds equal to the pom profile and the manifests.
 * **`ServiceLoader`** — an absent module means the no-op impl is the only one discovered (same pattern as the
-  optional [assist agent](../../module/agent/spec-assist-agent.md) and [connectors](../../module/connectors/architecture.md)).
+  optional [assist agent](../../module/agent/spec-assist-agent.md) and [connectors](../../module/connectors/architecture-connectors.md)).
 * **Edition features** — for a feature whose code cannot leave a base module, a module declares the feature and
   every door asks `EditionFeatures.present(id)` (item 28 below).
 * **`-D` flags** — `-Dauth.mode` is `none` by default (Basic); the `serve` launchers of every other edition add

@@ -83,9 +83,10 @@ class LaOwnershipTemplateTest {
         // every role a persona names resolves here; the shared admin's fraud-analyst reads as in la-utility and la-card, and every
         // role named in la-card too reads the same (both are composed into the Banking and finance industry Space)
         Map<String, Roles.Def> table = Roles.effective(CFG);
+        // the outsider holds no-access, which no roles.toon defines: a closed LA Space admits it nowhere (operator 2026-11-18)
         for (Map<String, Object> u : users)
             for (String r : String.valueOf(u.get("roles")).split(";"))
-                assertTrue(table.containsKey(r.trim().toLowerCase()), u.get("id") + ": role " + r + " is not defined");
+                assertEquals(!"outsider".equals(u.get("id")), table.containsKey(r.trim().toLowerCase()), u.get("id") + ": role " + r);
         assertEquals(Roles.effective(Path.of("..", "spaces", "_templates", "la-utility", "config")).get("fraud-analyst").capabilities(),
                 table.get("fraud-analyst").capabilities());
         Map<String, Roles.Def> card = Roles.effective(Path.of("..", "spaces", "_templates", "la-card", "config"));

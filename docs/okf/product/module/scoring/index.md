@@ -11,17 +11,17 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.scoring`](../../../../../product-map/module/scoring.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Scoring — plan](plan.md) |
+| plan | current | [Scoring — plan](plan-scoring.md) |
 | spec | current | [Risk Scores — weighted-factor scoring per entity](spec-risk-scores.md) |
-| architecture | current | [Scoring and the Decision Kernel](architecture.md) |
+| architecture | current | [Scoring and the Decision Kernel](architecture-scoring.md) |
 | features | current | [Decision Kernel (Decision Rules and the Condition Language) — features](features-decision-kernel.md) · [Risk Scores and Entity Lists — features](features-scoring-entity-lists.md) |
 | feature-db | current | [Scoring — feature database](feature-db.md) |
 | user-guide | current | [Decision Kernel (Decision Rules and the Condition Language) — screens](user-guide-decision-kernel.md) · [Risk Scores and Entity Lists — screens](user-guide-scoring-entity-lists.md) |
-| admin-guide | current | [Scoring — admin guide](admin-guide.md) |
+| admin-guide | current | [Scoring — admin guide](admin-guide-scoring.md) |
 | api | current | [Decision Kernel (Decision Rules and the Condition Language) — API](api-decision-kernel.md) · [HTTP routes — module.scoring](api-routes.md) · [Risk Scores and Entity Lists — API](api-scoring-entity-lists.md) |
 | tests | current | [Scoring — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

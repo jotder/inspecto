@@ -26,6 +26,7 @@ import { SessionService } from '@inspecto/core/auth/session.service';
 import { LA_APP_SHORTCUTS, ShortcutsHelpDialog, isEditingTarget } from 'app/inspecto/shortcuts-help.dialog';
 import { appAreas, appOfUrl, areaIcon, productNav, ProductNavEntry } from '@inspecto/core/product/product-host';
 import { FirstRun } from './first-run';
+import { NoAccessComponent } from './no-access.component';
 import { PRODUCT } from './product.generated';
 
 export { LA_RAIL_EXPANDED_KEY } from '@inspecto/link-analysis/la-host/la-rail.service';
@@ -86,6 +87,7 @@ export const railLink = (n: ProductNavEntry): RailLink => ({ path: n.path, label
         MatIconModule,
         MatMenuModule,
         MatTooltipModule,
+        NoAccessComponent,
         RouterLink,
         RouterLinkActive,
         RouterOutlet,
@@ -115,7 +117,7 @@ export const railLink = (n: ProductNavEntry): RailLink => ({ path: n.path, label
                 }
             </a>
             <!-- PA-5b: a Product with more than one App picks the App whose areas the rail shows -->
-            @if (switcher()) {
+            @if (switcher() && !noAccess()) {
                 <button
                     type="button"
                     class="focus-visible:outline-primary flex h-10 items-center gap-3 rounded-md border px-2.5 text-sm focus-visible:outline-2"
@@ -148,46 +150,53 @@ export const railLink = (n: ProductNavEntry): RailLink => ({ path: n.path, label
                     }
                 </mat-menu>
             }
-            <nav
-                class="flex flex-1 flex-row items-center gap-1 sm:mt-2 sm:flex-col sm:items-stretch"
-                aria-label="Areas"
-            >
-                @for (item of nav(); track item.path) {
-                    <a
-                        [routerLink]="'/' + item.path"
-                        routerLinkActive="bg-hover text-primary font-semibold"
-                        ariaCurrentWhenActive="page"
-                        class="focus-visible:outline-primary flex h-10 items-center gap-3 rounded-md px-2.5 text-sm no-underline focus-visible:outline-2"
-                        [matTooltip]="expanded() ? '' : item.label"
-                        matTooltipPosition="right"
-                    >
-                        <mat-icon class="icon-size-5 flex-0" [svgIcon]="item.icon"></mat-icon>
-                        <span [class]="expanded() ? 'max-sm:sr-only' : 'sr-only'">{{ item.label }}</span>
-                    </a>
-                }
-            </nav>
+            <!-- admitted to no Space: no area, Settings, next steps or Space switcher; only the user menu -->
+            @if (noAccess()) {
+                <div class="flex-1"></div>
+            } @else {
+                <nav
+                    class="flex flex-1 flex-row items-center gap-1 sm:mt-2 sm:flex-col sm:items-stretch"
+                    aria-label="Areas"
+                >
+                    @for (item of nav(); track item.path) {
+                        <a
+                            [routerLink]="'/' + item.path"
+                            routerLinkActive="bg-hover text-primary font-semibold"
+                            ariaCurrentWhenActive="page"
+                            class="focus-visible:outline-primary flex h-10 items-center gap-3 rounded-md px-2.5 text-sm no-underline focus-visible:outline-2"
+                            [matTooltip]="expanded() ? '' : item.label"
+                            matTooltipPosition="right"
+                        >
+                            <mat-icon class="icon-size-5 flex-0" [svgIcon]="item.icon"></mat-icon>
+                            <span [class]="expanded() ? 'max-sm:sr-only' : 'sr-only'">{{ item.label }}</span>
+                        </a>
+                    }
+                </nav>
+            }
             <div class="flex flex-row items-center gap-1 sm:flex-col sm:items-stretch">
                 <!-- UC-15 rule 4: always one click away, on every screen. -->
-                <button
-                    type="button"
-                    class="focus-visible:outline-primary flex h-10 items-center gap-3 rounded-md px-2.5 text-sm focus-visible:outline-2"
-                    data-testid="la-next-steps-open"
-                    aria-label="What can I do next?"
-                    [matTooltip]="expanded() ? '' : 'What can I do next?'"
-                    matTooltipPosition="right"
-                    (click)="openNextSteps()"
-                >
-                    <mat-icon class="icon-size-5 flex-0" svgIcon="heroicons_outline:light-bulb"></mat-icon>
-                    <span [class]="expanded() ? 'max-sm:sr-only' : 'sr-only'" aria-hidden="true"
-                        >What can I do next?</span
+                @if (!noAccess()) {
+                    <button
+                        type="button"
+                        class="focus-visible:outline-primary flex h-10 items-center gap-3 rounded-md px-2.5 text-sm focus-visible:outline-2"
+                        data-testid="la-next-steps-open"
+                        aria-label="What can I do next?"
+                        [matTooltip]="expanded() ? '' : 'What can I do next?'"
+                        matTooltipPosition="right"
+                        (click)="openNextSteps()"
                     >
-                </button>
-                <div [class.slim-switcher]="!expanded()">
-                    <inspecto-space-switcher
-                        [create]="createSpace"
-                        preferredSample="la-sample"
-                    ></inspecto-space-switcher>
-                </div>
+                        <mat-icon class="icon-size-5 flex-0" svgIcon="heroicons_outline:light-bulb"></mat-icon>
+                        <span [class]="expanded() ? 'max-sm:sr-only' : 'sr-only'" aria-hidden="true"
+                            >What can I do next?</span
+                        >
+                    </button>
+                    <div [class.slim-switcher]="!expanded()">
+                        <inspecto-space-switcher
+                            [create]="createSpace"
+                            preferredSample="la-sample"
+                        ></inspecto-space-switcher>
+                    </div>
+                }
                 <user [showAvatar]="false" [schemeChoice]="true"></user>
                 @if (expanded()) {
                     <p class="text-secondary m-0 px-2 text-xs max-sm:hidden">{{ footer }}</p>
@@ -209,7 +218,11 @@ export const railLink = (n: ProductNavEntry): RailLink => ({ path: n.path, label
             <inspecto-connectivity-banner></inspecto-connectivity-banner>
             <inspecto-entitlement-banner></inspecto-entitlement-banner>
             <main class="flex min-h-0 flex-1 flex-col">
-                <router-outlet></router-outlet>
+                @if (noAccess()) {
+                    <la-app-no-access></la-app-no-access>
+                } @else {
+                    <router-outlet></router-outlet>
+                }
             </main>
         </div>
     `,
@@ -269,6 +282,8 @@ export class LaShellComponent {
     private readonly firstRun = inject(FirstRun);
     /** New Space in the switcher runs the first-run create: Add data on, then Onboard a file. */
     protected readonly createSpace = (): void => this.firstRun.createSpace();
+    /** Signed in but admitted to no Space: the shell hides everything but the user menu ({@link FirstRun.noAccess}). */
+    protected readonly noAccess = this.firstRun.noAccess;
 
     constructor() {
         // Opening an App's area makes it the App the landing page and Settings keep showing.

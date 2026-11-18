@@ -11,20 +11,20 @@ tags: [product-item, solution-pack]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`solution-pack.telco-fraud`](../../../../../product-map/solution-pack/telco-fraud.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [Interconnect / wholesale fraud from CDRs (IRSF, Wangiri, flash-call / CLI): plan](plan-irsf-wangiri.md) |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| architecture | current | [Telecom fraud](architecture.md) |
-| features | current | [Telecom fraud — features](features.md) |
+| architecture | current | [Telecom fraud](architecture-telco-fraud.md) |
+| features | current | [Telecom fraud — features](features-telco-fraud.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Telecom fraud — user guide](user-guide.md) |
-| admin-guide | current | [Telecom fraud — admin guide](admin-guide.md) |
+| user-guide | current | [Telecom fraud — user guide](user-guide-telco-fraud.md) |
+| admin-guide | current | [Telecom fraud — admin guide](admin-guide-telco-fraud.md) |
 | api | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | tests | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| brochure | current | [Telecom fraud — brochure](brochure.md) |
+| brochure | current | [Telecom fraud — brochure](brochure-telco-fraud.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
 

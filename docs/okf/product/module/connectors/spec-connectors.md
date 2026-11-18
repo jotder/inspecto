@@ -9,7 +9,7 @@ timestamp: 2026-06-28T00:00:00Z
 
 # Collector Connectors
 
-## The SPI (in the core; implemented in [connectors](architecture.md))
+## The SPI (in the core; implemented in [connectors](architecture-connectors.md))
 
 * `CollectorConnector` (`platform/inspecto-acquire/src/main/java/com/gamma/acquire/CollectorConnector.java`) — `discover`,
   `readiness`, `open` (stream bytes), `fetchTo` (materialise the bytes at the destination it is given —
@@ -95,7 +95,7 @@ a listed object is atomic ⇒ `readiness` is always `READY`.
   same category of hand-rollable JDK crypto as SigV4/SharedKey, needs no SDK.
 
 **Egress policy (2026-09-27).** All three dial through `AbstractHttpObjectStoreConnector.send`, the same rule as
-Action Requests and the webhooks ([egress policy](../action-requests/spec.md#the-egress-policy)): host
+Action Requests and the webhooks ([egress policy](../action-requests/spec-action-requests.md#the-egress-policy)): host
 syntax → resolve ONCE per request → every address checked against deny-by-default less the current Space's
 allowlist (`EgressAllowlist.forCurrentSpace()`) → `PinnedObjectStoreHttp` sends the already-signed request to the
 CHECKED address. The JDK `HttpClient` is gone from these connectors. The `Host` header is `AwsSigV4.hostHeader(uri)`

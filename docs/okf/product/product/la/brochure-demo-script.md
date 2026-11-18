@@ -19,7 +19,7 @@ Run the **demo** Distribution: it signs people in as Demo Users with no password
 | `manager` | Demo Manager | Fraud manager: the second approver of four-eyes requests; the Case is assigned to this user |
 | `admin` | Demo Admin | Platform administrator: lead on the Investigation; can Reveal masked values and change LA settings |
 | `reviewer` | Demo Reviewer | Revenue Assurance reviewer: a member of the Investigation with no capability (view only) |
-| `outsider` | Demo Outsider | NOT a member of the Investigation: shows what a non-member sees (refused) |
+| `outsider` | Demo Outsider | Signs in but is admitted to no Space: shows what someone without access sees |
 
 ## The walk-through
 
@@ -49,7 +49,7 @@ The Alert Rules the demo Space holds: those its Space Templates ship and those t
 
 Say the tagline: *Find the links between entities in your data: explore them as a graph, place them on a map, and keep lists of the ones that matter.*
 
-Editions: [Basic](../../edition/basic/index.md) · [Standard](../../edition/standard/index.md) · [Advanced](../../edition/advanced/index.md) · [Preview](../../edition/preview/index.md). Distributions: production, trial, demo, pilot. The [datasheet](features.md) says which Apps each Edition can carry.
+Editions: [Basic](../../edition/basic/index.md) · [Standard](../../edition/standard/index.md) · [Advanced](../../edition/advanced/index.md) · [Preview](../../edition/preview/index.md). Distributions: production, trial, demo, pilot. The [datasheet](features-la.md) says which Apps each Edition can carry.
 
 ## Reset
 

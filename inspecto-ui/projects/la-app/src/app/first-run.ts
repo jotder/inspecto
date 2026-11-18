@@ -44,6 +44,15 @@ export class FirstRun {
     readonly canCreate = computed(() => this.session.authMode() !== 'oidc' || this.lens.canAdminister());
 
     /**
+     * Signed in on a multi-Space server where no Space admits this person (a closed Space lists only the people it admits)
+     * and they may not create one: the shell then shows nothing but the no-access page and the user menu. False until
+     * the Space list has loaded (`multiSpace` starts false), so nothing flashes on sign-in.
+     */
+    readonly noAccess = computed(
+        () => this.spaces.multiSpace() && this.spaces.availableSpaces().length === 0 && !this.canCreate(),
+    );
+
+    /**
      * Create a Space (name + What kind of data?), turn Add data on in it, then enter it at `then`. A Space made here
      * is made to add data to (LA-FULL-CYCLE-TEST-1 D2), so its creator does not meet a locked Add data page: where
      * people sign in Add data starts off, and this asks the server to turn it on (`canAdminister`, as the create

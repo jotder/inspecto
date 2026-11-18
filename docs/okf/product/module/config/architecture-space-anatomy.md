@@ -2,7 +2,7 @@
 
 > **Reference page** for Product Map Item `module.config`. Checked against the code and the shipped Spaces
 > (`spaces/demo`, `spaces/telco-assurance`, `spaces/ucc`, `spaces/cricket-analytics`) on 2026-11-11.
-> How a Space boots, its lifecycle and its three module gates are on [Spaces](architecture.md); this page
+> How a Space boots, its lifecycle and its three module gates are on [Spaces](architecture-config.md); this page
 > answers the other question: *what is this file, who reads it, and may I edit it?*
 >
 > **This page is checked, not trusted.** `node tools/check-space-anatomy.mjs` (CI `guards` job, so every commit)
@@ -11,7 +11,7 @@
 > `SpaceRoot.dataRoot`) no longer exists. The link table of §12.2 is generated from the link census
 > (`node tools/render-space-links.mjs`, `--check` in CI). What each file *means* is prose and is not
 > machine-checked. **One home per fact:** boot, lifecycle, data-root rules and "what is not a Space" live on
-> [Spaces](architecture.md) and are linked from here, never restated.
+> [Spaces](architecture-config.md) and are linked from here, never restated.
 
 ## 1. The shape at a glance
 
@@ -90,7 +90,7 @@ no mount can be, so its parents are created on first boot.
 
 ⚠ "Rooted", not "absolute": on Windows `Path.of("/mnt/bigdisk").isAbsolute()` is `false`, so an operator's POSIX
 path would otherwise be taken for a relative one. The test is `Path.getRoot() != null` (`AppRoot.rooted`). The
-refusal rules and the move procedure are on [Spaces §4](architecture.md) and the
+refusal rules and the move procedure are on [Spaces §4](architecture-config.md) and the
 [configuration reference](admin-guide-configuration-reference.md).
 
 ## 3. Space-level files
@@ -378,7 +378,7 @@ generated `spaces/uat/`. Never commit real or client data into `data/samples/` �
 ## 11. Folders under the Spaces root that are not Spaces
 
 A folder is skipped by its name or for having no `config/` (`SpaceManager.notASpaceReason`). The rule and its
-reason are on [Spaces §4](architecture.md) — keep backups outside the Spaces root.
+reason are on [Spaces §4](architecture-config.md) — keep backups outside the Spaces root.
 
 ## 12. Links between files — what breaks when you edit one
 
@@ -649,5 +649,5 @@ free-form saved-view content beyond `query.projection.datasetId`. Plan (provenan
 - `inspecto/src/main/java/com/gamma/service/ServiceBootstrap.java` — the suffix loaders
 - `platform/inspecto-engine/src/main/java/com/gamma/pipeline/ComponentRegistry.java` — registry directory → kind
 - `spaces/demo/config/README.md` — a working sample of almost every kind
-- [Spaces](architecture.md) · [Configuration reference](admin-guide-configuration-reference.md) ·
+- [Spaces](architecture-config.md) · [Configuration reference](admin-guide-configuration-reference.md) ·
   [TOON configuration](spec-toon-config.md)

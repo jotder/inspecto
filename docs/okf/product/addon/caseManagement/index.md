@@ -11,14 +11,14 @@ tags: [product-item, addon]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`addon.caseManagement`](../../../../../product-map/addon/caseManagement.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
 | plan | n/a | an Add-on licenses modules — see the hubs of the modules it holds |
 | spec | n/a | an Add-on licenses modules — see the hubs of the modules it holds |
 | architecture | n/a | an Add-on licenses modules — see the hubs of the modules it holds |
-| features | current | [Case Management — features](features.md) |
+| features | current | [Case Management — features](features-caseManagement.md) |
 | feature-db | current | [Case Management — feature database](feature-db.md) |
 | user-guide | n/a | an Add-on licenses modules — see the hubs of the modules it holds |
 | admin-guide | n/a | an Add-on licenses modules — see the hubs of the modules it holds |

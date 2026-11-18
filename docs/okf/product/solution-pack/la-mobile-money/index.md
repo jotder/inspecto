@@ -11,20 +11,20 @@ tags: [product-item, solution-pack]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`solution-pack.la-mobile-money`](../../../../../product-map/solution-pack/la-mobile-money.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
 | plan | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| architecture | current | [Link Analysis mobile money — architecture](architecture.md) |
-| features | current | [Link Analysis mobile money — features](features.md) |
+| architecture | current | [Link Analysis mobile money — architecture](architecture-la-mobile-money.md) |
+| features | current | [Link Analysis mobile money — features](features-la-mobile-money.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Link Analysis mobile money — user guide](user-guide.md) |
+| user-guide | current | [Link Analysis mobile money — user guide](user-guide-la-mobile-money.md) |
 | admin-guide | current | [Inspecto LA (Link Analysis) showcase A: mobile money (runbook, synthetic data)](admin-guide-showcase-runbook.md) |
 | api | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | tests | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| brochure | current | [Link Analysis mobile money showcase — brochure](brochure.md) |
+| brochure | current | [Link Analysis mobile money showcase — brochure](brochure-la-mobile-money.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
 

@@ -11,17 +11,17 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.workflow`](../../../../../product-map/module/workflow.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Workflow and SLA models — plan](plan.md) |
-| spec | current | [Workflow and SLA models — spec](spec.md) |
-| architecture | current | [Workflow, SLA and maker-checker](architecture.md) |
+| plan | current | [Workflow and SLA models — plan](plan-workflow.md) |
+| spec | current | [Workflow and SLA models — spec](spec-workflow.md) |
+| architecture | current | [Workflow, SLA and maker-checker](architecture-workflow.md) |
 | features | current | [Maker-checker (Pending Changes) — features](features-maker-checker.md) · [Workflow and SLA — features](features-workflow-sla.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Maker-checker (Pending Changes) — screens](user-guide-maker-checker.md) · [Workflow and SLA — screens](user-guide-workflow-sla.md) |
-| admin-guide | current | [Workflow and SLA models — admin guide](admin-guide.md) |
+| admin-guide | current | [Workflow and SLA models — admin guide](admin-guide-workflow.md) |
 | api | current | [Maker-checker (Pending Changes) — API](api-maker-checker.md) · [Workflow and SLA — API](api-workflow-sla.md) |
 | tests | current | [Workflow and SLA models — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

@@ -19,7 +19,7 @@ computed several ways in several modules; the kernel is the single home, and cal
 onto it.
 
 The concept page of record, with every formula, is
-[analytics-kernel](spec.md); the plan (row `ANALYTICS-CORE-1`, closed 2026-11-13) is
+[analytics-kernel](spec-analytics.md); the plan (row `ANALYTICS-CORE-1`, closed 2026-11-13) is
 [`analytics-core-plan.md`](../../../../archived-documents/plans-archive/analytics-core-plan.md).
 
 ## Where it fits
@@ -41,4 +41,4 @@ Packages under `platform/inspecto-analytics/src/main/java/com/gamma/analytics`:
 | `.similarity` | `Similarity`, `JaroWinkler`, `TextUnit`, `SimilaritySql` |
 | `.accuracy`, `.split` | `Accuracy`, `AccuracySql`, `Backtest`; `HoldoutSplit` |
 
-More: [screens](user-guide-analytics.md) · [API](api-analytics.md) · [architecture](architecture.md).
+More: [screens](user-guide-analytics.md) · [API](api-analytics.md) · [architecture](architecture-analytics.md).

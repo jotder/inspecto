@@ -1,0 +1,57 @@
+---
+type: Feature
+title: "Advanced Edition — features"
+description: "Advanced includes Standard and adds policy, a PostgreSQL investigation store and intelligence modules."
+tags: [advanced, edition, features, presales]
+timestamp: 2026-10-19T00:00:00Z
+---
+
+# Advanced Edition — features
+
+**Product Map Item:** [`edition.advanced`](../../../../../product-map/edition/advanced.toon) · **Status:** ga · **Availability:** Billable Edition `INS-ED-ADVANCED`, per-node billing, standard support, enforced at build (`offerings/advanced.toon`).
+
+## What it is
+
+Advanced includes Standard and adds policy, a PostgreSQL investigation store and intelligence modules. For the sales story see [brochure](brochure-advanced.md).
+
+## Includes
+
+- Everything in the [Standard Edition](../standard/features-standard.md) (`includes: standard`).
+
+## Platform posture
+
+- Sign-in mode: `oidc`
+- Events backend: `parquet`
+- Objects backend: `postgres`
+- PostgreSQL sidecar: `bundled`
+
+## Modules added over Standard
+
+- [telecom-asn1](../../module/telecom-asn1/index.md) (from Standard on 2026-11-17, DATA-TIERS-1 DT-12)
+- [policy](../../module/policy/index.md)
+- [la-store-pg](../../module/la-store-pg/index.md)
+- [intelligence](../../module/intelligence/index.md)
+
+## Add-ons available
+
+| Add-on | Order code | Stages this Edition contributes |
+|---|---|---|
+| [linkAnalysis](../../addon/linkAnalysis/index.md) | `INS-AO-LINK-ANALYSIS` | la-store-pg |
+| [aiAssist](../../addon/aiAssist/index.md) | `INS-AO-AI-ASSIST` | intelligence |
+| [telecomIndustryPack](../../addon/telecomIndustryPack/index.md) | `INS-AO-TELECOM-INDUSTRY-PACK` | telecom-asn1 |
+
+## Content packs added over Standard
+
+- None added; packs of lower Editions carry over.
+
+## Data layer over Standard
+
+- The same data layer as Standard (DATA-TIERS-1), plus the ASN.1 and telecom decoders: module `telecom-asn1` and the Telecom industry pack moved from Standard to Advanced on 2026-11-17 (DT-12). Full table: [EDITIONS.md](../../../../EDITIONS.md) *Data layer by edition*.
+
+## Limits
+
+- No Edition-specific limits are declared in the offering file (`defaultSpaceSettings` is empty or absent).
+
+## Related hubs
+
+[Basic](../basic/index.md) · [Standard](../standard/index.md) · [Advanced](index.md) · [Preview](../preview/index.md)

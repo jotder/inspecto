@@ -289,9 +289,9 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark each sentence's next step.
 
 ### S10 · Not available
-- Voice: Sign in as the outsider, and open the link to the same Investigation. This Investigation is not available: it does not exist, is not yours, or its Dataset is no longer shared with you. The product will not say which, on purpose, so that nobody can learn that an Investigation exists by asking for it. Ask its owner to add you.
-- Chip: not available
-- Action: sign out ▸ Demo Outsider ▸ address bar `/link-analysis?investigation=sim-swap-takeover` ▸ hold.
+- Voice: Sign in as the outsider. The home page says you have no access to any Space: this Space admits only an administrator and the holders of a role it defines, and the outsider holds none. Open the link to the same Investigation, and it is not found, the same answer as for a Space that does not exist, on purpose, so that nobody can learn what is inside by asking for it. Ask an administrator to give you a role here.
+- Chip: no access
+- Action: sign out ▸ Demo Outsider ▸ hold on the home page ▸ address bar `/link-analysis?investigation=sim-swap-takeover` ▸ hold. [check in UI: the home page shows *You have no access to any Space*]
 - Impact: mark the sentence.
 
 ### S11 · When you cannot even start

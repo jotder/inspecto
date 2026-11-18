@@ -9,8 +9,8 @@ timestamp: 2026-10-22T00:00:00Z
 # Telecom re-rating (tariff validation) — decisions and as-built record
 
 > **What this page is.** The durable record of slices **R0 to R3** of `PACK-RERATING-1` (R0 to R2 built 2026-10-20, R3 2026-10-21),
-> distilled from the original plan on 2026-10-22. How the pack works today is in [architecture](architecture.md) and
-> [admin guide](admin-guide.md) (which holds the sizing figures). **Open work** (R4 to R7, D-RR10, the contract with partner
+> distilled from the original plan on 2026-10-22. How the pack works today is in [architecture](architecture-telco-rerating.md) and
+> [admin guide](admin-guide-telco-rerating.md) (which holds the sizing figures). **Open work** (R4 to R7, D-RR10, the contract with partner
 > settlement) lives in [`superpower/telco-packs-plan.md`](../../../../superpower/telco-packs-plan.md). Full history: the archived
 > original [`rerating-tariff-validation-plan.md`](../../../../archived-documents/plans-archive/rerating-tariff-validation-plan.md)
 > (section 12 the measurements, sections 13 to 15 the as-built narratives).

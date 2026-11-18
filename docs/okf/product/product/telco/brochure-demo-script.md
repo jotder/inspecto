@@ -83,7 +83,7 @@ The Alert Rules the demo Space holds: those its Space Templates ship and those t
 
 Say the tagline: *Find revenue leakage and fraud in your network's records, see who is linked to whom, and work every case to a decision.*
 
-Editions: [Standard](../../edition/standard/index.md) · [Advanced](../../edition/advanced/index.md). Distributions: production, trial, demo, pilot. The [datasheet](features.md) says which Apps each Edition can carry.
+Editions: [Standard](../../edition/standard/index.md) · [Advanced](../../edition/advanced/index.md). Distributions: production, trial, demo, pilot. The [datasheet](features-telco.md) says which Apps each Edition can carry.
 
 ## Reset
 

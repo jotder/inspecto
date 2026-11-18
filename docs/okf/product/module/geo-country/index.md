@@ -11,18 +11,18 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.geo-country`](../../../../../product-map/module/geo-country.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [MaxMind geo-country resolver — plan](plan.md) |
-| spec | current | [MaxMind geo-country resolver — spec](spec.md) |
-| architecture | current | [MaxMind geo-country resolver — architecture](architecture.md) |
-| features | current | [MaxMind geo-country resolver — features](features.md) |
+| plan | current | [MaxMind geo-country resolver — plan](plan-geo-country.md) |
+| spec | current | [MaxMind geo-country resolver — spec](spec-geo-country.md) |
+| architecture | current | [MaxMind geo-country resolver — architecture](architecture-geo-country.md) |
+| features | current | [MaxMind geo-country resolver — features](features-geo-country.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | n/a | no screens - the resolver only adds geo_country and geo_db_build to audit rows; operators configure it per the admin guide |
-| admin-guide | current | [MaxMind geo-country resolver — admin guide](admin-guide.md) |
-| api | current | [GeoCountryResolver SPI](api.md) |
+| admin-guide | current | [MaxMind geo-country resolver — admin guide](admin-guide-geo-country.md) |
+| api | current | [GeoCountryResolver SPI](api-geo-country.md) |
 | tests | current | [MaxMind geo-country resolver — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

@@ -1,6 +1,6 @@
 # Inspecto — Forward Roadmap
 
-**Status:** **§3 NEXT horizon, §6 sequence and vocabulary reconciled 2026-07-25** — §3.1–§3.3 have all shipped, and the banned term *Flow* is renamed to **Pipeline** per the binding [GLOSSARY](../../../../GLOSSARY.md). <!-- vocab-allow: names the Flow→Pipeline rename itself --> The **§1 theme horizons and the §2 NOW horizon had their status pass 2026-11-15** (`ARCH-DOC-CONTRADICTIONS-1`; see §9). · **Companion:** [../product/brochure-stakeholder-overview.md](../product/brochure-stakeholder-overview.md) · **Engineering detail:** [../../module/elt/architecture.md](../../module/elt/architecture.md)
+**Status:** **§3 NEXT horizon, §6 sequence and vocabulary reconciled 2026-07-25** — §3.1–§3.3 have all shipped, and the banned term *Flow* is renamed to **Pipeline** per the binding [GLOSSARY](../../../../GLOSSARY.md). <!-- vocab-allow: names the Flow→Pipeline rename itself --> The **§1 theme horizons and the §2 NOW horizon had their status pass 2026-11-15** (`ARCH-DOC-CONTRADICTIONS-1`; see §9). · **Companion:** [../product/brochure-stakeholder-overview.md](../product/brochure-stakeholder-overview.md) · **Engineering detail:** [../../module/elt/architecture-elt.md](../../module/elt/architecture-elt.md)
 
 > **Timeline convention.** This roadmap sequences work into **Now / Next / Later** horizons and gives **relative effort** sizing (S/M/L). It deliberately does **not** assign calendar dates — the cadence is one minor release per milestone on the active line, and dates are set per planning cycle, not here. Where an item gates revenue or another item, that dependency is called out explicitly.
 
@@ -86,7 +86,7 @@ The single most important item for commercialization.
 
 > **Delivered (ING-5).** The unified `parsing:` block — aliasing `csv_settings` / `processing.ingester` so
 > existing configs keep working — plus the **JSON/NDJSON** and **text/regex** frontends, with no engine
-> change. **Deferred:** LDIF block-records remain PROPOSED (`okf/product/module/elt/plan.md` §2 `ING-5` — the requirement of record since `REQUIREMENTS.md` §3 became an index).
+> change. **Deferred:** LDIF block-records remain PROPOSED (`okf/product/module/elt/plan-elt.md` §2 `ING-5` — the requirement of record since `REQUIREMENTS.md` §3 became an index).
 
 - **Scope:** promote today's frontends under one `parsing:` block (with `csv_settings`/plugin aliases so existing configs keep working), and add two new thin frontends producing rows for the shared backend:
   - **JSON** — wrap native JSON/NDJSON reads; lean on expression-mapping rules for nesting.
@@ -204,4 +204,4 @@ restated, because each needs a status call rather than a doc edit:
 
 ---
 
-*For the business framing of these items see [../product/brochure-stakeholder-overview.md](../product/brochure-stakeholder-overview.md) §10. For engineering-level task detail see [../../module/elt/architecture.md](../../module/elt/architecture.md) §14.*
+*For the business framing of these items see [../product/brochure-stakeholder-overview.md](../product/brochure-stakeholder-overview.md) §10. For engineering-level task detail see [../../module/elt/architecture-elt.md](../../module/elt/architecture-elt.md) §14.*

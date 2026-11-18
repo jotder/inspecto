@@ -11,17 +11,17 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.entity-list`](../../../../../product-map/module/entity-list.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Entity Lists — plan of record](plan.md) |
-| spec | current | [Entity Lists — assurance entries (ranges, CIDR, expiry, sidecar, four-eyes)](spec.md) |
-| architecture | current | [Entity Lists — architecture](architecture.md) |
-| features | current | [Entity lists — features](features.md) |
+| plan | current | [Entity Lists — plan of record](plan-entity-list.md) |
+| spec | current | [Entity Lists — assurance entries (ranges, CIDR, expiry, sidecar, four-eyes)](spec-entity-list.md) |
+| architecture | current | [Entity Lists — architecture](architecture-entity-list.md) |
+| features | current | [Entity lists — features](features-entity-list.md) |
 | feature-db | current | [Entity lists — feature database](feature-db.md) |
-| user-guide | current | [Entity Lists — user guide](user-guide.md) |
-| admin-guide | current | [Entity Lists — admin guide](admin-guide.md) |
+| user-guide | current | [Entity Lists — user guide](user-guide-entity-list.md) |
+| admin-guide | current | [Entity Lists — admin guide](admin-guide-entity-list.md) |
 | api | current | [HTTP routes — module.entity-list](api-routes.md) |
 | tests | current | [Entity lists — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

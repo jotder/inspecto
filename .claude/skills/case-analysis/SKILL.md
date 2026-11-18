@@ -17,12 +17,12 @@ check `docs/GLOSSARY.md` before naming anything (Entity List, Expectation, Decis
 
 | Topic | Hub / slot file |
 |---|---|
-| Case model, routes, permissions | `module/case-management/architecture.md` (add-on index: `addon/caseManagement/index.md`) |
+| Case model, routes, permissions | `module/case-management/architecture-case-management.md` (add-on index: `addon/caseManagement/index.md`) |
 | Case Rules within Incidents | `addon/incidents/plan-incidents.md` (Case Rules section) |
-| Link analysis (investigations, graph) | `module/la-core/architecture.md`, `module/la-core/user-guide.md` (§6.3 pivot between graph and map), `module/la-core/architecture-records.md` |
-| Scoring + Decision kernel | `module/scoring/architecture.md`, `module/scoring/spec-risk-scores.md`, `module/scoring/architecture.md` |
-| Entity Lists | `module/entity-list/spec.md` |
-| Screening | `module/screening/architecture.md`, `module/screening/spec.md` |
+| Link analysis (investigations, graph) | `module/la-core/architecture-la-core.md`, `module/la-core/user-guide-la-core.md` (§6.3 pivot between graph and map), `module/la-core/architecture-records.md` |
+| Scoring + Decision kernel | `module/scoring/architecture-scoring.md`, `module/scoring/spec-risk-scores.md`, `module/scoring/architecture-scoring.md` |
+| Entity Lists | `module/entity-list/spec-entity-list.md` |
+| Screening | `module/screening/architecture-screening.md`, `module/screening/spec-screening.md` |
 | Anomaly scores | `module/anomaly/` hub |
 
 ## Control API routes

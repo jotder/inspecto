@@ -11,7 +11,7 @@ import java.util.Set;
  * ({@code inspecto-ui/src/app/inspecto/component-model/attribute-spec.ts}), published on
  * {@code GET /pipelines/node-types} so the node cfg vocabulary has ONE definition instead of living only
  * client-side. Current knowledge: {@code docs/okf/product/module/config/spec-pipeline-config-keys.md} (the block
- * census) and {@code docs/okf/product/module/elt/user-guide.md} (how the drawer consumes the served
+ * census) and {@code docs/okf/product/module/elt/user-guide-elt.md} (how the drawer consumes the served
  * spec). Provenance only, not maintained: §3.1 of
  * {@code docs/archived-documents/plans-archive/vocabulary-and-config-contract-plan.md}.
  *

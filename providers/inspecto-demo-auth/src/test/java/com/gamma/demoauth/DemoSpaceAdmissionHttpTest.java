@@ -184,4 +184,58 @@ class DemoSpaceAdmissionHttpTest {
             MetricRegistry.global().reset();
         }
     }
+
+    /**
+     * Operator 2026-11-18: every Link Analysis demo Space signs in the same five Demo Users and is closed, as the LA scaffolders
+     * write it. The real rosters and role tables of two LA templates are attached: admin, analyst, manager and reviewer are
+     * admitted to both (their roles are defined there); `outsider` holds `no-access`, which no role table defines, so it signs
+     * in, is told it holds nothing and is listed no Space, and each Space answers it as an unknown one.
+     */
+    @Test
+    void theLaOutsiderSignsInAndIsAdmittedToNoClosedLaSpace(@TempDir Path root) throws Exception {
+        Path templates = Path.of("..", "..", "spaces", "_templates");
+        for (String id : List.of("la-audit", "la-mobile-money")) {
+            Path space = Files.createDirectories(root.resolve(id).resolve("config"));
+            for (String f : List.of("demo-users.toon", "roles.toon"))
+                Files.copy(templates.resolve(id).resolve("config").resolve(f), space.resolve(f));
+            Files.writeString(root.resolve(id).resolve("space.toon"), "display_name: " + id + "\nadmission: closed\n");
+        }
+        System.setProperty("control.bind", "127.0.0.1");
+        System.setProperty("spaces.root", root.toString());
+        SpaceManager spaces = SpaceManager.discover(root);
+        ControlApi api = new ControlApi(spaces, 0);
+        api.start();
+        try {
+            int port = api.port();
+            for (String member : List.of("admin", "analyst", "manager", "reviewer")) {
+                String token = signIn(port, member);
+                String list = json(port, "GET", "/spaces", token, null).body();
+                for (String id : List.of("la-audit", "la-mobile-money")) {
+                    assertTrue(list.contains("\"id\":\"" + id + "\""), member + " is admitted to " + id + ": " + list);
+                    assertEquals(200, json(port, "GET", "/spaces/" + id + "/components/dataset", token, null).statusCode(), member + " in " + id);
+                }
+            }
+
+            String outsider = signIn(port, "outsider");   // the demo token relay accepts a user whose role grants nothing
+            HttpResponse<String> list = json(port, "GET", "/spaces", outsider, null);
+            assertEquals(200, list.statusCode(), list.body());
+            assertFalse(list.body().contains("la-audit") || list.body().contains("la-mobile-money"), "listed no Space: " + list.body());
+            HttpResponse<String> boot = json(port, "GET", "/bootstrap", outsider, null);
+            assertEquals(200, boot.statusCode(), boot.body());
+            assertTrue(boot.body().contains("\"spaces\":[]"), "the bootstrap roster is empty: " + boot.body());
+            assertTrue(boot.body().contains("\"authenticated\":true") && boot.body().contains("\"capabilities\":[]"),
+                    "signed in, holding nothing: " + boot.body());
+            assertEquals(200, json(port, "GET", "/spaces/_meta", outsider, null).statusCode(), "the SPA's multi-Space probe still answers");
+            for (String id : List.of("la-audit", "la-mobile-money"))
+                for (String read : List.of("/bootstrap", "/components/dataset", "/inv/investigations")) {
+                    HttpResponse<String> r = json(port, "GET", "/spaces/" + id + read, outsider, null);
+                    assertEquals(404, r.statusCode(), id + read + ": " + r.body());
+                    assertTrue(r.body().contains("no such space '" + id + "'"), "answered as an unknown Space: " + r.body());
+                }
+        } finally {
+            api.close();
+            spaces.close();
+            MetricRegistry.global().reset();
+        }
+    }
 }

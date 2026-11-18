@@ -11,13 +11,13 @@ tags: [product-item, addon]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`addon.incidents`](../../../../../product-map/addon/incidents.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [Alerts & Incidents (INC)](plan-incidents.md) |
 | spec | n/a | an Add-on licenses modules — see the hubs of the modules it holds |
-| architecture | current | [Incidents and Alerts](architecture.md) |
+| architecture | current | [Incidents and Alerts](architecture-incidents.md) |
 | features | current | [Alerts — features](features-alerts.md) · [Incidents — features](features-incidents.md) |
 | feature-db | current | [Incidents — feature database](feature-db.md) |
 | user-guide | current | [Alerts](user-guide-alerts.md) · [Incidents — screens](user-guide-incidents.md) |

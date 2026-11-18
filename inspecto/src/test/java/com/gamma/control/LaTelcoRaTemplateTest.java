@@ -83,9 +83,10 @@ class LaTelcoRaTemplateTest {
         // every role a persona names resolves here; the shared admin's fraud-analyst, la-viewer and la-settings read as in la-card
         // (the industry packer merges roles by name and refuses one defined differently: la-telco-ra is composed with la-mfs)
         Map<String, Roles.Def> table = Roles.effective(CFG);
+        // the outsider holds no-access, which no roles.toon defines: a closed LA Space admits it nowhere (operator 2026-11-18)
         for (Map<String, Object> u : users)
             for (String r : String.valueOf(u.get("roles")).split(";"))
-                assertTrue(table.containsKey(r.trim().toLowerCase()), u.get("id") + ": role " + r + " is not defined");
+                assertEquals(!"outsider".equals(u.get("id")), table.containsKey(r.trim().toLowerCase()), u.get("id") + ": role " + r);
         Map<String, Roles.Def> card = Roles.effective(Path.of("..", "spaces", "_templates", "la-card", "config"));
         for (String r : List.of("fraud-analyst", "la-viewer", "la-settings"))
             assertEquals(card.get(r).capabilities(), table.get(r).capabilities(), r + " reads as in la-card");

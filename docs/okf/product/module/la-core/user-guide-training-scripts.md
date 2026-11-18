@@ -13,7 +13,7 @@ timestamp: 2026-11-16T00:00:00Z
 > not reviewed by product.** The scripts are one file per episode group (A-I), listed under *Episode contents*; the pilots
 > C4, D3 and F8 were written first and set the format. The series, its 41 episodes and its teaching rules
 > are in the plan [`2026-11-16-la-training-series-plan.md`](../../../../superpower/2026-11-16-la-training-series-plan.md).
-> Each episode complements a chapter of the [user guide](user-guide.md): the guide says what every control does; the
+> Each episode complements a chapter of the [user guide](user-guide-la-core.md): the guide says what every control does; the
 > episode shows why you would use it and what it changes on the graph.
 
 **How to read an episode.** The `## <code>_<Title>` line names the video file. Under it, the episode card: edition, Space,

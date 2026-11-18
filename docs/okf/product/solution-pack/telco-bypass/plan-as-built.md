@@ -10,7 +10,7 @@ timestamp: 2026-10-22T00:00:00Z
 
 > **What this page is.** The durable record of slices **B0 to B3** of `TELCO-BYPASS-SIMBOX-1` (built 2026-10-20 and
 > 2026-10-21), distilled from the original plan when it was consolidated on 2026-10-22. How the pack works today is in
-> [architecture](architecture.md) and [admin guide](admin-guide.md); this page keeps **why**, what was measured and what was
+> [architecture](architecture-telco-bypass.md) and [admin guide](admin-guide-telco-bypass.md); this page keeps **why**, what was measured and what was
 > found on the way. **Open work** (B4 to B7, D-BP10, the deferred items below) lives in
 > [`superpower/telco-packs-plan.md`](../../../../superpower/telco-packs-plan.md). Full history (design rationale, the B1 to B3
 > narratives in their own words): the archived original

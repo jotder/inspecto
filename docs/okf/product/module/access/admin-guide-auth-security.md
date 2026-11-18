@@ -131,7 +131,7 @@ server-side authorization system, all behind the existing SPIs (core stays auth-
   `ComponentAccess`: no `shares` key ⇒ byte-identical today; once present the component is restricted (owner +
   `canConfigureAccess` holders full, shares grant view/edit, everyone else the SEC-7d 404/filtered contract on
   read *and* mutate). Role matching rides `ComponentAccess.ATTR_HELD_ROLES` (authenticator-stamped, never
-  serialized). See [Exchange & sharing](../exchange/spec.md).
+  serialized). See [Exchange & sharing](../exchange/spec-exchange.md).
 - **Capability manifest (R4).** `CapabilityManifest` declares all gated `method+pattern → capability`
   registrations; `CapabilityManifestTest` source-scans the route files and fails the build on drift, asserts
   every route-demanded capability is granted by ≥1 seed role, and is the single source of truth for
@@ -505,7 +505,7 @@ As built: [events & metrics](../event/spec-events-metrics.md) § *Security trigg
 
 **A machine call names its client** (`OIDC-CC-MACHINE-ACTOR-1`, 2026-11-01). A client-credentials Subject's id is
 `client:<client id>` and `RequestAttrs.actorType` says `service`; `AuditTrail` adds the IdP's `sub` as `idp_subject`.
-Which tokens count as a machine's: [oidc admin guide](../oidc/admin-guide.md) section 5.
+Which tokens count as a machine's: [oidc admin guide](../oidc/admin-guide-oidc.md) section 5.
 
 **Evidence** is `compliance/evidence/route-gating.md`, whose inventory table is **generated** by
 `tools/route-gating-report.mjs` and CI-enforced in `--check` mode — the document cannot say something the

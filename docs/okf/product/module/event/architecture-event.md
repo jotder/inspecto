@@ -1,0 +1,128 @@
+# Events and event log
+
+> **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.
+> Offering: every edition (the bus is `platform/inspecto-event`; the `/events*` routes ship with the
+> `observability` module in `features/inspecto-observability`). Checked against the code on 2026-10-17.
+
+## 1. What it is
+
+The **event log** is the per-Space, append-only record of what happened: lifecycle facts (`BATCH_COMMITTED`,
+`FILE_QUARANTINED`, `ALERT_FIRED` ...), captured log lines (`LOG`) and the security audit trail (`AUDIT`,
+`ACCESS_DENIED`). `EventLog` (`platform/inspecto-event/src/main/java/com/gamma/event/EventLog.java`) is the
+synchronous bus that writes each event to an `EventStore` and hands it to subscribers.
+
+## 2. Who uses it
+
+- **Operators** read the Events screen and filter by level, type, Pipeline or correlation id (any caller).
+- **Builders** save named filters (`/events/views`, capability `canAuthorWorkbench`).
+- **Auditors / administrators** search and export the audit trail and verify the hash chain (`canAdminister`
+  for `/audit/verify` and `/audit/anchors`).
+- Internally, [Alerts](../../addon/incidents/architecture-incidents.md), [Notifications](../notify-channels/architecture-notify-channels.md) and freshness probes subscribe to it.
+
+## 3. Where it sits
+
+- SPI types: `spi/inspecto-audit-spi` - `Event`, `EventLevel`, `EventType`, `EventStore`, `EventSink`,
+  `EventQuery`, `AuditChain`, `AuditAttrs` (package `com.gamma.audit`).
+- Implementation: `platform/inspecto-event` - `EventLog`, `InMemoryEventStore`, `ParquetEventStore`,
+  `DbEventStore`, `EventStoreAppender`, `SecretScrubber`, `AuditChainLinker`, `SavedViewStore`, plus
+  `MetricRegistry` (`com/gamma/metrics/MetricRegistry.java`).
+- Routes: `EventRoutes` (`features/inspecto-observability/src/main/java/com/gamma/eventsapi/EventRoutes.java`)
+  and `AuditLogRoutes` (`inspecto/src/main/java/com/gamma/control/AuditLogRoutes.java`).
+- Gates: Installed (every Offering ships the bus); the `/events*` routes follow the `observability` module's
+  Enabled gate; Permitted per the table in section 7.
+
+## 4. How it works
+
+![Event log flow](../../assets/events.svg)
+
+1. A domain emitter calls `EventLog.emit`, or `EventStoreAppender` turns an SLF4J record at `INFO` or above
+   into a `LOG` event (`EventLevel.CAPTURE_THRESHOLD`; `DEBUG`/`TRACE` are never captured automatically).
+2. `EventLog.current()` routes by the calling thread's `space` MDC; an MDC naming an unregistered Space is
+   dropped, never routed to the global log.
+3. `SecretScrubber` redacts secrets in message and attributes.
+4. For `AUDIT` and `ACCESS_DENIED`, the Space's `AuditChain` stamps `audit_seq`, `audit_prev_hash` and
+   `audit_hash` (SHA-256 over canonical JSON) before the append, holding one writer per Space.
+5. The event is appended to the Space's `EventStore`, then each subscriber is called **inline on the
+   publishing thread**; subscribers that start work hand it to a virtual-thread pool.
+6. Readers query through `/events*` and `/audit/*`; the `event_prune` maintenance Job ages out old days.
+
+**Event kinds.** `EventType` is an open set of string constants, not a closed enum: a caller may emit a new
+type without editing the class. Families present today: logging and audit (`LOG`, `AUDIT`, `ACCESS_DENIED`,
+`SECURITY_TRIGGERED`), Space config integrity (`CONFIG_LINK_BROKEN`, `CONFIG_CHANGED_OUTSIDE`, from the Space
+lock — [spec-space-lock.md](../config/spec-space-lock.md) §11), Pipeline lifecycle (`PIPELINE_REGISTERED`, `PIPELINE_PAUSED`, `PIPELINE_RENAMED`
+...), consignment and file acquisition (`BATCH_COMMITTED`, `BATCH_FAILED`, `FILE_RECEIVED`,
+`FILE_DISCOVERED`, `FILE_FETCHED`, `FILE_STABLE`, `SEQUENCE_GAP`, `SOURCE_CIRCUIT_OPEN` ...), Jobs
+(`JOB_STARTED`, `JOB_FAILED`), `SIGNAL`, conservation (`PIPELINE_CONSERVATION_IMBALANCE`), Exchange
+(`EXCHANGE_OFFERED` ... `EXCHANGE_REFRESHED`), Entity Lists, geo projection, alerting (`ALERT_FIRED`,
+`ALERT_CLEARED`), reports (`REPORT_READY`), `EXPECTATION_FAILED`, and object activity. Levels are
+`TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`.
+
+## 5. Configuration
+
+Event storage is a JVM system property, not a TOON key (`ServiceStores.openEventStore`,
+`inspecto/src/main/java/com/gamma/service/ServiceStores.java`):
+
+| Property | Default | Meaning |
+|---|---|---|
+| `-Devents.backend` | `memory` | `memory` = bounded ring, nothing survives a restart; `parquet` = rolling Hive-partitioned Parquet; `db`, `postgres`, `postgresql` or a `jdbc:` URL = `DbEventStore` |
+| `-Devents.dir` | the Space root's events directory | Parquet location |
+
+A Parquet store that fails to open degrades to memory and is reported as degraded in store health.
+
+Retention is a maintenance Job of type `event_prune` with a **required** `retention_days` (>= 1, no default;
+`platform/inspecto-engine/src/main/java/com/gamma/job/EventPruneTask.java`). It deletes whole
+`level/year/month/day` partitions. Until such a Job is scheduled, retention is stated policy only.
+
+## 6. Screens
+
+Moved to [the user guide](user-guide-events.md#screens).
+
+## 7. API
+
+Moved to [Events and event log — API](api-events.md).
+
+## 8. Interactions
+
+- Every mutating control-plane request is recorded as `AUDIT` by the central audit interceptor; denials on a
+  matched route become `ACCESS_DENIED` with the missing capability in `AuditAttrs`.
+- [Alerts](../../addon/incidents/architecture-incidents.md) evaluate on terminal batch events and emit `ALERT_FIRED` / `ALERT_CLEARED`.
+- [Notifications](../notify-channels/architecture-notify-channels.md) subscribe and deliver off the bus.
+- [Jobs and scheduler](../processor/architecture-processor.md) runs `event_prune`; [Observability and backup](../observability/architecture-observability.md)
+  exposes `/metrics`. Deep detail: [Events and metrics](spec-events-metrics.md).
+
+## 9. Limits and gotchas
+
+- ⚠ Emission is synchronous. A subscriber that starts the same Pipeline inline deadlocks on the run claim the
+  publishing thread holds - always hand off.
+- ⚠ The engine default backend is `memory`: the audit trail is lost on restart unless `events.backend` is set.
+  Every edition's `serve.*` sets `parquet` (Basic too since 2026-11-06, `BASIC-EVENTS-DURABLE-1`); the daily
+  audit anchors cannot roll over a memory store after a restart.
+- ⚠ SHA-256 needs no key, so a chain rewritten after the last anchor still verifies; only an anchor catches it.
+  Anchors live in the Space's `.secrets` sibling and are not backed up.
+- Rows written before 2026-09-27 carry no `audit_seq` and are outside the chain.
+- A corrupt Parquet file is skipped and raised once as a `SIGNAL` (`events.file_unreadable`); reads answer
+  from the remaining files rather than failing.
+- The `/events*` read routes carry no capability gate; any caller past AuthN can read the whole log. Where the
+  `observability` module is off, the feed is gone but `/audit/search` still serves the audit projection.
+- **Parquet store: append vs flush (`LA-PERF-N9-1`, 2026-11-13).** `ParquetEventStore.append` writes the event
+  to the journal `pending.jsonl` on the caller's thread (forced for `AUDIT` / `ACCESS_DENIED`), so an audit
+  event is durable before the HTTP reply. A threshold or time-roll flush runs on the `event-store-flush` thread
+  in three steps. (1) Under the store lock, the journal is renamed to `pending.seg-<n>.jsonl` and the buffer
+  becomes the in-flight batch. (2) Without the lock, the batch is written on a second DuckDB connection into
+  `.staging/flush-<n>/`. (3) Under the lock, the files are moved into place, the batch leaves memory and the
+  segment is deleted. Reads merge the in-flight batch and never walk `.staging/`. If the flush fails, the
+  events not already in Parquet go back to the buffer and the journal. On open, the store replays the held
+  file, every segment and the journal, skipping event ids already in Parquet, and deletes leftover scratch
+  directories. `flush()` and `close()` wait for an in-flight flush. `prune`, `close` and replay still flush
+  under the lock. Measured per append (50-event threshold): p99 fell from 153–245 ms to 5.7–7.3 ms. The
+  ~2.6 ms median is the journal force, which stays.
+- **Torn UTF-8 on replay (`EVENT-JOURNAL-TORN-UTF8-1`, 2026-11-13).** A kill can land inside a multi-byte
+  character of the last journal line. `ParquetEventStore.replayJournal` therefore decodes the journal, every
+  segment and the held file leniently (malformed bytes become U+FFFD) rather than failing the whole replay.
+
+## References
+
+- `platform/inspecto-event/src/main/java/com/gamma/event/EventLog.java`
+- `spi/inspecto-audit-spi/src/main/java/com/gamma/audit/EventType.java`
+- `inspecto/src/main/java/com/gamma/control/AuditVerifier.java`
+- [Events and metrics (backend)](spec-events-metrics.md)

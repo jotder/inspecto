@@ -11,13 +11,13 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.graph`](../../../../../product-map/module/graph.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Graph algorithms — plan](plan.md) |
-| spec | current | [Graph algorithms — spec](spec.md) |
-| architecture | current | [Graph library](architecture.md) |
+| plan | current | [Graph algorithms — plan](plan-graph.md) |
+| spec | current | [Graph algorithms — spec](spec-graph.md) |
+| architecture | current | [Graph library](architecture-graph.md) |
 | features | current | [Graph library — features](features-graph.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Graph library — screens](user-guide-graph.md) |

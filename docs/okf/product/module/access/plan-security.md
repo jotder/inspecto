@@ -175,7 +175,7 @@ default `mvn -o clean test` reactor **never compiles either module** — see §8
 ### 3.2 The request-gating order in `ControlApi`
 
 Every request passes, in order (`ControlApi.routeDispatch`, `inspecto/src/main/java/com/gamma/control/ControlApi.java`;
-since 2026-11-15 `SpaceAdmission` runs between stages 1 and 2, then the rate limit — see [spec](spec.md)):
+since 2026-11-15 `SpaceAdmission` runs between stages 1 and 2, then the rate limit — see [spec](spec-access.md)):
 
 1. **`authenticate(ex, path)`**. First, on every edition and every matched route (static and SPA assets never reach `authenticate`): a non-blank `X-Actor`
    header is **rejected outright with `403 PERMISSION_DENIED`** (the SEC-7a spoof guard, extended from
@@ -226,7 +226,7 @@ SDK. Configuration is system properties only:
 |---|---|---|
 | `-Dauth.oidc.issuer` | expected `iss` | **yes — the process exits without it** (or from discovery) |
 | `-Dauth.oidc.jwksUri` | JWKS endpoint (explicit, or from discovery / the `keycloak` preset since 2026-10-13) | **yes** |
-| `-Dauth.oidc.audience` | expected `aud` | warn-only by decision (`docs/okf/product/module/oidc/architecture.md`) |
+| `-Dauth.oidc.audience` | expected `aud` | warn-only by decision (`docs/okf/product/module/oidc/architecture-oidc.md`) |
 | `-Dauth.oidc.rolesClaim` | which claim carries role names | default per module |
 | `-Dauth.oidc.clientId` | the public client id the BFF exchanges on behalf of | for the relay |
 | `-Dauth.oidc.tokenEndpoint` | the provider's `token_endpoint` | **mandatory, no default** (D15) unless discovery or the `keycloak` preset supplies it |
@@ -537,7 +537,7 @@ earlier one, both appear.
 | 2026-08-29 | **SEC-INCIDENT-1 closed by decommission** | The affected system was decommissioned, so no issuer entry remains to rotate; the values stay in public history and are immaterial only because none is in use |
 | 2026-09-02 (operator) | **SEC-08 masking / classification-driven row scope is Enterprise-only** | Classification (SCH-03) and row scope both exist; the join is Enterprise build work |
 | 2026-09-06 | Secrets: `${ENV}`/`${SYS}` everywhere, `${FILE}`/`${KEYSTORE}` by module, **Vault/KMS on client demand only** | A Personal bundle refuses the module-backed schemes with a message, never a silent null |
-| 2026-09-07 | `-Dauth.oidc.audience` is **warn-only** | Recorded in `docs/okf/product/module/oidc/architecture.md`; a hard fail would brick deployments whose IdP omits `aud` |
+| 2026-09-07 | `-Dauth.oidc.audience` is **warn-only** | Recorded in `docs/okf/product/module/oidc/architecture-oidc.md`; a hard fail would brick deployments whose IdP omits `aud` |
 
 ## 5. Not built
 
@@ -678,10 +678,10 @@ the logs were deleted 2026-07-26 before export).
 | Mechanism | Owning file | `resource:` | Read it for |
 |---|---|---|---|
 | The whole posture, RBAC R0–R5, ABAC A1–A5, the 2026-07-25 decisions, the boot precondition | `docs/okf/product/module/access/admin-guide-auth-security.md` (`Concept`) | `providers/inspecto-oidc/, providers/inspecto-policy/` | the long-form narrative every row above was distilled from |
-| The Standard module's classes, properties, shading and boot behaviour | `docs/okf/product/module/oidc/architecture.md` (`Concept`) | `providers/inspecto-oidc/` | `audience` warn-only, `SEC-SIDECAR-BOOT-1`, why the sidecar is shaded |
+| The Standard module's classes, properties, shading and boot behaviour | `docs/okf/product/module/oidc/architecture-oidc.md` (`Concept`) | `providers/inspecto-oidc/` | `audience` warn-only, `SEC-SIDECAR-BOOT-1`, why the sidecar is shaded |
 | Edition gating as a mechanism; the EDG-01 recipe items | `docs/okf/product/layer/platform/architecture-editions.md` (`Concept`) | `pom.xml` | how a module joins a profile and what the compiler cannot see |
 | Request dispatch, `PUBLIC_PATHS`, the envelope, error codes | `docs/okf/product/module/processor/api-control-api.md` · `api-v1.md` (`Concept`) | `inspecto/src/main/java/com/gamma/control` | the contract SEC gates inside |
-| Intra-Space shares and the cross-Space Exchange lifecycle | `docs/okf/product/module/exchange/spec.md` (`Concept`) | `features/inspecto-exchange/` | the `ShareGrant` state machine and the attribute-scope pin |
+| Intra-Space shares and the cross-Space Exchange lifecycle | `docs/okf/product/module/exchange/spec-exchange.md` (`Concept`) | `features/inspecto-exchange/` | the `ShareGrant` state machine and the attribute-scope pin |
 | The write-root jail, `PathJail`, `ConfigSafetyValidator` | `docs/okf/product/module/config/spec-config-safety.md` (`Concept`) | `platform/inspecto-config/` | what happens *inside* the root once §3.13 lets a write through |
 | Actor attribution, `AuditTrail`, `access.denied` in the ledger | `docs/okf/product/module/event/spec-events-metrics.md` (`Concept`) | `inspecto/src/main/java/com/gamma/control` | how a decision becomes an event |
 | 🔴 **The UI seam has no concept file.** `LensService`, `SessionService`, the Access / Roles / Policies editors and the sign-in flow are documented only in source and in this spec | *(none — gap)* | `inspecto-ui/src/app/inspecto/api/lens.service.ts` · `session.service.ts` · `inspecto-ui/src/app/modules/admin/access/` | the code. Same class of gap the plan flagged for `INC`'s missing backend concept; filed under `UI`/Surfaces, not here |

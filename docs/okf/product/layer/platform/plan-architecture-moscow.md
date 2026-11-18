@@ -32,9 +32,9 @@ before `4.0.0` is tagged and installed for a first customer?**
 | **Could** | Worth doing when the area is next touched or when a customer asks; nothing depends on it. |
 | **Won't (this time)** | Already refused or postponed with a stated reason. Each has a reopen trigger; none is forgotten. |
 
-**Where the facts come from.** The six system-set pages ([architecture](architecture.md),
+**Where the facts come from.** The six system-set pages ([architecture](architecture-platform.md),
 [modules](architecture-modules.md), [Editions](architecture-editions.md),
-[Platform Services](architecture-platform-services.md), [UI](../product/architecture.md),
+[Platform Services](architecture-platform-services.md), [UI](../product/architecture-product.md),
 [Studio BI](../product/architecture-studio-bi.md)), the board, the active plans in `docs/superpower/`,
 [API stability](../../module/api/plan-api-stability.md), the
 [maturity assessment](../product/plan-maturity-assessment.md) and `compliance/controls-matrix.md`.

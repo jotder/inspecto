@@ -116,7 +116,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   const read = await call('reviewer', 'GET', `${base2}/log`);
   record('reviewer is read-only (write refused, read allowed)', write.status === 403 && read.status === 200 ? null : `write ${write.status}, read ${read.status}`);
   const outsider = await call('outsider', 'GET', `${base2}/log`);
-  record('outsider is not a member (404)', outsider.status === 404 ? null : `HTTP ${outsider.status}`);
+  record('outsider is not admitted to the Space (404)', outsider.status === 404 ? null : `HTTP ${outsider.status}`);
   const inbox = await call('manager', 'GET', '/inv/pending?status=pending&limit=200');
   record('manager sees the pending four-eyes expand', inbox.status === 200 && (inbox.data.items || []).some((i) => i.investigationId === INV) ? null : `HTTP ${inbox.status}`);
   const run1 = await call('analyst', 'POST', '/inv/graph/runs', { investigationId: INV, algorithm: 'articulationPoints', params: {} });

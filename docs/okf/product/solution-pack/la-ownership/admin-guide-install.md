@@ -108,7 +108,7 @@ Draft. To lay the Space out offline instead of unzipping the downloads, `node to
 | `analyst` | `la-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
 | `manager` | `la-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
 | `reviewer` | `la-viewer`, member as reviewer | reads `sanctions-exposure`; any change is refused (403) |
-| `outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `outsider` | `no-access`, admitted to no Space | nothing: signs in, but no Space is listed and every read answers 404 |
 | `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
 
 **The Alert Rule.** `ownership_path_to_listed_person` (CRITICAL) reads the one row of `ownership_sanctions_counts`:
@@ -145,7 +145,7 @@ is for testers and stays in the repository; it is not in the data download.
 
 ## References
 
-[Brochure](brochure.md) · [User guide: tour and exercises](user-guide.md) · [Configuration reference: data root](../../module/config/admin-guide-configuration-reference.md)
+[Brochure](brochure-la-ownership.md) · [User guide: tour and exercises](user-guide-la-ownership.md) · [Configuration reference: data root](../../module/config/admin-guide-configuration-reference.md)
 
 ## As part of the *Banking and finance* industry Space
 

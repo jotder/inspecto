@@ -18,13 +18,14 @@ if (!origins.length) for (const p of ports) origins.push(`http://localhost:${p}`
 export const CLIENT_ID = 'inspecto_preview_la';
 export const PASSWORD = 'Preview#LA2026';   // test value for the synthetic demo users, local only
 // The five shared Demo Users of every LA showcase Space (operator 2026-11-16); each Space decides what the shared role
-// names (la-analyst, la-manager, la-viewer) may do in its own roles.toon.
+// names (la-analyst, la-manager, la-viewer) may do in its own roles.toon. `outsider` holds `no-access`, which no roles.toon
+// defines, so a closed LA Space admits it nowhere (operator 2026-11-18).
 export const USERS = [
   ['admin', 'Demo', 'Admin', ['super', 'admin', 'fraud-analyst', 'la-settings']],
   ['analyst', 'Demo', 'Analyst', ['operations', 'la-analyst']],
   ['manager', 'Demo', 'Manager', ['manager', 'la-manager']],
   ['reviewer', 'Demo', 'Reviewer', ['la-viewer']],
-  ['outsider', 'Demo', 'Outsider', ['la-viewer']],
+  ['outsider', 'Demo', 'Outsider', ['no-access']],
 ];
 const GROUPS = [...new Set(USERS.flatMap((u) => u[3]))];
 const auth = 'Basic ' + Buffer.from('admin:admin').toString('base64');

@@ -45,11 +45,11 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "scaffold failed: $s" }
     }
     Remove-Item (Join-Path $root '_templates') -Recurse -Force -ErrorAction SilentlyContinue
-    # la-daily-feed has no seeder: a plain Space from its template
+    # la-daily-feed has no seeder: a plain Space from its template, closed like every LA demo Space (operator 2026-11-18)
     $df = Join-Path $root 'la-daily-feed'; New-Item -ItemType Directory $df | Out-Null
     Copy-Item (Join-Path $Repo 'spaces\_templates\la-daily-feed\config') (Join-Path $df 'config') -Recurse
     Copy-Item (Join-Path $Repo 'spaces\_templates\la-daily-feed\data') (Join-Path $df 'data') -Recurse -ErrorAction SilentlyContinue
-    Set-Content (Join-Path $df 'space.toon') "display_name: Link Analysis daily feed`ndescription: Scaffolded from the la-daily-feed Space Template`ncreated_at: $((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ'))`n"
+    Set-Content (Join-Path $df 'space.toon') "display_name: Link Analysis daily feed`ndescription: Scaffolded from the la-daily-feed Space Template`ncreated_at: $((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ'))`nadmission: closed`n"
     Write-Host ("Spaces to bake: " + ((Get-ChildItem $root -Directory | ForEach-Object Name) -join ', ')) -ForegroundColor Cyan
 
     # 2. boot the demo bundle against that one spaces root
@@ -106,7 +106,8 @@ try {
     foreach ($sp in Get-ChildItem $root -Directory) {
         Remove-Item (Join-Path $sp.FullName 'data\events'), (Join-Path $sp.FullName 'data\.duckdb_tmp') -Recurse -Force -ErrorAction SilentlyContinue
         foreach ($f in Get-ChildItem -Path $sp.FullName -Recurse -File | Where-Object { $_.Extension -in '.db', '.duckdb' }) {
-            & (Join-Path $Bundle 'runtime\bin\java.exe') --enable-native-access=ALL-UNNAMED -cp (Join-Path $Bundle 'lib\inspecto.jar') $rebase $f.FullName @pairArgs | Out-Null
+            # the full JDK, never the bundle's jlinked runtime: the rebase tool needs jdk.compiler
+            & (Join-Path $env:JAVA_HOME 'bin\java.exe') --enable-native-access=ALL-UNNAMED -cp (Join-Path $Bundle 'lib\inspecto.jar') $rebase $f.FullName @pairArgs | Out-Null
             if ($LASTEXITCODE -ne 0) { $keep = $true; throw ("rebasing " + $f.Name + " failed") }
         }
         foreach ($f in @(& $findHits $sp.FullName)) {

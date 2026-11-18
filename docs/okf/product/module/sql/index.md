@@ -11,17 +11,17 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.sql`](../../../../../product-map/module/sql.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [SQL guard and helpers — plan](plan.md) |
-| spec | current | [SQL guard and helpers — spec](spec.md) |
-| architecture | current | [SQL guard and helpers — architecture](architecture.md) |
-| features | current | [SQL guard and helpers — features](features.md) |
+| plan | current | [SQL guard and helpers — plan](plan-sql.md) |
+| spec | current | [SQL guard and helpers — spec](spec-sql.md) |
+| architecture | current | [SQL guard and helpers — architecture](architecture-sql.md) |
+| features | current | [SQL guard and helpers — features](features-sql.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | n/a | a backend library with no screen and no user-authored configuration; users meet it only as a refusal message on query screens documented in their own hubs |
-| admin-guide | current | [SQL guard and helpers — admin guide](admin-guide.md) |
+| admin-guide | current | [SQL guard and helpers — admin guide](admin-guide-sql.md) |
 | api | n/a | exposes no HTTP routes; it is a Java library called by the engine, BI and Link Analysis modules |
 | tests | current | [SQL guard and helpers — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Analytics kernel — screens
 
-Screens for Analytics kernel. Design and internals: [Analytics kernel architecture](architecture.md).
+Screens for Analytics kernel. Design and internals: [Analytics kernel architecture](architecture-analytics.md).
 
 None. Its output appears in the Step previews, Expectation baselines, Anomaly and Risk Score
 screens, Screening hits and the Link Analysis profile panes.

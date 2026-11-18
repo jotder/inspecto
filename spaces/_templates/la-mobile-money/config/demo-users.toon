@@ -3,4 +3,4 @@ users[5]{id,displayName,title,roles}:
   analyst,Demo Analyst,Analyst (lead),la-analyst
   manager,Demo Manager,Manager (second approver),la-manager
   reviewer,Demo Reviewer,Reviewer (read-only),la-viewer
-  outsider,Demo Outsider,Not a member of the Investigation,la-viewer
+  outsider,Demo Outsider,Signs in but is admitted to no Space,no-access

@@ -1,0 +1,51 @@
+---
+type: Plan
+title: "Screening — plan"
+description: "Requirement of record for the screening add-on: what was required, built, left and refused."
+resource: features/inspecto-screening/src/main/resources/META-INF/inspecto/module.toon
+tags: [screening, plan]
+timestamp: 2026-10-19T00:00:00Z
+---
+
+# Screening — plan
+
+Requirement of record, distilled from the archived
+[`screening-addon-plan.md`](../../../../archived-documents/plans-archive/screening-addon-plan.md) and the
+`SCREENING-1` row of the [BACKLOG](../../../../BACKLOG.md). As-built detail: [spec](spec-screening.md).
+
+## Required
+
+Match subjects (name and/or identifier) against Entity Lists of any purpose with a Match Score; an ad-hoc check
+that persists nothing; a scheduled Run raising reviewable, tamper-evident Screening Hits; audited decisions.
+Domain-neutral: the AML pack (`PACK-AML-1`) builds on it.
+
+## Built (`SCREENING-1`)
+
+- 2026-10-09: module `inspecto-screening`, `POST /screening/check`, the `screening.run` Job Type, signed hits with
+  read and decide routes, the `/screening` review pane (decisions SCR-D1..SCR-D14).
+- 2026-10-11: phonetic / transliteration block keys.
+- 2026-10-14: four-eyes on `confirmed` (D1), a confirm opens an Incident and a Case (D2), the audited reveal (D3),
+  the save-time check of a `screening.run` Job, the *Check a name* dialog.
+- 2026-11-01: the dedupe index (D6; building it once the measurement crossed the trigger was assistant-decided under
+  operator delegation, pending confirmation). D6's trigger was measured, not assumed: reading every hit document
+  took ~12.5 ms a document cold on Windows, 1 030 s at 100 000 hits, all under the hit lock; the indexed pass takes 0.5 s. A Run now reads one signed
+  index file plus only the hits it does not cover. The same change keeps a Run from reusing a hit id another hit
+  already holds (a same-second id used to overwrite that hit).
+- 2026-11-01: the paged hit listing (D8; assistant-decided under operator delegation, pending confirmation).
+  `GET /screening/hits` read and verified every hit document per call (1 730 s at 100 000 hits on a busy Windows
+  box); it now pages by cursor (`limit` 1..500, default 100) and filters by state from the D6 index, widened to
+  `{key, state, mtime}`, and reads only the page's documents: 2.9 s for the first page at 100 000 hits. Chosen
+  conservatively: a cursor rather than an offset (newest-first ids stay stable as hits arrive), the returned hits
+  still verified one by one, a bad cursor refused rather than restarted, and no lock on reads. The pane appends
+  pages through the data-table's Load more.
+
+## Left
+
+Open items stay on the `SCREENING-1` row; the recorded limits are in the [spec](spec-screening.md) (*Limits and what is open*).
+
+## Refused or deferred
+
+- `check` raising hits: refused (D4); raising belongs to the Job.
+- A Space-level threshold default: not until a customer asks (D5, SCR-D2).
+- Comparing an initial-letter difference that is not a known transliteration: needs a full cross-join (D7).
+- A module-contributed capability: declined; `canWorkIncidents` decides.

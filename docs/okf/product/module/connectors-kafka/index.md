@@ -11,18 +11,18 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.connectors-kafka`](../../../../../product-map/module/connectors-kafka.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Kafka stream connector — plan](plan.md) |
-| spec | current | [Kafka stream connector — spec](spec.md) |
-| architecture | current | [Kafka stream connector — architecture](architecture.md) |
-| features | current | [Kafka stream connector — features](features.md) |
+| plan | current | [Kafka stream connector — plan](plan-connectors-kafka.md) |
+| spec | current | [Kafka stream connector — spec](spec-connectors-kafka.md) |
+| architecture | current | [Kafka stream connector — architecture](architecture-connectors-kafka.md) |
+| features | current | [Kafka stream connector — features](features-connectors-kafka.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | n/a | no screens of its own - a kafka Connection is created in the shared Connections screen (connectors/user-guide-connections.md) |
-| admin-guide | current | [Kafka stream connector — admin guide](admin-guide.md) |
-| api | n/a | no HTTP routes; the Java contract it implements is the Collector connector SPI in the connectors hub (connectors/api.md) |
+| admin-guide | current | [Kafka stream connector — admin guide](admin-guide-connectors-kafka.md) |
+| api | n/a | no HTTP routes; the Java contract it implements is the Collector connector SPI in the connectors hub (connectors/api-connectors.md) |
 | tests | current | [Kafka stream connector — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

@@ -1,0 +1,46 @@
+---
+type: Feature
+title: "SQL guard and helpers — architecture"
+description: "How the two-layer SQL defence (guard, then sealed sandbox) is put together and where it is used."
+tags: [sql, architecture]
+timestamp: 2026-10-19T00:00:00Z
+---
+
+# SQL guard and helpers — architecture
+
+## Two layers, neither sufficient alone
+
+```
+candidate SQL ──► SqlGuard (lexical + DuckDB parse tree) ──finding──► refuse (no connection opened)
+                        │ pass
+                        ▼
+      SqlSandbox.open ── trusted caller registers its inputs (file access still on)
+                        ▼
+      seal / sealAllowing(dirs) ── enable_external_access=false (or allow-listed dirs), lock_configuration=true
+                        ▼
+      untrusted SQL runs under memory / thread / timeout caps
+```
+
+- The guard runs **before** DuckDB sees the text, because `EXPLAIN` can evaluate smuggled functions while
+  planning. It errs toward rejection: a false reject costs a repair round, a false accept is a hole.
+- The sandbox is the backstop: once sealed, a guard bypass still cannot reach the filesystem or change
+  configuration. `sealAllowing` keeps named directories readable for callers that need their own inputs.
+- `SqlViews` makes the oracle and production Enrichment read a Dataset the same way.
+- **Quoted text is data (`SQLGUARD-QUOTED-TEXT-1`, 2026-10-27).** The keyword and `;` checks run on a masked copy of
+  the SQL in which the content of `'…'` strings (`''` escapes), `"…"` identifiers and `$$…$$`/`$tag$…$tag$` strings is
+  emptied and comments (nested `/* */` included) are removed, so `WHERE record_kind = 'CALL'` passes (it refused three
+  `sql.template` Jobs) while `'x'; DROP TABLE t; --` and a real `CALL`/`SET`/`COPY` statement are refused as before.
+  Unsure cases scan MORE, never less: a backslash is not an escape, an unterminated quote masks to the end and the parser
+  layer then refuses it. The function-call, relation (replacement-scan) and parse-tree checks still read the raw text,
+  so a file function or path literal is refused wherever it sits. Tests: `SqlGuardQuotedTextTest`.
+
+## Where it is used
+
+Per [BACKLOG](../../../../BACKLOG.md): Enrichment `transformSql` (run and preview), the Pipeline dry run's
+scratch connection, virtual Dataset rename (`renameBaseTable`), persisted queries, and the Link Analysis
+recursive-paths walk (`traversalThreads`, read by `InvRoutes`). The guard and sandbox also serve the Consignment
+readers, Reconciliation, the control plane's query / BI / rule / save gates (`SaveGate`, `QueryRoutes`, `BiRoutes`)
+and the agent's SQL skills (`SqlOracleTool`, `ReportSqlSkill`, `KpiToSqlSkill`). DuckDB connection handling in general:
+[engine spec-duckdb](../engine/spec-duckdb.md).
+
+Details: [spec](spec-sql.md).

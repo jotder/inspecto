@@ -17,12 +17,12 @@ Routes below are in `docs/api/openapi-v1.json` or the cited hub doc; confirm the
 
 | Topic | Hub / slot file |
 |---|---|
-| Incident model, lifecycle, permissions | `addon/incidents/architecture.md`, `addon/incidents/plan-incidents.md` |
-| Alerts + Alert Rules | `addon/incidents/architecture.md`, `addon/incidents/user-guide-alerts.md` |
+| Incident model, lifecycle, permissions | `addon/incidents/architecture-incidents.md`, `addon/incidents/plan-incidents.md` |
+| Alerts + Alert Rules | `addon/incidents/architecture-incidents.md`, `addon/incidents/user-guide-alerts.md` |
 | Objects (Incident/Case store, workflows, findings) | `module/ops/user-guide-objects.md` |
-| Events, signals | `module/event/architecture.md`, `module/event/spec-events-metrics.md`, `module/event/spec-signal-backbone.md`, `module/event/user-guide-events.md` |
-| Observability / backup | `module/observability/architecture.md` |
-| Runs and run detail | `module/elt/user-guide.md`, `module/elt/user-guide.md`, `module/elt/spec-pipeline.md` |
+| Events, signals | `module/event/architecture-event.md`, `module/event/spec-events-metrics.md`, `module/event/spec-signal-backbone.md`, `module/event/user-guide-events.md` |
+| Observability / backup | `module/observability/architecture-observability.md` |
+| Runs and run detail | `module/elt/user-guide-elt.md`, `module/elt/user-guide-elt.md`, `module/elt/spec-pipeline-execution.md` |
 | Known failure modes | `layer/platform/admin-guide-troubleshooting.md`, `layer/platform/admin-guide-gotchas.md` |
 | Operating, flags | `layer/platform/admin-guide-operations-reference.md`, `layer/platform/admin-guide-launch-flags.md` |
 
@@ -51,14 +51,14 @@ Recovery and transition routes mutate state — confirm with the operator before
 
 | Symptom | Start at |
 |---|---|
-| Run FAILED / stuck / parked | `module/elt/user-guide.md`, `module/elt/spec-pipeline.md` |
-| File quarantined, wrong schema, parsed=0 | `layer/platform/admin-guide-troubleshooting.md`, `module/elt/architecture.md` |
+| Run FAILED / stuck / parked | `module/elt/user-guide-elt.md`, `module/elt/spec-pipeline-execution.md` |
+| File quarantined, wrong schema, parsed=0 | `layer/platform/admin-guide-troubleshooting.md`, `module/elt/architecture-elt.md` |
 | Output in `year=NULL/...` partitions | `layer/platform/admin-guide-troubleshooting.md` |
-| Collector picks nothing up / re-pick | `module/elt/architecture.md`; troubleshooting (`.processed` markers) |
+| Collector picks nothing up / re-pick | `module/elt/architecture-elt.md`; troubleshooting (`.processed` markers) |
 | JVM crash / native access / out of memory | `layer/platform/admin-guide-troubleshooting.md`, `layer/platform/admin-guide-launch-flags.md` |
 | Config refused at save | `pipeline-author` skill, `module/config/spec-config-safety.md` |
-| Alert fired / did not fire | `addon/incidents/architecture.md` |
-| Incident transition refused | `addon/incidents/architecture.md` (workflow actions), `module/ops/user-guide-objects.md` |
+| Alert fired / did not fire | `addon/incidents/architecture-incidents.md` |
+| Incident transition refused | `addon/incidents/architecture-incidents.md` (workflow actions), `module/ops/user-guide-objects.md` |
 | Missing or odd events | `module/event/spec-events-metrics.md` |
 | Sign-in / OIDC failure | `module/oidc/` hub, `layer/platform/admin-guide-operations-reference.md` |
 

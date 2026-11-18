@@ -11,20 +11,20 @@ tags: [product-item, solution-pack]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`solution-pack.telco-rerating`](../../../../../product-map/solution-pack/telco-rerating.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [Telecom re-rating (tariff validation) — decisions and as-built record](plan-as-built.md) |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| architecture | current | [Telecom re-rating (tariff validation)](architecture.md) |
-| features | current | [Telecom re-rating (tariff validation) — features](features.md) |
+| architecture | current | [Telecom re-rating (tariff validation)](architecture-telco-rerating.md) |
+| features | current | [Telecom re-rating (tariff validation) — features](features-telco-rerating.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Telecom re-rating (tariff validation) — user guide](user-guide.md) |
-| admin-guide | current | [Telecom re-rating (tariff validation) — admin guide](admin-guide.md) |
+| user-guide | current | [Telecom re-rating (tariff validation) — user guide](user-guide-telco-rerating.md) |
+| admin-guide | current | [Telecom re-rating (tariff validation) — admin guide](admin-guide-telco-rerating.md) |
 | api | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | tests | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| brochure | current | [Telecom re-rating (tariff validation) — brochure](brochure.md) |
+| brochure | current | [Telecom re-rating (tariff validation) — brochure](brochure-telco-rerating.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
 

@@ -11,17 +11,17 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.notify-channels`](../../../../../product-map/module/notify-channels.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Notifications — requirement of record](plan.md) |
-| spec | current | [Notifications — specification](spec.md) |
-| architecture | current | [Notifications](architecture.md) |
+| plan | current | [Notifications — requirement of record](plan-notify-channels.md) |
+| spec | current | [Notifications — specification](spec-notify-channels.md) |
+| architecture | current | [Notifications](architecture-notify-channels.md) |
 | features | current | [Notifications — features](features-notifications.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Notifications — screens](user-guide-notifications.md) |
-| admin-guide | current | [Notifications — admin guide](admin-guide.md) |
+| admin-guide | current | [Notifications — admin guide](admin-guide-notify-channels.md) |
 | api | current | [Notifications — API](api-notifications.md) |
 | tests | current | [Notification channels — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

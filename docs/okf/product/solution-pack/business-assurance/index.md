@@ -11,20 +11,20 @@ tags: [product-item, solution-pack]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`solution-pack.business-assurance`](../../../../../product-map/solution-pack/business-assurance.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [Sales, commissions, marketing and churn: a plan (`PACK-SALES-MARKETING-1`)](plan-sales-commissions-churn.md) |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| architecture | current | [Business assurance and revenue assurance](architecture.md) |
-| features | current | [Business assurance — features](features.md) |
+| architecture | current | [Business assurance and revenue assurance](architecture-business-assurance.md) |
+| features | current | [Business assurance — features](features-business-assurance.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Business assurance — user guide](user-guide.md) |
-| admin-guide | current | [Business assurance — admin guide](admin-guide.md) |
+| user-guide | current | [Business assurance — user guide](user-guide-business-assurance.md) |
+| admin-guide | current | [Business assurance — admin guide](admin-guide-business-assurance.md) |
 | api | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | tests | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| brochure | current | [Business assurance — brochure](brochure.md) |
+| brochure | current | [Business assurance — brochure](brochure-business-assurance.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
 

@@ -11,17 +11,17 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.event`](../../../../../product-map/module/event.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Event model and log — plan](plan.md) |
+| plan | current | [Event model and log — plan](plan-event.md) |
 | spec | current | [Events & Metrics](spec-events-metrics.md) · [Signal Backbone (canonical envelope, agent context fabric, gated agentic write)](spec-signal-backbone.md) |
-| architecture | current | [Events and event log](architecture.md) |
+| architecture | current | [Events and event log](architecture-event.md) |
 | features | current | [Events and event log — features](features-events.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Events & Activity](user-guide-events.md) |
-| admin-guide | current | [Event model and log — admin guide](admin-guide.md) |
+| admin-guide | current | [Event model and log — admin guide](admin-guide-event.md) |
 | api | current | [Events and event log — API](api-events.md) |
 | tests | current | [Event model and log — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

@@ -10,7 +10,7 @@ timestamp: 2026-11-07T00:00:00Z
 
 The showcase ships as three downloads that unzip **side by side** into one folder you choose (`<parent>`), so the
 product can be upgraded without touching the Space or its data. It runs on every edition, Basic included. Layout
-and seams: [showcase distribution and install layout](../la-showcase/architecture.md#distribution-and-install-layout)
+and seams: [showcase distribution and install layout](../la-showcase/architecture-la-showcase.md#distribution-and-install-layout)
 and the [configuration reference](../../module/config/admin-guide-configuration-reference.md) (`spaces.ref`, `data_root`).
 
 | Download | File | Unzip into |
@@ -59,7 +59,7 @@ load. Within a minute or two:
   `card_auth`, `chargeback` and `online_account`, and nothing is under any `<feed>/quarantine` or `<feed>/errors`.
 - `inspecto-la-data/la-card/data/card_links/` holds the link Dataset (about 38 000 rows, eight kinds).
 - In Link Analysis, **File ▸ Open… ▸ Saved views** lists `card_testing`, `account_takeover_ring`,
-  `colluding_merchant_refunds` and `common_point_of_purchase`. The [user guide](user-guide.md) has the tour and the exercises.
+  `colluding_merchant_refunds` and `common_point_of_purchase`. The [user guide](user-guide-la-card.md) has the tour and the exercises.
 
 The Space folder holds only configuration; all runtime state (`data/`, `audit/`, `duckdb/`) is written under
 `inspecto-la-data/la-card/`.
@@ -109,7 +109,7 @@ downloads, `node tools/seed-la-card.mjs --scaffold <bundle>\spaces` does it befo
 | `analyst` | `la-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
 | `manager` | `la-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
 | `reviewer` | `la-viewer`, member as reviewer | reads `compromised-terminal`; any change is refused (403) |
-| `outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `outsider` | `no-access`, admitted to no Space | nothing: signs in, but no Space is listed and every read answers 404 |
 | `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
 
 **The Alert Rule.** `card_new_cards_at_compromised_terminal` (WARNING) reads the one row of `card_compromise_counts`:

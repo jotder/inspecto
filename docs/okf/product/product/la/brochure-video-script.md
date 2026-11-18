@@ -8,7 +8,7 @@
 
 - **Film on:** the demo Distribution, Space `la-showcase`; a corner tag *Example · synthetic data* on every product shot.
 - **Shows:** [Link Analysis](../../app/link-analysis/index.md).
-- **Claims:** only what this script says; each line comes from the Product definition, its Apps and its demo Space. The [brochure](brochure.md) is the reference for anything wider.
+- **Claims:** only what this script says; each line comes from the Product definition, its Apps and its demo Space. The [brochure](brochure-la.md) is the reference for anything wider.
 
 ## Shots
 

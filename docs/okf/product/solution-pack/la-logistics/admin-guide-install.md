@@ -10,7 +10,7 @@ timestamp: 2026-11-08T00:00:00Z
 
 The showcase ships as three downloads that unzip **side by side** into one folder you choose (`<parent>`), so the
 product can be upgraded without touching the Space or its data. It runs on every edition, Basic included. Layout
-and seams: [showcase distribution and install layout](../la-showcase/architecture.md#distribution-and-install-layout)
+and seams: [showcase distribution and install layout](../la-showcase/architecture-la-showcase.md#distribution-and-install-layout)
 and the [configuration reference](../../module/config/admin-guide-configuration-reference.md) (`spaces.ref`, `data_root`).
 
 | Download | File | Unzip into |
@@ -61,7 +61,7 @@ load (and every 5 minutes, so the last load is never missed), and each time it f
 - `inspecto-la-data/la-logistics/data/logistics_links/` holds the link Dataset (about 45 000 rows, seven kinds);
   `logistics_screen_links/` holds the three cargo-security screens the saved views read.
 - In Link Analysis, **File ▸ Open… ▸ Saved views** lists `driver_team_inside_job`, `theft_stop_hotspot` and
-  `fictitious_carrier`. The [user guide](user-guide.md) has the tour and the exercises.
+  `fictitious_carrier`. The [user guide](user-guide-la-logistics.md) has the tour and the exercises.
 
 The Space folder holds only configuration; all runtime state (`data/`, `audit/`, `duckdb/`) is written under
 `inspecto-la-data/la-logistics/`.
@@ -115,7 +115,7 @@ before the first start.
 | `analyst` | `la-analyst` (lead) | everything; opens Investigations, runs graph analysis, authors Alert Rules, reveals masked ids; cannot approve its own held expand |
 | `manager` | `la-manager` (second approver) | the held four-eyes expand in its approval inbox, the Case assigned to it; may run Jobs |
 | `reviewer` | `la-viewer`, member as reviewer | reads `fictitious-carrier`; any change is refused (403) |
-| `outsider` | `la-viewer`, not a member | the Datasets, but not the Investigation (404) |
+| `outsider` | `no-access`, admitted to no Space | nothing: signs in, but no Space is listed and every read answers 404 |
 | `admin` | `admin` | administers the Space; shared with the other demo Spaces, defined identically in each |
 
 **The Alert Rule.** `logistics_high_value_trip_new_carrier` (WARNING) reads the one row of

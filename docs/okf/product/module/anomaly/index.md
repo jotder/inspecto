@@ -11,17 +11,17 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.anomaly`](../../../../../product-map/module/anomaly.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Predictive Analytics add-on - design with options (`PREDICTIVE-ANALYTICS-1`)](plan-predictive-analytics.md) · [Anomaly Detection — plan](plan.md) |
+| plan | current | [Anomaly Detection — plan](plan-anomaly.md) · [Predictive Analytics add-on - design with options (`PREDICTIVE-ANALYTICS-1`)](plan-predictive-analytics.md) |
 | spec | current | [Anomaly Scores — explainable behavioural anomaly scoring per entity](spec-anomaly-scores.md) |
-| architecture | current | [Anomaly Detection](architecture.md) |
+| architecture | current | [Anomaly Detection](architecture-anomaly.md) |
 | features | current | [Anomaly Detection — features](features-anomaly.md) |
 | feature-db | current | [Anomaly Detection — feature database](feature-db.md) |
 | user-guide | current | [Anomaly Detection — screens](user-guide-anomaly.md) |
-| admin-guide | current | [Anomaly Detection — admin guide](admin-guide.md) |
+| admin-guide | current | [Anomaly Detection — admin guide](admin-guide-anomaly.md) |
 | api | current | [Anomaly Detection — API](api-anomaly.md) · [HTTP routes — module.anomaly](api-routes.md) |
 | tests | current | [Anomaly Detection — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

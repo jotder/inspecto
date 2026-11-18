@@ -11,18 +11,18 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.audit-spi`](../../../../../product-map/module/audit-spi.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
 | plan | n/a | a contract module carved out by MODULE-REORG-1; its requirement of record is decision D-MR1 in docs/okf/product/layer/platform/spec-module-reorg-decisions.md, and audit behaviour is planned in the event and access hubs |
-| spec | n/a | the contract's invariants are stated per type in api.md and the design in architecture.md; the implementation lives in the event module hub |
-| architecture | current | [Audit contract — architecture](architecture.md) |
-| features | current | [Audit contract — features](features.md) |
+| spec | n/a | the contract's invariants are stated per type in api-audit-spi.md and the design in architecture-audit-spi.md; the implementation lives in the event module hub |
+| architecture | current | [Audit contract — architecture](architecture-audit-spi.md) |
+| features | current | [Audit contract — features](features-audit-spi.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | n/a | a pure Java contract with no screens; the audit trail screens are documented in the event hub user guide |
 | admin-guide | n/a | nothing to install or configure in this jar; event storage and retention settings belong to the event module |
-| api | current | [Audit contract — Java API](api.md) |
+| api | current | [Audit contract — Java API](api-audit-spi.md) |
 | tests | current | [Audit contract — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
