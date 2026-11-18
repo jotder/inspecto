@@ -501,13 +501,13 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the nine built-in names as the voice reads them.
 
 ### S03 · A chain: pass-through intermediary
-- Voice: Pick Pass-through intermediary. Its description: one account receives money and forwards it within forty-eight hours, check the middle account. Below it, the steps. A start node, then a step outgoing, then another step outgoing, carrying a chip: after the previous hop, within forty-eight hours. That chip is the time order, and it is shown so you can remove it. Press Find matches. The matches are listed, and light up on the canvas: depositors into the hub and out to a relay, the second hub through its accounts to the till.
+- Voice: Pick Pass-through intermediary. Its description: one account receives money and forwards it within forty-eight hours, check the middle account. Below it, the steps. A start node, then a step outgoing, then another step outgoing, carrying a chip: after the previous hop, within forty-eight hours. That chip is the time order, and it is shown so you can remove it. Press Find matches. The matches are listed under the button, one chain per row, and light up on the canvas.
 - Chip: Pattern match · Pass-through intermediary · Find matches
 - Action: Pattern ▸ *Pass-through intermediary* ▸ zoom on the steps and the *After the previous hop, within 48 hours* chip ▸ Find matches ▸ click two match rows. [check in UI: the matches listed, and whether a *Showing the first … matches* note appears]
 - Impact: the matched links glow; mark the chip, then each clicked match.
 
 ### S04 · Build your own steps
-- Voice: Now build one. Pick Custom pattern: a step with no link kind matches any link. Each step has a direction, outgoing, incoming or both ways, a link kind, and an Entity Type. Set the first step outgoing, by cash deposit. Press Add step, and set it outgoing, by wire. In words: someone pays cash into an account that then wires money on. Press Find matches. Only the depositors into MULE-HUB-01 and its two relays come back. The ordinary accounts never take cash and pay on.
+- Voice: Now build one. Pick Custom pattern: a step with no link kind matches any link. Each step has a direction, outgoing, incoming or both ways, a link kind, and an Entity Type. Press Add step to chain another hop. In words: someone pays into an account that then pays on. Set each step's link kind to narrow the question, and press Find matches.
 - Chip: Custom pattern · Add step · Link kind
 - Action: Pattern ▸ *Custom pattern* ▸ step 2: → Outgoing, Link kind `cash_deposit` ▸ Add step ▸ step 3: → Outgoing, Link kind `wire` ▸ Find matches. [check in UI: the link kind names offered and that every match runs through MULE-HUB-01]
 - Impact: before/after hold: the ordinary traffic stays dark; the hub's chains glow.
@@ -531,13 +531,13 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the message.
 
 ### S08 · Use selection as pattern
-- Voice: Back on Structuring into one account. Sometimes you find one example first, and want every other one like it. Select three entities on the canvas: MULE-HUB-02, one account it pays, and TILL-06. Press Use selection as pattern. The chain loads as steps, with each step's direction, link kind and Entity Type taken from your example, and an after the previous hop chip. Only the order is kept, never the exact gaps. Press Find matches: the same route, once through each of the eight accounts.
+- Voice: Back on Structuring into one account. Sometimes you find one example first, and want every other one like it. Select a chain of entities on the canvas, and Use selection as pattern, greyed until something is selected, loads that chain as steps, with each step's direction, link kind and Entity Type taken from your example, and an after the previous hop chip. Only the order is kept, never the exact gaps. Then Find matches finds every other copy of the same route.
 - Chip: Use selection as pattern
 - Action: File ▸ Open… ▸ *Structuring into one account* ▸ Shift+click `MULE-HUB-02`, `CASHER-01`, `TILL-06` ▸ Use selection as pattern ▸ hold on the note *From your selection: …* ▸ Find matches. [check in UI: the derived steps and chips; the match count, expected eight]
 - Impact: mark the loaded steps, then the eight matched routes.
 
 ### S09 · Save as pattern pack
-- Voice: A pattern worth finding twice is worth saving. Press Save as pattern pack, give it a name, cash-out through one till, a category, and a description of what it looks for. Save. The line under the steps says it is saved, and everyone in this Space can now pick it. Saving a pack is a change to the Space, so it needs the Workbench author permission.
+- Voice: A pattern worth finding twice is worth saving. Press Save as pattern pack, give it a name, a category, and a description of what it looks for, and save. The line under the steps says it is saved, and everyone in this Space can now pick it. Saving a pack is a change to the Space, so it needs the Workbench author permission.
 - Chip: Save as pattern pack
 - Action: Save as pattern pack ▸ Name `Cash-out through one till` ▸ Category ▸ Description `A hub pays several accounts, each of which cashes out at the same till.` ▸ save ▸ hold on the note ▸ reopen the Pattern picker. [check in UI: the button shows on Basic, and the dialog's save button label]
 - Impact: mark the note *Saved as the pattern pack …* and the new name in the picker.
@@ -586,13 +586,13 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: none.
 
 ### S02 · The Value Measures form
-- Voice: On the Whole Dataset tab, open Value Measures: find entities by how money moves through them. It reads the whole Dataset in a window of at most thirty-one days, not the filtered picture on screen. Choose the Dataset, check that the value, time and kind columns are right, and pick a window: a fixed From and To, or a rolling one. Until the form is valid, Run Measure stays off and the line above it says what is missing.
+- Voice: Open the saved view mm structuring band, then on the Whole Dataset tab open Value Measures: find entities by how money moves through them. It reads the whole Dataset in a window of at most thirty-one days, not the filtered picture on screen. The form starts with the Dataset and the sender, receiver and kind columns filled in. Choose the Measure, then the value column and the time column, and a window: a fixed From and To, or a rolling one. Until the form is valid, Run Measure stays off.
 - Chip: Whole Dataset · Value Measures
 - Action: the toolbox's Whole Dataset tab ▸ Value Measures ▸ hold on the form ▸ zoom on the reason line above Run Measure. [check in UI: the prefilled Dataset and columns without an Investigation open, and the reason line's words]
 - Impact: mark the reason line and the disabled Run Measure.
 
 ### S03 · Structuring
-- Voice: Pick the Measure: structuring, legs just under a limit. Set From to the first of October and To, not included, to the fifteenth. Set the leg value from four thousand seven hundred and fifty, and below five thousand: the top of the band under the limit. Press Run Measure. The answer first says which thresholds and which window it used. Then the table: HUB-01, twenty-five legs in the band, from twenty-five different payers. Every deposit was legal. Together they are a pattern.
+- Voice: Pick the Measure: structuring, legs just under a limit. Value column amount, time column ts. Set the leg value from four thousand seven hundred and fifty, and below five thousand: the top of the band under the limit. Set the window, from the first of October to the fifteenth, not included, and press Run Measure. The answer first says which thresholds and which window it used. Then the table of entities that match. Every deposit was legal. Together they are a pattern.
 - Chip: Measure · Structuring (legs just under a limit) · Run Measure
 - Action: Measure ▸ *Structuring (legs just under a limit)* ▸ From `2026-10-01` ▸ To (not included) `2026-10-15` ▸ Leg value from `4750` ▸ Leg value below `5000` ▸ Run Measure. [check in UI: the table's columns and that HUB-01 is the only row]
 - Impact: mark *Thresholds in use*, *Window read*, then the HUB-01 row.

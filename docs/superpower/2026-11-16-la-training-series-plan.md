@@ -273,9 +273,9 @@ A2 "Try the sample" greyed on Basic; the Graph counts pill is in the DOM but not
 Install state left behind: Scratch Space, "Card authorisations" rename, list "Tills to review", views "Contractor C-14",
 a C-14 snapshot, and a saved F1 Investigation. Next: P4/P5 waves.
 
-### 6.7 Wave 2 status (2026-11-18) — seven of eighteen rendered and pushed
+### 6.7 Wave 2 status (2026-11-18) — ten of eighteen rendered
 
-Rendered (`C:sandboxla-video-out_wave2`, outside git): A4, B2, B3, C3, D2, D4, D5. The recorder runs several renders in parallel
+Rendered (`C:sandboxla-video-out_wave2`, outside git): A4, B2, B3, C3, C5, D2, D4, D5, D6, D7. The recorder runs several renders in parallel
 when each uses its own `--port` (`render-la-demo-video.mjs --port 9433` and so on). Page loads must wait for the text
 *Start from*, or the first frame can show *No Dataset in this Space has a link yet*. Voice was rewritten wherever the live screen
 differed: A4 (Banking has no phone column; cards read Not assessed), B2 (Two steps answer cut short at 50 rows), B3 (picking a
@@ -283,12 +283,7 @@ Dataset in File ▸ Explore Dataset… draws it at once; Settings ▸ Graph mode
 with details), D2 (the Whole Dataset tools run on an open Investigation, so the episode shows the tab and its Run on server
 card), D4 (Triangles and Cliques not shown), D5 (top similar rows, CLI-01 tops the suspicion table).
 
-Not delivered, with the reason (open work, in this order): **C5** — selecting the three team nodes needs a Lasso on a
-crowded graph; *Keep paths between start entities* needs start entities and its Apply stays off for a plain selection, and the
-later Hide / Remove / Exclude lassos miss after the layout moves. **D6** — Find matches needs a Time column (Filter links by
-time ▸ BOOKED_AT, and the *Large transfers only* view has none, so the guide's refusal message does not appear); matches never
-light up in the recording. **D7** — Value Measures starts blank (Dataset, columns and window are text pencils to fill) and Burst
-and periodicity needs a Time column; Run Measure was never pressed. Still to do: E2, F2, F3, F4, F5, F7, F9 (all drive saved
+Fixed and rendered afterwards: **C5** (Hide, Remove and Exclude scenes reload the view first, so the same Lasso hits; Exclude shows its dialog; the *Show them again* button is not found and is skipped), **D6** (opens *Structuring into one account*, sets Filter links by time ▸ BOOKED_AT, then Find matches lights up the matches) and **D7** (the From and To fields are native date inputs: type digits as key presses, dd mm yyyy, then Enter; Run Measure sits higher once the form is valid and reports *1 entity breaches*; the Burst and periodicity Scan Dataset button is not found and is skipped, so the scene is narration over the steps). Still to do: E2, F2, F3, F4, F5, F7, F9 (all drive saved
 lists, Investigations, four-eyes or permissions) — probe each screen first.
 Install state left behind (Basic :8099): saved preset "Merchants defrauded cards passed through" on the Banking Space; the Phone
 number type added in A4 was deleted again.
