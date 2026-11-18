@@ -49,54 +49,54 @@ timestamp: 2026-11-16T00:00:00Z
   "not available" answer as someone who is not a member. Delete the policy at the end: it applies to the whole Space.
 
 ### S01 · Roles say what; policies say when not
-- Voice: This is Inspecto LA training, episode I1: Access Policies. Roles say what each kind of user may do: read, investigate, approve, reveal. Some rules do not fit a role. This reviewer must not see these Investigations. Nobody outside the head office may open that Dataset. An Access Policy is a condition on who, what and where, and it can only narrow what the roles already allow. Nothing a policy says can grant more. We are in the Advanced edition, in the Banking and finance Space, signed in as the administrator.
+- Voice: This is Inspecto LA training, episode I1: Access Policies. Roles say what each kind of user may do: read, investigate, approve, reveal. Some rules do not fit a role. This reviewer must not see these Investigations. Nobody outside the head office may open that Dataset. An Access Policy is a condition on who, what and where, and it can only narrow what the roles already allow. Nothing a policy says can grant more. Policies are an Advanced edition feature, written in the Inspecto console. This recording is made on the Standard edition, so it shows the screens that exist here, and says plainly where the rest happens.
 - Action: intro card (edition chip *Advanced*).
 - Impact: none.
 
 ### S02 · Before the policy
-- Voice: First, the state today. The reviewer is a member of the Investigation Sanctions exposure two ownership hops down, so the reviewer can open it and read it, as episode F5 showed. Suppose the compliance team decides that this reviewer must no longer read any Investigation in this Space. The role is shared with other reviewers, so changing the role is the wrong tool. A policy is the right one.
+- Voice: First, the state today. Signed in as the reviewer, open File, Open, Investigations. The list shows Sanctions exposure two ownership hops down, and the reviewer can open it and read it, as episode F5 showed. Suppose the compliance team decides that this reviewer must no longer read any Investigation in this Space. The role is shared with other reviewers, so changing the role is the wrong tool. A policy is the right one.
 - Chip: Members · reviewer
 - Action: (as Demo Reviewer, recorded first) File ▸ Open… ▸ Investigations ▸ the list shows *Sanctions exposure two ownership hops down* ▸ open it ▸ sign out.
 - Impact: mark the Investigation in the reviewer's list.
 
 ### S03 · Where policies live
-- Voice: In Inspecto LA, Settings, Access shows the roles: what each one may do. Policies are written in the Inspecto console, under Settings, Access, on the Policies tab. Effective policies lists every policy in force: its name, whether it denies or allows, what it targets, its condition, and where it comes from. Some rows are built in: the engine keeps every Space's data apart, and those denies are shown, never hidden.
+- Voice: Now sign in as the administrator. In Inspecto LA, Settings, Access shows the roles: what each one may do. It lists each role and the capabilities it grants, and notes that who holds a role is set in the identity provider. Policies are not written on this page. In the Advanced edition they are written in the Inspecto console, under Settings, Access, on the Policies tab, where Effective policies lists every policy in force, with its name, whether it denies or allows, what it targets, and its condition.
 - Chip: Access · Policies · Effective policies
 - Action: Inspecto LA ▸ Settings ▸ Access (roles) ▸ the console ▸ Settings ▸ Access ▸ Policies tab ▸ hold on Effective policies. [check in UI: the console's address on the Advanced build, and the built-in rows]
 - Impact: mark the table's columns and a built-in row.
 
 ### S04 · Write the policy
-- Voice: Press New policy. Give it a name. Effect: Deny. Actions: leave them all unticked, which means every action. Resource kinds: tick investigation, so it targets Investigations and nothing else. And the condition: when the subject's id is reviewer. The hint under the box lists what a condition can read: who the person is, their roles and permissions, the action, the route, the Space, and the resource itself.
+- Voice: In the console, you press New policy and give it a name. Effect: Deny. Actions: leave them all unticked, which means every action. Resource kinds: investigation, so it targets Investigations and nothing else. And the condition: when the subject's id is reviewer. These screens are the Advanced edition's, so this card stands in for them.
 - Chip: New policy · Effect · Resource kinds · Condition (when)
 - Action: New policy ▸ Policy name (the sample's name, `deny-ra-analyst-investigations`, or a clearer one) ▸ Effect: Deny ▸ Actions: none ▸ Resource kinds: `investigation` ▸ Condition (when) `subject.id == 'reviewer'`. [check in UI: the resource kind is listed as `investigation`]
 - Impact: mark each field as the voice names it.
 
 ### S05 · Preview, and what it cannot show
-- Voice: Before saving, press Preview impact. The table shows, role by role, which decisions would change. Here it says none change, and it tells you why: each role is evaluated by its permissions and name only, so a condition on one person or one claim shows no change here. That is honest, not wrong. A policy on a person is tested on that person, which we will do in a moment. Save the policy. If the server has a warning about it, it shows under Check this policy.
+- Voice: Before saving, the console offers Preview impact. It shows, role by role, which decisions would change. For a policy on one person it says none change, and tells you why: each role is evaluated by its permissions and name only, so a condition on one person shows no change there. That is honest, not wrong. A policy on a person is tested on that person.
 - Chip: Impact · Preview impact
 - Action: Preview impact ▸ hold on the sentence ▸ Save. [check in UI: *0 of N decisions change. Each role is evaluated by its capabilities and name only — a condition on subject.id or a claim shows no change here.*]
 - Impact: mark the sentence; then the new row in Effective policies.
 
 ### S06 · Why denied?
-- Voice: Under the table, Why denied? evaluates an action against the policies, for your own session, without performing it. Enter the route of the Investigation, method GET, resource kind investigation, and evaluate. For the administrator, no policy matched: the standard roles and sharing decide. The tool is for the person who was refused: they run it on their own session, and see which policy said no.
+- Voice: Under the table, Why denied? evaluates an action against the policies, for your own session, without performing it. You give a route, a method and a resource kind. The tool is for the person who was refused: they run it on their own session, and see which policy said no.
 - Chip: Why denied?
 - Action: Why denied? ▸ Route `/inv/investigations/sanctions-exposure` ▸ Method GET ▸ Resource kind `investigation` ▸ evaluate. [check in UI: the evaluate button's label and the answer *No policy matched — the standard capability and sharing gates decide.*]
 - Impact: mark the answer.
 
 ### S07 · The refusal, as the reviewer sees it
-- Voice: Now sign in as the reviewer. In File, Open, the Investigations are gone. Open the link to Sanctions exposure directly. This Investigation is not available: it does not exist, is not yours, or its Dataset is no longer shared with you. A policy answers exactly like absence, so a denied person learns nothing about what they may not see. In Why denied, the reviewer would see the policy by name.
+- Voice: What the reviewer would then see: in File, Open, the Investigations are gone, and a link to Sanctions exposure answers: not available. It does not exist, is not yours, or its Dataset is no longer shared with you. A policy answers exactly like absence, so a denied person learns nothing about what they may not see. We do not show it here, because a Standard server does not enforce policies.
 - Chip: not available
 - Action: sign out ▸ Demo Reviewer ▸ File ▸ Open… ▸ Investigations (empty) ▸ address bar `/link-analysis?investigation=sanctions-exposure` ▸ hold. [check in UI: the deny holds for this persona-based condition; the sample notes it was tested by Dataset only]
 - Impact: before/after hold: the reviewer's Investigation list, then empty; mark the sentence.
 
 ### S08 · Narrow only, and Advanced only
-- Voice: Two rules to remember. A policy can only narrow: an allow policy never grants what the role does not, it only marks where a deny does not apply. And policies are enforced only on the Advanced edition. On Standard you can read the page, and the preview says the engine is not active. To take the reviewer's access back, sign in as the administrator and delete the policy. The next request is decided by the roles alone.
+- Voice: Two rules to remember. A policy can only narrow: an allow policy never grants what the role does not, it only marks where a deny does not apply. And policies are enforced only on the Advanced edition: on Basic and Standard they are inert. To take the reviewer's access back, the administrator deletes the policy in the console, and the next request is decided by the roles alone.
 - Chip: Deny · Allow · Delete
 - Action: sign out ▸ Demo Admin ▸ the console ▸ Access ▸ Policies ▸ delete the policy ▸ confirm. [check in UI: the delete control's label in Effective policies]
 - Impact: mark the row leaving the table.
 
 ### S09 · Try it
-- Voice: So: roles say what, policies say when not; a policy can only narrow, a person-based one is tested on that person, and a denied person sees nothing at all. Your turn. Write the same policy again, sign in as the analyst, and open Sanctions exposure. Does the policy stop you, and why? The answer is in the description. Next, in I2, Investigations shared by several servers.
+- Voice: So: roles say what, policies say when not; a policy can only narrow, a person-based one is tested on that person, and a denied person sees nothing at all. Your turn. Write the same policy on an Advanced server, sign in as the analyst, and open Sanctions exposure. Does the policy stop you, and why? The answer is in the description. Next, in I2, Investigations shared by several servers.
 - Action: outro card: *Try it* and *Next: I2 · Investigations on PostgreSQL*.
 - Impact: none.
 
@@ -126,54 +126,54 @@ timestamp: 2026-11-16T00:00:00Z
   password out of command lines.
 
 ### S01 · One store, several servers
-- Voice: This is Inspecto LA training, episode I2: Investigations shared by several servers. This one is for administrators, in the Advanced edition, and it is about the server, not about one Space. By default, a Space keeps its Investigations as files, on the one server that runs it. When a team grows, you may want several servers to serve the same Space, or the Investigations to live in a managed database. The Advanced edition can keep them in PostgreSQL. This episode explains what changes, how to switch it on, and what to settle before you do.
+- Voice: This is Inspecto LA training, episode I2: Investigations shared by several servers. This one is an explainer for administrators, about the server and not about one Space, and it is not a how-to to follow today. By default, a Space keeps its Investigations as files, on the one server that runs it. A design exists to keep them in PostgreSQL instead, so that several servers can serve the same Space. That work is postponed: the next release ships without it. This episode shows where the setting appears today, and what the design says about what changes, and what to settle first.
 - Action: intro card (edition chip *Advanced*).
 - Impact: none.
 
 ### S02 · Where they live today
-- Voice: In Settings, This Space, Link Analysis, the last line says where this server keeps Investigations: filesystem, chosen when the server starts; not a setting. There is no switch on this page on purpose. The store is decided by whoever starts the server, because every server serving the Space must agree.
+- Voice: This is the one screen of this episode that exists today. In Settings, This Space, Link Analysis, the last line before the Save button says where this server keeps Investigations: filesystem, chosen when the server starts; not a setting. There is no switch on this page, on purpose. The store is decided by whoever starts the server, because every server serving the Space must agree.
 - Chip: Investigation store
 - Action: Settings ▸ Link Analysis ▸ scroll to *Investigation store: filesystem (chosen when the server starts; not a setting)*.
 - Impact: mark the line.
 
 ### S03 · What changes, and what does not
-- Voice: On PostgreSQL, the step log, the sealed Working Sets, the members, the Drafts and the approvals live in the database, one schema per Space. Several servers can write at once safely: each step is taken in one short transaction, and a sealed row cannot be changed afterwards, the database itself refuses it. For the analyst, nothing changes. The same steps, the same Drafts and four-eyes, the same masking, the same Dossier, verified the same way.
+- Voice: In the design, the step log, the sealed Working Sets, the members, the Drafts and the approvals would live in the database, one schema per Space. Several servers could write at once safely: each step in one short transaction, and a sealed row that the database itself refuses to change. For the analyst, nothing would change: the same steps, Drafts, four-eyes, masking and Dossier. Only where the Investigations are kept.
 - Chip: one schema per Space
 - Action: title card: a diagram, two servers → one PostgreSQL database, schema `space_<space id>`.
 - Impact: mark the two servers and the one schema.
 
 ### S04 · Switching it on
-- Voice: Use an Advanced bundle: the store's module ships there. Give it a PostgreSQL database, and a user that may create a schema and tables. Then start the server with four settings: the Investigations backend set to db, the database address, the user, and the password, taken from an environment variable, never typed on the command line. Restart. On first use, the store creates the Space's schema itself. There is no separate migration step.
+- Voice: Switching it on would be done at start-up, not in the app: the Investigations backend set to db, the database address, the user, and the password taken from an environment variable, never typed on a command line. On first use the store would create the Space's schema itself. There would be no separate migration step. None of this can be tried in this release, so the card shows the shape of the settings and nothing is run.
 - Chip: start-up settings
 - Action: terminal shot of the start command with `-Dinvestigations.backend=db`, `-Dinvestigations.db.url=jdbc:postgresql://…`, `-Dinvestigations.db.user=…`, `-Dinvestigations.db.password=${ENV:INSPECTO_INV_DB_PASSWORD}` (values blurred).
 - Impact: mark the backend setting and the environment reference.
 
 ### S05 · Check that it took
-- Voice: Open Settings, Link Analysis again. The line now says PostgreSQL. The server's health details list the Investigation store for each Space as up or down, with the cause. Now the proof: open the same Investigation on two servers, take a step on one, and refresh the other. The step is there, with the same number.
+- Voice: To check that it took, the design has three signs: the Settings line would read PostgreSQL, the server's health details would list the Investigation store of each Space as up or down with the cause, and a step taken on one server would appear, with the same number, on another. These are described, not shown: there is no build here to show them on.
 - Chip: Investigation store · PostgreSQL
 - Action: Settings ▸ Link Analysis ▸ *Investigation store: PostgreSQL* ▸ `/health/details` ▸ `live.investigations` UP ▸ two browser windows, one per server ▸ a Keep on one ▸ Step log refreshed on the other. [check in UI: the step appears on the second server after Refresh]
 - Impact: mark the store line; then the new step on the second server.
 
 ### S06 · Settle three things first
-- Voice: Three things before you switch a Space that is already in use. There is no migration: existing Investigations do not move, so the Space starts on PostgreSQL with none. Deleting an Investigation is refused on PostgreSQL for now, because sealed rows are append-only. And back-ups move with the data: back up the Space's schema in the database, not the Space folder. The size limits stay the same on both stores.
+- Voice: Three things to settle before switching a Space that is already in use. There would be no migration: existing Investigations do not move, so the Space starts on the database with none. Deleting an Investigation would be refused for now, because sealed rows are append-only. And back-ups move with the data: back up the Space's schema in the database, not the Space folder.
 - Chip: no migration · no delete · back-ups
 - Action: title card with the three points and the back-up command `pg_dump --schema=space_<id>`.
 - Impact: mark each point as the voice names it.
 
 ### S07 · Keep it safe
-- Voice: The database now holds the evidence, so treat it that way. Keep the password in an environment variable: the server never writes it to a log, only the address before any options. When the database is on another machine, connect over an encrypted, verified connection. Sealed rows are protected by the database itself: an update or a delete on them is refused. But whoever owns the schema could still drop it whole, so give that role to as few people as you can.
+- Voice: The database would then hold the evidence, so treat it that way. Keep the password in an environment variable. When the database is on another machine, connect over an encrypted, verified connection. Sealed rows are protected by the database itself, but whoever owns the schema could still drop it whole, so give that role to as few people as you can.
 - Chip: password · encryption · schema owner
 - Action: title card with the three safeguards: `${ENV:NAME}` for the password, `sslmode=verify-full` on the address, a restricted schema owner.
 - Impact: mark each safeguard as the voice names it.
 
 ### S08 · When the database is away
-- Voice: If the database cannot be reached, the server still starts. Every Investigation request of that Space answers that the Investigation store is unavailable, with the reason, and the health details show it down. When the database comes back, it recovers on its own, with no restart. A wrong setting is different: the connection comes from the start-up settings, so fixing it needs a restart.
+- Voice: If the database could not be reached, the server would still start, every Investigation request of that Space would answer that the Investigation store is unavailable with the reason, and the health details would show it down. It would recover on its own when the database comes back. A wrong connection setting would need a restart. Again: a design, not something you can see today.
 - Chip: Investigation store unavailable
 - Action: stop the database ▸ File ▸ Open… ▸ the refusal ▸ `/health/details` DOWN ▸ start the database ▸ Refresh. [check in UI: how the 503 *Investigation store unavailable: …* reads in Inspecto LA (expected *Investigations are not available: …* from the Investigation tab)]
 - Impact: mark the refusal; then the recovery.
 
 ### S09 · Try it
-- Voice: So: PostgreSQL changes where Investigations live, not how anyone works with them. It is chosen at start-up, checked on the Settings page and in the health details, kept safe like any store of evidence, and needs three decisions first. Your turn, on a test server. Switch an existing Space to PostgreSQL, and open the list of Investigations. What do you find, and why? The answer is in the description. Next, in I3, scale: server runs, the link index, and daily ingestion.
+- Voice: So: PostgreSQL would change where Investigations live, not how anyone works with them. It is chosen at start-up, it is postponed, and it needs three decisions first. Your turn, as a thought exercise: if you switched an existing Space to it, what would the list of Investigations show, and why? None: there is no import, and a Space uses one store. The answer is in the description. Next, in I3, scale: server runs, the link index, and daily ingestion.
 - Action: outro card: *Try it* and *Next: I3 · Scale*.
 - Impact: none.
 
