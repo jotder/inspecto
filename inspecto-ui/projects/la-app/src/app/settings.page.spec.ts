@@ -7,7 +7,7 @@ import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it } from 'vitest';
-import { LensService } from 'app/inspecto/api';
+import { LensService, SpacesService } from 'app/inspecto/api';
 import { SessionService } from 'app/inspecto/auth/session.service';
 import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
@@ -27,6 +27,8 @@ describe('SettingsPageComponent (compact master-detail, split by audience)', () 
             admin?: boolean;
             /** `/bootstrap` features.investigations; false = a Basic build. */
             investigations?: boolean;
+            /** A multi-Space server (lists Spaces to an administrator). */
+            multi?: boolean;
         } = {},
     ) {
         TestBed.configureTestingModule({
@@ -64,6 +66,7 @@ describe('SettingsPageComponent (compact master-detail, split by audience)', () 
                 provideRouter([settingsRoute]),
             ],
         });
+        TestBed.inject(SpacesService).multiSpace.set(opts.multi ?? false);
         const harness = await RouterTestingHarness.create(opts.url ?? '/settings');
         harness.detectChanges();
         return harness.routeNativeElement as HTMLElement;
@@ -146,6 +149,17 @@ describe('SettingsPageComponent (compact master-detail, split by audience)', () 
 
     it('with sign-in, an administrator sees the counters', async () => {
         expect(names(await render({ signIn: true, admin: true }))).toContain('getting-started-counters');
+    });
+
+    it('lists Spaces under This server to an administrator on a multi-Space server only (SPACE-LOCATIONS-UI-1)', async () => {
+        const admin = await render({ admin: true, multi: true });
+        const server = admin.querySelector('[aria-labelledby="la-settings-server"]')!;
+        expect(server.querySelector('[data-section="spaces"]')).not.toBeNull();
+        expect(readOnly(admin, 'spaces')).toBe(false);
+        TestBed.resetTestingModule();
+        expect(names(await render({ admin: false, multi: true }))).not.toContain('spaces');
+        TestBed.resetTestingModule();
+        expect(names(await render({ admin: true, multi: false }))).not.toContain('spaces');
     });
 
     it('has no axe violations', async () => {

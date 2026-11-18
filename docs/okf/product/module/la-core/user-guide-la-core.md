@@ -162,6 +162,12 @@ required steps are ticked.
 Dataset, first graph, the Space guide finished, the step people stopped at). No names or values are kept and nothing
 is sent anywhere. Administrators see it, read-only, in **Settings → Getting started counters**.
 
+**Space folders.** On a server with several Spaces, an administrator's **Settings → Spaces** lists each Space with its
+Space folder and Data folder, and offers **Attach existing Space**, **Change data folder** (only while the Space holds no
+data) and **Detach** (only a Space attached by reference; its folders stay on disk); **Create a Space** offers the same
+folders under *Advanced: folders*. Where the server sets no `spaces.allowed.roots` (`SPACES_ALLOWED_ROOTS`), the page
+says so and offers no folder action.
+
 ### 3.2 Add data: onboard a file
 
 **Add data** opens **Onboard a file**: one of your files becomes a Dataset Link Analysis can draw, in four steps.
@@ -1534,6 +1540,7 @@ If a control is greyed out, hover it: it names what is missing.
 | Change Link Analysis settings, set what a column holds, add an Entity Type, choose the Space's Industry pack | `canAuthorWorkbench` |
 | Add data with sign-in, **Upload a CSV** to a Collector | the right to upload data (`canUploadData`) |
 | See **Getting started counters** | an administrator (`canAdminister`) |
+| **Settings → Spaces**: attach, detach, change a Space's Data folder | an administrator (`canAdminister`) |
 
 **Read-only roles.** Without *Manage Incidents and Cases* the Investigation tab shows a **Read-only** banner, *Changing an Investigation needs the Manage
 Incidents and Cases permission.* (the banner's title says Read-only, so the sentence does not repeat it): you can open, read, replay, re-read and build, download and verify the Dossier; every

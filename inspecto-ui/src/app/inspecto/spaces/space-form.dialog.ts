@@ -194,6 +194,9 @@ export const DATA_KIND_OPTIONS: readonly DataKindOption[] = [
                         </mat-radio-group>
                         <p class="text-secondary m-0 text-sm">It sets the words Link Analysis uses for your data.</p>
                     </div>
+                    @if (showFolders) {
+                        <app-space-folders [spaceId]="form.get('id')?.value ?? ''" (changed)="folders.set($event)" />
+                    }
                 } @else {
                     <inspecto-pen-field label="Description" formControlName="description"></inspecto-pen-field>
 
@@ -299,8 +302,11 @@ export class SpaceFormDialog {
     readonly defaultLogo = environment.appLogo;
 
     readonly saving = signal(false);
-    /** The console create offers **Advanced: folders**; the edit and the Inspecto LA create do not. */
-    readonly showFolders = !this.editMode && !this.dataKind && this.canAdminister() && this.api.multiSpace();
+    /**
+     * Every create (the console's and the Inspecto LA one) offers **Advanced: folders**, collapsed, to an administrator
+     * on a multi-Space server; an edit does not (SPACE-LOCATIONS-UI-1).
+     */
+    readonly showFolders = !this.editMode && this.canAdminister() && this.api.multiSpace();
     /** The chosen Space folder and Data folder; Create waits until each given folder passed its check. */
     readonly folders = signal<SpaceFolderChoice>({ ready: true });
     /** Whether the id field is being shown/overridden manually (create mode only). */
