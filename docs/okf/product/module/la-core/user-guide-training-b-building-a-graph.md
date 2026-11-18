@@ -149,19 +149,19 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the top row.
 
 ### S04 · Narrow it to the kind that matters
-- Voice: Narrow the question. In Only these kinds of link, type visited_before_fraud: the link from a defrauded card to each merchant it paid in the forty-five days before the fraud. Ask again. Now one merchant leads: M-317, a fuel station, reached by sixty defrauded cards. The supermarket is gone, because none of its customers was defrauded.
+- Voice: Narrow the question. In Only these kinds of link, type visited_before_fraud: the link from a defrauded card to each merchant it paid in the forty-five days before the fraud. Ask again. Now one row is left: M-317, a fuel station, reached by sixty defrauded cards. The supermarket is gone, because none of its customers was defrauded.
 - Chip: Only these kinds of link
 - Action: Only these kinds of link ✎ `visited_before_fraud` ▸ Ask ▸ hold. [check in UI: M-317 first with 60 distinct senders; ground truth also has 40 background fraud cards, so other merchants appear lower]
 - Impact: before/after hold of the table; mark M-317's row.
 
 ### S05 · Draw these
-- Voice: Under the answer, Draw these starts a graph from the listed entities, the top twenty-five first, the way a paste does. Press it. M-317 sits at the centre of its defrauded cards. Close the answer with its cross when you are done. Every question asked is recorded, an answer holds at most five hundred rows, and a longer one says it was cut short.
+- Voice: Under the answer, Draw these starts a graph from the listed entities, the top twenty-five first, the way a paste does. Press it. The page says what it drew: one entity and its linked nodes, with M-317 at the centre of its defrauded cards. To keep the table and draw nothing, close the answer with its cross instead. Every question asked is recorded, an answer holds at most five hundred rows, and a longer one says it was cut short.
 - Chip: Draw these · Close the answer
 - Action: Draw these ▸ wait for the draw ▸ Close the answer (×).
 - Impact: before/after hold: empty canvas → the graph round M-317; mark M-317.
 
 ### S06 · Questions about one entity
-- Voice: Two questions start from one entity. Top counterparts of one entity says who it links to most, how often, and how much. Two steps from one entity says who is around it: its direct counterparts, then theirs, and through how many of them. Choose Two steps, type M-317, and ask. Its cards, then the other merchants those cards used. A merchant reached through many of M-317's cards would be worth a look; here, none stands out.
+- Voice: Two questions start from one entity. Top counterparts of one entity says who it links to most, how often, and how much. Two steps from one entity says who is around it: its direct counterparts, then theirs, and through how many of them. Choose Two steps, type M-317, and ask. The first rows are its cards, one step away, each with its links. The merchants those cards used are two steps away, and the answer says it was cut short at fifty rows: raise the limit, or sort by Steps away, to read further.
 - Chip: Two steps from one entity
 - Action: File ▸ New ▸ Preset queries ▸ Question: Two steps from one entity ▸ The entity `M-317` ▸ Ask ▸ hold. [check in UI: no second merchant is reached through more than a handful of the 60 cards; if one is, the voice names it as a lead to check]
 - Impact: mark the *Steps away* column.
@@ -173,7 +173,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark each field as the voice groups it.
 
 ### S08 · Ask your own question
-- Voice: Build it. Rank Receivers, by Most distinct counterparts. Kinds of link: visited_before_fraud. From day: the second of March, which is included; Before day: the twenty-third, which is not. Keep groups with at least ten, and ten rows. Press Ask. M-317 stands alone at the top: in three weeks of March, sixty cards that were later defrauded all paid at one pump.
+- Voice: Build it. Rank Receivers, by Most distinct counterparts. Kinds of link: visited_before_fraud. From day: the second of March, which is included; Before day: the twenty-third, which is not. Keep groups with at least ten, and ten rows. Press Ask. M-317 stands alone at the top: in three weeks of March, sixty cards that were later defrauded all paid at one pump. Close the answer closes the table when you are done.
 - Chip: Ask
 - Action: Rank: Receivers (To) ▸ By: Most distinct counterparts ▸ Kinds of link `visited_before_fraud` ▸ From day `2026-03-02` ▸ Before day `2026-03-23` ▸ Keep groups with at least `10` ▸ How many rows `10` ▸ Ask. [check in UI: M-317 first with 60; the window 2026-03-02..22 is the ground-truth compromise window]
 - Impact: mark M-317's row and its count.
