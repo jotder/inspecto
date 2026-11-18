@@ -270,15 +270,14 @@ What "inert" means, as seen live on Basic:
 `la-police`, `la-utility` and the eleven wave C Spaces share one pattern (the older `la-showcase`, `la-mobile-money`,
 `la-claims` and `la-audit` have their own Advanced tiers, described in their runbooks):
 
-- **Personas.** A lead analyst, a second approver (manager), a read-only reviewer and an outsider who is not a member,
+- **Personas.** A lead analyst, a second approver (manager), a read-only reviewer and an outsider who signs in but is admitted to no Space (role `no-access`; every LA demo Space is closed),
   named `<prefix>.analyst` and so on (`rp.*` in `la-utility`, `manager` as the approver in `la-police`), plus the
   shared `admin`.
 - **One roster across Spaces.** `admin` and the `fraud-analyst`, `la-viewer` and `la-settings` roles are byte-identical
   in these thirteen: a user id defined differently in two Spaces of one server is refused with 409
   `ROSTER_CONFLICT` ([Demo Auth](../../module/demo-auth/admin-guide-demo-auth.md)). Proved 2026-11-09 with all twelve 2026-11-09
-  Spaces in one server. The older templates differ in their roles (`la-showcase`'s `fraud-analyst` adds
-  `canShareInvestigation`; `la-audit` and `la-mobile-money` define no `la-viewer`; `la-audit`'s roster uses
-  `admin`).
+  Spaces in one server. Since 2026-11-18 every LA template also grants `la-analyst`, `la-manager`, `la-viewer` and `la-settings` the
+  same capabilities (`tools/la-demo-roster.test.mjs`); `la-showcase`'s `fraud-analyst` still adds `canShareInvestigation`.
 - **Four-eyes and Drafts.** Every `link-analysis.toon` states `four_eyes_fan_out_above: 2000` and the same Drafts limits;
   no Entity Type is masked.
 - **The Alert Rule is a registry rule over a one-row counts Job** (one exception: `la-utility`'s

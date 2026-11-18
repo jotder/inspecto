@@ -8,4 +8,4 @@ roles[5]:
   - name: la-settings
     capabilities[1]: canAuthorWorkbench
   - name: la-analyst
-    capabilities[7]: canManageIncidents,canWorkIncidents,canRunLinkGraphAnalysis,canBuildLinkIndex,canAuthorAlertRules,canRevealLinkEntities,canShareInvestigation
+    capabilities[6]: canManageIncidents,canWorkIncidents,canRunLinkGraphAnalysis,canBuildLinkIndex,canAuthorAlertRules,canRevealLinkEntities

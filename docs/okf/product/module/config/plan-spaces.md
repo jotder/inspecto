@@ -924,8 +924,9 @@ Two templates: **`la-showcase`** (the demo) and **`la-showcase-off`** (an empty 
   $signal.status == SUCCESS`, `allow_full: "true"`, `owner` is re-stamped to the applier by `TemplateSeedGate`) and `la_detect` (`*/5 * * * *`).
 - **Personas** (`demo-users.toon` + `roles.toon`; an authored role REPLACES a seed role of the same name): `admin` (`admin;fraud-analyst`: Reveal),
   `analyst` (`la-analyst`: Manage Incidents, Run Link Graph Analysis, Build Link Index, Author Alert Rules, Work Incidents),
-  `manager` (`la-manager`: Approve Link Expansions, Manage Incidents, Work Incidents - the second approver), `reviewer` and `outsider`
-  (`la-viewer`: no capability at all). The Dataset carries explicit `user` shares for all five (standing detection refuses a role-only share).
+  `manager` (`la-manager`: Approve Link Expansions, Manage Incidents, Work Incidents - the second approver), `reviewer`
+  (`la-viewer`: no capability at all) and `outsider` (`no-access`, defined by no `roles.toon`: since 2026-11-18 it signs in and is
+  admitted to no Space, every LA demo Space being closed). The Dataset carries explicit `user` shares for all five (standing detection refuses a role-only share).
 - **Data tuning (DR-S10).** The ordinary traffic is acyclic and triangle-free (first half of the accounts pays the second half) and small, so the Suspicion
   score ranks `MULE-HUB-01` first (top 3 asserted) and `SHELL-A->B->C->D->A` is the only directed cycle. Pinned by `LaShowcaseGoldenTest`
   (inspecto-graph, reads the shipped CSVs); regenerate with `tools/gen-la-showcase-data.py`. Trade-off: the ordinary traffic is less realistic than the

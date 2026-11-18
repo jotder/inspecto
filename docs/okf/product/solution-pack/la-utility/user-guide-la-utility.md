@@ -162,7 +162,7 @@ after `node tools/seed-la-utility.mjs --apply`, sign in as each persona and chec
 2. **Four-eyes:** an unbounded expand by `analyst` is held, not run. Sign in as **`manager`**: it is in the
    approval inbox; approve or refuse it. `analyst` cannot approve its own request.
 3. **`reviewer`:** opens `tampering-case` and reads every step; any change is refused.
-4. **`outsider`:** sees the Datasets, but `tampering-case` is not found (404).
+4. **`outsider`:** signs in, but no Space is listed and every read of this one answers 404 (the Space is closed).
 5. **Draft:** `analyst` has one open Draft that annotates `C-14` about `C-22` (exercise 2); promote it to widen
    the case, or leave it.
 

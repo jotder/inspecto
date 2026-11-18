@@ -26,10 +26,10 @@ as `manager` to skip the wait (`admin` holds no `canOperateRuns`: 403; rehearsed
 
 | User | Role | Does |
 |---|---|---|
-| `analyst` | `la-analyst` | lead of the Investigation; runs algorithms, builds the index, authors the Alert Rule; **no Reveal, no approval** |
+| `analyst` | `la-analyst` | lead of the Investigation; runs algorithms, builds the index, authors the Alert Rule; Reveal (audited); **no approval** |
 | `manager` | `la-manager` | the second person: approves expansions, presses Run on Jobs, owns the Case |
 | `reviewer` | `la-viewer` | read-only member (the regulator liaison) |
-| `outsider` | `la-viewer` | not a member: sees nothing (404) |
+| `outsider` | `no-access` | signs in, admitted to no Space: sees nothing (404) |
 | `admin` | `admin; fraud-analyst; la-settings` | lead; Reveal; Settings; mints embed links; opens the Case (a Case from an entity of a classified Dataset needs Reveal) |
 
 The saved views (`mm_money_trail`, `mm_structuring_band`, `mm_device_farm`) project `mm_links_dataset` (`src`, `dst`, `kind`; `ts`, `amount`, `via` on the link).
@@ -54,7 +54,7 @@ Benign look-alikes by design: a household of three wallets sharing one national 
 | Min | Scene | Click path | Say |
 |---|---|---|---|
 | 0-1 | Data trust | open `mm-structuring-case`; read the footer counts and the data-trust strip | "14 landed days, one event-day column; this is synthetic and the plants are planted" |
-| 1-3 | M-1 Ladder and masking | seed `HUB-01`, expand one hop (25 payers, 2 relays); entities show as `masked:` tokens | "typed masking: the analyst sees structure, not wallets; Reveal is `admin`'s, audited" |
+| 1-3 | M-1 Ladder and masking | seed `HUB-01`, expand one hop (25 payers, 2 relays); entities show as `masked:` tokens | "typed masking: everyone sees structure, not wallets, until a holder of Reveal (`analyst` or `admin`) reveals one, audited" |
 | 3-4 | M-2 Four-eyes | as `analyst` press Expand with no limit: held; sign in as `manager`, Approvals, approve | "above 100 neighbours needs a second person" |
 | 4-6 | M-3 Structuring Measure | Value Measures, `structuring`, 4 750 to 5 000 | "one wallet, 25 legs, 25 payers, all just under the 5 000 limit; the cash-in agent is `AG-18`" |
 | 6-8 | M-4 The chain | Shortest path `HUB-01` to `AG-39` (3 hops); Maximum flow (25); `passThrough` Measure (0.98) | "the money does not stay: 98 % leaves within minutes" |
@@ -99,7 +99,7 @@ expanding three times the working set holds about 219 entities; seed `LOOP-1` fo
 * **Ordinary traffic is a layered DAG with repeated counterparties** (cash-in agents to group A to group B to cash-out agents and merchants): that keeps the loop the only directed cycle and the graph sparse enough for the hub to stand out. Consequence: ordinary wallets use either a cash-in or a cash-out agent, never both.
 * **Shared links are one direction (lower id to higher id)**, unlike the telecom Job's both directions, so they cannot form a 2-cycle. A column cannot mix Entity Types, so `src`/`dst` carry the `WALLET` classification for wallets, agents and merchants alike; the agent register is classified `AGENT`.
 * **The index build runs on a cron**, because `la.index.build` fires only on a clock or a Pipeline commit, not on another Job's output.
-* **A Case opened from an entity needs Reveal**, so the seed opens it as `admin` (and links it as the Investigation's lead), keeping `analyst` without Reveal for the masking beat.
+* **A Case opened from an entity needs Reveal**, so the seed opens it as `admin` (and links it as the Investigation's lead). Since 2026-11-18 `analyst` holds Reveal too, as `la-analyst` does in every LA Space (operator: the four kinds mean the same everywhere).
 
 ## 5. Reset and regenerate
 

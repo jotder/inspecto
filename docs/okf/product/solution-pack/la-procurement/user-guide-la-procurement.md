@@ -147,7 +147,7 @@ after `node tools/seed-la-procurement.mjs --apply`, sign in as each persona and 
    **`manager`**: it is in the approval inbox; approve or refuse it. `analyst` cannot approve
    its own request.
 3. **`reviewer`:** opens `cover-bids` and reads every step; any change is refused.
-4. **`outsider`:** sees the Datasets, but `cover-bids` is not found (404).
+4. **`outsider`:** signs in, but no Space is listed and every read of this one answers 404 (the Space is closed).
 5. **Draft:** `analyst` has one open Draft that annotates `CO-0074` about its estimator `y.fenwick`;
    promote it, or leave it.
 

@@ -297,7 +297,7 @@ export function scaffold(spacesRoot, templatesDir = path.join(here, '..', 'space
     for (const sub of ['config', 'data', 'audit', 'duckdb']) fs.mkdirSync(path.join(base, sub), { recursive: true });
     if (fs.existsSync(path.join(templatesDir, id, 'config'))) copy(path.join(templatesDir, id, 'config'), path.join(base, 'config'), id);
     if (fs.existsSync(path.join(templatesDir, id, 'data'))) copy(path.join(templatesDir, id, 'data'), path.join(base, 'data'), null);
-    fs.writeFileSync(path.join(base, 'space.toon'), `display_name: ${id === 'la-showcase' ? 'Other Examples' : 'Other Examples (feature off)'}\ndescription: Scaffolded from the ${id} Space Template\ncreated_at: ${new Date().toISOString()}\n`);
+    fs.writeFileSync(path.join(base, 'space.toon'), `display_name: ${id === 'la-showcase' ? 'Other Examples' : 'Other Examples (feature off)'}\ndescription: Scaffolded from the ${id} Space Template\ncreated_at: ${new Date().toISOString()}\nadmission: closed\n`);
     made.push(id);
   }
   return made;

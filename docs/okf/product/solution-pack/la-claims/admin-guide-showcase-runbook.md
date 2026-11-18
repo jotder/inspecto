@@ -31,7 +31,7 @@ The Space has **no landed link Dataset until the `claims_links` Job has run** (i
 | `analyst` | lead | builds the Investigation, authors Alert Rules, runs Graph Runs |
 | `manager` | second approver | approves the held expand, presses Run on Jobs |
 | `reviewer` | read-only | reads the Investigation; every write is 403 |
-| `outsider` | not a member | the Investigation is 404 |
+| `outsider` | admitted to no Space (`no-access`) | signs in, sees no Space; the Investigation is 404 |
 | `admin` | lead and Reveal | audited Reveal, Settings, mints the embed link |
 
 ## 1. The planted stories (ground truth; pinned by `LaClaimsGoldenTest`)

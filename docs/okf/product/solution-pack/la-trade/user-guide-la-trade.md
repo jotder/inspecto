@@ -161,7 +161,7 @@ after `node tools/seed-la-trade.mjs --apply`, sign in as each persona and check 
 2. **Four-eyes:** an unbounded expand by `analyst` is held, not run. Sign in as **`manager`**: it is in the
    approval inbox; approve or refuse it. `analyst` cannot approve its own request.
 3. **`reviewer`:** opens `over-invoicing` and reads every step; any change is refused.
-4. **`outsider`:** sees the Datasets, but `over-invoicing` is not found (404).
+4. **`outsider`:** signs in, but no Space is listed and every read of this one answers 404 (the Space is closed).
 5. **Draft:** `analyst` has one open Draft that annotates `CO-01461` about its other suppliers; promote it, or
    leave it.
 

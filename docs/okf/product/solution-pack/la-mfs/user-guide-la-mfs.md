@@ -140,7 +140,7 @@ after `node tools/seed-la-mfs.mjs --apply`, sign in as each persona and check wh
 2. **Four-eyes:** an unbounded expand by `analyst` is held, not run. Sign in as **`manager`**: it is in the
    approval inbox; approve or refuse it. `analyst` cannot approve its own request.
 3. **`reviewer`:** opens `sim-swap-takeover` and reads every step; any change is refused.
-4. **`outsider`:** sees the Datasets, but `sim-swap-takeover` is not found (404).
+4. **`outsider`:** signs in, but no Space is listed and every read of this one answers 404 (the Space is closed).
 5. **Draft:** `analyst` has one open Draft that annotates `S-41` about the mule wallets; promote it, or leave it.
 
 **Not the story:** the store login `S-72` swapped 160 SIMs, more than `S-41`, but its customers kept their balances

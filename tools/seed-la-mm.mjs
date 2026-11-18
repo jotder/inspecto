@@ -58,8 +58,8 @@ export function buildPlan() {
       add: farmIds, reason: 'one handset, nine national ids (showcase)' } },
     { id: 'identity', as: 'analyst', method: 'POST', path: '/inv/entity-identities', body: {
       a: 'wallet:FARM-1', b: 'wallet:FARM-2', reason: 'same handset DEV-FARM-01 (showcase)' } },
-    // A Case opened from an entity of a classified Dataset needs canRevealLinkEntities, which only `admin` holds in this Space
-    // (analyst deliberately does not: the masking beat). admin is also the Investigation's lead, so it may link the Case.
+    // A Case opened from an entity of a classified Dataset needs canRevealLinkEntities (admin holds it; since 2026-11-18 analyst
+    // does too, as in every LA Space). admin is also the Investigation's lead, so it may link the Case.
     { id: 'case', as: 'admin', method: 'POST', path: '/cases/from-entities', body: {
       title: CASE_TITLE, entities: [{ id: 'entity:wallet:HUB-01', dataset: DATASET }] } },
     { id: 'case-assign', as: 'admin', method: 'POST', path: '/objects/@case/assign', body: { assignee: 'manager' } },
@@ -215,7 +215,7 @@ export function scaffold(spacesRoot, templatesDir = path.join(here, '..', 'space
     for (const sub of ['config', 'data', 'audit', 'duckdb']) fs.mkdirSync(path.join(base, sub), { recursive: true });
     copy(path.join(templatesDir, id, 'config'), path.join(base, 'config'), id);
     copy(path.join(templatesDir, id, 'data'), path.join(base, 'data'), null);
-    fs.writeFileSync(path.join(base, 'space.toon'), `display_name: Mobile Money\ndescription: Scaffolded from the ${id} Space Template\ncreated_at: ${new Date().toISOString()}\n`);
+    fs.writeFileSync(path.join(base, 'space.toon'), `display_name: Mobile Money\ndescription: Scaffolded from the ${id} Space Template\ncreated_at: ${new Date().toISOString()}\nadmission: closed\n`);
     made.push(id);
   }
   return made;

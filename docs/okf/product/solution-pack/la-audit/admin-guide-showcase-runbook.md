@@ -30,7 +30,7 @@ Ids are the five shared Demo Users of every LA showcase Space (operator, 2026-11
 | `analyst` | la-analyst (Lead auditor) | work Investigations, run Graph Runs, build the index, author Alert Rules; a lead member | approve her own expand |
 | `manager` | la-manager (second approver) | approve held expands, operate Jobs | Reveal; author |
 | `reviewer` | la-viewer (read-only) | read the Investigation (a reviewer member) | write anything |
-| `outsider` | la-viewer | nothing: not a member (404) | |
+| `outsider` | no-access | nothing: signs in, admitted to no Space (404) | |
 | `admin` | admin + fraud-analyst + la-settings | Reveal, Settings, mint embed links; a lead member | operate Jobs (administering is not operating) |
 
 Masking is `typed`: Dataset columns classified `PARTY` (vendors, employees, bank accounts, addresses) are masked for everyone without Reveal; `LEGAL_ENTITY` (the journal) is not masked.
@@ -71,7 +71,7 @@ with a single approver is a pendant. Three vendors carry the placeholder account
 ### A. Open, cast, masking (1.5 min)
 1. Sign in as `analyst`, open Investigations, open `vendor-v117-workpaper`. **Expect:** seeds V-117 and E-31 and their neighbours; a snapshot named "workpaper baseline".
 2. Sign in as `reviewer` (another window). **Expect:** the same graph, ids masked, every write control disabled; a write via the API answers 403 (`la-audit-smoke.mjs` checks it).
-3. `outsider`: the Investigation is not listed; its API answers 404.
+3. `outsider`: signs in, but no Space is listed (the Space is closed); every read, the Investigation included, answers 404.
 * **If it goes wrong:** an empty Investigation list means the seed has not run, or the first ingest has not landed (the create answers 422 until it does; the seed script waits).
 
 ### B. V-117, Connect seeds, Entity profile (2 min)

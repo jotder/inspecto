@@ -42,7 +42,7 @@ redeploys: `.claude/memory/preview-la-demo.md`.
 - **Link Jobs also carry `cron: "*/5 * * * *"`** — a `pipeline.commit` during a running Job is skipped, not queued
   (`JOB-SIGNAL-OVERLAP-SKIP-1`). A Job judging a month waits until every side of that month has landed.
 - **Advanced tier, inert on Basic:** personas `<prefix>.analyst` (lead), `.manager` (second approver), `.reviewer`
-  (read-only), `.outsider` (not a member) + shared `admin`; `four_eyes_fan_out_above: 2000` and the shared Drafts
+  (read-only), `.outsider` + shared `admin`. Since 2026-11-18 every LA Space signs in the five shared `admin`, `analyst`, `manager`, `reviewer`, `outsider` (role `no-access`, admitted to no Space), the four kinds grant the same capabilities everywhere and every scaffold writes `admission: closed` (`tools/la-demo-roster.test.mjs`); `four_eyes_fan_out_above: 2000` and the shared Drafts
   limits in `link-analysis.toon`.
 - **One roster across Spaces:** `admin` and the `fraud-analyst` / `la-viewer` / `la-settings` roles must be
   byte-identical to the other showcases, or one server refuses the second Space with 409 `ROSTER_CONFLICT`. Copy

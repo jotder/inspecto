@@ -435,7 +435,7 @@ export function buildProbes({ space = 'la-showcase', offSpace = 'la-showcase-off
   return [
     { id: '401 no token', as: null, method: 'GET', path: '/inv/investigations', want: 401 },
     { id: '403 reviewer on identities', as: 'reviewer', method: 'GET', path: '/inv/entity-identities', want: 403 },
-    { id: '404 non-member (outsider)', as: 'outsider', method: 'GET', path: `${inv}/log`, want: 404 },
+    { id: '404 not admitted to the Space (outsider)', as: 'outsider', method: 'GET', path: `${inv}/log`, want: 404 },
     { id: '404 MODULE_DISABLED on the switched-off Space', as: 'analyst', method: 'GET', path: '/inv/investigations', space: offSpace,
       want: { status: 404, code: 'MODULE_DISABLED' } },
     { id: '422 bad Investigation create', as: 'analyst', method: 'POST', path: '/inv/investigations', body: {}, want: 422 },

@@ -148,7 +148,7 @@ load. Setting it up is in the [admin guide](admin-guide-install.md#advanced-tier
 | `analyst` | intelligence analyst, lead of the Investigation | runs the analysis, adds steps, asks for a large expand, authors Alert Rules; cannot approve their own request |
 | `manager` | senior investigating officer, second approver | a member of the Investigation (reviewer); approves or denies a held expand; runs Jobs; owns the Case |
 | `reviewer` | reviewer, read-only | a member: reads the Investigation, adds nothing, approves nothing |
-| `outsider` | not a member | cannot open the Investigation |
+| `outsider` | admitted to no Space (`no-access`) | signs in, but sees no Space: the Investigation and the Space answer "not found" |
 | `admin` | platform administrator | lead member; edits the Link Analysis settings |
 
 No Entity Type is masked: every id is synthetic and names no real person, so no persona needs a Reveal.
@@ -176,7 +176,7 @@ a second one.
 
 *Hint:* sign in as each persona and open `burglary-series`; as `analyst`, expand with no limit.
 
-**Answer:** `analyst`, `manager`, `reviewer` and `admin` can open it; `outsider` gets "not
+**Answer:** `analyst`, `manager`, `reviewer` and `admin` can open it; `outsider` sees no Space at all and gets "not
 found". Only `analyst` and `admin` add steps. The unlimited expand is held; `analyst` and
 `reviewer` cannot approve it; `manager` approves it and it runs. **Not the story:** the one-off sellers
 of ordinary stolen goods never raise the Alert, however many of them there are.
@@ -196,6 +196,6 @@ and `tools/seed-la-police.test.mjs`.
 - [ ] No look-alike links to a story entity: `ZX 3465 D` and `P-05203`, `+447700900260` and `P-00371`, `ADR-0264`
       and its residents and numbers, `P-01231`.
 - [ ] Advanced tier, on a Demo Auth build: the Alert Rule is armed and raises one WARNING with value 12; the seed runs
-      with nothing failed; the outsider cannot open `burglary-series`; only `manager` can approve the held expand.
+      with nothing failed; the outsider sees no Space and cannot open `burglary-series`; only `manager` can approve the held expand.
 - [ ] Basic: the log says "Not arming alert rule 'police_repeat_seller_serial_matches'", `police_serial_match_alerts`
       reports no new breach, and nothing errors.

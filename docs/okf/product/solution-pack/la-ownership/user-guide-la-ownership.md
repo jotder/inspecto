@@ -141,7 +141,7 @@ after `node tools/seed-la-ownership.mjs --apply`, sign in as each persona and ch
    is in the approval inbox; approve it and the expand runs, bringing in `CO-04431` among others. `analyst`
    cannot approve its own request.
 3. **`reviewer`:** opens `sanctions-exposure` and reads every step; any change is refused.
-4. **`outsider`:** sees the Datasets, but `sanctions-exposure` is not found (404).
+4. **`outsider`:** signs in, but no Space is listed and every read of this one answers 404 (the Space is closed).
 5. **Draft:** `analyst` has one open Draft that annotates `PER-03904` about bringing in the owner; promote
    it, or leave it.
 

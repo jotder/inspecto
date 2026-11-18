@@ -161,7 +161,7 @@ after `node tools/seed-la-health.mjs --apply`, sign in as each persona and check
 2. **Four-eyes:** an unbounded expand by `analyst` is held, not run. Sign in as **`manager`**: it is in
    the approval inbox; approve or refuse it. `analyst` cannot approve its own request.
 3. **`reviewer`:** opens `phantom-billing` and reads every step; any change is refused.
-4. **`outsider`:** sees the Datasets, but `phantom-billing` is not found (404).
+4. **`outsider`:** signs in, but no Space is listed and every read of this one answers 404 (the Space is closed).
 5. **Draft:** `analyst` has one open Draft that annotates `PR-1241` about the hospitals that admitted its
    patients; promote it, or leave it.
 

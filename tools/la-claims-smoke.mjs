@@ -108,7 +108,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
     try { await token(u); record(`${u} signs in`, null); } catch (e) { record(`${u} signs in`, e.message); }
   }
   const inv = `/inv/investigations/${INV}`;
-  record('outsider is not a member: 404', expectStatus(await call('outsider', 'GET', `${inv}/log`), 404));
+  record('outsider is not admitted to the Space: 404', expectStatus(await call('outsider', 'GET', `${inv}/log`), 404));
   record('reviewer reads the log: 200', expectStatus(await call('reviewer', 'GET', `${inv}/log`), 200));
   const denied = await call('reviewer', 'POST', `${inv}/ops`, { op: 'annotate', ids: ['CLI-04'], note: 'smoke' });
   record('reviewer is read-only: a write is 403', expectStatus(denied, 403));

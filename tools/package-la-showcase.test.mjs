@@ -45,6 +45,11 @@ test('space.toon declares the data root relative to the bundle root, per Space',
   assert.ok(!/^data_root: "[A-Za-z]:|^data_root: "\//m.test(out), 'the data root must not be rooted');
 });
 
+// Operator 2026-11-18: an LA demo Space is closed, so the `outsider` Demo User signs in and sees no Space.
+test('space.toon closes the Space to everyone its own roles.toon does not admit', () => {
+  assert.match(spaceToon('name: x\n', 'la-claims', '4.0.0'), /^admission: closed$/m);
+});
+
 test('toonValue reads bare and quoted values and misses absent keys', () => {
   assert.equal(toonValue('name: Bare value\n', 'name'), 'Bare value');
   assert.equal(toonValue('tagline: "q"\n', 'tagline'), 'q');

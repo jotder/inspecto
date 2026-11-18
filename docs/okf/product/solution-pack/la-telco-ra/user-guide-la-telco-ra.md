@@ -143,7 +143,7 @@ after `node tools/seed-la-telco-ra.mjs --apply`, sign in as each persona and che
 2. **Four-eyes:** an unbounded expand by `analyst` is held, not run. Sign in as **`manager`**: it is in
    the approval inbox; approve or refuse it. `analyst` cannot approve its own request.
 3. **`reviewer`:** opens `unbilled-usage` and reads every step; any change is refused.
-4. **`outsider`:** sees the Datasets, but `unbilled-usage` is not found (404).
+4. **`outsider`:** signs in, but no Space is listed and every read of this one answers 404 (the Space is closed).
 5. **Draft:** `analyst` has one open Draft that annotates `DL-047` about its activation device `DEV-00086`.
    The device itself is two hops out (dealer, SIM, device) and not in the Working Set, so the note goes on the dealer.
    Promote it, or leave it.

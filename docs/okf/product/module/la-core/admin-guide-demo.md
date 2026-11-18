@@ -54,7 +54,7 @@ ingested until you copy them into the inbox (used live only if you choose the dr
   `SMURF-01` (type `account`); a bounded expand (`maxFanOut` 5, either direction); exclude `RELAY-02` with a reason; annotate
   `MULE-HUB-01`; threshold 1; window 2026-09-01..2026-09-04; resolve; snapshot "showcase baseline".
 * **Members:** `analyst` is the owner (lead); `reviewer` reviewer; `manager` reviewer; `admin` lead. `outsider` is
-  deliberately NOT a member.
+  deliberately NOT a member, and is not admitted to the Space at all (below).
 * **Entity Lists:** `smurf-accounts` (SMURF-01..SMURF-12, a `SMURF-` prefix range, and `TILL-06` expiring in 30 days);
   `telecom-watch-msisdn` (`99979100001`, `99979200001`).
 * **Identity assertion:** `account:MULE-HUB-01` = `account:ACC-1006` ("same KYC document").
@@ -71,10 +71,18 @@ ingested until you copy them into the inbox (used live only if you choose the dr
 | Demo User | Role in the story | Capabilities that matter |
 |---|---|---|
 | `admin` | Platform admin; Settings; mints embed links; Reveal | admin role plus `fraud-analyst` and `la-settings` (`canAuthorWorkbench`); a lead member of the Investigation |
-| `analyst` | Lead analyst, owner | `canManageIncidents`, `canWorkIncidents`, `canRunLinkGraphAnalysis`, `canBuildLinkIndex`, `canAuthorAlertRules`, `canRevealLinkEntities`, `canShareInvestigation` (`la-analyst`), so `analyst` can Reveal too |
+| `analyst` | Lead analyst, owner | `canManageIncidents`, `canWorkIncidents`, `canRunLinkGraphAnalysis`, `canBuildLinkIndex`, `canAuthorAlertRules`, `canRevealLinkEntities` (`la-analyst`, the same in every LA Space), so `analyst` can Reveal too; `admin` mints the embed links |
 | `manager` | Second approver | `canManageIncidents`, `canWorkIncidents`, `canApproveLinkExpansions`, `canOperateRuns` |
 | `reviewer` | Reviewer, read-only | none (`la-viewer`) |
-| `outsider` | Not a member | none (`la-viewer`) |
+| `outsider` | Signs in but is admitted to no Space | none (`no-access`, a role no `roles.toon` defines) |
+
+Every Link Analysis demo Space signs in these same five Demo Users, and each kind means the same in every Space
+(`tools/la-demo-roster.test.mjs`). Every LA scaffolder (`tools/seed-la-*.mjs --scaffold`) and the showcase packager
+(`tools/package-la-showcase.mjs`) write the Space **closed** (`admission: closed` in `space.toon`): it admits an
+administrator and a holder of a role its own `roles.toon` defines, and answers anyone else as if it did not exist (404,
+and it is left out of the Space lists). So `outsider` signs in and sees, on the la-app home page, *You have no access to
+any Space* / *Ask your administrator to give you access to a Space.*, with nothing to press. A Space laid down before
+2026-11-18 stays open until you add `admission: closed` to its `space.toon` and restart.
 
 ### 0.3 Other Spaces and Space Templates
 
@@ -195,11 +203,12 @@ Times are rehearsal targets. Persona in brackets. "Arch" = the architecture page
   the gates with `curl` (token from the demo exchange: `POST /api/v1/auth/exchange` with `{"code":"demo:<id>","codeVerifier":"x","redirectUri":"..."}`;
   the smoke runner does exactly this):
   * no token `GET /api/v1/spaces/la-showcase/inv/investigations` -> **401**
-  * `outsider` `GET .../inv/investigations/mule-hub-case/log` -> **404** (non-member: 404-as-absence, same answer as "does not exist")
+  * `outsider` `GET .../inv/investigations/mule-hub-case/log` -> **404** (not admitted to the Space: the whole Space answers as if it did not exist)
   * `reviewer` `GET .../inv/entity-identities` -> **403**
   * `analyst` `POST .../inv/investigations` with `{}` -> **422**
   * `analyst` `GET` on the `la-showcase-off` Space -> **404 `MODULE_DISABLED`**
   * `analyst` `GET .../mule-hub-case/log` -> **200**
+* **Show:** sign in as `outsider`: the home page says *You have no access to any Space* and no Space is offered.
 * **Expect:** exactly those statuses (all six are smoke probes, `17/17`). `reviewer` in the UI: the Investigation tab is read-only (Seed, Expand, Undo,
   Fork a Draft disabled with a note saying why); a mutating `curl` as `reviewer` is 403. Members: a lead can **Grant**/**Revoke**; revoking the last
   lead is refused.

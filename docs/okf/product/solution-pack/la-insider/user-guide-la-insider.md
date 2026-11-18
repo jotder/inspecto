@@ -127,7 +127,7 @@ after `node tools/seed-la-insider.mjs --apply`, sign in as each persona and chec
 2. **Four-eyes:** an unbounded expand by `analyst` is held, not run. Sign in as **`manager`**: it is in
    the approval inbox; approve or refuse it. `analyst` cannot approve its own request.
 3. **`reviewer`:** opens `access-creep` and reads every step; any change is refused.
-4. **`outsider`:** sees the Datasets, but `access-creep` is not found (404).
+4. **`outsider`:** signs in, but no Space is listed and every read of this one answers 404 (the Space is closed).
 5. **Draft:** `analyst` has one open Draft that annotates `EMP-0482` about its change to the bank account of
    `VEN-0264`; promote it, or leave it. The vendor itself is two hops from the seed, so a step on it is refused until an
    expand brings it in.

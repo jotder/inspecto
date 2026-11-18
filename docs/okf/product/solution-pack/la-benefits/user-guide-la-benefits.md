@@ -152,7 +152,7 @@ after `node tools/seed-la-benefits.mjs --apply`, sign in as each persona and che
 2. **Four-eyes:** an unbounded expand by `analyst` is held, not run. Sign in as **`manager`**: it is
    in the approval inbox; approve or refuse it. `analyst` cannot approve its own request.
 3. **`reviewer`:** opens `paid-after-death` and reads every step; any change is refused.
-4. **`outsider`:** sees the Datasets, but `paid-after-death` is not found (404).
+4. **`outsider`:** signs in, but no Space is listed and every read of this one answers 404 (the Space is closed).
 5. **Draft:** `analyst` has one open Draft that annotates `CIT-08276`, asking who else lives at that address;
    promote it, or leave it.
 

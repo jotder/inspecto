@@ -89,12 +89,13 @@ export function toonValue(text, key) {
  *  is what replaces SPACES_DATA_ROOT: that flag leaves data_root blank, and a blank one is stamped ABSOLUTE. */
 export const DATA_ROOT_PARENT = '../inspecto-la-data';
 
-/** The space.toon a Space created from this template gets, plus min_product_version and the relative data_root. */
+/** The space.toon a Space created from this template gets, plus min_product_version, the relative data_root and
+ *  `admission: closed` (operator 2026-11-18: only an administrator or a holder of a role its roles.toon defines may use it). */
 export function spaceToon(templateToon, id, minProduct) {
   const name = toonValue(templateToon, 'name') || id;
   const desc = toonValue(templateToon, 'tagline');
   return `display_name: ${q(name)}\ndescription: ${q(desc)}\ncreated_at: ${q(new Date().toISOString())}\n`
-    + `min_product_version: ${q(minProduct)}\ndata_root: ${q(`${DATA_ROOT_PARENT}/${id}`)}\n`;
+    + `min_product_version: ${q(minProduct)}\ndata_root: ${q(`${DATA_ROOT_PARENT}/${id}`)}\nadmission: closed\n`;
 }
 
 /** One config .toon as a Space created from the template gets it:  replaced by the id, and a la.index.build Job stamped with its

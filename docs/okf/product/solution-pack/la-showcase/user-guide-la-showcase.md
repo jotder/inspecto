@@ -33,7 +33,7 @@ Pick a Demo User (`spaces/_templates/la-showcase/config/demo-users.toon`, `roles
 | `analyst` | lead analyst; authors Alert Rules |
 | `manager` | second approver for four-eyes expands |
 | `reviewer` | reviewer, read-only |
-| `outsider` | not a member of the Investigation |
+| `outsider` | signs in, but is admitted to no Space (the Space is closed) |
 | `admin` | can reveal masked values |
 
 ## A walk-through

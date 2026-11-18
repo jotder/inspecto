@@ -13,7 +13,7 @@
 //   4 loop          Find cycles on a LOOP-1 neighbourhood: exactly one cycle of 4 nodes
 //   masking         every entity answered to analyst is a `masked:` token
 //   four-eyes       an unbounded expand is HELD (status pending), a bounded one runs
-//   roles           reviewer reads (200) and cannot write (403); outsider is not a member (404)
+//   roles           reviewer reads (200) and cannot write (403); outsider is not admitted to the Space (404)
 //   7 alert         the mm-structuring Alert exists (seed stage or la_detect), naming a count, never a wallet
 // Exit 1 on any failed probe.
 import path from 'node:path';
@@ -80,7 +80,7 @@ export async function run({ fetchFn = fetch, base = 'http://127.0.0.1:8096', spa
   await step('1 structuring Measure: one entity, 25 legs, 25 payers in the top-5% band', async () => structuringVerdict(await measure('name=structuring&min=4750&max=5000')));
   await step('2 passThrough Measure: an entity at 0.98', async () => passThroughVerdict(await measure('name=passThrough')));
   await step('masking typed: every Measure entity is a masked token', async () => allMasked((await measure('name=passThrough')).entities.map((e) => e.entity)));
-  await step('roles: reviewer reads (200) and cannot write (403); outsider is not a member (404)', async () => {
+  await step('roles: reviewer reads (200) and cannot write (403); outsider is not admitted to the Space (404)', async () => {
     const read = await call('reviewer', 'GET', `/inv/investigations/${INV}/working-set`);
     const write = await call('reviewer', 'POST', `/inv/investigations/${INV}/ops`, { op: 'annotate', ids: ['x'], note: 'x' });
     const outsider = await call('outsider', 'GET', `/inv/investigations/${INV}/working-set`);

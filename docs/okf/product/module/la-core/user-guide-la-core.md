@@ -1541,7 +1541,7 @@ write control is disabled with that sentence. A reviewer of an Investigation, an
 the same way (*You review this Investigation: you can read it and decide approvals…*): only a lead changes its steps, so they get no Expand form, and **Undo** and **Redo** are disabled with that reason. A refusal shows the server's reason; a missing
 permission is named in words (*Your role does not have the Workbench author permission*). *Not found* on an Investigation can mean it does
 not exist, is not yours, or its Dataset is no longer shared with you — the same answer on purpose. In the
-`la-showcase` demo, *Demo Reviewer* and *Demo Outsider* are read-only; *Demo Analyst* holds manage-incidents,
+`la-showcase` demo, *Demo Reviewer* is read-only and *Demo Outsider* signs in but is admitted to no Space (the home page says *You have no access to any Space*); *Demo Analyst* holds manage-incidents,
 graph-run, index-build and Alert Rule authoring; *Demo Manager* is the second approver; *Demo Admin* also holds
 `canAuthorWorkbench`.
 
