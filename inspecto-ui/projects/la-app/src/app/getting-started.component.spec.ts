@@ -124,12 +124,26 @@ describe('GettingStartedComponent', () => {
     });
 
     it('a user who may not create a Space sees both choices locked, each with its reason (no violations)', async () => {
-        const { el, card, button } = create({ canCreate: false });
+        const { el, card, button } = create({ canCreate: false, spaces: [ALPHA] });
+        expect(el.querySelector('[data-testid="la-no-access"]')).toBeNull();
         expect(button('sample')!.disabled).toBe(true);
         expect(card('sample')!.textContent).toContain('Only an administrator can create a Space');
         expect(button('sample')!.getAttribute('aria-describedby')).toBe('la-sample-why');
         expect(button('own')!.disabled).toBe(true);
         expect(card('own')!.textContent).toContain('Only an administrator can create a Space');
+        await expectNoA11yViolations(el);
+    });
+
+    it('a user admitted to no Space who may not create one is told so in plain words, with nothing to press (no violations)', async () => {
+        const { el, card } = create({ canCreate: false, spaces: [] });
+        const empty = el.querySelector('[data-testid="la-no-access"]');
+        expect(empty!.textContent).toContain('You have no access to any Space');
+        expect(empty!.textContent).toContain('Ask your administrator');
+        expect(el.querySelectorAll('h1').length).toBe(1);
+        expect(card('sample')).toBeNull();
+        expect(card('own')).toBeNull();
+        expect(el.querySelector('button')).toBeNull();
+        expect(el.querySelector('[aria-busy="true"]')).toBeNull();
         await expectNoA11yViolations(el);
     });
 
