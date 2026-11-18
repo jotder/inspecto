@@ -335,7 +335,7 @@ column may say `carried: false`. A Mapping copies its base's columns with their 
   the section out of the cache. The Entity Type page shows it as **Measures**. Measured on 200,000 synthetic Entities
   with a cap of 1,000: 1 in 232, under 1,000 grouped, the LIMIT not reached (`ControlApiEntityProfileScaleTest`).
 - **Roles from the record type (`ENTITY-TYPE-RECORD-ROLES-1`, 2026-11-05).** A record type names its usual Time,
-  Measure and Category columns by hints (entity-store `spec-la-core.md` *A record type's usual roles*; the one rule is
+  Measure and Category columns by hints (entity-store `spec-entity-store.md` *A record type's usual roles*; the one rule is
   `EntityShapes.hintedRole` / UI `hintedRole` in `column-roles.ts`, kept alike). **Add data:** after the record type is
   proposed, `EntityShapes.recordTypeRoles` gives each column a hint names its role - never one holding an Entity Type
   or chosen as the link's kind, time or measure - sure when the record type is, and keeps the role proposed without it

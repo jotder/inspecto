@@ -1084,8 +1084,8 @@ compressed spelling of that logical name has been processed.
 | Plan of record — requirements, decisions, open work, refusals, verification | [plan-elt.md](plan-elt.md) |
 | Poll cycle, phases A–F summary, the Collectors module page, multi-location ingest | [architecture-elt.md](architecture-elt.md) |
 | Connector SPI, the remote schemes, stage-then-land, profiles, secrets, workbench, proxy chain | [connectors/spec-connectors.md](../connectors/spec-connectors.md) |
-| The Kafka connector, its fence and stream lane | [connectors-kafka/spec.md](../connectors-kafka/spec-connectors-kafka.md) |
+| The Kafka connector, its fence and stream lane | [connectors-kafka/spec-connectors-kafka.md](../connectors-kafka/spec-connectors-kafka.md) |
 | Operator runbook: profile YAML, host-key table, FTPS, bastion, db-export | [connectors/admin-guide-connectors-runbook.md](../connectors/admin-guide-connectors-runbook.md) |
-| Module boundary + dependency confinement of the connectors jar | [connectors/architecture.md](../connectors/architecture-connectors.md) |
+| Module boundary + dependency confinement of the connectors jar | [connectors/architecture-connectors.md](../connectors/architecture-connectors.md) |
 | Consignments, the ingest strategies and commit order that consume the landed inbox | [spec-ingest.md](spec-ingest.md) (Part I ingest, Part II Consignments) |
 | Screens and the Collector configuration surface | [user-guide-elt.md](user-guide-elt.md) |

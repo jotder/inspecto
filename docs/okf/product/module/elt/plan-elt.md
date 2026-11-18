@@ -1534,7 +1534,7 @@ against `git ls-files` and the module tree — and in this area, that check woul
 | Screens and the Collector configuration surface | [user-guide-elt.md](user-guide-elt.md) |
 | Connector SPI, remote schemes, profiles, secrets, workbench, proxy chain | [connectors/spec-connectors.md](../connectors/spec-connectors.md) |
 | Operator runbook: profile YAML, host-key table, FTPS, bastion, db-export | [connectors/admin-guide-connectors-runbook.md](../connectors/admin-guide-connectors-runbook.md) |
-| Module boundary + dependency confinement | [connectors/architecture.md](../connectors/architecture-connectors.md) |
+| Module boundary + dependency confinement | [connectors/architecture-connectors.md](../connectors/architecture-connectors.md) |
 | What happens after the inbox | [§1.1](#11-ingestion-ing) ingestion, [§1.2](#12-pipeline-authoring-pip-1) authoring, [§EXE.1](#exe1-pipeline-execution-pip-2--pip-7) execution (this file) |
 
 ### Ingestion, authoring and execution — references

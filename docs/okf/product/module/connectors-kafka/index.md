@@ -22,7 +22,7 @@ tags: [product-item, module]
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | n/a | no screens of its own - a kafka Connection is created in the shared Connections screen (connectors/user-guide-connections.md) |
 | admin-guide | current | [Kafka stream connector — admin guide](admin-guide-connectors-kafka.md) |
-| api | n/a | no HTTP routes; the Java contract it implements is the Collector connector SPI in the connectors hub (connectors/api.md) |
+| api | n/a | no HTTP routes; the Java contract it implements is the Collector connector SPI in the connectors hub (connectors/api-connectors.md) |
 | tests | current | [Kafka stream connector — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

@@ -22,7 +22,7 @@ tags: [product-item, module]
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | n/a | no screens - a storage backend chosen by JVM properties, invisible to end users |
 | admin-guide | current | [Link analysis PostgreSQL store - admin guide](admin-guide-la-store-pg.md) |
-| api | n/a | implements la-core's InvestigationStoreProvider SPI and adds no contract of its own; the SPI is specified in la-core/spec.md |
+| api | n/a | implements la-core's InvestigationStoreProvider SPI and adds no contract of its own; the SPI is specified in la-core/spec-la-core.md |
 | tests | current | [Link Analysis PostgreSQL store — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

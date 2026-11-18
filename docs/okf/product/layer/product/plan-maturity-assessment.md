@@ -1037,7 +1037,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - `features/inspecto-reconciliation/src/test/java/com/gamma/job/TelcoRaGoldenTest.java` (6 tests, 502 lines). Every control flags exactly its planted leakages (15 completeness Breaks / 9 lost xDRs, 4 rated-vs-billed, 5+N re-rating, 6 roll-forward, 10 settlement) against 24 benign boundary look-alikes. `theTemplateIngestsEvaluatesAndAlertsEndToEnd` ingests through all 8 Pipelines and checks 6 Alerts and KPIs of 161.16 USD / 17 / 17.
   - Mutation-checked: about 20 rule and tolerance mutations, each run separately and each red (`plan-spaces.md` §3.5). `ControlApiSpaceTemplateSeedGateTest` and `KpiCompletenessWidgetTest` (3 tests) cover apply and the completeness tile.
   - BACKLOG: `ASSURE-PACK-TELCO-RA-1` was closed 2026-10-04 (`docs/BACKLOG.md` line 169). Its vendor-feed-mapping half is parked in `docs/archived-documents/plans-archive/assurance-capability-plan.md` §4. The hub shows "No open rows".
-  - Decided limits: the impact ledger stays manual (`PUT /objects/{id}/impact`, no automatic write); timestamps are naive (one agreed timezone); the `kpi.completeness` tile ships `enabled: false` (`business-assurance/architecture.md` "Limits").
+  - Decided limits: the impact ledger stays manual (`PUT /objects/{id}/impact`, no automatic write); timestamps are naive (one agreed timezone); the `kpi.completeness` tile ships `enabled: false` (`business-assurance/architecture-business-assurance.md` "Limits").
   - Every feed Schema column is classified `INTERNAL`, `SUBSCRIBER_ID` and `B_NUMBER` included (`config/switch_xdr/switch_xdr_schema.toon`). No `MSISDN`/`PII` classification exists anywhere in the pack (grep: 0 hits), so masking never applies to RA records.
   - Competitive matrix: A = **Y**, C re-rating = **P**, Q settlement = **P** (`brochure-competitive-matrix.md` rows A, C, Q).
 - **Strengths vs market:**
@@ -1532,7 +1532,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Entity resolution is assertion-based. Fuzzy merge suggestions were retired (`LA-I2-GAPS-RESIDUALS-1`, D-M1). Quantexa's core value is probabilistic entity resolution at billions of records (general market). This is the largest functional gap: no row beyond the §6 retirement.
   - Scale and topology: 10^9 is not measured, and multi-pod is not complete. The Helm chart is `replicas: 1` (`SCALEOUT-HELM-NPOD-1` P2, `LA-INVESTIGATION-STORE-DESIGN-1` P3). The stakeholder Q&A says NOT YET for multi-pod and for a two-host drill.
   - Retention / legal hold of Investigation evidence is declined (`D-U8`), yet `docs/EDITIONS.md` and the Advanced brochure list "retention, legal hold, residency" as Advanced roadmap. That is a contradiction, and legal hold and residency have no row.
-  - Analyst ergonomics vs i2: no timeline / time-bar view (the G6 `timebar` was declined; only a timeline filter exists, `la-core/user-guide.md` §6), no i2 ANX import/export, no unstructured/document ingestion: no rows. Precision on real data is not measured (stakeholder Q&A line 201).
+  - Analyst ergonomics vs i2: no timeline / time-bar view (the G6 `timebar` was declined; only a timeline filter exists, `la-core/user-guide-la-core.md` §6), no i2 ANX import/export, no unstructured/document ingestion: no rows. Precision on real data is not measured (stakeholder Q&A line 201).
 - **RFP stance on the 5 most-asked requirements (link analysis / investigation):**
 
 | Requirement | Stance | Evidence or caveat |
