@@ -203,9 +203,12 @@ public final class ControlApi implements AutoCloseable, HostContext {
      * Captures a per-space request prefix {@code /spaces/<id>/<rest>}: group 1 = the space id (same charset as
      * {@link SpaceId}), group 2 = the remaining path (with leading {@code /}) matched against the unchanged route
      * table. {@code /spaces} and {@code /spaces/<id>} with no trailing path deliberately do <em>not</em> match —
-     * they stay server-global for the {@code SpaceRoutes} CRUD group.
+     * they stay server-global for the {@code SpaceRoutes} CRUD group. So do {@code /spaces/<id>/detach} and
+     * {@code /spaces/<id>/data-root} ({@code SPACE-LOCATIONS-1}): they act on the Space from outside it (stop it, boot it
+     * again), and no Space-scoped route has either tail.
      */
-    private static final Pattern SPACE_PREFIX = Pattern.compile("^/spaces/([a-z0-9][a-z0-9-]{0,62})(/.*)$");
+    private static final Pattern SPACE_PREFIX =
+            Pattern.compile("^/spaces/([a-z0-9][a-z0-9-]{0,62})(?!/(?:detach|data-root)$)(/.*)$");
 
     /** Routes that stay open even when the Standard edition's security module is active (W6): liveness/
      *  readiness/metrics probes carry no credentials; {@code /bootstrap} is how the SPA discovers it

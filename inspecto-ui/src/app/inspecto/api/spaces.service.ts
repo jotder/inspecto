@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { catchError, concatMap, first, forkJoin, from, map, Observable, of, switchMap, tap } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
@@ -16,6 +16,75 @@ export interface Space {
     createdAt: string;
     /** The Space lock's counts (LC-4), only when the caller may read that Space's `/integrity`. */
     integrity?: SpaceIntegritySummary;
+    /** Where the Space lives on disk (SPACE-LOCATIONS-1 D8): sent only to a caller who may administer Spaces. */
+    location?: SpaceLocation;
+}
+
+/** `GET /spaces` row `location`: the Space folder and Data folder, and what may be changed about them. */
+export interface SpaceLocation {
+    spaceFolder?: string;
+    dataFolder?: string;
+    /** Kept outside the Spaces root and attached by reference: only such a Space can be detached. */
+    referenced?: boolean;
+    /** Whether the Space already holds data: its Data folder can be changed only while it holds none. */
+    holdsData?: boolean;
+}
+
+/** What a folder is checked for: a Space folder or a Data folder. */
+export type SpaceLocationKind = 'space' | 'data';
+
+/** One check of a folder: its id (`allowed`, `install`, `overlap`, …), passed or not, and the server's reason. */
+export interface SpaceLocationCheck {
+    check: string;
+    ok: boolean;
+    reason?: string;
+}
+
+/** `POST /spaces/_locations/check` answer: nothing is written; `ok` is true only when every check passes. */
+export interface SpaceLocationCheckResult {
+    path?: string;
+    kind?: SpaceLocationKind;
+    ok: boolean;
+    checks: SpaceLocationCheck[];
+}
+
+/** The plain words for each check id the server runs, in its order; an unknown id is shown as it comes. */
+export const SPACE_LOCATION_CHECK_LABELS: Readonly<Record<string, string>> = {
+    allowed: 'In a folder the server allows',
+    install: 'Outside the installation',
+    overlap: 'Not inside another Space',
+    name: 'Named after a free Space id',
+    reachable: 'Exists or can be created',
+    writable: 'The server can write to it',
+    'free-space': 'Enough free disk space',
+    stamp: 'Not claimed by another Space',
+    content: 'Holds what it should',
+};
+
+/** The plain label of a check id. */
+export function spaceLocationCheckLabel(check: string): string {
+    return SPACE_LOCATION_CHECK_LABELS[check] ?? check;
+}
+
+/** The error code the folder routes answer (409) when the server has no allowed folders configured. */
+export const SPACE_LOCATIONS_DISABLED = 'SPACE_LOCATIONS_DISABLED';
+
+/** What a person reads when folder choices are switched off on this server. */
+export const SPACE_LOCATIONS_DISABLED_MESSAGE =
+    'Choosing folders is switched off on this server. The administrator must set spaces.allowed.roots ' +
+    '(or the SPACES_ALLOWED_ROOTS environment variable) to the folders Spaces may use, and restart the server.';
+
+/** The server error code inside a v1 error body (`{ error: { errorCode } }`), else ''. */
+export function spaceErrorCode(err: unknown): string {
+    if (!(err instanceof HttpErrorResponse)) return '';
+    const body = err.error as { error?: { errorCode?: unknown; code?: unknown }; errorCode?: unknown } | null;
+    const c = body?.error?.errorCode ?? body?.error?.code ?? body?.errorCode;
+    return typeof c === 'string' ? c : '';
+}
+
+/** True when a folder route was refused because the server has no allowed folders (`spaces.allowed.roots` unset). */
+export function isSpaceLocationsDisabled(err: unknown): boolean {
+    return err instanceof HttpErrorResponse && err.status === 409 && spaceErrorCode(err) === SPACE_LOCATIONS_DISABLED;
 }
 
 /** `GET /spaces` row `integrity`: the totals are present only when `status` is `ready`. */
@@ -36,6 +105,10 @@ export interface CreateSpaceRequest {
     /** Also load the template's sample data and run each Pipeline that received files, once (LA-ONBOARD-1 OB-12).
      *  Refused (422) when the template ships no samples ({@link SpaceTemplateInfo.samples}). */
     loadSamples?: boolean;
+    /** The pre-created Space folder to create the Space in (SPACE-LOCATIONS-1 D6); omitted = under the Spaces root. */
+    path?: string;
+    /** The pre-created Data folder for the Space's data; omitted = inside the Space folder. */
+    dataRoot?: string;
 }
 
 /** One Pipeline's outcome of a `loadSamples` create. */
@@ -164,6 +237,9 @@ export class SpacesService {
     readonly availableSpaces = signal<Space[]>([]);
     /** Whether this server is the CRUD-capable discover runtime (GET /spaces/_meta). */
     readonly multiSpace = signal(false);
+    /** True when `GET /spaces/_meta` says `locationsEnabled: false`, or a folder route answered
+     *  {@link SPACE_LOCATIONS_DISABLED}: the folder actions are hidden. */
+    readonly locationsDisabled = signal(false);
     /** The active space id, or null for the un-prefixed default namespace. */
     readonly currentSpaceId = signal<string | null>(this.restore());
 
@@ -191,8 +267,8 @@ export class SpacesService {
     private loadAndReconcile(): Observable<Space[]> {
         return forkJoin({
             meta: this.http
-                .get<{ multiSpace: boolean }>(apiUrl('/spaces/_meta'))
-                .pipe(catchError(() => of({ multiSpace: false }))),
+                .get<{ multiSpace: boolean; locationsEnabled?: boolean }>(apiUrl('/spaces/_meta'))
+                .pipe(catchError(() => of({ multiSpace: false, locationsEnabled: undefined }))),
             // `catchError` covers a FAILED request; a 200 carrying an unexpected shape used to reach
             // `spaces.some(...)` and throw during bootstrap, cascading into an NG0201 injector error.
             // ⚠ This is containment, NOT a fix — the root cause of an observed non-array is still
@@ -209,6 +285,8 @@ export class SpacesService {
         }).pipe(
             tap(({ meta, spaces }) => {
                 this.multiSpace.set(meta.multiSpace);
+                // SPACE-LOCATIONS-1: `spaces.allowed.roots` unset ⇒ the folder routes answer 409; say so up front.
+                this.locationsDisabled.set(meta.locationsEnabled === false);
                 this.availableSpaces.set(spaces);
             }),
             switchMap(({ meta, spaces }) =>
@@ -232,7 +310,9 @@ export class SpacesService {
 
     /** Create + boot a space (multi-space servers only). 400 bad id, 409 dup / single-tenant. */
     create(req: CreateSpaceRequest): Observable<Space> {
-        return this.http.post<Space>(apiUrl('/spaces'), req).pipe(tap(() => this.reads.clear()));
+        return this.http
+            .post<Space>(apiUrl('/spaces'), req)
+            .pipe(tap({ next: () => this.reads.clear(), error: (e) => this.noteLocationsDisabled(e) }));
     }
 
     /**
@@ -305,6 +385,40 @@ export class SpacesService {
                 headers: { 'Content-Type': 'application/zip' },
             })
             .pipe(tap(() => this.reads.clear()));
+    }
+
+    // ── Space folder and Data folder (SPACE-LOCATIONS-1) ──────────────────────────
+
+    /** Check a folder before it is used; nothing is written. */
+    checkLocation(path: string, kind: SpaceLocationKind, id?: string): Observable<SpaceLocationCheckResult> {
+        return this.http
+            .post<SpaceLocationCheckResult>(apiUrl('/spaces/_locations/check'), { path, kind, ...(id ? { id } : {}) })
+            .pipe(tap({ error: (e) => this.noteLocationsDisabled(e) }));
+    }
+
+    /** Attach a Space folder kept outside the Spaces root and start the Space. */
+    attach(path: string, id?: string): Observable<Space> {
+        return this.http
+            .post<Space>(apiUrl('/spaces/attach'), { path, ...(id ? { id } : {}) })
+            .pipe(tap({ next: () => this.reads.clear(), error: (e) => this.noteLocationsDisabled(e) }));
+    }
+
+    /** Stop an attached Space and drop its reference; its Space folder and Data folder stay on disk. */
+    detach(id: string): Observable<{ id: string; detached: boolean }> {
+        return this.http
+            .post<{ id: string; detached: boolean }>(apiUrl(`/spaces/${encodeURIComponent(id)}/detach`), {})
+            .pipe(tap({ next: () => this.reads.clear(), error: (e) => this.noteLocationsDisabled(e) }));
+    }
+
+    /** Point a Space that holds no data yet at a Data folder; `null` puts the data back in the Space folder. */
+    setDataRoot(id: string, path: string | null): Observable<Space> {
+        return this.http
+            .put<Space>(apiUrl(`/spaces/${encodeURIComponent(id)}/data-root`), { path })
+            .pipe(tap({ next: () => this.reads.clear(), error: (e) => this.noteLocationsDisabled(e) }));
+    }
+
+    private noteLocationsDisabled(e: unknown): void {
+        if (isSpaceLocationsDisabled(e)) this.locationsDisabled.set(true);
     }
 
     // ── per-space data sources + export/import (/spaces/{id}/…) ───────────────────

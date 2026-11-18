@@ -146,4 +146,97 @@ describe('SpacesService', () => {
         expect(req.request.method).toBe('POST');
         req.flush(SPACES[0]);
     });
+
+    // ── SPACE-LOCATIONS-1: Space folder and Data folder ──────────────────────────
+
+    const DISABLED = {
+        status: 409,
+        statusText: 'Conflict',
+    };
+    const disabledBody = {
+        error: { errorCode: 'SPACE_LOCATIONS_DISABLED', message: 'spaces.allowed.roots is not set' },
+    };
+
+    it('checkLocation() POSTs path, kind and id to /spaces/_locations/check', () => {
+        let ok: boolean | undefined;
+        svc.checkLocation('/srv/spaces/delta', 'space', 'delta').subscribe((r) => (ok = r.ok));
+        const req = httpMock.expectOne(`${base}/spaces/_locations/check`);
+        expect(req.request.method).toBe('POST');
+        expect(req.request.body).toEqual({ path: '/srv/spaces/delta', kind: 'space', id: 'delta' });
+        req.flush({ ok: true, checks: [{ check: 'allowed', ok: true, reason: 'under /srv' }], extra: 1 });
+        expect(ok).toBe(true);
+        expect(svc.locationsDisabled()).toBe(false);
+    });
+
+    it('checkLocation() leaves the id out when none is given', () => {
+        svc.checkLocation('/srv/data/delta', 'data').subscribe();
+        const req = httpMock.expectOne(`${base}/spaces/_locations/check`);
+        expect(req.request.body).toEqual({ path: '/srv/data/delta', kind: 'data' });
+        req.flush({ ok: false, checks: [] });
+    });
+
+    it('a 409 SPACE_LOCATIONS_DISABLED switches the folder actions off', () => {
+        let failed = false;
+        svc.checkLocation('/x', 'space').subscribe({ error: () => (failed = true) });
+        httpMock.expectOne(`${base}/spaces/_locations/check`).flush(disabledBody, DISABLED);
+        expect(failed).toBe(true);
+        expect(svc.locationsDisabled()).toBe(true);
+    });
+
+    it('another 409 does not switch the folder actions off', () => {
+        svc.attach('/x/delta').subscribe({ error: () => undefined });
+        httpMock
+            .expectOne(`${base}/spaces/attach`)
+            .flush({ error: { errorCode: 'CONFLICT', message: 'taken' } }, DISABLED);
+        expect(svc.locationsDisabled()).toBe(false);
+    });
+
+    it('GET /spaces/_meta locationsEnabled: false switches the folder actions off', () => {
+        expect(svc.locationsDisabled()).toBe(false);
+        svc.refresh().subscribe();
+        httpMock.expectOne(`${base}/spaces/_meta`).flush({ multiSpace: true, locationsEnabled: false });
+        httpMock.expectOne(`${base}/spaces`).flush([{ ...SPACES[0], id: 'default' }]);
+        expect(svc.locationsDisabled()).toBe(true);
+    });
+
+    it('an older server without locationsEnabled leaves the folder actions on', () => {
+        svc.refresh().subscribe();
+        httpMock.expectOne(`${base}/spaces/_meta`).flush({ multiSpace: true });
+        httpMock.expectOne(`${base}/spaces`).flush([{ ...SPACES[0], id: 'default' }]);
+        expect(svc.locationsDisabled()).toBe(false);
+    });
+
+    it('attach() POSTs the folder and optional id to /spaces/attach', () => {
+        svc.attach('/srv/elsewhere/delta', 'delta').subscribe();
+        const req = httpMock.expectOne(`${base}/spaces/attach`);
+        expect(req.request.method).toBe('POST');
+        expect(req.request.body).toEqual({ path: '/srv/elsewhere/delta', id: 'delta' });
+        req.flush(SPACES[0]);
+    });
+
+    it('detach() POSTs to /spaces/{id}/detach', () => {
+        svc.detach('alpha').subscribe();
+        const req = httpMock.expectOne(`${base}/spaces/alpha/detach`);
+        expect(req.request.method).toBe('POST');
+        req.flush({ id: 'alpha', detached: true });
+    });
+
+    it('setDataRoot() PUTs the path, or null to use the Space folder', () => {
+        svc.setDataRoot('alpha', '/srv/data/alpha').subscribe();
+        const a = httpMock.expectOne(`${base}/spaces/alpha/data-root`);
+        expect(a.request.method).toBe('PUT');
+        expect(a.request.body).toEqual({ path: '/srv/data/alpha' });
+        a.flush(SPACES[0]);
+        svc.setDataRoot('alpha', null).subscribe();
+        const b = httpMock.expectOne(`${base}/spaces/alpha/data-root`);
+        expect(b.request.body).toEqual({ path: null });
+        b.flush(SPACES[0]);
+    });
+
+    it('create() sends the chosen Space folder and Data folder', () => {
+        svc.create({ id: 'delta', path: '/srv/spaces/delta', dataRoot: '/srv/data/delta' }).subscribe();
+        const req = httpMock.expectOne(`${base}/spaces`);
+        expect(req.request.body).toEqual({ id: 'delta', path: '/srv/spaces/delta', dataRoot: '/srv/data/delta' });
+        req.flush(SPACES[0]);
+    });
 });

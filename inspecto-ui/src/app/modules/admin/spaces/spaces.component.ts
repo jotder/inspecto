@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -6,7 +6,8 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, LensService, Space, SpacesService } from 'app/inspecto/api';
+import { apiErrorMessage, LensService, Space, SPACE_LOCATIONS_DISABLED_MESSAGE, SpacesService } from 'app/inspecto/api';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
@@ -19,6 +20,8 @@ import { SpaceTemplateGalleryData, SpaceTemplateGalleryDialog } from './space-te
 import { ImportBundleData, ImportBundleDialog } from './import-bundle.dialog';
 import { SpaceComparisonData, SpaceComparisonDialog } from './space-comparison.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { AttachSpaceDialog } from './attach-space.dialog';
+import { DataFolderData, DataFolderDialog } from './data-folder.dialog';
 
 /**
  * Spaces admin — manage the projects this server hosts: list every space, create empty ones or onboard
@@ -39,6 +42,7 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
         InspectoEmptyStateComponent,
         StatusBadgeComponent,
         ChipComponent,
+        InspectoAlertComponent,
     ],
     templateUrl: './spaces.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -60,6 +64,16 @@ export class SpacesComponent implements OnInit {
     readonly dataSources = signal<Record<string, string[]>>({});
     readonly dsLoading = signal<Record<string, boolean>>({});
 
+    /** SPACE-LOCATIONS-1: the folder actions are an administrator's, on a server with allowed folders set. */
+    readonly canManageFolders = computed(
+        () => this.spaces.multiSpace() && this.lens.canAdminister() && !this.spaces.locationsDisabled(),
+    );
+    /** Shown to an administrator when the server has no allowed folders, in place of the folder actions. */
+    readonly showLocationsDisabled = computed(
+        () => this.spaces.multiSpace() && this.lens.canAdminister() && this.spaces.locationsDisabled(),
+    );
+    protected readonly locationsDisabledMessage = SPACE_LOCATIONS_DISABLED_MESSAGE;
+
     ngOnInit(): void {
         this.reload();
     }
@@ -73,6 +87,56 @@ export class SpacesComponent implements OnInit {
                 this.toastr.warning(apiErrorMessage(e, 'Could not load spaces.'));
             },
         });
+    }
+
+    /** SPACE-LOCATIONS-1 D3: attach a Space folder kept outside the Spaces root. */
+    attachSpace(): void {
+        this.dialog
+            .open(AttachSpaceDialog, { width: '560px', maxHeight: '90vh' })
+            .afterClosed()
+            .subscribe((attached?: Space) => {
+                if (attached) this.reload();
+            });
+    }
+
+    /** D4: offered only for a Space attached by reference; its folders stay on disk. */
+    canDetach(s: Space): boolean {
+        return this.canManageFolders() && s.location?.referenced === true;
+    }
+
+    /** D5: offered only while the Space holds no data. */
+    canChangeDataFolder(s: Space): boolean {
+        return this.canManageFolders() && s.location?.holdsData === false;
+    }
+
+    async detach(s: Space): Promise<void> {
+        const go = await this.confirm.confirm(
+            `Detach "${s.displayName || s.id}"? It stops and leaves this server. Its Space folder and Data folder ` +
+                'stay on disk, and you can attach it again later.',
+            'Detach Space',
+        );
+        if (!go) return;
+        this.spaces.detach(s.id).subscribe({
+            next: () => {
+                this.toastr.success(`Space "${s.id}" detached; its folders are kept`);
+                if (this.isCurrent(s)) this.spaces.selectSpace(null);
+                this.reload();
+            },
+            error: (e) => {
+                if (!this.spaces.locationsDisabled())
+                    this.toastr.error(apiErrorMessage(e, `Could not detach "${s.id}".`));
+            },
+        });
+    }
+
+    changeDataFolder(s: Space): void {
+        const data: DataFolderData = { space: s };
+        this.dialog
+            .open(DataFolderDialog, { data, width: '560px', maxHeight: '90vh' })
+            .afterClosed()
+            .subscribe((updated?: Space) => {
+                if (updated) this.reload();
+            });
     }
 
     /** The row's integrity count (LC-4), or null while the Space lock has no ready report to show. */

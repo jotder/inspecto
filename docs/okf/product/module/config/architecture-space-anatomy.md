@@ -93,6 +93,48 @@ path would otherwise be taken for a relative one. The test is `Path.getRoot() !=
 refusal rules and the move procedure are on [Spaces §4](architecture-config.md) and the
 [configuration reference](admin-guide-configuration-reference.md).
 
+### 2.2 Setting the folders over HTTP (`SPACE-LOCATIONS-1`, server as built 2026-11-18)
+
+The `<id>.ref` and `data_root` above can also be written by the server, live, from Settings ▸ Spaces:
+
+| Action | Route | What it writes |
+|---|---|---|
+| check a folder | `POST /spaces/_locations/check {path, kind: space\|data, id?}` | nothing; `{path, kind, ok, checks[{check, ok, reason}]}` |
+| *Attach existing Space* | `POST /spaces/attach {path, id?}` | `<id>.ref`, then boots the Space; it boots again at every restart |
+| *Detach* | `POST /spaces/{id}/detach` | stops the Space, deletes `<id>.ref`; both folders stay on disk |
+| *Change data folder* | `PUT /spaces/{id}/data-root {path\|null}` | `data_root` in `space.toon`, then reboots the Space (which stamps the folder) |
+| New Space ▸ *Advanced: folders* | `POST /spaces {…, path?, dataRoot?}` | the Space in `path`, `<id>.ref`, `data_root` |
+
+`GET /spaces` rows carry `location {spaceFolder, dataFolder, referenced, holdsData}` for a `canAdminister` holder
+only; `GET /spaces/_meta` says `locationsEnabled`. A path is absolute or relative to the app root; a `<id>.ref` and a
+`data_root` are written **relative to the app root when the folder lies under it** (so the stamp is relative too),
+else absolute.
+
+**Gates, in order** (`SpaceRoutes`): `canAdminister` 403 → multi-Space server 409 → launch setting
+`spaces.allowed.roots` / `SPACES_ALLOWED_ROOTS` set, else 409 `SPACE_LOCATIONS_DISABLED` → malformed body 422 → the
+checks (`SpaceLocations`), refusing on the first that fails: **allowed** (the canonical path — `..`, symlinks and
+junctions resolved — lies under an allowed folder; 403 `PATH_JAIL_VIOLATION`), then 409 `CONFLICT` for **install**
+(is or contains the app root; is, contains or lies in the Spaces root, so `_templates`/`_shared` too — a Space folder
+in the Spaces root needs no path), **overlap** (another hosted Space's folder or data folder; for a data folder also its
+own Space folder and the folder holding it, which the boot's `SpaceDataRoot.stake` refuses too), **name** (a Space
+folder is named its id, and the id is free), **reachable** (exists, or its parent does — an unmounted volume is never
+created), **writable**, **free-space** (the deploy kit's `MIN_FREE_GB`, default 5), **stamp** (a data folder's
+`.inspecto-space` names no other Space) and **content** (attach: a Space; create: empty; data folder: empty or already
+this Space's).
+
+**Decisions as built.**
+- *Holds data* means files in the data folder's `data/` or `audit/`, except the event log under `data/events/`. A
+  booted Space always has store files in `duckdb/`, and with a file-backed event store (the demo launcher's
+  `-Devents.backend=parquet`) an event log in `data/events/` — every boot writes them — so those move with the Space
+  (copy, then delete) when its data folder changes, and the old folder's stamp is removed. (Found driving the screens
+  live on 2026-11-18: counting the event log hid *Change data folder* on every just-attached Space.) A Space with files in `data/` or `audit/` is refused 409
+  `SPACE_HOLDS_DATA`: moving data is `SPACE-ROOTED-DATA-ROOT-MIGRATION-1`. A failed change puts the Space back.
+- Attach never moves data (`bootStarted(base, false)`); only a create adopts its seeded `data/`.
+- `/spaces/{id}/detach` and `/spaces/{id}/data-root` are kept server-global by `ControlApi.SPACE_PREFIX` (no
+  Space-scoped route has either tail); the check route is `_locations`, an underscore sentinel like `_meta`, because
+  `/spaces/locations/check` would be read as the Space `locations`.
+- Detach refuses a Space inside the Spaces root (409): that one is removed with `DELETE /spaces/{id}`.
+
 ## 3. Space-level files
 
 | File | Written by | What it holds |

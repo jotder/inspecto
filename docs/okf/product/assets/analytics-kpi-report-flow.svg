@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" viewBox="0 0 680 500" role="img" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+<title>From ingest to KPI and Report</title><desc>A Collector feeds a Pipeline that writes Datasets. Pipeline Steps call the Analytics kernel. Datasets feed the SQL path, which serves Queries, Measures, Widgets and Dashboards. Scheduled Jobs run Pipelines and call the analytics Platform Service; the Report Job renders a Dashboard to CSV, PDF or PNG.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect x="0" y="0" width="680" height="500" fill="#FFFFFF"/>
+<rect x="40" y="40" width="180" height="56" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="130" y="63" text-anchor="middle" font-size="13" font-weight="500" fill="#2C2C2A">Collector</text>
+<text x="130" y="80" text-anchor="middle" font-size="11" fill="#5F5E5A">files, databases, streams</text>
+<rect x="250" y="40" width="180" height="56" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="340" y="63" text-anchor="middle" font-size="13" font-weight="500" fill="#2C2C2A">Pipeline</text>
+<text x="340" y="80" text-anchor="middle" font-size="11" fill="#5F5E5A">parse → Steps</text>
+<rect x="460" y="40" width="180" height="56" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="550" y="63" text-anchor="middle" font-size="13" font-weight="500" fill="#2C2C2A">Datasets</text>
+<text x="550" y="80" text-anchor="middle" font-size="11" fill="#5F5E5A">and Derived Tables</text>
+<line x1="220" y1="68" x2="248" y2="68" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="430" y1="68" x2="458" y2="68" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="340" y1="96" x2="340" y2="138" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="550" y1="96" x2="550" y2="138" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<path d="M200 140 L200 118 L300 118 L300 98" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#a)"/>
+<rect x="40" y="140" width="180" height="72" rx="4" fill="#FAECE7" stroke="#993C1D" stroke-width="0.6"/>
+<text x="130" y="162" text-anchor="middle" font-size="13" font-weight="500" fill="#712B13">Scheduled Jobs</text>
+<text x="130" y="180" text-anchor="middle" font-size="11" fill="#993C1D">PIPELINE · ENRICH</text>
+<text x="130" y="196" text-anchor="middle" font-size="11" fill="#993C1D">kpi.completeness</text>
+<rect x="250" y="140" width="180" height="72" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="340" y="162" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">Analytics kernel</text>
+<text x="340" y="180" text-anchor="middle" font-size="11" fill="#534AB7">via transform.* Steps</text>
+<text x="340" y="196" text-anchor="middle" font-size="11" fill="#534AB7">forecasts, baselines</text>
+<rect x="460" y="140" width="180" height="72" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="550" y="162" text-anchor="middle" font-size="13" font-weight="500" fill="#3C3489">SQL path</text>
+<text x="550" y="180" text-anchor="middle" font-size="11" fill="#534AB7">SqlBuilder · SqlViews · SqlGuard</text>
+<text x="550" y="196" text-anchor="middle" font-size="11" fill="#534AB7">runs on DuckDB</text>
+<line x1="220" y1="176" x2="248" y2="176" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<path d="M550 212 L550 241 L107 241 L107 268" fill="none" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<rect x="40" y="270" width="135" height="56" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="107" y="293" text-anchor="middle" font-size="13" font-weight="500" fill="#2C2C2A">Query</text>
+<text x="107" y="310" text-anchor="middle" font-size="11" fill="#5F5E5A">SQL + Parameters</text>
+<rect x="195" y="270" width="135" height="56" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="262" y="293" text-anchor="middle" font-size="13" font-weight="500" fill="#2C2C2A">Measure</text>
+<text x="262" y="310" text-anchor="middle" font-size="11" fill="#5F5E5A">aggregation</text>
+<rect x="350" y="270" width="135" height="56" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="417" y="293" text-anchor="middle" font-size="13" font-weight="500" fill="#2C2C2A">Widget</text>
+<text x="417" y="310" text-anchor="middle" font-size="11" fill="#5F5E5A">KPI tile, chart</text>
+<rect x="505" y="270" width="135" height="56" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="572" y="293" text-anchor="middle" font-size="13" font-weight="500" fill="#2C2C2A">Dashboard</text>
+<text x="572" y="310" text-anchor="middle" font-size="11" fill="#5F5E5A">grid of Widgets</text>
+<line x1="175" y1="298" x2="193" y2="298" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="330" y1="298" x2="348" y2="298" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="485" y1="298" x2="503" y2="298" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<line x1="572" y1="326" x2="572" y2="378" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<rect x="460" y="380" width="180" height="56" rx="4" fill="#FAECE7" stroke="#993C1D" stroke-width="0.6"/>
+<text x="550" y="403" text-anchor="middle" font-size="13" font-weight="500" fill="#712B13">Report Job</text>
+<text x="550" y="420" text-anchor="middle" font-size="11" fill="#993C1D">on a cron schedule</text>
+<line x1="460" y1="408" x2="432" y2="408" stroke="#888780" stroke-width="1" marker-end="url(#a)"/>
+<rect x="250" y="380" width="180" height="56" rx="4" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="340" y="403" text-anchor="middle" font-size="13" font-weight="500" fill="#2C2C2A">CSV / PDF / PNG</text>
+<text x="340" y="420" text-anchor="middle" font-size="11" fill="#5F5E5A">REPORT_READY event</text>
+<rect x="40" y="462" width="12" height="12" rx="2" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.6"/>
+<text x="58" y="472" font-size="11" fill="#5F5E5A">data path</text>
+<rect x="140" y="462" width="12" height="12" rx="2" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+<text x="158" y="472" font-size="11" fill="#5F5E5A">compute</text>
+<rect x="230" y="462" width="12" height="12" rx="2" fill="#FAECE7" stroke="#993C1D" stroke-width="0.6"/>
+<text x="248" y="472" font-size="11" fill="#5F5E5A">scheduled Jobs</text>
+<line x1="350" y1="468" x2="380" y2="468" stroke="#888780" stroke-width="1" stroke-dasharray="4 3"/>
+<text x="388" y="472" font-size="11" fill="#5F5E5A">a Job runs a Pipeline</text>
+</svg>

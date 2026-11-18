@@ -99,6 +99,16 @@ from `config/audit/`.
 `C:\sandbox\spaces\demo` from an install's `spaces\demo.ref`). The folder must be named `<id>` and lie outside the
 spaces root; a real `<id>/` beside the ref wins. Purge of a referenced Space deletes only the `.ref`.
 
+**From Settings ▸ Spaces, without a restart** (`SPACE-LOCATIONS-1`). Set the launch setting
+`SPACES_ALLOWED_ROOTS` (`-Dspaces.allowed.roots`; e.g. `D:\inspecto-spaces;E:\inspecto-data` on Windows) to the
+folders you will use, then: *Attach existing Space* writes the `.ref` and starts the Space; *Detach* stops it and
+deletes the `.ref`, leaving both folders; *Change data folder* writes `data_root` for a Space that holds no data yet
+(no files in `data/` or `audit/`); New Space ▸ *Advanced: folders* creates the Space into a pre-made empty Space folder
+(named the Space id) and data folder. Each folder is checked first and the screen shows why one is refused. A Space
+folder and its data folder may not sit side by side in one parent folder (the boot refuses the data folder), so use
+two parent folders as above. Without the setting these actions are switched off. Rules and routes:
+[Space anatomy §2.2](architecture-space-anatomy.md).
+
 Each space is fully isolated: its own service, scheduler, event log, stores, connection registry and metric
 `space` label. Store **backends** (`status.backend`, `objects.backend`, `events.backend`, …) stay process-global
 `-D` flags; only their location defaults move under the space root.

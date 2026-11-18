@@ -59,21 +59,44 @@ final class SpaceDataRoot {
         Path dataRoot = root.dataRoot();
         if (dataRoot.equals(base)) return;
         stake(root, SpaceContext.SpaceManifest.read(base.resolve("space.toon"), root.id()));   // before any byte is copied
-        for (String sub : STATE_DIRS) {
-            Path src = base.resolve(sub);
-            if (!Files.isDirectory(src)) continue;
-            Path dst = dataRoot.resolve(sub);
-            try (Stream<Path> walk = Files.walk(src)) {
-                for (Path p : walk.sorted().toList()) {
-                    Path target = dst.resolve(src.relativize(p).toString());
-                    if (Files.isDirectory(p)) Files.createDirectories(target);
-                    else Files.copy(p, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                }
-            }
-            try (Stream<Path> walk = Files.walk(src)) {
-                for (Path p : walk.sorted(java.util.Comparator.reverseOrder()).toList()) Files.delete(p);
+        moveState(base, dataRoot);
+    }
+
+    /** Move a stopped Space's {@code data/}, {@code audit/} and {@code duckdb/} from {@code from} to {@code to}. */
+    static void moveState(Path from, Path to) throws IOException {
+        if (from.equals(to)) return;
+        for (String sub : STATE_DIRS) moveTree(from.resolve(sub), to.resolve(sub));
+    }
+
+    /** Copy {@code src} into {@code dst}, then delete {@code src}: copy-then-delete, since the two are usually on
+     *  different volumes. A no-op when {@code src} is absent. */
+    static void moveTree(Path src, Path dst) throws IOException {
+        if (!Files.isDirectory(src)) return;
+        try (Stream<Path> walk = Files.walk(src)) {
+            for (Path p : walk.sorted().toList()) {
+                Path target = dst.resolve(src.relativize(p).toString());
+                if (Files.isDirectory(p)) Files.createDirectories(target);
+                else Files.copy(p, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
         }
+        try (Stream<Path> walk = Files.walk(src)) {
+            for (Path p : walk.sorted(java.util.Comparator.reverseOrder()).toList()) Files.delete(p);
+        }
+    }
+
+    /** Whether a Space keeps anything in its data folder's {@code data/} or {@code audit/} - files a person or a
+     *  Pipeline put there, not what every boot writes: the stores under {@code duckdb/} and the event log under
+     *  {@code data/events/} (a file-backed event store opens it at boot). Both move with the Space ({@link #moveState})
+     *  ({@code SPACE-LOCATIONS-1} D5). */
+    static boolean holdsData(Path dataRoot) throws IOException {
+        Path data = dataRoot.resolve("data");
+        Path events = data.resolve("events");
+        if (Files.isDirectory(data)) {
+            try (Stream<Path> walk = Files.walk(data)) {
+                if (walk.anyMatch(p -> Files.isRegularFile(p) && !p.startsWith(events))) return true;
+            }
+        }
+        return holdsFiles(dataRoot.resolve("audit"));
     }
 
     /** Whether the stamp in {@code dataRoot} names the Space at {@code base} (canonical paths, so a case or alias

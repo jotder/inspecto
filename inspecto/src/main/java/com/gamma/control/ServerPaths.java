@@ -14,6 +14,12 @@ final class ServerPaths {
 
     private ServerPaths() {}
 
+    /** Whether this caller may see where things are on the server's disk: a holder of {@code canAdminister}, or anyone
+     *  where nobody signs in (no Subject). */
+    static boolean administers(HttpExchange ex) {
+        return ApiContext.subject(ex).map(s -> s.capabilities().contains(Roles.CAN_ADMINISTER)).orElse(true);
+    }
+
     /**
      * {@code dir} as this caller may see it: the absolute path for a holder of {@code canAdminister}, and wherever
      * nobody signs in (no Subject: nothing is checked, as before); for anyone else the path relative to the Space's
@@ -21,8 +27,7 @@ final class ServerPaths {
      */
     static String shown(HttpExchange ex, Path dir, Path dataRoot) {
         Path absolute = dir.toAbsolutePath().normalize();
-        if (ApiContext.subject(ex).map(s -> s.capabilities().contains(Roles.CAN_ADMINISTER)).orElse(true))
-            return absolute.toString();
+        if (administers(ex)) return absolute.toString();
         if (dataRoot == null) return null;
         Path root = dataRoot.toAbsolutePath().normalize();
         if (!absolute.startsWith(root) || absolute.equals(root)) return null;

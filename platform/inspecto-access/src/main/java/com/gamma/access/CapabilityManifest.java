@@ -475,6 +475,12 @@ public final class CapabilityManifest {
             new Entry("POST", "/spaces/import", Roles.CAN_ADMINISTER),
             new Entry("PUT", "/spaces/([^/]+)", Roles.CAN_ADMINISTER),
             new Entry("DELETE", "/spaces/([^/]+)", Roles.CAN_ADMINISTER),
+            // SPACE-LOCATIONS-1: where a Space folder and its data folder live is installation administration, and
+            // each also needs the launch setting spaces.allowed.roots (unset: 409 SPACE_LOCATIONS_DISABLED).
+            new Entry("POST", "/spaces/_locations/check", Roles.CAN_ADMINISTER),
+            new Entry("POST", "/spaces/attach", Roles.CAN_ADMINISTER),
+            new Entry("POST", "/spaces/([^/]+)/detach", Roles.CAN_ADMINISTER),
+            new Entry("PUT", "/spaces/([^/]+)/data-root", Roles.CAN_ADMINISTER),
             // SpaceComparisonRoutes — a cross-Space AGGREGATE read (space-comparison design §5 Q2, decided
             // 2026-09-24): it crosses the Space isolation "reads are open" rests on, so it is administration,
             // not an open read. The route resolves the named Spaces only after this gate passes.

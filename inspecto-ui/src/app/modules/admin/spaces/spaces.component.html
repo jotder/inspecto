@@ -33,6 +33,12 @@
                 >
                     <mat-icon svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
                 </button>
+                @if (canManageFolders()) {
+                    <button mat-stroked-button data-testid="attach-space" (click)="attachSpace()">
+                        <mat-icon svgIcon="heroicons_outline:link"></mat-icon>
+                        <span class="ml-2">Attach existing Space</span>
+                    </button>
+                }
                 <button mat-stroked-button data-testid="new-from-sample" (click)="newFromSample()">
                     <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
                     <span class="ml-2">New from sample</span>
@@ -48,6 +54,12 @@
             }
         </ng-container>
     </inspecto-page-header>
+
+    @if (showLocationsDisabled()) {
+        <inspecto-alert class="mt-4 block" variant="info" title="Folders" data-testid="locations-disabled">{{
+            locationsDisabledMessage
+        }}</inspecto-alert>
+    }
 
     @if (!loading() && !spaces.multiSpace()) {
         <inspecto-empty-state
@@ -74,8 +86,8 @@
         <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
             @for (s of spaces.availableSpaces(); track s.id) {
                 <div class="bg-card flex flex-col rounded-2xl p-5 shadow">
-                    <div class="flex items-start justify-between gap-4">
-                        <div class="min-w-0">
+                    <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                        <div class="min-w-[10rem] flex-1">
                             <div class="flex items-center gap-2">
                                 <span class="truncate text-lg font-semibold">{{ s.displayName || s.id }}</span>
                                 @if (isCurrent(s)) {
@@ -157,6 +169,17 @@
                             >
                                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
                             </button>
+                            @if (canChangeDataFolder(s)) {
+                                <button
+                                    mat-icon-button
+                                    data-testid="change-data-folder"
+                                    (click)="changeDataFolder(s)"
+                                    matTooltip="Change data folder"
+                                    aria-label="Change data folder"
+                                >
+                                    <mat-icon class="icon-size-5" svgIcon="heroicons_outline:folder-open"></mat-icon>
+                                </button>
+                            }
                             <button
                                 mat-icon-button
                                 [matMenuTriggerFor]="rowMenu"
@@ -170,6 +193,12 @@
                                     <mat-icon svgIcon="heroicons_outline:eye-slash"></mat-icon>
                                     <span>Unload (keep files)</span>
                                 </button>
+                                @if (canDetach(s)) {
+                                    <button mat-menu-item data-testid="detach-space" (click)="detach(s)">
+                                        <mat-icon svgIcon="heroicons_outline:scissors"></mat-icon>
+                                        <span>Detach (keep folders)</span>
+                                    </button>
+                                }
                                 <button mat-menu-item (click)="remove(s, true)">
                                     <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
                                     <span>Delete &amp; purge files</span>
@@ -177,6 +206,19 @@
                             </mat-menu>
                         </div>
                     </div>
+                    <!-- SPACE-LOCATIONS-1 D8: the server sends where a Space lives to administrators only; full card width, so a long path wraps by segment, not by letter -->
+                    @if (lens.canAdminister() && s.location; as loc) {
+                        <dl class="mt-3 flex flex-col gap-1 border-t pt-3 text-xs" data-testid="space-location">
+                            <div>
+                                <dt class="text-secondary">Space folder</dt>
+                                <dd class="m-0 font-mono [overflow-wrap:anywhere]">{{ loc.spaceFolder || '—' }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-secondary">Data folder</dt>
+                                <dd class="m-0 font-mono [overflow-wrap:anywhere]">{{ loc.dataFolder || '—' }}</dd>
+                            </div>
+                        </dl>
+                    }
 
                     <!-- Data sources -->
                     @if (expanded[s.id]) {

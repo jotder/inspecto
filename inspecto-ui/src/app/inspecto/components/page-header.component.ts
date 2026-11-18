@@ -135,7 +135,7 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
                             </button>
                         }
                     </div>
-                    <div class="flex shrink-0 items-center gap-2 pt-0.5">
+                    <div class="flex min-w-0 flex-wrap items-center justify-end gap-2 pt-0.5">
                         <ng-container *ngTemplateOutlet="actionsTpl"></ng-container>
                     </div>
                 </div>

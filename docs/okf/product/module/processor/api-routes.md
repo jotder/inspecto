@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-388 route(s) registered; 388 in the OpenAPI contract, 0 not.
+392 route(s) registered; 392 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -383,9 +383,13 @@ tags: [api, routes, generated]
 | POST | `/space-comparisons` | Compare the storage growth of two or more hosted Spaces | space-comparisons | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceComparisonRoutes.java` |
 | GET | `/spaces` | List hosted Spaces | Platform & Spaces | — | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java` |
 | POST | `/spaces` | Create a Space, optionally seeded from a Space Template | spaces | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java` |
+| POST | `/spaces/_locations/check` | Check a Space folder or data folder | spaces | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java` |
 | GET | `/spaces/_meta` | Multi-Space capability probe | spaces | — | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java` |
 | DELETE | `/spaces/{spaceId}` | Deregister a Space | spaces | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java` |
 | PUT | `/spaces/{spaceId}` | Rename or re-describe a Space | spaces | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java` |
+| PUT | `/spaces/{spaceId}/data-root` | Change the data folder of a Space that holds no data | spaces | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java` |
+| POST | `/spaces/{spaceId}/detach` | Detach a Space kept outside the Spaces root | spaces | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java` |
+| POST | `/spaces/attach` | Attach a Space folder kept outside the Spaces root | spaces | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java` |
 | POST | `/spaces/import` | Create a Space from a bundle zip | spaces | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java` |
 | GET | `/spaces/templates` | List shipped Space Templates | spaces | — | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java` |
 | GET | `/status` | Status snapshot report | status | — | `inspecto/src/main/java/com/gamma/control/RunRoutes.java` |

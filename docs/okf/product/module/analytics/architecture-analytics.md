@@ -103,6 +103,24 @@ Callers found in the code (`grep com.gamma.analytics`):
 - **[Link Analysis](../la-core/architecture-la-core.md):** `ColumnProfile`, `DatasetLinkStats`, `LinkTemporalDetector`.
 - **[Graph library](../graph/architecture-graph.md):** the temporal motif matcher lives there, not here.
 
+### From ingest to KPI and Report
+
+![From ingest to KPI and Report](../../assets/analytics-kpi-report-flow.svg)
+
+The kernel computes values; it does not schedule or present them. Pipeline Steps (`transform.profile`,
+`transform.timeseries.*`, `transform.cohort.*`, `transform.similarity`) call it and write the results into
+Datasets and Derived Tables. The SQL path (`SqlBuilder`, `SqlViews`, `SqlGuard`) turns those into Queries,
+Measures, Widgets and Dashboards. Jobs decide when work runs: `PIPELINE` and `ENRICH` re-run Pipelines over data at
+rest, `kpi.completeness` computes the completeness KPI, and Jobs reach the kernel directly only through the
+read-only Platform Service `analytics` (statistics, profiler SQL, time grain; no forecasts or baselines). The
+`REPORT` Job runs a Dashboard's Widget queries on a cron schedule, renders CSV, PDF or PNG, and emits
+`REPORT_READY`.
+
+A `kpi` component (`KpiDefinition`) is evaluated on demand by `KpiEvaluator` (`GET /kpis/{id}/value`): the
+Measure over the period to date, the previous period, the target and the RAG bands. ⚠ Nothing stores a KPI's
+values over time, so there is no KPI history to chart or forecast, and an Alert Rule watches a Dataset Measure,
+not a KPI id. The `*_meta.toon` KPI catalog (`SemanticModel`) only describes KPIs; it is not evaluated.
+
 ## 9. Limits and gotchas
 
 - `DISCRETE` and `NEAREST_RANK` pick the same rank written two ways; both stay so existing figures
