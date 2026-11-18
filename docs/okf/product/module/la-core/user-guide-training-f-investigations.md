@@ -403,37 +403,37 @@ timestamp: 2026-11-16T00:00:00Z
 
 ## F5_Teams-members-four-eyes-reviewers-and-outsiders
 
-> **F5 · Teams: members, four-eyes, reviewers and outsiders** · Standard · Telecom Space · the SIM-swap takeover · 7 min ·
+> **F5 · Teams: members, four-eyes, reviewers and outsiders** · Standard · Utilities Space · the meter tampering · 7 min ·
 > user guide §11.4, §11.5, §14
 
 - **Objectives:** grant and revoke a member and say what each role may do; recognise an expand held for a second person
   and approve or deny it as that person; read an Investigation as a reviewer; say what an outsider sees and why.
-- **Before:** a fresh unzip of `la-standard.zip`, the Telecom Space, the seeded Investigation *SIM-swap wallet takeover*
-  (`tools/seed-la-mfs.mjs`: members analyst and admin as leads, reviewer and manager as reviewers; one unbounded expand by
+- **Before:** a fresh unzip of `la-standard.zip`, the Utilities Space, the seeded Investigation *Meter tampering after one contractor's visits*
+  (`tools/seed-la-utility.mjs`: members analyst and admin as leads, reviewer and manager as reviewers; one unbounded expand by
   the analyst, held for a second person). Sign in as Demo Analyst first; the episode signs in as Demo Manager, Demo
   Reviewer and Demo Outsider in turn (user menu ▸ sign out, off camera between scenes).
 - **Covers (plan §5):** 5.1 user menu, sign-in as each Demo User; 5.3 Members (Grant, Revoke, roles lead / analyst /
   reviewer), the held line, *N to approve*, Approve, Deny (Reason, Deny request), Oversight and approvals; Read-only
   banner; 5.5 Settings ▸ Investigation access.
-- **Try it:** sign in as Demo Reviewer and open *SIM-swap wallet takeover*. Name two things you can still do, and the
+- **Try it:** sign in as Demo Reviewer and open *Meter tampering after one contractor's visits*. Name two things you can still do, and the
   sentence that says why Expand is missing. *Answer: read it, Replay it, build and verify a Dossier; the Read-only banner
   says Changing an Investigation needs the Manage Incidents and Cases permission.*
 - **Check:** who may approve a held expand? *Answer: someone other than the person who asked, holding Approve link
   expansions; where the Investigation has members, only a lead or a reviewer.*
 - **Gotchas:** without sign-in (Basic) nobody can approve, so four-eyes is Standard and up. The Space's four-eyes limit
-  is 2,000 neighbours of each entity (`four_eyes_fan_out_above` in Telecom's `link-analysis.toon`); the seeded request
-  asks for every neighbour, so it is held. The Telecom Space also holds a second Investigation with its own held
+  is 2,000 neighbours of each entity (`four_eyes_fan_out_above` in Utilities's `link-analysis.toon`); the seeded request
+  asks for every neighbour, so it is held. The Utilities Space also holds a second Investigation with its own held
   request: open the right one. Approving runs the expand for real: record S07 last of the manager's scenes.
 
 ### S01 · Investigations are team work
-- Voice: This is Inspecto LA training, episode F5: teams. An Investigation is rarely one person's work. Someone leads it, someone checks it, and some steps are too big to take alone. In this episode you will see who is on an Investigation and what each role may do, add and remove a member, ask for a large expand that waits for a second person, approve it as that person, and see the same Investigation through the eyes of a reviewer and of someone who is not on it at all. We are in the Standard edition, in the Telecom Space.
+- Voice: This is Inspecto LA training, episode F5: teams. An Investigation is rarely one person's work. Someone leads it, someone checks it, and some steps are too big to take alone. In this episode you will see who is on an Investigation and what each role may do, add and remove a member, ask for a large expand that waits for a second person, approve it as that person, and see the same Investigation through the eyes of a reviewer and of someone who is not on it at all. We are in the Standard edition, in the Utilities Space.
 - Action: intro card.
 - Impact: none.
 
 ### S02 · Who is on it
-- Voice: Signed in as the analyst, open the Investigation SIM-swap wallet takeover: one call-centre login, S-41, and the numbers it swapped. Open the Investigation actions menu and choose Members. Four people, each with a role. A lead changes the Investigation and decides who is on it. An analyst works on it. A reviewer reads it, and may decide approvals. The analyst opened it, so the analyst is its owner. The manager is here as a reviewer: that is the second pair of eyes.
+- Voice: Signed in as the analyst, open the Investigation Meter tampering after one contractor's visits: two transformers, one contractor, and the premises between them. Open the Investigation actions menu and choose Members. Four people, each with a role. A lead changes the Investigation and decides who is on it. An analyst works on it. A reviewer reads it, and may decide approvals. The analyst opened it, so the analyst is its owner. The manager is here as a reviewer: that is the second pair of eyes.
 - Chip: Investigation actions · Members…
-- Action: File ▸ Open… ▸ Investigations ▸ *SIM-swap wallet takeover* ▸ ⋯ Investigation actions ▸ Members. [check in UI: the four rows analyst lead (owner, you), admin lead, reviewer reviewer, manager reviewer]
+- Action: File ▸ Open… ▸ Investigations ▸ *Meter tampering after one contractor's visits* ▸ ⋯ Investigation actions ▸ Members. [check in UI: the four rows analyst lead (owner, you), admin lead, reviewer reviewer, manager reviewer]
 - Impact: mark each role badge as the voice names it.
 
 ### S03 · Grant and revoke
@@ -451,13 +451,13 @@ timestamp: 2026-11-16T00:00:00Z
 ### S05 · Who can open your Investigations
 - Voice: One page answers who can open your work, across every Investigation you can open. Go to Settings, and under My settings choose Investigation access. Each Investigation has a card: your role on it, its members, and any live link that shows it outside. Where you lead, a Revoke button sits beside each member and each link. It is the place to check, before a holiday or a handover.
 - Chip: Settings · Investigation access
-- Action: rail ▸ Settings ▸ My settings ▸ Investigation access ▸ scroll to *SIM-swap wallet takeover*. [check in UI: the card shows *You: lead*, the four members and *Live embed links: None.*]
+- Action: rail ▸ Settings ▸ My settings ▸ Investigation access ▸ scroll to *Meter tampering after one contractor's visits*. [check in UI: the card shows *You: lead*, the four members and *Live embed links: None.*]
 - Impact: mark the *You: lead* chip and the member rows.
 
 ### S06 · The approver's view
 - Voice: Now sign out, and sign in as the manager. Open the same Investigation. Under the Dataset line, a badge says one to approve. The banner says what the manager may do here: read it and decide approvals; only a lead changes its steps. And where the analyst saw a waiting line, the manager sees the decision. It names who asks, and says in plain words what the expand would do: add every neighbour of each entity, more than the two thousand allowed without a second approval. Two buttons: Approve and Deny.
 - Chip: 1 to approve · Approve · Deny
-- Action: user menu ▸ sign out ▸ Demo Manager ▸ File ▸ Open… ▸ *SIM-swap wallet takeover* ▸ click *1 to approve*. [check in UI: the approver line's exact sentence, and that the banner reads *You review this Investigation: you can read it and decide approvals; only a lead changes its steps.*]
+- Action: user menu ▸ sign out ▸ Demo Manager ▸ File ▸ Open… ▸ *Meter tampering after one contractor's visits* ▸ click *1 to approve*. [check in UI: the approver line's exact sentence, and that the banner reads *You review this Investigation: you can read it and decide approvals; only a lead changes its steps.*]
 - Impact: mark the badge, the banner and the approver line.
 
 ### S07 · Approve, or deny with a reason
@@ -481,11 +481,11 @@ timestamp: 2026-11-16T00:00:00Z
 ### S10 · The outsider's view
 - Voice: Last, the outsider: signed in, but admitted to no Space. The home page says so in one sentence: you have no access to any Space; ask your administrator. No Space is listed, and a link into this one answers as if it did not exist, so an outsider cannot even learn that the Investigation exists. To let them in, an administrator gives them a role this Space defines; a lead then grants them a role in the Investigation, as you saw at the start.
 - Chip: No access
-- Action: sign out ▸ Demo Outsider ▸ hold on the home page ▸ open `/link-analysis?investigation=sim-swap-takeover` in the address bar. [check in UI: the home page shows *You have no access to any Space*]
+- Action: sign out ▸ Demo Outsider ▸ hold on the home page ▸ open `/link-analysis?investigation=tampering-case` in the address bar. [check in UI: the home page shows *You have no access to any Space*]
 - Impact: mark the sentence.
 
 ### S11 · Try it
-- Voice: So: leads change, analysts work, reviewers read and decide, and outsiders are not told. Large expands wait for a second person, and every decision is recorded. Your turn. Sign in as the reviewer, and open SIM-swap wallet takeover. Name two things you can still do, and the sentence that tells you why Expand is missing. The answer is in the description. Next, in F6, Drafts: working on a side line in parallel.
+- Voice: So: leads change, analysts work, reviewers read and decide, and outsiders are not told. Large expands wait for a second person, and every decision is recorded. Your turn. Sign in as the reviewer, and open Meter tampering after one contractor's visits. Name two things you can still do, and the sentence that tells you why Expand is missing. The answer is in the description. Next, in F6, Drafts: working on a side line in parallel.
 - Action: outro card: *Try it* and *Next: F6 · Drafts*.
 - Impact: none.
 
@@ -531,19 +531,19 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the Draft row, then the Working Set line, then the conflicts line.
 
 ### S04 · Work on the Draft
-- Voice: Press Work on this Draft, and close the settings. A banner now sits at the top of the Investigation tab: working on a Draft. Steps and Undo go to the Draft, not to the Investigation. Select EMP-0482, and in the Expand filter choose the one kind of link that matters here: who changed which supplier. Press Expand. The supplier VEN-0264 arrives, on the Draft only.
+- Voice: Press Work on this Draft, and close the settings. A banner now sits at the top of the Investigation tab: working on a Draft. Steps and Undo go to the Draft, not to the Investigation. Select EMP-0482, and the Selected entity section shows its note, recorded on the Draft. An expand from here would go to the Draft only, and a large one would wait for a second person, as on the main log. We do not expand in this episode, so the Draft keeps its single step.
 - Chip: Work on this Draft · Working on a Draft
 - Action: Drafts ▸ Work on this Draft ▸ close Settings ▸ zoom on the banner ▸ click EMP-0482 ▸ Expand filter ▸ Link kinds: only `changed_vendor` ▸ Expand. [check in UI: the link kind's label in the filter; that VEN-0264 arrives]
 - Impact: mark the banner; before/after hold: VEN-0264 joins the canvas.
 
 ### S05 · The Investigation did not move
-- Voice: Now go back. In Drafts, press Back to the Investigation. The supplier is gone from the canvas, and the step log is exactly as it was. That is the promise of a Draft: you can explore freely, and nothing reaches the record until you decide it should. While you are on a Draft, two things are off on purpose. Re-order is not available, and Replay cannot compare a Draft with current data: both are about the record itself.
+- Voice: Now go back. In Drafts, press Back to the Investigation. The banner goes, and the canvas and the step log are exactly as they were. That is the promise of a Draft: you can explore freely, and nothing reaches the record until you decide it should. While you are on a Draft, two things are off on purpose. Re-order is not available, and Replay cannot compare a Draft with current data: both are about the record itself.
 - Chip: Back to the Investigation
 - Action: Settings ▸ Investigation settings ▸ Drafts ▸ Back to the Investigation ▸ close ▸ dock ▸ Step log.
 - Impact: before/after hold: VEN-0264 leaves; mark the unchanged last row of the Step log.
 
 ### S06 · Meanwhile, the main log moves on
-- Voice: In real work, the Investigation does not wait for you. Someone records another step on the main log. Here we do it ourselves: select EMP-0007 and press K, to keep the manager safe from any later exclusion. That is a step on the main log. Open Drafts again: the Draft now says main moved one step. It was forked from an older point of the record.
+- Voice: In real work, the Investigation does not wait for you. Someone records another step on the main log. Here we do it ourselves: select another of the reports, EMP-2278, and press K, to keep it safe from any later exclusion. That is a step on the main log. Open Drafts again: the Draft now says main moved one step. It was forked from an older point of the record.
 - Chip: Keep · K · main moved
 - Action: click EMP-0007 ▸ K ▸ Settings ▸ Investigation settings ▸ Drafts. [check in UI: the badge reads *main moved 1 step*]
 - Impact: mark the Keep row in the log; then the *main moved 1 step* badge.
@@ -555,13 +555,13 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the conflicts report, then the notice.
 
 ### S08 · Promote
-- Voice: Now decide. Press Promote. Promoted: the Draft's steps are now in the Investigation. The supplier appears on the main canvas, and the step log has the note and the expand, recorded with your name, after the keep. If a Draft contained a large expand, above the Space's four-eyes limit, the promote would not apply anything: it would wait for a second person, exactly like an expand on the main log.
+- Voice: Now decide. Press Promote. Promoted: the Draft's steps are now in the Investigation. The note on EMP-0482 is in the step log, recorded with your name, after the keep. If a Draft contained a large expand, above the Space's four-eyes limit, the promote would not apply anything: it would wait for a second person, exactly like an expand on the main log.
 - Chip: Promote
 - Action: Promote ▸ hold ▸ close ▸ dock ▸ Step log. [check in UI: the notice *Promoted — the Draft’s steps are now in the Investigation.*; if the expand is held instead, reword the first two sentences to the held notice]
 - Impact: before/after hold: VEN-0264 joins the main canvas; mark the promoted rows.
 
 ### S09 · Discard, and the limits
-- Voice: A hunch that leads nowhere is discarded. Discard asks first, and means it: the Draft's steps are dropped, they are not promoted, and this cannot be undone. A few limits keep Drafts tidy. One live Draft per person on an Investigation. A Draft left alone goes to sleep, and after some days it expires; the panel warns you with expires soon. And a reviewer's role cannot change Drafts at all.
+- Voice: A hunch that leads nowhere is discarded. To see how, fork a new Draft: type a name, cash out, and press Fork a Draft. Now press Discard. It asks first, and means it: the Draft's steps are dropped, they are not promoted, and this cannot be undone. Confirm, and the Draft is gone, and the Investigation never knew it. A few limits keep Drafts tidy. One live Draft per person on an Investigation. A Draft left alone goes to sleep, and after some days it expires. And a reviewer's role cannot change Drafts at all.
 - Chip: Discard · Fork a Draft
 - Action: point at Discard on a Draft row (do not confirm) ▸ point at Name this Draft (optional) and Fork a Draft. [check in UI: the Discard dialog's sentence, opened and cancelled]
 - Impact: mark the dialog's last sentence, then the Fork a Draft button.
@@ -648,13 +648,13 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark row 7; mark the group and its Retract button.
 
 ### S09 · Why the canvas will not merge these
-- Voice: The quickest way to merge is on the canvas: select two entities, and press Merge identities on the canvas toolbar. Try it on two wallets here. It is greyed, and the tooltip says why: a masked entity cannot be merged, only its alias is visible, and an identity needs the real value. Even after a reveal, the graph holds aliases. In a Space that masks, the merge is made in the Identities form, by someone who knows the real values.
+- Voice: The quickest way to merge is on the canvas: select two entities, and press Merge identities on the canvas toolbar. On a masked wallet it stays greyed, and the tooltip says why: a masked entity cannot be merged, only its alias is visible, and an identity needs the real value. Even after a reveal, the graph holds aliases. In a Space that masks, the merge is made in the Identities form, by someone who knows the real values.
 - Chip: Merge identities…
 - Action: Shift+click two wallet nodes ▸ hover Merge identities… on the canvas toolbar. [check in UI: the tooltip *A masked entity cannot be merged: only its alias is visible, and an identity needs the real value.*]
 - Impact: mark the greyed button and its tooltip.
 
 ### S10 · Assert, then show it
-- Voice: In Identities, fill in Assert same entity. First identifier type, wallet, and the value FARM-1. Second identifier type, wallet, and FARM-3. The reason: same handset, DEV-FARM-01. Press Assert same entity. The group now holds three identifiers. Because an Investigation is open, the form asks whether to show this merge there. Press Add a resolve step. It is sealed as a step. These farm wallets are not on this graph, so nothing moves on screen now; on any later step that brings them in, the three draw as one. And it is reversible: retract the assertion, and the group splits.
+- Voice: That form is Assert same entity. You choose the first identifier type, wallet, and give its value, then the second type and value, and a reason, such as same handset. Pressing Assert records that the two are one entity, and the group then holds every identifier that shares a member. Because an Investigation is open, the form then asks whether to show the merge there, and Add a resolve step seals it as a step. And it is reversible: retract the assertion, and the group splits. We do not press it here, so the seeded group stays as it is.
 - Chip: Assert same entity · Add a resolve step
 - Action: Settings ▸ Identities ▸ First identifier type `wallet`, First identifier `FARM-1`, Second identifier type `wallet`, Second identifier `FARM-3`, Reason `same handset DEV-FARM-01` ▸ Assert same entity ▸ Add a resolve step ▸ dock ▸ Step log. [check in UI: the notice *Sealed a resolve step: the Investigation now shows the merged identities.* and a new *Resolve identities* row]
 - Impact: mark the group (3 identifiers), the notice and the new log row.
@@ -793,55 +793,55 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the strip, then the two template buttons.
 
 ### S03 · Watch a Measure
-- Voice: Each Measure has a Watch button. Press Watch on Entities. The dialog proposes a name, and asks when to fire: greater than, at least, less than, at most a threshold. Set greater than, and a threshold just above today's value, so the rule fires if the Working Set grows. Severity: Info, Warning, or Critical, which also opens an Incident when it fires. Choose Warning, and press Create Alert Rule. Armed, and it says whether it would fire now, and what a fired Alert discloses: the Investigation, never the entities.
+- Voice: Each Measure has a Watch button. Press Watch on Entities. The dialog proposes a name, and asks when to fire: greater than, at least, less than, at most a threshold. Keep greater than, and set the threshold to eighteen, one above today's seventeen, so the rule fires if the Working Set grows. Severity: Info, Warning, or Critical, which also opens an Incident when it fires. Warning is chosen. Press Create Alert Rule. The rule is armed, and a fired Alert discloses the Investigation, never the entities.
 - Chip: Watch · Create Alert Rule
 - Action: Watch on Entities ▸ Fire when the value is: greater than ▸ Threshold: the current value ▸ Severity: Warning ▸ Create Alert Rule ▸ hold ▸ Done. [check in UI: *Alert Rule armed* with *it would not fire now*, and the disclosure sentence]
 - Impact: mark the severity hint *Also opens an Incident when it fires.*; then *Alert Rule armed*.
 
 ### S04 · Watching live data
-- Voice: That rule watches the sealed Working Set. To watch the live data, use a value Measure. In the toolbox, Whole Dataset, under What looks unusual, open Value Measures. Bound to this Investigation is the rule that found this funnel: cash-ins just under the five thousand limit, many of them, from many payers. Its standing detection is enabled: a scheduled sweep reads the Dataset with the owner's access, counts only, and stops on record if that access changes. Only the Investigation's owner can enable it. Watch this Measure arms a new one the same way.
+- Voice: That rule watches the sealed Working Set. To watch the live data, use a value Measure. In the toolbox, Whole Dataset, under What looks unusual, open Value Measures. It reads the whole Dataset for a window of up to thirty-one days, not the graph on screen. The rule bound to this Investigation, mm-structuring, is one that watches the live data: cash-ins just under the five thousand limit, many of them, from many payers. A scheduled sweep reads the Dataset with the owner's access, counts only, and stops on record if that access changes. Only the Investigation's owner can enable it.
 - Chip: Value Measures · Standing detection
 - Action: toolbox ▸ Whole Dataset ▸ *What looks unusual?* ▸ Value Measures ▸ Bound Alert Rules ▸ Standing detection ▸ point at Watch this Measure. [check in UI: *mm-structuring — CRITICAL (value Measure over the live Dataset)* and *Status: Enabled.*]
 - Impact: mark the bound rule, its status, and the Watch this Measure button.
 
 ### S05 · The Alerts page
-- Voice: That rule has fired. In the rail, open Alerts. Each fired Alert is a row: the rule, its severity, when, and its state. What happened explains it. Acknowledge says you have seen it and are on it; Resolve closes it. Press Acknowledge: the state changes at once. Someone allowed to run operations also sees Evaluate now, to check every rule without waiting for the schedule. Below the Alerts are the Alert Rules themselves, including the one you just armed.
+- Voice: That rule has fired, many times. In the rail, open Alerts. Each fired Alert is a row: when, the severity, the Alert Rule, what it watches, and its value. On each row, two actions: What happened, which explains it when the intelligence module is installed, and Open Investigation. Here the module is not installed, so the dialog says so, once, in words. Below the Alerts are the Alert Rules themselves: Mm structuring, Critical, at least one.
 - Chip: Alerts · Acknowledge · Resolve
 - Action: rail ▸ Alerts ▸ the *mm-structuring* row ▸ What happened ▸ close ▸ Acknowledge ▸ scroll to Alert Rules. [check in UI: the row's columns and that Evaluate now is absent for Demo Analyst]
 - Impact: before/after hold: the state OPEN → ACKNOWLEDGED; mark the new rule under Alert Rules.
 
 ### S06 · Back to the Investigation
-- Voice: A fired Alert names the Investigation, not the entities. To see who breached, press Open Investigation on its row. It opens here, where your access and the masking apply, so an Alert never shows more than you may see. When the work is done, come back and press Resolve.
+- Voice: A fired Alert names the Investigation, not the entities. To see who breached, press Open Investigation on its row, the second action. It opens here, where your access and the masking apply, so an Alert never shows more than you may see.
 - Chip: Open Investigation
 - Action: Alerts ▸ the row ▸ Open Investigation ▸ hold ▸ back ▸ Resolve. [check in UI: the action's hint *Open Investigation mm-structuring-case — it lists the breaching entities*]
 - Impact: mark the Investigation opening; then the state RESOLVED.
 
 ### S07 · Attach to a Case
-- Voice: A finding someone else must act on goes to a Case. On the canvas toolbar, press Attach to Case. It seals what is on screen as a snapshot with a fingerprint, and attaches it to a Case, in one step. Give the snapshot a title, choose an existing Case, Structuring through HUB-01, and press Seal and attach. A new Case from the selected nodes is greyed here, and says why: these wallets are masked, and a Case needs real identifiers.
+- Voice: A finding someone else must act on goes to a Case. On the canvas toolbar, press Attach to Case. It seals what is on screen as a snapshot with a fingerprint, and attaches it to a Case, in one step. The dialog proposes a title, and offers an existing Case, or a new Case from the selected nodes. That one is greyed here, and says why: these wallets are masked, and a Case needs real identifiers, so you link the Investigation to the existing Case instead. We do not seal anything in this lesson.
 - Chip: Attach to Case · Seal and attach
 - Action: canvas toolbar ▸ Attach to Case ▸ Snapshot title `funnel at step 8` ▸ An existing Case ▸ pick *Structuring through HUB-01* ▸ point at the greyed *A new Case, from the selected nodes* and its reason ▸ Seal and attach. [check in UI: the reason sentence, and the toast *Sealed “funnel at step 8” (…) and attached it to …*]
 - Impact: mark the reason; then the toast.
 
 ### S08 · The Case, from both sides
-- Voice: From the Investigation's side: Investigation settings, Case. It is linked to that Case, so the Case's owner and assignee can read this Investigation until the Case closes, and only you can change it. From the entity's side: open the hub's details and unfold Case history. Every Incident and Case that names this entity is listed, newest first, and Show filters all, open or closed.
+- Voice: From the Investigation's side: Investigation settings, Case. It is linked to that Case, so the Case's owner and assignee can read this Investigation, and only its leads change it. From the entity's side: open the hub's details and unfold Case history. Every Incident and Case that names this entity is listed, newest first, with how it got here: via this Investigation. Show filters all, open or closed.
 - Chip: Case · Case history
 - Action: Settings ▸ Investigation settings ▸ Case ▸ close ▸ click the hub twice ▸ Case history ▸ Show: open. [check in UI: *Linked to Case …* and the Case listed under the hub's alias]
 - Impact: mark *Linked to Case*; then the Case history row.
 
 ### S09 · Pin to a Widget
-- Voice: A manager may want this funnel on a dashboard. Investigation settings, Pin to a Widget. Name it, choose what to show, the entities, the links, or the exclusions, and choose Frozen, as it is now, or Live, which follows the Investigation. Press Save Widget. It goes to the Widget library, ready to add to a dashboard. Only people who can read the Investigation see its rows; anyone else sees that it is not available to them.
+- Voice: A manager may want this funnel on a dashboard. Where the host has a Widget library, Investigation settings offers Pin to a Widget: name it, choose what to show, entities, links or exclusions, Frozen as it is now or Live, which follows the Investigation, and Save Widget. This install has no Widget library, so the fold is not shown. The Widget is added to a dashboard in the Inspecto console, which this app does not show.
 - Chip: Pin to a Widget · Frozen · Live
 - Action: Settings ▸ Investigation settings ▸ Pin to a Widget ▸ Widget name `mm-funnel-entities` ▸ Show: Entities ▸ Frozen ▸ Save Widget. [check in UI: the fold is shown in this app; the notice *Widget saved*]
 - Impact: mark the notice.
 
 ### S10 · Share a read-only link
-- Voice: Someone without an account can be given a read-only, sealed view. Investigation settings, Share and embed. As the analyst, it says: only a lead with Investigation sharing can create embed links. The administrator has that right, so we switch. Press Create link: a label, what the link shows, its masking, which can be stricter than the Space and never looser, and a lifetime. Create link. The link is shown once: copy it now. Each link lists its status, expiry and views, and Revoke cuts it off at once.
+- Voice: Someone without an account can be given a read-only, sealed view. Investigation settings, Share and embed. On this server embed links are turned off, and the panel says so in one sentence: ask an administrator. Where they are on, a lead with Investigation sharing creates a link with a label, what it shows, its masking, which can be stricter than the Space and never looser, and a lifetime. The link is shown once, so you copy it then, and Revoke cuts it off at once.
 - Chip: Share and embed · Create link · Revoke
 - Action: Share and embed (as Demo Analyst, hold on the sentence) ▸ sign out ▸ Demo Admin ▸ the same Investigation ▸ Share and embed ▸ Create link ▸ Label `auditor` ▸ What the link shows: *Entities and links only* ▸ Lifetime (hours) `24` ▸ Create link ▸ Copy ▸ Done ▸ Revoke. [check in UI: whether embed links are on in this build; if the panel says *Embed links are turned off. Ask an administrator.*, the voice says so instead of the minting]
 - Impact: mark *Copy now: it is not shown again.*; then the link row and its Revoke.
 
 ### S11 · A link from another system
-- Voice: Last, the other direction: a case manager or a fraud product links straight into Inspecto LA. The link opens the Open in Inspecto LA page. It checks the link first, and never moves on by itself. It names the Investigation, and the entity by its alias, because a masked value never travels in an address. Choose Open the Investigation, or Open the Entity. Someone allowed to reveal also sees Reveal the value: it asks the server once, records it, and keeps the value on this page. A broken link gets one sentence saying what is wrong.
+- Voice: Last, the other direction: a case manager or a fraud product links straight into Inspecto LA. The link opens the Open in Inspecto LA page. It checks the link first, and never moves on by itself. It names the Investigation, and the entity by its alias, because a masked value never travels in an address. A broken link, such as an entity without its type, gets one sentence saying what is wrong.
 - Chip: Open in Inspecto LA
 - Action: address bar `/open?investigation=mm-structuring-case&entity=wallet:<the hub's alias>` ▸ hold ▸ Reveal the value ▸ hold ▸ address bar `/open?entity=HUB-01` ▸ hold. [check in UI: the Entity line *wallet: masked:… masked, shown by its alias*; the broken link's sentence *The entity in this link is not in the form “<type>:<key>” …*]
 - Impact: mark the page's three buttons; the revealed value; then the error box *This link cannot be opened*.
