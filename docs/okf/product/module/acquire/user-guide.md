@@ -44,7 +44,7 @@ The route, folder and service had already moved; the old screen doc had not — 
 
 ## Configuring a Collector — the one surface
 
-One surface authors a pipeline's `collector:` block: the [pipeline editor](../etl/user-guide.md)'s
+One surface authors a pipeline's `collector:` block: the [pipeline editor](../elt/user-guide.md)'s
 **`acquisition`** Step definition drawer (also reached through guided mode's Collect chip — the
 onboarding stage-rail shell that used to host a second screen was deleted 2026-08-16, see
 [Onboarding](../../layer/product/user-guide-onboarding.md)).
@@ -94,7 +94,7 @@ persisted shapes genuinely differ: a `collector:` block vs. a node's raw config 
 *(UI-S7, 2026-08-28.)* The third mode authors the **dataset entry** the engine shipped in ELT Phase 3 S3c-2: `collector:
 {connector: dataset, dataset: <id>}`, resolved to the producer's snapshot dir fresh at every acquire
 cycle by the `dataset` connector scheme, which copies new parquet snapshots into this pipeline's
-inbox. See [Pipelines](../etl/user-guide.md) and the [`dataset` scheme](spec.md#the-connector-spi-and-the-resolvable-schemes).
+inbox. See [Pipelines](../elt/user-guide.md) and the [`dataset` scheme](spec.md#the-connector-spi-and-the-resolvable-schemes).
 
 - The mode owns its field the same way Connection does: `dataset` is asked **only** in Dataset mode,
   `connection` only in Connection mode, and `connector` stays **derived** (Dataset mode ⇒ `dataset`).

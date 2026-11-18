@@ -20,7 +20,7 @@ Mobile-money revenue assurance, fraud and operations teams.
 
 ## Key capabilities
 
-- 5 Pipelines with Schemas — [etl](../../module/etl/index.md)
+- 5 Pipelines with Schemas — [etl](../../module/elt/index.md)
 - 2 Reconciliations: wallet vs bank float, wallet vs partner settlement — [reconciliation](../../module/reconciliation/index.md)
 - 7 daily detection Jobs: commission over/under-pay, fee mis-charge, agent split transactions, agent round-tripping, dormant-wallet reactivation, KYC tier-limit breach, wallet-vs-core provisioning mismatch
 - 7 per-entity Alert Rules keyed on the offending agent or wallet — [incidents](../../addon/incidents/index.md)

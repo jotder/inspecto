@@ -66,4 +66,4 @@ wiring editor nor a storage unification. Adoption (D0→P4) completed 2026-06-28
 `docs/archived-documents/plans-archive/component-model.md` and its adoption plan, not maintained.)*
 
 The UI counterparts are the [components](../../layer/product/spec-components.md) and
-[Pipelines](../etl/user-guide.md) features in the frontend bundle.
+[Pipelines](../elt/user-guide.md) features in the frontend bundle.

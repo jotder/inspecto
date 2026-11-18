@@ -3,7 +3,7 @@ name: pipeline-author
 description: >
   Author or modify an Inspecto Pipeline (TOON config): new pipeline, new step/transform, Collector
   wiring, schema/grammar, sinks. Trigger on "create/edit a pipeline", "add a step", "wire a collector",
-  "why is my pipeline config refused". Routes through the module.etl / module.engine / module.config /
+  "why is my pipeline config refused". Routes through the module.elt / module.engine / module.config /
   module.acquire hubs, encodes the config-safety (SaveGate) rules and the validate → dry-run loop.
 ---
 
@@ -16,8 +16,8 @@ Vocabulary (`docs/GLOSSARY.md`): **Pipeline**, **Collector** (acquisition entity
 
 | Need | Hub / slot file |
 |---|---|
-| Pipeline model, editor, steps | `module/etl/architecture.md`, `module/etl/spec-step-catalog.md`, `module/etl/user-guide.md`, `module/etl/user-guide.md` |
-| Parsing / schema mapping / enrichment | `module/etl/architecture.md`, `module/etl/user-guide.md`, `module/etl/user-guide.md` |
+| Pipeline model, editor, steps | `module/elt/architecture.md`, `module/elt/spec-step-catalog.md`, `module/elt/user-guide.md`, `module/elt/user-guide.md` |
+| Parsing / schema mapping / enrichment | `module/elt/architecture.md`, `module/elt/user-guide.md`, `module/elt/user-guide.md` |
 | Execution: graph, node types, lanes | `module/engine/architecture.md`, `module/engine/spec-pipeline-model.md`, `module/engine/spec-pipeline-execution.md` |
 | Test run / dry run | `module/engine/spec-pipeline-execution.md` |
 | Sinks, grammar, parser options | `module/engine/spec-sinks.md`, `module/engine/spec-parsing.md`, `module/engine/spec-parsing.md` |

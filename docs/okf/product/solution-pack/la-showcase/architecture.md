@@ -100,7 +100,7 @@ home; `tools/seed-la-showcase.mjs` and `tools/seed-la-mm.mjs` create them agains
 - [Link Analysis](../../module/la-core/architecture.md) — index, views, Investigations,
   four-eyes, masking, standing detection.
 - [Graph library](../../module/graph/architecture.md) — cycles, paths, pattern packs.
-- [Pipelines and Steps](../../module/etl/architecture.md),
+- [Pipelines and Steps](../../module/elt/architecture.md),
   [Jobs and scheduler](../../module/processor/architecture.md).
 - [Identity and access](../../module/access/architecture.md) — roles, reveal.
 - [Maker-checker](../../module/workflow/architecture.md) — the second approver.

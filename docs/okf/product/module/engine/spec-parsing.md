@@ -24,7 +24,7 @@ framework that lets a new format be deployed and configured with no UI change.
 > How the parsed rows are written (the ingest SPI, union/generation modes, segments) is
 > [spec-ingest.md](spec-ingest.md). Authoring Grammars in the UI is
 > [grammar-config](../config/user-guide-grammar-config.md); the requirement of record is the ING
-> capability spec in [the etl plan](../etl/plan.md) (§3.3, §3.9).
+> capability spec in [the etl plan](../elt/plan.md) (§3.3, §3.9).
 
 **Status legend** used throughout:
 `[LIVE]` = exposed by the engine today · `[NATIVE]` = DuckDB can do it, engine doesn't surface it
@@ -844,7 +844,7 @@ them.
 ### UI adoption
 
 The authoring screens are described in [grammar-config](../config/user-guide-grammar-config.md) and the
-[etl user guide](../etl/user-guide.md); the engine-relevant contract points are:
+[etl user guide](../elt/user-guide.md); the engine-relevant contract points are:
 
 - **Onboarding Parsing stage**: the file-type toggle appends the served non-builtin parsers; their
   options form renders the served schema via `fieldSpecsToAttributes`
@@ -1348,7 +1348,7 @@ attacker-controlled input. No bounds check can reject that, because the length i
 - [admin-guide-configuration-reference.md](../config/admin-guide-configuration-reference.md) — every config key, incl. the fixed-width frontend
 - [user-guide-grammar-config.md](../config/user-guide-grammar-config.md) — authoring Grammars, the Parse drawer
 - [spec-component-registry.md](../processor/spec-component-registry.md) — Grammar Templates as components
-- [etl plan](../etl/plan.md) — the ING capability spec (requirements of record)
+- [etl plan](../elt/plan.md) — the ING capability spec (requirements of record)
 - Archived designs: [delimited-grammar-design.md](../../../../archived-documents/plans-archive/delimited-grammar-design.md) ·
   [parser-plugins-trust-design.md](../../../../archived-documents/plans-archive/parser-plugins-trust-design.md) ·
   [parsing-repeated-child-design.md](../../../../archived-documents/plans-archive/parsing-repeated-child-design.md)

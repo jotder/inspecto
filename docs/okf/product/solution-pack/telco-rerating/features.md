@@ -20,7 +20,7 @@ Revenue-assurance teams at operators and MVNOs that want to know whether what wa
 
 ## Key capabilities
 
-- Three Pipelines: the rated usage feed, the tariff as one row per version (each with its own effective dates and an optional `PRIORITY`) and the subscription history (the plan each subscriber was assigned, from and to an instant) — [etl](../../module/etl/index.md)
+- Three Pipelines: the rated usage feed, the tariff as one row per version (each with its own effective dates and an optional `PRIORITY`) and the subscription history (the plan each subscriber was assigned, from and to an instant) — [etl](../../module/elt/index.md)
 - `rr_tariff_hygiene`: judges the tariff table itself, before any usage: rows in force at once with the same rate or different rates, gaps, negative or missing rates, intervals that end before they start
 - `rr_rerate`: re-rates each call at its start and gives one verdict per call: `single`, `agree`, `precedence`, `disagree` or `none`; an expected charge, or an expected range when an ambiguous tariff allows several amounts
 - A charge an ambiguous tariff could justify is explained and goes to data quality, never to leakage

@@ -1,15 +1,15 @@
 ---
 type: ProductItem
-title: ETL model and step registry
-item: module.etl
-description: Documentation hub for module.etl — every document about it, by slot.
+title: ELT — ingestion, Pipelines and step registry
+item: module.elt
+description: Documentation hub for module.elt — every document about it, by slot.
 tags: [product-item, module]
 ---
 
-# ETL model and step registry (`module.etl`)
+# ELT — ingestion, Pipelines and step registry (`module.elt`)
 
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
-> [`module.etl`](../../../../../product-map/module/etl.toon). Editions, add-ons, order codes and dependencies are read
+> [`module.elt`](../../../../../product-map/module/elt.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
 > this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
 
@@ -23,14 +23,14 @@ tags: [product-item, module]
 | user-guide | current | [Pipelines — user guide](user-guide.md) |
 | admin-guide | current | [ETL model and step registry — admin guide](admin-guide.md) |
 | api | current | [Pipelines, parsing and ingest — API](api.md) |
-| tests | current | [ETL model and step registry — tests inventory](tests-inventory.md) |
+| tests | current | [ELT — ingestion, Pipelines and step registry — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
 
 ## Open work
 
-Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.etl` — the board is the only list; change the row there.
+Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.elt` — the board is the only list; change the row there.
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|

@@ -151,7 +151,7 @@ Group letters match §6. Scores are the assessor's; levels are calibrated (§2).
 
 ### 4.4 Docs that had drifted from the code (verified 2026-10-20 in code)
 - `layer/product/plan-studio.md` says 13 Visualization Types — `BUILTIN_VIZ_PLUGINS` registers **20**.
-- `module/etl/plan.md` says Expectations have no UI — the `expectations` route exists in `app.routes.ts`.
+- `module/elt/plan.md` says Expectations have no UI — the `expectations` route exists in `app.routes.ts`.
 - `docs/EDITIONS.md` SEC-09 says the audit log is not tamper-evident — the hash chain (`AuditAnchors`, `/audit/verify`) shipped.
 - Assessors also report stale claims in `addon/incidents/plan-incidents.md` and `module/agent/plan-assistant.md` (§6 B).
   A docs-only review of these is tracked by `DOCS-AGENT-WRITTEN-REVIEW-1`.
@@ -214,11 +214,11 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 
 - **To reach the next level:** (1) Make the `db` ledger the edition default, or set it in the Standard/Advanced launchers. (2) Add a real-broker Kafka leg and an S3 (MinIO) end-to-end acquisition-node run to CI. (3) File a row for one CDC or REST-poller connector and build it.
 
-#### cap.pipelines — Pipelines & processing (module.etl, module.engine, module.config)
+#### cap.pipelines — Pipelines & processing (module.elt, module.engine, module.config)
 - **What it is (customer view):** Visual and TOON-authored Pipelines that parse many formats, then cast, validate (Expectations), transform, enrich, route (Decision Rules) and write partitioned Parquet. They are validated before save, can be dry-run or test-run, and are scheduled as Jobs.
 - **Scores:** F 4 · B 4 · Q 4 · E 3 · R 4 → **Level L3 (Pilot-ready)**, capped by E and by the platform baseline
 - **Evidence:**
-  - 46 built-in node types. 10 parser frontend tokens across 8 formats: delimited, fixed-width, JSON, text-regex, xlsx, Parquet, ASN.1, plugin (`module/etl/plan.md` §2; `module/etl/plan.md` §2.2).
+  - 46 built-in node types. 10 parser frontend tokens across 8 formats: delimited, fixed-width, JSON, text-regex, xlsx, Parquet, ASN.1, plugin (`module/elt/plan.md` §2; `module/elt/plan.md` §2.2).
   - Step Processor board: **119 processors, 51 delivered, 17 partial, 51 planned** on the Advanced column (`docs/EDITIONS.md` §Step Processors, generated from `ProcessorCatalog`). The planned share is heaviest in parsers (9), transforms (10), enrichment (7) and sinks (6).
   - Requirements of record ING-1..6 and PIP-1..7 are recorded as shipped (plans §2). The Expectations UI exists now (`inspecto-ui/src/app/inspecto/api/expectations.service.ts`, routed in `app.routes.ts`). That makes the plan's "ING-6 has no UI" claim stale.
   - Tests: engine **369**, etl **104**, config **22** unit test classes. 18 test classes reference golden fixtures (for example the `asn-golden` `SyntheticCorpusTest`). The nightly CI benchmark floors run `PluginIngestBenchmark` at 1M rows (floor 50,000 rows/s) and `MixedLoadBenchmark` (floor 30,000 rows/s, p95 ceiling 5 s). Both were green on the GitHub runner on 2026-10-08, 10-09 and 10-10 (`.github/workflows/nightly-perf.yml`; BACKLOG `ASSURE-OPERABILITY-1`).
@@ -231,7 +231,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - The authoring loop (validate → dry-run → test-run to a node → arm) is fail-closed, and save-time safety checks are pinned by tests.
 - **Gaps vs market / RFP risk:**
   - Outbound writes are thin: no JDBC/SQL sink, no Iceberg/Delta write, and the multi-destination `sinks:` executor is not wired (`module/connectors/plan-warehouse-targets.md` §2, §7). **No BACKLOG row** (EXPORT-1 closed 2026-09-24, covering only object-store export).
-  - 51 of 119 catalogued processors are planned, not built (EDITIONS board). Planned work has rows only by family. The processor-catalog item in the module.etl hub has no row id.
+  - 51 of 119 catalogued processors are planned, not built (EDITIONS board). Planned work has rows only by family. The processor-catalog item in the module.elt hub has no row id.
   - Record-level replay from quarantine is deliberately not built without a driver (engine plan §5.2). Run replay is in-memory: **no row**.
   - Single-node execution. Distributed scheduler coordination has **no BACKLOG row** (engine plan §5.1). Only the Postgres run lease exists, for active/passive.
 - **RFP stance on the 5 most-asked requirements:**

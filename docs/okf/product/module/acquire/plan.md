@@ -46,7 +46,7 @@ acquisition ledger; the Unpack stage.
 
 | Adjacent concern | Whose it is |
 |---|---|
-| Parsing a fetched file into records | `ING` — ingestion & parsing ([ETL plan](../etl/plan.md)) |
+| Parsing a fetched file into records | `ING` — ingestion & parsing ([ETL plan](../elt/plan.md)) |
 | What runs after a commit, and in what order | `PIP` — pipelines & orchestration |
 | The Consignment as a unit of work, and its addressing | `PIP` / the engine's [Consignments spec](../engine/spec-consignments.md) |
 | The Connections **pane** and the Collector drawer | `UI` — operator console |
@@ -516,4 +516,4 @@ control-plane port, not a working SFTP endpoint) · `spaces/demo/config/connecti
 | Connector SPI, remote schemes, profiles, secrets, workbench, proxy chain | [connectors/spec-connectors.md](../connectors/spec-connectors.md) |
 | Operator runbook: profile YAML, host-key table, FTPS, bastion, db-export | [connectors/admin-guide-connectors-runbook.md](../connectors/admin-guide-connectors-runbook.md) |
 | Module boundary + dependency confinement | [connectors/architecture.md](../connectors/architecture.md) |
-| What happens after the inbox | [ETL plan](../etl/plan.md) · [engine plan](../engine/plan.md) |
+| What happens after the inbox | [ETL plan](../elt/plan.md) · [engine plan](../engine/plan.md) |

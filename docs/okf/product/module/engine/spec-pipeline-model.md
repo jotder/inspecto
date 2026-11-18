@@ -16,7 +16,7 @@ those types, what each one emits, and how a plugin adds a new one. It explains w
 author picks from has fewer real executors behind it than entries, how the SQL Step and the Record
 Transformer work, and how the editor's graph is saved to — and read back from — the `*_pipeline.toon` file
 the engine runs, including every named reason a save is refused. How a Pipeline then runs is
-[spec-pipeline-execution.md](spec-pipeline-execution.md); the editor screens are [../etl/user-guide.md](../etl/user-guide.md).
+[spec-pipeline-execution.md](spec-pipeline-execution.md); the editor screens are [../elt/user-guide.md](../elt/user-guide.md).
 
 ## Contents
 
@@ -133,7 +133,7 @@ predate 4.0.0; their values are the `reject:<reason>` outlets (X5-a, below).
 
 *(Distilled here 2026-09-10 from `pipeline-spec.md` §11/§12 when that plan was archived; five current-tier
 pages used to delegate this to the plan. Decision **D2**, 2026-08-31, is recorded in
-[`etl/plan.md`](../etl/plan.md) § Decisions.)*
+[`etl/plan.md`](../elt/plan.md) § Decisions.)*
 
 **A Step receives a Consignment token and resolves data by reference. An edge carries no records — it names
 the outlet a token continues on.** The token is
@@ -316,7 +316,7 @@ sites were consolidated.
 
 ## Step Processor catalog vs. real node executors
 
-The [Step Processor catalog](../etl/user-guide.md) (122<!--count:processors--> entries, 8<!--count:processor-families--> families,
+The [Step Processor catalog](../elt/user-guide.md) (122<!--count:processors--> entries, 8<!--count:processor-families--> families,
 `ProcessorCatalog.java`) is a **taxonomy/palette layer**, not a 1:1 map to engine code. Five catalog entries
 that read like a "Mapping and Transformer" family — spanning the `DQ` and `XFM` families — all resolve to
 three node types (above): `transform.map` (2), `transform.sql` (2 — repointed 2026-09-04 when the
@@ -415,7 +415,7 @@ As built:
   statements. The Angular pane also stores a `fields[]` block beside `sql` (the Simple-mode rows that
   *generated* the SQL) — an **authoring artifact, not an engine contract**: the engine reads only `sql`,
   and a node without `fields[]` is a hand-written ("locked") one. See
-  [the editor guide](../etl/user-guide.md) for the pane.
+  [the editor guide](../elt/user-guide.md) for the pane.
 * **Executor:** `RowShaper.shape()` gains one branch (`RowShaper.java`) → `sql(conn, node, input,
   outPrefix)`: the statement passes `SqlGuard.check` (allow-list — anything that is not a
   single `SELECT` throws naming the node), then `CREATE OR REPLACE TEMP VIEW input AS SELECT * FROM <in>`
@@ -631,7 +631,7 @@ facts: a chain preview must run each Step's `shape` in order over the previous r
 "last projection wins" and caller-less, was **deleted 2026-09-06** rather than wired); and a preview publishes at two
 points — the relation and the derived schema — which must agree. S4, the one-surface workbench, **SHIPPED 2026-09-07** — all three
 slices, UI-only, no new endpoint. As-built:
-[`okf/product/module/etl/user-guide.md`](../etl/user-guide.md) §"The step workbench".
+[`okf/product/module/elt/user-guide.md`](../elt/user-guide.md) §"The step workbench".
 🔴 Its planned merge/join input PICKER was refused on grounding: `transform.merge` declares no attributes and
 takes its inputs as a positional list the executor builds from the graph edges, so a picker would have written
 a key nothing reads. The 2026-09-06 grounding above still holds for why no endpoint was needed — the input
@@ -699,7 +699,7 @@ Related: `OutputFormat` is the third such enum-as-strategy seam (see [output & s
 > parser family's retype/lower rules, route-branch arming, the settings surface, and dry-run.
 > The model itself (IR, lift, validator, token execution model) is
 > [architecture.md](architecture.md); the editor UI is
-> [the editor guide](../etl/user-guide.md). Sections keep their
+> [the editor guide](../elt/user-guide.md). Sections keep their
 > historical §16–§22 numbers (§16–§20 moved here whole from the pipeline-graph architecture page).
 
 ### 16. The editable round-trip — the graph editor writes the canonical config (W5, 2026-08-01)

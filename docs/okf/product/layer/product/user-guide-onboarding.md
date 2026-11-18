@@ -144,7 +144,7 @@ timestamp: 2026-07-16T00:00:00Z
 
 > 🔴 **The stage-rail shell was DELETED 2026-08-16 (definition-surface unification P6-e, plan
 > archived).** Onboarding a data origin now means: this **create dialog**, then the **guided pipeline
-> editor** — [pipelines](../../module/etl/user-guide.md). The route `/catalog/onboard/:name(/:stage)` is a redirect
+> editor** — [pipelines](../../module/elt/user-guide.md). The route `/catalog/onboard/:name(/:stage)` is a redirect
 > (P6-a); the stage rail is the editor's checklist chips (P6-d); go-live + the Dataset hop (P6-b), the
 > enrichment seed (P6-c), the impact-aware delete and the stream-config export (P6-e) are editor
 > surfaces.
@@ -154,7 +154,7 @@ timestamp: 2026-07-16T00:00:00Z
 > inherited (the stage model, readiness, lifecycle). Each section below names its live host. Rules
 > about a shared component live with that component — [collector-config](../../module/acquire/user-guide.md),
 > [grammar-config](../../module/config/user-guide-grammar-config.md) — and the editor's own as-built is in
-> [pipelines](../../module/etl/user-guide.md).
+> [pipelines](../../module/elt/user-guide.md).
 
 Route `/catalog/onboard/:name(/:stage)` — since P6-a a **matcher route that redirects** into the guided
 editor, kept so old per-stage bookmarks resolve rather than 404. Onboarding is entered from the Catalog Streams/References tabs' **Onboard Stream / Onboard Reference** header CTA
@@ -201,7 +201,7 @@ draft** (shift-handover safe; no wizard state is ever stored). Vocabulary: [GLOS
 ⚠ **Host: the pipeline editor's guided mode** (`pipeline-stages.ts`, P6-d). The stage *model* below is
 the durable part and survived the shell; ⛔ the readiness computation did NOT port — the wizard asked
 "is this stage configured?" of a server-held config draft, while the editor answers it from the
-**nodes**. See [pipelines](../../module/etl/user-guide.md) for why keying on a `transform.map` node's presence shows
+**nodes**. See [pipelines](../../module/elt/user-guide.md) for why keying on a `transform.map` node's presence shows
 every pipeline as blocked.
 
 - **Stream:** Collection → Parsing → Schema & Mapping → Enrichment *(optional)* → Dataset & Go-live.
@@ -246,7 +246,7 @@ hot-reload, they need explicit re-registration.)*
 authoring one. ⚠ **Host: the editor's toolbar activation**, through the shared
 `DatasetRegistrationService` — the hop was EXTRACTED there in P6-b, not copied, and the as-built
 (idempotent by `physicalRef` not id; `sourceName` = the store; never reverses an activation that
-already succeeded; Streams only) lives in [pipelines](../../module/etl/user-guide.md). ⛔ Two claims that used to sit
+already succeeded; Streams only) lives in [pipelines](../../module/elt/user-guide.md). ⛔ Two claims that used to sit
 here are superseded and must not be restored: that the *publish pane* writes it, and that the dataset
 carries **no** `sourceName` — blank falls through to a default naming nothing, so the dataset reads
 zero rows everywhere.
@@ -297,7 +297,7 @@ sides replay existing `ConfigService` reads/writes.
 ## Sample-as-thread (now a strip in the editor's parse drawer, one per tab)
 
 ⚠ **Host: the pipeline editor's parse definition drawer**, which keeps one thread PER TAB (P6-e
-follow-on) — see [pipelines](../../module/etl/user-guide.md) for the per-tab rule and the `previewFn` failure path. What
+follow-on) — see [pipelines](../../module/elt/user-guide.md) for the per-tab rule and the `previewFn` failure path. What
 follows is the thread's own contract, unchanged.
 
 One captured sample (file ≤256KB or paste, session-held) threads through the stages: raw → parsed

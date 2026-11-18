@@ -536,10 +536,10 @@ naming rule is held by `node tools/check-product-docs.mjs`.
 | Kafka stream connector (`module.connectors-kafka`) | [architecture](../../module/connectors-kafka/architecture.md) |  |
 | Collector and export connectors (`module.connectors`) | [architecture](../../module/connectors/architecture.md) |  |
 | Demo authenticator (`module.demo-auth`) | [architecture](../../module/demo-auth/architecture.md) |  |
+| ELT — ingestion, Pipelines and step registry (`module.elt`) | [architecture](../../module/elt/architecture.md) |  |
 | Execution engine (`module.engine`) | [architecture](../../module/engine/architecture.md) |  |
 | Entity lists (`module.entity-list`) | [architecture](../../module/entity-list/architecture.md) |  |
 | Entity store (`module.entity-store`) | [architecture](../../module/entity-store/architecture.md) |  |
-| ETL model and step registry (`module.etl`) | [architecture](../../module/etl/architecture.md) |  |
 | Event model and log (`module.event`) | [architecture](../../module/event/architecture.md) |  |
 | Exchange (publication and ingestion contracts) (`module.exchange`) | [architecture](../../module/exchange/architecture.md) |  |
 | MaxMind geo-country resolver (`module.geo-country`) | [architecture](../../module/geo-country/architecture.md) |  |

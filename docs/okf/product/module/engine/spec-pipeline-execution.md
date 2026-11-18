@@ -17,7 +17,7 @@ five lanes (two ingest lanes, an at-rest Job, a scratch test run, and a paused "
 post-sync lane that derives tables after commit. This page says which lane does what, how each is triggered,
 what each writes, how failures are retried or replayed, and how a test or dry run stays harmless.
 How an author writes a Pipeline is the Pipeline model ([spec-pipeline-model.md](spec-pipeline-model.md)) and the
-editor guide ([../etl/user-guide.md](../etl/user-guide.md)); the requirement of record is [plan.md](plan.md).
+editor guide ([../elt/user-guide.md](../elt/user-guide.md)); the requirement of record is [plan.md](plan.md).
 
 ## Contents
 
@@ -1201,7 +1201,7 @@ whose every member is rejected shows in the run log, not the overlay. With prove
 `-Dprovenance.backend` default) nothing is written at all, the same as a real run. Half (b), the UI
 marking, shipped 2026-09-23 (`e02eeab2`): `GET /provenance/batches` carries a per-batch `simulated`, and
 the Pipeline editor's run overlay labels, dashes and annotates a dry-run batch
-([pipeline editor](../etl/user-guide.md)) — so a dry run is now visible **and**
+([pipeline editor](../elt/user-guide.md)) — so a dry run is now visible **and**
 marked on both lanes. Pinned by `FlatLaneDryRunTest` (a filesystem diff of the whole pipeline tree plus
 the store's `batches()` read, and its real-run control) and `FlatLaneDryRunParseTest` (per-kind outcomes,
 and zero side effects against probes the real pass trips — the quarantine move and the DB-export
@@ -1656,7 +1656,7 @@ that claim is STALE as of 2026-08-31.
 [consignment-addressing](spec-consignments.md) (Selector, revision model) ·
 [consignment-status-flow](architecture.md) · [node-types](spec-pipeline-model.md) ·
 [transforms-seams](spec-pipeline-model.md) · [plugins](spec-ingest.md) ·
-[step-catalog](../etl/spec-step-catalog.md) ·
+[step-catalog](../elt/spec-step-catalog.md) ·
 [jobs](../processor/spec-jobs.md) · [job-vs-step](../processor/architecture.md)
 
 **Provenance:** distilled from

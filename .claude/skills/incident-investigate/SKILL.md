@@ -52,7 +52,7 @@ Recovery and transition routes mutate state — confirm with the operator before
 | Symptom | Start at |
 |---|---|
 | Run FAILED / stuck / parked | `module/engine/user-guide.md`, `module/engine/spec-pipeline-execution.md` |
-| File quarantined, wrong schema, parsed=0 | `layer/platform/admin-guide-troubleshooting.md`, `module/etl/architecture.md` |
+| File quarantined, wrong schema, parsed=0 | `layer/platform/admin-guide-troubleshooting.md`, `module/elt/architecture.md` |
 | Output in `year=NULL/...` partitions | `layer/platform/admin-guide-troubleshooting.md` |
 | Collector picks nothing up / re-pick | `module/acquire/architecture.md`; troubleshooting (`.processed` markers) |
 | JVM crash / native access / out of memory | `layer/platform/admin-guide-troubleshooting.md`, `layer/platform/admin-guide-launch-flags.md` |

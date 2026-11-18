@@ -1,16 +1,16 @@
 ---
 type: TestsInventory
-title: ETL model and step registry — tests inventory
-item: module.etl
-description: Generated list of the test classes for module.etl, with how to run them.
+title: ELT — ingestion, Pipelines and step registry — tests inventory
+item: module.elt
+description: Generated list of the test classes for module.elt, with how to run them.
 tags: [tests, module]
 ---
 
-# ETL model and step registry — tests inventory (`module.etl`)
+# ELT — ingestion, Pipelines and step registry — tests inventory (`module.elt`)
 
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked test sources under `platform/inspecto-etl/src/test/` — never edit this table; add or
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
-> [`module.etl`](../../../../../product-map/module/etl.toon).
+> [`module.elt`](../../../../../product-map/module/elt.toon).
 
 105 test class(es): 105 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP

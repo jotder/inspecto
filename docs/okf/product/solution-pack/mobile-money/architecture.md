@@ -60,7 +60,7 @@ Five synthetic feeds, each a Pipeline with a Schema under `spaces/_templates/mob
 
 ## Modules used
 
-- [Pipelines and Steps](../../module/etl/architecture.md),
+- [Pipelines and Steps](../../module/elt/architecture.md),
   [Jobs and scheduler](../../module/processor/architecture.md).
 - [Reconciliation](../../module/reconciliation/architecture.md).
 - [Alerts](../../addon/incidents/architecture.md), [Incidents](../../addon/incidents/architecture.md).

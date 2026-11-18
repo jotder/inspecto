@@ -35,6 +35,6 @@ Bring a week of your daily extract and we will stand the feed up with you.
 
 ## Read more
 
-- Ingestion contract: [ETL ingestion plan](../../module/etl/plan.md)
+- Ingestion contract: [ETL ingestion plan](../../module/elt/plan.md)
 - The template manifest is `spaces/_templates/la-daily-feed/template.toon`.
 - Whole-product sales material: [executive brief](../../layer/product/brochure-executive-brief.md) · [solution overview](../../layer/product/brochure-solution-overview.md) · [enterprise whitepaper](../../layer/product/brochure-enterprise-whitepaper.md) · [competitive landscape](../../layer/product/brochure-competitive-landscape.md)

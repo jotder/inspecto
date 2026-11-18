@@ -33,7 +33,7 @@ OKF concepts linked below; this page only strings them together.
    parses, transforms and partitions it and checks Expectations; rejected rows go to quarantine.
 5. **Lakehouse commit.** `ConsignmentIngestor` commits in crash-safe order: DuckLake register, manifest,
    backup of originals, markers, ledger last. A failed Consignment leaves no markers, so it is picked up again.
-   Detail: [ingestion](../../module/etl/plan.md).
+   Detail: [ingestion](../../module/elt/plan.md).
 6. **Pipeline Run.** The Pipeline's later Steps read the committed Parquet and write their outputs. Operators
    watch it on **Runs** (route `runs`): `GET /api/v1/runs/{runId}/files`, `/commits`, `/quarantine`,
    `/outputs`, `/errors`, `/lineage`; `POST /api/v1/runs/{runId}/reprocess` and `/replay-rejects` repair.
@@ -73,9 +73,9 @@ Script: `tools/doc-diagrams/journey-file-to-dashboard.py`.
 ## Related modules
 
 [collectors](../../module/acquire/architecture.md) ·
-[parsing-ingest](../../module/etl/architecture.md) ·
+[parsing-ingest](../../module/elt/architecture.md) ·
 [storage](../../module/entity-store/architecture.md) ·
-[pipelines-steps](../../module/etl/architecture.md) ·
+[pipelines-steps](../../module/elt/architecture.md) ·
 [jobs-scheduler](../../module/processor/architecture.md) ·
 [analytics-kernel](../../module/analytics/architecture.md) ·
 [studio-bi](architecture-studio-bi.md) ·
@@ -83,5 +83,5 @@ Script: `tools/doc-diagrams/journey-file-to-dashboard.py`.
 [observability-backup](../../module/observability/architecture.md)
 
 Concepts: [Studio](plan-studio.md) ·
-[ingestion](../../module/etl/plan.md) ·
+[ingestion](../../module/elt/plan.md) ·
 [acquisition](../../module/acquire/plan.md)

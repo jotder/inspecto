@@ -21,7 +21,7 @@ import { parseToon } from './check-offerings.mjs';
 export const ALIASES = {
     recon: 'module.reconciliation', la: 'layer.la', 'la-ui': 'layer.la', ui: 'layer.product',
     regreporting: 'module.regulatory-reporting', 'telco-fraud': 'solution-pack.telco-fraud',
-    pipeline: 'module.etl', ingest: 'module.acquire', 'db-layer': 'module.sql', query: 'module.sql',
+    pipeline: 'module.elt', ingest: 'module.acquire', 'db-layer': 'module.sql', query: 'module.sql',
     control: 'module.processor', jobs: 'module.ops', masking: 'module.access',
 };
 /** Types shown in the notes, in order. BREAKING is any `!` or `BREAKING CHANGE:` footer. */

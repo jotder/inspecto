@@ -29,7 +29,7 @@ request -> authenticate (oidc / demo-auth) -> Subject
 * **Audit** — the engine stamps the matched policy; the core writes the audit entry
   ([events](../event/index.md)).
 * **Second contract** — `EditionFeatureProvider` declares `PII_MASK`, so the pipeline `mask` Step is legal
-  only in bundles that carry this module ([etl](../etl/index.md)); elsewhere it is refused with
+  only in bundles that carry this module ([etl](../elt/index.md)); elsewhere it is refused with
   `ERR_EDITION_FEATURE` at save and at run.
 * **Editions** — staged from Advanced (`offerings/advanced.toon`) and in Preview; built by the
   `edition-advanced` Maven profile.

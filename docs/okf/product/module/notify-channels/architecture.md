@@ -99,7 +99,7 @@ Moved to [Notifications — API](api-notifications.md).
   [events and metrics](../event/spec-events-metrics.md).
 - [Alerts](../../addon/incidents/architecture.md) and [Incidents](../../addon/incidents/architecture.md) raise events that rules turn into notifications.
 - [Platform Services](../../layer/platform/architecture-platform-services.md) — `notifications` and `mail` services granted to Runs.
-- [Pipelines and Steps](../etl/architecture.md) — the webhook sink posts through `HttpWebhookSinkTransport`.
+- [Pipelines and Steps](../elt/architecture.md) — the webhook sink posts through `HttpWebhookSinkTransport`.
 - [Spaces](../config/architecture.md) — channel destinations are per Space; webhook egress uses the Space's allowlist.
 - [Identity and access](../access/architecture.md) — the capability gates above.
 

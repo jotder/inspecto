@@ -212,7 +212,7 @@ edge.
 
 | Vocabulary | Values |
 |---|---|
-| `NodeKind` (12) | ETL half — `STREAM · RAW_SCHEMA · STEP · COLUMN · TABLE · DERIVED_TABLE · REFERENCE_DATASET` (`STEP` = a `sql` Step describing its output columns, 2026-10-11, [schema-mapping-authoring §0](../etl/user-guide.md)); semantic — `KPI · REPORT`; Studio BI — `DATASET · WIDGET · DASHBOARD` (⚠ this row read "(7)" and omitted `REPORT` until 2026-09-13) |
+| `NodeKind` (12) | ETL half — `STREAM · RAW_SCHEMA · STEP · COLUMN · TABLE · DERIVED_TABLE · REFERENCE_DATASET` (`STEP` = a `sql` Step describing its output columns, 2026-10-11, [schema-mapping-authoring §0](../elt/user-guide.md)); semantic — `KPI · REPORT`; Studio BI — `DATASET · WIDGET · DASHBOARD` (⚠ this row read "(7)" and omitted `REPORT` until 2026-09-13) |
 | `EdgeKind` (9, the P2 lineage plane) | `EMITS · DECLARES · DESCRIBES · MATERIALIZES · FEEDS · JOINS_INTO · COMPUTED_FROM · CONSUMES · BINDS_TO` |
 | `IdScheme` tokens | `stream:` · `schema:` · `event:` · `col:` · `xform:` · `ref:<enrich>/<ref>` · `ref:<pipeline>` (a produced Reference) · `kpi:` · `report:` · `dataset:` · `widget:` · `dashboard:` |
 
@@ -515,7 +515,7 @@ A draft is server state (an inactive pipeline); "⚠ Do not implement" stands in
 | The layer table naming `catalog` as L2 | `docs/okf/product/layer/platform/architecture.md` (`Architecture`) | — | the one structural line on the read model |
 | Catalog tabs, resolve, the Data Browser | `docs/okf/product/layer/product/user-guide-catalog.md` (`Feature`) | `inspecto-ui/src/app/modules/admin/catalog` | §3.9 |
 | Onboarding as the editor's checklist; stream bundle import | `docs/okf/product/layer/product/user-guide-onboarding.md` (`Feature`) | — | §3.8 |
-| The schema / mapping grids, the compatibility gate's UI | `docs/okf/product/module/etl/user-guide.md` (`Feature`) | — | §3.7 |
+| The schema / mapping grids, the compatibility gate's UI | `docs/okf/product/module/elt/user-guide.md` (`Feature`) | — | §3.7 |
 | The Components pane | `docs/okf/product/layer/product/spec-components.md` (`Feature`, 0.9 KB) | — | §3.9 — ⚠ a stub |
 | 🔴 **No concept file owns the Catalog read model** (`com.gamma.catalog`: `MetadataGraph*`, `NodeKind`, `EdgeKind`, `IdScheme`, `CatalogOverlay`) | *(gap)* | `platform/inspecto-engine/src/main/java/com/gamma/catalog` | §3.5–§3.6 of this spec are the only account |
 | 🔴 **No page owns `SchemaFieldTypes`** (the classification vocabulary is owned by `spec-config-safety.md` since 2026-11-14) | *(gap)* | `platform/inspecto-etl/src/main/java/com/gamma/etl/SchemaFieldTypes.java` | §3.7 |

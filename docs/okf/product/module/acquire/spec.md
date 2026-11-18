@@ -442,7 +442,7 @@ defaults when the block is present (`PipelineConfigParser.parseCollector`). `alg
 which is JDK-only (`MessageDigest`/`CRC32`), streams in 64 KB chunks, returns lowercase hex, and accepts
 `MD5`, `SHA1`, `SHA256` (default), `SHA512`, `CRC32` with or without the dash. A feed that must let a
 corrected same-name file land uses `mode: checksum` + `on_change: reprocess` (worked example: the daily feed in
-[the ETL user guide](../etl/user-guide.md#113-daily-feeds--the-template-the-export-contract-and-delivery-checks)).
+[the ETL user guide](../elt/user-guide.md#113-daily-feeds--the-template-the-export-contract-and-delivery-checks)).
 
 **Collection guarantee.** `collector.guarantee` → `BEST_EFFORT` (default) | `AT_LEAST_ONCE` |
 `EXACTLY_ONCE` (`PipelineConfig.Guarantee`; both dash and underscore spellings parse). `requiresLedger()`
@@ -510,7 +510,7 @@ Two optional keys beside it (operator, 2026-10-06) — `file_template` (one date
 e.g. `CDR_{yyyyMMddHH}_{seq}_*`, or date-only `XDR_{yyyyMMdd}.csv` = one expected file per date bucket) and
 `seq_scope` (`PER_BUCKET` | `CONTINUOUS`, required when the template holds `{seq}`, refused when it does not;
 operator, 2026-10-06) — are read by the `kpi.completeness` job to count missing files and by the delivery check
-(per-day manifest + windowed `SEQUENCE_GAP`, [the ETL user guide](../etl/user-guide.md#113-daily-feeds--the-template-the-export-contract-and-delivery-checks)).
+(per-day manifest + windowed `SEQUENCE_GAP`, [the ETL user guide](../elt/user-guide.md#113-daily-feeds--the-template-the-export-contract-and-delivery-checks)).
 `sequence` and `GapDetector` are unchanged. See [observability §3.9](../observability/plan-observability.md).
 
 ## Phase E — retrieval: plan once, stage, then land
@@ -619,7 +619,7 @@ registered via `META-INF/services`) and `ConnectionWorkbench` — lives in the c
 
 ⚠ **"Eight connectors" is the count of the optional module, not of the registry.** Verified from `META-INF/services/com.gamma.acquire.CollectorConnectorFactory`: **seven** factories ship in `inspecto-connectors` (`sftp`, `ftp`, `ftps`, `db`, `s3`, `azure`, `gcs`), **one** (`kafka`) in the premium module `inspecto-connectors-kafka` (MODULE-REORG-1 P7, 2026-10-07; Standard and above — Basic has no Kafka), **one** more in `inspecto-engine` (`DatasetCollectorConnectorFactory` → `connector: dataset`, UI-S7), and `local` is the built-in default that needs no jar. So ten values resolve, and a bundle without the sidecar resolves only `local` and `dataset`. *(Two more entries exist under `inspecto/src/test/resources` — `FakeRemoteConnectorFactory` and `FakeOffsetTailConnectorFactory` — and are test-only; do not count them.)*
 
-⚠ **`https` is a Connection scheme, not a Collector scheme** (2026-09-23). No `CollectorConnectorFactory` serves it: an `https` Connection is the target of the outbound **Webhook sink** (`sink.webhook`, [step-catalog](../etl/spec-step-catalog.md#webhook--sinkwebhook--the-outbound-webhook)), onboarded under the same `canOnboardConnections` grant as every other Connection. That grant is what makes a Connection the egress gate. `host`/`port`/`base_path` build the URL, `password` is the bearer-token reference, and the option `timeout_seconds` sets the request timeout. The sink refuses a tunnel or proxy. A Collector bound to an `https` Connection fails as an unknown scheme.
+⚠ **`https` is a Connection scheme, not a Collector scheme** (2026-09-23). No `CollectorConnectorFactory` serves it: an `https` Connection is the target of the outbound **Webhook sink** (`sink.webhook`, [step-catalog](../elt/spec-step-catalog.md#webhook--sinkwebhook--the-outbound-webhook)), onboarded under the same `canOnboardConnections` grant as every other Connection. That grant is what makes a Connection the egress gate. `host`/`port`/`base_path` build the URL, `password` is the bearer-token reference, and the option `timeout_seconds` sets the request timeout. The sink refuses a tunnel or proxy. A Collector bound to an `https` Connection fails as an unknown scheme.
 
 🔴 **For 85 days the remote connectors were build-available and deploy-absent.** `inspecto-connectors` was a
 reactor module no bundle shipped, so `connector: s3` and its siblings could be authored, compiled and tested and

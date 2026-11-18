@@ -61,8 +61,8 @@ of being ingested. Gap detection watches the daily file sequence.
 
 ## Modules used
 
-- [Pipelines and Steps](../../module/etl/architecture.md),
-  [Parsing and ingest](../../module/etl/architecture.md) — the card-number refusal scan.
+- [Pipelines and Steps](../../module/elt/architecture.md),
+  [Parsing and ingest](../../module/elt/architecture.md) — the card-number refusal scan.
 - [Storage](../../module/entity-store/architecture.md) — restricted quarantine.
 - [Jobs and scheduler](../../module/processor/architecture.md).
 - [Alerts](../../addon/incidents/architecture.md), [Incidents](../../addon/incidents/architecture.md).

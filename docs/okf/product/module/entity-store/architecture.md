@@ -26,7 +26,7 @@ A **Sink** is where a Pipeline writes business data. The capability spec of reco
 
 ## 3. Where it sits
 
-Everything else sits on it: [parsing-ingest](../etl/architecture.md) and [Pipelines](../etl/architecture.md)
+Everything else sits on it: [parsing-ingest](../elt/architecture.md) and [Pipelines](../elt/architecture.md)
 write business data; [Studio](../../layer/product/architecture-studio-bi.md) reads it through Datasets; every add-on keeps its
 records in the operational stores; [Spaces](../config/architecture.md) decide where each Space's roots are. Code homes:
 
@@ -107,6 +107,6 @@ Moved to [Storage — API](api-storage.md).
 - A sink nested inside another store fails the run before any bytes are written.
 - Business data is never in the operational database, in any edition.
 - The `.restricted` refusal store is excluded from reads, listings and backups
-  ([parsing-ingest](../etl/architecture.md)).
+  ([parsing-ingest](../elt/architecture.md)).
 - Postgres round-trip tests cover fifteen of the sixteen families; Alerts (`DbAlertStore`) is covered by
   reasoning only.

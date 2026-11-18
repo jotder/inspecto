@@ -624,7 +624,7 @@ When data is ingested, error and failure text must not carry the offending cell.
 value, so the platform replaces every quoted literal and "original line" tail with a salted fingerprint, and
 file-name handling avoids raw paths. The aim is that a rejected record leaves a reason, not a copy of the personal
 data.
-Evidence: [`ingestion.md`](../etl/plan.md) "Failure text never stores a value"
+Evidence: [`ingestion.md`](../elt/plan.md) "Failure text never stores a value"
 (`FailureText.scrub`); [`spaces.md`](../config/plan-spaces.md) (malformed-row rejects).
 Confidence: DOCUMENTED (shipped 2026-10-03; this pass did not re-run it). Scope is ingest failure text, not a claim
 that no personal data exists anywhere.

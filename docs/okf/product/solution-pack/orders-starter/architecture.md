@@ -36,7 +36,7 @@ data/inbox/orders/*.csv
 
 ## Modules used
 
-[etl](../../module/etl/index.md) for the Pipeline, Schema and Expectation; Studio BI for Widgets and the dashboard.
+[etl](../../module/elt/index.md) for the Pipeline, Schema and Expectation; Studio BI for Widgets and the dashboard.
 
 ## Limits
 

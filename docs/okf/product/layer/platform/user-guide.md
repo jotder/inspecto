@@ -51,7 +51,7 @@ First-time users: [onboarding](../product/user-guide-onboarding.md).
 
 | Task | Guide |
 |---|---|
-| Build or edit a Pipeline | [Pipeline editor](../../module/etl/user-guide.md) |
+| Build or edit a Pipeline | [Pipeline editor](../../module/elt/user-guide.md) |
 | Browse Streams, References, Tables and lineage | [Catalog](../product/user-guide-catalog.md) |
 | Query, chart and build dashboards | [Studio](../product/user-guide-studio.md) · [Dashboard](../product/user-guide-dashboard.md) |
 | Schedule and watch Jobs | [Jobs](../../module/processor/user-guide-jobs.md) |

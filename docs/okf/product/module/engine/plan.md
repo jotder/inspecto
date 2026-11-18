@@ -37,7 +37,7 @@ section to its new home), so this file stays a short list of commitments and ope
 > built, §6 what was refused, §7 the pointers, §8 how it is verified.
 >
 > ⛔ **This is the second of two `PIP` specs.** Authoring — the editor, the config contract, the Step
-> catalog — is [`pipeline-authoring`](../etl/plan.md), which owns `PIP-1`.
+> catalog — is [`pipeline-authoring`](../elt/plan.md), which owns `PIP-1`.
 > This file owns **`PIP-2` through `PIP-7`**. "Orchestration" is folded in here; the word is not a
 > glossary term.
 >

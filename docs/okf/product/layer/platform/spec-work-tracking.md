@@ -75,7 +75,7 @@ only the backticked `→` pointer list, and the count markers (`check-doc-counts
   restore T with B's text joined in. The tool rewrites `docs/…` mentions and relative links only; a mention spelled
   relative to `docs/` or to a hub (`okf/product/…`, `module/<name>/…`) needs a plain text replace, and the citation
   guard names the ones that are left.
-- **Section numbers in a merged page restart in each part** (two "§6" in `module/etl/architecture.md`). Cite the
+- **Section numbers in a merged page restart in each part** (two "§6" in `module/elt/architecture.md`). Cite the
   part: link its anchor (`architecture.md#parsing-and-ingest`) and then give the number.
 - **Splitting or merging a page keeps its section numbers.** `module/la-core/architecture.md` (about 2,500
   lines) was split on 2026-11-12 (`ARCH-DOCS-RESIDUALS-1`) into five pages; on 2026-11-15 the hub was

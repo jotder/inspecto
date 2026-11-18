@@ -247,7 +247,7 @@ that changes:
     Refusals carry `ERR_EDITION_FEATURE` (a finding code; the v1 `errorCode` stays `CONFIG_VALIDATION_FAILED`,
     because the `ErrorCode` enum is a contract catalog). Gate every door, not one: the save gate, the feature's own
     routes, and the run-time arrivals (registry load, boot load, the lanes the registry does not guard). Full
-    list: [step catalog → Edition notes](../../module/etl/spec-step-catalog.md).
+    list: [step catalog → Edition notes](../../module/elt/spec-step-catalog.md).
 29. ⚠ **Core, engine, etl and connectors test classpaths are Basic.** A test of the Standard behaviour of
     such a feature pins it with `EditionFeatures.overrideForTest(...)` and restores `null` in teardown; the
     Standard acceptance proper lives in the declaring module, where the REAL provider is discovered.

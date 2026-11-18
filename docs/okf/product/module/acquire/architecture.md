@@ -95,7 +95,7 @@ lifecycle manager (one of the five MDC-routed singletons — see [multi-space](.
 A **Collector** is a configured collection task bound to one **Connection** (a named endpoint plus
 credentials). It reaches a remote system, decides which files are new and complete, fetches them once,
 and lands them in the Pipeline's inbox (`dirs.poll`). Everything after landing is ingest's job
-([parsing-ingest](../etl/architecture.md)). The capability spec of record is
+([parsing-ingest](../elt/architecture.md)). The capability spec of record is
 [acquisition.md](plan.md); this part is the module summary.
 
 Code homes:
@@ -117,7 +117,7 @@ Code homes:
 ### 3. Where it sits
 
 Collectors are the first stage of the platform base: a remote system feeds a Collector, the Collector
-lands bytes, and a [Pipeline](../etl/architecture.md) parses and loads them into [storage](../entity-store/architecture.md).
+lands bytes, and a [Pipeline](../elt/architecture.md) parses and loads them into [storage](../entity-store/architecture.md).
 The connector schemes are pluggable through `ServiceLoader`: `CollectorConnectors.forConfig` resolves
 `local` to the built-in `LocalFileSystemConnector` and any other scheme to a registered
 `CollectorConnectorFactory` matched on `scheme()`. An unknown scheme fails fast; there is no fall-back
@@ -205,8 +205,8 @@ Moved to [Collectors — API](api-collectors.md).
 
 ### 8. Interactions
 
-- [parsing-ingest](../etl/architecture.md) — consumes the landed inbox.
-- [pipelines-steps](../etl/architecture.md) — the `collector:` block lives in a Pipeline.
+- [parsing-ingest](../elt/architecture.md) — consumes the landed inbox.
+- [pipelines-steps](../elt/architecture.md) — the `collector:` block lives in a Pipeline.
 - [identity-access](../access/architecture.md) — `canOperateRuns`, `canOnboardConnections`.
 - [observability-backup](../observability/architecture.md) — acquisition metrics and the completeness KPI that reads `gap_detection`.
 - [events](../event/architecture.md) — `SEQUENCE_GAP`, `FILE_CHANGED`.

@@ -13,7 +13,7 @@ One surface authors how raw bytes become rows — a **Grammar** (`docs/GLOSSARY.
 "parser config" / "parse options", banned synonyms):
 
 - the Pipelines editor's **`parse`** node — since 2026-08-15 either the right-dock **Parse drawer** or the
-  `GrammarEditorDialog`, split by the rule below — see [Pipelines](../etl/user-guide.md).
+  `GrammarEditorDialog`, split by the rule below — see [Pipelines](../elt/user-guide.md).
 
 ⚠ **The Onboarding Parsing stage no longer exists** (P6-e, definition-surface unification): the drawer
 and the dialog are the only two adopters of `<inspecto-grammar-editor>` today. Earlier sections below
@@ -21,7 +21,7 @@ that mention the stage describe history, not a live host.
 
 > ⚠ **Amended 2026-09-04 by D8–D10 — decided and BUILT the same day** (`4e64fe4a`, `c769719d`;
 > `AUTHORING-WIDE-1` is CLOSED) — see
-> [ETL user guide § Wide feeds](../etl/user-guide.md). In short: **Parse does not drop
+> [ETL user guide § Wide feeds](../elt/user-guide.md). In short: **Parse does not drop
 > columns** (it settles existence/name/type/synonym; exclusion is `transform.sql`'s job only, because
 > excluding here edits the schema and `SchemaCompatibility` gates that BACKWARD), and the columns table
 > carries the wide-feed treatment: a search box over name · selector · synonym, a **type dropdown**
@@ -102,7 +102,7 @@ this is what renders now, and why. Grounding: `grammar-editor.component.{ts,html
   `dataColumn()` (`inspecto/grid`) every row-derived data-table column now uses.
 - **The dialog host feeds the Pipeline tab's sample thread** (2026-09-25): its sample and a table Test
   parse land in the same `DefinitionStateService` the Parse drawer's Sample card and the downstream Steps
-  read — see [Pipeline Editor § Parse](../etl/user-guide.md).
+  read — see [Pipeline Editor § Parse](../elt/user-guide.md).
 - **ONE columns table — "Columns that come out"** (R11; `schema-fields-editor.component.html`): `#` ·
   Name · Type · **Sample value** (first parsed row) · Also known as (the synonym), a search box; ⅋ **no
   Use/include column** — D8 removed include-control, so every row the grid holds is emitted
@@ -277,7 +277,7 @@ nothing else on the template side.
 exist, and **binary fixed width** — plus a new Pipeline's generic placeholder `parser`, whose first
 configuration it hosts. Since 2026-09-25 its **Save writes the output schema** after a table Test parse
 when the node names none — the same `writeParseSchema` the drawer's Apply calls — so the placeholder's
-first Save leaves a Schema behind ([Pipelines](../etl/user-guide.md) § the Grammar dialog). The plain `parser` type still has no drawer pane either — the plugin
+first Save leaves a Schema behind ([Pipelines](../elt/user-guide.md) § the Grammar dialog). The plain `parser` type still has no drawer pane either — the plugin
 subtype covers only nodes with an *authored* `parsing.plugin` block, not the unbound generic type.
 ⚠ "P3d retires the dialog entirely" was always false and stays false:
 the dangling and binary cases are deliberate keeps. The dangling case is deliberate: with nothing to resolve there is no faithful copy
@@ -548,7 +548,7 @@ D13 (operator, 2026-07-25) parked every parser/grammar field's `tier:` assignmen
 onboarding-observation session** — ⛔ *explicitly not an engineering guess*. The session has **not
 happened**. The full kit (session protocol, per-lane task script, per-field capture sheets, field
 inventory) is provenance in
-[`okf/product/module/etl/plan-parser-field-tiers-interview.md`](../etl/plan-parser-field-tiers-interview.md),
+[`okf/product/module/elt/plan-parser-field-tiers-interview.md`](../elt/plan-parser-field-tiers-interview.md),
 archived 2026-09-09 by operator decision. ⚠ **The kit is still runnable and the session is still owed** —
 archived here means "not maintained", not "abandoned". Board row: `BACKLOG.md` §2 *D13 parser field tiers*.
 

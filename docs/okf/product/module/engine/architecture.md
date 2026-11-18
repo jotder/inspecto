@@ -397,7 +397,7 @@ include/exclude keys. An explicit `steps:` filter is post-map and runs fine.
 > model, and the authoring round-trip — refusal codes, parser family, settings, dry-run),
 > [spec-pipeline-execution.md](spec-pipeline-execution.md) (which lanes run a pipeline),
 > [../config/spec-pipeline-config-keys.md](../config/spec-pipeline-config-keys.md) (the config-key census),
-> [../etl/user-guide.md](../etl/user-guide.md) (the Pipeline editor UI). The plan of record is
+> [../elt/user-guide.md](../elt/user-guide.md) (the Pipeline editor UI). The plan of record is
 > [`archived-documents/plans-archive/pipeline-spec.md`](../../../../archived-documents/plans-archive/pipeline-spec.md). The 2026-06 design-era
 > prose (motivation, roadmap, T-checklist, capability gate) is archived verbatim at
 > [`plans-archive/pipeline-graph-design-era-2026-06.md`](../../../../archived-documents/plans-archive/pipeline-graph-design-era-2026-06.md).
@@ -612,7 +612,7 @@ commit · in-file component identity, no version pinning · DAG over `data` edge
 scratch dry-run · legacy auto-lift with parity gate) all stand; the full statements with rationale
 are in the [archived design text](../../../../archived-documents/plans-archive/pipeline-graph-design-era-2026-06.md)
 §9. The decisions of record taken 2026-08-31 (D1–D10) are in
-[the etl plan](../etl/plan.md) § *Decisions*, and the
+[the etl plan](../elt/plan.md) § *Decisions*, and the
 token model itself is [spec-pipeline-model.md](spec-pipeline-model.md) § *The token model*.
 
 Boundaries still true (v1 non-goals, archived §12 for the full table): no decoupled per-node
@@ -753,7 +753,7 @@ reconciling output against the store by these counters concludes nothing was los
 
 ⚠ The invariant the split buys: `total_input_rows = total_output_rows + rejected_rows` when no Step drops
 rows; a Step that drops rows is the other, already-honest half (see
-[`spec-step-catalog.md`](../etl/spec-step-catalog.md)'s counted reject relation). Tracked as `WB-09` in
+[`spec-step-catalog.md`](../elt/spec-step-catalog.md)'s counted reject relation). Tracked as `WB-09` in
 `archived-documents/plans-archive/workbench-trust-plan.md`; row `INGEST-REJECT-ACCOUNTING-1`.
 
 ### Intrinsic and inherited status must not collapse into one enum

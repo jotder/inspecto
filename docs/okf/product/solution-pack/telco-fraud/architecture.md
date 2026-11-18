@@ -62,7 +62,7 @@ The golden corpus ships in `data/samples`; copy it into `data/inbox/<feed>` to i
 
 ## Modules used
 
-- [Pipelines and Steps](../../module/etl/architecture.md),
+- [Pipelines and Steps](../../module/elt/architecture.md),
   [Collectors](../../module/acquire/architecture.md).
 - [Decision kernel](../../module/scoring/architecture.md) — the two Decision Rules.
 - [Jobs and scheduler](../../module/processor/architecture.md).

@@ -22,7 +22,7 @@ tags: [product-item, module]
 | feature-db | current | [Execution engine — feature database](feature-db.md) |
 | user-guide | current | [Runs and Run Detail](user-guide.md) |
 | admin-guide | current | [Execution engine — admin guide](admin-guide.md) |
-| api | n/a | the engine registers no HTTP routes; the Pipeline, Run and Job routes it serves are documented in module/processor api-routes and api-jobs-scheduler and module/etl api-parsing-ingest |
+| api | n/a | the engine registers no HTTP routes; the Pipeline, Run and Job routes it serves are documented in module/processor api-routes and api-jobs-scheduler and module/elt api-parsing-ingest |
 | tests | current | [Execution engine — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

@@ -19,12 +19,12 @@ re-exported from the `inspecto/api` barrel. See [API & data conventions](spec-ap
 | `RunsService` | [runs](../../module/engine/user-guide.md), [run-detail](../../module/engine/user-guide.md) |
 | `CollectorsService` | [collectors](../../module/acquire/user-guide.md) |
 | `ConnectionsService` · `ConnectionProbeService` | [connections](../../module/connectors/user-guide-connections.md) |
-| `PipelinesService` · `ComponentsService` | [pipelines](../../module/etl/user-guide.md), [components](spec-components.md) |
+| `PipelinesService` · `ComponentsService` | [pipelines](../../module/elt/user-guide.md), [components](spec-components.md) |
 | `CatalogService` | [catalog](user-guide-catalog.md) |
 | `EventsService` | [events](../../module/event/user-guide-events.md) |
 | `AlertsService` | [alerts](../../addon/incidents/user-guide-alerts.md) |
 | `ObjectsService` | [objects (cases/issues)](../../module/ops/user-guide-objects.md) |
-| `EnrichmentService` | [enrichment](../../module/etl/user-guide.md) |
+| `EnrichmentService` | [enrichment](../../module/elt/user-guide.md) |
 | `JobsService` | [jobs](../../module/processor/user-guide-jobs.md) |
 | `AcquisitionMetricsService` · `ReportsService` | [dashboard](user-guide-dashboard.md), reports |
 | `ConfigService` | [config](../../module/config/user-guide-config.md), [model-settings](../../module/agent/user-guide-model-settings.md) |

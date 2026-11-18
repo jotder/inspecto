@@ -34,8 +34,8 @@ emphasised; your Role decides what you may do (see the [platform user guide](use
     save with any ERROR finding is refused, and `/validate` reports the same findings without saving. (A smaller
     edit, such as a label or a rename, is refused only for an ERROR it introduces.)
   - A **dry run** executes the graph and writes nothing.
-  - Read [the Pipeline editor guide](../../module/etl/user-guide.md), then
-    [Pipelines](../../module/etl/user-guide.md).
+  - Read [the Pipeline editor guide](../../module/elt/user-guide.md), then
+    [Pipelines](../../module/elt/user-guide.md).
 - **Studio** (`/studio`) is BI authoring: the Query Library, the Viz Library and Widget builder, the Dashboard
   builder, and dashboard templates. It also hosts Link Analysis, Entities and the Geo map.
   - Datasets are a Catalog asset now (`/catalog/datasets`); a bare `/studio` and `/studio/datasets` redirect there.

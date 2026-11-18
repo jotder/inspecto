@@ -341,7 +341,7 @@ own flat output Schema. A single source file holding several record kinds (an XM
 multi-layout fixed-width file) is decomposed into one Segment per kind, and each Segment becomes **one output
 table** and **one Catalog node**. Authored as `parsing.plugin.segments` (legacy `processing.segments`);
 `PipelineConfig.Schemas.segments` is `@PublicApi since 2.0.0`. As built:
-`okf/product/module/etl/plan.md`, `okf/product/module/engine/spec-parsing.md`. ⛔ Not a path token, not a
+`okf/product/module/elt/plan.md`, `okf/product/module/engine/spec-parsing.md`. ⛔ Not a path token, not a
 time slice, and ⛔ unrelated to the *market* segment in the brochures — an accidental homonym.
 
 **Field Classification** *(defined 2026-09-10 — `SPEC-GLOSSARY-1`; rewritten 2026-11-14,
@@ -555,8 +555,8 @@ is read. ⛔ There is no `mode: streaming` value; it is a block, not an enum.
 **Sink** — Writes processed records to a destination. The lakehouse Sink writes **Parquet into a Table**.
 
 **Load** *(added 2026-08-13 — operator decision; as built:
-[`okf/product/module/etl/user-guide.md`](okf/product/module/etl/user-guide.md) ·
-[`okf/product/module/etl/user-guide.md`](okf/product/module/etl/user-guide.md).
+[`okf/product/module/elt/user-guide.md`](okf/product/module/elt/user-guide.md) ·
+[`okf/product/module/elt/user-guide.md`](okf/product/module/elt/user-guide.md).
 Provenance: `archived-documents/plans-archive/definition-surface-unification-plan.md` §4b)* —
 The third **definition stage/drawer** in the unified pipeline editor (**Collector → Parse → Load**): create
 the **Schema** (derive from the parsed sample or import), author the **Mapping** (per-field rules incl.
