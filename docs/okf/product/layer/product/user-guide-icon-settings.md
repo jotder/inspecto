@@ -10,5 +10,5 @@ timestamp: 2026-06-28T00:00:00Z
 # Icon Settings
 
 Route under the Settings nav group. Maps processor / node types to gamma SVG icons (via `IconMapService`)
-used by the [Pipelines](../../module/etl/user-guide-pipeline-editor.md) graph editor and the [catalog](user-guide-catalog.md) graph. Icon names follow the gamma
+used by the [Pipelines](../../module/elt/user-guide.md) graph editor and the [catalog](user-guide-catalog.md) graph. Icon names follow the gamma
 convention (e.g. `heroicons_outline:play`).

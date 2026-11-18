@@ -1,6 +1,6 @@
 # Inspecto — Forward Roadmap
 
-**Status:** **§3 NEXT horizon, §6 sequence and vocabulary reconciled 2026-07-25** — §3.1–§3.3 have all shipped, and the banned term *Flow* is renamed to **Pipeline** per the binding [GLOSSARY](../../../../GLOSSARY.md). <!-- vocab-allow: names the Flow→Pipeline rename itself --> The **§1 theme horizons and the §2 NOW horizon had their status pass 2026-11-15** (`ARCH-DOC-CONTRADICTIONS-1`; see §9). · **Companion:** [../product/brochure-stakeholder-overview.md](../product/brochure-stakeholder-overview.md) · **Engineering detail:** [../../module/engine/architecture-pipeline-graph.md](../../module/engine/architecture-pipeline-graph.md)
+**Status:** **§3 NEXT horizon, §6 sequence and vocabulary reconciled 2026-07-25** — §3.1–§3.3 have all shipped, and the banned term *Flow* is renamed to **Pipeline** per the binding [GLOSSARY](../../../../GLOSSARY.md). <!-- vocab-allow: names the Flow→Pipeline rename itself --> The **§1 theme horizons and the §2 NOW horizon had their status pass 2026-11-15** (`ARCH-DOC-CONTRADICTIONS-1`; see §9). · **Companion:** [../product/brochure-stakeholder-overview.md](../product/brochure-stakeholder-overview.md) · **Engineering detail:** [../../module/elt/architecture.md](../../module/elt/architecture.md)
 
 > **Timeline convention.** This roadmap sequences work into **Now / Next / Later** horizons and gives **relative effort** sizing (S/M/L). It deliberately does **not** assign calendar dates — the cadence is one minor release per milestone on the active line, and dates are set per planning cycle, not here. Where an item gates revenue or another item, that dependency is called out explicitly.
 
@@ -86,7 +86,7 @@ The single most important item for commercialization.
 
 > **Delivered (ING-5).** The unified `parsing:` block — aliasing `csv_settings` / `processing.ingester` so
 > existing configs keep working — plus the **JSON/NDJSON** and **text/regex** frontends, with no engine
-> change. **Deferred:** LDIF block-records remain PROPOSED (`okf/product/module/etl/plan-ingestion.md` §2 `ING-5` — the requirement of record since `REQUIREMENTS.md` §3 became an index).
+> change. **Deferred:** LDIF block-records remain PROPOSED (`okf/product/module/elt/plan.md` §2 `ING-5` — the requirement of record since `REQUIREMENTS.md` §3 became an index).
 
 - **Scope:** promote today's frontends under one `parsing:` block (with `csv_settings`/plugin aliases so existing configs keep working), and add two new thin frontends producing rows for the shared backend:
   - **JSON** — wrap native JSON/NDJSON reads; lean on expression-mapping rules for nesting.
@@ -95,7 +95,7 @@ The single most important item for commercialization.
 
 ### 3.4 Pipeline authoring polish & streaming (T3) · Effort: **M**
 
-- **Scope:** round out the visual Pipeline editor (→ `../../../../BACKLOG.md` §3 `AUTHORING-REDESIGN-1`, **P2**, open letters only); ✅ the dedicated **run endpoint** for authored Pipelines **SHIPPED** — `POST /pipelines/authored/{id}/run` (`CapabilityManifest`); the **adapter stream-consumer runtime** for streaming sources — ✅ **BUILT 2026-09-24** (`STREAM-CONSUMER-1`, row closed): the loop is the Collector scan, hardened to slice-level at-least-once (the frontier re-keys on land and survives a restart; one uncommitted slice per partition; lag exported) — `../../module/acquire/plan-acquisition.md` §3.7, §3.9. A continuous `trigger: stream` lane is deferred until a latency target is named.
+- **Scope:** round out the visual Pipeline editor (→ `../../../../BACKLOG.md` §3 `AUTHORING-REDESIGN-1`, **P2**, open letters only); ✅ the dedicated **run endpoint** for authored Pipelines **SHIPPED** — `POST /pipelines/authored/{id}/run` (`CapabilityManifest`); the **adapter stream-consumer runtime** for streaming sources — ✅ **BUILT 2026-09-24** (`STREAM-CONSUMER-1`, row closed): the loop is the Collector scan, hardened to slice-level at-least-once (the frontier re-keys on land and survives a restart; one uncommitted slice per partition; lag exported) — `../../module/elt/spec-acquisition.md` § *Phase E* and § *The connector SPI*. A continuous `trigger: stream` lane is deferred until a latency target is named.
 - **Exit criteria:** an operator can author, validate, run, and observe a Pipeline entirely from the console; a streaming source lands records through the adapter with at-least-once semantics.
 
 ### 3.5 Config-authoring completion (T3) · Effort: **S**
@@ -204,4 +204,4 @@ restated, because each needs a status call rather than a doc edit:
 
 ---
 
-*For the business framing of these items see [../product/brochure-stakeholder-overview.md](../product/brochure-stakeholder-overview.md) §10. For engineering-level task detail see [../../module/engine/architecture-pipeline-graph.md](../../module/engine/architecture-pipeline-graph.md) §14.*
+*For the business framing of these items see [../product/brochure-stakeholder-overview.md](../product/brochure-stakeholder-overview.md) §10. For engineering-level task detail see [../../module/elt/architecture.md](../../module/elt/architecture.md) §14.*

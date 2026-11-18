@@ -17,7 +17,7 @@ sample**, creates the Space, loads `data/samples/orders` and runs the Pipeline o
 ([onboarding](../../layer/product/user-guide-onboarding.md), slice C4). By hand:
 
 1. Copy the files of `data/samples/orders` into `data/inbox/orders`.
-2. The `orders` Pipeline picks up each `ORDERS_<yyyyMMdd>.csv`, applies the Schema (adding `GROSS`) and writes Parquet. A repeated file is skipped by the duplicate check; a missing day is reported by gap detection. See [Pipelines](../../module/etl/user-guide-pipelines.md).
+2. The `orders` Pipeline picks up each `ORDERS_<yyyyMMdd>.csv`, applies the Schema (adding `GROSS`) and writes Parquet. A repeated file is skipped by the duplicate check; a missing day is reported by gap detection. See [Pipelines](../../module/elt/user-guide.md).
 3. The `orders_id_non_null` Expectation checks that every row has an `ORDER_ID`.
 
 ## Look at the result
@@ -27,4 +27,4 @@ sample**, creates the Space, loads `data/samples/orders` and runs the Pipeline o
 
 ## Make it yours
 
-Replace the sample feed with your own CSV: change the Pipeline's poll folder and file pattern, the Schema columns and the Expectation column, then point the Widgets at your fields — [Pipeline editor](../../module/etl/user-guide-pipeline-editor.md).
+Replace the sample feed with your own CSV: change the Pipeline's poll folder and file pattern, the Schema columns and the Expectation column, then point the Widgets at your fields — [Pipeline editor](../../module/elt/user-guide.md).

@@ -3,7 +3,7 @@ name: pipeline-author
 description: >
   Author or modify an Inspecto Pipeline (TOON config): new pipeline, new step/transform, Collector
   wiring, schema/grammar, sinks. Trigger on "create/edit a pipeline", "add a step", "wire a collector",
-  "why is my pipeline config refused". Routes through the module.etl / module.engine / module.config /
+  "why is my pipeline config refused". Routes through the module.elt / module.engine / module.config /
   module.acquire hubs, encodes the config-safety (SaveGate) rules and the validate → dry-run loop.
 ---
 
@@ -16,14 +16,14 @@ Vocabulary (`docs/GLOSSARY.md`): **Pipeline**, **Collector** (acquisition entity
 
 | Need | Hub / slot file |
 |---|---|
-| Pipeline model, editor, steps | `module/etl/architecture.md`, `module/etl/spec-step-catalog.md`, `module/etl/user-guide-pipelines.md`, `module/etl/user-guide-pipeline-editor.md` |
-| Parsing / schema mapping / enrichment | `module/etl/architecture.md`, `module/etl/user-guide-schema-mapping.md`, `module/etl/user-guide-enrichment.md` |
-| Execution: graph, node types, lanes | `module/engine/architecture-pipeline-graph.md`, `module/engine/spec-node-types.md`, `module/engine/spec-execution-lanes.md` |
-| Test run / dry run | `module/engine/spec-pipeline-test-run.md` |
-| Sinks, grammar, parser options | `module/engine/spec-output-sinks.md`, `module/engine/spec-parsing-grammar.md`, `module/engine/spec-parsing-options.md` |
+| Pipeline model, editor, steps | `module/elt/architecture.md`, `module/elt/spec-step-catalog.md`, `module/elt/user-guide.md`, `module/elt/user-guide.md` |
+| Parsing / schema mapping / enrichment | `module/elt/architecture.md`, `module/elt/user-guide.md`, `module/elt/user-guide.md` |
+| Execution: graph, node types, lanes | `module/elt/architecture.md`, `module/elt/spec-pipeline.md`, `module/elt/spec-pipeline.md` |
+| Test run / dry run | `module/elt/spec-pipeline.md` |
+| Sinks, grammar, parser options | `module/elt/spec-pipeline.md`, `module/elt/spec-ingest.md`, `module/elt/spec-ingest.md` |
 | TOON syntax + keys | `module/config/spec-toon-config.md`, `module/config/spec-pipeline-config-keys.md`, `module/config/admin-guide-configuration-reference.md` |
 | Safety gates | `module/config/spec-config-safety.md` |
-| Collectors (acquisition) | `module/acquire/architecture.md`, `module/acquire/user-guide-collector-config.md` |
+| Collectors (acquisition) | `module/elt/architecture.md`, `module/elt/user-guide.md` |
 | Spaces (where config lives) | `module/config/architecture.md` |
 
 ## Config-safety rules (from `spec-config-safety.md`)
@@ -68,6 +68,6 @@ Live probing: use the `smoke` skill (it boots ControlApi and always stops it).
 - [ ] Hub files read (table above); every key exists in `spec-pipeline-config-keys.md`.
 - [ ] Canonical terms only (Pipeline, Collector, Dataset, Expectation).
 - [ ] `POST /validate` reports no ERROR; dry-run returns the expected rows and rejects.
-- [ ] New node type? It also needs a flat-config home and a `spec-node-types.md` entry.
+- [ ] New node type? It also needs a flat-config home and a `module/elt/spec-pipeline.md` entry.
 - [ ] New route? Use the `endpoint` skill (openapi-v1.json entry + every gate tested).
 - [ ] Relevant unit tests green; the owning hub slot file updated.

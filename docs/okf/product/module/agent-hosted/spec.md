@@ -11,7 +11,7 @@ timestamp: 2026-06-28T00:00:00Z
 
 [`providers/inspecto-agent-hosted/`](architecture.md) supplies `ModelProvider` implementations backed by
 external/hosted LLM SDKs (langchain4j). It is **physically omitted from air-gapped builds** — neither the
-[core](../engine/architecture.md) nor the [assist agent](../agent/spec-assist-agent.md) module depends on a hosted SDK, so an
+[core](../elt/architecture.md) nor the [assist agent](../agent/spec-assist-agent.md) module depends on a hosted SDK, so an
 offline deployment simply doesn't bundle this jar (and the assist agent then runs only against any
 locally-available model, or abstains). Model/provider selection is configured via the `/assist/settings`
 route.

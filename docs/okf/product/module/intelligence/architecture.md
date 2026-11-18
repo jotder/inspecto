@@ -75,7 +75,7 @@ Moved to [AI assist — API](api-ai-assist.md).
 
 ## 8. Interactions
 
-- [Pipelines and steps](../etl/architecture.md) - draft-pipeline skill; [Alerts](../../addon/incidents/architecture.md) - triage-alert skill.
+- [Pipelines and steps](../elt/architecture.md) - draft-pipeline skill; [Alerts](../../addon/incidents/architecture.md) - triage-alert skill.
 - [Reconciliation](../reconciliation/architecture.md) - diagnose-break skill; [Anomaly](../anomaly/architecture.md) - `anomaly_scan` tool.
 - [Observability and backup](../observability/architecture.md) - batch failure events; [Maker-checker](../workflow/architecture.md).
 - [Identity and access](../access/architecture.md) - tool gates; [Link Analysis](../la-core/architecture.md).

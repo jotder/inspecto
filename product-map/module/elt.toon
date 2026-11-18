@@ -1,0 +1,8 @@
+id: module.elt
+kind: module
+title: ELT — ingestion, Pipelines and step registry
+parent: layer.platform
+module: etl
+billable: false
+status: ga
+docs: docs/okf/product/module/elt/index.md

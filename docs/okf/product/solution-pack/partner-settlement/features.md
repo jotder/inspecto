@@ -20,7 +20,7 @@ Wholesale finance and revenue-assurance teams at operators and MVNOs that settle
 
 ## Key capabilities
 
-- Seven Pipelines: partners, effective-dated settlement agreements, daily FX rates, public holidays, the partner statement (versioned lines with control totals), finance payments and notes, and the re-rated usage feed — [etl](../../module/etl/index.md)
+- Seven Pipelines: partners, effective-dated settlement agreements, daily FX rates, public holidays, the partner statement (versioned lines with control totals), finance payments and notes, and the re-rated usage feed — [etl](../../module/elt/index.md)
 - A settlement-cycle calendar: statement due, dispute window end and payment due, rolled to business days for the partner's country
 - Statement integrity: control total mismatch, duplicate, restated version, unknown partner, unknown agreement; a re-sent line counts once and the highest version wins
 - A per-agreement compare in the settlement currency: tolerance (percent or absolute), FX and effective dating come from the agreement, not the SQL

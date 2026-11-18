@@ -42,7 +42,7 @@ are three physically distinct kinds of state:
 
 Only the **operational** layer is a database in the SQL sense. This document covers it in full;
 business data (the file lake) and config (TOON) are documented in
-[`pipeline-graph-design.md`](architecture-pipeline-graph.md) and [`configuration`](../config/admin-guide-configuration-reference.md) respectively.
+[`pipeline-graph-design.md`](../elt/architecture.md) and [`configuration`](../config/admin-guide-configuration-reference.md) respectively.
 
 ### Key seams (source of truth)
 
@@ -671,7 +671,7 @@ before the cut: every writer (`ConsignmentOutputs.build`, `DerivedTableWriter`, 
 record field whose accessor no main-code path called; no SQL string, route (`RunRoutes` provenance omits it),
 openapi entry or UI surface mentioned it. The semantics it was declared for are already carried elsewhere —
 reprocess by `state = SUPERSEDED`, compaction by `COMPACTED_AWAY`, revisions by batch-id file names
-(`spec-consignment-addressing.md`, which records why a counter was refused), and torn-read safety by
+(`spec-ingest.md`, which records why a counter was refused), and torn-read safety by
 `ConsignmentSelector` pinning an **enumerated file list**, not a generation. ⛔ Do not re-add a counter
 "for pinning": the Selector never needed one. Pinned by
 `DbConsignmentOutputStoreTest.aRegistryCarryingTheRetiredGenerationColumnLosesItOnReopen`.
@@ -707,7 +707,7 @@ filesystem"* — is **false there**: each run writes a **new `path`**, so `DO UP
 and every run inserts its own row. ⛔ Do not "unify" the two lanes on the strength of the local one's
 idempotence: re-running a batch is idempotent locally and additive on an object store, which is a
 semantic difference, not a naming detail. ⚠ **Live since 2026-11-01:** the ingest lane writes an
-allow-listed `s3://` `dirs.database` (`SCALEOUT-OBJSTORE-DATABASE-DIR-1`; `spec-output-sinks.md`
+allow-listed `s3://` `dirs.database` (`SCALEOUT-OBJSTORE-DATABASE-DIR-1`; `spec-pipeline.md`
 § *Object-store `dirs.database`*), so a re-run batch now really does add rows here.
 
 ⚠ **`run_id` is deliberately still nullable**, even though every production path has supplied one since
@@ -908,7 +908,7 @@ run, lane and `seq` (a failed read throws: an empty list must never stand for "c
   `-Dconsignment.steps.retentionDays` (default 30; below 1 keeps everything) before its CHECKPOINT / VACUUM.
 - **Writers today:** the at-rest job lane (`PipelineJobRunner`, lane `job`), the ingest lanes
   (`ConsignmentIngestor`, lanes `ingest-flat` / `ingest-graph`, park included) and the drain (`DrainCommand`, lane
-  `drain`) — X5 L1 and L3, [execution lanes](spec-execution-lanes.md). The read route
+  `drain`) — X5 L1 and L3, [execution lanes](../elt/spec-pipeline.md). The read route
   `GET /consignments/{consignmentId}` is L4. Not listed in the raw table browser
   (`browseTables()` names `consignment_outputs` only).
 - **Reader (X5 L4, 2026-11-17):** `GET /consignments/{consignmentId}` (`ConsignmentRoutes`) reads

@@ -194,7 +194,7 @@ local `s3:` directory — see `PathJail.isUri`), so an object-store location has
 * **The Connection it writes through, `output.connection` (2026-11-01).** An `s3://` `dirs.database` must name the `s3` Connection
   that reaches it, and a local one may not name any (`ConfigSafetyValidator.checkOutputConnection`, 422 on
   `output.connection`). The pipeline stores an id, never a secret; whether the id is registered is checked
-  where the run resolves it (`ObjectStoreDatabase`, module.engine `spec-output-sinks.md` § *Object-store `dirs.database`*).
+  where the run resolves it (`ObjectStoreDatabase`, module.elt `spec-pipeline.md` (Part III — Sinks) § *Object-store `dirs.database`*).
 * **The run's seal admits the prefix alone.** `SqlSandbox.sealAllowing(conn, dirs, files, objectPrefixes)` adds
   each contained prefix to DuckDB's `allowed_directories` (with a trailing `/`, which is redundant: removing it
   left every test green, because DuckDB treats each entry as a directory itself). Measured on DuckDB 2.0.0.0

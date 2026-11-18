@@ -20,7 +20,7 @@ New customers and evaluators, and teams that want a pattern to copy for their ow
 
 ## Key capabilities
 
-- Stage-1 Pipeline with Schema and a derived `GROSS` column — [etl](../../module/etl/index.md)
+- Stage-1 Pipeline with Schema and a derived `GROSS` column — [etl](../../module/elt/index.md)
 - Non-null quality Expectation on `ORDER_ID`
 - Queryable Dataset `orders_dataset`
 - Dashboard `orders_overview`: total-orders KPI and a revenue-by-region bar chart

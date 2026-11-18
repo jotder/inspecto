@@ -59,8 +59,8 @@ seed), and per-capability overrides `searchable`/`exportable`/`queryable`/`savab
 
 ## Tier assignments across hosts
 
-* **pro**: [events](../../module/event/user-guide-events.md), [alerts](../../addon/incidents/user-guide-alerts.md), [objects](../../module/ops/user-guide-objects.md), [enrichment](../../module/etl/user-guide-enrichment.md) detail.
-* **standard**: [diagnoses](../../module/processor/user-guide-diagnoses.md), [runs](../../module/engine/user-guide-runs.md), [collectors](../../module/acquire/user-guide-collectors.md), [jobs](../../module/processor/user-guide-jobs.md), [catalog](user-guide-catalog.md), [run-detail](../../module/engine/user-guide-run-detail.md).
+* **pro**: [events](../../module/event/user-guide-events.md), [alerts](../../addon/incidents/user-guide-alerts.md), [objects](../../module/ops/user-guide-objects.md), [enrichment](../../module/elt/user-guide.md) detail.
+* **standard**: [diagnoses](../../module/processor/user-guide-diagnoses.md), [runs](../../module/elt/user-guide.md), [collectors](../../module/elt/user-guide.md), [jobs](../../module/processor/user-guide-jobs.md), [catalog](user-guide-catalog.md), [run-detail](../../module/elt/user-guide.md).
 * **mini / single-select**: enrichment-jobs grid, batch-detail & node-detail dialogs.
 
 # Examples

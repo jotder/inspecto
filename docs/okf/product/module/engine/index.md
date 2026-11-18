@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Pipeline execution (PIP) — capability spec](plan-pipeline-execution.md) |
-| spec | current | [Branch-aware ingest — `route:` on the poll-driven path](spec-branch-aware-ingest.md) · [Step Processor catalog vs. real node executors — the mapping/transform family](spec-catalog-vs-executors.md) · [Consignment addressing](spec-consignment-addressing.md) · [Consignment concurrency — the four-layer hierarchy](spec-consignment-concurrency.md) · [Database / persistence layer](spec-db-layer.md) · [DuckDB Integration](spec-duckdb.md) · [The editable round-trip (lift / lower)](spec-editable-round-trip.md) · [Execution lanes](spec-execution-lanes.md) · [The ingest wrap-SPI — non-DuckDB formats into the DuckDB core](spec-ingest-wrap-spi.md) · [Ingestion (StreamingFileIngester + consignment coordination)](spec-ingestion.md) · [Pipeline Live Execution](spec-live-execution.md) · [Pipeline node types & the node-type plugin seam](spec-node-types.md) · [Object-storage export (S3 / HDFS) — the push post-action and its posture](spec-object-storage-export.md) · [Output & Sinks](spec-output-sinks.md) · [Parser plugins (the self-describing Parser framework)](spec-parser-plugins.md) · [Parsing & Grammar](spec-parsing-grammar.md) · [Parsing options reference](spec-parsing-options.md) · [Pipeline test run (run-to-here)](spec-pipeline-test-run.md) · [Plugin ingester](spec-plugin-ingester.md) · [Post-sync step chains (the open DAG)](spec-post-sync-step-chains.md) · [Per-Step enabled — park and drain](spec-step-park-drain.md) · [Transforms & Modularity Seams](spec-transforms-seams.md) |
-| architecture | current | [Pipeline graph — the backend model](architecture-pipeline-graph.md) · [Stage-1 architecture & design](architecture-stage1.md) · [Execution engine](architecture.md) |
-| features | current | [Execution engine — features](features.md) |
+| plan | n/a | documented in the ELT hub module/elt plan.md (part EXE), merged 2026-11-18 (DOCS-ELT-CONSOLIDATE-1) |
+| spec | current | [Database / persistence layer](spec-db-layer.md) · [DuckDB Integration](spec-duckdb.md) |
+| architecture | n/a | documented in the ELT hub module/elt architecture.md (Execution engine internals, sections E1-E7), merged 2026-11-18 |
+| features | n/a | documented in the ELT hub module/elt features.md (Execution engine), merged 2026-11-18 |
 | feature-db | current | [Execution engine — feature database](feature-db.md) |
-| user-guide | current | [Run Detail](user-guide-run-detail.md) · [Runs (Operations)](user-guide-runs.md) |
-| admin-guide | current | [Execution engine — admin guide](admin-guide.md) |
-| api | n/a | the engine registers no HTTP routes; the Pipeline, Run and Job routes it serves are documented in module/processor api-routes and api-jobs-scheduler and module/etl api-parsing-ingest |
+| user-guide | n/a | documented in the ELT hub module/elt user-guide.md section 22 (Runs and Run Detail), merged 2026-11-18 |
+| admin-guide | n/a | documented in the ELT hub module/elt admin-guide.md, merged 2026-11-18 |
+| api | n/a | the engine registers no HTTP routes; the Pipeline, Run and Job routes it serves are documented in module/processor api-routes and api-jobs-scheduler and module/elt api.md |
 | tests | current | [Execution engine — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

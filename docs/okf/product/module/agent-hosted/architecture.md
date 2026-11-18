@@ -10,6 +10,6 @@ timestamp: 2026-06-28T00:00:00Z
 # Agent Hosted Module (`providers/inspecto-agent-hosted/`)
 
 artifactId `inspecto-agent-hosted`. Provides `ModelProvider` implementations backed by external/hosted
-LLM SDKs (langchain4j). It is **physically omitted from air-gapped builds** — the [core](../engine/architecture.md) and the
+LLM SDKs (langchain4j). It is **physically omitted from air-gapped builds** — the [core](../elt/architecture.md) and the
 [agent](../agent/architecture.md) module carry no hosted-SDK dependency, so an offline deployment simply doesn't bundle this
 jar. See [Hosted providers](spec.md).

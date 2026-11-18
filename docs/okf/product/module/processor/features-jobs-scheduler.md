@@ -15,8 +15,8 @@ timestamp: 2026-10-19T00:00:00Z
 Inspecto has two units of work:
 
 - A **Consignment** is a set of files ingested and processed together, atomically, by the poll cycle
-  ([parsing-ingest](../etl/architecture.md)). Its status flow is
-  [consignment-status-flow](../engine/architecture.md).
+  ([parsing-ingest](../elt/architecture.md)). Its status flow is
+  [consignment-status-flow](../elt/architecture.md).
 - A **Job** is a configured, triggerable unit of work outside the poll cycle. Each Job names a
   **Job Type** (the template) and runs as a **Run** with a Run Log, Signals and artifacts.
 
@@ -29,7 +29,7 @@ the boundary with Steps is [job-vs-step](architecture.md).
 
 Jobs are the platform's scheduler. Add-ons register Job Types (for example `alert.evaluate`,
 `caserule.evaluate`, `incident.open`), and Pipelines run their at-rest chain as a `pipeline` Job
-([pipelines-steps](../etl/architecture.md)). A Job reaches shared capabilities only through
+([pipelines-steps](../elt/architecture.md)). A Job reaches shared capabilities only through
 [Platform Services](../../layer/platform/architecture-platform-services.md) it declares in `requires:`.
 
 Job Types come from `JobTypeRegistry`, which records each type's source as `builtin`, `classpath`

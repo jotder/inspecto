@@ -16,7 +16,7 @@ timestamp: 2026-10-23T00:00:00Z
 ## Install
 
 1. Create the Space: `POST /spaces` with body `{"id":"<space>","template":"la-daily-feed"}` (needs `canAdminister`; `docs/api/openapi-v1.json`).
-2. Adapt per feed: rename the feed, columns and `include` file pattern; keep `partitionKey` on the event-date column. For a database export, follow the contract in the [ETL ingestion plan](../../module/etl/plan-ingestion.md).
+2. Adapt per feed: rename the feed, columns and `include` file pattern; keep `partitionKey` on the event-date column. For a database export, follow the contract in the [ETL ingestion plan](../../module/elt/plan.md).
 
 ## Verify
 

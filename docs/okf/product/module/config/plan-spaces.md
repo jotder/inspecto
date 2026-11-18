@@ -176,7 +176,7 @@ reads are (2026-09-24, `DataSourceBundleResolver.findReferencesFor`): its `*_enr
 and every Reference Dataset it joins by name travels as its `produces: reference` Pipeline + connection +
 schemas, indexed in the manifest's `references` map; an import into a Space that already hosts that Reference
 keeps the target's copy and names it in `referencesKept` rather than 409ing — see
-[editable round-trip §22](../engine/spec-editable-round-trip.md). `BundleImporter`
+[editable round-trip §22](../elt/spec-pipeline.md). `BundleImporter`
 **jails every zip entry** — an entry resolving outside `configDir` throws (the zip-slip pin, tested
 with a re-packed archive) — and **rebases** `spaces/<source>/…` path prefixes to the target Space (W3).
 `POST /spaces/import` reuses the same importer to seed a brand-new Space. ⚠ `multi-space.md` enumerates the
@@ -566,10 +566,10 @@ Step Processor and no new route.
   sha256, reason and retention, never its content. To investigate a refusal, use that event and the
   `ingest.refused` event inside the window, then fix the file at its origin and resend it. Never copy a restricted
   file out of the store. Nothing replays from the store, so a deletion costs no replay
-  ([Ingestion §3.6](../etl/plan-ingestion.md)).
+  ([Ingestion §3.6](../elt/plan.md)).
 - **Card-number scan at ingest (WS-40): what it covers, exactly.** The three Pipelines set
   `processing.refusal: restricted_quarantine`, `refusal_scan: card_number` and `refusal_retention_days: 30` (the
-  maximum). The scan is the platform's (`RefusalQuarantine.cardScanSql`, [Ingestion §3.6](../etl/plan-ingestion.md)). The schemas carry
+  maximum). The scan is the platform's (`RefusalQuarantine.cardScanSql`, [Ingestion §3.6](../elt/plan.md)). The schemas carry
   no scan expression.
   - **What it reads:** every raw cell except the `refusal_scan_exempt` columns (default: none), before anything is
     written.
@@ -581,7 +581,7 @@ Step Processor and no new route.
   - **The scan fails CLOSED.** If it cannot run (a read or SQL error), the file is restricted with
     `INGEST_REFUSE:SCAN_FAILED`, never landed. Restricting is chosen over failing the batch because a failed batch
     leaves the unscanned file in the inbox, re-polled every cycle. (The batch error text no longer quotes cell
-    values since 2026-10-03: [Ingestion](../etl/plan-ingestion.md).)
+    values since 2026-10-03: [Ingestion](../elt/plan.md).)
   - **The exempt list cannot switch the scan off.** A list covering every raw field is refused at load. A name that
     is no raw field is warned. Every control-plane write that changes a refusal key emits `pipeline.refusal.changed`
     (AUDIT, before / after).

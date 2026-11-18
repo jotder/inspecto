@@ -108,7 +108,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (87 open rows
 # Modules
 
 * [Access policy (roles, grants, row scope, audit trail)](module/access/index.md) - `module.access` · 8 doc(s) · 2 open row(s)
-* [Acquisition and collectors](module/acquire/index.md) - `module.acquire` · 11 doc(s) · 2 open row(s)
+* [Acquisition and collectors](module/acquire/index.md) - `module.acquire` · 2 doc(s) · 2 open row(s)
 * [Action Requests](module/action-requests/index.md) - `module.action-requests` · 10 doc(s) · 0 open row(s)
 * [Hosted model providers for the assistant](module/agent-hosted/index.md) - `module.agent-hosted` · 7 doc(s) · 0 open row(s)
 * [Assistant agent](module/agent/index.md) - `module.agent` · 10 doc(s) · 3 open row(s)
@@ -124,10 +124,10 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (87 open rows
 * [Kafka stream connector](module/connectors-kafka/index.md) - `module.connectors-kafka` · 6 doc(s) · 0 open row(s)
 * [Collector and export connectors](module/connectors/index.md) - `module.connectors` · 8 doc(s) · 1 open row(s)
 * [Demo authenticator](module/demo-auth/index.md) - `module.demo-auth` · 7 doc(s) · 0 open row(s)
-* [Execution engine](module/engine/index.md) - `module.engine` · 32 doc(s) · 7 open row(s)
+* [ELT — ingestion, Pipelines and step registry](module/elt/index.md) - `module.elt` · 11 doc(s) · 5 open row(s)
+* [Execution engine](module/engine/index.md) - `module.engine` · 4 doc(s) · 7 open row(s)
 * [Entity lists](module/entity-list/index.md) - `module.entity-list` · 9 doc(s) · 0 open row(s)
 * [Entity store](module/entity-store/index.md) - `module.entity-store` · 8 doc(s) · 1 open row(s)
-* [ETL model and step registry](module/etl/index.md) - `module.etl` · 17 doc(s) · 5 open row(s)
 * [Event model and log](module/event/index.md) - `module.event` · 9 doc(s) · 1 open row(s)
 * [Exchange (publication and ingestion contracts)](module/exchange/index.md) - `module.exchange` · 10 doc(s) · 2 open row(s)
 * [MaxMind geo-country resolver](module/geo-country/index.md) - `module.geo-country` · 7 doc(s) · 0 open row(s)

@@ -22,7 +22,7 @@ describe the chain, and this page is the one place both are laid out side by sid
 2. **Step Processors** — the 122<!--count:processors-->-entry product taxonomy the palette lists in eight families
    (`processor-catalog.contract.json`, `ProcessorCatalog.java`, served as
    `GET /pipelines/processor-catalog`). A processor is a *label* over a Step kind or an engine
-   capability, never a Java class of its own ([catalog-vs-executors](../engine/spec-catalog-vs-executors.md)).
+   capability, never a Java class of its own ([catalog-vs-executors](spec-pipeline.md)).
    Part B lists all of them by status: **54**<!--count:processors-delivered--> delivered, **17**<!--count:processors-partial--> partial
    (something ships, not as a chain Step, or not the whole promise), **51**<!--count:processors-planned--> **planned**
    (the palette shows them inactive — *"Not yet available"*). The board rendering of the same list is
@@ -42,8 +42,8 @@ legacy singular `processing.dedup:` / `processing.join:` / `processing.summarize
 summarize → route`) and the **recipe** (`RecipeCompiler`), which compiles to the flat form. Route
 branches may chain their own `steps[]`, limited to `filter` (with `where:`), `dedup` (consignment scope)
 and `summarize` — `RouteArming.BRANCH_STEP_KINDS`; a `join` or a nested `route` refuses at save and at
-registration. Mechanism detail: [execution-lanes](../engine/spec-execution-lanes.md), [live-execution](../engine/spec-live-execution.md),
-[editable-round-trip](../engine/spec-editable-round-trip.md).
+registration. Mechanism detail: [execution-lanes](spec-pipeline.md), [live-execution](spec-pipeline.md),
+[editable-round-trip](spec-pipeline.md).
 
 **Every delivered Step kind has a runnable example** in two places: standalone under
 [`inspecto/examples/`](../../../../../inspecto/examples/README.md) (`07-steps/` + `02-parsing/`) and, wired
@@ -195,7 +195,7 @@ relation, so nothing disappears unaccounted. ✅ **The INGEST lane keeps it too,
 the batch ledger's `rejected_rows`, and `total_input_rows` includes it, so nothing disappears
 unaccounted on either lane. 🔴 It did not until then: the ledger reported `rejected_count=0` for a file
 that lost a truncated record, with input and output both excluding it, so the counters reconciled while
-the record was missing. See [`consignment-status-flow.md`](../engine/architecture.md). A NULL predicate result drops the row. Mid-branch (inside
+the record was missing. See [`consignment-status-flow.md`](architecture.md). A NULL predicate result drops the row. Mid-branch (inside
 `route:`) a filter must carry `where:`; a blank predicate or a pre-parse key refuses to arm. At rest the
 legacy pre-map filter (`csv_settings.where`) is refused because the landed store no longer has raw columns.
 
@@ -1003,7 +1003,7 @@ execution-free DESCRIBE); only a DuckDB binder 422 blocks Apply. In the editor t
 views — a **Fields** grid over the function catalog and the **SQL** — with the bounded reconciler
 (projections only, catalog templates matched in reverse and re-compiled to prove the round-trip, the
 rest kept verbatim as custom rows; a `WHERE`/`JOIN` disables the Fields tab with the reason)
-([schema-mapping-authoring](user-guide-schema-mapping.md) §0).
+([ETL user guide](user-guide.md) §8.2).
 
 **Configuration.**
 
@@ -1234,7 +1234,7 @@ exactly one branch is the default, and a duplicated database refuses (rows would
 A branch may chain its own `steps[]` (filter · consignment-scope dedup · summarize) before its sink.
 Route lives on the **ingest lane** (the branch-aware executor gives each branch key its own sink), so
 the at-rest lift refuses a route step; switching a branch's sink off *parks* its rows for a later
-*drain* ([step-park-drain](../engine/spec-step-park-drain.md)). Multi-schema pipelines cannot arm a route.
+*drain* ([step-park-drain](spec-pipeline.md)). Multi-schema pipelines cannot arm a route.
 
 **Configuration.** The contract exposes `mode`; keys, predicates and destinations are the branch rows:
 
@@ -1458,7 +1458,7 @@ the declared ones also from its `ConfigSpecs` spec.
 **Function.** Runs hand-written SQL over a Pipeline's committed Stage-1 output joined to named
 references, and writes an enriched store. The canvas `enrichment` node is **companion-persisted**: its
 truth is the `*_enrich.toon`, which `PipelineEditable.lower` ignores
-([pipeline-editor § The enrichment Step](user-guide-pipeline-editor.md#the-enrichment-step)).
+([pipeline-editor § The enrichment Step](user-guide.md)).
 Parser: `EnrichmentConfig.fromMap`. Spec: `ConfigSpecs.enrichment()`, censused one level down
 (`AcceptedConfigKeys`, `EnrichmentKeyCoverageContractTest`).
 
@@ -1484,7 +1484,7 @@ Parser: `EnrichmentConfig.fromMap`. Spec: `ConfigSpecs.enrichment()`, censused o
 target's at-rest Parquet. A FAILED check opens a deduplicated `expectation:<name>` Incident and emits
 `EXPECTATION_FAILED`. It is authored through `/expectations*` and persisted as an `expectation` component
 under `<write-root>/registry` (`ExpectationRoutes`). It is never a chain Step.
-[ingestion § Expectations](plan-ingestion.md#37-expectations). Parser:
+[ingestion § Expectations](plan.md). Parser:
 `Expectation.fromMap`. Spec: `ConfigSpecs.expectation()`, the same twenty-two keys (the last eight are the
 `baseline` kind's — [observability § Baseline Expectations](../observability/plan-observability.md#310-baseline-expectations-duckle-c8-2026-09-24)).
 
@@ -1541,7 +1541,7 @@ four disjoint shapes, chosen by which keys are present:
 at all is moved to `dirs.quarantine`, under a reason sub-directory: `field_mismatch/`, `unreadable/`,
 `corrupt_download/` or `retry_exhausted/`
 ([operations-reference § Quarantine](../../layer/platform/admin-guide-operations-reference.md#quarantine),
-[output-sinks § Quarantine outcomes](../engine/spec-output-sinks.md#quarantine-outcomes)). The rows a
+[output-sinks § Quarantine outcomes](spec-pipeline.md#quarantine-outcomes)). The rows a
 parse rejects drain to `<dirs.errors>/<base>_errors.csv`. The lift models a quarantine *node* (a
 `sink.persistent` carrying `dir`, never `database`) only for selector/segments pipelines. Otherwise the
 directory has no owning node, and a save preserves it.
@@ -1567,7 +1567,7 @@ palette (*"Not yet available"*): no engine code, no config keys; adding one is a
 a `BuiltinNodeType.FlatHome` declaration on the enum case (since `NODE-TYPE-MIRRORS-1`, 2026-09-15, this is
 where `PipelineEditable` derives LOWERABLE and STEP_KIND from — they are no longer hand-kept lists) plus the
 lift/lower code that home names, and the runtime steps→graph seam — the
-four registrations [catalog-vs-executors](../engine/spec-catalog-vs-executors.md) names). The board's
+four registrations [catalog-vs-executors](spec-pipeline.md) names). The board's
 edition cells and the two Enterprise-only rows live in `tools/render-processor-board.mjs`.
 
 ✅ **"Delivered" now means "releasable" — the bar is adopted** (`PROCESSOR-RELEASE-READINESS-1`; audit
@@ -1582,7 +1582,7 @@ committed Space config, or, where infrastructure is unavoidable, an `examples/_r
 true by `ShippedExamplesPassTheSaveGateTest`. A processor that cannot meet a point is **PARTIAL**, not
 DELIVERED with a footnote. Earlier gap groups G1, G3–G8 and G11 closed 2026-09-23 (catalog↔docs drift, one
 `SaveGate`, save-time step checks — [config safety](../config/spec-config-safety.md#step-config-checks-g4) —,
-dry-run blind spots — [pipeline test run](../engine/spec-pipeline-test-run.md)).
+dry-run blind spots — [pipeline test run](spec-pipeline.md)).
 
 **Verdicts on the seven "questionably delivered" (2026-09-24).** ✓ met · ✗ not met · — no keys to get wrong ·
 column 5 = edition gating (G9, closed 2026-09-24 — see *Edition notes* below): *all* = every edition, as the board says.
@@ -1955,10 +1955,10 @@ file to `archive/archive/…`).
 - **Every delivered Step kind keeps its example runnable** — `inspecto/examples/07-steps` and
   `spaces/default/config/<kind>_step`. Run `bash inspecto/examples/run-example.sh 01-ingest/hello-csv`
   after touching the path jail or the launchers: the examples sit outside every test.
-- Related: [pipeline-graph-design](../engine/architecture-pipeline-graph.md) (the model) ·
+- Related: [pipeline-graph-design](architecture.md) (the model) ·
   [pipeline-config-keys](../config/spec-pipeline-config-keys.md) (who reads every block) ·
-  [execution-lanes](../engine/spec-execution-lanes.md) · [catalog-vs-executors](../engine/spec-catalog-vs-executors.md) ·
-  [pipeline-editor](user-guide-pipeline-editor.md) (the palette and panes) ·
+  [execution-lanes](spec-pipeline.md) · [catalog-vs-executors](spec-pipeline.md) ·
+  [pipeline-editor](user-guide.md) (the palette and panes) ·
   [job-vs-step](../processor/architecture.md) (why some catalog entries are Jobs, not Steps).
 
 ## Adding a node type — what is declared once, what is derived, what is legitimately separate (2026-09-15)

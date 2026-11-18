@@ -20,7 +20,7 @@ Card and wallet payment fraud teams.
 
 ## Key capabilities
 
-- 3 Pipelines that scan every row for a Luhn-valid, card-shaped number and move such a file to the restricted quarantine — [etl](../../module/etl/index.md)
+- 3 Pipelines that scan every row for a Luhn-valid, card-shaped number and move such a file to the restricted quarantine — [etl](../../module/elt/index.md)
 - 7 feature Datasets built hourly by `sql.template` Jobs over rolling windows
 - Dispute labels with a maturity flag (`DISPUTED`, `NEGATIVE`, `UNMATURED`)
 - 4 per-entity Alert Rules: card testing, BIN attack, velocity burst, SIM-swap takeover — [incidents](../../addon/incidents/index.md)

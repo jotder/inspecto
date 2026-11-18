@@ -1824,7 +1824,7 @@ hold, `D-ING5`). Live-drive findings: [tests-live-drives.md](tests-live-drives.m
   not cached. Measured (`ControlApiCoverageCacheTest#coldOpenBench`, `-Dinspecto.bench.coverage=true`): coverage 480 ms
   uncached → 683 ms first read, then 86-102 ms; the Dossier 524-714 ms → 97-166 ms (the replay itself is ~100 ms).
 - **Open remainder:** a literal-suffix `file_template` cannot see a RENAMED correction (see
-  `okf/product/module/etl/plan-ingestion.md`; the shipped template ends in `*`); completeness against an expected
+  `okf/product/module/elt/plan.md`; the shipped template ends in `*`); completeness against an expected
   Collector roster is `LA-COLLECTOR-COVERAGE-1`.
 
 ### Industry pack in the browser (`LA-EDITIONS-1` phase 4, as built 2026-10-17)

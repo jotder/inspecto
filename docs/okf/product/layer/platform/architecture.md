@@ -153,8 +153,8 @@ module layer; a split-package guard (`tools/check-module-architecture.mjs`) hold
 
 The contracts a jar can implement include: Collector connectors (`CollectorConnectorFactory`,
 [spec](../../module/connectors/spec-connectors.md)), parser plugins (`ParserPlugin`,
-[spec](../../module/engine/spec-parser-plugins.md)), Pipeline node types (`PipelineNodeType`,
-`PipelineNodeExecutor`, `StepExecutor`; [Pipeline graph](../../module/engine/architecture-pipeline-graph.md)),
+[spec](../../module/elt/spec-ingest.md)), Pipeline node types (`PipelineNodeType`,
+`PipelineNodeExecutor`, `StepExecutor`; [Pipeline graph](../../module/elt/architecture.md#e4-the-pipeline-graph--the-backend-model)),
 HTTP routes (`RouteModule`), Job Types and maintenance tasks (`JobTypeProvider`,
 `MaintenanceTaskProvider`), Platform Services contributed by a pack (`ServiceProvider`), Decision Rule
 Consequences (`ConsequenceProvider`), operational store families (`StoreFamilyProvider`), boot-time
@@ -175,7 +175,7 @@ Three facts about discovery are worth knowing before adding one:
 - **`StreamingFileIngester` is not a `ServiceLoader` contract.** A plugin ingester is instantiated by
   fully qualified class name off `schemas().ingesterClass()`, through one resolver,
   `PluginIngesters.open`. It has no `META-INF/services` entry. See
-  [ingestion](../../module/engine/spec-ingestion.md).
+  [ingestion](../../module/elt/spec-ingest.md).
 
 ## 6. Data path
 
@@ -183,15 +183,15 @@ Three facts about discovery are worth knowing before adding one:
 
 1. **Collect.** Collectors pull from local directories, SFTP, FTP and FTPS, databases, object stores
    (S3, Azure Blob, GCS) and Kafka, with deduplication and watermark ledgers and a stability gate.
-   See the [acquisition framework](../../module/acquire/architecture.md).
+   See the [acquisition framework](../../module/elt/architecture.md#data-acquisition-framework).
 2. **Parse and ingest.** Stage-1 parsing (M files to N record types) writes typed Parquet into the
-   lakehouse; bad rows are quarantined. See [Stage-1](../../module/engine/architecture-stage1.md) and
-   [ingestion](../../module/engine/spec-ingestion.md).
+   lakehouse; bad rows are quarantined. See [Stage-1](../../module/elt/architecture.md#e2-design-philosophy--scope) and
+   [ingestion](../../module/elt/spec-ingest.md).
 3. **Shape.** Pipelines of Steps: enrichment, deduplication, joins, time-series and analytics Steps,
-   then partitioned [output](../../module/engine/spec-output-sinks.md). The authored Pipeline graph and
+   then partitioned [output](../../module/elt/spec-pipeline.md). The authored Pipeline graph and
    its executor are layered on the engine; see
-   [Pipeline graph](../../module/engine/architecture-pipeline-graph.md) and
-   [live execution](../../module/engine/spec-live-execution.md).
+   [Pipeline graph](../../module/elt/architecture.md#e4-the-pipeline-graph--the-backend-model) and
+   [live execution](../../module/elt/spec-pipeline.md).
 4. **Analyse.** Measures and KPIs in Studio and BI; scores and baselines through the Analytics Kernel.
 5. **Act.** Alerts, Decision Rules (the Decision Kernel and its condition tree), Incidents, Cases and
    Action Requests.
@@ -391,10 +391,10 @@ that consumes data, Signals and decisions and produces new ones.
 
 | Network | Responsibility | Where its as-built detail lives |
 |---|---|---|
-| **Data** | records, Datasets, storage, transformations, record lineage, replay | [DB layer](../../module/engine/spec-db-layer.md) · [ingestion](../../module/engine/spec-ingestion.md) · [Consignment addressing](../../module/engine/spec-consignment-addressing.md) |
+| **Data** | records, Datasets, storage, transformations, record lineage, replay | [DB layer](../../module/engine/spec-db-layer.md) · [ingestion](../../module/elt/spec-ingest.md) · [Consignment addressing](../../module/elt/spec-ingest.md) |
 | **Signal** | events, notifications, Alerts, triggers, scheduler outputs | [Signal backbone](../../module/event/spec-signal-backbone.md) · [events and metrics](../../module/event/spec-events-metrics.md) |
 | **Decision** | Expectations, Alert Rules, Decision Rules, AI reasoning, recommendations, approvals | [Decision Rules](../../module/processor/spec-decision-rules.md) · [inline AI authoring](../../module/intelligence/user-guide-inline-ai-authoring.md) |
-| **Execution** | Jobs, processors, scheduling, retries | [Jobs](../../module/processor/spec-jobs.md) · [execution lanes](../../module/engine/spec-execution-lanes.md) |
+| **Execution** | Jobs, processors, scheduling, retries | [Jobs](../../module/processor/spec-jobs.md) · [execution lanes](../../module/elt/spec-pipeline.md) |
 | **Metadata** | schemas, Datasets, queries, lineage, catalog, dimensions, Measures — the spine | [component registry](../../module/processor/spec-component-registry.md) · [Metadata Bundle](../../module/processor/spec-metadata-bundle.md) |
 | **Presentation** | dashboards, Widgets, maps, graphs, reports, investigation views | [Studio](../product/user-guide-studio.md) · [geo map](../../module/geo-link/user-guide-geo-map.md) |
 | **Security** | users, permissions, audit, ownership, authentication | [auth and security](../../module/access/admin-guide-auth-security.md) |
@@ -520,7 +520,6 @@ naming rule is held by `node tools/check-product-docs.mjs`.
 | Item | Architecture | Topic pages |
 |---|---|---|
 | Access policy (roles, grants, row scope, audit trail) (`module.access`) | [architecture](../../module/access/architecture.md) |  |
-| Acquisition and collectors (`module.acquire`) | [architecture](../../module/acquire/architecture.md) |  |
 | Action Requests (`module.action-requests`) | [architecture](../../module/action-requests/architecture.md) |  |
 | Hosted model providers for the assistant (`module.agent-hosted`) | [architecture](../../module/agent-hosted/architecture.md) |  |
 | Assistant agent (`module.agent`) | [architecture](../../module/agent/architecture.md) |  |
@@ -536,10 +535,9 @@ naming rule is held by `node tools/check-product-docs.mjs`.
 | Kafka stream connector (`module.connectors-kafka`) | [architecture](../../module/connectors-kafka/architecture.md) |  |
 | Collector and export connectors (`module.connectors`) | [architecture](../../module/connectors/architecture.md) |  |
 | Demo authenticator (`module.demo-auth`) | [architecture](../../module/demo-auth/architecture.md) |  |
-| Execution engine (`module.engine`) | [architecture](../../module/engine/architecture.md) | [Pipeline graph — the backend model](../../module/engine/architecture-pipeline-graph.md) · [Stage-1 architecture & design](../../module/engine/architecture-stage1.md) |
+| ELT — ingestion, Pipelines and step registry (`module.elt`) | [architecture](../../module/elt/architecture.md) |  |
 | Entity lists (`module.entity-list`) | [architecture](../../module/entity-list/architecture.md) |  |
 | Entity store (`module.entity-store`) | [architecture](../../module/entity-store/architecture.md) |  |
-| ETL model and step registry (`module.etl`) | [architecture](../../module/etl/architecture.md) |  |
 | Event model and log (`module.event`) | [architecture](../../module/event/architecture.md) |  |
 | Exchange (publication and ingestion contracts) (`module.exchange`) | [architecture](../../module/exchange/architecture.md) |  |
 | MaxMind geo-country resolver (`module.geo-country`) | [architecture](../../module/geo-country/architecture.md) |  |

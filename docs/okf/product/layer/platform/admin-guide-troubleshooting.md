@@ -93,7 +93,7 @@ framework runs in **generation mode** for a genuinely huge single file (member �
 scratch stay bounded regardless of file size — or **union mode** for many small files. If a huge custom
 file still exhausts memory, confirm it is actually being routed to generation mode (lower
 `large_file_bytes`, or check the member size). See
-[plugins.md → execution modes](../../module/engine/spec-plugin-ingester.md#execution-modes--the-framework-picks-by-file-size).
+[plugins.md → execution modes](../../module/elt/spec-ingest.md#execution-modes--the-framework-picks-by-file-size).
 
 ### DuckLake registration fails silently
 

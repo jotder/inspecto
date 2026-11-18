@@ -62,7 +62,7 @@ The corpus ships in `data/samples`; copy each feed into `data/inbox/<feed>` to i
 
 ## Modules used
 
-- [Pipelines and Steps](../../module/etl/architecture.md),
+- [Pipelines and Steps](../../module/elt/architecture.md),
   [Jobs and scheduler](../../module/processor/architecture.md).
 - [Alerts](../../addon/incidents/architecture.md), [Incidents](../../addon/incidents/architecture.md),
   [Case management](../../module/case-management/architecture.md).

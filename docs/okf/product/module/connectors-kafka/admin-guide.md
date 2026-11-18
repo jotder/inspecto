@@ -73,7 +73,7 @@ host.
 * **Continuous:** `trigger: {type: stream, records: N, max_wait: T}` (defaults 1000 records, 5 s) on the
   Pipeline keeps the consumer open, probes the backlog every 200 ms and drains at N records or after T.
   Backoff tunables `-Dstream.lane.backoff.baseMs` / `-Dstream.lane.backoff.maxMs` (1 s doubling to 60 s).
-  Details: [acquisition plan](../acquire/plan-acquisition.md).
+  Details: [acquisition plan](../elt/plan.md).
 
 ## 3. Offsets and delivery
 

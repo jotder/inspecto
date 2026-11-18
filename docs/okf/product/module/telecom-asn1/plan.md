@@ -39,4 +39,4 @@ EDITIONS row SP-PRS-06: an ASN.1 BER telecom CDR decoder as a Pipeline step (`pa
 
 ## References
 
-- [architecture](architecture.md) · [spec](spec.md) · [engine spec-parser-plugins](../engine/spec-parser-plugins.md)
+- [architecture](architecture.md) · [spec](spec.md) · [engine spec-parser-plugins](../elt/spec-ingest.md)

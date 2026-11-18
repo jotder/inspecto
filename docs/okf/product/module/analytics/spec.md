@@ -337,7 +337,7 @@ instead of forcing one to look like the other. NULL handling in `SimilaritySql` 
 |---|---|---|
 | Screening `NameMatcher` (token similarity of the name method) | `TOKEN_JARO_WINKLER = new JaroWinkler(UTF16_CHAR, HALF, 0.1, 4, 0.0)` — the prefix boost always applied, exactly its old arithmetic. Folding, honorifics, transliteration, the phonetic reading and blocking **stay in Screening** | `NameMatcherGoldenTest` (bit for bit against the frozen old code over 20,000 seeded pairs; SHA-256 of 5,000 seeded `score` results) |
 | Intelligence `TriageRunSimilarity` / `TriageRunStore` (Triage Run recall) | `Similarity.jaccard`; its own tokenizer (lower-case, `[a-z0-9]+`, ≥ 3 characters) stays | `TriageRunSimilarityGoldenTest` (bit for bit over 20,000 seeded set pairs; SHA-256 of 5,000 seeded `score` results) |
-| Step `transform.similarity` (catalog `quality.match.fuzzy`) | `SimilaritySql.Method` + `normalize` through the engine's `SimilarityStep`, which adds a 1,000-character cap per value (a longer value fails the run) | [step-catalog § similarity](../etl/spec-step-catalog.md) |
+| Step `transform.similarity` (catalog `quality.match.fuzzy`) | `SimilaritySql.Method` + `normalize` through the engine's `SimilarityStep`, which adds a 1,000-character cap per value (a longer value fails the run) | [step-catalog § similarity](../elt/spec-step-catalog.md) |
 
 Each golden test was committed against the old code first and passed after the switch with only its `SUBJECT` line
 repointed. That closed the duplication guard's category c: **0** findings (from 2), baseline rewritten.
@@ -403,7 +403,7 @@ component size), and `USING KEY` recursion waits for DuckDB 2.0 (plan C7). Becau
 
 | Caller | Uses |
 |---|---|
-| Step `transform.entity.link` (catalog `enrichment.entity.link`) | `EntityGroupingSql.run` through the engine's `EntityLinkStep` ([step-catalog § entity_link](../etl/spec-step-catalog.md)) |
+| Step `transform.entity.link` (catalog `enrichment.entity.link`) | `EntityGroupingSql.run` through the engine's `EntityLinkStep` ([step-catalog § entity_link](../elt/spec-step-catalog.md)) |
 
 Link Analysis' `EntityRegistry` keeps its own fold of `identity.asserted` / `retracted` facts into resolution groups
 (on the same `UnionFind`): what counts as an identity fact stays in that module (plan §2). The Step's resolution group
@@ -478,7 +478,7 @@ empty bins in a Pipeline.
 ### The Steps
 
 `DistributionStep` (engine) owns the three grammars; `RowShaper`, the recipe compiler and the save gate (`ConfigRoutes`)
-refuse with its words. Keys, outputs and release bar: [step-catalog](../etl/spec-step-catalog.md) § `outlier`,
+refuse with its words. Keys, outputs and release bar: [step-catalog](../elt/spec-step-catalog.md) § `outlier`,
 § `binning`, § `correlation`. Base in every edition (D-AN7). The catalog's *Pearson & Spearman correlation matrix* is
 **DELIVERED** (2026-10-18): `method: spearman` runs the same figures over the within-group *average ranks*
 (`Stats.ranks`, `Stats.spearman`, `CorrelationSql.Method.SPEARMAN`; ties share the average of the ranks they span, so
@@ -580,7 +580,7 @@ the repeated hour gets a day start after itself; its label is still the right da
   counts (key, bucket) pairs with more than one row, which a caller must refuse first.
 
 Exposed as the Steps `transform.timeseries.resample` and `transform.timeseries.shift`
-([step-catalog](../etl/spec-step-catalog.md)), through the engine's `TimeSeriesStep` (grammar, clock/type checks).
+([step-catalog](../elt/spec-step-catalog.md)), through the engine's `TimeSeriesStep` (grammar, clock/type checks).
 Release bar (2026-10-17): documented; real-path tests (`RowShaperTimeSeriesTest`, `PipelineJobRunnerTest`); lift/lower
 round trip (`NodeConfigNameContractTest`, `PipelineEditableTest`) — the dry run walks every `transform.*` node through
 the same `RowShaper` arm, with no test of its own; palette `addable` from the regenerated contract; Base in every
@@ -848,7 +848,7 @@ forecast and distribution Steps: one grammar parsed in one place (`TimeSeriesSte
 output columns flowing on to later Steps), so all three refuse the same config with the same words. Registered in
 `BuiltinNodeType` (flat home `steps:`, kinds `changepoint`, `retention`, `funnel`), `PipelineConfig.Step.KINDS`,
 `NodeAttributes`, `ProcessorCatalog` (BI family, DELIVERED) and both UI contract JSONs. Keys, defaults and refusals per
-Step: [step catalog](../etl/spec-step-catalog.md#changepoint--transformtimeserieschangepoint--change-point-regime--drift-detector).
+Step: [step catalog](../elt/spec-step-catalog.md#changepoint--transformtimeserieschangepoint--change-point-regime--drift-detector).
 
 **Shape decisions (assistant-decided 2026-11-01, pending operator confirmation; the Sales & Marketing pack's plan is
 still not in the repository):**
@@ -922,7 +922,7 @@ neither caller's buckets moved.
 *ANALYTICS-CORE-1 S4, built 2026-10-17.* Three Steps for BI, investigations and testing large Datasets. Only the sampler
 needs kernel code — its order must be reproducible outside DuckDB; ranking is one window function and the pivot's
 aggregates are the Measure grammar's, so both live in the engine's Step grammar (`RankStep`, `PivotStep`). Every Step:
-[step-catalog](../etl/spec-step-catalog.md) (`rank`, `sample`, `pivot`).
+[step-catalog](../elt/spec-step-catalog.md) (`rank`, `sample`, `pivot`).
 
 ### The sampler — `com.gamma.analytics.sample.Sampler`
 
@@ -1013,7 +1013,7 @@ layering and circular-financing rings are this shape. It returns each match's no
 *ANALYTICS-CORE-1 S5 (a) + (e), built 2026-10-17.* Package `com.gamma.analytics.forecast`. The `business-assurance`
 Space Template's Holt-Winters SQL, lifted into a core function: a JVM kernel (`Forecaster`) for bounded series, its
 DuckDB form (`ForecastSql`) for Datasets, and the Step `transform.timeseries.forecast`
-([step-catalog](../etl/spec-step-catalog.md)). No training on the request path, no new dependency (W1–W3, W7):
+([step-catalog](../elt/spec-step-catalog.md)). No training on the request path, no new dependency (W1–W3, W7):
 both methods are closed-form recursions with **declared** parameters — nothing is fitted or searched, so the same
 input gives the same numbers.
 

@@ -31,8 +31,8 @@ many isolated Spaces. The parts keep their own status lines and verification dat
 Inspecto has two units of work:
 
 - A **Consignment** is a set of files ingested and processed together, atomically, by the poll cycle
-  ([parsing-ingest](../etl/architecture.md)). Its status flow is
-  [consignment-status-flow](../engine/architecture.md).
+  ([parsing-ingest](../elt/architecture.md)). Its status flow is
+  [consignment-status-flow](../elt/architecture.md).
 - A **Job** is a configured, triggerable unit of work outside the poll cycle. Each Job names a
   **Job Type** (the template) and runs as a **Run** with a Run Log, Signals and artifacts.
 
@@ -51,7 +51,7 @@ the boundary with Steps is [job-vs-step](#job-vs-pipeline-step--capability-bound
 
 Jobs are the platform's scheduler. Add-ons register Job Types (for example `alert.evaluate`,
 `caserule.evaluate`, `incident.open`), and Pipelines run their at-rest chain as a `pipeline` Job
-([pipelines-steps](../etl/architecture.md)). A Job reaches shared capabilities only through
+([pipelines-steps](../elt/architecture.md)). A Job reaches shared capabilities only through
 [Platform Services](../../layer/platform/architecture-platform-services.md) it declares in `requires:`.
 
 Job Types come from `JobTypeRegistry`, which records each type's source as `builtin`, `classpath`
@@ -140,7 +140,7 @@ Moved to [Jobs and scheduler — API](api-jobs-scheduler.md).
 
 Both do work on data, so they invite the question "which one should this be?". The answer is not a
 matter of taste: [`GLOSSARY.md`](../../../../GLOSSARY.md) §5 and
-[`pipeline-graph-design.md`](../engine/architecture-pipeline-graph.md) §3.8 make **in-motion
+[`pipeline-graph-design.md`](../elt/architecture.md) §3.8 make **in-motion
 (Pipeline) vs at-rest (Job)** a *binding* line. This part carries the full capability comparison behind
 that rule, verified against source 2026-08-07; extensibility and naming re-grounded 2026-09-01.
 
@@ -151,7 +151,7 @@ Java — you implement `Job.run(ctx)` and ship a class. A Step is *today* declar
 DuckDB SQL by `RowShaper`/`TransformCompiler` and executed by `ConsignmentGraphRunner`. In the committed
 vocabulary (D2) a Step receives a **Consignment token** and resolves the data by reference — edges carry no
 records; the full runtime edge model converges at Phase 7
-([`node-types.md`](../engine/spec-node-types.md) § *The token model*). Since 2026-08-29 a plugin *can* supply a Step's execution
+([`node-types.md`](../elt/spec-pipeline.md) § *The token model*). Since 2026-08-29 a plugin *can* supply a Step's execution
 (`PipelineNodeExecutor`, §3) — that changes who writes the SQL-shaping code, not what a Step **is**, and
 it still gets no service façade. [Platform Services](spec-platform-services.md) stage 2 (still unbuilt) is
 the different, richer thing: a pack-hosted Step *program* (`EXECUTED` mode) — again without changing what
@@ -192,7 +192,7 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
 |---|---|---|
 | **Data state** | **In motion** — the Step's Consignment token references rows in flight | **At rest** — data already landed |
 | **Implementation** | Config → DuckDB SQL | Java class in a jar |
-| **Extensibility** | **Open, in two independent halves** (both `ServiceLoader` seams): `PipelineNodeType` (descriptor) + `PipelineNodeExecutor` (execution, SHIPPED 2026-08-29) — a third party CAN ship a Step type today; a plugin needs **both** registrations. See [node-types.md §"The execution half"](../engine/spec-node-types.md) | **Open registry**: `JobTypeProvider` via `ServiceLoader` *and* hot-deployable Job Packs |
+| **Extensibility** | **Open, in two independent halves** (both `ServiceLoader` seams): `PipelineNodeType` (descriptor) + `PipelineNodeExecutor` (execution, SHIPPED 2026-08-29) — a third party CAN ship a Step type today; a plugin needs **both** registrations. See [node-types.md §"The execution half"](../elt/spec-pipeline.md) | **Open registry**: `JobTypeProvider` via `ServiceLoader` *and* hot-deployable Job Packs |
 | **Hot deploy / unload** | via a **pack**: `JobPackManager` also registers pack-contributed node types + their Steps into the owner-keyed overlay (`PipelineNodeTypes.register` / `StepExecutors.register`, first pack wins per type, deregistered on unload — 2026-08-31; since S2-3, 2026-09-28, a pack's executor is a `StepExecutor` and a pack carrying a raw `PipelineNodeExecutor` is rejected, D-2). Classpath (`META-INF/services`) providers still require a build. 🔴 **The two routes are deliberately ASYMMETRIC: a pack may NOT redefine a built-in** — the registration is refused and, pack loading being atomic, the whole pack is rejected, because a jar dropped in a directory silently redefining `sink.persistent` would change what every existing pipeline means — **while a classpath provider MAY**, that being an edition specialising the core at build time, reviewed and shipped together. ⚠ And **unloading a pack makes its types unknown again, so a stored pipeline naming one stops loading** — the same exposure a Job typed on an unloaded pack has, and the reason a pack is normally *replaced* rather than removed. Stated, not fixed. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)* | `JobPackManager`: watched dir, isolated `URLClassLoader`, atomic load-or-reject, in-flight-Run quiesce before unload |
 | **Code trust** | classpath providers: none needed (compiled/deployed with the engine); pack-contributed ones inherit the pack jar's trust gate | `-Djobs.packs.allowlist` (SHA-256 of the staged jar, required; none ⇒ every pack refused), plus the optional integrity check `-Djobs.packs.requireSignature` on every class entry |
 | **Runtime context** | ⛔ none — config plus a SQL relation | `JobContext`: `runId`, `spaceId`, `trigger`, `config`, `params`, `log()`, `signals()`, `artifacts()`, `dryRun()` |
@@ -291,7 +291,7 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
 > (`PipelineNodeType` + `PipelineNodeExecutor`, plus the pack overlay) shipped independently,
 > 2026-08-29/31 — what S2 still owns is the *pack-hosted* Step kind with isolation and a watchdog.
 
-Related: [Jobs & Scheduling](spec-jobs.md) · [Pipeline graph design](../engine/architecture-pipeline-graph.md)
+Related: [Jobs & Scheduling](spec-jobs.md) · [Pipeline graph design](../elt/architecture.md)
 · [Signal backbone](../event/spec-signal-backbone.md) · [Platform Services](spec-platform-services.md)
 
 ## Multi-Space Hosting

@@ -1317,7 +1317,7 @@ What exists to build on (measured 2026-11-12, code read; claims checked against 
 - **A continuous lane already exists.** `trigger: {type: stream, records: N, max_wait: T}` gives a Pipeline one
   `StreamLane` (`inspecto-acquire`), a virtual thread that keeps the consumer open. It probes `pendingRecords()` every
   200 ms (`PipelineScheduler.STREAM_PROBE_MS`). It drains when the backlog reaches N (default 1000) or has waited T
-  (default 5 s). It was built for D-P7, "p95 ≤ 30 s event → Incident". **Measured** (`plan-acquisition.md` §3.9):
+  (default 5 s). It was built for D-P7, "p95 ≤ 30 s event → Incident". **Measured** (`archived-documents/plans-archive/2026-11-18-plan-acquisition.md` §3.9):
   event → committed frontier p50 563 ms, p95 1030 ms (MockConsumer, T = 1 s); file → committed batch 1.6 s through real
   ingest. **Not measured: the hop from commit to Alert.** D-P7 is therefore not proven end to end. Push ingest
   (`POST /streams/{id}/records`) is a second live input on the same path.

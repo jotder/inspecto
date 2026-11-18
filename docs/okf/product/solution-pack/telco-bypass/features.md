@@ -20,7 +20,7 @@ Fraud and revenue-assurance teams at operators and MVNOs that see their own voic
 
 ## Key capabilities
 
-- Four Pipelines: the voice CDR feed and three small Reference feeds (cell sites, own number ranges, the subscriber profile) — [etl](../../module/etl/index.md)
+- Four Pipelines: the voice CDR feed and three small Reference feeds (cell sites, own number ranges, the subscriber profile) — [etl](../../module/elt/index.md)
 - A nightly chain of six Jobs: the SIM-day signals (`tb_features`), the score inputs (`tb_factors`), the Risk Score (`tb_risk_score`), the findings (`tb_findings`), the box members (`tb_cluster_members`) and the boxes (`tb_clusters`)
 - One Incident per suspected box (`tb_box_suspected`, CRITICAL) and a Case per box: SIMs that share a device, a cell or an activation batch; an IMEI-swapping box is caught by its cell, a slow-roll box whose SIMs are each under the volume floor is still found, and 1,200 alerting SIMs of 20 boxes read as 20 Incidents, not one storm — [case-management](../../module/case-management/index.md)
 - A Link Analysis view of the box members, a registry runbook, and an analyst-facing evidence row per box (candidates, scored and alerting members, top score, talk minutes, cells, devices, IMEI swaps, days seen)

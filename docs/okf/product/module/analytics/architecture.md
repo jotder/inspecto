@@ -80,7 +80,7 @@ Packages under `platform/inspecto-analytics/src/main/java/com/gamma/analytics`:
 ## 5. Configuration
 
 None of its own: the kernel is a library. Parameters arrive from its callers — Step keys
-([step catalog](../etl/spec-step-catalog.md)), score model specs, and the per-kind
+([step catalog](../elt/spec-step-catalog.md)), score model specs, and the per-kind
 entity cap `-D` property that `EntityCap` parses (malformed or ≤ 0 keeps the default).
 
 ## 6. Screens
