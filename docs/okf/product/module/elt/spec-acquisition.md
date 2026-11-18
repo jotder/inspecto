@@ -417,7 +417,7 @@ Implementations: `InMemoryAcquisitionLedger` (**default — lost on restart**) a
 `inspecto_acquisition_ledger` and `inspecto_acquisition_db_watermark`
 (`DbAcquisitionLedger.TABLE`, `.WM_TABLE`). `AcquisitionLedgers` is the per-space `shared()` accessor + lifecycle
 manager — one of the five MDC-routed singletons. Dedup keys are SHA-256 hashed in the ledger (decision
-2026-09-01, [plan](plan.md#decisions)).
+2026-09-01, [plan](plan.md)).
 
 🔴 **`DuplicatePolicy` is TWO orthogonal enums, not one list.** The retired `framework.md` stated the modes as
 "PATH / METADATA / CHECKSUM / SKIP / REPROCESS / VERSION / FAIL", which conflates the detection axis with
@@ -442,7 +442,7 @@ defaults when the block is present (`PipelineConfigParser.parseCollector`). `alg
 which is JDK-only (`MessageDigest`/`CRC32`), streams in 64 KB chunks, returns lowercase hex, and accepts
 `MD5`, `SHA1`, `SHA256` (default), `SHA512`, `CRC32` with or without the dash. A feed that must let a
 corrected same-name file land uses `mode: checksum` + `on_change: reprocess` (worked example: the daily feed in
-[the ETL user guide](../elt/user-guide.md#113-daily-feeds--the-template-the-export-contract-and-delivery-checks)).
+[the ETL user guide](user-guide.md#113-daily-feeds--the-template-the-export-contract-and-delivery-checks)).
 
 **Collection guarantee.** `collector.guarantee` → `BEST_EFFORT` (default) | `AT_LEAST_ONCE` |
 `EXACTLY_ONCE` (`PipelineConfig.Guarantee`; both dash and underscore spellings parse). `requiresLedger()`
@@ -470,8 +470,8 @@ an event-time column.
 `order` is `mtime` (arrival — the default) or `name`, and **garbage refuses at parse time** rather than being
 silently ignored (`PipelineConfigParser`, the consignment-caps block). The pre-move `processing.batch:`
 spelling is dual-read, canonical-first, and nothing writes it any more (same block). How the planner then
-cuts and runs Consignments: [engine — Consignments](../engine/spec-consignments.md) and
-[engine — ingest](../engine/spec-ingest.md).
+cuts and runs Consignments: [engine — Consignments](spec-ingest.md) and
+[engine — ingest](spec-ingest.md).
 
 ## Phase D — gap detection
 
@@ -510,7 +510,7 @@ Two optional keys beside it (operator, 2026-10-06) — `file_template` (one date
 e.g. `CDR_{yyyyMMddHH}_{seq}_*`, or date-only `XDR_{yyyyMMdd}.csv` = one expected file per date bucket) and
 `seq_scope` (`PER_BUCKET` | `CONTINUOUS`, required when the template holds `{seq}`, refused when it does not;
 operator, 2026-10-06) — are read by the `kpi.completeness` job to count missing files and by the delivery check
-(per-day manifest + windowed `SEQUENCE_GAP`, [the ETL user guide](../elt/user-guide.md#113-daily-feeds--the-template-the-export-contract-and-delivery-checks)).
+(per-day manifest + windowed `SEQUENCE_GAP`, [the ETL user guide](user-guide.md#113-daily-feeds--the-template-the-export-contract-and-delivery-checks)).
 `sequence` and `GapDetector` are unchanged. See [observability §3.9](../observability/plan-observability.md).
 
 ## Phase E — retrieval: plan once, stage, then land
@@ -619,7 +619,7 @@ registered via `META-INF/services`) and `ConnectionWorkbench` — lives in the c
 
 ⚠ **"Eight connectors" is the count of the optional module, not of the registry.** Verified from `META-INF/services/com.gamma.acquire.CollectorConnectorFactory`: **seven** factories ship in `inspecto-connectors` (`sftp`, `ftp`, `ftps`, `db`, `s3`, `azure`, `gcs`), **one** (`kafka`) in the premium module `inspecto-connectors-kafka` (MODULE-REORG-1 P7, 2026-10-07; Standard and above — Basic has no Kafka), **one** more in `inspecto-engine` (`DatasetCollectorConnectorFactory` → `connector: dataset`, UI-S7), and `local` is the built-in default that needs no jar. So ten values resolve, and a bundle without the sidecar resolves only `local` and `dataset`. *(Two more entries exist under `inspecto/src/test/resources` — `FakeRemoteConnectorFactory` and `FakeOffsetTailConnectorFactory` — and are test-only; do not count them.)*
 
-⚠ **`https` is a Connection scheme, not a Collector scheme** (2026-09-23). No `CollectorConnectorFactory` serves it: an `https` Connection is the target of the outbound **Webhook sink** (`sink.webhook`, [step-catalog](../elt/spec-step-catalog.md#webhook--sinkwebhook--the-outbound-webhook)), onboarded under the same `canOnboardConnections` grant as every other Connection. That grant is what makes a Connection the egress gate. `host`/`port`/`base_path` build the URL, `password` is the bearer-token reference, and the option `timeout_seconds` sets the request timeout. The sink refuses a tunnel or proxy. A Collector bound to an `https` Connection fails as an unknown scheme.
+⚠ **`https` is a Connection scheme, not a Collector scheme** (2026-09-23). No `CollectorConnectorFactory` serves it: an `https` Connection is the target of the outbound **Webhook sink** (`sink.webhook`, [step-catalog](spec-step-catalog.md#webhook--sinkwebhook--the-outbound-webhook)), onboarded under the same `canOnboardConnections` grant as every other Connection. That grant is what makes a Connection the egress gate. `host`/`port`/`base_path` build the URL, `password` is the bearer-token reference, and the option `timeout_seconds` sets the request timeout. The sink refuses a tunnel or proxy. A Collector bound to an `https` Connection fails as an unknown scheme.
 
 🔴 **For 85 days the remote connectors were build-available and deploy-absent.** `inspecto-connectors` was a
 reactor module no bundle shipped, so `connector: s3` and its siblings could be authored, compiled and tested and
@@ -692,7 +692,7 @@ of scope by design. The default `options.payload: envelope` already carries `top
 weighed. (A) the scheduler's acquisition tick, hardened — **built**; its latency floor is the acquisition
 cadence, or a `POST /collectors/{id}/notify` wake-up. (B) a continuous `trigger: stream` lane in
 `PipelineScheduler` — **deferred** at the time, then built (below). (C) a long-running Job — **refused**
-([plan](plan.md#refused--superseded)). The at-least-once fixes (Phase E and the fence) were needed under every
+([plan](plan.md)). The at-least-once fixes (Phase E and the fence) were needed under every
 option, so they landed inside the row rather than as a separate P1 (Q1).
 
 **The continuous lane — option B, built (ASSURE-PUSH-INGEST-1, 2026-09-29).** D-P7 named the target the
@@ -748,7 +748,7 @@ differently or not at all:
   the 5 forms and omitted this gate; its current text is correct — prefer it over any older account.
 - Only `ConnectionRegistry.find` is consulted at `forConfig` time; a missing profile yields `null` and the
   factory decides. Since 2026-09-25 a remote Collector whose `collector.connection` names no profile in the
-  Space is an ERROR finding at save ([plan](plan.md#not-built)).
+  Space is an ERROR finding at save ([plan](plan.md)).
 - **Proxy precedence.** A proxy is **ignored when an SSH `tunnel:` is also configured**, because the tunnel
   already rewrites the dial target to a local loopback forward. Fail-closed on what cannot be routed: an
   unrecognised proxy `type`, a JDBC driver other than PostgreSQL, and a proxy combined with an SSH tunnel on
@@ -824,7 +824,7 @@ the security boundary. To collect from a share: mount it at the OS level (Window
 the jail via `-Dassist.safety.roots=<existing roots>;X:\` (a `;`-separated list), and point `dirs.poll` (or
 `base_path`) at the mounted path. The built-in `local` connector then handles discovery / stability / dedup
 identically to a local inbox, and credentials, reconnection and caching stay the OS's job, where they are
-audited and battle-tested. Why it is refused: [plan](plan.md#refused--superseded).
+audited and battle-tested. Why it is refused: [plan](plan.md).
 
 ## Defaults worth not "fixing"
 
@@ -844,8 +844,7 @@ consignment `order` **`mtime`** · stability `window` **`30s`** / `size_checks` 
 > files *before* Consignments are planned, and the run-level ledger that reports what became of each
 > Archive. Shipped `d6cd55b7` (2026-08-23); honesty fixes `fe6e1d7e` and the ledger 2026-08-26.
 > Plan (archived, complete): [`archived-documents/plans-archive/unpack-stage-plan.md`](../../../../archived-documents/plans-archive/unpack-stage-plan.md).
-> Related: [`../engine/spec-ingest.md`](../engine/spec-ingest.md) · [`../engine/architecture.md`](../engine/architecture.md) ·
-> [`../engine/spec-parsing.md`](../engine/spec-parsing.md)
+> Related: [`spec-ingest.md`](spec-ingest.md) (ingest and parsing) · [`architecture.md`](architecture.md)
 
 Vocabulary (`GLOSSARY.md`): an **Archive** is a container file; an **Entry** is one inner file — ⛔ never
 *member* (a Member is a file in a Consignment); **Unpack** is the Collector-level stage that turns Archives and
@@ -1088,5 +1087,5 @@ compressed spelling of that logical name has been processed.
 | The Kafka connector, its fence and stream lane | [connectors-kafka/spec.md](../connectors-kafka/spec.md) |
 | Operator runbook: profile YAML, host-key table, FTPS, bastion, db-export | [connectors/admin-guide-connectors-runbook.md](../connectors/admin-guide-connectors-runbook.md) |
 | Module boundary + dependency confinement of the connectors jar | [connectors/architecture.md](../connectors/architecture.md) |
-| Consignments, the ingest strategies and commit order that consume the landed inbox | [engine/spec-consignments.md](../engine/spec-consignments.md) · [engine/spec-ingest.md](../engine/spec-ingest.md) |
+| Consignments, the ingest strategies and commit order that consume the landed inbox | [engine/spec-consignments.md](spec-ingest.md) · [engine/spec-ingest.md](spec-ingest.md) |
 | Screens and the Collector configuration surface | [user-guide.md](user-guide.md) |

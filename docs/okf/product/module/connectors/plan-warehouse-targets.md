@@ -175,5 +175,5 @@ is the *customer's* system, reached only by the outbound job.
   [Delta grows up: writes, Unity Catalog and time travel (2026-05-07)](https://duckdb.org/2026/05/07/delta-uc-updates) ·
   [duckdb-delta #289 — managed-table write failure](https://github.com/duckdb/duckdb-delta/issues/289)
 * In-repo — `PartitionWriter` object-store lane (`d87b7890`, 2026-09-14) · `EXPORT-1` (BACKLOG §3) ·
-  `docs/archived-documents/plans-archive/sinks-config-format-plan.md` · `docs/okf/product/module/engine/spec-sinks.md` ·
+  `docs/archived-documents/plans-archive/sinks-config-format-plan.md` · `docs/okf/product/module/elt/spec-pipeline.md` ·
   `tools/fetch-duckdb-extensions.mjs` (the staged extension set)

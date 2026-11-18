@@ -1,20 +1,20 @@
 ---
 type: Feature
-title: Pipelines — user guide
-description: One guide to building a Pipeline, from a blank install to a queryable Dataset — the first-run journey and use cases, the Pipeline editor (shell, canvas, Step configuration, Parse, schema authoring, the Record Transformer and the transform.sql pane, joins, filters, enrichment, sinks and route branches), ingest options and feed contracts, testing, saving and history, pipeline-level surfaces, guided mode and the Run screens.
-resource: inspecto-ui/src/app/modules/admin/pipelines/pipelines.routes.ts, inspecto-ui/src/app/modules/admin/pipelines/pipeline-transform-sql-definition.component.ts, inspecto-ui/src/app/modules/admin/enrichment/enrichment.routes.ts
-tags: [feature, pipelines, editor, authoring, g6, graph, workbench, schema, mapping, transform, parsing-ingest, enrichment, onboarding, use-cases, user-guide]
+title: ELT — user guide
+description: One guide to building and running a Pipeline, from a blank install to a queryable Dataset — the first-run journey and use cases, the Pipeline editor (shell, canvas, Step configuration, Parse, schema authoring, the Record Transformer and the transform.sql pane, joins, filters, enrichment, sinks and route branches), ingest options and feed contracts, testing, saving and history, pipeline-level surfaces, guided mode, the Collectors and Connections screens with the one collector-block form, and the Runs and Run Detail screens.
+resource: inspecto-ui/src/app/modules/admin/pipelines/pipelines.routes.ts, inspecto-ui/src/app/modules/admin/pipelines/pipeline-transform-sql-definition.component.ts, inspecto-ui/src/app/modules/admin/enrichment/enrichment.routes.ts, inspecto-ui/src/app/modules/admin/collectors/collectors.routes.ts, inspecto-ui/src/app/inspecto/collector/collector-config.component.ts, inspecto-ui/src/app/modules/admin/runs/runs.routes.ts
+tags: [feature, pipelines, editor, authoring, g6, graph, workbench, schema, mapping, transform, parsing-ingest, enrichment, onboarding, use-cases, user-guide, collectors, acquisition, connections, runs, operations, detail, breadcrumb]
 timestamp: 2026-11-18T00:00:00Z
 ---
 
-# Pipelines — user guide
+# ELT — user guide
 
 **What this covers.** How a person turns a file into a Dataset they can query, and how the **Pipeline
 editor** works when they do it by hand. It starts with the first-time journey (who the first user is, the
 steps they take today, the nine use cases the product is built against), then follows a Pipeline in build
-order: the editor itself, collecting, parsing, the schema, transforming and mapping, enriching, loading into
-sinks, the ingest options a feed needs, testing, saving, and the screens that show a Run. Every section keeps
-the traps and decisions that shaped the screen, so the next change does not re-break them.
+order: the editor, collecting, parsing, the schema, transforming and mapping, enriching, loading into sinks,
+ingest options, testing, saving, and the screens that show a Run. Two appended sections cover the
+**Collectors** and **Connections** screens (§21) and the **Runs** and **Run Detail** screens (§22).
 
 **Contents**
 
@@ -39,12 +39,21 @@ the traps and decisions that shaped the screen, so the next change does not re-b
 19. [Verification culture](#19-verification-culture)
 20. [References](#20-references)
 
+**Reading order.** §21 and §22 joined this guide on 2026-11-18, when the Collectors and Runs guides were
+merged into it. They are appended so that §1–§20 keep their numbers, and they sit just before §20
+References, which stays last. Read §21 with §5 (it is the full contract of the Collect Step, before §12
+testing and §13 saving), and §22 with §16.
+
+21. [Collectors and Collector configuration](#21-collectors-and-collector-configuration) — the Collectors and
+    Connections screens and the one `collector:` form (§21.1–§21.8)
+22. [Runs and Run Detail](#22-runs-and-run-detail) — the Runs list and the Run Detail tabs (§22.1–§22.2)
+
 > **Scope and owners.** This guide owns the **editor UI** truth (operator decision 2026-09-01: single source of
 > truth, split by layer). It defers to:
 > - [Grammar configuration](../config/user-guide-grammar-config.md) — the Parse pane's internals and everything Grammar;
-> - [Collector configuration](../acquire/user-guide.md) — the `acquisition` Step surface;
+> - [§21 Collectors](#21-collectors-and-collector-configuration) (below) — the `acquisition` Step surface;
 > - [Inline AI authoring](../intelligence/user-guide-inline-ai-authoring.md) — the `<inspecto-ai-assist>` adoption;
-> - [`okf/backend/pipeline-graph/`](../../index.md) and the [engine Pipeline model](../engine/spec-pipeline-model.md) —
+> - [`okf/backend/pipeline-graph/`](../../index.md) and the [Pipeline spec — model](spec-pipeline.md) —
 >   the backend Pipeline model (lift/lower/validator/executor, the token model);
 > - [`archived-documents/plans-archive/pipeline-spec.md`](../../../../archived-documents/plans-archive/pipeline-spec.md) — **archived 2026-09-10**, provenance only.
 >
@@ -457,7 +466,7 @@ the border. jsdom cannot host G6: the specs drive the fit against a stand-in tha
 dragging a Step persists every node's position (`node:dragend` → `persistLayout()`), and the next open
 restores them instead of re-running the automatic `antv-dagre` layout. **Home = browser
 `localStorage`, `inspecto.pipelines.layout.<space>.<pipelineId>`** (`pipelines/pipeline-layout.ts`) —
-deliberately NOT the `*_pipeline.toon`: the [editable round-trip](../engine/spec-pipeline-model.md)
+deliberately NOT the `*_pipeline.toon`: the [editable round-trip](spec-pipeline.md)
 carries no coordinates, and a position key there would be config the engine never reads that every
 writer must preserve. Positions are a view preference, like the dock widths and grid layouts beside
 them. Rules: a stored layout is applied **only when it covers every node** (a Step it does not know —
@@ -507,7 +516,7 @@ guard a different failure: the **verbatim** test (unmodelled keys included); a *
 because "a block can be perfectly modelled, perfectly parsed from a map, and still be unwritable or
 unreadable as a file"; and a **reachable-path** test that drives the editor's actual write route to an engine
 field, because a key can be read by the executor while being unreachable from the file the editor writes.
-Backend detail: [engine — Pipeline model](../engine/spec-pipeline-model.md).
+Backend detail: [Pipeline spec — model](spec-pipeline.md).
 
 ### 3.2 The Step-type vocabulary is the engine's, and only the engine's
 
@@ -546,7 +555,7 @@ Edge `rel`s are `PipelineRel` constants, and in the token vocabulary they are **
 operator-named `route:*`. 🔴 **`success`/`failure` are NOT sink-emitted** — an earlier revision of this
 line said so; `PipelineRel` records that they are "constructed nowhere … declared vocabulary with no
 producer at all". They, with `on_commit` and `gap`, are **Signals, not edges**. See
-[the token model](../engine/spec-pipeline-model.md).
+[the token model](spec-pipeline.md).
 
 ⚠ **An invented vocabulary survives unnoticed because nothing rejects it**: `PipelineValidator`
 flags an unknown type as a *warning*, `PipelineCodec` stores `config` as an unchecked map, and
@@ -671,7 +680,7 @@ closing D1–D9 (full history: `NodeConfigNameContractTest` docblock and git his
   two adopters that reach `collector:` differently, so a key can be real for one and unreachable for
   the other. Treat "declared but unreachable" as a per-adopter question; the fix is **derive the
   adopter's table (never fork it) or move the key to the Step the engine reads it from** — and ask
-  where the engine reads the key before choosing ([collector configuration](../acquire/user-guide.md)).
+  where the engine reads the key before choosing ([§21 Collectors](#21-collectors-and-collector-configuration)).
 - Sinks are specced only for the `output:` keys the backend reads; remaining `transform.*` types are
   **deliberately unspecced**, falling back to the typed extra-config editor (§4). Declared
   defaults **persist on save** even when untouched (product-confirmed: configs stay explicit).
@@ -735,8 +744,8 @@ definition drawer via `pipeline-config-definition.component.ts`. (`NodeConfigDia
 
 Renders the shared **`<inspecto-collector-config>`** over the shared `COLLECTOR_ATTRIBUTES` — mode
 toggle (Local inbox | Connection | Dataset), Test connection, create-a-Connection, derived
-`collector.connector`. Full contract: [Collector configuration](../acquire/user-guide.md); engine side:
-[acquisition spec](../acquire/spec.md).
+`collector.connector`. Full contract: [§21 Collectors](#21-collectors-and-collector-configuration) below; engine side:
+[acquisition spec](spec-acquisition.md).
 
 **Marker dedup lives on the acquisition Step** (file-grain duplicate detection is decided in the
 poll cycle; `transform.dedup.marker` is retired read-compat). Config keys unchanged
@@ -930,7 +939,7 @@ exists** (P6-e); the editor is the guided surface.
 Fixed-width: `start` is a **0-based** offset (1-based counting shifts every field one character and parses
 "successfully"); `has_header` defaults `true` for `fixedwidth` too, silently eating a line — a server-published
 default, deliberately not flipped (migration, not UI fix). Every `parsing:` key, per frontend, with its refusals:
-[engine — parsing](../engine/spec-parsing.md).
+[ingest spec — parsing](spec-ingest.md).
 
 ---
 
@@ -959,7 +968,7 @@ default, deliberately not flipped (migration, not UI fix). Every `parsing:` key,
   a strptime pattern such as `%B %d,%Y`) — without it a non-ISO date lands NULL; see §7.4. For a column holding an
   epoch count (`1700000000`, with `0` for none), declare the type `TIMESTAMP` and type `epoch` (seconds) or
   `epoch_ms` (milliseconds) in **Date format**: it lands as the UTC time and `0` lands empty — no `sql` step needed
-  ([engine — parsing](../engine/spec-parsing.md)).
+  ([ingest spec — parsing](spec-ingest.md)).
 - **Suggested selectors follow the frontend** (LA-ONBOARD-FIXES-1, F-4): the route's optional body key
   `frontend` (the value `/config/preview/parsing` reports) picks the selector. Delimited — the default when
   it is absent — and fixed-width get the column's **zero-based index** in the sample's order, because their
@@ -1036,7 +1045,7 @@ format and is suggested VARCHAR. `SchemaExtractor` regeneration does not preserv
 **Epoch counts (2026-11-15, `MAPPING-EPOCH-TIMESTAMP-1`):** the reserved values `epoch` / `epoch_ms` on a
 `TIMESTAMP` field read a count of seconds / milliseconds since 1970 as its UTC wall clock — no source zone
 applies, `0` is NULL and not a counted failure, a non-integer is a counted NULL; rules and reasons in
-[engine — parsing](../engine/spec-parsing.md).
+[ingest spec — parsing](spec-ingest.md).
 
 **Time zone of the incoming data.** Precedence `raw.fields[].timezone_column > raw.fields[].timezone > parsing.source_timezone >
 none` (`SourceZones`); `TIMESTAMPTZ` with no zone source and `%z` / `%Z` formats are **refused at config load**;
@@ -1138,7 +1147,7 @@ a bespoke pane reached from the editor's routing arm `dn.type === 'transform.sql
 2026-09-05 (the projection slot is a `transform.sql`, so it opens this pane); every other `transform.*` kind stays on
 the generic `pipeline-config-definition` schema-form. A node TYPE routes to its own pane — the rule that already held
 for map/parse/sink. ⅋ The pane is **bespoke — NOT the shared fields editor**: it does not import
-`<inspecto-schema-fields-editor>`. Engine half: [engine — Pipeline model](../engine/spec-pipeline-model.md).
+`<inspecto-schema-fields-editor>`. Engine half: [Pipeline spec — model](spec-pipeline.md).
 
 🔴 **This surface flipped twice on 2026-09-04. The SQL-only middle state is NOT current.** The Step
 shipped SQL-only that morning (`24171333`, which deleted the 2026-09-03 fields grid), and the operator
@@ -1255,7 +1264,7 @@ for a new Step with an explicit column list over the upstream sample columns, el
 - **Row order is the output order** — ▲/▼ per row reorder `fields[]`, and `generateSql` emits in that
   order.
 - **Audit boundary:** saving a `transform.sql` node yields one WARNING `SQL_STEP_UNAUDITED` from the
-  validator; a WARNING never blocks save (proven by test — [engine — Pipeline model](../engine/spec-pipeline-model.md)).
+  validator; a WARNING never blocks save (proven by test — [Pipeline spec — model](spec-pipeline.md)).
   The SQL guard (`SqlGuard`) refuses data-definition statements, multiple statements and file-reading functions at
   the describe preview, at execution and — since 2026-09-09 — on save (`SQL_STEP_REFUSED`, §13.2).
 
@@ -1553,7 +1562,7 @@ until the pane read them back (`loadSavedSchema`). Legacy `partitionKey:` loads 
 trio. Mixed date sources WARN, never block (the engine degrades catalog bounds). A stored `source` the schema no
 longer carries stays listed — visible beats vanished. The smart launcher pre-picks a date field only when exactly
 ONE exists; ⚠ native `<select>` in `@for`: bind `[selected]` per option, never `[value]` on the select. Sinks
-themselves: [engine — sinks](../engine/spec-sinks.md).
+themselves: [Pipeline spec — sinks](spec-pipeline.md).
 
 ### 10.2 Route branches — the destination is IDENTITY
 
@@ -1591,7 +1600,7 @@ database; the lift rebuilds pairing from the stamp.
   `new TreeSet<>(BRANCH_STEP_KINDS)`), which is exactly why the server side never drifted. Pinned by three specs
   asserting the label names every member of the set. Remove/move inside a branch stay canvas work. Design:
   [`mid-branch-transforms-design.md`](../../../../archived-documents/plans-archive/mid-branch-transforms-design.md);
-  backend: [engine — Pipeline model](../engine/spec-pipeline-model.md).
+  backend: [Pipeline spec — model](spec-pipeline.md).
 
 **`sql` mid-branch (SQL-BRANCH-1, 2026-09-06).** A `transform.sql` step inside a `route:` branch used to compile and
 then refuse at arming, because `RouteArming.BRANCH_STEP_KINDS` held filter/dedup/summarize only. `RowShaper.sql`
@@ -1726,7 +1735,7 @@ batch row now splits `rejected_files`/`rejected_rows` and `total_input_rows` cou
 `INGEST-ERRORS-CSV-PER-COLUMN-1` (one errors row per bad line, raw line once), and
 `DUPLICATE-CHECK-GRAIN-UNSTATED-1` (§5). The workbench-side findings (`GRAPH-SAVE-REFORMATS-CONFIG-1`,
 `UI-CREATED-PIPELINE-FLAT-HOME-1`, `READONLY-LENS-PALETTE-ENABLED-1`) are in this guide (§6.3) and the
-[engine Pipeline model](../engine/spec-pipeline-model.md). Reproduce:
+[Pipeline spec — model](spec-pipeline.md). Reproduce:
 `python spaces/demo/data/samples/gen-postmed-xdr.py --seed-inbox`, then run the CLI over the Pipeline; copy
 `PMXDR_20260904_001.psv.defect` in as `.psv` for the fault run. Build record:
 [postmed-xdr-pipeline-build](../../../../archived-documents/plans-archive/postmed-xdr-pipeline-build.md).
@@ -1785,7 +1794,7 @@ config only, like every other Job param (no per-run override).
 **Delivery checks (T8, operator 2026-10-06).** Declare the feed's parts on the Collector:
 `gap_detection.file_template: "XDR_{yyyyMMdd}_part{seq}*"` + `seq_scope: PER_BUCKET` (`seq_scope` is required when the
 template holds `{seq}` and refused when it does not; the same keys the completeness KPI uses —
-[acquire spec Phase D](../acquire/spec.md#phase-d--gap-detection)). A one-file-per-day feed declares a date-only template,
+[acquisition spec Phase D](spec-acquisition.md#phase-d--gap-detection)). A one-file-per-day feed declares a date-only template,
 `file_template: "XDR_{yyyyMMdd}.csv"` with no `seq_scope` (operator, 2026-10-06): one expected file per day, its part number
 recorded as 0, a missing day = one missing file. ⚠ A literal suffix means a RENAMED correction (`XDR_20260902_fix.csv`)
 does not match the series: it lands, the day's rows double, and nothing is signalled (found live 2026-10-14). The shipped
@@ -1823,7 +1832,7 @@ this change).
   parsed rows. `to=` bounds the walk to the **ancestor closure** of the chosen Step; unknown `to=` is 400. Opened via
   `PipelineEditorComponent.openRunToHere()` / `RunToHereDialog`. This runs the actual compiled SQL, so an expression
   typo or a missing join reference WOULD surface here. Details:
-  [engine — Pipeline execution](../engine/spec-pipeline-execution.md).
+  [Pipeline spec — execution](spec-pipeline.md).
 - **Test this Step** (drawer inline preview) — `POST /components/{transform|sink}/preview` runs an
   **inline** config over the tab's parsed rows: exactly what the operator is mid-writing.
   🔴 The gate is the Step's own TYPE (`testFamily()`), ⛔ never `data.bindKind` — `bindKind` is null
@@ -1863,7 +1872,7 @@ toast. Apply (drawer) patches in memory; Save persists; the per-tab dirty flag g
 **The save route runs the arming pre-checks** (2026-09-01): `armedWithoutSchema` / `routeArming` /
 `stepDisable` findings, same severity split as `/config/write` (ERROR ⇒ 422 when `active: true`,
 WARNING on a draft) — before this, the editor's Save could 200 a pipeline that silently failed to
-arm at the next registry rebuild. Backend detail: [engine — Pipeline model](../engine/spec-pipeline-model.md).
+arm at the next registry rebuild. Backend detail: [Pipeline spec — model](spec-pipeline.md).
 
 **Validation is live while dirty** (2026-09-01): a debounced (~1.5s) pass recomputes `findings()`
 after graph mutations (drawer keystrokes live outside the model until Apply, so they never
@@ -1941,7 +1950,7 @@ Known save-path defects are tracked in [BACKLOG](../../../../BACKLOG.md) — see
   the `produces` select; when `reference`, load-mode + comma-separated key + refresh seconds.
   Dedicated `GET/POST /pipelines/{name}/settings` — NOT `PUT .../graph`; `PipelineEditable`
   deliberately never models non-node keys (decision 2026-08-13). A hand-built form: `fieldSpecsToAttributes` deliberately
-  skips served `LIST`. Backend: [engine — Pipeline model](../engine/spec-pipeline-model.md).
+  skips served `LIST`. Backend: [Pipeline spec — model](spec-pipeline.md).
 - **`description`** is declared (`ConfigSpecs.pipeline()`), parsed, projected conditionally by
   `GET /pipelines`, and rendered as the open-dialog row subtitle. ⛔ Display only. Editable
   post-creation via the settings surface since 2026-09-01 (trimmed on write; **blank clears the
@@ -1974,7 +1983,7 @@ Known save-path defects are tracked in [BACKLOG](../../../../BACKLOG.md) — see
   `produces`), so the Open dialog's per-row download action exports WITHOUT opening a tab and the
   editor's menu item delegates to the same function. Un-gated (export is a read); an OPEN dirty
   row keeps the refusal toast, a closed row exports freely. The server-side pipeline bundle shipped 2026-09-01
-  (TRANSFER-ARCH-1; [engine — Pipeline model](../engine/spec-pipeline-model.md)); Duplicate and the row export still
+  (TRANSFER-ARCH-1; [Pipeline spec — model](spec-pipeline.md)); Duplicate and the row export still
   ride the client stream-bundle (BACKLOG follow-up).
 - 🔴 **`produces` names two different things**: `PipelineSummary.produces` = the list of STORES;
   stream-vs-reference is the config-level `produces` behind the settings endpoint. Deciding the
@@ -2109,7 +2118,7 @@ Enrich → Publish — each with a status word and finding count, each click ope
   decision 2026-09-23) a flat-lane `?dryRun=true` run writes one `parse`/`sink` record flagged
   `simulated` — its only write — so it appears in the picker marked. Since 2026-09-24 its counts are
   **real** — rows parsed, rows that would have landed — because the flat-lane dry run now parses inside a
-  contained pass ([engine plan](../engine/plan.md)).
+  contained pass ([plan](plan.md)).
 - ⛔ **The go-live readiness gate is guided-only**: `validatePipeline` does not require a parse
   Step; a hand-built collect→sink graph is legitimate. ⚠ Every stage resolves through the served
   catalog — unresolved catalog reads as five empty stages.
@@ -2134,8 +2143,8 @@ Enrich → Publish — each with a status word and finding count, each click ope
 
 ## Runs and processing status
 
-Design and internals: [Parsing and ingest architecture](architecture.md); the Run screens in depth:
-[engine user guide](../engine/user-guide.md).
+Design and internals: [Parsing and ingest architecture](architecture.md#parsing-and-ingest); the Run screens in depth:
+[§22 Runs and Run Detail](#22-runs-and-run-detail) below.
 
 - **Pipeline editor, Parse definition** (`inspecto-ui/src/app/modules/admin/pipelines/pipeline-parse-definition.component.ts`):
   frontend choice, grammar form rendered from the parser's served `grammarSchema`, and a sample preview (§6).
@@ -2145,7 +2154,7 @@ Design and internals: [Parsing and ingest architecture](architecture.md); the Ru
   true total). Trigger, pause, resume and drain are on the Run surfaces ([API](api.md#parsing-and-ingest)).
 - **Processing status** (`inspecto-ui/src/app/modules/admin/processing-status/processing-status.component.ts`):
   problem files per Pipeline.
-- **Collectors** (`/collectors`): *Run now* and Collector state — [Collectors](../acquire/user-guide.md).
+- **Collectors** (`/collectors`): *Run now* and Collector state — [§21 Collectors](#21-collectors-and-collector-configuration).
 
 ---
 
@@ -2210,14 +2219,313 @@ Three lessons this feature keeps re-proving, kept here because they shape every 
 - **Falsify guards before trusting them** — the write-ordering guards were verified by deleting
   them and watching exactly their own tests fail.
 
+## 21. Collectors and Collector configuration
+
+How a person works with Collectors in the console: the **Collectors** screen that
+lists every configured collection task, the **Connections** screen where endpoints and credentials are
+kept, and the one form used to configure what a Collector does (local inbox, a Connection, or another
+Pipeline's Dataset). It also records the rules that form follows, so the next change to it does not
+re-break them. The engine side is in [the acquisition spec](spec-acquisition.md) and [architecture](architecture.md#collectors).
+*(Merged from the acquire hub's user guide on 2026-11-18; §5 is the short version inside the editor.)*
+
+### 21.1 The screens
+
+Route `/collectors` (Workbench nav group). Lists configured collection tasks in a **standard**
+[data-table](../../layer/product/spec-ds-data-table.md) (`autoHeight`). Backed by `CollectorsService`.
+Design and internals: [Collectors architecture](architecture.md#collectors).
+
+- **Collectors** — route `collectors`, `inspecto-ui/src/app/modules/admin/collectors/collectors.component.ts`,
+  with the detail drawer `collector-detail.dialog.ts`.
+- **Connections** — route `settings/connections` (the old `connections` path redirects),
+  `inspecto-ui/src/app/modules/admin/connections/connections.component.ts`, plus the graded probe /
+  explore / sample view `connection-workbench.component.ts`.
+
+*(Renamed from "Sources" per the Source→Collector glossary flip, GLOSSARY §2/§3. <!-- vocab-allow: names the rename itself -->
+The route, folder and service had already moved; the old screen doc had not — it still claimed `/sources`,
+`SourcesService` and an "Acquisition" nav group.)*
+
+### 21.2 Configuring a Collector — the one surface
+
+One surface authors a pipeline's `collector:` block: the [pipeline editor](#2-the-pipeline-editor--shell-lenses-tabs-and-docks)'s
+**`acquisition`** Step definition drawer (also reached through guided mode's Collect chip — the
+onboarding stage-rail shell that used to host a second screen was deleted 2026-08-16, see
+[Onboarding](../../layer/product/user-guide-onboarding.md)).
+
+Historically two screens rendered it; they always shared the store, the model, the spec table, the
+form renderer and the engine (W2/U-D, 2026-07-31), and the chrome/write-route/node-model gap was
+unified 2026-08-04. The per-*block*-not-per-*node* rules below date from that two-adopter era and
+still hold — the shared table must stay correct for any future second adopter.
+
+### 21.3 One store, one spec table
+
+Both write `collector:` in `spaces/<space>/config/<name>_pipeline.toon`, parsed into
+`PipelineConfig.Collector`, executed by `CollectorProcessor` → `CollectorConnectors.forConfig`.
+Both render `COLLECTOR_ATTRIBUTES` (`inspecto/component-model/collector-attributes.ts`) — **the**
+table, asserted by object identity on both sides so a forked copy fails the suite.
+
+### 21.4 One component — `<inspecto-collector-config>`
+
+`inspecto/collector/collector-config.component.ts`: the **Local inbox | Connection | Dataset** mode
+toggle, the schema form, Test connection, create-a-Connection in place (shared
+[ConnectionFormDialog](../connectors/user-guide-connections.md)), and the derived-connector readout. **No write path** —
+hosts read `value()` / `resolveConnector()` and persist through their own route, because the two
+persisted shapes genuinely differ: a `collector:` block vs. a node's raw config plus a
+`use: connection/<id>` binding.
+
+- ⚠ **`connector` is never asked, always derived** (local ⇒ `local`, else the picked Connection's own
+  type). `CollectorConnectors.forConfig` dispatches on `collector.connector` while handing that
+  factory the profile named by `collector.connection`, and never checks the two agree — so one place
+  must decide both. A hand-authored non-local connector with no Connection is *grandfathered*, not
+  destroyed.
+- ⚠ **Un-binding a Connection is the mode toggle, not blanking the picker.** An empty picker while
+  still in Connection mode is refused; a Connection-less non-local collector is the state that used
+  to fail at run time.
+- ⚠ **An unreachable Connections service is not a verdict.** `connections.list()` degrades to `[]` on
+  error, which reads exactly like a list that answered and lacks the id — so the ghost-id refusal used
+  to fire on an unchanged, previously-valid node whenever the service was down. The component tracks
+  `loading | ok | failed` separately from the array: only `ok` licenses *"not a saved Connection"*, and
+  under `failed` the id the node was **loaded with** keeps its stored connector. A *newly picked* id is
+  still refused there — there is nothing to derive its connector from — with a distinct "could not be
+  loaded, retry" message, so the guard is narrowed, not weakened.
+- ⚠ **A host swapping the spec list at runtime must carry the live values across the swap.**
+  Reassigning `<inspecto-schema-form>`'s `specs` rebuilds every control from its declared default,
+  so the mode toggle silently wiped the form until this component started re-seeding.
+
+### 21.5 Dataset mode — consuming another Pipeline's output
+
+*(UI-S7, 2026-08-28.)* The third mode authors the **dataset entry** the engine shipped in ELT Phase 3 S3c-2: `collector:
+{connector: dataset, dataset: <id>}`, resolved to the producer's snapshot dir fresh at every acquire
+cycle by the `dataset` connector scheme, which copies new parquet snapshots into this pipeline's
+inbox. See [§5 Collect](#5-collect--the-acquisition-step) and the [`dataset` scheme](spec-acquisition.md#the-connector-spi-and-the-resolvable-schemes).
+
+- The mode owns its field the same way Connection does: `dataset` is asked **only** in Dataset mode,
+  `connection` only in Connection mode, and `connector` stays **derived** (Dataset mode ⇒ `dataset`).
+- ⚠ **`post_action__*` is hidden in Dataset mode.** The dataset connector **forces RETAIN** — a
+  consumer must never delete or move a producer's snapshots, whatever its config says — so offering
+  the knob would author config the engine silently ignores (the written-but-never-read shape).
+- Resolve **fails closed** with no Dataset picked, which is the engine's own paired gate
+  (`PipelineConfigParser` refuses `dataset` without `connector: dataset` and vice versa) moved up
+  front, rather than discovered at run time.
+
+#### 21.5.1 The trigger half
+
+The entry node also carries `trigger__on` / `trigger__from` / `trigger__coalesce`, authoring
+`{type: event, on: dataset, from: datasets/<id>, coalesce: …}` — the S3b trigger the `dataset.write`
+Signal fires. Two rules:
+
+- ⚠ **`trigger.type` is DERIVED, never asked**: picking an event `on` writes `type: event`, and
+  clearing it withdraws the derived type. `PipelineTrigger.of` only reads `on`/`from` under
+  `type: event`, so an `on:` under a schedule type is config nothing reads.
+- ⚠ **The modeled trigger leaves are form-authoritative.** `buildConfiguredNode`'s deep merge is
+  root-granular, so without deleting a blanked leaf explicitly a cleared `on`/`from` would be
+  resurrected from the stored value on every save.
+- `on: commit` (an upstream Pipeline commit) is deliberately **not** in the form — it stays an
+  Additional-config key rather than a second event vocabulary to keep in step.
+
+### 21.6 One write route — `POST /config/patch`
+
+Onboarding's stage saves were a wholesale file replace after a **client-side** merge: a stale-read
+clobber race. `POST /config/patch` (`ConfigWriteRoutes.java`) decodes the stored TOON, deep-merges the
+posted block server-side (maps recurse, scalars/lists replace, JSON `null` **deletes** a key),
+validates the whole merged draft, and writes atomically — same response shape as `/config/write`,
+so findings routing is unchanged. Every onboarding stage got the fix from that one route.
+See [Config](../config/user-guide-config.md).
+
+The graph save (`PUT /pipelines/{name}/graph`) keeps merging through `PipelineEditable.lower(g,
+existing)` — deliberately **not** rerouted, which would put two writers on one operation.
+
+⚠ TS delete markers must be `null` on the wire (`nullifyDeletes` in `component-model/flat-keys.ts`) —
+JSON drops `undefined`.
+
+### 21.7 Dedup belongs to acquisition
+
+*(The `transform.dedup.fingerprint` removal.)* File duplicate detection executes **inside the
+`CollectorProcessor` poll cycle** — `ledgerFilter` reads `collector.duplicate` before a file is ever
+collected. `transform.dedup.fingerprint` therefore never had a runtime of its own: `PipelineLift`
+synthesized it, `lower()` dissolved it back into `collector:`, and `PipelineCompiler` emitted no step for
+it. Modelling it as a transform told the operator the check happens *after* collection, and its node
+overlay silently beat a `duplicate.mode` typed on the acquisition node (the D9 tripwire).
+
+It was removed 2026-08-04. `duplicate` and `incremental` ride the acquisition node, where the engine
+reads them; a stored graph carrying a fingerprint node is refused at save with `UNSUPPORTED_NODE`.
+
+⚠ **`transform.dedup.marker` is a different thing and was not touched** — it seeds real
+`processing.duplicate_check` settings. Only `gap_detection` remains a collector-block key owned by a
+node other than acquisition (`NOT_ACQ_OWNED` in `PipelineEditable`).
+
+### 21.8 At rest
+
+`collector.connection` is the persisted form; `use: connection/<id>` is **edit-time only** —
+synthesized by `PipelineLift`, lowered back by `PipelineEditable`. Runtime reads only
+`collector.connection`. Presenting it as a binding on both surfaces needed no migration.
+
+---
+
+## 22. Runs and Run Detail
+
+The two operator screens for Pipelines that are running. **Runs** lists every running Pipeline with
+run-now, pause and history actions. Clicking a row opens **Run Detail**, which shows one Pipeline's
+Consignments (batches), files, lineage, quarantined files, commits, files waiting on a commit retry and a
+report, and lets an operator reprocess a batch, drain a parked one, replay rejected records or act on a
+waiting retry. How these runs execute underneath is [spec-pipeline.md](spec-pipeline.md).
+*(Merged from the engine hub's user guide on 2026-11-18; §16 is the short summary.)*
+
+### 22.1 Runs (Operations)
+
+Route `/runs` (Workbench nav group), dir `modules/admin/runs/`. The operations view over executing
+Pipelines: a **standard** [data-table](../../layer/product/spec-ds-data-table.md) (`autoHeight`) of the `RunView` /
+`RunResult` / `RunStatus` models with per-row run-now/pause/history actions; row-click opens
+Run Detail (below, `/runs/:name`). Backed by `RunsService`.
+
+**Run now** follows the v1 async contract (W5b): the trigger returns `202` + `{runId, …}` and the pane shows
+a `Run "<name>" started.` toast. The 202 arrives while the run is still going, so the immediate list re-fetch
+races it (a run that finished in 0.3 s still showed `Committed 0` until a manual refresh — fixed 2026-09-25).
+The pane therefore also polls `GET /runs/runs/{runId}` via `RunsService.awaitRun` — backoff
+`RUN_POLL_BACKOFF_MS` (500 ms, 1 s, 2 s, 4 s, then every 5 s), capped at `RUN_POLL_MAX` = 60 polls — and
+re-fetches the list once the run leaves `RUNNING` (or a poll fails: 404 = evicted/unknown, or the cap is
+hit). This runs whether or not *Auto* is on. Poll delays use `visibleDelay`, so a hidden tab stops polling
+and resumes on return; the poll is torn down with the pane (`takeUntilDestroyed`).
+
+**Auto** (toggle, on by default) re-fetches the list every `DEFAULT_REFRESH_MS` = **15 s** via
+`visibleInterval` — paused while the tab is hidden, and skipped while the reprocess dialog is open. Grounded
+2026-09-25: this clock was working; the stale row came from the trigger race above, not from Auto. Neither
+refresh is a server push — there is no SSE on this pane.
+
+**Business lens is read-only observe here** (product decision 2026-07-03): trigger/pause/resume/reprocess
+are hidden *and* method-guarded on `lens.readOnly()` (defense-in-depth) — a deliberate pane-specific
+exception to the Jobs precedent, where run-now/enable stay operational in every lens. New panes default to
+the Jobs heuristic unless the plan says "read-only observe" this explicitly.
+
+### 22.2 Run Detail
+
+Route `/runs/:name` (carries a list→name [breadcrumb](../../layer/product/spec-routing-navigation.md)), dir
+`modules/admin/run-detail/`. Drills into one running Pipeline across tabs — batches / files / lineage
+(filterable by batch id) / quarantine / commits / commit retries / report — in **standard**
+[data-tables](../../layer/product/spec-ds-data-table.md); a row opens the **batch-detail dialog** (mini/single-select
+grids inside). Backed by `RunsService`. A `PARKED` row on the Batches tab carries a **Drain** action and the
+batch-detail dialog a *Parked at* table (see *Per-Step `enabled` — park and drain* in
+[spec-pipeline-execution.md](spec-pipeline.md)).
+
+**Registered outputs on the batch-detail dialog (shipped 2026-08-29).** `GET /runs/{name}/outputs?consignmentId=`
+returns one Consignment's registered outputs — sync's own files **and** whatever a post-sync step derived
+onto it — so the post-sync lane, which was real and invisible in the UI, is finally visible with each row
+attributed to the step that wrote it (`producer`).
+
+🔴 **`enabled` is not decoration, and off must not render like empty.** The output registry is switchable
+(`-Dconsignment.outputs.backend=none`); an empty table with it OFF would read as *"this Consignment wrote
+nothing"*, which is false — the **manifest**, not the registry, is authoritative for a file's existence.
+Registry-off renders an `<inspecto-alert>` explaining it; genuinely-empty renders the table's own empty
+state. Pinned by three specs.
+
+⚠ **Fetched OUTSIDE the dialog's core `forkJoin`.** A registry that is off, or a backend too old to serve
+the route, must degrade to an explanation — not blank a dialog that already has its summary, members and
+lineage.
+
+**Quarantine remediation (D-ETL, shipped 2026-07-20):** the Quarantine tab lists `GET /runs/{name}/quarantine`
+rows via the same generic audit-row grid. ⚠ **Corrected 2026-08-13**: the server's `FileStatusStore.quarantine`
+*synthesizes* these rows off the on-disk `<reason>/<filename>` layout, so each row carries only `file, reason,
+path, size_bytes` — **no batch/consignment id, no timestamp**. **Lineage & details** and **Reprocess this
+batch** therefore hide on Quarantine rows (`visible: (r) => !!r['consignment_id']`); only **View the rejected
+rows** is offered there, since a quarantined file's whole content was rejected. The Batches tab still shows
+Lineage/Reprocess normally — those rows do carry a `consignment_id`. Reprocess always asks
+`InspectoConfirmService.confirm()` before calling `POST /runs/{name}/reprocess {batchId}` — a real mutating
+action needs an explicit step, unlike the read-only tabs.
+
+**Record-level replay (X4, shipped in the UI 2026-09-25).** The **rejected-rows dialog** (`rejected-rows.dialog.ts`
+— opened by *View the rejected rows* on a Files row with `error_rows > 0` and on every Quarantine row) carries a
+**Replay rejected records** action → `RunsService.replayRejects` → `POST /runs/{name}/replay-rejects {file}`
+(backend: [execution-lanes](spec-pipeline.md) X4). Rules it follows:
+
+- Offered only once the reject file loaded with `rowCount > 0` — never on the 404 empty state or a load error.
+- Always asks `InspectoConfirmService.confirm()` first; the text says it replays **only the rejected lines, as a
+  new Consignment**, **once per reject file**, and warns that reject files written **before 2026-09-25** may have
+  turned `"` into `'` (the ingester fix that date), so a quoted value there can land split or altered.
+- ⚠ **Disabled, not hidden**, without `lens.canOperateRuns()` — the button stays with a visible reason line and
+  a tooltip. This deliberately differs from the grid row actions above (reprocess/drain *hide* for the
+  Business lens): inside an already-open dialog a vanished button just looks broken.
+- Success renders an `<inspecto-alert variant="success">` with the new Consignment id and an **Open Consignment**
+  button (the batch-detail dialog), and the replay button stays disabled — a reject file replays once. A
+  non-`SUCCESS` terminal status (every record rejected again) is a warning naming the replay file whose own reject
+  file holds them. A `200 status: FAILED` is **not stored**: the server released its claim, so a warning toast
+  says nothing landed and the button stays usable.
+- Refusals go through `replayRejectsErrorMessage(err, file)` (`inspecto/api/runs.service.ts`), which prefixes the
+  next step to the server's reason: **409** already replayed / still in flight — or, when the reason says
+  *changed*, the source file changed since the rejects were recorded — **410** the source file is gone (values
+  are never stored, so replay re-reads the source), **422** cannot be replayed
+  (non-CSV, no source columns, possibly truncated at `rejects_limit`), **403** needs `canOperateRuns` and a bare file
+  name; anything else falls back to `apiErrorMessage`. Pinned by `rejected-rows.dialog.spec.ts`.
+
+**Commit retries tab (X1 UI, shipped 2026-09-25).** `CommitRetriesPanelComponent`
+(`commit-retries.panel.ts`) lists `GET /runs/{name}/retries` — the files of THIS pipeline waiting on a bounded
+COMMIT retry (backend: [execution-lanes](spec-pipeline.md) § *The COMMIT retry
+affordance*). The panel loads itself when the tab opens and reloads when the bound pipeline changes; Run Detail's
+own `loadTab()` skips it. Rules it follows:
+
+- 🔴 **"keeps no retry state" is its own warning, never the empty state.** `keepsRetryState: false` (no
+  `dirs.status_dir`: failures are retried every cycle without bound) renders an `<inspecto-alert variant="warning">`;
+  only a pipeline that keeps state and has nothing waiting gets the *No retries pending* `<inspecto-empty-state>`.
+  The two look identical as an empty list and mean opposite things.
+- Columns: file (the poll-relative path, the key both actions take), **attempts / max** (`/ unbounded` when the
+  policy is not bounded), **next retry** (a `due` status badge, else the time), last error, and a **Record** column
+  that badges `unreadable` sidecars (their attempts read `—`); a warning above the grid counts them. A policy line
+  (cap, backoff range) sits beside the reload button. `truncated` shows *first N of total*.
+- **Retry now** posts `{file}` and renders the server's `note` in a success alert — it says the attempt count was
+  **kept** and how many attempts remain (Q2). **Cancel** first asks `confirmDestructive()`, which says the file is
+  quarantined **now under `retry_cancelled`** and **not retried again**, then posts.
+- ⚠ **Disabled, not hidden**, without `lens.canOperateRuns()` — both row actions stay with a tooltip reason and a
+  reason line above the grid (the rejected-rows replay convention).
+- Refusals go through `commitRetryErrorMessage(err, file, action)` (`inspecto/api/runs.service.ts`, sibling of
+  `replayRejectsErrorMessage`). A **409** has three causes the server tells apart only in its reason text, so the
+  reason picks the prefix: the pipeline is **mid-cycle** (try again when it finishes), it **keeps no retry state**,
+  or the file is **already quarantined** (its fate is decided); anything else is "could not be acted on". **404** =
+  no record any more / left the inbox (reload), **403** = capability or a path outside the poll directory. The
+  server's reason is always appended. Pinned by `commit-retries.panel.spec.ts` (HTTP mocked with
+  `HttpTestingController`, plus an axe check).
+
+**Files tab: real field names + the live step gauge (2026-08-13).** The Files tab's `GET /runs/{name}/files`
+rows are the `_status_` ledger header **verbatim** (`ConsignmentAuditWriter`): `start_time, end_time, filename,
+status, parsed_rows, error_rows, output_paths, output_sizes_bytes, duration_ms, error, consignment_id`. Status
+is `SUCCESS` or one of `QUARANTINED_UNREADABLE|QUARANTINED_MISMATCH|QUARANTINED_EMPTY|QUARANTINED_RESTRICTED` (the last only with the opt-in `processing.refusal: restricted_quarantine`: the Pipeline's own mapping refused the file with a reason code, or its name / header carried a card number; or the platform card scan (`refusal_scan: card_number`) found a card-shaped number; the file was MOVED to the restricted store `<data root>/.restricted/<pipeline>/` under a generated name, and the row's `filename` is that generated name, its `error` the reason code alone and its `logical_name` blank — `okf/product/module/config/plan-spaces.md` §3.5.1) — there is no per-file
+`FAILED` (that only exists at the batch-summary level). Alongside the file-history grid, the tab now renders
+the **live step gauge**: `GET /runs/{name}/pending`'s `InboxStatus.step` (`{consignmentId, step, index, total,
+startedAt}`) is shown as "‹step› · Step N of M · in step for ‹age›" — the age of `startedAt`, computed **once
+per load** (not from the template, which would re-derive `Date.now()` every change-detection pass and throw
+NG0100), is the design's only hang signal since the in-memory snapshot is always "present" while running.
+
+**Batches tab: FAILED retries automatically (2026-08-13).** Markers/fingerprints are written last in the
+commit sequence, so a FAILED consignment leaves no "already processed" record and its files are simply
+rediscovered on the next inbox poll — retry is implicit, not an action an operator takes. The Batches tab
+surfaces this: an `<inspecto-alert variant="info">` above the grid, shown only when the loaded ledger actually
+contains a `FAILED` row, explains that the files will reappear as Pending on the Files tab with nothing
+further needed. The all-`SUCCESS` case renders no banner.
+
+⚠ **The row shapes are the server's, and the mock that had to mirror them is deleted.** Corrected
+2026-09-09: `mock/handlers/demo.handler.ts` and `demo.handler.spec.ts` went with the offline mock backend
+on **2026-08-31**, so the pinning this paragraph described no longer exists — the authority is now
+`ConsignmentAuditWriter.java`, whose header is
+`consignment_id,pipeline,schema_name,output_table,start_time,end_time,status,…`. The drift history is kept
+because it names the failure class: before 2026-08-13 the mock had invented
+`file_name`/`quarantined_at`/`PROCESSED` spellings, which also made the offline Files tab always show
+"0 Succeeded". The mock's **batches**
+rows had the same drift class (invented `status: 'COMMITTED'`, `input_files`/`input_rows`/`output_rows`/
+`rejected_files`/`committed_at` columns) — also fixed 2026-08-13 (`de781124`): `batches()` now returns the
+real `ConsignmentAuditWriter` header verbatim (`consignment_id, pipeline, schema_name, output_table, start_time,
+end_time, status, member_count, rejected_count, total_input_rows, total_output_rows, output_file_count,
+total_output_bytes, duration_ms, error, cast_failures`), status is `SUCCESS`/`FAILED` (the mock never
+generates `EMPTY`), `cast_failures` of `-1` ("not measured") is written blank not as `"-1"`, and
+`ops.handler`'s alert-evaluation math (`rowsInWindow`/`ledgerMetric`) reads the same real column names
+`AlertService` does. Pinned in `demo.handler.spec.ts`. No open residual remains in this area.
+
+---
+
 ## 20. References
 
 - Plan of record (requirements, decisions, open work, refusals, verification): [plan.md](plan.md)
 - Routes: [api.md](api.md) · Module summary: [features.md](features.md) · Design: [architecture.md](architecture.md) ·
   Step catalog: [spec-step-catalog.md](spec-step-catalog.md) · Admin: [admin-guide.md](admin-guide.md)
-- Engine: [Pipeline model](../engine/spec-pipeline-model.md) · [Pipeline execution](../engine/spec-pipeline-execution.md) ·
-  [parsing](../engine/spec-parsing.md) · [ingest](../engine/spec-ingest.md) · [sinks](../engine/spec-sinks.md)
-- Acquisition: [Collectors user guide](../acquire/user-guide.md) · [spec](../acquire/spec.md)
+- Specs: [Pipeline — model, execution, sinks](spec-pipeline.md) · [ingest — Consignments, parsing](spec-ingest.md) ·
+  [acquisition](spec-acquisition.md)
+- Collectors and Runs: [§21](#21-collectors-and-collector-configuration) and [§22](#22-runs-and-run-detail) above
 - Archived plans of the 2026-09-04 authoring pass:
   [`parse-pane-redesign-plan.md`](../../../../archived-documents/plans-archive/parse-pane-redesign-plan.md) and
   [`sql-transform-v1-plan.md`](../../../../archived-documents/plans-archive/sql-transform-v1-plan.md).

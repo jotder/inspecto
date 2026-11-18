@@ -28,7 +28,7 @@ timestamp: 2026-06-28T00:00:00Z
   one group, or one entry; a Favorites shortcut (`fav-<id>`) follows its entry's grant. Like platform
   menus these are UI visibility only — the backend enforces action nodes alone.
 * **Detail pages carry a breadcrumb** — the shared `<inspecto-breadcrumb>`
-  (`inspecto/components/breadcrumb.component.ts`), e.g. [run-detail](../../module/engine/user-guide.md).
+  (`inspecto/components/breadcrumb.component.ts`), e.g. [run-detail](../../module/elt/user-guide.md).
 * **Global search** (`layout/common/search`) is a client-side jump-to-page palette over the nav — **not**
   a backend search. **Ctrl/Cmd+K** opens it app-wide (empty-query recents + shell action commands such
   as lens switch); **`?`** opens the shortcuts-help overlay (`inspecto/shortcuts-help.dialog.ts`).

@@ -6,7 +6,7 @@ column and masks the rest, so a subscriber identifier stays joinable on its pref
 full value downstream.
 
 This is the worked example for the **node-type plugin seam** — see
-[`docs/okf/product/module/engine/spec-pipeline-model.md`](../../../docs/okf/product/module/engine/spec-pipeline-model.md).
+[`docs/okf/product/module/elt/spec-pipeline.md`](../../../docs/okf/product/module/elt/spec-pipeline.md).
 
 ## Four commands
 

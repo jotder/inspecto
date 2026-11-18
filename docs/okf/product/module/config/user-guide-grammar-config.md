@@ -185,7 +185,7 @@ What else the redesign shipped, all §-referenced to the plan (in `superpower/` 
   grammars.
   ⚠ **`xlsx.stop_at_empty` is the THIRD field in that class**, recorded here 2026-09-09 from the D13 kit
   where it was the only mention. ⛔ Do not "fix" it by copying the engine default across: the engine
-  *does* default it to `false` (`okf/product/module/engine/spec-parsing.md`, in the xlsx example),
+  *does* default it to `false` (`okf/product/module/elt/spec-ingest.md`, in the xlsx example),
   and that is a **different layer** — an engine default applies at load, whereas a *spec* default would
   be written into every saved grammar copy. The two are meant to disagree, so neither is the bug.
 - **Columns table ①–⑤** (`<inspecto-schema-fields-editor>`): include / `#` sequence / **icon-only
@@ -229,7 +229,7 @@ What else the redesign shipped, all §-referenced to the plan (in `superpower/` 
 
 
 The delimited redesign's shell generalized: **xlsx** (new, DuckDB `read_xlsx` via the `excel`
-extension — see `okf/product/module/engine/spec-parsing.md` §6.4b for the engine lane and
+extension — see `okf/product/module/elt/spec-ingest.md` §P.6.4b for the engine lane and
 the fail-closed `ExcelExtension` loading), **json** and **fixedwidth** each render the 4-tab
 surface with their own first-tab language via `grammarTabsFor` (*Sheet & range* · *Format &
 records* · *Record layout*); `text_regex` stays flat. Load-bearing facts:
@@ -373,7 +373,7 @@ like the built-ins. Three consequences, each of which cost a test:
   it keys on the `configuredIngester` FQCN input, which the drawer never passes.
 * **A Decode Profile is READ BACK, so the form shows effective values** (2026-09-25). When the block names
   `asn1.profile_file`, the pane calls `ParsersService.decodeProfile(ref, subdir)` (`GET /parsers/asn1/profile`,
-  [parser-plugins.md § Decode Profile](../engine/spec-parsing.md)) and seeds the editor with the
+  [parser-plugins.md § Decode Profile](../elt/spec-ingest.md)) and seeds the editor with the
   profile's own values UNDER the Pipeline's (`withDecodeProfile`; a key the Pipeline saved blank is unset, and
   `segments` stays the Pipeline's). A `data-test="decode-profile"` list above the editor names each served
   `asn1.*` key's effective value and provenance — **from profile `<file>`**, **set here**, or **default**
@@ -405,7 +405,7 @@ green. The regression spec therefore uses an rxjs `delay` to reproduce productio
 reacts to a fetch, a test that resolves it synchronously is testing a different component.**
 
 - **`[lockType]`** hides the format picker: for a per-format node the format *is* the node's type
-  ([per-format node types](../engine/architecture.md)), so offering a switch could only author
+  ([per-format node types](../elt/architecture.md)), so offering a switch could only author
   a block the save path refuses with `PARSER_FRONTEND_MISMATCH`. The pane stamps its **derived** frontend
   (`frontend()`, read off the node type) onto the block it emits, never a literal.
 - The pane follows the P2 pure-pane contract: `[node]` in, `(applied)`/`(dirtyChange)` out, no injected
@@ -415,7 +415,7 @@ reacts to a fetch, a test that resolves it synchronously is testing a different 
   `dialog.open` dies inside Material with `Cannot read properties of undefined (reading 'push')` — ten green
   tests in `pipeline-editor.component.spec.ts` broke exactly this way. Use `TestBed.overrideProvider`.
 
-Unlike [Collector configuration](../acquire/user-guide.md), these two surfaces were **not** already one
+Unlike [Collector configuration](../elt/user-guide.md), these two surfaces were **not** already one
 feature before 2026-08-04: they shared only the renderer layer (`fieldSpecsToAttributes`,
 `ParsersService`, `<app-parser-tree>`, `<inspecto-data-table>`, `<inspecto-schema-form>`), and the gap
 between them held two live defects, both fixed as part of this unification (§ below).
@@ -548,7 +548,7 @@ D13 (operator, 2026-07-25) parked every parser/grammar field's `tier:` assignmen
 onboarding-observation session** — ⛔ *explicitly not an engineering guess*. The session has **not
 happened**. The full kit (session protocol, per-lane task script, per-field capture sheets, field
 inventory) is provenance in
-[`okf/product/module/elt/plan-parser-field-tiers-interview.md`](../elt/plan-parser-field-tiers-interview.md),
+[`okf/product/module/elt/plan.md`](../elt/plan.md),
 archived 2026-09-09 by operator decision. ⚠ **The kit is still runnable and the session is still owed** —
 archived here means "not maintained", not "abandoned". Board row: `BACKLOG.md` §2 *D13 parser field tiers*.
 
@@ -592,7 +592,7 @@ durable design — regenerate it from the file rather than trusting the copy in 
 ## Deferred (logged to `docs/BACKLOG.md`)
 
 - ~~**The unknown-`use:`-prefix refusal.**~~ **SHIPPED 2026-08-10** — see
-  `okf/product/module/engine/architecture.md` for the as-built. Two claims this section made
+  `okf/product/module/elt/architecture.md` for the as-built. Two claims this section made
   were wrong: `ComponentRegistry.resolve` *did* have a caller (`ComponentStore.get`; only `isKnown` had
   none), and the seam was `PipelineValidator.checkWiring`, not `ConfigSafetyValidator`. A binding whose
   kind is valid but whose named component is absent now refuses at save with `UNKNOWN_USE_REF` (422).

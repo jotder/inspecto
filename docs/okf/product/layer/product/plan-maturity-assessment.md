@@ -187,7 +187,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **What it is (customer view):** Connections and Collectors that pull files and records from local or NFS directories, SFTP/FTP/FTPS, JDBC databases, S3/GCS/Azure Blob and Kafka into Pipelines. They come with dedup, watermarks, gap detection, retry and decompression.
 - **Scores:** F 3 · B 4 · Q 3 · E 3 · R 3 → **Level L3 (Pilot-ready)**
 - **Evidence:**
-  - Seven requirements of record. ACQ-1/2/3/5/6/7 are shipped. ACQ-4 (a Must) is **partial**: object storage is shipped, NFS/SMB network share was refused by design (`module/acquire/plan.md` §2, §6.1).
+  - Seven requirements of record. ACQ-1/2/3/5/6/7 are shipped. ACQ-4 (a Must) is **partial**: object storage is shipped, NFS/SMB network share was refused by design (`module/elt/plan.md` §ACQ.2, §6.1).
   - Connector factories in code: Sftp, Ftp, Ftps, DbExport (JDBC), S3, GCS, AzureBlob, Kafka (`providers/inspecto-connectors/src/main/java/com/gamma/connect/`), plus the local file system and a Dataset-entry collector.
   - Step Processor board, ACQ family: 4 delivered on every edition (SP-ACQ-01..04). 4 are partial: S3/GCS have no proven end-to-end acquisition-node run, ADLS Gen2 is unproven, Kafka is unproven against a real broker, Excel is one sheet per file. 11 are planned: Pulsar, Kinesis, SQS, RabbitMQ, MQTT, Debezium CDC, Delta, Iceberg, Snowflake/BigQuery readers, a REST poller and a webhook receiver/gRPC (`docs/EDITIONS.md` SP-ACQ-*; plan §5).
   - Tests: 26 + 36 + 6 = **68 unit test classes**, 0 real-HTTP in these hubs (the HTTP routes are tested under module.processor). `KafkaRealBrokerTest` is opt-in and skips unless a broker is supplied; CI has none (`module/connectors-kafka/plan.md`).
@@ -225,7 +225,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - Measured throughput: native DuckDB ingest of 2M rows × 12 columns in about 3.5 s, and 1.0–1.4M rows/s for transform and write (`layer/platform/tests-performance.md`).
   - Config safety: `ConfigSafetyValidator`, path jail, fail-closed schema types (`module/config/spec-config-safety.md`). Config writes can be held for maker-checker (item 6).
   - Open rows: P2 `AUTHORING-REDESIGN-1` (remaining letters parked on demand), P2 "Postgres multi-user", P2 `SCALEOUT-OBJSTORE-DATABASE-DIR-1` (operator hold), P3 defect `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` (a duplicate output after failover re-plan; operator hold).
-  - Replay is bounded. `JobService` resolves runs from an in-memory map capped at `LIVE_RUN_CAP = 1000` (`JobService.java`), so replay after a restart or eviction returns 404 (`module/engine/plan.md` §2.3).
+  - Replay is bounded. `JobService` resolves runs from an in-memory map capped at `LIVE_RUN_CAP = 1000` (`JobService.java`), so replay after a restart or eviction returns 404 (`module/elt/plan.md` §EXE.2.3).
 - **Strengths vs market:**
   - A full ingest → Pipeline → data-quality → lineage platform under the assurance controls. The competitive matrix (§3) names this as something none of the six vendors shows publicly.
   - The authoring loop (validate → dry-run → test-run to a node → arm) is fail-closed, and save-time safety checks are pinned by tests.

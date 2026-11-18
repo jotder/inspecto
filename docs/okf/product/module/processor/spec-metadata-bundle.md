@@ -60,7 +60,7 @@ Closes BUNDLE-AUTHORED-PIPELINE-STORE-1 (the grounding is kept below, struck).
 
 * **`pipeline`** = a REGISTERED `*_pipeline.toon` — what the editor edits and the poll cycle runs.
   `BundleRoutes.RegisteredPipelineBundleSource` delegates to `PipelineBundleRoutes`' two cores, so there is
-  ONE closure and ONE set of gates ([editable round-trip §21](../engine/spec-pipeline-model.md)):
+  ONE closure and ONE set of gates ([editable round-trip §21](../elt/spec-pipeline.md)):
   * **Content** = the editable graph (`PipelineEditable.toMap`, the `GET …/graph/raw` shape — lineage and
     Import as draft read it) **plus `closure: {manifest, files}`**: the zip door's manifest (no
     `exported_at` — a timestamp in content made every export hash as drifted) and every entry it names
@@ -253,7 +253,7 @@ transfer menus) lives in the frontend bundle. Design history: `docs/archived-doc
   * **Registered `*_pipeline.toon`** is what the editor edits (`GET …/graph/raw`, `PUT …/graph`) and what the
     poll cycle runs — canonical since W5 (`d079c1398`, 2026-08-01), with its own fully gated transfer door
     already shipped: `GET /pipelines/{name}/bundle` + `POST /pipelines/import` (`PipelineBundleRoutes`,
-    [editable round-trip §21](../engine/spec-pipeline-model.md) — closure, satellites, safety gate,
+    [editable round-trip §21](../elt/spec-pipeline.md) — closure, satellites, safety gate,
     register).
   * **`PipelineStore`** holds the GRANDFATHERED `*_flow.toon` graphs — the topologies the flat config cannot
     lower (`transform.derive`/`route`, `sink.view`/`materialized`, a second sink). W5 decided they stay

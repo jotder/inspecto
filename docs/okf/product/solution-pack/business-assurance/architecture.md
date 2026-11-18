@@ -154,7 +154,7 @@ Every tolerance and threshold is configuration in these files.
 ### Modules used
 
 - [Pipelines and Steps](../../module/elt/architecture.md) — the eight feeds.
-- [Collectors](../../module/acquire/architecture.md) and
+- [Collectors](../../module/elt/architecture.md) and
   [Parsing and ingest](../../module/elt/architecture.md) — inbox polling and Schemas.
 - [Reconciliation](../../module/reconciliation/architecture.md) — the two `recon.run` controls.
 - [Jobs and scheduler](../../module/processor/architecture.md) — cron and signal chaining.

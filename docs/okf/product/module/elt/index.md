@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Parser field tiers — interview #2 observation-session kit (D13)](plan-parser-field-tiers-interview.md) · [Ingestion, parsing and Pipeline authoring (ING, PIP) — plan](plan.md) |
-| spec | current | [Step catalog — every Step kind, delivered and pending](spec-step-catalog.md) |
-| architecture | current | [Pipelines, Steps and ingest](architecture.md) |
-| features | current | [Pipelines, parsing and ingest — features](features.md) |
+| plan | current | [Acquisition, ingestion and Pipelines (ACQ, ING, PIP) — plan](plan.md) |
+| spec | current | [Acquisition — specification](spec-acquisition.md) · [Ingest, Consignments and parsing — how a landed file becomes Table rows](spec-ingest.md) · [Pipeline — the model, execution and sinks](spec-pipeline.md) · [Step catalog — every Step kind, delivered and pending](spec-step-catalog.md) |
+| architecture | current | [ELT — architecture](architecture.md) |
+| features | current | [Collectors, parsing, ingest and Pipelines — features](features.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Pipelines — user guide](user-guide.md) |
-| admin-guide | current | [ETL model and step registry — admin guide](admin-guide.md) |
-| api | current | [Pipelines, parsing and ingest — API](api.md) |
+| user-guide | current | [ELT — user guide](user-guide.md) |
+| admin-guide | current | [ELT — admin guide](admin-guide.md) |
+| api | current | [Collectors, parsing, ingest and Pipelines — API](api.md) |
 | tests | current | [ELT — ingestion, Pipelines and step registry — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

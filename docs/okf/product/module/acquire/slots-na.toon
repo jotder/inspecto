@@ -1,0 +1,7 @@
+plan: documented in the ELT hub module/elt plan.md (part ACQ), merged 2026-11-18 (DOCS-ELT-CONSOLIDATE-1)
+spec: documented in the ELT hub module/elt spec-acquisition.md, merged 2026-11-18
+architecture: documented in the ELT hub module/elt architecture.md (Collectors part), merged 2026-11-18
+features: documented in the ELT hub module/elt features.md (Collectors), merged 2026-11-18
+user-guide: documented in the ELT hub module/elt user-guide.md section 21, merged 2026-11-18
+admin-guide: documented in the ELT hub module/elt admin-guide.md, merged 2026-11-18
+api: documented in the ELT hub module/elt api.md (Collectors and Connections), merged 2026-11-18

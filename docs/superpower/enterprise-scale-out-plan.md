@@ -70,7 +70,7 @@ and the heap lease is `PipelineRunGuard implements RunLease` (there is no `HeapR
 | B: scopes (run, acquire, job arming, authored pipeline), `lastRunAtMs` on the lease | BUILT | `CollectorService.java:375-376,1636-1637` |
 | B: lease credentials, heartbeat in `/health` | BUILT | `HealthDetails.java:92` (live probe); board `HA-RUNLEASE-DB-CREDENTIALS-1` closed 2026-10-10 |
 | B: section 7 `RunLeaseContractTest` (two instances, one lease) | BUILT | `inspecto/src/test/.../RunLeaseContractTest.java` (4 tests); `DbRunLeaseTest` |
-| HA lanes 2026-10-10/11: kill -9 failover contract, graceful-stop lease release, cooperative cancel, exchange multi-pod snapshots | BUILT (not in the plan's text) | `okf/product/module/engine/spec-ingest.md` Failover (line 72); `okf/product/layer/platform/admin-guide-ha-dr-drill.md:225-230`; `CommitFence.java`; board `HA-KILL9-DOUBLE-INGEST-1`, `HA-GRACEFUL-STOP-LEASE-RELEASE-1`, `EXCHANGE-SNAPSHOT-MULTIPOD-1`. Open: `HA-CANCEL-RESIDUALS-1` (P3) |
+| HA lanes 2026-10-10/11: kill -9 failover contract, graceful-stop lease release, cooperative cancel, exchange multi-pod snapshots | BUILT (not in the plan's text) | `okf/product/module/elt/spec-ingest.md` Failover (line 72); `okf/product/layer/platform/admin-guide-ha-dr-drill.md:225-230`; `CommitFence.java`; board `HA-KILL9-DOUBLE-INGEST-1`, `HA-GRACEFUL-STOP-LEASE-RELEASE-1`, `EXCHANGE-SNAPSHOT-MULTIPOD-1`. Open: `HA-CANCEL-RESIDUALS-1` (P3) |
 | section 12 data-plane idempotency prerequisite (stable Consignment id, unique constraints, CAS) | PARTLY | `ConsignmentId.java:72` (content digest id); `DbFileStageStore` `UNIQUE (consignment_id, source_id, relative_path, stage)` + `ON CONFLICT DO NOTHING`; `DbConsignmentOutputStore.java:127` `UNIQUE (consignment_id, path, run_id)`. UNKNOWN: that every write path keys on the new id; the `DbAcquisitionLedger` check-then-record window |
 | C 5.3 C1: static Space to pod map | BUILT | `partition.toon`, `SpacePartition.java`, `SpaceManager.java:156-184` |
 | C 5.3 C2: shared-inbox detection + cross-pod registry | BUILT | `DbInboxRegistry.java` (`INBOX-REGISTRY-CROSS-POD-1`) |
@@ -458,7 +458,7 @@ a decision**, because the broker deliberately preserves FIFO per Pipeline and di
 
 **Admission-pool rules — ADOPTED 2026-09-15 as a design constraint on phase B (`DUCKLE-C10-ADMISSION-POOLS-1`);
 ✅ BUILT 2026-09-24 on `ConcurrencyBroker`, JVM-local** — as-built in
-[consignment-concurrency §2a](../okf/product/module/engine/spec-consignments.md) (server `scheduler.toon`
+[consignment-concurrency §2a](../okf/product/module/elt/spec-ingest.md) (server `scheduler.toon`
 `pools:`, Pipeline `processing.pool`, tickets with `queueReason`/`queueMs`, gauge
 `inspecto_pool_free_permits`). ⚠ Distributing the pool counters across pods is still U2's open work below.
 Recorded here because `RunLease` + `ConcurrencyBroker` are the seam they bind, and the deadlock rule is

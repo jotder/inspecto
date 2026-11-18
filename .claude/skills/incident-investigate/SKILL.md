@@ -22,7 +22,7 @@ Routes below are in `docs/api/openapi-v1.json` or the cited hub doc; confirm the
 | Objects (Incident/Case store, workflows, findings) | `module/ops/user-guide-objects.md` |
 | Events, signals | `module/event/architecture.md`, `module/event/spec-events-metrics.md`, `module/event/spec-signal-backbone.md`, `module/event/user-guide-events.md` |
 | Observability / backup | `module/observability/architecture.md` |
-| Runs and run detail | `module/engine/user-guide.md`, `module/engine/user-guide.md`, `module/engine/spec-pipeline-execution.md` |
+| Runs and run detail | `module/elt/user-guide.md`, `module/elt/user-guide.md`, `module/elt/spec-pipeline.md` |
 | Known failure modes | `layer/platform/admin-guide-troubleshooting.md`, `layer/platform/admin-guide-gotchas.md` |
 | Operating, flags | `layer/platform/admin-guide-operations-reference.md`, `layer/platform/admin-guide-launch-flags.md` |
 
@@ -51,10 +51,10 @@ Recovery and transition routes mutate state — confirm with the operator before
 
 | Symptom | Start at |
 |---|---|
-| Run FAILED / stuck / parked | `module/engine/user-guide.md`, `module/engine/spec-pipeline-execution.md` |
+| Run FAILED / stuck / parked | `module/elt/user-guide.md`, `module/elt/spec-pipeline.md` |
 | File quarantined, wrong schema, parsed=0 | `layer/platform/admin-guide-troubleshooting.md`, `module/elt/architecture.md` |
 | Output in `year=NULL/...` partitions | `layer/platform/admin-guide-troubleshooting.md` |
-| Collector picks nothing up / re-pick | `module/acquire/architecture.md`; troubleshooting (`.processed` markers) |
+| Collector picks nothing up / re-pick | `module/elt/architecture.md`; troubleshooting (`.processed` markers) |
 | JVM crash / native access / out of memory | `layer/platform/admin-guide-troubleshooting.md`, `layer/platform/admin-guide-launch-flags.md` |
 | Config refused at save | `pipeline-author` skill, `module/config/spec-config-safety.md` |
 | Alert fired / did not fire | `addon/incidents/architecture.md` |

@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Acquisition & connectivity (ACQ) — plan](plan.md) |
-| spec | current | [Acquisition — specification](spec.md) |
-| architecture | current | [Acquisition](architecture.md) |
-| features | current | [Collectors — features](features-collectors.md) |
+| plan | n/a | documented in the ELT hub module/elt plan.md (part ACQ), merged 2026-11-18 (DOCS-ELT-CONSOLIDATE-1) |
+| spec | n/a | documented in the ELT hub module/elt spec-acquisition.md, merged 2026-11-18 |
+| architecture | n/a | documented in the ELT hub module/elt architecture.md (Collectors part), merged 2026-11-18 |
+| features | n/a | documented in the ELT hub module/elt features.md (Collectors), merged 2026-11-18 |
 | feature-db | current | [Acquisition and collectors — feature database](feature-db.md) |
-| user-guide | current | [Collectors and Collector configuration](user-guide.md) |
-| admin-guide | current | [Acquisition and collectors — admin guide](admin-guide.md) |
-| api | current | [Collectors — API](api-collectors.md) |
+| user-guide | n/a | documented in the ELT hub module/elt user-guide.md section 21, merged 2026-11-18 |
+| admin-guide | n/a | documented in the ELT hub module/elt admin-guide.md, merged 2026-11-18 |
+| api | n/a | documented in the ELT hub module/elt api.md (Collectors and Connections), merged 2026-11-18 |
 | tests | current | [Acquisition and collectors — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

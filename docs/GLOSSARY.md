@@ -36,6 +36,7 @@
 | ⛔ Banned | ✅ Canonical | Reason |
 |---|---|---|
 | Flow | **Pipeline** | "Flow" collided with FlowGraph/Run; one word for the DAG |
+| ETL *(naming this layer)* | **ELT** | the load is a plain write and the transform runs in place (§5); Product Map item `module.elt`, hub `module/elt` (2026-11-18). The build module keeps `inspecto-etl` / `com.gamma.etl` — not guard-enforced, see §13 |
 | Data Store *(as a relation)* | **Dataset** | "Store" means the physical backend, not a queryable relation |
 | `EscalationPolicy` *(agent LLM retry ladder)* | **Store family** — One named group of a module's per-Space operational files (for example Ops' `OBJECTS`, `LINKS`,
 `NOTES`, `TAGS`), declared in the manifest as `provides.storeFamilies` and contributed through the
@@ -341,7 +342,7 @@ own flat output Schema. A single source file holding several record kinds (an XM
 multi-layout fixed-width file) is decomposed into one Segment per kind, and each Segment becomes **one output
 table** and **one Catalog node**. Authored as `parsing.plugin.segments` (legacy `processing.segments`);
 `PipelineConfig.Schemas.segments` is `@PublicApi since 2.0.0`. As built:
-`okf/product/module/elt/plan.md`, `okf/product/module/engine/spec-parsing.md`. ⛔ Not a path token, not a
+`okf/product/module/elt/plan.md`, `okf/product/module/elt/spec-ingest.md`. ⛔ Not a path token, not a
 time slice, and ⛔ unrelated to the *market* segment in the brochures — an accidental homonym.
 
 **Field Classification** *(defined 2026-09-10 — `SPEC-GLOSSARY-1`; rewritten 2026-11-14,
@@ -444,7 +445,7 @@ follow the same open-registry posture **Job types** already have (`JobTypeProvid
 
 > ⚠ **An embedded Job and a sub-Pipeline are NOT Steps** *(corrected 2026-08-02 — this entry asserted they
 > were; no `job` or sub-pipeline id has ever existed in `BuiltinNodeType`).* This is not an oversight:
-> §3.8 of [`okf/product/module/engine/architecture.md`](okf/product/module/engine/architecture.md)
+> §3.8 of [`okf/product/module/elt/architecture.md`](okf/product/module/elt/architecture.md)
 > makes **in-motion (Pipeline) vs at-rest (Job)** a binding line, so an at-rest operator cannot be an
 > in-motion node. The two compose as **producer/consumer over a shared store**, never by nesting: a Job
 > fires on the Pipeline's commit (`on_pipeline:`), or binds by store name to a `sink.view` (the designated hand-off —
@@ -464,7 +465,7 @@ the ordered set of its receipts. Type/Instance: *Step Receipt* is the shape (`St
 (`consignment_steps`) is one receipt. ⛔ *StepInfo envelope* is the retired working name — **envelope** already
 names the v1 response envelope, the `Signal` record and a component's sharing envelope; ⛔ *Step Record* — a
 **record** is a data row. Design: `archived-documents/plans-archive/2026-11-17-x5-stepinfo-envelope-plan.md`; as built:
-`okf/product/module/engine/spec-pipeline-execution.md`.
+`okf/product/module/elt/spec-pipeline.md`.
 
 **Parser** — Reads a raw file of a given format (CSV, fixed-width, XML, JSON, EDI, ASN.1, …) into rows/columns
 — or, for tree-shaped formats, into records that must be flattened before they load into Tables. Two engines
@@ -485,7 +486,7 @@ Grammar inline and untouched, and later edits to the template reach nothing that
 component and bound the Step via `use: grammar/<id>`. That `use:` form stays **read-supported** in the
 engine (a hand-authored file may still carry it) but is **never authored**, and opening such a Step in the
 editor migrates it to an independent inline copy on save. As built:
-[`okf/product/module/engine/spec-pipeline-model.md`](okf/product/module/engine/spec-pipeline-model.md)
+[`okf/product/module/elt/spec-pipeline.md`](okf/product/module/elt/spec-pipeline.md)
 (the read path that must not be tidied away as dead code) and
 [`okf/product/module/config/user-guide-grammar-config.md`](okf/product/module/config/user-guide-grammar-config.md). *(Provenance:
 `archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`, not maintained.)*
@@ -512,7 +513,7 @@ of repeating it. Unlike a **Grammar Template** it is **referenced, not copied**:
 reaches every Pipeline that names it. A key the Pipeline sets wins over the profile, and `segments` is
 replaced whole, never merged (D5). Not a registry kind and not a transform language: it holds no transforms.
 ⛔ not *Access Profile* (a different concept, §1-A) · ⛔ not *transform config* / *tx config*. As built:
-[`okf/product/module/engine/spec-parsing.md`](okf/product/module/engine/spec-parsing.md).
+[`okf/product/module/elt/spec-ingest.md`](okf/product/module/elt/spec-ingest.md).
 
 **Transform** — Reshapes/derives/aggregates (cubes) data. When it materializes output it produces a **Derived
 Table**. **Amendment v1.0 (D-4):** the `transform` Step verb covers filter / derive / **reference join**
@@ -572,7 +573,7 @@ Transformer instance named **"Shape &lt;table&gt;"**, or **"Shape records"** whe
 `processing.map.fields[]` and runs at ingest. A Record Transformer added from the palette is a separate chain
 Step that runs after Load, at rest, writing the Pipeline's `output_store:`.)*
 
-**Trigger** — The start condition of a run. ⚠ **There are TWO models** (corrected 2026-09-09; this entry listed four values, omitted `on_signal` entirely, and counted `event`/`on-pipeline` as two names for one mechanism). **Job triggers:** `cron` \| `on_pipeline` \| `on_signal` (+ a `when` guard) \| `manual`, with `catch_up`. **Pipeline triggers** (`PipelineTrigger.Kind`): `SCHEDULE_INTERVAL` \| `SCHEDULE_CRON` \| `EVENT` (`on: commit` or `on: dataset`) \| `MANUAL` \| `DEFAULT_POLL` \| `STREAM` (the continuous lane, `trigger: {type: stream}` — ⚠ it names how a Pipeline is driven, not a Catalog **Stream**), with coalescing and **no** `catch_up`. See `okf/product/module/engine/plan.md` §3.2. Owned by the
+**Trigger** — The start condition of a run. ⚠ **There are TWO models** (corrected 2026-09-09; this entry listed four values, omitted `on_signal` entirely, and counted `event`/`on-pipeline` as two names for one mechanism). **Job triggers:** `cron` \| `on_pipeline` \| `on_signal` (+ a `when` guard) \| `manual`, with `catch_up`. **Pipeline triggers** (`PipelineTrigger.Kind`): `SCHEDULE_INTERVAL` \| `SCHEDULE_CRON` \| `EVENT` (`on: commit` or `on: dataset`) \| `MANUAL` \| `DEFAULT_POLL` \| `STREAM` (the continuous lane, `trigger: {type: stream}` — ⚠ it names how a Pipeline is driven, not a Catalog **Stream**), with coalescing and **no** `catch_up`. See `okf/product/module/elt/plan.md` §EXE.3.2. Owned by the
 **Scheduler**.
 
 ---
@@ -607,7 +608,7 @@ defines *when*, not *what*.
 *(Was `Run ⊇ Batch ⊇ File` until 2026-08-03; see the Consignment entry in §2 and the §13 row. Identity is
 `(consignment_id, run_id)` — the run is the attempt, so a reprocess is a new Run over the same Consignment.)*
 
-**Archive** *(added 2026-08-26; as-built in `okf/product/module/acquire/spec.md`)* — A **container file** the
+**Archive** *(added 2026-08-26; as-built in `okf/product/module/elt/spec-acquisition.md`)* — A **container file** the
 operator drops in the inbox that holds many inner files: `.zip`, `.tar`, `.tar.gz`. Expanded by the **Unpack**
 stage at the Collector *before* Consignments are planned, so its contents become ordinary Files from birth. An
 Archive is **not** a Consignment and can outlive one (500 entries at `collector.consignment.max_files: 100` plans five), which
@@ -646,7 +647,7 @@ mutating service defines its dry-run behaviour (record, don't act — MNT-1 exte
 that word is RBAC's (`CapabilityManifest` route gates → `Roles.KNOWN_CAPABILITIES`); ⛔ not *Controller
 Service* — NiFi's term implies user-instantiated enable/disable resources, deliberately that plan's stage 3.
 
-**Execution pool** *(added 2026-09-24; as-built in [`okf/product/module/engine/spec-consignments.md`](okf/product/module/engine/spec-consignments.md) §B.2a)* —
+**Execution pool** *(added 2026-09-24; as-built in [`okf/product/module/elt/spec-ingest.md`](okf/product/module/elt/spec-ingest.md) §B.2a)* —
 A named, server-defined admission tier for **Consignments** (`scheduler.toon` `pools:`), chosen by a Pipeline
 with `processing.pool`. It answers only "may this start now" and never widens a thread or memory cap; an
 unknown name runs in the always-present `default` pool. ⛔ not *queue* (waiting is a state of an admission,
@@ -1336,6 +1337,7 @@ touchpoint before renaming; the backend hits below are *known examples*, not an 
 
 | ⛔ Old | ✅ Canonical | Known touchpoints to audit |
 |---|---|---|
+| ETL | **ELT** | ✅ **DOCS DONE 2026-11-18**: Product Map item `module.etl` → `module.elt`, hub `docs/okf/product/module/etl/` → `module/elt/`, board tags, skills, `tools/release-notes.mjs`. ⏳ Not renamed (backend, deliberate): Maven module `platform/inspecto-etl`, package `com.gamma.etl`, the module manifest `META-INF/inspecto/module.toon` (`id: etl`, title "ETL model and step registry"), and comments in `inspecto-ui` naming "the ETL" |
 | Flow | **Pipeline** | ✅ **UI DONE** (`feat/rename-flow-pipeline-runs`): authored-DAG editor FE renamed `Flow*`→`Pipeline*`, `modules/admin/flows/`→`pipelines/`, route `/flows`→`/pipelines`, `FlowsService`→`PipelinesService` + `Flow*` types, `flow-mock`→`pipeline-mock`. **Collision resolved** (full restructure): the *ingest ops* page took `/pipelines`, so it moved to **Runs** (`modules/admin/{pipelines→runs, pipeline-detail→run-detail}`, `Pipeline*`→`Run*` (`RunView`/`RunResult`/`RunStatus`), route `/pipelines`→`/runs`) — matches glossary §5 (Run = one execution). ✅ **Backend DONE** (`refactor/rename-flow-pipeline-backend`): `com.gamma.flow{,.exec}`→`com.gamma.pipeline{,.exec}` + the 18 `Flow*` types→`Pipeline*`; `JobType.FLOW`→`PIPELINE`; routes `/flows`→`/pipelines` (`FlowRoutes`→`PipelineRoutes`) and `/pipelines`→`/runs` (old `PipelineRoutes`→`RunRoutes`); FE service paths + mock-interceptor regexes re-aligned. Audit action names kept as `pipeline.*` (the audited entity is a pipeline config) via an `AuditTrail.resource()` override mapping `/runs`→`pipeline`. Kept: authored-flow storage dir `flows/` + JSON response keys. **No version bump** (nothing shipped on 4.x → no contract/data in the wild). Plans: `docs/archived-documents/plans-archive/flow-pipeline-runs-rename.md` (UI) + `flow-pipeline-backend-rename.md` (backend). ⚠ **The two "Kept" items above are REVERSED as of 2026-08-03** by the operator's Tier-3 decision — they are now scheduled work, not settled keeps (`docs/archived-documents/plans-archive/vocabulary-and-config-contract-plan.md` §4 (shipped/archived)). **Tier 1 (non-breaking internals) DONE 2026-08-04:** `flowId`→`pipelineId`, `runningFlows()`→`runningPipelines()`, `triggerFlowRun()`→`triggerPipelineRun()`, the three `ControlApiFlow*Test` classes, and the UI's `RunToHereData.flowId`. **Tier 2 DONE 2026-08-04:** `inspecto_flow_provenance`→`inspecto_pipeline_provenance` + `ProvenanceRow.flowId`→`pipelineId` (⚠ moved down from Tier 1 — it is `@PublicApi`, a tier boundary on its own) + `FLOW_CONSERVATION_IMBALANCE`→`PIPELINE_CONSERVATION_IMBALANCE`, with `FLOW_CONSERVATION_IMBALANCE_LEGACY` kept as a **read-alias** (never a hard cutover) so pre-rename event-ledger rows still promote to an ALERT. **Tier 3 DONE 2026-08-04** (no version bump — dual-read/dual-emit means no existing space or caller breaks,
 same rationale as the earlier no-bump note above): `config/flows/`→`pipelines/` (`SpaceRoot.pipelinesDir()`/
 `pipelinesSubdir()` prefer `pipelines/`, fall back to a pre-existing `flows/` — no on-disk move, since

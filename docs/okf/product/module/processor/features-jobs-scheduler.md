@@ -16,7 +16,7 @@ Inspecto has two units of work:
 
 - A **Consignment** is a set of files ingested and processed together, atomically, by the poll cycle
   ([parsing-ingest](../elt/architecture.md)). Its status flow is
-  [consignment-status-flow](../engine/architecture.md).
+  [consignment-status-flow](../elt/architecture.md).
 - A **Job** is a configured, triggerable unit of work outside the poll cycle. Each Job names a
   **Job Type** (the template) and runs as a **Run** with a Run Log, Signals and artifacts.
 

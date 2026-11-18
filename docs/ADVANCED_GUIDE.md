@@ -4,8 +4,8 @@
 > reference: how each component actually works, what it emits (events + metrics), what state it writes to disk,
 > which `-D` flags govern it, and how to diagnose issues. For *config authoring* see
 > [`configuration.md`](okf/product/module/config/admin-guide-configuration-reference.md); for the *design rationale* of the Pipeline engine see
-> [`pipeline-graph-design.md`](okf/product/module/engine/architecture.md); for *acquisition feature depth* see
-> [`data-acquisition-framework.md`](okf/product/module/acquire/spec.md); for the *edition/build model* see
+> [`pipeline-graph-design.md`](okf/product/module/elt/architecture.md); for *acquisition feature depth* see
+> [`data-acquisition-framework.md`](okf/product/module/elt/spec-acquisition.md); for the *edition/build model* see
 > [`EDITIONS.md`](EDITIONS.md). Short, focused fixes live in [`troubleshooting.md`](okf/product/layer/platform/admin-guide-troubleshooting.md).
 
 ---
@@ -196,7 +196,7 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
   `BranchCommitCoordinator`/`BranchCommitLog`, optional data-plane provenance
   (`-Dprovenance.backend=duckdb` + `-Dprovenance.db.url`; `GET /provenance?flow=&consignment=`).
 - ⚠ **The `*_flow.toon` authoring surface is RETIRED**
-  ([`pipeline-graph-design.md`](okf/product/module/engine/architecture.md) §16):
+  ([`pipeline-graph-design.md`](okf/product/module/elt/architecture.md) §16):
   grandfathered flows stay readable/runnable/deletable, never newly written.
 - **Deep dives (design of record):** the [`module.engine` hub](okf/product/module/engine/index.md)
   — `architecture.md`, `spec-pipeline-model.md`, `spec-pipeline-execution.md` (views,
@@ -537,10 +537,10 @@ are computed at scrape time by `MetricsService`'s collector. Confirm the service
 
 ## 13. Cross-references
 - Config authoring & all TOON keys → [`configuration.md`](okf/product/module/config/admin-guide-configuration-reference.md)
-- Acquisition feature depth (connectors, watermark, retry/circuit/post-actions, bastion) → [`data-acquisition-framework.md`](okf/product/module/acquire/spec.md)
-- Pipeline engine design (IR, lift, validator, executor, T32 live-exec) → [`pipeline-graph-design.md`](okf/product/module/engine/architecture.md), [`live-execution.md`](okf/product/module/engine/spec-pipeline-execution.md)
+- Acquisition feature depth (connectors, watermark, retry/circuit/post-actions, bastion) → [`data-acquisition-framework.md`](okf/product/module/elt/spec-acquisition.md)
+- Pipeline engine design (IR, lift, validator, executor, T32 live-exec) → [`pipeline-graph-design.md`](okf/product/module/elt/architecture.md), [`live-execution.md`](okf/product/module/elt/spec-pipeline.md)
 - Editions / build flavors → [`EDITIONS.md`](EDITIONS.md) · Branch & release policy → [`BRANCHING.md`](BRANCHING.md)
-- Architecture overview → [`engine/architecture.md`](okf/product/module/engine/architecture.md) · Operator console → [`operator-console.md`](archived-documents/operator-console.md)
+- Architecture overview → [`engine/architecture.md`](okf/product/module/elt/architecture.md) · Operator console → [`operator-console.md`](archived-documents/operator-console.md)
 - Short fixes (DuckDB/PG view quirks, partition extraction) → [`troubleshooting.md`](okf/product/layer/platform/admin-guide-troubleshooting.md)
 
 ---

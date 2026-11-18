@@ -57,10 +57,10 @@ timestamp: 2026-07-16T00:00:00Z
   it is correct for a lowered graph or template body that is not landing anywhere, and **wrong** for anything
   whose directory is known. Prefer the 4-arg form.
 * **`PartitionWriter` requires non-empty partition columns** (it emits `PARTITION_BY (...)`). The unpartitioned
-  single-file `COPY` path is `PartitionSinkWriter.writeUnpartitioned()`. See [output & sinks](../../module/engine/spec-sinks.md).
+  single-file `COPY` path is `PartitionSinkWriter.writeUnpartitioned()`. See [output & sinks](../../module/elt/spec-pipeline.md).
 * **Pipeline seed must be ≥ 1 `source_store`** — `PipelineJobRunner.seedsOf` throws on zero; multi-source merge is the
   `transform.merge` path (the Phase-A "exactly one" rule was relaxed in Phase C). See
-  [Pipeline live execution](../../module/engine/spec-pipeline-execution.md).
+  [Pipeline live execution](../../module/elt/spec-pipeline.md).
 * **Source→Collector rename (2026-07-14) residuals — what deliberately did NOT move.** <!-- vocab-allow: names the rename itself -->
   The acquisition entity is **Collector** (`CollectorConnector` SPI, `CollectorService`, routes
   `/collectors`) and the Catalog origin node is **Stream** (`NodeKind.STREAM`, id `stream:<pipeline>`,

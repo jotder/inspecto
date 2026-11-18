@@ -67,7 +67,7 @@ If the test stays green, the inventory is dead weight.
 
 | Done | ID | ~Min | Guard protects | Mutation | Run | Expect |
 |---|---|---|---|---|---|---|
-| [ ] | DOC-1 | 2 | A stated count is derived from its contract | `docs/okf/product/module/engine/spec-pipeline-model.md` line 12: edit the number 119 that sits directly before its `count:processors` marker to 118 | `node tools/check-doc-counts.mjs` | exit 1; marker `processors` states 118, the contract says 119 |
+| [ ] | DOC-1 | 2 | A stated count is derived from its contract | `docs/okf/product/module/elt/spec-pipeline.md` line 12: edit the number 119 that sits directly before its `count:processors` marker to 118 | `node tools/check-doc-counts.mjs` | exit 1; marker `processors` states 118, the contract says 119 |
 | [ ] | DOC-2 | 2 | Route-gating evidence table matches the code | `compliance/evidence/route-gating.md`: delete one table row between `<!--route-gating:begin-->` and `<!--route-gating:end-->` | `node tools/route-gating-report.mjs --check` | exit 1, table stale (regenerating is the fix, not part of the mutation) |
 | [ ] | DOC-3 | 2 | Doc links resolve | in a tracked doc add a markdown link whose target file does not exist (an `[x]` label followed by a parenthesised missing path) | `node tools/check-doc-links.mjs` | exit 1 naming the broken link |
 | [ ] | DOC-4 | 2 | Canonical vocabulary | add the heading `## Sources` to a `docs/ops/*.md` (the known trip) | `node tools/check-vocabulary.mjs` | exit 1 naming the file and the banned term |

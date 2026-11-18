@@ -152,7 +152,7 @@ timestamp: 2026-07-16T00:00:00Z
 > **This file is still current for what it now covers**: the entry point and create dialog, the
 > draft-IS-server-state rule, the config export/import bundle, and the *concepts* the editor
 > inherited (the stage model, readiness, lifecycle). Each section below names its live host. Rules
-> about a shared component live with that component — [collector-config](../../module/acquire/user-guide.md),
+> about a shared component live with that component — [collector-config](../../module/elt/user-guide.md),
 > [grammar-config](../../module/config/user-guide-grammar-config.md) — and the editor's own as-built is in
 > [pipelines](../../module/elt/user-guide.md).
 
@@ -352,7 +352,7 @@ options → Test parse → full-width results. For the `json` frontend the resul
 that the engine reads. ⚠ **That note is now out of date in the engine's favour** (2026-07-31): a
 dotted `raw.fields[].selector` reaches a nested value (`addr.city`), and `parsing.json.records_path`
 now accepts a dotted path to a nested record array (`payload.records`) — see
-`okf/product/module/engine/spec-parsing.md` §6.4. The tree itself is unchanged; only the
+`okf/product/module/elt/spec-ingest.md` §P.6.4. The tree itself is unchanged; only the
 caveat it carries needs revisiting when the pane next gets attention.
 
 **`records_path` became authorable 2026-07-31** (W2/U-D): `parsing-attributes.ts` offers
@@ -379,7 +379,7 @@ loads CodeMirror) and stub `InspectoGridThemeService`, which otherwise chains to
 `GAMMA_APP_CONFIG`.
 
 Since 2026-07-30 the toggle also appends the **served plugin parsers** (`GET /parsers` — XML today,
-ASN.1/vendor formats when their plugins deploy; `okf/product/module/engine/spec-parsing.md`): their
+ASN.1/vendor formats when their plugins deploy; `okf/product/module/elt/spec-ingest.md`): their
 options form renders the served grammar schema (`fieldSpecsToAttributes`), Test parse runs the real
 `POST /parsers/{id}/preview` (table or record tree), and **Save is disabled with an honest note** for a
 preview-only plugin (one that is not `ingestable` or names no `ingesterClass` — **none shipped today**: XML gained
@@ -457,7 +457,7 @@ next to the picker). This is not cosmetic: `CollectorConnectors.forConfig` dispa
 **without checking the two agree** — `connector: sftp` plus an Azure Connection silently gives the
 SFTP factory an Azure profile. Since 2026-08-04 the whole surface is the shared
 `<inspecto-collector-config>` — the pane is a thin host that only persists — so the Pipelines
-`acquisition` node dialog behaves identically; see [Collector configuration](../../module/acquire/user-guide.md).
+`acquisition` node dialog behaves identically; see [Collector configuration](../../module/elt/user-guide.md).
 Rules encoded there:
 - Connection mode requires a **saved** profile (unknown ids are refused at save — the whole point
   is that the id resolves to a connector); ＋New connection opens the shared `ConnectionFormDialog`.

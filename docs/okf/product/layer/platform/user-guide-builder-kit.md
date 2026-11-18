@@ -76,7 +76,7 @@ what it `provides`: features, config kinds, contracts, Job types and routes. `Mo
 manifests to the code. Read [the module taxonomy](architecture-modules.md).
 
 Deeper reading:
-- [node types](../../module/engine/spec-pipeline-model.md) (Steps);
+- [node types](../../module/elt/spec-pipeline.md) (Steps);
 - [Decision Rules](../../module/processor/spec-decision-rules.md) and the
   [Action Requests spec](../../module/action-requests/spec.md) (Consequences);
 - [the data plane plan](plan-data-plane.md) (Collectors).

@@ -140,7 +140,7 @@ or `-Dspaces.data.root`), `data/`, `audit/` and `duckdb/` go onto that data root
 
 Configuration is organized **per source format** — each format has its own
 block and its own knobs, by design (see
-[Design Philosophy](../engine/architecture.md#design-philosophy--scope)). Pick the row that matches your
+[Design Philosophy](../elt/architecture.md)). Pick the row that matches your
 input; the rest of this section details each block.
 
 | Source format | Ingest path | Key config block(s) | Notable knobs |
@@ -148,7 +148,7 @@ input; the rest of this section details each block.
 | **Delimited text** (CSV, CSV.GZ, TSV, pipe-delimited) | built-in | `processing.csv_settings` + a `schema_file` (or `schemas[]` for multi-schema) | `delimiter`, `engine` (`auto`/`duckdb`/`java`), `skip_header_lines`, `skip_junk_lines`, `skip_tail_lines`, `skip_tail_columns`, `has_header`, `date_formats`, `timestamp_formats` |
 | **Messy text dumps** (SQL\*Plus exports with banners/footers, ragged columns) | built-in (Java engine) | same as above, with the messy-file knobs set | `skip_junk_lines`, `skip_tail_lines`, `skip_tail_columns` → forces `engine: java` under `auto` |
 | **Fixed-width text** (column-positional records, one record per line) | built-in (native `read_csv`+`substring`) | `frontend: fixedwidth` + a `fixedwidth:` block (inline or in a `*.grammar.toon`) + a `schema_file` | `record: line`, `trim`, `min_record_length`, `fields[]{name,start,length}` |
-| **Binary / proprietary / multi-event-type** (CDR blobs, fixed-length binary, anything one parser splits into several record types) | [plugin](../engine/spec-ingest.md#plugin-ingester) | `processing.ingester` + `processing.segments` + optional `processing.ingester_config` | `ingester` (FQCN), per-segment schema files, free-form `ingester_config` map for format-specific settings (`record_length`, `byte_order`, …) |
+| **Binary / proprietary / multi-event-type** (CDR blobs, fixed-length binary, anything one parser splits into several record types) | [plugin](../elt/spec-ingest.md#plugin-ingester) | `processing.ingester` + `processing.segments` + optional `processing.ingester_config` | `ingester` (FQCN), per-segment schema files, free-form `ingester_config` map for format-specific settings (`record_length`, `byte_order`, …) |
 
 Common to **all** formats: `dirs.*`, `output.format` (`PARQUET`/`CSV`; **absent = `PARQUET`** since
 2026-09-25 — see *Output format and stored types* below),
@@ -205,7 +205,7 @@ row of one table** — cast a type, rename, pick a column, compose a date. It *c
 up, or aggregate, because Stage-1 is stateless per record — which is exactly what makes every
 batch parallel and safely re-runnable. Joins, lookups, and aggregation live in **Stage-2
 enrichment**: a separate `*_enrich.toon` with hand-written SQL over the committed output. See
-[Architecture → Design Philosophy & Scope](../engine/architecture.md#design-philosophy--scope).
+[Architecture → Design Philosophy & Scope](../elt/architecture.md).
 
 ### 1. Generation Config (`<source>_gen.toon`)
 
@@ -426,7 +426,7 @@ config SPI), reached only when config genuinely can't express the need:
 |---|---|---|
 | **1 — Record Transformer field** *(config, no code)* | rename/select (`keep`), cast a type (`convert.type`), compose a timestamp (`date.concat_parts`), derive a date from the filename (`date.from_filename`), **or any per-row DuckDB scalar expression (`custom`)** — a legacy `mapping.rules[]` row is read as one of these | a row in `mapping.fields[]` |
 | **2 — New named `transformType`** *(engine code)* | you want a **reusable, named** verb across many schemas (e.g. a domain checksum) rather than repeating the same `EXPR` everywhere | add the verb to the **`RecordTransform`** catalog (`platform/inspecto-etl/src/main/java/com/gamma/etl/RecordTransform.java`) — a one-line addition returning a DuckDB **scalar** expression (one row in → one row out). 🔴 It must not drift from `inspecto-ui/src/app/modules/admin/pipelines/sql-functions.ts`; `RecordTransformContractTest` pins the pair by writing `sql-functions.contract.json` from the catalog. *(Corrected 2026-09-08: this cell used to name a `ColumnRule` in a `DATA_RULES` registry in `etl/TransformCompiler`. `DATA_RULES` does not exist anywhere in the tree — the Record Transformer replaced that lane.)* |
-| **3 — Plugin ingester** *(engine code)* | the **input format** isn't delimited text — binary, fixed-width, ASN.1 — or one file splits into several event-type tables | implement [`StreamingFileIngester`](../engine/spec-ingest.md#plugin-ingester): you parse and `emit` records; the framework still applies the same `mapping.rules[]` / `partitions[]` to them |
+| **3 — Plugin ingester** *(engine code)* | the **input format** isn't delimited text — binary, fixed-width, ASN.1 — or one file splits into several event-type tables | implement [`StreamingFileIngester`](../elt/spec-ingest.md#plugin-ingester): you parse and `emit` records; the framework still applies the same `mapping.rules[]` / `partitions[]` to them |
 
 Anything that needs **more than one row** — a join to a reference table, a `GROUP BY`, a running
 total — is not a transform and does not belong in any of these levels. It is **Stage-2
@@ -583,7 +583,7 @@ the bytes to quarantine (`corrupt_download`) and skips the file — never proces
 `DuckLakeRegistrar` reads: `enabled` (BOOL, default `false`), `catalog_url`, `data_path` (FILEPATH), `schema`
 (default `main`) and `table`. All are optional in the spec; `ConfigSafetyValidator` requires `catalog_url` /
 `data_path` / `table` when `enabled` is true and jails `data_path`. A `sinks[]` entry's own `ducklake` block
-overrides this one. See [output sinks](../engine/spec-sinks.md).
+overrides this one. See [output sinks](../elt/spec-pipeline.md).
 
 **`fetch`** *(remote)* — `parallel_fetch > 1` fetches over a pool of independent connector sessions (the clients
 hold one non-thread-safe session each, so concurrency uses extra sessions, not shared reuse). `rate_limit` is a
@@ -638,7 +638,7 @@ fixedwidth:
   of `engine`. A field's `selector` must index a declared slice or the config fails to load.
 - **`record: bytes`** (binary) is handled by the shipped `com.gamma.ingester.FixedWidthRecordIngester`
   plugin — wire it via `processing.ingester` + `processing.segments` + `ingester_config` (see
-  [Plugin Ingester](../engine/spec-ingest.md)), not the
+  [Plugin Ingester](../elt/spec-ingest.md)), not the
   `fixedwidth:` block above.
 - Worked example: `spaces/default/config/subscriber/` (`subscriber.grammar.toon` + `subscriber_schema.toon`
   + `subscriber_pipeline.toon`).
@@ -734,7 +734,7 @@ processing:
   single file processes with bounded heap and scratch; it writes per-generation output files
   (`<stem>_gNNNNN_out.*`).
 
-Both are optional and have working defaults; see [plugins.md](../engine/spec-ingest.md) for the full SPI guide.
+Both are optional and have working defaults; see [plugins.md](../elt/spec-ingest.md) for the full SPI guide.
 
 ---
 
@@ -746,7 +746,7 @@ Transformations are applied by DuckDB during the `CREATE TABLE AS SELECT` step.
 |---|---|---|
 | `DATE` | `COALESCE(TRY_STRPTIME(col, 'fmt1'), TRY_STRPTIME(col, 'fmt2'), ...)::DATE` | Unparseable value → `NULL` |
 | `TIMESTAMP` | `COALESCE(TRY_STRPTIME(col, 'fmt1'), TRY_STRPTIME(col, 'fmt2'), ...)::TIMESTAMP` | Unparseable value → `NULL` |
-| `TIMESTAMP` + field `format: epoch` / `epoch_ms` | `make_timestamp(<whole count> * 1000000)` (`* 1000` for `epoch_ms`) when the count is inside the `TIMESTAMP` range — the UTC time, no source zone applied ([§2.2](../engine/spec-parsing.md)) | `0`, blank → `NULL` (not a failure); non-integer or out of range → `NULL`, counted |
+| `TIMESTAMP` + field `format: epoch` / `epoch_ms` | `make_timestamp(<whole count> * 1000000)` (`* 1000` for `epoch_ms`) when the count is inside the `TIMESTAMP` range — the UTC time, no source zone applied ([§2.2](../elt/spec-ingest.md)) | `0`, blank → `NULL` (not a failure); non-integer or out of range → `NULL`, counted |
 | `DOUBLE` | `TRY_CAST(col AS DOUBLE)` | Non-numeric value → `NULL` |
 | `VARCHAR` | Direct column reference — no cast | Never NULL from cast |
 | `FILENAME_DATE` | `TRY_STRPTIME(regexp_extract(col, 'PREFIX([0-9]{8})', 1), '%Y%m%d')::DATE` | No regex match → `NULL` |

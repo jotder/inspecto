@@ -72,7 +72,7 @@ Script: `tools/doc-diagrams/journey-file-to-dashboard.py`.
 
 ## Related modules
 
-[collectors](../../module/acquire/architecture.md) ·
+[collectors](../../module/elt/architecture.md) ·
 [parsing-ingest](../../module/elt/architecture.md) ·
 [storage](../../module/entity-store/architecture.md) ·
 [pipelines-steps](../../module/elt/architecture.md) ·
@@ -84,4 +84,4 @@ Script: `tools/doc-diagrams/journey-file-to-dashboard.py`.
 
 Concepts: [Studio](plan-studio.md) ·
 [ingestion](../../module/elt/plan.md) ·
-[acquisition](../../module/acquire/plan.md)
+[acquisition](../../module/elt/plan.md)

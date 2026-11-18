@@ -507,7 +507,7 @@ A draft is server state (an inactive pipeline); "⚠ Do not implement" stands in
 | Mechanism | Owning file | `resource:` | Read it for |
 |---|---|---|---|
 | `ComponentStore`, the kinds, routes, ETags, preview, safe delete | `docs/okf/product/module/processor/spec-component-registry.md` (`Concept`) | `ComponentStore.java` | §3.1–§3.4 — ⚠ 4 KB; corrected with this spec, still owed a fuller page |
-| The `use:` seam, `bindKindFor`, the palette contract, `transform.sql` internals | `docs/okf/product/module/engine/spec-pipeline-model.md` · `node-types.md` (`Concept`) | `inspecto-engine` | how a kind is bound and executed |
+| The `use:` seam, `bindKindFor`, the palette contract, `transform.sql` internals | `docs/okf/product/module/elt/spec-pipeline.md` · `node-types.md` (`Concept`) | `inspecto-engine` | how a kind is bound and executed |
 | The TOON key reference incl. the schema config and its `mapping:` block | `docs/okf/product/module/config/admin-guide-configuration-reference.md` (`Reference`) | — | §3.7 — read with §2 note 1 |
 | `schema_file` / `grammar` / `mapping` resolution and the jail | `docs/okf/product/module/config/spec-config-safety.md` (`Concept`) | `platform/inspecto-config/` | §3.7 |
 | Draft lifecycle, previews, the register pair, Reference production | `docs/okf/product/module/processor/api-onboarding-authoring.md` (`Seam`) | — | §3.8 |

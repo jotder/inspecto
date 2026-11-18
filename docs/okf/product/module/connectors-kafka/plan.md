@@ -20,7 +20,7 @@ the same Pipelines as files. Origin ACQ-5 in the acquisition roadmap.
 |---|---|
 | 2026-07-24 | `KafkaConnectionWorkbench`: probe / explore / sample ([connectors spec](../connectors/spec-connectors.md)). |
 | 2026-09-24 | `STREAM-CONSUMER-1` closed: frontier on the ledger watermark, re-keyed on land and durable across a restart, one uncommitted slice per partition, lag gauge ([stream-consumer-design](../../../../archived-documents/plans-archive/stream-consumer-design.md)). |
-| 2026-09-29 | `ASSURE-PUSH-INGEST-1`: the continuous `trigger: stream` lane and `pendingRecords()` ([acquisition plan](../acquire/plan.md)). |
+| 2026-09-29 | `ASSURE-PUSH-INGEST-1`: the continuous `trigger: stream` lane and `pendingRecords()` ([acquisition plan](../elt/plan.md)). |
 | 2026-10-06 | Safety Policy: Kafka partition-leader egress check (T12) under `DUCKLE-C6-POLICY-NARROWING-1`. |
 | 2026-10-07 | MODULE-REORG-1 P7: moved to its own module `inspecto-connectors-kafka`, staged from Standard; Basic loses the scheme by decision. |
 

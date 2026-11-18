@@ -176,7 +176,7 @@ reads are (2026-09-24, `DataSourceBundleResolver.findReferencesFor`): its `*_enr
 and every Reference Dataset it joins by name travels as its `produces: reference` Pipeline + connection +
 schemas, indexed in the manifest's `references` map; an import into a Space that already hosts that Reference
 keeps the target's copy and names it in `referencesKept` rather than 409ing — see
-[editable round-trip §22](../engine/spec-pipeline-model.md). `BundleImporter`
+[editable round-trip §22](../elt/spec-pipeline.md). `BundleImporter`
 **jails every zip entry** — an entry resolving outside `configDir` throws (the zip-slip pin, tested
 with a re-packed archive) — and **rebases** `spaces/<source>/…` path prefixes to the target Space (W3).
 `POST /spaces/import` reuses the same importer to seed a brand-new Space. ⚠ `multi-space.md` enumerates the

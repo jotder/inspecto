@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Pipeline execution (PIP) — capability plan](plan.md) |
-| spec | current | [Consignments — addressing and concurrency](spec-consignments.md) · [Database / persistence layer](spec-db-layer.md) · [DuckDB Integration](spec-duckdb.md) · [Ingest — the StreamingFileIngester SPI, Consignment coordination and branch-aware ingest](spec-ingest.md) · [Parsing — frontends, the parsing block and parser plugins](spec-parsing.md) · [Pipeline execution](spec-pipeline-execution.md) · [Pipeline model — node types, executors and the editable round-trip](spec-pipeline-model.md) · [Output & Sinks](spec-sinks.md) |
-| architecture | current | [Execution engine — architecture](architecture.md) |
-| features | current | [Execution engine — features](features.md) |
+| plan | n/a | documented in the ELT hub module/elt plan.md (part EXE), merged 2026-11-18 (DOCS-ELT-CONSOLIDATE-1) |
+| spec | current | [Database / persistence layer](spec-db-layer.md) · [DuckDB Integration](spec-duckdb.md) |
+| architecture | n/a | documented in the ELT hub module/elt architecture.md (Execution engine internals, sections E1-E7), merged 2026-11-18 |
+| features | n/a | documented in the ELT hub module/elt features.md (Execution engine), merged 2026-11-18 |
 | feature-db | current | [Execution engine — feature database](feature-db.md) |
-| user-guide | current | [Runs and Run Detail](user-guide.md) |
-| admin-guide | current | [Execution engine — admin guide](admin-guide.md) |
-| api | n/a | the engine registers no HTTP routes; the Pipeline, Run and Job routes it serves are documented in module/processor api-routes and api-jobs-scheduler and module/elt api-parsing-ingest |
+| user-guide | n/a | documented in the ELT hub module/elt user-guide.md section 22 (Runs and Run Detail), merged 2026-11-18 |
+| admin-guide | n/a | documented in the ELT hub module/elt admin-guide.md, merged 2026-11-18 |
+| api | n/a | the engine registers no HTTP routes; the Pipeline, Run and Job routes it serves are documented in module/processor api-routes and api-jobs-scheduler and module/elt api.md |
 | tests | current | [Execution engine — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

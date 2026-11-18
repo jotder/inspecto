@@ -213,7 +213,7 @@ Collectors run on a virtual-thread executor bounded by `-Dsources.max` (default:
 
 > ⚠ **The rest of this section describes the CLI orchestrator (`MultiCollectorProcessor`).** In
 > **server mode** the fleet factor is not `-Dsources.max` but the broker's system Consignment cap —
-> see [Consignment concurrency](../../module/engine/spec-consignments.md) for the four-layer model
+> see [Consignment concurrency](../../module/elt/spec-ingest.md) for the four-layer model
 > (per-Pipeline / per-space / per-server + priority), all of it hot-tunable from Settings ▸ Scheduler
 > since 2026-08-25. The oversubscription warning reads the installed fleet cap there; the arithmetic
 > becomes `cap × duckdb_threads ≈ cores`.

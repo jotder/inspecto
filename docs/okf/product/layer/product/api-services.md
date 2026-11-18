@@ -16,8 +16,8 @@ re-exported from the `inspecto/api` barrel. See [API & data conventions](spec-ap
 
 | Service | Backs feature(s) |
 |---|---|
-| `RunsService` | [runs](../../module/engine/user-guide.md), [run-detail](../../module/engine/user-guide.md) |
-| `CollectorsService` | [collectors](../../module/acquire/user-guide.md) |
+| `RunsService` | [runs](../../module/elt/user-guide.md), [run-detail](../../module/elt/user-guide.md) |
+| `CollectorsService` | [collectors](../../module/elt/user-guide.md) |
 | `ConnectionsService` · `ConnectionProbeService` | [connections](../../module/connectors/user-guide-connections.md) |
 | `PipelinesService` · `ComponentsService` | [pipelines](../../module/elt/user-guide.md), [components](spec-components.md) |
 | `CatalogService` | [catalog](user-guide-catalog.md) |
