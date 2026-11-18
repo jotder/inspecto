@@ -347,7 +347,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the EMP-0482 to VEN-0264 link.
 
 ### S07 · Cohesive groups: dense, or just connected?
-- Voice: Cohesive groups asks how tight a group is. Open it, and pick a Method. Dense core scores each node by how deeply it sits in a group where everyone has several links inside. Triangles counts the closed threes a node is part of. Cliques finds groups where everyone links to everyone. Press Find groups for each. Here every core is one deep, no node closes a triangle, and the answer says: no cliques of size three or more. That is a finding: access here was handed down a line, not passed round a ring.
+- Voice: Cohesive groups asks how tight a group is. Open it, and pick a Method. Dense core scores each node by how deeply it sits in a group where everyone has several links inside. Triangles counts the closed threes a node is part of. Cliques finds groups where everyone links to everyone. Press Find groups. Here every core is one deep: nothing here is a ring. That is a finding: access here was handed down a line, not passed round a circle.
 - Chip: Cohesive groups · Dense core (k-core) · Triangles · Cliques
 - Action: Cohesive groups ▸ Method: Dense core (k-core) ▸ Find groups ▸ Triangles ▸ Find groups ▸ Cliques ▸ Find groups. [check in UI: the k-core table scores 1 throughout, triangles 0, and Cliques reports *No cliques of size 3 or more.*]
 - Impact: two table states and the Cliques message, each held 2 s; mark the message.
