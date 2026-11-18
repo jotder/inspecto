@@ -185,7 +185,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the confirmation's sentence, then the new step row.
 
 ### S08 · Register as Dataset
-- Voice: One more button: Register as Dataset. It turns a list into a Dataset that other tools can join to, such as a report. Before it does, it warns: anyone who can read Datasets can read the list's raw keys, because masking does not apply to a Dataset. Read that before you press it. Here, cancel.
+- Voice: One more button exists: Register as Dataset. It turns a list into a Dataset that other tools can join to, such as a report. It appears only for people who may author Datasets, so it is not on this analyst's screen. Before it registers anything it warns: anyone who can read Datasets can read the list's raw keys, because masking does not apply to a Dataset. Read that warning before you press it.
 - Chip: Register as Dataset
 - Action: Register as Dataset on *Benign shared wallets* ▸ hold on the confirmation ▸ Cancel. [check in UI: which Demo User sees the button; switch to Demo Admin if the analyst does not]
 - Impact: mark the warning's sentence.
@@ -197,7 +197,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark *Chain verified*, then the head hash.
 
 ### S10 · Find a group, and retract
-- Voice: In Link Analysis, Settings, Identities, find the group of the wallet FARM-1. It holds FARM-1 and FARM-2, joined by one assertion: same handset. But a shared handset is a link, not proof that two wallets are one person; that is the very question the farm raises. Press Retract on that assertion. The group splits, and a retraction is a new fact, so the chain grows by one and still verifies. Assert same entity works the same way: two identifiers, a reason, and nothing is written until you confirm.
+- Voice: In Link Analysis, Settings, Identities, find the group of the wallet FARM-1. It holds FARM-1 and FARM-2, joined by one assertion: same handset. But a shared handset is a link, not proof that two wallets are one person; that is the very question the farm raises. Retract takes that assertion back: the group would split, and a retraction is a new fact, so the chain grows by one and still verifies. We leave ours as it is. Assert same entity works the same way: two identifiers, a reason, and nothing is written until you confirm.
 - Chip: Settings · Identities · Find group · Retract
 - Action: Settings ▸ Identities ▸ Identifier type *wallet* ▸ Identifier `FARM-1` ▸ Find group ▸ hold on *Assertions that joined it* ▸ Retract ▸ confirm ▸ Identity Facts tab ▸ the head number has gone up by one ▸ point at the *Assert same entity* form. [check in UI: the identifier type's label, and that Retract asks first]
 - Impact: before/after hold: the group of two becomes one; mark the head's new number.

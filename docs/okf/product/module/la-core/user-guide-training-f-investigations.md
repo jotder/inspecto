@@ -162,43 +162,43 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark each part as the voice names it.
 
 ### S03 · Link kinds and strength
-- Voice: Select the premium-rate number 99891000001. From switches to the selection. Open Link kinds: one chip per kind, pressed means followed. Keep only voice calls. Set Direction to Incoming: who calls it? The preview counts everyone, including the forty victims' one-off call-backs. Now open Strength, and set the minimum events per link to three. The preview shrinks to the lines that call it again and again. Press Expand. Two numbers arrive, pumping long night calls into the premium range.
+- Voice: Open Link kinds: one chip per kind, pressed means followed. This pack has three: forwarding, shared device, and voice. Press forwarding and shared device to let them go, and keep only voice calls. Now open Strength, and set the minimum events per link to three. A pair of numbers that spoke once no longer counts; only the lines that call again and again do. Read the preview line under the Expand button after each change: it says what the step would add, before you press anything.
 - Chip: Link kinds · Strength · Minimum events per link
 - Action: click `99891000001` ▸ Link kinds: only `voice` ▸ Direction: Incoming ▸ hold on the preview ▸ Strength ▸ Minimum events per link `3` ▸ hold on the preview ▸ Expand. [check in UI: the two previews' counts, the link kind chip names, and that 99979200001 and 99979200002 arrive]
 - Impact: before/after hold of the preview line; mark the two IRSF numbers.
 
 ### S04 · Reciprocal
-- Voice: Direction has a fourth choice, only in an Investigation: Reciprocal, only pairs linked in both directions. Select the start number, and choose it. The preview says this step adds nothing new. Nobody the suspect rang ever rang it back directly; their call-backs were forwarded elsewhere. Mutual contact is how a relationship looks. A one-way burst is how a campaign looks. Set Direction back to Both ways.
+- Voice: Direction has a fourth choice, only in a saved Investigation: Reciprocal, only pairs linked in both directions. Choose it, and read the preview: it counts only the numbers that were rung and also rang back. Mutual contact is how a relationship looks. A one-way burst, four hundred numbers rung for a few seconds, is how a campaign looks, and Reciprocal leaves it out. The filter title now says one group changed, and a dot marks the fold.
 - Chip: Direction · Reciprocal
 - Action: click `99979100001` ▸ Direction: Reciprocal ▸ hold on the preview ▸ Direction: Both ways. [check in UI: the preview reads *This step adds nothing new*; reword if a reciprocal pair exists]
 - Impact: mark the preview line.
 
 ### S05 · Degrees
-- Voice: Select 99979200001, the first of the two pumping lines. Link kinds: shared identity, and shared payment. Open Depth, and set Degrees to two. Above two, a line warns that it stops early if a degree would expand from more than two thousand numbers. Press Expand two degrees. First, five lines registered on the same identity document. Then, from one of them, a SIM box line topped up with the same card. One identity, five lines, and a gateway.
+- Voice: Open Depth. Degrees says how many rings one Expand adds: one ring is the numbers a number touches, two rings is the numbers those touch. Press plus, and the preview counts two rings instead of one. Wider steps grow fast, so an Expand that would grow from too many numbers at once stops early, and says so, rather than flooding the canvas. For a real question, widen one degree at a time.
 - Chip: Depth · Degrees
 - Action: click `99979200001` ▸ Link kinds: `shared_identity`, `shared_payment` ▸ Direction: Both ways ▸ Depth ▸ Degrees `2` ▸ Expand 2 degrees. [check in UI: 99979300001…05 at degree 1 and 99979400001 at degree 2; both links fall inside the 30-day window]
 - Impact: before/after hold: mark the five subscription-fraud lines, then the SIM box line.
 
 ### S06 · Shrink an Expand, and grow it again
-- Voice: While the newest step is an Expand, Degrees is that Expand's size, and a line says so. Lower it to one. The outermost degree leaves the canvas, and the record keeps that you took it back. Raise it to two again, and it grows back from the outer ring. The first degree always stays. This is how you try a wider step without losing your place.
+- Voice: While the newest step is an Expand, Degrees is that Expand's size, and a line under it says so: Degrees follows the last Expand. Fewer removes its outermost degrees from the Working Set, and the record keeps that you took them back. More expands further, from the outer ring. The first degree always stays. This is how you try a wider step without losing your place.
 - Chip: Degrees follows the last Expand
 - Action: zoom on *Degrees follows the last Expand …* ▸ Degrees `1` ▸ wait ▸ Degrees `2` ▸ wait. [check in UI: the SIM box line leaves and returns; and how the Step log shows the lowered degree]
 - Impact: before/after hold: 99979400001 leaves, then returns.
 
 ### S07 · Time
-- Voice: This Investigation reads the last thirty days, counted back from the Dataset's latest event, never from today. Select the second SIM, 99979100002. Link kinds: voice. Direction: Outgoing. The preview says nothing new: in this window it rang no one. Open Time. The chips are: the Investigation window, all data, the last seven, thirty or ninety days, and a custom window for this Expand only. Choose all data. Now the preview counts sixty numbers it rang in late August. Press Expand. Same handset, same play, a month earlier.
+- Voice: This Investigation reads the last thirty days, counted back from the Dataset's latest event, never from today, and a line above the Expand button says which days the next Expand reads. Open Time. The chips are: the Investigation window, all data, the last seven, thirty or ninety days, and a custom window for this Expand only. Choose all data, and the next Expand reads the whole Dataset instead of the last month. Use it when the thing you chase happened before your window, such as a second SIM that rang its numbers a month earlier.
 - Chip: Time · Investigation window · All data
 - Action: click `99979100002` ▸ Link kinds: only `voice` ▸ Direction: Outgoing ▸ hold on the preview ▸ Time ▸ All data ▸ hold on the preview ▸ Expand. [check in UI: the first preview finds nothing new or very few, the second about 60]
 - Impact: before/after hold of the preview; mark the new ring of numbers.
 
 ### S08 · Fan-out and busy
-- Voice: The last fold limits the size of a step. Hold busy entities is on: an entity with more than five hundred linked is shown, but not expanded through. Most neighbours per entity keeps the strongest few from each. Fewest and most links a neighbour may have screen out the lonely and the crowded. Row limit per degree stops a step at that many rows and marks it incomplete. Type three thousand neighbours per entity: a line warns that each degree would need a second person's approval. Clear it again.
+- Voice: The last fold limits the size of a step. Hold busy entities is on: an entity with more than five hundred linked is shown, but not expanded through. Most neighbours per entity keeps the strongest few from each. Fewest and most links a neighbour may have screen out the lonely and the crowded. Row limit per degree stops a step at that many rows and marks it incomplete. If you set Most neighbours per entity very high, a line warns that each degree would need a second person's approval; episode F5 shows that.
 - Chip: Fan-out and busy · Most neighbours per entity · Row limit per degree
 - Action: Fan-out and busy ▸ zoom on *Hold busy entities (more than 500 linked)*, Busy limit, Most neighbours per entity, Fewest links a neighbour may have, Most links a neighbour may have, Row limit per degree ▸ Most neighbours per entity `3000` ▸ hold on *Each degree will need approval from a second person: …* ▸ clear the field.
 - Impact: mark the warning line.
 
 ### S09 · A wide step, held at the hub
-- Voice: Now a wide step. From: the outer ring. Link kinds: voice. Direction: both ways. The preview says how many numbers and calls it adds, and that one busy number will be held. Press Expand. Hundreds of numbers arrive, the circles the victims call every day, and the graph is laid out again. The taxi line, called by six hundred and fifty numbers, sits with a ring and a held badge. The line above the form says one busy entity is held, and how to go through it if you must.
+- Voice: Now a wide step. Reset the filter to its defaults, and From is the outer ring. The preview says how many numbers and calls it adds, and that one busy number will be held, shown but not expanded through. Press Expand. Hundreds of numbers arrive, the circles the victims call every day, and the graph is laid out again. A line above the form says a busy entity is held, and how to go through it if you must.
 - Chip: The outer ring (next degree) · held
 - Action: From: The outer ring (next degree) ▸ Link kinds: only `voice` ▸ Direction: Both ways ▸ hold on the preview ▸ Expand ▸ zoom on 99970000100 and the line *1 busy entity is held. …*. [check in UI: the preview's numbers and that the taxi line is the one held]
 - Impact: before/after hold: the wide ring arrives; mark the held taxi line.
