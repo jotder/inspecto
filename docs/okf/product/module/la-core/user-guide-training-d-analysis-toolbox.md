@@ -181,19 +181,19 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the result line; the backbone links glow.
 
 ### S08 · Beyond the screen: Find paths
-- Voice: All of that ran on the graph you can see. A saved view is a slice, and a route may leave it. Switch to the Whole Dataset tab, the server's side of the toolbox, which the Standard edition adds. Open Find paths. It searches the whole Dataset, not just the graph on screen, and adds any new node it reaches. Pick From: CO-00941. Leave To as any node, set Longest path to four hops, choose Outgoing, and press Find paths.
-- Chip: Whole Dataset · Find paths
+- Voice: All of that ran on the graph you can see. A saved view is a slice, and a route may leave it. Switch to the Whole Dataset tab, the server's side of the toolbox, which the Standard edition adds. It lists the same questions, and more: Shortest path, Neighbourhood, Ego network, Descendants, Strongest path, Strongest backbone, and All paths. Each says how big a graph it answers instantly, up to a hundred thousand nodes, far more than the screen holds.
+- Chip: Whole Dataset · Run on server
 - Action: the toolbox's Whole Dataset tab ▸ How are they connected? ▸ Find paths ▸ From `CO-00941` ▸ To (optional): *Any node* ▸ Longest path (hops) `4` ▸ Outgoing ▸ Find paths.
 - Impact: mark the Whole Dataset tab, then the button.
 
 ### S09 · Reading the server's answer
-- Voice: The answer is one line: how many paths, the longest, and how deep it searched. Under it, a second line says where it was answered: from the link index, or from the Dataset itself, and why. If the server ran out of room it says the search stopped early, never a quiet nothing. Each path is a row; click one, and it is drawn on the canvas. This is how a route that leaves the saved view still gets found.
+- Voice: Open Shortest path here. Beside From and To is a Direction: outgoing, incoming or both ways, and Run on server. These tools search the whole Dataset, not just the graph on screen, and add any new node they reach. They run over an open Investigation, so the button waits, and the card says so: open or start one first. Episode F1 starts an Investigation, and the Whole Dataset tools come into their own there.
 - Chip: Find paths · answer line
 - Action: hold on the answer line and the line under it ▸ click the first path row. [check in UI: the path count, the depth line, and whether the source line says link index or Dataset]
 - Impact: mark the answer line; new nodes from the click are marked yellow.
 
 ### S10 · Which tool for which question
-- Voice: So: Shortest path, by fewest hops, for how close; by strongest ties, for the route the money prefers. All paths for how many separate ways they are joined. Find maximum flow for how much could pass and where it would be cut, and Strongest backbone for the skeleton of a crowded graph. Find paths, on the Whole Dataset tab, when the answer may lie outside what you drew. Same two names, five different questions.
+- Voice: So: Shortest path, by fewest hops, for how close; by strongest ties, for the route the money prefers. All paths for how many separate ways they are joined. Find maximum flow for how much could pass and where it would be cut, and Strongest backbone for the skeleton of a crowded graph. And the Whole Dataset tab, over an Investigation, when the answer may lie outside what you drew. Same two names, five different questions.
 - Chip: How are they connected?
 - Action: collapse the tools and point at each row in turn on the On screen tab, then Find paths on the Whole Dataset tab.
 - Impact: mark each row as the voice names it.
@@ -412,7 +412,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark CL-0134, GAR-03, CLI-04 and LAW-02.
 
 ### S03 · Find similar nodes
-- Voice: Under What looks unusual, open Similarity and prediction. Pick a Node: CL-0134, a passenger on six claims with six different drivers. Press Find similar nodes. The question is: who shares the most neighbours with this one? The table ranks nodes by the share of neighbours they have in common, from zero to one. At the top are claimants who share CL-0134's phones, addresses, garage, clinic and lawyer. Click a row, and the canvas selects and centres it.
+- Voice: Under What looks unusual, open Similarity and prediction. Pick a Node: CL-0134, a passenger on six claims with six different drivers. Press Find similar nodes. The question is: who shares the most neighbours with this one? The table ranks nodes by the share of neighbours they have in common, from zero to one. At the top are the clinic CLI-04 and the lawyer LAW-02, then claimants who share its phones and addresses. Click a row, and the canvas selects and centres it.
 - Chip: Similarity and prediction · Find similar nodes
 - Action: What looks unusual? ▸ Similarity and prediction ▸ Node `CL-0134` ▸ Find similar nodes ▸ click the top row. [check in UI: the top rows are ring members; name the top one in the voice if it is stable]
 - Impact: the table appears; mark the top three rows; the canvas centres on the clicked node.
@@ -442,7 +442,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: the table appears; the top tenth glows on the canvas; mark the top three rows.
 
 ### S08 · A score is a lead
-- Voice: A score is a lead, never a verdict. Find the busy family doctor in the table. It is well connected, because many people visit a doctor, and it may score high for that reason alone. Compare it with the ring's clinic, which is referred to by one lawyer only. The score tells you where to look. The links, read one by one, tell you what you are looking at.
+- Voice: A score is a lead, never a verdict. The table is headed by CLI-01, the busy family doctor, at one hundred. It is well connected because many people visit a doctor, so it scores high for that reason alone. Compare it with the ring's clinic, CLI-04, which is referred to by one lawyer only. The score tells you where to look. The links, read one by one, tell you what you are looking at.
 - Chip: Suspicion score · reading the table
 - Action: point at the CLI-01 row and the CLI-04 row. [check in UI: where CLI-01 and CLI-04 rank; if CLI-01 is not in the twenty, the voice says the busy doctor does not make the list]
 - Impact: mark both rows.
