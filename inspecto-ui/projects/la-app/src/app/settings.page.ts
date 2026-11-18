@@ -3,12 +3,13 @@ import { ChangeDetectionStrategy, Component, DestroyRef, Type, computed, inject,
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute, Router } from '@angular/router';
-import { LensService } from 'app/inspecto/api';
+import { LensService, SpacesService } from 'app/inspecto/api';
 import { SessionService } from 'app/inspecto/auth/session.service';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
 import { AccessPageComponent } from './access.page';
 import { InvestigationAccessPageComponent } from './investigation-access.page';
+import { SpacesSettingsComponent } from './spaces.page';
 import {
     AddDataSettingsComponent,
     AnalysisLimitsSettingsComponent,
@@ -109,6 +110,7 @@ const AUDIENCES: readonly { id: Audience; label: string }[] = [
 export class SettingsPageComponent {
     private readonly lens = inject(LensService);
     private readonly session = inject(SessionService);
+    private readonly spaces = inject(SpacesService);
     private readonly limits = inject(LaLimitsService);
     private readonly route = inject(ActivatedRoute);
     private readonly router = inject(Router);
@@ -175,6 +177,18 @@ export class SettingsPageComponent {
             audience: 'space',
             component: AccessPageComponent,
             canChange: () => this.lens.canConfigureAccess(),
+        },
+        {
+            id: 'spaces',
+            title: 'Spaces',
+            icon: 'heroicons_outline:square-3-stack-3d',
+            description: 'Space and Data folders; attach, detach.',
+            audience: 'server',
+            component: SpacesSettingsComponent,
+            // SPACE-LOCATIONS-UI-1: read-only while the server has no allowed folders (spaces.allowed.roots)
+            canChange: () => !this.spaces.locationsDisabled(),
+            // an administrator's, and only where there are Spaces to manage (the server sends folders to admins only)
+            visible: () => this.spaces.multiSpace() && this.lens.canAdminister(),
         },
         {
             id: 'host-resources',

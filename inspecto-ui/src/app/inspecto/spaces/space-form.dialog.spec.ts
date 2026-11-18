@@ -328,6 +328,22 @@ describe('SpaceFormDialog', () => {
         ).toBeNull();
     });
 
+    it('offers Advanced: folders on the Inspecto LA create too (multi-Space), and only to an administrator', () => {
+        const q = '[data-testid="folders-toggle"]';
+        expect(
+            (
+                create({ dataKind: true }, undefined, undefined, { multi: true }).fixture.nativeElement as HTMLElement
+            ).querySelector(q),
+        ).not.toBeNull();
+        TestBed.resetTestingModule();
+        expect(
+            (
+                create({ dataKind: true }, undefined, ['canAuthorWorkbench'], { multi: true }).fixture
+                    .nativeElement as HTMLElement
+            ).querySelector(q),
+        ).toBeNull();
+    });
+
     it('keeps Create disabled until a given folder passed its check, then sends it', async () => {
         const { fixture, spaceSave } = create(null, undefined, undefined, { multi: true });
         const el = fixture.nativeElement as HTMLElement;

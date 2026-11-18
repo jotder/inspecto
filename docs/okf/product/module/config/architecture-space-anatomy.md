@@ -95,7 +95,8 @@ refusal rules and the move procedure are on [Spaces §4](architecture-config.md)
 
 ### 2.2 Setting the folders over HTTP (`SPACE-LOCATIONS-1`, server as built 2026-11-18)
 
-The `<id>.ref` and `data_root` above can also be written by the server, live, from Settings ▸ Spaces:
+The `<id>.ref` and `data_root` above can also be written by the server, live, from Settings ▸ Spaces (the console,
+and Inspecto LA for an administrator on a multi-Space server, reusing the same dialogs):
 
 | Action | Route | What it writes |
 |---|---|---|
@@ -103,7 +104,7 @@ The `<id>.ref` and `data_root` above can also be written by the server, live, fr
 | *Attach existing Space* | `POST /spaces/attach {path, id?}` | `<id>.ref`, then boots the Space; it boots again at every restart |
 | *Detach* | `POST /spaces/{id}/detach` | stops the Space, deletes `<id>.ref`; both folders stay on disk |
 | *Change data folder* | `PUT /spaces/{id}/data-root {path\|null}` | `data_root` in `space.toon`, then reboots the Space (which stamps the folder) |
-| New Space ▸ *Advanced: folders* | `POST /spaces {…, path?, dataRoot?}` | the Space in `path`, `<id>.ref`, `data_root` |
+| New Space (Inspecto LA: Create a Space) ▸ *Advanced: folders* | `POST /spaces {…, path?, dataRoot?}` | the Space in `path`, `<id>.ref`, `data_root` |
 
 `GET /spaces` rows carry `location {spaceFolder, dataFolder, referenced, holdsData}` for a `canAdminister` holder
 only; `GET /spaces/_meta` says `locationsEnabled`. A path is absolute or relative to the app root; a `<id>.ref` and a
