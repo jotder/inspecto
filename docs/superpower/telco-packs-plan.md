@@ -22,7 +22,7 @@ None edits `telco-fraud` or `telco-ra`.
 ## 1. Bypass / SIM-box (`telco-bypass`)
 
 CDR-based only by design: signalling (matrix row F), test calls (row G) and inline blocking stay out of scope, and a CDR pattern is
-evidence of consistency with a box, never proof. As built: [architecture](../okf/product/solution-pack/telco-bypass/architecture.md),
+evidence of consistency with a box, never proof. As built: [architecture](../okf/product/solution-pack/telco-bypass/architecture-telco-bypass.md),
 [decisions and as-built record](../okf/product/solution-pack/telco-bypass/plan-as-built.md).
 
 ### 1.1 Open slices
@@ -97,7 +97,7 @@ corpus only (boxes adapt; the signal list is closed, a missing signal is gate G-
 
 ## 2. Partner settlement (`partner-settlement`)
 
-As built: [architecture](../okf/product/solution-pack/partner-settlement/architecture.md),
+As built: [architecture](../okf/product/solution-pack/partner-settlement/architecture-partner-settlement.md),
 [decisions and as-built record](../okf/product/solution-pack/partner-settlement/plan-as-built.md) (PS-D1 to PS-D10, answered, with how
 to reverse each).
 
@@ -158,7 +158,7 @@ Scope creep into re-rating, payments or the ledger (the pack moves no money).
 
 ## 3. Re-rating (`telco-rerating`)
 
-As built: [architecture](../okf/product/solution-pack/telco-rerating/architecture.md),
+As built: [architecture](../okf/product/solution-pack/telco-rerating/architecture-telco-rerating.md),
 [decisions and as-built record](../okf/product/solution-pack/telco-rerating/plan-as-built.md) (why no kernel, D-RR1 to D-RR9, R0's
 answers, known limits).
 

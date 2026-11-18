@@ -11,20 +11,20 @@ tags: [product-item, product]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`product.la`](../../../../../product-map/product/la.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
 | plan | n/a | a Product assembles Apps — see the hubs of its Apps and Add-ons |
 | spec | n/a | a Product assembles Apps — see the hubs of its Apps and Add-ons |
 | architecture | n/a | a Product assembles Apps — see the hubs of its Apps and Add-ons |
-| features | current | [Inspecto LA — datasheet](features.md) |
+| features | current | [Inspecto LA — datasheet](features-la.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Inspecto LA — user guide](user-guide.md) |
-| admin-guide | current | [Inspecto LA — admin guide](admin-guide.md) |
+| user-guide | current | [Inspecto LA — user guide](user-guide-la.md) |
+| admin-guide | current | [Inspecto LA — admin guide](admin-guide-la.md) |
 | api | n/a | a Product assembles Apps — see the hubs of its Apps and Add-ons |
 | tests | n/a | a Product assembles Apps — see the hubs of its Apps and Add-ons |
-| brochure | current | [Inspecto LA — demo script](brochure-demo-script.md) · [Inspecto LA — video script](brochure-video-script.md) · [Inspecto LA — brochure](brochure.md) |
+| brochure | current | [Inspecto LA — demo script](brochure-demo-script.md) · [Inspecto LA — brochure](brochure-la.md) · [Inspecto LA — video script](brochure-video-script.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
 

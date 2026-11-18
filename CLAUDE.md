@@ -87,8 +87,10 @@ change that adds or retires a doc:
 1. **Current knowledge → one product hub per Product Map Item:
    `docs/okf/product/<kind>/<name>/`** (mirrors `product-map/<kind>/<name>.toon`; `PRODUCT-DOCS-HUB-1`,
    2026-10-19). File name = slot: `plan` · `spec` · `architecture` · `features` · `feature-db` ·
-   `user-guide` · `admin-guide` · `api` · `tests` · `brochure`, as `<slot>.md` or `<slot>-<topic>.md`.
-   Platform-wide backend docs → `layer/platform`; UI-wide and whole-product sales docs →
+   `user-guide` · `admin-guide` · `api` · `tests` · `brochure`, as `<slot>-<hub>.md` (the slot's main file
+   carries the hub folder name: `architecture-la-core.md`, `user-guide-elt.md`; every hub's entry page is
+   `architecture-<hub>.md`) or `<slot>-<topic>.md` (`DOCS-HUB-NAMES-1`, 2026-11-18). Never a bare `<slot>.md`
+   except the generated `feature-db.md`; `tools/check-product-docs.mjs` refuses one. Platform-wide backend docs → `layer/platform`; UI-wide and whole-product sales docs →
    `layer/product`. A hub's `index.md` is generated (`node tools/render-product-docs.mjs`) — never
    hand-edit it. Plus the small root canon (GLOSSARY, INDEX, REQUIREMENTS, BACKLOG, USER_GUIDE,
    PROJECT_NOTES, BRANCHING, EDITIONS, FEATURE_INVENTORY, ADVANCED_GUIDE), the HTTP contract

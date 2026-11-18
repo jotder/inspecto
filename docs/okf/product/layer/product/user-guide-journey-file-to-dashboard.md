@@ -33,7 +33,7 @@ OKF concepts linked below; this page only strings them together.
    parses, transforms and partitions it and checks Expectations; rejected rows go to quarantine.
 5. **Lakehouse commit.** `ConsignmentIngestor` commits in crash-safe order: DuckLake register, manifest,
    backup of originals, markers, ledger last. A failed Consignment leaves no markers, so it is picked up again.
-   Detail: [ingestion](../../module/elt/plan.md).
+   Detail: [ingestion](../../module/elt/plan-elt.md).
 6. **Pipeline Run.** The Pipeline's later Steps read the committed Parquet and write their outputs. Operators
    watch it on **Runs** (route `runs`): `GET /api/v1/runs/{runId}/files`, `/commits`, `/quarantine`,
    `/outputs`, `/errors`, `/lineage`; `POST /api/v1/runs/{runId}/reprocess` and `/replay-rejects` repair.
@@ -72,16 +72,16 @@ Script: `tools/doc-diagrams/journey-file-to-dashboard.py`.
 
 ## Related modules
 
-[collectors](../../module/elt/architecture.md) ·
-[parsing-ingest](../../module/elt/architecture.md) ·
-[storage](../../module/entity-store/architecture.md) ·
-[pipelines-steps](../../module/elt/architecture.md) ·
-[jobs-scheduler](../../module/processor/architecture.md) ·
-[analytics-kernel](../../module/analytics/architecture.md) ·
+[collectors](../../module/elt/architecture-elt.md) ·
+[parsing-ingest](../../module/elt/architecture-elt.md) ·
+[storage](../../module/entity-store/architecture-entity-store.md) ·
+[pipelines-steps](../../module/elt/architecture-elt.md) ·
+[jobs-scheduler](../../module/processor/architecture-processor.md) ·
+[analytics-kernel](../../module/analytics/architecture-analytics.md) ·
 [studio-bi](architecture-studio-bi.md) ·
-[alerts](../../addon/incidents/architecture.md) ·
-[observability-backup](../../module/observability/architecture.md)
+[alerts](../../addon/incidents/architecture-incidents.md) ·
+[observability-backup](../../module/observability/architecture-observability.md)
 
 Concepts: [Studio](plan-studio.md) ·
-[ingestion](../../module/elt/plan.md) ·
-[acquisition](../../module/elt/plan.md)
+[ingestion](../../module/elt/plan-elt.md) ·
+[acquisition](../../module/elt/plan-elt.md)

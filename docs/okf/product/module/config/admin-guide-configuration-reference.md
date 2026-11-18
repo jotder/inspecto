@@ -108,9 +108,9 @@ Each space is fully isolated: its own service, scheduler, event log, stores, con
   gate re-reads the *raw* URI, so a space-outside path is never an API path at all). An unknown id is a
   `404`; `/health`, `/ready`, `/metrics` stay un-prefixed and server-global; an un-prefixed API path
   resolves the `default` (or sole) space. The wire protocol lives in
-  [multi-space](../processor/architecture.md) — do not restate routes here.
+  [multi-space](../processor/architecture-processor.md) — do not restate routes here.
 - **Space CRUD** is server-global and lives on the wire-protocol page — the seven routes are documented
-  in [multi-space](../processor/architecture.md); this file covers on-disk layout and `SpaceMigrator`
+  in [multi-space](../processor/architecture-processor.md); this file covers on-disk layout and `SpaceMigrator`
   only.
 - **Single-tenant mode** (no `-Dspaces.root` AND a config/dir passed on the CLI) hosts one `default` space and is
   byte-identical to the pre-spaces behaviour; CRUD returns `409`.
@@ -140,7 +140,7 @@ or `-Dspaces.data.root`), `data/`, `audit/` and `duckdb/` go onto that data root
 
 Configuration is organized **per source format** — each format has its own
 block and its own knobs, by design (see
-[Design Philosophy](../elt/architecture.md)). Pick the row that matches your
+[Design Philosophy](../elt/architecture-elt.md)). Pick the row that matches your
 input; the rest of this section details each block.
 
 | Source format | Ingest path | Key config block(s) | Notable knobs |
@@ -205,7 +205,7 @@ row of one table** — cast a type, rename, pick a column, compose a date. It *c
 up, or aggregate, because Stage-1 is stateless per record — which is exactly what makes every
 batch parallel and safely re-runnable. Joins, lookups, and aggregation live in **Stage-2
 enrichment**: a separate `*_enrich.toon` with hand-written SQL over the committed output. See
-[Architecture → Design Philosophy & Scope](../elt/architecture.md).
+[Architecture → Design Philosophy & Scope](../elt/architecture-elt.md).
 
 ### 1. Generation Config (`<source>_gen.toon`)
 
@@ -583,7 +583,7 @@ the bytes to quarantine (`corrupt_download`) and skips the file — never proces
 `DuckLakeRegistrar` reads: `enabled` (BOOL, default `false`), `catalog_url`, `data_path` (FILEPATH), `schema`
 (default `main`) and `table`. All are optional in the spec; `ConfigSafetyValidator` requires `catalog_url` /
 `data_path` / `table` when `enabled` is true and jails `data_path`. A `sinks[]` entry's own `ducklake` block
-overrides this one. See [output sinks](../elt/spec-pipeline.md).
+overrides this one. See [output sinks](../elt/spec-sinks.md).
 
 **`fetch`** *(remote)* — `parallel_fetch > 1` fetches over a pool of independent connector sessions (the clients
 hold one non-thread-safe session each, so concurrency uses extra sessions, not shared reuse). `rate_limit` is a

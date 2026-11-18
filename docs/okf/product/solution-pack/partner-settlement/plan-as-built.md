@@ -9,8 +9,8 @@ timestamp: 2026-11-01T00:00:00Z
 # Partner settlement — decisions and as-built record
 
 > **What this page is.** The durable record of slices **S0 to S7** of `PACK-PARTNER-SETTLEMENT-1` (S0 to S3 built 2026-10-20, S4
-> 2026-10-21, S5, S6 and S7 2026-11-01), distilled from the original plan on 2026-10-22. How the pack works today is in [architecture](architecture.md) and
-> [admin guide](admin-guide.md). **Open work** (W1 to W3, the open decisions, the unsigned contract with the re-rating
+> 2026-10-21, S5, S6 and S7 2026-11-01), distilled from the original plan on 2026-10-22. How the pack works today is in [architecture](architecture-partner-settlement.md) and
+> [admin guide](admin-guide-partner-settlement.md). **Open work** (W1 to W3, the open decisions, the unsigned contract with the re-rating
 > pack) lives in [`superpower/telco-packs-plan.md`](../../../../superpower/telco-packs-plan.md). Full history: the archived original
 > [`partner-settlement-wholesale-plan.md`](../../../../archived-documents/plans-archive/partner-settlement-wholesale-plan.md)
 > (sections 16 and 17 are the as-built narratives).
@@ -151,7 +151,7 @@ the corpus does not do) is in `settlement_dispute` but not on any position; a fu
 the statement-due date (already the `missing_statement` finding, so no new rule). The Impact is not written by the pack (PS-D9).
 
 **Verification.** `PartnerSettlementDisputeGoldenTest` (5, `inspecto-reconciliation`) and `PartnerSettlementDisputeCaseTest` (2,
-`inspecto-case-management`), described on the [architecture](architecture.md) page; the S3 and S4 goldens pass unchanged except the
+`inspecto-case-management`), described on the [architecture](architecture-partner-settlement.md) page; the S3 and S4 goldens pass unchanged except the
 chain list and the template-shape counts. The golden split mirrors the bypass pack's B3: the SQL half runs the real chain, the Case
 half runs the shipped rules on the real object engine with the Measure probe answering the keys the SQL half pins.
 
@@ -190,7 +190,7 @@ this; an agreement keeps its direction, currency and netting group inside one cy
 payment; the corpus has none, so that branch is not exercised. The KPIs read `as_of` at day grain with no comparison (each run
 replaces the snapshot, so there is no previous day to compare).
 
-**Verification.** `PartnerSettlementAgingGoldenTest` (9, `inspecto-reconciliation`), described on the [architecture](architecture.md)
+**Verification.** `PartnerSettlementAgingGoldenTest` (9, `inspecto-reconciliation`), described on the [architecture](architecture-partner-settlement.md)
 page. The earlier goldens pass unchanged except the chain list and the template-shape counts. On the corpus as of 2026-08-20: 13 aged
 cycles, 10 payment-due Alerts, 15 accrual rows (D1 July `statement_late` 1702.0000, E1 July `unbilled` 2573.0000), KPI values 213.2351
 open disputed, 4660.0000 aged over 60 days, 4275.0000 accrued unbilled (USD).
@@ -211,7 +211,7 @@ before committing.
 Delivered: the Report Templates `settlement-dispute-pack` (JSON) and `settlement-dispute-pack-csv` in
 `config/regulatory-report-templates/`, thirteen evidence columns on `settlement_dispute` (`ps_dispute` now also reads
 `settlement_expected` and `settlement_billed`), and a generic Regulatory Reporting seam: the Report Template `rows` block
-(`rows: {dataset, matchOn}`, [Regulatory Reporting spec](../../module/regulatory-reporting/spec.md)).
+(`rows: {dataset, matchOn}`, [Regulatory Reporting spec](../../module/regulatory-reporting/spec-regulatory-reporting.md)).
 
 **Decisions made inside S7, assistant-decided 2026-11-01 under delegation; PS-S7-1 operator-confirmed 2026-11-01, PS-S7-2…5 PENDING OPERATOR CONFIRMATION:**
 

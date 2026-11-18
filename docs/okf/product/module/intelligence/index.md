@@ -11,17 +11,17 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.intelligence`](../../../../../product-map/module/intelligence.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Agentic investigation — design (`AGENTIC-INVESTIGATION-1`)](plan-agentic-investigation.md) · [AI assist and intelligence — plan](plan.md) |
-| spec | current | [AI assist and intelligence — spec](spec.md) |
-| architecture | current | [Embedded intelligence (AGT-5)](architecture-embedded-intelligence.md) · [AI assist](architecture.md) |
+| plan | current | [Agentic investigation — design (`AGENTIC-INVESTIGATION-1`)](plan-agentic-investigation.md) · [AI assist and intelligence — plan](plan-intelligence.md) |
+| spec | current | [AI assist and intelligence — spec](spec-intelligence.md) |
+| architecture | current | [Embedded intelligence (AGT-5)](architecture-embedded-intelligence.md) · [AI assist](architecture-intelligence.md) |
 | features | current | [AI assist — features](features-ai-assist.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [AI assist — screens](user-guide-ai-assist.md) · [Assistant](user-guide-assist.md) · [Inline AI authoring (`<inspecto-ai-assist>`, AGT-6a)](user-guide-inline-ai-authoring.md) |
-| admin-guide | current | [AI assist and intelligence — admin guide](admin-guide.md) |
+| admin-guide | current | [AI assist and intelligence — admin guide](admin-guide-intelligence.md) |
 | api | current | [AI assist — API](api-ai-assist.md) |
 | tests | current | [AI assist and intelligence — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

@@ -24,16 +24,22 @@ test('product-map docs: must point at the hub', () => {
 test('a dropped slot is refused', () => {
     assert.match(checkHub('module', 'acquire', hub(SLOTS.slice(1).map((s) => [s, 'missing'])), map).findings.join(), /slot rows/);
 });
-test('architecture.md alone or with a subject page passes; no architecture page passes', () => {
-    assert.deepEqual(checkArchitectureNames('module.engine', ['index.md', 'architecture.md', 'architecture-stage1.md', 'spec.md']), []);
-    assert.deepEqual(checkArchitectureNames('module.engine', ['index.md', 'spec.md']), []);
+test('architecture-<hub>.md alone or with a subject page passes; no architecture page passes', () => {
+    assert.deepEqual(checkArchitectureNames('module.engine', ['index.md', 'architecture-engine.md', 'architecture-stage1.md', 'spec-engine.md', 'feature-db.md']), []);
+    assert.deepEqual(checkArchitectureNames('module.engine', ['index.md', 'spec-engine.md']), []);
+});
+test('a bare slot file name is refused; the generated feature-db.md is not', () => {
+    const f = checkArchitectureNames('module.la-core', ['index.md', 'user-guide.md', 'feature-db.md', 'tests-inventory.md']).join();
+    assert.match(f, /user-guide\.md — a bare slot name; name it user-guide-la-core\.md/);
+    assert.doesNotMatch(f, /feature-db|tests-inventory/);
+    assert.match(checkArchitectureNames('module.engine', ['architecture.md']).join(), /name it architecture-engine\.md/);
 });
 test('an overview or change-log architecture page is refused', () => {
-    assert.match(checkArchitectureNames('module.graph', ['architecture.md', 'architecture-overview.md']).join(), /'overview' is not a subject/);
-    assert.match(checkArchitectureNames('layer.product', ['architecture.md', 'architecture-change-log.md']).join(), /'change-log'/);
+    assert.match(checkArchitectureNames('module.graph', ['architecture-graph.md', 'architecture-overview.md']).join(), /'overview' is not a subject/);
+    assert.match(checkArchitectureNames('layer.product', ['architecture-product.md', 'architecture-change-log.md']).join(), /'change-log'/);
 });
-test('topic pages without architecture.md are refused', () => {
-    assert.match(checkArchitectureNames('module.etl', ['architecture-parsing-ingest.md']).join(), /no architecture\.md/);
+test('topic pages without architecture-<hub>.md are refused', () => {
+    assert.match(checkArchitectureNames('module.elt', ['architecture-parsing-ingest.md']).join(), /no architecture-elt\.md/);
 });
 test('an unknown status is refused', () => {
     assert.match(checkHub('module', 'acquire', hub(SLOTS.map((s) => [s, 'done'])), map).findings.join(), /unknown status 'done'/);

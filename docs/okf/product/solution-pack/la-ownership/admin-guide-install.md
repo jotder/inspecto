@@ -145,7 +145,7 @@ is for testers and stays in the repository; it is not in the data download.
 
 ## References
 
-[Brochure](brochure.md) · [User guide: tour and exercises](user-guide.md) · [Configuration reference: data root](../../module/config/admin-guide-configuration-reference.md)
+[Brochure](brochure-la-ownership.md) · [User guide: tour and exercises](user-guide-la-ownership.md) · [Configuration reference: data root](../../module/config/admin-guide-configuration-reference.md)
 
 ## As part of the *Banking and finance* industry Space
 

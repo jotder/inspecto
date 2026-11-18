@@ -11,7 +11,7 @@ timestamp: 2026-11-08T00:00:00Z
 The showcase ships as three downloads that unzip **side by side** into one folder you choose (`<parent>`), so the
 product can be upgraded without touching the Space or its data. It runs on every edition, Basic included; the saved
 Geo View needs the Geo map (Standard and above) and does nothing on Basic. Layout and seams:
-[showcase distribution and install layout](../la-showcase/architecture.md#distribution-and-install-layout)
+[showcase distribution and install layout](../la-showcase/architecture-la-showcase.md#distribution-and-install-layout)
 and the [configuration reference](../../module/config/admin-guide-configuration-reference.md) (`spaces.ref`, `data_root`).
 
 | Download | File | Unzip into |
@@ -64,7 +64,7 @@ runs every five minutes, and each time it builds its Dataset the three derived J
   `police_property_links/`, `police_call_links/` and `police_witness_links/` hold the three derived ones (about 70,
   1 300 and 700 rows).
 - In Link Analysis, **File ▸ Open… ▸ Saved views** lists `burglary_series`, `drug_supply_handset_network` and
-  `suspicious_witness`, and each draws without "Result cut short". The [user guide](user-guide.md) has the tour and
+  `suspicious_witness`, and each draws without "Result cut short". The [user guide](user-guide-la-police.md) has the tour and
   the exercises.
 
 The Space folder holds only configuration; all runtime state (`data/`, `audit/`, `duckdb/`) is written under
@@ -99,7 +99,7 @@ The Space download also carries the Advanced tier: `config/demo-users.toon` and 
 `analyst`, `manager`, `reviewer`, `outsider` and `admin`), four-eyes above a fan-out of 2 000
 and Drafts in `config/link-analysis.toon`, and the Alert Rule `police_repeat_seller_serial_matches` with its two Jobs
 (`police_serial_match_counts`, `police_serial_match_alerts`). What each persona does is in the
-[user guide](user-guide.md#advanced-tier-investigation-four-eyes-and-the-serial-match-alert-rule).
+[user guide](user-guide-la-police.md#advanced-tier-investigation-four-eyes-and-the-serial-match-alert-rule).
 
 **On Basic it is inert.** The personas and roles are ignored (no sign-in), the log says once "Not arming alert rule
 'police_repeat_seller_serial_matches'", and `police_serial_match_alerts` runs after each build and finds no rule

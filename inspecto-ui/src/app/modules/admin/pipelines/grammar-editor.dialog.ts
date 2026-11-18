@@ -97,7 +97,7 @@ export const GRAMMAR_DIALOG_SAMPLE_NAME = 'sample from Edit Grammar';
  * authored: opening a bound node and saving MIGRATES it to an independent inline copy rather than
  * writing back to the shared component. **No pipeline-editor surface updates a `grammar` component in
  * place any more** — only the Components registry page does, which is what editing a template in the
- * library means. As built: `docs/okf/product/module/elt/spec-pipeline.md` and
+ * library means. As built: `docs/okf/product/module/elt/spec-pipeline-model.md` and
  * `docs/okf/product/module/config/user-guide-grammar-config.md`. Provenance only, not maintained:
  * `docs/archived-documents/plans-archive/grammar-templates-not-bindings-plan.md`.
  *

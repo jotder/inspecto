@@ -72,13 +72,13 @@ Script: `tools/doc-diagrams/journey-safe-config-change.py`.
 
 ## Related modules
 
-[maker-checker](../../module/workflow/architecture.md) ·
-[pipelines-steps](../../module/elt/architecture.md) ·
-[jobs-scheduler](../../module/processor/architecture.md) ·
+[maker-checker](../../module/workflow/architecture-workflow.md) ·
+[pipelines-steps](../../module/elt/architecture-elt.md) ·
+[jobs-scheduler](../../module/processor/architecture-processor.md) ·
 [platform-services](../platform/architecture-platform-services.md) ·
-[identity-access](../../module/access/architecture.md) ·
-[spaces](../../module/config/architecture.md) ·
-[observability-backup](../../module/observability/architecture.md)
+[identity-access](../../module/access/architecture-access.md) ·
+[spaces](../../module/config/architecture-config.md) ·
+[observability-backup](../../module/observability/architecture-observability.md)
 
-Concepts: [pipeline authoring](../../module/elt/plan.md) ·
+Concepts: [pipeline authoring](../../module/elt/plan-elt.md) ·
 [security](../../module/access/plan-security.md)

@@ -15,14 +15,14 @@ timestamp: 2026-10-24T00:00:00Z
 (checked against `inspecto-ui/projects/la-app` and `projects/link-analysis` on 2026-10-24) with the on-screen
 names; **Today** keeps the 2026-10-22 walkthrough state the work started from. The acceptance drive is
 [`tests-live-drives.md#onboarding-acceptance-drive-la-onboard-1-2026-10-22`](tests-live-drives.md#onboarding-acceptance-drive-la-onboard-1-2026-10-22) (Basic: first graph 2 min 40 s after first
-launch); the as-built design is [architecture](architecture.md#34-masking) §3.4, [architecture-data-onboarding](architecture-data-onboarding.md) §6.10-§6.13.
+launch); the as-built design is [architecture](architecture-la-core.md#34-masking) §3.4, [architecture-data-onboarding](architecture-data-onboarding.md) §6.10-§6.13.
 
 **Evidence.** On 2026-10-22 a fresh Basic bundle (`la-app` UI, master `cb4feedd9`) was started on an empty Spaces
 root and driven as a first-time user with a synthetic mobile-money file pair (`transfers.csv` 2,215 rows,
 `accounts.csv` 312 rows, a hidden mule ring and one busy merchant). Today's state in each use case comes from
 that walkthrough, marked **F-n** and listed in §7.
 
-**Companion.** The [console first-run use cases](../elt/user-guide.md)
+**Companion.** The [console first-run use cases](../elt/user-guide-elt.md)
 (nine use cases UC-1…UC-9, help catalogue H1…H9) cover the console path from a file to a Dataset. This doc covers
 what Inspecto LA adds on top of it. §9 maps the two and records what was reconciled. Edition rules for the data
 layer are owned by `DATA-TIERS-1` (the draft `PIPELINE-EDITIONS-1` was merged into it and never published; its
@@ -31,8 +31,8 @@ the one verb for creating a data origin (GLOSSARY).
 
 Related: [DATA-TIERS-1 plan](../../../../archived-documents/plans-archive/data-tier-editions-plan.md) ·
 [LA-ONBOARD-1 plan](../../../../archived-documents/plans-archive/la-onboarding-plan.md) ·
-[ONBOARDING-FIRST-RUN-1 console plan](../../../../archived-documents/plans-archive/first-run-onboarding-plan.md) · [user guide](user-guide.md) ·
-[Space guide steps](user-guide.md#31-the-getting-started-page) · [GLOSSARY](../../../../GLOSSARY.md).
+[ONBOARDING-FIRST-RUN-1 console plan](../../../../archived-documents/plans-archive/first-run-onboarding-plan.md) · [user guide](user-guide-la-core.md) ·
+[Space guide steps](user-guide-la-core.md#31-the-getting-started-page) · [GLOSSARY](../../../../GLOSSARY.md).
 
 ---
 
@@ -557,5 +557,5 @@ DT-7.
   (`LA-GROW-EXCLUDE-1`).
 - [DATA-TIERS-1](../../../../archived-documents/plans-archive/data-tier-editions-plan.md) decisions DT-1…DT-10 (DT-4 and the data-quality
   placement revised by A-12, A-13).
-- [Entity List spec](../entity-list/spec.md) (purposes, category lists).
+- [Entity List spec](../entity-list/spec-entity-list.md) (purposes, category lists).
 - [GLOSSARY](../../../../GLOSSARY.md): Stream, Reference, Dataset, Entity Type, Collector, Pipeline, Onboard.

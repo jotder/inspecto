@@ -11,20 +11,20 @@ tags: [product-item, solution-pack]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`solution-pack.telco-bypass`](../../../../../product-map/solution-pack/telco-bypass.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [Telecom bypass (SIM-box) — decisions and as-built record](plan-as-built.md) |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| architecture | current | [Telecom bypass (SIM-box)](architecture.md) |
-| features | current | [Telecom bypass (SIM-box) — features](features.md) |
+| architecture | current | [Telecom bypass (SIM-box)](architecture-telco-bypass.md) |
+| features | current | [Telecom bypass (SIM-box) — features](features-telco-bypass.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Telecom bypass (SIM-box) — user guide](user-guide.md) |
-| admin-guide | current | [Telecom bypass (SIM-box) — admin guide](admin-guide.md) |
+| user-guide | current | [Telecom bypass (SIM-box) — user guide](user-guide-telco-bypass.md) |
+| admin-guide | current | [Telecom bypass (SIM-box) — admin guide](admin-guide-telco-bypass.md) |
 | api | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | tests | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| brochure | current | [Telecom bypass (SIM-box) — brochure](brochure.md) |
+| brochure | current | [Telecom bypass (SIM-box) — brochure](brochure-telco-bypass.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
 

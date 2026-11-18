@@ -11,14 +11,14 @@ tags: [product-item, layer]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`layer.la`](../../../../../product-map/layer/la.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
 | plan | n/a | a layer groups modules — see the hubs of the modules it holds |
 | spec | n/a | a layer groups modules — see the hubs of the modules it holds |
-| architecture | current | [Link Analysis modules - layer architecture](architecture.md) |
-| features | current | [Link Analysis modules — features](features.md) |
+| architecture | current | [Link Analysis modules - layer architecture](architecture-la.md) |
+| features | current | [Link Analysis modules — features](features-la.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | n/a | a layer groups modules — see the hubs of the modules it holds |
 | admin-guide | n/a | a layer groups modules — see the hubs of the modules it holds |

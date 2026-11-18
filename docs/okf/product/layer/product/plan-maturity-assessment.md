@@ -151,7 +151,7 @@ Group letters match §6. Scores are the assessor's; levels are calibrated (§2).
 
 ### 4.4 Docs that had drifted from the code (verified 2026-10-20 in code)
 - `layer/product/plan-studio.md` says 13 Visualization Types — `BUILTIN_VIZ_PLUGINS` registers **20**.
-- `module/elt/plan.md` says Expectations have no UI — the `expectations` route exists in `app.routes.ts`.
+- `module/elt/plan-elt.md` says Expectations have no UI — the `expectations` route exists in `app.routes.ts`.
 - `docs/EDITIONS.md` SEC-09 says the audit log is not tamper-evident — the hash chain (`AuditAnchors`, `/audit/verify`) shipped.
 - Assessors also report stale claims in `addon/incidents/plan-incidents.md` and `module/agent/plan-assistant.md` (§6 B).
   A docs-only review of these is tracked by `DOCS-AGENT-WRITTEN-REVIEW-1`.
@@ -187,10 +187,10 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **What it is (customer view):** Connections and Collectors that pull files and records from local or NFS directories, SFTP/FTP/FTPS, JDBC databases, S3/GCS/Azure Blob and Kafka into Pipelines. They come with dedup, watermarks, gap detection, retry and decompression.
 - **Scores:** F 3 · B 4 · Q 3 · E 3 · R 3 → **Level L3 (Pilot-ready)**
 - **Evidence:**
-  - Seven requirements of record. ACQ-1/2/3/5/6/7 are shipped. ACQ-4 (a Must) is **partial**: object storage is shipped, NFS/SMB network share was refused by design (`module/elt/plan.md` §ACQ.2, §6.1).
+  - Seven requirements of record. ACQ-1/2/3/5/6/7 are shipped. ACQ-4 (a Must) is **partial**: object storage is shipped, NFS/SMB network share was refused by design (`module/elt/plan-elt.md` §ACQ.2, §6.1).
   - Connector factories in code: Sftp, Ftp, Ftps, DbExport (JDBC), S3, GCS, AzureBlob, Kafka (`providers/inspecto-connectors/src/main/java/com/gamma/connect/`), plus the local file system and a Dataset-entry collector.
   - Step Processor board, ACQ family: 4 delivered on every edition (SP-ACQ-01..04). 4 are partial: S3/GCS have no proven end-to-end acquisition-node run, ADLS Gen2 is unproven, Kafka is unproven against a real broker, Excel is one sheet per file. 11 are planned: Pulsar, Kinesis, SQS, RabbitMQ, MQTT, Debezium CDC, Delta, Iceberg, Snowflake/BigQuery readers, a REST poller and a webhook receiver/gRPC (`docs/EDITIONS.md` SP-ACQ-*; plan §5).
-  - Tests: 26 + 36 + 6 = **68 unit test classes**, 0 real-HTTP in these hubs (the HTTP routes are tested under module.processor). `KafkaRealBrokerTest` is opt-in and skips unless a broker is supplied; CI has none (`module/connectors-kafka/plan.md`).
+  - Tests: 26 + 36 + 6 = **68 unit test classes**, 0 real-HTTP in these hubs (the HTTP routes are tested under module.processor). `KafkaRealBrokerTest` is opt-in and skips unless a broker is supplied; CI has none (`module/connectors-kafka/plan-connectors-kafka.md`).
   - The acquisition ledger defaults to **memory** (`AcquisitionLedgers.java`, `acquire.ledger.backend` defaults to `memory`). No launcher, offering or script sets `db`. Plan §5 flags that the completeness KPI cannot be computed on a fresh install.
   - Open rows: P3 `SCALEOUT-U1-REMOTE-ACQUIRE-1` (two pods would both fetch the same remote file) and the untagged P3 "Unpack (11) absent codecs" (no xz/zstd; multi-part archives). No open defects.
   - Security: SFTP host-key pinning and bastion tunnel. Secret references `${ENV}`/`${SYS}` on every edition and `${FILE}`/`${KEYSTORE}` on Standard and up (EDITIONS SEC-07). The Safety Policy checks Kafka partition-leader egress (connectors-kafka plan, 2026-10-06).
@@ -218,14 +218,14 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **What it is (customer view):** Visual and TOON-authored Pipelines that parse many formats, then cast, validate (Expectations), transform, enrich, route (Decision Rules) and write partitioned Parquet. They are validated before save, can be dry-run or test-run, and are scheduled as Jobs.
 - **Scores:** F 4 · B 4 · Q 4 · E 3 · R 4 → **Level L3 (Pilot-ready)**, capped by E and by the platform baseline
 - **Evidence:**
-  - 46 built-in node types. 10 parser frontend tokens across 8 formats: delimited, fixed-width, JSON, text-regex, xlsx, Parquet, ASN.1, plugin (`module/elt/plan.md` §2; `module/elt/plan.md` §2.2).
+  - 46 built-in node types. 10 parser frontend tokens across 8 formats: delimited, fixed-width, JSON, text-regex, xlsx, Parquet, ASN.1, plugin (`module/elt/plan-elt.md` §2; `module/elt/plan-elt.md` §2.2).
   - Step Processor board: **119 processors, 51 delivered, 17 partial, 51 planned** on the Advanced column (`docs/EDITIONS.md` §Step Processors, generated from `ProcessorCatalog`). The planned share is heaviest in parsers (9), transforms (10), enrichment (7) and sinks (6).
   - Requirements of record ING-1..6 and PIP-1..7 are recorded as shipped (plans §2). The Expectations UI exists now (`inspecto-ui/src/app/inspecto/api/expectations.service.ts`, routed in `app.routes.ts`). That makes the plan's "ING-6 has no UI" claim stale.
   - Tests: engine **369**, etl **104**, config **22** unit test classes. 18 test classes reference golden fixtures (for example the `asn-golden` `SyntheticCorpusTest`). The nightly CI benchmark floors run `PluginIngestBenchmark` at 1M rows (floor 50,000 rows/s) and `MixedLoadBenchmark` (floor 30,000 rows/s, p95 ceiling 5 s). Both were green on the GitHub runner on 2026-10-08, 10-09 and 10-10 (`.github/workflows/nightly-perf.yml`; BACKLOG `ASSURE-OPERABILITY-1`).
   - Measured throughput: native DuckDB ingest of 2M rows × 12 columns in about 3.5 s, and 1.0–1.4M rows/s for transform and write (`layer/platform/tests-performance.md`).
   - Config safety: `ConfigSafetyValidator`, path jail, fail-closed schema types (`module/config/spec-config-safety.md`). Config writes can be held for maker-checker (item 6).
   - Open rows: P2 `AUTHORING-REDESIGN-1` (remaining letters parked on demand), P2 "Postgres multi-user", P2 `SCALEOUT-OBJSTORE-DATABASE-DIR-1` (operator hold), P3 defect `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` (a duplicate output after failover re-plan; operator hold).
-  - Replay is bounded. `JobService` resolves runs from an in-memory map capped at `LIVE_RUN_CAP = 1000` (`JobService.java`), so replay after a restart or eviction returns 404 (`module/elt/plan.md` §EXE.2.3).
+  - Replay is bounded. `JobService` resolves runs from an in-memory map capped at `LIVE_RUN_CAP = 1000` (`JobService.java`), so replay after a restart or eviction returns 404 (`module/elt/plan-elt.md` §EXE.2.3).
 - **Strengths vs market:**
   - A full ingest → Pipeline → data-quality → lineage platform under the assurance controls. The competitive matrix (§3) names this as something none of the six vendors shows publicly.
   - The authoring loop (validate → dry-run → test-run to a node → arm) is fail-closed, and save-time safety checks are pinned by tests.
@@ -253,7 +253,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - **20 Visualization Types** in `BUILTIN_VIZ_PLUGINS` (`inspecto-ui/src/app/inspecto/viz/plugins/index.ts`): kpi, table, bar, line, area, pie, bubble, gauge, scatter, funnel, kpi-trend, progress-list, treemap, waterfall, combo, heatmap, geo-map, link-analysis, reconciliation, working-set. `layer/product/plan-studio.md` BI-2 still says 13, so it is stale.
   - BI-1..BI-8 are shipped (`plan-studio.md` §2). Drill-through, time grain on the wire, PNG export. Scheduled reports in json/csv/png/pdf. Measure alerting (whole-dataset only). Semantic BI API `POST /bi/query`. HMAC-signed, expiring, fail-closed public share. Only 3 curated templates.
   - Server-side Measures: `MeasureCompiler` with window, recency and ratio Measures, plus 4 test classes (`platform/inspecto-engine/src/main/java/com/gamma/query/MeasureCompiler.java`). The plan's "no server Measure entity" line is stale.
-  - Analytics Kernel: Musts M1–M10, Shoulds S1–S8 and Coulds C1–C6, C8 and C9 are built, among them forecasting with backtest, k-means, logistic regression, isolation forest, change-point and cohort/funnel (`module/analytics/plan.md`). 41 unit test classes. A CI duplication ratchet guards it (`tools/check-data-ops-duplication.mjs`).
+  - Analytics Kernel: Musts M1–M10, Shoulds S1–S8 and Coulds C1–C6, C8 and C9 are built, among them forecasting with backtest, k-means, logistic regression, isolation forest, change-point and cohort/funnel (`module/analytics/plan-analytics.md`). 41 unit test classes. A CI duplication ratchet guards it (`tools/check-data-ops-duplication.mjs`).
   - BI publication: the `publish.postgres` Job (`PostgresPublishJobType.java`) does full or partition-incremental refresh into Postgres for an external BI tool (EDITIONS JOB-06).
   - Masking on BI results: `BiResultMasking` and `ControlApiBiQueryMaskingTest` cover `/bi/query`, `/queries/{id}/run`, `/datasets/{id}/rows`, share queries, `/db/*` and Report exports (BACKLOG `BI-QUERY-MASKING-1`, built 2026-10-13, closed 2026-10-23 after its security review; open free-SQL channels: P1 `BI-MASKING-ROW-VALUE-LEAKS-1`, P1 `BI-MASKING-FREE-SQL-ORACLES-1`).
   - UI tests: 41 Studio spec files and 32 viz spec files. The only e2e file is `inspecto-ui/src/e2e/backend-smoke.spec.ts`, and it self-skips without `E2E_BASE_URL`. Nightly `MixedLoadBenchmark` drives 4 `/bi/query` readers during ingest (local p95 528–639 ms).
@@ -283,7 +283,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **Scores:** F 4 · B 4 · Q 4 · E 4 · R 3 → **Level L3 (Pilot-ready)**. B and E would allow L4. It is held at L3 by the platform cap and by having no independent pen test.
 - **Evidence:**
   - Security requirements: SEC-1..SEC-7 and SEC-9 are shipped. SEC-8 (secrets) is partial by design: Vault/KMS is not built and is reserved for Advanced when a client requires it (`module/access/plan-security.md` §2).
-  - The OIDC resource server has been **proven live against WSO2 IS 7.3.0 and Keycloak** (`module/oidc/plan.md`; `OidcAgainstRealProviderTest`, `OidcKeycloakAgainstRealProviderTest`). 8 test classes, 1 real-HTTP. Entra and Okta go through the `generic` preset and are unverified.
+  - The OIDC resource server has been **proven live against WSO2 IS 7.3.0 and Keycloak** (`module/oidc/plan-oidc.md`; `OidcAgainstRealProviderTest`, `OidcKeycloakAgainstRealProviderTest`). 8 test classes, 1 real-HTTP. Entra and Okta go through the `generic` preset and are unverified.
   - ABAC (`inspecto-policy`) is Advanced only (SEC-04). The policy authoring UX with guards and `POST /access/policies/preview` shipped 2026-09-25 (SEC-05). 6 test classes, 5 real-HTTP.
   - Route gating: a mutating route with neither a capability nor a recorded exemption fails the boot (`UndeclaredMutatingRouteTest`, `RouteInventoryTest`; `compliance/evidence/route-gating.md`). In `processor/api-routes.md`, 140 of 178 mutating routes declare a capability. The other 38 are previews, auth or self-service routes.
   - Masking: `AuditReadMasking`, `BiResultMasking`, `ObjectReadMasking`, `NotificationContentMasking`, `BiReportRowMasking` in `inspecto/src/main/java/com/gamma/control/`, each with a real-HTTP test. The `quality.pii.mask` Step is gated to Advanced (SEC-08 🟡).
@@ -316,7 +316,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - Control API v1 (JDK HttpServer, envelope, ETag/If-Match, idempotency keys; EDITIONS CP-01). module.processor registers **343 routes, all 343 in the OpenAPI contract** (`module/processor/api-routes.md`).
   - Jobs: 12 Job Types, 23 maintenance tasks. Triggers are cron, `on_pipeline`, `on_signal` with guards, catch-up and manual (EDITIONS JOB-01..04; ELT plan §EXE.2.2). Concurrency defaults to 4 and the intake cap to 500 files per cycle.
   - Tests: processor **350 classes (221 real-HTTP)**, observability 8 (5 real-HTTP), backup 10 (1 real-HTTP), event 8. That adds up to 405 test classes across the repo that drive a real `ControlApi`.
-  - Backup: per-file and archive SHA-256 sidecar, fail-closed restore into a new Space, a `maintenance_backups` catalog, and secrets excluded (`module/backup/plan.md`; `BackupTaskSecretExclusionTest`). Standard and up only (OPS-06).
+  - Backup: per-file and archive SHA-256 sidecar, fail-closed restore into a new Space, a `maintenance_backups` catalog, and secrets excluded (`module/backup/plan-backup.md`; `BackupTaskSecretExclusionTest`). Standard and up only (OPS-06).
   - **No restore drill recorded** (`compliance/evidence/rto-rpo-statement.md` §4: "none recorded yet"). The RTO/RPO targets are operator-fill fields.
   - The service wrappers (systemd plus a Windows Scheduled Task) shipped, but their live acceptance (`kill -9`, reboot) is **unrun** (P2 `DEPLOY-SERVICE-WRAPPER-1`).
   - Retention: the `event_prune` one-year window and 23 maintenance tasks, all **operator-scheduled; nothing prunes by default** (controls-matrix G5).
@@ -345,7 +345,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **What it is (customer view):** Four-eyes approval of configuration changes (Pending Changes), plus authored lifecycles, SLA Policies on a business calendar and Escalation Rules for Incidents and Cases. A graphical state editor is included.
 - **Scores:** F 3 · B 5 · Q 3 · E 4 · R 3 → **Level L3 (Pilot-ready)**. B and E would allow L4. Held at L3 by the platform cap and by thin live evidence.
 - **Evidence:**
-  - `ASSURE-MAKER-CHECKER-1` shipped 2026-09-27, and its residual rows closed by 2026-10-06. `ASSURE-WORKFLOW-SLA-1` closed 2026-10-04. The graphical state editor shipped 2026-10-11. **No open rows** (`module/workflow/plan.md`; hub index).
+  - `ASSURE-MAKER-CHECKER-1` shipped 2026-09-27, and its residual rows closed by 2026-10-06. `ASSURE-WORKFLOW-SLA-1` closed 2026-10-04. The graphical state editor shipped 2026-10-11. **No open rows** (`module/workflow/plan-workflow.md`; hub index).
   - Maker-checker code: `PendingChanges`, `ApprovalPolicy`, `ApproverCheck`, `ApproverRoster` (`inspecto/src/main/java/com/gamma/control/`). The author cannot decide their own change, and the original request is replayed on approval (`module/workflow/features-maker-checker.md`).
   - Tests: 4 unit classes in `platform/inspecto-workflow` (SlaDecisions, SlaPolicy, Workflow, WorkflowValidation). Core has `ControlApiPendingChangesTest`, `PendingChangesMultiPodTest`, `PendingChangesLockTimeoutTest` and `PendingChangesKeyTest`. Engine has `ApprovalGoldenVectorTest` and ops has `ControlApiWorkflowStrandTest`. About 12 classes in all.
   - Deciding needs an Authenticator, so maker-checker cannot be switched on through the API on Basic. The SLA sweep runs in `inspecto-ops` (Standard and up, EDITIONS CP-17).
@@ -377,7 +377,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 
 | Area | State | Evidence |
 |---|---|---|
-| SSO / OIDC | ✅ live-proven | WSO2 7.3.0 and Keycloak (`module/oidc/plan.md`). Standard and Advanced only; Basic is auth-free by design and binds every interface unless `-Dcontrol.bind` is set (`EDITIONS.md` §Matrix). |
+| SSO / OIDC | ✅ live-proven | WSO2 7.3.0 and Keycloak (`module/oidc/plan-oidc.md`). Standard and Advanced only; Basic is auth-free by design and binds every interface unless `-Dcontrol.bind` is set (`EDITIONS.md` §Matrix). |
 | RBAC / ABAC | ✅ RBAC Standard and up, ABAC Advanced | SEC-03/04/05/06. Route gating is enforced at boot (`compliance/evidence/route-gating.md`). |
 | Masking | 🟡 Advanced | SEC-08. Read masking across BI, audit, objects and notifications. `BI-QUERY-MASKING-1` closed 2026-10-23; the free-SQL key channels `BI-MASKING-ROW-VALUE-LEAKS-1` (2026-10-23) and `BI-MASKING-FREE-SQL-ORACLES-1` (2026-10-25: a key named only bare, vetted per caller) are closed. |
 | Audit chain | ✅ tamper-evident, not tamper-proof | `ASSURE-AUDIT-CHAIN-1`: a per-Space hash chain with MAC-signed daily anchors, checked by `GET /audit/verify` (`AuditVerifier`, `ControlApiAuditChainTest`). Not WORM, not non-repudiable, and events are dropped after 50k buffered on sustained flush failure (controls-matrix AU-9). ⚠ `EDITIONS.md` SEC-09 still says "not tamper-evident", which is stale. |
@@ -425,7 +425,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - UI: 16 vitest specs under `inspecto-ui/src/app/modules/admin/objects/`, for example `object-mail`, `postmortem-panel`, `resolve.dialog`
     and `impact-panel`. Plus `settings/incident-governance.component.spec.ts`.
   - Retention: `incident_purge` with a fail-safe legal hold (MNT-14). The event ledger is append-only. By decision no purge job is shipped
-    on a schedule (`module/ops/plan.md`).
+    on a schedule (`module/ops/plan-ops.md`).
   - Committed demo config: 2 Alert Rules under `spaces/demo/config/registry/alert-rules/`, plus
     `spaces/demo/config/ops/incident_burst_caserule.toon` and `critical_incidents_tagrule.toon`.
   - Open work is only P3 chores: `MODULE-REORG-P7-INCIDENTS` and `DOCS-SKILLS-ALERTS-AGENTIC-1` (`addon/incidents/index.md`).
@@ -464,7 +464,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   split, Case Rules, dispositions, Findings fields, and opening a Case from Link Analysis entities.
 - **Scores:** F 3 · B 3 · Q 4 · E 3 · R 3 → **Level L3 (Pilot-ready)**
 - **Evidence:**
-  - `module/case-management/plan.md`: roadmap C1–C6, I1 and I2 shipped 2026-07-12. The `caserule.evaluate` Job Type exists.
+  - `module/case-management/plan-case-management.md`: roadmap C1–C6, I1 and I2 shipped 2026-07-12. The `caserule.evaluate` Job Type exists.
     `POST /cases/from-entities` is capped at 100 entities. Optimistic lock returns 409, and a real-Postgres two-node soak was run on one
     Case.
   - `module/case-management/api-routes.md`: 7 routes. `feature-db.md` has about 8 rows.
@@ -510,7 +510,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   Incidents and Cases. A background sweep stamps deadlines and escalates once per breach.
 - **Scores:** F 3 · B 4 · Q 3 · E 4 · R 3 → **Level L3 (Pilot-ready)**
 - **Evidence:**
-  - `module/workflow/plan.md`: `ASSURE-WORKFLOW-SLA-1` closed 2026-10-04. `ASSURE-MAKER-CHECKER-1` shipped 2026-09-27. The graphical
+  - `module/workflow/plan-workflow.md`: `ASSURE-WORKFLOW-SLA-1` closed 2026-10-04. `ASSURE-MAKER-CHECKER-1` shipped 2026-09-27. The graphical
     state-diagram editor shipped 2026-10-11 (`workflow-state-editor.component.ts`). `ASSURE-WORKFLOW-SLA-RESIDUALS-1` closed 2026-10-18.
   - `features/inspecto-ops/.../module.toon` has `configKinds[3]: workflow,sla-policy,escalation-rule`. The add-on feature-db has about
     70 lines (`addon/workflowSla/feature-db.md`).
@@ -551,7 +551,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   `invoke-api` consequence. It is sent only after a *different* person approves it, and every answer is recorded.
 - **Scores:** F 3 · B 4 · Q 3 · E 4 · R 3 → **Level L3 (Pilot-ready)**
 - **Evidence:**
-  - `module/action-requests/plan.md`: `ASSURE-ACTION-REQUESTS-1` shipped 2026-09-27. `WEBHOOK-EGRESS-POLICY-1` closed 2026-09-27. The
+  - `module/action-requests/plan-action-requests.md`: `ASSURE-ACTION-REQUESTS-1` shipped 2026-09-27. `WEBHOOK-EGRESS-POLICY-1` closed 2026-09-27. The
     approver roster and `approverCheck` landed 2026-09-28 and 2026-10-04. Absent module → every route answers 503.
   - `module/action-requests/api-routes.md`: 7 routes, all in OpenAPI. `feature-db.md` has about 8 rows.
   - `module/action-requests/tests-inventory.md`: 8 classes (6 unit, 2 real-HTTP). They include `ActionDispatcherTest`,
@@ -593,7 +593,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **Evidence:**
   - `module/agent/plan-assistant.md` §2: AGT-1 (7 skills), AGT-2 (pluggable transport incl. Ollama), AGT-3 (air-gap; `EgressGuardTest`) and
     AGT-4 are built. AGT-6a is partial: `<inspecto-ai-assist>` on 5 panes and `<inspecto-ai-explain>` on 12. AGT-6b is only planned.
-  - `module/intelligence/plan.md`: AGT-5 P0–P5 complete, with 23 tools pinned by `InspectoPackTest`. Egress masking
+  - `module/intelligence/plan-intelligence.md`: AGT-5 P0–P5 complete, with 23 tools pinned by `InspectoPackTest`. Egress masking
     (`AGENT-EGRESS-MASK-1`) and the model allowlist (`ASSIST-MODEL-EGRESS-1`) are in.
   - Packaging: `tools/bundle-modules.mjs` stages `inspecto-agent.jar` from Standard and `inspecto-intelligence.jar` from Advanced.
   - Tests (inventories): agent 28 classes (25 unit, 3 real-HTTP), intelligence 35 classes (all unit, 0 HTTP), agent-hosted 2. UI: about 15
@@ -635,7 +635,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   and with its peers, can use an isolation forest, and can raise Incidents through Alert Rules.
 - **Scores:** F 3 · B 3 · Q 4 · E 3 · R 3 → **Level L3 (Pilot-ready)**
 - **Evidence:**
-  - `module/anomaly/plan.md` lists what is built:
+  - `module/anomaly/plan-anomaly.md` lists what is built:
     - `ANOMALY-DETECTION-1` S1–S5 (2026-10-10)
     - `ANOMALY-PEER-GROUPING-1`: 200k entities in about 1–1.6 s
     - `ANOMALY-ML-SCORING-1`: `method: isolation_forest`, closed 2026-10-20
@@ -683,7 +683,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   Signal type between Spaces. Sharing is per item, opt-in and read-only, through approved Share Grants, as a snapshot or live.
 - **Scores:** F 4 · B 4 · Q 4 · E 4 · R 4 → **Level L3 (Pilot-ready)** — module scores at L4. *(Calibrated 2026-10-20 to **L3**: the platform enterprise baseline is L3 and no item can exceed it — this item's own scores support **L4 once the platform gaps in §4.1 close**.)*
 - **Evidence:**
-  - `module/exchange/plan.md`: the offer / request / approve ledger is built, with snapshot and live delivery and version pin with drift.
+  - `module/exchange/plan-exchange.md`: the offer / request / approve ledger is built, with snapshot and live delivery and version pin with drift.
     It also lists `EXCHANGE-OWNING-SPACE-AUTHZ-1` (P1, closed 2026-09-28), `SHARE-SNAPSHOT-ON-APPROVE-1`,
     `EXCHANGE-SNAPSHOT-MULTIPOD-1` and `BI-MASKING-EXCHANGE-SNAPSHOTS-1` (2026-10-13).
   - `module/exchange/api-routes.md`: 12 routes, all in OpenAPI. `feature-db.md` has about 13 rows.
@@ -691,7 +691,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
     `ExchangeSnapshotMultiPodTest` and the end-to-end `CrossSpaceFraudIncidentAcceptanceTest`. UI: about 6 sharing specs.
   - Gating (grep of the module source): `canRequestShares`, `canOfferDatasets`, `canOfferSignals`, `canRender*`.
   - Open: only P3 `IMPORT-WHOLE-SPACE-SPLIT-1` (demand hold) and the "load as draft" browser pass.
-  - Known limits (`architecture.md` §9): Signals cross only within one Pod and are never queued. Duplicate `EXCHANGE_REFRESHED`
+  - Known limits (`architecture-product.md` §9): Signals cross only within one Pod and are never queued. Duplicate `EXCHANGE_REFRESHED`
     events are possible from two pods.
 - **Strengths vs market:**
   - The matrix says no RAFM peer shows a multi-entity / group-regulator model on its public pages. Here sharing fails closed and masks under
@@ -743,7 +743,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **Scores:** F 3 · B 4 · Q 4 · E 3 · R 3 → **Level L3 (Pilot-ready)**
 - **Evidence:**
   - The add-on holds one module, `reconciliation` (`offerings/standard.toon`); it ships in Standard and above (`docs/EDITIONS.md` l.178).
-  - Built per `docs/okf/product/module/reconciliation/plan.md`: the Board, 2-way and 3-way compare, Break lifecycle `open | assigned | resolved | auto_closed`, the `recon.run` Job, `POST /recon/promote` to Incident, cardinality tier 1, 90-day state retention and the uplift slices. The only open row is P3 `PACK-PARTNER-SETTLEMENT-1`, a content pack. No defects.
+  - Built per `docs/okf/product/module/reconciliation/plan-reconciliation.md`: the Board, 2-way and 3-way compare, Break lifecycle `open | assigned | resolved | auto_closed`, the `recon.run` Job, `POST /recon/promote` to Incident, cardinality tier 1, 90-day state retention and the uplift slices. The only open row is P3 `PACK-PARTNER-SETTLEMENT-1`, a content pack. No defects.
   - Code confirms per-Measure tolerances (`exact`, `absolute`, percent) in `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconBreaks.java`, and cardinality assertion in `ReconService.Cardinality`.
   - 10 routes (`api-routes.md`). Writes are gated in `ReconRoutes.java`: `canOperateRuns` for record and breaks/status, `canManageIncidents` for promote. Read-shaped POSTs are recorded in `CapabilityManifest.EXEMPTIONS`.
   - 21 test classes: 16 unit and 5 real-HTTP (`ControlApiReconTest`, `ControlApiReconDayTest`, `ControlApiReconStateTest`, `ControlApiReconPromoteTest`, `MobileMoneyPackGoldenTest`), plus `TelcoRaGoldenTest` and an oracle parity corpus (`tests-inventory.md`).
@@ -777,7 +777,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
 - **What it is (customer view):** Drafts a regulator-format filing (SAR/STR-style) from a Case or Incident, has a second person approve it, writes it atomically to a submission folder and audits every step.
 - **Scores:** F 2 · B 4 · Q 3 · E 4 · R 2 → **Level L3 (Pilot-ready)**
 - **Evidence:**
-  - The add-on holds one module, `regulatory-reporting` (`offerings/standard.toon`). The MVP shipped 2026-10-09 and `REGULATORY-REPORTING-1` closed 2026-10-18 (`module/regulatory-reporting/plan.md`).
+  - The add-on holds one module, `regulatory-reporting` (`offerings/standard.toon`). The MVP shipped 2026-10-09 and `REGULATORY-REPORTING-1` closed 2026-10-18 (`module/regulatory-reporting/plan-regulatory-reporting.md`).
   - 11 routes (`api-routes.md`). Draft and request-approval need `canWorkIncidents`. Approve, decline, retry and template PUT/DELETE need `canApproveChanges`.
   - XSD validation at draft time is real code (`features/inspecto-regulatory-reporting/src/main/java/com/gamma/regreporting/SchemaCheck.java`). There is a `.sha256` sidecar plus `GET /regulatory-reports/{id}/verify`, and `FileDrop.java` does the atomic file drop.
   - 6 test classes: 4 unit and 2 real-HTTP (`ControlApiRegulatoryReportsTest`, `ControlApiRegulatoryTemplatesTest`) (`tests-inventory.md`). That is thin for a filing engine.
@@ -880,7 +880,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - The add-on holds one module, `notify-channels` (`offerings/standard.toon`). The code is 5 classes in `providers/inspecto-notify-channels/src/main/java/com/gamma/notify/channel/`: `SmtpEmailChannel`, `WebhookChannel`, `HttpWebhookSinkTransport`, `PinnedHttp` and `WebhookEgress`.
   - `plan.md`: email and webhook are built only under Standard and above, with digest batching, receipts, bounce suppression and per-Space destinations. `WEBHOOK-EGRESS-POLICY-1` gives a pinned connect, and channel and notification-rule writes go through maker-checker (`ASSURE-MAKER-CHECKER-RESIDUALS-1`). No open rows.
   - Module tests: 9 unit classes, including two channel TCKs, `SmtpEmailChannelStarttlsRequiredTest`, `SmtpEmailChannelTlsIdentityTest` and `PinnedHttpTlsTest`. The core holds 5 real-HTTP notification tests (`inspecto/src/test/java/com/gamma/control/ControlApiNotification*Test`, `NotificationContentMaskingTest`).
-  - Known limits (`architecture.md` §9): no retry inside a channel except the soft-bounce retry, and suppression applies only to persisted destinations.
+  - Known limits (`architecture-product.md` §9): no retry inside a channel except the soft-bounce retry, and suppression applies only to persisted destinations.
   - There is no feature-db row (`addon/integrationDelivery/index.md`: "no feature rows derive to this item").
   - No HMAC or signature code exists in `providers/inspecto-notify-channels` (grep `signature|hmac`). Signing of notification webhooks is unverified. Link Analysis has its own signed webhooks (`IntegrationWebhooksTest`).
 - **Strengths vs market:**
@@ -949,7 +949,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
     - `IndexScaleBench`: about 21 ms one-key p50 from 10^6 to 10^8 edges.
     - Daily append at 10^8 takes 30.6 s against 929 s for a full rebuild.
     - A production-scale day (132M records, 39.4M links) was indexed in 5.3 min. This is a single run on private data.
-    - Live axe passes, real WSO2 OIDC sign-in, a Data Trust live drive, a think-aloud script and a stakeholder Q&A are recorded in `module/la-core/tests-*.md` and `admin-guide.md`.
+    - Live axe passes, real WSO2 OIDC sign-in, a Data Trust live drive, a think-aloud script and a stakeholder Q&A are recorded in `module/la-core/tests-*.md` and `admin-guide-product.md`.
   - Governance proven by named tests: seven-gate order, strict 404 for non-members, keyed masking with anti-oracle, four-eyes on sensitive expansion, per-entity audited reveal, Dossier tamper detection (`ControlApiDossierTest`) and replay determinism.
   - Open work: P2 `LA-DAILY-INGEST-1` follow-ups (Hive/Kerberos deferred by D-ING5, SCD2 deferred by D-ING4), six P3 rows, and the P3 defect row `LA-CASE-HISTORY-UPLOAD-FOLLOWUPS-1`. Items (1)–(6) of that defect row are done; only the alias-book scan check remains.
   - Stated NOT YET items (whitepaper §7): retention purge and legal hold (declined, D-U8), the multi-host HA two-host drill (`ASSURE-OPERABILITY-1`), 5×10^8 and 10^9 edge builds (`LA-INDEX-SCALE-MEASURE-1`), machine-to-machine trust, and full WCAG 2.2 AA (`LA-A11Y-AUDIT-1`). The Postgres store tests do not run on the shared profile (`TEST-ENV-PG-ASN-UNRUN-1`).
@@ -1077,7 +1077,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - Live evidence: a demo rehearsal on an Enterprise (today Advanced) Demo Auth bundle on 2026-10-14 (the 2026-10-14 ⬆ count note in `docs/BACKLOG.md`'s header). The live bundle run on the same day exercised the Expectation Job and the offender export (row `TELCO-FRAUD-STORY-GAPS-1`).
   - Masking: `TELCO-FRAUD-MASKED-DASHBOARD-1` was closed 2026-10-18. 10 of the 14 sink Datasets classify `msisdn`/`caller` `MSISDN` and `id_doc` `PII`, and a viewer without `canRevealLinkEntities` gets masked bars over real HTTP (BACKLOG line 54).
   - Open rows (hub `index.md`): defect `ANOMALY-TF-STORE-CLASH-1` (P3: `AnomalyTemplateModelsTest...[1]` ERRORS on clean master; the pack's `tf_subscriber_anomaly_latest` Dataset clashes with the model's store), `TELCO-FRAUD-STORY-GAPS-1` (P3 remainder), `ASSURE-PACK-TELCO-FRAUD-RESIDUALS-1` (P3, demand), `PACK-IRSF-WANGIRI-1` (P3, plan only), `TELCO-BYPASS-SIMBOX-1` (P3, B0 measurement done 2026-10-20, nothing built).
-  - The SIM-box check is a single heuristic (`fraud_simbox_job.toon`: no MT calls, no SMS, ≤ 1 cell, ≥ 10 distinct targets). The IRSF check is a static prefix list (`irsf_prefixes: "882,883,8818"`). Detection is daily batch at 02:00; only the Decision Rules act at ingest (`architecture.md` "Limits").
+  - The SIM-box check is a single heuristic (`fraud_simbox_job.toon`: no MT calls, no SMS, ≤ 1 cell, ≥ 10 distinct targets). The IRSF check is a static prefix list (`irsf_prefixes: "882,883,8818"`). Detection is daily batch at 02:00; only the Decision Rules act at ingest (`architecture-product.md` "Limits").
   - Competitive matrix: D = **Y**, E bypass = **P**, F signalling = **N**, G test call = **N**, H interconnect fraud = **P**.
 - **Strengths vs market:**
   - Each typology has a runbook, a per-offender Incident with a masked key, a Case per offender and a dashboard tile, all proven by a golden corpus with look-alikes. Detection, case handling and evidence are tested together.
@@ -1114,7 +1114,7 @@ lines as **Partial / Roadmap** with the dates above; each item's RFP-stance tabl
   - **Detection models: 2** (revenue forecast with 3 flags: outside band, regime change, drift; and margin erosion with a data-quality status). In Basic edition `contentPacks` (`offerings/basic.toon`).
   - `platform/inspecto-engine/src/test/java/com/gamma/alert/BusinessAssurancePackGoldenTest.java` (11 tests): planted detections with no false positive, level shift, ramp, slow-ramp absorbed, a second corpus, bad margin input flagged, SqlGuard on each Job. Also `BusinessAssuranceSinkDatasetTest` (1) and `ForecastTemplateGoldenTest` (2, template vs analytics kernel parity).
   - `ASSURE-PACK-BUSINESS-ASSURANCE-1` was closed 2026-10-10 after a **live drive** (*Evaluate now* fired `ba_revenue_outside_band` CRITICAL and `ba_margin_erosion` 11.25 pp). An independently built second corpus passed with the shipped constants (`docs/BACKLOG.md` line 133). The hub has no open rows.
-  - Limits (`architecture.md`): no ingest; model parameters are SQL literals, not config keys; one weekly season; no holiday calendar; fixed 28-day windows. No column classification (grep: 0 hits).
+  - Limits (`architecture-product.md`): no ingest; model parameters are SQL literals, not config keys; one weekly season; no holiday calendar; fixed 28-day windows. No column classification (grep: 0 hits).
   - Competitive matrix row P = **Y** (all six vendors Y/P).
 - **Strengths vs market:**
   - Explainable statistical forecasting in plain SQL with honest look-alike tests and a second-corpus check, with no data-science dependency. It ships in the Basic edition.
@@ -1200,10 +1200,10 @@ Not verified: vendor control and typology counts (general-market). Also not veri
 - **Scores:** F 2 · B 4 · Q 4 · E 3 · R 3 → **Level L3 (Pilot-ready)**
 - **Evidence:**
   - Typology count: **4 rule scenarios** as `sql.template` Jobs + per-account CRITICAL Alert Rules — structuring, threshold crossing, smurfing fan-in, high-risk-jurisdiction wires (`spaces/_templates/aml/config/jobs/aml_{structuring,threshold,fan_in,high_risk_traffic}_job.toon`, `config/registry/alert-rules/*.toon`, 4 files); **2 model-based detectors** — Risk Score `aml_account` (3 weighted, capped factors, high ≥ 60; `registry/risk-scores/aml_account.toon`) and Anomaly Model `aml_account_transfers` (`method: isolation_forest`, 28-day weekday-seasonal baseline; `registry/anomaly-models/aml_account_transfers.toon`), each with a pending Alert Rule (`config/pending/alert-rules/`, 2 files); **4 investigative pattern packs** (circular flow, inbound collector, layering chain with 48 h hop ordering, pass-through) + 1 Link Analysis view.
-  - Screening: `aml_screening` Job (`screening.run`, threshold 0.85, lists `aml_sanctions,aml_pep`) ships `enabled: false`; Entity Lists are not shipped (`config/jobs/aml_screening_job.toon`; architecture.md "Limits"). No vendor list-feed loader (OFAC / UN / World-Check) found — grep of `module/screening` docs and `features/inspecto-screening/src/main` returns nothing.
-  - SAR/STR: `regulatory-report-templates/aml-str.toon` — 17-field XML, file-drop delivery, explicitly "follows no real regulator's schema"; engine is four-eyes (`docs/okf/product/module/regulatory-reporting/spec.md`); regulator formats are open P3 `REGULATORY-SAR-STR-TEMPLATES-1` (hold: demand).
+  - Screening: `aml_screening` Job (`screening.run`, threshold 0.85, lists `aml_sanctions,aml_pep`) ships `enabled: false`; Entity Lists are not shipped (`config/jobs/aml_screening_job.toon`; architecture-product.md "Limits"). No vendor list-feed loader (OFAC / UN / World-Check) found — grep of `module/screening` docs and `features/inspecto-screening/src/main` returns nothing.
+  - SAR/STR: `regulatory-report-templates/aml-str.toon` — 17-field XML, file-drop delivery, explicitly "follows no real regulator's schema"; engine is four-eyes (`docs/okf/product/module/regulatory-reporting/spec-regulatory-reporting.md`); regulator formats are open P3 `REGULATORY-SAR-STR-TEMPLATES-1` (hold: demand).
   - Tests: `AmlPackGoldenTest` 4 (committed corpus = seeded generator output; golden corpus raises exactly the planted accounts per typology), `AmlScreeningGoldenTest` 2 (hits exactly the planted parties, no look-alike; STR template loads), `PackFraudAmlAnomalyPropertyTest` 3 of 5 on AML (forest ranks and explains the planted account), plus `ControlApiSpaceTemplateSeedGateTest` 12 (real-HTTP apply of every shipped template, capability refusal, pending-rule gating).
-  - Live evidence: screening demo rehearsal 2026-10-14 recorded with 11 beats PASS, re-driven on an Enterprise (today Advanced) Demo Auth bundle (`docs/BACKLOG.md` row `SCREENING-1`; `docs/okf/product/module/screening/spec.md` § *Demo script and rehearsal*; `tools/seed-screening-demo.mjs` builds the Space from the `aml` template).
+  - Live evidence: screening demo rehearsal 2026-10-14 recorded with 11 beats PASS, re-driven on an Enterprise (today Advanced) Demo Auth bundle (`docs/BACKLOG.md` row `SCREENING-1`; `docs/okf/product/module/screening/spec-screening.md` § *Demo script and rehearsal*; `tools/seed-screening-demo.mjs` builds the Space from the `aml` template).
   - Enterprise hooks the pack uses: party `full_name` / `national_id` classified `PII` (masked) after the rehearsal; confirmed screening hit opens an Incident + Case; audited privileged reveal; four-eyes on `confirmed` (`SCREENING-1` D1-D3).
   - Corpus: ~1,200 ledger rows over 10 days + 127 parties (`data/samples/`); 3 KPIs, 7-tile dashboard, runbooks (57 lines). Closed P2 `PACK-AML-1` (2026-10-10).
 - **Strengths vs market:**
@@ -1223,7 +1223,7 @@ Not verified: vendor control and typology counts (general-market). Also not veri
 | Sanctions / PEP screening | Comply (with caveat) | `screening.run` + fuzzy/phonetic matcher, four-eyes, Case linkage, rehearsal PASS; customer must load lists — no vendor feed connector |
 | SAR / STR filing | Partial | four-eyes Report Template engine + file drop; shipped template is illustrative, regulator schema is P3 `REGULATORY-SAR-STR-TEMPLATES-1` |
 | Model governance | Partial | Risk Score versions + approval policy (`module/scoring/spec-risk-scores.md` ~l.272), explainable factors and anomaly contributions; no model validation / backtest / champion-challenger record found |
-| Real-time scoring / interdiction | Not offered | daily batch (architecture.md Limits); `REALTIME-DECISIONING-1` P3 roadmap |
+| Real-time scoring / interdiction | Not offered | daily batch (architecture-product.md Limits); `REALTIME-DECISIONING-1` P3 roadmap |
 
 - **To reach the next level:** (1) ship a sanctions/PEP list-feed Collector (UN / OFAC / EU consolidated, delta + version) and file a row for it; (2) author one real regulator STR/SAR template (goAML) under `REGULATORY-SAR-STR-TEMPLATES-1` and classify `account_id` / `counterparty_id` as `ACCOUNT`; (3) widen the scenario library (CTR, rapid in-out, dormant reactivation, peer-segment) with golden tests.
 
@@ -1236,7 +1236,7 @@ Not verified: vendor control and typology counts (general-market). Also not veri
   - Label management: `pf_attempt_labels` derives DISPUTED / NEGATIVE / UNMATURED with a 120-day maturity flag — the training-label hygiene a supervised model needs, but no supervised model consumes it.
   - PCI-relevant ingest guard: every row scanned for a Luhn-valid card-shaped number; a hit quarantines the file (`template.toon` description). `PaymentFraudTemplateGoldenTest` **12 tests** (exact planted cases per typology; card number in any spelling / column / file name / header / chunk / malformed row never lands; 1 MB digit cell scanned quickly) + `PaymentFraudDashboardTest` 1 (every tile renders the planted values).
   - Data columns are tokenised by design (`INSTRUMENT_TOKEN` "never a card number"); all classified `INTERNAL` (`config/payment_attempts/payment_attempts_schema.toon`).
-  - Hourly batch: "Features are hourly batch, not authorisation-time scoring" (`docs/okf/product/solution-pack/payment-fraud/architecture.md` Limits). Closed P2 `ASSURE-PACK-PAYMENT-FRAUD-1` as BUILT "further typologies on customer request" (BACKLOG l.163); the two PAN-leak rows it spawned (`INGEST-REJECT-SIDECAR-RAW-PAN-1`, `INGEST-FAILURE-TEXT-QUOTES-VALUE-1`) are no longer open.
+  - Hourly batch: "Features are hourly batch, not authorisation-time scoring" (`docs/okf/product/solution-pack/payment-fraud/architecture-payment-fraud.md` Limits). Closed P2 `ASSURE-PACK-PAYMENT-FRAUD-1` as BUILT "further typologies on customer request" (BACKLOG l.163); the two PAN-leak rows it spawned (`INGEST-REJECT-SIDECAR-RAW-PAN-1`, `INGEST-FAILURE-TEXT-QUOTES-VALUE-1`) are no longer open.
   - Corpus: ~1,060 attempts over 3 days, 15 SIM changes, 6 disputes (`data/samples/`); runbooks 73 lines.
 - **Strengths vs market:**
   - SIM-swap × payment correlation joins telecom and payment signals — a natural edge for a telco-owned PSP / mobile-money operator that card-only vendors do not get from their data (general market).
@@ -1276,7 +1276,7 @@ Not verified: vendor control and typology counts (general-market). Also not veri
   - No screening, no STR template and no Link Analysis view inside the pack (LA is the separate `la-mobile-money` template) — a mobile-money AML RFP needs the `aml` pack alongside — no row.
   - Daily batch; no real-time agent/wallet blocking — `REALTIME-DECISIONING-1` (P3).
   - MSISDN / wallet ids were stored unmasked (`CONFIDENTIAL` not a masked class) — reclassified 2026-11-14 (`TEMPLATE-CONFIDENTIAL-UNMASKED-1`, pinned by `TemplateIdentifierClassificationTest`).
-  - Pending score Alert Rules must be created by hand after the first run (architecture.md Limits) — accepted design (`TEMPLATE-RISK-SCORE-ALERT-RULE-1` closed).
+  - Pending score Alert Rules must be created by hand after the first run (architecture-product.md Limits) — accepted design (`TEMPLATE-RISK-SCORE-ALERT-RULE-1` closed).
 - **RFP stance on the 5 most-asked requirements for this category:**
 
 | Requirement | Stance | Evidence or caveat |
@@ -1294,7 +1294,7 @@ Not verified: vendor control and typology counts (general-market). Also not veri
 - **Scores:** F 2 · B 4 · Q 4 · E 3 · R 3 → **Level L3 (Pilot-ready)**
 - **Evidence:**
   - Content: 3 Entity Types (wallet `masked: true`, agent, msisdn `e164`, masked), 6 link kinds, 16 relabelled terms, 5 pattern packs, measure/time hints (`platform/inspecto-entity-store/src/main/resources/META-INF/inspecto/industry-packs/mobile-money/*.toon`, 40 lines total).
-  - Fail-closed loading: a pack with a missing / unparseable file or duplicate id is refused whole (`docs/okf/product/solution-pack/industry-mobile-money/architecture.md`, `IndustryPacks.java`).
+  - Fail-closed loading: a pack with a missing / unparseable file or duplicate id is refused whole (`docs/okf/product/solution-pack/industry-mobile-money/architecture-industry-mobile-money.md`, `IndustryPacks.java`).
   - Tests: `IndustryPacksTest` 17 (bundled packs load; references to shipped templates and pattern packs resolve; unknown entity type / normaliser / term refuses the pack), `IndustryPackNeutralityTest` 4 (core labels hold no pack word), `ControlApiDomainProfileTest` 7 (real-HTTP domain profile).
   - Commercial: `enforcement: contract` and "bundled in every Edition from Basic" (`product-map/solution-pack/industry-mobile-money.toon`; features.md) — billable `INS-IP-MOBILE-MONEY` but not enforced by build or licence check.
   - Paired templates `la-mobile-money` and `mobile-money`; no open rows.
@@ -1321,7 +1321,7 @@ Not verified: vendor control and typology counts (general-market). Also not veri
 - **Scores:** F 1 · B 4 · Q 2 · E 2 · R 1 → **Level L2 (Prototype)** — by design an onboarding sample, not a commerce solution.
 - **Evidence:**
   - Contents: 1 Pipeline + schema (derived `GROSS`, gap detection, duplicate check), 1 Expectation (`orders_id_non_null`), 1 Dataset, 2 Widgets, 1 Dashboard, 3 sample files of 12 rows each (`spaces/_templates/orders-starter/`, 245 lines total).
-  - No Jobs, Alert Rules, scores or typologies ("a starter to copy for a first feed" — architecture.md Limits).
+  - No Jobs, Alert Rules, scores or typologies ("a starter to copy for a first feed" — architecture-product.md Limits).
   - Tests: no golden test; only `ControlApiSpaceTemplateSeedGateTest#everyShippedTemplateApplies` plus use as a fixture in `RefusalQuarantineTest` and `ConfigMigratorTest`.
   - Schema columns classified `INTERNAL` or blank; no masking need on the sample.
   - Yet it is a **billable** Product Map Item with order code `INS-SP-ORDERS-STARTER` (`product-map/solution-pack/orders-starter.toon`) and in Basic `contentPacks` (`offerings/basic.toon`).
@@ -1382,7 +1382,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
 - **Evidence:**
   - Template: 5 files: `modules.toon` (geoLink disabled), roles, demo users, an SLA example and `template.toon` (`spaces/_templates/la-showcase-off/`).
   - `LaShowcaseTemplateTest` asserts the template has no registry, and that its `roles.toon` equals la-showcase's (fixed in `f1b64ce03` after it drifted; la-audit runbook §6 "Known limits").
-  - Admin guide: 2 steps, create then verify (`solution-pack/la-showcase-off/admin-guide.md`, 14 lines). No live drive is recorded for this Space. The variants runbook's live record covers the Postgres variant only.
+  - Admin guide: 2 steps, create then verify (`solution-pack/la-showcase-off/admin-guide-la-showcase-off.md`, 14 lines). No live drive is recorded for this Space. The variants runbook's live record covers the Postgres variant only.
   - `OFFERING-DECLARATION-DRIFT-1` recommends leaving it unlisted in every Offering.
 - **Strengths vs market:** it answers the RFP line "can a capability be disabled per tenant or business unit" in under a minute, using the platform's per-Space module switch.
 - **Gaps vs market / RFP risk:**
@@ -1489,7 +1489,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Live drive on 2026-10-14 (`module/la-core/tests-live-drives.md#data-trust-drive-la-data-trust-1-s10-2026-10-14`): 8 steps, 1 FAIL (corrected day, since fixed by `f3a90e6a3`). At that time the template shipped no index Job; the Jobs were added later and are pinned by `theTemplateShipsTheJobsThatIndexAndEvaluateOnEveryCommit`.
   - **Edition mismatch.** The pack ships Alert Rules, but the Alert Rule dispatcher (`alert.dispatch`, declared by `inspecto-ops`) is Standard and up (`layer/platform/architecture-editions.md` §28; `OFFERING-DECLARATION-DRIFT-1` D1, closed 2026-10-20). The template has no `minEdition`, so the `tools/check-offerings.mjs` check 5 guard cannot catch it.
   - The index Job runs as `owner: admin` (`config/jobs/la_index_build_job.toon`), but Basic ships no Authenticator. By code read (2026-10-23, `LA-DAILY-INGEST-1`): on an open server the run authority is skipped (`JobAuthority.runAuthority`) and the template's Dataset has no `shares`, so `ComponentAccess.canViewAs` allows `admin`; with an Authenticator, `TemplateSeedGate.stampJobs` re-stamps the owner to the applier unless the applier holds `canConfigureAccess`. `LaIndexBuildJob` and `ScheduledLinkIndexBuilder` consult no edition feature (`platform/inspecto-engine/.../LaIndexBuildJob.java`, `la/inspecto-geo-link/.../ScheduledLinkIndexBuilder.java`), so the index probably builds on Basic while every index-consuming Investigation route is 503 there (unverified live).
-  - The row-band Expectation "does not judge a day until 3 prior days exist" (`admin-guide.md`), and only 2 sample days ship. The out-of-box verify cannot show the band working.
+  - The row-band Expectation "does not judge a day until 3 prior days exist" (`admin-guide-product.md`), and only 2 sample days ship. The out-of-box verify cannot show the band working.
 - **Strengths vs market:**
   - The ingestion is measured to 10^8 rows a day with append-only index refresh and data-trust signals (freshness, gaps, quarantine, index lag). Neo4j Bloom and Linkurious leave this to customer ETL (general market).
   - The feed contract (stable name, one event date per file, gap detection by `{seq}`/date template) is documented for database exports too.
@@ -1518,7 +1518,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Live evidence:
     - analyst coverage on 2026-10-15: 11 use cases, axe 0 violations (`tests-live-drives.md`);
     - data trust drive on 2026-10-14;
-    - real OIDC sign-in against WSO2 IS 7.3.0 on 2026-10-13 (`admin-guide.md`);
+    - real OIDC sign-in against WSO2 IS 7.3.0 on 2026-10-13 (`admin-guide-product.md`);
     - Postgres store on 2026-10-13;
     - stakeholder Q&A with 22 PROVEN-tagged answers and 16 NOT YET mentions (`admin-guide-demo.md`).
   - Edition placement is gated in code: Basic is the explorer; the Investigation surface answers 503 via `EditionFeatures.INVESTIGATIONS` (`ControlApiBasicEditionLinkAnalysisTest`, 2 tests, real HTTP).
@@ -1558,7 +1558,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Its own content is mis-tiered. `business-assurance` and `la-daily-feed` ship Alert Rules whose dispatcher is Standard+ (`OFFERING-DECLARATION-DRIFT-1` D1).
 - **Strengths vs market:**
   - The install is zero-dependency (one process, no database, no IdP), which suits a presales or analyst desk. That is comparable to i2 ANB desktop or Neo4j Desktop/Bloom free use (general market).
-  - It is upgraded by swapping the build, not migrating: Spaces and configuration carry over (`edition/basic/brochure.md`). This is held by the build-flavor model (`architecture-editions.md`).
+  - It is upgraded by swapping the build, not migrating: Spaces and configuration carry over (`edition/basic/brochure-basic.md`). This is held by the build-flavor model (`architecture-editions.md`).
 - **Gaps vs market / RFP risk:**
   - No authentication at all. Competitors' entry tiers (Linkurious, Neo4j Enterprise starter, general market) still have users and roles. Basic cannot answer any SSO/RBAC RFP line (by design; no row needed, but it limits Basic to non-regulated use).
   - Per-node billing with no metering or licence key. The node count is honour-system: no row (D-MR3 decided "none").
@@ -1583,7 +1583,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Staged jars: 41 first-party, 42 total (`docs/EDITIONS.md`). `release.yml` builds a signed Standard bundle without the policy jar (lines 238–244).
   - Absent-surface parity tests per module: `AnomalyAbsentSurfaceParityTest`, `ReconAbsentSurfaceParityTest`, `ScoringAbsentSurfaceParityTest`, `ScreeningAbsentSurfaceParityTest`, `EntityListAbsentSurfaceParityTest`, `GeoLinkAbsentSurfaceParityTest`, plus `OpsEditionFeaturesTest`.
   - The `tools/check-offerings.mjs` guard (CI `guards`) asserts Offering == bundle == pom profile and checks `minEdition` against each pack (check 5).
-  - Real IdP sign-in proven once against WSO2 IS 7.3.0 (`module/la-core/admin-guide.md#2-real-oidc-sign-in-runbook-la-app-local-wso2-identity-server`, 2026-10-13).
+  - Real IdP sign-in proven once against WSO2 IS 7.3.0 (`module/la-core/admin-guide-la-core.md#2-real-oidc-sign-in-runbook-la-app-local-wso2-identity-server`, 2026-10-13).
   - ~~Open: `OFFERING-DECLARATION-DRIFT-1`~~ closed 2026-10-20 (`78fc6e583`).
 - **Strengths vs market:**
   - One SKU spans assurance, case and investigation, where competitors sell separate products. Examples: Linkurious + a case tool; i2 ANB + EIA; Subex or Mobileum modules priced per function (general market, and `layer/product/brochure-competitive-landscape.md`).
@@ -1610,7 +1610,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
   - Offering: `offerings/advanced.toon` adds 3 modules (`policy`, `la-store-pg`, `intelligence`); posture `objectsBackend postgres`. 44 first-party jars (`docs/EDITIONS.md`).
   - `PolicyEditionFeaturesTest`, `ObjectsBackendEditionBootTest`. `PgInvestigationStoreContractTest` ran live 45/0/0 against Postgres 18 on 2026-10-13 (la-showcase variants runbook).
   - `la-store-pg` is "inert until `-Dinvestigations.backend=db`: every edition, Advanced included, defaults to the filesystem" (`docs/EDITIONS.md` "Assembly model").
-  - The brochure promises "multi-node, highly-available deployments" (`edition/advanced/brochure.md`). But the only Helm chart is a `replicas: 1` StatefulSet "NOT MULTI-REPLICA SAFE" (`SCALEOUT-HELM-NPOD-1` P2), and the D14–D16 decisions are owed (`SCALEOUT-D14-D16-DECISIONS-1` P2, `SCALEOUT-OBJSTORE-DATABASE-DIR-1` P2).
+  - The brochure promises "multi-node, highly-available deployments" (`edition/advanced/brochure-advanced.md`). But the only Helm chart is a `replicas: 1` StatefulSet "NOT MULTI-REPLICA SAFE" (`SCALEOUT-HELM-NPOD-1` P2), and the D14–D16 decisions are owed (`SCALEOUT-D14-D16-DECISIONS-1` P2, `SCALEOUT-OBJSTORE-DATABASE-DIR-1` P2).
   - "Scale-out, retention, legal hold, residency (not built yet)" is in the placement table (`docs/EDITIONS.md`). Investigation retention is declined (`D-U8`, BACKLOG line 774), and legal hold and residency have no row.
   - Its own showcases (`la-*` with `minEdition: advanced`) are listed in no Offering (`OFFERING-DECLARATION-DRIFT-1` D2).
 - **Strengths vs market:**
@@ -1637,7 +1637,7 @@ All five hubs have no plan / spec / tests slot and no open BACKLOG rows, so "bui
 - **Evidence:**
   - The product map makes it a priced GA SKU: `billable: true, orderCode INS-ED-PREVIEW, billing per-node, status ga` (`product-map/edition/preview.toon`).
   - The binding doc forbids that: "Preview — not a customer-facing tier… Never ship Preview to a customer, never advertise it externally… carries no compliance-scope guarantee at all" (`docs/EDITIONS.md` "Preview — not a customer-facing tier").
-  - Its own brochure, written for customers, says "evaluation and incubation build, not a production tier" (`edition/preview/brochure.md`). No BACKLOG row tracks this contradiction.
+  - Its own brochure, written for customers, says "evaluation and incubation build, not a production tier" (`edition/preview/brochure-preview.md`). No BACKLOG row tracks this contradiction.
   - `release.yml` packages Basic, Standard and Advanced only (lines 189, 244, 262), so Preview has no released artifact.
   - Posture differs from Advanced (`objectsBackend default` vs `postgres`, `offerings/preview.toon`), so "identical to Advanced" is true of modules, not of posture.
   - Guards: `tools/offering-classpath.test.mjs` "Preview carries every module…" and `tools/check-offerings.mjs`. The `pom.xml` `edition-preview` profile "does not auto-union" (`docs/EDITIONS.md`), which is a manual drift risk.

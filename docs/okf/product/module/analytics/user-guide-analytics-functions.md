@@ -26,4 +26,4 @@ ANALYTICS-CORE-1 Could item C8, built 2026-10-18 (decisions D-AN33…D-AN35 in
 * **Tests.** `analytics-functions.component.spec.ts` (load, tabs and counts, kernel filter, failure, axe) and
   `analytics-functions.spec.ts` (the formatters). Backend: `ControlApiAnalyticsCatalogueTest`.
 
-Back end and registration point: [analytics-kernel](spec.md) § *Function catalogue*.
+Back end and registration point: [analytics-kernel](spec-analytics.md) § *Function catalogue*.

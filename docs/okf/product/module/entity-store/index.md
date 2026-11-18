@@ -11,17 +11,17 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.entity-store`](../../../../../product-map/module/entity-store.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Entity store — plan](plan.md) |
-| spec | current | [Entity store — spec](spec.md) |
-| architecture | current | [Storage](architecture.md) |
+| plan | current | [Entity store — plan](plan-entity-store.md) |
+| spec | current | [Entity store — spec](spec-entity-store.md) |
+| architecture | current | [Storage](architecture-entity-store.md) |
 | features | current | [Storage — features](features-storage.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Storage — screens](user-guide-storage.md) |
-| admin-guide | current | [Entity store — admin guide](admin-guide.md) |
+| admin-guide | current | [Entity store — admin guide](admin-guide-entity-store.md) |
 | api | current | [Storage — API](api-storage.md) |
 | tests | current | [Entity store — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

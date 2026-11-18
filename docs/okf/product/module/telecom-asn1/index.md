@@ -11,18 +11,18 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.telecom-asn1`](../../../../../product-map/module/telecom-asn1.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Telecom ASN.1 decoder — plan of record](plan.md) |
-| spec | current | [Telecom ASN.1 decoder — implementation spec](spec.md) |
-| architecture | current | [Telecom ASN.1 decoder — architecture](architecture.md) |
-| features | current | [Telecom ASN.1 decoder — features](features.md) |
+| plan | current | [Telecom ASN.1 decoder — plan of record](plan-telecom-asn1.md) |
+| spec | current | [Telecom ASN.1 decoder — implementation spec](spec-telecom-asn1.md) |
+| architecture | current | [Telecom ASN.1 decoder — architecture](architecture-telecom-asn1.md) |
+| features | current | [Telecom ASN.1 decoder — features](features-telecom-asn1.md) |
 | feature-db | current | [Telecom ASN.1 decoder — feature database](feature-db.md) |
-| user-guide | current | [Telecom ASN.1 decoder — user guide](user-guide.md) |
-| admin-guide | current | [Telecom ASN.1 decoder — admin guide](admin-guide.md) |
-| api | n/a | implements the ParserPlugin contract owned by the engine (documented in module.elt spec-ingest.md, Part III Parsing); the preview route POST /parsers/{id}/preview is an engine route, and the library API is in module.asn-decoders api.md |
+| user-guide | current | [Telecom ASN.1 decoder — user guide](user-guide-telecom-asn1.md) |
+| admin-guide | current | [Telecom ASN.1 decoder — admin guide](admin-guide-telecom-asn1.md) |
+| api | n/a | implements the ParserPlugin contract owned by the engine (documented in module.elt spec-parsing.md, Part III Parsing); the preview route POST /parsers/{id}/preview is an engine route, and the library API is in module.asn-decoders api.md |
 | tests | current | [Telecom ASN.1 decoder — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

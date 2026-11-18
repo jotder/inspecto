@@ -19,11 +19,11 @@ then again the evening before.*
   §9 technical / security review cut (T1-T13) · [§10 stakeholder Q&A](#10-stakeholder-qa)
 
 What this is: the step-by-step script for presenting the Inspecto LA demo on the **standalone Inspecto LA app
-bundle**. It defends the architecture page ([`architecture.md`](architecture.md), cited below as "arch §n") with the running application. The claim-to-evidence map and the requirement ids (DR-*) are in
+bundle**. It defends the architecture page ([`architecture-la-core.md`](architecture-la-core.md), cited below as "arch §n") with the running application. The claim-to-evidence map and the requirement ids (DR-*) are in
 the archived [demo readiness plan](../../../../archived-documents/plans-archive/la-demo-readiness-plan.md) (all built by 2026-10-13; history only). The
 technical / security review cut of this script (T1-T13) is section 9 below: rehearsed by the
 assistant alone on 2026-10-24, the sceptical-reviewer rehearsal is still owed. Every control label below is the
-one on screen (see the [user guide](user-guide.md)). The variants (Personal bundle, Postgres
+one on screen (see the [user guide](user-guide-la-core.md)). The variants (Personal bundle, Postgres
 store) are in the [showcase variants runbook](../../solution-pack/la-showcase/admin-guide-variants-runbook.md).
 
 ---
@@ -337,7 +337,7 @@ Say these before anyone asks. Confidence tags as in [§10](#10-stakeholder-qa).
 * **A fired Alert names entities:** it does not, by design (aggregate only).
 * **Alerts inside the standalone app:** the la-app has its own Alerts area since 2026-10-12, and Open Investigation stays in the la-app.
 * **Real-IAM sign-in** was proven once, end to end, against a local WSO2 Identity Server on 2026-10-13
-  ([admin guide §2](admin-guide.md#2-real-oidc-sign-in-runbook-la-app-local-wso2-identity-server)); the demo bundle
+  ([admin guide §2](admin-guide-la-core.md#2-real-oidc-sign-in-runbook-la-app-local-wso2-identity-server)); the demo bundle
   itself never shows it. Confidence: PROVEN on that run, not on the demo bundle.
 * **Embed links** are built and driven live on both the file and the Postgres store (viewer page, frame headers,
   revoke); a few edge paths are unit-tested only (`LA-EMBED-VIEW-1` remainder). OFF unless the host runs with
@@ -365,8 +365,8 @@ This kit follows the figure named; the others should be corrected at source.
    expand (`maxFanOut` 5) so none is pending after seeding. The scene S8 therefore creates the request live.
 4. **Smoke wording:** the task brief expects "N/N pass"; the runner prints `N/N probes passed`.
 5. **Alert -> Open Investigation** is described by the plan and manual as part of the product; since 2026-10-12 the la-app renders it too (its Alerts area).
-6. **Algorithms:** 29 in code and in [architecture](architecture.md) §5; the readiness plan's defence matrix says 28.
-7. **Routes:** the readiness plan says 75; the route count today is in [architecture](architecture.md) §6.
+6. **Algorithms:** 29 in code and in [architecture](architecture-la-core.md) §5; the readiness plan's defence matrix says 28.
+7. **Routes:** the readiness plan says 75; the route count today is in [architecture](architecture-la-core.md) §6.
 8. **10^8 build:** the first spike says 368 s (17.9 GB peak), the later table 447 s (8 GB cap), the roadmap "24 min
    under an 8 GB cap"; index size 3.43 GB versus 2.23 GB across the two measurements. Quote the later table.
 9. **Accessibility:** the stakeholder framing "spec-level" versus the board, which records axe runs in a browser.
@@ -520,15 +520,15 @@ Say out loud: 10^9 edges, retention purge (D-U8), precision rates, multi-pod HA,
 
 **Calls decided by the assistant, pending operator confirmation (2026-10-24):**
 
-* **IdP or Demo Users: Demo Users for a rehearsal.** It is the safest reading: no credential is typed and no external identity provider has to be reachable in the room. Say out loud that this build is no SSO demonstration. For the real review the operator may choose a real IdP sign-in instead (verified on la-app 2026-10-13, `LA-APP-REAL-SIGNIN-1`; [`admin-guide.md#2-real-oidc-sign-in-runbook-la-app-local-wso2-identity-server`](admin-guide.md#2-real-oidc-sign-in-runbook-la-app-local-wso2-identity-server)).
+* **IdP or Demo Users: Demo Users for a rehearsal.** It is the safest reading: no credential is typed and no external identity provider has to be reachable in the room. Say out loud that this build is no SSO demonstration. For the real review the operator may choose a real IdP sign-in instead (verified on la-app 2026-10-13, `LA-APP-REAL-SIGNIN-1`; [`admin-guide-la-core.md#2-real-oidc-sign-in-runbook-la-app-local-wso2-identity-server`](admin-guide-la-core.md#2-real-oidc-sign-in-runbook-la-app-local-wso2-identity-server)).
 * **T12 stays in the technical cut** (it is dropped only in the 35-minute cut, with T10).
 
 ## 10. Stakeholder Q&A
 
 Audience: bank and telecom risk, security, IT and compliance reviewers of the LA demo. Every figure was checked
 against the repo on 2026-10-12. Terms follow [`GLOSSARY.md`](../../../../GLOSSARY.md). "backend §n" below means
-[architecture](architecture.md) §n (§6.1-§6.9 in [architecture-http-and-ui](architecture-http-and-ui.md)); "user
-manual §n" means [user-guide](user-guide.md) §n; "Part II reference" means [architecture-records](architecture-records.md).
+[architecture](architecture-la-core.md) §n (§6.1-§6.9 in [architecture-http-and-ui](architecture-http-and-ui.md)); "user
+manual §n" means [user-guide](user-guide-la-core.md) §n; "Part II reference" means [architecture-records](architecture-records.md).
 
 How to read an answer: two to five plain sentences you can repeat, then **Evidence** (where to look), then a
 **Confidence** tag.
@@ -555,7 +555,7 @@ default mode is `typed`: only columns whose classification an Entity Type claims
 are masked; `all` masks every id; `none` shows raw. The same rule applies on the canvas, node lists, paths,
 patterns, Value Measures and the Working Set, and a raw id typed into an alias field is refused, so the route is not
 an oracle for guessing.
-Evidence: [architecture](architecture.md#34-masking) §3.4; `ControlApiExplorationMaskingTest` (the `everyInvReadOnAMaskedSpaceIsScannedForRawIds`
+Evidence: [architecture](architecture-la-core.md#34-masking) §3.4; `ControlApiExplorationMaskingTest` (the `everyInvReadOnAMaskedSpaceIsScannedForRawIds`
 case scans every Investigation read for raw ids); `ControlApiInvestigationOversightTest` (typed by default).
 Confidence: PROVEN for the routes the tests cover. A new route must be added to that scan; say so if asked about
 future routes.
@@ -564,7 +564,7 @@ future routes.
 Yes, through *Reveal*: a lead of the Investigation holding its own capability (`canRevealLinkEntities`, a separate
 action from approving) reveals the nodes on screen in one step with a reason, and every entity revealed writes one
 audit row with that reason. Reviewers and non-members keep the aliases. In the shipped demo the `admin` persona holds it.
-Evidence: [architecture](architecture.md#34-masking) §3.4 and backend §6 (Four-eyes / reveal row);
+Evidence: [architecture](architecture-la-core.md#34-masking) §3.4 and backend §6 (Four-eyes / reveal row);
 `ControlApiInvestigationRevealOnScreenTest`, `ControlApiInvestigationOversightTest
 .revealIsPerEntityGatedOnItsOwnCapabilityAndAudited`.
 Confidence: PROVEN.
@@ -624,7 +624,7 @@ When data is ingested, error and failure text must not carry the offending cell.
 value, so the platform replaces every quoted literal and "original line" tail with a salted fingerprint, and
 file-name handling avoids raw paths. The aim is that a rejected record leaves a reason, not a copy of the personal
 data.
-Evidence: [`ingestion.md`](../elt/plan.md) "Failure text never stores a value"
+Evidence: [`ingestion.md`](../elt/plan-elt.md) "Failure text never stores a value"
 (`FailureText.scrub`); [`spaces.md`](../config/plan-spaces.md) (malformed-row rejects).
 Confidence: DOCUMENTED (shipped 2026-10-03; this pass did not re-run it). Scope is ingest failure text, not a claim
 that no personal data exists anywhere.
@@ -633,7 +633,7 @@ that no personal data exists anywhere.
 Columns carry a classification from the Dataset registry and lineage. In `typed` mode a column is masked when an
 Entity Type claims its classification; untraceable lineage fails closed (masked). A Space can also refuse to mint an
 embed link when the strictest classification of the Investigation's columns is on its refusal list.
-Evidence: [architecture](architecture.md#34-masking) §3.4 and [architecture-http-and-ui](architecture-http-and-ui.md) §6.2; `ControlApiInvestigationOversightTest
+Evidence: [architecture](architecture-la-core.md#34-masking) §3.4 and [architecture-http-and-ui](architecture-http-and-ui.md) §6.2; `ControlApiInvestigationOversightTest
 .aColumnClassificationIsTypedByTheEntityTypeClaimingIt`; `ControlApiInvestigationEmbedTest
 .aSpaceCanRefuseToShareInvestigationsOfAClassificationAndAPolicyCanForbidTheActionEmbed`.
 Confidence: PROVEN.

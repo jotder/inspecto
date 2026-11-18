@@ -4,14 +4,18 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { GENERATED_FILES, GENERATED_SLOTS, MARK, productDocuments, refuseHandWritten } from './product-documents.mjs';
+import { GENERATED_FILES, GENERATED_SLOTS, MARK, generatedName, productDocuments, refuseHandWritten } from './product-documents.mjs';
 
 const docs = productDocuments('.');
 const products = readdirSync('products').filter((f) => f.endsWith('.toon')).map((f) => f.slice(0, -5));
 
+test('a bare generated slot carries the Product id, a topic file does not', () => {
+    assert.equal(generatedName('brochure', 'telco'), 'brochure-telco');
+    assert.equal(generatedName('brochure-demo-script', 'telco'), 'brochure-demo-script');
+});
 test('every Product gets its six generated documents (the demo and video scripts too), each marked generated and committed as generated', () => {
     for (const id of products) for (const slot of GENERATED_FILES) {
-        const path = `docs/okf/product/product/${id}/${slot}.md`;
+        const path = `docs/okf/product/product/${id}/${generatedName(slot, id)}.md`;
         assert.ok(docs[path]?.includes(MARK), `${path} is generated`);
         assert.equal(readFileSync(path, 'utf8'), docs[path], `${path} is current (node tools/render-product-docs.mjs)`);
     }
@@ -24,18 +28,18 @@ test('every link in a generated document resolves to a file', () => {
     }
 });
 test('the Telco brochure and datasheet are composed from its definition and its Apps', () => {
-    const b = docs['docs/okf/product/product/telco/brochure.md'];
+    const b = docs['docs/okf/product/product/telco/brochure-telco.md'];
     assert.match(b, /\[Revenue Assurance\]\(\.\.\/\.\.\/app\/telco-ra\/index\.md\)\*\* \(required\)/);
     assert.match(b, /\[Fraud Management\]\(\.\.\/\.\.\/app\/telco-fraud\/index\.md\)\*\* \(optional\)/);
     assert.match(b, /Editions: \[Standard\].*\[Advanced\]/);
-    const f = docs['docs/okf/product/product/telco/features.md'];
+    const f = docs['docs/okf/product/product/telco/features-telco.md'];
     assert.match(f, /\| \[Standard\]\(\.\.\/\.\.\/edition\/standard\/index\.md\) \| yes \| yes \| yes \| yes \|/);
     assert.match(f, /composed into one Space Template, `telco`/);
-    assert.match(docs['docs/okf/product/product/telco/user-guide.md'], /## Link Analysis\n\n(- .*\n)*- \[[^\]]+\]\(\.\.\/\.\.\/module\/la-core\//);
-    assert.match(docs['docs/okf/product/product/inspecto/user-guide.md'], /## The console/);
+    assert.match(docs['docs/okf/product/product/telco/user-guide-telco.md'], /## Link Analysis\n\n(- .*\n)*- \[[^\]]+\]\(\.\.\/\.\.\/module\/la-core\//);
+    assert.match(docs['docs/okf/product/product/inspecto/user-guide-inspecto.md'], /## The console/);
     // a Domain product's own templates (Inspecto LA's showcases) are listed too, with their hubs' guides
-    assert.match(docs['docs/okf/product/product/la/features.md'], /## Space Templates it ships\n\n.*\(\.\.\/\.\.\/solution-pack\/la-showcase\/index\.md\)/);
-    assert.match(docs['docs/okf/product/product/la/admin-guide.md'], /## The Space Templates it ships\n\n(- .*\n)*- \[[^\]]+\]\(\.\.\/\.\.\/solution-pack\/la-/);
+    assert.match(docs['docs/okf/product/product/la/features-la.md'], /## Space Templates it ships\n\n.*\(\.\.\/\.\.\/solution-pack\/la-showcase\/index\.md\)/);
+    assert.match(docs['docs/okf/product/product/la/admin-guide-la.md'], /## The Space Templates it ships\n\n(- .*\n)*- \[[^\]]+\]\(\.\.\/\.\.\/solution-pack\/la-/);
 });
 test("the Telco demo script names its Apps, its Demo Users and every seeded Alert; its video script walks the Apps", () => {
     const d = docs['docs/okf/product/product/telco/brochure-demo-script.md'];
@@ -64,8 +68,8 @@ test("the Telco demo script names its Apps, its Demo Users and every seeded Aler
 test('a hand-written file in a generated slot of a Product hub is refused', () => {
     const dir = mkdtempSync(join(tmpdir(), 'pd-'));
     try {
-        writeFileSync(join(dir, 'brochure.md'), `${MARK}x.toon -->\n`);
-        writeFileSync(join(dir, 'plan.md'), '# a plan\n');
+        writeFileSync(join(dir, 'brochure-x.md'), `${MARK}x.toon -->\n`);
+        writeFileSync(join(dir, 'plan-x.md'), '# a plan\n');
         refuseHandWritten(dir, 'x');
         writeFileSync(join(dir, 'user-guide-extra.md'), '# hand-written\n');
         assert.throws(() => refuseHandWritten(dir, 'x'), /user-guide slot of a Product hub is generated/);
@@ -78,7 +82,7 @@ test('a hand-written file in a generated slot of a Product hub is refused', () =
         writeFileSync(join(dir, 'brochure-launch-video.md'), `${MARK}x.toon -->\n`);
         assert.throws(() => refuseHandWritten(dir, 'x'), /brochure slot of a Product hub is generated/);
         rmSync(join(dir, 'brochure-launch-video.md'));
-        writeFileSync(join(dir, 'features.md'), '# hand-written datasheet\n');
+        writeFileSync(join(dir, 'features-x.md'), '# hand-written datasheet\n');
         assert.throws(() => refuseHandWritten(dir, 'x'), /features slot of a Product hub is generated/);
     } finally { rmSync(dir, { recursive: true, force: true }); }
 });

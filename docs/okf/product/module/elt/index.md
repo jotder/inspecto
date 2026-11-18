@@ -11,18 +11,18 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.elt`](../../../../../product-map/module/elt.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Acquisition, ingestion and Pipelines (ACQ, ING, PIP) — plan](plan.md) |
-| spec | current | [Acquisition — specification](spec-acquisition.md) · [Ingest, Consignments and parsing — how a landed file becomes Table rows](spec-ingest.md) · [Pipeline — the model, execution and sinks](spec-pipeline.md) · [Step catalog — every Step kind, delivered and pending](spec-step-catalog.md) |
-| architecture | current | [ELT — architecture](architecture.md) |
-| features | current | [Collectors, parsing, ingest and Pipelines — features](features.md) |
+| plan | current | [Acquisition, ingestion and Pipelines (ACQ, ING, PIP) — plan](plan-elt.md) |
+| spec | current | [Acquisition — specification](spec-acquisition.md) · [Consignments — addressing and concurrency](spec-consignments.md) · [Ingest — the ingestion SPI, ingesters, Consignment coordination and branch-aware ingest](spec-ingest.md) · [Parsing — frontends, the parsing block, parser plugins, XML and ASN.1, Decode Profiles](spec-parsing.md) · [Pipeline execution — engines, lanes, test run, dry run, park and drain, post-sync chains](spec-pipeline-execution.md) · [Pipeline model — node types, the Step catalog, transforms and the editable round-trip](spec-pipeline-model.md) · [Sinks — writers, store layout, destinations and object-storage export](spec-sinks.md) · [Step catalog — every Step kind, delivered and pending](spec-step-catalog.md) |
+| architecture | current | [ELT — architecture](architecture-elt.md) |
+| features | current | [Collectors, parsing, ingest and Pipelines — features](features-elt.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [ELT — user guide](user-guide.md) |
-| admin-guide | current | [ELT — admin guide](admin-guide.md) |
-| api | current | [Collectors, parsing, ingest and Pipelines — API](api.md) |
+| user-guide | current | [ELT — user guide](user-guide-elt.md) |
+| admin-guide | current | [ELT — admin guide](admin-guide-elt.md) |
+| api | current | [Collectors, parsing, ingest and Pipelines — API](api-elt.md) |
 | tests | current | [ELT — ingestion, Pipelines and step registry — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

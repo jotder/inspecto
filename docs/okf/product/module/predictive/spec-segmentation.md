@@ -78,7 +78,7 @@ or in a table row, are refused — never ignored.
 config, so a back-dated run is `POST /jobs/{name}/trigger {"params":{"as_of":"…"}}`).
 
 1. **Read.** One statement through `MeasureCompiler` with a `window: {field: time, asOf, days: window}` (ANALYTICS-CORE-1
-   C1, [windowed Measures](../analytics/spec.md#windowed-and-ratio-measures)): `recency(time)`, the frequency and the
+   C1, [windowed Measures](../analytics/spec-analytics.md#windowed-and-ratio-measures)): `recency(time)`, the frequency and the
    monetary Measure, grouped by `key`, ordered by key, every date and value bound. NULL keys are dropped. An entity with
    no row in `(as_of − window, as_of]` has **no assignment**. A monetary value that is the sum of only NULLs is 0.
 2. **Bin.** Per dimension, the Analytics Kernel's quantile edges over the run's population

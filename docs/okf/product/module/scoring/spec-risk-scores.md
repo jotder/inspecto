@@ -21,7 +21,7 @@ Its `_latest` Dataset can be a Risk Score factor (`measure: max(score)`).
 
 **Shared with Anomaly Scores (ANALYTICS-CORE-1 M7, D-AN6; fulfils D-AD5):** the output names, column head and tail,
 0–100 clamp and inclusive `high`, entity cap, run files and retention, and the explanation part are the score output
-contract in the Analytics Kernel ([Score output contract](../analytics/spec.md#score-output-contract)); the run is
+contract in the Analytics Kernel ([Score output contract](../analytics/spec-analytics.md#score-output-contract)); the run is
 written by `com.gamma.alert.ScoreOutputWriter` (engine) and the watch list fed by `WatchListFeed.feedScored`. The
 factor arithmetic, `recompute`, the model spec and the wording stay in `com.gamma.risk`.
 
@@ -40,7 +40,7 @@ is injective (`a-b` and `a_b` cannot share an output).
 | `entityType` | `subscriber` · `account` · `device` · `sim` · `dealer` · `channel` · `partner`, or any plain token |
 | `highThreshold` | a score at or above this is `high` (in (0, 100]) |
 | `dataScope` | optional; a data-scoped caller must hold it to read a score |
-| `watchList` | optional `{list, ttlHours}`: feed every high entity to a `watch` Entity List for 1..24 h ([Entity Lists](../entity-list/spec.md)) |
+| `watchList` | optional `{list, ttlHours}`: feed every high entity to a `watch` Entity List for 1..24 h ([Entity Lists](../entity-list/spec-entity-list.md)) |
 | `segments` | optional, 1..4 **evidence columns** of the model's factors that act as filters on the Risk Scores list (see [Segments](#segments--filtering-the-scores-list)); each must be evidence of some factor, no duplicates |
 | `factors[]` | `id`, `label?`, `dataset`, `key`, `measure`, `filters?`, `weight`, `cap?`, `evidence?` |
 
@@ -343,7 +343,7 @@ renders it as a required autocomplete over the saved models (`riskScoreModelOpti
 
 - ✅ **The watch Entity List is fed (2026-09-28).** An optional `watchList: {list, ttlHours}` (1..24) adds every
   high entity to a `watch` Entity List after each run, expiring `ttlHours` later. It fails closed at save and at
-  run. See [Entity Lists — assurance entries](../entity-list/spec.md#the-risk-score-watch-list-feed).
+  run. See [Entity Lists — assurance entries](../entity-list/spec-entity-list.md#the-risk-score-watch-list-feed).
 - ✅ **Entity-key masking (D-P8 = mask on read, 2026-10-06).** The GET and preview routes mask the key unless the caller holds `canRevealLinkEntities` (`keyMasked`); the SPA displays keys through `displayEntityKey`, which passes a `masked:` token through.
 - ✅ **Authoring pane shipped (2026-10-06): S1 list + detail, S2a create/edit, S2b held/delete/Alert Rule link, S3
   preview.** Decisions D-RP1..D-RP10 (operator 2026-10-06): own admin route; schema-form plus bespoke factor cards

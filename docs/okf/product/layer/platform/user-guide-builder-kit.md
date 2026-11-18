@@ -26,7 +26,7 @@ Pick the lowest level that does the job:
 ## 1. In the console: Studio and the Pipeline editor
 
 Both live in the **Builder Lens**. Its home page is `/pipelines`. The Lens only chooses where you start and what is
-emphasised; your Role decides what you may do (see the [platform user guide](user-guide.md)).
+emphasised; your Role decides what you may do (see the [platform user guide](user-guide-platform.md)).
 
 - **The Pipeline editor** (`/pipelines`, open a Pipeline) edits a Pipeline's graph: its steps and their config, the
   parse and transform definitions, and the Collector it reads from.
@@ -34,8 +34,8 @@ emphasised; your Role decides what you may do (see the [platform user guide](use
     save with any ERROR finding is refused, and `/validate` reports the same findings without saving. (A smaller
     edit, such as a label or a rename, is refused only for an ERROR it introduces.)
   - A **dry run** executes the graph and writes nothing.
-  - Read [the Pipeline editor guide](../../module/elt/user-guide.md), then
-    [Pipelines](../../module/elt/user-guide.md).
+  - Read [the Pipeline editor guide](../../module/elt/user-guide-elt.md), then
+    [Pipelines](../../module/elt/user-guide-elt.md).
 - **Studio** (`/studio`) is BI authoring: the Query Library, the Viz Library and Widget builder, the Dashboard
   builder, and dashboard templates. It also hosts Link Analysis, Entities and the Geo map.
   - Datasets are a Catalog asset now (`/catalog/datasets`); a bare `/studio` and `/studio/datasets` redirect there.
@@ -76,9 +76,9 @@ what it `provides`: features, config kinds, contracts, Job types and routes. `Mo
 manifests to the code. Read [the module taxonomy](architecture-modules.md).
 
 Deeper reading:
-- [node types](../../module/elt/spec-pipeline.md) (Steps);
+- [node types](../../module/elt/spec-pipeline-model.md) (Steps);
 - [Decision Rules](../../module/processor/spec-decision-rules.md) and the
-  [Action Requests spec](../../module/action-requests/spec.md) (Consequences);
+  [Action Requests spec](../../module/action-requests/spec-action-requests.md) (Consequences);
 - [the data plane plan](plan-data-plane.md) (Collectors).
 
 ## 3. The Control API and its OpenAPI document
@@ -117,7 +117,7 @@ code outside the repo. Its `since` attribute names the Platform version that int
   re-run your pack's tests on each Platform upgrade
   ([API stability](../../module/api/plan-api-stability.md)).
 
-Read [the layers architecture](architecture.md).
+Read [the layers architecture](architecture-platform.md).
 
 ## 5. The App kit: `tools/inspecto-app.mjs`
 

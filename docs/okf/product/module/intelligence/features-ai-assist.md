@@ -24,7 +24,7 @@ AI assist is the optional model-backed help layer, in two tiers:
 Hosted model providers come from `providers/inspecto-agent-hosted` (manifest id `agent-hosted`, requires `agent`).
 Concepts: [Assist agent](../agent/spec-assist-agent.md),
 [Embedded intelligence](architecture-embedded-intelligence.md),
-[Hosted providers](../agent-hosted/spec.md), [Assistant](../agent/plan-assistant.md).
+[Hosted providers](../agent-hosted/spec-agent-hosted.md), [Assistant](../agent/plan-assistant.md).
 
 ## Where it fits
 
@@ -33,4 +33,4 @@ An add-on over the platform base. Routes live in the host (`AssistRoutes`, `Agen
 The agents hold no write credential of their own; anything that changes state goes through the control plane's
 own gates and audit.
 
-More: [screens](user-guide-ai-assist.md) · [API](api-ai-assist.md) · [architecture](architecture.md).
+More: [screens](user-guide-ai-assist.md) · [API](api-ai-assist.md) · [architecture](architecture-intelligence.md).

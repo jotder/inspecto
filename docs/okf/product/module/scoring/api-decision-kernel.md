@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Decision Kernel (Decision Rules and the Condition Language) — API
 
-Routes for Decision Kernel (Decision Rules and the Condition Language). Design and internals: [Decision Kernel (Decision Rules and the Condition Language) architecture](architecture.md).
+Routes for Decision Kernel (Decision Rules and the Condition Language). Design and internals: [Decision Kernel (Decision Rules and the Condition Language) architecture](architecture-scoring.md).
 
 | Route | Purpose |
 |---|---|

@@ -88,7 +88,7 @@ and — under an explicit human gate — acts.
 
 | Where it is stated | What it says |
 |---|---|
-| `okf/product/index.md`, `okf/product/module/agent/architecture.md` | `0.1.0-SNAPSHOT`, "no release tag yet" |
+| `okf/product/index.md`, `okf/product/module/agent/architecture-agent.md` | `0.1.0-SNAPSHOT`, "no release tag yet" |
 | `REQUIREMENTS.md` `EOI-7` | `v0.1.0` tagged, poms pin `0.1.0`, "no SNAPSHOT anywhere" |
 | `pom.xml` (the build) | **`<eoiagent.version>0.2.0-SNAPSHOT</eoiagent.version>`** |
 | `okf/product/module/intelligence/architecture-embedded-intelligence.md` | CI builds from the upstream `main`, "currently `0.2.0-SNAPSHOT`" |
@@ -571,7 +571,7 @@ So the honest reading of §2 is: `AGT-1`, `AGT-2` and `AGT-4` (the assist agent)
 |---|---|---|
 | Assist SPI + routes | `inspecto/src/main/java/com/gamma/assist/spi/AssistAgent.java` | [`assist-agent.md`](spec-assist-agent.md) |
 | Reflex agent + skills | `features/inspecto-agent/src/main/java/com/gamma/agent/UccAssistAgent.java`; `features/inspecto-agent/src/main/java/com/gamma/agent/skill/AlertRuleTool.java`, `SqlOracleTool.java` | same |
-| Hosted providers (quarantined) | `providers/inspecto-agent-hosted/` | [`hosted-providers.md`](../agent-hosted/spec.md) |
+| Hosted providers (quarantined) | `providers/inspecto-agent-hosted/` | [`hosted-providers.md`](../agent-hosted/spec-agent-hosted.md) |
 | Deliberative agent | `features/inspecto-intelligence/src/main/java/com/gamma/intelligence/agent/InspectoIntelligenceAgent.java`, `GatewayFactory.java` | [`embedded-intelligence.md`](../intelligence/architecture-embedded-intelligence.md) |
 | The tool belt | `features/inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/InspectoTools.java`, `ArgumentDeriver.java`, `GlossaryLoader.java` | same |
 | Gated actions | `features/inspecto-intelligence/src/main/java/com/gamma/intelligence/action/ComponentActions.java`, `OperationalActions.java` | same §P3 |

@@ -10,7 +10,7 @@ timestamp: 2026-11-08T00:00:00Z
 
 The showcase ships as three downloads that unzip **side by side** into one folder you choose (`<parent>`), so the
 product can be upgraded without touching the Space or its data. It runs on every edition, Basic included. Layout
-and seams: [showcase distribution and install layout](../la-showcase/architecture.md#distribution-and-install-layout)
+and seams: [showcase distribution and install layout](../la-showcase/architecture-la-showcase.md#distribution-and-install-layout)
 and the [configuration reference](../../module/config/admin-guide-configuration-reference.md) (`spaces.ref`, `data_root`).
 
 | Download | File | Unzip into |
@@ -67,7 +67,7 @@ minute or two:
 - `inspecto-la-data/la-utility/data/utility_links/` holds the link Dataset (about 4 300 rows, six kinds),
   `transformer_loss/` the monthly energy balance (144 rows) and `utility_bank_links/` the churn view's links.
 - In Link Analysis, **File ▸ Open… ▸ Saved views** lists `meter_tampering_contractor`, `account_churn_by_bank_account` and
-  `prepaid_token_fraud_vendor`. The [user guide](user-guide.md) has the tour and the exercises.
+  `prepaid_token_fraud_vendor`. The [user guide](user-guide-la-utility.md) has the tour and the exercises.
 
 The Space folder holds only configuration; all runtime state (`data/`, `audit/`, `duckdb/`) is written under
 `inspecto-la-data/la-utility/`.

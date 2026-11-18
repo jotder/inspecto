@@ -13,7 +13,7 @@ One surface authors how raw bytes become rows — a **Grammar** (`docs/GLOSSARY.
 "parser config" / "parse options", banned synonyms):
 
 - the Pipelines editor's **`parse`** node — since 2026-08-15 either the right-dock **Parse drawer** or the
-  `GrammarEditorDialog`, split by the rule below — see [Pipelines](../elt/user-guide.md).
+  `GrammarEditorDialog`, split by the rule below — see [Pipelines](../elt/user-guide-elt.md).
 
 ⚠ **The Onboarding Parsing stage no longer exists** (P6-e, definition-surface unification): the drawer
 and the dialog are the only two adopters of `<inspecto-grammar-editor>` today. Earlier sections below
@@ -21,7 +21,7 @@ that mention the stage describe history, not a live host.
 
 > ⚠ **Amended 2026-09-04 by D8–D10 — decided and BUILT the same day** (`4e64fe4a`, `c769719d`;
 > `AUTHORING-WIDE-1` is CLOSED) — see
-> [ETL user guide § Wide feeds](../elt/user-guide.md). In short: **Parse does not drop
+> [ETL user guide § Wide feeds](../elt/user-guide-elt.md). In short: **Parse does not drop
 > columns** (it settles existence/name/type/synonym; exclusion is `transform.sql`'s job only, because
 > excluding here edits the schema and `SchemaCompatibility` gates that BACKWARD), and the columns table
 > carries the wide-feed treatment: a search box over name · selector · synonym, a **type dropdown**
@@ -102,7 +102,7 @@ this is what renders now, and why. Grounding: `grammar-editor.component.{ts,html
   `dataColumn()` (`inspecto/grid`) every row-derived data-table column now uses.
 - **The dialog host feeds the Pipeline tab's sample thread** (2026-09-25): its sample and a table Test
   parse land in the same `DefinitionStateService` the Parse drawer's Sample card and the downstream Steps
-  read — see [Pipeline Editor § Parse](../elt/user-guide.md).
+  read — see [Pipeline Editor § Parse](../elt/user-guide-elt.md).
 - **ONE columns table — "Columns that come out"** (R11; `schema-fields-editor.component.html`): `#` ·
   Name · Type · **Sample value** (first parsed row) · Also known as (the synonym), a search box; ⅋ **no
   Use/include column** — D8 removed include-control, so every row the grid holds is emitted
@@ -229,7 +229,7 @@ What else the redesign shipped, all §-referenced to the plan (in `superpower/` 
 
 
 The delimited redesign's shell generalized: **xlsx** (new, DuckDB `read_xlsx` via the `excel`
-extension — see `okf/product/module/elt/spec-ingest.md` §P.6.4b for the engine lane and
+extension — see `okf/product/module/elt/spec-parsing.md` §P.6.4b for the engine lane and
 the fail-closed `ExcelExtension` loading), **json** and **fixedwidth** each render the 4-tab
 surface with their own first-tab language via `grammarTabsFor` (*Sheet & range* · *Format &
 records* · *Record layout*); `text_regex` stays flat. Load-bearing facts:
@@ -277,7 +277,7 @@ nothing else on the template side.
 exist, and **binary fixed width** — plus a new Pipeline's generic placeholder `parser`, whose first
 configuration it hosts. Since 2026-09-25 its **Save writes the output schema** after a table Test parse
 when the node names none — the same `writeParseSchema` the drawer's Apply calls — so the placeholder's
-first Save leaves a Schema behind ([Pipelines](../elt/user-guide.md) § the Grammar dialog). The plain `parser` type still has no drawer pane either — the plugin
+first Save leaves a Schema behind ([Pipelines](../elt/user-guide-elt.md) § the Grammar dialog). The plain `parser` type still has no drawer pane either — the plugin
 subtype covers only nodes with an *authored* `parsing.plugin` block, not the unbound generic type.
 ⚠ "P3d retires the dialog entirely" was always false and stays false:
 the dangling and binary cases are deliberate keeps. The dangling case is deliberate: with nothing to resolve there is no faithful copy
@@ -373,7 +373,7 @@ like the built-ins. Three consequences, each of which cost a test:
   it keys on the `configuredIngester` FQCN input, which the drawer never passes.
 * **A Decode Profile is READ BACK, so the form shows effective values** (2026-09-25). When the block names
   `asn1.profile_file`, the pane calls `ParsersService.decodeProfile(ref, subdir)` (`GET /parsers/asn1/profile`,
-  [parser-plugins.md § Decode Profile](../elt/spec-ingest.md)) and seeds the editor with the
+  [parser-plugins.md § Decode Profile](../elt/spec-parsing.md)) and seeds the editor with the
   profile's own values UNDER the Pipeline's (`withDecodeProfile`; a key the Pipeline saved blank is unset, and
   `segments` stays the Pipeline's). A `data-test="decode-profile"` list above the editor names each served
   `asn1.*` key's effective value and provenance — **from profile `<file>`**, **set here**, or **default**
@@ -405,7 +405,7 @@ green. The regression spec therefore uses an rxjs `delay` to reproduce productio
 reacts to a fetch, a test that resolves it synchronously is testing a different component.**
 
 - **`[lockType]`** hides the format picker: for a per-format node the format *is* the node's type
-  ([per-format node types](../elt/architecture.md)), so offering a switch could only author
+  ([per-format node types](../elt/architecture-elt.md)), so offering a switch could only author
   a block the save path refuses with `PARSER_FRONTEND_MISMATCH`. The pane stamps its **derived** frontend
   (`frontend()`, read off the node type) onto the block it emits, never a literal.
 - The pane follows the P2 pure-pane contract: `[node]` in, `(applied)`/`(dirtyChange)` out, no injected
@@ -415,7 +415,7 @@ reacts to a fetch, a test that resolves it synchronously is testing a different 
   `dialog.open` dies inside Material with `Cannot read properties of undefined (reading 'push')` — ten green
   tests in `pipeline-editor.component.spec.ts` broke exactly this way. Use `TestBed.overrideProvider`.
 
-Unlike [Collector configuration](../elt/user-guide.md), these two surfaces were **not** already one
+Unlike [Collector configuration](../elt/user-guide-elt.md), these two surfaces were **not** already one
 feature before 2026-08-04: they shared only the renderer layer (`fieldSpecsToAttributes`,
 `ParsersService`, `<app-parser-tree>`, `<inspecto-data-table>`, `<inspecto-schema-form>`), and the gap
 between them held two live defects, both fixed as part of this unification (§ below).
@@ -548,7 +548,7 @@ D13 (operator, 2026-07-25) parked every parser/grammar field's `tier:` assignmen
 onboarding-observation session** — ⛔ *explicitly not an engineering guess*. The session has **not
 happened**. The full kit (session protocol, per-lane task script, per-field capture sheets, field
 inventory) is provenance in
-[`okf/product/module/elt/plan.md`](../elt/plan.md),
+[`okf/product/module/elt/plan-elt.md`](../elt/plan-elt.md),
 archived 2026-09-09 by operator decision. ⚠ **The kit is still runnable and the session is still owed** —
 archived here means "not maintained", not "abandoned". Board row: `BACKLOG.md` §2 *D13 parser field tiers*.
 
@@ -592,7 +592,7 @@ durable design — regenerate it from the file rather than trusting the copy in 
 ## Deferred (logged to `docs/BACKLOG.md`)
 
 - ~~**The unknown-`use:`-prefix refusal.**~~ **SHIPPED 2026-08-10** — see
-  `okf/product/module/elt/architecture.md` for the as-built. Two claims this section made
+  `okf/product/module/elt/architecture-elt.md` for the as-built. Two claims this section made
   were wrong: `ComponentRegistry.resolve` *did* have a caller (`ComponentStore.get`; only `isKnown` had
   none), and the seam was `PipelineValidator.checkWiring`, not `ConfigSafetyValidator`. A binding whose
   kind is valid but whose named component is absent now refuses at save with `UNKNOWN_USE_REF` (422).

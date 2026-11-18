@@ -1880,11 +1880,11 @@ What exists to build on:
 - **D-PA36: Product documents are generated into the Product's hub.** Products, Apps and Industries get hubs at
   `docs/okf/product/{product,app,industry}/<id>/`.
   - For each Product, `render-product-docs.mjs` writes four files from the Product definition, its Apps, Add-ons and
-    Editions, linking into their hubs:
-    - `brochure.md`;
-    - `features.md`, the datasheet;
-    - `user-guide.md`;
-    - `admin-guide.md`.
+    Editions, linking into their hubs (named after the Product since `DOCS-HUB-NAMES-1`, 2026-11-18):
+    - `brochure-<id>.md`;
+    - `features-<id>.md`, the datasheet;
+    - `user-guide-<id>.md`;
+    - `admin-guide-<id>.md`.
   - Each says it is generated, and `--check` holds it current.
   - ~~Demo and video scripts are not generated.~~ **Changed by the operator 2026-11-12:** a demo script and a video
     script are generated too (`PRODUCT-SCRIPTS-GENERATED-1`, built the same day; see §11 PA-10d as built).
@@ -2185,7 +2185,7 @@ left (`SCREENING-1`, `ANALYTICS-CORE-1`, `TELCO-BYPASS-SIMBOX-1`, `SCALEOUT-OBJS
 - Test mapping row: ✅ **done**, deleted (no `Test mapping` in `inspecto-ui/` confirmed; removed in `42fa41fe5`);
   `user-guide-pipeline-editor.md` line 645 rewritten to say it is gone and where a mapping is previewed now.
 - Queries / BI row: ✅ **done**, deleted; `spec-queries.md` records the retirement, including "more `$`-resolvers".
-- `SCREENING-1`: ⏸ **left at P2**: the hub (`module/screening/plan.md`, `spec.md`) still marks D6 and D8 "pending
+- `SCREENING-1`: ⏸ **left at P2**: the hub (`module/screening/plan-screening.md`, `spec.md`) still marks D6 and D8 "pending
   confirmation"; it closes when the operator confirms them.
 - `PREDICTIVE-ANALYTICS-1`: ✅ **done**, merged into `PREDICTIVE-STUDIO-PREVIEW-1` (five slices shipped, not four:
   windowed Measures, RFM, churn, forecast, surface). OD-10/12/13/16 moved with it, OD-11 settled, OD-15 → `PACK-SALES-MARKETING-1`;

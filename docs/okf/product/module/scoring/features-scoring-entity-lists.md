@@ -24,13 +24,13 @@ Two modules sold as one add-on:
   `RiskWatchListFeed` (implements the `WatchListFeed` SPI), `EntityListGovernableKinds`.
 
 `scoring` requires `entity-list`; `entity-list` requires `entity-store`. Full concepts:
-[Risk Scores](spec-risk-scores.md), [Entity Lists](../entity-list/spec.md).
+[Risk Scores](spec-risk-scores.md), [Entity Lists](../entity-list/spec-entity-list.md).
 
 ## Where it fits
 
 Add-ons over the platform base. Scores are written through the shared score output contract (engine
-`ScoreOutputWriter`, see [analytics-kernel](../analytics/architecture.md)); Incidents come from the ordinary Alert Rule
-machinery ([alerts](../../addon/incidents/architecture.md)). Without the modules `/risk-scores*` and `/entity-lists*` answer 503 and
+`ScoreOutputWriter`, see [analytics-kernel](../analytics/architecture-analytics.md)); Incidents come from the ordinary Alert Rule
+machinery ([alerts](../../addon/incidents/architecture-incidents.md)). Without the modules `/risk-scores*` and `/entity-lists*` answer 503 and
 `/bootstrap` reports `features.scoring` / `features.entityList` false.
 
-More: [screens](user-guide-scoring-entity-lists.md) · [API](api-scoring-entity-lists.md) · [architecture](architecture.md).
+More: [screens](user-guide-scoring-entity-lists.md) · [API](api-scoring-entity-lists.md) · [architecture](architecture-scoring.md).

@@ -9,7 +9,7 @@
 > **Point-in-time snapshot** (compiled 2026-06-20). Status tags — `[LIVE]` shipped, `[NATIVE]`/
 > `[PROPOSED]` not yet wired — and `file:line` references reflect the tree at that date; **verify
 > against current code** before relying on a specific line. The authoritative living docs are
-> [`configuration.md`](okf/product/module/config/admin-guide-configuration-reference.md) (all TOON keys), [`parsing-options-reference.md`](okf/product/module/elt/spec-ingest.md)
+> [`configuration.md`](okf/product/module/config/admin-guide-configuration-reference.md) (all TOON keys), [`parsing-options-reference.md`](okf/product/module/elt/spec-parsing.md)
 > (frontend status), and [`ADVANCED_GUIDE.md`](ADVANCED_GUIDE.md) (runtime flags, events, metrics, Control API).
 >
 > **Which module ships in which edition** is not tabulated here: the generated *Offerings matrix* in [`spec-editions.md`](okf/product/layer/platform/spec-editions.md) is the one place (module × edition, add-ons, deployment posture, jar counts).
@@ -130,15 +130,15 @@ runnable and deletable, never newly written (the `Pipeline*Routes` modules). The
 
 | Node | Fragment | Doc |
 |---|---|---|
-| `transform.filter` | `- { id: keep, type: transform.filter, where: "amount > 0" }` | `okf/product/module/engine/index.md` · `okf/product/module/elt/architecture.md` |
-| `transform.route` (case / clone) | `mode: case` (exclusive) or `mode: clone` (fan-out); `routes: [{rel,where},{rel,default:true}]` | `okf/product/module/engine/index.md` · `okf/product/module/elt/architecture.md` |
-| `transform.derive` | `fields: [{name,type:EXPR,expr}]` | `okf/product/module/engine/index.md` · `okf/product/module/elt/architecture.md` |
-| `transform.select` | `columns: [a,b,c]` | `okf/product/module/engine/index.md` · `okf/product/module/elt/architecture.md` |
-| `transform.validate` | `check: "amount > 0"` → `valid` + `invalid` edges | `okf/product/module/engine/index.md` · `okf/product/module/elt/architecture.md` |
-| `transform.dedup` | `key: [call_id]` | `okf/product/module/engine/index.md` · `okf/product/module/elt/architecture.md` |
-| `transform.split` | UNNEST | `okf/product/module/engine/index.md` · `okf/product/module/elt/architecture.md` |
-| `transform.merge` (fan-in) | `inputs: [a,b]` / `sql: "SELECT … JOIN … USING(id)"` | `okf/product/module/engine/index.md` · `okf/product/module/elt/architecture.md` |
-| `sink.persistent` | `store: events` | `okf/product/module/engine/index.md` · `okf/product/module/elt/architecture.md` |
+| `transform.filter` | `- { id: keep, type: transform.filter, where: "amount > 0" }` | `okf/product/module/engine/index.md` · `okf/product/module/elt/architecture-elt.md` |
+| `transform.route` (case / clone) | `mode: case` (exclusive) or `mode: clone` (fan-out); `routes: [{rel,where},{rel,default:true}]` | `okf/product/module/engine/index.md` · `okf/product/module/elt/architecture-elt.md` |
+| `transform.derive` | `fields: [{name,type:EXPR,expr}]` | `okf/product/module/engine/index.md` · `okf/product/module/elt/architecture-elt.md` |
+| `transform.select` | `columns: [a,b,c]` | `okf/product/module/engine/index.md` · `okf/product/module/elt/architecture-elt.md` |
+| `transform.validate` | `check: "amount > 0"` → `valid` + `invalid` edges | `okf/product/module/engine/index.md` · `okf/product/module/elt/architecture-elt.md` |
+| `transform.dedup` | `key: [call_id]` | `okf/product/module/engine/index.md` · `okf/product/module/elt/architecture-elt.md` |
+| `transform.split` | UNNEST | `okf/product/module/engine/index.md` · `okf/product/module/elt/architecture-elt.md` |
+| `transform.merge` (fan-in) | `inputs: [a,b]` / `sql: "SELECT … JOIN … USING(id)"` | `okf/product/module/engine/index.md` · `okf/product/module/elt/architecture-elt.md` |
+| `sink.persistent` | `store: events` | `okf/product/module/engine/index.md` · `okf/product/module/elt/architecture-elt.md` |
 | `sink.view` (no bytes; `derived_sql` registered) | `store: active_subs` / `source_store: subscriber` | `ADVANCED_GUIDE §5.3` |
 | `incremental_column` (flow job watermark) | in the `*_job.toon`: `flow: f` / `incremental_column: event_dt` | `ADVANCED_GUIDE §5.3` |
 

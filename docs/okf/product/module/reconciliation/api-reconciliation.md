@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Reconciliation — API
 
-Routes for Reconciliation. Design and internals: [Reconciliation architecture](architecture.md).
+Routes for Reconciliation. Design and internals: [Reconciliation architecture](architecture-reconciliation.md).
 
 Handler: `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java`.
 

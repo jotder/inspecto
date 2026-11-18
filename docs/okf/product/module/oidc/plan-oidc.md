@@ -1,0 +1,61 @@
+---
+type: Plan
+title: OIDC authenticator and token relay — plan of record
+description: What module.oidc is required to do, what is built, what is left and what was refused.
+resource: providers/inspecto-oidc/
+tags: [module, oidc, plan, security]
+timestamp: 2026-10-19T00:00:00Z
+---
+
+# OIDC authenticator and token relay — plan of record
+
+Requirement: Standard and Advanced bundles sign users in through the customer's own OIDC identity
+provider, with the core staying auth-free behind the `Authenticator` / `TokenRelay` contracts
+(see [auth-spi](../auth-spi/index.md)). The full security plan is [plan-security](../access/plan-security.md);
+the design history is `docs/archived-documents/plans-archive/rbac-abac-plan.md`.
+
+## Built
+
+| Item | Where |
+|---|---|
+| JWKS-validated resource server (RS256, issuer, optional audience, `exp`, `typ` JWT or `at+jwt`) | `providers/inspecto-oidc/src/main/java/com/gamma/oidc/OidcAuthenticator.java` |
+| Gateway trust mode (RBAC R0): a second, gateway-signed JWT in a header | same file |
+| Per-Space role table, Access Profile denials, held roles, ABAC attribute allowlist (RBAC R1-R3, ABAC A1) | `OidcAuthenticator.verify`, `providers/inspecto-oidc/src/main/java/com/gamma/oidc/RoleMapper.java` |
+| Code + PKCE exchange, refresh, nonce check, RP-initiated logout, public bootstrap config | `providers/inspecto-oidc/src/main/java/com/gamma/oidc/OidcTokenRelay.java` |
+| Provider preset `generic` / `wso2` / `keycloak` and discovery document (2026-10-13) | `providers/inspecto-oidc/src/main/java/com/gamma/oidc/OidcConfig.java` |
+| Shaded sidecar jar so Nimbus ships (SEC-SIDECAR-BOOT-1) | [architecture](architecture-oidc.md) |
+
+Proven live against WSO2 Identity Server 7.3.0 and Keycloak
+(`providers/inspecto-oidc/src/test/java/com/gamma/oidc/OidcAgainstRealProviderTest.java`,
+`providers/inspecto-oidc/src/test/java/com/gamma/oidc/OidcKeycloakAgainstRealProviderTest.java`; runbook
+[admin-guide](../la-core/admin-guide-la-core.md#2-real-oidc-sign-in-runbook-la-app-local-wso2-identity-server)).
+
+## Decided
+
+* **No IdP of record** (`access/admin-guide-auth-security.md`; not BACKLOG D15, which is the scale-out ZK call): the module stays vendor-neutral; the provider is configuration.
+* **Audience is warn-only**, not mandatory, so existing deployments keep booting (`warnIfNoAudience`) — except
+  when `auth.oidc.clients` is set, which requires it.
+* **Machine-client trust is opt-in** (`OIDC-CC-CLIENT-PIN-1`, `OIDC-CC-LIFETIME-REPLAY-1`, 2026-11-01): a machine
+  token is one whose `azp` / `client_id` is listed in `auth.oidc.clients`, not a claim heuristic. The SPA client
+  (`auth.oidc.clientId`) is always admitted and never checked for lifetime or replay, so people's sign-in is
+  unchanged. Settings that would guard nothing (a ceiling or replay refusal without the list) refuse boot. The
+  gateway path is not pinned, and replay refusal is per node; DPoP / mTLS waits for demand.
+* **A machine is named by its client** (`OIDC-CC-MACHINE-ACTOR-1`, 2026-11-01): `MachineTrust.machineClient` makes a
+  Bearer token a machine's when its client is listed in `auth.oidc.clients` or it carries `gty` `client_credentials` /
+  `client-credentials`; nothing else is guessed (WSO2 sends `client_id` on people's tokens too). The Subject's **id**
+  becomes `client:<client id>`, not only the audit actor, because owner fields are written from `RequestAttrs.actor`
+  and read back against `Subject.id()` (Investigation lead and members, for example): the two must stay one value.
+  `Subject.machineSub` keeps the `sub`, audited as `idp_subject` (not `token_sub`: `SecretScrubber` redacts any key
+  that says token). An approved Pending Change replays under a Subject rebuilt from its author id, so that replay's
+  row says `actor_type: user`; the actor is still `client:<client id>`.
+* **Fail closed at boot** when issuer or JWKS URI is missing, the provider value is unknown, or discovery fails.
+
+## Left
+
+* Inbound OIDC client-credentials trust for Link Analysis integration: reviewed 2026-11-01, verdict
+  **enable with conditions** ([security review](tests-security-review-oidc-client-credentials.md)). A machine token is
+  already accepted like a user's. Audience, client allowlist, https JWKS, lifetime ceiling and replay refusal are in
+  code as opt-in settings since 2026-11-01; the role and actor conditions stay deployment rules until the filed rows
+  (in Open work) put them in code.
+* A live check of the SPA's sign-in return path under a real token lapse needs a running provider
+  (`ANOMALY-UI-FINDINGS-1`).

@@ -147,7 +147,7 @@ for testers and stays in the repository; it is not in the data download.
 
 ## References
 
-[Brochure](brochure.md) · [User guide: tour and exercises](user-guide.md) · [Architecture](architecture.md) · [Configuration reference: data root](../../module/config/admin-guide-configuration-reference.md)
+[Brochure](brochure-la-trade.md) · [User guide: tour and exercises](user-guide-la-trade.md) · [Architecture](architecture-la-trade.md) · [Configuration reference: data root](../../module/config/admin-guide-configuration-reference.md)
 
 ## As part of the *Banking and finance* industry Space
 

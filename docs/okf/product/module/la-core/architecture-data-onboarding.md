@@ -12,7 +12,7 @@ timestamp: 2026-11-12T00:00:00Z
 How data reaches Link Analysis and what a first-time user meets: Add data and the shared import route, help on every
 screen and the onboarding counters, the explorer defects and onboarding residuals, column roles, discovery in Basic,
 arrivals, arrival feeds, Dataset storage and the watched folder.
-Section numbers continue those of [architecture.md](architecture.md), from which this page was split on 2026-11-12.
+Section numbers continue those of [architecture-la-core.md](architecture-la-core.md), from which this page was split on 2026-11-12.
 
 ## 6.10 Add data: the shared import route (LA-ONBOARD-1 phase 2, as built 2026-10-22)
 
@@ -108,8 +108,8 @@ limits and the commit's write order are in
 ## 6.11 Help on every screen and the onboarding counters (LA-ONBOARD-1 phase 8, as built 2026-10-22; UC-15, A-9, A-10, OB-13)
 
 `LA-ONBOARD-1` closed with this phase; the plan is archived
-(`docs/archived-documents/plans-archive/la-onboarding-plan.md`). What phases 1-7 built is in [architecture.md#34-masking](architecture.md#34-masking) §3.4 (*Start from...*,
-*My work*), §6.10 and [architecture.md](architecture.md) §8 (*Trust vs level*); the acceptance drive is
+(`docs/archived-documents/plans-archive/la-onboarding-plan.md`). What phases 1-7 built is in [architecture-la-core.md#34-masking](architecture-la-core.md#34-masking) §3.4 (*Start from...*,
+*My work*), §6.10 and [architecture-la-core.md](architecture-la-core.md) §8 (*Trust vs level*); the acceptance drive is
 [`tests-live-drives.md#onboarding-acceptance-drive-la-onboard-1-2026-10-22`](tests-live-drives.md#onboarding-acceptance-drive-la-onboard-1-2026-10-22).
 
 * **Onboarding counters (OB-13).** `com.gamma.util.OnboardingCounters` (inspecto-util, below both the host and la-api,
@@ -335,7 +335,7 @@ column may say `carried: false`. A Mapping copies its base's columns with their 
   the section out of the cache. The Entity Type page shows it as **Measures**. Measured on 200,000 synthetic Entities
   with a cap of 1,000: 1 in 232, under 1,000 grouped, the LIMIT not reached (`ControlApiEntityProfileScaleTest`).
 - **Roles from the record type (`ENTITY-TYPE-RECORD-ROLES-1`, 2026-11-05).** A record type names its usual Time,
-  Measure and Category columns by hints (entity-store `spec.md` *A record type's usual roles*; the one rule is
+  Measure and Category columns by hints (entity-store `spec-la-core.md` *A record type's usual roles*; the one rule is
   `EntityShapes.hintedRole` / UI `hintedRole` in `column-roles.ts`, kept alike). **Add data:** after the record type is
   proposed, `EntityShapes.recordTypeRoles` gives each column a hint names its role - never one holding an Entity Type
   or chosen as the link's kind, time or measure - sure when the record type is, and keeps the role proposed without it

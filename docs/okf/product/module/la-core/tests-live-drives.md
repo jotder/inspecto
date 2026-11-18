@@ -25,7 +25,7 @@ Each section is one recorded drive: re-run it after a change to the screens it n
 [`la-onboarding-plan.md`](../../../../archived-documents/plans-archive/la-onboarding-plan.md) §1): a first-time user goes
 from an empty install to a finding with the screens alone. Run 2026-10-22 on the phase 8 worktree (base `5f39c3328`),
 results in §3 and §4. Re-run it after any change to the la-app first-run path; the beginner path it follows is the
-[end user guide](user-guide.md) §2 *Getting started*.*
+[end user guide](user-guide-la-core.md) §2 *Getting started*.*
 
 ### 1. Set-up
 
@@ -104,7 +104,7 @@ administrator would set up).
 
 Driven 2026-10-14 on a fresh Enterprise `la-app` demo bundle (`package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo` *(removed 2026-11-10 by `PRODUCT-ASSEMBLY-1` PA-2; today `package.ps1 -Edition Advanced -Product la -Distribution demo -NoBakeDemo`)*, built from master `388651a19`), served on port 8147, with a Space `la-feed` created from the `la-daily-feed` template through `POST /spaces`. Personas copied from the `la-showcase` template (`roles.toon`, `demo-users.toon`, `link-analysis.toon`) because `la-daily-feed` ships none. Synthetic days came from a scratchpad script (nothing committed). The built-in browser drove the SPA for steps 3 and 4; the rest was driven over the control API as the Demo Users.
 
-Plan: [la-data-trust-plan.md](../../../../archived-documents/plans-archive/la-data-trust-plan.md). As-built: [link-analysis.md](user-guide.md), section *Data trust*.
+Plan: [la-data-trust-plan.md](../../../../archived-documents/plans-archive/la-data-trust-plan.md). As-built: [link-analysis.md](user-guide-la-core.md), section *Data trust*.
 
 ### Setup facts that matter for a demo
 

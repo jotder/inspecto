@@ -13,7 +13,7 @@ timestamp: 2026-11-12T00:00:00Z
 
 This is the one current page on how the code is divided into modules: which modules exist, how each is
 classified, how they are composed into editions and shipped, and why the reactor has this shape. For the whole
-system see [architecture.md](architecture.md).
+system see [architecture-platform.md](architecture-platform.md).
 
 The module model was built by the module reorganisation (`MODULE-REORG-1`, phases P0 to P7, closed 2026-10-18).
 Every module carries a manifest, the host activates modules from those manifests, a Space can switch an optional
@@ -517,5 +517,5 @@ Workflow & SLA: [incidents plan](../../addon/incidents/plan-incidents.md). Build
 
 ## Related
 
-[Architecture](architecture.md) · [Editions](architecture-editions.md) ·
+[Architecture](architecture-platform.md) · [Editions](architecture-editions.md) ·
 [Module reorganisation: decisions](spec-module-reorg-decisions.md) · [gotchas](spec-module-reorg-gotchas.md)

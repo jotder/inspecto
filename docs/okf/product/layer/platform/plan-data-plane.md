@@ -657,11 +657,11 @@ A whole Space on S3 (no atomic rename); `hadoop-client` for HDFS (⛔ never — 
 | The three data classes, the store roster and schemas, per-Space topology, Postgres, the CWD traps, proving DAT-6 | `docs/okf/product/module/engine/spec-db-layer.md` (`Reference`, 53 KB) | eleven source files via its `PostToolUse` hook | §3.1, §3.8 — the largest Reference in the bundle |
 | Appender ingest, threads, D11, the three timezone rules, aggregate state | `docs/okf/product/module/engine/spec-duckdb.md` (`Concept`) | `DuckDbUtil.java` | §3.7 |
 | Query as a Component, `/queries/{id}/run`, calculated columns, time grains | `docs/okf/product/module/processor/spec-queries.md` (`Concept`) | `com.gamma.query` | §3.3–§3.5 |
-| The store-layout contract, `sinks:`, quarantine | `docs/okf/product/module/elt/spec-pipeline.md` (`Concept`) | `inspecto-etl` | §3.2 |
-| The Consignment Selector, revisions, `retire_superseded` | `docs/okf/product/module/elt/spec-ingest.md` (`Concept`) | `inspecto-engine` | §3.2 |
+| The store-layout contract, `sinks:`, quarantine | `docs/okf/product/module/elt/spec-sinks.md` (`Concept`) | `inspecto-etl` | §3.2 |
+| The Consignment Selector, revisions, `retire_superseded` | `docs/okf/product/module/elt/spec-consignments.md` (`Concept`) | `inspecto-engine` | §3.2 |
 | `materialize`, `retire_superseded` as Job / task types | `docs/okf/product/module/processor/spec-jobs.md` (`Concept`) | `com.gamma.job` | §3.6 |
 | DuckLake and the warehouse runbook | `docs/okf/product/layer/platform/api-integrations-ducklake.md` (`Reference`) | `DuckLakeRegistrar.java` | §3.10 — ⚠ runbook, not feature |
-| Object-storage export (`objectstore.export`) | `docs/okf/product/module/elt/spec-pipeline.md` (`Reference`) | `ObjectStoreExportJobType.java` | §3.10 |
+| Object-storage export (`objectstore.export`) | `docs/okf/product/module/elt/spec-sinks.md` (`Reference`) | `ObjectStoreExportJobType.java` | §3.10 |
 | Retention and the operational flags | `docs/okf/product/layer/platform/admin-guide-operations-reference.md` (`Reference`) §Retention | — | the operator's view |
 | Studio Datasets, Query Library, the rows seam | `docs/okf/product/layer/product/user-guide-studio.md` (`Feature`) | `inspecto-ui/src/app/modules/admin/studio/` | §3.11 |
 | The Data Browser | `docs/okf/product/layer/product/user-guide-catalog.md` (`Feature`) §Data Browser | — | §3.9 |

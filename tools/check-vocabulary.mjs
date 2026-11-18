@@ -251,7 +251,7 @@ const RULES = [
         //
         // The trailing-noun exemption covers the *data-origin* axis, which is NOT the acquisition entity:
         //   · `[-\s]` not `\s` — "Source-of-truth" is the same sense as "source of truth" and was a live
-        //     false positive (docs/okf/product/layer/product/architecture.md) until the hyphen was allowed here;
+        //     false positive (docs/okf/product/layer/product/architecture-product.md) until the hyphen was allowed here;
         //   · path/format/size describe the origin artefact ("Source path", "Source size equals local
         //     size"), never the configured collection task.
         // ⚠ Do NOT add `connector` here: the SPI is `CollectorConnector`, so "Source Connector" is a real

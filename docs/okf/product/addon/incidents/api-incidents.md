@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Incidents — API
 
-Routes for Incidents. Design and internals: [Incidents architecture](architecture.md).
+Routes for Incidents. Design and internals: [Incidents architecture](architecture-incidents.md).
 
 Handler: `features/inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java`.
 

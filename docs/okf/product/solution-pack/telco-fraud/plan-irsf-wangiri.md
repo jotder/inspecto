@@ -99,7 +99,7 @@ calls or probes (rows F, G); no trained model (no ML runtime; RFP `FM-18` stays 
 
 Match is **longest prefix wins**, so a risky country entry can carry a more specific `normal` sub-range (today's "any prefix" cannot).
 The Reference is **a data origin, not an Entity List**: a prefix is a *range*, and Entity Lists hold typed entity keys (a range block is
-supported there as a number block, `okf/product/module/entity-list/spec.md`, but dimension data with class, cost and review dates is a Reference).
+supported there as a number block, `okf/product/module/entity-list/spec-entity-list.md`, but dimension data with class, cost and review dates is a Reference).
 
 ### 4.2 Provenance, licensing and the seed that ships
 
@@ -288,7 +288,7 @@ it, and to hand it to the enforcement point after approval. Real-time or autonom
   `TARGET` (number, prefix, partner), `BASIS` (the feature table), `EXPOSURE` (suspected), `EXPIRES` (the recommendation lapses). The same
   Decision Rule's `invoke-api` consequence drafts an **Action Request** to a customer-owned Connection (the RTSC partner or a switch
   management API), which is **held for a four-eyes approval** and sent only after a *different* person approves, with bounded retries
-  and one idempotency key (`okf/product/module/action-requests/spec.md`). The block entry in `iw-recommended-block` is written
+  and one idempotency key (`okf/product/module/action-requests/spec-action-requests.md`). The block entry in `iw-recommended-block` is written
   only on approval.
 - **Form B, a named Consequence (optional, IW7).** A `recommend-block` Consequence registered through the Consequence provider seam
   (a `ConsequenceProvider` contribution), taking `ACTION`, `TARGET`, `BASIS`, `EXPIRES` as typed inputs and producing exactly Form A's
@@ -506,8 +506,8 @@ memory on a synthetic 5M-CDR day, hourly-cadence detection latency, the module o
 - Matrix: [`okf/product/layer/product/brochure-competitive-matrix.md`](../../layer/product/brochure-competitive-matrix.md) rows D, E, H, I.
 - `telco-fraud` as-built: [`okf/product/module/config/plan-spaces.md`](../../module/config/plan-spaces.md) §3.5.
 - Anomaly Models: [`okf/product/module/anomaly/spec-anomaly-scores.md`](../../module/anomaly/spec-anomaly-scores.md). Entity Lists:
-  [`okf/product/module/entity-list/spec.md`](../../module/entity-list/spec.md). Action Requests:
-  [`okf/product/module/action-requests/spec.md`](../../module/action-requests/spec.md).
+  [`okf/product/module/entity-list/spec-entity-list.md`](../../module/entity-list/spec-entity-list.md). Action Requests:
+  [`okf/product/module/action-requests/spec-action-requests.md`](../../module/action-requests/spec-action-requests.md).
 - Sibling plans: [`rerating-tariff-validation-plan.md`](../../../../archived-documents/plans-archive/rerating-tariff-validation-plan.md),
   [`partner-settlement-wholesale-plan.md`](../../../../archived-documents/plans-archive/partner-settlement-wholesale-plan.md).
 - Canonical vocabulary: [`GLOSSARY.md`](../../../../GLOSSARY.md) (the single source of truth).

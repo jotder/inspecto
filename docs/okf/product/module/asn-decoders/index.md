@@ -11,18 +11,18 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.asn-decoders`](../../../../../product-map/module/asn-decoders.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [ASN.1 decoders — plan of record](plan.md) |
-| spec | current | [ASN.1 decoders — implementation spec](spec.md) |
-| architecture | current | [ASN.1 decoders — architecture](architecture.md) |
-| features | current | [ASN.1 decoders — features](features.md) |
+| plan | current | [ASN.1 decoders — plan of record](plan-asn-decoders.md) |
+| spec | current | [ASN.1 decoders — implementation spec](spec-asn-decoders.md) |
+| architecture | current | [ASN.1 decoders — architecture](architecture-asn-decoders.md) |
+| features | current | [ASN.1 decoders — features](features-asn-decoders.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | n/a | a decoding library with no screens; the ASN.1 grammar fields an end user sees belong to the telecom-asn1 hub |
 | admin-guide | n/a | a library jar with nothing to install or configure on its own; it is staged and configured through telecom-asn1 |
-| api | current | [ASN.1 decoders — Java API](api.md) |
+| api | current | [ASN.1 decoders — Java API](api-asn-decoders.md) |
 | tests | current | [ASN.1 decoders — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 

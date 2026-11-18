@@ -11,16 +11,16 @@ tags: [product-item, layer]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`layer.platform`](../../../../../product-map/layer/platform.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [Architecture work — MoSCoW analysis (2026-11-12)](plan-architecture-moscow.md) · [Compliance (CMP) — capability spec](plan-compliance.md) · [Data plane (DAT)](plan-data-plane.md) · [Editions & packaging (PKG) — capability spec](plan-editions.md) · [Inspecto — Forward Roadmap](plan-roadmap.md) · [Guards & repository tooling (TOOL) — capability spec](plan-tooling.md) |
 | spec | current | [Branching & Release Policy](spec-branching-release.md) · [Build & Test](spec-build-test.md) · [Editions — engineering specification (Basic / Standard / Advanced / Preview)](spec-editions.md) · [Module reorganisation - decision record (D-MR1..D-MR12)](spec-module-reorg-decisions.md) · [Module reorganisation - traps and gotchas](spec-module-reorg-gotchas.md) · [Product Map — the commercial tree, its guard, its views and customer builds (as built)](spec-product-map.md) · [Work tracking — one board, tagged rows, generated hub views](spec-work-tracking.md) |
-| architecture | current | [Editions](architecture-editions.md) · [Modules](architecture-modules.md) · [Platform Services](architecture-platform-services.md) · [Inspecto platform architecture](architecture.md) |
-| features | current | [Platform — features](features.md) |
+| architecture | current | [Editions](architecture-editions.md) · [Modules](architecture-modules.md) · [Platform Services](architecture-platform-services.md) · [Inspecto platform architecture](architecture-platform.md) |
+| features | current | [Platform — features](features-platform.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Platform — the builder kit](user-guide-builder-kit.md) · [Platform — user guide](user-guide.md) |
+| user-guide | current | [Platform — the builder kit](user-guide-builder-kit.md) · [Platform — user guide](user-guide-platform.md) |
 | admin-guide | current | [Platform — installing Apps on a running server](admin-guide-apps.md) · [Platform — container image, Helm chart and air-gapped install](admin-guide-container-airgap.md) · [Platform — the deploy kit: reverse proxy, preflight, upgrade, bundle verify and off-site backup](admin-guide-deploy-kit.md) · [Platform — entitlements](admin-guide-entitlements.md) · [Cross-Cutting Gotchas](admin-guide-gotchas.md) · [HA/DR drill runbook: two-node active/passive on plain Linux (T4)](admin-guide-ha-dr-drill.md) · [Operations & Launch Flags](admin-guide-launch-flags.md) · [Local feature testing without a real IAM or Postgres](admin-guide-local-testing.md) · [Operations reference — utilities, batching, output, deployment](admin-guide-operations-reference.md) · [Inspecto — Operations & Support Guide (pointer map)](admin-guide-operations.md) · [Troubleshooting](admin-guide-troubleshooting.md) · [UAT Sample-Data Seeding Runbook](admin-guide-uat-seeding.md) |
 | api | current | [DuckLake & the warehouse query layer](api-integrations-ducklake.md) |
 | tests | current | [Doc claim audit — 2026-10-19 (PRODUCT-DOCS-HUB-1)](tests-doc-claim-audit-2026-10-19.md) · [Guards that cannot fail](tests-guard-coverage.md) · [Operator mutation checklist](tests-operator-mutation-checklist.md) · [Performance assessment & bottleneck analysis](tests-performance.md) · [Provenance conservation — live-data verification protocol (OPS-5)](tests-provenance-conservation.md) · [Java Review Coverage](tests-review-coverage.md) · [Inspecto — Testing Guide](tests-testing-guide.md) · [Platform tooling — tests inventory](tests-tools-inventory.md) |

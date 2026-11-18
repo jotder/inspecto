@@ -1,6 +1,6 @@
-api: the engine registers no HTTP routes; the Pipeline, Run and Job routes it serves are documented in module/processor api-routes and api-jobs-scheduler and module/elt api.md
-plan: documented in the ELT hub module/elt plan.md (part EXE), merged 2026-11-18 (DOCS-ELT-CONSOLIDATE-1)
-architecture: documented in the ELT hub module/elt architecture.md (Execution engine internals, sections E1-E7), merged 2026-11-18
-features: documented in the ELT hub module/elt features.md (Execution engine), merged 2026-11-18
-user-guide: documented in the ELT hub module/elt user-guide.md section 22 (Runs and Run Detail), merged 2026-11-18
-admin-guide: documented in the ELT hub module/elt admin-guide.md, merged 2026-11-18
+api: the engine registers no HTTP routes; the Pipeline, Run and Job routes it serves are documented in module/processor api-routes and api-jobs-scheduler and module/elt api-elt.md
+plan: documented in the ELT hub module/elt plan-elt.md (part EXE), merged 2026-11-18 (DOCS-ELT-CONSOLIDATE-1)
+architecture: documented in the ELT hub module/elt architecture-elt.md (Execution engine internals, sections E1-E7), merged 2026-11-18
+features: documented in the ELT hub module/elt features-elt.md (Execution engine), merged 2026-11-18
+user-guide: documented in the ELT hub module/elt user-guide-elt.md section 22 (Runs and Run Detail), merged 2026-11-18
+admin-guide: documented in the ELT hub module/elt admin-guide-elt.md, merged 2026-11-18

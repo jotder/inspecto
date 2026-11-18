@@ -11,17 +11,17 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.reconciliation`](../../../../../product-map/module/reconciliation.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Reconciliation — requirement of record](plan.md) |
-| spec | current | [Reconciliation — implementation spec](spec.md) |
-| architecture | current | [Reconciliation](architecture.md) |
+| plan | current | [Reconciliation — requirement of record](plan-reconciliation.md) |
+| spec | current | [Reconciliation — implementation spec](spec-reconciliation.md) |
+| architecture | current | [Reconciliation](architecture-reconciliation.md) |
 | features | current | [Reconciliation — features](features-reconciliation.md) |
 | feature-db | current | [Reconciliation — feature database](feature-db.md) |
 | user-guide | current | [Reconciliation](user-guide-reconciliation.md) |
-| admin-guide | current | [Reconciliation — admin guide](admin-guide.md) |
+| admin-guide | current | [Reconciliation — admin guide](admin-guide-reconciliation.md) |
 | api | current | [Reconciliation — API](api-reconciliation.md) · [HTTP routes — module.reconciliation](api-routes.md) |
 | tests | current | [Reconciliation — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

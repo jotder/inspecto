@@ -11,7 +11,7 @@ timestamp: 2026-11-13T00:00:00Z
 
 Distilled from the LA performance plan when it closed on 2026-11-13 (every `LA-PERF-*` row closed; full history and
 every run in `archived-documents/plans-archive/la-performance-plan.md`). Server-side stage costs and the N7–N11 profile:
-[`../la-api/spec-server-profile.md`](../la-api/spec-server-profile.md). Event store flush: [`../event/architecture.md`](../event/architecture.md).
+[`../la-api/spec-server-profile.md`](../la-api/spec-server-profile.md). Event store flush: [`../event/architecture-event.md`](../event/architecture-event.md).
 
 **Reference graph for every number below:** la-showcase saved view `telecom_fraud_network`, 767 nodes / 4,000 links
 (cut by the 4,000-ROW cap, not the node cap), production `la-app` build, demo-auth Preview, built-in browser with the

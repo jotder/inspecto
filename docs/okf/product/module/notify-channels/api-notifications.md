@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 # Notifications — API
 
-Routes for Notifications. Design and internals: [Notifications architecture](architecture.md).
+Routes for Notifications. Design and internals: [Notifications architecture](architecture-notify-channels.md).
 
 All in `NotificationRoutes`; gates per `platform/inspecto-access/src/main/java/com/gamma/access/CapabilityManifest.java`.
 

@@ -11,7 +11,7 @@ description: >
 
 # Link Analysis showcase Spaces — how they are built
 
-Canonical facts: `docs/okf/product/solution-pack/la-showcase/architecture.md` (pattern,
+Canonical facts: `docs/okf/product/solution-pack/la-showcase/architecture-la-showcase.md` (pattern,
 data generation, gotchas) and each Space's own hub `docs/okf/product/solution-pack/la-<id>/`. Read the
 catalogue before changing a pattern; update it (and the Space hub) in the same change. Demo installs and
 redeploys: `.claude/memory/preview-la-demo.md`.
@@ -26,7 +26,7 @@ redeploys: `.claude/memory/preview-la-demo.md`.
 | Data test | `tools/gen-la-<id>-data.test.mjs` (planted facts in the files) |
 | Java tests | `<X>LinksJobGoldenTest` (real Pipelines + Jobs) and `La<X>TemplateTest`; `ControlApiSpaceTemplatesTest` counts templates |
 | Seed | `tools/seed-la-<id>.mjs` + `.test.mjs` (`--scaffold`, dry run by default, `--apply`, idempotent) |
-| Docs | hub `brochure.md`, `user-guide.md`, `admin-guide-install.md`; catalogue `user-guide-showcase-catalogue.md` |
+| Docs | hub `brochure-la-<id>.md`, `user-guide-la-<id>.md`, `admin-guide-install.md`; catalogue `user-guide-showcase-catalogue.md` |
 
 ## Rules learned the hard way
 

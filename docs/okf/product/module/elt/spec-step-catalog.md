@@ -22,7 +22,7 @@ describe the chain, and this page is the one place both are laid out side by sid
 2. **Step Processors** — the 122<!--count:processors-->-entry product taxonomy the palette lists in eight families
    (`processor-catalog.contract.json`, `ProcessorCatalog.java`, served as
    `GET /pipelines/processor-catalog`). A processor is a *label* over a Step kind or an engine
-   capability, never a Java class of its own ([catalog-vs-executors](spec-pipeline.md)).
+   capability, never a Java class of its own ([catalog-vs-executors](spec-pipeline-model.md)).
    Part B lists all of them by status: **54**<!--count:processors-delivered--> delivered, **17**<!--count:processors-partial--> partial
    (something ships, not as a chain Step, or not the whole promise), **51**<!--count:processors-planned--> **planned**
    (the palette shows them inactive — *"Not yet available"*). The board rendering of the same list is
@@ -42,8 +42,8 @@ legacy singular `processing.dedup:` / `processing.join:` / `processing.summarize
 summarize → route`) and the **recipe** (`RecipeCompiler`), which compiles to the flat form. Route
 branches may chain their own `steps[]`, limited to `filter` (with `where:`), `dedup` (consignment scope)
 and `summarize` — `RouteArming.BRANCH_STEP_KINDS`; a `join` or a nested `route` refuses at save and at
-registration. Mechanism detail: [execution-lanes](spec-pipeline.md), [live-execution](spec-pipeline.md),
-[editable-round-trip](spec-pipeline.md).
+registration. Mechanism detail: [execution-lanes](spec-pipeline-model.md), [live-execution](spec-pipeline-model.md),
+[editable-round-trip](spec-pipeline-model.md).
 
 **Every delivered Step kind has a runnable example** in two places: standalone under
 [`inspecto/examples/`](../../../../../inspecto/examples/README.md) (`07-steps/` + `02-parsing/`) and, wired
@@ -195,7 +195,7 @@ relation, so nothing disappears unaccounted. ✅ **The INGEST lane keeps it too,
 the batch ledger's `rejected_rows`, and `total_input_rows` includes it, so nothing disappears
 unaccounted on either lane. 🔴 It did not until then: the ledger reported `rejected_count=0` for a file
 that lost a truncated record, with input and output both excluding it, so the counters reconciled while
-the record was missing. See [`consignment-status-flow.md`](architecture.md). A NULL predicate result drops the row. Mid-branch (inside
+the record was missing. See [`consignment-status-flow.md`](architecture-elt.md). A NULL predicate result drops the row. Mid-branch (inside
 `route:`) a filter must carry `where:`; a blank predicate or a pre-parse key refuses to arm. At rest the
 legacy pre-map filter (`csv_settings.where`) is refused because the landed store no longer has raw columns.
 
@@ -324,7 +324,7 @@ wide `charge_*` keys, unpivoted into `(CHARGE_TYPE, AMOUNT)` rows.
 
 ## `resample` → `transform.timeseries.resample` — Time-grain resampler & gap imputer
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 M5, [analytics-kernel § Time-series primitives](../analytics/spec.md#time-series-primitives)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 M5, [analytics-kernel § Time-series primitives](../analytics/spec-analytics.md#time-series-primitives)).*
 
 **Function.** One row per key per time bucket, **every bucket between the bounds present** — a daily, weekly or
 monthly series ready for a chart, a KPI or a shift, with no missing periods.
@@ -393,7 +393,7 @@ empty value instead of the wrong period's. Every inbound row is kept, ordered by
 
 ## `forecast` → `transform.timeseries.forecast` — Time-series forecaster (Holt-Winters)
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 S5, [analytics-kernel § Forecasting](../analytics/spec.md#forecasting)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 S5, [analytics-kernel § Forecasting](../analytics/spec-analytics.md#forecasting)).*
 
 **Function.** A forecast per key of a regular series — every bucket of the history with its one-step-ahead forecast
 and prediction band, then `horizon` buckets ahead — so a chart, a KPI band or an Alert Rule reads actual, forecast,
@@ -435,7 +435,7 @@ lower and upper side by side.
 
 ## `changepoint` → `transform.timeseries.changepoint` — Change-point, regime & drift detector
 
-*Added 2026-11-01 (ANALYTICS-STEPS-TS-1, [analytics-kernel § Change-point and regime detection](../analytics/spec.md#change-point-and-regime-detection)).*
+*Added 2026-11-01 (ANALYTICS-STEPS-TS-1, [analytics-kernel § Change-point and regime detection](../analytics/spec-analytics.md#change-point-and-regime-detection)).*
 
 **Function.** Flags where a series stops behaving as expected. It reads a **residual** (actual minus expected — a
 forecast's error, a baseline or a peer median) and its scale σ, and every row gains four 0/1 flags: `outside_band` (a
@@ -477,7 +477,7 @@ Business Assurance forecast template's own flags). Defaults are the template's: 
 
 ## `retention` → `transform.cohort.retention` — Cohort retention matrix
 
-*Added 2026-11-01 (ANALYTICS-STEPS-TS-1, [analytics-kernel § Cohort retention and funnel](../analytics/spec.md#cohort-retention-and-funnel)).*
+*Added 2026-11-01 (ANALYTICS-STEPS-TS-1, [analytics-kernel § Cohort retention and funnel](../analytics/spec-analytics.md#cohort-retention-and-funnel)).*
 
 **Function.** Summarising: one row per acquisition cohort per period — `cohort` (the bucket start, a `TIMESTAMP`),
 `period` (0 = the cohort's own bucket), `size`, `active`, `rate` — as of a stated date.
@@ -506,7 +506,7 @@ Business Assurance forecast template's own flags). Defaults are the template's: 
 
 ## `funnel` → `transform.cohort.funnel` — Ordered conversion funnel
 
-*Added 2026-11-01 (ANALYTICS-STEPS-TS-1, [analytics-kernel § Cohort retention and funnel](../analytics/spec.md#cohort-retention-and-funnel)).*
+*Added 2026-11-01 (ANALYTICS-STEPS-TS-1, [analytics-kernel § Cohort retention and funnel](../analytics/spec-analytics.md#cohort-retention-and-funnel)).*
 
 **Function.** Summarising: one row per funnel step — `step` (1..n), `name`, `entities` that reached it, `from_previous`
 and `from_first` (the conversion rates; empty where the base is 0, and `from_previous` empty for step 1).
@@ -531,7 +531,7 @@ and `from_first` (the conversion rates; empty where the base is 0, and `from_pre
 
 ## `similarity` → `transform.similarity` — Similarity score
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 S1, catalog `quality.match.fuzzy`, [analytics-kernel § Similarity kit](../analytics/spec.md#similarity-kit)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 S1, catalog `quality.match.fuzzy`, [analytics-kernel § Similarity kit](../analytics/spec-analytics.md#similarity-kit)).*
 
 **Function.** Every row gains a **0..1 score of how alike two of its text columns are** (a customer name and an
 account name, a payee and a beneficiary) and, with a `threshold`, a **true/false candidate flag** for review.
@@ -586,7 +586,7 @@ same `RowShaper` arm · (4) palette `addable` from the regenerated contract · (
 
 ## `rank` → `transform.analytics.rank` — Rank & Top-N pruner
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 S4, [analytics-kernel § Ranking, sampling and pivot](../analytics/spec.md#ranking-sampling-and-pivot)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 S4, [analytics-kernel § Ranking, sampling and pivot](../analytics/spec-analytics.md#ranking-sampling-and-pivot)).*
 
 **Function.** Ranks the rows of each group by a stated order — the top 3 calls per region, the largest invoice per
 customer — and either **keeps the top N** or **adds the rank as a column**.
@@ -630,7 +630,7 @@ ranked 1 and 2 by `CALL_ID`; K07 has no amount and sorts last.
 
 ## `sample` → `transform.sample` — Statistical & reservoir sampler
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 S4, catalog `quality.sample.reservoir`, [analytics-kernel § Ranking, sampling and pivot](../analytics/spec.md#ranking-sampling-and-pivot)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 S4, catalog `quality.sample.reservoir`, [analytics-kernel § Ranking, sampling and pivot](../analytics/spec-analytics.md#ranking-sampling-and-pivot)).*
 
 **Function.** Keeps a **fixed number** or a **share** of the rows of each group — a test extract of a large Dataset, an
 audit sample per region — and keeps the **same rows on every run**.
@@ -673,7 +673,7 @@ selection), `PipelineJobRunnerTest#runsAFlatConfigsRankSampleAndPivotSteps` · (
 
 ## `pivot` → `transform.matrix.pivot` — Pivot (rows to columns)
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 S4, [analytics-kernel § Ranking, sampling and pivot](../analytics/spec.md#ranking-sampling-and-pivot)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 S4, [analytics-kernel § Ranking, sampling and pivot](../analytics/spec-analytics.md#ranking-sampling-and-pivot)).*
 
 **Function.** The reverse of `unpivot`: long rows become a wide table — one row per key, **one column per declared
 value**, each holding one aggregate of that value's rows (usage per subscriber per call type, revenue per month column).
@@ -715,7 +715,7 @@ even with no schema; only the keys and pivoted columns flow on) · (7) `examples
 
 ## `entity_link` → `transform.entity.link` — Entity grouping
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 S2, catalog `enrichment.entity.link`, [analytics-kernel § Entity grouping](../analytics/spec.md#entity-grouping)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 S2, catalog `enrichment.entity.link`, [analytics-kernel § Entity grouping](../analytics/spec-analytics.md#entity-grouping)).*
 
 **Function.** Every row gains a **resolution group**: rows that agree exactly on a match key — the same email, the
 same phone number — are the same entity, and the links chain (A shares an email with B, B a phone with C: one group).
@@ -781,7 +781,7 @@ same `RowShaper` arm · (4) palette `addable` from the regenerated contract · (
 
 ## `outlier` → `transform.stats.outlier` — Outlier detector & IQR boxplot fencer
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 S3, [analytics-kernel § Distribution Steps](../analytics/spec.md#distribution-steps)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 S3, [analytics-kernel § Distribution Steps](../analytics/spec-analytics.md#distribution-steps)).*
 
 **Function.** Every row gains its group's outlier figures and a **true/false flag**: is this number unusual for its
 own group (its region, its customer)?
@@ -829,7 +829,7 @@ SUCCESS, 14 rows as its `probes.txt` states).
 
 ## `binning` → `transform.data.binning` — Histogram & quantile binner
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 S3, [analytics-kernel § Distribution Steps](../analytics/spec.md#distribution-steps)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 S3, [analytics-kernel § Distribution Steps](../analytics/spec-analytics.md#distribution-steps)).*
 
 **Function.** Every row gains a **bin number** (0 … bins − 1) and a **label** (`[lower, upper)`) for a number column —
 amount bands, age bands, deciles.
@@ -881,7 +881,7 @@ the same `RowShaper` arm · (4) palette `addable` · (5) Base, every edition · 
 
 ## `correlation` → `transform.stats.correlation` — Pearson correlation & linear regression
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 S3, [analytics-kernel § Distribution Steps](../analytics/spec.md#distribution-steps)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 S3, [analytics-kernel § Distribution Steps](../analytics/spec-analytics.md#distribution-steps)).*
 Catalog `transform.stats.correlation` is **DELIVERED**: Pearson (default) and Spearman (`method: spearman`, 2026-10-18).
 
 **Function.** How strongly two number columns move together, and the straight line that fits them — per group, for
@@ -1003,7 +1003,7 @@ execution-free DESCRIBE); only a DuckDB binder 422 blocks Apply. In the editor t
 views — a **Fields** grid over the function catalog and the **SQL** — with the bounded reconciler
 (projections only, catalog templates matched in reverse and re-compiled to prove the round-trip, the
 rest kept verbatim as custom rows; a `WHERE`/`JOIN` disables the Fields tab with the reason)
-([ETL user guide](user-guide.md) §8.2).
+([ETL user guide](user-guide-elt.md) §8.2).
 
 **Configuration.**
 
@@ -1234,7 +1234,7 @@ exactly one branch is the default, and a duplicated database refuses (rows would
 A branch may chain its own `steps[]` (filter · consignment-scope dedup · summarize) before its sink.
 Route lives on the **ingest lane** (the branch-aware executor gives each branch key its own sink), so
 the at-rest lift refuses a route step; switching a branch's sink off *parks* its rows for a later
-*drain* ([step-park-drain](spec-pipeline.md)). Multi-schema pipelines cannot arm a route.
+*drain* ([step-park-drain](spec-pipeline-execution.md)). Multi-schema pipelines cannot arm a route.
 
 **Configuration.** The contract exposes `mode`; keys, predicates and destinations are the branch rows:
 
@@ -1458,7 +1458,7 @@ the declared ones also from its `ConfigSpecs` spec.
 **Function.** Runs hand-written SQL over a Pipeline's committed Stage-1 output joined to named
 references, and writes an enriched store. The canvas `enrichment` node is **companion-persisted**: its
 truth is the `*_enrich.toon`, which `PipelineEditable.lower` ignores
-([pipeline-editor § The enrichment Step](user-guide.md)).
+([pipeline-editor § The enrichment Step](user-guide-elt.md)).
 Parser: `EnrichmentConfig.fromMap`. Spec: `ConfigSpecs.enrichment()`, censused one level down
 (`AcceptedConfigKeys`, `EnrichmentKeyCoverageContractTest`).
 
@@ -1484,7 +1484,7 @@ Parser: `EnrichmentConfig.fromMap`. Spec: `ConfigSpecs.enrichment()`, censused o
 target's at-rest Parquet. A FAILED check opens a deduplicated `expectation:<name>` Incident and emits
 `EXPECTATION_FAILED`. It is authored through `/expectations*` and persisted as an `expectation` component
 under `<write-root>/registry` (`ExpectationRoutes`). It is never a chain Step.
-[ingestion § Expectations](plan.md). Parser:
+[ingestion § Expectations](plan-elt.md). Parser:
 `Expectation.fromMap`. Spec: `ConfigSpecs.expectation()`, the same twenty-two keys (the last eight are the
 `baseline` kind's — [observability § Baseline Expectations](../observability/plan-observability.md#310-baseline-expectations-duckle-c8-2026-09-24)).
 
@@ -1541,7 +1541,7 @@ four disjoint shapes, chosen by which keys are present:
 at all is moved to `dirs.quarantine`, under a reason sub-directory: `field_mismatch/`, `unreadable/`,
 `corrupt_download/` or `retry_exhausted/`
 ([operations-reference § Quarantine](../../layer/platform/admin-guide-operations-reference.md#quarantine),
-[output-sinks § Quarantine outcomes](spec-pipeline.md#quarantine-outcomes)). The rows a
+[output-sinks § Quarantine outcomes](spec-sinks.md#quarantine-outcomes)). The rows a
 parse rejects drain to `<dirs.errors>/<base>_errors.csv`. The lift models a quarantine *node* (a
 `sink.persistent` carrying `dir`, never `database`) only for selector/segments pipelines. Otherwise the
 directory has no owning node, and a save preserves it.
@@ -1567,7 +1567,7 @@ palette (*"Not yet available"*): no engine code, no config keys; adding one is a
 a `BuiltinNodeType.FlatHome` declaration on the enum case (since `NODE-TYPE-MIRRORS-1`, 2026-09-15, this is
 where `PipelineEditable` derives LOWERABLE and STEP_KIND from — they are no longer hand-kept lists) plus the
 lift/lower code that home names, and the runtime steps→graph seam — the
-four registrations [catalog-vs-executors](spec-pipeline.md) names). The board's
+four registrations [catalog-vs-executors](spec-pipeline-model.md) names). The board's
 edition cells and the two Enterprise-only rows live in `tools/render-processor-board.mjs`.
 
 ✅ **"Delivered" now means "releasable" — the bar is adopted** (`PROCESSOR-RELEASE-READINESS-1`; audit
@@ -1582,7 +1582,7 @@ committed Space config, or, where infrastructure is unavoidable, an `examples/_r
 true by `ShippedExamplesPassTheSaveGateTest`. A processor that cannot meet a point is **PARTIAL**, not
 DELIVERED with a footnote. Earlier gap groups G1, G3–G8 and G11 closed 2026-09-23 (catalog↔docs drift, one
 `SaveGate`, save-time step checks — [config safety](../config/spec-config-safety.md#step-config-checks-g4) —,
-dry-run blind spots — [pipeline test run](spec-pipeline.md)).
+dry-run blind spots — [pipeline test run](spec-pipeline-execution.md)).
 
 **Verdicts on the seven "questionably delivered" (2026-09-24).** ✓ met · ✗ not met · — no keys to get wrong ·
 column 5 = edition gating (G9, closed 2026-09-24 — see *Edition notes* below): *all* = every edition, as the board says.
@@ -1955,11 +1955,11 @@ file to `archive/archive/…`).
 - **Every delivered Step kind keeps its example runnable** — `inspecto/examples/07-steps` and
   `spaces/default/config/<kind>_step`. Run `bash inspecto/examples/run-example.sh 01-ingest/hello-csv`
   after touching the path jail or the launchers: the examples sit outside every test.
-- Related: [pipeline-graph-design](architecture.md) (the model) ·
+- Related: [pipeline-graph-design](architecture-elt.md) (the model) ·
   [pipeline-config-keys](../config/spec-pipeline-config-keys.md) (who reads every block) ·
-  [execution-lanes](spec-pipeline.md) · [catalog-vs-executors](spec-pipeline.md) ·
-  [pipeline-editor](user-guide.md) (the palette and panes) ·
-  [job-vs-step](../processor/architecture.md) (why some catalog entries are Jobs, not Steps).
+  [execution-lanes](spec-pipeline-execution.md) · [catalog-vs-executors](spec-pipeline-model.md) ·
+  [pipeline-editor](user-guide-elt.md) (the palette and panes) ·
+  [job-vs-step](../processor/architecture-processor.md) (why some catalog entries are Jobs, not Steps).
 
 ## Adding a node type — what is declared once, what is derived, what is legitimately separate (2026-09-15)
 

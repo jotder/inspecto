@@ -14,7 +14,7 @@ timestamp: 2026-10-10T00:00:00Z
 > Professional, Enterprise and Preview; not Personal — D-AD4). It depends on `inspecto-entity-list`
 > (`requires.modules: entity-list`) and **not** on `inspecto-scoring`: the pieces it shares with
 > [Risk Scores](../scoring/spec-risk-scores.md) are extracted, never copied (D-AD5, fulfilled 2026-10-17 by ANALYTICS-CORE-1 M7):
-> the score output contract is in the Analytics Kernel (D-AN6, [Score output contract](../analytics/spec.md#score-output-contract))
+> the score output contract is in the Analytics Kernel (D-AN6, [Score output contract](../analytics/spec-analytics.md#score-output-contract))
 > and its writer `com.gamma.alert.ScoreOutputWriter` in the engine. Without the module `/anomaly-scores*` answers 503
 > and an `anomaly-model` component is unknown to the SPA, which then hides every anomaly surface.
 > Built 2026-10-10 in slices S1..S5 (`ANOMALY-DETECTION-1`); the design and its lane notes are archived at
@@ -105,7 +105,7 @@ wording; **confirmed by the operator 2026-10-11**, no change. The peers join `ke
 
 Job Type `anomaly.score` (`AnomalyScoreJobType`; params `model`, optional `as_of` YYYY-MM-DD, UTC days)
 scores the day before `as_of` over a `window` that excludes it. `AnomalyScoreEvaluator` issues one grouped
-DuckDB statement per Feature (day grain); the pure maths is `AnomalyScorer` plus `com.gamma.analytics.baseline` (the Analytics Kernel, [analytics-kernel](../analytics/spec.md)).
+DuckDB statement per Feature (day grain); the pure maths is `AnomalyScorer` plus `com.gamma.analytics.baseline` (the Analytics Kernel, [analytics-kernel](../analytics/spec-analytics.md)).
 
 - **Self baseline** (`BaselineStatistic` seam ← `BaselineStatistics.forModel`; `SeasonalBaseline`):
   median and `MAD × 1.4826` of the same-slot buckets, walking the fallback chain `weekday → none` until a
@@ -270,7 +270,7 @@ so the tile reads an absent store until the Job's first run; its masking and top
 the LA panel's Risk Score model gate. The pack goldens are property tests (2026-10-12). The ML scorer is BUILT (`ANOMALY-ML-SCORING-1`,
 2026-10-18, form closed 2026-10-20): `method: isolation_forest` on the model (`AnomalyForestScorer`; the form authors
 `method` and the forest's `trees` / `sampleSize` / `seed`); the AML pack model `aml_account_transfers` ships on it, while
-telco-fraud and mobile-money stay on the robust scorer. Facts: [plan](plan.md), [analytics spec](../analytics/spec.md). (Shipped 2026-10-11 and removed from this list: refusing a classified cohort column at save;
+telco-fraud and mobile-money stay on the robust scorer. Facts: [plan](plan-anomaly.md), [analytics spec](../analytics/spec-analytics.md). (Shipped 2026-10-11 and removed from this list: refusing a classified cohort column at save;
 Feature `filters` / `unit` fields; unsaved-content preview; NULL as its own `peers.by` cohort value with a
 collision-free key.)
 

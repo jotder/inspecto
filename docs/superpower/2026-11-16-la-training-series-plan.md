@@ -7,7 +7,7 @@
 > to use Inspecto LA; group the videos by category; the user guide helps but may not be complete; the intention of each
 > tool is said in the voice, and the graph changes caused by each action are shown."*
 >
-> This plan was built from: the user guide [`okf/product/module/la-core/user-guide.md`](../okf/product/module/la-core/user-guide.md)
+> This plan was built from: the user guide [`okf/product/module/la-core/user-guide-la-core.md`](../okf/product/module/la-core/user-guide-la-core.md)
 > (§1–§17), a control-by-control inventory of the la-app and link-analysis sources taken 2026-11-16 (summarised in §5), and
 > the production pipeline that made the 20 case videos the same week (`tools/record-la-live.mjs`,
 > `tools/render-la-demo-video.mjs`, scripts in `okf/product/module/la-core/brochure-video-demo-*.md`).

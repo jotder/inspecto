@@ -71,15 +71,15 @@ Script: `tools/doc-diagrams/journey-alert-to-case.py`.
 
 ## Related modules
 
-[events](../../module/event/architecture.md) ·
-[alerts](../../addon/incidents/architecture.md) ·
-[decision-kernel](../../module/scoring/architecture.md) ·
-[incidents](../../addon/incidents/architecture.md) ·
-[case-management](../../module/case-management/architecture.md) ·
-[action-requests](../../module/action-requests/architecture.md) ·
-[workflow-sla](../../module/workflow/architecture.md) ·
-[notifications](../../module/notify-channels/architecture.md) ·
+[events](../../module/event/architecture-event.md) ·
+[alerts](../../addon/incidents/architecture-incidents.md) ·
+[decision-kernel](../../module/scoring/architecture-scoring.md) ·
+[incidents](../../addon/incidents/architecture-incidents.md) ·
+[case-management](../../module/case-management/architecture-case-management.md) ·
+[action-requests](../../module/action-requests/architecture-action-requests.md) ·
+[workflow-sla](../../module/workflow/architecture-workflow.md) ·
+[notifications](../../module/notify-channels/architecture-notify-channels.md) ·
 [platform-services](../platform/architecture-platform-services.md) ·
-[identity-access](../../module/access/architecture.md)
+[identity-access](../../module/access/architecture-access.md)
 
 Concept: [incidents](../../addon/incidents/plan-incidents.md)

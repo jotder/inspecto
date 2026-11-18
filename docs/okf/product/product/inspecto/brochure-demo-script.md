@@ -21,4 +21,4 @@ Inspecto has no demo Space: demo it on a trial or production install, over a Spa
 
 ## Close
 
-Editions: [Basic](../../edition/basic/index.md) · [Standard](../../edition/standard/index.md) · [Advanced](../../edition/advanced/index.md) · [Preview](../../edition/preview/index.md). Distributions: production, trial, demo, pilot. The [datasheet](features.md) says which Apps each Edition can carry.
+Editions: [Basic](../../edition/basic/index.md) · [Standard](../../edition/standard/index.md) · [Advanced](../../edition/advanced/index.md) · [Preview](../../edition/preview/index.md). Distributions: production, trial, demo, pilot. The [datasheet](features-inspecto.md) says which Apps each Edition can carry.

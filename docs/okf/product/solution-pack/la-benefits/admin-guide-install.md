@@ -10,7 +10,7 @@ timestamp: 2026-11-08T00:00:00Z
 
 The showcase ships as three downloads that unzip **side by side** into one folder you choose (`<parent>`), so the
 product can be upgraded without touching the Space or its data. It runs on every edition, Basic included. Layout
-and seams: [showcase distribution and install layout](../la-showcase/architecture.md#distribution-and-install-layout)
+and seams: [showcase distribution and install layout](../la-showcase/architecture-la-showcase.md#distribution-and-install-layout)
 and the [configuration reference](../../module/config/admin-guide-configuration-reference.md) (`spaces.ref`, `data_root`).
 
 | Download | File | Unzip into |
@@ -61,7 +61,7 @@ Job runs. Within a minute or two:
 - `inspecto-la-data/la-benefits/data/benefits_links/` holds the link Dataset (about 39 000 rows, six kinds);
   `benefits_screen_links/` holds the four integrity screens the saved views read.
 - In Link Analysis, **File ▸ Open… ▸ Saved views** lists `address_farm`, `paid_after_death`,
-  `undeclared_work` and `tax_preparer_refund_ring`. The [user guide](user-guide.md) has the tour
+  `undeclared_work` and `tax_preparer_refund_ring`. The [user guide](user-guide-la-benefits.md) has the tour
   and the exercises.
 
 The Space folder holds only configuration; all runtime state (`data/`, `audit/`, `duckdb/`) is written under

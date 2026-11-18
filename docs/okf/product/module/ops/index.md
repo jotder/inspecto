@@ -11,17 +11,17 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.ops`](../../../../../product-map/module/ops.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Case management and objects — plan of record](plan.md) |
-| spec | current | [Case management and objects — implementation spec](spec.md) |
-| architecture | current | [Case management and objects — architecture](architecture.md) |
-| features | current | [Case management and objects — features](features.md) |
+| plan | current | [Case management and objects — plan of record](plan-ops.md) |
+| spec | current | [Case management and objects — implementation spec](spec-ops.md) |
+| architecture | current | [Case management and objects — architecture](architecture-ops.md) |
+| features | current | [Case management and objects — features](features-ops.md) |
 | feature-db | current | [Case management and objects — feature database](feature-db.md) |
 | user-guide | current | [Incidents & Cases (Objects)](user-guide-objects.md) |
-| admin-guide | current | [Case management and objects — admin guide](admin-guide.md) |
+| admin-guide | current | [Case management and objects — admin guide](admin-guide-ops.md) |
 | api | current | [HTTP routes — module.ops](api-routes.md) |
 | tests | current | [Case management and objects — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

@@ -13,8 +13,8 @@ timestamp: 2026-11-18T00:00:00Z
 system, decides which files are new and complete, fetches each one exactly once and lands it in a Pipeline's
 inbox, and how a compressed or archived file is unpacked into plain files on the way. Part 1 is the original
 requirement in its own words; Part 2 is the engine as built, with its traps; Part 3 is the Unpack stage.
-What is still open, what was decided and what was refused is in [the plan](plan.md); the screens are in
-[the user guide](user-guide.md).
+What is still open, what was decided and what was refused is in [the plan](plan-elt.md); the screens are in
+[the user guide](user-guide-elt.md).
 
 **Contents**
 
@@ -51,7 +51,7 @@ What is still open, what was decided and what was refused is in [the plan](plan.
 > **The requirement of record, kept for the wording of its 14 numbered areas.** *(Moved from the retired
 > root-level `data_acquisition_framework.md` (docs consolidation, 2026-07-16); merged here 2026-11-18.)*
 > **The framework is built — Phases A–F have all shipped on `master`.** What is built is Part 2; what is left
-> and what was refused is [the plan](plan.md) (the in-process NFS/SMB client is a **declined** design, not a
+> and what was refused is [the plan](plan-elt.md) (the in-process NFS/SMB client is a **declined** design, not a
 > pending one — mount the share and use `local`). The original phase roadmap is archived at
 > [`2026-06-14-data-acquisition-framework-roadmap.md`](../../../../archived-documents/superpowers/specs/2026-06-14-data-acquisition-framework-roadmap.md),
 > and the operator-facing config/runbook are
@@ -288,7 +288,7 @@ drift from the code comments, not the reverse. ⚠ `inspecto/examples/README.md`
 
 ⚠ The boundary that is easy to get wrong: **acquisition never widens to "read from N places at once."**
 Multi-location ingest is composition of existing pieces — see
-[multi-location ingest](architecture.md#multi-location-ingest--the-composition-pattern).
+[multi-location ingest](architecture-elt.md#multi-location-ingest--the-composition-pattern).
 
 ## The poll cycle and its two timers
 
@@ -417,7 +417,7 @@ Implementations: `InMemoryAcquisitionLedger` (**default — lost on restart**) a
 `inspecto_acquisition_ledger` and `inspecto_acquisition_db_watermark`
 (`DbAcquisitionLedger.TABLE`, `.WM_TABLE`). `AcquisitionLedgers` is the per-space `shared()` accessor + lifecycle
 manager — one of the five MDC-routed singletons. Dedup keys are SHA-256 hashed in the ledger (decision
-2026-09-01, [plan](plan.md)).
+2026-09-01, [plan](plan-elt.md)).
 
 🔴 **`DuplicatePolicy` is TWO orthogonal enums, not one list.** The retired `framework.md` stated the modes as
 "PATH / METADATA / CHECKSUM / SKIP / REPROCESS / VERSION / FAIL", which conflates the detection axis with
@@ -442,7 +442,7 @@ defaults when the block is present (`PipelineConfigParser.parseCollector`). `alg
 which is JDK-only (`MessageDigest`/`CRC32`), streams in 64 KB chunks, returns lowercase hex, and accepts
 `MD5`, `SHA1`, `SHA256` (default), `SHA512`, `CRC32` with or without the dash. A feed that must let a
 corrected same-name file land uses `mode: checksum` + `on_change: reprocess` (worked example: the daily feed in
-[the ETL user guide](user-guide.md#113-daily-feeds--the-template-the-export-contract-and-delivery-checks)).
+[the ETL user guide](user-guide-elt.md#113-daily-feeds--the-template-the-export-contract-and-delivery-checks)).
 
 **Collection guarantee.** `collector.guarantee` → `BEST_EFFORT` (default) | `AT_LEAST_ONCE` |
 `EXACTLY_ONCE` (`PipelineConfig.Guarantee`; both dash and underscore spellings parse). `requiresLedger()`
@@ -510,7 +510,7 @@ Two optional keys beside it (operator, 2026-10-06) — `file_template` (one date
 e.g. `CDR_{yyyyMMddHH}_{seq}_*`, or date-only `XDR_{yyyyMMdd}.csv` = one expected file per date bucket) and
 `seq_scope` (`PER_BUCKET` | `CONTINUOUS`, required when the template holds `{seq}`, refused when it does not;
 operator, 2026-10-06) — are read by the `kpi.completeness` job to count missing files and by the delivery check
-(per-day manifest + windowed `SEQUENCE_GAP`, [the ETL user guide](user-guide.md#113-daily-feeds--the-template-the-export-contract-and-delivery-checks)).
+(per-day manifest + windowed `SEQUENCE_GAP`, [the ETL user guide](user-guide-elt.md#113-daily-feeds--the-template-the-export-contract-and-delivery-checks)).
 `sequence` and `GapDetector` are unchanged. See [observability §3.9](../observability/plan-observability.md).
 
 ## Phase E — retrieval: plan once, stage, then land
@@ -664,7 +664,7 @@ consumed frontier rides the ledger watermark, persisted only after the batch com
 mid-ingest re-drains the slice rather than skipping it). Broker consumer groups stay out by operator decision
 (STREAM-CONSUMER-1 Q4, 2026-09-24): one offset store, fewer ACLs, no broker-visible lag. The loop is the
 Collector scan, plus — since ASSURE-PUSH-INGEST-1 (2026-09-29) — the continuous lane below for a Pipeline that
-opts in with `trigger: {type: stream}`. The Kafka module itself: [connectors-kafka](../connectors-kafka/spec.md).
+opts in with `trigger: {type: stream}`. The Kafka module itself: [connectors-kafka](../connectors-kafka/spec-connectors-kafka.md).
 
 **One uncommitted slice per partition — the in-flight fence (STREAM-CONSUMER-1, 2026-09-24).** With split
 acquire and ingest timers, a second acquisition cycle before the commit read the same stored frontier and
@@ -692,7 +692,7 @@ of scope by design. The default `options.payload: envelope` already carries `top
 weighed. (A) the scheduler's acquisition tick, hardened — **built**; its latency floor is the acquisition
 cadence, or a `POST /collectors/{id}/notify` wake-up. (B) a continuous `trigger: stream` lane in
 `PipelineScheduler` — **deferred** at the time, then built (below). (C) a long-running Job — **refused**
-([plan](plan.md)). The at-least-once fixes (Phase E and the fence) were needed under every
+([plan](plan-elt.md)). The at-least-once fixes (Phase E and the fence) were needed under every
 option, so they landed inside the row rather than as a separate P1 (Q1).
 
 **The continuous lane — option B, built (ASSURE-PUSH-INGEST-1, 2026-09-29).** D-P7 named the target the
@@ -748,7 +748,7 @@ differently or not at all:
   the 5 forms and omitted this gate; its current text is correct — prefer it over any older account.
 - Only `ConnectionRegistry.find` is consulted at `forConfig` time; a missing profile yields `null` and the
   factory decides. Since 2026-09-25 a remote Collector whose `collector.connection` names no profile in the
-  Space is an ERROR finding at save ([plan](plan.md)).
+  Space is an ERROR finding at save ([plan](plan-elt.md)).
 - **Proxy precedence.** A proxy is **ignored when an SSH `tunnel:` is also configured**, because the tunnel
   already rewrites the dial target to a local loopback forward. Fail-closed on what cannot be routed: an
   unrecognised proxy `type`, a JDBC driver other than PostgreSQL, and a proxy combined with an SSH tunnel on
@@ -824,7 +824,7 @@ the security boundary. To collect from a share: mount it at the OS level (Window
 the jail via `-Dassist.safety.roots=<existing roots>;X:\` (a `;`-separated list), and point `dirs.poll` (or
 `base_path`) at the mounted path. The built-in `local` connector then handles discovery / stability / dedup
 identically to a local inbox, and credentials, reconnection and caching stay the OS's job, where they are
-audited and battle-tested. Why it is refused: [plan](plan.md).
+audited and battle-tested. Why it is refused: [plan](plan-elt.md).
 
 ## Defaults worth not "fixing"
 
@@ -844,7 +844,7 @@ consignment `order` **`mtime`** · stability `window` **`30s`** / `size_checks` 
 > files *before* Consignments are planned, and the run-level ledger that reports what became of each
 > Archive. Shipped `d6cd55b7` (2026-08-23); honesty fixes `fe6e1d7e` and the ledger 2026-08-26.
 > Plan (archived, complete): [`archived-documents/plans-archive/unpack-stage-plan.md`](../../../../archived-documents/plans-archive/unpack-stage-plan.md).
-> Related: [`spec-ingest.md`](spec-ingest.md) (ingest and parsing) · [`architecture.md`](architecture.md)
+> Related: [`spec-parsing.md`](spec-parsing.md) (ingest and parsing) · [`architecture-elt.md`](architecture-elt.md)
 
 Vocabulary (`GLOSSARY.md`): an **Archive** is a container file; an **Entry** is one inner file — ⛔ never
 *member* (a Member is a file in a Consignment); **Unpack** is the Collector-level stage that turns Archives and
@@ -1081,11 +1081,11 @@ compressed spelling of that logical name has been processed.
 
 | Mechanism | Owning file |
 |---|---|
-| Plan of record — requirements, decisions, open work, refusals, verification | [plan.md](plan.md) |
-| Poll cycle, phases A–F summary, the Collectors module page, multi-location ingest | [architecture.md](architecture.md) |
+| Plan of record — requirements, decisions, open work, refusals, verification | [plan-elt.md](plan-elt.md) |
+| Poll cycle, phases A–F summary, the Collectors module page, multi-location ingest | [architecture-elt.md](architecture-elt.md) |
 | Connector SPI, the remote schemes, stage-then-land, profiles, secrets, workbench, proxy chain | [connectors/spec-connectors.md](../connectors/spec-connectors.md) |
-| The Kafka connector, its fence and stream lane | [connectors-kafka/spec.md](../connectors-kafka/spec.md) |
+| The Kafka connector, its fence and stream lane | [connectors-kafka/spec.md](../connectors-kafka/spec-connectors-kafka.md) |
 | Operator runbook: profile YAML, host-key table, FTPS, bastion, db-export | [connectors/admin-guide-connectors-runbook.md](../connectors/admin-guide-connectors-runbook.md) |
-| Module boundary + dependency confinement of the connectors jar | [connectors/architecture.md](../connectors/architecture.md) |
+| Module boundary + dependency confinement of the connectors jar | [connectors/architecture.md](../connectors/architecture-connectors.md) |
 | Consignments, the ingest strategies and commit order that consume the landed inbox | [spec-ingest.md](spec-ingest.md) (Part I ingest, Part II Consignments) |
-| Screens and the Collector configuration surface | [user-guide.md](user-guide.md) |
+| Screens and the Collector configuration surface | [user-guide-elt.md](user-guide-elt.md) |

@@ -80,7 +80,7 @@ Declares: **spec** = `FieldSpec` in `ConfigSpecs.pipeline()`; **parser-only** = 
 | `processing` | spec block (see next table) | ingest runtime | Parse drawer + per-key surfaces below |
 | `output` | spec (`format`/`compression`/`filename_column`) | ingest strategies / `PartitionWriter` | sink node config |
 | `output_store` | spec (since 2026-08-31, gap 8) | `PipelineConfig.prepare()` **arming condition** for `steps:`/`dedup`/`summarize`/`join`/`webhook`/`excel`; `PipelineLift.stageTwo`; `SchedulerAuditTask` orphan report | hand / schema form; required to arm a Stage-2 chain (`stage-two-blocks-require-output-store`, ERROR at save) |
-| `sinks` | spec — a list of objects: `FieldSpec.listOf` with an item spec (`database` required; `format`/`compression`/`filename_column`/`ducklake.*` optional, since an omitted key inherits `output:`), so a non-list, a non-map entry or an entry with no `database` is a 422 at save rather than a load-time throw ([output-sinks](../elt/spec-pipeline.md)) | `IngestSinkWriter` / `ConsignmentGraphRunner` — `database` is the branch↔sink join key | canvas (multiple destinations) |
+| `sinks` | spec — a list of objects: `FieldSpec.listOf` with an item spec (`database` required; `format`/`compression`/`filename_column`/`ducklake.*` optional, since an omitted key inherits `output:`), so a non-list, a non-map entry or an entry with no `database` is a 422 at save rather than a load-time throw ([output-sinks](../elt/spec-sinks.md)) | `IngestSinkWriter` / `ConsignmentGraphRunner` — `database` is the branch↔sink join key | canvas (multiple destinations) |
 | `route` | parser-only | `ConsignmentGraphRunner` — branch-aware **ingest lane only**; refused inside `steps:` by both paths | canvas route node + branch predicates |
 | `steps` | parser-only — **entry kept deliberately** (no item-schema facility; declaring it would game the ratchet) | `PipelineLift` authored-order chain → at-rest `pipeline_config:` job | Recipe view step cards (`<app-pipeline-step-cards>`) |
 | `trigger` | parser-only | `PipelineScheduler` (`every:`/`cron:` per-tick gate); dataset-commit trigger (`on:dataset`) | canvas trigger nodes (`trigger__every`/`trigger__cron` borrow the top-level keys); `trigger.type` is derived |
@@ -114,7 +114,7 @@ Parser-only (10):
 | `processing.join` | at-rest chain | node drawer |
 | `processing.summarize` | at-rest chain | node drawer |
 | `processing.map` | `RowShaper.columnsOf`/`mappingSchemaOf` — **executes on the live ingest graph executor**, unlike its three neighbours; authored `columns`/`rules` vs derived `schema`/`csv` split pinned by `MapNodeKeyContractTest` | map node dialog; never a `steps:` kind |
-| `processing.disabled_steps` | `StepDisableArming` / `PipelineLift` overlays `enabled: false` — park-and-drain ([step-park-drain](../elt/spec-pipeline.md)) | **product-derived** on save from node enabled state |
+| `processing.disabled_steps` | `StepDisableArming` / `PipelineLift` overlays `enabled: false` — park-and-drain ([step-park-drain](../elt/spec-pipeline-execution.md)) | **product-derived** on save from node enabled state |
 | `processing.duplicate_check` | marker-file dedup on the local poll path (`CollectorProcessor`) — ⚠ the `collector.duplicate:` block is a no-op there | guided create derives it silently; hand |
 | `processing.schemas` | `SchemaSelector` two-pass multi-schema dispatch (file-pattern fast path, column-count probe) — replaces `schema_file` | hand-authored only |
 | `processing.segments` | plugin-ingester segment→schema map (`StreamingPluginIngestStrategy`); required non-empty when `ingester` is set | hand-authored only |
@@ -160,7 +160,7 @@ Falsification-probed: forcing the gate open turns the test red. Row `VALIDATE-CS
 A `transform.sql` Step has **no `processing.*` block** — its flat-config home is an explicit `steps:` entry
 of kind `sql` (`PipelineEditable` LOWERABLE + STEP_KIND, `c119a6af`), and since 2026-09-04 it is also a
 **recipe verb** (`sql`, between `transform` and `summarize`; `RecipeCompiler`/`RecipeConverter`
-round-trip it, see [`catalog-vs-executors.md`](../elt/spec-pipeline.md)). Like any explicit
+round-trip it, see [`catalog-vs-executors.md`](../elt/spec-pipeline-model.md)). Like any explicit
 chain, an ACTIVE pipeline carrying one must declare top-level `output_store:`
 (`PipelineConfig.prepare()`), and mid-branch inside `route:` it compiles but does not arm
 (`RouteArming.BRANCH_STEP_KINDS` excludes it — a save-time finding, deliberate). Its node config carries **`sql`** — the one declared attribute (`NodeAttributes.TRANSFORM_SQL`,
@@ -179,7 +179,7 @@ dropped on save, which is the failure both constants exist to make impossible."*
 client mirror `pipeline-editable.ts` carrying two keys where `PipelineEditable.MAP_AUTHORED` carries
 three — the drift recorded in `pipeline-authoring.md` §2 (that mirror was deleted 2026-09-24). ⚠ Its absence also no longer means a locked table: the
 “hand edit LOCKS the Step” rule was superseded 2026-09-05 by the peer Fields|SQL views. Details:
-[`catalog-vs-executors.md`](../elt/spec-pipeline.md).
+[`catalog-vs-executors.md`](../elt/spec-pipeline-model.md).
 
 ## Retired utility-only sections
 

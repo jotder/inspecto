@@ -11,17 +11,17 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.regulatory-reporting`](../../../../../product-map/module/regulatory-reporting.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Regulatory Reporting — requirement of record](plan.md) |
-| spec | current | [Regulatory Reporting — regulator-format reports from Cases, four-eyes, file drop](spec.md) |
-| architecture | current | [Regulatory Reporting](architecture.md) |
+| plan | current | [Regulatory Reporting — requirement of record](plan-regulatory-reporting.md) |
+| spec | current | [Regulatory Reporting — regulator-format reports from Cases, four-eyes, file drop](spec-regulatory-reporting.md) |
+| architecture | current | [Regulatory Reporting](architecture-regulatory-reporting.md) |
 | features | current | [Regulatory Reporting — features](features-regulatory-reporting.md) |
 | feature-db | current | [Regulatory Reporting — feature database](feature-db.md) |
 | user-guide | current | [Regulatory Reporting — screens](user-guide-regulatory-reporting.md) |
-| admin-guide | current | [Regulatory Reporting — admin guide](admin-guide.md) |
+| admin-guide | current | [Regulatory Reporting — admin guide](admin-guide-regulatory-reporting.md) |
 | api | current | [Regulatory Reporting — API](api-regulatory-reporting.md) · [HTTP routes — module.regulatory-reporting](api-routes.md) |
 | tests | current | [Regulatory Reporting — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

@@ -100,6 +100,6 @@ Verdict: **the tail goes with the first job burst after boot.** N10 did not remo
   SPA decodes in `edge-wire.ts` BEFORE its conditional-read cache. Measured: raw bytes −41 %, gzip only −1 to −7 %, no
   server or parse-time change (gzip had already removed the repetition). `columnTypes` is not cached (no measured cost).
 - **N9 decision:** audit append stays per-event durable; the Parquet flush moved off the lock as journal segments
-  ([`../event/architecture.md`](../event/architecture.md)). The first-job-burst-after-boot tail is accepted as a cold-start cost.
+  ([`../event/architecture-event.md`](../event/architecture-event.md)). The first-job-burst-after-boot tail is accepted as a cold-start cost.
 - History and every run: `archived-documents/plans-archive/la-performance-plan.md`. Browser side and the measured
-  no-gos: [`../la-core/spec.md#performance`](../la-core/spec.md#performance).
+  no-gos: [`../la-core/spec-la-core.md#performance`](../la-core/spec-la-core.md#performance).

@@ -9,7 +9,7 @@ timestamp: 2026-11-15T00:00:00Z
 
 # Link Analysis — HTTP surface and Investigation UI
 
-Section numbers are those of [architecture.md](architecture.md), which keeps the route table (§6). Sections
+Section numbers are those of [architecture-la-core.md](architecture-la-core.md), which keeps the route table (§6). Sections
 §6.10-§6.13 and §6.15-§6.20 are in [architecture-data-onboarding.md](architecture-data-onboarding.md).
 
 - **HTTP surface:** [§6.1 Gate order](#61-gate-order-for-an-inv-request) · §6.2 Embed links · §6.3 Entity profile
@@ -103,13 +103,13 @@ Plan archived: [`la-entity-profile-plan`](../../../../archived-documents/plans-a
   D-LAE4), `GET /inv/entity-types/{id}/profile?sections=` (bindings, volume, shapes, time, lineage, links, relationships,
   measures - [architecture-data-onboarding.md](architecture-data-onboarding.md) §6.15) and
   `GET /inv/entities/{type}/{key}/profile`. Audit events `LINK_ENTITY_*` (three).
-* **A raw identifier never travels in a URL** (the rule, the resolve POST and the type-ahead: [architecture.md](architecture.md#34-masking)
+* **A raw identifier never travels in a URL** (the rule, the resolve POST and the type-ahead: [architecture-la-core.md](architecture-la-core.md#34-masking)
   §3.4 *Entity profiles*). Type pages are aggregates only (D-EP3): a dominant value is reported as
   `kind:"dominant"`, `value:null`; only the built-in sentinels (`''`, `-99`, `0`, `NULL`, `null`, `unknown`, `n/a`) are shown by value.
   **Dominance counts a value the normaliser rejects by its raw (trimmed) text (2026-10-18)**, so a name filling a number column still
   raises the sentinel (seen on the IMS Space); built-in sentinels and blanks never dominate. The SPA never rounds a share short of
   all up to 100 % (`percent()` caps it at 99.9 %: a 99.95 % one-to-one share sat beside a maximum of 15 per Entity).
-* **Bindings** (`EntityTypeBindings`, one Entity = the normalised typed key `EntityKeySql`, D-EP5: [architecture.md](architecture.md#34-masking)
+* **Bindings** (`EntityTypeBindings`, one Entity = the normalised typed key `EntityKeySql`, D-EP5: [architecture-la-core.md](architecture-la-core.md#34-masking)
   §3.4 *Entity profiles*); a column no link end names has `role` `attribute`.
   **Parties (2026-10-16):** a Dataset column may carry `party` (free text, trimmed, lower-case; the binding shows it). Relationships
   and an Entity's related identifiers pair two columns of a row only when their parties match or either has none, so a served IMSI
@@ -196,7 +196,7 @@ surface). Outbound (case hand-off, webhooks, client-credentials trust) is a sepa
   `{entity?: {type, key, masked}, investigation?: {id, title}, window?}`; an Investigation the caller cannot read is the 404 of absence.
   `reveal:true` returns a masked entity's raw value only to a holder of `canRevealLinkEntities` (403 otherwise), audited as
   `LINK_ENTITY_REVEALED` with `via: deep-link` naming the alias as `alias` and as the row's target (never as `tokens`, which the
-  event sink's `SecretScrubber` redacts; LA-DEEPLINK-REVEAL-AUDIT-1, 2026-11-16). Aliases are resolved from the Space's alias book ([architecture.md](architecture.md#34-masking) §3.4), which is
+  event sink's `SecretScrubber` redacts; LA-DEEPLINK-REVEAL-AUDIT-1, 2026-11-16). Aliases are resolved from the Space's alias book ([architecture-la-core.md](architecture-la-core.md#34-masking) §3.4), which is
   persisted beside the Space key, so a deep link still works after a restart (2026-10-19).
 * **Tests:** `ControlApiInvestigationInboundTest` (geo-link, armed Authenticator: seeding and window, idempotency incl. other system /
   id, invalid entity / reference / window / binding 422 with nothing written, 403 / 401 / 409, 503, the deep-link masking and reveal
@@ -350,7 +350,7 @@ Webhook payload example:
 ## 6.8 Category exclusion lists in Investigations (LA-GROW-EXCLUDE-1 phase 4, as built 2026-10-22)
 
 The list side (attributes, `PUT /entity-lists/{id}/attributes`, `canManageExclusionCategories`) is in the entity-list hub
-[spec](../entity-list/spec.md), "Category lists". What Link Analysis does with them:
+[spec](../entity-list/spec-entity-list.md), "Category lists". What Link Analysis does with them:
 
 - **Auto-apply (GE-9).** `InvestigationRoutes.create` reads the fact log and turns every live admin exclusion list with
   `autoApply` (`EntityList.autoApplies()`, creation order) into an `excludeBy` step numbered from 1: params from the same
@@ -405,7 +405,7 @@ The list side (attributes, `PUT /entity-lists/{id}/attributes`, `canManageExclus
 
 The analyst side of the plan (archived:
 [`la-grow-exclude-plan.md`](../../../../archived-documents/plans-archive/la-grow-exclude-plan.md); decisions GE-1…GE-12
-built as recommended). How it reads to a user: [user guide §7](user-guide.md#7-expand-and-clean-up-the-graph) "Expand and clean up the graph".
+built as recommended). How it reads to a user: [user guide §7](user-guide-la-core.md#7-expand-and-clean-up-the-graph) "Expand and clean up the graph".
 
 - **Seams.** `grow-exclude.ts` is the pure half (wording, the request a Grow sends, lists in force, what they removed,
   the hint store); `GrowExcludeStore` (provided beside `InvestigationSessionStore`) holds the session state and the
@@ -488,8 +488,8 @@ built as recommended). How it reads to a user: [user guide §7](user-guide.md#7-
 
 ### 6.9.1 The Investigation tab as one Expand filter (LA-INVESTIGATE-UX-1, SPA, as built 2026-10-31)
 
-How it reads to a user: [user guide §7](user-guide.md#7-expand-and-clean-up-the-graph) and
-[§11.2](user-guide.md#112-the-investigation-tab-act-panel). No server change and no new op.
+How it reads to a user: [user guide §7](user-guide-la-core.md#7-expand-and-clean-up-the-graph) and
+[§11.2](user-guide-la-core.md#112-the-investigation-tab-act-panel). No server change and no new op.
 
 - **One filter, published.** `LinkAnalysisExpandComponent`, embedded in the tab (the explorer's popup never publishes),
   publishes its request to
@@ -617,7 +617,7 @@ How it reads to a user: [user guide §7](user-guide.md#7-expand-and-clean-up-the
 ## 6.14 Studio UI reorganization (LA-STUDIO-UI-REORG-1, as built 2026-10-28)
 
 The Studio was reorganized without removing a function; the layout is described in
-[user-guide.md](user-guide.md#studio-layout-internals-la-studio-ui-reorg-1-phases-1-3-as-built-2026-10-27) *Studio layout*, and the plan with its "nothing removed" map
+[user-guide-la-core.md](user-guide-la-core.md#studio-layout-internals-la-studio-ui-reorg-1-phases-1-3-as-built-2026-10-27) *Studio layout*, and the plan with its "nothing removed" map
 is archived as [`la-studio-ui-reorg-plan`](../../../../archived-documents/plans-archive/la-studio-ui-reorg-plan.md) §6.
 
 - **Decisions (operator interview 2026-10-27, UIR-D1…D16):**

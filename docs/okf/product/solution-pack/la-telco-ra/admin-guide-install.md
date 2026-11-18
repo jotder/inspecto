@@ -10,7 +10,7 @@ timestamp: 2026-11-08T00:00:00Z
 
 The showcase ships as three downloads that unzip **side by side** into one folder you choose (`<parent>`), so the
 product can be upgraded without touching the Space or its data. It runs on every edition, Basic included. Layout
-and seams: [showcase distribution and install layout](../la-showcase/architecture.md#distribution-and-install-layout)
+and seams: [showcase distribution and install layout](../la-showcase/architecture-la-showcase.md#distribution-and-install-layout)
 and the [configuration reference](../../module/config/admin-guide-configuration-reference.md) (`spaces.ref`, `data_root`).
 
 | Download | File | Unzip into |
@@ -61,7 +61,7 @@ Job runs. Within a minute or two:
 - `inspecto-la-data/la-telco-ra/data/telco_ra_links/` holds the link Dataset (about 21 000 rows, five kinds);
   `telco_ra_screen_links/` holds the three revenue-assurance screens the saved views read.
 - In Link Analysis, **File ▸ Open… ▸ Saved views** lists `unbilled_usage`, `dealer_commission_fraud`
-  and `pbx_hacking_off_hours`. The [user guide](user-guide.md) has the tour
+  and `pbx_hacking_off_hours`. The [user guide](user-guide-la-telco-ra.md) has the tour
   and the exercises.
 
 The Space folder holds only configuration; all runtime state (`data/`, `audit/`, `duckdb/`) is written under

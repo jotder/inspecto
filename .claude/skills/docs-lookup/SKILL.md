@@ -23,7 +23,9 @@ live in its `product/<id>` hub). All hubs are listed in `docs/okf/product/index.
    (`addon/caseManagement`). An add-on hub is often a thin index pointing at its module hubs.
 2. **Read the hub `index.md`** — `docs/okf/product/<kind>/<name>/index.md`. It is **generated**
    (`node tools/render-product-docs.mjs`): never hand-edit it.
-3. **Pick the slot** from the table and read `<slot>.md` / `<slot>-<topic>.md`.
+3. **Pick the slot** from the table and read `<slot>-<hub>.md` (the slot's main file, named after the hub
+   folder: `architecture-la-core.md`, `user-guide-elt.md`) / `<slot>-<topic>.md`. A bare `<slot>.md` exists
+   only for the generated `feature-db.md` (`DOCS-HUB-NAMES-1`, 2026-11-18).
 4. Still missing? `grep -rl "<symbol>" docs/okf/product/` — then the root canon, then the HTTP
    contract `docs/api/openapi-v1.json` for exact routes. For code, `codegraph_explore` first.
 
@@ -31,12 +33,12 @@ live in its `product/<id>` hub). All hubs are listed in `docs/okf/product/index.
 
 | Slot | Answers | Example |
 |---|---|---|
-| `plan` | why / decisions / roadmap of the item | `docs/okf/product/module/elt/plan.md` |
+| `plan` | why / decisions / roadmap of the item | `docs/okf/product/module/elt/plan-elt.md` |
 | `spec` | exact behaviour, contracts, config keys | `docs/okf/product/module/config/spec-config-safety.md` |
-| `architecture` | how it is built, seams, classes — every hub's entry page is `architecture.md`; all of them are listed in the map at the end of `docs/okf/product/layer/platform/architecture.md` | `docs/okf/product/module/elt/architecture.md` |
+| `architecture` | how it is built, seams, classes — every hub's entry page is `architecture-<hub>.md`; all of them are listed in the map at the end of `docs/okf/product/layer/platform/architecture-platform.md` | `docs/okf/product/module/elt/architecture-elt.md` |
 | `features` | what it can do (feature list) | — |
 | `feature-db` | feature rows / inventory data | — |
-| `user-guide` | how a user does a task in the UI | `docs/okf/product/module/elt/user-guide.md` |
+| `user-guide` | how a user does a task in the UI | `docs/okf/product/module/elt/user-guide-elt.md` |
 | `admin-guide` | operate, configure, deploy, flags | `docs/okf/product/layer/platform/admin-guide-launch-flags.md` |
 | `api` | HTTP / integration surface | `docs/okf/product/layer/platform/api-integrations-ducklake.md` |
 | `tests` | test strategy, coverage, QA scripts | `docs/okf/product/layer/platform/tests-testing-guide.md` |

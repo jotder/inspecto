@@ -11,20 +11,20 @@ tags: [product-item, solution-pack]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`solution-pack.la-audit`](../../../../../product-map/solution-pack/la-audit.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
 | plan | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| architecture | current | [Link Analysis audit showcase — architecture](architecture.md) |
-| features | current | [Link Analysis audit showcase — features](features.md) |
+| architecture | current | [Link Analysis audit showcase — architecture](architecture-la-audit.md) |
+| features | current | [Link Analysis audit showcase — features](features-la-audit.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Link Analysis audit showcase — user guide](user-guide.md) |
+| user-guide | current | [Link Analysis audit showcase — user guide](user-guide-la-audit.md) |
 | admin-guide | current | [Inspecto LA (Link Analysis) showcase B: Finance and audit (runbook, synthetic data only)](admin-guide-showcase-runbook.md) |
 | api | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | tests | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| brochure | current | [Link Analysis audit showcase — brochure](brochure.md) |
+| brochure | current | [Link Analysis audit showcase — brochure](brochure-la-audit.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
 

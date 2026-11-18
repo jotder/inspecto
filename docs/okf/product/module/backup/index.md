@@ -11,14 +11,14 @@ tags: [product-item, module]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`module.backup`](../../../../../product-map/module/backup.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Backup and restore — plan](plan.md) |
-| spec | current | [Backup and restore — spec](spec.md) |
-| architecture | current | [Backup and restore — architecture](architecture.md) |
-| features | current | [Backup and restore — features](features.md) |
+| plan | current | [Backup and restore — plan](plan-backup.md) |
+| spec | current | [Backup and restore — spec](spec-backup.md) |
+| architecture | current | [Backup and restore — architecture](architecture-backup.md) |
+| features | current | [Backup and restore — features](features-backup.md) |
 | feature-db | current | [Backup and restore — feature database](feature-db.md) |
 | user-guide | n/a | no screen or end-user configuration of its own; the tasks are maintenance Jobs authored by administrators, covered by admin-guide-backup-restore |
 | admin-guide | current | [Backup & Restore Runbook (System Maintenance MNT-5/MNT-6)](admin-guide-backup-restore.md) |

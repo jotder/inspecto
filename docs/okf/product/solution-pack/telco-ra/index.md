@@ -11,20 +11,20 @@ tags: [product-item, solution-pack]
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`solution-pack.telco-ra`](../../../../../product-map/solution-pack/telco-ra.toon). Editions, add-ons, order codes and dependencies are read
 > from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
-> this folder — add or rename a file (`<slot>.md` / `<slot>-<topic>.md`), never edit this table.
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
 
 | Slot | Status | Document |
 |---|---|---|
 | plan | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| architecture | current | [Telecom revenue assurance — architecture](architecture.md) |
-| features | current | [Telecom revenue assurance — features](features.md) |
+| architecture | current | [Telecom revenue assurance — architecture](architecture-telco-ra.md) |
+| features | current | [Telecom revenue assurance — features](features-telco-ra.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Telecom revenue assurance — user guide](user-guide.md) |
-| admin-guide | current | [Telecom revenue assurance — admin guide](admin-guide.md) |
+| user-guide | current | [Telecom revenue assurance — user guide](user-guide-telco-ra.md) |
+| admin-guide | current | [Telecom revenue assurance — admin guide](admin-guide-telco-ra.md) |
 | api | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | tests | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
-| brochure | current | [Telecom revenue assurance — brochure](brochure.md) |
+| brochure | current | [Telecom revenue assurance — brochure](brochure-telco-ra.md) |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
 
