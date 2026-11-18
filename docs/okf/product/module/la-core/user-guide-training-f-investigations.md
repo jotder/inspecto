@@ -261,13 +261,13 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: before/after hold: 40 premises leave; mark the 23 that stay.
 
 ### S04 · The other clean-ups
-- Voice: The other buttons work the same way. Hide those with fewer than a number of events, set by the stepper beside it. One button per Entity Type, when there are several. With two entities selected, keep the paths between them; with some selected, keep only those. And the box above them all: exclude instead of hide. Hidden entities stay in the Working Set, out of view. Excluded ones leave it, with their links, and later expands do not bring them back.
+- Voice: The other buttons work the same way. Hide those with fewer than a number of events, set by the stepper beside it. With one Entity Type in the Working Set, as here, there is no per-type button; with several, there is one for each. Select two entities and a button keeps the paths between them; select some, and one keeps only those. And the box above them all: exclude instead of hide. Hidden entities stay in the Working Set, out of view. Excluded ones leave it, with their links, and later expands do not bring them back.
 - Chip: Clean up · Exclude instead of hide
 - Action: point at *Hide … with fewer than … events* and its Events stepper, the per-type buttons, then select two entities to show *Keep paths between the 2 selected* and *Keep only the 2 selected* ▸ clear the selection ▸ point at *Exclude instead of hide*. [check in UI: whether per-type buttons show on this Working Set]
 - Impact: mark each button as the voice names it.
 
 ### S05 · Keep, and a note
-- Voice: Some entities prove the point. Select C-14 and the two transformers, and press K. Keep is one step, and from now on a clean-up or an exclusion can never take them away. Now click C-14 alone. The Selected entity section shows who it is, and the note recorded earlier, with its step number. Type a new note: three of these visits were joint with the contractor C-22. Press Annotate. A note changes nothing on the graph; it is part of the record.
+- Voice: Some entities prove the point. Click C-14 and press K. Keep is one step, and from now on a clean-up or an exclusion can never take it away. The Selected entity section shows who it is, and the note recorded earlier, with its step number. Type a new note: three of these visits were joint with the contractor C-22. Press Enter, then Annotate. A note changes nothing on the graph; it is part of the record.
 - Chip: Keep · K · Selected entity · Annotate
 - Action: Shift+click `C-14`, `TX-007`, `TX-019` ▸ K ▸ click `C-14` ▸ Selected entity ▸ hold on the notes list ▸ Note `Three of these visits were joint with C-22` ▸ Annotate.
 - Impact: mark the keep step's result line, then the new note under Selected entity.
@@ -279,25 +279,25 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the result line.
 
 ### S07 · Expand, and a busy entity
-- Voice: Select the twenty-three premises. In the Expand filter, follow only the visited by links, and set Most neighbours per entity to twenty: without a limit, this Space would ask a second person to approve. For this lesson only, set the Busy limit to fifty. Press Expand. Nine contractors arrive, C-22 among them, and C-27 does not. One, C-21, links to ninety premises: it has a ring, a held badge, and a Busy entities fold of its own.
+- Voice: Now look for the other contractors who visited these premises. In the Expand filter, start from the whole Working Set, and follow only the visited by links. Under Fan-out and busy, set Most neighbours per entity to twenty: without a limit, this Space would ask a second person to approve. For this lesson only, set the Busy limit to fifty. Press Expand. Contractors arrive; the busiest of them link to more premises than the limit, so they are held, with a badge and a Busy entities fold of their own.
 - Chip: Expand · Busy limit · Most neighbours per entity
 - Action: right-click `C-14` ▸ Select neighbours ▸ Expand filter: Link kinds only `visited_by` ▸ Fan-out and busy ▸ Most neighbours per entity `20` ▸ Busy limit `50` ▸ Expand. [check in UI: nine contractors arrive, C-27 absent, C-21 held]
 - Impact: before/after hold: mark the nine contractors and C-21's held badge.
 
 ### S08 · Busy entities, and Include
-- Voice: Open Busy entities. Each is shown, but not expanded, with how many it links to against the limit, and Expand anyway, an override you confirm and that is recorded. There is a second way. In the Scope list, Include names entities every later expand goes through, busy or not, and Only these limits expands to the list. Each step records what it used. We do not need C-21's ninety premises, so leave it held.
+- Voice: Open Busy entities. Each held entity is shown, but not expanded, with how many it links to against the limit, and Expand anyway, an override you confirm and that is recorded. There is a second way. In the Scope list, Include names entities every later expand goes through, busy or not, and Only these limits expands to the list. Each step records what it used. We do not need the held contractors' hundreds of premises, so leave them held.
 - Chip: Busy entities · Expand anyway · Include
 - Action: Busy entities ▸ zoom on C-21's row and Expand anyway ▸ More steps ▸ Scope list ▸ point at Include and, after it, *Only these (an expand admits nothing outside the list)*. [check in UI: C-21's badge reads *… 90 … (limit 50) …*]
 - Impact: mark the busy row, then Include.
 
 ### S09 · Hide or exclude
-- Voice: Select C-30, which visited one of these premises once, and press H. Hide takes it off the view, recorded, and it stays in the Working Set. Now select C-21 and press X. The Exclude dialog: from this Investigation only, one recorded step with your reason, or add to a list, so it stays out wherever that list is used. Recent reasons are one press away. Type: busy across the city, one visit to these premises. Press Exclude. C-21 leaves, with its links.
+- Voice: Two more decisions, on any entity you do not need. Select it and press H: Hide takes it off the view, recorded, and it stays in the Working Set. Select another and press X: the Exclude dialog offers from this Investigation only, one recorded step with your reason, or add to a list, so it stays out wherever that list is used. Recent reasons are one press away. An excluded entity leaves with its links.
 - Chip: Hide · H · Exclude… · X
 - Action: click `C-30` ▸ H ▸ click `C-21` ▸ X ▸ *From this Investigation only* ▸ Reason `Busy across the city; one visit to these premises` ▸ Exclude.
 - Impact: before/after hold twice: C-30 hides; C-21 leaves with its links.
 
 ### S10 · Outside a time window
-- Voice: The last clean-up reads time. The tampering visits fell between December and June. In Outside a time window, set From the first of December and To the first of July. Press Find what is outside the window. It reads the Dataset now, and finds the entities none of whose links has an event in that window. The button below says how many. Press it: one hide, and its reason names the window. Kept entities stay, whatever the window says.
+- Voice: The last clean-up reads time. The tampering visits fell between December and June. In Outside a time window, set From the first of December and To the first of July, or press seven, thirty or ninety days. Press Find what is outside the window. It reads the Dataset now, and finds the entities none of whose links has an event in that window. The button below says how many. Press it: one hide, and its reason names the window. Kept entities stay, whatever the window says.
 - Chip: Outside a time window · Find what is outside the window
 - Action: Clean up ▸ Outside a time window ▸ From `2025-12-01T00:00Z` ▸ To `2026-07-01T00:00Z` ▸ Find what is outside the window ▸ press *Hide … with no link event in the window*. [check in UI: what the count is, and who leaves; if nothing, the voice says every remaining entity had a link in the window]
 - Impact: mark the count, then the entities that leave.
@@ -343,7 +343,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: none.
 
 ### S02 · Five steps, in order
-- Voice: From the File menu, Open, choose the Investigation Sanctions exposure two ownership hops down. A bank customer, CUS-00528, sits below a person whose name nearly matches an entry on a sanctions list, SL-0137. Open the Step log in the dock. Five rows: the start from the list entry and the customer, one expand, a note, a time window, and a snapshot marker. The expand brought in the matched person and the customer's company. Look closely, and something is missing: the company between them, the one that owns half of the customer's company, is not on the graph yet.
+- Voice: From the File menu, Open, choose the Investigation Sanctions exposure two ownership hops down. A bank customer, CUS-00528, sits below a person whose name nearly matches an entry on a sanctions list, SL-0137. Open the Step log in the dock. The first row is the start from the list entry and the customer; the rows after it are the expand, a note, a time window and a snapshot marker. The expand brought in the matched person and the customer's company. Look closely, and something is missing: the company between them, the one that owns half of the customer's company, is not on the graph yet.
 - Chip: File · Open… · Step log
 - Action: File ▸ Open… ▸ Investigations ▸ *Sanctions exposure two ownership hops down* ▸ dock ▸ Step log. [check in UI: five rows named Start, Expand, Annotation, Time window, Snapshot; the canvas holds SL-0137, CUS-00528, PER-03904 and CO-04313, not CO-04431]
 - Impact: mark the five rows; mark the gap between PER-03904 and CO-04313 on the canvas.
@@ -379,7 +379,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the window fields as named; then the new Snapshot row in the log; the canvas does not change.
 
 ### S08 · Compare: a threshold and two windows
-- Voice: The third group is Compare. Threshold keeps only the entities whose degree, links or events fall inside a band you set, a minimum, a maximum, or both. Use it to set aside the barely linked, or the busiest. Compare asks a different question: what changed between two windows of time? Set Window A to the years before 2025 and Window B to the last year, and press Compare and seal. The difference is sealed as a step, so it is part of the evidence, not a remark.
+- Voice: The third group is Compare. Threshold keeps only the entities whose degree, links or events fall inside a band you set, a minimum, a maximum, or both. Use it to set aside the barely linked, or the busiest. Compare asks a different question: what changed between two windows of time? Set Window A to the years before 2025 and Window B to the last year, and Compare and seal records the difference as a step, so it is part of the evidence, not a remark. We leave both forms unsent here.
 - Chip: More steps · Threshold · Compare
 - Action: More steps ▸ Threshold (open: Measure, Minimum, Maximum, Apply threshold; do not apply) ▸ Compare ▸ Window A 2016-01-01 to 2025-01-01, Window B 2025-10-01 to 2026-10-01 ▸ Compare and seal. [check in UI: the field names in Window A and B, and what the result shows for these windows; reword the last sentence to it]
 - Impact: mark the Threshold fields; then the Compare result and its log row.
@@ -391,7 +391,7 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark *Replay matches*; then the drift table's Drift column.
 
 ### S10 · Re-order, as a fork
-- Voice: Would the expand have found the same people if the time window had come first? Do not rewrite the record to find out. In the Step log, press Re-order steps. The box says it plainly: re-ordering creates a fork. Move the time window up above the expand, and press Create fork. A new Investigation opens, its steps re-applied in the new order, every expand reading the Dataset again. The line at the top says whose fork it is, and that the parent is unchanged. Open the parent to go back.
+- Voice: Would the expand have found the same people if the time window had come first? Do not rewrite the record to find out. In the Step log, press Re-order steps. The box says it plainly: re-ordering creates a fork. The original Investigation stays exactly as it is, and a new Investigation is created with the steps in the new order, every expand reading the Dataset again, and it records this one as its parent. Move the time window up above the expand, press Create fork, and Open the parent takes you back.
 - Chip: Re-order steps… · Create fork
 - Action: Step log ▸ Re-order steps… ▸ *Move step 4 up* twice ▸ Create fork ▸ hold on the Lineage line ▸ Open the parent. [check in UI: the Lineage line *Fork of sanctions-exposure: its steps re-applied in the order …*]
 - Impact: mark the alert *Re-ordering creates a fork*; then the Lineage line in the new Investigation.
