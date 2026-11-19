@@ -3,6 +3,7 @@ package com.gamma.control;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.gamma.etl.EditionFeatures;
 import com.gamma.etl.PipelineConfigBatchTest;
+import com.gamma.job.ArrivalCompactor;
 import com.gamma.onboard.ImportFollowOn;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
@@ -94,7 +95,7 @@ class ControlApiImportCommitStepsTest {
             public Map<String, Object> run(Context ctx) {
                 Map<String, Object> m = new LinkedHashMap<>();
                 try {
-                    m.put("files", DatasetCompaction.parquetFiles(ctx.dataRoot().resolve(ctx.dataset()).resolve("database")).size());
+                    m.put("files", ArrivalCompactor.parquetFiles(ctx.dataRoot().resolve(ctx.dataset()).resolve("database")).size());
                 } catch (Exception e) {
                     throw new IllegalStateException(e);
                 }
@@ -155,7 +156,7 @@ class ControlApiImportCommitStepsTest {
     }
 
     private static int parquetFiles(String id) throws Exception {
-        return DatasetCompaction.parquetFiles(Path.of("database", id, "database").toAbsolutePath().normalize()).size();
+        return ArrivalCompactor.parquetFiles(Path.of("database", id, "database").toAbsolutePath().normalize()).size();
     }
 
     private static String day(int d) {
@@ -169,8 +170,8 @@ class ControlApiImportCommitStepsTest {
         probe(root);
         try (Ctx c = open(cfg, root)) {
             String id = imported(c, "steps");
-            for (int d = 2; d <= DatasetCompaction.THRESHOLD; d++) append(c, id, d);
-            assertEquals(DatasetCompaction.THRESHOLD, parquetFiles(id));
+            for (int d = 2; d <= ArrivalCompactor.THRESHOLD; d++) append(c, id, d);
+            assertEquals(ArrivalCompactor.THRESHOLD, parquetFiles(id));
             expectation(root, id);
             probed.clear();
 

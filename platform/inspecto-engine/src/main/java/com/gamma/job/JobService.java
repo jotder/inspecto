@@ -517,6 +517,11 @@ public final class JobService implements AutoCloseable {
                         ParameterDecl.of("min_files", ParamType.INTEGER).min(2).defaultValue("4")
                                 .description("compact: only merge a partition directory holding at least N files")
                                 .build(),
+                        // BASIC-ELT-PROFILE-1 B6: read by MaintenanceJob.compact; arrivals reads `dataset` below
+                        ParameterDecl.of("mode", ParamType.STRING).options("partitions", "arrivals").defaultValue("partitions")
+                                .description("compact: partitions (each partition directory under dir, by age) or arrivals "
+                                        + "(one import Dataset's files in arrival order, with its merge map and retention)")
+                                .build(),
                         ParameterDecl.optional("source", ParamType.STRING, null, "ledger_prune: scope to one Source"),
                         ParameterDecl.optional("store", ParamType.STRING, null, "Store(s) a delete task targets (fenced)"),
                         // materialize's five, read by MaterializeTask:63-68,139,147 and undeclared until
@@ -525,7 +530,7 @@ public final class JobService implements AutoCloseable {
                         // `materialize` could not offer a single parameter that makes it do anything.
                         // Declared optional (not required) because requiredness is per-TASK on this type,
                         // exactly as retention_days is — MaterializeTask owns the refusal.
-                        ParameterDecl.optional("dataset", ParamType.DATASET_REF, null, "materialize: source Dataset id (required)"),
+                        ParameterDecl.optional("dataset", ParamType.DATASET_REF, null, "materialize: source Dataset id (required) · compact mode arrivals: the import Dataset (required)"),
                         ParameterDecl.optional("target", ParamType.STRING, null, "materialize: output Dataset id and directory (required; must differ from dataset)"),
                         ParameterDecl.optional("measures", ParamType.STRING, null, "materialize: comma-separated measure shorthand (field,agg); empty = a raw SELECT * snapshot"),
                         ParameterDecl.optional("group_by", ParamType.STRING, null, "materialize: comma-separated dimensions to group by"),

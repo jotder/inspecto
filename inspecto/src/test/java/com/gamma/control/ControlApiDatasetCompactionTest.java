@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.EditionFeatures;
 import com.gamma.etl.PipelineConfigBatchTest;
+import com.gamma.job.ArrivalCompactor;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.CollectorService;
 import com.gamma.spi.auth.Authenticators;
@@ -133,7 +134,7 @@ class ControlApiDatasetCompactionTest {
     }
 
     private static int parquetFiles(String id) throws Exception {
-        return DatasetCompaction.parquetFiles(Path.of("database", id, "database").toAbsolutePath().normalize()).size();
+        return ArrivalCompactor.parquetFiles(Path.of("database", id, "database").toAbsolutePath().normalize()).size();
     }
 
     private static String day(int d) {
@@ -147,21 +148,21 @@ class ControlApiDatasetCompactionTest {
         EditionFeatures.overrideForTest(Set.of());   // Basic: compaction is every edition's
         try (Ctx c = open(cfg, root)) {
             String id = imported(c, "compacted", transfersOn(day(1), 5), null);
-            for (int d = 2; d <= DatasetCompaction.THRESHOLD; d++) {
+            for (int d = 2; d <= ArrivalCompactor.THRESHOLD; d++) {
                 JsonNode s = append(c, id, "day" + d + ".csv", transfersOn(day(d), 5), null);
                 assertEquals("NOT_NEEDED", s.at("/compaction/result").asText(), s.toString());
             }
-            assertEquals(DatasetCompaction.THRESHOLD, parquetFiles(id), "one file per arrival so far");
+            assertEquals(ArrivalCompactor.THRESHOLD, parquetFiles(id), "one file per arrival so far");
             JsonNode s = append(c, id, "day21.csv", transfersOn(day(21), 5), null);
             assertEquals("COMPACTED", s.at("/compaction/result").asText(), s.toString());
             assertEquals(1, parquetFiles(id), "every arrival in one file");
             assertEquals(105, OnboardImport.countRows(Path.of("database", id, "database")), "no row lost or doubled");
 
-            Map<String, DatasetCompaction.Segment> merged = DatasetCompaction.merged(Path.of("database"), id);
+            Map<String, ArrivalCompactor.Segment> merged = ArrivalCompactor.merged(Path.of("database"), id);
             assertEquals(21, merged.size(), merged.keySet().toString());
             long first = 0;
             int d = 1;
-            for (DatasetCompaction.Segment seg : merged.values()) {   // in arrival order, each its own day
+            for (ArrivalCompactor.Segment seg : merged.values()) {   // in arrival order, each its own day
                 assertEquals(first, seg.firstRow(), seg.toString());
                 assertEquals(5, seg.rows(), seg.toString());
                 assertTrue(seg.coversFrom().startsWith(day(d)) && seg.coversTo().startsWith(day(d)), seg + " covers " + day(d));
@@ -197,7 +198,7 @@ class ControlApiDatasetCompactionTest {
             assertEquals(1, now.get("files").asInt());
             assertEquals(22, now.get("compactedArrivals").asInt());
             assertEquals(110, OnboardImport.countRows(Path.of("database", id, "database")));
-            DatasetCompaction.Segment last = new ArrayList<>(DatasetCompaction.merged(Path.of("database"), id).values()).get(21);
+            ArrivalCompactor.Segment last = new ArrayList<>(ArrivalCompactor.merged(Path.of("database"), id).values()).get(21);
             assertEquals(105, last.firstRow(), last.toString());
             assertTrue(last.coversFrom().startsWith(day(22)), last.toString());
 
@@ -208,10 +209,10 @@ class ControlApiDatasetCompactionTest {
             assertEquals(5, period.at("/period/rowsReplaced").asLong(), period.toString());
             long afterPeriod = OnboardImport.countRows(Path.of("database", id, "database"));
             assertEquals(108, afterPeriod);
-            List<DatasetCompaction.Segment> exact = new ArrayList<>(DatasetCompaction.merged(Path.of("database"), id).values());
+            List<ArrivalCompactor.Segment> exact = new ArrayList<>(ArrivalCompactor.merged(Path.of("database"), id).values());
             assertEquals(21, exact.size(), "day 5's arrival left the merged file: " + exact);
             long at = 0;
-            for (DatasetCompaction.Segment seg : exact) {
+            for (ArrivalCompactor.Segment seg : exact) {
                 assertEquals(at, seg.firstRow(), seg.toString());
                 assertEquals(5, seg.rows(), seg.toString());
                 assertFalse(seg.coversFrom().startsWith(day(5)), seg.toString());
@@ -220,7 +221,7 @@ class ControlApiDatasetCompactionTest {
             JsonNode recompacted = data(json(c, "POST", "/datasets/" + id + "/compact", null, null), 200);
             assertEquals("COMPACTED", recompacted.at("/compaction/result").asText(), recompacted.toString());
             assertEquals(afterPeriod, OnboardImport.countRows(Path.of("database", id, "database")), "no row lost or doubled");
-            Map<String, DatasetCompaction.Segment> carried = DatasetCompaction.merged(Path.of("database"), id);
+            Map<String, ArrivalCompactor.Segment> carried = ArrivalCompactor.merged(Path.of("database"), id);
             assertEquals(22, carried.size(), "the 21 arrivals left and the new upload: " + carried.keySet());
             assertTrue(carried.values().stream().allMatch(seg -> seg.rows() > 0 && seg.coversFrom() != null), carried.toString());
             assertEquals(22, data(json(c, "GET", "/datasets/" + id + "/storage", null, null), 200).get("compactedArrivals").asInt());
@@ -233,7 +234,7 @@ class ControlApiDatasetCompactionTest {
             // a Replace everything sets the folder aside: the map falls silent with it
             data(send(c, "POST", "/datasets/" + id + "/files?name=fresh.csv&mode=replace",
                     transfersOn(day(28), 4).getBytes(StandardCharsets.UTF_8), null), 200);
-            assertTrue(DatasetCompaction.merged(Path.of("database"), id).isEmpty(), "the old merged file is gone");
+            assertTrue(ArrivalCompactor.merged(Path.of("database"), id).isEmpty(), "the old merged file is gone");
             assertEquals(0, data(json(c, "GET", "/datasets/" + id + "/storage", null, null), 200).get("compactedArrivals").asInt());
         }
     }
@@ -258,7 +259,7 @@ class ControlApiDatasetCompactionTest {
             JsonNode kept = data(json(c, "POST", "/datasets/" + id + "/compact", null, null), 200);
             assertEquals(15, kept.at("/compaction/rowsRemoved").asLong(), "days 1, 2 and 4 go, each its own arrival: " + kept);
             assertEquals(8, OnboardImport.countRows(Path.of("database", id, "database")), "day 5 and the corrected day 3 stay");
-            List<DatasetCompaction.Segment> segs = new ArrayList<>(DatasetCompaction.merged(Path.of("database"), id).values());
+            List<ArrivalCompactor.Segment> segs = new ArrayList<>(ArrivalCompactor.merged(Path.of("database"), id).values());
             assertEquals(2, segs.size(), segs.toString());
             assertTrue(segs.get(0).coversFrom().startsWith(day(5)) && segs.get(1).coversFrom().startsWith(day(3)), segs.toString());
             assertEquals(3, kept.get("removedArrivals").asInt(), kept.toString());
@@ -277,8 +278,8 @@ class ControlApiDatasetCompactionTest {
         EditionFeatures.overrideForTest(Set.of(OnboardImport.AUTOMATION_FEATURE));   // Standard: a feed runs on the scheduler
         try (Ctx c = open(cfg, root)) {
             String id = imported(c, "scheduled", transfersOn(day(1), 5), null);
-            for (int d = 2; d <= DatasetCompaction.THRESHOLD; d++) append(c, id, "day" + d + ".csv", transfersOn(day(d), 5), null);
-            assertEquals(DatasetCompaction.THRESHOLD, parquetFiles(id));
+            for (int d = 2; d <= ArrivalCompactor.THRESHOLD; d++) append(c, id, "day" + d + ".csv", transfersOn(day(d), 5), null);
+            assertEquals(ArrivalCompactor.THRESHOLD, parquetFiles(id));
             Path inbox = Path.of("database", "inbox", id).toAbsolutePath();
 
             // held (an import in flight): the commit does not compact behind the holder's back
@@ -291,7 +292,7 @@ class ControlApiDatasetCompactionTest {
             } finally {
                 OnboardImport.IN_FLIGHT.remove(key);
             }
-            assertEquals(DatasetCompaction.THRESHOLD + 1, parquetFiles(id), "left to the run that holds the Dataset");
+            assertEquals(ArrivalCompactor.THRESHOLD + 1, parquetFiles(id), "left to the run that holds the Dataset");
 
             // the scheduler's run: nobody holds the Dataset, so its commit compacts
             Files.writeString(inbox.resolve("feed22.csv"), transfersOn(day(22), 5));
@@ -300,6 +301,93 @@ class ControlApiDatasetCompactionTest {
             assertEquals(110, OnboardImport.countRows(Path.of("database", id, "database")), "no row lost or doubled");
             assertEquals(22, data(json(c, "GET", "/datasets/" + id + "/storage", null, null), 200).get("compactedArrivals").asInt());
         }
+    }
+
+    /**
+     * BASIC-ELT-PROFILE-1 B6: a compaction marks the files it merged away {@code COMPACTED_AWAY} in the Consignment output
+     * registry, so a reprocess of an arrival whose file was merged is refused - before B6 it re-read the arrival's file
+     * beside the merged one, which still holds its rows, and put them in twice.
+     */
+    @Test
+    void aReprocessOfAMergedArrivalIsRefusedNotDoubled(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        EditionFeatures.overrideForTest(Set.of());
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "reprocessed", transfersOn(day(1), 5), null);
+            List<String> before = new ArrayList<>();
+            data(json(c, "GET", "/runs/" + id + "/commits", null, null), 200).forEach(b -> before.add(b.asText()));
+            assertEquals(1, before.size(), before.toString());
+            append(c, id, "day2.csv", transfersOn(day(2), 5), null);
+            data(json(c, "POST", "/datasets/" + id + "/compact", null, null), 200);
+            assertEquals(1, parquetFiles(id));
+            assertEquals(10, OnboardImport.countRows(Path.of("database", id, "database")));
+
+            var registry = com.gamma.consignment.ConsignmentOutputStores.shared();
+            assertNotNull(registry, "the Space's Consignment output registry (on by default)");
+            List<com.gamma.consignment.ConsignmentOutput> outputs = registry.outputs(before.get(0));
+            assertFalse(outputs.isEmpty(), "the first arrival's output was recorded");
+            assertTrue(outputs.stream().allMatch(o -> o.state() == com.gamma.consignment.ConsignmentOutput.State.COMPACTED_AWAY), outputs.toString());
+
+            // ReprocessCommand refuses (its message names server paths, so the route answers it as an internal error)
+            HttpResponse<String> r = json(c, "POST", "/runs/" + id + "/reprocess", "{\"batchId\":\"" + before.get(0) + "\"}", null);
+            assertEquals(10, OnboardImport.countRows(Path.of("database", id, "database")), "no row put in twice: " + r.body());
+            assertNotEquals(200, r.statusCode(), r.body());
+        }
+    }
+
+    /**
+     * BASIC-ELT-PROFILE-1 B6: a maintenance Job {@code {task: compact, mode: arrivals, dataset}} in the Space compacts the
+     * import Dataset at any count, as Compact now - and while an import holds the Dataset it leaves it alone, through the
+     * claim the control plane installs (the very key Add data claims), and gives the claim back.
+     */
+    @Test
+    void aCompactJobInArrivalsModeTakesTheImportsClaim(@TempDir Path cfg, @TempDir Path root, @TempDir Path audit) throws Exception {
+        String priorAudit = System.getProperty("jobs.audit.dir");
+        System.setProperty("jobs.audit.dir", audit.toString());   // never a jobs_audit/ in the module folder
+        try (Ctx c = open(cfg, root)) {
+            System.setProperty("assist.write.root", root.toString());   // the default Space's registry, as a deployment sets it
+            String id = imported(c, "jobbed", transfersOn(day(1), 5), null);
+            append(c, id, "day2.csv", transfersOn(day(2), 5), null);
+            assertEquals(2, parquetFiles(id));
+            String name = "compact_" + id;
+            HttpResponse<String> made = json(c, "POST", "/jobs", "{\"name\":\"" + name + "\",\"type\":\"maintenance\",\"task\":\"compact\","
+                    + "\"mode\":\"arrivals\",\"dataset\":\"" + id + "\"}", null);
+            assertTrue(made.statusCode() < 300, made.body());
+
+            String key = c.root() + "|" + id;
+            assertTrue(OnboardImport.IN_FLIGHT.add(key));
+            JsonNode held;
+            try {
+                held = runJob(c, name);
+            } finally {
+                OnboardImport.IN_FLIGHT.remove(key);
+            }
+            assertEquals("SUCCESS", held.get("status").asText(), held.toString());
+            assertTrue(held.toString().contains("being imported"), held.toString());
+            assertEquals(2, parquetFiles(id), "left to the import that holds it");
+
+            JsonNode ran = runJob(c, name);
+            assertEquals("SUCCESS", ran.get("status").asText(), ran.toString());
+            assertEquals(1, parquetFiles(id), "two arrivals in one file, below the threshold: as Compact now");
+            assertEquals(10, OnboardImport.countRows(Path.of("database", id, "database")));
+            assertEquals(2, data(json(c, "GET", "/datasets/" + id + "/storage", null, null), 200).get("compactedArrivals").asInt());
+            assertFalse(OnboardImport.IN_FLIGHT.contains(key), "the Job gave the claim back");
+        } finally {
+            System.clearProperty("assist.write.root");
+            if (priorAudit == null) System.clearProperty("jobs.audit.dir");
+            else System.setProperty("jobs.audit.dir", priorAudit);
+        }
+    }
+
+    /** Fire Job {@code name} and wait (10 s at most) for its run to end. */
+    private JsonNode runJob(Ctx c, String name) throws Exception {
+        String runId = data(json(c, "POST", "/jobs/" + name + "/trigger", null, null), 202).get("runId").asText();
+        long deadline = System.nanoTime() + 10_000_000_000L;
+        while (System.nanoTime() < deadline) {
+            JsonNode run = data(json(c, "GET", "/jobs/runs/" + runId, null, null), 200);
+            if (!"RUNNING".equals(run.get("status").asText())) return run;
+            Thread.sleep(50);
+        }
+        return fail("run " + runId + " did not end within 10 s");
     }
 
     // ── retention (Standard and up) ──────────────────────────────────────────────────────────────────────────
@@ -313,7 +401,7 @@ class ControlApiDatasetCompactionTest {
             assertEquals(503, basic.statusCode(), basic.body());
             ComponentStore registry = new ComponentStore(root.resolve("registry"));
             Map<String, Object> entry = new LinkedHashMap<>(registry.get("dataset", id).orElseThrow().content());
-            entry.put(DatasetCompaction.RETENTION, Map.of("arrivals", 1));
+            entry.put(ArrivalCompactor.RETENTION, Map.of("arrivals", 1));
             registry.write("dataset", id, entry);
             append(c, id, "b.csv", transfersOn("2020-01-02", 4), null);
             data(json(c, "POST", "/datasets/" + id + "/compact", null, null), 200);
@@ -328,7 +416,7 @@ class ControlApiDatasetCompactionTest {
             JsonNode kept = data(json(c, "POST", "/datasets/" + id + "/compact", null, null), 200);
             assertEquals(4, kept.at("/compaction/rowsRemoved").asLong(), kept.toString());
             assertEquals(1, kept.get("removedArrivals").asInt());
-            List<DatasetCompaction.Segment> segs = new ArrayList<>(DatasetCompaction.merged(Path.of("database"), id).values());
+            List<ArrivalCompactor.Segment> segs = new ArrayList<>(ArrivalCompactor.merged(Path.of("database"), id).values());
             assertEquals(2, segs.size(), segs.toString());
             assertTrue(segs.get(0).coversFrom().startsWith("2020-01-02") && segs.get(1).coversFrom().startsWith("2099-01-03"), segs.toString());
 
@@ -337,7 +425,7 @@ class ControlApiDatasetCompactionTest {
             JsonNode byDay = data(json(c, "POST", "/datasets/" + id + "/compact", null, null), 200);
             assertEquals(4, byDay.at("/compaction/rowsRemoved").asLong(), byDay.toString());
             assertEquals(4, OnboardImport.countRows(Path.of("database", id, "database")));
-            assertEquals(1, DatasetCompaction.merged(Path.of("database"), id).size());
+            assertEquals(1, ArrivalCompactor.merged(Path.of("database"), id).size());
 
             // a date that cannot be read never makes a row go: the When column pointed at the currency ('EUR')
             Map<String, Object> odd = new LinkedHashMap<>(registry.get("dataset", id).orElseThrow().content());
@@ -382,25 +470,25 @@ class ControlApiDatasetCompactionTest {
         Path db = Files.createDirectories(data.resolve("ds").resolve("database"));
         Files.writeString(db.resolve("a.parquet"), "x");
         Files.writeString(db.resolve("compacted_1.parquet"), "x");
-        Path pending = data.resolve("ds").resolve(DatasetCompaction.MAP + ".pending");
+        Path pending = data.resolve("ds").resolve(ArrivalCompactor.MAP + ".pending");
         Map<String, Object> map = Map.of("merged", "compacted_1.parquet", "arrivals", List.of(Map.of("file", "a.parquet", "rows", 1)));
         Files.writeString(pending, JSON.writeValueAsString(Map.of("merged", "compacted_1.parquet", "inputs",
                 List.of("a.parquet", "compacted_1.parquet", "../escape.parquet"), "map", map)));
         Files.writeString(data.resolve("ds").resolve("escape.parquet"), "outside the database folder");
-        DatasetCompaction.heal(data, "ds");
+        ArrivalCompactor.heal(data, "ds");
         assertFalse(Files.exists(pending));
         assertFalse(Files.exists(db.resolve("a.parquet")), "the merged file moved in: its inputs go");
         assertTrue(Files.exists(db.resolve("compacted_1.parquet")), "never the merged file itself");
         assertTrue(Files.exists(data.resolve("ds").resolve("escape.parquet")), "never a path outside the folder");
-        assertEquals(1, DatasetCompaction.merged(data, "ds").size(), "the map is committed");
+        assertEquals(1, ArrivalCompactor.merged(data, "ds").size(), "the map is committed");
 
         Files.writeString(db.resolve("b.parquet"), "x");
         Files.writeString(pending, JSON.writeValueAsString(Map.of("merged", "compacted_2.parquet", "inputs", List.of("b.parquet"),
                 "map", Map.of("merged", "compacted_2.parquet"))));
-        DatasetCompaction.heal(data, "ds");
+        ArrivalCompactor.heal(data, "ds");
         assertFalse(Files.exists(pending), "a merged file that never moved in: the swap is dropped");
         assertTrue(Files.exists(db.resolve("b.parquet")), "and its inputs stay");
-        assertEquals("compacted_1.parquet", JSON.readTree(data.resolve("ds").resolve(DatasetCompaction.MAP).toFile()).get("merged").asText());
+        assertEquals("compacted_1.parquet", JSON.readTree(data.resolve("ds").resolve(ArrivalCompactor.MAP).toFile()).get("merged").asText());
 
         // an input that cannot be deleted (held, here a non-empty folder) stays named for the next heal; the map is committed
         Path held = Files.createDirectories(db.resolve("held.parquet"));
@@ -408,11 +496,11 @@ class ControlApiDatasetCompactionTest {
         Files.writeString(db.resolve("c.parquet"), "x");
         Files.writeString(pending, JSON.writeValueAsString(Map.of("merged", "compacted_1.parquet", "inputs", List.of("held.parquet", "c.parquet"),
                 "map", Map.of("merged", "compacted_1.parquet", "at", "now"))));
-        DatasetCompaction.heal(data, "ds");
+        ArrivalCompactor.heal(data, "ds");
         assertFalse(Files.exists(db.resolve("c.parquet")));
         assertTrue(Files.exists(pending), "kept for a retry");
         assertEquals("[\"held.parquet\"]", JSON.readTree(pending.toFile()).get("inputs").toString());
-        assertEquals("now", JSON.readTree(data.resolve("ds").resolve(DatasetCompaction.MAP).toFile()).get("at").asText());
+        assertEquals("now", JSON.readTree(data.resolve("ds").resolve(ArrivalCompactor.MAP).toFile()).get("at").asText());
     }
 
     /**
@@ -429,7 +517,7 @@ class ControlApiDatasetCompactionTest {
             append(c, id, "b.csv", transfersOn(day(2), 5), null);
             append(c, id, "c.csv", transfersOn(day(3), 4), null);
             Path db = Path.of("database", id, "database").toAbsolutePath().normalize();
-            Path heldFile = DatasetCompaction.parquetFiles(db).stream().filter(p -> p.getFileName().toString().contains("_b_"))
+            Path heldFile = ArrivalCompactor.parquetFiles(db).stream().filter(p -> p.getFileName().toString().contains("_b_"))
                     .findFirst().orElseThrow();
             try (var ch = Files.newByteChannel(heldFile, Set.of(java.nio.file.StandardOpenOption.READ,
                     com.sun.nio.file.ExtendedOpenOption.NOSHARE_DELETE))) {
@@ -442,7 +530,7 @@ class ControlApiDatasetCompactionTest {
             JsonNode released = data(json(c, "POST", "/datasets/" + id + "/compact", null, null), 200);
             assertFalse(Files.exists(heldFile), "released: the next compaction's heal removes it");
             assertEquals(14, OnboardImport.countRows(db), "every row once: " + released);
-            assertEquals(1, DatasetCompaction.parquetFiles(db).size());
+            assertEquals(1, ArrivalCompactor.parquetFiles(db).size());
         }
     }
 

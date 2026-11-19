@@ -179,7 +179,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/connections/test` | gated | `canOnboardConnections` | `inspecto/src/main/java/com/gamma/control/ConnectionRoutes.java:63` |
 | POST | `/dashboards/([^/]+)/share` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ShareRoutes.java:55` |
 | PUT | `/datasets/([^/]+)/columns/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:88` |
-| POST | `/datasets/([^/]+)/compact` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/DatasetCompaction.java:81` |
+| POST | `/datasets/([^/]+)/compact` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/DatasetCompaction.java:48` |
 | DELETE | `/datasets/([^/]+)/feed` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/DatasetFeed.java:70` |
 | PUT | `/datasets/([^/]+)/feed` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/DatasetFeed.java:68` |
 | POST | `/datasets/([^/]+)/files` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:84` |
@@ -187,7 +187,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/datasets/([^/]+)/materialize` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/DatasetRoutes.java:68` |
 | PUT | `/datasets/([^/]+)/record-type` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:90` |
 | POST | `/datasets/([^/]+)/run` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:86` |
-| PUT | `/datasets/([^/]+)/storage` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DatasetCompaction.java:79` |
+| PUT | `/datasets/([^/]+)/storage` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DatasetCompaction.java:46` |
 | PUT | `/datasets/([^/]+)/watch` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/InboxWatch.java:117` |
 | POST | `/db/query` | exempt | group-gated | `inspecto/src/main/java/com/gamma/control/DbBrowserRoutes.java:62` |
 | POST | `/decision-rules` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DecisionRoutes.java:64` |
