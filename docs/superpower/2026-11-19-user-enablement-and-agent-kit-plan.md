@@ -114,6 +114,48 @@ Developers read Inspecto along their own lifecycle — **Requirements → Archit
   site render external pages only; an internal render for the team adds *Inside Inspecto*. Internal pages name open
   gaps, board rows, repository paths and maturity scores, so they never reach a customer (§4.3).
 
+### 3.2 The Handbook's table of contents *(added 2026-11-19, operator)*
+
+The manifest (§4.2) renders this tree. Chapters follow the lifecycle; each leaf is one page of one type, written into
+the hub of the item it explains.
+
+```
+Inspecto Handbook
+├─ Start here
+│   ├─ What Inspecto is, and the editions on one page
+│   ├─ Pick your track: Builder · Partner developer · Operator · Business user
+│   └─ Your first App in a day (the worked example, §5.1)
+├─ 1. Understand — concepts
+│   Space · Dataset · Connection & Collector · Pipeline · Expectation · Alert Rule ·
+│   Incident & Case · Widget & Dashboard · Space Template · App · Edition & Add-on
+├─ 2. Build — console builder
+│   2.1 Bring data in    add a file · watch a folder · SFTP / database / object store · a stream
+│   2.2 Shape it         Pipelines, mappings, enrichment
+│   2.3 Trust it         Expectations, quarantine, duplicates
+│   2.4 Analyse it       Queries, Studio, Link Analysis, Geo map
+│   2.5 Detect           Alert Rules, real-time detection, Reconciliation, scoring, anomaly, screening
+│   2.6 Respond          Incidents, Cases, Workflow & SLA, four-eyes approval
+│   2.7 Present          Dashboards, scheduled reports, sharing
+├─ 3. Ship
+│   3.1 Builder          export / import a Space, promote a change safely
+│   3.2 Partner          App kit, golden data, package and sign, install and upgrade
+│   3.3 Operator         install an edition, reverse proxy, preflight, upgrade
+├─ 4. Manage
+│   4.1 Run your App     runs, data-quality breaches, Incidents, safe changes
+│   4.2 Run the platform sign-in, Roles, Access Policies, masking, backup / restore,
+│                        upgrades, monitoring, audit verification, retention
+├─ 5. Develop            the tree in §3.1: On Inspecto (external) · Inside Inspecto (internal render)
+├─ Reference (generated) API · configuration · glossary · edition matrix · screen reference (USER_GUIDE.md)
+└─ Troubleshooting       symptom → cause → fix
+```
+
+**Reuse:** the 98 existing user guides are mapped into this tree (§5.4); the three journeys become tutorial and
+how-to pages; the LA video series is the Link Analysis track (§6); the builder kit feeds 5.4–5.5; `USER_GUIDE.md` is
+the screen reference.
+
+**One template per how-to:** *Goal* · *Before you start* (edition and role needed) · *Steps* · *Check it worked* ·
+*What can go wrong* · *Next*. `tools/check-handbook.mjs` (§4.3) checks that every how-to page has these six headings.
+
 ## 4. The Handbook — the user's view, without a second docs tree
 
 ### 4.1 Pages stay in the hubs
