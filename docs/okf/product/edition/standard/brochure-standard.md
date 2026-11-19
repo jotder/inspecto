@@ -1,3 +1,13 @@
+---
+type: Brochure
+title: Inspecto Standard — brochure
+description: Sales brochure for the Standard edition: what it adds to Basic for a team — kept-up-to-date feeds, OIDC sign-in and roles, masking with audited reveal, Cases, Reconciliations, scoring and Investigations.
+item: edition.standard
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+---
+
 # Inspecto Standard — brochure
 
 > **A governed assurance and investigation platform for a team — sign-in, Cases, Reconciliations, scoring and Investigations with evidence you can defend.**

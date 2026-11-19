@@ -1,3 +1,13 @@
+---
+type: Practice
+title: Operator mutation checklist
+description: One-line mutations the operator runs by hand to prove each guard and safety test can go red — the embed API, store and concurrency guards, guard inventories and documentation guards — with how to run them safely and revert.
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+---
+
 # Operator mutation checklist
 
 A green suite only means something if the guard CAN go red. The auto-mode classifier refuses an agent that

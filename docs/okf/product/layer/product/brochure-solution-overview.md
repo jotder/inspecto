@@ -1,3 +1,13 @@
+---
+type: Brochure
+title: Inspecto — Solution Overview
+description: Level-0 map of the solution suite for buyers and new users: the collect-to-act data path, what each Offering includes, the level-2 solutions and the level-1 and level-3 pages to read next.
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+---
+
 # Inspecto — Solution Overview
 
 > **Level 0 of the solution suite** (`SOLUTION-SUITE-DOCS-1`, plan: [`solution-suite-docs-plan.md`](../../../../archived-documents/plans-archive/solution-suite-docs-plan.md)).

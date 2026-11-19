@@ -1,3 +1,13 @@
+---
+type: Plan
+title: Inspecto — Forward Roadmap
+description: The forward roadmap in Now / Next / Later horizons with relative effort: strategic themes, what each horizon holds and what has shipped from it, the recommended sequence, success measures and what is explicitly not on the roadmap.
+item: layer.platform
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+---
+
 # Inspecto — Forward Roadmap
 
 **Status:** **§3 NEXT horizon, §6 sequence and vocabulary reconciled 2026-07-25** — §3.1–§3.3 have all shipped, and the banned term *Flow* is renamed to **Pipeline** per the binding [GLOSSARY](../../../../GLOSSARY.md). <!-- vocab-allow: names the Flow→Pipeline rename itself --> The **§1 theme horizons and the §2 NOW horizon had their status pass 2026-11-15** (`ARCH-DOC-CONTRADICTIONS-1`; see §9). · **Companion:** [../product/brochure-stakeholder-overview.md](../product/brochure-stakeholder-overview.md) · **Engineering detail:** [../../module/elt/architecture-elt.md](../../module/elt/architecture-elt.md)

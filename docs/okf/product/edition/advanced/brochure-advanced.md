@@ -1,3 +1,13 @@
+---
+type: Brochure
+title: Inspecto Advanced — brochure
+description: Sales brochure for the Advanced edition: who it is for, and what it adds to Standard — Investigations and operational objects on Postgres, the attribute-based policy engine and the Intelligence module.
+item: edition.advanced
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+---
+
 # Inspecto Advanced — brochure
 
 > **Standard, built for the organisation — shared Postgres storage for Investigations, a policy engine that narrows access, and AI-assisted intelligence.**

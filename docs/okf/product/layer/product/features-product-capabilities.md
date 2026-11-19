@@ -1,3 +1,13 @@
+---
+type: Reference
+title: Inspecto — Product Capabilities
+description: Product capability map for product owners and analysts: the three Lenses, every capability with its status (2026-09-23) and edition (2026-11-19), what is deliberately out of scope and the remaining release-gating MUST list.
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+---
+
 # Inspecto — Product Capabilities
 
 > Audience: product owners & business analysts · Status date: **2026-09-23** (was 2026-07-07); **edition placements

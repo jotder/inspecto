@@ -1,3 +1,13 @@
+---
+type: Brochure
+title: Inspecto — Competitive Capability Matrix
+description: Capability-by-capability matrix of Inspecto against six telecom and fintech assurance vendors (LATRO, Subex, Mobileum, Neural Technologies, TEOCO, Araxxe), mapped to Inspecto modules, with how to read it and its confidence.
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+---
+
 # Inspecto — Competitive Capability Matrix
 
 > Audience: product owner and market/sales · Status date: **2026-10-07**, Inspecto column refreshed **2026-11-19** · Companion to

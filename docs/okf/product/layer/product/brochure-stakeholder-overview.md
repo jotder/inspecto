@@ -1,3 +1,13 @@
+---
+type: Brochure
+title: Inspecto — Platform Overview & Strategy
+description: Platform overview and strategy for business and technical stakeholders (2026-06-19): the problem, what Inspecto is, its architecture and processing model, capability inventory, editions, quality, maturity, roadmap and risks.
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+---
+
 # Inspecto — Platform Overview & Strategy
 
 *A configuration-driven data ingestion, processing, and operational-intelligence platform*

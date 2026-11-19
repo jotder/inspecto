@@ -1,3 +1,13 @@
+---
+type: Practice
+title: Provenance conservation — live-data verification protocol (OPS-5)
+description: The live-data protocol for verifying provenance conservation (OPS-5) — the per-edge provenance store and the records-in equals records-out check are built but off by default — with the steps to run once on a real feed and the outcome log.
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
+---
+
 # Provenance conservation — live-data verification protocol (OPS-5)
 
 **Status:** feature built + tested + off by default; verified so far only against synthetic data.

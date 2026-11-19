@@ -1,3 +1,13 @@
+---
+type: Brochure
+title: Inspecto — Competitive Landscape
+description: Living two-sided competitive landscape: the product side (what ships, by edition, with evidence), the market side (vendors and buyer beliefs, with dated sources), a head-to-head table by lane, the claims register, positioning and open alignment questions.
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+---
+
 # Inspecto — Competitive Landscape
 
 > Audience: product owner **and** the market/sales side, together · Status date: **2026-09-10** for the market

@@ -1,3 +1,13 @@
+---
+type: Plan
+title: Architecture work — MoSCoW analysis (2026-11-12)
+description: Dated MoSCoW ranking (2026-11-12, refreshed to 2026-11-17) of the architecture work named by board rows — Must, Should, Could and Won't items, with the operator's decisions of 2026-11-16 and the limits of the analysis.
+item: layer.platform
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+---
+
 # Architecture work — MoSCoW analysis (2026-11-12)
 
 > **Status:** analysis of 2026-11-12, operator-requested. A dated ranking, not a list of open work: the
