@@ -26,8 +26,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * {@code BASIC-ELT-PROFILE-1} BE-3 slice 2, the import half of "Add data follows the sniff" (operator ruling 2026-11-19):
- * the Pipeline Add data writes reads the file the way its draft did - no quote when the sniff found none
- * ({@code quote: ""}), the lines the sniff skipped before the header skipped ({@code skip_header_lines}) - so the run that
+ * the Pipeline Add data writes reads the file the way its draft did - no quote ({@code quote: ""}) when the sniff found
+ * none and the file holds a {@code "} the default quote would read otherwise, the lines the sniff skipped before the
+ * header skipped ({@code skip_header_lines}) - so the run that
  * commits the import, and every later run, lands what the draft showed. The draft half is {@code DialectSniffGoldenTest}.
  * Real HTTP, synthetic fixtures only.
  */
@@ -108,12 +109,16 @@ class ControlApiOnboardDialectTest {
         return out;
     }
 
+    /**
+     * No quote found in a file that holds no {@code "}: the engine's default quote reads it exactly as no quote does, so
+     * none is written - a later file of the import may quote its fields ({@code ControlApiDecimalColumnTest}).
+     */
     @Test
-    void noQuoteFoundIsWrittenAsNoQuote(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void aQuoteFreeFileKeepsTheEngineDefaultQuote(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             String id = addData(c, "plain.csv", "id,name\n1,Ann\n2,Bob\n");
             Map<String, Object> csv = csvSettings(c, id);
-            assertEquals("", csv.get("quote"), csv.toString());
+            assertFalse(csv.containsKey("quote"), csv.toString());
             assertFalse(csv.containsKey("skip_header_lines"), csv.toString());
             assertEquals(List.of("1|Ann", "2|Bob"), rows(id, "id", "name"));
         }

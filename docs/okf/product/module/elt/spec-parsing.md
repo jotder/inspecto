@@ -269,11 +269,13 @@ differences; they are now one rule — Add data takes the sniff's answer as it i
 quote** (it was `"`), so a stray quote such as `1,"x` is text in its value and the file imports (it was a 422); and the
 lines the sniff skips before the header are skipped (`format.skipLines`, present only when the sniff skips lines), so
 the real header is read (the first line was). The person's own `?delimiter=`, `?quote=` and `?header=` still win over
-the sniff. The Pipeline Add data writes reads the file the same way: `csv_settings.quote` is written as the draft read
-it, `""` included (`quote: ""` = no quote, see the key table above), and `skip_header_lines` when the draft skipped
-lines — `ControlApiOnboardDialectTest` imports each case. Consequence to know: a later file of the same import is read
-with the first file's quote, so a no-quote import reads a later file's quoted fields as text (a quoted delimiter then
-splits the field and the line no longer fits — inferred from the reader, not tested); the quote entry of the fix catalogue offers `"` when the draft's lines do not split alike. ⛔ The
+the sniff. The Pipeline Add data writes reads the file the same way: `skip_header_lines` when the draft skipped lines,
+and `csv_settings.quote` as the draft read it - except that no quote (`quote: ""`, see the key table above) is written
+only when the file holds a `"`: a quote-free file reads alike under the engine's default `"`, which keeps a later file's
+quoted fields whole (`ControlApiDecimalColumnTest` adds a later file with `"1,22"` values to an import made from a
+quote-free file). `ControlApiOnboardDialectTest` imports each case. A no-quote import made from a file with a stray
+quote reads a later file's quoted fields as text; the quote entry of the fix catalogue offers `"` when a draft's lines
+do not split alike. ⛔ The
 grammar editor cannot author "no quote" (clearing the field removes the key, which means `"`).
 
 **One type inference (BE-3 slice 2, 2026-11-19).** `SampleProfiler.types(conn, relation, limit)` is the one entry for

@@ -168,7 +168,9 @@ final class OnboardImport {
                         + " imported Datasets (import.max_datasets); remove one or ask an administrator to raise the limit");
 
             Map<String, Object> schema = plan.schema(id);
-            Map<String, Object> pipeline = plan.pipeline(id, dataRoot, kind, fileName, String.valueOf(draft.get("type")));
+            String type = String.valueOf(draft.get("type"));
+            Map<String, Object> pipeline = plan.pipeline(id, dataRoot, kind, fileName, type,
+                    ("csv".equals(type) || "tsv".equals(type)) && holdsDoubleQuote(draftFile));
             Map<String, Object> dataset = plan.dataset(id, kind, fileName, String.valueOf(draft.get("type")));
             String recordType = commitRecordType(draft, body, LinkAnalysisSettings.forRoot(writeRoot));
             if (recordType != null) dataset.put(DatasetEntryRules.RECORD_TYPE, recordType);
@@ -590,7 +592,12 @@ final class OnboardImport {
             return s;
         }
 
-        Map<String, Object> pipeline(String id, Path dataRoot, String kind, String fileName, String type) {
+        /**
+         * The import's Pipeline. {@code holdsQuote}: the file holds a double quote anywhere - only then does a draft that
+         * read it with no quote write {@code quote: ""}; otherwise the engine's default quote reads the file alike and
+         * keeps a later file's quoted fields whole.
+         */
+        Map<String, Object> pipeline(String id, Path dataRoot, String kind, String fileName, String type, boolean holdsQuote) {
             String d = dataRoot.resolve(id).toString().replace('\\', '/');
             Map<String, Object> p = new LinkedHashMap<>();
             p.put("name", id);
@@ -621,9 +628,10 @@ final class OnboardImport {
             if ("csv".equals(type) || "tsv".equals(type)) {
                 csv.put("delimiter", String.valueOf(formatValue("delimiter")));
                 csv.put("has_header", Boolean.parseBoolean(String.valueOf(formatValue("header"))));
-                // the draft's quote as it read the file, "" included: no quote (absent would be the engine's '"')
+                // the draft's quote as it read the file (BASIC-ELT-PROFILE-1 BE-3): "" is no quote, written when the file
+                // holds a '"' the default quote would read differently; absent, the engine's '"' reads a quote-free file alike
                 Object q = formatValue("quote");
-                if (q != null) csv.put("quote", String.valueOf(q));
+                if (q != null && (holdsQuote || !String.valueOf(q).isEmpty())) csv.put("quote", String.valueOf(q));
                 Object skip = formatValue("skipLines");   // the lines the draft's sniff skipped before the header
                 if (skip != null) csv.put("skip_header_lines", Integer.parseInt(String.valueOf(skip)));
                 Object enc = formatValue("encoding");   // C2: the encoding fix
@@ -1671,6 +1679,14 @@ final class OnboardImport {
         } catch (Exception unreadable) {
             return null;
         }
+    }
+
+    /** Whether {@code file} holds a {@code "} byte anywhere (BE-3: the engine's default quote would read it otherwise than no quote). */
+    static boolean holdsDoubleQuote(Path file) throws IOException {
+        try (java.io.InputStream in = new java.io.BufferedInputStream(Files.newInputStream(file))) {
+            for (int b; (b = in.read()) != -1; ) if (b == '"') return true;
+        }
+        return false;
     }
 
     /**
