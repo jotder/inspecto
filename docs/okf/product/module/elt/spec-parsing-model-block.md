@@ -36,7 +36,7 @@ several formats per mechanism):
    DuckDB-native frontends (`read_csv`, `read_json`, `read_text`/`read_blob`) parse the bytes *inside*
    DuckDB. Fast, vectorized, zero Java parsing. Good for delimited, JSON, and
    "regular-enough-to-regex" text.
-3. **The plugin frontend** (`StreamingFileIngester`, [§ Plugin ingester](spec-ingest.md#plugin-ingester) above)
+3. **The plugin frontend** (`StreamingFileIngester`, [§ Plugin ingester](spec-ingest-plugin-ingester.md#plugin-ingester) above)
    decodes in Java and `emit()`s records. The *only* path for genuinely binary/grammar-driven formats —
    ASN.1/BER-TLV, proprietary CDRs, deeply nested XML.
 

@@ -320,7 +320,7 @@ ingest trough that otherwise starves many-core hosts (see [troubleshooting → C
 Mode comparison (`PluginIngestBenchmark`, 500K rows, PARQUET, 30 day-partitions): union ≈ 233K rows/s /
 30 consolidated files / 23 MB peak; generation (4 gens) ≈ 202K rows/s / 120 files / 15 MB peak — i.e.
 generation trades output fragmentation and a little throughput for bounded memory. See
-[plugins.md → execution modes](../../module/elt/spec-ingest.md#execution-modes--the-framework-picks-by-file-size) and
+[plugins.md → execution modes](../../module/elt/spec-ingest-plugin-ingester.md#execution-modes--the-framework-picks-by-file-size) and
 [design-notes D9/D10](../../../../archived-documents/design-notes.md).
 
 ## Nightly throughput floor (ASSURE-OPERABILITY-1, 2026-09-29)

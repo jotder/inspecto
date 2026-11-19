@@ -245,7 +245,7 @@ four disjoint shapes, chosen by which keys are present:
 **Function.** Two outputs, and neither is a node the author adds. A file the engine cannot process
 at all is moved to `dirs.quarantine`, under a reason sub-directory: `field_mismatch/`, `unreadable/`,
 `corrupt_download/` or `retry_exhausted/`
-([operations-reference § Quarantine](../../layer/platform/admin-guide-operations-reference.md#quarantine),
+([operations-reference § Quarantine](../../layer/platform/admin-guide-operations-reference-output-audit.md#quarantine),
 [output-sinks § Quarantine outcomes](spec-sinks.md#quarantine-outcomes)). The rows a
 parse rejects drain to `<dirs.errors>/<base>_errors.csv`. The lift models a quarantine *node* (a
 `sink.persistent` carrying `dir`, never `database`) only for selector/segments pipelines. Otherwise the

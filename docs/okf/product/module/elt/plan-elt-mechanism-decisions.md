@@ -114,7 +114,7 @@ are acquisition's ([§ACQ.3](#acq3-acquisition--decisions), *Poll cycle, consign
 in the current tier for the stability gate** — the mechanism that decides a remote file has stopped
 growing. It is the single most consequential piece of acquisition (get it wrong and you ingest a
 half-written file), it is fully built and documented as *mechanism* in
-[spec Phase B](spec-acquisition.md#phase-b--the-readiness--stability-gate), and *why* its thresholds are what they are is
+[spec Phase B](spec-acquisition-file-collection.md#phase-b--the-readiness--stability-gate), and *why* its thresholds are what they are is
 recorded nowhere. ⛔ Do not invent one. It needs an operator to state the intent, and until then the defaults
 are as-built facts with no recorded rationale.
 

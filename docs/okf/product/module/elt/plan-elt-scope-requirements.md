@@ -182,12 +182,12 @@ against source:
 ⚠ **`ACQ-1` carries an edition nuance the matrix column cannot express.** Connections are `All`, but two
 of `SecretResolver`'s five reference forms — `${FILE:…}` and `${KEYSTORE:…}` — are **Standard +
 Advanced only** (SEC-07): a Basic bundle refuses the scheme *by name* and a connection test surfaces that
-as the failure ([spec](spec-acquisition.md#connection-profiles-secrets-host-keys-tunnels-and-proxies)).
+as the failure ([spec](spec-acquisition-connectors-control.md#connection-profiles-secrets-host-keys-tunnels-and-proxies)).
 
 🔴 **A requirement is not delivered until it is *reachable*.** For 85 days the remote connectors were
 build-available and deploy-absent — no bundle shipped `inspecto-connectors` — until CONNECTORS-BUNDLE-1
 (2026-09-07). "SHIPPED" against a module no bundle carries is the most expensive kind of true statement
-([spec](spec-acquisition.md#the-connector-spi-and-the-resolvable-schemes)).
+([spec](spec-acquisition-connectors-control.md#the-connector-spi-and-the-resolvable-schemes)).
 
 ### 2.1 Ingestion
 

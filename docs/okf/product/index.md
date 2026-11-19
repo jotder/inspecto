@@ -80,8 +80,8 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (97 open rows
 
 * [Feature modules](layer/features/index.md) - `layer.features` · 2 doc(s) · 0 open row(s)
 * [Link Analysis modules](layer/la/index.md) - `layer.la` · 3 doc(s) · 1 open row(s)
-* [Platform](layer/platform/index.md) - `layer.platform` · 57 doc(s) · 25 open row(s)
-* [Product host](layer/product/index.md) - `layer.product` · 69 doc(s) · 15 open row(s)
+* [Platform](layer/platform/index.md) - `layer.platform` · 67 doc(s) · 25 open row(s)
+* [Product host](layer/product/index.md) - `layer.product` · 71 doc(s) · 15 open row(s)
 * [Providers](layer/providers/index.md) - `layer.providers` · 2 doc(s) · 0 open row(s)
 * [Service contracts (SPI)](layer/spi/index.md) - `layer.spi` · 2 doc(s) · 0 open row(s)
 
@@ -108,7 +108,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (97 open rows
 
 # Modules
 
-* [Access policy (roles, grants, row scope, audit trail)](module/access/index.md) - `module.access` · 13 doc(s) · 3 open row(s)
+* [Access policy (roles, grants, row scope, audit trail)](module/access/index.md) - `module.access` · 17 doc(s) · 3 open row(s)
 * [Acquisition and collectors](module/acquire/index.md) - `module.acquire` · 3 doc(s) · 2 open row(s)
 * [Action Requests](module/action-requests/index.md) - `module.action-requests` · 10 doc(s) · 0 open row(s)
 * [Hosted model providers for the assistant](module/agent-hosted/index.md) - `module.agent-hosted` · 7 doc(s) · 0 open row(s)
@@ -121,12 +121,12 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (97 open rows
 * [Authentication and capability contract](module/auth-spi/index.md) - `module.auth-spi` · 4 doc(s) · 0 open row(s)
 * [Backup and restore](module/backup/index.md) - `module.backup` · 7 doc(s) · 0 open row(s)
 * [Case Management](module/case-management/index.md) - `module.case-management` · 11 doc(s) · 2 open row(s)
-* [Config model and codecs](module/config/index.md) - `module.config` · 33 doc(s) · 8 open row(s)
+* [Config model and codecs](module/config/index.md) - `module.config` · 35 doc(s) · 8 open row(s)
 * [Kafka stream connector](module/connectors-kafka/index.md) - `module.connectors-kafka` · 6 doc(s) · 0 open row(s)
 * [Collector and export connectors](module/connectors/index.md) - `module.connectors` · 8 doc(s) · 1 open row(s)
 * [Demo authenticator](module/demo-auth/index.md) - `module.demo-auth` · 7 doc(s) · 0 open row(s)
-* [ELT — ingestion, Pipelines and step registry](module/elt/index.md) - `module.elt` · 58 doc(s) · 8 open row(s)
-* [Execution engine](module/engine/index.md) - `module.engine` · 11 doc(s) · 8 open row(s)
+* [ELT — ingestion, Pipelines and step registry](module/elt/index.md) - `module.elt` · 63 doc(s) · 8 open row(s)
+* [Execution engine](module/engine/index.md) - `module.engine` · 13 doc(s) · 8 open row(s)
 * [Entity lists](module/entity-list/index.md) - `module.entity-list` · 9 doc(s) · 0 open row(s)
 * [Entity store](module/entity-store/index.md) - `module.entity-store` · 8 doc(s) · 1 open row(s)
 * [Event model and log](module/event/index.md) - `module.event` · 13 doc(s) · 1 open row(s)
@@ -137,7 +137,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (97 open rows
 * [Route module contract](module/http-spi/index.md) - `module.http-spi` · 3 doc(s) · 0 open row(s)
 * [AI assist and intelligence](module/intelligence/index.md) - `module.intelligence` · 13 doc(s) · 1 open row(s)
 * [Link Analysis and geo routes](module/la-api/index.md) - `module.la-api` · 9 doc(s) · 0 open row(s)
-* [Link Analysis core and ports](module/la-core/index.md) - `module.la-core` · 72 doc(s) · 18 open row(s)
+* [Link Analysis core and ports](module/la-core/index.md) - `module.la-core` · 82 doc(s) · 18 open row(s)
 * [Link Analysis storage](module/la-storage/index.md) - `module.la-storage` · 8 doc(s) · 2 open row(s)
 * [Link Analysis PostgreSQL store](module/la-store-pg/index.md) - `module.la-store-pg` · 6 doc(s) · 2 open row(s)
 * [Notification channels](module/notify-channels/index.md) - `module.notify-channels` · 8 doc(s) · 0 open row(s)
@@ -146,7 +146,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (97 open rows
 * [Case management and objects](module/ops/index.md) - `module.ops` · 10 doc(s) · 1 open row(s)
 * [Attribute-based access policy](module/policy/index.md) - `module.policy` · 8 doc(s) · 0 open row(s)
 * [Predictive Analytics](module/predictive/index.md) - `module.predictive` · 9 doc(s) · 1 open row(s)
-* [Control plane and processor host](module/processor/index.md) - `module.processor` · 27 doc(s) · 7 open row(s)
+* [Control plane and processor host](module/processor/index.md) - `module.processor` · 33 doc(s) · 7 open row(s)
 * [Real-time Detection](module/realtime/index.md) - `module.realtime` · 2 doc(s) · 1 open row(s)
 * [Reconciliation](module/reconciliation/index.md) - `module.reconciliation` · 11 doc(s) · 1 open row(s)
 * [Regulatory Reporting](module/regulatory-reporting/index.md) - `module.regulatory-reporting` · 10 doc(s) · 1 open row(s)

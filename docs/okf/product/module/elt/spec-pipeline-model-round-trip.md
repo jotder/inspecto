@@ -26,7 +26,7 @@ These behavior-preserving seams keep the engine modular (SQL / `.toon` / on-disk
   implementations: `CsvIngestStrategy` (default) and `StreamingPluginIngestStrategy` (renamed 2026-08-31; this
   page said `BatchIngestStrategy` → `ConsignmentIngestStrategy`, `CsvBatchStrategy` → `CsvIngestStrategy` and
   `StreamingPluginBatchStrategy` → `StreamingPluginIngestStrategy` until 2026-09-08) (the
-  [plugin](spec-ingest.md#plugin-ingester) path). Each owns its DuckDB connection lifecycle; the shared commit+audit tail in
+  [plugin](spec-ingest-plugin-ingester.md#plugin-ingester) path). Each owns its DuckDB connection lifecycle; the shared commit+audit tail in
   `ConsignmentIngestor` is path-agnostic. The interface also carries static helpers (`dropTable`, `dropView`,
   `partitionColumns`).
 

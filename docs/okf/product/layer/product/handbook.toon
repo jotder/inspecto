@@ -763,6 +763,21 @@ chapters:
         type: unsorted
         tracks[1]: builder
         audience: internal
+      user_guide_training_d_analysis_toolbox_connections:
+        file: docs/okf/product/module/la-core/user-guide-training-d-analysis-toolbox-connections.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_d_analysis_toolbox_patterns:
+        file: docs/okf/product/module/la-core/user-guide-training-d-analysis-toolbox-patterns.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_d_analysis_toolbox_money_scope:
+        file: docs/okf/product/module/la-core/user-guide-training-d-analysis-toolbox-money-scope.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
       user_guide_training_e_keeping_and_sharing:
         file: docs/okf/product/module/la-core/user-guide-training-e-keeping-and-sharing.md
         type: unsorted
@@ -1033,6 +1048,16 @@ chapters:
         type: unsorted
         tracks[1]: operator
         audience: internal
+      admin_guide_configuration_reference_spaces:
+        file: docs/okf/product/module/config/admin-guide-configuration-reference-spaces.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_configuration_reference_collector_types:
+        file: docs/okf/product/module/config/admin-guide-configuration-reference-collector-types.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
       user_guide_config:
         file: docs/okf/product/module/config/user-guide-config.md
         type: unsorted
@@ -1101,6 +1126,26 @@ chapters:
         audience: internal
       admin_guide_operations_reference:
         file: docs/okf/product/layer/platform/admin-guide-operations-reference.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_operations_reference_output_audit:
+        file: docs/okf/product/layer/platform/admin-guide-operations-reference-output-audit.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_operations_reference_batch_processing:
+        file: docs/okf/product/layer/platform/admin-guide-operations-reference-batch-processing.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_operations_reference_status_backend:
+        file: docs/okf/product/layer/platform/admin-guide-operations-reference-status-backend.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_operations_reference_deployment:
+        file: docs/okf/product/layer/platform/admin-guide-operations-reference-deployment.md
         type: unsorted
         tracks[1]: operator
         audience: internal

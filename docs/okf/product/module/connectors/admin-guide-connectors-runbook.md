@@ -72,7 +72,7 @@ collector:
 ```
 
 The full set of `source:` knobs (stability, dedup, integrity, retry, circuit breaker, post-actions, parallel
-fetch, rate limit) is documented in [configuration.md](../config/admin-guide-configuration-reference.md#data-acquisition--the-collector-block).
+fetch, rate limit) is documented in [configuration.md](../config/admin-guide-configuration-reference-collector-types.md#data-acquisition--the-collector-block).
 Remote files are fetched into the local staging tree and then flow through the *exact same* batch/dedup/backup
 engine as local files — nothing downstream special-cases them.
 

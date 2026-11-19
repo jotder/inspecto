@@ -248,7 +248,7 @@ that claim is STALE as of 2026-08-31.
 ### References
 [consignment-addressing](spec-consignments.md#part-a--addressing) (Selector, revision model) ·
 [consignment-status-flow](architecture-elt.md) · [node-types](spec-pipeline-model-node-types.md#pipeline-node-types--the-node-type-plugin-seam) ·
-[transforms-seams](spec-pipeline-model-round-trip.md#transforms--modularity-seams) · [plugins](spec-ingest.md#plugin-ingester) ·
+[transforms-seams](spec-pipeline-model-round-trip.md#transforms--modularity-seams) · [plugins](spec-ingest-plugin-ingester.md#plugin-ingester) ·
 [step-catalog](spec-step-catalog.md) ·
 [jobs](../processor/spec-jobs.md) · [job-vs-step](../processor/architecture-processor.md)
 
@@ -313,7 +313,7 @@ current citations named classes the 2026-08-31 rename removed (plan §EXE.5.3 it
 | The Job concept page | [`jobs.md`](../processor/spec-jobs.md) | ⚠ Dead class citations, by line |
 | The boundary page | [`job-vs-step.md`](../processor/architecture-processor.md) | ⚠ A fifth wrong node-type count |
 | Concurrency | [`spec-consignments.md` Part II](spec-consignments.md#part-b--concurrency-the-four-layer-hierarchy) | ✅ The most accurate page in the area |
-| The ingest fork | [`spec-ingest.md`](spec-ingest.md#11-branch-aware-ingest--route-on-the-poll-driven-path) | ✅ Accurate |
+| The ingest fork | [`spec-ingest.md`](spec-ingest-branch-aware.md#11-branch-aware-ingest--route-on-the-poll-driven-path) | ✅ Accurate |
 | The post-sync lane | *Post-sync step chains* (this page) | ✅ The job type id is spelled right |
 | Resource caps | [`duckdb.md`](../engine/spec-duckdb.md) | 🔴 Its bolded headline still states the absent default |
 | ~~The active plans~~ | **ALL FOUR ARCHIVED** — the first three 2026-09-10, `completeness-kpi-plan.md` 2026-09-09 | ✅ Their decisions of record are distilled into the current tier (`INDEX.md` names each target). The "what actually runs" staleness this row flagged was **corrected before the move** (Sprint 7.5): four dead class names and a "you cannot add a new Step type" claim that a shipped pack overlay had refuted |

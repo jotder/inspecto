@@ -60,14 +60,14 @@ One file per episode group; render an episode with `--script` set to its group f
 | [C3](user-guide-training-c-the-canvas.md#c3_making-the-graph-readable-display-options-and-display-rules) | Making the graph readable: Display options and Display rules | Basic | 12 | 802 | 6 |
 | [C4](user-guide-training-c-the-canvas.md#c4_expand-and-collapse) | Expand and collapse, one degree at a time | Basic | 10 | 947 | 6 |
 | [C5](user-guide-training-c-the-canvas.md#c5_cleaning-up-hide-remove-trim-exclude-lists) | Cleaning up: hide, remove, trim, exclude, lists | Basic | 12 | 699 | 4 |
-| [D1](user-guide-training-d-analysis-toolbox.md#d1_quick-questions-busiest-tight-groups-route) | Quick questions: busiest, tight groups, route A to B | Basic | 11 | 861 | 8 |
-| [D2](user-guide-training-d-analysis-toolbox.md#d2_how-are-they-connected) | How are they connected? | ? | 11 | 872 | 8 |
-| [D3](user-guide-training-d-analysis-toolbox.md#d3_who-matters-most) | Who matters most? | Basic | 11 | 976 | 9 |
-| [D4](user-guide-training-d-analysis-toolbox.md#d4_groups-and-weak-points) | Groups and weak points | Basic | 11 | 831 | 7 |
-| [D5](user-guide-training-d-analysis-toolbox.md#d5_what-looks-unusual) | What looks unusual? | Basic | 11 | 810 | 8 |
-| [D6](user-guide-training-d-analysis-toolbox.md#d6_pattern-match) | Pattern match | Basic | 11 | 841 | 8 |
-| [D7](user-guide-training-d-analysis-toolbox.md#d7_money-and-time) | Money and time: Value Measures, bursts and rhythms | ? | 11 | 832 | 7 |
-| [D8](user-guide-training-d-analysis-toolbox.md#d8_on-screen-vs-whole-dataset) | On screen vs Whole Dataset: limits and scale | Basic → Standard | 11 | 889 | 7 |
+| [D1](user-guide-training-d-analysis-toolbox-connections.md#d1_quick-questions-busiest-tight-groups-route) | Quick questions: busiest, tight groups, route A to B | Basic | 11 | 861 | 8 |
+| [D2](user-guide-training-d-analysis-toolbox-connections.md#d2_how-are-they-connected) | How are they connected? | ? | 11 | 872 | 8 |
+| [D3](user-guide-training-d-analysis-toolbox-connections.md#d3_who-matters-most) | Who matters most? | Basic | 11 | 976 | 9 |
+| [D4](user-guide-training-d-analysis-toolbox-patterns.md#d4_groups-and-weak-points) | Groups and weak points | Basic | 11 | 831 | 7 |
+| [D5](user-guide-training-d-analysis-toolbox-patterns.md#d5_what-looks-unusual) | What looks unusual? | Basic | 11 | 810 | 8 |
+| [D6](user-guide-training-d-analysis-toolbox-patterns.md#d6_pattern-match) | Pattern match | Basic | 11 | 841 | 8 |
+| [D7](user-guide-training-d-analysis-toolbox-money-scope.md#d7_money-and-time) | Money and time: Value Measures, bursts and rhythms | ? | 11 | 832 | 7 |
+| [D8](user-guide-training-d-analysis-toolbox-money-scope.md#d8_on-screen-vs-whole-dataset) | On screen vs Whole Dataset: limits and scale | Basic → Standard | 11 | 889 | 7 |
 | [E1](user-guide-training-e-keeping-and-sharing.md#e1_saving-opening-and-exporting) | Saving, opening and exporting | Basic | 12 | 848 | 5 |
 | [E2](user-guide-training-e-keeping-and-sharing.md#e2_entity-lists-and-identity-facts) | Entity Lists and Identity Facts | Standard | 11 | 805 | 6 |
 | [F1](user-guide-training-f-investigations-first-graph.md#f1_signing-in-roles-and-your-first-investigation) | Signing in, roles and your first Investigation | Standard | 11 | 819 | 6 |

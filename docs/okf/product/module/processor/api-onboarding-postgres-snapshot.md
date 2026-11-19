@@ -9,7 +9,7 @@ timestamp: 2026-11-19T00:00:00Z
 
 # Choose a table: a Postgres snapshot (`PostgresSnapshot`; `BASIC-ONBOARD-1` P3, 2026-11-05)
 
-Part of [Add data: `/onboard/files`](api-onboarding-authoring.md#add-data-onboardfiles-file-in--dataset-out-la-onboard-1-phase-2-2026-10-22)
+Part of [Add data: `/onboard/files`](api-onboarding-authoring-add-data.md#add-data-onboardfiles-file-in--dataset-out-la-onboard-1-phase-2-2026-10-22)
 in the [onboarding authoring seams](api-onboarding-authoring.md) — the draft and the commit it reuses are described
 there; this page is the Postgres way in, kept on its own page so each stays readable whole.
 

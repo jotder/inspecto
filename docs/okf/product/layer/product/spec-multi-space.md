@@ -28,7 +28,7 @@ The server hosts many isolated **spaces** (projects). Do **not** re-roll per-spa
   seam: `/spaces/{id}/…` (`ControlApi.dispatch` strips + MDC-binds; un-prefixed → current/default). Space CRUD
   (no restart): `GET/POST /spaces`, `DELETE /spaces/{id}?purge=` (purge = opt-in file removal). **No flat
   fallback** — migrate once via `com.gamma.service.SpaceMigrator`. Editions/auth stay future SPI (no
-  `if(edition==)`). → [`configuration.md` §Spaces](../../module/config/admin-guide-configuration-reference.md#spaces-multi-project-layout).
+  `if(edition==)`). → [`configuration.md` §Spaces](../../module/config/admin-guide-configuration-reference-spaces.md#spaces-multi-project-layout).
   **UI (Stage 7):** `SpacesService` (signals) + a global `spaceInterceptor` rewrite `/api/<p>` →
   `/api/spaces/<id>/<p>` so every feature service stays space-agnostic (no-op single-tenant = byte-identical);
   header space-switcher + `modules/admin/spaces` admin (CRUD + per-space/per-data-source zip export + import

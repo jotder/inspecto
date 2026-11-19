@@ -87,7 +87,7 @@ persisted shapes genuinely differ: a `collector:` block vs. a node's raw config 
 *(UI-S7, 2026-08-28.)* The third mode authors the **dataset entry** the engine shipped in ELT Phase 3 S3c-2: `collector:
 {connector: dataset, dataset: <id>}`, resolved to the producer's snapshot dir fresh at every acquire
 cycle by the `dataset` connector scheme, which copies new parquet snapshots into this pipeline's
-inbox. See [§5 Collect](user-guide-elt-steps.md#5-collect--the-acquisition-step) and the [`dataset` scheme](spec-acquisition.md#the-connector-spi-and-the-resolvable-schemes).
+inbox. See [§5 Collect](user-guide-elt-steps.md#5-collect--the-acquisition-step) and the [`dataset` scheme](spec-acquisition-connectors-control.md#the-connector-spi-and-the-resolvable-schemes).
 
 - The mode owns its field the same way Connection does: `dataset` is asked **only** in Dataset mode,
   `connection` only in Connection mode, and `connector` stays **derived** (Dataset mode ⇒ `dataset`).

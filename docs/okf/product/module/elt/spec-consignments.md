@@ -139,7 +139,7 @@ derived from `declaredSources` rather than parsing the list again, and the previ
 exactly the declarations the writer refuses: none declared, two that disagree, one blank, one that is not a
 plain identifier. Deliberately **not** unified with `PartitionDef.fromSchema` on the ingest side — same config
 word, different contract (`type` required per entry, non-list hard-fails, legacy `partitionKey` fallback; see
-[§3](spec-ingest.md#3-segment-schemas-and-the-partition-declaration) above).
+[§3](spec-ingest-plugin-ingester.md#3-segment-schemas-and-the-partition-declaration) above).
 
 ⚠ An entry declaring **no `column`** (or a blank one) is the single `partitions[]` defect this path refuses
 rather than degrades past. It names no directory segment, so accepting it silently writes the store to a layout

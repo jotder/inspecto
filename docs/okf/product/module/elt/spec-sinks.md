@@ -96,7 +96,7 @@ one-element shorthand; `PipelineConfig.sinks()` is never empty (it synthesises t
   `finalizeSource` (backup / markers-LAST / ledger) is per-source-file, so it runs exactly once
   regardless of destination count. `ConsignmentGraphRunner` is not used by this fan-out. (⚠ When written, 2026-08-02, this line called it "the
   flow-job executor, unused by ingest"; since 2026-08-29 it drives the ingest graph fork — see
-  [spec-ingest.md](spec-ingest.md#11-branch-aware-ingest--route-on-the-poll-driven-path).)
+  [spec-ingest.md](spec-ingest-branch-aware.md#11-branch-aware-ingest--route-on-the-poll-driven-path).)
 * **Bypass guards** — paths that skip `writeAndTrace` (native single-member `streamingIngest`/
   `chunkedIngest`; plugin `GenerationModeIngester`) materialise via the union path when `sinks>1`
   (`CsvIngestStrategy`, `StreamingPluginIngestStrategy`).
