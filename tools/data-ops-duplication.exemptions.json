@@ -3,6 +3,7 @@
   {"category":"a","file":"la/inspecto-la-core/src/main/java/com/gamma/la/core/FsInvestigationLayout.java","member":"quote","reason":"JSON string quoting for the investigation index line, not SQL"},
   {"category":"a","file":"la/inspecto-la-core/src/main/java/com/gamma/la/core/SnapshotStore.java","member":"quote","reason":"JSON string quoting for the snapshot ledger line, not SQL"},
   {"category":"a","file":"platform/inspecto-engine/src/main/java/com/gamma/pipeline/XlsxSheetMerger.java","member":"escape","reason":"XML entity escaper for sheet XML, not SQL"},
+  {"category":"a","file":"platform/inspecto-engine/src/main/java/com/gamma/parse/SampleProfiler.java","member":"quote","reason":"Dialect record accessor returning the quote character sniff_csv found; it quotes nothing (the SQL goes through SqlIdent)"},
   {"category":"a","file":"platform/inspecto-event/src/main/java/com/gamma/metrics/MetricRegistry.java","member":"escape","reason":"Prometheus exposition label-value escaper, not SQL"},
   {"category":"a","file":"features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconBreaks.java","member":"esc","reason":"escapes | and \\ in a pipe-joined Break identity key, not SQL"},
   {"category":"a","file":"platform/inspecto-util/src/main/java/com/gamma/util/CsvLedger.java","member":"q","reason":"CSV ledger field sanitiser (the canonical CSV q()), not SQL"},

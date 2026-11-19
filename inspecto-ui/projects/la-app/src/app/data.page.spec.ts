@@ -7,6 +7,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { of } from 'rxjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { apiUrl } from '@inspecto/core/api';
+import { ADD_DATA_LINK_ANALYSIS } from '@inspecto/core/add-data/add-data-link-analysis';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { DataPageComponent } from './data.page';
 import { DatasetDetailsDialog } from './dataset-details.dialog';
@@ -136,6 +137,13 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
             ?.match((r) => r.url.endsWith('/inv/index'))
             .forEach((r) => !r.cancelled && r.flush({}, { status: 503, statusText: 'Unavailable' }));
         http?.verify();
+    });
+
+    it("provides what Link Analysis hands the Dataset cards in the page's own providers, not the shell's (BASIC-ELT-PROFILE-1 UI-0)", () => {
+        const { fixture } = create();
+        // the root default (no Link Analysis) has no Rebuild; the page's own provider hands Link Analysis's
+        expect(TestBed.inject(ADD_DATA_LINK_ANALYSIS).rebuild).toBeNull();
+        expect(fixture.debugElement.injector.get(ADD_DATA_LINK_ANALYSIS).rebuild).not.toBeNull();
     });
 
     it('lists each Add data Dataset with its Entities and Mappings, and the Pipeline-fed ones by name (no violations)', async () => {

@@ -21,6 +21,8 @@ import { ConnectionFormDialog, ConnectionFormResult } from 'app/inspecto/connect
 /** Collect from the pipeline's local inbox, through a saved Connection, or from a Dataset (UI-S7). */
 export type CollectorMode = 'local' | 'connection' | 'dataset';
 
+const ALL_MODES: readonly CollectorMode[] = ['local', 'connection', 'dataset'];
+
 /**
  * **The** collector-config surface (collector-config unification, 2026-08-04): the where-do-files-come-from
  * chrome shared by the two features that author one `collector:` block — Onboarding's Collection stage and
@@ -60,26 +62,32 @@ export type CollectorMode = 'local' | 'connection' | 'dataset';
                     (change)="setMode($event.value)"
                     aria-label="Collect from"
                 >
-                    <mat-button-toggle value="local" matTooltip="Read files from the pipeline's inbox folder">
-                        Local inbox
-                    </mat-button-toggle>
-                    <mat-button-toggle
-                        value="connection"
-                        [matTooltip]="remoteLock() ?? 'Collect through a saved Connection (SFTP, Azure Blob, Kafka, Database)'"
-                        [disabled]="connectionLocked()"
-                        [attr.aria-describedby]="connectionLocked() ? 'collector-remote-lock' : null"
-                    >
-                        @if (connectionLocked()) {
-                            <mat-icon class="icon-size-4 mr-1" svgIcon="heroicons_outline:lock-closed"></mat-icon>
-                        }
-                        Connection
-                    </mat-button-toggle>
-                    <mat-button-toggle
-                        value="dataset"
-                        matTooltip="Consume another Pipeline's Dataset — its parquet snapshots feed this pipeline's inbox"
-                    >
-                        Dataset
-                    </mat-button-toggle>
+                    @if (offers('local')) {
+                        <mat-button-toggle value="local" matTooltip="Read files from the pipeline's inbox folder">
+                            Local inbox
+                        </mat-button-toggle>
+                    }
+                    @if (offers('connection')) {
+                        <mat-button-toggle
+                            value="connection"
+                            [matTooltip]="remoteLock() ?? connectionTip()"
+                            [disabled]="connectionLocked()"
+                            [attr.aria-describedby]="connectionLocked() ? 'collector-remote-lock' : null"
+                        >
+                            @if (connectionLocked()) {
+                                <mat-icon class="icon-size-4 mr-1" svgIcon="heroicons_outline:lock-closed"></mat-icon>
+                            }
+                            Connection
+                        </mat-button-toggle>
+                    }
+                    @if (offers('dataset')) {
+                        <mat-button-toggle
+                            value="dataset"
+                            matTooltip="Consume another Pipeline's Dataset — its parquet snapshots feed this pipeline's inbox"
+                        >
+                            Dataset
+                        </mat-button-toggle>
+                    }
                 </mat-button-toggle-group>
                 @if (connectionLocked()) {
                     <!-- DATA-TIERS-1 P4 (DT-13): locked with the server's reason, never hidden. -->
@@ -163,7 +171,7 @@ export class CollectorConfigComponent {
     @ViewChild('sf') schemaForm!: InspectoSchemaFormComponent;
 
     readonly optionLoaders = {
-        connection: connectionOptionLoader(),
+        connection: connectionOptionLoader(() => this.onlyConnectors()),
         dataset: datasetOptionLoader(),
         trigger__from: datasetRefOptionLoader(),
     };
@@ -204,10 +212,35 @@ export class CollectorConfigComponent {
         this.deriveMode();
     }
 
+    /**
+     * The modes this host offers (all three by default). A host whose save route takes only some of them names those:
+     * Add data's *Keep this up to date* offers the local inbox and a Connection (BASIC-ELT-PROFILE-1 U4-Keep).
+     */
+    @Input() set modes(value: readonly CollectorMode[] | null | undefined) {
+        this.offered.set(value?.length ? value : ALL_MODES);
+    }
+
+    /**
+     * The connector types a Connection may have here (null = any): the picker lists only those Connections, and
+     * {@link resolveConnector} refuses another. Add data's *Keep this up to date* reads SFTP only.
+     */
+    @Input() set connectors(value: readonly string[] | null | undefined) {
+        this.onlyConnectors.set(value?.length ? value.map((c) => c.toLowerCase()) : null);
+    }
+
     /** Enter in any field — hosts bind their save action here, exactly as with `<inspecto-schema-form>`. */
     readonly submitted = output<void>();
 
     private readonly allSpecs = signal<AttributeSpec[]>([]);
+    private readonly offered = signal<readonly CollectorMode[]>(ALL_MODES);
+    private readonly onlyConnectors = signal<readonly string[] | null>(null);
+    /** The Connection toggle's tooltip: the connector types it reaches. */
+    protected readonly connectionTip = computed(() => {
+        const only = this.onlyConnectors();
+        return only
+            ? `Collect through a saved Connection (${only.map((c) => c.toUpperCase()).join(', ')})`
+            : 'Collect through a saved Connection (SFTP, Azure Blob, Kafka, Database)';
+    });
     private readonly stored = signal('');
     /**
      * What the embedded form is seeded with. Reassigning `specs` rebuilds every control from its
@@ -276,6 +309,10 @@ export class CollectorConfigComponent {
             return;
         }
         this.mode.set(this.seed()['connection'] || (stored && stored !== 'local') ? 'connection' : 'local');
+    }
+
+    protected offers(m: CollectorMode): boolean {
+        return this.offered().includes(m);
     }
 
     setMode(m: CollectorMode): void {
@@ -353,7 +390,7 @@ export class CollectorConfigComponent {
         const id = this.connectionId();
         if (id) {
             const known = this.profiles().find((p) => p.id === id)?.connector;
-            if (known) return known;
+            if (known) return this.allowedHere(id, known);
             if (this.profilesState() !== 'ok') {
                 // The list never answered, so absence is not evidence. An UNCHANGED id keeps the
                 // connector it was authored with; a newly picked one has nothing to derive from.
@@ -371,6 +408,16 @@ export class CollectorConfigComponent {
         const stored = this.stored();
         if (stored && stored !== 'local') return stored;
         this.error.set('Pick a Connection (or create one) — or switch to Local inbox.');
+        return null;
+    }
+
+    /** `connector` when this host takes it, else null with {@link error} naming what it takes. */
+    private allowedHere(id: string, connector: string): string | null {
+        const only = this.onlyConnectors();
+        if (!only || only.includes(connector.toLowerCase())) return connector;
+        this.error.set(
+            `"${id}" connects through ${connector}; this takes ${only.map((c) => c.toUpperCase()).join(' or ')} Connections only.`,
+        );
         return null;
     }
 

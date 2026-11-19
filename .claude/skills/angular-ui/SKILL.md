@@ -259,8 +259,10 @@ src/app/
 - **Asking where files come from → `<inspecto-collector-config>`** (`inspecto/collector/`, 2026-08-04).
   ONE shared surface for the `collector:` block: the local-inbox/Connection toggle, the schema form over
   the shared `COLLECTOR_ATTRIBUTES`, Test connection, create-a-Connection in place, and the derived
-  connector. Adopters: Onboarding's Collection stage and the Pipelines `acquisition` Collector pane —
-  never fork it. Like the enrichment editor it has **no write path** — hosts read `value()`/`resolveConnector()`
+  connector. Adopters: the Pipelines `acquisition` Collector pane and Add data's *Keep this up to date*
+  (BASIC-ELT-PROFILE-1 U4-Keep, 2026-11-19: it passes only the spec entries its route saves, plus
+  `[modes]="['local','connection']"` and `[connectors]="['sftp']"`, which hide the other toggles, filter the
+  Connection list and make `resolveConnector()` refuse another type) — never fork it. Like the enrichment editor it has **no write path** — hosts read `value()`/`resolveConnector()`
   and save through their own route, because the two persisted shapes genuinely differ (a `collector:`
   block vs. a node's raw config plus a `use: connection/<id>` binding). ⚠ **Never ask for `connector`** —
   it is derived (local ⇒ `local`, else the picked Connection's own type) because
