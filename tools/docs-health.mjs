@@ -25,7 +25,10 @@
 //   header    a hub page (docs/okf/**) without the base header (`type`, `title`, `description`) that is not in the
 //             baseline list; and, wherever a header carries them, an invalid `audience` (external | internal), `verified`
 //             (starts YYYY-MM-DD) or `code` path (must be tracked). The full header (D-IR4: type, title, description,
-//             item, audience, status, verified, code) is REPORTED, not required — W4 fills it.
+//             item, audience, status, verified, code) is required of every hub page that is not in the baseline's
+//             `partialHeader` list (pages W4 could not fill — a layer links no `code`) or its `headerless` list: a NEW
+//             hub page needs it (`node tools/fill-doc-headers.mjs --write --hub <kind>/<name>` adds what it can), and a
+//             page that has it may not lose it, so the full-header count only rises (INFO-RESTRUCTURE-1 W4).
 //   editions  a page with more hand-written Basic | Standard | Advanced tables than its baseline. The homes of that fact
 //             (EDITIONS.md and spec-editions.md) are exempt.
 //   ledger    the board's ledger (BACKLOG.md, between the count line and "## Area index") over LEDGER_CAP (60 KB):
@@ -155,6 +158,7 @@ export function measure(paths, read, isTracked) {
             editions: editionTables(text),
             baseHeader: !!fm && BASE_KEYS.every((k) => fm[k] !== undefined && fm[k] !== ''),
             fullHeader: !!fm && FULL_KEYS.every((k) => fm[k] !== undefined && fm[k] !== ''),
+            missingFull: FULL_KEYS.filter((k) => !fm || fm[k] === undefined || fm[k] === ''),
             headerProblems: headerProblems(fm, isTracked),
             fm,
         });
@@ -165,15 +169,17 @@ export function measure(paths, read, isTracked) {
 
 /** The numbers a baseline keeps: only the debt, so the file stays small. */
 export function baselineOf(m) {
-    const b = { oversize: {}, history: {}, headerless: [], editions: {} };
+    const b = { oversize: {}, history: {}, headerless: [], partialHeader: [], editions: {} };
     for (const p of m.pages) {
         if (p.generated) continue;
         if (sizeScoped(p) && p.bytes > CAP) b.oversize[p.path] = p.bytes;
         if (historyScoped(p) && p.history > 0) b.history[p.path] = p.history;
         if (p.hub && !p.baseHeader) b.headerless.push(p.path);
+        else if (p.hub && !p.fullHeader) b.partialHeader.push(p.path);
         if (!EDITION_HOMES.has(p.path) && p.editions > 0) b.editions[p.path] = p.editions;
     }
     b.headerless.sort();
+    b.partialHeader.sort();
     return b;
 }
 const historyScoped = (p) => !HISTORY_EXEMPT.has(p.path) && !p.path.startsWith('docs/superpower/');
@@ -199,6 +205,10 @@ export function evaluate(m, base) {
         if (p.hub && !p.baseHeader && !base.headerless.includes(p.path))
             failures.push(`header: ${p.path} has no type / title / description header`);
         if (p.hub && p.baseHeader && base.headerless.includes(p.path)) improvements.push(`header: ${p.path} gained its header`);
+        const partial = base.partialHeader ?? [];
+        if (p.hub && p.baseHeader && !p.fullHeader && !partial.includes(p.path) && !base.headerless.includes(p.path))
+            failures.push(`header: ${p.path} lacks the full D-IR4 header (missing: ${p.missingFull.join(', ')}) — run node tools/fill-doc-headers.mjs --write --hub ${p.path.split('/').slice(3, 5).join('/')}`);
+        if (p.hub && p.fullHeader && partial.includes(p.path)) improvements.push(`header: ${p.path} gained the full header`);
         for (const msg of p.headerProblems) failures.push(`header: ${p.path}: ${msg}`);
         if (!EDITION_HOMES.has(p.path)) {
             const was = base.editions[p.path] || 0;
@@ -208,7 +218,7 @@ export function evaluate(m, base) {
     }
     if (m.ledgerBytes !== null && m.ledgerBytes > LEDGER_CAP)
         failures.push(`ledger: the board's ledger is ${(m.ledgerBytes / 1024).toFixed(1)} KB, over 60 KB — run node tools/roll-backlog-ledger.mjs --write`);
-    const known = [...Object.keys(base.oversize), ...Object.keys(base.history), ...base.headerless, ...Object.keys(base.editions)];
+    const known = [...Object.keys(base.oversize), ...Object.keys(base.history), ...base.headerless, ...(base.partialHeader ?? []), ...Object.keys(base.editions)];
     for (const k of new Set(known)) if (!present.has(k)) stale.push(k);
     return { failures, improvements, stale };
 }

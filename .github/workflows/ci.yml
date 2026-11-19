@@ -474,11 +474,12 @@ jobs:
       # Docs-health ratchet (INFO-RESTRUCTURE-1 W2, docs/superpower/2026-11-19-information-restructure-and-maintenance-plan.md):
       # against tools/docs-health.baseline.json, new debt fails and old debt may only shrink — a page past 60 KB (2 KB
       # allowance on a baselined one; the board, glossary and plans exempt), a new inline history note, a hub page without
-      # its header or with an invalid audience / verified / code field, a hand-written Basic | Standard | Advanced table
+      # its header (or, for a page not in the baseline, without the full D-IR4 header) or with an invalid audience /
+      # verified / code field, a hand-written Basic | Standard | Advanced table
       # outside EDITIONS.md and spec-editions.md, and the board's ledger past 60 KB (fix: tools/roll-backlog-ledger.mjs
       # --write). After shrinking debt, lock it in with --baseline-write. Tracked docs only; no build, ~1s.
       - name: Guard — docs stay readable whole, current and in one home (docs-health ratchet)
-        run: node tools/docs-health.mjs --ratchet && node --test tools/docs-health.test.mjs tools/roll-backlog-ledger.test.mjs
+        run: node tools/docs-health.mjs --ratchet && node --test tools/docs-health.test.mjs tools/roll-backlog-ledger.test.mjs tools/fill-doc-headers.test.mjs
 
       # Handbook guard (USER-HANDBOOK-1 P1): docs/okf/product/layer/product/handbook.toon keeps the contract chapter ids
       # the console's help links use, places every hub user / admin guide (a new guide is placed in the change that adds
