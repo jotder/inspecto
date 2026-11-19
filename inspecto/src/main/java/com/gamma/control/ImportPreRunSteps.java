@@ -40,8 +40,10 @@ import java.util.Set;
  *       looks again); a person's run of one goes ahead untouched - Add data's own run is such a run. A kept column is
  *       undone when the run fails. A scheduled run of a local folder with a stability window judges only the files
  *       unmodified for that window and takes only those: a file still being written is never judged half-written.
+ *       After the run the step writes its arrivals sidecar lines, as Run now does (BASIC-WATCH-ARRIVALS-1).
  *       <i>Watch this folder</i> ({@link InboxWatch}, B1) is such a scheduled run: it also waits while Add data is off in
- *       the Space, and keeps what Data status says after it ({@code watchError}).</li>
+ *       the Space, and keeps what Data status says after a run that took a file ({@code watchError}: the run failed, or
+ *       set a file aside).</li>
  * </ul>
  */
 final class ImportPreRunSteps {
@@ -112,8 +114,11 @@ final class ImportPreRunSteps {
 
     /** The control planes whose Spaces' runs are looked at. */
     private static final Set<ApiContext> ATTACHED = java.util.concurrent.ConcurrentHashMap.newKeySet();
-    /** The {@link OnboardImport#IN_FLIGHT} claims an engine run holds from its pre-run steps to its end. */
-    private static final Set<String> HELD_BY_RUN = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    /**
+     * The {@link OnboardImport#IN_FLIGHT} claims an engine run holds from its pre-run steps to its end, each with what the
+     * run's commit steps answered ({@link #outcome}): its arrivals line reads the follow-on's index outcome from it.
+     */
+    private static final Map<String, Map<String, Object>> HELD_BY_RUN = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Called once per ControlApi (from {@link OnboardRoutes#register}); registering again replaces the step. */
     static void register(ApiContext api) {
@@ -124,7 +129,13 @@ final class ImportPreRunSteps {
 
     /** Whether {@code claim} ({@code writeRoot|id}) is held by an engine run's pre-run step: its commit steps act for it. */
     static boolean heldByRun(String claim) {
-        return HELD_BY_RUN.contains(claim);
+        return HELD_BY_RUN.containsKey(claim);
+    }
+
+    /** A commit step's outcome ({@link ImportCommitSteps}) for the run that holds {@code claim}; nothing when no run holds it. */
+    static void outcome(String claim, Map<String, Object> out) {
+        Map<String, Object> summary = HELD_BY_RUN.get(claim);
+        if (summary != null) summary.putAll(out);
     }
 
     private static PreRun beforeRun(CollectorService service, String pipeline, boolean scheduled) {
@@ -151,7 +162,8 @@ final class ImportPreRunSteps {
             if (watched && !DataSettings.forRoot(writeRoot).selfImportInForce()) return PreRun.SKIP;
             String claim = writeRoot + "|" + id;
             if (!OnboardImport.IN_FLIGHT.add(claim)) return scheduled ? PreRun.SKIP : PreRun.GO;   // Add data, a rewrite or a delete holds it
-            HELD_BY_RUN.add(claim);
+            Map<String, Object> summary = java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>());
+            HELD_BY_RUN.put(claim, summary);
             OnboardImport.Space s = new OnboardImport.Space(writeRoot, dataRoot, service, "scheduler");
             OnboardImport.Job job = new OnboardImport.Job(s, id, String.valueOf(content.get("kind")), null, null, content, false);
             RunFiles.Scope narrowed = null;
@@ -164,19 +176,29 @@ final class ImportPreRunSteps {
                 if (!run.refused.isEmpty() || !job.keptColumns.isEmpty())
                     log.info("Dataset '{}' before its run: refused {}, kept columns {}", id, run.refused, job.keptColumns);
                 boolean kept = !job.keptColumns.isEmpty();
-                // a run that sets a file aside after a column was kept for it did not take what the column was kept for
-                Set<String> quarantined = kept ? quarantined(cfg) : Set.of();
+                // BASIC-WATCH-ARRIVALS-1: what the run adds to the folder's own records - the files it takes and the ones it
+                // sets aside - read on disk, so under either status store; nothing to read when no file waits to be taken
+                boolean takes = only == null || !only.isEmpty();
+                Set<String> quarantined = takes ? quarantined(cfg) : Set.of();
+                Set<String> filesBefore = takes ? fileKeys(cfg) : Set.of();
                 final RunFiles.Scope scope = narrowed;
                 java.util.function.Consumer<Boolean> after = ok -> {
                     boolean good = false;
+                    List<Map<String, String>> setAside = List.of();
                     try {
-                        good = ok && (!kept || quarantined.containsAll(quarantined(cfg)));
+                        setAside = takes ? setAsideSince(cfg, quarantined) : List.of();
+                        // a run that sets a file aside after a column was kept for it did not take what the column was kept for
+                        good = ok && (!kept || setAside.isEmpty());
                         if (scope != null) scope.close();
                         if (!good) job.rollback();   // a column kept for a run that failed is not kept
+                        if (takes) recordArrivals(job, cfg, filesBefore, good, summary);
                     } finally {
                         release(claim);
                     }
-                    if (watched) InboxWatch.ran(dataRoot, id, good ? null : InboxWatch.SERVER_FAULT);   // Data status: watchError
+                    // Data status (watchError): kept until a run that takes a file says otherwise - not cleared by the 30 s
+                    // runs that find nothing to take
+                    if (watched && takes) InboxWatch.ran(dataRoot, id, !ok ? InboxWatch.SERVER_FAULT
+                            : setAside.isEmpty() ? null : InboxWatch.setAside(setAside, dataRoot, writeRoot));
                 };
                 handedOff = true;
                 // a kept column grew the schema: the run reads the Pipeline's config again, or it would read the file
@@ -215,6 +237,53 @@ final class ImportPreRunSteps {
     }
 
     private static final FileStatusStore ON_DISK = new FileStatusStore();
+
+    /**
+     * The files set aside since {@code before} (quarantine paths): the quarantine entries {@code cfg}'s folder holds now that
+     * it did not hold then, read on disk, less each one's companion rejected-rows file ({@code <stem>_errors.csv}, moved in
+     * beside it), which is not a file the run was given.
+     */
+    private static List<Map<String, String>> setAsideSince(PipelineConfig cfg, Set<String> before) {
+        List<Map<String, String>> fresh = new ArrayList<>();
+        for (Map<String, String> q : ON_DISK.quarantine(cfg)) if (!before.contains(String.valueOf(q.get("path")))) fresh.add(q);
+        Set<String> companions = new HashSet<>();
+        for (Map<String, String> q : fresh) companions.add(com.gamma.etl.FileNames.errorsFileName(cfg, String.valueOf(q.get("file"))));
+        List<Map<String, String>> out = new ArrayList<>();
+        for (Map<String, String> q : fresh) if (!companions.contains(String.valueOf(q.get("file")))) out.add(q);
+        return out;
+    }
+
+    /** The per-file ledger rows {@code cfg} holds, as {@code filename|consignment_id}, read on disk as {@link #quarantined}. */
+    private static Set<String> fileKeys(PipelineConfig cfg) {
+        Set<String> out = new HashSet<>();
+        for (Map<String, String> f : ON_DISK.files(cfg)) out.add(f.get("filename") + "|" + f.get("consignment_id"));
+        return out;
+    }
+
+    /**
+     * BASIC-WATCH-ARRIVALS-1: the arrivals sidecar lines of an engine run of the import, as Run now writes them
+     * ({@link OnboardImport.Job#recordArrival}): one per file the run added to the ledger, with its index outcome (the
+     * follow-on's answer in {@code summary}) and the columns the run kept - none when they were taken back ({@code good}
+     * false). Best effort, as every sidecar line.
+     */
+    private static void recordArrivals(OnboardImport.Job job, PipelineConfig cfg, Set<String> before, boolean good,
+                                       Map<String, Object> summary) {
+        try {
+            List<Map<String, String>> took = new ArrayList<>();
+            for (Map<String, String> f : ON_DISK.files(cfg))
+                if (!before.contains(f.get("filename") + "|" + f.get("consignment_id"))) took.add(f);
+            if (took.isEmpty()) return;
+            job.taken = took;
+            if (!good) job.keptColumns = List.of();
+            Map<String, Object> outcome;
+            synchronized (summary) {
+                outcome = new java.util.LinkedHashMap<>(summary);
+            }
+            job.recordArrival(outcome);
+        } catch (RuntimeException lost) {
+            log.warn("Dataset '{}': the arrivals of its run were not recorded: {}", job.id, lost.toString());
+        }
+    }
 
     private static void release(String claim) {
         HELD_BY_RUN.remove(claim);

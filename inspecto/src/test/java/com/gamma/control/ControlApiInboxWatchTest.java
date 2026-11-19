@@ -398,7 +398,108 @@ class ControlApiInboxWatchTest {
                     "the run set the file aside");
             assertEquals(40, OnboardImport.countRows(Path.of("database", id, "database")));
             assertNull(fee(root, id), "the column kept for the file the run set aside is taken back");
-            assertEquals(InboxWatch.SERVER_FAULT, feed(c, id).path("watchError").asText());
+            // BASIC-WATCH-ARRIVALS-1: Data status names the file and the engine's reason, not a server fault
+            assertEquals("'wider.csv' was set aside (field_mismatch)", feed(c, id).path("watchError").asText(),
+                    "the file and its reason, not its rejected-rows companion: " + feed(c, id));
+            for (Map<String, Object> line : sidecar(id))
+                assertNull(line.get("keptColumns"), "a column taken back is not said to be kept: " + line);
+        }
+    }
+
+    // ── BASIC-WATCH-ARRIVALS-1: what a scheduled run records after it ─────────────────────────────────────
+
+    /** The arrivals sidecar lines of the import, oldest first. */
+    private static List<Map<String, Object>> sidecar(String id) {
+        return DatasetArrivals.sidecarLines(Path.of("database"), id);
+    }
+
+    private static Map<String, Object> lineFor(String id, String landed) {
+        return sidecar(id).stream().filter(l -> landed.equals(l.get("landed"))).reduce((a, b) -> b)
+                .orElseThrow(() -> new AssertionError("no arrivals line for " + landed + ": " + sidecar(id)));
+    }
+
+    @Test
+    void aScheduledRunWritesItsArrivalsLine(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        scheduledRunWritesItsArrivalsLine(null, cfg, root);
+    }
+
+    @Test
+    void aScheduledRunWritesItsArrivalsLineUnderTheDatabaseStatusStore(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        scheduledRunWritesItsArrivalsLine(com.gamma.service.DbStatusStore.open("jdbc:duckdb:", null, null), cfg, root);
+    }
+
+    private void scheduledRunWritesItsArrivalsLine(com.gamma.etl.StatusStore status, Path cfg, Path root) throws Exception {
+        EditionFeatures.overrideForTest(Set.of());
+        OnboardImport.followOnsForTest(List.of(new ImportFollowOn() {
+            public String key() { return "index"; }
+            public String does() { return "indexes it"; }
+            public Set<String> needs() { return Set.of(); }
+            public Map<String, Object> run(Context ctx) {
+                return Map.of("result", "BUILT", "mode", "append");
+            }
+        }));
+        try (Ctx c = openOver(status, cfg, root)) {
+            String id = imported(c, "recorded", "stream", ControlApiOnboardFilesTest.transfers(40), null);
+            data(json(c, "PUT", "/datasets/" + id + "/watch", "{\"watch\":true}", null), 200);
+            int before = sidecar(id).size();
+            Path file = inbox(id).resolve("wider.csv");
+            Files.writeString(file, wider(6));
+            poll(c);   // modified just now: not judged; the gate sees it once
+            assertEquals(before, sidecar(id).size(), "a run that takes nothing writes nothing");
+            Files.setLastModifiedTime(file, SETTLED);
+            poll(c);   // judged (its column kept) and taken in the same run
+            assertEquals(46, OnboardImport.countRows(Path.of("database", id, "database")), "the scheduled run took it");
+            assertEquals(before + 1, sidecar(id).size(), "one line for the one file the run took: " + sidecar(id));
+            Map<String, Object> line = lineFor(id, "wider.csv");
+            assertEquals("system", line.get("sender"), line.toString());
+            assertEquals("append", line.get("mode"), line.toString());
+            assertEquals("BUILT", line.get("index"), "the follow-on's index outcome: " + line);
+            assertEquals("append", line.get("indexMode"), line.toString());
+            assertEquals(List.of("fee"), line.get("keptColumns"), "the column the pre-run step kept: " + line);
+            assertNotNull(line.get("batch"), line.toString());
+
+            poll(c);
+            assertEquals(before + 1, sidecar(id).size(), "a run that takes nothing writes nothing");
+            if (status == null) {   // the route reads the service's store: the file-backed one has the run at once
+                String all = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals").toString();
+                assertTrue(all.contains("\"index\":\"BUILT\"") && all.contains("\"keptColumns\":[\"fee\"]"), all);
+            }
+        }
+    }
+
+    @Test
+    void aScheduledRunThatSetsAFileAsideSaysSo(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        scheduledRunThatSetsAFileAsideSaysSo(null, cfg, root);
+    }
+
+    @Test
+    void aScheduledRunThatSetsAFileAsideSaysSoUnderTheDatabaseStatusStore(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        scheduledRunThatSetsAFileAsideSaysSo(com.gamma.service.DbStatusStore.open("jdbc:duckdb:", null, null), cfg, root);
+    }
+
+    private void scheduledRunThatSetsAFileAsideSaysSo(com.gamma.etl.StatusStore status, Path cfg, Path root) throws Exception {
+        EditionFeatures.overrideForTest(Set.of());
+        try (Ctx c = openOver(status, cfg, root)) {
+            String id = imported(c, "emptied", "stream", ControlApiOnboardFilesTest.transfers(40), null);
+            data(json(c, "PUT", "/datasets/" + id + "/watch", "{\"watch\":true}", null), 200);
+            dropSettled(id, "empty.csv", ControlApiOnboardFilesTest.transfers(0));   // the columns match; no row to read
+            poll(c);
+            poll(c);
+            assertFalse(new com.gamma.service.FileStatusStore().quarantine(c.svc().configFor(id).orElseThrow()).isEmpty(),
+                    "the run set the file aside");
+            assertNull(fee(root, id), "no column was kept for it");
+            assertEquals("'empty.csv' was set aside (empty)", feed(c, id).path("watchError").asText(), feed(c, id).toString());
+            assertEquals("'empty.csv' was set aside (empty)", data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200)
+                    .at("/feed/watchError").asText());
+
+            poll(c);
+            assertEquals("'empty.csv' was set aside (empty)", feed(c, id).path("watchError").asText(),
+                    "a run that finds nothing to take does not clear it");
+            dropSettled(id, "good.csv", ControlApiOnboardFilesTest.transfers(5).replace("T0000", "N0000"));
+            poll(c);
+            poll(c);
+            assertEquals(45, OnboardImport.countRows(Path.of("database", id, "database")));
+            assertFalse(feed(c, id).has("watchError"), "a run that takes a file and sets none aside clears it");
         }
     }
 

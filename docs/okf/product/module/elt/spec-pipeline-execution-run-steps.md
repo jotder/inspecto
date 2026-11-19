@@ -81,9 +81,16 @@ last registered first, **after** the run's `RUN` commit steps. `stepRun` wraps `
   failure. The set-aside file is read from the Pipeline's quarantine folder itself (`FileStatusStore.quarantine`), not
   from the service's status store: the default `status.backend=db` store is a projection that catches up only after
   the run (the poll's `syncStatus`), so it would not yet hold the file (tested under both stores). Claims and kept columns are given back on every path, an `Error` included.
+- **The arrivals after the run** (B3, `BASIC-WATCH-ARRIVALS-1`). The `after` writes the run's arrivals sidecar lines as
+  Run now does (`Job.recordArrival`): one per file the run added to the per-file ledger, read on disk
+  (`FileStatusStore.files`) for the same reason as the quarantine, with the follow-on's index outcome — the commit
+  steps hand their outcomes to the run that holds the claim (`ImportPreRunSteps.outcome`) — and the columns kept
+  (none once taken back). A run that has nothing to take (a narrowed run with no settled file) reads neither ledger.
 - **Watch this folder** (B1) is a scheduled run of this kind: the import Pipeline's locked `every: 30s` schedule with a
   `local` Collector and `stability {30s, 2}` (`InboxWatch`). For it the step also waits while `data.self_import` is
-  off (SKIP) and keeps `watchError` for Data status (cleared by a run that succeeds).
+  off (SKIP) and keeps `watchError` for Data status after a run that took a file: the server-fault phrase when the run
+  failed, `'<file>' was set aside (<reason>)` when it set a file aside (its companion `<stem>_errors.csv` not counted),
+  cleared when it set none aside; a run that took nothing leaves it as it is.
 
 ### Honour each every (B1, operator 2026-11-19)
 

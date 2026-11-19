@@ -27,10 +27,6 @@ work; this page keeps the narrative the row carried, verbatim as it stood on the
 
 - `BASIC-ELT-PROFILE-1` — **Basic onboarding as a locked profile of ELT: one implementation, Basic = options locked.** Basic already runs a registered Pipeline, but a parallel layer of about 6,700 backend lines (own 30 s poller, own follow-on seam, arrival rules, sniff and Postgres path in `inspecto/.../control/`) and about 9,400 UI lines in the LA project duplicate ELT parts. Phases: P0 verify (backend, UI), UI-0 move Add data to the core library, UI-1 reuse the schema / connection / grammar / Collector components, BE-1 poller and follow-on, BE-2 arrival rules as engine Pipeline options, BE-3 sniff, BE-4 Postgres as a connector scheme, then the Edition gate. → `superpower/2026-11-19-basic-elt-profile-plan.md`
 
-### BASIC-WATCH-ARRIVALS-1
-
-- `BASIC-WATCH-ARRIVALS-1` — **A watched inbox's scheduled run leaves no arrivals sidecar line and no `watchError` for a quarantined file (filed 2026-11-19, `BASIC-ELT-PROFILE-1` B1 review).** Since B1 *Watch this folder* is the import Pipeline's own 30 s schedule, run by the engine; Add data's in-run `Job.recordArrival` (sha256, index outcome, kept columns per arrival) and the poller's `watchError` for a run that set the file aside no longer happen for it. The arrivals list still shows each file from the engine's file ledger, refusals are still recorded by the pre-run step, and a run that sets aside a file whose column the pre-run step kept does set `watchError` and takes the column back (read from the quarantine folder, so under either status store). Operator 2026-11-19: restored in BE-2 (B3, the arrivals as an engine Pipeline option), not in B1. → `../la-core/architecture-watch-this-folder.md` §6.20
-
 ## Standing refusals and decisions
 
 Board §6: not work — kept so nobody re-files it.

@@ -497,7 +497,8 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   min / max of the Dataset's `eventDate` over the arrival's own Parquet, read in a DuckDB sealed to `<dataRoot>/<id>`.
   Gates as `/freshness` (no capability); an entry whose import fields do not name ITS OWN Add data Pipeline reads nothing.
 - **The sidecar** gets one line per file a run took (`DatasetArrivals.recordRun`): the upload's name, mode, sha256; every
-  file's index outcome and its mode (`append` / `full` / `compact`). *Run now* records the drops it took (`sender: system`).
+  file's index outcome and its mode (`append` / `full` / `compact`). *Run now* records the drops it took (`sender: system`),
+  and so does an engine run of the import, a watched inbox's schedule included (B3, [§6.20](architecture-watch-this-folder.md)).
   A system line is keyed by name AND batch; a line written before senders were recorded reads as an upload. A file
   with NO line (imported before the sidecar existed, 2026-11-03, or its best-effort write lost) is an upload when its
   inbox name is Add data's own `add_<stamp>_<name>` (`DatasetArrivals.ADD_DATA_NAME`), shown as `<name>`; else a
