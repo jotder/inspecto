@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: AI assist
+description: How AI assist is built in two tiers: the read-only or draft-only Assist agent with failure diagnosis, and the Advanced Intelligence agent with sessions, tool calls, playbook Triage Runs, an approvals gate and a kill switch.
+item: module.intelligence
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [features/inspecto-intelligence]
+---
+
 # AI assist
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.

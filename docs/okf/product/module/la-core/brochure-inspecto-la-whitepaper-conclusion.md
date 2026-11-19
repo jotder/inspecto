@@ -2,6 +2,11 @@
 type: Brochure
 title: Inspecto LA whitepaper — Conclusion and architectural recommendation
 description: Part 6 of 6 of Inspecto LA whitepaper: · Conclusion & architectural recommendation
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA whitepaper — Conclusion and architectural recommendation

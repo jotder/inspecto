@@ -1,3 +1,14 @@
+---
+type: Plan
+title: Space evolution — a Space the server understands as a whole, reached without breaking one
+description: Plan for making a Space something the server understands as a whole without breaking one: the safety net, workstreams SE-0 to SE-6 (all startable steps built 2026-11-12/13), order, decisions, risks, and what remains gated on releases.
+item: module.config
+audience: internal
+status: plan
+verified: 2026-11-17 last-edit
+code: [platform/inspecto-config]
+---
+
 # Space evolution — a Space the server understands as a whole, reached without breaking one
 
 > **Plan page** for Product Map Item `module.config`. **State:** every startable step built and pushed 2026-11-12/13

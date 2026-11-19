@@ -5,6 +5,11 @@ description: A regulator-format report (SAR / STR shaped) rendered once from a R
 resource: features/inspecto-regulatory-reporting/src/main/java/com/gamma/regreporting/RegulatoryReportRoutes.java
 tags: [control-plane, regulatory-reporting, maker-checker, four-eyes, sar, case, incident, add-on]
 timestamp: 2026-10-09T00:00:00Z
+item: module.regulatory-reporting
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-regulatory-reporting
 ---
 
 # Regulatory Reporting

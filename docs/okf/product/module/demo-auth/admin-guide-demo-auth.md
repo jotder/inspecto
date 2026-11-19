@@ -5,6 +5,11 @@ description: Build and run a demo bundle with Demo User sign-in, author demo-use
 resource: providers/inspecto-demo-auth/
 tags: [module, demo-auth, admin-guide, demo, packaging]
 timestamp: 2026-10-19T00:00:00Z
+item: module.demo-auth
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-demo-auth
 ---
 
 # Demo authenticator — admin guide

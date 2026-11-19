@@ -2,6 +2,11 @@
 type: Brochure
 title: Inspecto LA short videos — scripts and agency briefs — Videos 4-7, what they show and open points
 description: Part 4 of 4 of Inspecto LA short videos — scripts and agency briefs: · Retire the red string (about 40 s); · It stays current (about 1 min 30 s); · The analyst — dramatization (about 65 s); · One graph for any data (about 100 s); What these videos show, and what Standard and above add; Open points before filming
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA short videos — scripts and agency briefs — Videos 4-7, what they show and open points

@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis ownership showcase — brochure
+description: Brochure for the Link Analysis ownership showcase: a hidden beneficial owner behind layered stakes, sanctions exposure two hops away, a nominee director and circular ownership, found among 6 000 companies.
+item: solution-pack.la-ownership
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-ownership]
+---
+
 # Link Analysis ownership showcase — brochure
 
 > **Who really owns your customer? A hidden owner behind five layers of 24 % stakes, a sanctioned person two hops away, a nominee director of 120 companies and a circle of companies paying each other, found among 6 000 companies and 5 000 people.**

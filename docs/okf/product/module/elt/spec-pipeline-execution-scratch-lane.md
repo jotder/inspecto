@@ -4,6 +4,11 @@ title: Pipeline execution — engines, lanes, test run, dry run, park and drain,
 description: Part 3 of 5 of Pipeline execution — engines, lanes, test run, dry run, park and drain, post-sync chains: The scratch lane — Pipeline test run (run-to-here)
 tags: [elt, engine, pipeline, plugins, spi, node-types, catalog, transform, seam, lift, lower, round-trip, authoring, gotcha, pipeline-graph, execution, lanes, ingest, job, scratch, test-run, dry-run, park, drain, post-sync, consignment, output, sink, partition, quarantine, ducklake, export, object-storage, s3, hdfs, job-type, post-action]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # Pipeline execution — engines, lanes, test run, dry run, park and drain, post-sync chains — The scratch lane — Pipeline test run

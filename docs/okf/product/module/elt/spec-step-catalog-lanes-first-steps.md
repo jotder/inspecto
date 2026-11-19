@@ -4,6 +4,11 @@ title: Step catalog — every Step kind, delivered and pending — The two lanes
 description: Part 1 of 5 of Step catalog — every Step kind, delivered and pending: The two lanes (read this before authoring a chain); collect → acquisition — the Collector; parse → the 7 parser.* frontends; transform → transform.filter — Row filter; lookup → transform.lookup — Lookup & static map transcoder; explode → transform.explode — Array exploder; unpivot → transform.matrix.unpivot — Unpivot / …
 tags: [pipeline-graph, steps, catalog, processors, palette, examples, roadmap]
 timestamp: 2026-09-06T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # Step catalog — every Step kind, delivered and pending — The two lanes, and collect to shift

@@ -4,6 +4,11 @@ title: "Assistant agent — features"
 description: "The Assistant agent adds optional AI assist skills to Inspecto, discovered through the AssistAgent SPI."
 tags: [agent, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.agent
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-agent
 ---
 
 # Assistant agent — features

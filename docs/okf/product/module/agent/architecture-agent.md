@@ -5,6 +5,11 @@ description: The assistant agent in four parts — the eoiagent architecture (el
 resource: jotder/inspect-agent/docs/architecture/, jotder/inspect-agent, features/inspecto-agent/, features/inspecto-agent/src/main/java/com/gamma/agent/  # the two jotder/… entries are the upstream GitHub repo; NOT local paths (corrected 2026-09-09)
 tags: [agentic, architecture, hexagonal, ports, application-pack, eoiagent, overview, langchain4j, module, agent, assist, vendored-kernel, optional, inspecto, model-transport, intelligence]
 timestamp: 2026-07-07T00:00:00Z  # the first three parts; the integration part carried 2026-07-16. Part types were Concept, Overview, Module, Concept
+item: module.agent
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-agent
 ---
 
 # Assistant agent and eoiagent
@@ -59,7 +64,7 @@ in-product help (signature output: a `NavigationIntent` that routes the user to 
   adapter modules per port (`model`, `knowledge`, `tool`, `runtime`, `memory`, `scratchpad`, `safety`,
   `persistence`, `observability`, `config`); the host facade (`host`); the Application-Pack SPI
   (`app-api`) + bootstrap (`platform`); `eval`; a worked reference pack (`app-reference`); `examples`.
-* ⚠ **Version — this part's `0.1.0-SNAPSHOT` is stale (corrected 2026-09-08).** A `v0.1.0` tag was cut
+* ⚠ **Version — this part's `0.1.0-SNAPSHOT` is stale.** A `v0.1.0` tag was cut
   2026-07-08 and the trunk bumped; this reactor now pins **`0.2.0-SNAPSHOT`**, rebuilt from the upstream
   branch head by CI. See [the Assistant spec](plan-assistant.md) §3.9.
 * **Maturity** — phases 0–2 implemented, phase 3 + the 3.5 "wire everything into the live ask() path"

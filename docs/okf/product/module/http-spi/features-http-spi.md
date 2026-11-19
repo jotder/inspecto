@@ -4,6 +4,11 @@ title: "Route module contract — features"
 description: "The route module contract lets an optional module contribute its own Control API routes."
 tags: [http-spi, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.http-spi
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spi/inspecto-http-spi
 ---
 
 # Route module contract — features

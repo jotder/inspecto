@@ -4,6 +4,8 @@ title: "Tutorial: run it — install, sign-in, backup, upgrade and audit"
 description: "Install a Standard bundle, connect sign-in through an OpenID Connect provider, put the server behind a reverse proxy, back up and restore a Space, upgrade the bundle in place, verify the audit chain and open the Help."
 item: layer.platform
 audience: external
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Tutorial: run it — install, sign-in, backup, upgrade and audit

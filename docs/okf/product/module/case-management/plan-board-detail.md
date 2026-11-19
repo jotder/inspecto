@@ -4,6 +4,11 @@ title: module.case-management - board row detail
 description: The narrative behind module.case-management's long rows on the board (docs/BACKLOG.md), moved here verbatim so each board row stays a short summary.
 tags: [module, case-management, plan, backlog]
 timestamp: 2026-11-19T00:00:00Z
+item: module.case-management
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: features/inspecto-case-management
 ---
 
 # module.case-management - board row detail

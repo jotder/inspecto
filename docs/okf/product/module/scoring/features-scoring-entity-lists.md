@@ -4,6 +4,11 @@ title: "Risk Scores and Entity Lists — features"
 description: "Two modules sold as one add-on:  - **Risk Scores** — features/inspecto-scoring (id scoring, package com.gamma.risk): an explainable 0–100 score   per entity from weighted factors, computed by the risk.score Job."
 tags: [scoring, scoring-entity-lists, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.scoring
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-scoring
 ---
 
 # Risk Scores and Entity Lists — features

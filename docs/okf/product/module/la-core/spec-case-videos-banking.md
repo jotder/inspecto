@@ -5,6 +5,11 @@ description: "The v2 spoken script, screen action and marks of the six banking c
 resource: tools/render-la-demo-video.mjs
 tags: [module, la-core, link-analysis, video, case, banking, spec]
 timestamp: 2026-11-19T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA case videos v2 — Banking and finance

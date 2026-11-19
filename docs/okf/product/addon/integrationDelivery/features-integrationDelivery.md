@@ -4,6 +4,11 @@ title: "Integration & Delivery — features"
 description: "Integration & Delivery sends platform notifications out over external channels."
 tags: [integrationDelivery, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: addon.integrationDelivery
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-notify-channels
 ---
 
 # Integration & Delivery — features

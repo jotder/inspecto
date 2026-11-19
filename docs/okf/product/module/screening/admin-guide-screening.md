@@ -5,6 +5,11 @@ description: "Enabling the screening add-on, permissions, Job parameters, hit st
 resource: features/inspecto-screening/src/main/resources/META-INF/inspecto/module.toon
 tags: [screening, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.screening
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-screening
 ---
 
 # Screening — admin guide

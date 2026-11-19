@@ -4,6 +4,11 @@ title: Pipeline model — node types, the Step catalog, transforms and the edita
 description: Part 3 of 4 of Pipeline model — node types, the Step catalog, transforms and the editable round-trip: Transforms & Modularity Seams; The editable round-trip — the editor's graph ⇄ the canonical config
 tags: [elt, engine, pipeline, plugins, spi, node-types, catalog, transform, seam, lift, lower, round-trip, authoring, gotcha, pipeline-graph, execution, lanes, ingest, job, scratch, test-run, dry-run, park, drain, post-sync, consignment, output, sink, partition, quarantine, ducklake, export, object-storage, s3, hdfs, job-type, post-action]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # Pipeline model — node types, the Step catalog, transforms and the editable round-trip — Transforms, modularity seams and the editable round-trip
@@ -26,7 +31,7 @@ These behavior-preserving seams keep the engine modular (SQL / `.toon` / on-disk
   implementations: `CsvIngestStrategy` (default) and `StreamingPluginIngestStrategy` (renamed 2026-08-31; this
   page said `BatchIngestStrategy` → `ConsignmentIngestStrategy`, `CsvBatchStrategy` → `CsvIngestStrategy` and
   `StreamingPluginBatchStrategy` → `StreamingPluginIngestStrategy` until 2026-09-08) (the
-  [plugin](spec-ingest.md#plugin-ingester) path). Each owns its DuckDB connection lifecycle; the shared commit+audit tail in
+  [plugin](spec-ingest-plugin-ingester.md#plugin-ingester) path). Each owns its DuckDB connection lifecycle; the shared commit+audit tail in
   `ConsignmentIngestor` is path-agnostic. The interface also carries static helpers (`dropTable`, `dropView`,
   `partitionColumns`).
 

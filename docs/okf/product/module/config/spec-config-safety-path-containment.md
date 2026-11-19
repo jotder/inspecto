@@ -4,6 +4,11 @@ title: Config Safety Validator — Path containment and the config write routes
 description: Part 1 of 4 of Config Safety Validator: Path containment: one primitive, five callers; Object-store containment — PathJail.requireObjectStore (2026-10-18, SCALEOUT-OBJSTORE-DATABASE-DIR-1); The /config/* write routes never reach registry/ or a reserved file (CONFIG-WRITE-REGISTRY-1, 2026-09-27); Decision 2026-09-23 — a relative DATA path resolves under the Space directory
 tags: [config, safety, validation, path-jail, security]
 timestamp: 2026-06-28T00:00:00Z
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-config
 ---
 
 # Config Safety Validator — Path containment and the config write routes

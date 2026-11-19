@@ -4,6 +4,11 @@ title: Step catalog — every Step kind, delivered and pending — Webhook and E
 description: Part 4 of 5 of Step catalog — every Step kind, delivered and pending: webhook → sink.webhook — the outbound webhook; excel → sink.excel — the Excel workbook sink; The delivered processors that are not chain Steps — where their keys live
 tags: [pipeline-graph, steps, catalog, processors, palette, examples, roadmap]
 timestamp: 2026-09-06T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # Step catalog — every Step kind, delivered and pending — Webhook and Excel sinks, and the non-chain processors
@@ -191,7 +196,7 @@ target's at-rest Parquet. A FAILED check opens a deduplicated `expectation:<name
 under `<write-root>/registry` (`ExpectationRoutes`). It is never a chain Step.
 [ingestion § Expectations](plan-elt.md). Parser:
 `Expectation.fromMap`. Spec: `ConfigSpecs.expectation()`, the same twenty-two keys (the last eight are the
-`baseline` kind's — [observability § Baseline Expectations](../observability/plan-observability.md#310-baseline-expectations-duckle-c8-2026-09-24)).
+`baseline` kind's — [observability § Baseline Expectations](../observability/plan-observability-ops-lens-decisions.md#310-baseline-expectations-duckle-c8-2026-09-24)).
 
 | Key | Type · default | What it does |
 |---|---|---|
@@ -245,7 +250,7 @@ four disjoint shapes, chosen by which keys are present:
 **Function.** Two outputs, and neither is a node the author adds. A file the engine cannot process
 at all is moved to `dirs.quarantine`, under a reason sub-directory: `field_mismatch/`, `unreadable/`,
 `corrupt_download/` or `retry_exhausted/`
-([operations-reference § Quarantine](../../layer/platform/admin-guide-operations-reference.md#quarantine),
+([operations-reference § Quarantine](../../layer/platform/admin-guide-operations-reference-output-audit.md#quarantine),
 [output-sinks § Quarantine outcomes](spec-sinks.md#quarantine-outcomes)). The rows a
 parse rejects drain to `<dirs.errors>/<base>_errors.csv`. The lift models a quarantine *node* (a
 `sink.persistent` carrying `dir`, never `database`) only for selector/segments pipelines. Otherwise the

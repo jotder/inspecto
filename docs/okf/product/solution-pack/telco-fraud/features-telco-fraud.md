@@ -4,6 +4,11 @@ title: "Telecom fraud — features"
 description: "Fourteen telecom fraud typologies over synthetic CDR, subscriber-event and payment feeds, with per-offender Alert Rules."
 tags: [telco-fraud, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.telco-fraud
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/telco-fraud
 ---
 
 # Telecom fraud — features

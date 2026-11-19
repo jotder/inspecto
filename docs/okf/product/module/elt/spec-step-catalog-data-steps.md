@@ -4,6 +4,11 @@ title: Step catalog — every Step kind, delivered and pending — Binning to si
 description: Part 3 of 5 of Step catalog — every Step kind, delivered and pending: binning → transform.data.binning — Histogram & quantile binner; correlation → transform.stats.correlation — Pearson correlation & linear regression; dedup → transform.dedup — Record deduplicator; join → transform.join — Reference join; sql → transform.sql — the Record Transformer; summarize → transform.summarize — Group-by …
 tags: [pipeline-graph, steps, catalog, processors, palette, examples, roadmap]
 timestamp: 2026-09-06T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # Step catalog — every Step kind, delivered and pending — Binning to sink — data, privacy and routing Steps

@@ -4,6 +4,11 @@ title: "Scoring & Lists — features"
 description: "Scoring & Lists combines Entity Lists with Risk Scores."
 tags: [scoringLists, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: addon.scoringLists
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [features/inspecto-entity-list, features/inspecto-scoring]
 ---
 
 # Scoring & Lists — features

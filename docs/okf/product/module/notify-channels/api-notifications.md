@@ -4,6 +4,11 @@ title: "Notifications — API"
 description: "Control-plane routes for Notifications, with their gates."
 tags: [notify-channels, notifications, api]
 timestamp: 2026-10-19T00:00:00Z
+item: module.notify-channels
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-notify-channels
 ---
 
 # Notifications — API

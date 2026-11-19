@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Case Management
+description: How Case Management works: a Case is an operational object of type CASE grouping Incidents by CONTAINS links, and the case-management module adds Case Rules, merge, split, open-from-entities and the Case routes.
+item: module.case-management
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [features/inspecto-case-management]
+---
+
 # Case Management
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.

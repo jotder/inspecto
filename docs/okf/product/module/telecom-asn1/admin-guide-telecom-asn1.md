@@ -5,6 +5,11 @@ description: Installing, confirming, securing and troubleshooting the optional i
 resource: providers/inspecto-telecom-asn1/
 tags: [module, telecom-asn1, asn1, admin-guide, editions]
 timestamp: 2026-10-19T00:00:00Z
+item: module.telecom-asn1
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-telecom-asn1
 ---
 
 # Telecom ASN.1 decoder — admin guide

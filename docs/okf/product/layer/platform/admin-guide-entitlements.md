@@ -4,6 +4,10 @@ title: "Platform — entitlements"
 description: "How a signed entitlement narrows what an install runs: issuing one with tools/entitle.mjs, installing it beside the bundle, what it switches off, what it does not narrow yet, and how the issuer key is kept."
 tags: [platform, admin-guide, entitlement, licence]
 timestamp: 2026-11-11T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-14 last-edit
 ---
 
 # Platform — entitlements

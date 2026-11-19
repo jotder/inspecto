@@ -4,6 +4,9 @@ title: Expectation
 description: What an Expectation is — a data-quality check on the records of a Dataset — what happens when it fails, and how it differs from an Alert Rule.
 item: module.elt
 audience: external
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # Expectation

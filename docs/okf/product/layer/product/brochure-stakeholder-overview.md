@@ -1,3 +1,13 @@
+---
+type: Brochure
+title: Inspecto — Platform Overview & Strategy
+description: Platform overview and strategy for business and technical stakeholders (2026-06-19): the problem, what Inspecto is, its architecture and processing model, capability inventory, editions, quality, maturity, roadmap and risks.
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+---
+
 # Inspecto — Platform Overview & Strategy
 
 *A configuration-driven data ingestion, processing, and operational-intelligence platform*
@@ -373,7 +383,7 @@ The forward plan is organized into three horizons — **Now**, **Next**, and **L
 
 ### 10.3 Next (committed direction)
 
-> 🔴 **Corrected 2026-09-09 (docs-consolidation step 6).** This heading read "**not yet started**" and listed four items that had shipped between 2026-07-07 and 2026-07-24 — including the one it called "the single highest-leverage item for commercialization". **This is the document an executive reads**, so the error was the most expensive kind of staleness in the doc set: it under-promised a delivered product. Each verdict below was re-checked against the capability spec that owns the row, not against another roadmap.
+> Each verdict below is checked against the capability spec that owns the row, not against another roadmap.
 
 - ✅ **`inspecto-security` module (Standard edition) — SHIPPED 2026-07-24.** An `Authenticator` SPI plus OIDC resource-server validation, RBAC/ABAC from token claims, HTTPS, and actor-attributed audit. Delivered as a Maven module assembled into Standard by profile; Personal simply does not bundle it. *Incremental hardening on the framework-free core — explicitly not a Spring/Quarkus migration.* ⚠ Residual hardening is tracked as `SEC-7` in `okf/product/module/access/plan-security.md` §2, not here.
 - 🟡 **Object-storage connectors — SHIPPED; network-share — REFUSED.** S3 / MinIO / GCS-interop and Azure Blob landed 2026-07-08 and native GCS 2026-07-22, all SDK-free on the connector SPI. ⛔ NFS/SMB was **not** built as a connector: the supported pattern is an OS-mounted share read as a local path, and a UNC path stays jail-rejected by design. So `ACQ-4` is PARTIAL rather than shipped — stating it as "planned" hid a **decision**, which is worse than hiding a delay.
@@ -386,7 +396,7 @@ The forward plan is organized into three horizons — **Now**, **Next**, and **L
 - **Enterprise distributed tier** — shared-state backends (Postgres for status, object store for events, shared secrets), distributed scheduler coordination, work distribution, and per-tenant ABAC. The seams are already open; this is opt-in and against the single-JVM default by design.
 - **Richer "AI behind every screen" UX** — inline natural-language authoring across the console (a parallel track; benefits from GPU availability on the deployment).
 - **Multi-step agent graphs** — provision → watch → roll back orchestration, beyond today's single-shot generate→validate→return skills.
-- ✅ **Push-based / event-notification discovery — SHIPPED 2026-07-08 (`ACQ-6`), not Later.** `POST /collectors/{id}/notify` lets an external system trigger an immediate scan, and `collector.discovery: watch` adds WatchService push for local or mounted inboxes with the poll loop kept as a backstop. ⚠ Corrected 2026-09-09; `../platform/plan-roadmap.md` had it demand-gated here too.
+- ✅ **Push-based / event-notification discovery — SHIPPED 2026-07-08 (`ACQ-6`), not Later.** `POST /collectors/{id}/notify` lets an external system trigger an immediate scan, and `collector.discovery: watch` adds WatchService push for local or mounted inboxes with the poll loop kept as a backstop.
 
 ### 10.5 Cross-cutting & continuous
 
@@ -442,3 +452,9 @@ This overview synthesizes: the consolidated reference set (`docs/consolidated/`)
 ---
 
 *Maintained by Inspecto engineering. For the forward plan see [../platform/plan-roadmap.md](../platform/plan-roadmap.md).*
+
+## Changes
+
+- 2026-09-09: §10.3 corrected (docs-consolidation step 6) — the heading read "**not yet started**" and listed four items
+  that had shipped between 2026-07-07 and 2026-07-24, including the one it called "the single highest-leverage item for
+  commercialization". Push-based discovery had also been listed as demand-gated, as in the roadmap.

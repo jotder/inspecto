@@ -4,6 +4,11 @@ title: Link Analysis — as-built reference and design records — Product, code
 description: Part 1 of 6 of Link Analysis — as-built reference and design records: Product, code layout and the studio; Pattern packs; AI-derived projection mappings; Dense-graph link labels
 tags: [module, la-core, link-analysis, architecture]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — as-built reference and design records — Product, code layout, pattern packs and labels

@@ -1,3 +1,13 @@
+---
+type: Guide
+title: Journey: a safe config change
+description: Walk-through of a safe config change: authoring in the editor, a scratch-only dry run, the SaveGate with ConfigSafetyValidator, maker-checker Pending Changes, and config history with restore.
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+---
+
 # Journey: a safe config change
 
 ## Purpose

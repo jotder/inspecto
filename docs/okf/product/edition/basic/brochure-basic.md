@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Inspecto Basic — brochure
+description: Sales brochure for the Basic edition: a single-machine data-assurance desk with three ways to add data, checked imports, Pipelines, Datasets, dashboards and Link Analysis, with nothing else to install.
+item: edition.basic
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: offerings/basic.toon
+---
+
 # Inspecto Basic — brochure
 
 > **Land your files, check them, explore them as a graph — on one machine, with nothing else to install.**
@@ -39,5 +50,5 @@ Ask for a Basic build and start from the Orders starter template — a first liv
 
 ## Read more
 
-- This Edition's hub: [index](index.md); the full module and Add-on matrix is in [spec-editions.md](../../layer/platform/spec-editions.md)
+- This Edition's hub: [index](index.md); the full module and Add-on matrix is in [spec-editions-placement.md](../../layer/platform/spec-editions-placement.md#add-ons-by-edition)
 - Whole-product sales material: [executive brief](../../layer/product/brochure-executive-brief.md) · [solution overview](../../layer/product/brochure-solution-overview.md) · [enterprise whitepaper](../../layer/product/brochure-enterprise-whitepaper.md) · [competitive landscape](../../layer/product/brochure-competitive-landscape.md)

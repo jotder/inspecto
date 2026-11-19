@@ -5,6 +5,10 @@ description: The single sanctioned place to map a status/severity/level to a col
 resource: inspecto-ui/src/app/inspecto/components/status-badge.component.ts
 tags: [design-system, status, badge, color-owner]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
 ---
 
 # Status Badge

@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Graph library
+description: The server-side graph library (platform/inspecto-graph): plain-JDK algorithms over node and edge ids — paths, flow, centrality, PageRank, communities, k-core, link prediction, propagated risk and a temporal motif matcher — and who calls it.
+item: module.graph
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [platform/inspecto-graph]
+---
+
 # Graph library
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.

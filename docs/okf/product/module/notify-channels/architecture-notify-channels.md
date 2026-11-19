@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Notifications
+description: How Notifications turn platform events into messages over three channels — the in-app feed with Server-Sent Events push in every edition, and the email and webhook NotificationChannel providers on Standard and above.
+item: module.notify-channels
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [providers/inspecto-notify-channels]
+---
+
 # Notifications
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.

@@ -4,6 +4,11 @@ title: "Authentication and capability contract — features"
 description: "The authentication and capability contract defines `Authenticator`, `TokenRelay`, `AccessDecider`, `Subject`, `SecretsProvider` and `SecretResolver`."
 tags: [auth-spi, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.auth-spi
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spi/inspecto-auth-spi
 ---
 
 # Authentication and capability contract — features

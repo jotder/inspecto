@@ -4,6 +4,11 @@ title: "Kafka stream connector — features"
 description: "The Kafka stream connector adds the `kafka` scheme to the Collector connector family."
 tags: [connectors-kafka, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.connectors-kafka
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-connectors-kafka
 ---
 
 # Kafka stream connector — features

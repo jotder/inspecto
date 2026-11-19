@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Inspecto Preview — brochure
+description: Brochure for the Preview build: every module (today identical to Advanced) plus demo sign-in and the seeded Link Analysis showcases, for evaluation and presales rather than production.
+item: edition.preview
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: offerings/preview.toon
+---
+
 # Inspecto Preview — brochure
 
 > **Everything Inspecto has, in one build — to evaluate, demonstrate and try what is coming next.**
@@ -33,5 +44,5 @@ Ask your Inspecto contact for a Preview build and a guided showcase walk-through
 
 ## Read more
 
-- This Edition's hub: [index](index.md); the full module and Add-on matrix is in [spec-editions.md](../../layer/platform/spec-editions.md)
+- This Edition's hub: [index](index.md); the full module and Add-on matrix is in [spec-editions-placement.md](../../layer/platform/spec-editions-placement.md#add-ons-by-edition)
 - Whole-product sales material: [executive brief](../../layer/product/brochure-executive-brief.md) · [solution overview](../../layer/product/brochure-solution-overview.md) · [enterprise whitepaper](../../layer/product/brochure-enterprise-whitepaper.md) · [competitive landscape](../../layer/product/brochure-competitive-landscape.md)

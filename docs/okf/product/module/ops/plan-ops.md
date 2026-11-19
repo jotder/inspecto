@@ -5,6 +5,11 @@ description: Where the requirement of record for the operational-object module (
 resource: features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon
 tags: [ops, plan, requirements, incidents, cases]
 timestamp: 2026-10-19T00:00:00Z
+item: module.ops
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: features/inspecto-ops
 ---
 
 # Case management and objects — plan of record

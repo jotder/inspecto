@@ -4,6 +4,11 @@ title: "Link Analysis Investigations — features"
 description: "The Investigations add-on lifts Link Analysis from the Explorer level to recorded, evidence-grade Investigations."
 tags: [laInvestigations, linkAnalysis, features, presales]
 timestamp: 2026-10-22T00:00:00Z
+item: addon.laInvestigations
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-ops
 ---
 
 # Link Analysis Investigations — features

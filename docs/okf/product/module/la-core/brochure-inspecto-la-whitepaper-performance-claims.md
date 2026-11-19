@@ -2,6 +2,11 @@
 type: Brochure
 title: Inspecto LA whitepaper — Performance, sizing, limits and the claims register
 description: Part 5 of 6 of Inspecto LA whitepaper: · Performance benchmarks, sizing & operational limits; · Transparent Claims Register (Evidentiary disclosure)
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA whitepaper — Performance, sizing, limits and the claims register

@@ -4,6 +4,11 @@ title: "Incidents — features"
 description: "An **Incident** is an operational object of type INCIDENT (ObjectType, in platform/inspecto-workflow/src/main/java/com/gamma/workflow/ObjectType.java) that records something wrong and is worked to resolution."
 tags: [incidents, incidents, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: addon.incidents
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-ops
 ---
 
 # Incidents — features

@@ -5,6 +5,11 @@ description: "Enabling the intelligence module, its permissions, configuration, 
 resource: features/inspecto-intelligence/
 tags: [intelligence, admin-guide, autonomy, egress]
 timestamp: 2026-10-19T00:00:00Z
+item: module.intelligence
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-intelligence
 ---
 
 # AI assist and intelligence — admin guide

@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Inspecto LA whitepaper
+description: Front page of the Inspecto LA (Link Analysis) whitepaper for risk, security, financial-crime and fraud leaders: the summary and the six parts it is split into, each with the sections it holds.
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: [la/inspecto-la-core]
+---
+
 # Inspecto LA whitepaper
 > **Sovereign Graph Operations: In-Process Entity Investigation, High-Scale Parquet Indexing, and Forensic Integrity Without Cluster or Cloud Sprawl**
 > *Audience: Chief Risk Officers (CRO), Chief Information Security Officers (CISO), Heads of Financial Crime & AML, Telecom Fraud Operations, Lead Enterprise Architects, Forensic Investigators, and the technical stakeholders who evaluate the system*

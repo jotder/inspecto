@@ -5,6 +5,11 @@ description: Dataset-vs-Dataset (and 3-way) reconciliation read one day at a tim
 resource: inspecto-ui/src/app/modules/admin/reconciliation/
 tags: [feature, reconciliation, breaks, board, paging, dat-7, recon-perf-1]
 timestamp: 2026-07-16T00:00:00Z
+item: module.reconciliation
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-reconciliation
 ---
 
 # Reconciliation

@@ -5,6 +5,11 @@ description: The one canonical Signal envelope + type catalog + addressing gramm
 resource: platform/inspecto-engine/src/main/java/com/gamma/signal/Signal.java
 tags: [control-plane, signal, agent, a2ui, ag-ui, agentic-write, deadlock]
 timestamp: 2026-07-19T00:00:00Z
+item: module.event
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-event
 ---
 
 # Signal Backbone

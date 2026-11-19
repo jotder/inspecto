@@ -5,6 +5,11 @@ description: Enabling Regulatory Reporting, who may draft and approve, templates
 resource: features/inspecto-regulatory-reporting/src/main/resources/META-INF/inspecto/module.toon
 tags: [regulatory-reporting, admin-guide, four-eyes, configuration]
 timestamp: 2026-10-19T00:00:00Z
+item: module.regulatory-reporting
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-regulatory-reporting
 ---
 
 # Regulatory Reporting — admin guide

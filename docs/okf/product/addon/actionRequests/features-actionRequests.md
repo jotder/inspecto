@@ -4,6 +4,11 @@ title: "Action Requests — features"
 description: "Action Requests let the platform ask an external system to do something — through the `invoke-api` consequence — and track the request."
 tags: [actionRequests, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: addon.actionRequests
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-action-requests
 ---
 
 # Action Requests — features

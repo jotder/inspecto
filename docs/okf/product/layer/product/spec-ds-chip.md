@@ -5,6 +5,10 @@ description: Shared tag / token / filter pill (outline|soft × neutral|primary, 
 resource: inspecto-ui/src/app/inspecto/components/chip.component.ts
 tags: [design-system, chip, tag, filter]
 timestamp: 2026-07-17T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
 ---
 
 # Chip

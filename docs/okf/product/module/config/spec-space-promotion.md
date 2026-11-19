@@ -1,3 +1,14 @@
+---
+type: Spec
+title: Space promotion — a whole Space applied to an existing Space as a previewed change set (SE-6b)
+description: Space promotion (SE-6b): applying one Space's whole configuration to an existing Space as a previewed change set of added, changed and removed files — decisions, the two routes, gates and kill switch.
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-15 last-edit
+code: [platform/inspecto-config]
+---
+
 # Space promotion — a whole Space applied to an existing Space as a previewed change set (SE-6b)
 
 **State:** built 2026-11-13 (SE-6b of the Space evolution plan, §4.6, under D-SE7 and its 2026-11-13 detail). Two

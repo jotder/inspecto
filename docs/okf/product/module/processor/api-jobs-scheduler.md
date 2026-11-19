@@ -4,6 +4,11 @@ title: "Jobs and scheduler — API"
 description: "Control-plane routes for Jobs and scheduler, with their gates."
 tags: [processor, jobs-scheduler, api]
 timestamp: 2026-10-19T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: inspecto
 ---
 
 # Jobs and scheduler — API

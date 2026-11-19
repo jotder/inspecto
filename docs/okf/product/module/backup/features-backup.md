@@ -4,6 +4,11 @@ title: "Backup and restore — features"
 description: "Backup and restore contributes the `backup`, `backup_verify` and `restore` maintenance tasks."
 tags: [backup, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.backup
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-backup
 ---
 
 # Backup and restore — features

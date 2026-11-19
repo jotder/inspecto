@@ -2,6 +2,11 @@
 type: Brochure
 title: Inspecto LA whitepaper — Systems architecture and data plane engineering
 description: Part 3 of 6 of Inspecto LA whitepaper: · Systems architecture & data plane engineering
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA whitepaper — Systems architecture and data plane engineering

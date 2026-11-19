@@ -1,3 +1,14 @@
+---
+type: Guide
+title: Inspecto LA: the 30-minute cross-vertical tour (mobile money, audit, claims)
+description: Run of show for a 30-minute Link Analysis tour of three verticals (mobile money, audit, claims) on one server: setup, timed scenes with clicks, expected results and traps, a persona panel checklist and claims not to make.
+item: solution-pack.la-showcase
+audience: internal
+status: current
+verified: 2026-11-16 last-edit
+code: [spaces/_templates/la-showcase]
+---
+
 # Inspecto LA: the 30-minute cross-vertical tour (mobile money, audit, claims)
 
 *Status: written 2026-10-24 from a full browser rehearsal on one locally packaged Demo Auth bundle (`package.ps1 -Edition Advanced -DemoAuth -Ui la-app -NoBakeDemo` *(removed 2026-11-10 by `PRODUCT-ASSEMBLY-1` PA-2; today `package.ps1 -Edition Advanced -Product la -Distribution demo -NoBakeDemo`)*, build `31539d9c5`, `serve-demo.bat` on a free port with `-Dla.embed.enabled=true`), driven as the real Demo Users in the built-in browser. Row `LA-SHOWCASE-REHEARSAL-1`. Every figure below was read on screen in that pass unless marked **not driven**. The items left then were driven on 2026-10-28 on the reorganized Studio (section 5). Synthetic data only; the plants are planted, so no figure here is a detection rate.*

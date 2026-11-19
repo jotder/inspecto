@@ -4,6 +4,11 @@ title: Link Analysis — as-built reference and design records — Closed-plan r
 description: Part 6 of 6 of Link Analysis — as-built reference and design records: Closed-plan record; InvestigationStore port; Consolidated as-built facts
 tags: [module, la-core, link-analysis, architecture]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — as-built reference and design records — Closed-plan record and consolidated as-built facts

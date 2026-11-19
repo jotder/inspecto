@@ -4,6 +4,10 @@ title: "Platform — the builder kit"
 description: "For builders, integrators, OEMs and partner App authors: every way to extend Inspecto - Studio, the Pipeline editor, the Step, Collector, Consequence and Job type extension points, the Control API and its OpenAPI document, the Java embedding API, the App kit and the Add-on picker - with where each lives and the doc to read next."
 tags: [platform, user-guide, builder-kit, extension, partner]
 timestamp: 2026-11-11T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
 ---
 
 # Platform — the builder kit

@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Inspecto LA Standard demos — from the Basic walk-through to a sealed Dossier
+description: Draft scripts for two Telecom demo videos that continue the Basic walk-through into Standard features — sign-in, Investigations, four-eyes, Entity Lists — up to a sealed Dossier, with the recording setup.
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-16 last-edit
+code: [la/inspecto-la-core]
+---
+
 # Inspecto LA Standard demos — from the Basic walk-through to a sealed Dossier
 
 > **Draft of 2026-11-16, not reviewed by product or legal.** Operator direction (2026-11-16): the case demos showed Basic only;

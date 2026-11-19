@@ -5,6 +5,11 @@ description: AI model / provider settings for the assistant and AI-backed featur
 resource: inspecto-ui/src/app/modules/admin/model-settings/model-settings.routes.ts
 tags: [feature, model-settings, settings, ai]
 timestamp: 2026-06-28T00:00:00Z
+item: module.agent
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
+code: features/inspecto-agent
 ---
 
 # Model Settings

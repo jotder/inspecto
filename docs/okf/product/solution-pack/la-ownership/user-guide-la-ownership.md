@@ -4,6 +4,11 @@ title: "Link Analysis ownership showcase — user guide"
 description: "A five-minute tour of the la-ownership Space and one exercise per planted story (hidden owner, sanctions two hops away, nominee director, circular ownership), each with a hint and an answer."
 tags: [la-ownership, user-guide]
 timestamp: 2026-11-07T00:00:00Z
+item: solution-pack.la-ownership
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-ownership
 ---
 
 # Link Analysis ownership showcase — user guide

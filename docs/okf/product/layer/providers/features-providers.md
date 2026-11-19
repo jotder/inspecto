@@ -4,6 +4,10 @@ title: "Providers — features"
 description: "Providers are the pluggable implementations behind the SPI contracts — sign-in, secrets, policy, connectors, decoders, geo lookup."
 tags: [providers, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: layer.providers
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
 ---
 
 # Providers — features

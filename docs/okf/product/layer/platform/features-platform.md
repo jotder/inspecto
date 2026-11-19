@@ -4,6 +4,10 @@ title: "Platform — features"
 description: "The platform is the framework-free Java engine and control plane every Edition shares: JDK HttpServer, manual wiring, ServiceLoader SPIs and embedded DuckDB."
 tags: [platform, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
 ---
 
 # Platform — features

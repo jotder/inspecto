@@ -2,6 +2,11 @@
 type: Brochure
 title: Inspecto LA short videos — scripts and agency briefs — Industry videos
 description: Part 2 of 4 of Inspecto LA short videos — scripts and agency briefs: · Industry videos — one per industry (9 videos)
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA short videos — scripts and agency briefs — Industry videos

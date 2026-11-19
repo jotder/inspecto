@@ -4,6 +4,11 @@ title: "Link Analysis ownership showcase — architecture"
 description: "How the la-ownership template is built: seven feeds, seven Pipelines, one link Job with an engine-side fuzzy name match, four saved views, and how its stories are generated and pinned."
 tags: [la-ownership, architecture]
 timestamp: 2026-11-07T00:00:00Z
+item: solution-pack.la-ownership
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-ownership
 ---
 
 # Link Analysis ownership showcase — architecture

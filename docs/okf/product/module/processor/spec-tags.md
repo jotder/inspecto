@@ -5,6 +5,11 @@ description: One label graph over five entity kinds — `(targetKind, targetId)`
 resource: features/inspecto-ops/src/main/java/com/gamma/ops/tag
 tags: [tags, labels, cross-entity, assignment, authorization]
 timestamp: 2026-07-12T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
+code: inspecto
 ---
 
 # Tags — the cross-entity label graph

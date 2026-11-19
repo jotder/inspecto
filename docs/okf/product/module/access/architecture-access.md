@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Identity and Access
+description: How Identity and Access decides who is calling and what they may do — core contracts, the ServiceLoader modules for OIDC sign-in, secrets, ABAC Access Policies and demo sign-in, and which edition carries each.
+item: module.access
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [platform/inspecto-access]
+---
+
 # Identity and Access
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.

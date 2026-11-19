@@ -5,6 +5,11 @@ description: Configure OIDC sign-in (auth.oidc.* flags, Keycloak or WSO2 preset,
 resource: providers/inspecto-oidc/
 tags: [module, oidc, admin-guide, keycloak, wso2, tls, cacerts]
 timestamp: 2026-11-01T00:00:00Z
+item: module.oidc
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-oidc
 ---
 
 # OIDC authenticator and token relay — admin guide

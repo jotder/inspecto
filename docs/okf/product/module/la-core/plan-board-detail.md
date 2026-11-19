@@ -4,6 +4,11 @@ title: module.la-core - board row detail
 description: The narrative behind module.la-core's long rows on the board (docs/BACKLOG.md), moved here verbatim so each board row stays a short summary.
 tags: [module, la-core, plan, backlog]
 timestamp: 2026-11-19T00:00:00Z
+item: module.la-core
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # module.la-core - board row detail

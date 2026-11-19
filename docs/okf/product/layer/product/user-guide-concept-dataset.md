@@ -4,6 +4,8 @@ title: Dataset
 description: What a Dataset is — any table of data you can query in Inspecto — how you get one, and what its columns and Measures are for.
 item: layer.product
 audience: external
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Dataset

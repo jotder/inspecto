@@ -5,6 +5,11 @@ description: Configure a kafka Connection (brokers, topic, SASL, TLS passthrough
 resource: providers/inspecto-connectors-kafka/
 tags: [module, connectors-kafka, kafka, collector, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.connectors-kafka
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-connectors-kafka
 ---
 
 # Kafka stream connector — admin guide

@@ -4,6 +4,11 @@ title: ELT — architecture — Engine code, design scope and how a file becomes
 description: Part 2 of 3 of ELT — architecture: Where the engine's code lives; Design Philosophy & Scope; How a file becomes Tables
 tags: [elt, acquisition, phases, dedup, watermark, stability, ledger, multi-location, composition, pattern, module, core, composition-root, inspecto-processor, engine, architecture, stage1, multiplexer, ingest, layout, pipeline-graph, lift, node-types, derived, tokens, sinks, consignment, observability, audit, provenance, quarantine, status]
 timestamp: 2026-11-18T00:00:00Z  # merged 2026-11-18 from the elt, acquire and engine architecture pages; the multi-location ingest part carried type Practice (2026-08-25)
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # ELT — architecture — Engine code, design scope and how a file becomes Tables
@@ -127,7 +132,7 @@ output file count are decoupled. Two complementary mechanisms do the routing:
   of how the input was split across files.
 - **Segment demultiplexing (plugin path).** A single input file can carry
   multiple record types (e.g. CALL + SMS interleaved in one CDR file). The
-  [plugin ingester](spec-ingest.md#plugin-ingester) splits these into independent typed
+  [plugin ingester](spec-ingest-plugin-ingester.md#plugin-ingester) splits these into independent typed
   streams, each with its own schema and its own partitioned output tree. One
   input → many typed outputs.
 
@@ -190,7 +195,7 @@ does these; see the scope note above):
 These constraints are what make the engine fast, parallel, and crash-isolated.
 Because no batch needs shared reference state, every batch is an embarrassingly
 parallel, single-pass unit with its own DuckDB connection (see
-[Batch Processing](../../layer/platform/admin-guide-operations-reference.md#batch-processing)). Adding joins or lookups would force
+[Batch Processing](../../layer/platform/admin-guide-operations-reference-batch-processing.md#batch-processing)). Adding joins or lookups would force
 shared state, serialize the batch model, and break the clean M..N routing. If
 you need heavy joins or enrichment, do it **downstream** — query the
 Hive-partitioned Parquet output through the
@@ -212,7 +217,7 @@ Because different file formats need different handling, configuration is
 organized **per format** rather than forced into one shape — and that
 divergence is intended. Delimited text uses `csv_settings`; binary/proprietary
 formats use a plugin `ingester` plus `ingester_config`. See
-[Configuration by source format](../config/admin-guide-configuration-reference.md#configuration-by-source-format) for the map,
+[Configuration by source format](../config/admin-guide-configuration-reference-spaces.md#configuration-by-source-format) for the map,
 and [spec-parsing.md](spec-parsing.md) for the parse model.
 
 ---

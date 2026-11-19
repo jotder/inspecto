@@ -4,6 +4,11 @@ title: Jobs & Scheduling — The parameter contract, failure handling and single
 description: Part 2 of 4 of Jobs & Scheduling: The parameter contract & runtime Expressions (shipped 2026-08-07/10); Failure handling: retry, alarm, misfire, re-run (JOB-RELIABILITY-1, decision D8, 2026-10-27); Three single-seam properties, confirmed by audit (2026-09-15)
 tags: [control-plane, jobs, scheduling, cron, triggers, async-runs]
 timestamp: 2026-07-07T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: inspecto
 ---
 
 # Jobs & Scheduling — The parameter contract, failure handling and single-seam properties

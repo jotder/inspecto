@@ -1,3 +1,14 @@
+---
+type: Plan
+title: Sales, commissions, marketing and churn: a plan (`PACK-SALES-MARKETING-1`)
+description: Parked plan for a sales, commissions, marketing and churn pack (competitive gap V): what exists, four lanes, data model and Alert Rules, a three-way split of the board row, phased slices, RFP traceability and open decisions.
+item: solution-pack.business-assurance
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/business-assurance]
+---
+
 # Sales, commissions, marketing and churn: a plan (`PACK-SALES-MARKETING-1`)
 
 > ⏸ **PARKED 2026-10-22 — design only, demand-gated; not in flight.** To resume: move it back to docs/superpower/ and rank its BACKLOG row.

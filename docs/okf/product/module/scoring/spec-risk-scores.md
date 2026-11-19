@@ -5,6 +5,11 @@ description: The risk-score component kind, the risk.score Job that writes the s
 resource: platform/inspecto-engine/src/main/java/com/gamma/risk/RiskScoreEvaluator.java
 tags: [control-plane, risk-score, job, alert-rule, incident, assurance, ws-22]
 timestamp: 2026-09-27T00:00:00Z
+item: module.scoring
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: features/inspecto-scoring
 ---
 
 # Risk Scores

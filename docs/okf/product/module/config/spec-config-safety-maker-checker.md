@@ -4,6 +4,11 @@ title: Config Safety Validator — Maker-checker and Safety Policy tier files
 description: Part 4 of 4 of Config Safety Validator: Maker-checker — Pending Changes (2026-09-26); Safety Policy tier files — loading and the unreadable refusal (2026-10-03/04, DUCKLE-C6-POLICY-NARROWING-1 S2a + S2b)
 tags: [config, safety, validation, path-jail, security]
 timestamp: 2026-06-28T00:00:00Z
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-config
 ---
 
 # Config Safety Validator — Maker-checker and Safety Policy tier files
@@ -13,7 +18,7 @@ Part 4 of 4 of [Config Safety Validator](spec-config-safety.md) · previous: [Jo
 ## Maker-checker — Pending Changes (2026-09-26)
 
 *`ASSURE-MAKER-CHECKER-1` S1–S3.* Glossary: **Pending Change**, **Approval Policy**. Security side:
-[auth & security](../access/admin-guide-auth-security.md#maker-checker-a-held-config-change-needs-a-different-person-assure-maker-checker-1-2026-09-26).
+[auth & security](../access/admin-guide-auth-security-imports-maker-checker.md#maker-checker-a-held-config-change-needs-a-different-person-assure-maker-checker-1-2026-09-26).
 
 **The policy** — `approval.toon` in the Space config root, `GET|PUT /settings/approval`:
 `{approval: {<kind>: {required, approverCapability, fourEyes}}, expiresAfterHours}` (defaults: off, the

@@ -5,6 +5,10 @@ description: Reusable "nothing here yet" placeholder with icon, message, and an 
 resource: inspecto-ui/src/app/inspecto/components/empty-state.component.ts
 tags: [design-system, empty-state]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
 ---
 
 # Empty State

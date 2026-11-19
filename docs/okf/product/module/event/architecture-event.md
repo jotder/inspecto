@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Events and event log
+description: How the per-Space, append-only event log works: the EventLog bus and EventStore, lifecycle, log and audit events, the Events screen, saved filters, and audit search, export and hash-chain verification.
+item: module.event
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [platform/inspecto-event]
+---
+
 # Events and event log
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.

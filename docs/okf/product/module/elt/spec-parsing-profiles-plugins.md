@@ -4,6 +4,11 @@ title: Parsing — frontends, the parsing block, parser plugins, XML and ASN.1, 
 description: Part 2 of 3 of Parsing — frontends, the parsing block, parser plugins, XML and ASN.1, Decode Profiles: Per-format profiles (copy-paste starting points); Decision matrix — pick a frontend; Roadmap status and corrections to the PDF; Parser plugins — the self-describing Parser framework
 tags: [elt, engine, ingestion, spi, streaming, consignment, ingester, duckdb, seam, partitions, contract-test, plugins, segments, quarantine, route, branch, arming, fail-closed, lanes, addressing, revisions, watermark, selector, event-time, concurrency, scheduler, priority, backpressure, operations, parsing, grammar, csv, plugin, read-csv, frontend, options, asn1, xml, decode-profile]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # Parsing — frontends, the parsing block, parser plugins, XML and ASN.1, Decode Profiles — Format profiles, decision matrix and parser plugins
@@ -61,7 +66,7 @@ No native DuckDB fixed-width reader, so the engine carves slices itself. Two rou
   `com.gamma.ingester.FixedWidthRecordIngester` (a `StreamingFileIngester`), wired via
   `processing.ingester` + `processing.segments` + an `ingester_config` carrying `record_length`,
   `encoding`, `trim`, and `fields[]{name,start,length}`. It reads N-byte records and `emit()`s byte
-  slices; see [§6 *Fixed-length binary records*](spec-ingest.md#fixed-length-binary-records-fixedwidthrecordingester) above.
+  slices; see [§6 *Fixed-length binary records*](spec-ingest-plugin-ingester.md#fixed-length-binary-records-fixedwidthrecordingester) above.
 
 ### P.6.4 JSON / NDJSON `[LIVE]`
 ```yaml
@@ -206,7 +211,7 @@ mechanism is literally "emit events" (CALL/SMS/… → separate event tables).
 ### P.6.8 Custom binary (fixed or TLV) `[PLUGIN]`
 Same shape as P.6.7. Put `record_length`, `byte_order`, field offsets in `ingester_config`; your
 ingester reads structs and `emit()`s. The `large_file_bytes`/generation mode
-([§ Execution modes](spec-ingest.md#execution-modes--the-framework-picks-by-file-size) above) keeps TB-scale
+([§ Execution modes](spec-ingest-plugin-ingester.md#execution-modes--the-framework-picks-by-file-size) above) keeps TB-scale
 binaries within bounded memory.
 
 ---

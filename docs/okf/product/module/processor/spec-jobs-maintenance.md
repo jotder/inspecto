@@ -4,6 +4,11 @@ title: Jobs & Scheduling — Maintenance jobs and the push and process jobs
 description: Part 3 of 4 of Jobs & Scheduling: Maintenance jobs (MNT, shipped 2026-07-12); objectstore.export — the push post-action (shipped 2026-09-24); consignment.process — the third-party Consignment SPI (shipped 2026-08-04); Three corrections worth keeping about commit-fired work
 tags: [control-plane, jobs, scheduling, cron, triggers, async-runs]
 timestamp: 2026-07-07T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: inspecto
 ---
 
 # Jobs & Scheduling — Maintenance jobs and the push and process jobs

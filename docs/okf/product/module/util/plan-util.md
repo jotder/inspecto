@@ -4,6 +4,11 @@ title: "Utilities, DuckDB access, TOON helpers, module manifests — plan"
 description: "Requirement of record for the shared utility module: what is required, built, left and refused."
 tags: [util, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.util
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: platform/inspecto-util
 ---
 
 # Utilities, DuckDB access, TOON helpers, module manifests — plan

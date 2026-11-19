@@ -4,6 +4,11 @@ title: Link Analysis — User Guide — Worked examples, roles, limits and troub
 description: Part 5 of 7 of Link Analysis — User Guide: Worked examples; Who can do what: roles and editions; Limits and honest behaviour; Troubleshooting; Vocabulary; If you used the old Studio
 tags: [module, la-core, link-analysis, user-guide]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — User Guide — Worked examples, roles, limits and troubleshooting

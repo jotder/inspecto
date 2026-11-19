@@ -5,6 +5,11 @@ description: The operational event stream — backend filters, live tail, saved 
 resource: inspecto-ui/src/app/modules/admin/events/events.routes.ts
 tags: [feature, events, operations, live-tail, pro]
 timestamp: 2026-06-28T00:00:00Z
+item: module.event
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-event
 ---
 
 # Events & Activity

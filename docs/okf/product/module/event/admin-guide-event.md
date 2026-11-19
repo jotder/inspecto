@@ -4,6 +4,11 @@ title: "Event model and log — admin guide"
 description: "How to choose, place, back up and troubleshoot the event store and audit chain."
 tags: [event, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.event
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-event
 ---
 
 # Event model and log — admin guide

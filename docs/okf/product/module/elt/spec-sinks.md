@@ -5,6 +5,11 @@ description: Where a Pipeline's rows land: the OutputFormat strategy, partitione
 resource: platform/inspecto-engine/src/main/java/com/gamma/pipeline/PipelineEditable.java, platform/inspecto-engine/src/main/java/com/gamma/inspector/ConsignmentIngestStrategy.java, platform/inspecto-etl/src/main/java/com/gamma/etl/PartitionWriter.java
 tags: [elt, engine, pipeline, plugins, spi, node-types, catalog, transform, seam, lift, lower, round-trip, authoring, gotcha, pipeline-graph, execution, lanes, ingest, job, scratch, test-run, dry-run, park, drain, post-sync, consignment, output, sink, partition, quarantine, ducklake, export, object-storage, s3, hdfs, job-type, post-action]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # Sinks — writers, store layout, destinations and object-storage export
@@ -96,7 +101,7 @@ one-element shorthand; `PipelineConfig.sinks()` is never empty (it synthesises t
   `finalizeSource` (backup / markers-LAST / ledger) is per-source-file, so it runs exactly once
   regardless of destination count. `ConsignmentGraphRunner` is not used by this fan-out. (⚠ When written, 2026-08-02, this line called it "the
   flow-job executor, unused by ingest"; since 2026-08-29 it drives the ingest graph fork — see
-  [spec-ingest.md](spec-ingest.md#11-branch-aware-ingest--route-on-the-poll-driven-path).)
+  [spec-ingest.md](spec-ingest-branch-aware.md#11-branch-aware-ingest--route-on-the-poll-driven-path).)
 * **Bypass guards** — paths that skip `writeAndTrace` (native single-member `streamingIngest`/
   `chunkedIngest`; plugin `GenerationModeIngester`) materialise via the union path when `sinks>1`
   (`CsvIngestStrategy`, `StreamingPluginIngestStrategy`).

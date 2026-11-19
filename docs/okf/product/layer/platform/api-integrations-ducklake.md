@@ -5,6 +5,10 @@ description: Registering pipeline output in a DuckLake catalog, and the warehous
 resource: platform/inspecto-etl/src/main/java/com/gamma/etl/DuckLakeRegistrar.java
 tags: [integrations, ducklake, warehouse, pg-duckdb]
 timestamp: 2026-07-16T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
 ---
 
 # DuckLake & Warehouse Query Layer

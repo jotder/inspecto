@@ -4,6 +4,11 @@ title: "Link Analysis trade showcase — install"
 description: "Install the la-trade showcase from its three downloads (product, Space, data), start it on any edition, check what it loaded, reset it, and rebuild its data."
 tags: [la-trade, admin-guide, install]
 timestamp: 2026-11-07T00:00:00Z
+item: solution-pack.la-trade
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-trade
 ---
 
 # Link Analysis trade showcase — install

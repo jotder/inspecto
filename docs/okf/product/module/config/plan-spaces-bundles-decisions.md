@@ -4,6 +4,11 @@ title: Spaces & tenancy (SPC) — Anomaly Model examples, bundles, decisions and
 description: Part 4 of 4 of Spaces & tenancy (SPC): Decisions; Not built; Refused & superseded; As-built mechanism (pointers only); Verification
 tags: [spc, capability, spaces, tenancy, multi-space, space-root, migrator, templates, metadata-bundle, exchange, isolation]
 timestamp: 2026-09-08T00:00:00Z
+item: module.config
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: platform/inspecto-config
 ---
 
 # Spaces & tenancy (SPC) — Anomaly Model examples, bundles, decisions and verification

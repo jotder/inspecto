@@ -4,6 +4,11 @@ title: "Risk Scores and Entity Lists — screens"
 description: "Where Risk Scores and Entity Lists lives in the UI and what each screen does."
 tags: [scoring, scoring-entity-lists, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.scoring
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-scoring
 ---
 
 # Risk Scores and Entity Lists — screens

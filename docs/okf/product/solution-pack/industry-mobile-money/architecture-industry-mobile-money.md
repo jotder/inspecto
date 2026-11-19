@@ -4,6 +4,11 @@ title: "Mobile money industry pack — architecture"
 description: "How the mobile-money Industry pack relabels Link Analysis through a Space's domain profile."
 tags: [industry-mobile-money, architecture]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.industry-mobile-money
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-entity-store/src/main/resources/META-INF/inspecto/industry-packs/mobile-money
 ---
 
 # Mobile money industry pack — architecture

@@ -4,6 +4,11 @@ title: Inspecto LA training videos — F · Investigations (Standard): narration
 description: Part 3 of 3 of Inspecto LA training videos — F · Investigations (Standard): narration scripts: F7_Masked-data-reveal-and-identity-resolution; F8_Evidence-coverage-Dossier-and-sealed-bundle; F9_From-finding-to-action
 tags: [module, la-core, link-analysis, user-guide, training, video]
 timestamp: 2026-11-16T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA training videos — F · Investigations (Standard): narration scripts — Episodes F7-F9 — masked data, evidence and action

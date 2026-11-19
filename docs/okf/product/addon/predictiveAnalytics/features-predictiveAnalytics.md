@@ -4,6 +4,11 @@ title: "Predictive Analytics — features"
 description: "Predictive Analytics assigns customers to declared segments from their recency, frequency and spend, scores how likely each is to churn, and forecasts a Measure per series."
 tags: [predictiveAnalytics, features, presales]
 timestamp: 2026-11-01T00:00:00Z
+item: addon.predictiveAnalytics
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-predictive
 ---
 
 # Predictive Analytics — features

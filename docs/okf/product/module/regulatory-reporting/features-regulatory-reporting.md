@@ -4,6 +4,11 @@ title: "Regulatory Reporting — features"
 description: "Regulatory Reporting turns a Case or an Incident into a regulator-format document (XML, CSV or JSON) from a **Report Template**, has a second person approve it, and submits the exact approved bytes to a jailed **file drop**."
 tags: [regulatory-reporting, regulatory-reporting, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.regulatory-reporting
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-regulatory-reporting
 ---
 
 # Regulatory Reporting — features

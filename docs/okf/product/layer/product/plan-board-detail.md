@@ -4,6 +4,10 @@ title: layer.product - board row detail
 description: The narrative behind layer.product's long rows on the board (docs/BACKLOG.md), moved here verbatim so each board row stays a short summary.
 tags: [layer, product, plan, backlog]
 timestamp: 2026-11-19T00:00:00Z
+item: layer.product
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
 ---
 
 # layer.product - board row detail

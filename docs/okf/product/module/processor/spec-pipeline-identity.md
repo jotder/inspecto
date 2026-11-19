@@ -5,6 +5,11 @@ description: The identity model and its four operations — `label` display-only
 resource: inspecto/src/main/java/com/gamma/control
 tags: [pipeline, identity, rename, template, migration]
 timestamp: 2026-08-17T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-17 last-edit
+code: inspecto
 ---
 
 # Pipeline identity: rename & Save-as-template

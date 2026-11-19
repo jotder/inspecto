@@ -5,6 +5,11 @@ description: Enabling the email and webhook channels, the notify.* flags, permis
 resource: providers/inspecto-notify-channels/src/main/resources/META-INF/inspecto/module.toon
 tags: [notify-channels, notifications, admin-guide, smtp, webhook, configuration]
 timestamp: 2026-10-19T00:00:00Z
+item: module.notify-channels
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-notify-channels
 ---
 
 # Notifications — admin guide

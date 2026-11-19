@@ -4,6 +4,11 @@ title: "Business assurance — features"
 description: "Seasonal revenue forecast with a prediction band, and margin erosion by product, channel and partner."
 tags: [business-assurance, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.business-assurance
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/business-assurance
 ---
 
 # Business assurance — features

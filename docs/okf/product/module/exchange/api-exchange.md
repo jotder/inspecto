@@ -4,6 +4,11 @@ title: "Exchange (multi-entity sharing) — API"
 description: "Control-plane routes for Exchange (multi-entity sharing), with their gates."
 tags: [exchange, exchange, api]
 timestamp: 2026-10-19T00:00:00Z
+item: module.exchange
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-exchange
 ---
 
 # Exchange (multi-entity sharing) — API

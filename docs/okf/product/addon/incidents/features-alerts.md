@@ -4,6 +4,11 @@ title: "Alerts — features"
 description: "An **Alert Rule** is an operator-saved, deterministic threshold check; an **Alert** is the stored record a breach raises."
 tags: [incidents, alerts, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: addon.incidents
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-ops
 ---
 
 # Alerts — features

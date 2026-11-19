@@ -4,6 +4,11 @@ title: "SQL guard and helpers — architecture"
 description: "How the two-layer SQL defence (guard, then sealed sandbox) is put together and where it is used."
 tags: [sql, architecture]
 timestamp: 2026-10-19T00:00:00Z
+item: module.sql
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-sql
 ---
 
 # SQL guard and helpers — architecture

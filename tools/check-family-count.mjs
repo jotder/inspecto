@@ -51,7 +51,10 @@ const ENUM_FILE = 'inspecto/src/main/java/com/gamma/service/OperationalDb.java';
 /** Docs whose prose states the count. Add a file here when it starts quoting the roster's size. */
 const DOC_FILES = [
     'docs/okf/product/module/engine/spec-db-layer-schemas-continued.md',
-    'docs/okf/product/layer/platform/plan-data-plane.md',
+    'docs/okf/product/module/engine/spec-db-layer-topology-postgres.md',
+    'docs/okf/product/layer/platform/plan-data-plane-scope.md',
+    'docs/okf/product/layer/platform/plan-data-plane-specification.md',
+    'docs/okf/product/layer/platform/plan-data-plane-decisions-verification.md',
     'docs/superpower/enterprise-scale-out-plan.md',
 ];
 

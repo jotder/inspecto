@@ -4,6 +4,11 @@ title: "Collector and export connectors — features"
 description: "Collector and export connectors bring files and tables in from remote systems and push results out."
 tags: [connectors, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.connectors
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-connectors
 ---
 
 # Collector and export connectors — features

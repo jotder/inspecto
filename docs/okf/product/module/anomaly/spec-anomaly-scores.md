@@ -5,6 +5,11 @@ description: The anomaly-model component kind, the anomaly.score Job writing the
 resource: features/inspecto-anomaly/src/main/java/com/gamma/anomaly/AnomalyScoreEvaluator.java
 tags: [control-plane, anomaly-score, job, alert-rule, incident, assurance, entity-list]
 timestamp: 2026-10-10T00:00:00Z
+item: module.anomaly
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: features/inspecto-anomaly
 ---
 
 # Anomaly Scores

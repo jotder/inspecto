@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Telecom bypass (SIM-box) — brochure
+description: Brochure for the Telecom bypass (SIM-box) pack: which SIMs behave like part of a SIM-box from existing CDRs, with an explainable score, allow lists, and one Incident and Case per suspected box.
+item: solution-pack.telco-bypass
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/telco-bypass]
+---
+
 # Telecom bypass (SIM-box) — brochure
 
 > **See which SIMs behave like part of a SIM-box, from the CDRs you already have, with every signal and every decision explained.**

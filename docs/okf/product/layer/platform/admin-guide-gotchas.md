@@ -5,6 +5,10 @@ description: The non-obvious backend pitfalls that are expensive to rediscover â
 resource: docs/archived-documents/project-notes-2026-11-19.md
 tags: [gotchas, pitfalls, toon, duckdb, mdc, deadlock]
 timestamp: 2026-07-16T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Cross-Cutting Gotchas

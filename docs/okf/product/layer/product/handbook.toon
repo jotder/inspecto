@@ -683,6 +683,21 @@ chapters:
         type: unsorted
         tracks[1]: operator
         audience: internal
+      admin_guide_demo_preflight_script:
+        file: docs/okf/product/module/la-core/admin-guide-demo-preflight-script.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_demo_short_version_records:
+        file: docs/okf/product/module/la-core/admin-guide-demo-short-version-records.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_demo_stakeholder_qa:
+        file: docs/okf/product/module/la-core/admin-guide-demo-stakeholder-qa.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
       admin_guide_la_core:
         file: docs/okf/product/module/la-core/admin-guide-la-core.md
         type: unsorted
@@ -745,6 +760,21 @@ chapters:
         audience: internal
       user_guide_training_d_analysis_toolbox:
         file: docs/okf/product/module/la-core/user-guide-training-d-analysis-toolbox.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_d_analysis_toolbox_connections:
+        file: docs/okf/product/module/la-core/user-guide-training-d-analysis-toolbox-connections.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_d_analysis_toolbox_patterns:
+        file: docs/okf/product/module/la-core/user-guide-training-d-analysis-toolbox-patterns.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_d_analysis_toolbox_money_scope:
+        file: docs/okf/product/module/la-core/user-guide-training-d-analysis-toolbox-money-scope.md
         type: unsorted
         tracks[1]: builder
         audience: internal
@@ -1018,6 +1048,16 @@ chapters:
         type: unsorted
         tracks[1]: operator
         audience: internal
+      admin_guide_configuration_reference_spaces:
+        file: docs/okf/product/module/config/admin-guide-configuration-reference-spaces.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_configuration_reference_collector_types:
+        file: docs/okf/product/module/config/admin-guide-configuration-reference-collector-types.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
       user_guide_config:
         file: docs/okf/product/module/config/user-guide-config.md
         type: unsorted
@@ -1089,6 +1129,26 @@ chapters:
         type: unsorted
         tracks[1]: operator
         audience: internal
+      admin_guide_operations_reference_output_audit:
+        file: docs/okf/product/layer/platform/admin-guide-operations-reference-output-audit.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_operations_reference_batch_processing:
+        file: docs/okf/product/layer/platform/admin-guide-operations-reference-batch-processing.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_operations_reference_status_backend:
+        file: docs/okf/product/layer/platform/admin-guide-operations-reference-status-backend.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_operations_reference_deployment:
+        file: docs/okf/product/layer/platform/admin-guide-operations-reference-deployment.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
       admin_guide_operations:
         file: docs/okf/product/layer/platform/admin-guide-operations.md
         type: unsorted
@@ -1101,6 +1161,21 @@ chapters:
         audience: internal
       admin_guide_auth_security:
         file: docs/okf/product/module/access/admin-guide-auth-security.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_auth_security_abac_decisions:
+        file: docs/okf/product/module/access/admin-guide-auth-security-abac-decisions.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_auth_security_boot_guards:
+        file: docs/okf/product/module/access/admin-guide-auth-security-boot-guards.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_auth_security_imports_maker_checker:
+        file: docs/okf/product/module/access/admin-guide-auth-security-imports-maker-checker.md
         type: unsorted
         tracks[1]: operator
         audience: internal

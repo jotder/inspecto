@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Inspecto LA short vertical videos — collage style, real product screens
+description: Draft scripts for 85-second vertical (9:16) collage-style Link Analysis videos built from real product screens, with the shot format and the bank mule-ring short and live versions.
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-16 last-edit
+code: [la/inspecto-la-core]
+---
+
 # Inspecto LA short vertical videos — collage style, real product screens
 
 > **Draft of 2026-11-15, not reviewed by product or legal.** About 85 seconds, 9:16, for social and presales. Style taken from the operator's reference video (*How Graph Analytics Uncovers Hidden Fraud Rings*): a grainy noir paper-collage world, one prop per beat, a new picture every 5 to 10 seconds, and a short serif caption on a cream strip that follows the narration three words at a time. **Unlike the reference, every picture is a real Inspecto LA screen** (the shipped showcase Space, synthetic data) in a torn-paper print, with the camera panning across it to the ids named in the voice. Same telling rules as [brochure-video-industry-scripts.md](brochure-video-industry-scripts.md): the industry problem first, then the data, the mapping, the investigation step by step, the conclusion; **no record counts**; the scale message (millions of records, search and filter in moments); the outcome is a lead and never a verdict.

@@ -4,6 +4,11 @@ title: "Link Analysis showcase (feature off) — architecture"
 description: "Differences from la-showcase: an empty Space with geoLink disabled."
 tags: [la-showcase-off, architecture]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.la-showcase-off
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-showcase-off
 ---
 
 # Link Analysis showcase (feature off) — architecture

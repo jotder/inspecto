@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Business assurance — brochure
+description: Sales brochure for the Business assurance pack: a seasonal revenue forecast with an Alert for each day outside its band, margin-erosion Alerts by product, channel and partner, KPIs and a dashboard.
+item: solution-pack.business-assurance
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/business-assurance]
+---
+
 # Business assurance — brochure
 
 > **See revenue drift and margin erosion the day they happen, not at quarter end.**

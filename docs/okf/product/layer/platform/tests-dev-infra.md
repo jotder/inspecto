@@ -4,6 +4,10 @@ title: Local dev services for the skipping suites
 description: The docker-compose services that turn on the test suites which skip without a real backing service, and the commands for each (moved from dev-infra/README.md).
 tags: [dev-infra, docker, testing, postgres, oidc]
 timestamp: 2026-11-19T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # `dev-infra/` — the local services the skipping test suites need

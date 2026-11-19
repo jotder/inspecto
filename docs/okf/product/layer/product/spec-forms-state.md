@@ -5,6 +5,10 @@ description: Reactive forms with inline errors; signal state; optimistic mutatio
 resource: inspecto-ui/src/app/inspecto/api/optimistic.ts
 tags: [forms, reactive-forms, property-rows, pen-field, option-picker, signals, state, optimistic-ui]
 timestamp: 2026-11-04T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-16 last-edit
 ---
 
 # Forms & State

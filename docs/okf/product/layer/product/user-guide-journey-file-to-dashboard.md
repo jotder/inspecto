@@ -1,3 +1,13 @@
+---
+type: Guide
+title: Journey: from a file to a dashboard
+description: Walk-through of one file from a remote store to a number on a Dashboard — Connection, Collector, parse and ingest, lakehouse commit, Pipeline Run, Dataset, Measure and Widget — naming the screen and /api/v1 route at each step.
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+---
+
 # Journey: from a file to a dashboard
 
 ## Purpose

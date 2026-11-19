@@ -5,6 +5,10 @@ description: The repo's enforcement surface — which guards are wired, the two 
 resource: tools/ · .github/workflows/ · .githooks/pre-push
 tags: [ci, guards, testing, verification, packaging]
 timestamp: 2026-09-07T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-17 last-edit
 ---
 
 # Guards that cannot fail

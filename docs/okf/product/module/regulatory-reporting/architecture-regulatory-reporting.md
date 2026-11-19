@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Regulatory Reporting
+description: How Regulatory Reporting turns a Case or Incident into a regulator-format document from a Report Template, has a second person approve it, and submits the approved bytes to a jailed file drop.
+item: module.regulatory-reporting
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [features/inspecto-regulatory-reporting]
+---
+
 # Regulatory Reporting
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.
