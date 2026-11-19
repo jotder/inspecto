@@ -9,6 +9,7 @@ import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.CollectorService;
 import com.gamma.service.CollectorService.PreRun;
 import com.gamma.service.SpaceContext;
+import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.http.ApiContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +38,9 @@ import java.util.Set;
  *       cannot judge the inbox under it. A scheduled run of a Dataset someone else holds does not start (the next tick
  *       looks again); a person's run of one goes ahead untouched - Add data's own run is such a run. A kept column is
  *       undone when the run fails. A scheduled run of a local folder with a stability window judges only the files
- *       unmodified for that window and takes only those: a file still being written is never judged half-written.</li>
+ *       unmodified for that window and takes only those: a file still being written is never judged half-written.
+ *       <i>Watch this folder</i> ({@link InboxWatch}, B1) is such a scheduled run: it also waits while Add data is off in
+ *       the Space, and keeps what Data status says after it ({@code watchError}).</li>
  * </ul>
  */
 final class ImportPreRunSteps {
@@ -142,6 +145,9 @@ final class ImportPreRunSteps {
             if (content == null || !OnboardImport.isOurs(writeRoot, id, content, service)) return PreRun.GO;
             PipelineConfig cfg = service.configFor(id).orElse(null);
             if (cfg == null) return PreRun.GO;
+            // B1: Watch this folder is a scheduled run of the import; while Add data is off in the Space it waits (as before)
+            boolean watched = scheduled && InboxWatch.watched(content, cfg);
+            if (watched && !DataSettings.forRoot(writeRoot).selfImportInForce()) return PreRun.SKIP;
             String claim = writeRoot + "|" + id;
             if (!OnboardImport.IN_FLIGHT.add(claim)) return scheduled ? PreRun.SKIP : PreRun.GO;   // Add data, a rewrite or a delete holds it
             HELD_BY_RUN.add(claim);
@@ -159,6 +165,8 @@ final class ImportPreRunSteps {
                 job.rollback();
                 release(claim);
                 log.warn("Dataset '{}' before its run failed: {}", id, failed.toString());
+                if (watched) InboxWatch.ran(dataRoot, id, failed instanceof ApiException a && a.status < 500
+                        ? ServerFaults.withoutServerPaths(a.getMessage(), dataRoot, writeRoot) : InboxWatch.SERVER_FAULT);
                 return scheduled ? PreRun.SKIP : PreRun.GO;   // a person's run goes ahead and answers for itself
             }
             final RunFiles.Scope scope = narrowed;
@@ -166,6 +174,7 @@ final class ImportPreRunSteps {
                 if (scope != null) scope.close();
                 if (!ok) job.rollback();   // a column kept for a run that failed is not kept
                 release(claim);
+                if (watched) InboxWatch.ran(dataRoot, id, ok ? null : InboxWatch.SERVER_FAULT);   // Data status: watchError
             });
         } finally {
             if (prev == null) MDC.remove(EventLog.SPACE_MDC_KEY);

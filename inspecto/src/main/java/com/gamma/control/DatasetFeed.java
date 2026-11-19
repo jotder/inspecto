@@ -119,12 +119,12 @@ final class DatasetFeed {
         out.put("files", files);
         out.put("truncated", waiting.size() > LISTED);
         out.put("automatic", EditionFeatures.present(OnboardImport.AUTOMATION_FEATURE));
-        out.put("feed", feedOf(cfg));
+        out.put("feed", InboxWatch.feedOf(cfg, imp.content()));   // B1: a watched inbox still says uploads
         watch(out, cfg, imp.dataRoot(), imp.id(), imp.content());   // BASIC-ONBOARD-1 P2
         // the toggle is offered: not a Reference (it is replaced, a watched inbox adds rows), no schedule runs the Pipeline
-        // a Postgres snapshot is never polled (manual only, operator 2026-11-05)
+        // but the watch's own (B1); a Postgres snapshot is never polled (manual only, operator 2026-11-05)
         out.put("watchable", !InboxWatch.snapshot(imp.content()) && !"reference".equals(imp.content().get("kind"))
-                && PipelineTrigger.of(cfg.triggerConfig()).scheduler() == PipelineTrigger.Scheduler.MANUAL);
+                && (PipelineTrigger.of(cfg.triggerConfig()).scheduler() == PipelineTrigger.Scheduler.MANUAL || InboxWatch.preset(cfg)));
         return out;
     }
 
@@ -133,7 +133,7 @@ final class DatasetFeed {
      * the inbox path, which {@code GET /datasets/{id}/feed} shows under {@code canUploadData}.
      */
     static Map<String, Object> summary(PipelineConfig cfg, Path dataRoot, String id, Map<String, Object> content) {
-        Map<String, Object> f = new LinkedHashMap<>(feedOf(cfg));
+        Map<String, Object> f = new LinkedHashMap<>(InboxWatch.feedOf(cfg, content));
         watch(f, cfg, dataRoot, id, content);
         try {
             Path inbox = OnboardImport.inbox(dataRoot, id).toAbsolutePath().normalize();

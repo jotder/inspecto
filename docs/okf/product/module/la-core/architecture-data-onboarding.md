@@ -750,6 +750,22 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
 Plan [`basic-onboard-plan.md`](../../../../archived-documents/plans-archive/basic-onboard-plan.md) §4.6, §5 Q1; narrows DT-5 / DT-17 (a
 Basic import inbox may poll; still no user-defined schedule). Class `inspecto/.../control/InboxWatch.java`.
 
+> **Superseded 2026-11-19 (`BASIC-ELT-PROFILE-1` B1, operator ruling O1 reversing DT-17).** The poller below is retired.
+> *Watch this folder* is now the locked preset of *Keep this up to date*: `PUT /datasets/{id}/watch {watch: true}`
+> rewrites the import's own Pipeline through `DatasetFeed.rewritePipeline` (approval policy over Pipelines 409, save gate,
+> history) to `trigger: {type: schedule, every: 30s}` with `collector.stability {window: 30s, size_checks: 2}` on its
+> `local` Collector, and keeps `watchInbox: true` on the entry; off writes `trigger: manual` and removes that stability
+> block. The engine's poll cycle runs it: the import's pre-run steps judge the inbox and keep new columns
+> (`ImportPreRunSteps`), the per-file stability gate decides what is read (O1: per file, no longer the whole inbox),
+> the commit steps compact, follow on and check Expectations (`ImportCommitSteps`). `watched` = the entry flag AND
+> the preset; the feed keeps its shape (`watch`, `watchable` true while watched, `feed.kind: uploads`, `watchError`
+> after a failed scheduled run) until the UI's U4-Watch slice. The run waits while `data.self_import` is off, as
+> before. A watch survives a restart because it is the Pipeline. Not carried over: the arrivals sidecar line and
+> `watchError` for a quarantined file (a scheduled run records only the engine's ledger), an entry switched on before
+> B1 with a manual Pipeline (it reads as off until switched on again: the feature never shipped in a release), and a
+> 30 s cadence on a host whose poll tick is longer (the Space tick, default 60 s, bounds it). See
+> [spec-pipeline-execution.md](../elt/spec-pipeline-execution.md#pre-run-steps--the-other-side-of-the-run).
+
 | Route | What |
 |---|---|
 | `PUT /datasets/{id}/watch` | `{watch: true \| false}`; `canUploadData`; gates as the feed (`DatasetFeed.gate`); 422 not a boolean, 422 a Reference (a watched inbox adds rows), 409 a Pipeline already on a schedule (*Keep this up to date*), 409 an approval policy over Datasets; answers the feed read |

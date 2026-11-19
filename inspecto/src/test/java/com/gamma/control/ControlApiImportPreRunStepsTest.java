@@ -141,6 +141,12 @@ class ControlApiImportPreRunStepsTest {
         ((Map<String, ?>) m.get(guard)).clear();
     }
 
+    /** One poll cycle with every scheduled Pipeline due, whatever else the host runs. */
+    static void poll(CollectorService svc) throws Exception {
+        dueAgain(svc);
+        svc.runAllOnce();
+    }
+
     /** One poll cycle with every scheduled Pipeline due (Add data's own run reset the import's cadence). */
     static void tick(CollectorService svc) throws Exception {
         dueAgain(svc);

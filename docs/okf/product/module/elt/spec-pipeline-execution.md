@@ -1457,6 +1457,9 @@ last registered first, **after** the run's `RUN` commit steps. `stepRun` wraps `
   between the step and the read is neither judged half-written nor taken unjudged; it waits for a later run. A remote
   Collector's files land during the run, so its run judges what waits before it and is not narrowed.
 - **A failed run** takes a kept column back (`Job.rollback` in the `after`), as Add data's own run does.
+- **Watch this folder** (B1) is a scheduled run of this kind: the import Pipeline's locked `every: 30s` schedule with a
+  `local` Collector and `stability {30s, 2}` (`InboxWatch`). For it the step also waits while `data.self_import` is
+  off (SKIP) and keeps `watchError` for Data status (cleared by a run that succeeds).
 
 ## Failure and recovery, per lane
 
