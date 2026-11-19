@@ -863,6 +863,11 @@ chapters:
     group: Ship
     summary: Move a Space, package and install an App, install an edition, deploy and upgrade.
     pages:
+      tutorial_ship_an_app:
+        file: docs/okf/product/layer/platform/user-guide-tutorial-ship-an-app.md
+        type: tutorial
+        tracks[1]: partner
+        audience: external
       admin_guide_apps:
         file: docs/okf/product/layer/platform/admin-guide-apps.md
         type: unsorted
@@ -948,6 +953,11 @@ chapters:
     group: Manage
     summary: Sign-in, Roles, Access Policies, masking, backup and restore, upgrades, monitoring and audit verification.
     pages:
+      tutorial_run_the_platform:
+        file: docs/okf/product/layer/platform/user-guide-tutorial-run-the-platform.md
+        type: tutorial
+        tracks[1]: operator
+        audience: external
       operations_guide:
         file: docs/ADVANCED_GUIDE.md
         title: Operations guide
