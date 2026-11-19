@@ -11,6 +11,7 @@
 - [Alert, Incident and Case](../../addon/incidents/user-guide-concept-alert-incident-case.md)
 - [Alert Rule, Expectation and Decision Rule](../../addon/incidents/user-guide-concept-alert-rule.md)
 - [Incidents — screens](../../addon/incidents/user-guide-incidents.md)
+- [Tutorial 3 — Detect and respond: Reconciliation, Alert Rule, Incidents and a Case](../../addon/incidents/user-guide-tutorial-detect-respond.md)
 - [Reconciliation](../../module/reconciliation/user-guide-reconciliation.md)
 - [Incidents & Cases (Objects)](../../module/ops/user-guide-objects.md)
 
@@ -20,6 +21,7 @@
 - [Alert, Incident and Case](../../addon/incidents/user-guide-concept-alert-incident-case.md)
 - [Alert Rule, Expectation and Decision Rule](../../addon/incidents/user-guide-concept-alert-rule.md)
 - [Incidents — screens](../../addon/incidents/user-guide-incidents.md)
+- [Tutorial 3 — Detect and respond: Reconciliation, Alert Rule, Incidents and a Case](../../addon/incidents/user-guide-tutorial-detect-respond.md)
 - [Case Management — screens](../../module/case-management/user-guide-case-management.md)
 - [Incidents & Cases (Objects)](../../module/ops/user-guide-objects.md)
 
@@ -31,6 +33,7 @@
 - [Alert, Incident and Case](../../addon/incidents/user-guide-concept-alert-incident-case.md)
 - [Alert Rule, Expectation and Decision Rule](../../addon/incidents/user-guide-concept-alert-rule.md)
 - [Incidents — screens](../../addon/incidents/user-guide-incidents.md)
+- [Tutorial 3 — Detect and respond: Reconciliation, Alert Rule, Incidents and a Case](../../addon/incidents/user-guide-tutorial-detect-respond.md)
 - [Incidents & Cases (Objects)](../../module/ops/user-guide-objects.md)
 - [Case Management — screens](../../module/case-management/user-guide-case-management.md)
 - [Entity Lists — user guide](../../module/entity-list/user-guide-entity-list.md)

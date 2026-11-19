@@ -20,7 +20,7 @@ tags: [product-item, addon]
 | architecture | current | [Incidents and Alerts](architecture-incidents.md) |
 | features | current | [Alerts — features](features-alerts.md) · [Incidents — features](features-incidents.md) |
 | feature-db | current | [Incidents — feature database](feature-db.md) |
-| user-guide | current | [Alerts](user-guide-alerts.md) · [Alert, Incident and Case](user-guide-concept-alert-incident-case.md) · [Alert Rule, Expectation and Decision Rule](user-guide-concept-alert-rule.md) · [Incidents — screens](user-guide-incidents.md) |
+| user-guide | current | [Alerts](user-guide-alerts.md) · [Alert, Incident and Case](user-guide-concept-alert-incident-case.md) · [Alert Rule, Expectation and Decision Rule](user-guide-concept-alert-rule.md) · [Incidents — screens](user-guide-incidents.md) · [Tutorial 3 — Detect and respond: Reconciliation, Alert Rule, Incidents and a Case](user-guide-tutorial-detect-respond.md) |
 | admin-guide | n/a | an Add-on licenses modules — see the hubs of the modules it holds |
 | api | current | [Alerts — API](api-alerts.md) · [Incidents — API](api-incidents.md) |
 | tests | n/a | an Add-on licenses modules — see the hubs of the modules it holds |

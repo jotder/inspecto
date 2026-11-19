@@ -13,6 +13,11 @@ chapters:
         type: reference
         tracks[4]: builder,partner,operator,business
         audience: external
+      tutorial_first_space:
+        file: docs/okf/product/module/config/user-guide-tutorial-first-space.md
+        type: tutorial
+        tracks[1]: builder
+        audience: external
       user_guide_journey_alert_to_case:
         file: docs/okf/product/layer/product/user-guide-journey-alert-to-case.md
         type: unsorted
@@ -538,6 +543,11 @@ chapters:
     group: Build
     summary: Expectations, quarantine and duplicates.
     pages:
+      tutorial_pipeline_expectations:
+        file: docs/okf/product/module/elt/user-guide-tutorial-pipeline-expectations.md
+        type: tutorial
+        tracks[1]: builder
+        audience: external
   build_analyse:
     title: Analyse it
     group: Build
@@ -763,6 +773,11 @@ chapters:
     group: Build
     summary: Incidents, Cases, Workflow & SLA, four-eyes approval and notifications.
     pages:
+      tutorial_detect_respond:
+        file: docs/okf/product/addon/incidents/user-guide-tutorial-detect-respond.md
+        type: tutorial
+        tracks[1]: builder
+        audience: external
       user_guide_alerts:
         file: docs/okf/product/addon/incidents/user-guide-alerts.md
         type: unsorted
@@ -843,6 +858,11 @@ chapters:
     group: Build
     summary: Dashboards, scheduled reports and sharing.
     pages:
+      tutorial_dashboard:
+        file: docs/okf/product/layer/product/user-guide-tutorial-dashboard.md
+        type: tutorial
+        tracks[2]: builder,business
+        audience: external
       user_guide_dashboard:
         file: docs/okf/product/layer/product/user-guide-dashboard.md
         type: unsorted

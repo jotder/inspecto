@@ -20,7 +20,7 @@ tags: [product-item, module]
 | architecture | current | [ELT — architecture](architecture-elt.md) |
 | features | current | [Collectors, parsing, ingest and Pipelines — features](features-elt.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Connection and Collector](user-guide-concept-connection-collector.md) · [Expectation](user-guide-concept-expectation.md) · [Pipeline and Steps](user-guide-concept-pipeline.md) · [ELT — user guide](user-guide-elt.md) |
+| user-guide | current | [Connection and Collector](user-guide-concept-connection-collector.md) · [Expectation](user-guide-concept-expectation.md) · [Pipeline and Steps](user-guide-concept-pipeline.md) · [ELT — user guide](user-guide-elt.md) · [Tutorial 2 — Make it a Pipeline with Expectations](user-guide-tutorial-pipeline-expectations.md) |
 | admin-guide | current | [ELT — admin guide](admin-guide-elt.md) |
 | api | current | [Collectors, parsing, ingest and Pipelines — API](api-elt.md) |
 | tests | current | [ELT — ingestion, Pipelines and step registry — tests inventory](tests-inventory.md) |
