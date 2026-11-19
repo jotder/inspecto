@@ -1542,14 +1542,14 @@ final class OnboardImport {
                             + (first.get("file") != null && !name.equals(first.get("file")) ? " as '" + first.get("file") + "'" : "")
                             + " and its rows are in '" + id + "'; adding it again would count them twice. To load it again, replace everything");
             }
-            // the run also takes any file waiting in the inbox: judged by the same columns policy as Run now
-            List<DatasetNewColumns.Taken> taken = new ArrayList<>();
-            List<Map<String, Object>> refused = judgeInbox(dataRoot, pipeline, id, type,
-                    writeRoot.resolve(CONFIG_DIR).resolve(pipeline + "_schema.toon"), content, taken, null);
-            taken.add(new DatasetNewColumns.Taken(stage, file, name, uploadCheck));
+            // the run also takes any file waiting in the inbox: judged by the same columns policy as Run now, then the new
+            // columns of every file it takes, the upload's too (BE-1b: the pre-run steps, ImportPreRunSteps)
             job = new Job(space, pipeline, String.valueOf(content.get("kind")), file, name, content, replace);
             job.period = period;
-            settleNewColumns(job, id, type, taken, keepNewColumns);
+            ImportPreRunSteps.Run pre = new ImportPreRunSteps.Run(space, id, content, job, null, keepNewColumns);
+            pre.upload = new DatasetNewColumns.Taken(stage, file, name, uploadCheck);
+            ImportPreRunSteps.runAll(pre);
+            List<Map<String, Object>> refused = pre.refused;
             List<String> newColumns = job.newColumns;
             job.sha256 = sha;
             job.moveSource = moveIntoInbox;
@@ -1621,7 +1621,7 @@ final class OnboardImport {
      * LA-ARRIVAL-NEW-COLUMNS-1: keep the new columns every file of this run carries ({@link DatasetNewColumns#settle}),
      * onto {@code job}: what was kept, what each file left out, and why. Undone with the job.
      */
-    private static void settleNewColumns(Job job, String id, String type, List<DatasetNewColumns.Taken> files, boolean keep)
+    static void settleNewColumns(Job job, String id, String type, List<DatasetNewColumns.Taken> files, boolean keep)
             throws IOException {
         Map<String, List<String>> leftOut = new LinkedHashMap<>();
         DatasetNewColumns.Outcome o = DatasetNewColumns.settle(job.space, id, job.id, "csv".equals(type) || "tsv".equals(type),
@@ -1898,16 +1898,14 @@ final class OnboardImport {
         if (!IN_FLIGHT.add(key)) throw new ApiException(409, ErrorCodes.CONFLICT, "'" + id + "' is being imported right now");
         try {
             Job job = new Job(space, pipeline, String.valueOf(content.get("kind")), null, null, content, false);
-            // LA-ARRIVAL-MODES-1: a waiting file is judged by the columns policy first; a refused one is set aside, named
-            String type = String.valueOf(content.get("importFormat"));
-            List<DatasetNewColumns.Taken> taken = new ArrayList<>();
-            List<Map<String, Object>> refused = judgeInbox(dataRoot, pipeline, id, type,
-                    writeRoot.resolve(CONFIG_DIR).resolve(pipeline + "_schema.toon"), content, taken, only);
             long before = countRows(job.database());
+            // LA-ARRIVAL-MODES-1: a waiting file is judged by the columns policy first; a refused one is set aside, named.
+            // LA-ARRIVAL-NEW-COLUMNS-1: an unattended run keeps the new columns every waiting file carries. BE-1b: the same
+            // pre-run steps a run outside Add data runs (ImportPreRunSteps), in the same order
+            ImportPreRunSteps.Run pre = new ImportPreRunSteps.Run(space, id, content, job, only, true);
             Map<String, Object> s;
             try {
-                // LA-ARRIVAL-NEW-COLUMNS-1: an unattended run keeps the new columns every waiting file carries
-                settleNewColumns(job, id, type, taken, true);
+                ImportPreRunSteps.runAll(pre);
                 if (only == null) {
                     s = job.runChecked(before);
                 } else {
@@ -1922,7 +1920,7 @@ final class OnboardImport {
             }
             putNewColumns(job, s);
             s.put("dataset", id);
-            if (!refused.isEmpty()) s.put("refused", refused);
+            if (!pre.refused.isEmpty()) s.put("refused", pre.refused);
             job.followOn(s);
             job.recordArrival(s);   // LA-ARRIVAL-LEDGER-1: each file Run now took, with the index outcome
             return s;
@@ -1944,9 +1942,9 @@ final class OnboardImport {
      * into {@code fresh} by file name. Answers {@code [{file, reason, setAside}]}. A file that cannot be read at all is left
      * for the run, which quarantines it as before.
      */
-    private static List<Map<String, Object>> judgeInbox(Path dataRoot, String pipeline, String id, String type, Path schema,
-                                                        Map<String, Object> dataset, List<DatasetNewColumns.Taken> accepted,
-                                                        Set<Path> only) {
+    static List<Map<String, Object>> judgeInbox(Path dataRoot, String pipeline, String id, String type, Path schema,
+                                                Map<String, Object> dataset, List<DatasetNewColumns.Taken> accepted,
+                                                Set<Path> only) {
         List<Map<String, Object>> out = new ArrayList<>();
         Path in = inbox(dataRoot, pipeline);
         if (!Files.isDirectory(in)) return out;

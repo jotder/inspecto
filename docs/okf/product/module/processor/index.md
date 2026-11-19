@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Control API (API)](plan-control-api.md) |
+| plan | current | [module.processor - board row detail](plan-board-detail.md) · [Control API (API)](plan-control-api.md) |
 | spec | current | [Component Registry](spec-component-registry.md) · [Decision Rules & the Condition-Tree Evaluator](spec-decision-rules.md) · [Jobs & Scheduling](spec-jobs.md) · [Metadata Bundle & Transportability](spec-metadata-bundle.md) · [Pipeline closure — what belongs to a pipeline](spec-pipeline-closure.md) · [Pipeline identity — rename & save-as-template](spec-pipeline-identity.md) · [Platform Services — the plugin envelope](spec-platform-services.md) · [Query catalog & execution](spec-queries.md) · [Tags — the cross-entity label graph](spec-tags.md) |
 | architecture | current | [Jobs, scheduler and multi-Space](architecture-processor.md) |
 | features | current | [Jobs and scheduler — features](features-jobs-scheduler.md) |
@@ -35,8 +35,9 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | — | P3 | feature | Platform Services Stage 2 / 3 | demand |
-| `BASIC-ELT-PROFILE-1` | P2 | feature | Basic onboarding as a locked profile of ELT: one implementation, Basic = options locked. | — |
+| `BASIC-ELT-PROFILE-1` | P2 | feature | Make Basic onboarding a locked profile of ELT, retiring the parallel Basic backend and LA UI layers that duplicate ELT parts. | — |
+| `BASIC-WATCH-ARRIVALS-1` | P3 | defect | A watched inbox's scheduled run leaves no arrivals sidecar line and no watchError for a quarantined file (filed 2026-11-19, BASIC-ELT-PRO… | — |
 | — | P3 | feature | Bundle / Exchange — "load as draft" residuals | — |
 | `ONBOARDING-REMOTE-SYSTEMS-1` | P3 | feature | Connect a system on Standard: Add data and the guided editor's Collect stage offer remote kinds (SFTP, object stores, other databases) wi… | — |
-| `DEPLOY-EXPOSURE-KIT-1` | P3 | chore | /metrics and /health/details are fenced only by the network, and the deploy kit the docs assume is unbuilt (filed 2026-11-15, verified fr… | — |
-| `LA-ONBOARD-RESIDUALS-1` | P3 | feature | what wave 1 of LA-ONBOARD-1 left (2026-10-22). Re-triaged 2026-11-05: two items remain. | operator |
+| `DEPLOY-EXPOSURE-KIT-1` | P3 | chore | Prove the deploy kit (proxy fence for /metrics and /health/details, TLS, upgrade, off-site backup, signature verify) on a real host. | — |
+| `LA-ONBOARD-RESIDUALS-1` | P3 | feature | Two items wave 1 of LA-ONBOARD-1 left: how far no-code row filtering goes in Basic, and a real drag-and-drop of a file onto Add data. | operator |

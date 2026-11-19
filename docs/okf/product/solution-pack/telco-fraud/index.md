@@ -15,7 +15,7 @@ tags: [product-item, solution-pack]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Interconnect / wholesale fraud from CDRs (IRSF, Wangiri, flash-call / CLI): plan](plan-irsf-wangiri.md) |
+| plan | current | [solution-pack.telco-fraud - board row detail](plan-board-detail.md) · [Interconnect / wholesale fraud from CDRs (IRSF, Wangiri, flash-call / CLI): plan](plan-irsf-wangiri.md) |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | architecture | current | [Telecom fraud](architecture-telco-fraud.md) |
 | features | current | [Telecom fraud — features](features-telco-fraud.md) |
@@ -34,6 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `ASSURE-PACK-TELCO-FRAUD-RESIDUALS-1` | P3 | feature | the three telco-fraud pack items that wait on a customer or a model change; nothing here is buildable today. | demand |
-| `PACK-IRSF-WANGIRI-1` | P3 | feature | interconnect / wholesale fraud from CDRs: IRSF, Wangiri, flash-call / CLI patterns | — |
-| `TELCO-BYPASS-SIMBOX-1` | P3 | feature | bypass / SIM-box detection from CDRs | — |
+| `ASSURE-PACK-TELCO-FRAUD-RESIDUALS-1` | P3 | feature | Three telco-fraud pack items wait on a customer or a model change; nothing is buildable today. | demand |
+| `PACK-IRSF-WANGIRI-1` | P3 | feature | Interconnect / wholesale fraud from CDRs: IRSF, Wangiri, flash-call / CLI patterns. | — |
+| `TELCO-BYPASS-SIMBOX-1` | P3 | feature | Bypass / SIM-box detection from CDRs: slices B4…B7, D-BP10, the barring Action Request and box persistence. | — |

@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `TELCO-BYPASS-SIMBOX-1` | P3 | feature | bypass / SIM-box detection from CDRs | — |
+| `TELCO-BYPASS-SIMBOX-1` | P3 | feature | Bypass / SIM-box detection from CDRs: slices B4…B7, D-BP10, the barring Action Request and box persistence. | — |

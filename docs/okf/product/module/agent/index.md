@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Assistant (AGT + EOI) — capability spec](plan-assistant.md) |
+| plan | current | [Assistant (AGT + EOI) — capability spec](plan-assistant.md) · [module.agent - board row detail](plan-board-detail.md) |
 | spec | current | [eoiagent ADR log](spec-adr-log.md) · [Assist Agent](spec-assist-agent.md) · [eoiagent governance & safety](spec-governance.md) |
 | architecture | current | [Assistant agent and eoiagent](architecture-agent.md) |
 | features | current | [Assistant agent — features](features-agent.md) |
@@ -34,7 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `AGENT-KIT-1` | P2 | feature | the Agent Kit: AI agents (Claude, Gemini, OpenAI, local / offline models) build, ship and manage Apps on a running Inspecto, safely. | — |
+| `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |
 | — | P2 | feature | AGT-5 per-tool dry-run seam — BLOCKED-EXTERNAL | — |
 | `AGT-SEGMENT-1` | P3 | chore | the assistant's commercial framing is an unvalidated product read. | — |
 | `DOCS-SKILLS-ALERTS-AGENTIC-1` | P3 | feature | hub-routed agent skills exist for docs lookup, pipeline authoring, incident investigation and case analysis (.claude/skills/) | demand |

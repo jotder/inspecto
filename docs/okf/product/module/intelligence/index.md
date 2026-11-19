@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Agentic investigation — design (`AGENTIC-INVESTIGATION-1`)](plan-agentic-investigation.md) · [AI assist and intelligence — plan](plan-intelligence.md) |
+| plan | current | [Agentic investigation — design (`AGENTIC-INVESTIGATION-1`)](plan-agentic-investigation.md) · [module.intelligence - board row detail](plan-board-detail.md) · [AI assist and intelligence — plan](plan-intelligence.md) |
 | spec | current | [AI assist and intelligence — spec](spec-intelligence.md) |
 | architecture | current | [Embedded intelligence (AGT-5)](architecture-embedded-intelligence.md) · [AI assist](architecture-intelligence.md) |
 | features | current | [AI assist — features](features-ai-assist.md) |
@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `AGENTIC-INVESTIGATION-1` | P2 | feature | an agent that works an Incident: explains why it fired, gathers evidence, quantifies value at risk and proposes the next action for a hum… | — |
+| `AGENTIC-INVESTIGATION-1` | P2 | feature | An agent that works an Incident and proposes the next action for a human to approve: slices S2-S6 remain. | — |

@@ -326,11 +326,14 @@ final class PipelineScheduler {
         if (id != null) this.spaceId = id;
     }
 
-    /** BE-1a: what a poll's run of one Pipeline runs inside - {@code CollectorService}'s RUN-phase commit steps; set by it. */
-    private volatile java.util.function.BiFunction<String, java.util.function.Supplier<MultiCollectorProcessor.RunResult>,
-            MultiCollectorProcessor.RunResult> runScope = (id, run) -> run.get();
+    /**
+     * BE-1a / BE-1b: what a poll's run of one Pipeline runs inside - {@code CollectorService}'s pre-run and commit steps; set
+     * by it. The run is handed true when a pre-run step changed the Pipeline's config: it then reads the config again.
+     */
+    private volatile java.util.function.BiFunction<String, java.util.function.Function<Boolean, MultiCollectorProcessor.RunResult>,
+            MultiCollectorProcessor.RunResult> runScope = (id, run) -> run.apply(false);
 
-    void runScope(java.util.function.BiFunction<String, java.util.function.Supplier<MultiCollectorProcessor.RunResult>,
+    void runScope(java.util.function.BiFunction<String, java.util.function.Function<Boolean, MultiCollectorProcessor.RunResult>,
             MultiCollectorProcessor.RunResult> scope) {
         this.runScope = scope;
     }
@@ -347,11 +350,65 @@ final class PipelineScheduler {
     }
 
     /**
+     * BE-1b: {@code due}'s config read again after a pre-run step changed its files (a kept column grows the schema), so
+     * the run reads what the step wrote; selection parsed it before. The registry rebuild is fingerprint-cached: only the
+     * changed files are parsed. Falls back to the selected config when the Pipeline no longer loads.
+     */
+    private PipelineConfig reloaded(Due due) {
+        registryLock.lock();
+        try {
+            configRegistry.rebuild(registry);
+            return configRegistry.get(due.id()).map(PipelineConfig::forNewRun).orElse(due.cfg());
+        } finally {
+            registryLock.unlock();
+        }
+    }
+
+    /** An interval schedule ({@code trigger.every}) on the loop: the triggers the cadence wake serves. */
+    private static boolean intervalScheduled(PipelineConfig cfg) {
+        PipelineTrigger t = PipelineTrigger.of(cfg.triggerConfig());
+        return t.scheduler() == PipelineTrigger.Scheduler.LOOP && t.kind() == PipelineTrigger.Kind.SCHEDULE_INTERVAL;
+    }
+
+    /**
+     * Honour each every (operator 2026-11-19): when the next interval-scheduled Pipeline is due (its last run plus its
+     * {@code every}; now when it never ran), in epoch ms; {@link Long#MAX_VALUE} when none is. A running one is left out:
+     * its run was stamped when it was selected. Reads the cached config index only.
+     */
+    long nextCadenceDueMs() {
+        long next = Long.MAX_VALUE;
+        registryLock.lock();
+        try {
+            for (Path p : registry) {
+                PipelineConfig cfg = configRegistry.configForPath(p).orElse(null);
+                if (cfg == null || cfg.template() || !intervalScheduled(cfg)) continue;
+                String id = cfg.identity().pipelineName();
+                if (running.contains(id) || !runnable(id, cfg)) continue;
+                long last = runGuard.lastRunAt(id);
+                next = Math.min(next, last == 0L ? 0L : last + PipelineTrigger.of(cfg.triggerConfig()).everyMs());
+            }
+        } finally {
+            registryLock.unlock();
+        }
+        return next;
+    }
+
+    /** The cadence wake's cycle: only the interval-scheduled Pipelines that are due, each as the poll tick runs it. */
+    List<Future<MultiCollectorProcessor.RunResult>> dispatchCadenceCycle() {
+        return dispatch(selectDue(System.currentTimeMillis(), true), false);
+    }
+
+    private List<Due> selectDue(long nowMs) {
+        return selectDue(nowMs, false);
+    }
+
+    /**
      * Pick the pipelines to run on this tick and claim each one. The <em>only</em> part of a cycle that needs
      * {@link #registryLock}, and it is bounded work — the lock is never held across a run, which is what lets
      * ticks overlap at all.
+     * {@code intervalOnly}: the cadence wake's selection, interval-scheduled Pipelines only (B1).
      */
-    private List<Due> selectDue(long nowMs) {
+    private List<Due> selectDue(long nowMs, boolean intervalOnly) {
         if (frozen()) return List.of();
         List<Due> due = new ArrayList<>();
         registryLock.lock();
@@ -370,6 +427,7 @@ final class PipelineScheduler {
                 String id = cfg.identity().pipelineName();
                 if (!runnable(id, cfg)) continue;          // paused, not activated, or held
                 if (cfg.template()) continue;                                // authoring template — never runs
+                if (intervalOnly && !intervalScheduled(cfg)) continue;       // B1: the cadence wake serves `every` only
                 if (!dueThisTick(cfg, id, nowMs)) continue;                  // T13: trigger gates the loop
                 // Per-pipeline exclusion: a pipeline still running from an earlier tick is SKIPPED, not
                 // queued — queueing would pile runs up behind a slow pipeline. Its cadence baseline is
@@ -450,7 +508,7 @@ final class PipelineScheduler {
                 // policy-narrowing-design S2b (D8): pinned once per run; an unreadable Safety Policy file throws
                 // here, BEFORE any file is touched, and lands in the RuntimeException arm below (poll failed).
                 MultiCollectorProcessor.RunResult r = com.gamma.config.safety.SafetyPolicy.pinnedForRun(() -> runScope.apply(due.id(),
-                        () -> MultiCollectorProcessor.runConfigs(List.of(due.cfg()), 1, bus.sink(), acquireFirst)));
+                        reload -> MultiCollectorProcessor.runConfigs(List.of(reload ? reloaded(due) : due.cfg()), 1, bus.sink(), acquireFirst)));
                 // DUCKLE-C9: stamped for EVERY dispatched poll, including one that found nothing — a quiet
                 // poll is exactly the case that previously left no trace anywhere.
                 poll.polled(System.currentTimeMillis());

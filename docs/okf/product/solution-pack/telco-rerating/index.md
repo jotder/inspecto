@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `PACK-RERATING-1` | P3 | feature | re-rating / tariff validation pack | — |
+| `PACK-RERATING-1` | P3 | feature | Re-rating / tariff validation pack slices R4…R7. | — |
