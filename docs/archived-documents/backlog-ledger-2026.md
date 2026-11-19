@@ -3,7 +3,7 @@
 > **History tier — not maintained.** Each line below is a ledger entry from the header of
 > [`../BACKLOG.md`](../BACKLOG.md), moved here verbatim (newest first, as on the board) when the board started
 > keeping only three days of ledger (`INFO-RESTRUCTURE-1` wave W1, plan
-> [`../superpower/2026-11-19-information-restructure-and-maintenance-plan.md`](../superpower/2026-11-19-information-restructure-and-maintenance-plan.md) D-IR2).
+> [`plans-archive/2026-11-19-information-restructure-and-maintenance-plan.md`](plans-archive/2026-11-19-information-restructure-and-maintenance-plan.md) D-IR2).
 > Relative links were re-pointed for this folder; nothing else changed. Later rolls add their entries at the top.
 
 > ⬆ **89 → 90 (P3 76 → 77) on 2026-11-16**: narrowed P2 feature `SPACE-LINK-CENSUS-1` [items: module.config, module.engine · kind: feature] — MoSCoW S9 built: the LC-3 delete and save refusals are ready in `refuse` (`-Dlinks.delete=refuse`, `-Dlinks.save=refuse`; the save refusal on Standard and Advanced only, D-LC5) and stay in shadow by default, since D-LC3's two clean releases have not passed and S9 did not override it; a clean census run over every shipped Space, Space Template and `inspecto/examples/` folder found one false refusal (single-tenant layout: a link to a Pipeline or Connection the server runs from outside the write root), now fixed. The plan is archived; the row keeps the default flip, waiting on the operator, and the plan scope not built. Filed P3 defect `COMPONENT-DELETE-IN-USE-WORDS-1` [items: layer.product, module.config · kind: defect]: the Components screen words every refused delete as "referenced by a pipeline". `SPACE-EVOLUTION-1` item (1) still carries the LC-3 flip (`hold: operator`).

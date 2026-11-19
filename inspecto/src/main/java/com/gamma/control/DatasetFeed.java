@@ -361,6 +361,64 @@ final class DatasetFeed {
     }
 
     /**
+     * The schema half of {@link #rewritePipeline} ({@code BASIC-ELT-PROFILE-1} B5; it was a bare file write): {@code edit}
+     * changes a copy of the import's {@code schemaFile} in place; the schema save's gates block only what the edit
+     * introduces ({@link SaveGate#check} for a schema, the mapping drift gate, the BACKWARD-compatibility gate), the file
+     * is written, the import's Pipeline must load with it (else the old bytes go back), and the version is kept in the
+     * Pipeline's history ({@link PipelineHistory#recordSchema}). For a caller that already holds the import's claim
+     * ({@link OnboardImport#IN_FLIGHT}): a run's pre-run step. The caller has weighed the approval policy. Answers the
+     * bytes it replaced, for the caller's undo ({@link #restoreSchema}); 422 (nothing written) when refused or unreadable.
+     */
+    static byte[] rewriteSchema(Path writeRoot, String id, Path schemaFile, Path pipelineFile, CollectorService service,
+                                java.util.function.Consumer<Map<String, Object>> edit) throws IOException {
+        byte[] before;
+        Map<String, Object> src;
+        try {
+            before = Files.readAllBytes(schemaFile);
+            src = ToonHelper.load(schemaFile.toString());
+        } catch (IOException | RuntimeException unreadable) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the schema of '" + id + "' cannot be read");
+        }
+        Map<String, Object> s = new LinkedHashMap<>(src);
+        edit.accept(s);
+        List<Finding> introduced = new ArrayList<>(SaveGate.introduced(schemaFindings(s, writeRoot, schemaFile), schemaFindings(src, writeRoot, schemaFile)));
+        introduced.addAll(com.gamma.config.safety.SchemaCompatibility.check(src, s));
+        if (SaveGate.refuses(introduced)) {
+            StringBuilder sb = new StringBuilder();
+            for (Finding f : introduced)
+                if (f.severity() == Severity.ERROR) sb.append(sb.isEmpty() ? "" : "; ").append(f.fieldPath()).append(": ").append(f.message());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the import's schema was refused: " + sb);
+        }
+        AtomicFiles.write(schemaFile, ConfigCodec.toToon(s).getBytes(StandardCharsets.UTF_8), ".cfg-");
+        try {
+            PipelineConfig.load(pipelineFile.toString());
+        } catch (IOException | RuntimeException refused) {
+            AtomicFiles.write(schemaFile, before, ".cfg-");
+            service.refreshConfigs();
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the import's schema did not load with the change ("
+                    + refused.getMessage() + ")");
+        }
+        PipelineHistory.recordSchema(writeRoot, id, schemaFile);
+        service.refreshConfigs();
+        return before;
+    }
+
+    /** A schema's save findings: the save gate's, and the mapping drift gate's ({@code POST /config/write} runs both). */
+    private static List<Finding> schemaFindings(Map<String, Object> schema, Path writeRoot, Path schemaFile) {
+        // the save gate's Space-reading checks are a Pipeline's (Connections, Jobs, webhooks): a schema needs no ApiContext
+        List<Finding> f = new ArrayList<>(SaveGate.check(null, "schema", schema, writeRoot, schemaFile.getParent(), SaveGate.Referents.MUST_EXIST));
+        f.addAll(com.gamma.etl.SchemaMappingDrift.check(schema));
+        return f;
+    }
+
+    /** Undo a {@link #rewriteSchema}: {@code before} goes back, and that version is kept in history too. */
+    static void restoreSchema(Path writeRoot, String id, Path schemaFile, byte[] before, CollectorService service) throws IOException {
+        AtomicFiles.write(schemaFile, before, ".cfg-");
+        PipelineHistory.recordSchema(writeRoot, id, schemaFile);
+        service.refreshConfigs();
+    }
+
+    /**
      * The {@code la.index.build} Job that appends each new arrival to the link index (the first build full, then the append
      * the server advises), or null when the Dataset has no link mapping. Saved by the client through {@code POST /jobs}, so
      * the Job's own gates (rights, approvals, owner stamping) decide; this route never writes a Job.

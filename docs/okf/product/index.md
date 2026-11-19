@@ -80,8 +80,8 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (101 open row
 
 * [Feature modules](layer/features/index.md) - `layer.features` · 2 doc(s) · 0 open row(s)
 * [Link Analysis modules](layer/la/index.md) - `layer.la` · 3 doc(s) · 1 open row(s)
-* [Platform](layer/platform/index.md) - `layer.platform` · 72 doc(s) · 26 open row(s)
-* [Product host](layer/product/index.md) - `layer.product` · 71 doc(s) · 16 open row(s)
+* [Platform](layer/platform/index.md) - `layer.platform` · 73 doc(s) · 26 open row(s)
+* [Product host](layer/product/index.md) - `layer.product` · 71 doc(s) · 15 open row(s)
 * [Providers](layer/providers/index.md) - `layer.providers` · 2 doc(s) · 0 open row(s)
 * [Service contracts (SPI)](layer/spi/index.md) - `layer.spi` · 2 doc(s) · 0 open row(s)
 
@@ -137,7 +137,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (101 open row
 * [Route module contract](module/http-spi/index.md) - `module.http-spi` · 3 doc(s) · 0 open row(s)
 * [AI assist and intelligence](module/intelligence/index.md) - `module.intelligence` · 13 doc(s) · 1 open row(s)
 * [Link Analysis and geo routes](module/la-api/index.md) - `module.la-api` · 9 doc(s) · 0 open row(s)
-* [Link Analysis core and ports](module/la-core/index.md) - `module.la-core` · 82 doc(s) · 18 open row(s)
+* [Link Analysis core and ports](module/la-core/index.md) - `module.la-core` · 82 doc(s) · 19 open row(s)
 * [Link Analysis storage](module/la-storage/index.md) - `module.la-storage` · 8 doc(s) · 2 open row(s)
 * [Link Analysis PostgreSQL store](module/la-store-pg/index.md) - `module.la-store-pg` · 6 doc(s) · 2 open row(s)
 * [Notification channels](module/notify-channels/index.md) - `module.notify-channels` · 8 doc(s) · 0 open row(s)

@@ -161,7 +161,7 @@ the screen reference.
 ### 4.1 Pages stay in the hubs
 
 The information base underneath — page size, headers, one home per fact, history out of current pages — is
-restructured and maintained by [`2026-11-19-information-restructure-and-maintenance-plan.md`](2026-11-19-information-restructure-and-maintenance-plan.md).
+restructured and maintained by [`2026-11-19-information-restructure-and-maintenance-plan.md`](../archived-documents/plans-archive/2026-11-19-information-restructure-and-maintenance-plan.md).
 
 Every page is still written into the hub of the item it explains, in the existing slots: `user-guide-<topic>` for
 tutorials, how-tos and concepts, `admin-guide-<topic>` for operator pages, `api-<topic>` for reference. No new docs
