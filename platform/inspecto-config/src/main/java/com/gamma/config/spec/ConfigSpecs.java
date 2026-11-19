@@ -92,7 +92,8 @@ public final class ConfigSpecs {
                 FieldSpec.of("import_steps", "Import steps", FieldType.LIST,
                         "The default Pipeline's steps an Add data import runs (BASIC-ONBOARD-1): `read`, `arrange`, "
                                 + "`write_parquet`, `follow_on` (each installed application's registered follow-on, "
-                                + "e.g. Link Analysis's link index). Written by Add data; read by no engine code."),
+                                + "e.g. Link Analysis's link index). Written by Add data; the control plane's import commit steps "
+                                + "(compaction, follow-ons, Expectations) run only when `follow_on` is listed or the key is absent."),
                 FieldSpec.enumField("reference.load", "Reference load mode",
                         List.of("replace", "upsert", "scd2"), "replace",
                         "How a produces:reference dataset is loaded: replace (full-replace, today's default), "
