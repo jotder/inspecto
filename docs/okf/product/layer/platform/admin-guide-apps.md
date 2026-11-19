@@ -4,6 +4,10 @@ title: "Platform — installing Apps on a running server"
 description: "How an administrator installs, upgrades and removes a signed App on a running Platform product build: the trusted signers, the dry run, what an upgrade offers each Space, and what removal keeps."
 tags: [platform, admin-guide, app, install, upgrade]
 timestamp: 2026-11-11T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-11 last-edit
 ---
 
 # Platform — installing Apps on a running server

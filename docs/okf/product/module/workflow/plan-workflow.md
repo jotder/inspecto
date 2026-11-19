@@ -4,6 +4,11 @@ title: "Workflow and SLA models — plan"
 description: "Requirement of record for Workflows, SLA policies, Escalation Rules and maker-checker."
 tags: [workflow, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.workflow
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: platform/inspecto-workflow
 ---
 
 # Workflow and SLA models — plan

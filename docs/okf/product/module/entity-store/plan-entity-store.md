@@ -4,6 +4,11 @@ title: "Entity store — plan"
 description: "Requirement of record for the entity-store platform module: the identity fact log, Entity Lists, Entity Types, Industry packs and Link Analysis settings and limits."
 tags: [entity-store, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.entity-store
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: platform/inspecto-entity-store
 ---
 
 # Entity store — plan

@@ -4,6 +4,11 @@ title: "Geo and link adapters over platform data — features"
 description: "Geo and link adapters connect the Link Analysis studio to platform data: Datasets, Cases, Collector coverage and measures."
 tags: [geo-link, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.geo-link
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: la/inspecto-geo-link
 ---
 
 # Geo and link adapters over platform data — features

@@ -4,6 +4,11 @@ title: ELT — user guide — Collectors, Runs and references
 description: Part 7 of 7 of ELT — user guide: Collectors and Collector configuration; Runs and Run Detail; References
 tags: [feature, pipelines, editor, authoring, g6, graph, workbench, schema, mapping, transform, parsing-ingest, enrichment, onboarding, use-cases, user-guide, collectors, acquisition, connections, runs, operations, detail, breadcrumb]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # ELT — user guide — Collectors, Runs and references
@@ -87,7 +92,7 @@ persisted shapes genuinely differ: a `collector:` block vs. a node's raw config 
 *(UI-S7, 2026-08-28.)* The third mode authors the **dataset entry** the engine shipped in ELT Phase 3 S3c-2: `collector:
 {connector: dataset, dataset: <id>}`, resolved to the producer's snapshot dir fresh at every acquire
 cycle by the `dataset` connector scheme, which copies new parquet snapshots into this pipeline's
-inbox. See [§5 Collect](user-guide-elt-steps.md#5-collect--the-acquisition-step) and the [`dataset` scheme](spec-acquisition.md#the-connector-spi-and-the-resolvable-schemes).
+inbox. See [§5 Collect](user-guide-elt-steps.md#5-collect--the-acquisition-step) and the [`dataset` scheme](spec-acquisition-connectors-control.md#the-connector-spi-and-the-resolvable-schemes).
 
 - The mode owns its field the same way Connection does: `dataset` is asked **only** in Dataset mode,
   `connection` only in Connection mode, and `connector` stays **derived** (Dataset mode ⇒ `dataset`).

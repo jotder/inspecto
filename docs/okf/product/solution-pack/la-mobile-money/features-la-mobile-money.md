@@ -4,6 +4,11 @@ title: "Link Analysis mobile money — features"
 description: "A seeded mobile-money Space with seven planted stories, from agent-assisted structuring to a device farm, ending in an Alert and a Case."
 tags: [la-mobile-money, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.la-mobile-money
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-mobile-money
 ---
 
 # Link Analysis mobile money — features

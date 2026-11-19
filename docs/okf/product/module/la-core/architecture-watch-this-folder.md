@@ -5,6 +5,11 @@ description: Watch this folder (section 6.20 of the backend architecture) - the 
 resource: inspecto/src/main/java/com/gamma/control/InboxWatch.java, inspecto/src/main/java/com/gamma/control/ImportPreRunSteps.java, inspecto/src/main/java/com/gamma/control/DatasetFeed.java
 tags: [module, link-analysis, onboarding, add-data, inbox, watch, scheduler, architecture]
 timestamp: 2026-11-19T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — Watch this folder

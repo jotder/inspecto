@@ -5,6 +5,11 @@ description: As built for PREDICTIVE-SEGMENT-RFM-1 (2026-11-01) — the first sl
 resource: docs/okf/product/module/anomaly/plan-predictive-analytics.md
 tags: [predictive, segmentation, rfm, customer-segment, job, analytics]
 timestamp: 2026-11-01T00:00:00Z
+item: module.predictive
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: features/inspecto-predictive
 ---
 
 # Customer Segments (declared RFM)

@@ -5,6 +5,11 @@ description: Requirement of record for the hosted-model jar - what was required,
 resource: providers/inspecto-agent-hosted/
 tags: [module, agent-hosted, llm, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.agent-hosted
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: providers/inspecto-agent-hosted
 ---
 
 # Hosted model providers — plan

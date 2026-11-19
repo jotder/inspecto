@@ -1,3 +1,14 @@
+---
+type: Plan
+title: Inspecto as the feeder — warehouse and lake targets
+description: Roadmap for Inspecto as the feeder that populates a customer's warehouse, lakehouse or analytical database: what exists, four delivery mechanisms, open table formats via DuckDB, a target matrix, build order and what must not be claimed yet.
+item: module.connectors
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: [providers/inspecto-connectors]
+---
+
 # Inspecto as the feeder — warehouse and lake targets
 
 > **Status: feature doc, 2026-09-15.** Where Inspecto is useful as the ETL/ELT tool that *populates* a

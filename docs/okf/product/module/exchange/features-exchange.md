@@ -4,6 +4,11 @@ title: "Exchange (multi-entity sharing) — features"
 description: "The Exchange is the installation-scope surface through which one Space shares a Dataset, a Widget, a saved Link Analysis view or a Signal type with another Space - the multi-entity add-on (group companies, a regulator and its reporting entities)."
 tags: [exchange, exchange, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.exchange
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-exchange
 ---
 
 # Exchange (multi-entity sharing) — features

@@ -5,6 +5,11 @@ description: The platform module inspecto-analytics (ANALYTICS-CORE-1 M1, M2, M4
 resource: docs/archived-documents/plans-archive/analytics-core-plan.md
 tags: [analytics, statistics, baseline, time-series, scores, similarity, entity-grouping, cohort, change-point, modules, duckdb]
 timestamp: 2026-10-18T00:00:00Z
+item: module.analytics
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-analytics
 ---
 
 # Analytics Kernel

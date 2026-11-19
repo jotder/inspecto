@@ -4,6 +4,11 @@ title: Link Analysis — as-built reference and design records
 description: The engineer-facing as-built reference for Link Analysis that the architecture pages do not carry - grounded limits and their consequences, Graph Run, the link index with its measurements, external references and the Dossier bundle, and the durable decisions of the separation (D-1, D-3, D-5, D-6) and closed-plan records.
 tags: [module, la-core, link-analysis, architecture]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — as-built reference and design records

@@ -5,6 +5,11 @@ description: The hard-fail gate that path-jails writes, bounds numeric config, a
 resource: platform/inspecto-config/src/main/java/com/gamma/config/safety/ConfigSafetyValidator.java
 tags: [config, safety, validation, path-jail, security]
 timestamp: 2026-06-28T00:00:00Z
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-config
 ---
 
 # Config Safety Validator

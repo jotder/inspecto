@@ -4,6 +4,11 @@ title: "Link Analysis ownership showcase — install"
 description: "Install the la-ownership showcase from its three downloads (product, Space, data), start it on any edition, reset it, and rebuild its data."
 tags: [la-ownership, admin-guide, install]
 timestamp: 2026-11-07T00:00:00Z
+item: solution-pack.la-ownership
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-ownership
 ---
 
 # Link Analysis ownership showcase — install

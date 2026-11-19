@@ -4,6 +4,11 @@ title: "Telecom bypass (SIM-box) — decisions and as-built record"
 description: "Slices B0 to B3 of TELCO-BYPASS-SIMBOX-1 as built: the answered decisions, gate G-SB, the measurements, the mutation passes, the deviations from the plan and the traps found."
 tags: [telco-bypass, plan, as-built]
 timestamp: 2026-10-22T00:00:00Z
+item: solution-pack.telco-bypass
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: spaces/_templates/telco-bypass
 ---
 
 # Telecom bypass (SIM-box) — decisions and as-built record

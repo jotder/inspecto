@@ -5,6 +5,11 @@ description: Fired operational alerts in a pro data-table.
 resource: inspecto-ui/src/app/modules/admin/alerts/alerts.routes.ts
 tags: [feature, alerts, operations, pro]
 timestamp: 2026-09-27T00:00:00Z
+item: addon.incidents
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-ops
 ---
 
 # Alerts

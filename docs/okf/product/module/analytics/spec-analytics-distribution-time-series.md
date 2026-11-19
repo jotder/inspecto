@@ -4,6 +4,11 @@ title: Analytics Kernel — canonical statistics, the column profiler, time-seri
 description: Part 2 of 3 of Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts: Distribution Steps; Score output contract; Tests; Time-series primitives; Accuracy and backtest; Seasonality detection; Hour of week and seasonal profile; Change-point and regime detection; Windowed and ratio Measures
 tags: [analytics, statistics, baseline, time-series, scores, similarity, entity-grouping, cohort, change-point, modules, duckdb]
 timestamp: 2026-10-18T00:00:00Z
+item: module.analytics
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-analytics
 ---
 
 # Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts — Distribution Steps, score contract and time-series primitives

@@ -5,6 +5,10 @@ description: Multi-space (project) administration — the only space-aware admin
 resource: inspecto-ui/src/app/modules/admin/spaces/spaces.routes.ts
 tags: [feature, spaces, settings, multi-space]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-15 last-edit
 ---
 
 # Spaces

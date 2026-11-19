@@ -4,6 +4,11 @@ title: "Link Analysis logistics cargo theft showcase — user guide"
 description: "A five-minute tour of the la-logistics Space from its three saved views, then one exercise per planted story with a hint and an answer, and the tester's checklist of look-alikes that must not join a story."
 tags: [la-logistics, user-guide, showcase]
 timestamp: 2026-11-08T00:00:00Z
+item: solution-pack.la-logistics
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-logistics
 ---
 
 # Link Analysis logistics cargo theft showcase — user guide

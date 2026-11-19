@@ -4,6 +4,11 @@ title: "Link Analysis mobile money — user guide"
 description: "How a mobile-money investigator works the la-mobile-money Space day to day: Investigations, Measures, four-eyes, Entity profiles, Alerts and Cases."
 tags: [la-mobile-money, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.la-mobile-money
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-mobile-money
 ---
 
 # Link Analysis mobile money — user guide

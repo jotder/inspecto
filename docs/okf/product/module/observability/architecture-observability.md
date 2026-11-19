@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Observability and backup
+description: How observability (Prometheus counters, the event ledger, the audit trail, run reports, health and readiness probes) and backup and restore through maintenance Job tasks keep a deployment operable.
+item: module.observability
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [features/inspecto-observability]
+---
+
 # Observability and backup
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.

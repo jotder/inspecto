@@ -4,6 +4,10 @@ title: Guards, claims and board rows - gotchas
 description: Why guards fail in the direction of passing, how to falsify them, and why board rows, plans and findings are hypotheses.
 tags: [guards, falsification, backlog, claims, gotchas]
 timestamp: 2026-11-19T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Guards, claims and board rows - gotchas

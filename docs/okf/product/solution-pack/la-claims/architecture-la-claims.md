@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Link Analysis claims showcase — architecture
+description: How the la-claims Space Template is built: seven claims feeds, the claims_links and policy-timing Jobs, index build and detection, Link Analysis settings, tiers, saved views, Geo Views and Demo Users.
+item: solution-pack.la-claims
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-claims]
+---
+
 # Link Analysis claims showcase — architecture
 
 The `la-claims` Space Template (`spaces/_templates/la-claims/template.toon`). Shared studio, index and store seams: [la-showcase architecture](../la-showcase/architecture-la-showcase.md) and [la-core architecture](../../module/la-core/architecture-la-core.md). This page covers what is specific to claims.

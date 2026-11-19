@@ -5,6 +5,11 @@ description: A Decode Profile keeps one vendor's decode settings once — the op
 resource: platform/inspecto-etl/src/main/java/com/gamma/etl/DecodeProfile.java
 tags: [parsing, decode-profile, asn1, grammar, plugin, segments, bundle]
 timestamp: 2026-11-19T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # P.12 Decode Profile — one vendor's decode settings, kept once (2026-09-25, slices C1–C4)

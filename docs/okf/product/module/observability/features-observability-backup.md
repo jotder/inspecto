@@ -4,6 +4,11 @@ title: "Observability and backup — features"
 description: "Two platform concerns that keep a deployment operable:  - **Observability** — engine counters exposed for Prometheus, the event ledger, the who-did-what   audit trail, run reports with percentiles, and health and readiness probes."
 tags: [observability, observability-backup, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.observability
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-observability
 ---
 
 # Observability and backup — features

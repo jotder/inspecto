@@ -4,6 +4,11 @@ title: "SQL guard and helpers — features"
 description: "The SQL guard and helpers check every SQL statement the platform runs on a user's behalf."
 tags: [sql, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.sql
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-sql
 ---
 
 # SQL guard and helpers — features

@@ -5,6 +5,11 @@ description: Every top-level block of <name>_pipeline.toon — who declares it (
 resource: platform/inspecto-etl/src/test/java/com/gamma/etl/PipelineKeyCoverageContractTest.java
 tags: [pipeline-graph, config, pipeline, config-spec, parser, coverage, ratchet]
 timestamp: 2026-09-01T00:00:00Z
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-config
 ---
 
 # Pipeline config keys — the single block census
@@ -166,7 +171,7 @@ chain, an ACTIVE pipeline carrying one must declare top-level `output_store:`
 (`RouteArming.BRANCH_STEP_KINDS` excludes it — a save-time finding, deliberate). Its node config carries **`sql`** — the one declared attribute (`NodeAttributes.TRANSFORM_SQL`,
 `multiline`, required): a single `SELECT` whose input relation is the fixed alias **`input`** (`FROM
 input`), rewritten to the real relation at execution. 🔴 **DDL/DML/multi-statement are refused at
-EXECUTION and at `/components/transform/describe` — NOT at save** (corrected 2026-09-09): `SqlGuard` has
+EXECUTION and at `/components/transform/describe` — NOT at save**: `SqlGuard` has
 zero call sites on any save path, so such a statement persists cleanly and fails only when it runs.
 The Angular pane stores **`fields[]`** beside it — the grid rows that generated the SQL.
 
@@ -192,9 +197,7 @@ reads them now, and the graph lift drops them.
 - **`version:`** — present in the worked examples (configuration.md §3, pipeline spec §3); the parser
   never reads it. Inert.
 - **`source:`** — the retired pre-rename spelling of `collector:` (the 2026-07-14 GLOSSARY flip);
-  the parser reads only `collector:`, so a `source:` block is silently ignored. Both the docs'
-  ghost section and the parser's message-level drift were corrected 2026-09-01
-  (configuration.md's acquisition section; the R1 message sweep incl. the connector factories).
+  the parser reads only `collector:`, so a `source:` block is silently ignored.
 
 ## The ratchet
 
@@ -323,3 +326,8 @@ against, round-tripped untouched.
 ⚠ `version:` and `source:` (the two "appear in docs, read by nothing" keys above) are **not** on this
 table and are therefore now refused at the authoring gate — which is the row's point: both were
 silently ignored, and `source:` in particular looked like it still worked.
+
+## Changes
+
+- 2026-09-01: the docs' ghost `source:` section (configuration.md's acquisition section) and the parser's
+  message-level drift (the R1 message sweep, incl. the connector factories) fixed to say `collector:`.

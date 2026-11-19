@@ -4,6 +4,11 @@ title: "Observability and backup — API"
 description: "Control-plane routes for Observability and backup, with their gates."
 tags: [observability, observability-backup, api]
 timestamp: 2026-10-19T00:00:00Z
+item: module.observability
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-observability
 ---
 
 # Observability and backup — API

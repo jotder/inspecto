@@ -5,6 +5,11 @@ description: Grant-mediated, read-only Dataset/Widget sharing across Spaces — 
 resource: features/inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java
 tags: [control-plane, multi-space, exchange, sharing]
 timestamp: 2026-09-25T00:00:00Z
+item: module.exchange
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-exchange
 ---
 
 # Exchange — Cross-Space Sharing

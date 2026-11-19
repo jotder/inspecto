@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis police showcase — brochure
+description: Brochure for the Link Analysis police showcase: a burglary series traced through dealer sales and a vehicle, a drug-supply network with a rotating controller number, drug bases at vulnerable residents' addresses and more.
+item: solution-pack.la-police
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-police]
+---
+
 # Link Analysis police showcase — brochure
 
 > **A burglary series traced through second-hand dealer sales and one vehicle, a drug-supply network whose controller number keeps changing, drug bases at vulnerable residents' addresses and a witness who was arrested with the suspect, hidden among 4 000 incidents and 6 000 people. Find each one from a saved view in minutes, and see why the innocent look-alikes stay apart.**

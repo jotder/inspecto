@@ -4,6 +4,11 @@ title: ELT — user guide — Authoring gap list, enrich, load, ingest options a
 description: Part 5 of 7 of ELT — user guide: Enrich; Load — sinks, partitioning and route branches; Ingest options and feed contracts; Testing what you author
 tags: [feature, pipelines, editor, authoring, g6, graph, workbench, schema, mapping, transform, parsing-ingest, enrichment, onboarding, use-cases, user-guide, collectors, acquisition, connections, runs, operations, detail, breadcrumb]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # ELT — user guide — Authoring gap list, enrich, load, ingest options and testing
@@ -328,7 +333,7 @@ config only, like every other Job param (no per-run override).
 **Delivery checks (T8, operator 2026-10-06).** Declare the feed's parts on the Collector:
 `gap_detection.file_template: "XDR_{yyyyMMdd}_part{seq}*"` + `seq_scope: PER_BUCKET` (`seq_scope` is required when the
 template holds `{seq}` and refused when it does not; the same keys the completeness KPI uses —
-[acquisition spec Phase D](spec-acquisition.md#phase-d--gap-detection)). A one-file-per-day feed declares a date-only template,
+[acquisition spec Phase D](spec-acquisition-file-collection.md#phase-d--gap-detection)). A one-file-per-day feed declares a date-only template,
 `file_template: "XDR_{yyyyMMdd}.csv"` with no `seq_scope` (operator, 2026-10-06): one expected file per day, its part number
 recorded as 0, a missing day = one missing file. ⚠ A literal suffix means a RENAMED correction (`XDR_20260902_fix.csv`)
 does not match the series: it lands, the day's rows double, and nothing is signalled (found live 2026-10-14). The shipped

@@ -4,6 +4,11 @@ title: "Reconciliation — features"
 description: "Reconciliation compares two sides of the same business — for example billed versus switched — and reports the gaps."
 tags: [reconciliation, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: addon.reconciliation
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-reconciliation
 ---
 
 # Reconciliation — features

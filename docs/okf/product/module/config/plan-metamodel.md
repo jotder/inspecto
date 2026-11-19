@@ -5,6 +5,11 @@ description: Everything authored is a Component — the kind registry and Compon
 resource: platform/inspecto-engine/src/main/java/com/gamma/pipeline/ComponentStore.java, platform/inspecto-engine/src/main/java/com/gamma/catalog
 tags: [met, capability, component, component-store, kind-registry, catalog, metadata-graph, node-kind, id-scheme, schema, mapping, field-types, onboarding, lineage]
 timestamp: 2026-09-08T00:00:00Z
+item: module.config
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: platform/inspecto-config
 ---
 
 # Component metamodel & Catalog — capability spec (`MET`)
@@ -316,13 +321,11 @@ graph editor writes the canonical `*_pipeline.toon`. Seams: `onboarding-authorin
 
 **Catalog** (`/admin/catalog`): tabs Streams (default) · References · Tables · KPIs · Lineage (`graph`) ·
 Usage · Shared with / by me (Exchange-gated); `MetadataNode` / `NodeKind` in `inspecto/api/models.ts`
-as an **open** union. ⚠ **One concept, two spellings — corrected 2026-09-14.** The wire carries
+as an **open** union. ⚠ **One concept, two spellings.** The wire carries
 `RAW_SCHEMA` (`CatalogRoutes` serializes `kind().name()`, so the enum constant IS the wire value); the
 UI's `SCHEMA` is the *pipeline editor's* *synthetic* visual kind (`categoryVisualKind`: PARSE → SCHEMA),
-as is `ENRICHMENT`. 🔴 The SPA had modelled `SCHEMA` only, so **every real catalog schema node rendered
-unstyled** — the previously recorded note "the UI also names `SCHEMA`, `REPORT`, `ENRICHMENT` the server
-never emits" was right about the synthetics but missed that a wire kind had no home. Both Schema
-spellings are now styled identically, pinned by a spec so a palette de-duplication cannot split them.
+as is `ENRICHMENT`. Both Schema
+spellings are styled identically, pinned by a spec so a palette de-duplication cannot split them.
 One G6 `GraphViewComponent` renders every plane.
 
 **Node styling — `colour names the layer, shape names the structural role`** (operator decision
@@ -584,3 +587,9 @@ declared type.
 | ~~**No test of a migrated `fields[]` schema in a committed Space**~~ — moot: every committed schema is on `fields[]` | §8.5 |
 | ✅ Closed 2026-11-14: `ClassificationVocabularyTest`, `ControlApiClassificationVocabularyTest` | §3.7 |
 | **No client-side `If-Match` test on the generic component form or the mapping editor** — neither sends it (the schema editor does) | §3.9 |
+
+## Changes
+
+- 2026-09-14: Catalog schema kinds corrected — the page said the UI names `SCHEMA`, `REPORT`, `ENRICHMENT`
+  that the server never emits, missing that the wire kind `RAW_SCHEMA` had no UI style; the SPA modelled
+  `SCHEMA` only, so every real catalog schema node rendered unstyled.

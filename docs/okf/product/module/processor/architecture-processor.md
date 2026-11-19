@@ -5,6 +5,11 @@ description: Jobs and the scheduler (the module summary); the full capability co
 resource: platform/inspecto-engine/src/main/java/com/gamma/job/JobContext.java, inspecto/src/main/java/com/gamma/service/SpaceManager.java
 tags: [control-plane, jobs, pipeline-graph, steps, executables, boundary, plugins, multi-space, isolation, mdc, spaces]
 timestamp: 2026-08-09T00:00:00Z  # the Job vs Pipeline Step part; the Multi-Space Hosting part carried 2026-07-07
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: inspecto
 ---
 
 # Jobs, scheduler and multi-Space
@@ -274,8 +279,8 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
 - **No timeout or cancellation on either side.** → *Partially owned*: the **S2-3** watchdog covers
   `EXECUTED` Steps (plan R1); the Job-side watchdog stays a recorded gap beyond that plan.
 - **`NodeAttribute` lacks `secret`, `pattern`, `group`, `multi` and expression support** that
-  `ParameterDecl` gained in the job-parameter-contract work (re-verified 2026-09-01; it has since
-  gained `dependsOn`, which `ParameterDecl` lacks). → *Fulfilled by* stage 2's widened
+  `ParameterDecl` gained in the job-parameter-contract work (it has `dependsOn`, which
+  `ParameterDecl` lacks). → *Fulfilled by* stage 2's widened
   `StepTypeProvider` descriptor (**S2-1**).
 
 > ⚠ **The §6 gaps have an owner: [Platform Services](spec-platform-services.md).** **Stage 1 is COMPLETE

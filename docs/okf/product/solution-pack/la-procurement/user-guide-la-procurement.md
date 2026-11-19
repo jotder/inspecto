@@ -4,6 +4,11 @@ title: "Link Analysis procurement fraud showcase — user guide"
 description: "A five-minute tour of the la-procurement Space from its four saved views, then one exercise per planted story with a hint and an answer, and the tester's checklist of look-alikes that must not join a story."
 tags: [la-procurement, user-guide, showcase]
 timestamp: 2026-11-08T00:00:00Z
+item: solution-pack.la-procurement
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-procurement
 ---
 
 # Link Analysis procurement fraud showcase — user guide

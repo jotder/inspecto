@@ -4,6 +4,11 @@ title: "Collectors, parsing, ingest and Pipelines — features"
 description: "A Collector lands files from a remote system in a Pipeline's inbox; Stage-1 ingest turns them into typed rows in a Parquet store; a Pipeline is the chain of Steps (collect → parse → transform Steps → sink) that the execution engine runs."
 tags: [elt, acquire, collectors, pipelines-steps, parsing-ingest, engine, features, presales]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # Collectors, parsing, ingest and Pipelines — features

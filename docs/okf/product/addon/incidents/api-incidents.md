@@ -4,6 +4,11 @@ title: "Incidents — API"
 description: "Control-plane routes for Incidents, with their gates."
 tags: [incidents, incidents, api]
 timestamp: 2026-10-19T00:00:00Z
+item: addon.incidents
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-ops
 ---
 
 # Incidents — API

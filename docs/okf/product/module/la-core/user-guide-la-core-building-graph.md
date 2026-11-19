@@ -4,6 +4,11 @@ title: Link Analysis — User Guide — The screen, building and looking at a gr
 description: Part 2 of 7 of Link Analysis — User Guide: The screen; Building a graph; Looking at the graph
 tags: [module, la-core, link-analysis, user-guide]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — User Guide — The screen, building and looking at a graph

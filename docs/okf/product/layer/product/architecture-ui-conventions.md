@@ -4,6 +4,10 @@ title: inspecto-ui conventions and gotchas
 description: Conventions for adding panes to inspecto-ui, and the UI build and test traps; the angular-ui skill holds the full rules.
 tags: [angular, ui, conventions, gotchas]
 timestamp: 2026-11-19T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # inspecto-ui conventions and gotchas

@@ -15,14 +15,14 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [module.processor - board row detail](plan-board-detail.md) · [Control API (API)](plan-control-api.md) |
+| plan | current | [module.processor - board row detail](plan-board-detail.md) · [Control API (API) — Decisions, not built, refused and verification](plan-control-api-decisions-verification.md) · [Control API (API) — Purpose, scope and requirements of record](plan-control-api-scope.md) · [Control API (API) — Specification](plan-control-api-specification.md) · [Control API (API)](plan-control-api.md) |
 | spec | current | [Component Registry](spec-component-registry.md) · [Decision Rules & the Condition-Tree Evaluator](spec-decision-rules.md) · [Jobs & Scheduling — The Job Framework](spec-jobs-framework.md) · [Jobs & Scheduling — Maintenance jobs and the push and process jobs](spec-jobs-maintenance.md) · [Jobs & Scheduling — Open rows this concept owns](spec-jobs-open-rows.md) · [Jobs & Scheduling — The parameter contract, failure handling and single-seam properties](spec-jobs-parameters-failure.md) · [Jobs & Scheduling](spec-jobs.md) · [Metadata Bundle & Transportability](spec-metadata-bundle.md) · [Pipeline closure — what belongs to a pipeline](spec-pipeline-closure.md) · [Pipeline identity — rename & save-as-template](spec-pipeline-identity.md) · [Platform Services — the plugin envelope](spec-platform-services.md) · [Query catalog & execution](spec-queries.md) · [Tags — the cross-entity label graph](spec-tags.md) |
 | architecture | current | [Jobs, scheduler and multi-Space](architecture-processor.md) |
 | features | current | [Jobs and scheduler — features](features-jobs-scheduler.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Diagnoses](user-guide-diagnoses.md) · [Jobs](user-guide-jobs.md) |
 | admin-guide | current | [Control plane and processor host — admin guide](admin-guide-processor.md) |
-| api | current | [HTTP Control API](api-control-api.md) · [Jobs and scheduler — API](api-jobs-scheduler.md) · [Onboarding authoring seams (draft lifecycle, previews, register pair)](api-onboarding-authoring.md) · [Choose a table — the Postgres snapshot seam](api-onboarding-postgres-snapshot.md) · [HTTP routes — module.processor](api-routes.md) · [Versioned API (/api/v1)](api-v1.md) |
+| api | current | [HTTP Control API](api-control-api.md) · [Jobs and scheduler — API](api-jobs-scheduler.md) · [Onboarding authoring seams (draft lifecycle, previews, register pair) — Add data — /onboard/files](api-onboarding-authoring-add-data.md) · [Onboarding authoring seams (draft lifecycle, previews, register pair) — Add data — the commit onward](api-onboarding-authoring-commit.md) · [Onboarding authoring seams (draft lifecycle, previews, register pair) — Drafts, previews, the register pair and reference production](api-onboarding-authoring-drafts-previews.md) · [Onboarding authoring seams (draft lifecycle, previews, register pair)](api-onboarding-authoring.md) · [Choose a table — the Postgres snapshot seam](api-onboarding-postgres-snapshot.md) · [HTTP routes — module.processor](api-routes.md) · [Versioned API (/api/v1)](api-v1.md) |
 | tests | current | [Control plane and processor host — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
@@ -36,6 +36,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | — | P3 | feature | Platform Services Stage 2 / 3 | demand |
 | `BASIC-ELT-PROFILE-1` | P2 | feature | Make Basic onboarding a locked profile of ELT, retiring the parallel Basic backend and LA UI layers that duplicate ELT parts. | — |
+| `REPROCESS-REFUSAL-500-1` | P3 | defect | A reprocess refused because its outputs were compacted away answers 500 INTERNAL, not a conflict with its reason (filed 2026-11-19, BASIC… | — |
 | — | P3 | feature | Bundle / Exchange — "load as draft" residuals | — |
 | `ONBOARDING-REMOTE-SYSTEMS-1` | P3 | feature | Connect a system on Standard: Add data and the guided editor's Collect stage offer remote kinds (SFTP, object stores, other databases) wi… | — |
 | `DEPLOY-EXPOSURE-KIT-1` | P3 | chore | Prove the deploy kit (proxy fence for /metrics and /health/details, TLS, upgrade, off-site backup, signature verify) on a real host. | — |

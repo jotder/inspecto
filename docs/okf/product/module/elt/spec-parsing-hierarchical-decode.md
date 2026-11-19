@@ -4,6 +4,11 @@ title: Parsing — frontends, the parsing block, parser plugins, XML and ASN.1, 
 description: Part 3 of 3 of Parsing — frontends, the parsing block, parser plugins, XML and ASN.1, Decode Profiles: XML and ASN.1 — hierarchical parsers that ingest; Drop-in parser jars — trust gate, staging dir, pack parsers, ingest and preview gate SHIPPED (2026-09-25); Decode Profile — one vendor's decode settings, kept once (2026-09-25, slices C1–C4); Deferred by decision (the trust design's open …
 tags: [elt, engine, ingestion, spi, streaming, consignment, ingester, duckdb, seam, partitions, contract-test, plugins, segments, quarantine, route, branch, arming, fail-closed, lanes, addressing, revisions, watermark, selector, event-time, concurrency, scheduler, priority, backpressure, operations, parsing, grammar, csv, plugin, read-csv, frontend, options, asn1, xml, decode-profile]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # Parsing — frontends, the parsing block, parser plugins, XML and ASN.1, Decode Profiles — XML, ASN.1, drop-in jars, Decode Profiles and BER

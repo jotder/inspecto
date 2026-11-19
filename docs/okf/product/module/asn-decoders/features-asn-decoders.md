@@ -4,6 +4,11 @@ title: "ASN.1 decoders — features"
 description: "The ASN.1 decoders are the decoding library behind Inspecto's ASN.1 parsing."
 tags: [asn-decoders, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.asn-decoders
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/asn-parser/asn-decoders/asn-facade
 ---
 
 # ASN.1 decoders — features

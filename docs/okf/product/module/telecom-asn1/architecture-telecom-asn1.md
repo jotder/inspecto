@@ -5,6 +5,11 @@ description: How the optional inspecto-telecom-asn1 provider plugs the ASN.1 BER
 resource: providers/inspecto-telecom-asn1/
 tags: [module, telecom-asn1, asn1, parser, spi, editions]
 timestamp: 2026-10-19T00:00:00Z
+item: module.telecom-asn1
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-telecom-asn1
 ---
 
 # Telecom ASN.1 decoder — architecture

@@ -161,7 +161,7 @@ the screen reference.
 ### 4.1 Pages stay in the hubs
 
 The information base underneath — page size, headers, one home per fact, history out of current pages — is
-restructured and maintained by [`2026-11-19-information-restructure-and-maintenance-plan.md`](2026-11-19-information-restructure-and-maintenance-plan.md).
+restructured and maintained by [`2026-11-19-information-restructure-and-maintenance-plan.md`](../archived-documents/plans-archive/2026-11-19-information-restructure-and-maintenance-plan.md).
 
 Every page is still written into the hub of the item it explains, in the existing slots: `user-guide-<topic>` for
 tutorials, how-tos and concepts, `admin-guide-<topic>` for operator pages, `api-<topic>` for reference. No new docs
@@ -475,9 +475,9 @@ stays open; nothing needs it before P1's renderer exists. D-UE10 came later the 
 | **D-UE5** | Agent identity: the delegated-person allowlist, and the machine agent capability set (widens operator decision B1) | both; delegated first |
 | **D-UE6** | May an agent save a low-risk change directly, or does every save go through a Draft and approval | every save is a Draft; promotion and outbound actions need a human approver |
 | **D-UE7** | Which bundle carries the Labs | Preview and a training bundle only, not the sold editions |
-| **D-UE8** | Where the static site is hosted on the web | **open** — the operator's call (external) |
+| **D-UE8** | Where the static site is hosted on the web | **open** — the operator's call (external). **Ready (2026-11-20, operator: "keep it ready so that it can be updated easily"):** the place is one line, `handbook.publish.external` in `handbook.toon` (`none` until decided); `tools/publish-handbook.mjs` renders there once it is set |
 | **D-UE9** | The golden-suite pass rate per model, and whether the in-product Assistant reuses the Agent Skills in wave 1 | pass rate set after the first run; Assistant reuse after AK-4 |
-| **D-UE10** *(added 2026-11-19 with §3.1)* | Where the *Inside Inspecto* internal render is published for the team | **open** — recommended: built from the repository on demand (`tools/render-handbook.mjs --internal`) into a gitignored folder, never into a bundle or the public site; a team host only if the operator names one |
+| **D-UE10** *(added 2026-11-19 with §3.1)* | Where the *Inside Inspecto* internal render is published for the team | **open** — recommended: built from the repository on demand (`tools/render-handbook.mjs --internal`) into a gitignored folder, never into a bundle or the public site; a team host only if the operator names one. **Ready (2026-11-20):** `handbook.publish.internal` in `handbook.toon` (`none` until decided); meanwhile `tools/publish-handbook.mjs` keeps the render current in the gitignored `target/handbook/internal` |
 
 ## 10. Risks
 

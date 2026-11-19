@@ -4,6 +4,11 @@ title: "Public API annotations — features"
 description: "Public API annotations mark which Java surfaces are intended to stay stable for integrators."
 tags: [api, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.api
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-api
 ---
 
 # Public API annotations — features

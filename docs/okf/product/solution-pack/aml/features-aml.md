@@ -4,6 +4,11 @@ title: "AML — features"
 description: "Anti-money-laundering typologies, an account Risk Score, an Anomaly Model, screening and Link Analysis starters over a synthetic account feed."
 tags: [aml, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.aml
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/aml
 ---
 
 # AML — features

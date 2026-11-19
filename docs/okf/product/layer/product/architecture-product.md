@@ -5,6 +5,10 @@ description: The Angular workspace behind the Inspecto web UI — what it is, it
 resource: inspecto-ui/
 tags: [architecture, inspecto-ui, angular, tech-stack, layering, shared-libraries, signals, app-shell]
 timestamp: 2026-11-12T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Architecture
@@ -100,7 +104,10 @@ port 4304. Both proxy `/api` unchanged to the control plane on `localhost:8080`
 same origin (`-Dui.dir`), so `apiBaseUrl` is `/api` in both modes. `package.ps1` also renders the user Handbook
 (`tools/render-handbook.mjs`) into the bundle's `ui/help/`, served at `/help/`; the console's top bar and the LA rail
 open it as **Help**, and every page header links to its screen's chapter through the one map in
-`inspecto/help/help-chapter.ts` (USER-HANDBOOK-1). `angular.json` has no environment file
+`inspecto/help/help-chapter.ts` (USER-HANDBOOK-1). Outside the bundle, `tools/publish-handbook.mjs` (run by the `handoff`
+skill at shift end) rebuilds the external and internal Handbook into the gitignored `target/handbook/` and renders
+to the web and team places named in `handbook.toon`'s `handbook.publish` (`none` until D-UE8 and D-UE10 are decided);
+the internal render never goes to the external place. `angular.json` has no environment file
 replacement: `src/environments/environment.ts` is the file that ships.
 
 ## 4. Layering and where things live

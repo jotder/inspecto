@@ -4,6 +4,11 @@ title: ELT — architecture — The Pipeline graph, consignment status and direc
 description: Part 3 of 3 of ELT — architecture: The Pipeline graph — the backend model; Consignment status flow (the flowfile question); Stopping a Space (graceful stop); Directory layout; References
 tags: [elt, acquisition, phases, dedup, watermark, stability, ledger, multi-location, composition, pattern, module, core, composition-root, inspecto-processor, engine, architecture, stage1, multiplexer, ingest, layout, pipeline-graph, lift, node-types, derived, tokens, sinks, consignment, observability, audit, provenance, quarantine, status]
 timestamp: 2026-11-18T00:00:00Z  # merged 2026-11-18 from the elt, acquire and engine architecture pages; the multi-location ingest part carried type Practice (2026-08-25)
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # ELT — architecture — The Pipeline graph, consignment status and directory layout

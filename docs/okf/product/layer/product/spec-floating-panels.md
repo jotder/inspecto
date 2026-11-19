@@ -1,3 +1,13 @@
+---
+type: Spec
+title: Unified Canvas UI, Docking System & Enterprise Analytics Step Directory
+description: Master UI specification for the graph canvas shell: a collapsible, resizable step-palette sidebar with floating contextual panels, the layout tree, a categorized directory of 87+ processors, TypeScript contracts and rendering guidelines.
+item: layer.product
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
+---
+
 # Unified Canvas UI, Docking System & Enterprise Analytics Step Directory
 
 This document is the master architectural specification for the **Inspecto Graph Canvas UI Shell**, integrating a **Left-Fixed Collapsible & Resizable Sidebar (Step Palette)** with **Floating/Draggable Contextual Panels (Inspectors, Minimap, AI Copilot)**, a **Bottom Telemetry Drawer**, and an expanded **87+ Enterprise Processor Directory** that unifies modern streaming/Lakehouse ingestion with conventional ETL (SCD2, DML Strategy, Mainframe), **Tableau / Apache Superset Visual Analytics** (LOD Calculations, Time-Series Resampling, YoY Growth, H3 Hexagon Grid Indexing), and **Mission-Critical Audit & Regulatory Processors (File Sequence Analyzer, IFRS 15/9 Revenue Recognition Engine)**.

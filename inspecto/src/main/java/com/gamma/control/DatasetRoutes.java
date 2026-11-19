@@ -71,7 +71,7 @@ final class DatasetRoutes implements RouteModule {
     }
 
     /** The Dataset config key naming its event-date column (LA-DAILY-INGEST-1 T8), e.g. {@code eventDate: EVENT_DATE}. */
-    static final String EVENT_DATE_KEY = "eventDate";
+    static final String EVENT_DATE_KEY = com.gamma.job.ArrivalCompactor.EVENT_DATE_KEY;
 
     /**
      * {@code GET /datasets/{id}/freshness} (LA-DAILY-INGEST-1 T8, operator 2026-10-06) - "data as of": the instant the

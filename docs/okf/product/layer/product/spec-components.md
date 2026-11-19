@@ -5,6 +5,10 @@ description: The reusable-component registry — grammar, schema, transform, sin
 resource: inspecto-ui/src/app/modules/admin/components/components.routes.ts
 tags: [feature, components, settings, registry]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
 ---
 
 # Components Registry

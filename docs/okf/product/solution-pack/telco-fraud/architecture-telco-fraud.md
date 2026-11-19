@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Telecom fraud
+description: How the telco-fraud Space Template is built: three feeds with Expectations, the per-offender detection Jobs, Decision Rules and a Case Rule, a day in the analyst's life, the modules used and its limits.
+item: solution-pack.telco-fraud
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/telco-fraud]
+---
+
 # Telecom fraud
 
 > **Level 2 solution page** (`SOLUTION-SUITE-DOCS-1`). Content pack: Space Template `telco-fraud`

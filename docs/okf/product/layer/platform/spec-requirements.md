@@ -4,6 +4,10 @@ title: Platform requirements and MoSCoW
 description: The platform requirements-of-record with their MoSCoW priority; a hub plan §2 overrides it where they differ.
 tags: [requirements, moscow, platform]
 timestamp: 2026-11-19T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Inspecto — Platform Requirements & MoSCoW Analysis
@@ -47,7 +51,7 @@ AI-driven autonomy without redesign.
 |---|---|---|
 | **Angular UI** | The one operator console (all Lenses); requires a live control plane | `inspecto-ui/` |
 | **Java backend** | Engine + control plane + connectors + agent + security modules | `inspecto/`, `providers/inspecto-connectors/`, `features/inspecto-agent/`, `providers/inspecto-agent-hosted/`, `providers/inspecto-oidc/` |
-| **Agentic framework** | **eoiagent** — reusable, embeddable agent platform (separate repo); Inspecto's model transport since 2026-07-07; the kernel reasoning layer is vendored in `inspecto-agent` | upstream repo `jotder/inspect-agent` (`com.eoiagent:*`) — ⚠ corrected 2026-09-09; this cell named a machine-local path |
+| **Agentic framework** | **eoiagent** — reusable, embeddable agent platform (separate repo); Inspecto's model transport since 2026-07-07; the kernel reasoning layer is vendored in `inspecto-agent` | upstream repo `jotder/inspect-agent` (`com.eoiagent:*`) — ⚠ a repo, not a local path |
 
 ### 1.2 Personas (Lenses) and editions
 
@@ -150,8 +154,8 @@ library. The split is fixed by `GLOSSARY.md` §14, not chosen here.
 | NFR-6 | **API compatibility** | SemVer; versioned `/api/v1` as the sole business surface (unversioned routes retired 2026-07-25, API-5); `@PublicApi` embedding policy | SHIPPED |
 | NFR-7 | **Compliance posture (Professional)** | SOC2 / ISO27001 / FedRAMP / HIPAA / PCI scope; small SBOM as a deliberate compliance asset | PARTIAL (module shipped; certifications not started) — ⚠ **owner 2026-09-08: [`okf/product/layer/platform/plan-compliance.md`](plan-compliance.md)**. This is not one undifferentiated gap: it is **seven named items** in `compliance/controls-matrix.md` §4, six needing an external party or org authorship and **one needing only a named owner and a cadence**; the board's check is a line-anchored count that reads 7 and closes at 0. ⚠ The "small SBOM" claim is qualified by measurement — the reactor resolves **94** third-party artifacts, which is why generation moved per-bundle |
 | NFR-8 | **Scale ceiling** | Single-node by design; Enterprise distributed tier is the opt-in escape hatch | ACCEPTED CONSTRAINT — escape hatch **design SIGNED 2026-09-10** as T5 partitioned scale-out (Enterprise; its lease + shared state are also Professional's T4 DR) → `superpower/enterprise-scale-out-plan.md` |
-| NFR-9 | **Quality gates** | GAUNTLET (full reactor tests + UI lint/test/build), token lint, ~~a11y gate~~, ~~live smoke~~ | 🟡 SHIPPED — ⚠ **understated and misstated (corrected 2026-09-09; owner [`okf/product/layer/platform/plan-tooling.md`](plan-tooling.md) §2)**: there is **no a11y gate step** (axe rides unit specs), and **live smoke exists only in `release.yml`, which has never executed**. The row names none of the **nine repo guards** nor the coverage floors — the substance of what is enforced. ⚠ Load-bearing: `compliance/controls-matrix.md` ISO 8.25–8.31 cites NFR-9 as its only evidence |
-| NFR-10 | **Vocabulary discipline** | One concept → one word; banned synonyms never appear in UI/model/API/docs (GLOSSARY §0) | 🔴 SHIPPED — **both halves of this cell were wrong (corrected 2026-09-09)**. (a) Not "enforced in review": it is `tools/check-vocabulary.mjs`, wired into `ci.yml` **and** `.githooks/pre-push`, and cited by name as CC8 evidence. (b) The scope claim far exceeds the guard — of the **seven** hard bans in `CLAUDE.md`, **three have NO rule at all** (bare *Rule*, *Metric* BI, *Data Source*), *Issue* is enforced only in config KEYS and *Source* only in prose. Owner: [`okf/product/layer/platform/plan-tooling.md`](plan-tooling.md) §2 | <!-- vocab-allow: names the banned term in order to state whether a rule covers it -->
+| NFR-9 | **Quality gates** | GAUNTLET (full reactor tests + UI lint/test/build), token lint, ~~a11y gate~~, ~~live smoke~~ | 🟡 SHIPPED — owner [`okf/product/layer/platform/plan-tooling.md`](plan-tooling.md) §2: there is **no a11y gate step** (axe rides unit specs), and **live smoke exists only in `release.yml`, which has never executed**. The row names none of the **nine repo guards** nor the coverage floors — the substance of what is enforced. ⚠ Load-bearing: `compliance/controls-matrix.md` ISO 8.25–8.31 cites NFR-9 as its only evidence |
+| NFR-10 | **Vocabulary discipline** | One concept → one word; banned synonyms never appear in UI/model/API/docs (GLOSSARY §0) | 🔴 SHIPPED. (a) Enforced by a guard, not in review: it is `tools/check-vocabulary.mjs`, wired into `ci.yml` **and** `.githooks/pre-push`, and cited by name as CC8 evidence. (b) The scope claim far exceeds the guard — of the **seven** hard bans in `CLAUDE.md`, **three have NO rule at all** (bare *Rule*, *Metric* BI, *Data Source*), *Issue* is enforced only in config KEYS and *Source* only in prose. Owner: [`okf/product/layer/platform/plan-tooling.md`](plan-tooling.md) §2 | <!-- vocab-allow: names the banned term in order to state whether a rule covers it -->
 
 ---
 
@@ -306,3 +310,9 @@ template gallery + apply).*
 guidelines and the W1–W7 worklog), `backend-backlog.md` and `embedded-intelligence-plan.md` — are in
 `archived-documents/plans-archive/` and are listed in the archived-plans table of [`archived-documents/README.md`](../../../../archived-documents/README.md). ⛔ Read them for
 *why* a row was written, never for what is built; the archive is not maintained.
+
+## Changes
+
+- 2026-09-09: the eoiagent cell corrected — it named a machine-local path. NFR-9 corrected — it was understated and
+  misstated (an a11y gate and live smoke listed as running). NFR-10 corrected — it said vocabulary was "enforced in
+  review" and claimed every hard ban was covered.

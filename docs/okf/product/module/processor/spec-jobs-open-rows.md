@@ -4,6 +4,11 @@ title: Jobs & Scheduling — Open rows this concept owns
 description: Part 4 of 4 of Jobs & Scheduling: Open rows this concept owns — the job-path semantics change (2026-09-16)
 tags: [control-plane, jobs, scheduling, cron, triggers, async-runs]
 timestamp: 2026-07-07T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: inspecto
 ---
 
 # Jobs & Scheduling — Open rows this concept owns

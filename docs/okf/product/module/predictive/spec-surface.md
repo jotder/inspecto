@@ -1,6 +1,12 @@
 ---
+type: Spec
 title: Predictive read surface — as built
 description: The Predictions read route, the entity prediction panel and the forecast chart (PREDICTIVE-SURFACE-1, first slice).
+item: module.predictive
+audience: internal
+status: current
+verified: 2026-11-01 last-edit
+code: [features/inspecto-predictive]
 ---
 
 # Predictive read surface — as built (PREDICTIVE-SURFACE-1, 2026-11-01)

@@ -4,6 +4,9 @@ title: Alert Rule, Expectation and Decision Rule
 description: What an Alert Rule is — a watch on a number that fires an Alert when it crosses a threshold — and how it differs from an Expectation and a Decision Rule.
 item: addon.incidents
 audience: external
+status: current
+verified: 2026-11-19 last-edit
+code: features/inspecto-ops
 ---
 
 # Alert Rule, Expectation and Decision Rule

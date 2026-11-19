@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis crypto laundering showcase — brochure
+description: Brochure for the Link Analysis crypto laundering showcase: a peel chain, a mixer hop matched by timing and amount, and a converging cash-out through exchange accounts, each beside an innocent look-alike.
+item: solution-pack.la-crypto
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-crypto]
+---
+
 # Link Analysis crypto laundering showcase — brochure
 
 > **Coins stolen from a hacked wallet are peeled off, a little at a time, over 80 hops into six exchange accounts. Ransom money goes into a mixer and comes out under two hours later, 98 % of it, at a fresh address that pays one exchange account. Forty exchange accounts in forty unrelated names are all funded by one wallet cluster and all cash out to the same three bank accounts. All of it is hidden among 10 900 addresses and 44 500 transfers. You can find each one from a saved view in minutes, and see why the innocent look-alikes stay apart.**

@@ -5,6 +5,11 @@ description: Implementation detail of the notification engine and the notify-cha
 resource: platform/inspecto-engine/src/main/java/com/gamma/notify/
 tags: [notify-channels, notifications, spec, smtp, webhook, spi]
 timestamp: 2026-10-19T00:00:00Z
+item: module.notify-channels
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-notify-channels
 ---
 
 # Notifications — specification

@@ -5,6 +5,11 @@ description: Developer-facing spec of the inspecto-reconciliation module — cla
 resource: features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconService.java
 tags: [reconciliation, spec, breaks, duckdb, backend]
 timestamp: 2026-10-19T00:00:00Z
+item: module.reconciliation
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-reconciliation
 ---
 
 # Reconciliation — implementation spec

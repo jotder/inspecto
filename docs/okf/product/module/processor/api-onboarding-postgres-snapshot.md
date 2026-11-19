@@ -5,11 +5,16 @@ description: Add data's third way in on every edition — a Postgres table or on
 resource: inspecto/src/main/java/com/gamma/control/PostgresSnapshot.java
 tags: [control-plane, onboarding, add-data, postgres, snapshot, basic]
 timestamp: 2026-11-19T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: inspecto
 ---
 
 # Choose a table: a Postgres snapshot (`PostgresSnapshot`; `BASIC-ONBOARD-1` P3, 2026-11-05)
 
-Part of [Add data: `/onboard/files`](api-onboarding-authoring.md#add-data-onboardfiles-file-in--dataset-out-la-onboard-1-phase-2-2026-10-22)
+Part of [Add data: `/onboard/files`](api-onboarding-authoring-add-data.md#add-data-onboardfiles-file-in--dataset-out-la-onboard-1-phase-2-2026-10-22)
 in the [onboarding authoring seams](api-onboarding-authoring.md) — the draft and the commit it reuses are described
 there; this page is the Postgres way in, kept on its own page so each stays readable whole.
 

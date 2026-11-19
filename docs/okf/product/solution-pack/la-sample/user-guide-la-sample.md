@@ -4,6 +4,11 @@ title: "Link Analysis sample — user guide"
 description: "The first-run sample Space of Inspecto LA: invented transfers with a planted money-mule ring, loaded and run from one button."
 tags: [la-sample, user-guide, onboarding]
 timestamp: 2026-10-22T00:00:00Z
+item: solution-pack.la-sample
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-sample
 ---
 
 # Link Analysis sample — user guide

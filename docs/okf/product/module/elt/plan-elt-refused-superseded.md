@@ -5,6 +5,10 @@ description: Part 5 of 7 of Acquisition, ingestion and Pipelines (ACQ, ING, PIP)
 status: current
 tags: [acq, ing, pip, capability, acquisition, connections, collectors, connectors, ledger, ingestion, parsing, consignment, grammar, parser-plugin, quarantine, expectation, pipeline, authoring, step-catalog, execution, scheduler, jobs, plan]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # Acquisition, ingestion and Pipelines (ACQ, ING, PIP) — plan — Refused and superseded
@@ -30,7 +34,7 @@ connector and there will not be one.** The path validator **rejects UNC outright
 keeps an authored config from reaching an arbitrary host on the network.
 
 **What serves the need instead:** mount the share at the OS level and point the built-in `local`
-connector at it ([spec](spec-acquisition.md#network-shares--the-declined-design-recorded-once)). The editions matrix's
+connector at it ([spec](spec-acquisition-connectors-control.md#network-shares--the-declined-design-recorded-once)). The editions matrix's
 `SP-ACQ-01` (`spec-editions.md`) is titled "**Local / NFS** directory watcher" — `LocalFileSystemConnector`, the
 default collector — and reads `✅✅✅`, so NFS **is** served; what is refused is an in-process protocol client.
 

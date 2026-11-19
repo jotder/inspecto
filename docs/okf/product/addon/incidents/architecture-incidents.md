@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Incidents and Alerts
+description: How the Incident object (its workflow, openers and governance) and the Alert Rule evaluator (triggers, rule shapes, promotion of critical Alerts) are built, along the Alert → Incident → Case chain.
+item: addon.incidents
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-ops
+---
+
 # Incidents and Alerts
 
 The architecture of the `incidents` add-on hub, in two parts: the **Incident**, the operational object that

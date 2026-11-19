@@ -5,6 +5,10 @@ description: vitest + axe, the lint:tokens guard, the production build, preview 
 resource: inspecto-ui/package.json
 tags: [testing, build, vitest, ci, definition-of-done]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
 ---
 
 # Testing, Build & Definition of Done

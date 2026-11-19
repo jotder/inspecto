@@ -5,6 +5,10 @@ description: The data catalog — Streams/References/Tables/KPIs grids, lineage 
 resource: inspecto-ui/src/app/modules/admin/catalog/catalog.routes.ts
 tags: [feature, catalog, acquisition, graph]
 timestamp: 2026-07-30T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-17 last-edit
 ---
 
 # Catalog

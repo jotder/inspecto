@@ -4,6 +4,11 @@ title: ELT — user guide — Save, pipeline-level surfaces, guided mode and kno
 description: Part 6 of 7 of ELT — user guide: Save, validation, refusals and history; Pipeline-level surfaces; Guided mode — the onboarding host; Runs and processing status; The Recipe view and the step cards (stale record); Known gaps; Verification culture
 tags: [feature, pipelines, editor, authoring, g6, graph, workbench, schema, mapping, transform, parsing-ingest, enrichment, onboarding, use-cases, user-guide, collectors, acquisition, connections, runs, operations, detail, breadcrumb]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # ELT — user guide — Save, pipeline-level surfaces, guided mode and known gaps

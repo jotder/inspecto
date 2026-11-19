@@ -4,6 +4,11 @@ title: "Link Analysis utility showcase — user guide"
 description: "A five-minute tour of the la-utility Space from its three saved views, then one exercise per planted story with the steps to find it, the answer, and the benign look-alike that must not link to it, plus the tester's checklist."
 tags: [la-utility, user-guide, showcase]
 timestamp: 2026-11-08T00:00:00Z
+item: solution-pack.la-utility
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-utility
 ---
 
 # Link Analysis utility showcase — user guide

@@ -4,6 +4,10 @@ title: "Platform — user guide"
 description: "What the platform does for an end user — signing in, Spaces, Lenses and navigation — with links onward to each module's user guide."
 tags: [platform, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
 ---
 
 # Platform — user guide

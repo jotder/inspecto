@@ -4,6 +4,11 @@ title: "Graph library — features"
 description: "The graph library is the module platform/inspecto-graph (package com.gamma.graph): server-side graph algorithms over plain node and edge ids — paths, flow, centrality, PageRank, communities, k-core, cliques, link prediction, propagated risk, a suspicion blend and a temporal motif matcher."
 tags: [graph, graph, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.graph
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-graph
 ---
 
 # Graph library — features

@@ -5,6 +5,11 @@ description: How http-spi lets optional modules contribute Control API routes, s
 resource: spi/inspecto-http-spi/
 tags: [module, http-spi, spi, architecture, control-api, editions]
 timestamp: 2026-10-19T00:00:00Z
+item: module.http-spi
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spi/inspecto-http-spi
 ---
 
 # Route module contract — architecture (`module.http-spi`)

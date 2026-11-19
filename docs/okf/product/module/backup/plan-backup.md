@@ -4,13 +4,18 @@ title: "Backup and restore — plan"
 description: "Requirement of record for the backup, backup_verify and restore maintenance tasks: what was required, built, left and refused."
 tags: [backup, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.backup
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: features/inspecto-backup
 ---
 
 # Backup and restore — plan
 
 **Requirement of record:** System Maintenance MNT-5 (backup, verify), MNT-6 (restore) and MNT-10 (backup
 catalog), restated in [plan-observability](../observability/plan-observability.md) §3.6; edition placement is
-EDITIONS `OPS-06` and `EDG-01` cell 2 ([spec-editions](../../layer/platform/spec-editions.md)). The original plan is archived at
+EDITIONS `OPS-06` and `EDG-01` cell 2 ([spec-editions-platform-board](../../layer/platform/spec-editions-platform-board.md)). The original plan is archived at
 [system-maintenance-plan](../../../../archived-documents/plans-archive/system-maintenance-plan.md).
 
 ## Required

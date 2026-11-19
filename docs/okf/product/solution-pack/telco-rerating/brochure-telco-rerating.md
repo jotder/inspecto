@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Telecom re-rating (tariff validation) — brochure
+description: Brochure for the Telecom re-rating (tariff validation) pack: checking billed usage against your own tariff independently of billing, separating tariff defects, ambiguity ranges, over-billing and likely causes.
+item: solution-pack.telco-rerating
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/telco-rerating]
+---
+
 # Telecom re-rating (tariff validation) — brochure
 
 > **Check what you billed against your own tariff, independently of the billing system, and see which of the differences a tariff defect explains, and what the rest is consistent with.**

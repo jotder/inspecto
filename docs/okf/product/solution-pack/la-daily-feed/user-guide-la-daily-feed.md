@@ -4,6 +4,11 @@ title: "Link Analysis daily feed — user guide"
 description: "How an investigator works with a daily-fed Link Analysis index."
 tags: [la-daily-feed, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.la-daily-feed
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: spaces/_templates/la-daily-feed
 ---
 
 # Link Analysis daily feed — user guide

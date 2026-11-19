@@ -5,6 +5,11 @@ description: As built for PREDICTIVE-CHURN-DECLARED-1 (2026-11-01) — slice S3 
 resource: docs/okf/product/module/anomaly/plan-predictive-analytics.md
 tags: [predictive, churn, churn-score, logistic, job, alert-rule, analytics]
 timestamp: 2026-11-01T00:00:00Z
+item: module.predictive
+audience: internal
+status: current
+verified: 2026-11-01 last-edit
+code: features/inspecto-predictive
 ---
 
 # Churn Scores (declared coefficients)

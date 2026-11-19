@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // docs-health — the health of the information base, and the ratchets that keep it from getting worse
-// (INFO-RESTRUCTURE-1 wave W2, docs/superpower/2026-11-19-information-restructure-and-maintenance-plan.md §2, §4).
+// (INFO-RESTRUCTURE-1 wave W2, docs/okf/product/layer/platform/spec-docs-maintenance.md).
 //
 //   node tools/docs-health.mjs [--json] [--ratchet] [--baseline-write]
 //
@@ -25,9 +25,12 @@
 //   header    a hub page (docs/okf/**) without the base header (`type`, `title`, `description`) that is not in the
 //             baseline list; and, wherever a header carries them, an invalid `audience` (external | internal), `verified`
 //             (starts YYYY-MM-DD) or `code` path (must be tracked). The full header (D-IR4: type, title, description,
-//             item, audience, status, verified, code) is REPORTED, not required — W4 fills it.
+//             item, audience, status, verified, code; `code` optional on layer hub pages, which link no code) is required
+//             of every hub page that is not in the baseline's `partialHeader` list or its `headerless` list: a NEW
+//             hub page needs it (`node tools/fill-doc-headers.mjs --write --hub <kind>/<name>` adds what it can), and a
+//             page that has it may not lose it, so the full-header count only rises (INFO-RESTRUCTURE-1 W4).
 //   editions  a page with more hand-written Basic | Standard | Advanced tables than its baseline. The homes of that fact
-//             (EDITIONS.md and spec-editions.md) are exempt.
+//             (EDITIONS.md and spec-editions.md with its parts spec-editions-*.md) are exempt.
 //   ledger    the board's ledger (BACKLOG.md, between the count line and "## Area index") over LEDGER_CAP (60 KB):
 //             run `node tools/roll-backlog-ledger.mjs --write`. Capped by size, not age, so the calendar alone never
 //             turns a commit red.
@@ -67,10 +70,13 @@ export const HISTORY_EXEMPT = new Set([
     'docs/GLOSSARY.md',
     'docs/okf/product/layer/product/brochure-competitive-landscape.md',
 ]);
-export const EDITION_HOMES = new Set(['docs/EDITIONS.md', 'docs/okf/product/layer/platform/spec-editions.md']);
+export const EDITION_HOMES = { has: (p) => p === 'docs/EDITIONS.md' || /^docs\/okf\/product\/layer\/platform\/spec-editions(-[a-z0-9-]+)?\.md$/.test(p) };
 const ARCHIVE = 'docs/archived-documents/';
 const BASE_KEYS = ['type', 'title', 'description'];
 const FULL_KEYS = ['type', 'title', 'description', 'item', 'audience', 'status', 'verified', 'code'];
+/** The full header a page needs: a layer hub links no code of its own (tools/fill-doc-headers.mjs), so `code` is optional
+ *  there — validated when present, never required. */
+export const fullKeysOf = (path) => (path.startsWith('docs/okf/product/layer/') ? FULL_KEYS.filter((k) => k !== 'code') : FULL_KEYS);
 
 /** Is this page generated (exempt from ratchets)? */
 export function isGenerated(path, text) {
@@ -154,7 +160,8 @@ export function measure(paths, read, isTracked) {
             history: historyNotes(text),
             editions: editionTables(text),
             baseHeader: !!fm && BASE_KEYS.every((k) => fm[k] !== undefined && fm[k] !== ''),
-            fullHeader: !!fm && FULL_KEYS.every((k) => fm[k] !== undefined && fm[k] !== ''),
+            fullHeader: !!fm && fullKeysOf(path).every((k) => fm[k] !== undefined && fm[k] !== ''),
+            missingFull: fullKeysOf(path).filter((k) => !fm || fm[k] === undefined || fm[k] === ''),
             headerProblems: headerProblems(fm, isTracked),
             fm,
         });
@@ -165,15 +172,17 @@ export function measure(paths, read, isTracked) {
 
 /** The numbers a baseline keeps: only the debt, so the file stays small. */
 export function baselineOf(m) {
-    const b = { oversize: {}, history: {}, headerless: [], editions: {} };
+    const b = { oversize: {}, history: {}, headerless: [], partialHeader: [], editions: {} };
     for (const p of m.pages) {
         if (p.generated) continue;
         if (sizeScoped(p) && p.bytes > CAP) b.oversize[p.path] = p.bytes;
         if (historyScoped(p) && p.history > 0) b.history[p.path] = p.history;
         if (p.hub && !p.baseHeader) b.headerless.push(p.path);
+        else if (p.hub && !p.fullHeader) b.partialHeader.push(p.path);
         if (!EDITION_HOMES.has(p.path) && p.editions > 0) b.editions[p.path] = p.editions;
     }
     b.headerless.sort();
+    b.partialHeader.sort();
     return b;
 }
 const historyScoped = (p) => !HISTORY_EXEMPT.has(p.path) && !p.path.startsWith('docs/superpower/');
@@ -199,6 +208,10 @@ export function evaluate(m, base) {
         if (p.hub && !p.baseHeader && !base.headerless.includes(p.path))
             failures.push(`header: ${p.path} has no type / title / description header`);
         if (p.hub && p.baseHeader && base.headerless.includes(p.path)) improvements.push(`header: ${p.path} gained its header`);
+        const partial = base.partialHeader ?? [];
+        if (p.hub && p.baseHeader && !p.fullHeader && !partial.includes(p.path) && !base.headerless.includes(p.path))
+            failures.push(`header: ${p.path} lacks the full D-IR4 header (missing: ${p.missingFull.join(', ')}) — run node tools/fill-doc-headers.mjs --write --hub ${p.path.split('/').slice(3, 5).join('/')}`);
+        if (p.hub && p.fullHeader && partial.includes(p.path)) improvements.push(`header: ${p.path} gained the full header`);
         for (const msg of p.headerProblems) failures.push(`header: ${p.path}: ${msg}`);
         if (!EDITION_HOMES.has(p.path)) {
             const was = base.editions[p.path] || 0;
@@ -208,7 +221,7 @@ export function evaluate(m, base) {
     }
     if (m.ledgerBytes !== null && m.ledgerBytes > LEDGER_CAP)
         failures.push(`ledger: the board's ledger is ${(m.ledgerBytes / 1024).toFixed(1)} KB, over 60 KB — run node tools/roll-backlog-ledger.mjs --write`);
-    const known = [...Object.keys(base.oversize), ...Object.keys(base.history), ...base.headerless, ...Object.keys(base.editions)];
+    const known = [...Object.keys(base.oversize), ...Object.keys(base.history), ...base.headerless, ...(base.partialHeader ?? []), ...Object.keys(base.editions)];
     for (const k of new Set(known)) if (!present.has(k)) stale.push(k);
     return { failures, improvements, stale };
 }
@@ -243,7 +256,7 @@ function report(m, d) {
     for (const p of over.slice(0, 10)) lines.push(`    ${Math.round(p.bytes / 1024)} KB  ${p.path}`);
     lines.push(`  inline history notes (ratcheted pages): ${hand.filter(historyScoped).reduce((s, p) => s + p.history, 0)}`);
     const hubs = hand.filter((p) => p.hub);
-    lines.push(`  hub headers: ${hubs.filter((p) => p.baseHeader).length} of ${hubs.length} base, ${hubs.filter((p) => p.fullHeader).length} full (D-IR4)`);
+    lines.push(`  hub headers: ${hubs.filter((p) => p.baseHeader).length} of ${hubs.length} base, ${hubs.filter((p) => p.fullHeader).length} full (D-IR4; code optional on layer pages)`);
     lines.push(`  hand-written edition tables outside their homes: ${hand.filter((p) => !EDITION_HOMES.has(p.path)).reduce((s, p) => s + p.editions, 0)}`);
     if (m.ledgerBytes !== null) lines.push(`  board ledger: ${(m.ledgerBytes / 1024).toFixed(1)} KB (cap 60 KB)`);
     lines.push(`  drift list (code changed after verified): ${d.length}`);
@@ -265,8 +278,15 @@ function main() {
     if (docs.length < listed.length) console.log(`docs-health: ${listed.length - docs.length} tracked doc(s) missing on disk, skipped`);
     const m = measure(docs, (p) => readFileSync(join(root, p), 'utf8'), isTracked);
     if (m.pages.length < 300) { console.error(`✗ docs-health: only ${m.pages.length} page(s) measured — run from the repository root`); process.exit(2); }
+    // Memoized: hundreds of pages name the same few code paths, and each lookup is a git process.
+    const changed = new Map();
     const lastChange = (p) => {
-        try { return execFileSync('git', ['log', '-1', '--format=%cs', '--', p], { cwd: root, encoding: 'utf8' }).trim() || null; } catch { return null; }
+        if (!changed.has(p)) {
+            let d = null;
+            try { d = execFileSync('git', ['log', '-1', '--format=%cs', '--', p], { cwd: root, encoding: 'utf8' }).trim() || null; } catch { /* untracked: no date */ }
+            changed.set(p, d);
+        }
+        return changed.get(p);
     };
     if (args.has('--baseline-write')) {
         writeFileSync(BASELINE, JSON.stringify({ _note: 'tools/docs-health.mjs --baseline-write; only debt is kept, and it may only shrink (INFO-RESTRUCTURE-1 W2)', ...baselineOf(m) }, null, 1) + '\n');

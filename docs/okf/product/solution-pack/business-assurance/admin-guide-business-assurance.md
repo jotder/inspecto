@@ -4,6 +4,11 @@ title: "Business assurance — admin guide"
 description: "Install, enable and verify the Business assurance Solution Pack."
 tags: [business-assurance, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.business-assurance
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/business-assurance
 ---
 
 # Business assurance — admin guide

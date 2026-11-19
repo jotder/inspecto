@@ -1,3 +1,13 @@
+---
+type: Brochure
+title: Inspecto — Solution Overview
+description: Level-0 map of the solution suite for buyers and new users: the collect-to-act data path, what each Offering includes, the level-2 solutions and the level-1 and level-3 pages to read next.
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+---
+
 # Inspecto — Solution Overview
 
 > **Level 0 of the solution suite** (`SOLUTION-SUITE-DOCS-1`, plan: [`solution-suite-docs-plan.md`](../../../../archived-documents/plans-archive/solution-suite-docs-plan.md)).
@@ -24,15 +34,12 @@ someone owns:
 An **Offering** is a tier plus add-ons plus content packs, composed in `offerings/*.toon`. The tiers are
 **Basic**, **Standard** (includes Basic) and **Advanced** (includes Standard); **Preview** bundles everything for
 evaluation. A module is usable only when it is Installed in the build, Enabled for the Space and Permitted for
-the user. See [`../../../../EDITIONS.md`](../../../../EDITIONS.md) for the full placement table.
-
-| | Basic | Standard | Advanced |
-|---|---|---|---|
-| Sign-in | none (single user, local) | OIDC | OIDC plus attribute-based Access Policies |
-| Platform base (Collectors, Pipelines, Studio & BI, Alerts, maker-checker) | ✅ | ✅ | ✅ |
-| Link Analysis explorer | ✅ | ✅ | ✅ (Postgres investigation store) |
-| Add-ons: Incidents, Case Management, Action Requests, Reconciliation, Risk Scores (Entity Lists are in Basic), Anomaly Detection, Screening, Regulatory Reporting, Exchange, AI assist | — | ✅ | ✅ (adds the intelligence agent) |
-| Content packs | Link Analysis daily feed, the Link Analysis showcases' Basic tiers, Orders starter | adds Business Assurance (moved from Basic 2026-10-20, `OFFERING-DECLARATION-DRIFT-1`, closed), Revenue Assurance, Telecom Fraud, Payment Fraud, AML, Mobile Money | same as Standard |
+the user. See [`../../../../EDITIONS.md`](../../../../EDITIONS.md) for the full placement table. In short: Basic
+is one user on one machine with no sign-in — Collectors, Pipelines, Studio dashboards, the Link Analysis explorer and
+Entity Lists, with the Link Analysis showcases and the Orders starter as content; Standard adds OIDC sign-in, the
+operating Add-ons (Incidents, Case Management, Action Requests, Reconciliation, Risk Scores, Anomaly Detection,
+Screening, Regulatory Reporting, Exchange, the AI assistant) and the domain solution packs listed below; Advanced adds
+attribute-based Access Policies, the PostgreSQL Investigation store and the intelligence agent.
 
 ## 3. Solutions (level 2)
 

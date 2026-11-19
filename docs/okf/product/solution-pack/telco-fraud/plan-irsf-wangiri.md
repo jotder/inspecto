@@ -1,3 +1,14 @@
+---
+type: Plan
+title: Interconnect / wholesale fraud from CDRs (IRSF, Wangiri, flash-call / CLI): plan
+description: Parked CDR-only plan for interconnect and wholesale fraud (IRSF, Wangiri, flash-call, CLI) at trunk, partner and destination level: reference data, features, thresholds, lists and Case flow, limits, slices, RFP traceability and answered decisions.
+item: solution-pack.telco-fraud
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/telco-fraud]
+---
+
 # Interconnect / wholesale fraud from CDRs (IRSF, Wangiri, flash-call / CLI): plan
 
 > ⏸ **PARKED 2026-10-22 — design only, demand-gated; not in flight.** To resume: move it back to docs/superpower/ and rank its BACKLOG row.

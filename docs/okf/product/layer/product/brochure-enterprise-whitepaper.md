@@ -1,3 +1,13 @@
+---
+type: Brochure
+title: Inspecto — Enterprise Product & Solutions Whitepaper
+description: Enterprise whitepaper (version 1.4, 2026-10-21) for CIOs, CTOs, data architects and assurance and compliance heads, presenting Inspecto as a sovereign data-operations platform for environments where data cannot leave.
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-14 last-edit
+---
+
 # Inspecto — Enterprise Product & Solutions Whitepaper
 > **Sovereign Data Operations: the end-to-end platform for environments where data cannot leave**
 > *Audience: CIOs, CTOs, Enterprise Data Architects, Heads of Revenue Assurance and Fraud, Compliance Officers*

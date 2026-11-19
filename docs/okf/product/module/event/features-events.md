@@ -4,6 +4,11 @@ title: "Events and event log — features"
 description: "The **event log** is the per-Space, append-only record of what happened: lifecycle facts (BATCH_COMMITTED, FILE_QUARANTINED, ALERT_FIRED ...), captured log lines (LOG) and the security audit trail (AUDIT, ACCESS_DENIED)."
 tags: [event, events, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.event
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-event
 ---
 
 # Events and event log — features

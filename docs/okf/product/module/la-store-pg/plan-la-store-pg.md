@@ -5,6 +5,11 @@ description: What the PostgreSQL Investigation store is required to do, what is 
 resource: la/inspecto-la-store-pg/
 tags: [module, la-store-pg, link-analysis, postgres, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.la-store-pg
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: la/inspecto-la-store-pg
 ---
 
 # Link analysis PostgreSQL store - plan of record

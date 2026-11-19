@@ -4,6 +4,11 @@ title: "Basic Edition — features"
 description: "Basic is the entry Edition: core connectors, Entity Lists, the Link Analysis studio and two content packs."
 tags: [basic, edition, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: edition.basic
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: offerings/basic.toon
 ---
 
 # Basic Edition — features

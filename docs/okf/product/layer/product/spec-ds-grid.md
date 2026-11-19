@@ -5,6 +5,10 @@ description: The ag-Grid 35 gamma theme plus shared column/cell/overlay helpers 
 resource: inspecto-ui/src/app/inspecto/grid/index.ts
 tags: [design-system, ag-grid, grid, theme]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
 ---
 
 # Grid

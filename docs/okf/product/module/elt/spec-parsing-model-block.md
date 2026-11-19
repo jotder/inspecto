@@ -4,6 +4,11 @@ title: Parsing — frontends, the parsing block, parser plugins, XML and ASN.1, 
 description: Part 1 of 3 of Parsing — frontends, the parsing block, parser plugins, XML and ASN.1, Decode Profiles: The unifying model: a parser *frontend* feeding the DuckDB *backend*; What the engine exposes today vs. raw DuckDB; Corrected & extended DuckDB read_csv parameter reference; Beyond CSV — the other DuckDB-native readers; The parsing: block [LIVE]
 tags: [elt, engine, ingestion, spi, streaming, consignment, ingester, duckdb, seam, partitions, contract-test, plugins, segments, quarantine, route, branch, arming, fail-closed, lanes, addressing, revisions, watermark, selector, event-time, concurrency, scheduler, priority, backpressure, operations, parsing, grammar, csv, plugin, read-csv, frontend, options, asn1, xml, decode-profile]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # Parsing — frontends, the parsing block, parser plugins, XML and ASN.1, Decode Profiles — The parser model, DuckDB readers and the parsing block
@@ -36,7 +41,7 @@ several formats per mechanism):
    DuckDB-native frontends (`read_csv`, `read_json`, `read_text`/`read_blob`) parse the bytes *inside*
    DuckDB. Fast, vectorized, zero Java parsing. Good for delimited, JSON, and
    "regular-enough-to-regex" text.
-3. **The plugin frontend** (`StreamingFileIngester`, [§ Plugin ingester](spec-ingest.md#plugin-ingester) above)
+3. **The plugin frontend** (`StreamingFileIngester`, [§ Plugin ingester](spec-ingest-plugin-ingester.md#plugin-ingester) above)
    decodes in Java and `emit()`s records. The *only* path for genuinely binary/grammar-driven formats —
    ASN.1/BER-TLV, proprietary CDRs, deeply nested XML.
 

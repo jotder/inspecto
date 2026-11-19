@@ -4,6 +4,11 @@ title: "Mobile money industry pack — admin guide"
 description: "Select and verify the mobile-money domain profile for a Space."
 tags: [industry-mobile-money, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.industry-mobile-money
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-entity-store/src/main/resources/META-INF/inspecto/industry-packs/mobile-money
 ---
 
 # Mobile money industry pack — admin guide

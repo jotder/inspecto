@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Anomaly Detection
+description: How Anomaly Detection computes a 0–100 Anomaly Score per entity per run with a per-Feature explanation, from an authored Anomaly Model through the anomaly.score Job, and how it differs from a Risk Score.
+item: module.anomaly
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [features/inspecto-anomaly]
+---
+
 # Anomaly Detection
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.

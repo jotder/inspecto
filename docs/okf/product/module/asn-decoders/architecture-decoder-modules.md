@@ -4,6 +4,11 @@ title: ASN.1 decoder modules
 description: The asn-decoders reactor: its modules, build, benchmarks and how it maps to the redesign (moved from its README).
 tags: [asn1, decoders, modules, benchmark]
 timestamp: 2026-11-19T00:00:00Z
+item: module.asn-decoders
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: providers/asn-parser/asn-decoders/asn-facade
 ---
 
 # asn-decoders
@@ -141,7 +146,7 @@ pins one fast case per build; the full sweep is a manual main (see PARITY.md hea
   The **codec is 6–20x faster than legacy** (framing+BER only: 21k–1.24M rec/s vs legacy's
   5k–95k). Full decode *including schema bind* started at **0.7x legacy** — the binder, not
   the codec, was the bottleneck. Three fixes, each measured, took it to **1.2x overall with
-  every corpus file now ≥1.0x** (was 0.4x–1.6x):
+  every corpus file now ≥1.0x**:
   1. `CompiledType.acceptedTags()` allocated a `HashSet` per tag comparison inside the
      per-child × per-component loops → memoized, plus a direct-tag fast path in `matches()`.
      0.7x → 0.9x.
@@ -216,3 +221,8 @@ Phase 4, per that module's own description — not before.
   [MIGRATION_STATUS.md](../../../../../providers/asn-parser/docs/MIGRATION_STATUS.md).
 - Further decode throughput if ever needed: leaf decoding + `NamedNode` allocation are what
   is left (see Phase 5 above); the cheap structural wins are taken.
+
+## Changes
+
+- Phase 5 decode throughput: before the three binder fixes, per-file decode including schema bind ranged
+  0.4x–1.6x legacy.

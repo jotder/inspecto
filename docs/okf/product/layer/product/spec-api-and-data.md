@@ -5,6 +5,10 @@ description: Service per resource in inspecto/api, apiUrl → /api/v1, the v1Int
 resource: inspecto-ui/src/app/inspecto/api/api-base.ts
 tags: [api, http, services, v1, interceptors, downloads, secrets, auth]
 timestamp: 2026-07-07T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
 ---
 
 # API & Data Integration

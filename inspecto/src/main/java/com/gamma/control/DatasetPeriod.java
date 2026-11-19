@@ -1,6 +1,7 @@
 package com.gamma.control;
 
 import com.gamma.config.safety.PathJail;
+import com.gamma.job.ArrivalCompactor;
 import com.gamma.job.SnapshotSwapLock;
 import com.gamma.sql.SqlViews;
 import com.gamma.util.DuckDbUtil;
@@ -81,9 +82,9 @@ final class DatasetPeriod {
                     boolean empties = hit == rs.getLong(2);
                     // LA-DATASET-COMPACT-2: the merged file of a compaction is rewritten in its row order and each arrival's
                     // segment re-counted, so the merge map keeps every arrival at a known place (keep N arrivals counts them)
-                    List<DatasetCompaction.Segment> segs = empties ? null : DatasetCompaction.trustedSegments(base, f);
+                    List<ArrivalCompactor.Segment> segs = empties ? null : ArrivalCompactor.trustedSegments(base, f);
                     String keep = col + " IS NULL OR NOT (" + in + ")";
-                    List<DatasetCompaction.Segment> next = new ArrayList<>();
+                    List<ArrivalCompactor.Segment> next = new ArrayList<>();
                     if (segs != null && !recount(st, f, segs, keep, col, next)) segs = null;
                     // the rewrite is named so no Parquet glob reads it, and never left behind
                     Path tmp = f.resolveSibling(".period-" + f.getFileName() + ".tmp");
@@ -104,7 +105,7 @@ final class DatasetPeriod {
                     } finally {
                         Files.deleteIfExists(tmp);
                     }
-                    if (segs != null) mapBefore = DatasetCompaction.segmentsRewritten(base, f, next);
+                    if (segs != null) mapBefore = ArrivalCompactor.segmentsRewritten(base, f, next);
                 }
             }
             return new Result(days, removed, touched);
@@ -125,7 +126,7 @@ final class DatasetPeriod {
             }
         }
         moved.clear();
-        if (mapBefore != null) DatasetCompaction.restoreMap(base, mapBefore);
+        if (mapBefore != null) ArrivalCompactor.restoreMap(base, mapBefore);
         mapBefore = null;
         OnboardRoutes.deleteTree(aside);
     }
@@ -135,8 +136,8 @@ final class DatasetPeriod {
      * ranges), into {@code next} (new first rows, in order; the period over {@code col}; an arrival left with no row drops
      * out). False when a kept row falls in no segment: the map is then left to its stale check.
      */
-    private boolean recount(Statement st, Path f, List<DatasetCompaction.Segment> segs, String keep, String col,
-                            List<DatasetCompaction.Segment> next) throws SQLException {
+    private boolean recount(Statement st, Path f, List<ArrivalCompactor.Segment> segs, String keep, String col,
+                            List<ArrivalCompactor.Segment> next) throws SQLException {
         StringBuilder seg = new StringBuilder("CASE");
         for (int i = 0; i < segs.size(); i++)
             seg.append(" WHEN file_row_number >= ").append(segs.get(i).firstRow()).append(" AND file_row_number < ")
@@ -150,11 +151,11 @@ final class DatasetPeriod {
         if (by.containsKey(-1)) return false;
         long first = 0;
         for (int i = 0; i < segs.size(); i++) {
-            DatasetCompaction.Segment s = segs.get(i);
+            ArrivalCompactor.Segment s = segs.get(i);
             Object[] r = by.get(i);
             if (r == null) continue;
             long n = (Long) r[0];
-            next.add(new DatasetCompaction.Segment(s.file(), s.received(), first, n, (String) r[1], (String) r[2], s.holds()));
+            next.add(new ArrivalCompactor.Segment(s.file(), s.received(), first, n, (String) r[1], (String) r[2], s.holds()));
             first += n;
         }
         return true;

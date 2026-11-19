@@ -4,6 +4,11 @@ title: "Exchange (multi-entity sharing) — screens"
 description: "Where Exchange (multi-entity sharing) lives in the UI and what each screen does."
 tags: [exchange, exchange, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.exchange
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-exchange
 ---
 
 # Exchange (multi-entity sharing) — screens

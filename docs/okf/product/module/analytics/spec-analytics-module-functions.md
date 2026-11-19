@@ -4,6 +4,11 @@ title: Analytics Kernel — canonical statistics, the column profiler, time-seri
 description: Part 1 of 3 of Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts: The module; The definitions; Platform Service analytics; Function catalogue; Column profiler; Input rules; Callers consolidated; Similarity kit; Entity grouping
 tags: [analytics, statistics, baseline, time-series, scores, similarity, entity-grouping, cohort, change-point, modules, duckdb]
 timestamp: 2026-10-18T00:00:00Z
+item: module.analytics
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-analytics
 ---
 
 # Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts — The module, definitions, functions and the profiler

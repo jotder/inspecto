@@ -4,6 +4,11 @@ title: "AI assist — features"
 description: "AI assist is the optional model-backed help layer, in two tiers:  - **Assist agent** (features/inspecto-agent, manifest id agent): explain, diagnose, draft and triage skills   that are read-only or draft-only and abstain rather than ship a low-confidence answer; plus failure diagnosis of   failed batches."
 tags: [intelligence, ai-assist, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.intelligence
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-intelligence
 ---
 
 # AI assist — features

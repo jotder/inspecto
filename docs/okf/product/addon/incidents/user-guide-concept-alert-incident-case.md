@@ -4,6 +4,9 @@ title: Alert, Incident and Case
 description: What an Alert, an Incident and a Case are, how one leads to the next, and how you work them in the console.
 item: addon.incidents
 audience: external
+status: current
+verified: 2026-11-19 last-edit
+code: features/inspecto-ops
 ---
 
 # Alert, Incident and Case

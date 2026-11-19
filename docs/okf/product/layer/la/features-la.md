@@ -4,6 +4,10 @@ title: "Link Analysis modules — features"
 description: "The Link Analysis modules form the investigation studio: core, storage, API, geo adapters and the optional PostgreSQL store."
 tags: [la, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: layer.la
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
 ---
 
 # Link Analysis modules — features

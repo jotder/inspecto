@@ -4,6 +4,11 @@ title: Pipeline execution — engines, lanes, test run, dry run, park and drain,
 description: Part 2 of 5 of Pipeline execution — engines, lanes, test run, dry run, park and drain, post-sync chains: Lane-fork admission notes; Run identity, ledgers and the async contract; Caps and the bounded retry; The at-rest job lane (live execution); The at-rest runner, and the two lifts
 tags: [elt, engine, pipeline, plugins, spi, node-types, catalog, transform, seam, lift, lower, round-trip, authoring, gotcha, pipeline-graph, execution, lanes, ingest, job, scratch, test-run, dry-run, park, drain, post-sync, consignment, output, sink, partition, quarantine, ducklake, export, object-storage, s3, hdfs, job-type, post-action]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # Pipeline execution — engines, lanes, test run, dry run, park and drain, post-sync chains — Identity, ledgers, caps and the at-rest lane
@@ -163,7 +168,7 @@ the `batch_id` ledger columns keep their read-alias, `GET /runs/{n}/batches` kee
 
 The lane fork itself — what admits a write to the graph lane, the `-Dingest.lane=auto|graph|flat` flag, the
 decision-rule and scratch-dir rules, the engagement predicate and the parity test — is owned by
-[spec-ingest.md](spec-ingest.md#11-branch-aware-ingest--route-on-the-poll-driven-path). This section keeps the execution-side notes the PIP spec carried.
+[spec-ingest.md](spec-ingest-branch-aware.md#11-branch-aware-ingest--route-on-the-poll-driven-path). This section keeps the execution-side notes the PIP spec carried.
 
 ✅ **The ELT amendment §6 step-2 parity gate is MET (2026-09-16, `GRAPH-LANE-RULE-ROUTED-1`, `b6b90fa2c`):** the whole suite
 under `-Dingest.lane=graph` passed with zero "cannot carry pipeline" refusals, once rule-routed writes rode the

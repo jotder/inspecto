@@ -5,6 +5,11 @@ description: Classes, ports, store selection, invariants and failure handling of
 resource: la/inspecto-la-core/
 tags: [module, la-core, link-analysis, spec, performance]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link analysis core and ports - spec

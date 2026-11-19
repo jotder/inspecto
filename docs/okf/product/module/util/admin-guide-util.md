@@ -4,6 +4,11 @@ title: "Utilities, DuckDB access, TOON helpers, module manifests — admin guide
 description: "The deployment-wide JVM flags this module reads, the files it writes and the boot failures it raises."
 tags: [util, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.util
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-util
 ---
 
 # Utilities, DuckDB access, TOON helpers, module manifests — admin guide

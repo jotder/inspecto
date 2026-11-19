@@ -4,6 +4,11 @@ title: Link Analysis — User Guide — Expand, analyse, match patterns and save
 description: Part 3 of 7 of Link Analysis — User Guide: Expand and clean up the graph; The analysis catalogue; Pattern matching; Saving, exporting and the File menu
 tags: [module, la-core, link-analysis, user-guide]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — User Guide — Expand, analyse, match patterns and save

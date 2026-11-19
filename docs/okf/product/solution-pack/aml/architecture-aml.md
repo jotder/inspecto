@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Anti-money-laundering (AML)
+description: How the aml Space Template is put together: the ledger and party feeds, the four detection Jobs, risk and anomaly scoring, screening and Link Analysis starters, a day in the analyst's life, the modules used and its limits.
+item: solution-pack.aml
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/aml]
+---
+
 # Anti-money-laundering (AML)
 
 > **Level 2 solution page** (`SOLUTION-SUITE-DOCS-1`). Content pack: Space Template `aml`

@@ -4,6 +4,11 @@ title: ASN.1 decoder corpora
 description: The golden parity corpus (operator data, never in git) and the committed synthetic corpus that CI runs (moved from their READMEs).
 tags: [asn1, corpus, parity, tests]
 timestamp: 2026-11-19T00:00:00Z
+item: module.asn-decoders
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: providers/asn-parser/asn-decoders/asn-facade
 ---
 
 # Golden corpus (Phase 0 — REDESIGN.md §6)

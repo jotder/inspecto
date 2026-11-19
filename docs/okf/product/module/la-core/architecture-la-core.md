@@ -5,6 +5,11 @@ description: How Link Analysis is built - an overview (what it is, who uses it, 
 resource: la/
 tags: [module, la-core, link-analysis, architecture]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — architecture

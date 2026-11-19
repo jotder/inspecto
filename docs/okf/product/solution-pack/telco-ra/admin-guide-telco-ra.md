@@ -4,6 +4,11 @@ title: "Telecom revenue assurance — admin guide"
 description: "Install, enable and verify the Telecom revenue assurance Solution Pack."
 tags: [telco-ra, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.telco-ra
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/telco-ra
 ---
 
 # Telecom revenue assurance — admin guide

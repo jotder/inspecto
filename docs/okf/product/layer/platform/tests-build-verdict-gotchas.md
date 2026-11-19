@@ -4,6 +4,10 @@ title: Build and test verdicts - gotchas
 description: Ways a Maven, surefire or UI test verdict lied, how to read one, and how to count the reactor.
 tags: [build, maven, surefire, testing, gotchas]
 timestamp: 2026-11-19T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Build and test verdicts - gotchas

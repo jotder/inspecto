@@ -5,6 +5,11 @@ description: How the operational-object module is wired into the host — provid
 resource: features/inspecto-ops/src/main/java/com/gamma/ops/OpsEngineProvider.java
 tags: [ops, architecture, objects]
 timestamp: 2026-10-19T00:00:00Z
+item: module.ops
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-ops
 ---
 
 # Case management and objects — architecture

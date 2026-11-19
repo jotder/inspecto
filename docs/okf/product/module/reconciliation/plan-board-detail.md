@@ -4,6 +4,11 @@ title: module.reconciliation - board row detail
 description: The narrative behind module.reconciliation's long rows on the board (docs/BACKLOG.md), moved here verbatim so each board row stays a short summary.
 tags: [module, reconciliation, plan, backlog]
 timestamp: 2026-11-19T00:00:00Z
+item: module.reconciliation
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: features/inspecto-reconciliation
 ---
 
 # module.reconciliation - board row detail

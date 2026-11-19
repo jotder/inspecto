@@ -4,6 +4,11 @@ title: "Graph algorithms — plan"
 description: "Requirement of record for the platform graph library: why it exists, what is built, what is left and what was refused."
 tags: [graph, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.graph
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: platform/inspecto-graph
 ---
 
 # Graph algorithms — plan

@@ -4,6 +4,11 @@ title: module.access - board row detail
 description: The narrative behind module.access's long rows on the board (docs/BACKLOG.md), moved here verbatim so each board row stays a short summary.
 tags: [module, access, plan, backlog]
 timestamp: 2026-11-19T00:00:00Z
+item: module.access
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: platform/inspecto-access
 ---
 
 # module.access - board row detail

@@ -5,6 +5,11 @@ description: Install or omit the hosted-model jar, the settings file, API key ha
 resource: providers/inspecto-agent-hosted/
 tags: [module, agent-hosted, llm, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.agent-hosted
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-agent-hosted
 ---
 
 # Hosted model providers — admin guide

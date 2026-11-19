@@ -4,6 +4,10 @@ title: Product maturity assessment — every client-facing item
 description: Scored maturity (feature breadth, build status, quality evidence, enterprise grade, RFP defensibility → L1–L5) of every add-on, solution pack, edition and platform capability, against market competitors, with RFP stances and the actions that raise each level.
 tags: [maturity, assessment, rfp, competitive, enterprise, product]
 timestamp: 2026-10-20T00:00:00Z
+item: layer.product
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
 ---
 
 # Product maturity assessment — every client-facing item

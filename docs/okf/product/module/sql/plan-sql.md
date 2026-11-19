@@ -4,6 +4,11 @@ title: "SQL guard and helpers — plan"
 description: "Requirement of record for the SQL guard, sandbox and oracle: what is required, built, left and refused."
 tags: [sql, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.sql
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: platform/inspecto-sql
 ---
 
 # SQL guard and helpers — plan

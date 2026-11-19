@@ -4,6 +4,11 @@ title: "Entity store — admin guide"
 description: "Files on disk, configuration, keys and failure modes of the entity store: the identity fact log, Entity List sidecars, link-analysis.toon, la-limits.toon and Industry packs."
 tags: [entity-store, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.entity-store
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-entity-store
 ---
 
 # Entity store — admin guide

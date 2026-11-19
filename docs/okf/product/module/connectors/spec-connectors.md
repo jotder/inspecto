@@ -5,6 +5,11 @@ description: The CollectorConnector SPI and its eight registered schemes (sftp, 
 resource: providers/inspecto-connectors/src/main/java/com/gamma/acquire/connectors
 tags: [acquisition, connectors, sftp, ftp, jdbc, ssh-tunnel, secrets]
 timestamp: 2026-06-28T00:00:00Z
+item: module.connectors
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-connectors
 ---
 
 # Collector Connectors

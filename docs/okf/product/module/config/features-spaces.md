@@ -4,6 +4,11 @@ title: "Spaces — features"
 description: "A **Space** is a fully isolated project environment inside one installation: its own config, data, audit trail and DuckDB stores, its own engine instance, and its own module switches."
 tags: [config, spaces, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-config
 ---
 
 # Spaces — features

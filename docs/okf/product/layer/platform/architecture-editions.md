@@ -5,6 +5,10 @@ description: Basic, Standard and Advanced (plus Preview) are build flavors of on
 resource: docs/EDITIONS.md
 tags: [editions, build-flavors, maven, serviceloader]
 timestamp: 2026-11-12T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
 ---
 
 # Editions

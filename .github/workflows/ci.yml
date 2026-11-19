@@ -81,7 +81,7 @@ jobs:
       - name: Guard — new gated routes need an armed-Authenticator test
         run: node tools/check-authgate-coverage.mjs
 
-      # Step Processors board guard (CONNECTORS-BUNDLE-1 follow-up, 2026-09-07). docs/okf/product/layer/platform/spec-editions.md's
+      # Step Processors board guard (CONNECTORS-BUNDLE-1 follow-up, 2026-09-07). docs/okf/product/layer/platform/spec-editions-step-processors.md's
       # `| SP-*` rows are GENERATED from inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json
       # (itself written by ProcessorCatalogContractTest), plus the per-edition decisions the renderer holds
       # in code. The script has advertised a `--check` mode as CI-friendly since it was written, and nothing
@@ -452,7 +452,7 @@ jobs:
       - name: Guard — jlink module lock covers every edition
         run: node tools/jlink-modules.mjs --check && node --test tools/jlink-modules.test.mjs tools/maven-repo.test.mjs
 
-      # Offerings matrix guard (MODULE-REORG-1 P6b): docs/okf/product/layer/platform/spec-editions.md's offerings-matrix block (modules x editions, add-ons,
+      # Offerings matrix guard (MODULE-REORG-1 P6b): docs/okf/product/layer/platform/spec-editions-placement.md's offerings-matrix block (modules x editions, add-ons,
       # deployment posture, jar counts) is GENERATED from offerings/*.toon + manifests + bundle-modules.mjs. No build needed.
       # The fix when it fails is `node tools/render-offerings-matrix.mjs --write`, never a hand edit inside the markers.
       - name: Guard — spec-editions offerings matrix is generated, not hand-edited
@@ -471,14 +471,15 @@ jobs:
       - name: Guard — data-ops duplication may only go down
         run: node tools/check-data-ops-duplication.mjs --ratchet && node --test tools/check-data-ops-duplication.test.mjs
 
-      # Docs-health ratchet (INFO-RESTRUCTURE-1 W2, docs/superpower/2026-11-19-information-restructure-and-maintenance-plan.md):
+      # Docs-health ratchet (INFO-RESTRUCTURE-1 W2, docs/okf/product/layer/platform/spec-docs-maintenance.md):
       # against tools/docs-health.baseline.json, new debt fails and old debt may only shrink — a page past 60 KB (2 KB
       # allowance on a baselined one; the board, glossary and plans exempt), a new inline history note, a hub page without
-      # its header or with an invalid audience / verified / code field, a hand-written Basic | Standard | Advanced table
-      # outside EDITIONS.md and spec-editions.md, and the board's ledger past 60 KB (fix: tools/roll-backlog-ledger.mjs
+      # its header (or, for a page not in the baseline, without the full D-IR4 header) or with an invalid audience /
+      # verified / code field, a hand-written Basic | Standard | Advanced table
+      # outside EDITIONS.md and spec-editions*.md, and the board's ledger past 60 KB (fix: tools/roll-backlog-ledger.mjs
       # --write). After shrinking debt, lock it in with --baseline-write. Tracked docs only; no build, ~1s.
       - name: Guard — docs stay readable whole, current and in one home (docs-health ratchet)
-        run: node tools/docs-health.mjs --ratchet && node --test tools/docs-health.test.mjs tools/roll-backlog-ledger.test.mjs
+        run: node tools/docs-health.mjs --ratchet && node --test tools/docs-health.test.mjs tools/roll-backlog-ledger.test.mjs tools/fill-doc-headers.test.mjs
 
       # Handbook guard (USER-HANDBOOK-1 P1): docs/okf/product/layer/product/handbook.toon keeps the contract chapter ids
       # the console's help links use, places every hub user / admin guide (a new guide is placed in the change that adds
@@ -488,7 +489,7 @@ jobs:
       # how-to. The checks themselves need a live install, so they are NOT run here: tools/run-handbook-checks.mjs runs them
       # on demand and before each release (spec-handbook-doc-tests.md); its tests below use a stub server.
       - name: Guard — the Handbook manifest holds together and its external render cannot leak
-        run: node tools/check-handbook.mjs && node --test tools/check-handbook.test.mjs tools/render-handbook.test.mjs tools/handbook-checks.test.mjs tools/run-handbook-checks.test.mjs
+        run: node tools/check-handbook.mjs && node --test tools/check-handbook.test.mjs tools/render-handbook.test.mjs tools/publish-handbook.test.mjs tools/handbook-checks.test.mjs tools/run-handbook-checks.test.mjs
 
       # OpenAPI fragments guard (MODULE-REORG-1 P1): docs/api/openapi-v1.json is GENERATED from the core fragment +
       # each module's META-INF/inspecto/openapi.fragment.json. Reads tracked files only; no build, ~0.3s.

@@ -4,6 +4,11 @@ title: "Payment fraud starter — user guide"
 description: "How a fraud analyst works with the Payment fraud pack day to day."
 tags: [payment-fraud, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.payment-fraud
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/payment-fraud
 ---
 
 # Payment fraud starter — user guide

@@ -4,6 +4,11 @@ title: "Link Analysis daily feed — features"
 description: "A ready-made, monitored daily feed for the Link Analysis index."
 tags: [la-daily-feed, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.la-daily-feed
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-daily-feed
 ---
 
 # Link Analysis daily feed — features

@@ -5,6 +5,11 @@ description: The named seam through which a Job (and later a Step) reaches engin
 resource: platform/inspecto-engine/src/main/java/com/gamma/job/PlatformServices.java
 tags: [control-plane, jobs, plugins, packs, platform-services, grants, scaffolding]
 timestamp: 2026-08-10T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: inspecto
 ---
 
 # Platform Services — the plugin envelope

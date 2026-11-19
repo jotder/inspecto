@@ -5,6 +5,10 @@ description: One <inspecto-data-table [tier]> consolidating every grid host — 
 resource: inspecto-ui/src/app/inspecto/data-table/data-table.component.ts
 tags: [design-system, data-table, ag-grid, sql, codemirror, alasql, tiers]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
 ---
 
 # Data Table

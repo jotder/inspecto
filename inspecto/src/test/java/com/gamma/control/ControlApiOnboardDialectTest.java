@@ -173,6 +173,26 @@ class ControlApiOnboardDialectTest {
         }
     }
 
+    /**
+     * BASIC-ELT-PROFILE-1 B5: a later file whose new column is left out is rewritten with the columns the import reads -
+     * past the lines the import skips before the header, which stay in the file, so the run still reads its header and
+     * every row (the rewrite took the skipped line for the header line).
+     */
+    @Test
+    void aLeftOutColumnKeepsTheLinesTheImportSkips(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = addData(c, "skip.csv", "# exported\na,b\n1,2\n3,4\n");
+            HttpResponse<String> r = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1/datasets/"
+                    + id + "/files?name=wider.csv&mode=append&newColumns=leave"))
+                    .POST(BodyPublishers.ofString("# exported again\na,b,c\n5,6,x\n7,8,y\n")).build(), BodyHandlers.ofString());
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode s = V1Body.of(r.body());
+            assertEquals("[\"c\"]", s.get("newColumns").toString(), s.toString());
+            assertEquals(0, s.get("rowsRejected").asLong(), s.toString());
+            assertEquals(List.of("1|2", "3|4", "5|6", "7|8"), rows(id, "a", "b"));
+        }
+    }
+
     @Test
     void aQuoteTheSniffFoundIsWritten(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

@@ -5,6 +5,11 @@ description: What ASSURE-ENTITY-LISTS-1 (WS-12) added on top of the LA-17 Entity
 resource: features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java
 tags: [control-plane, entity-list, assurance, ws-12, maker-checker, risk-score, link-analysis]
 timestamp: 2026-09-28T00:00:00Z
+item: module.entity-list
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-entity-list
 ---
 
 # Entity Lists — the assurance entries

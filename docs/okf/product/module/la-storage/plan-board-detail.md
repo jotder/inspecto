@@ -4,6 +4,11 @@ title: module.la-storage - board row detail
 description: The narrative behind module.la-storage's long rows on the board (docs/BACKLOG.md), moved here verbatim so each board row stays a short summary.
 tags: [module, la-storage, plan, backlog]
 timestamp: 2026-11-19T00:00:00Z
+item: module.la-storage
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-storage
 ---
 
 # module.la-storage - board row detail

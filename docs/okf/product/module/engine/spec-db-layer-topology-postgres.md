@@ -4,6 +4,11 @@ title: Database / persistence layer — File topology, Postgres and the raw tabl
 description: Part 4 of 4 of Database / persistence layer: File topology (per space); Running operational data on Postgres; Browsing the raw tables; Why __consignment_id is on the row, not just in the registry; Proving the JDBC stores on real PostgreSQL (DAT-6)
 tags: [persistence, duckdb, postgres, schema, topology, stores]
 timestamp: 2026-07-16T00:00:00Z
+item: module.engine
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-engine
 ---
 
 # Database / persistence layer — File topology, Postgres and the raw tables

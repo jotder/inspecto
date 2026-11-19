@@ -5,6 +5,10 @@ description: How the code is divided into Maven modules - the module list (deriv
 resource: pom.xml
 tags: [architecture, modules, reactor, maven, offering, editions, itemization]
 timestamp: 2026-11-12T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Modules

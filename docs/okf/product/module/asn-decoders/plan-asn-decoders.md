@@ -5,6 +5,11 @@ description: What the new-generation ASN.1 decoder is required to do, what is bu
 resource: providers/asn-parser/asn-decoders/
 tags: [module, asn-decoders, asn1, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.asn-decoders
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: providers/asn-parser/asn-decoders/asn-facade
 ---
 
 # ASN.1 decoders — plan of record

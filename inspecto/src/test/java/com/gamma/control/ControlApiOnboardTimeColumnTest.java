@@ -22,6 +22,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -134,6 +135,11 @@ class ControlApiOnboardTimeColumnTest {
                     "{\"name\":\"" + id + "\"}"), 200);
             assertEquals(240, s.get("rowsAfter").asLong(), s.toString());
             assertEquals("TIME", parquetType(id, "starts_at"));
+            // U3 (2026-11-20): the Dataset calls a TIME column 'date', the temporal type a Dataset read gives it (was 'string')
+            Object startsAt = ((List<?>) new com.gamma.pipeline.ComponentStore(root.resolve("registry")).get("dataset", id)
+                    .orElseThrow().content().get("columns")).stream()
+                    .filter(o -> "starts_at".equals(((Map<?, ?>) o).get("name"))).findFirst().orElseThrow();
+            assertEquals("date", ((Map<?, ?>) startsAt).get("type"), startsAt.toString());
             JsonNode rows = data(send(c, "GET", "/datasets/" + id + "/rows?limit=100", null), 200);
             assertTrue(rows.toString().contains("\"starts_at\":\"07:07\""), rows.toString());   // shift 1, read back as a time
         }
