@@ -205,6 +205,10 @@ public final class ConfigSpecs {
                         "Lines starting with this single character are skipped; blank = no comment handling."),
                 FieldSpec.of("processing.csv_settings.encoding", "Encoding", FieldType.STRING,
                         "Source charset for the native reader (e.g. utf-8, latin-1, utf-16); blank = utf-8."),
+                FieldSpec.enumField("processing.csv_settings.decimal_separator", "Decimal mark",
+                        List.of(".", ","), null,
+                        "The mark a number column's text is written with: , reads 1.234,50 as 1234.5 (the other mark "
+                                + "and spaces group digits); blank = a plain cast (1234.5 only). BASIC-ELT-PROFILE-1 U3."),
                 FieldSpec.enumField("processing.csv_settings.compression", "Input compression",
                         List.of("auto", "gzip", "zstd", "none"), "auto",
                         "read_csv input compression; blank = auto-detect by extension. Refused fail-closed "

@@ -2498,9 +2498,19 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
             const stored = grammarContentAsParsingBlock((storedParsing as Record<string, unknown>) ?? {});
             const legacy = (legacyCsv as Record<string, unknown>) ?? {};
             const delimited = { ...legacy, ...((stored['delimited'] as Record<string, unknown>) ?? {}) };
+            // BASIC-ELT-PROFILE-1 U3: `encoding` and `compression` are parsing-level rows in the drawer, but Add data
+            // writes `csv_settings.encoding` - lifted to the parsing level so the row shows it. The engine's own
+            // precedence (mergeParsing): `parsing.<key>` over `delimited.<key>` over `csv_settings.<key>`.
+            const lifted: Record<string, unknown> = {};
+            for (const k of ['encoding', 'compression']) {
+                if (delimited[k] === undefined) continue;
+                if (stored[k] === undefined) lifted[k] = delimited[k];
+                delete delimited[k];
+            }
             const parsing: Record<string, unknown> = {
                 frontend: retyped.slice('parser.'.length),
                 ...stored,
+                ...lifted,
                 ...(Object.keys(delimited).length ? { delimited } : {}),
             };
             return { ...node, type: retyped, config: { ...cfg, parsing } };

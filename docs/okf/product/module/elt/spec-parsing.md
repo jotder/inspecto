@@ -126,8 +126,9 @@ today are **only**:
 | `date_formats`, `timestamp_formats` | used at **transform** time (`TRY_STRPTIME`), *not* at read time | `[LIVE]` |
 | `quote`, `escape`, `comment` | `quote`/`escape`/`comment` (single char, validated fail-closed at load; both engines). `quote: ""` is **no quote** (DuckDB's `quote=''`, NUL on the Java path); only an absent `quote` takes the default `"` (BE-3 slice 2, 2026-11-19) | `[LIVE]` (5.2) |
 | `encoding`, `compression`, `null_strings`, `strict_mode` | `encoding`/`compression`/`nullstr`/`strict_mode` | `[LIVE]` (4.1) |
+| `decimal_separator` (`.` or `,`; any other value refused at load) | **not** a `read_csv` param: honoured at **transform** time — a number field (`SchemaFieldTypes.isNumber`) is read with `DecimalMarkText.sql` (spaces and the other mark as digit grouping removed, a `,` mark read as the point), so `1.234,50` under `,` is `1234.5`. Absent = the plain `TRY_CAST` every Pipeline had; `.` is not the same as absent (it also drops `,` grouping). The parse preview and schema suggest read the same key (§P.3.6) | `[LIVE]` (`BASIC-ELT-PROFILE-1` U3, 2026-11-19) |
 
-Everything else in the PDF — `decimal_separator`, `sample_size`, `auto_type_candidates`, `names`,
+Everything else in the PDF — `sample_size`, `auto_type_candidates`, `names`,
 `union_by_name`, `hive_partitioning`, read-time `dateformat` — is **`[NATIVE]`**: DuckDB supports
 it, but it is **not reachable from config** (deliberately: ingest is all-VARCHAR; typing is the
 mapping's job).
@@ -244,7 +245,9 @@ nothing. ⛔ Not `default: true` (that would stamp every saved grammar). Build: 
 spec (BACKLOG §3 `STRICT-MODE-1`).
 
 ### P.3.4 Format (read-time typing — mostly redundant in this engine, see §P.2 note)
-`dateformat`, `timestampformat`, `decimal_separator`.
+`dateformat`, `timestampformat`, `decimal_separator`. ⚠ DuckDB's `decimal_separator` acts only on a column `read_csv`
+itself types; the engine reads every raw column as `VARCHAR`, so the Grammar's `decimal_separator` key is applied in the
+typing step instead (§P.2 table, U3 2026-11-19).
 
 ### P.3.5 Multi-file
 `filename` (inject source path), `hive_partitioning` (dir → columns), `union_by_name` (align by
@@ -255,47 +258,7 @@ mainly for ad-hoc analyst SQL, not the ingest path.
 `FROM sniff_csv('file')` returns the dialect DuckDB *would* pick — invaluable when authoring a new
 profile. Keep the PDF's Recipe C.
 
-**One sniff in the product (`BASIC-ELT-PROFILE-1` BE-3 slice 1, 2026-11-19).** The engine's sample profiler,
-`com.gamma.parse.SampleProfiler.dialect(conn, file, encoding)` (`inspecto-engine`), runs `sniff_csv` with no authored
-options and returns DuckDB's answer under the grammar option names (`delimiter`, `quote`, `escape`, `comment`,
-`has_header`, `skip_header_lines`, `date_format`, `timestamp_format`), unshaped: DuckDB's `(empty)` ("none found") is
-passed through, and an unsettled dialect (mixed line endings) throws. Both readers call it and keep their own shaping:
-the parse preview (`ComponentPreview.parsing`, the `resolved` line) shows the map and shows nothing when the sniff
-fails; Add data (`OnboardDraft`) passes its chosen encoding, falls back to its own delimiter guess (with `"`) when the
-sniff throws, and adds its evidence and confidence. `DialectSniffGoldenTest` pins both readers' answers.
-
-**Add data follows the sniff (BE-3 slice 2; operator ruling 2026-11-19, "follow the sniff").** Slice 1 left three
-differences; they are now one rule — Add data takes the sniff's answer as it is: a quote not found (`(empty)`) is **no
-quote** (it was `"`), so a stray quote such as `1,"x` is text in its value and the file imports (it was a 422); and the
-lines the sniff skips before the header are skipped (`format.skipLines`, present only when the sniff skips lines), so
-the real header is read (the first line was). The person's own `?delimiter=`, `?quote=` and `?header=` still win over
-the sniff. The Pipeline Add data writes reads the file the same way: `skip_header_lines` when the draft skipped lines,
-and `csv_settings.quote` as the draft read it - except that no quote (`quote: ""`, see the key table above) is written
-only when the file holds a `"`: a quote-free file reads alike under the engine's default `"`, which keeps a later file's
-quoted fields whole (`ControlApiDecimalColumnTest` adds a later file with `"1,22"` values to an import made from a
-quote-free file). A later file (Add a file, the inbox) is judged against the lines the import skips: when its own sniff
-skips a different number of lines before the header it is refused (422, "it has N lines before the header line and
-'<id>' skips M") — the run would otherwise lose its first row or read its header as a row.
-`ControlApiOnboardDialectTest` imports each case. A no-quote import made from a file with a stray
-quote reads a later file's quoted fields as text; the quote entry of the fix catalogue offers `"` when a draft's lines
-do not split alike. ⛔ The
-grammar editor cannot author "no quote" (clearing the field removes the key, which means `"`).
-
-**One type inference (BE-3 slice 2, 2026-11-19).** `SampleProfiler.types(conn, relation, limit)` is the one entry for
-column types. Per column it answers two ways: `duckdb`, the type DuckDB's own reader gives the column (`DESCRIBE`:
-the auto-detect sniff for the parse preview's `read_csv(…, auto_detect=true)`, the declared type for Parquet, `VARCHAR`
-for an all-text read), and the **vote** (`type`, `format`) over the first `limit` values read as text — the TRY_CAST
-vote that was `SchemaSuggest`'s (`BIGINT` → `DOUBLE` → `TIMESTAMP`/`DATE` → `BOOLEAN`, then `SampleProfiler.DATE_FORMATS`
-with ambiguity refused). Each caller keeps its own answer: the parse preview's `columnTypes` give `duckdb`; schema
-suggest (`SchemaSuggest.infer`, over the preview's parsed rows) gives the vote; Add data (`OnboardDraft.typed`) gives
-the vote — or `duckdb` for a file that declares its types — and then its own layers: the decimal mark (C1), a later
-fraction (DECIMAL-TEXT-NOT-BIGINT-1), almost-all numbers or dates (finding 3), the timestamp format and the person's
-stated types. `TypeInferenceGoldenTest` pins the three answers; where they differ on a TYPE (not only on whether a
-format is reported) a `disagreement…` test keeps each one, for the operator to decide: dates written in words (text
-in the preview, `DATE` with `%B %d, %Y` in the other two), times of day (`TIME` in the preview, text in the other two),
-numbers with a decimal comma and columns that are almost all numbers (numbers only in Add data), and the full-cycle
-transfers fixture (an amount and a booking time that are text in the preview and suggest, a number and a date with a
-time in Add data).
+**The sample profiler** — one dialect sniff and one type answer for Add data, the parse preview and schema suggest (`com.gamma.parse.SampleProfiler`, `BASIC-ELT-PROFILE-1` BE-3, operator rulings 2026-11-19) — has its own page: **[spec-parsing-sample-profiler.md](spec-parsing-sample-profiler.md)** (the sniff and how Add data follows it, the type vote and its rules, the decimal mark, what the rulings changed).
 
 ---
 
@@ -380,6 +343,7 @@ parsing:
     skip_tail_lines: 0       # footer drop ("N rows selected.")
     skip_tail_columns: 0
     null_strings: ["", "NULL", "NaN", "N/A"]
+    decimal_separator: ","   # . | , - the mark number columns are written with; blank = a plain cast (U3)
     strict_mode: true        # false → tolerate quote/column drift (the engine reads strict_mode, NOT strict)
     engine: auto             # auto | duckdb | java
 

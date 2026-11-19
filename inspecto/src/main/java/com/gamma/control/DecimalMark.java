@@ -1,9 +1,10 @@
 package com.gamma.control;
 
+import com.gamma.etl.DecimalMarkText;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * The decimal mark of a file's numbers ({@code ONBOARDING-FIRST-RUN-1} C1): {@code .} ({@code 1,234.50}) or {@code ,}
@@ -20,21 +21,9 @@ final class DecimalMark {
 
     private DecimalMark() {}
 
-    private static final Pattern POINT = Pattern.compile("[+-]?(\\d+|\\d{1,3}([, ]\\d{3})+)(\\.\\d+)?");
-    private static final Pattern COMMA = Pattern.compile("[+-]?(\\d+|\\d{1,3}([. ]\\d{3})+)(,\\d+)?");
-
-    /**
-     * Whether {@code value} is a number written with {@code mark}. A whole part with a leading zero ({@code 000 345 678},
-     * {@code 012.000.789}) is an identifier, not a number: reading it as one would drop the zeros.
-     */
+    /** Whether {@code value} is a number written with {@code mark} ({@link DecimalMarkText#reads}). */
     static boolean reads(String value, String mark) {
-        String t = value.trim();
-        if (!(",".equals(mark) ? COMMA : POINT).matcher(t).matches()) return false;
-        String whole = t.replaceFirst("^[+-]", "");
-        int at = whole.indexOf(mark.charAt(0));
-        if (at >= 0) whole = whole.substring(0, at);
-        whole = whole.replaceAll("[^0-9]", "");
-        return whole.length() <= 1 || whole.charAt(0) != '0';
+        return DecimalMarkText.reads(value, mark);
     }
 
     private static boolean all(List<String> values, String mark) {
@@ -80,19 +69,9 @@ final class DecimalMark {
         return OnboardDraft.choice(".", "no sampled number has a decimal mark, so the mark changes nothing", true);
     }
 
-    /**
-     * {@code DOUBLE} when a column's numbers need {@code mark} to be read, else {@code null}: not every value is such a
-     * number, or a plain cast already reads them. Always DOUBLE, never BIGINT: a later file's {@code 7.500,25} must keep
-     * its fraction even when the sample had none.
-     */
+    /** {@code DOUBLE} when a column's numbers need {@code mark} to be read, else {@code null} ({@link DecimalMarkText#numberType}). */
     static String numberType(List<String> values, String mark) {
-        if (!all(values, mark)) return null;
-        for (String v : values) {
-            String t = v.trim();
-            if (",".equals(mark) ? t.indexOf('.') >= 0 || t.indexOf(',') >= 0 || t.indexOf(' ') >= 0
-                    : t.indexOf(',') >= 0 || t.indexOf(' ') >= 0) return "DOUBLE";
-        }
-        return null;
+        return DecimalMarkText.numberType(values, mark);
     }
 
     /** The first value that shows a mark, else the first value. */
@@ -107,13 +86,8 @@ final class DecimalMark {
         return String.join(", ", q) + (at.size() > 3 ? " and " + (at.size() - 3) + " more" : "");
     }
 
-    /**
-     * The SQL reading {@code column} (a quoted identifier of text) as {@code type} with {@code mark}: spaces and the
-     * grouping mark removed, a {@code ,} mark turned into {@code .}, then a forgiving cast (an unreadable value is empty).
-     */
+    /** The SQL reading {@code column} as {@code type} with {@code mark} ({@link DecimalMarkText#sql}). */
     static String sql(String column, String type, String mark) {
-        String s = "REPLACE(TRIM(" + column + "), ' ', '')";
-        s = ",".equals(mark) ? "REPLACE(REPLACE(" + s + ", '.', ''), ',', '.')" : "REPLACE(" + s + ", ',', '')";
-        return "TRY_CAST(" + s + " AS " + type + ")";
+        return DecimalMarkText.sql(column, type, mark);
     }
 }

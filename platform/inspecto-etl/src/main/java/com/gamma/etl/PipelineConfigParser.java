@@ -1119,6 +1119,12 @@ final class PipelineConfigParser {
                 SourceZones.validateZone(b.sourceTimezone, "parsing.source_timezone");
             // 4.1 additive: native read_csv pass-throughs + row filters
             b.encoding         = trimToNull(csv.get("encoding"));
+            // BASIC-ELT-PROFILE-1 U3: the mark a number column's text is written with. FAIL CLOSED - any other
+            // value would load looking honoured; absent keeps the plain cast every Pipeline had before the key.
+            b.decimalSeparator = csv.get("decimal_separator") == null ? null : String.valueOf(csv.get("decimal_separator"));
+            if (b.decimalSeparator != null && !DecimalMarkText.MARKS.contains(b.decimalSeparator))
+                throw new IllegalArgumentException("csv_settings.decimal_separator must be '.' or ',' (got: '"
+                        + b.decimalSeparator + "')");
             b.inputCompression = trimToNull(csv.get("compression"));
             // FAIL CLOSED (unpack-stage plan Phase 1 step 4): this value is passed VERBATIM into
             // read_csv, so an unsupported one used to load fine and then quarantine every file at

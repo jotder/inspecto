@@ -14,6 +14,15 @@
  * component content to the editor loses the operator's settings while looking like it worked.
  */
 
+/**
+ * The Grammar's decimal mark (`delimited.decimal_separator`, BASIC-ELT-PROFILE-1 U3) in a `parsing:`-shaped block, or
+ * `undefined` when it sets none - what the parse preview reads, so schema suggest is asked with the same mark.
+ */
+export function decimalMarkOf(block: Record<string, unknown> | undefined): string | undefined {
+    const mark = (block?.['delimited'] as Record<string, unknown> | undefined)?.['decimal_separator'];
+    return mark === '.' || mark === ',' ? mark : undefined;
+}
+
 /** Keys that live under the `delimited:` sub-block but sat at top level in a legacy component. */
 const CSV_SETTINGS_KEYS = ['delimiter', 'has_header', 'skip_header_lines', 'null_strings', 'quote', 'escape'];
 

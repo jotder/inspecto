@@ -125,7 +125,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (95 open rows
 * [Kafka stream connector](module/connectors-kafka/index.md) - `module.connectors-kafka` · 6 doc(s) · 0 open row(s)
 * [Collector and export connectors](module/connectors/index.md) - `module.connectors` · 8 doc(s) · 1 open row(s)
 * [Demo authenticator](module/demo-auth/index.md) - `module.demo-auth` · 7 doc(s) · 0 open row(s)
-* [ELT — ingestion, Pipelines and step registry](module/elt/index.md) - `module.elt` · 20 doc(s) · 6 open row(s)
+* [ELT — ingestion, Pipelines and step registry](module/elt/index.md) - `module.elt` · 21 doc(s) · 6 open row(s)
 * [Execution engine](module/engine/index.md) - `module.engine` · 4 doc(s) · 8 open row(s)
 * [Entity lists](module/entity-list/index.md) - `module.entity-list` · 9 doc(s) · 0 open row(s)
 * [Entity store](module/entity-store/index.md) - `module.entity-store` · 8 doc(s) · 1 open row(s)

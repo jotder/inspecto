@@ -79,8 +79,11 @@ public final class TransformCompiler {
         StringBuilder sb = new StringBuilder();
         switch (pd.type()) {
             case VARCHAR -> sb.append(col);
-            case DOUBLE  -> sb.append("TRY_CAST(").append(col).append(" AS DOUBLE)");
-            case INTEGER -> sb.append("TRY_CAST(").append(col).append(" AS INTEGER)");
+            // the Grammar's decimal mark (U3) reads a number partition exactly as the column it is cut from
+            case DOUBLE  -> sb.append(csv.decimalSeparator() != null ? DecimalMarkText.sql(col, "DOUBLE", csv.decimalSeparator())
+                    : "TRY_CAST(" + col + " AS DOUBLE)");
+            case INTEGER -> sb.append(csv.decimalSeparator() != null ? DecimalMarkText.sql(col, "INTEGER", csv.decimalSeparator())
+                    : "TRY_CAST(" + col + " AS INTEGER)");
             case DATE_YEAR, DATE_MONTH, DATE_DAY -> {
                 String dateExpr = dateExpr(pd, sourceTable, fieldTypes, fieldFormats, csv, zones);
                 switch (pd.type()) {

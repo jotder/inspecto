@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parsingAttributesFor } from './parsing-attributes';
+import { decimalMarkOf } from './grammar-block';
+import { PARSING_FRONTENDS, parsingAttributesFor } from './parsing-attributes';
 
 /**
  * The delimited Robustness tab's error-handling knobs (2026-08-23). These pin the ONE property that
@@ -15,6 +16,33 @@ describe('strict_mode is a three-way choice (STRICT-MODE-1, 2026-09-06)', () => 
         expect(spec.type).toBe('select');
         expect(spec.default).toBeUndefined();
         expect(spec.options?.map((o) => o.value)).toEqual(['', 'true', 'false']);
+    });
+});
+
+describe('what Basic accepts and the Grammar now carries (BASIC-ELT-PROFILE-1 U3)', () => {
+    it('the decimal mark is a three-way choice with no spec default: blank writes nothing', () => {
+        const spec = _paf('delimited').find((s) => s.key === 'delimited__decimal_separator')!;
+        expect(spec.type).toBe('select');
+        expect(spec.default).toBeUndefined();
+        expect(spec.section).toBe('types');
+        expect(spec.options?.map((o) => o.value)).toEqual(['', '.', ',']);
+    });
+
+    it('Parquet is a frontend, with the one option the engine honours', () => {
+        expect(PARSING_FRONTENDS.map((f) => f.id)).toContain('parquet');
+        expect(_paf('parquet').map((s) => s.key)).toEqual(['parquet__hive_partitioning']);
+    });
+
+    it("schema suggest is asked with the Grammar's own decimal mark, and only a real one", () => {
+        expect(decimalMarkOf({ delimited: { decimal_separator: ',' } })).toBe(',');
+        expect(decimalMarkOf({ delimited: { decimal_separator: '' } })).toBeUndefined();
+        expect(decimalMarkOf({ frontend: 'delimited' })).toBeUndefined();
+        expect(decimalMarkOf(undefined)).toBeUndefined();
+    });
+
+    it('the encoding and the JSON records path were already Grammar keys', () => {
+        expect(_paf('delimited').map((s) => s.key)).toContain('encoding');
+        expect(_paf('json').map((s) => s.key)).toContain('json__records_path');
     });
 });
 

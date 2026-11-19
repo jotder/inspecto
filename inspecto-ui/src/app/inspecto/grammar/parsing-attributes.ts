@@ -15,7 +15,7 @@ import { timeZoneOptions } from 'app/inspecto/schema/time-zones';
  * line-based frontend, e.g. `delimited.has_header` also drives the fixed-width header skip);
  * per-frontend sub-blocks are `fixedwidth.*`, `json.*`, `text_regex.*`.
  */
-export type ParsingFrontend = 'delimited' | 'fixedwidth' | 'json' | 'text_regex' | 'xlsx';
+export type ParsingFrontend = 'delimited' | 'fixedwidth' | 'json' | 'text_regex' | 'xlsx' | 'parquet';
 
 /**
  * The Grammar editor's tab shell for the delimited frontend (delimited-grammar-properties plan §4.1).
@@ -118,6 +118,9 @@ export const PARSING_FRONTENDS: { id: ParsingFrontend; label: string; hint: stri
     { id: 'json', label: 'JSON', hint: 'NDJSON (one object per line) or a JSON array document' },
     { id: 'text_regex', label: 'Text / regex', hint: 'Named capture groups over matching lines' },
     { id: 'xlsx', label: 'Excel', hint: 'An .xlsx workbook sheet, read natively' }, //(DuckDB read_xlsx)
+    // BASIC-ELT-PROFILE-1 U3: the engine and Add data read Parquet (`parsing.frontend: parquet`); without this entry an
+    // imported Parquet file opened in the Pipelines editor showed as delimited.
+    { id: 'parquet', label: 'Parquet', hint: 'A Parquet file — its columns and types come from the file' },
 ];
 
 /**
@@ -279,6 +282,23 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     type: 'list',
                     tier: 'optional',
                     help: 'Text values read as "no value", e.g. NULL or N/A. Empty = only an empty cell means no value.',
+                    section: 'types',
+                },
+                {
+                    // BASIC-ELT-PROFILE-1 U3 (`csv_settings.decimal_separator`, read by the engine's typing step and
+                    // by the parse preview and schema suggest). ⚠ No `default`: blank writes nothing and keeps the
+                    // plain cast every Grammar had before the key; '.' is NOT the same as blank (it also drops ','
+                    // and spaces as digit grouping).
+                    key: 'delimited__decimal_separator',
+                    label: 'Decimal mark',
+                    type: 'select',
+                    tier: 'optional',
+                    options: [
+                        { value: '', label: 'Point, no grouping (1234.5)' },
+                        { value: '.', label: 'Point, comma groups (1,234.5)' },
+                        { value: ',', label: 'Comma, point groups (1.234,5)' },
+                    ],
+                    help: 'How numbers are written: the mark before the fraction. The other mark and spaces may group digits.',
                     section: 'types',
                 },
                 // ── tab 3: Robustness / error handling ───────────────────────────
@@ -706,6 +726,19 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                 // a second tab is introduced, rather than needing a second edit then.
                 ...sharedRobustnessAttributes(true),
                 { key: 'encoding', label: 'Encoding', type: 'string', tier: 'advanced', placeholder: 'UTF-8' },
+            ];
+        case 'parquet':
+            // The file names and types its own columns; `parquet.hive_partitioning` is the one option the engine
+            // honours (PipelineConfig.Parquet, BuiltinParsers' parquet grammar schema) - everything else is refused.
+            return [
+                {
+                    key: 'parquet__hive_partitioning',
+                    label: 'Folder names are columns',
+                    type: 'boolean',
+                    tier: 'optional',
+                    default: false,
+                    help: 'Read key=value folder levels (year=/month=/day=) as columns.',
+                },
             ];
     }
 }

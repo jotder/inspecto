@@ -121,7 +121,29 @@ public final class PipelineConfig {
                               List<String> excludePrefixes, List<String> excludeRegex,
                               int filterTargetColumn, String where,
                               Boolean ignoreErrors, Boolean nullPadding, Rejects rejects,
-                              String sourceTimezone) {
+                              String sourceTimezone, String decimalSeparator) {
+
+        /**
+         * The pre-decimal-mark arity ({@code BASIC-ELT-PROFILE-1} U3). {@code decimalSeparator} {@code null} means no
+         * {@code decimal_separator} key: a number column is read by a plain cast, exactly as before the key existed.
+         */
+        public CsvSettings(String delimiter, String quote, String escape, String comment,
+                           int skipHeaderLines, int skipJunkLines,
+                           int skipTailLines, int skipTailCols, boolean hasHeader,
+                           String engine, List<String> dateFormats, List<String> tsFormats,
+                           String encoding, String inputCompression, Boolean strictMode,
+                           List<String> nullStrings,
+                           List<String> includePrefixes, List<String> includeRegex,
+                           List<String> excludePrefixes, List<String> excludeRegex,
+                           int filterTargetColumn, String where,
+                           Boolean ignoreErrors, Boolean nullPadding, Rejects rejects,
+                           String sourceTimezone) {
+            this(delimiter, quote, escape, comment, skipHeaderLines, skipJunkLines,
+                    skipTailLines, skipTailCols, hasHeader, engine, dateFormats, tsFormats,
+                    encoding, inputCompression, strictMode, nullStrings,
+                    includePrefixes, includeRegex, excludePrefixes, excludeRegex,
+                    filterTargetColumn, where, ignoreErrors, nullPadding, rejects, sourceTimezone, null);
+        }
 
         /**
          * The pre-robustness arity, kept so callers built before the error-handling knobs existed still
@@ -1802,7 +1824,7 @@ public final class PipelineConfig {
                 b.filterTargetColumn, b.rowWhere,
                 b.ignoreErrors, b.nullPadding,
                 new CsvSettings.Rejects(b.storeRejects, b.rejectsTable, b.rejectsScan, b.rejectsLimit),
-                b.sourceTimezone);
+                b.sourceTimezone, b.decimalSeparator);
         this.output = new Output(b.outputFormat, b.compression, b.duckLakeCfg, b.filenameColumn, b.outputConnection);
         this.sinks = resolveSinks(b.sinks, this.output, b.databaseDir);
         this.steps = resolveSteps(b.steps, b.rowWhere, b.join, b.dedup, b.summarize, b.profile, b.route);
@@ -2029,7 +2051,7 @@ public final class PipelineConfig {
                 null, null, c.strictMode(), c.nullStrings(),
                 c.includePrefixes(), c.includeRegex(), c.excludePrefixes(), c.excludeRegex(),
                 c.filterTargetColumn(), c.where(),
-                c.ignoreErrors(), c.nullPadding(), c.rejects(), c.sourceTimezone());
+                c.ignoreErrors(), c.nullPadding(), c.rejects(), c.sourceTimezone(), c.decimalSeparator());
         return new PipelineConfig(this, identity, dirs, sinks, route, replay);
     }
 
@@ -2557,6 +2579,7 @@ public final class PipelineConfig {
         List<String> dateFormats     = new ArrayList<>();
         List<String> tsFormats       = new ArrayList<>();
         String       sourceTimezone;
+        String       decimalSeparator;  // csv_settings.decimal_separator: "." or ","; null => a plain cast (U3)
         String       encoding;
         String       inputCompression;
         Boolean      strictMode;

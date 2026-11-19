@@ -52,6 +52,7 @@ export const PARSING_ROOTS = [
     'json',
     'text_regex',
     'xlsx',
+    'parquet',
     'encoding',
     'compression',
     'plugin',
@@ -613,15 +614,15 @@ export class GrammarEditorComponent implements AfterViewInit {
         }
     }
 
-    /** Load sample content from a local file (text, capped; an .xlsx workbook captures as BYTES). */
+    /** Load sample content from a local file (text, capped; an .xlsx workbook or a .parquet file captures as BYTES). */
     onSampleFile(files: FileList | null): void {
         const file = files?.[0];
         if (!file) return;
-        // Binary: text() would round-trip the zip through a charset. No truncation — a sliced zip is
-        // unreadable, so an oversized workbook is refused whole rather than silently maimed.
-        if (this.frontend() === 'xlsx' || /\.xlsx$/i.test(file.name)) {
+        // Binary: text() would round-trip the bytes through a charset. No truncation — a sliced file is
+        // unreadable, so an oversized one is refused whole rather than silently maimed.
+        if (this.frontend() === 'xlsx' || this.frontend() === 'parquet' || /\.(xlsx|parquet)$/i.test(file.name)) {
             if (file.size > MAX_SAMPLE_BYTES) {
-                this.error.set(`Workbook too large for a preview sample (max ${MAX_SAMPLE_BYTES / 1024} KB).`);
+                this.error.set(`File too large for a preview sample (max ${MAX_SAMPLE_BYTES / 1024} KB).`);
                 return;
             }
             file.arrayBuffer().then(
@@ -630,7 +631,7 @@ export class GrammarEditorComponent implements AfterViewInit {
                     for (const b of new Uint8Array(buf)) bin += String.fromCharCode(b);
                     this.sampleB64.set(btoa(bin));
                     this.sampleText.set(
-                        `[${file.name} — binary workbook, ${Math.max(1, Math.round(file.size / 1024))} KB]`,
+                        `[${file.name} — binary file, ${Math.max(1, Math.round(file.size / 1024))} KB]`,
                     );
                     this.preview.set(null);
                     this.error.set(null);
@@ -779,5 +780,6 @@ function normalizeFrontend(raw: unknown): ParsingFrontend {
     if (f === 'json') return 'json';
     if (f === 'text_regex') return 'text_regex';
     if (f === 'xlsx' || f === 'excel') return 'xlsx';
+    if (f === 'parquet') return 'parquet';
     return 'delimited';
 }
