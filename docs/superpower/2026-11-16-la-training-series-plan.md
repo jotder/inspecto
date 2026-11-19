@@ -1,7 +1,7 @@
 # Inspecto LA user training series — plan
 
 > **DECIDED 2026-11-16 — D-TR1…D-TR6 answered by the operator (§9); D-TR7 (episode list) taken as approved with the
-> Advanced category added; the voice is a local neural engine (D-TR1)** (board row `LA-TRAINING-SERIES-1`). Operator request: *"a Inspecto LA user
+> Advanced category added; the voice is a local neural engine (D-TR1)** (board row `LA-TRAINING-SERIES-1`). **Rendered 2026-11-19: all 41 episodes (I1 and I2 as explainers; §6.6–§6.7 list what each one narrates instead of shows). Follow-up: the twenty case films re-specified to this standard, [`2026-11-19-la-case-videos-v2-plan.md`](2026-11-19-la-case-videos-v2-plan.md).** Operator request: *"a Inspecto LA user
 > training video series, each video 5 to 7 minutes, that handholds new users through the product features and
 > functionalities; describe each tool in the toolbars, tabs and configuration tabs including settings, and demonstrate how
 > to use Inspecto LA; group the videos by category; the user guide helps but may not be complete; the intention of each

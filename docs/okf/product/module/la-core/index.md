@@ -16,7 +16,7 @@ tags: [product-item, module]
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [Link analysis core and ports - plan of record](plan-la-core.md) |
-| spec | current | [Inspecto LA - first-time user use cases (blank product to first findings)](spec-first-time-user-use-cases.md) · [Link analysis core and ports - spec](spec-la-core.md) · [Link analysis performance - decisions, seams and measured no-gos](spec-performance.md) |
+| spec | current | [Inspecto LA case videos v2 — Banking and finance: six case specs](spec-case-videos-banking.md) · [Inspecto LA case videos v2 — Insurance, Utilities, Law enforcement and the shared Standard module](spec-case-videos-insurance-utilities-law.md) · [Inspecto LA case videos v2 — specs: public sector, healthcare, logistics, enterprise](spec-case-videos-public-health-logistics-enterprise.md) · [Inspecto LA case videos v2 - Telecom specs (five cases)](spec-case-videos-telecom.md) · [Inspecto LA - first-time user use cases (blank product to first findings)](spec-first-time-user-use-cases.md) · [Link analysis core and ports - spec](spec-la-core.md) · [Link analysis performance - decisions, seams and measured no-gos](spec-performance.md) |
 | architecture | current | [Link Analysis — data onboarding](architecture-data-onboarding.md) · [Link Analysis — HTTP surface and Investigation UI](architecture-http-and-ui.md) · [Link Analysis — architecture](architecture-la-core.md) · [Link Analysis — as-built reference and design records](architecture-records.md) |
 | features | current | [Link Analysis — features](features-la-core.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
@@ -35,7 +35,8 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LA-FULL-CYCLE-RESIDUALS-1` | P3 | chore | what the full-cycle plan left on purpose, and two environment gaps its drive found. | — |
-| `LA-TRAINING-SERIES-1` | P3 | feature | an Inspecto LA user training video series, planned and decided (D-TR1…D-TR7, 2026-11-16); narration for all 41 episodes drafted (267 UI c… | operator |
+| `LA-TRAINING-SERIES-1` | P3 | feature | an Inspecto LA user training video series, planned and decided (D-TR1…D-TR7, 2026-11-16); all 41 episodes rendered 2026-11-19 (I1 and I2… | operator |
+| `LA-CASE-VIDEOS-2` | P3 | feature | the twenty industry case films re-specified and re-recorded to the training-series standard (proposed 2026-11-19, D-CV1…D-CV6 open; specs… | operator |
 | `LA-EXEC-DEMO-POLISH-1` | P3 | chore | what the third executive review of Inspecto LA (2026-11-16) left as polish, plus amounts on the links. | — |
 | `SPACE-ADMISSION-FOLLOWUPS-1` | P3 | chore | what the closed-Space change (D5, 91f0af69a) left on purpose. | — |
 | `LA-SPACE-SWITCHER-NAMES-1` | P3 | defect | the Space switcher still shows near-twin names, no name on a phone, and squeezes a two-line name. | — |
