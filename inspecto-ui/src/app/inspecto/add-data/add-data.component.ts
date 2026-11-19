@@ -37,6 +37,11 @@ import {
     entityTypeOptions,
 } from '@inspecto/core/api/entity-type-options';
 import { OnboardingEventsService } from '@inspecto/core/onboarding/onboarding-events.service';
+import {
+    BASIC_COLUMN_TYPES,
+    BASIC_COLUMN_TYPE_LABELS,
+    type BasicColumnType,
+} from '@inspecto/core/schema/basic-column-types';
 import { AddDataAccess } from './add-data-access';
 import { ADD_DATA_LINK_ANALYSIS } from './add-data-link-analysis';
 import {
@@ -49,7 +54,6 @@ import {
     choiceStep,
     confirmAllLabel,
     ColumnState,
-    ColumnType,
     DATASET_NAME,
     FormatOverrides,
     ImportDataset,
@@ -63,7 +67,6 @@ import {
     ROW_OP_LABELS,
     RowConditionState,
     RowOp,
-    TYPE_LABELS,
     buildCommit,
     buildFilter,
     conditionProblem,
@@ -236,9 +239,9 @@ export class AddDataComponent implements OnInit {
     // ── words and options ────────────────────────────────────────────────────────────────────────────────────────────
     protected readonly accept = ACCEPTED_EXTENSIONS;
     protected readonly formats = READ_FORMATS;
-    protected readonly typeOptions: PickerOption[] = (Object.keys(TYPE_LABELS) as ColumnType[]).map((t) => ({
+    protected readonly typeOptions: PickerOption[] = BASIC_COLUMN_TYPES.map((t) => ({
         value: t,
-        label: TYPE_LABELS[t],
+        label: BASIC_COLUMN_TYPE_LABELS[t],
     }));
     protected readonly delimiterOptions: PickerOption[] = [',', ';', '\t', '|'].map((d) => ({
         value: d,
@@ -464,7 +467,7 @@ export class AddDataComponent implements OnInit {
         this.keptColumns().map((c) => ({
             value: c.name,
             label: c.rename.trim() || c.name,
-            hint: TYPE_LABELS[c.type as ColumnType],
+            hint: BASIC_COLUMN_TYPE_LABELS[c.type as BasicColumnType],
         })),
     );
     /** The sentence the Dataset card will show, by the names the columns will have. */

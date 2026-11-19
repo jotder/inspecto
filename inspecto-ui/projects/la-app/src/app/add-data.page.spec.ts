@@ -13,6 +13,7 @@ import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile
 import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
 import { NO_UPLOAD_RIGHT, SELF_IMPORT_OFF } from '@inspecto/core/add-data/add-data.model';
 import { AddDataAccess } from '@inspecto/core/add-data/add-data-access';
+import { ADD_DATA_LINK_ANALYSIS } from '@inspecto/core/add-data/add-data-link-analysis';
 import { AddDataPageComponent } from './add-data.page';
 import { FirstRun } from './first-run';
 
@@ -113,6 +114,13 @@ describe('AddDataPageComponent (/add-data, LA-ONBOARD-1 phase 4)', () => {
         const titles = Array.from(list.querySelectorAll('h3')).map((h) => h.textContent);
         expect(titles).toEqual(['transfers', 'accounts']); // a Pipeline-built Dataset is not an import
         await expectNoA11yViolations(el);
+    });
+
+    it("provides what Link Analysis hands Add data in the page's own providers, not the shell's (BASIC-ELT-PROFILE-1 UI-0)", () => {
+        const { fixture } = create();
+        // the root default (no Link Analysis) has no Rebuild; the page's own provider hands Link Analysis's
+        expect(TestBed.inject(ADD_DATA_LINK_ANALYSIS).rebuild).toBeNull();
+        expect(fixture.debugElement.injector.get(ADD_DATA_LINK_ANALYSIS).rebuild).not.toBeNull();
     });
 
     it('with Add data on, nothing offers to turn it on', () => {
