@@ -205,6 +205,20 @@ queue and decides; delivery is recorded against the requirement), linkable to th
 it. *(Lifecycle simplified from the Wave-0 draft per the product-owner decision 2026-07-03, shipped as C1 —
 `archived-documents/superpower-reviews/requirements-intake.md`.)*
 
+**Handbook** *(added 2026-11-19 — `USER-HANDBOOK-1`, D-UE1)* — The user's view of the documentation: chapters in
+lifecycle order (Understand → Build → Ship → Manage → Develop) for each track — console builder, partner developer,
+operator — rendered from hub pages by one navigation manifest and served in the console at `/help` and as a static
+site. Each entry is `external` or `internal`; only the team's internal render shows the *Inside Inspecto* pages for
+Inspecto's own engineers. ⛔ Not a docs tree: every page stays in its product hub, and the Handbook only orders and
+renders them. ⛔ Not `USER_GUIDE.md`, which becomes the Handbook's screen-reference chapter.
+
+**Learning Path** *(added 2026-11-19 — `USER-TRAINING-1`, D-UE1)* — An ordered set of Handbook tutorials, Labs, videos
+and self-checks for one track, ending each lifecycle stage with a self-check.
+
+**Lab** *(added 2026-11-19 — `USER-TRAINING-1`, D-UE1)* — A hands-on exercise: a `lab-*` Space Template that seeds a
+starting state, plus a checker that reads the learner's result through the API. Shipped in Preview and a training
+bundle, not in the sold editions (D-UE7). ⛔ Not a showcase Space Template, which is built to be shown, not worked.
+
 ---
 
 ## 2. Connectivity & Ingestion
@@ -1350,6 +1364,21 @@ The tier vocabulary is a closed six-value set — `AUTHORITATIVE` · `OFFICIAL` 
 inside one agent turn.
 
 **Model Settings** — AI model selection, keys, and generation parameters used by the Assistant and Diagnosis.
+
+**Agent Kit** *(added 2026-11-19 — `AGENT-KIT-1`, D-UE1)* — What lets an AI agent running outside Inspecto (Claude,
+Gemini, OpenAI or a local model) build, ship and manage Apps on a running install: the MCP endpoint with its MCP
+Tools, the Agent Skills, and one package per agent vendor. ⛔ Not the **Assistant**, which runs inside Inspecto.
+
+**Agent Skill** *(added 2026-11-19 — `AGENT-KIT-1`, D-UE1)* — One job an outside AI agent can do on Inspecto, written
+in the open `SKILL.md` format: when to use it, its steps as MCP Tool calls, its guardrails and links into the
+Handbook. ⛔ Not one of the Assistant's own skills or tools (inside Inspecto), and not a repository skill under
+`.claude/skills/` (for engineers working on Inspecto's code).
+
+**MCP Tool** *(added 2026-11-19 — `AGENT-KIT-1`, D-UE1)* — One task-level operation the Inspecto MCP endpoint offers
+an outside agent (for example `describe_dataset`, `dry_run_pipeline`, `propose_action`), run as the signed-in person
+or a machine identity; every write goes validate → dry-run → Draft, and every outbound or promoting act becomes an
+Action Request for a human to approve. ⛔ Not a Control API route — one MCP Tool may call several — and not a tool
+the Assistant calls.
 
 ---
 

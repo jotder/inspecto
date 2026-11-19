@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.api` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `AGENT-KIT-1` | P2 | feature | the Agent Kit: AI agents (Claude, Gemini, OpenAI, local / offline models) build, ship and manage Apps on a running Inspecto, safely. | — |
