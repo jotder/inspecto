@@ -22,8 +22,8 @@
 // UI steps (```check-ui) run only with --ui, through tools/record-la-live.mjs `episode` (headless Chrome or Edge and
 // ffmpeg on the machine); without --ui each is listed as NOT RUN and the summary says how many — never as passed.
 //
-// Tests: tools/run-handbook-checks.test.mjs (a stub HTTP server in the test). Where it runs: the nightly workflow
-// .github/workflows/nightly-handbook-checks.yml, and by hand against a demo install (the spec page says how).
+// Tests: tools/run-handbook-checks.test.mjs (a stub HTTP server in the test). Where it runs: by hand against a demo
+// install and before each release — not in CI, which boots no install (the spec page says why and how).
 
 import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdtempSync, existsSync } from 'node:fs';
@@ -56,7 +56,7 @@ export function signIn({ base, env = process.env, creds = {}, fetchFn = fetch })
     return async (as) => {
         if (!as) { const t = env.INSPECTO_HANDBOOK_TOKEN || creds.token; return t ? `Bearer ${t}` : null; }
         const key = `INSPECTO_HANDBOOK_TOKEN_${as.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
-        const t = env[key] || creds.tokens?.[as];
+        const t = env[key] || (creds.tokens && Object.hasOwn(creds.tokens, as) ? creds.tokens[as] : undefined);
         if (t) return `Bearer ${t}`;
         if (authFree) return null;
         if (cache.has(as)) return cache.get(as);
@@ -164,6 +164,7 @@ function parseArgs(argv) {
         else throw new Error(`unknown argument ${a}`);
     }
     if (!o.base) throw new Error('--base-url is required');
+    if (!(o.timeoutMs > 0)) throw new Error('--timeout takes a positive number of milliseconds');
     return o;
 }
 

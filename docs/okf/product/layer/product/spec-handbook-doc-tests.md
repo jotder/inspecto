@@ -57,7 +57,8 @@ string holds the text, an object has the key), `matches /regex/flags`, `exists`,
 is JSON when it parses (`"text"`, `3`, `true`, `{"k":1}`), otherwise the bare word as text (`has o2c_orders`).
 
 **Variables:** `{space}` is the runner's `--space`; every other `{name}` must be set by an earlier `save … as name`
-on the same page (the guard refuses it otherwise). `--var name=value` sets one for a run.
+on the same page (the guard refuses it otherwise). `--var name=value` presets a value for a run; a `save` of the same
+name overrides it.
 
 A page's steps share one sequence: trigger a Job, keep its Run id, wait for it.
 

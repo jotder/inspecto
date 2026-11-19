@@ -89,6 +89,15 @@ test('evaluate: every operator, true and false', () => {
     assert.deepEqual(evaluate(parseExpect('data.items[*].id has y'), root).actual, ['x']);
 });
 
+test('evaluate: a /g regex gives the same answer twice (retry); exists/absent on a [*] list mean non-empty/empty', () => {
+    const e = parseExpect('data.s matches /cash/g');
+    const root = { data: { s: 'Order-to-cash', items: [] } };
+    assert.deepEqual([evaluate(e, root).ok, evaluate(e, root).ok], [true, true]);
+    assert.equal(evaluate(parseExpect('data.items[*].id exists'), root).ok, false);
+    assert.equal(evaluate(parseExpect('data.items[*].id absent'), root).ok, true);
+    assert.equal(evaluate(parseExpect('data.items[*] exists'), { data: { items: [{ id: 1 }] } }).ok, true);
+});
+
 test('substitute: {vars} in strings, deep; an unset one throws', () => {
     assert.deepEqual(substitute({ a: '/runs/{run}', b: ['{space}', 2] }, { run: 'r1', space: 's' }), { a: '/runs/r1', b: ['s', 2] });
     assert.throws(() => substitute('/runs/{nope}', {}), /\{nope\} is not set/);

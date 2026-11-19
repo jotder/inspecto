@@ -116,6 +116,7 @@ test('CLI: a failing assertion exits 1 naming page, step, file:line, the expecta
 
 test('CLI: usage errors exit 2 — no base URL, unknown page, a page with no check', async () => {
     assert.equal((await cli([])).code, 2);
+    assert.equal((await cli(['--base-url', s.base, '--timeout', 'abc'])).code, 2);
     assert.match((await cli(['--base-url', s.base, '--page', 'nope'])).out, /no page 'nope'/);
     const none = await cli(['--base-url', s.base, '--page', 'none']);
     assert.equal(none.code, 2);
@@ -150,6 +151,7 @@ test('signIn: per-persona env token, then the credentials file, then the demo ex
     assert.equal(await auth(null), 'Bearer gen');
     assert.deepEqual(calls, ['demo:manager'], 'the generic token never stands in for a named persona');
     assert.equal(await signIn({ base: 'http://x', env: {}, fetchFn })(null), null);
+    assert.equal(await signIn({ base: 'http://x', env: {}, creds: { tokens: {} }, fetchFn })('constructor'), 'Bearer demo-tok', 'an inherited key is not a token');
 });
 
 test('signIn: an exchange refused is a clear error naming the env variable; Basic (503) sends no header', async () => {

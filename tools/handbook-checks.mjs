@@ -214,10 +214,12 @@ export function evalPath(root, tokens) {
 export function evaluate(expect, root) {
     const actual = evalPath(root, expect.tokens);
     const v = expect.value;
+    // a [*] path yields a list: it "exists" when the list holds something
+    const present = expect.tokens.includes('*') ? actual.length > 0 : actual !== undefined && actual !== null;
     let ok;
     switch (expect.op) {
-        case 'exists': ok = actual !== undefined && actual !== null; break;
-        case 'absent': ok = actual === undefined || actual === null; break;
+        case 'exists': ok = present; break;
+        case 'absent': ok = !present; break;
         case '=': ok = isDeepStrictEqual(actual, v); break;
         case '!=': ok = !isDeepStrictEqual(actual, v); break;
         case '>': ok = typeof actual === 'number' && actual > v; break;
@@ -229,7 +231,7 @@ export function evaluate(expect, root) {
                 : typeof actual === 'string' ? actual.includes(String(v))
                     : !!actual && typeof actual === 'object' && typeof v === 'string' && Object.hasOwn(actual, v);
             break;
-        case 'matches': ok = typeof actual === 'string' && v.test(actual); break;
+        case 'matches': v.lastIndex = 0; ok = typeof actual === 'string' && v.test(actual); break;   // a /g or /y regex keeps state between tries
         default: ok = false;
     }
     return { ok, actual };
