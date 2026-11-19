@@ -92,7 +92,7 @@ and a default purge deletes business records.
 | "The engine hot-loads `*_alert.toon`" | in-process arming by the write routes | `events-metrics.md`, the archived authoring plan's own correction |
 | Alert Rules as raw files only | `ComponentStore`-backed CRUD (the `alert-rule` kind) | `decision-rules.md` |
 | "Scheduler auto-evaluation of Case Rules is a follow-up" | the `caserule.evaluate` Job Type | `jobs.md` |
-| "The backend resolution gate is a follow-up" | I1 shipped 2026-07-24 (`ObjectService.commit`) | `PROJECT_NOTES.md` §3 |
+| "The backend resolution gate is a follow-up" | I1 shipped 2026-07-24 (`ObjectService.commit`) | `module/engine/spec-engine-gotchas.md` |
 | MNT-14 plan §3 G1 / G4 framing | marked wrong in the plan's own header; `jobs.md` is the account | archived `mnt-14-incident-retention-plan.md` |
 | D6's two premises ("reuse the C6 workflow/TOON pattern", "the `attribute-spec` renderer" = `ConfigSpecs`) | the `findings-spec` kind and the frontend `AttributeSpec` vocabulary | `objects.md` |
 | `DecisionConsequence` | `Consequence` (aliased for back-compat) | archived `decision-network-plan.md` |

@@ -64,7 +64,7 @@ body straight to `JobConfig.fromMap`, so keys are **snake_case** (`on_pipeline`,
 and type-specific parameters are **flat** alongside them. An unrecognised key is **absorbed as a parameter,
 never rejected** — so a misspelled trigger key yields a job with no trigger and no error anywhere. Pinned by
 `ControlApiJobCrudTest`; the full trap and the read side's deliberate asymmetry are in
-[`PROJECT_NOTES.md`](../../../../PROJECT_NOTES.md) §4.
+[`spec-config-gotchas.md`](../config/spec-config-gotchas.md).
 
 `submit()` binds the `space` MDC (for non-default spaces — see [multi-space](architecture-processor.md)) and runs on a
 virtual thread. `runJob()` uses `runner.runExclusiveOrSkip(name, …)` for a non-overlap guarantee (a job

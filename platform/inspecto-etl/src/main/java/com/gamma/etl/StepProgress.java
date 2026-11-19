@@ -21,7 +21,7 @@ import com.gamma.util.CurrentSpace;
  * live gauge, not history. Durable per-step history is the provenance matrix, terminal outcomes are
  * the {@code pipeline.batch.committed|failed} Signals — a per-step Signal would be a durable write
  * per step per Consignment on the claim-holding thread and could trigger jobs mid-batch (the
- * PROJECT_NOTES re-entrancy class), and a persisted snapshot is stale by construction. Two map ops
+ * re-entrancy class in docs/okf/product/module/engine/spec-engine-gotchas.md), and a persisted snapshot is stale by construction. Two map ops
  * per step; the hot loop pays effectively nothing.
  */
 public final class StepProgress {

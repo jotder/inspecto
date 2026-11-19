@@ -293,7 +293,7 @@ failure alike. Both are served by the existing poll route (`InboxStatus.current`
   synchronous *inside the pipeline's run claim* (`ConsignmentAuditWriter.flush` → `PipelineConsignmentSignal`).
   Per-step would multiply durable writes on the claim-holding thread — and because Signals trigger
   `on_signal` jobs, a mid-batch Signal invites triggered work to fire **while the claim is held**: the
-  re-entrancy class [PROJECT_NOTES §6](../../../../PROJECT_NOTES.md) forbids. Revisit only at
+  re-entrancy class [engine gotchas](../engine/spec-engine-gotchas.md) forbids. Revisit only at
   per-Consignment grain with a mandatory off-bus hand-off.
 - ⛔ **Periodic persistence of progress.** Stale by construction, recurring writes for a value that
   expires in seconds, and crash-orphaned rows to clean. The post-crash question is already answered by

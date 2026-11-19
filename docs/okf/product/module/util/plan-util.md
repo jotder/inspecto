@@ -13,7 +13,7 @@ timestamp: 2026-10-19T00:00:00Z
 ## Required
 
 One shared home, with no dependency on any feature module, for the helpers every module needs: DuckDB
-connections and caps (NFR-1 throughput, NFR-2 footprint in [REQUIREMENTS](../../../../REQUIREMENTS.md)),
+connections and caps (NFR-1 throughput, NFR-2 footprint in [REQUIREMENTS](../../layer/platform/spec-requirements.md)),
 crash-safe file writes (NFR-3 resilience), SQL identifier quoting, TOON reading, module manifests (so an
 Edition is assembled from optional modules — `MODULE-REORG-1`), and the deployment-wide switches for
 scale-out (topology, shared lakehouse catalog, operations zone).

@@ -28,7 +28,7 @@ converter (not yet built).
 
 Only pairings with **real sample data** can be proven, and those are exactly the golden-corpus
 cases. All 9 are green: 16/16 data files at structural parity, 10/16 at content parity 1.0, row
-counts identical on all 8 row-bearing files (see `corpus/PARITY.md`, `asn-decoders/README.md`).
+counts identical on all 8 row-bearing files (see `corpus/PARITY.md`, `docs/okf/product/module/asn-decoders/architecture-decoder-modules.md`).
 
 | Case | Grammar | Transform |
 |---|---|---|

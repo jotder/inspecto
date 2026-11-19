@@ -15,7 +15,7 @@ tags: [product-item, solution-pack]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
+| plan | current | [solution-pack.la-mobile-money - board row detail](plan-board-detail.md) |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | architecture | current | [Link Analysis mobile money — architecture](architecture-la-mobile-money.md) |
 | features | current | [Link Analysis mobile money — features](features-la-mobile-money.md) |
@@ -34,5 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-INDUSTRY-FOLD-1` | P3 | chore | fold la-showcase into *Banking and finance* and la-mobile-money into *Telecom*, so only industry Spaces ship. | — |
-| `LA-SHOWCASE-REHEARSAL-1` | P3 | chore | all three showcases are driven in the browser (2026-10-24, and the items left then on 2026-10-28 on the reorganized Studio); what is left… | — |
+| `LA-INDUSTRY-FOLD-1` | P3 | chore | Fold la-showcase into *Banking and finance* and la-mobile-money into *Telecom*, so only industry Spaces ship. | — |
+| `LA-SHOWCASE-REHEARSAL-1` | P3 | chore | A spoken showcase run with an audience, the portal on :8140 and the B Alert beat. | — |

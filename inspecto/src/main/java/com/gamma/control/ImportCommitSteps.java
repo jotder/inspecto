@@ -36,7 +36,8 @@ import java.util.Set;
  *       {@link CommitPhase#COMMIT} (every Consignment, before the Space's Jobs see it), the follow-ons and the Expectations in
  *       {@link CommitPhase#RUN} (once per run, after its last Consignment and outside ingest: a link index build waits for
  *       ingest to end, so it cannot run on the publishing thread). Each claims the Dataset while it works and leaves a
- *       Dataset someone else holds alone - Add data's own run does the work itself, so it never runs twice.</li>
+ *       Dataset someone else holds alone - Add data's own run does the work itself, so it never runs twice. The claim the
+ *       run's own pre-run step holds ({@link ImportPreRunSteps}, BE-1b) is not someone else's.</li>
  * </ul>
  * Both ways run only when the Pipeline's {@code import_steps} names {@code follow_on}; a Pipeline with no
  * {@code import_steps} (written before BASIC-ONBOARD-1 P1) runs all four steps.
@@ -115,8 +116,9 @@ final class ImportCommitSteps {
                     .map(ComponentRegistry.Component::content).orElse(null);
             if (content == null || !OnboardImport.isOurs(writeRoot, id, content, service)) return;
             String claim = writeRoot + "|" + id;
-            if (!OnboardImport.IN_FLIGHT.add(claim)) return;   // an import, Compact now or a delete holds it: that holder does it
-            key = claim;
+            if (OnboardImport.IN_FLIGHT.add(claim)) key = claim;
+            // an import, Compact now or a delete holds it: that holder does it - unless it is this run's own pre-run claim (BE-1b)
+            else if (!ImportPreRunSteps.heldByRun(claim)) return;
             if (!followsOn(writeRoot, id)) return;
             Map<String, Object> out = new LinkedHashMap<>();
             step.work().run(new OnboardImport.Space(writeRoot, dataRoot, service, "scheduler"), id, content, out);

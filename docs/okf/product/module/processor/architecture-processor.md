@@ -284,7 +284,7 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
 > Step-kind registry, `LOWERED`/`EXECUTED`) stays gated on the branch-aware executor's armed path, so
 > every §6 gap still marked *Fulfilled by* an `S2-*` step is open; it and stage 3 are tracked in
 > [`BACKLOG.md`](../../../../BACKLOG.md) §4. The seam's durable operating rules live in
-> [`PROJECT_NOTES.md`](../../../../PROJECT_NOTES.md) §5; this part's §0 wording came from **S1-0**, and the
+> [`spec-engine-seams.md`](../engine/spec-engine-seams.md); this part's §0 wording came from **S1-0**, and the
 > plan itself is archived at
 > [`plans-archive/platform-services-plan.md`](../../../../archived-documents/plans-archive/platform-services-plan.md).
 > ⚠ Stage 2 being gated no longer means "no plugin Step at all": the classpath node-type seam

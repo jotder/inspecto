@@ -4,7 +4,7 @@
 > re-derived 2026-11-19** from [`EDITIONS.md`](../../../../EDITIONS.md) and `offerings/*.toon` — the Personal /
 > Professional / Enterprise ladder became Basic / Standard / Advanced on 2026-10-17 (`LA-EDITIONS-1`), and modules
 > moved between rungs, not only names
-> Requirement of record: the capability specs indexed by [`../../../../REQUIREMENTS.md`](../../../../REQUIREMENTS.md) §3 ·
+> Requirement of record: the capability specs indexed by [`spec-requirements.md`](../platform/spec-requirements.md) §3 ·
 > edition per capability: [`spec-editions.md`](../platform/spec-editions.md) · forward plan:
 > [`../platform/plan-roadmap.md`](../platform/plan-roadmap.md).
 
@@ -28,7 +28,7 @@ blueprints were a roadmap item; they ship as these Space Templates.)*
 
 ## Capability map (status as of 2026-09-23; edition column 2026-11-19)
 
-Each status traces to its capability spec's §2 (via [`../../../../REQUIREMENTS.md`](../../../../REQUIREMENTS.md) §3); the
+Each status traces to its capability spec's §2 (via [`spec-requirements.md`](../platform/spec-requirements.md) §3); the
 edition column is the lowest edition that bundles it, per [`spec-editions.md`](../platform/spec-editions.md) and
 [`EDITIONS.md`](../../../../EDITIONS.md). Where a status sentence names an edition, it was re-checked 2026-11-19.
 
@@ -113,4 +113,4 @@ security, then Professional, now Standard (`SEC-7`, 2026-07-08) · the live end-
   from upstream (`EOI-7` half a). Publishing its artifacts (half b) is no longer a gate: it became a standing
   refusal on 2026-09-15.
 
-(Detail and sequencing: [`../../../../REQUIREMENTS.md`](../../../../REQUIREMENTS.md) §5–6 and the capability specs it indexes.)
+(Detail and sequencing: [`spec-requirements.md`](../platform/spec-requirements.md) §5–6 and the capability specs it indexes.)

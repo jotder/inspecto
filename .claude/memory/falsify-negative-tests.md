@@ -35,3 +35,5 @@ Standing rule for security/concurrency code: falsify before believing a negative
   exact one-line mutation and the tests that must go red in `SESSION_STATUS.local.md` for the operator to run.
 
 Related: [[maven-verdict-traps]], [[guard-scope-is-a-silent-exemption]].
+
+Long form, with the original incidents (from the retired `PROJECT_NOTES.md`, 2026-11-19): [tests-guards-and-claims-gotchas.md](../../docs/okf/product/layer/platform/tests-guards-and-claims-gotchas.md).

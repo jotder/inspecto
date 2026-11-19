@@ -3,7 +3,7 @@
 #
 # This example demonstrates a `type: pipeline` JOB — an authored flow (Pipeline DAG) run as a
 # scheduled/event-driven Job (PipelineJobRunner). It is the live end-to-end proof for the
-# authored-Pipeline execution path (docs/REQUIREMENTS.md PIP-1).
+# authored-Pipeline execution path (docs/okf/product/layer/platform/spec-requirements.md PIP-1).
 #
 # Pieces:
 #   sales_pipeline.toon         ingest pipeline — lands seeded SALES CSVs as partitioned Parquet

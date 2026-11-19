@@ -44,7 +44,7 @@
 > [`archived-documents/plans-archive/postgres-multi-user-plan.md`](../archived-documents/plans-archive/postgres-multi-user-plan.md)
 > §5–6 (the connection pool this plan un-parks) ·
 > [`archived-documents/plans-archive/deployment-topology-plan.md`](../archived-documents/plans-archive/deployment-topology-plan.md)
-> §10 (D1–D8 as signed) · [`REQUIREMENTS.md`](../REQUIREMENTS.md) (`NFR-8`).
+> §10 (D1–D8 as signed) · [`REQUIREMENTS.md`](../okf/product/layer/platform/spec-requirements.md) (`NFR-8`).
 
 **Coverage map:** what changes and why §1 · what it amends §2 · the seams, grounded §3 · the scaling
 model §4 · the four workstreams §5 · sequencing §6 · the first test §7 · risks §8 · decisions asked §9 ·
@@ -763,7 +763,7 @@ not own.*
 > seven weeks before the plan bullet was written), and "partition by Space" which was always a statement of
 > direction rather than work. ⚠ **A plan section can be staler than the code it plans**, and §12 of *this
 > same document* already recorded one of them as closed. ⛔ Ground every bullet against the code before
-> building it — see PROJECT_NOTES §4.
+> building it — see `layer/platform/architecture-backend-gotchas.md` and `module/engine/spec-engine-gotchas.md`.
 
 Work:
 - **Partition by Space, not by pipeline** (D3). Spaces are already the tenant boundary and the

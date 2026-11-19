@@ -9,7 +9,7 @@
 //   * module manifests META-INF/inspecto/module.toon — every `provides:` list except `contracts` (features, configKinds, routes, ...)
 //   * the processor catalog contract — a processor belongs to the module its `requires` names (`inspecto-<id>`), else to the
 //     module its `capability` names, else to `engine` (where ProcessorCatalog lives)
-//   * docs/FEATURE_INVENTORY.md §1 — a row whose Doc / code cell links into a module hub (`okf/product/module/<id>/`)
+//   * docs/okf/product/layer/platform/features-feature-inventory.md §1 — a row whose Doc / code cell links into a module hub (`okf/product/module/<id>/`)
 // Editions come from offerings/*.toon (`includes` resolved; a base/internal module is in every Edition); add-ons from the
 // Offerings' `addons:` blocks. A feature-db.md this tool would no longer write is removed.
 
@@ -21,7 +21,7 @@ import { parseToon } from './check-offerings.mjs';
 
 const TIERS = ['basic', 'standard', 'advanced', 'preview'];
 export const COLUMNS = ['feature', 'type', 'module', 'editions', 'addon', 'status', 'key', 'source'];
-const CATALOG = 'inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json', INVENTORY = 'docs/FEATURE_INVENTORY.md';
+const CATALOG = 'inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json', INVENTORY = 'docs/okf/product/layer/platform/features-feature-inventory.md';
 const SINGULAR = { features: 'feature', configKinds: 'config kind', routes: 'route', jobTypes: 'job type', consequences: 'consequence',
     background: 'background task', maintenanceTasks: 'maintenance task', storeFamilies: 'store family', stepKinds: 'step kind' };
 
@@ -73,7 +73,8 @@ export function rows(files, world) {
         out.push(row(module, { feature: p.label, type: 'processor', status: p.status, key: p.id, source: CATALOG }));
     }
     for (const { section, cells } of inventoryRows(inventory)) {
-        const module = /okf\/product\/module\/([a-z0-9-]+)\//.exec(cells.join(' '))?.[1];
+        // the inventory lives in layer/platform/, so its hub links read ../../module/<id>/ (D-IR6); okf/product/… kept for fixtures
+        const module = /(?:okf\/product\/|\(\.\.\/\.\.\/)module\/([a-z0-9-]+)\//.exec(cells.join(' '))?.[1];
         if (!module || !manifests[module]) continue;
         const tag = /\[(LIVE|NATIVE|PROPOSED)\]/.exec(cells.join(' '))?.[1];
         out.push(row(module, { feature: cells[0], type: 'inventory', status: tag ? tag.toLowerCase() : status[module] ?? '',
@@ -110,7 +111,7 @@ tags: [feature-db, ${kind}]
 # ${title} — feature database (\`${id}\`)
 
 > **Generated** by \`tools/render-feature-db.mjs\` from the module manifests, \`offerings/*.toon\`, the processor catalog
-> contract and \`docs/FEATURE_INVENTORY.md\` — never edit this table; change its sources and re-run the tool. The whole
+> contract and \`docs/okf/product/layer/platform/features-feature-inventory.md\` — never edit this table; change its sources and re-run the tool. The whole
 > product is in \`target/product-docs/feature-db.csv\` (sortable). Hub: [index](index.md) · Product Map Item
 > [\`${id}\`](../../../../../product-map/${kind}/${name}.toon).
 

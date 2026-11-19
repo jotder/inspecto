@@ -291,6 +291,7 @@ current citations named classes the 2026-08-31 rename removed (plan §EXE.5.3 it
 | Pipeline triggers | `PipelineTrigger` (6 kinds + a scheduler enum) | ⚠ The glossary's trigger entry omits a shipped kind |
 | The commit bus | `ConsignmentEventBus` | ⚠ Cited under its **old** name in a concept page |
 | Commit steps | `CollectorService.commitStep` / `CommitPhase` / `commitStepRun`; the import's: `ImportCommitSteps` | — |
+| Pre-run steps | `CollectorService.preRunStep` / `PreRun` / `stepRun`; the import's: `ImportPreRunSteps` | — |
 | The lane fork | `ConsignmentIngestStrategy.admittedLift` / `flatReason` | — |
 | The whole-pipeline dry run | `RunRoutes.triggerPipeline`, `CollectorProcessor.run`/`ingest`, `ConsignmentIngestor.process`, `PipelineTestRun.dryIngest`, `EventLog.CONTAINED`, `ConsignmentAuditWriter` | *Whole-pipeline dry run* above — `strategy.ingest` runs contained (member copies, scratch root, throwaway event log), so parsing IS re-validated and reported per member |
 | The graph runner | `ConsignmentGraphRunner` — `engages`, `run`, `dataFedSinkCount` | 🔴 The backlog names a **non-existent** class and denies its callers (§EXE.2.3) |

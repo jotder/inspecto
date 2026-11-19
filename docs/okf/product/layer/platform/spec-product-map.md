@@ -10,7 +10,7 @@ timestamp: 2026-10-22T00:00:00Z
 
 **Status: BUILT 2026-10-18 (`PRODUCT-MAP-1`, slices S0–S5); distilled here 2026-10-22** from the archived
 [`product-map-plan.md`](../../../../archived-documents/plans-archive/product-map-plan.md). Day-to-day use (folders,
-commands) is in [`product-map/README.md`](../../../../../product-map/README.md); the words are in `GLOSSARY.md` §15.
+commands) is in § Product Map (folders and commands) below, moved from `product-map/README.md`; the words are in `GLOSSARY.md` §15.
 
 ## Shape and the one design rule
 
@@ -120,3 +120,45 @@ S6 is row `PRODUCT-MAP-S6-1`.
 - `enabled-gate` items are not written into a default `modules.toon` (no item uses `enabled-gate` yet).
 - **Not built (S6, on demand):** a DuckDB query file of the map, a support view (module → owner / runbook), `usage`
   billing once metering exists.
+
+## Product Map
+
+> Moved verbatim from `product-map/README.md` (2026-11-19, `INFO-RESTRUCTURE-1` W3), which is now a pointer here.
+
+
+The commercial tree of Inspecto: one TOON file per **Product Map Item**, at `<kind>/<name>.toon`, with id `<kind>.<name>`.
+The as-built design and decisions are in [`docs/okf/product/layer/platform/spec-product-map.md`](spec-product-map.md)
+(history: the archived [`product-map-plan.md`](../../../../archived-documents/plans-archive/product-map-plan.md)); the words are in
+`docs/GLOSSARY.md` §15.
+
+| Folder | Item | Links to |
+|---|---|---|
+| `layer/` | a module directory group (`platform`, `features`, …) | — |
+| `module/` | one module | `module:` = the manifest id in `META-INF/inspecto/module.toon` |
+| `functionality/` | what a customer recognises inside a module (written by hand) | `parent:` + `module:` |
+| `addon/` | an Add-on | `offeringAddon:` = the key under `addons:` in `offerings/*.toon` |
+| `solution-pack/` | a Space Template or Industry pack | `template:` / `industryPack:` |
+| `edition/` | an Edition | `offering:` = `offerings/<id>.toon` |
+| `product/` | a Product (not billable: priced as its Edition plus its Apps) | `product:` = `products/<id>.toon` |
+| `app/` | an App (billable, `INS-APP-<ID>`) | `app:` = `apps/<id>/app.toon` |
+| `industry/` | an Industry (not billable: its pack is a Solution pack) | `industry:` = `industries/<id>/industry.toon` |
+
+Rules:
+- **Never copy technical facts** (roles, dependencies, which Edition holds what) here. Name the id; tools look the facts up.
+- **No prices here.** Prices and customer records go in `private/`, which is gitignored.
+- No `#` lines (TOON has no comments).
+- `node tools/render-product-map.mjs` writes the views (CSV, Excel, mind-map HTML) to `target/product-map/`, merging prices from
+  `private/prices.csv` (`orderCode,listPrice,currency`) when it exists.
+- `node tools/product-map-import.mjs <edited.csv|edited.xlsx> [--sheet "Price list"] [--write]` brings commercial edits back
+  (title, billing, support, status, prices). It is a dry run without `--write`, and it refuses structural edits.
+- `node tools/customer-build.mjs <customer|record.toon> [--bundle <product-bundle-dir>] [--key <issuer.pem>]` reads
+  `private/customers/<customer>.toon` (`id`, `title`, `product` (default `inspecto`), `edition`, `orderCodes[N]`, optional
+  `expires` and `nodes`), assembles it (`tools/assemble.mjs --customer`, PA-10b) and writes the Assembly Plan, the customer
+  Offering, a priced bill of materials and a signed entitlement to `target/customers/<customer>/`; with `--bundle`, a copy of the
+  Product bundle trimmed to the plan, with `conf/entitlement.toon` + `.sig`. The key defaults to `private/keys/inspecto-issuer-1.pem`.
+  `--distribution pilot` (PA-10c) also needs the record's `pilot:` block (`template`, and under `poll:` one absolute
+  folder per Pipeline of it) and adds the Space Template `<customer>-pilot` plus a `PILOT.txt` to the bundle.
+- `node tools/pick-addons.mjs` lists the Platform product's Add-ons with their closure, Edition floor and price;
+  `--pick a,b --id <id> --write` writes a picked Platform product to `private/products/<id>.toon`, which
+  `inspecto/package.ps1 -ProductFile` builds in place of the Platform product it narrows.
+- `node tools/product-map-seed.mjs` adds items for new modules, Add-ons, packs and Editions. It never overwrites an existing file.

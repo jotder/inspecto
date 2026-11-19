@@ -24,3 +24,5 @@ metadata:
 parser, and for data-shaped config RUN it (`CollectorProcessor <pipeline.toon>` with
 `--enable-native-access=ALL-UNNAMED -Dassist.safety.roots=<repo>`), then `DESCRIBE` the parquet output.
 Grammar components are templates you copy, never live bindings.
+
+Long form, with the original incidents (from the retired `PROJECT_NOTES.md`, 2026-11-19): [spec-config-gotchas.md](../../docs/okf/product/module/config/spec-config-gotchas.md).

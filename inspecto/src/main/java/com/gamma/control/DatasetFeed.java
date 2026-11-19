@@ -119,12 +119,12 @@ final class DatasetFeed {
         out.put("files", files);
         out.put("truncated", waiting.size() > LISTED);
         out.put("automatic", EditionFeatures.present(OnboardImport.AUTOMATION_FEATURE));
-        out.put("feed", feedOf(cfg));
+        out.put("feed", InboxWatch.feedOf(cfg, imp.content()));   // B1: a watched inbox still says uploads
         watch(out, cfg, imp.dataRoot(), imp.id(), imp.content());   // BASIC-ONBOARD-1 P2
         // the toggle is offered: not a Reference (it is replaced, a watched inbox adds rows), no schedule runs the Pipeline
-        // a Postgres snapshot is never polled (manual only, operator 2026-11-05)
+        // but the watch's own (B1); a Postgres snapshot is never polled (manual only, operator 2026-11-05)
         out.put("watchable", !InboxWatch.snapshot(imp.content()) && !"reference".equals(imp.content().get("kind"))
-                && PipelineTrigger.of(cfg.triggerConfig()).scheduler() == PipelineTrigger.Scheduler.MANUAL);
+                && (PipelineTrigger.of(cfg.triggerConfig()).scheduler() == PipelineTrigger.Scheduler.MANUAL || InboxWatch.preset(cfg)));
         return out;
     }
 
@@ -133,7 +133,7 @@ final class DatasetFeed {
      * the inbox path, which {@code GET /datasets/{id}/feed} shows under {@code canUploadData}.
      */
     static Map<String, Object> summary(PipelineConfig cfg, Path dataRoot, String id, Map<String, Object> content) {
-        Map<String, Object> f = new LinkedHashMap<>(feedOf(cfg));
+        Map<String, Object> f = new LinkedHashMap<>(InboxWatch.feedOf(cfg, content));
         watch(f, cfg, dataRoot, id, content);
         try {
             Path inbox = OnboardImport.inbox(dataRoot, id).toAbsolutePath().normalize();
@@ -249,7 +249,7 @@ final class DatasetFeed {
         trigger.put("type", "schedule");
         trigger.put("every", every);
         final String conn = connection, kindOf = connector;
-        rewrite(api, imp, "Keep this up to date rewrites the import's Pipeline", collector -> {
+        rewrite(api, imp, "Keep this up to date rewrites the import's Pipeline", null, collector -> {
             collector.put("discovery", "poll");
             collector.put("connector", kindOf);
             if (conn != null) collector.put("connection", conn);
@@ -269,7 +269,8 @@ final class DatasetFeed {
 
     static Object stop(ApiContext api, HttpExchange ex, String id) throws IOException {
         Import imp = gate(api, ex, id, "Stop the feed");
-        rewrite(api, imp, "stopping the feed rewrites the import's Pipeline", collector -> {
+        // B1: a watched inbox is a feed too: stopping it turns the watch off (watchInbox goes with the schedule)
+        rewrite(api, imp, "stopping the feed rewrites the import's Pipeline", () -> InboxWatch.keep(api, imp, id, false), collector -> {
             // the feed's own keys go; anything set in the guided editor (post_action, include, ...) stays
             collector.remove("connection");
             collector.remove("stability");
@@ -279,6 +280,7 @@ final class DatasetFeed {
             collector.put("accepts_upload", true);
             return Map.of("type", "manual");
         });
+        InboxWatch.ran(imp.dataRoot(), id, null);
         return describe(ex, imp);
     }
 
@@ -290,14 +292,14 @@ final class DatasetFeed {
      * is put back when the new one does not load.
      */
     @SuppressWarnings("unchecked")
-    private static void rewrite(ApiContext api, Import imp, String why,
+    private static void rewrite(ApiContext api, Import imp, String why, AfterWrite after,
                                 java.util.function.Function<Map<String, Object>, Map<String, Object>> edit) throws IOException {
         rewritePipeline(api, imp, why, p -> {
             Map<String, Object> collector = p.get("collector") instanceof Map<?, ?> c
                     ? new LinkedHashMap<>((Map<String, Object>) c) : new LinkedHashMap<>();
             p.put("trigger", edit.apply(collector));
             p.put("collector", collector);
-        }, null);
+        }, after);
     }
 
     /** A step run inside {@link #rewritePipeline}'s claim once the new Pipeline loads; a failure puts the old one back. */

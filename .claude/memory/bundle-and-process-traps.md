@@ -26,3 +26,5 @@ metadata:
   agent's completion notification and the log's mtime.
 
 Related: [[preview-la-demo]], [[ui-test-traps]].
+
+Long form, with the original incidents (from the retired `PROJECT_NOTES.md`, 2026-11-19): [architecture-backend-gotchas.md](../../docs/okf/product/layer/platform/architecture-backend-gotchas.md).

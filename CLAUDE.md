@@ -92,8 +92,8 @@ change that adds or retires a doc:
    `architecture-<hub>.md`) or `<slot>-<topic>.md` (`DOCS-HUB-NAMES-1`, 2026-11-18). Never a bare `<slot>.md`
    except the generated `feature-db.md`; `tools/check-product-docs.mjs` refuses one. Platform-wide backend docs → `layer/platform`; UI-wide and whole-product sales docs →
    `layer/product`. A hub's `index.md` is generated (`node tools/render-product-docs.mjs`) — never
-   hand-edit it. Plus the small root canon (GLOSSARY, INDEX, REQUIREMENTS, BACKLOG, USER_GUIDE,
-   PROJECT_NOTES, BRANCHING, EDITIONS, FEATURE_INVENTORY, ADVANCED_GUIDE), the HTTP contract
+   hand-edit it. Plus the small root canon (GLOSSARY, INDEX, BACKLOG, USER_GUIDE, BRANCHING, EDITIONS,
+   ADVANCED_GUIDE), the HTTP contract
    `docs/api/` and root `compliance/`. ⛔ Never create another docs tree or a doc outside a hub.
 2. **Active plans → `docs/superpower/`** — a plan lives here ONLY while its work is in flight.
    **When the work ships: distill the durable as-built facts (decisions, seams, gotchas, deliberate

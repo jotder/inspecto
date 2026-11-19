@@ -10,7 +10,8 @@ timestamp: 2026-11-15T00:00:00Z
 # Link Analysis — HTTP surface and Investigation UI
 
 Section numbers are those of [architecture-la-core.md](architecture-la-core.md), which keeps the route table (§6). Sections
-§6.10-§6.13 and §6.15-§6.20 are in [architecture-data-onboarding.md](architecture-data-onboarding.md).
+§6.10-§6.13 and §6.15-§6.19 are in [architecture-data-onboarding.md](architecture-data-onboarding.md), §6.20 in
+[architecture-watch-this-folder.md](architecture-watch-this-folder.md).
 
 - **HTTP surface:** [§6.1 Gate order](#61-gate-order-for-an-inv-request) · §6.2 Embed links · §6.3 Entity profile
   routes · §6.4 Third-party integration (inbound) · §6.5 Third-party integration (outbound) · §6.6 Analyst CSV upload ·
