@@ -42,12 +42,12 @@ and credentials once and reuse them in many Collectors. When a password changes,
 
 ## What you do with them in the console
 
-- **Connections** (in **Platform → Workbench**): create one from a form, with optional SSH tunnel and proxy
+- **Connections** (in **Settings → Connections**): create one from a form, with optional SSH tunnel and proxy
   sections. Use **Test** to check it can connect, and the probe and sample actions to see which paths or tables it
   can reach. Secrets are stored as references, never shown in clear.
 - **Collectors** (in **Platform → Workbench**): create one on a Connection, set its paths or query, schedule and
   file patterns, and use **Run now** to collect once.
-- **Catalog → Streams** and **References** describe where data comes from: a Stream for events and facts, a
+- The **Streams** and **References** tabs of **Catalog → Data Catalog** describe where data comes from: a Stream for events and facts, a
   Reference for lookup data. *Onboard Stream* opens the Pipeline editor in a guided mode — Collect, Parse, Schema,
   an optional Enrich, then Publish — so you can set up collection and parsing in one place.
 

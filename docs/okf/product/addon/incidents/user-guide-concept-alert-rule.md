@@ -8,7 +8,7 @@ audience: external
 
 # Alert Rule, Expectation and Decision Rule
 
-Inspecto has three kinds of rule, and each answers a different question. They are always named in full, because the
+Three kinds of rule work on your data, and each answers a different question. They are always named in full, because the
 word "rule" alone would not say which one you mean.
 
 | | Asks | Looks at | When it is not met |

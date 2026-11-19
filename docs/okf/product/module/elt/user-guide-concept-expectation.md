@@ -17,12 +17,12 @@ records broke it.
 
 The kinds of check include:
 
-- **not null** — a column always has a value;
-- **range** — a number lies between two limits;
-- **pattern** — a value matches a format, such as a phone number or an account code;
-- **referential** — a value exists in another Dataset, for example every order's customer is a known customer;
-- **condition** — any combination of conditions you write;
-- **baseline** — this delivery looks like the deliveries you accepted before.
+- **Non-null** — a column always has a value;
+- **Range** — a number lies between two limits;
+- **Regex** — a value matches a pattern, such as a phone number or an account code;
+- **Referential** — a value exists in another Dataset, for example every order's customer is a known customer;
+- **Condition** — any combination of conditions you write;
+- **Baseline** — this delivery looks like the deliveries you accepted before.
 
 ## Why it exists
 

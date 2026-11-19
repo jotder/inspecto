@@ -22,10 +22,9 @@ one industry; others work in any industry.
 
 An App brings together:
 
-- its **content** — one or more [Space Templates](../../module/config/user-guide-concept-space-template.md) with the
-  Pipelines, Datasets, checks and Dashboards the job needs;
+- its **content**, where it has any — [Space Templates](../../module/config/user-guide-concept-space-template.md)
+  with the Pipelines, Datasets, checks and Dashboards the job needs;
 - its own **landing page and menus**, so people see the App's screens, not a general toolbox;
-- its **personas**, mapped to [Roles](../../module/access/user-guide-concept-roles-access-policies.md);
 - the **[Add-ons](user-guide-concept-edition-addon.md)** it needs to run;
 - a **version**, and the range of Inspecto versions it works with.
 
@@ -43,8 +42,8 @@ answer already built for a common job. You install it, connect your data, and st
     └─ (optional) Fraud Management, Link Analysis
 ```
 
-- An App is **not a Space Template**: an App installs one or more Space Templates, and adds the menus, landing and
-  roles around them.
+- An App is **not a Space Template**: an App can install Space Templates, and adds the menus and landing page around
+  them.
 - An App is **not an Add-on**: an Add-on is a general capability (Incidents, Reconciliation, Scoring …) that any App
   or any Space can use. An App *requires* Add-ons.
 - What you buy is a **product** made of Apps: *Inspecto LA* is the Link Analysis App on its own; *Inspecto Telco*

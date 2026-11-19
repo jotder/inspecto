@@ -37,9 +37,9 @@ what.
 - Every **[Dataset](../../layer/product/user-guide-concept-dataset.md)**,
   **[Pipeline](../../module/elt/user-guide-concept-pipeline.md)** and
   **[Dashboard](../../layer/product/user-guide-concept-widget-dashboard.md)** belongs to exactly one Space.
-- **[Roles](../../module/access/user-guide-concept-roles-access-policies.md)** are defined per Space, so the same
-  person can hold different Roles in different Spaces.
-- An **[App](../../layer/product/user-guide-concept-app.md)** brings its content as one or more Space Templates.
+- What each **[Role](../../module/access/user-guide-concept-roles-access-policies.md)** may do is defined per Space,
+  so the same Role can allow different things in different Spaces.
+- An **[App](../../layer/product/user-guide-concept-app.md)** can bring its content as Space Templates.
 
 ## Who may enter a Space
 

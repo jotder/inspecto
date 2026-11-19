@@ -54,7 +54,6 @@ what Roles do, and the server enforces them.
 
 ## How they relate to their neighbours
 
-- An **[App](../../layer/product/user-guide-concept-app.md)** maps its personas to Roles.
 - Some actions need a second person's approval (four-eyes), for example sensitive changes and outbound actions. Who
   may approve is set in **Settings → Approvers**.
 - Values marked as sensitive are **masked**; revealing one needs a Role that allows it, and the reveal is recorded in

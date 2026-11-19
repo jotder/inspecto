@@ -68,10 +68,11 @@ committed, quarantined or failed.
 
 ## Which edition has it
 
-Pipelines are in every edition, and Basic runs any Pipeline you bring. In the Basic editor, the Steps that compute,
-join, enrich or summarise are locked; filtering rows and removing duplicates stay available. A Pipeline step that
-masks personal data is Advanced only, and the ASN.1 and telecom decoders come with the Telecom industry pack in
-Advanced. See [The editions on one page](../../../../EDITIONS.md).
+Pipelines are in every edition. In the Basic editor, the Steps that compute, join, enrich or summarise are locked;
+filtering rows and removing duplicates stay available, and a Pipeline you bring that already uses a locked Step still
+runs. A few Steps need a higher edition wherever they appear: the Step that masks personal data is Advanced only, the
+ASN.1 and telecom decoders come with the Telecom industry pack in Advanced, and DuckLake registration and the
+compliance archive start in Standard. See [The editions on one page](../../../../EDITIONS.md).
 
 ## Read next
 

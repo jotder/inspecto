@@ -52,7 +52,7 @@ of chart (a Type) or changing one chart on a Dashboard (a Widget). The same goes
 - **Business → KPI & Reports**: every Dashboard, with its Reports beneath it. **Schedule export** creates a Report;
   you can run it now or download its latest output.
 - A Dashboard can be shared by a public link. Its viewer is anonymous, so sensitive values on it are masked unless the
-  Space has turned masking off.
+  Space has set a masking mode of its own.
 
 ## Which edition has it
 

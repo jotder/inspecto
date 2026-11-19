@@ -33,8 +33,8 @@ invent it.
 ## How it relates to its neighbours
 
 - A Space Template creates a **[Space](user-guide-concept-space.md)**.
-- An **[App](../../layer/product/user-guide-concept-app.md)** brings its content as one or more Space Templates, plus
-  its own menus, landing page and roles.
+- An **[App](../../layer/product/user-guide-concept-app.md)** can bring its content as Space Templates, plus its own
+  menus and landing page.
 - **Export and import** move what you built between installations: **Settings → Import & Export** moves selected
   definitions (never data rows), and **Settings → Spaces** exports or imports a whole Space as a zip. Neither is a
   Space Template.
@@ -47,9 +47,9 @@ Then switch to it with the Space switcher and look around: its Pipelines, Datase
 ## Which edition has it
 
 Every edition can create Spaces from Space Templates; which Templates ship depends on the edition. Basic ships the
-**Orders starter** and the Link Analysis showcase Templates. Standard and Advanced add the industry Templates — for
-example **Business assurance**, **AML**, **Mobile money**, **Payment fraud starter**, **Partner settlement**,
-**Telecom fraud** and **Telecom revenue assurance** — and **Link Analysis daily feed**, which runs on a schedule.
+**Orders starter** and the Link Analysis Templates, one for each of many industries. Standard and Advanced add more
+industry Templates — for example **Business assurance**, **AML**, **Mobile money**, **Payment fraud starter**,
+**Partner settlement** and **Telecom fraud** — and **Link Analysis daily feed**, which runs on a schedule.
 See [The editions on one page](../../../../EDITIONS.md).
 
 ## Read next
