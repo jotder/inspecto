@@ -38,7 +38,8 @@ Without samples, copy `data/samples/orders/*.csv` into `data/inbox/orders` and `
    break: one order key, two order rows.
 4. **Incidents** (the Alert Rule `o2c_unmatched_value` runs with the alert evaluation). One Incident per order whose
    unmatched value is 100 or more: O-1017, O-1022, O-1041, O-1050, O-1088, O-9001. O-1064 (4.50) and O-9002 (55.00) stay
-   Breaks and raise nothing.
+   Breaks and raise nothing. The Reconciliation run itself also opens one Incident because it found Breaks, so the
+   Incidents list shows seven in all; only the six order Incidents carry a `customer_id` and join a Case.
 5. **Cases** (Jobs → `o2c_collections_case` → *Run now*). One collections Case per customer: five, and customer C-007's
    Case holds two Incidents (O-1022 and O-1041).
 6. **Dashboard** `o2c_overview`: the unmatched value in total, by status and by customer.
