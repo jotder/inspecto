@@ -70,3 +70,8 @@ almost-all-number columns (numbers only in Add data, the odd values blanked). Th
 (461 rows, one `abc` amount, one `not-a-date` booking time) now reads `amount` as **text** everywhere — one value would
 not survive a number, and its numbers carry no decimal comma, so rule 3 does not apply — and `booked_at` as
 `TIMESTAMP %Y-%m-%dT%H:%M:%S` everywhere (rule 6: 460 of 461 values fit; the odd one is left blank).
+
+## Open rows this concept owns
+
+- **`CONVERT-TYPE-DECIMAL-MARK-1`**: *Change the type* (`convert.type`) casts with a plain `TRY_CAST` and ignores the decimal mark.
+- **`GRAMMAR-NO-QUOTE-1`**: the Grammar editor's *Text quote* takes one character, so `quote: ""` (no quote) cannot be authored there.

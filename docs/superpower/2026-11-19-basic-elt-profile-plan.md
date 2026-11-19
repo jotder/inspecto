@@ -74,7 +74,7 @@ Parallel now: P0-BE, P0-UI, UI-0. Each build phase is its own lane, integrated a
 
 | Order | Phase | First slice | Blocked by |
 |---|---|---|---|
-| 1 | **BE-1a** commit-step registry (B2, B14) | `CollectorService.commitStep` → an ordered, per-run-coalesced list; compaction, follow-ons, Expectations registered; Add data calls the same function in-run | — |
+| 1 | **BE-1a** commit-step registry (B2, B14) | `CollectorService.commitStep` → an ordered, per-run-coalesced list; compaction, follow-ons, Expectations registered; Add data calls the same function in-run. **Built 2026-11-19** (`ImportCommitSteps`). **Left:** §5.2 B2's "`DatasetFeed.indexJob` and the double build go" — *Keep this up to date* still writes its own `la.index.build` Job (`DatasetFeed.indexJob`) | — |
 | 1 | **BE-3** sample profiler (B7) | extract the dialect sniff as a public engine service; `OnboardDraft` calls it, keeping its fallbacks; type unification next, with golden diff tests. **Type rulings built 2026-11-19** (`lane/basic-u3-types`): one type answer in the preview, suggest and Add data (`SampleProfiler.types`), Basic gains `TIME` (spec-parsing §P.3.6) | — |
 | 1 | **UI-1 U1-types** | Basic's column types move to `core/schema` as the named subset of `SCHEMA_TYPES` | UI-0 |
 | 2 | **BE-1b** pre-run seam, then B1 | pre-run step runs `judgeInbox` + `settleNewColumns` for scheduled import runs; then *Watch* = locked Keep preset | O1 for B1 |
@@ -190,6 +190,19 @@ Basic-profile declaration, the `postgres` exemption, telling a Basic entry point
 Basic's routes, nothing refused on load; O3 **the mapping** — rename and *Leave out* stay in the mapping; O4 **yes** — a
 Postgres snapshot keeps a saved Connection restricted to `INSPECTO_PG_` secrets. O5 not asked: ELT's wording is used
 unless the operator objects.
+
+**Ruled 2026-11-19 during the build (operator):**
+- **BE-1b:** the scheduler honours each Pipeline's own `every` (not only the Space's poll tick); the approval policy
+  over Pipelines also covers the watch switch; the arrivals sidecar and `watchError` for a quarantined file return in
+  BE-2 (B3), not in B1.
+- **BE-3 slice 2:** Add data follows the sniff; `quote: ""` (no quote) is written only when the first file holds a `"`.
+- **Type rulings:** dates in words and ISO timestamps with `T` are date / timestamp everywhere; `TIME` joins Basic's
+  column types; a decimal comma is a number under the Grammar's `decimal_separator`; a column that is almost all
+  numbers is text everywhere. That last rule is for numbers only: a column that is almost all dates stays a date.
+  The Link Analysis demo losing `amount` as its default link weight (its sample holds one `abc`) is accepted.
+- **BE-4:** one saved Connection per snapshot, `<id>_postgres`, with the table or query in its options; the upload
+  right is enough and the Connection is visible; old inline snapshots migrate at the B4 Pipeline switch.
+- **U2:** the Connection dialog's Username label and boxed Password are accepted; Routing is hidden for `postgres`.
 
 | # | Decision | Recommendation |
 |---|---|---|
