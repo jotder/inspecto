@@ -215,7 +215,7 @@ Under pressure, three screens overlap — here's which one answers which questio
 | "Is the system healthy *right now*?" | **Overview** | KPI-style tiles + trends across the whole Space, at a glance |
 | "Is anything backing up or failing?" | **Processing Status** | One row per Pipeline: committed vs. quarantined counts + last-batch outcome, side by side |
 | "What exactly happened, and when?" | **Events** | The newest-first activity stream — filter to a Pipeline/severity, turn on live-tail |
-| "Which files in *this* run succeeded/quarantined/errored?" | **Runs** (Workbench) | Drill **Run ⊇ Consignment ⊇ File** *(corrected 2026-09-09 — this said `Batch`, contradicting §the row 138 lines above it; renamed 2026-08-03)* to the individual outcome |
+| "Which files in *this* run succeeded/quarantined/errored?" | **Runs** (Workbench) | Drill **Run ⊇ Consignment ⊇ File** to the individual outcome |
 
 **Overview** — Your at-a-glance health check. It shows operational health tiles and trend
 charts: how many Pipelines are running or paused, recent Run outcomes,
@@ -238,7 +238,7 @@ full Signal (correlation id, type, severity, payload).
 
 **Audit log** — The append-only **who-did-what** trail: configuration changes, permission
 grants, exports and refused attempts (sign-ins are *not* recorded — the trail covers what you *did*, not
-that you arrived; corrected 2026-09-08). It answers accountability questions and is deliberately separate from **Events**:
+that you arrived). It answers accountability questions and is deliberately separate from **Events**:
 Events records *system activity* (Signals), Audit records *human and access actions*. Entries can't
 be edited or deleted.
 

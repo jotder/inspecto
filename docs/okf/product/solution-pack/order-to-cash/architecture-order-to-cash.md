@@ -4,6 +4,11 @@ title: "Order-to-cash assurance — architecture"
 description: "How the order-to-cash Space Template, the Handbook's worked example, wires two feeds to Expectations, a Reconciliation, Incidents, Cases and a Dashboard."
 tags: [order-to-cash, architecture, handbook]
 timestamp: 2026-11-19T00:00:00Z
+item: solution-pack.order-to-cash
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: spaces/_templates/order-to-cash
 ---
 
 # Order-to-cash assurance — architecture

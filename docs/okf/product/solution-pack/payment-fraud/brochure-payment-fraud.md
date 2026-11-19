@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Payment fraud starter — brochure
+description: Brochure for the Payment fraud starter: card testing, BIN attacks, velocity bursts and SIM-swap takeovers detected per account, with card numbers kept out of the data at ingest.
+item: solution-pack.payment-fraud
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/payment-fraud]
+---
+
 # Payment fraud starter — brochure
 
 > **Card testing, BIN attacks, velocity bursts and SIM-swap takeovers — detected per account, with card numbers kept out of your data.**

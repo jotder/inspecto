@@ -4,6 +4,11 @@ title: "Link Analysis claims showcase — features"
 description: "A seeded insurance SIU Space that finds a staged-accident ring through shared phones, addresses and providers."
 tags: [la-claims, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.la-claims
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-claims
 ---
 
 # Link Analysis claims showcase — features

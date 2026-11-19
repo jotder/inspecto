@@ -6,12 +6,16 @@ description: The requirement-of-record and as-built specification for the Assist
 status: current
 written: 2026-09-08
 supersedes-rows: REQUIREMENTS §3.13 AGT-1..AGT-6b and §3.14 EOI-1..EOI-7 (this file corrects them, see §2)
+item: module.agent
+audience: internal
+verified: 2026-11-19 last-edit
+code: features/inspecto-agent
 ---
 
 # Assistant (`AGT` + `EOI`)
 
 > **How to read this file.** §1–§2 are the *requirement of record*: where they disagree with
-> `docs/REQUIREMENTS.md` §3.13/§3.14 or `docs/EDITIONS.md`, **this file wins** and the disagreement is
+> `docs/okf/product/layer/platform/spec-requirements.md` §3.13/§3.14 or `docs/EDITIONS.md`, **this file wins** and the disagreement is
 > stated in place. §3 is the as-built specification, §4 the dated decisions, §5 what is not built,
 > §6 what was refused or superseded, §7 the pointers, §8 how it is verified.
 >
@@ -23,8 +27,7 @@ supersedes-rows: REQUIREMENTS §3.13 AGT-1..AGT-6b and §3.14 EOI-1..EOI-7 (this
 > edition of `All`, but the bundles are narrower: `inspecto/package.ps1` stages `inspecto-agent.jar` (the
 > `/assist/*` routes) on **Standard and Advanced** (`PKG-5`) and `inspecto-intelligence.jar` (the `/agent/*`
 > routes) on **Advanced only** (`ASSURE-INTELLIGENCE-BUNDLE-1`). On Basic, and for `/agent/*` on Standard,
-> the routes answer `503` by design. *(Corrected 2026-11-01, `DOCS-AGENT-WRITTEN-REVIEW-1`: this banner said
-> no bundle carried any of the code.)*
+> the routes answer `503` by design.
 
 ## 1. Purpose & scope
 
@@ -269,7 +272,7 @@ human-initiated, and a general event-triggered consequence gate is refused (§6)
   (`InspectoIntelligenceAgent`). The client consumer, `A2uiRenderComponent`, renders an `A2uiArtifact` for
   both the Assist console and Agent Chat behind a **closed client allowlist** (`text`, `kpi`, `chart`,
   `data-table`, `draft`, fail-closed). The Assist console still **synthesises** an artifact from a skill's
-  prose when the server sends none. *(Corrected 2026-11-01: this said the channel had no producer.)*
+  prose when the server sends none.
 * **S5 — the agent context fabric.** The context broker grounds an answer in real metadata rather than
   the model's memory. ⚠ **`SignalIngress` is tested but deliberately unwired**, and its severity floor
   (ERROR and above) differs from the context broker's (WARN and above) — the mismatch is the reason it
@@ -310,8 +313,7 @@ Two chat surfaces, deliberately separate, matching the two layers of §3.1:
   Library, `suggest_expectations` in the Expectation form, `kpi_report_builder` in the Dashboard
   Builder, `projection_author` in the Link-Analysis query panel. `component_draft`, the sixth tool, is
   hosted again: the Components pane's component form (`component-form.dialog`) and the schema editor
-  (`schema-editor.dialog`) both mount it. *(Corrected 2026-11-01: this said it had no host after its
-  2026-07-31 retirement from the `schema` kind.)*
+  (`schema-editor.dialog`) both mount it.
 
 **The inline explain-a-failure path** is a third component: a status dialog reached from Alerts,
 Processing status, Events and the Incident/Case detail. On Events it prefers a `correlationId`, which
@@ -333,7 +335,7 @@ Inspecto consumes a **narrow model-transport seam, not the full embed**. What ma
 | Upstream repository | **`jotder/inspect-agent`** (public), cloned by continuous integration |
 | Distribution | **none** — no package registry; the upstream is built from source into the runner's local repository on every run |
 | Java floor | the upstream targets **JDK 25**; this reactor targets **release 27** since 2026-09-17, so the upstream floor is no longer binding (it was `release 24`, which is what made it binding) |
-| The dry-run seam | `DryRunProvider` **is** present in the pinned artifact (verified in the local repository cache), which is what discharged the gate on 2026-09-08. 🔴 **But it is NOT reachable from the host** (re-verified 2026-09-16 with `javap` on the pinned `eoiagent-platform` jar): `PlatformBuilder` exposes `approvalHandler(...)` and `approvalDecisionStore(...)` and **no `dryRunProvider(...)`** — the only setter is on `CallbackApprovalGate.Builder`, which `PlatformBuilder` constructs internally. So "discharged" described the *type*, not the *seam*; consuming it needs an upstream `PlatformBuilder` change first (the ask is recorded on BACKLOG §2) |
+| The dry-run seam | `DryRunProvider` **is** present in the pinned artifact (verified in the local repository cache), which is what discharged the gate on 2026-09-08. 🔴 **But it is NOT reachable from the host** (checked 2026-09-16 with `javap` on the pinned `eoiagent-platform` jar): `PlatformBuilder` exposes `approvalHandler(...)` and `approvalDecisionStore(...)` and **no `dryRunProvider(...)`** — the only setter is on `CallbackApprovalGate.Builder`, which `PlatformBuilder` constructs internally. So "discharged" described the *type*, not the *seam*; consuming it needs an upstream `PlatformBuilder` change first (the ask is recorded on BACKLOG §2) |
 
 Two consequences worth stating plainly. First, **the build is not reproducible from published
 artifacts** — it is reproducible only from a branch head, so a change the pack needs must be pushed
@@ -348,8 +350,8 @@ exists; the row's framing predates the move.
 🔴 **This is the section that governs how every row in §2 should be read.**
 
 `inspecto-agent`, `inspecto-agent-hosted` and `inspecto-intelligence` are **unconditional reactor
-modules** — they compile and their tests run on every build. ⚠ **Corrected 2026-09-15: the two are no
-longer packaged alike, and this passage claimed they were for three days after that stopped being true.**
+modules** — they compile and their tests run on every build. `inspecto-agent` and `inspecto-intelligence`
+are **not packaged alike**:
 
 - **`inspecto-agent` ships in Standard and Advanced** since `PKG-5` (2026-09-12) — `bundleModules`
   (`tools/bundle-modules.mjs`, `from: 'standard'`) and `offerings/standard.toon` list it; `package.ps1`
@@ -357,8 +359,7 @@ longer packaged alike, and this passage claimed they were for three days after t
   service entry is missing. So `/assist/*` is live on Standard+.
 - **`inspecto-intelligence` ships in Advanced** since `ASSURE-INTELLIGENCE-BUNDLE-1` (2026-09-29) —
   `from: 'advanced'`, `offerings/advanced.toon`; `package.ps1` stages the shaded `inspecto-intelligence.jar`.
-  On Basic and Standard, `/agent/*` (`AgentRoutes`) answers **`503`**. *(Corrected 2026-11-01: this said the
-  module was bundled by nothing.)*
+  On Basic and Standard, `/agent/*` (`AgentRoutes`) answers **`503`**.
 
 Where a module is not bundled the original mechanism holds: the core fat JAR carries the two SPI
 *interfaces* (`com.gamma.assist.spi.AssistAgent`, `com.gamma.intelligence.spi.IntelligenceAgent`) and
@@ -389,7 +390,6 @@ investigation studios. The difference is that those hide; these do not.
 So the honest reading of §2 is: `AGT-1`, `AGT-2` and `AGT-4` (the assist agent) reach operators on
 **Standard+**, and `AGT-5` (the intelligence agent) on **Advanced**. The editions board states this
 (`CP-14` = `—/✅/✅`); the requirements board's `All` overstates it, because Basic carries neither.
-*(Corrected 2026-11-01: this said all five rows were unreachable and `CP-14` was `—/—/—`.)*
 
 ## 4. Decisions (dated one-liners)
 
@@ -645,3 +645,14 @@ as a distinct declared name so the maps can diverge later without a config chang
 `CPU_ONLY.models().equals(DEV_LAPTOP.models())` — is a guard that fires in the **wrong direction**: it would go
 red the day someone legitimately differentiates the maps, punishing the correct product call. `ModelSeamTest`
 already pins the real invariant (every tier mapped, all three profiles).
+
+## Changes
+
+- 2026-09-15: §3.10 packaging corrected — it said `inspecto-agent` and `inspecto-intelligence` were packaged
+  alike, three days after that stopped being true.
+- 2026-11-01: top banner corrected (`DOCS-AGENT-WRITTEN-REVIEW-1`) — it said no bundle carried any of the code.
+- 2026-11-01: S4 A2UI channel corrected — it said the channel had no producer.
+- 2026-11-01: `component_draft` hosts corrected — it said the tool had no host after its 2026-07-31
+  retirement from the `schema` kind.
+- 2026-11-01: §3.10 `inspecto-intelligence` corrected — it said the module was bundled by nothing.
+- 2026-11-01: §3.10 reading of §2 corrected — it said all five rows were unreachable and `CP-14` was `—/—/—`.

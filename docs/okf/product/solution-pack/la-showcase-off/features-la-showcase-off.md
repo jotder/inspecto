@@ -4,6 +4,11 @@ title: "Link Analysis showcase (feature off) — features"
 description: "An empty companion Space with the Link Analysis feature switched off."
 tags: [la-showcase-off, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.la-showcase-off
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-showcase-off
 ---
 
 # Link Analysis showcase (feature off) — features

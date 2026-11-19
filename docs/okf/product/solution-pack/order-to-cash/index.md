@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `USER-HANDBOOK-1` | P2 | feature | the Handbook: users learn to build, ship and manage an App from the console's Help, organised by lifecycle (Understand → Build → Ship → M… | — |
+| `USER-HANDBOOK-1` | P2 | feature | The Handbook: users learn to build, ship and manage an App from the console's Help, organised by lifecycle for three tracks. | — |

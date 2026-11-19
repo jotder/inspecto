@@ -4,6 +4,9 @@ title: "Tutorial 3 — Detect and respond: Reconciliation, Alert Rule, Incidents
 description: "Reconcile the Order-to-cash orders against their payments, read the Breaks, let an Alert Rule raise one Incident per order that matters, group them into collections Cases, and take one Case through a write-off approval."
 item: addon.incidents
 audience: external
+status: current
+verified: 2026-11-19 last-edit
+code: features/inspecto-ops
 ---
 
 # Tutorial 3 — Detect and respond

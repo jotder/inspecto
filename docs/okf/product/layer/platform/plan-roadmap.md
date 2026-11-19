@@ -1,3 +1,13 @@
+---
+type: Plan
+title: Inspecto — Forward Roadmap
+description: The forward roadmap in Now / Next / Later horizons with relative effort: strategic themes, what each horizon holds and what has shipped from it, the recommended sequence, success measures and what is explicitly not on the roadmap.
+item: layer.platform
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+---
+
 # Inspecto — Forward Roadmap
 
 **Status:** **§3 NEXT horizon, §6 sequence and vocabulary reconciled 2026-07-25** — §3.1–§3.3 have all shipped, and the banned term *Flow* is renamed to **Pipeline** per the binding [GLOSSARY](../../../../GLOSSARY.md). <!-- vocab-allow: names the Flow→Pipeline rename itself --> The **§1 theme horizons and the §2 NOW horizon had their status pass 2026-11-15** (`ARCH-DOC-CONTRADICTIONS-1`; see §9). · **Companion:** [../product/brochure-stakeholder-overview.md](../product/brochure-stakeholder-overview.md) · **Engineering detail:** [../../module/elt/architecture-elt.md](../../module/elt/architecture-elt.md)
@@ -27,7 +37,7 @@ These are built and integrated on the development line; the work remaining is ve
 | N1 | **Pipeline-graph platform** — authoring, validation, execution as first-class jobs, multi-source merge, incremental Pipelines, materialized views, visual editor | L | Built & tested; the live seeded end-to-end run is **RESOLVED 2026-07-07** (`REQUIREMENTS.md` §R1, `examples/06-serve/pipeline-job`) | A representative `type: pipeline` job runs end-to-end against seeded data; visual editor verified live; design doc §14 closed |
 | N2 | **Data-plane provenance** — per-edge counts, conservation invariant → managed alerts, Sankey overlay | M | Built & tested (off by default); the live-feed soak is still owed (`BACKLOG.md` §2 **OPS-5**) | Provenance verified against a real Pipeline-job run (not just synthetic injection); overlay confirmed against recorded data |
 | N3 | **`sink.view` consumer** — REST query of a Pipeline's logical views | S | Shipped in mainline | Done — `/views`, `/views/{name}`, `/views/{name}/data` live with tests |
-| N4 | **Edition realignment** — auth-free common core | M | 🟡 **Built and GATED — corrected 2026-09-09.** "uncommitted/ungated" is stale: `EDG-01` decided the model and all seven cells landed by 2026-09-08, and `edition-standard` / `edition-advanced` are real Maven profiles. | ⚠ **Only the RELEASE half of the original trigger is still open**, and that is true of the whole product — the newest master-ancestor tag is `v3.11.0`, so nothing after 3.x has ever shipped. ⛔ Do not read this row as "the three-edition model is unproven": it is built, gated and tested; it is unreleased. |
+| N4 | **Edition realignment** — auth-free common core | M | 🟡 **Built and GATED.** `EDG-01` decided the model and all seven cells landed by 2026-09-08, and `edition-standard` / `edition-advanced` are real Maven profiles. | ⚠ **Only the RELEASE half of the original trigger is still open**, and that is true of the whole product — the newest master-ancestor tag is `v3.11.0`, so nothing after 3.x has ever shipped. ⛔ Do not read this row as "the three-edition model is unproven": it is built, gated and tested; it is unreleased. |
 
 **Now-horizon focus:** the N2 live-feed soak (N1's live run is done), then the release call on N4.
 
@@ -73,7 +83,7 @@ The single most important item for commercialization.
 > plain JDK crypto, so no cloud SDK jar enters the build and it stays air-gappable. The etag/version
 > follow-on landed with them (listing ETag → `RemoteFile.etag`, GCS `generation` → `RemoteFile.version`,
 > consumed by `source.duplicate.mode: etag`, ACQ-7).
-> **Not delivered, and not pending — REFUSED by decision** (framing corrected 2026-09-09, step 6): the **NFS/SMB-CIFS** half of this item — there is no share connector; mounted shares
+> **Not delivered, and not pending — REFUSED by decision**: the **NFS/SMB-CIFS** half of this item — there is no share connector; mounted shares
 > are read through the local input path. As-built:
 > [`../../module/connectors/spec-connectors.md`](../../module/connectors/spec-connectors.md).
 
@@ -110,9 +120,9 @@ The single most important item for commercialization.
 | ID | Item | Effort | Trigger |
 |---|---|---|---|
 | L1 | **Advanced distributed tier** — shared-state backends (Postgres status store, object-store events, shared secrets), distributed scheduler coordination, work distribution, per-tenant ABAC | XL | A deployment whose scale or multi-tenancy actually exceeds the single-node design |
-| L2 | **Richer "AI behind every screen" UX** — inline natural-language authoring across the console | M | ✅ **SHIPPED as AGT-6a — A1–A5, 2026-07-26/28** (plan archived 2026-09-09: [`../../../../archived-documents/plans-archive/agt-6-plan.md`](../../../../archived-documents/plans-archive/agt-6-plan.md) §3). 🔴 Corrected 2026-09-09 — this row still read "Promoted, MoSCoW `Should`" with no mention that it had shipped. The residue is breadth (12 panes measured; none adopted since 2026-07-26), not capability** — no longer demand-gated: it reuses the shipped L1 draft tools (no new backend capability) and local models suffice, so GPU availability is not a gate. Still listed here pending a horizon refresh of this table. |
+| L2 | **Richer "AI behind every screen" UX** — inline natural-language authoring across the console | M | ✅ **SHIPPED as AGT-6a — A1–A5, 2026-07-26/28** (plan archived 2026-09-09: [`../../../../archived-documents/plans-archive/agt-6-plan.md`](../../../../archived-documents/plans-archive/agt-6-plan.md) §3). The residue is breadth (12 panes measured; none adopted since 2026-07-26), not capability** — no longer demand-gated: it reuses the shipped L1 draft tools (no new backend capability) and local models suffice, so GPU availability is not a gate. Still listed here pending a horizon refresh of this table. |
 | L3 | **Multi-step agent graphs** — provision → watch → roll back orchestration | L | **= AGT-6b**, scoped in [`../../../../archived-documents/plans-archive/agt-6-plan.md`](../../../../archived-documents/plans-archive/agt-6-plan.md) §4. Demand beyond the three code-defined seeded runbooks — **plus** one upstream prerequisite: the eoiagent per-tool `DryRunProvider` seam, without which a model-composed plan cannot be previewed per step. |
-| ~~L4~~ | ✅ **Push/event-notification discovery — SHIPPED 2026-07-08 as `ACQ-6`, not Later.** `POST /collectors/{id}/notify` triggers an immediate scan, and `collector.discovery: watch` adds WatchService push for local or mounted inboxes with the poll loop kept as a backstop. 🔴 Corrected 2026-09-09 (docs-consolidation step 6): this row's stated trigger — "a source that emits change notifications" — had already been met and the work delivered fourteen months of roadmap-time earlier than this table claims. | — | — |
+| ~~L4~~ | ✅ **Push/event-notification discovery — SHIPPED 2026-07-08 as `ACQ-6`, not Later.** `POST /collectors/{id}/notify` triggers an immediate scan, and `collector.discovery: watch` adds WatchService push for local or mounted inboxes with the poll loop kept as a backstop. | — | — |
 | L5 | **Cross-unit parallelism / Stage-2 streaming** — finer-grained parallelism within a run | M | A workload bottlenecked on per-unit sequencing |
 
 | L6 | **Inspecto as the warehouse feeder** — outbound export job (`EXPORT-1`), Iceberg/Delta sink via DuckDB's writers, `JdbcSink`, outbound connector SPI; the target matrix and build order are in [`../../module/connectors/plan-warehouse-targets.md`](../../module/connectors/plan-warehouse-targets.md) | S → M per step | A customer whose warehouse is the system of record and who needs the quality gate before the load (2026-09-15) |
@@ -150,7 +160,7 @@ N4 Edition realignment          [NFS/SMB-CIFS REFUSED, not open]         complet
 1. **Security first (3.1)** ✓ — it was the gating item for commercial deployment. Nothing else converted to revenue until a buyer could deploy securely. It was also self-contained (a new module behind an SPI), so it did not block other tracks.
 2. **Object storage second (3.2)** ✓ — the highest-demand ingestion gap, lowest technical risk (proven SPI + native engine support), compounding the value of the acquisition framework already shipped.
 3. **Parsing breadth third (3.3)** ✓ — widened the addressable feed set; modest effort; backward-compatible by construction.
-4. **Authoring polish fourth (3.4–3.5)** — compounds the value of everything beneath it and is the visible face of self-service, but depends on the platform underneath being solid first. ⚠ **Not "the front of the queue"** (corrected 2026-09-10): the board's §0 order is release notes for the next MAJOR, then the Step Processor catalog partials by name; every authoring row is **P2**, and the run endpoint and the temp-directory jail have shipped. What remains of 3.4–3.5 is `AUTHORING-REDESIGN-1`'s open letters (`STREAM-CONSUMER-1` closed 2026-09-24).
+4. **Authoring polish fourth (3.4–3.5)** — compounds the value of everything beneath it and is the visible face of self-service, but depends on the platform underneath being solid first. ⚠ **Not "the front of the queue"**: the board's §0 order is release notes for the next MAJOR, then the Step Processor catalog partials by name; every authoring row is **P2**, and the run endpoint and the temp-directory jail have shipped. What remains of 3.4–3.5 is `AUTHORING-REDESIGN-1`'s open letters (`STREAM-CONSUMER-1` closed 2026-09-24).
 5. **Distributed tier is demand-gated (L1)** — pulled forward only when a real workload requires it, never speculatively, to protect the lean single-node ethos.
 
 ---
@@ -186,7 +196,7 @@ restated, because each needs a status call rather than a doc edit:
 - ✅ **§2 NOW horizon** — *done 2026-11-15*: N1 and N2 now carry the states below (N4 was corrected
   2026-09-09). They had read as of 2026-06-19:
   N1's live end-to-end verification is recorded as **RESOLVED 2026-07-07** in
-  [`../../../../REQUIREMENTS.md`](../../../../REQUIREMENTS.md) §R1 (seeded `type: pipeline` run,
+  [`spec-requirements.md`](spec-requirements.md) §R1 (seeded `type: pipeline` run,
   `examples/06-serve/pipeline-job`), and N4's edition model shipped as real Maven build flavors
   (`-Pedition-standard` / `-Pedition-advanced`). N2 provenance is genuinely still open — it needs a live
   feed (**OPS-5** in [`../../../../BACKLOG.md`](../../../../BACKLOG.md) §2).
@@ -205,3 +215,11 @@ restated, because each needs a status call rather than a doc edit:
 ---
 
 *For the business framing of these items see [../product/brochure-stakeholder-overview.md](../product/brochure-stakeholder-overview.md) §10. For engineering-level task detail see [../../module/elt/architecture-elt.md](../../module/elt/architecture-elt.md) §14.*
+
+## Changes
+
+- 2026-09-09: N4 corrected — it read "uncommitted/ungated". L2 corrected — it still read "Promoted, MoSCoW `Should`"
+  with no mention that it had shipped. L4 corrected — its stated trigger ("a source that emits change notifications")
+  had already been met, the work delivered fourteen months of roadmap-time earlier than the table claimed. The
+  NFS/SMB-CIFS framing of the refused half corrected (docs-consolidation step 6).
+- 2026-09-10: item 4 of the order corrected — it called authoring polish "the front of the queue".

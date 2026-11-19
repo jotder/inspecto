@@ -5,6 +5,10 @@ description: Every module of the Link Analysis layer, how each plugs into the ho
 resource: la/
 tags: [layer, la, link-analysis, architecture]
 timestamp: 2026-10-19T00:00:00Z
+item: layer.la
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
 ---
 
 # Link Analysis modules - layer architecture

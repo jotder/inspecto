@@ -5,6 +5,11 @@ description: "The spoken script of the training episodes in group G (Geo and ent
 resource: tools/render-la-demo-video.mjs
 tags: [module, la-core, link-analysis, user-guide, training, video]
 timestamp: 2026-11-16T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA training videos — G · Geo and entity pages (Standard)

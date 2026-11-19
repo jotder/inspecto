@@ -4,6 +4,11 @@ title: "Analytics Kernel — admin guide"
 description: "Operating the Analytics Kernel: no install step, the entity-cap flags that bound score runs, the function catalogue route, the CI duplication guard and common failures."
 tags: [analytics, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.analytics
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-analytics
 ---
 
 # Analytics Kernel — admin guide
@@ -40,4 +45,4 @@ sample, past them (D-AN24 in the [plan](../../../../archived-documents/plans-arc
 |---|---|
 | Score run fails with an entity-cap refusal | Population larger than the cap; raise the flag or the model's `maxEntities`, or narrow the input. |
 | Isolation-forest model refused by preview (422) | By design: scored by the `anomaly.score` Job only (D-AN28). |
-| A kernel missing from the catalogue | Not registered as a provider: it needs an `AnalyticsFunctionProvider` and a line in the service file ([spec § Function catalogue](spec-analytics.md#function-catalogue)). |
+| A kernel missing from the catalogue | Not registered as a provider: it needs an `AnalyticsFunctionProvider` and a line in the service file ([spec § Function catalogue](spec-analytics-module-functions.md#function-catalogue)). |

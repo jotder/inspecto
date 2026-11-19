@@ -1,10 +1,20 @@
+---
+type: Reference
+title: Inspecto — Product Capabilities
+description: Product capability map for product owners and analysts: the three Lenses, every capability with its status (2026-09-23) and edition (2026-11-19), what is deliberately out of scope and the remaining release-gating MUST list.
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+---
+
 # Inspecto — Product Capabilities
 
-> Audience: product owners & business analysts · Status date: **2026-09-23** (was 2026-07-07); **edition placements
+> Audience: product owners & business analysts · Status date: **2026-09-23**; **edition placements
 > re-derived 2026-11-19** from [`EDITIONS.md`](../../../../EDITIONS.md) and `offerings/*.toon` — the Personal /
 > Professional / Enterprise ladder became Basic / Standard / Advanced on 2026-10-17 (`LA-EDITIONS-1`), and modules
 > moved between rungs, not only names
-> Requirement of record: the capability specs indexed by [`../../../../REQUIREMENTS.md`](../../../../REQUIREMENTS.md) §3 ·
+> Requirement of record: the capability specs indexed by [`spec-requirements.md`](../platform/spec-requirements.md) §3 ·
 > edition per capability: [`spec-editions.md`](../platform/spec-editions.md) · forward plan:
 > [`../platform/plan-roadmap.md`](../platform/plan-roadmap.md).
 
@@ -23,12 +33,11 @@ never a permission — server-enforced **Roles** arrive with the Standard editio
 **Orders starter** (a retail-orders feed with Pipeline, Expectation, Dataset and dashboard) and 18 Link Analysis
 showcase templates; Standard adds the domain templates — `telco-ra`, `telco-fraud`, `telco-bypass`,
 `telco-rerating`, `partner-settlement`, `business-assurance`, `mobile-money`, `aml`, `payment-fraud` — and
-`la-daily-feed` (`offerings/basic.toon`, `offerings/standard.toon`). *(Corrected 2026-11-19: this said the vertical
-blueprints were a roadmap item; they ship as these Space Templates.)*
+`la-daily-feed` (`offerings/basic.toon`, `offerings/standard.toon`).
 
 ## Capability map (status as of 2026-09-23; edition column 2026-11-19)
 
-Each status traces to its capability spec's §2 (via [`../../../../REQUIREMENTS.md`](../../../../REQUIREMENTS.md) §3); the
+Each status traces to its capability spec's §2 (via [`spec-requirements.md`](../platform/spec-requirements.md) §3); the
 edition column is the lowest edition that bundles it, per [`spec-editions.md`](../platform/spec-editions.md) and
 [`EDITIONS.md`](../../../../EDITIONS.md). Where a status sentence names an edition, it was re-checked 2026-11-19.
 
@@ -41,7 +50,7 @@ edition column is the lowest edition that bundles it, per [`spec-editions.md`](.
 | **Visualize** | Studio: Datasets → Widgets → Dashboards (quick filters, drill-through, PNG export); KPI & Reports gallery | ✅ Shipped. Scheduled report delivery renders json/csv/png/pdf; its e-mail carries the artifact **path**, not an attachment (`BI-4`) | Basic (report e-mail: Standard) |
 | **Investigate — where** | **Geo Map Analysis**: fully-offline map, heatmaps, routes, time playback, co-location/stay-point intelligence, saved Geo Views | ✅ Shipped, UI **and** server projection (`POST /geo/projection`, `/geo/routes`) | Standard |
 | **Investigate — who** | **Link Analysis**: entity/link graphs over Datasets, communities, pattern matching, saved Views | ✅ Shipped (`INV-1`); the Investigation layer (op log, multi-hop traversal, Working Set, dossier with chain of custody) landed 2026-09-23, parts of it backend-only. Evidential controls (`LA-19`: annotation, coverage indicator, purpose, masking, four-eyes) built 2026-09-24 | Basic, at the Explorer level (Investigations, Dossiers and the evidential controls: the Investigations add-on, Standard) |
-| **Operate** | Runs, Signal ledger (events), Prometheus metrics, three-layer audit, run reporting | ✅ Shipped. Runs, run reporting and the audit read/export are in every edition; `/metrics` and the events feed are Standard and up. The audit is append-only, hash-chained with signed anchors (`AuditAnchors`, `/audit/verify`), and kept on disk in every edition *(corrected 2026-11-19: this said not tamper-evident, and in memory on the free edition)* | Basic (metrics, events feed: Standard) |
+| **Operate** | Runs, Signal ledger (events), Prometheus metrics, three-layer audit, run reporting | ✅ Shipped. Runs, run reporting and the audit read/export are in every edition; `/metrics` and the events feed are Standard and up. The audit is append-only, hash-chained with signed anchors (`AuditAnchors`, `/audit/verify`), and kept on disk in every edition | Basic (metrics, events feed: Standard) |
 | **Respond** | Alert Rules → Alerts → **Incidents** → Cases, SLA, comments, AI Diagnosis | 🟡 Alert Rules are kept on Basic but not armed; Incidents → Cases need `inspecto-ops`. Windowed Alert Rules evaluated on each commit of a stream Pipeline ship in the Real-time Detection add-on (2026-11-12). SMTP + webhook delivery channels ship, but `INC-3` stays partial (one global preference set). AI Diagnosis drafts; it never raises an Incident | Standard (an Alert Rule saved on Basic is kept, not armed) |
 | **Reconcile** | Dataset-vs-Dataset Reconciliation producing **Breaks** with auto-close lifecycle | ✅ Shipped. Reconciliation is stateless: Break auto-close is a merge rule in the browser, with no server-side Break store | Standard (out of the free edition since 2026-10-07, `MODULE-REORG-1` P7) |
 | **Data quality** | **Expectation** engine (checks validating records against Schemas) | ✅ Shipped — engine + builder UI (`ING-6`, closed 2026-07-07), six check kinds (`baseline` added 2026-09-24), run over at-rest Parquet and in an import's own run. A breach raises a deduplicated Incident on Standard and up; on Basic it is recorded as an event only | Basic (Incident: Standard) |
@@ -97,7 +106,6 @@ no auth code in the free core.
 
 ## The remaining MUST list (release-gating)
 
-*(Refreshed 2026-09-23 — the 2026-07-07 list named seven items; five have closed.)*
 
 **Closed:** object-storage connectors (`ACQ-4`, 2026-07-22 — S3/MinIO, GCS, Azure Blob; network shares refused) ·
 JSON + text/regex parsing (`ING-5`, 2026-07-07) · Expectation engine (`ING-6`, 2026-07-07) · the paid edition's
@@ -113,4 +121,10 @@ security, then Professional, now Standard (`SEC-7`, 2026-07-08) · the live end-
   from upstream (`EOI-7` half a). Publishing its artifacts (half b) is no longer a gate: it became a standing
   refusal on 2026-09-15.
 
-(Detail and sequencing: [`../../../../REQUIREMENTS.md`](../../../../REQUIREMENTS.md) §5–6 and the capability specs it indexes.)
+(Detail and sequencing: [`spec-requirements.md`](../platform/spec-requirements.md) §5–6 and the capability specs it indexes.)
+
+## Changes
+
+- 2026-09-23: status date moved from 2026-07-07; of the seven open items the 2026-07-07 list named, five had closed.
+- 2026-11-19: the vertical blueprints corrected — they were listed as a roadmap item; they ship as Space Templates. The
+  audit corrected — it was described as not tamper-evident, and in memory on the free edition.

@@ -4,6 +4,11 @@ title: "Mobile money — admin guide"
 description: "Install, enable and verify the Mobile money pack."
 tags: [mobile-money, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.mobile-money
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/mobile-money
 ---
 
 # Mobile money — admin guide

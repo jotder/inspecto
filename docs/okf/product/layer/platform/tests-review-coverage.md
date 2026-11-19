@@ -5,6 +5,10 @@ description: Which Java surfaces have been read line-by-line, when, and the defe
 resource: pom.xml
 tags: [review, coverage, defect-classes, control-plane, engine]
 timestamp: 2026-08-18T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
 ---
 
 # Java Review Coverage (as-built)

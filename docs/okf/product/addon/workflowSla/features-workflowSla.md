@@ -4,6 +4,11 @@ title: "Workflow & SLA — features"
 description: "Workflow & SLA adds lifecycles, SLA policies and escalation to operational objects."
 tags: [workflowSla, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: addon.workflowSla
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-ops
 ---
 
 # Workflow & SLA — features

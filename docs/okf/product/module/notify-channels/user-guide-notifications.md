@@ -4,6 +4,11 @@ title: "Notifications — screens"
 description: "Where Notifications lives in the UI and what each screen does."
 tags: [notify-channels, notifications, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.notify-channels
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-notify-channels
 ---
 
 # Notifications — screens

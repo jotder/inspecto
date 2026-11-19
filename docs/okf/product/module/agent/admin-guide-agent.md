@@ -5,6 +5,11 @@ description: "Enabling the agent module, its permissions, model settings, -D fla
 resource: features/inspecto-agent/
 tags: [agent, assist, admin-guide, model-settings]
 timestamp: 2026-10-19T00:00:00Z
+item: module.agent
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-agent
 ---
 
 # Assistant agent — admin guide

@@ -4,6 +4,11 @@ title: "Graph algorithms — spec"
 description: "Developer reference for platform/inspecto-graph: package, types, entry points, run control and test idioms."
 tags: [graph, spec]
 timestamp: 2026-10-19T00:00:00Z
+item: module.graph
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-graph
 ---
 
 # Graph algorithms — spec

@@ -15,7 +15,7 @@ tags: [product-item, addon]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Alerts & Incidents (INC)](plan-incidents.md) |
+| plan | current | [Alerts & Incidents (INC) — Notifications, decisions and not built](plan-incidents-notifications-decisions.md) · [Alerts & Incidents (INC) — Specification — Incidents as operational objects](plan-incidents-operational-objects.md) · [Alerts & Incidents (INC) — Refused, as-built pointers and verification](plan-incidents-refused-verification.md) · [Alerts & Incidents (INC) — Purpose, scope and requirements of record](plan-incidents-scope.md) · [Alerts & Incidents (INC) — Specification](plan-incidents-specification.md) · [Alerts & Incidents (INC)](plan-incidents.md) |
 | spec | n/a | an Add-on licenses modules — see the hubs of the modules it holds |
 | architecture | current | [Incidents and Alerts](architecture-incidents.md) |
 | features | current | [Alerts — features](features-alerts.md) · [Incidents — features](features-incidents.md) |
@@ -34,7 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `a
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LEGAL-HOLD-SCOPE-1` | P3 | feature | a legal hold does not reach a Pipeline's data partitions, and has no screen (narrowed 2026-11-17; filed 2026-11-15 from ARCH-MOSCOW-UNTRA… | — |
+| `LEGAL-HOLD-SCOPE-1` | P3 | feature | A legal hold does not yet protect a Pipeline's data partitions, and holds have no screen. | — |
 | `ALERTS-PAGE-WORDS-1` | P3 | defect | the Alert text the server writes still uses stored ids | — |
-| `MODULE-REORG-P7-INCIDENTS` | P3 | chore | Incidents / Case Management split — one item left (everything else shipped 2026-10-06..09; item 2 declined 2026-10-11). | — |
+| `MODULE-REORG-P7-INCIDENTS` | P3 | chore | Delete AlertMigration (and LegacyAlertObjects) in 5.0.0; 4.0.0 ships the migration. | — |
 | `DOCS-SKILLS-ALERTS-AGENTIC-1` | P3 | feature | hub-routed agent skills exist for docs lookup, pipeline authoring, incident investigation and case analysis (.claude/skills/) | demand |

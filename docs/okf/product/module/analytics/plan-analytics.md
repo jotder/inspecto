@@ -4,6 +4,11 @@ title: "Analytics Kernel — plan"
 description: "Requirement of record for the Analytics Kernel: what was required, what is built, what is left and what was refused, from BACKLOG row ANALYTICS-CORE-1 and its plan."
 tags: [analytics, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.analytics
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: platform/inspecto-analytics
 ---
 
 # Analytics Kernel — plan
@@ -45,7 +50,7 @@ ratcheting duplication guard (Must items M1–M10).
   failed to compact or silently dropped the newer columns (`PartitionCompactorSchemaDriftTest`).
 - **Steps for C6 and C9 (2026-11-01, `ANALYTICS-STEPS-TS-1`):** `transform.timeseries.changepoint`,
   `transform.cohort.retention`, `transform.cohort.funnel` (`steps:` kinds `changepoint`, `retention`, `funnel`) —
-  [spec § Change-point and cohort Steps](spec-analytics.md#change-point-and-cohort-steps).
+  [spec § Change-point and cohort Steps](spec-analytics-cohorts-forecasting.md#change-point-and-cohort-steps).
 
 ## Left
 

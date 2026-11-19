@@ -4,6 +4,11 @@ title: "Orders starter — architecture"
 description: "How the Orders starter template wires a feed to a dashboard."
 tags: [orders-starter, architecture]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.orders-starter
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/orders-starter
 ---
 
 # Orders starter — architecture

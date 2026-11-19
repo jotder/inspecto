@@ -5,6 +5,11 @@ description: The inspecto-agent-hosted module — external LLM ModelProviders, p
 resource: providers/inspecto-agent-hosted/
 tags: [agent, hosted, llm, providers, air-gapped]
 timestamp: 2026-06-28T00:00:00Z
+item: module.agent-hosted
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-agent-hosted
 ---
 
 # Hosted Model Providers

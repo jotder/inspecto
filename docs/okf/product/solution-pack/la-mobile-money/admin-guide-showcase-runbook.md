@@ -1,3 +1,14 @@
+---
+type: Guide
+title: Inspecto LA (Link Analysis) showcase A: mobile money (runbook, synthetic data)
+description: Presenter runbook for the la-mobile-money Link Analysis showcase: pre-flight, personas, the seven planted stories, a 12-minute version, scenes, decisions and findings, reset and the 2026-10-24 browser rehearsal.
+item: solution-pack.la-mobile-money
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-mobile-money]
+---
+
 # Inspecto LA (Link Analysis) showcase A: mobile money (runbook, synthetic data)
 
 *Status: written 2026-10-16 from the code, the seed script, the smoke runner and a live pass (a fresh Space from the template on a demo-auth bundle, seed `--apply` clean, smoke 10/10).

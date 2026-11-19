@@ -1,3 +1,13 @@
+---
+type: Guide
+title: Inspecto — Testing Guide
+description: Testing guide for QA (human or agent): the verification ladder from unit tests to real data, the smoke test, end-to-end runs, the areas that deserve most attention and how to file what is found.
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+---
+
 # Inspecto — Testing Guide
 
 > Audience: testers / QA (human or agent) · Status date: **2026-07-16**
@@ -66,4 +76,4 @@ Recipe (agents: `SMOKE` invokes `.claude/skills/smoke/`):
 
 Open items go to [`BACKLOG.md`](../../../../BACKLOG.md) (one line + pointer to detail); cross-cutting
 gotchas worth keeping go to the OKF bundle ([`okf/`](../../index.md)) or
-[`PROJECT_NOTES.md`](../../../../PROJECT_NOTES.md). Update at the shift handoff, not in a side channel.
+team memory (`.claude/memory/`). Update at the shift handoff, not in a side channel.

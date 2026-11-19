@@ -5,6 +5,10 @@ description: Measured stage-isolated benchmark results (JDK 26 / DuckDB 1.5.2 vi
 resource: platform/inspecto-etl/src/test/java/com/gamma/etl/PipelineBenchmark.java
 tags: [performance, benchmark, duckdb, ingest, concurrency, bottleneck]
 timestamp: 2026-07-16T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
 ---
 
 # Performance Assessment & Bottleneck Analysis
@@ -139,7 +143,7 @@ total rows"* — is met; 12 batches went from 8K to **34.5K rows/s**.
 
 | Knob | Controls | Default |
 |---|---|---|
-| `processing.threads` | how many batches run concurrently (semaphore permits) | **logical cores** (was 4 until 2026-09-14) |
+| `processing.threads` | how many batches run concurrently (semaphore permits) | **logical cores** |
 | `processing.duckdb_threads` | `PRAGMA threads=N` per batch's DuckDB connection | 0 = **auto** (`cores ÷ threads`) |
 
 The inner/outer interaction: each concurrent batch opens its own DuckDB
@@ -320,7 +324,7 @@ ingest trough that otherwise starves many-core hosts (see [troubleshooting → C
 Mode comparison (`PluginIngestBenchmark`, 500K rows, PARQUET, 30 day-partitions): union ≈ 233K rows/s /
 30 consolidated files / 23 MB peak; generation (4 gens) ≈ 202K rows/s / 120 files / 15 MB peak — i.e.
 generation trades output fragmentation and a little throughput for bounded memory. See
-[plugins.md → execution modes](../../module/elt/spec-ingest.md#execution-modes--the-framework-picks-by-file-size) and
+[plugins.md → execution modes](../../module/elt/spec-ingest-plugin-ingester.md#execution-modes--the-framework-picks-by-file-size) and
 [design-notes D9/D10](../../../../archived-documents/design-notes.md).
 
 ## Nightly throughput floor (ASSURE-OPERABILITY-1, 2026-09-29)
@@ -437,3 +441,6 @@ readers ~1 min, csv ~1 min, la1m ~3 min, la10m ~8 min (index build each), engine
 (50,000-row keyed inserts run at hundreds of rows/s; `archived-documents/plans-archive/duckdb-2-plan.md` §2a). Leave it out of an A/B run
 (`-Workloads engine,csv,scan,readers`) and time it on its own. The harness reads the DuckDB jar from the Maven local
 repository named in `~/.m2/settings.xml` (`<localRepository>`), else `~/.m2/repository`.
+## Changes
+
+- 2026-09-14: the `processing.threads` default became the logical core count; it was 4.

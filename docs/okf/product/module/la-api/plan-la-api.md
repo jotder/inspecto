@@ -5,6 +5,11 @@ description: What la-api is required to do, what is built, what is left and what
 resource: la/inspecto-la-api/
 tags: [module, la-api, link-analysis, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.la-api
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-api
 ---
 
 # Link analysis and geo routes - plan of record
@@ -18,7 +23,7 @@ design: [architecture](architecture-la-api.md); layer: [layer/la architecture](.
 - Contribute every Link Analysis route to the one host `ControlApi` as ServiceLoader `RouteModule`s, with no LA server
   and no engine class named ([la-separation-execution-plan](../../../../archived-documents/plans-archive/la-separation-execution-plan.md)).
 - Enforce the request gate order (authenticate, rate, ABAC, module enabled, capability, Investigation membership, Dataset
-  visibility, PDP) and mask entities on every output ([la-core architecture-http-and-ui](../la-core/architecture-http-and-ui.md) §6.1, [la-core architecture](../la-core/architecture-la-core.md#34-masking) §3.4).
+  visibility, PDP) and mask entities on every output ([la-core architecture-http-and-ui](../la-core/architecture-http-and-ui.md) §6.1, [la-core architecture](../la-core/architecture-la-core-masking.md#34-masking) §3.4).
 - Orchestrate Drafts (admission, rebase, promote, four-eyes) over la-core storage
   ([la-separation-d7-design](../../../../archived-documents/plans-archive/la-separation-d7-design.md)).
 - Serve reads from the link index when a fresh index exists, else from the flat Dataset relation, never mixing the two

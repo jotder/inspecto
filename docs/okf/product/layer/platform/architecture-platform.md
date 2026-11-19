@@ -5,6 +5,10 @@ description: The entry-point architecture page for the whole platform — what t
 resource: pom.xml
 tags: [architecture, platform, framework-free, spi, serviceloader, duckdb, editions, metadata]
 timestamp: 2026-11-12T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
 ---
 
 # Inspecto platform architecture
@@ -154,7 +158,7 @@ module layer; a split-package guard (`tools/check-module-architecture.mjs`) hold
 The contracts a jar can implement include: Collector connectors (`CollectorConnectorFactory`,
 [spec](../../module/connectors/spec-connectors.md)), parser plugins (`ParserPlugin`,
 [spec](../../module/elt/spec-parsing.md)), Pipeline node types (`PipelineNodeType`,
-`PipelineNodeExecutor`, `StepExecutor`; [Pipeline graph](../../module/elt/architecture-elt.md#e4-the-pipeline-graph--the-backend-model)),
+`PipelineNodeExecutor`, `StepExecutor`; [Pipeline graph](../../module/elt/architecture-elt-graph-consignments.md#e4-the-pipeline-graph--the-backend-model)),
 HTTP routes (`RouteModule`), Job Types and maintenance tasks (`JobTypeProvider`,
 `MaintenanceTaskProvider`), Platform Services contributed by a pack (`ServiceProvider`), Decision Rule
 Consequences (`ConsequenceProvider`), operational store families (`StoreFamilyProvider`), boot-time
@@ -183,14 +187,14 @@ Three facts about discovery are worth knowing before adding one:
 
 1. **Collect.** Collectors pull from local directories, SFTP, FTP and FTPS, databases, object stores
    (S3, Azure Blob, GCS) and Kafka, with deduplication and watermark ledgers and a stability gate.
-   See the [acquisition framework](../../module/elt/architecture-elt.md#data-acquisition-framework).
+   See the [acquisition framework](../../module/elt/architecture-elt-acquisition-parsing.md#data-acquisition-framework).
 2. **Parse and ingest.** Stage-1 parsing (M files to N record types) writes typed Parquet into the
-   lakehouse; bad rows are quarantined. See [Stage-1](../../module/elt/architecture-elt.md#e2-design-philosophy--scope) and
+   lakehouse; bad rows are quarantined. See [Stage-1](../../module/elt/architecture-elt-engine-design.md#e2-design-philosophy--scope) and
    [ingestion](../../module/elt/spec-ingest.md).
 3. **Shape.** Pipelines of Steps: enrichment, deduplication, joins, time-series and analytics Steps,
    then partitioned [output](../../module/elt/spec-sinks.md). The authored Pipeline graph and
    its executor are layered on the engine; see
-   [Pipeline graph](../../module/elt/architecture-elt.md#e4-the-pipeline-graph--the-backend-model) and
+   [Pipeline graph](../../module/elt/architecture-elt-graph-consignments.md#e4-the-pipeline-graph--the-backend-model) and
    [live execution](../../module/elt/spec-pipeline-execution.md).
 4. **Analyse.** Measures and KPIs in Studio and BI; scores and baselines through the Analytics Kernel.
 5. **Act.** Alerts, Decision Rules (the Decision Kernel and its condition tree), Incidents, Cases and
@@ -505,8 +509,8 @@ naming rule is held by `node tools/check-product-docs.mjs`.
 |---|---|---|
 | Feature modules (`layer.features`) | [architecture](../../layer/features/architecture-features.md) |  |
 | Link Analysis modules (`layer.la`) | [architecture](../../layer/la/architecture-la.md) |  |
-| Platform (`layer.platform`) | [architecture](../../layer/platform/architecture-platform.md) | [Editions](../../layer/platform/architecture-editions.md) · [Modules](../../layer/platform/architecture-modules.md) · [Platform Services](../../layer/platform/architecture-platform-services.md) |
-| Product host (`layer.product`) | [architecture](../../layer/product/architecture-product.md) | [Studio BI](../../layer/product/architecture-studio-bi.md) |
+| Platform (`layer.platform`) | [architecture](../../layer/platform/architecture-platform.md) | [Control plane, SPIs and packaging - gotchas](../../layer/platform/architecture-backend-gotchas.md) · [Editions](../../layer/platform/architecture-editions.md) · [Modules](../../layer/platform/architecture-modules.md) · [Platform Services](../../layer/platform/architecture-platform-services.md) |
+| Product host (`layer.product`) | [architecture](../../layer/product/architecture-product.md) | [Studio BI](../../layer/product/architecture-studio-bi.md) · [inspecto-ui conventions and gotchas](../../layer/product/architecture-ui-conventions.md) |
 | Providers (`layer.providers`) | [architecture](../../layer/providers/architecture-providers.md) |  |
 | Service contracts (SPI) (`layer.spi`) | [architecture](../../layer/spi/architecture-spi.md) |  |
 
@@ -527,7 +531,7 @@ naming rule is held by `node tools/check-product-docs.mjs`.
 | Analytics Kernel (canonical statistics and baselines) (`module.analytics`) | [architecture](../../module/analytics/architecture-analytics.md) |  |
 | Anomaly Detection (`module.anomaly`) | [architecture](../../module/anomaly/architecture-anomaly.md) |  |
 | Public API annotations (`module.api`) | [architecture](../../module/api/architecture-api.md) |  |
-| ASN.1 decoders (`module.asn-decoders`) | [architecture](../../module/asn-decoders/architecture-asn-decoders.md) |  |
+| ASN.1 decoders (`module.asn-decoders`) | [architecture](../../module/asn-decoders/architecture-asn-decoders.md) | [ASN.1 decoder modules](../../module/asn-decoders/architecture-decoder-modules.md) |
 | Audit contract (`module.audit-spi`) | [architecture](../../module/audit-spi/architecture-audit-spi.md) |  |
 | Authentication and capability contract (`module.auth-spi`) | [architecture](../../module/auth-spi/architecture-auth-spi.md) |  |
 | Backup and restore (`module.backup`) | [architecture](../../module/backup/architecture-backup.md) |  |
@@ -536,7 +540,7 @@ naming rule is held by `node tools/check-product-docs.mjs`.
 | Kafka stream connector (`module.connectors-kafka`) | [architecture](../../module/connectors-kafka/architecture-connectors-kafka.md) |  |
 | Collector and export connectors (`module.connectors`) | [architecture](../../module/connectors/architecture-connectors.md) |  |
 | Demo authenticator (`module.demo-auth`) | [architecture](../../module/demo-auth/architecture-demo-auth.md) |  |
-| ELT — ingestion, Pipelines and step registry (`module.elt`) | [architecture](../../module/elt/architecture-elt.md) |  |
+| ELT — ingestion, Pipelines and step registry (`module.elt`) | [architecture](../../module/elt/architecture-elt.md) | [ELT — architecture — Acquisition, Collectors, parsing and Pipelines](../../module/elt/architecture-elt-acquisition-parsing.md) · [ELT — architecture — Engine code, design scope and how a file becomes Tables](../../module/elt/architecture-elt-engine-design.md) · [ELT — architecture — The Pipeline graph, consignment status and directory layout](../../module/elt/architecture-elt-graph-consignments.md) |
 | Entity lists (`module.entity-list`) | [architecture](../../module/entity-list/architecture-entity-list.md) |  |
 | Entity store (`module.entity-store`) | [architecture](../../module/entity-store/architecture-entity-store.md) |  |
 | Event model and log (`module.event`) | [architecture](../../module/event/architecture-event.md) |  |
@@ -547,7 +551,7 @@ naming rule is held by `node tools/check-product-docs.mjs`.
 | Route module contract (`module.http-spi`) | [architecture](../../module/http-spi/architecture-http-spi.md) |  |
 | AI assist and intelligence (`module.intelligence`) | [architecture](../../module/intelligence/architecture-intelligence.md) | [Embedded intelligence (AGT-5)](../../module/intelligence/architecture-embedded-intelligence.md) |
 | Link Analysis and geo routes (`module.la-api`) | [architecture](../../module/la-api/architecture-la-api.md) |  |
-| Link Analysis core and ports (`module.la-core`) | [architecture](../../module/la-core/architecture-la-core.md) | [Link Analysis — data onboarding](../../module/la-core/architecture-data-onboarding.md) · [Link Analysis — HTTP surface and Investigation UI](../../module/la-core/architecture-http-and-ui.md) · [Link Analysis — as-built reference and design records](../../module/la-core/architecture-records.md) · [Link Analysis — Watch this folder](../../module/la-core/architecture-watch-this-folder.md) |
+| Link Analysis core and ports (`module.la-core`) | [architecture](../../module/la-core/architecture-la-core.md) | [Link Analysis — data onboarding — Add data, help and onboarding residuals](../../module/la-core/architecture-data-onboarding-add-data-help.md) · [Link Analysis — data onboarding — Arrivals, arrival feeds and Dataset storage](../../module/la-core/architecture-data-onboarding-arrivals-storage.md) · [Link Analysis — data onboarding — Column roles and discovery in Basic](../../module/la-core/architecture-data-onboarding-roles-discovery.md) · [Link Analysis — data onboarding](../../module/la-core/architecture-data-onboarding.md) · [Link Analysis — HTTP surface and Investigation UI — Gate order, embeds, entity profiles and inbound integration](../../module/la-core/architecture-http-and-ui-gates-embeds.md) · [Link Analysis — HTTP surface and Investigation UI — Grow, Held and Exclude on the graph](../../module/la-core/architecture-http-and-ui-grow-exclude.md) · [Link Analysis — HTTP surface and Investigation UI — Outbound integration, CSV upload, masking and exclusion lists](../../module/la-core/architecture-http-and-ui-integration-uploads.md) · [Link Analysis — HTTP surface and Investigation UI — Studio UI reorganization](../../module/la-core/architecture-http-and-ui-studio-reorg.md) · [Link Analysis — HTTP surface and Investigation UI](../../module/la-core/architecture-http-and-ui.md) · [Link Analysis — architecture — Host registration, editions, bounds and known seams](../../module/la-core/architecture-la-core-host-editions.md) · [Link Analysis — architecture — Domain core — discovery; link index, Graph Run and HTTP surface](../../module/la-core/architecture-la-core-index-http.md) · [Link Analysis — architecture — Domain core — masking onward](../../module/la-core/architecture-la-core-masking.md) · [Link Analysis — architecture — Shape, modules and the domain core](../../module/la-core/architecture-la-core-shape-modules.md) · [Link Analysis — as-built reference and design records — Closed-plan record and consolidated as-built facts](../../module/la-core/architecture-records-closed-plans.md) · [Link Analysis — as-built reference and design records — External references, the Dossier and the separation records](../../module/la-core/architecture-records-dossier-separation.md) · [Link Analysis — as-built reference and design records — Evidence, the op log and Graph Run](../../module/la-core/architecture-records-evidence-graph-run.md) · [Link Analysis — as-built reference and design records — Grounded limits and consequences](../../module/la-core/architecture-records-grounded-limits.md) · [Link Analysis — as-built reference and design records — Product, code layout, pattern packs and labels](../../module/la-core/architecture-records-product-layout.md) · [Link Analysis — as-built reference and design records — Studio UI record and the link index](../../module/la-core/architecture-records-studio-index.md) · [Link Analysis — as-built reference and design records](../../module/la-core/architecture-records.md) · [Link Analysis — Watch this folder](../../module/la-core/architecture-watch-this-folder.md) |
 | Link Analysis storage (`module.la-storage`) | [architecture](../../module/la-storage/architecture-la-storage.md) |  |
 | Link Analysis PostgreSQL store (`module.la-store-pg`) | [architecture](../../module/la-store-pg/architecture-la-store-pg.md) |  |
 | Notification channels (`module.notify-channels`) | [architecture](../../module/notify-channels/architecture-notify-channels.md) |  |

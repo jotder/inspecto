@@ -5,6 +5,10 @@ description: No hardcoded colors — use gamma --gamma-* vars; enforced by the l
 resource: inspecto-ui/tools/check-design-tokens.mjs
 tags: [styling, design-tokens, gamma, lint, ci-gate, non-negotiable]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
 ---
 
 # Design Tokens & Styling

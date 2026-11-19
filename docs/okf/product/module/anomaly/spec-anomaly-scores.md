@@ -5,6 +5,11 @@ description: The anomaly-model component kind, the anomaly.score Job writing the
 resource: features/inspecto-anomaly/src/main/java/com/gamma/anomaly/AnomalyScoreEvaluator.java
 tags: [control-plane, anomaly-score, job, alert-rule, incident, assurance, entity-list]
 timestamp: 2026-10-10T00:00:00Z
+item: module.anomaly
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: features/inspecto-anomaly
 ---
 
 # Anomaly Scores
@@ -14,7 +19,7 @@ timestamp: 2026-10-10T00:00:00Z
 > Professional, Enterprise and Preview; not Personal — D-AD4). It depends on `inspecto-entity-list`
 > (`requires.modules: entity-list`) and **not** on `inspecto-scoring`: the pieces it shares with
 > [Risk Scores](../scoring/spec-risk-scores.md) are extracted, never copied (D-AD5, fulfilled 2026-10-17 by ANALYTICS-CORE-1 M7):
-> the score output contract is in the Analytics Kernel (D-AN6, [Score output contract](../analytics/spec-analytics.md#score-output-contract))
+> the score output contract is in the Analytics Kernel (D-AN6, [Score output contract](../analytics/spec-analytics-distribution-time-series.md#score-output-contract))
 > and its writer `com.gamma.alert.ScoreOutputWriter` in the engine. Without the module `/anomaly-scores*` answers 503
 > and an `anomaly-model` component is unknown to the SPA, which then hides every anomaly surface.
 > Built 2026-10-10 in slices S1..S5 (`ANOMALY-DETECTION-1`); the design and its lane notes are archived at

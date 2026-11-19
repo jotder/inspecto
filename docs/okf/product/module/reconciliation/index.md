@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Reconciliation — requirement of record](plan-reconciliation.md) |
+| plan | current | [module.reconciliation - board row detail](plan-board-detail.md) · [Reconciliation — requirement of record](plan-reconciliation.md) |
 | spec | current | [Reconciliation — implementation spec](spec-reconciliation.md) |
 | architecture | current | [Reconciliation](architecture-reconciliation.md) |
 | features | current | [Reconciliation — features](features-reconciliation.md) |
@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `PACK-PARTNER-SETTLEMENT-1` | P3 | feature | partner settlement function pack, slices W1…W3 open; S0…S3 (the smallest cut) BUILT 2026-10-20, S4 (netting, positions, roll-forward) BUI… | — |
+| `PACK-PARTNER-SETTLEMENT-1` | P3 | feature | Partner settlement slices W1…W3 (wholesale, MVNO, roaming) and confirmation of the delegated decisions. | — |

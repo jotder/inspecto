@@ -4,6 +4,11 @@ title: "Decision Kernel (Decision Rules and the Condition Language) — API"
 description: "Control-plane routes for Decision Kernel (Decision Rules and the Condition Language), with their gates."
 tags: [scoring, decision-kernel, api]
 timestamp: 2026-10-19T00:00:00Z
+item: module.scoring
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-scoring
 ---
 
 # Decision Kernel (Decision Rules and the Condition Language) — API

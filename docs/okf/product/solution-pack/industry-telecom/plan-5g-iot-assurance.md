@@ -1,3 +1,14 @@
+---
+type: Plan
+title: 5G / IoT / cloud / digital service assurance: a plan for a file-fed platform
+description: Parked plan for 5G, IoT, cloud and digital service assurance on a file-fed platform (competitive gap U), limited to what usage and session records can prove: feeds, controls, Measures, packaging, slices, RFP traceability and open decisions.
+item: solution-pack.industry-telecom
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: platform/inspecto-entity-store/src/main/resources/META-INF/inspecto/industry-packs/telecom
+---
+
 # 5G / IoT / cloud / digital service assurance: a plan for a file-fed platform
 
 > ⏸ **PARKED 2026-10-22 — design only, demand-gated; not in flight.** To resume: move it back to docs/superpower/ and rank its BACKLOG row.

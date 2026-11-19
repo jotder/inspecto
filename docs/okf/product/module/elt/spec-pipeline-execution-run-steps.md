@@ -1,10 +1,15 @@
 ---
 type: Concept
 title: Pipeline execution — run steps
-description: The work around a Pipeline run - the ordered registry of commit steps (COMMIT and RUN phases) and pre-run steps (GO, SKIP, reload, after), the import's steps (ImportCommitSteps, ImportPreRunSteps), the claim a run holds, and the cadence wake that honours each interval schedule's every.
-resource: inspecto/src/main/java/com/gamma/service/CollectorService.java, inspecto/src/main/java/com/gamma/service/PipelineScheduler.java, inspecto/src/main/java/com/gamma/control/ImportCommitSteps.java, inspecto/src/main/java/com/gamma/control/ImportPreRunSteps.java
-tags: [elt, engine, scheduler, commit-steps, pre-run-steps, import, cadence, trigger, onboarding]
+description: The work around a Pipeline run - the ordered registry of commit steps (COMMIT and RUN phases) and pre-run steps (GO, SKIP, reload, after), the import's steps (ImportCommitSteps, ImportPreRunSteps), the one drift comparison and the kept column's schema write, the claim a run holds, and the cadence wake that honours each interval schedule's every.
+resource: inspecto/src/main/java/com/gamma/service/CollectorService.java, inspecto/src/main/java/com/gamma/service/PipelineScheduler.java, inspecto/src/main/java/com/gamma/control/ImportCommitSteps.java, inspecto/src/main/java/com/gamma/control/ImportPreRunSteps.java, platform/inspecto-etl/src/main/java/com/gamma/etl/SchemaDrift.java, inspecto/src/main/java/com/gamma/control/DatasetNewColumns.java
+tags: [elt, engine, scheduler, commit-steps, pre-run-steps, import, cadence, trigger, onboarding, schema-drift, new-columns]
 timestamp: 2026-11-19T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # Pipeline execution — run steps
@@ -63,6 +68,25 @@ last registered first, **after** the run's `RUN` commit steps. `stepRun` wraps `
   carries are kept). ONE engine step, `import.pre_run` (100), runs that list, because the second step reads what the
   first judged. Add data's in-run paths (Add a file, Run now) call the same list (`ImportPreRunSteps.runAll`), so the
   order and outcome shapes (`refused`, `keptColumns`, `newColumnsReason`) are one implementation.
+- **One drift comparison** (`BASIC-ELT-PROFILE-1` B5, as built 2026-11-20). Both steps judge a file with the engine's
+  `SchemaDrift.diff` (`inspecto-etl`): the schema's `raw.fields` against the columns a file shows, addressed
+  `POSITION` (a digit selector is the column's place and the name there must agree: a name elsewhere has *moved*;
+  delimited text with a header), `WIDTH` (place only: a headerless import, a positional lane, a parsed sample) or
+  `NAME` (JSON, Parquet). It answers each field found, moved or missing, the columns no field reads (`added`) and those a
+  reader can take on (`keepable`: by position only the run right after the read width). The run-time detector
+  (`quality.schema.drift`) and schema suggest's drift (`SchemaSuggest.drift`) call the same function; what each does
+  with the answer stays its own (a Standard Pipeline reports and reads on; Basic refuses a missing or moved column and
+  may keep a new one). A kept column's type is `SchemaDrift.settle` over each file's sample-profiler answer: the same
+  type and format in every file, `BIGINT` with `DOUBLE` is `DOUBLE`, `TIME` included; anything else is `VARCHAR`.
+- **The kept column's schema write** goes through the import's schema write path (`DatasetFeed.rewriteSchema`, the
+  schema half of `rewritePipeline`, for a caller that already holds the claim): the save gate (`SaveGate.check` for a
+  schema), the mapping drift and BACKWARD-compatibility gates refuse what the edit introduces (the column is then left
+  out with that reason), the import's Pipeline must load with it, and each version is kept in
+  `.history/pipelines/<id>/schema/v<N>.toon` (`PipelineHistory.recordSchema`; a rename moves it with the Pipeline's
+  history, a purge removes it; the history routes list only the Pipeline's own versions). A failed run's undo puts the
+  old bytes back and records that version too. The approval-policy check stays the step's own (a held column is left
+  out, never a 409). A file whose new column is left out is rewritten with the read columns past the lines the import
+  skips before the header (`skip_header_lines`), which stay in the file (`ControlApiOnboardDialectTest`).
 - **The claim.** The engine step acts only for a Pipeline Add data wrote for that Dataset (`isOurs`). It takes the
   Dataset's `OnboardImport.IN_FLIGHT` claim and **holds it through the run** (released in its `after`); the import's
   commit steps treat a claim held by the run's own pre-run step as theirs (`ImportPreRunSteps.heldByRun`), so they

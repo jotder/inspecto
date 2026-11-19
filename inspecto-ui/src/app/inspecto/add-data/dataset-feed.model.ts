@@ -38,11 +38,14 @@ export interface DatasetFeedState {
     /** This installation runs feeds on their own (Standard and above); Basic imports waiting files with Run now. */
     automatic: boolean;
     feed: Feed;
-    /** BASIC-ONBOARD-1 P2: *Watch this folder* is on - the inbox is looked at every 30 seconds. */
+    /**
+     * BASIC-ONBOARD-1 P2: *Watch this folder* is on - the inbox is looked at every 30 seconds. Since BASIC-ELT-PROFILE-1
+     * B1 that is the import Pipeline's locked 30 s schedule; `feed` still says `uploads` for it.
+     */
     watch?: boolean;
     /** A Postgres table snapshot (P3): refreshed with Run now only, never polled (operator 2026-11-05). */
     snapshot?: boolean;
-    /** *Watch this folder* is offered: not a Reference, and no schedule keeps the Dataset up to date. */
+    /** *Watch this folder* is offered: not a Reference, and no schedule keeps the Dataset up to date but the watch's own. */
     watchable?: boolean;
     /** Why the poll's last import of this inbox failed; absent once one succeeds. */
     watchError?: string;

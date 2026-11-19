@@ -4,6 +4,11 @@ title: "Case Management — features"
 description: "Case Management groups related Incidents into Cases for investigation."
 tags: [caseManagement, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: addon.caseManagement
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-case-management
 ---
 
 # Case Management — features

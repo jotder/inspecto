@@ -4,6 +4,11 @@ title: "Link Analysis showcase — features"
 description: "A seeded Link Analysis demo Space with a planted mule ring, telecom fraud rings and a Geo scene."
 tags: [la-showcase, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.la-showcase
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-showcase
 ---
 
 # Link Analysis showcase — features

@@ -5,6 +5,11 @@ description: What was required of the Exchange (grant-mediated cross-Space shari
 resource: features/inspecto-exchange/
 tags: [exchange, plan, requirement, multi-space, sharing]
 timestamp: 2026-10-19T00:00:00Z
+item: module.exchange
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: features/inspecto-exchange
 ---
 
 # Exchange — requirement of record

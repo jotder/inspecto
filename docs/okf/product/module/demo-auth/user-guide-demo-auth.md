@@ -5,6 +5,11 @@ description: Signing in as a Demo User in a demo build, switching users, and wha
 resource: providers/inspecto-demo-auth/
 tags: [module, demo-auth, user-guide, demo]
 timestamp: 2026-10-19T00:00:00Z
+item: module.demo-auth
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-demo-auth
 ---
 
 # Demo authenticator — user guide

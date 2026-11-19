@@ -4,6 +4,11 @@ title: "Entity store — spec"
 description: "Implementation detail of platform/inspecto-entity-store: the identity fact log format, the Entity List fold, Entity Types, masking, Industry packs and the Link Analysis settings and limits."
 tags: [entity-store, spec]
 timestamp: 2026-10-19T00:00:00Z
+item: module.entity-store
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-entity-store
 ---
 
 # Entity store — spec

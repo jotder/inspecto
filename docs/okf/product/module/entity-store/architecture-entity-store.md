@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Storage
+description: How storage is laid out: the three physically distinct classes of state per Space, Sinks where Pipelines write business data, embedded DuckDB everywhere, and Postgres, DuckLake and the compliance archive on Standard and above.
+item: module.entity-store
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [platform/inspecto-entity-store]
+---
+
 # Storage
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.

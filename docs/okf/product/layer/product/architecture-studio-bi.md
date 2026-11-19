@@ -1,3 +1,13 @@
+---
+type: Architecture
+title: Studio BI
+description: How Studio BI turns a Dataset into Measures, Widgets (instances of a Visualization Type) and boards: its parts, users, placement, configuration, screens, API and limits.
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+---
+
 # Studio BI
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.

@@ -4,6 +4,11 @@ title: "Analytics kernel — features"
 description: "The Analytics kernel is the module platform/inspecto-analytics: one written definition of every statistic and time-series primitive the product uses, as pure Java functions and DuckDB SQL builders."
 tags: [analytics, analytics, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.analytics
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-analytics
 ---
 
 # Analytics kernel — features

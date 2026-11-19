@@ -4,6 +4,11 @@ title: "Telecom bypass (SIM-box) — admin guide"
 description: "Install, size, wire the Entity Lists, run in shadow mode and verify the Telecom bypass pack."
 tags: [telco-bypass, admin-guide]
 timestamp: 2026-10-20T00:00:00Z
+item: solution-pack.telco-bypass
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/telco-bypass
 ---
 
 # Telecom bypass (SIM-box) — admin guide

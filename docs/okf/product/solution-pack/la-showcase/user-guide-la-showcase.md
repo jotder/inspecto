@@ -4,6 +4,11 @@ title: "Link Analysis showcase — user guide"
 description: "How an investigator works through the la-showcase demo Space."
 tags: [la-showcase, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.la-showcase
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: spaces/_templates/la-showcase
 ---
 
 # Link Analysis showcase — user guide
@@ -52,4 +57,4 @@ Pick a Demo User (`spaces/_templates/la-showcase/config/demo-users.toon`, `roles
 
 ## References
 
-[features](features-la-showcase.md) · [Investigation pivot guide](../../module/la-core/user-guide-la-core.md#63-pivot-between-graph-and-map)
+[features](features-la-showcase.md) · [Investigation pivot guide](../../module/la-core/user-guide-la-core-building-graph.md#63-pivot-between-graph-and-map)

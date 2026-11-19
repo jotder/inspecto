@@ -5,6 +5,11 @@ description: The http-spi Java contract — RouteModule, ApiContext, Handler, En
 resource: spi/inspecto-http-spi/
 tags: [module, http-spi, spi, api, control-api]
 timestamp: 2026-10-19T00:00:00Z
+item: module.http-spi
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spi/inspecto-http-spi
 ---
 
 # Route module contract — Java API (`module.http-spi`)

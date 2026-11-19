@@ -4,6 +4,11 @@ title: "Link Analysis daily feed — architecture"
 description: "How the daily feed pack moves one file per day into the Link Analysis index, with monitors."
 tags: [la-daily-feed, architecture]
 timestamp: 2026-10-23T00:00:00Z
+item: solution-pack.la-daily-feed
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: spaces/_templates/la-daily-feed
 ---
 
 # Link Analysis daily feed — architecture
@@ -31,4 +36,4 @@ Template: `spaces/_templates/la-daily-feed/` (LA-DAILY-INGEST-1 T2).
 
 ## Modules used
 
-[Link Analysis](../../module/la-core/architecture-la-core.md) · [ETL user guide § Daily feeds](../../module/elt/user-guide-elt.md#113-daily-feeds--the-template-the-export-contract-and-delivery-checks) (export contract for a database origin).
+[Link Analysis](../../module/la-core/architecture-la-core.md) · [ETL user guide § Daily feeds](../../module/elt/user-guide-elt-enrich-load-test.md#113-daily-feeds--the-template-the-export-contract-and-delivery-checks) (export contract for a database origin).

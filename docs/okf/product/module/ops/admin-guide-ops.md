@@ -5,6 +5,11 @@ description: Enabling the operational-object module, its capabilities, the objec
 resource: features/inspecto-ops/src/main/java/com/gamma/ops/OpsStoreFamily.java
 tags: [ops, admin-guide, operations, incidents]
 timestamp: 2026-10-19T00:00:00Z
+item: module.ops
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-ops
 ---
 
 # Case management and objects — admin guide

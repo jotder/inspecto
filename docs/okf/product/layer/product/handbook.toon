@@ -538,6 +538,41 @@ chapters:
         type: unsorted
         tracks[1]: builder
         audience: internal
+      user_guide_elt_getting_started:
+        file: docs/okf/product/module/elt/user-guide-elt-getting-started.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_elt_steps:
+        file: docs/okf/product/module/elt/user-guide-elt-steps.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_elt_parse_schema:
+        file: docs/okf/product/module/elt/user-guide-elt-parse-schema.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_elt_record_transformer:
+        file: docs/okf/product/module/elt/user-guide-elt-record-transformer.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_elt_enrich_load_test:
+        file: docs/okf/product/module/elt/user-guide-elt-enrich-load-test.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_elt_save_surfaces:
+        file: docs/okf/product/module/elt/user-guide-elt-save-surfaces.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_elt_collectors_runs:
+        file: docs/okf/product/module/elt/user-guide-elt-collectors-runs.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
   build_trust:
     title: Trust it
     group: Build
@@ -648,6 +683,21 @@ chapters:
         type: unsorted
         tracks[1]: operator
         audience: internal
+      admin_guide_demo_preflight_script:
+        file: docs/okf/product/module/la-core/admin-guide-demo-preflight-script.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_demo_short_version_records:
+        file: docs/okf/product/module/la-core/admin-guide-demo-short-version-records.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_demo_stakeholder_qa:
+        file: docs/okf/product/module/la-core/admin-guide-demo-stakeholder-qa.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
       admin_guide_la_core:
         file: docs/okf/product/module/la-core/admin-guide-la-core.md
         type: unsorted
@@ -655,6 +705,41 @@ chapters:
         audience: internal
       user_guide_la_core:
         file: docs/okf/product/module/la-core/user-guide-la-core.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_la_core_getting_started:
+        file: docs/okf/product/module/la-core/user-guide-la-core-getting-started.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_la_core_building_graph:
+        file: docs/okf/product/module/la-core/user-guide-la-core-building-graph.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_la_core_analysis:
+        file: docs/okf/product/module/la-core/user-guide-la-core-analysis.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_la_core_investigations:
+        file: docs/okf/product/module/la-core/user-guide-la-core-investigations.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_la_core_examples_roles:
+        file: docs/okf/product/module/la-core/user-guide-la-core-examples-roles.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_la_core_reference_notes:
+        file: docs/okf/product/module/la-core/user-guide-la-core-reference-notes.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_la_core_reference_screens:
+        file: docs/okf/product/module/la-core/user-guide-la-core-reference-screens.md
         type: unsorted
         tracks[1]: builder
         audience: internal
@@ -678,6 +763,21 @@ chapters:
         type: unsorted
         tracks[1]: builder
         audience: internal
+      user_guide_training_d_analysis_toolbox_connections:
+        file: docs/okf/product/module/la-core/user-guide-training-d-analysis-toolbox-connections.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_d_analysis_toolbox_patterns:
+        file: docs/okf/product/module/la-core/user-guide-training-d-analysis-toolbox-patterns.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_d_analysis_toolbox_money_scope:
+        file: docs/okf/product/module/la-core/user-guide-training-d-analysis-toolbox-money-scope.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
       user_guide_training_e_keeping_and_sharing:
         file: docs/okf/product/module/la-core/user-guide-training-e-keeping-and-sharing.md
         type: unsorted
@@ -685,6 +785,21 @@ chapters:
         audience: internal
       user_guide_training_f_investigations:
         file: docs/okf/product/module/la-core/user-guide-training-f-investigations.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_f_investigations_first_graph:
+        file: docs/okf/product/module/la-core/user-guide-training-f-investigations-first-graph.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_f_investigations_teams_drafts:
+        file: docs/okf/product/module/la-core/user-guide-training-f-investigations-teams-drafts.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_f_investigations_evidence:
+        file: docs/okf/product/module/la-core/user-guide-training-f-investigations-evidence.md
         type: unsorted
         tracks[1]: builder
         audience: internal
@@ -933,6 +1048,16 @@ chapters:
         type: unsorted
         tracks[1]: operator
         audience: internal
+      admin_guide_configuration_reference_spaces:
+        file: docs/okf/product/module/config/admin-guide-configuration-reference-spaces.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_configuration_reference_collector_types:
+        file: docs/okf/product/module/config/admin-guide-configuration-reference-collector-types.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
       user_guide_config:
         file: docs/okf/product/module/config/user-guide-config.md
         type: unsorted
@@ -1004,6 +1129,26 @@ chapters:
         type: unsorted
         tracks[1]: operator
         audience: internal
+      admin_guide_operations_reference_output_audit:
+        file: docs/okf/product/layer/platform/admin-guide-operations-reference-output-audit.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_operations_reference_batch_processing:
+        file: docs/okf/product/layer/platform/admin-guide-operations-reference-batch-processing.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_operations_reference_status_backend:
+        file: docs/okf/product/layer/platform/admin-guide-operations-reference-status-backend.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_operations_reference_deployment:
+        file: docs/okf/product/layer/platform/admin-guide-operations-reference-deployment.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
       admin_guide_operations:
         file: docs/okf/product/layer/platform/admin-guide-operations.md
         type: unsorted
@@ -1016,6 +1161,21 @@ chapters:
         audience: internal
       admin_guide_auth_security:
         file: docs/okf/product/module/access/admin-guide-auth-security.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_auth_security_abac_decisions:
+        file: docs/okf/product/module/access/admin-guide-auth-security-abac-decisions.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_auth_security_boot_guards:
+        file: docs/okf/product/module/access/admin-guide-auth-security-boot-guards.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_auth_security_imports_maker_checker:
+        file: docs/okf/product/module/access/admin-guide-auth-security-imports-maker-checker.md
         type: unsorted
         tracks[1]: operator
         audience: internal

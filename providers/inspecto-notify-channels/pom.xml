@@ -72,7 +72,7 @@
         <!-- SMTP client (CDDL/GPLv2+CE) for SmtpEmailChannel. ⚠ COMPILE, not provided: this is the one
              dependency the core genuinely does not have, and it is the whole reason the sidecar is shaded.
              NotificationService discovering SmtpEmailChannel without javax.mail kills boot with
-             NoClassDefFoundError: javax/mail/Message (PROJECT_NOTES §6). -->
+             NoClassDefFoundError: javax/mail/Message (docs/okf/product/layer/platform/architecture-backend-gotchas.md). -->
         <dependency>
             <groupId>com.sun.mail</groupId>
             <artifactId>javax.mail</artifactId>

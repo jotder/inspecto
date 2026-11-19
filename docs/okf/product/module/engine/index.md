@@ -15,8 +15,8 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | n/a | documented in the ELT hub module/elt plan-elt.md (part EXE), merged 2026-11-18 (DOCS-ELT-CONSOLIDATE-1) |
-| spec | current | [Database / persistence layer](spec-db-layer.md) · [DuckDB Integration](spec-duckdb.md) |
+| plan | current | [module.engine - board row detail](plan-board-detail.md) |
+| spec | current | [Database / persistence layer — Three data classes and the operational store inventory](spec-db-layer-data-classes.md) · [Database / persistence layer — Schemas — consignment outputs onward](spec-db-layer-schemas-continued.md) · [Database / persistence layer — Schemas (operational, non-Parquet)](spec-db-layer-schemas.md) · [Database / persistence layer — File topology, Postgres and the raw tables](spec-db-layer-topology-postgres.md) · [Database / persistence layer](spec-db-layer.md) · [DuckDB Integration — Sealed connections, time zones and aggregate state](spec-duckdb-connections-state.md) · [DuckDB Integration — DuckDB 2.0.0.0, the pinned version](spec-duckdb-version-pin.md) · [DuckDB Integration](spec-duckdb.md) · [Engine - gotchas](spec-engine-gotchas.md) · [Engine seams and performance](spec-engine-seams.md) |
 | architecture | n/a | documented in the ELT hub module/elt architecture-elt.md (Execution engine internals, sections E1-E7), merged 2026-11-18 |
 | features | n/a | documented in the ELT hub module/elt features-elt.md (Execution engine), merged 2026-11-18 |
 | feature-db | current | [Execution engine — feature database](feature-db.md) |
@@ -36,9 +36,9 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | — | P2 | feature | SPACE-LINK-CENSUS-1 the link census: the default flip and the plan scope not built | — |
 | — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
-| `LEGAL-HOLD-SCOPE-1` | P3 | feature | a legal hold does not reach a Pipeline's data partitions, and has no screen (narrowed 2026-11-17; filed 2026-11-15 from ARCH-MOSCOW-UNTRA… | — |
-| `BI-INSIGHTS-1` | P2 | feature | advanced insights on business data in Widgets and Dashboards — what happened, why it moved, what is unusual, what comes next, who is at r… | — |
-| `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` | P3 | defect | a multi-file Consignment re-planned after a failover can write a second, differently named output, even on a shared output tree. | operator |
+| `LEGAL-HOLD-SCOPE-1` | P3 | feature | A legal hold does not yet protect a Pipeline's data partitions, and holds have no screen. | — |
+| `BI-INSIGHTS-1` | P2 | feature | Advanced insights on business data in Widgets and Dashboards, authored and tuned as Insight Profiles. | — |
+| `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` | P3 | defect | A multi-file Consignment re-planned after a failover can write a second, differently named output. | operator |
 | — | P2 | feature | Postgres multi-user | operator |
-| `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` | P3 | chore | report DuckDB 2.0.0's window_self_join hive-pruning defect upstream, then drop the workaround when it is fixed. | — |
-| `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | ⏸ POSTPONED 2026-11-16 (operator, MoSCoW S7): waits until a multi-Pod deployment is scheduled, together with the postponed scale-out rows… | operator |
+| `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` | P3 | chore | Drop the window_self_join workaround once a fixed DuckDB driver is pinned. | — |
+| `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | The shapes the object-store ingest lane still refuses (sinks:, produces: reference, the readers). | operator |

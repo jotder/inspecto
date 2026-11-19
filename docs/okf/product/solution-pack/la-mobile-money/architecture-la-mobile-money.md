@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Link Analysis mobile money — architecture
+description: How the la-mobile-money Space Template is built: three wallet and agent feeds, the mm_links Job and its link Dataset, the cron-driven index build and detection, Link Analysis settings and tiers.
+item: solution-pack.la-mobile-money
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-mobile-money]
+---
+
 # Link Analysis mobile money — architecture
 
 The `la-mobile-money` Space Template (`spaces/_templates/la-mobile-money/template.toon`). Shared studio, index and store seams: [la-showcase architecture](../la-showcase/architecture-la-showcase.md) and [la-core architecture](../../module/la-core/architecture-la-core.md). This page covers what is specific to mobile money.

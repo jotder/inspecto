@@ -4,6 +4,8 @@ title: "Tutorial: ship it — from a Space to an installed App"
 description: "Turn the working Order-to-cash Space into a signed App with the App kit, prove it against its golden data, install it on a second server, then upgrade it to version 2 without losing the Space's data."
 item: layer.platform
 audience: external
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Tutorial: ship it — from a Space to an installed App

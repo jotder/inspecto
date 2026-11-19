@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis insider threat showcase — brochure
+description: Brochure for the Link Analysis insider threat showcase: leaver exfiltration, access creep and collusion in approvals on privacy-minimised HR, access, mail, expense and vendor data.
+item: solution-pack.la-insider
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-insider]
+---
+
 # Link Analysis insider threat showcase — brochure
 
 > **An employee hands in their notice, then reads twenty times their normal number of customer records for three weeks and mails 1.2 GB to a personal mail domain. A manager gives four of their own staff payroll and treasury access with no ticket, and one of them later changes a vendor's bank account. Two colleagues approve each other's expenses forty times, each claim just under the limit, mostly at weekends. All of it is hidden among 3 000 invented employees. You can find each one from a saved view in minutes, and see why the innocent look-alikes stay apart.**

@@ -4,6 +4,11 @@ title: "Collectors, parsing, ingest and Pipelines — API"
 description: "Control-plane routes for Collectors and Connections, authoring Pipelines and Steps, previewing parsers, and reading and acting on Runs, with their gates."
 tags: [elt, acquire, collectors, pipelines-steps, parsing-ingest, api]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-etl
 ---
 
 # Collectors, parsing, ingest and Pipelines — API

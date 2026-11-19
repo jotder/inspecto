@@ -33,7 +33,8 @@ import com.gamma.access.WriteGates;
  * the per-Pipeline directory is what lets a rename move the whole history in one step. ⚠ The names are
  * chosen so no config walker can mistake a snapshot for a live config: every Pipeline discovery keys on
  * the {@code _pipeline.toon} suffix, and the satellite scan ({@code ConfigFileSupport}) stops at depth 3
- * while a snapshot sits at depth 4.
+ * while a snapshot sits at depth 4. An import Pipeline's schema, which a run may grow by a column, keeps its
+ * versions one level down, in {@code <pipelineId>/schema/v<N>.toon} ({@link #recordSchema}).
  *
  * <p><b>What a snapshot is</b> — the bytes on disk AFTER the write, read back, so it is exactly what the
  * next read serves. It is taken only once a save has succeeded; a refused save never reaches it. A
@@ -82,16 +83,44 @@ final class PipelineHistory {
                 log.warn("[PIPELINE-HISTORY] not recorded: pipeline id '{}' in {} is not a safe name", id, target);
                 return;
             }
-            synchronized (LOCK) {
-                Path dir = dirFor(writeRoot, id.trim());
-                int next = versions(dir).stream().mapToInt(Version::version).max().orElse(0) + 1;
-                AtomicFiles.write(dir.resolve("v" + next + ".toon"), bytes, ".hist-");
-                List<Version> kept = versions(dir);
-                for (int i = keep(writeRoot); i < kept.size(); i++) Files.deleteIfExists(kept.get(i).file());
-            }
+            snapshot(writeRoot, dirFor(writeRoot, id.trim()), bytes);
         } catch (IOException | RuntimeException e) {
             log.warn("[PIPELINE-HISTORY] snapshot of {} failed — the save stands, this version is not in history: {}",
                     target, e.getMessage());
+        }
+    }
+
+    /**
+     * {@code <writeRoot>/.history/pipelines/<id>/schema}: the history of an import Pipeline's schema, beside the
+     * Pipeline's own, so a rename moves it and a purge removes it with the Pipeline's ({@code BASIC-ELT-PROFILE-1} B5).
+     * The history routes list only the Pipeline's own versions ({@link #versions} reads files, not this folder).
+     */
+    static Path schemaDirFor(Path writeRoot, String id) {
+        return dirFor(writeRoot, id).resolve("schema");
+    }
+
+    /** Snapshot the schema of Pipeline {@code id} just written at {@code target}, as {@link #record} does. Never throws. */
+    static void recordSchema(Path writeRoot, String id, Path target) {
+        if (writeRoot == null || target == null) return;
+        try {
+            if (!WriteGates.isSafeName(id)) {
+                log.warn("[PIPELINE-HISTORY] schema not recorded: pipeline id '{}' is not a safe name", id);
+                return;
+            }
+            snapshot(writeRoot, schemaDirFor(writeRoot, id.trim()), Files.readAllBytes(target));
+        } catch (IOException | RuntimeException e) {
+            log.warn("[PIPELINE-HISTORY] snapshot of {} failed — the save stands, this version is not in history: {}",
+                    target, e.getMessage());
+        }
+    }
+
+    /** {@code bytes} as the next {@code v<N>.toon} in {@code dir}, the oldest beyond {@link #keep} pruned. */
+    private static void snapshot(Path writeRoot, Path dir, byte[] bytes) throws IOException {
+        synchronized (LOCK) {
+            int next = versions(dir).stream().mapToInt(Version::version).max().orElse(0) + 1;
+            AtomicFiles.write(dir.resolve("v" + next + ".toon"), bytes, ".hist-");
+            List<Version> kept = versions(dir);
+            for (int i = keep(writeRoot); i < kept.size(); i++) Files.deleteIfExists(kept.get(i).file());
         }
     }
 
@@ -131,16 +160,17 @@ final class PipelineHistory {
     }
 
     /**
-     * Delete {@code id}'s snapshots, then its directory if that left it empty — only {@code v<N>.toon}
-     * files, never a recursive delete of whatever else an operator put there.
+     * Delete {@code id}'s snapshots (its schema's too, {@link #schemaDirFor}), then each directory if that left it
+     * empty — only {@code v<N>.toon} files, never a recursive delete of whatever else an operator put there.
      */
     static void purge(Path writeRoot, String id) throws IOException {
         if (writeRoot == null || !WriteGates.isSafeName(id)) return;
         synchronized (LOCK) {
-            Path dir = dirFor(writeRoot, id.trim());
-            for (Version v : versions(dir)) Files.deleteIfExists(v.file());
-            try (Stream<Path> rest = Files.isDirectory(dir) ? Files.list(dir) : Stream.empty()) {
-                if (rest.findAny().isEmpty()) Files.deleteIfExists(dir);
+            for (Path dir : List.of(schemaDirFor(writeRoot, id.trim()), dirFor(writeRoot, id.trim()))) {
+                for (Version v : versions(dir)) Files.deleteIfExists(v.file());
+                try (Stream<Path> rest = Files.isDirectory(dir) ? Files.list(dir) : Stream.empty()) {
+                    if (rest.findAny().isEmpty()) Files.deleteIfExists(dir);
+                }
             }
         }
     }

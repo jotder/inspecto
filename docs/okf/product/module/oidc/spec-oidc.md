@@ -5,6 +5,11 @@ description: Classes, config resolution, token validation pipeline and failure h
 resource: providers/inspecto-oidc/
 tags: [module, oidc, spec, jwt, jwks]
 timestamp: 2026-11-01T00:00:00Z
+item: module.oidc
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-oidc
 ---
 
 # OIDC authenticator and token relay — implementation spec

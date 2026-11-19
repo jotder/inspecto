@@ -5,6 +5,11 @@ description: How audit-spi separates the event and audit-trail contract from its
 resource: spi/inspecto-audit-spi/
 tags: [module, audit-spi, spi, architecture, audit]
 timestamp: 2026-10-19T00:00:00Z
+item: module.audit-spi
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spi/inspecto-audit-spi
 ---
 
 # Audit contract — architecture (`module.audit-spi`)

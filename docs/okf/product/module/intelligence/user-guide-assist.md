@@ -5,6 +5,11 @@ description: The AI assist panel/dialog; degrades to a per-screen notice when di
 resource: inspecto-ui/src/app/modules/admin/assist/assist.routes.ts
 tags: [feature, assist, ai, assistant]
 timestamp: 2026-06-28T00:00:00Z
+item: module.intelligence
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
+code: features/inspecto-intelligence
 ---
 
 # Assistant

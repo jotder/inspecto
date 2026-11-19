@@ -9,7 +9,7 @@ tags: [feature-db, addon]
 # Incidents — feature database (`addon.incidents`)
 
 > **Generated** by `tools/render-feature-db.mjs` from the module manifests, `offerings/*.toon`, the processor catalog
-> contract and `docs/FEATURE_INVENTORY.md` — never edit this table; change its sources and re-run the tool. The whole
+> contract and `docs/okf/product/layer/platform/features-feature-inventory.md` — never edit this table; change its sources and re-run the tool. The whole
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`addon.incidents`](../../../../../product-map/addon/incidents.toon).
 
@@ -24,7 +24,7 @@ tags: [feature-db, addon]
 | create-incident | consequence | ops | standard;advanced;preview | incidents;laInvestigations;workflowSla | ga | `create-incident` | `features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon` |
 | alert.dispatch | feature | ops | standard;advanced;preview | incidents;laInvestigations;workflowSla | ga | `alert.dispatch` | `features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon` |
 | ops | feature | ops | standard;advanced;preview | incidents;laInvestigations;workflowSla | ga | `ops` | `features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon` |
-| RCA templates (`*_rca.toon`) | inventory | ops | standard;advanced;preview | incidents;laInvestigations;workflowSla | ga | consumed by `GET /rca/templates`; **no example file/shape in the tree yet** | `docs/FEATURE_INVENTORY.md §1J` |
+| RCA templates (`*_rca.toon`) | inventory | ops | standard;advanced;preview | incidents;laInvestigations;workflowSla | ga | consumed by `GET /rca/templates`; **no example file/shape in the tree yet** | `docs/okf/product/layer/platform/features-feature-inventory.md §1J` |
 | objects.analytics | job type | ops | standard;advanced;preview | incidents;laInvestigations;workflowSla | ga | `objects.analytics` | `features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon` |
 | incident_purge | maintenance task | ops | standard;advanced;preview | incidents;laInvestigations;workflowSla | ga | `incident_purge` | `features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon` |
 | "DELETE /objects/([^/]+)/links" | route | ops | standard;advanced;preview | incidents;laInvestigations;workflowSla | ga | `"DELETE /objects/([^/]+)/links"` | `features/inspecto-ops/src/main/resources/META-INF/inspecto/module.toon` |

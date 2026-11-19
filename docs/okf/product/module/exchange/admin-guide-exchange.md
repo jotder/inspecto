@@ -5,6 +5,11 @@ description: Enabling the Exchange, the sharing capabilities, the background sna
 resource: features/inspecto-exchange/src/main/resources/META-INF/inspecto/module.toon
 tags: [exchange, admin-guide, multi-space, sharing, configuration]
 timestamp: 2026-10-19T00:00:00Z
+item: module.exchange
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-exchange
 ---
 
 # Exchange — admin guide

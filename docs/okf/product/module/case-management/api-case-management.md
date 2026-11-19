@@ -4,6 +4,11 @@ title: "Case Management — API"
 description: "Control-plane routes for Case Management, with their gates."
 tags: [case-management, case-management, api]
 timestamp: 2026-10-19T00:00:00Z
+item: module.case-management
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-case-management
 ---
 
 # Case Management — API

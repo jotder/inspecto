@@ -4,6 +4,11 @@ title: "Payment fraud starter — features"
 description: "Payment fraud typologies, rolling-window features and an account Risk Score."
 tags: [payment-fraud, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.payment-fraud
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/payment-fraud
 ---
 
 # Payment fraud starter — features

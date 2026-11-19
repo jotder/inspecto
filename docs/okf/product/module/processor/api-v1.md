@@ -5,6 +5,11 @@ description: The v1 business contract — response envelope, error-code catalog,
 resource: inspecto/src/main/java/com/gamma/control/ControlApi.java
 tags: [control-plane, api, v1, envelope, etag, openapi, async]
 timestamp: 2026-07-07T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: inspecto
 ---
 
 # Versioned API (/api/v1)
@@ -52,7 +57,7 @@ guidelines, §4 the decisions); provenance:
 * **Optimistic concurrency (W3)** — Components carry a `ContentHash` (parity-pinned with the UI's
   `content-hash.ts`); reads return `ETag`, conditional reads honor `If-None-Match`, writes **honour**
   `If-Match` — a present, non-matching precondition is `409 CONFLICT_STALE_VERSION` (`ETags.requireMatch`);
-  an absent header passes. ⚠ The SPA sends neither header (corrected 2026-09-08 — this said "require"). See [component registry](spec-component-registry.md). The read-side idiom is a
+  an absent header passes. ⚠ The SPA sends neither header. See [component registry](spec-component-registry.md). The read-side idiom is a
   one-line `ETags.respond(ex, body)` wrapper (`ETags.java`) — hash the body → `If-None-Match` 304 →
   set the header → return body-or-`HANDLED`; the hash captures any body variance, so a changed body
   never yields a false 304. **Extended 2026-07-24** beyond `/bootstrap` + `GET /components/{type}/{id}`
@@ -104,3 +109,7 @@ guidelines, §4 the decisions); provenance:
   Location-header quirk stays until a v2 of the API (renaming would break every stored client link).
 * **Multi-space** — the space segment sits **after** the version: `/api/v1/spaces/{id}/…`
   (see [multi-space](architecture-processor.md)).
+
+## Changes
+
+- 2026-09-08: ETag section corrected — it said writes "require" `If-Match`.

@@ -4,6 +4,8 @@ title: Edition and Add-on
 description: What an edition is (Basic, Standard, Advanced) and what an Add-on is, and how together they decide which features your installation has.
 item: layer.product
 audience: external
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Edition and Add-on

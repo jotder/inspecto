@@ -4,6 +4,11 @@ title: "SQL guard and helpers — plan"
 description: "Requirement of record for the SQL guard, sandbox and oracle: what is required, built, left and refused."
 tags: [sql, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.sql
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: platform/inspecto-sql
 ---
 
 # SQL guard and helpers — plan
@@ -14,7 +19,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 Any SQL the platform runs on a user's or an agent's behalf must not reach the host's files, extensions or
 system surface, and must not change state. NFR-4 (air-gap operation) in
-[REQUIREMENTS](../../../../REQUIREMENTS.md) and the "working as designed" gates in
+[REQUIREMENTS](../../layer/platform/spec-requirements.md) and the "working as designed" gates in
 [BACKLOG](../../../../BACKLOG.md) (`SqlGuard` is one of them) depend on it.
 
 ## Built

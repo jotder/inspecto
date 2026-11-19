@@ -4,6 +4,11 @@ title: Inspecto LA - administration (LA level, Investigations add-on, masking de
 description: How an administrator runs Link Analysis at the Explorer or the Investigations level, what decides the masking default, and the runbook that proves a real OIDC sign-in end to end. The stakeholder demo is in admin-guide-demo.
 tags: [module, la-core, link-analysis, editions, add-on, masking, oidc, admin-guide]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA - administration

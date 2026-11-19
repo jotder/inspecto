@@ -6,12 +6,15 @@ description: The requirement-of-record and as-built specification for the repo's
 status: current
 written: 2026-09-09
 supersedes-rows: REQUIREMENTS §4 NFR-9 and NFR-10 (this file corrects them, see §2)
+item: layer.platform
+audience: internal
+verified: 2026-11-19 last-edit
 ---
 
 # Guards & repository tooling (`TOOL`)
 
 > **How to read this file.** §1–§2 are the *requirement of record*: where they disagree with
-> `docs/REQUIREMENTS.md` `NFR-9` or `NFR-10`, **this file wins** and the disagreement is stated in place.
+> `docs/okf/product/layer/platform/spec-requirements.md` `NFR-9` or `NFR-10`, **this file wins** and the disagreement is stated in place.
 > §3 is the as-built specification, §4 the dated decisions, §5 what is not built, §6 what was refused,
 > §7 the pointers, §8 how it is verified.
 >
@@ -499,7 +502,7 @@ name claims every edition is signed when **two of three** are, with no artifact 
 | Branch and release policy | `docs/BRANCHING.md`; [`branching-release.md`](spec-branching-release.md) |
 | The docs lifecycle | `CLAUDE.md` §Documentation lifecycle; `docs/INDEX.md` |
 | The shared setup | `.claude/` — three entry documents, team memory, four agents, five hooks, twelve skills, settings, launch configuration |
-| The guard roster in prose | `docs/PROJECT_NOTES.md` — the only prior inventory, and never a table |
+| The guard roster in prose | `docs/archived-documents/project-notes-2026-11-19.md` — the only prior inventory, and never a table |
 
 **Gap rows.** The doctrine page is a **rules register, not an inventory**: it never enumerates the roster
 with wiring, scope and floors, which is why §3.2 exists. Its own resource line omits the client token

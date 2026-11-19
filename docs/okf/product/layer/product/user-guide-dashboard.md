@@ -5,6 +5,10 @@ description: The default landing screen — operational KPIs and charts; BI dash
 resource: inspecto-ui/src/app/modules/admin/dashboard/dashboard.routes.ts
 tags: [feature, dashboard, kpi, charts, studio-bi]
 timestamp: 2026-07-07T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
 ---
 
 # Dashboard

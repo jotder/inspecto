@@ -5,6 +5,11 @@ description: How the Entity List module is built — the fact log, the fold, the
 resource: features/inspecto-entity-list/src/main/resources/META-INF/inspecto/module.toon
 tags: [entity-list, architecture]
 timestamp: 2026-10-19T00:00:00Z
+item: module.entity-list
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-entity-list
 ---
 
 # Entity Lists — architecture

@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Inspecto LA product demo videos — a plain, live walk-through with an explainer voice
+description: Draft script for the Link Analysis product demo video — the real product recorded live with an explainer voice — giving the scene format and the narration and zoom or box notes of the bank mule-ring demo.
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-16 last-edit
+code: [la/inspecto-la-core]
+---
+
 # Inspecto LA product demo videos — a plain, live walk-through with an explainer voice
 
 > **Draft of 2026-11-15, not reviewed by product or legal.** Operator direction (2026-11-15): no styled visuals. The picture is the **real product, full screen, recorded live**; the only graphics are a zoom or a mark on the node or subgraph being talked about. The voice does the explaining: short, vivid, conversational sentences in the manner of the reference explainer, a little faster than the earlier drafts, with the problem, the data, the mapping, the investigation and the conclusion told in that order. Same rules as [brochure-video-industry-scripts.md](brochure-video-industry-scripts.md): **no record counts or Dataset sizes** (say instead that search and filter answer in moments on millions of records), the outcome is a lead and never a verdict, no "fraudster", "criminal", "caught" or "proven".

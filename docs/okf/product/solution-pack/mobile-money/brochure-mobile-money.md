@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Mobile money — brochure
+description: Sales brochure for the Mobile money pack: proving the wallet ledger agrees with the bank float and partner settlements, and catching fee, commission, agent and wallet abuse every day.
+item: solution-pack.mobile-money
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/mobile-money]
+---
+
 # Mobile money — brochure
 
 > **Prove the wallet platform agrees with the bank and partners, and catch agent and wallet abuse every day.**

@@ -5,6 +5,10 @@ description: The Chart.js wrapper; canvas colors come exclusively from chart-tok
 resource: inspecto-ui/src/app/inspecto/components/chart.component.ts
 tags: [design-system, chart, chartjs, canvas]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
 ---
 
 # Chart

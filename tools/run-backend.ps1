@@ -20,7 +20,7 @@
          That is load-bearing: inspecto-connectors carries SmtpEmailChannel, and putting it on
          the classpath makes NotificationService.discoverChannels find a channel whose javax.mail
          dependency was never shipped — boot dies with NoClassDefFoundError: javax/mail/Message.
-         See docs/PROJECT_NOTES.md §4.
+         See docs/okf/product/layer/platform/architecture-backend-gotchas.md.
 
     Usage:
         pwsh -File tools/run-backend.ps1 [-Port 8080] [-Rebuild]

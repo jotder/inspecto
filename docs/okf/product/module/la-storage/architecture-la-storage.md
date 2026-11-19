@@ -5,6 +5,11 @@ description: How the link index is built, published, read and routed to, and how
 resource: la/inspecto-la-storage/
 tags: [module, la-storage, link-analysis, index, architecture]
 timestamp: 2026-10-19T00:00:00Z
+item: module.la-storage
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: la/inspecto-la-storage
 ---
 
 # Link analysis storage - architecture

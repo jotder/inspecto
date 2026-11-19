@@ -5,6 +5,11 @@ description: As built for PREDICTIVE-SEGMENT-RFM-1 (2026-11-01) — the first sl
 resource: docs/okf/product/module/anomaly/plan-predictive-analytics.md
 tags: [predictive, segmentation, rfm, customer-segment, job, analytics]
 timestamp: 2026-11-01T00:00:00Z
+item: module.predictive
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: features/inspecto-predictive
 ---
 
 # Customer Segments (declared RFM)
@@ -78,7 +83,7 @@ or in a table row, are refused — never ignored.
 config, so a back-dated run is `POST /jobs/{name}/trigger {"params":{"as_of":"…"}}`).
 
 1. **Read.** One statement through `MeasureCompiler` with a `window: {field: time, asOf, days: window}` (ANALYTICS-CORE-1
-   C1, [windowed Measures](../analytics/spec-analytics.md#windowed-and-ratio-measures)): `recency(time)`, the frequency and the
+   C1, [windowed Measures](../analytics/spec-analytics-distribution-time-series.md#windowed-and-ratio-measures)): `recency(time)`, the frequency and the
    monetary Measure, grouped by `key`, ordered by key, every date and value bound. NULL keys are dropped. An entity with
    no row in `(as_of − window, as_of]` has **no assignment**. A monetary value that is the sum of only NULLs is 0.
 2. **Bin.** Per dimension, the Analytics Kernel's quantile edges over the run's population

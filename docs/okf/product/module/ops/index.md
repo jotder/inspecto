@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Case management and objects — plan of record](plan-ops.md) |
+| plan | current | [module.ops - board row detail](plan-board-detail.md) · [Case management and objects — plan of record](plan-ops.md) |
 | spec | current | [Case management and objects — implementation spec](spec-ops.md) |
 | architecture | current | [Case management and objects — architecture](architecture-ops.md) |
 | features | current | [Case management and objects — features](features-ops.md) |
@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LEGAL-HOLD-SCOPE-1` | P3 | feature | a legal hold does not reach a Pipeline's data partitions, and has no screen (narrowed 2026-11-17; filed 2026-11-15 from ARCH-MOSCOW-UNTRA… | — |
+| `LEGAL-HOLD-SCOPE-1` | P3 | feature | A legal hold does not yet protect a Pipeline's data partitions, and holds have no screen. | — |

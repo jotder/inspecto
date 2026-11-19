@@ -4,6 +4,9 @@ title: Connection and Collector
 description: What a Connection and a Collector are — how to reach a remote system, and what to fetch from it and when — and how they feed a Pipeline.
 item: module.elt
 audience: external
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # Connection and Collector

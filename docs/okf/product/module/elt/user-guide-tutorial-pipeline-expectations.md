@@ -4,6 +4,9 @@ title: "Tutorial 2 — Make it a Pipeline with Expectations"
 description: "Open the orders and payments Pipelines of the Order-to-cash worked example, run its four Expectations, and find the planted mistakes: a negative payment, two orphan payments and a duplicate order."
 item: module.elt
 audience: external
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # Tutorial 2 — Make it a Pipeline with Expectations

@@ -5,6 +5,11 @@ description: Packages, classes, stores, config kinds, contributed seams and gate
 resource: features/inspecto-ops/src/main/java/com/gamma/ops/ObjectService.java
 tags: [ops, spec, objects, incidents, cases]
 timestamp: 2026-10-19T00:00:00Z
+item: module.ops
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-ops
 ---
 
 # Case management and objects — implementation spec

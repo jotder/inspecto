@@ -5,6 +5,11 @@ description: The Collector-level Unpack stage that turns Archives and compressed
 resource: platform/inspecto-etl/src/main/java/com/gamma/etl/unpack
 tags: [acquisition, unpack, decompression, archive, collector, consignment, ledger]
 timestamp: 2026-11-19T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # Part 3 — The Unpack stage

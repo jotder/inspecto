@@ -140,7 +140,7 @@ describe('DatasetFeedComponent - the inbox and Keep this up to date (LA-ARRIVAL-
         toggle().click();
         const req = http.expectOne(apiUrl('/datasets/calls/watch'));
         expect(req.request.method).toBe('PUT');
-        expect(req.request.body).toEqual({ watch: true });
+        expect(req.request.serializeBody()).toBe('{"watch":true}'); // byte for byte: the route reads only `watch`
         req.flush({
             ...STATE,
             automatic: false,
@@ -154,6 +154,27 @@ describe('DatasetFeedComponent - the inbox and Keep this up to date (LA-ARRIVAL-
         expect(q(el, 'watch-error')!.textContent).toContain('disk full');
         expect(fixture.componentInstance.last!.watch).toBe(true);
         await expectNoA11yViolations(el);
+    });
+
+    it('BASIC-ELT-PROFILE-1 U4-Watch: a watched import as B1 answers it (the 30 s schedule) is switched off with {"watch":false}', () => {
+        // since B1 the watch is the import Pipeline's locked 30 s schedule; the feed still answers uploads + watch
+        const { fixture, el } = create();
+        const basic = { ...STATE, automatic: false, watchable: true };
+        http.expectOne(apiUrl('/datasets/calls/feed')).flush({ ...basic, watch: true });
+        fixture.detectChanges();
+        const toggle = () => el.querySelector<HTMLButtonElement>('[data-testid="watch-folder"] button')!;
+        expect(toggle().getAttribute('aria-checked')).toBe('true');
+        expect(q(el, 'dataset-inbox')!.textContent).toContain('once they have stopped changing');
+        expect(q(el, 'dataset-inbox')!.textContent).toContain('checked every 30 seconds');
+        toggle().click();
+        const req = http.expectOne(apiUrl('/datasets/calls/watch'));
+        expect(req.request.method).toBe('PUT');
+        expect(req.request.serializeBody()).toBe('{"watch":false}');
+        req.flush({ ...basic, watch: false }); // back to trigger: manual
+        fixture.detectChanges();
+        expect(toggle().getAttribute('aria-checked')).toBe('false');
+        expect(q(el, 'dataset-inbox')!.textContent).toContain('wait there until you import them');
+        expect(fixture.componentInstance.last!.watch).toBe(false);
     });
 
     it('a table snapshot: no inbox and no refresh toggle - it is copied again only by Refresh now (no violations)', async () => {

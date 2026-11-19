@@ -34,7 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `p
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-FULL-CYCLE-RESIDUALS-1` | P3 | chore | what the full-cycle plan left on purpose, and two environment gaps its drive found. | — |
-| `LA-TRAINING-SERIES-1` | P3 | feature | an Inspecto LA user training video series, planned and decided (D-TR1…D-TR7, 2026-11-16); all 41 episodes rendered 2026-11-19 (I1 and I2… | operator |
-| `LA-CASE-VIDEOS-2` | P3 | feature | the twenty industry case films re-specified and re-recorded to the training-series standard (proposed 2026-11-19, D-CV1…D-CV6 open; specs… | operator |
-| `LA-EXEC-DEMO-POLISH-1` | P3 | chore | what the third executive review of Inspecto LA (2026-11-16) left as polish, plus amounts on the links. | — |
+| `LA-FULL-CYCLE-RESIDUALS-1` | P3 | chore | Eight items the LA full-cycle plan left on purpose, plus two environment gaps its drive found. | — |
+| `LA-TRAINING-SERIES-1` | P3 | feature | An Inspecto LA user training video series of 41 episodes. | operator |
+| `LA-CASE-VIDEOS-2` | P3 | feature | Re-specify and re-record the twenty industry case films to the training-series standard. | operator |
+| `LA-EXEC-DEMO-POLISH-1` | P3 | chore | Polish left by the third executive review of Inspecto LA, plus transfer amounts drawn on the links. | — |

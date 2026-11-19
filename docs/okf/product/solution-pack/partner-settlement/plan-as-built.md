@@ -4,6 +4,11 @@ title: "Partner settlement — decisions and as-built record"
 description: "Slices S0 to S7 of PACK-PARTNER-SETTLEMENT-1 as built: the answered decisions with how to reverse them, the corpus, the mutation passes, the measurements, the deviations from the plan and the traps found."
 tags: [partner-settlement, plan, as-built]
 timestamp: 2026-11-01T00:00:00Z
+item: solution-pack.partner-settlement
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: spaces/_templates/partner-settlement
 ---
 
 # Partner settlement — decisions and as-built record
@@ -65,7 +70,7 @@ Two statements name an unknown partner (`P99`) and an unknown agreement for a kn
 
 ## S1 to S3: References, ingestion and the compare
 
-Golden: 9 `amount_mismatch` (corrected 2026-11-01 from 8: the corpus also plants A1 `06-26`), 2 `cutoff_difference`, 1 `fx_difference`, 1 `missing_statement`, 1 `unrated_usage`, every look-alike
+Golden: 9 `amount_mismatch` (the corpus plants A1 `06-26` among them), 2 `cutoff_difference`, 1 `fx_difference`, 1 `missing_statement`, 1 `unrated_usage`, every look-alike
 silent; every expected and billed amount equals a plain-Java oracle; the Breaks equal the oracle's key set; a second run gives the
 same counts. Tests: `PartnerSettlementCorpusTest` (4), `PartnerSettlementReferenceTest` (4), `PartnerSettlementSeedTest` (1),
 `PartnerSettlementPackGoldenTest` (12); `ControlApiSpaceTemplateSeedGateTest` applies the template and checks its runbook.
@@ -237,3 +242,7 @@ four-eyes path delivering them, `sourceChanged` after a row change, the 422 and 
 **Traps.** ⚠ A template source walks maps by `.`, so an Incident attribute named `key.<column>` cannot be addressed by a field;
 the `rows` source reads it on the server instead. ⚠ The seed of `settlement_dispute` was regenerated (new columns); restore every
 other seed after `PARTNER_SETTLEMENT_REGENERATE=true`.
+
+## Changes
+
+- 2026-11-01: S1–S3 golden count corrected — it said 8 `amount_mismatch`, missing A1 `06-26`.

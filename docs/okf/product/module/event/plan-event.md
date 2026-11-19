@@ -4,12 +4,17 @@ title: "Event model and log — plan"
 description: "Requirement of record for the event model, event log and audit chain: what is required, built, left and refused."
 tags: [event, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.event
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: platform/inspecto-event
 ---
 
 # Event model and log — plan
 
 The capability-level requirement of record for events, the signal ledger and the audit trail is the
-`OPS` area ([`REQUIREMENTS.md`](../../../../REQUIREMENTS.md) §3.7, `OPS-1` … `OPS-6`), whose
+`OPS` area ([`REQUIREMENTS.md`](../../layer/platform/spec-requirements.md) §3.7, `OPS-1` … `OPS-6`), whose
 authoritative file is the [observability plan](../observability/plan-observability.md). This page
 records what falls to the `inspecto-event` module.
 
@@ -17,9 +22,9 @@ records what falls to the `inspecto-event` module.
 
 - **Every edition records events and the audit trail.** Recording is a compliance obligation, not a
   feature; only reading the feed back over HTTP is edition-gated (`EDG-01` cell 6, 2026-09-08, see
-  [`spec-editions.md`](../../layer/platform/spec-editions.md) *Audit* and `CP-13`).
+  [`spec-editions-platform-board.md`](../../layer/platform/spec-editions-platform-board.md) *Audit* and `CP-13`).
 - **A tamper-evident audit chain** — `ASSURE-AUDIT-CHAIN-1` (shipped 2026-09-27) and its residuals
-  `ASSURE-AUDIT-CHAIN-RESIDUALS-1` ([REQUIREMENTS](../../../../REQUIREMENTS.md)).
+  `ASSURE-AUDIT-CHAIN-RESIDUALS-1` ([REQUIREMENTS](../../layer/platform/spec-requirements.md)).
 - **Durable events** — a configured durable backend must not silently lose the trail on restart
   (`EVENTS-DURABLE-1`, cited in `ServiceStores`): a failed open is reported as a degraded store.
 - **Secrets never reach the log** (`SecretScrubber`) and audit rows are masked on read for a caller
@@ -43,6 +48,6 @@ records what falls to the `inspecto-event` module.
 ## Refused or deferred
 
 - **Per-record lineage / replay** (`OPS-6`) — per-batch ancestry is the accepted grain
-  ([REQUIREMENTS](../../../../REQUIREMENTS.md)).
+  ([REQUIREMENTS](../../layer/platform/spec-requirements.md)).
 - Multi-writer audit chains: one chain writer per directory or database; a second writer is refused
   rather than merged.

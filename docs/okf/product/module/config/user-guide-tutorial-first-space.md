@@ -4,6 +4,9 @@ title: "Tutorial 1 — Your first Space and Dataset"
 description: "Create the Order-to-cash Space from its Space Template, see its two sample feeds land, and look at the orders Dataset: its columns, its rows and the files it came from."
 item: module.config
 audience: external
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-config
 ---
 
 # Tutorial 1 — Your first Space and Dataset

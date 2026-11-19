@@ -4,6 +4,11 @@ title: "Entity lists — features"
 description: "Entity Lists hold named sets of entities — numbers, accounts, ranges, CIDR blocks — that Pipelines and analysts match against."
 tags: [entity-list, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.entity-list
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-entity-list
 ---
 
 # Entity lists — features

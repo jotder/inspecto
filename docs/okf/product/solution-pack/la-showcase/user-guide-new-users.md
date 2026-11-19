@@ -4,6 +4,11 @@ title: "Link Analysis showcase Spaces — new-user guide"
 description: "For someone opening Inspecto Link Analysis for the first time with a showcase Space installed: what the data is, how it is mapped, how to observe it, what you are trying to find in each of the 18 Spaces, and the steps to find it, with worked examples on la-sample and la-utility."
 tags: [la-showcase, user-guide, showcase, onboarding]
 timestamp: 2026-11-15T00:00:00Z
+item: solution-pack.la-showcase
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: spaces/_templates/la-showcase
 ---
 
 # Link Analysis showcase Spaces — new-user guide
@@ -348,7 +353,7 @@ two industries and is listed under both.
    4. The ordinary transfers are the contrast: they stay outside the ring's group.
 
 For the full exercise on the same data, with figures, see *Find a money-mule ring* in the
-[Link Analysis user guide](../../module/la-core/user-guide-la-core.md#13-worked-examples) (it uses
+[Link Analysis user guide](../../module/la-core/user-guide-la-core-examples-roles.md#13-worked-examples) (it uses
 `la-showcase`, which carries the same corpus).
 
 ### Worked example: `la-utility` (Utilities)

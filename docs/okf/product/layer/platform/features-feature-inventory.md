@@ -1,18 +1,30 @@
+---
+type: Reference
+title: Feature and example inventory
+description: Every user-facing engine feature an example can exercise, its TOON shape and where it is defined, plus the example set.
+tags: [features, examples, toon, inventory]
+timestamp: 2026-11-19T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+---
+
 # Feature & Example Inventory — advanced reference
 
 > **What this is.** A map of *every user-facing engine feature* an example/config can exercise —
 > its TOON config shape and where it's defined (doc + code) — plus the existing examples, how the
 > release bundle is assembled, what a config minimally needs to run, and a recommended example set.
 > Written for advanced users and for anyone extending the worked-example suite in
-> [`../inspecto/examples/`](../inspecto/examples).
+> [`../inspecto/examples/`](../../../../../inspecto/examples).
 >
 > **Point-in-time snapshot** (compiled 2026-06-20). Status tags — `[LIVE]` shipped, `[NATIVE]`/
 > `[PROPOSED]` not yet wired — and `file:line` references reflect the tree at that date; **verify
 > against current code** before relying on a specific line. The authoritative living docs are
-> [`configuration.md`](okf/product/module/config/admin-guide-configuration-reference.md) (all TOON keys), [`parsing-options-reference.md`](okf/product/module/elt/spec-parsing.md)
-> (frontend status), and [`ADVANCED_GUIDE.md`](ADVANCED_GUIDE.md) (runtime flags, events, metrics, Control API).
+> [`configuration.md`](../../module/config/admin-guide-configuration-reference.md) (all TOON keys), [`parsing-options-reference.md`](../../module/elt/spec-parsing.md)
+> (frontend status), and [`ADVANCED_GUIDE.md`](../../../../ADVANCED_GUIDE.md) (runtime flags, events, metrics, Control API).
 >
-> **Which module ships in which edition** is not tabulated here: the generated *Offerings matrix* in [`spec-editions.md`](okf/product/layer/platform/spec-editions.md) is the one place (module × edition, add-ons, deployment posture, jar counts).
+> **Which module ships in which edition** is not tabulated here: the generated *Offerings matrix* in [`spec-editions-placement.md`](spec-editions-placement.md#offerings-matrix-generated) is the one place (module × edition, add-ons, deployment posture, jar counts).
 >
 > **Shipped after this snapshot (2026-07-07 addendum)** — not yet folded into the tables below: the
 > versioned **`/api/v1`** contract (envelope, error-code catalog, ETag/`contentHash`, `GET /bootstrap`,
@@ -25,8 +37,8 @@
 > **guided Stream/Reference onboarding** (2026-07-16: Catalog ▸ Onboard — draft = `active:false`
 > pipeline, stage rail, sample previews `POST /config/preview/parsing|schema`, `produces: reference`
 > origins + by-name enrichment binding, `POST /enrichment` hot-register; seams in
-> [`okf/product/module/processor/api-onboarding-authoring.md`](okf/product/module/processor/api-onboarding-authoring.md)).
-> Current status lives in [`REQUIREMENTS.md`](REQUIREMENTS.md) §3 and the OKF bundle.
+> [`okf/product/module/processor/api-onboarding-authoring.md`](../../module/processor/api-onboarding-authoring.md)).
+> Current status lives in [`REQUIREMENTS.md`](spec-requirements.md) §3 and the OKF bundle.
 
 ---
 
@@ -118,10 +130,9 @@ Types: `enrich`, `report`, `maintenance`, `pipeline` (`JobConfig.load()` — enu
 
 ### G — Authored Pipelines (`*_pipeline.toon`) [`PIP`]
 
-> 🔴 **Heading corrected 2026-09-09 (step 8).** It read "Authored flows (`*_flow.toon`)" — the banned synonym *and* the retired representation. `*_flow.toon` write routes have answered **405 since W5**; measured today, **one** grandfathered file survives (`sales_rollup_flow.toon`, allowlisted in `tools/check-vocabulary.mjs`) against **35** `*_pipeline.toon`. The authored DAG is a **Pipeline** (`GLOSSARY.md` §5) — ⛔ author no new `*_flow.toon`.
+> 🔴 `*_flow.toon` is the retired representation: its write routes have answered **405 since W5**; measured 2026-09-09, **one** grandfathered file survives (`sales_rollup_flow.toon`, allowlisted in `tools/check-vocabulary.mjs`) against **35** `*_pipeline.toon`. The authored DAG is a **Pipeline** (`GLOSSARY.md` §5) — ⛔ author no new `*_flow.toon`.
 
-Node types from `PipelineNodeTypes.catalog()`. (⚠ **Corrected 2026-08-18**: the `demo` space no longer
-ships an authored-flow example — `orders_rollup_flow.toon` was converted to the canonical at-rest shape
+Node types from `PipelineNodeTypes.catalog()`. (The `demo` space ships no authored-flow example — `orders_rollup_flow.toon` was converted to the canonical at-rest shape
 (`steps:` + `output_store:` in `orders/orders_pipeline.toon`, run via the job's `pipeline_config:`), and
 the unconvertible `regional_orders_merge_flow.toon` was removed. The format stays GRANDFATHERED — readable,
 runnable and deletable, never newly written (the `Pipeline*Routes` modules). The shape now lives only in test Java strings
@@ -155,7 +166,7 @@ runnable and deletable, never newly written (the `Pipeline*Routes` modules). The
 
 ### I — Acquisition (`collector:` block) [`ACQ`]
 
-> 🔴 **Heading corrected 2026-09-09 (step 8).** It read "`source:` block". Measured: **zero** committed `.toon` files carry a `source:` key and **22** carry `collector:` — the acquisition-entity rename to **Collector** (`GLOSSARY.md` §2/§3, 2026-07-14) never reached this heading, so the canon advertised a key the product does not read.
+> Measured 2026-09-09: **zero** committed `.toon` files carry a `source:` key and **22** carry `collector:` — the acquisition entity is the **Collector** (`GLOSSARY.md` §2/§3); the product does not read `source:`.
 
 | Feature | TOON skeleton | Doc |
 |---|---|---|
@@ -195,7 +206,7 @@ runnable and deletable, never newly written (the `Pipeline*Routes` modules). The
 
 ---
 
-## 2. Existing example configs (under `spaces/<id>/config/` — `ucc` hosts voucher; `default` hosts the format-example pack (csv/fixedwidth/excel/json — one worked pipeline per DuckDB-native parser frontend, replacing the retired subscriber/gwlog/cdr/csv_demo pipelines 2026-08-20 — plus `asn1_example`/`xml_example` for the plugin-ingester frontends, 2026-09-06), the **Step catalog** (`<kind>_step/` — one pipeline per Step kind of `step-types.contract.json`; the six at-rest ones (filter, dedup, join, summarize, sql, lookup) run through `jobs/<kind>_step_rollup_job.toon`, mirroring `inspecto/examples/07-steps/`), and a Catalog/KPI demo (`events/` — a semantic model only; its sample corpus was removed 2026-09-06); `demo` hosts the full editable sample catalog — one sample of every authorable kind + committed sample data, see [`../spaces/demo/config/README.md`](../spaces/demo/config/README.md))
+## 2. Existing example configs (under `spaces/<id>/config/` — `ucc` hosts voucher; `default` hosts the format-example pack (csv/fixedwidth/excel/json — one worked pipeline per DuckDB-native parser frontend, replacing the retired subscriber/gwlog/cdr/csv_demo pipelines 2026-08-20 — plus `asn1_example`/`xml_example` for the plugin-ingester frontends, 2026-09-06), the **Step catalog** (`<kind>_step/` — one pipeline per Step kind of `step-types.contract.json`; the six at-rest ones (filter, dedup, join, summarize, sql, lookup) run through `jobs/<kind>_step_rollup_job.toon`, mirroring `inspecto/examples/07-steps/`), and a Catalog/KPI demo (`events/` — a semantic model only; its sample corpus was removed 2026-09-06); `demo` hosts the full editable sample catalog — one sample of every authorable kind + committed sample data, see [`../spaces/demo/config/README.md`](../../../../../spaces/demo/config/README.md))
 
 | File | Demonstrates |
 |---|---|
@@ -278,7 +289,7 @@ flags so the mandatory ones can't be clobbered, and echoed at launch so an inert
 ## 5. Recommended example set (build plan)
 
 Layout: `examples/<NN>-<category>/<name>/` — each with `*.toon` + a tiny `samples/` + its own `out/`.
-**Phase 1 (`[done]`) is built, verified, and shipped** in [`../inspecto/examples/`](../inspecto/examples);
+**Phase 1 (`[done]`) is built, verified, and shipped** in [`../inspecto/examples/`](../../../../../inspecto/examples);
 the rest are planned in subsequent phases. Features that can't run offline (remote connections, the
 `[PROPOSED]` frontends, custom-class plugins, RCA) ship as labeled `_reference/` templates.
 
@@ -315,10 +326,8 @@ not committable), and `hive_partitioning` is **off**, matching `DatasetRelation`
 
 ## 6. Known gaps
 
-- ~~No `*_flow.toon` or `*_rca.toon` example exists in the repo — the shapes live only in tests.~~
-  ~~**Stale, corrected 2026-07-22**: the `demo` sample catalog now ships both.~~
-  **Re-corrected 2026-08-18**: the demo space's authored flows were converted/removed, so only the RCA
-  template (`spaces/demo/config/ops/orders_rca.toon`) still ships. The one remaining `*_flow.toon` in the
+- The demo space ships no authored `*_flow.toon` example; only the RCA template
+  (`spaces/demo/config/ops/orders_rca.toon`) ships. The one remaining `*_flow.toon` in the
   repo is `inspecto/examples/06-serve/pipeline-job/write/flows/sales_rollup_flow.toon` — deliberately
   retained as the live end-to-end proof for PIP-1. The TOON shapes are additionally exercised in tests
   (`ControlApiPipelineCrudTest`, `PipelineJobRunnerTest`).
@@ -336,12 +345,19 @@ not committable), and `hive_partitioning` is **off**, matching `DatasetRelation`
   `ComponentPreview.textRegexSelect` mirrors the same block-mode SQL for UI previews. Default
   (line-per-record) behavior is unchanged. See `platform/inspecto-etl/src/test/java/com/gamma/etl/TextRegexTest.java`
   (`blankLineRecordSplitSpansMultipleLines`, `literalDelimiterRecordSplitIsAccepted`).
-- ~~No subscriber `.dat` / plugin-binary sample data in the repo — synthesize for those examples.~~
-  **Partly stale, corrected 2026-07-22**: subscriber `.dat` samples shipped from then until 2026-09-06, when the
-  four retired corpora (subscriber/events/cdr/gwlog — their pipelines went 2026-08-20) were removed with their
-  seed arms (SAMPLE-1-REMOVE). Only the plugin/CALL **binary** samples remain unsynthesized.
-- ~~`package.ps1` pre-creates inbox/database dirs only for `adjustment` + `voucher`~~ **stale, corrected
-  2026-07-20**: `package.ps1` does not pre-create any adapter inbox/database dirs — the bundle's own
-  comment (line 21) tells the operator to create `inspecto-deploy/inbox/<adapter>/` manually;
-  dir creation was the `ura` CLI's `prepare-inbox` command (retired 2026-11-06). The example suite sidesteps all of this by being self-contained (each example owns its
-  `out/`).
+- No subscriber `.dat` and no plugin/CALL **binary** sample data in the repo — synthesize for those examples.
+- `package.ps1` does not pre-create any adapter inbox/database dirs — the bundle's own comment (line 21) tells
+  the operator to create `inspecto-deploy/inbox/<adapter>/` manually. The example suite sidesteps all of this by
+  being self-contained (each example owns its `out/`).
+
+## Changes
+
+- 2026-07-20: the `package.ps1` gap corrected — it said the script pre-creates inbox/database dirs for `adjustment` +
+  `voucher`; dir creation was the `ura` CLI's `prepare-inbox` command, retired 2026-11-06.
+- 2026-07-22: the sample-data gaps corrected — the demo catalog then shipped `*_flow.toon` and `*_rca.toon` examples
+  and subscriber `.dat` samples.
+- 2026-08-18: the demo space's authored flows converted or removed, leaving only the RCA template.
+- 2026-09-06: subscriber `.dat` samples removed with the four retired corpora (subscriber/events/cdr/gwlog, whose
+  pipelines went 2026-08-20) and their seed arms (SAMPLE-1-REMOVE).
+- 2026-09-09: headings G and I corrected — they read "Authored flows (`*_flow.toon`)" (the banned synonym and the
+  retired representation) and "`source:` block" (the acquisition entity before the rename to Collector, 2026-07-14).

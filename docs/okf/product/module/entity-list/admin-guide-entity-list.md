@@ -5,6 +5,11 @@ description: Enabling Entity Lists, the capabilities that gate them, storage on 
 resource: features/inspecto-entity-list/src/main/resources/META-INF/inspecto/module.toon
 tags: [entity-list, admin-guide, operations]
 timestamp: 2026-10-19T00:00:00Z
+item: module.entity-list
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-entity-list
 ---
 
 # Entity Lists — admin guide

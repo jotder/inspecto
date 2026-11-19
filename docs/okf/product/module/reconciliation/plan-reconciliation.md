@@ -5,6 +5,11 @@ description: What was required of Reconciliation (2- and 3-way Dataset compariso
 resource: features/inspecto-reconciliation/
 tags: [reconciliation, plan, requirement, breaks]
 timestamp: 2026-10-19T00:00:00Z
+item: module.reconciliation
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: features/inspecto-reconciliation
 ---
 
 # Reconciliation — requirement of record

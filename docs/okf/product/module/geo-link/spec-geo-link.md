@@ -5,6 +5,11 @@ description: Classes, invariants and failure handling of inspecto-geo-link, the 
 resource: la/inspecto-geo-link/
 tags: [module, geo-link, link-analysis, spec]
 timestamp: 2026-10-19T00:00:00Z
+item: module.geo-link
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: la/inspecto-geo-link
 ---
 
 # Geo and link adapters — implementation spec

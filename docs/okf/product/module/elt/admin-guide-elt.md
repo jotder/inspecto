@@ -4,6 +4,11 @@ title: "ELT — admin guide"
 description: "Operating the ELT layer: Pipeline directories and roots, the -D flags for acquisition, intake admission control, ingest retry and lane, Jobs and Job packs, the ledgers and files on disk, quarantine, markers, start-up warnings, health and metrics routes, and one table of common failures."
 tags: [elt, etl, acquire, engine, admin-guide]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # ELT — admin guide
@@ -31,7 +36,7 @@ routes, and one table of common failures with their cause and fix. None of these
 
 - **`platform/inspecto-acquire`** (Base, every Edition) — acquisition: Collectors, Connections, the
   acquisition ledger, the stability gate, the circuit breaker, intake admission control. Collector and
-  Connection authoring is in [the user guide, §21](user-guide-elt.md#21-collectors-and-collector-configuration);
+  Connection authoring is in [the user guide, §21](user-guide-elt-collectors-runs.md#21-collectors-and-collector-configuration);
   routes are in [api-elt.md](api-elt.md).
 - **`platform/inspecto-etl`** holds the Pipeline config model (`PipelineConfig`, `PipelineConfigParser`),
   the step registry and the per-file machinery (ingest, partition writing, quarantine, markers, ledgers). It
@@ -211,7 +216,7 @@ In story order: acquisition, ingest, Jobs, packs.
 | File stays in the inbox, never processed | A marker exists for it (`dirs.markers`) | — |
 | Re-run re-ingests everything | `<pipeline>_commits.log` missing or not restored | — |
 | Run slow, cores saturated | — | The oversubscription warning; lower `threads` / `duckdb_threads`. |
-| File quarantined `retry_exhausted` | COMMIT failed `ingest.retry.max` times | Fix the cause, then reprocess or replay from the Runs screen ([user guide §22](user-guide-elt.md#22-runs-and-run-detail)). |
+| File quarantined `retry_exhausted` | COMMIT failed `ingest.retry.max` times | Fix the cause, then reprocess or replay from the Runs screen ([user guide §22](user-guide-elt-collectors-runs.md#22-runs-and-run-detail)). |
 | `-Dingest.lane=graph` batch fails naming a reason | The write needs the flat lane | Revert to `auto`, record the dependency. |
 | `no allowed roots configured for '<field>'` | No `-Dassist.safety.roots` and no hosted Space | Declare the roots at launch. |
 | Runs queue instead of starting | `jobs.maxConcurrentRuns` reached | Raise it with care: each Run's DuckDB `memory_limit` multiplies by it. |

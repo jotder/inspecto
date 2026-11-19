@@ -5,6 +5,10 @@ description: The Angular workspace behind the Inspecto web UI — what it is, it
 resource: inspecto-ui/
 tags: [architecture, inspecto-ui, angular, tech-stack, layering, shared-libraries, signals, app-shell]
 timestamp: 2026-11-12T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Architecture

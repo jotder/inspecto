@@ -11,6 +11,7 @@ import com.gamma.entitystore.LaLimitValues;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.etl.EditionFeatures;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.etl.SchemaDrift;
 import com.gamma.onboard.ImportFollowOn;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
@@ -40,7 +41,6 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -714,13 +714,19 @@ final class OnboardImport {
         };
     }
 
+    /**
+     * The Dataset entry's column type for an engine type: {@code number}, {@code date}, {@code timestamp},
+     * {@code boolean}, else what a Dataset read calls it ({@link com.gamma.query.ResultSetDescriptor#columnType(String)}):
+     * a time of day ({@code TIME}) is {@code date}, the temporal type (U3, 2026-11-20; it was {@code string}), text is
+     * {@code string}.
+     */
     static String datasetType(String engine) {
         return switch (engine) {
             case "BIGINT", "DOUBLE" -> "number";
             case "DATE" -> "date";
             case "TIMESTAMP" -> "timestamp";
             case "BOOLEAN" -> "boolean";
-            default -> "string";
+            default -> com.gamma.query.ResultSetDescriptor.columnType(engine);
         };
     }
 
@@ -1643,18 +1649,44 @@ final class OnboardImport {
 
     /**
      * A later file judged against the Dataset's columns: why it is refused (null = accepted), its new columns, and - for
-     * delimited text with new columns - the columns to keep ({@code keep}, in order) and the file's delimiter and quote.
+     * delimited text with new columns - the columns to keep ({@code keep}, in order), the file's delimiter and quote, and
+     * the lines before its header line ({@code skip}: as many as the import skips, or the file was refused).
      */
     record ColumnCheck(String refusal, List<String> newColumns, List<String> keep, String delimiter, String quote, List<String> missing,
-                       List<OnboardDraft.Col> freshCols) {
+                       List<OnboardDraft.Col> freshCols, int skip) {
         ColumnCheck(String refusal, List<String> newColumns, List<String> missing, List<OnboardDraft.Col> freshCols) {
-            this(refusal, newColumns, List.of(), null, null, missing, freshCols);
+            this(refusal, newColumns, List.of(), null, null, missing, freshCols, 0);
         }
 
         /** The same check keeping {@code keep} (the read columns plus the new ones a run kept, LA-ARRIVAL-NEW-COLUMNS-1). */
         ColumnCheck withKeep(List<String> keep) {
-            return new ColumnCheck(refusal, newColumns, keep, delimiter, quote, missing, freshCols);
+            return new ColumnCheck(refusal, newColumns, keep, delimiter, quote, missing, freshCols, skip);
         }
+    }
+
+    /** The schema's fields ({@code {selector, name, type}}) as the engine's drift comparison reads them. */
+    private static List<SchemaDrift.Declared> declared(List<String[]> fields) {
+        List<SchemaDrift.Declared> out = new ArrayList<>();
+        for (String[] f : fields) out.add(new SchemaDrift.Declared(f[0], f[1], f[2]));
+        return out;
+    }
+
+    /** A file's columns as the engine's drift comparison reads them: the cleaned name, the selector, the profiler's type. */
+    private static List<SchemaDrift.Observed> observed(List<OnboardDraft.Col> cols) {
+        List<SchemaDrift.Observed> out = new ArrayList<>();
+        for (OnboardDraft.Col c : cols) out.add(observed(c));
+        return out;
+    }
+
+    static SchemaDrift.Observed observed(OnboardDraft.Col c) {
+        return new SchemaDrift.Observed(c.name(), c.selector(), c.type(), c.format());
+    }
+
+    /** The columns of {@code cols} that {@code picked} names, in file order. */
+    private static List<OnboardDraft.Col> colsOf(List<SchemaDrift.Observed> picked, List<OnboardDraft.Col> cols) {
+        List<OnboardDraft.Col> out = new ArrayList<>();
+        for (OnboardDraft.Col c : cols) if (picked.contains(observed(c))) out.add(c);
+        return out;
     }
 
     /** C2: the missing-column entry, once per column the Dataset reads that the file lacks. */
@@ -1700,10 +1732,13 @@ final class OnboardImport {
      * New columns of delimited text are not kept: the engine reads by position and sets aside a file whose rows have more
      * fields than the import reads, so the file is rewritten in place with the read columns only (they lead the line: a
      * read column at another position is refused). DuckDB reads and writes it, so quoting is kept right; values stay text.
+     * The lines before the header line ({@code skip_header_lines}, BE-3) are read past and written back as they were:
+     * the import skips them in every file it reads.
      */
     static void keepReadColumns(Path dir, Path file, ColumnCheck c) throws IOException {
         if (c.keep().isEmpty() || c.freshCols().isEmpty()) return;
         Path tmp = file.resolveSibling(".keep-" + file.getFileName());
+        Path whole = file.resolveSibling(".kept-" + file.getFileName());
         String delim = SqlIdent.sqlStr(c.delimiter() == null ? "," : c.delimiter());
         String quote = SqlIdent.sqlStr(c.quote() == null ? "\"" : c.quote());
         String cols = String.join(", ", c.keep().stream().map(SqlIdent::q).toList());
@@ -1711,14 +1746,36 @@ final class OnboardImport {
             DuckDbUtil.loadDriver();
             try (Connection conn = DuckDbUtil.openInMemory(null, List.of(dir));
                  Statement st = conn.createStatement()) {
-                st.execute("COPY (SELECT " + cols + " FROM read_csv(" + SqlIdent.pathStr(file) + ", header = true, all_varchar = true, delim = "
-                        + delim + ", quote = " + quote + ")) TO " + SqlIdent.pathStr(tmp) + " (FORMAT CSV, HEADER, DELIMITER " + delim + ")");
+                st.execute("COPY (SELECT " + cols + " FROM read_csv(" + SqlIdent.pathStr(file) + ", header = true, skip = " + c.skip()
+                        + ", all_varchar = true, delim = " + delim + ", quote = " + quote + ")) TO " + SqlIdent.pathStr(tmp)
+                        + " (FORMAT CSV, HEADER, DELIMITER " + delim + ")");
+            }
+            if (c.skip() > 0) {
+                try (java.io.OutputStream out = Files.newOutputStream(whole)) {
+                    out.write(leadingLines(file, c.skip()));
+                    Files.copy(tmp, out);
+                }
+                Files.move(whole, tmp, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             }
             Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (ClassNotFoundException | java.sql.SQLException failed) {
-            Files.deleteIfExists(tmp);
             throw new IOException("the new columns of '" + file.getFileName() + "' could not be left out: " + failed.getMessage(), failed);
+        } finally {
+            Files.deleteIfExists(tmp);
+            Files.deleteIfExists(whole);
         }
+    }
+
+    /** The first {@code n} lines of {@code file}, byte for byte, line ends included. */
+    private static byte[] leadingLines(Path file, int n) throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        try (java.io.InputStream in = new java.io.BufferedInputStream(Files.newInputStream(file))) {
+            for (int b, lines = 0; lines < n && (b = in.read()) != -1; ) {
+                out.write(b);
+                if (b == '\n') lines++;
+            }
+        }
+        return out.toByteArray();
     }
 
     /**
@@ -1747,7 +1804,6 @@ final class OnboardImport {
         List<String> problems = new ArrayList<>();
         List<String> missing = new ArrayList<>();
         List<String> fresh = new ArrayList<>();
-        Set<String> read = new LinkedHashSet<>();
         if ("csv".equals(type) || "tsv".equals(type)) {
             int max = -1;
             boolean headerless = true;
@@ -1778,40 +1834,40 @@ final class OnboardImport {
             if (has != skips)
                 problems.add("it has " + Words.count(has, "line", "lines") + " before the " + (headerless ? "first record" : "header line")
                         + " and '" + id + "' skips " + skips);
+            // BASIC-ELT-PROFILE-1 B5: the engine's one comparison (SchemaDrift.diff); the refusal words stay Add data's
+            List<OnboardDraft.Col> cols = a.cols();
             if (headerless) {
-                if (a.cols().size() <= max)
-                    problems.add("it has " + a.cols().size() + " columns and '" + id + "' reads " + (max + 1));
+                SchemaDrift.Diff d = SchemaDrift.diff(declared(fields), observed(cols), SchemaDrift.By.WIDTH);
+                if (!d.missing().isEmpty())
+                    problems.add("it has " + d.observedWidth() + " columns and '" + id + "' reads " + d.declaredWidth());
                 else {
-                    String cut = cutRefusal(name, id, fields, f -> a.cols().get(Integer.parseInt(f[0])));
+                    String cut = cutRefusal(name, id, fields, f -> cols.get(Integer.parseInt(f[0])));
                     if (cut != null) return new ColumnCheck(cut, List.of(), List.of(), List.of());
                 }
             } else {
-                List<String> actual = a.cols().stream().map(OnboardDraft.Col::name).toList();
-                for (String[] f : fields) {
-                    int sel = Integer.parseInt(f[0]);
-                    read.add(f[1]);
-                    if (sel < actual.size() && actual.get(sel).equals(f[1])) continue;
-                    int at = actual.indexOf(f[1]);
-                    if (at < 0) missing.add(f[1]);
-                    problems.add(at < 0 ? "'" + f[1] + "' is missing" + (kept.containsKey(f[1]) ? " (" + kept.get(f[1]) + ")" : "")
-                            : "'" + f[1] + "' is column " + (at + 1) + " here and column " + (sel + 1) + " in '" + id + "'");
+                SchemaDrift.Diff d = SchemaDrift.diff(declared(fields), observed(cols), SchemaDrift.By.POSITION);
+                for (SchemaDrift.Placed p : d.fields()) {
+                    String n = p.field().name();
+                    if (p.missing()) {
+                        missing.add(n);
+                        problems.add("'" + n + "' is missing" + (kept.containsKey(n) ? " (" + kept.get(n) + ")" : ""));
+                    } else if (p.moved()) {
+                        problems.add("'" + n + "' is column " + (p.at() + 1) + " here and column "
+                                + (Integer.parseInt(p.field().selector()) + 1) + " in '" + id + "'");
+                    }
                 }
-                for (String n : actual) if (!read.contains(n)) fresh.add(n);
+                for (SchemaDrift.Observed o : d.added()) fresh.add(o.name());
                 if (problems.isEmpty()) {
-                    String cut = cutRefusal(name, id, fields, f -> a.cols().get(Integer.parseInt(f[0])));
+                    String cut = cutRefusal(name, id, fields, f -> cols.get(Integer.parseInt(f[0])));
                     if (cut != null) return new ColumnCheck(cut, List.copyOf(fresh), List.of(), List.of());
                 }
                 if (problems.isEmpty() && !fresh.isEmpty()) {
                     // the file's OWN header text: read_csv names its columns by it, not by the cleaned-up name
-                    List<String> keep = a.cols().subList(0, max + 1).stream().map(OnboardDraft.Col::header).toList();
-                    // the new columns by position (they follow the read ones); a name the Dataset reads again ends them
-                    List<OnboardDraft.Col> freshCols = new ArrayList<>();
-                    for (OnboardDraft.Col c : a.cols().subList(max + 1, a.cols().size())) {
-                        if (!fresh.contains(c.name())) break;
-                        freshCols.add(c);
-                    }
-                    return new ColumnCheck(null, List.copyOf(fresh), keep,
-                            choiceValue(a.format(), "delimiter"), choiceValue(a.format(), "quote"), List.of(), List.copyOf(freshCols));
+                    List<String> keep = cols.subList(0, max + 1).stream().map(OnboardDraft.Col::header).toList();
+                    // the new columns a run can keep: by position, those right after the read ones, in a row
+                    List<OnboardDraft.Col> freshCols = colsOf(d.keepable(), cols);
+                    return new ColumnCheck(null, List.copyOf(fresh), keep, choiceValue(a.format(), "delimiter"),
+                            choiceValue(a.format(), "quote"), List.of(), List.copyOf(freshCols), has);
                 }
             }
         } else {
@@ -1820,22 +1876,26 @@ final class OnboardImport {
             String recordPath = importSetting(schema, "parsing", "json", "records_path");
             if (recordPath != null && !"$".equals(recordPath)) how.put("recordPath", recordPath);
             OnboardDraft.Analysis a = OnboardDraft.analyse(dir, file, name, type, how);
-            Set<String> headers = new LinkedHashSet<>();
-            for (OnboardDraft.Col c : a.cols()) headers.add(c.selector());   // a flattened JSON field by its dotted path
+            List<SchemaDrift.Observed> seen = observed(a.cols());   // a flattened JSON field by its dotted path
+            Set<String> selectors = new HashSet<>();
+            for (String[] f : fields) selectors.add(f[0]);
             for (String[] f : fields) {
-                read.add(f[0]);
-                // an import written before C1 reads a nested object whole by its root key, which the file still has
-                if (!headers.contains(f[0]) && headers.stream().anyMatch(h -> h.startsWith(f[0] + "."))) {
-                    headers.removeIf(h -> h.startsWith(f[0] + "."));
-                    continue;
-                }
-                if (!headers.contains(f[0])) {
-                    problems.add("'" + f[0] + "' is missing" + (kept.containsKey(f[1]) ? " (" + kept.get(f[1]) + ")" : ""));
-                    missing.add(f[0]);
+                // an import written before C1 reads a nested object whole by its root key, which the file still has: its
+                // flattened fields stand for that one column
+                if (seen.stream().noneMatch(o -> o.selector().equals(f[0])) && seen.stream().anyMatch(o -> o.selector().startsWith(f[0] + "."))) {
+                    seen.removeIf(o -> o.selector().startsWith(f[0] + ".") && !selectors.contains(o.selector()));
+                    seen.add(new SchemaDrift.Observed(f[0], f[0], null, null));
                 }
             }
-            for (String h : headers) if (!read.contains(h)) fresh.add(h);
-            List<OnboardDraft.Col> freshCols = a.cols().stream().filter(c -> fresh.contains(c.selector())).toList();
+            SchemaDrift.Diff d = SchemaDrift.diff(declared(fields), seen, SchemaDrift.By.NAME);
+            for (SchemaDrift.Placed p : d.fields())
+                if (p.missing()) {
+                    String n = p.field().name();
+                    problems.add("'" + p.field().selector() + "' is missing" + (kept.containsKey(n) ? " (" + kept.get(n) + ")" : ""));
+                    missing.add(p.field().selector());
+                }
+            for (SchemaDrift.Observed o : d.added()) fresh.add(o.selector());
+            List<OnboardDraft.Col> freshCols = colsOf(d.keepable(), a.cols());
             String refusal = problems.isEmpty()
                     ? cutRefusal(name, id, fields, f -> a.cols().stream().filter(c -> f[0].equals(c.selector())).findFirst().orElse(null))
                     : refusal(name, id, problems);

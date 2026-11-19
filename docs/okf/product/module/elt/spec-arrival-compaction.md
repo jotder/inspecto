@@ -5,6 +5,11 @@ description: The compact maintenance task's arrivals mode (ArrivalCompactor) - o
 resource: platform/inspecto-engine/src/main/java/com/gamma/job/ArrivalCompactor.java, platform/inspecto-engine/src/main/java/com/gamma/job/MaintenanceJob.java, inspecto/src/main/java/com/gamma/control/DatasetCompaction.java, inspecto/src/main/java/com/gamma/control/ImportCommitSteps.java
 tags: [elt, engine, maintenance, compaction, import, merge-map, retention, reprocess, onboarding]
 timestamp: 2026-11-19T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-engine
 ---
 
 # Arrival compaction — `compact` `mode: arrivals`

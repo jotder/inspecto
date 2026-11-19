@@ -5,6 +5,11 @@ description: What module.oidc is required to do, what is built, what is left and
 resource: providers/inspecto-oidc/
 tags: [module, oidc, plan, security]
 timestamp: 2026-10-19T00:00:00Z
+item: module.oidc
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: providers/inspecto-oidc
 ---
 
 # OIDC authenticator and token relay — plan of record

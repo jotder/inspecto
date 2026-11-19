@@ -19,3 +19,5 @@ metadata:
   `PARTITION BY` aggregate over hive-pruned parquet count the pruned days. Code reading `json_serialize_sql` must read
   2.0's shape (`arguments[].expression`, `literal {kind, text}`) and fail CLOSED on a shape it does not know — the
   masking check failed open on exactly that. Facts and pins: `okf/product/module/engine/spec-duckdb.md` § *DuckDB 2.0.0.0*.
+
+Long form, with the original incidents (from the retired `PROJECT_NOTES.md`, 2026-11-19): [spec-engine-gotchas.md](../../docs/okf/product/module/engine/spec-engine-gotchas.md).

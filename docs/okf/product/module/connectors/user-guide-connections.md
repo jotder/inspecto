@@ -5,6 +5,11 @@ description: Schema-driven connection workbench — 5 connector types, SSH tunne
 resource: inspecto-ui/src/app/modules/admin/connections/connections.routes.ts
 tags: [feature, connections, acquisition, ssh-tunnel, proxy]
 timestamp: 2026-06-28T00:00:00Z
+item: module.connectors
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
+code: providers/inspecto-connectors
 ---
 
 # Connections

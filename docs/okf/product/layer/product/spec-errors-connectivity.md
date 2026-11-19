@@ -5,6 +5,10 @@ description: The global error interceptor, the persistent connectivity banner, a
 resource: inspecto-ui/src/app/inspecto/api/error.interceptor.ts
 tags: [errors, connectivity, interceptor, offline, toastr]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
 ---
 
 # Errors & Connectivity

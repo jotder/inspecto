@@ -5,6 +5,10 @@ description: One h1 per page, labelled icon buttons, focus-visible rings, and th
 resource: inspecto-ui/src/app/inspecto/testing/a11y.ts
 tags: [accessibility, wcag, axe, a11y, non-negotiable]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
 ---
 
 # Accessibility

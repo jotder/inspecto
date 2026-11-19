@@ -5,6 +5,11 @@ description: The Java contract for Collector and export connectors - CollectorCo
 resource: platform/inspecto-acquire/
 tags: [module, connectors, spi, api]
 timestamp: 2026-10-19T00:00:00Z
+item: module.connectors
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-connectors
 ---
 
 # Collector connector SPI

@@ -5,6 +5,11 @@ description: How the separate asn-decoders reactor is layered, how it reaches th
 resource: providers/asn-parser/asn-decoders/
 tags: [module, asn-decoders, asn1, telecom, architecture]
 timestamp: 2026-10-19T00:00:00Z
+item: module.asn-decoders
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: providers/asn-parser/asn-decoders/asn-facade
 ---
 
 # ASN.1 decoders — architecture
@@ -34,7 +39,7 @@ is built before anything that depends on it; the tree inherits nothing from `ins
 | `asn-golden` | Golden-corpus capture and the parity check between the legacy and new stacks |
 
 The full design rationale is in `providers/asn-parser/docs/REDESIGN.md`; the module list and deliberate
-deviations are in `providers/asn-parser/asn-decoders/README.md`.
+deviations are in [architecture-decoder-modules.md](architecture-decoder-modules.md).
 
 ## How Inspecto uses it
 

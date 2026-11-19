@@ -5,6 +5,11 @@ description: Overview of the Inspecto LA training-video narration scripts — ho
 resource: tools/render-la-demo-video.mjs
 tags: [module, la-core, link-analysis, user-guide, training, video]
 timestamp: 2026-11-16T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA training videos — narration scripts
@@ -60,25 +65,25 @@ One file per episode group; render an episode with `--script` set to its group f
 | [C3](user-guide-training-c-the-canvas.md#c3_making-the-graph-readable-display-options-and-display-rules) | Making the graph readable: Display options and Display rules | Basic | 12 | 802 | 6 |
 | [C4](user-guide-training-c-the-canvas.md#c4_expand-and-collapse) | Expand and collapse, one degree at a time | Basic | 10 | 947 | 6 |
 | [C5](user-guide-training-c-the-canvas.md#c5_cleaning-up-hide-remove-trim-exclude-lists) | Cleaning up: hide, remove, trim, exclude, lists | Basic | 12 | 699 | 4 |
-| [D1](user-guide-training-d-analysis-toolbox.md#d1_quick-questions-busiest-tight-groups-route) | Quick questions: busiest, tight groups, route A to B | Basic | 11 | 861 | 8 |
-| [D2](user-guide-training-d-analysis-toolbox.md#d2_how-are-they-connected) | How are they connected? | ? | 11 | 872 | 8 |
-| [D3](user-guide-training-d-analysis-toolbox.md#d3_who-matters-most) | Who matters most? | Basic | 11 | 976 | 9 |
-| [D4](user-guide-training-d-analysis-toolbox.md#d4_groups-and-weak-points) | Groups and weak points | Basic | 11 | 831 | 7 |
-| [D5](user-guide-training-d-analysis-toolbox.md#d5_what-looks-unusual) | What looks unusual? | Basic | 11 | 810 | 8 |
-| [D6](user-guide-training-d-analysis-toolbox.md#d6_pattern-match) | Pattern match | Basic | 11 | 841 | 8 |
-| [D7](user-guide-training-d-analysis-toolbox.md#d7_money-and-time) | Money and time: Value Measures, bursts and rhythms | ? | 11 | 832 | 7 |
-| [D8](user-guide-training-d-analysis-toolbox.md#d8_on-screen-vs-whole-dataset) | On screen vs Whole Dataset: limits and scale | Basic → Standard | 11 | 889 | 7 |
+| [D1](user-guide-training-d-analysis-toolbox-connections.md#d1_quick-questions-busiest-tight-groups-route) | Quick questions: busiest, tight groups, route A to B | Basic | 11 | 861 | 8 |
+| [D2](user-guide-training-d-analysis-toolbox-connections.md#d2_how-are-they-connected) | How are they connected? | ? | 11 | 872 | 8 |
+| [D3](user-guide-training-d-analysis-toolbox-connections.md#d3_who-matters-most) | Who matters most? | Basic | 11 | 976 | 9 |
+| [D4](user-guide-training-d-analysis-toolbox-patterns.md#d4_groups-and-weak-points) | Groups and weak points | Basic | 11 | 831 | 7 |
+| [D5](user-guide-training-d-analysis-toolbox-patterns.md#d5_what-looks-unusual) | What looks unusual? | Basic | 11 | 810 | 8 |
+| [D6](user-guide-training-d-analysis-toolbox-patterns.md#d6_pattern-match) | Pattern match | Basic | 11 | 841 | 8 |
+| [D7](user-guide-training-d-analysis-toolbox-money-scope.md#d7_money-and-time) | Money and time: Value Measures, bursts and rhythms | ? | 11 | 832 | 7 |
+| [D8](user-guide-training-d-analysis-toolbox-money-scope.md#d8_on-screen-vs-whole-dataset) | On screen vs Whole Dataset: limits and scale | Basic → Standard | 11 | 889 | 7 |
 | [E1](user-guide-training-e-keeping-and-sharing.md#e1_saving-opening-and-exporting) | Saving, opening and exporting | Basic | 12 | 848 | 5 |
 | [E2](user-guide-training-e-keeping-and-sharing.md#e2_entity-lists-and-identity-facts) | Entity Lists and Identity Facts | Standard | 11 | 805 | 6 |
-| [F1](user-guide-training-f-investigations.md#f1_signing-in-roles-and-your-first-investigation) | Signing in, roles and your first Investigation | Standard | 11 | 819 | 6 |
-| [F2](user-guide-training-f-investigations.md#f2_expand-with-intent) | Expand with intent: direction, kinds, time, strength, fan-out | Standard | 11 | 839 | 6 |
-| [F3](user-guide-training-f-investigations.md#f3_recorded-clean-up-and-scope) | Recorded clean-up and scope | Standard | 12 | 896 | 6 |
-| [F4](user-guide-training-f-investigations.md#f4_step-log-undo-re-order-and-replay) | The step log: replay, undo, re-order, more steps | Standard | 11 | 916 | 9 |
-| [F5](user-guide-training-f-investigations.md#f5_teams-members-four-eyes-reviewers-and-outsiders) | Teams: members, four-eyes, reviewers and outsiders | Standard | 11 | 870 | 8 |
-| [F6](user-guide-training-f-investigations.md#f6_drafts-work-in-parallel) | Drafts: work in parallel | Standard | 10 | 748 | 7 |
-| [F7](user-guide-training-f-investigations.md#f7_masked-data-reveal-and-identity-resolution) | Masked data and audited reveal; resolving identities | Standard | 11 | 899 | 8 |
-| [F8](user-guide-training-f-investigations.md#f8_evidence-coverage-dossier-and-sealed-bundle) | Evidence: coverage, Dossier and the sealed bundle | Standard | 11 | 838 | 5 |
-| [F9](user-guide-training-f-investigations.md#f9_from-finding-to-action) | From finding to action: Alert Rules, Cases, widgets and sharing | Standard | 12 | 957 | 10 |
+| [F1](user-guide-training-f-investigations-first-graph.md#f1_signing-in-roles-and-your-first-investigation) | Signing in, roles and your first Investigation | Standard | 11 | 819 | 6 |
+| [F2](user-guide-training-f-investigations-first-graph.md#f2_expand-with-intent) | Expand with intent: direction, kinds, time, strength, fan-out | Standard | 11 | 839 | 6 |
+| [F3](user-guide-training-f-investigations-first-graph.md#f3_recorded-clean-up-and-scope) | Recorded clean-up and scope | Standard | 12 | 896 | 6 |
+| [F4](user-guide-training-f-investigations-teams-drafts.md#f4_step-log-undo-re-order-and-replay) | The step log: replay, undo, re-order, more steps | Standard | 11 | 916 | 9 |
+| [F5](user-guide-training-f-investigations-teams-drafts.md#f5_teams-members-four-eyes-reviewers-and-outsiders) | Teams: members, four-eyes, reviewers and outsiders | Standard | 11 | 870 | 8 |
+| [F6](user-guide-training-f-investigations-teams-drafts.md#f6_drafts-work-in-parallel) | Drafts: work in parallel | Standard | 10 | 748 | 7 |
+| [F7](user-guide-training-f-investigations-evidence.md#f7_masked-data-reveal-and-identity-resolution) | Masked data and audited reveal; resolving identities | Standard | 11 | 899 | 8 |
+| [F8](user-guide-training-f-investigations-evidence.md#f8_evidence-coverage-dossier-and-sealed-bundle) | Evidence: coverage, Dossier and the sealed bundle | Standard | 11 | 838 | 5 |
+| [F9](user-guide-training-f-investigations-evidence.md#f9_from-finding-to-action) | From finding to action: Alert Rules, Cases, widgets and sharing | Standard | 12 | 957 | 10 |
 | [G1](user-guide-training-g-geo-and-entity-pages.md#g1_the-geo-map) | The Geo map | Standard | 11 | 804 | 6 |
 | [G2](user-guide-training-g-geo-and-entity-pages.md#g2_geo-intelligence-and-map-to-graph) | Geo intelligence and pivoting between map and graph | Standard | 10 | 779 | 5 |
 | [G3](user-guide-training-g-geo-and-entity-pages.md#g3_entity-profiles) | Entity profiles | Standard | 11 | 727 | 8 |

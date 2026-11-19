@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Orders starter — brochure
+description: Brochure for the Orders starter pack: a first live Space with a retail-orders Pipeline, a quality Expectation, a Dataset and a dashboard already wired together, in every edition.
+item: solution-pack.orders-starter
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/orders-starter]
+---
+
 # Orders starter — brochure
 
 > **Your first live Space in minutes — a feed, a quality check, a Dataset and a dashboard, already wired together.**

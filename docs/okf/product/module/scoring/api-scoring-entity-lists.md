@@ -4,6 +4,11 @@ title: "Risk Scores and Entity Lists — API"
 description: "Control-plane routes for Risk Scores and Entity Lists, with their gates."
 tags: [scoring, scoring-entity-lists, api]
 timestamp: 2026-10-19T00:00:00Z
+item: module.scoring
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-scoring
 ---
 
 # Risk Scores and Entity Lists — API

@@ -4,6 +4,11 @@ title: "Anomaly Detection — features"
 description: "An **Anomaly Score** answers \"is this entity behaving unlike itself, or unlike its peers, and why?\" — a 0–100 number per entity per run, stored with a per-Feature explanation so it can be recomputed."
 tags: [anomaly, anomaly, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.anomaly
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-anomaly
 ---
 
 # Anomaly Detection — features

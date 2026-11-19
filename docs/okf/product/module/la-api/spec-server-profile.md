@@ -1,3 +1,14 @@
+---
+type: Reference
+title: LA server profile — N7 / N8 / N9 (LA-PERF-SERVER-1, 2026-11-12)
+description: Measured server profile of Link Analysis requests (N7–N11, 2026-11-12): JFR stage costs on the Preview bundle, the suspects, the StampedCache fix and the before/after timings.
+item: module.la-api
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [la/inspecto-la-api]
+---
+
 # LA server profile — N7 / N8 / N9 (LA-PERF-SERVER-1, 2026-11-12)
 
 Evidence for the LA performance plan §0b (archived: `docs/archived-documents/plans-archive/la-performance-plan.md`). Claims here are measurements, not code reading.

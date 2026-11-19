@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis mobile financial services fraud showcase — brochure
+description: Brochure for the Link Analysis mobile financial services fraud showcase: SIM-swap wallet takeover, agent split-deposit commission fraud and merchant cash-out collusion, each beside an innocent look-alike.
+item: solution-pack.la-mfs
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-mfs]
+---
+
 # Link Analysis mobile financial services fraud showcase — brochure
 
 > **Thirty customers lose their wallet balances within two hours of a SIM swap, all through one call-centre login. An agent earns commission on hundreds of tiny deposits into wallets it opened itself. A merchant that opened three weeks ago is paid only by new wallets, minutes after each was funded with cash. All of it is hidden among 8 000 wallets, 300 agents and 400 merchants. You can find each one from a saved view in minutes, and see why the innocent look-alikes stay apart.**

@@ -5,6 +5,10 @@ description: Symptom-first fixes for operational failures — pg_duckdb view err
 resource: platform/inspecto-util/src/main/java/com/gamma/util/DuckDbUtil.java
 tags: [troubleshooting, diagnostics, duckdb, operations]
 timestamp: 2026-07-16T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
 ---
 
 # Troubleshooting
@@ -82,7 +86,7 @@ For a genuinely huge single file:
    (`max_file_bytes: 8589934592`, 8 GiB) — lower it (e.g. `5000000000` for ~5GB chunks) so peak scratch
    is ~one chunk.
 
-See [Configuration → Large files](../../module/config/admin-guide-configuration-reference.md#large-files-scratch-location--auto-chunking). Note
+See [Configuration → Large files](../../module/config/admin-guide-configuration-reference-collector-types.md#large-files-scratch-location--auto-chunking). Note
 the single-pass streaming ingest still materialises the `transformed` table before `COPY TO`, so the
 DuckDB-AVX2 crash workaround above remains in effect.
 
@@ -93,7 +97,7 @@ framework runs in **generation mode** for a genuinely huge single file (member �
 scratch stay bounded regardless of file size — or **union mode** for many small files. If a huge custom
 file still exhausts memory, confirm it is actually being routed to generation mode (lower
 `large_file_bytes`, or check the member size). See
-[plugins.md → execution modes](../../module/elt/spec-ingest.md#execution-modes--the-framework-picks-by-file-size).
+[plugins.md → execution modes](../../module/elt/spec-ingest-plugin-ingester.md#execution-modes--the-framework-picks-by-file-size).
 
 ### DuckLake registration fails silently
 

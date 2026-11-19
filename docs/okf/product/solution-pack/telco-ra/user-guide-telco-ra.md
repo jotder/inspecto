@@ -4,6 +4,11 @@ title: "Telecom revenue assurance — user guide"
 description: "Working day to day in a Space created from the telco-ra Space Template."
 tags: [telco-ra, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.telco-ra
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/telco-ra
 ---
 
 # Telecom revenue assurance — user guide

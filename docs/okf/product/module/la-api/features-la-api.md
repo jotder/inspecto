@@ -4,6 +4,11 @@ title: "Link analysis and geo routes — features"
 description: "The link analysis and geo routes are the HTTP surface of the Link Analysis studio."
 tags: [la-api, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.la-api
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: la/inspecto-la-api
 ---
 
 # Link analysis and geo routes — features
