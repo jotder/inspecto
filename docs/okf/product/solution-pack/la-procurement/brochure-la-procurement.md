@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis procurement fraud showcase — brochure
+description: Brochure for the Link Analysis procurement fraud showcase: bid rotation, cover bids, a conflict of interest and a phoenix firm among 1 200 tenders, each beside an innocent look-alike.
+item: solution-pack.la-procurement
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-procurement]
+---
+
 # Link Analysis procurement fraud showcase — brochure
 
 > **Bid rotation, cover bids, an official approving changes for a relative's firm, and a debarred firm reborn under its old directors, hidden among 1 200 ordinary tenders. Find each one from a saved view in minutes, and see why the innocent look-alikes stay apart.**

@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Telecom re-rating (tariff validation)
+description: How the telco-rerating Space Template re-rates usage independently of the rater: tariff versioning and hygiene, ambiguity verdicts, causes with confidence including plan inference, root-cause grouping and revenue at risk.
+item: solution-pack.telco-rerating
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/telco-rerating]
+---
+
 # Telecom re-rating (tariff validation)
 
 > **Level 2 solution page.** Content pack: Space Template `telco-rerating`

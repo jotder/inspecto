@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis trade showcase — brochure
+description: Brochure for the Link Analysis trade showcase: mis-invoicing, phantom shipments, circular trade and shell importers found in trade-finance data, each beside an innocent look-alike.
+item: solution-pack.la-trade
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-trade]
+---
+
 # Link Analysis trade showcase — brochure
 
 > **Is the trade real? Prices eight times the market between two companies with one director, six containers shipped round a circle, letters of credit paid on a vessel that was somewhere else, and six new importers at one address paying an exporter thirty-six times what it shipped them, found among 12 000 trades and 300 vessels.**

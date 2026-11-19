@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Partner settlement
+description: How the partner-settlement Space Template settles wholesale traffic under each partner agreement — References, statement ingestion, the compare, netting with a roll-forward, disputes as Cases, aging and accruals — and how it was verified.
+item: solution-pack.partner-settlement
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/partner-settlement]
+---
+
 # Partner settlement
 
 > **Level 2 solution page.** Content pack: Space Template `partner-settlement`

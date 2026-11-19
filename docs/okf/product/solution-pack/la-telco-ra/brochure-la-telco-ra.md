@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis telecom revenue assurance showcase — brochure
+description: Brochure for the Link Analysis telecom revenue assurance showcase: unbilled usage, dealer commission fraud and PBX hacking found in activation, usage, billing, top-up and switch data, each beside an innocent look-alike.
+item: solution-pack.la-telco-ra
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-telco-ra]
+---
+
 # Link Analysis telecom revenue assurance showcase — brochure
 
 > **Three hundred SIMs that use the network every day and never reach billing, a dealer earning commission on 400 SIMs that go silent after one top-up, and four company phone systems dialling premium-rate numbers abroad at night. All of it is hidden among 7 500 subscribers and 150 business trunks. You can find each one from a saved view in minutes, and see why the innocent look-alikes stay apart.**

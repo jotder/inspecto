@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis utility showcase — brochure
+description: Brochure for the Link Analysis utility showcase: meter tampering, illegal reconnection, debt-dodging account churn, a grow-house load and prepaid token fraud among 1 000 electricity premises.
+item: solution-pack.la-utility
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-utility]
+---
+
 # Link Analysis utility showcase — brochure
 
 > **Meter tampering behind one contractor, illegal reconnections, debt-dodging account churn, a grow-house load and prepaid token fraud, hidden among 1 000 electricity premises. Find each one from a saved view in minutes, and see why the innocent look-alikes stay apart.**

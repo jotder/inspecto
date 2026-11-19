@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Mobile money
+description: How the mobile-money Space Template is built: five feeds, the bank-float and partner-settlement Reconciliations, the agent and wallet abuse detection Jobs, a day in the analyst's life, the modules used and its limits.
+item: solution-pack.mobile-money
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/mobile-money]
+---
+
 # Mobile money
 
 > **Level 2 solution page** (`SOLUTION-SUITE-DOCS-1`). Content pack: Space Template `mobile-money`
