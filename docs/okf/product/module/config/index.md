@@ -38,6 +38,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | defect | COMPONENT-DELETE-IN-USE-WORDS-1 the Components screen words every refused delete as "referenced by a pipeline" | — |
 | — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
+| `SPACE-TO-APP-CONSOLE-1` | P3 | feature | turn a working Space into a Space Template, and into an App, from the console. | — |
 | `SPACE-ROOTED-DATA-ROOT-MIGRATION-1` | P3 | feature | an install whose data_root is rooted (or absent, i.e. -Dspaces.data.root) is still not relocatable, and there is no route that migrates it. | demand |
 | `SPACE-ADMISSION-FOLLOWUPS-1` | P3 | chore | what the closed-Space change (D5, 91f0af69a) left on purpose. | — |
 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | ⏸ POSTPONED 2026-11-16 (operator, MoSCoW S7): waits until a multi-Pod deployment is scheduled, together with the postponed scale-out rows… | operator |
