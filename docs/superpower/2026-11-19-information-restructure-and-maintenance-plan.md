@@ -1,7 +1,9 @@
 # Information restructure and maintenance — plan
 
-> **Status: APPROVED 2026-11-19 — the operator: "create a comprehensive … plan and go ahead".** Wave W1 (§6) is
-> executed in the commit after this plan's own; W2–W4 open. Board row: `INFO-RESTRUCTURE-1` (§10).
+> **Status: APPROVED 2026-11-19 — the operator: "create a comprehensive … plan and go ahead".** **W1 executed
+> 2026-11-19:** `BACKLOG.md` 577 → 280 KB (28 ledger entries of the last three days kept, 570 moved), `INDEX.md`
+> 111 → 23 KB, the stray board archived — nothing lost, checked line by line against the commit before. W2–W4 open.
+> Board row: `INFO-RESTRUCTURE-1` (§10).
 > **Scope:** all the information Inspecto's people and agents read — the product hubs, the root canon, plans, the
 > archive, `compliance/`, `product-map/`, `.claude/` (rules, team memory, skills, maps), code-adjacent READMEs and
 > Space Template docs — and how it is kept right after the restructure.
@@ -24,7 +26,7 @@ gone wrong is inside the pages:
 | The map's archive table | 87 KB of `INDEX.md`'s 110 KB | the map is too heavy to load |
 | Facts restated in many places | edition placement restated across six sales and edition docs, all stale on 2026-11-19 (fixed in `e7fcc8076`, `07bbe2bb8`) | drift, found only by accident |
 | Stale map text | `INDEX.md`'s header names six trees (`stakeholders/`, `ui/`, `ops/`, `roadmap/`, `wiki/`) that no longer exist | the map misleads |
-| Stray root file | `docs/Inspecto Backlog Board.md`, a 63-row snapshot from 2026-10-18 (the board now has 93 rows) | a second, stale board |
+| Stray root file | `docs/Inspecto Backlog Board.md`, a 63-row snapshot from 2026-10-18 (the board had 94 rows on 2026-11-19) | a second, stale board |
 | No link from a page to its code | 722 of 858 hub pages have a header, none names the code it describes | drift cannot be detected |
 
 What works and stays: one hub per Product Map Item with fixed slot names; generated hub indexes and Open work
@@ -132,7 +134,7 @@ The rules an agent must follow stay in `CLAUDE.md` and team memory, both small a
 
 | Wave | Delivers | Size |
 |---|---|---|
-| **W1** | **Mechanical, lossless (executed 2026-11-19):** the board ledger rolled to `archived-documents/backlog-ledger-2026.md`, keeping 3 days; the archived-plans table moved from `INDEX.md` to the archive's front page, `archived-documents/README.md`, links re-pointed; `INDEX.md`'s header made current; the stray board archived | a day |
+| **W1** | **Mechanical, lossless — done 2026-11-19:** the board ledger rolled to `archived-documents/backlog-ledger-2026.md`, keeping 3 days (570 entries moved, 28 kept; `BACKLOG.md` 577 → 280 KB); the archived-plans table moved from `INDEX.md` to the archive's front page, `archived-documents/README.md`, with 475 links re-pointed (`INDEX.md` 111 → 23 KB); `INDEX.md`'s header made current, its former note kept beside the table; the stray board archived as `archived-documents/backlog-board-2026-10-18.md` | a day |
 | **W2** | **Guards and header:** the header schema and its check; the size, history-note, fact-home, audience and ledger ratchets; `tools/docs-health.mjs`; a ledger-roll tool the `handoff` skill runs | about 1 week |
 | **W3** | **Judgment work:** board rows cut to a short summary with their narratives moved into hubs (23 rows run past 2,000 characters); `PROJECT_NOTES.md` split; `REQUIREMENTS.md` and `FEATURE_INVENTORY.md` generated or folded; the 46 oversize pages split, largest first (`tools/docs-relocate.mjs` re-points links); history notes moved out page by page; code-adjacent READMEs cut to pointers; the §13 rename map's finished rows archived | 2–3 weeks; mostly mechanical, suited to low-effort agents with spot checks |
 | **W4** | **Joined with the Handbook's P1 inventory:** one pass over the 858 hub pages fills each header (type, audience, track, `code`) — the same pass the Handbook needs | inside the Handbook's P1 |
