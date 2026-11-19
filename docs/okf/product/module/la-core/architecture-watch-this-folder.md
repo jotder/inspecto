@@ -28,7 +28,9 @@ Basic import inbox may poll; still no user-defined schedule). Class `inspecto/..
 > the commit steps compact, follow on and check Expectations (`ImportCommitSteps`). `watched` = the entry flag AND
 > the preset; the feed keeps its shape (`watch`, `watchable` true while watched, `feed.kind: uploads`, `watchError`
 > after a failed scheduled run): U4-Watch (2026-11-19) kept it, since the switch is a run switch over server state, not
-> Collector authoring, and the preset's cadence and stability are fixed, so nothing of the Collector is shown. The run waits while `data.self_import` is off, as
+> Collector authoring, and the preset's cadence and stability are fixed, so nothing of the Collector is shown. On
+> Standard the card still offers *Keep this up to date* while watched, and saving it replaces the watch with an
+> ordinary feed (`WATCH-KEEP-TWO-CONTROLS-1`). The run waits while `data.self_import` is off, as
 > before. A watch survives a restart because it is the Pipeline. An entry switched on before B1 (`watchInbox: true`
 > over a manual Pipeline) is moved onto the preset when the control plane starts (`InboxWatch.migrate`, through the
 > same write path; under an approval policy over Pipelines it is logged and reads as off). *Stop the feed*

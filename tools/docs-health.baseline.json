@@ -22,7 +22,7 @@
   "docs/okf/product/module/la-core/brochure-video-demo-case-scripts.md": 148376,
   "docs/okf/product/module/la-core/user-guide-training-d-analysis-toolbox.md": 84382,
   "docs/okf/product/module/observability/plan-observability.md": 89836,
-  "docs/okf/product/module/processor/api-onboarding-authoring.md": 73396,
+  "docs/okf/product/module/processor/api-onboarding-authoring.md": 73413,
   "docs/okf/product/module/processor/plan-control-api.md": 77921
  },
  "history": {
@@ -132,8 +132,6 @@
   "docs/okf/product/module/intelligence/architecture-intelligence.md",
   "docs/okf/product/module/intelligence/plan-agentic-investigation.md",
   "docs/okf/product/module/la-api/spec-server-profile.md",
-  "docs/okf/product/module/la-core/brochure-inspecto-la-whitepaper.md",
-  "docs/okf/product/module/la-core/brochure-inspecto-la-whitepaper.md",
   "docs/okf/product/module/la-core/brochure-inspecto-la-whitepaper.md",
   "docs/okf/product/module/la-core/brochure-video-demo-case-scripts.md",
   "docs/okf/product/module/la-core/brochure-video-demo-scripts.md",

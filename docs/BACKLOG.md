@@ -28,7 +28,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **96<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 17<!--count:backlog-p2--> × P2 · 79<!--count:backlog-p3--> × P3** —
+> **97<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 17<!--count:backlog-p2--> × P2 · 80<!--count:backlog-p3--> × P3** —
+> ⬆ **96 → 97 (P3 79 → 80) on 2026-11-19**: filed P3 defect `WATCH-KEEP-TWO-CONTROLS-1` [items: module.la-core, module.elt · kind: defect] — on Standard a watched folder's card also offers *Keep this up to date*; saving it replaces the 30 s watch with an ordinary feed.
 > Ledger entries dated before 2026-11-17 are kept verbatim in [`archived-documents/backlog-ledger-2026.md`](archived-documents/backlog-ledger-2026.md); git history has every change. The board keeps the last days of ledger (`tools/roll-backlog-ledger.mjs`, `INFO-RESTRUCTURE-1` D-IR2).
 > ↔ **96 (no count change, P2 17, P3 79) on 2026-11-19**: narrowed P2 chore `INFO-RESTRUCTURE-1` [items: layer.platform, layer.product · kind: chore] — W3 lane 2 done: the 82 rows over 800 characters (71 ranked, 11 in §6) cut to a summary, state, `→` hub pointer and unchanged tag, their narratives moved verbatim to each hub's `plan-board-detail.md` (25 hubs; this page 294 → 132 KB); `GLOSSARY.md` §13's 18 finished rows moved to `archived-documents/glossary-rename-map-done-2026-11-19.md`.
 > ⬆ **95 → 96 (P3 78 → 79) on 2026-11-19**: filed P3 defect `BASIC-WATCH-ARRIVALS-1` [items: module.elt, module.processor · kind: defect] — since `BASIC-ELT-PROFILE-1` B1 a watched inbox's scheduled run writes no arrivals sidecar line and shows no `watchError` for a quarantined file; the operator placed the fix in BE-2 (B3).
@@ -71,10 +72,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > ↔ **89 (no count change, P2 13, P3 76) on 2026-11-17**: narrowed P3 `LEGAL-HOLD-SCOPE-1` [items: module.ops, addon.incidents, module.engine · kind: feature] (MoSCoW S12) — a legal hold now protects an Incident's evidence (its notes and attachments, Alerts, links, the Case it is in and that Case's Investigations, its audit days): the three retention tasks skip it and seven delete paths answer 409, audited, until release. Left open: `partition_prune` (no Incident-to-partition lineage) and a screen to set a hold.
 > ⬇ **90 → 89 (P3 77 → 76) on 2026-11-17**: closed P3 chore `OPENAPI-SKELETON-SUMMARIES-1` [items: module.api · kind: chore] (MoSCoW C3) — all 439 public operations that were generated skeletons in `docs/api/openapi-v1.json` now carry a summary and a one- or two-sentence description read from their handlers (what it does, the capability, the main refusals), written in the module fragments. "Public" = every `/api/v1` operation registered by shipped code; the one skeleton left, `GET /test-discovered/ping`, is registered only by a test RouteModule. New CI guard `tools/check-openapi-summaries.mjs` fails on a skeleton summary or stock description outside its allow-list, which may only shrink. `x-generated` stays: those operations still have no request/response schemas.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 17<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 79<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 80<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 17<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 79<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 96<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 80<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 97<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -235,6 +236,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 - **P2** · `BASIC-ELT-PROFILE-1` — **Make Basic onboarding a locked profile of ELT, retiring the parallel Basic backend and LA UI layers that duplicate ELT parts.** In flight by phases P0 → Edition gate (BE-1b, B1 and U2 built); progress in `superpower/2026-11-19-basic-elt-profile-plan.md`. → `okf/product/module/elt/plan-board-detail.md` § BASIC-ELT-PROFILE-1 [items: module.elt, module.processor, layer.product, edition.basic · kind: feature]
 - **P3** · `BASIC-WATCH-ARRIVALS-1` — **A watched inbox's scheduled run leaves no arrivals sidecar line and no `watchError` for a quarantined file (filed 2026-11-19, `BASIC-ELT-PROFILE-1` B1 review).** Restored in BE-2 (B3, arrivals as an engine Pipeline option), not in B1 (operator, 2026-11-19). → `okf/product/module/elt/plan-board-detail.md` § BASIC-WATCH-ARRIVALS-1 · `okf/product/module/la-core/architecture-watch-this-folder.md` §6.20 [items: module.elt, module.processor · kind: defect]
+- **P3** · `WATCH-KEEP-TWO-CONTROLS-1` — **On Standard a watched folder offers two controls for one schedule (filed 2026-11-19, `BASIC-ELT-PROFILE-1` U4-Watch review).** Saving *Keep this up to date* while the folder is watched replaces the 30 s watch with an ordinary feed (15 min by default) and the switch disappears; show one control while watched. → `okf/product/module/la-core/architecture-watch-this-folder.md` [items: module.la-core, module.elt · kind: defect]
 
 #### Datasets & lineage
 
