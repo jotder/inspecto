@@ -231,8 +231,12 @@ final class ConnectionRoutes implements RouteModule {
      *  Package-private: {@link BundleRoutes}' {@code connection} source persists through the same helpers
      *  rather than re-deriving the path/encoding. */
     static Path connectionFile(ApiContext api, String id) {
+        return connectionFile(api.writeRoot(), id);
+    }
+
+    /** The same path under an explicit write root (a Postgres snapshot reads its Connection by name). */
+    static Path connectionFile(Path root, String id) {
         String safe = WriteGates.safeName(id, "connection id");
-        Path root = api.writeRoot();
         return WriteGates.jail(root, root.resolve(safe + "_connection.toon"), "resolved path");
     }
 

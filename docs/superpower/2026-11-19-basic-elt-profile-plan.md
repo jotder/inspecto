@@ -81,7 +81,7 @@ Parallel now: P0-BE, P0-UI, UI-0. Each build phase is its own lane, integrated a
 | 2 | **UI-1 U4-Keep** | ready marker + size checks into the Collector spec; host `collector-config` for *Keep this up to date* | — |
 | 3 | **BE-2** B6 → B4 → B3 → B5 | B6: engine owns the merge map, `compact mode: arrivals`, registry marking | BE-1a |
 | 3 | **UI-1 U1a, U3** | compact types mode; shared format wording, merged sniff after BE-3 | O3, O5 |
-| 4 | **BE-4** B8 | `postgres` connector factory called by `refresh`; Pipeline switch after B4 | O4 |
+| 4 | **BE-4** B8 | `postgres` connector factory called by `refresh`; Pipeline switch after B4. **Part 1 built 2026-11-19** (`lane/basic-be4-postgres`): the scheme (`PostgresConnectorFactory`, engine), test/draft/Run now through it, a saved `postgres` Connection `<id>_postgres` per snapshot, pre-BE-4 inline snapshots read as they are. Left: the Pipeline switch, `ProcessorCatalog`/Gate exemption | O4 |
 | 4 | **UI-1 U2, U4-Watch** | after BE-4 / BE-1b | |
 | 5 | **Gate** | one Basic-profile declaration read by screen flags, `ProcessorCatalog` and Basic's routes; a test per Basic entry point; nothing refused on load | O2 |
 

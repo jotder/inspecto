@@ -788,9 +788,19 @@ then 422 for a malformed connection, a raw password (never echoed), a reference 
 name, nothing resolved), an unset variable (named), a query that is not one
 `SELECT` / `WITH` (`;` inside, or another verb), a write-capable login, an empty result; 413 above
 `import.max_rows`. Rate class: the standard bucket. The commit is the ordinary `/onboard/files/{draftId}/commit`;
-for a snapshot draft it also writes `imports/<id>_snapshot.toon` (connection with the password as its reference,
-schema+table or query; refused 409 if it already exists) and stamps the Dataset entry `importSource: postgres`.
-Only this commit writes it: an import into an existing Space carrying a `*_snapshot.toon` anywhere is refused
+for a snapshot draft it also saves a **`postgres` Connection** `<id>_postgres` (`<write root>/<id>_postgres_connection.toon`:
+host, port, database, `username`, the password as its reference, `options.schema` + `options.table` or `options.query`)
+and writes `imports/<id>_snapshot.toon` naming it (`{source: postgres, connection: <id>_postgres}`), and stamps the
+Dataset entry `importSource: postgres` (`BASIC-ELT-PROFILE-1` BE-4, operator ruling O4, 2026-11-19). The Connection is
+saved through the same save as `POST /connections` (`ConnectionRoutes.validateProfile` + `persistConnection`), so the
+`postgres` scheme's own check refuses any secret that is not an `INSPECTO_PG_` reference there too - also when an
+administrator saves or edits a `postgres` Connection by hand. Both are decided before the commit writes anything:
+409 when a Connection `<id>_postgres` or the snapshot file already exists, 422 when the Connection save would refuse
+it; a failed commit removes both. Deleting the Dataset deletes the snapshot file and the Connection it names when
+that is `<id>_postgres` and no Pipeline is bound to it. **Snapshots committed before 2026-11-19** keep their connection
+inline in `_snapshot.toon` (connection map + schema/table or query): Run now reads that shape as it is (validated as a
+request body), refreshes through the same connector, and never rewrites it or makes a Connection for it (read-both,
+not migrate-on-write). Only this commit writes the snapshot file: an import into an existing Space carrying a `*_snapshot.toon` anywhere is refused
 (`ImportPaths.REFUSED_SUFFIXES`, 2026-11-05), so an import cannot point Run now at another database. A new Space
 created from a bundle (`canAdminister`) keeps the file, as it keeps every file it seeds.
 **Run now** (`POST /datasets/{id}/run`) on such a Dataset copies the table again and runs the Add-a-file replace path.
@@ -816,7 +826,11 @@ created from a bundle (`canAdminister`) keeps the file, as it keeps every file i
   replace, as an upload's *Replace everything* is.
 
 **How it reads (P0 V2, plan §6.1).** DuckDB's `postgres` extension (`postgres_scanner`), already staged in every
-bundle - no JDBC driver on Basic, no dependency added. `Session.open`: resolve the reference → in-memory DuckDB →
+bundle - no JDBC driver on Basic, no dependency added. Since BE-4 (2026-11-19) the test, the draft and Run now all go
+through the acquisition SPI's `postgres` scheme (`com.gamma.inspector.PostgresCollectorConnector`, built by
+`PostgresConnectorFactory`; [acquisition spec](../elt/spec-acquisition.md)); `PostgresSnapshot` keeps the HTTP edge,
+Add data's wording and the 413/422 mapping of the connector's `Refused`. The role-refusal text now reads "Inspecto
+reads Postgres with a read-only login" (was "Add data reads with a read-only login"). `Session.open`: resolve the reference → in-memory DuckDB →
 `DuckDbExtension.ensureLoaded("postgres_scanner")` → `CREATE TEMPORARY SECRET` → `ATTACH '' AS pg (TYPE postgres,
 SECRET …, READ_ONLY)`, all before the seal; then `allowed_directories` = the stage only, external access off.
 ⚠ Never the inline libpq string: DuckDB's connect error ECHOES it, password included (measured); the secret form
@@ -848,6 +862,13 @@ Run now replacing (35 rows after 5 added and 10 deleted) through the inbox (the 
 arrival a `replace`), a snapshot never polled (Watch refused, a tick copies nothing, Refresh now does), the row filter
 applied on every refresh, the session itself read-only for a write-capable login, a data-modifying `WITH` changing
 nothing. Five mutants, each killed by its test. All 11 ran against a throwaway `postgres:18` container on 2026-11-05.
+BE-4 (2026-11-19): the session read-only test moved with the session to `platform/inspecto-engine/.../PostgresConnectorFactoryTest`
+(also: the profile checks, the save seam finding the scheme by ServiceLoader, one export per cycle, a Collector
+`discover` + `fetchTo` giving typed Parquet, the row cap); `ControlApiPostgresSnapshotTest` adds a `postgres`
+Connection saved only with an `INSPECTO_PG_` reference (create and update), the commit's saved Connection and its
+removal with the Dataset, a pre-BE-4 inline snapshot refreshing unchanged, and a taken Connection name refusing the
+commit whole; `ControlApiSnapshotExportTest` runs its failed-export case on both shapes. 13 + 9 + 6 ran against a
+throwaway `postgres:18` container, 0 skipped.
 `ControlApiSnapshotExportTest` needs no database:
 - the export handed over as `refresh` does is moved in and imported like an upload; the row filter applies, the
   arrival is recorded and the temporary folder is gone. A watcher thread saw only the complete file in the inbox; it

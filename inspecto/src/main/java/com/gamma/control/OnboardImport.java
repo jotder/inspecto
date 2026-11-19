@@ -157,9 +157,10 @@ final class OnboardImport {
             Path snapshotFile = PostgresSnapshot.configFile(writeRoot, id);
             if (Files.exists(pipelineFile) || Files.exists(schemaFile) || Files.exists(snapshotFile))
                 throw new ApiException(409, ErrorCodes.CONFLICT, "config files for '" + id + "' already exist; choose another name");
-            // BASIC-ONBOARD-1 P3: a draft copied from Postgres keeps its connection and table, so Run now can copy it again
-            Map<String, Object> snapshot = draft.get("snapshot") instanceof Map<?, ?> sm
-                    ? PostgresSnapshot.config((Map<String, Object>) sm) : null;
+            // BASIC-ONBOARD-1 P3: a draft copied from Postgres keeps its connection and table, so Run now can copy it again;
+            // BASIC-ELT-PROFILE-1 BE-4 (O4): as a saved postgres Connection
+            PostgresSnapshot.Saved snapshot = draft.get("snapshot") instanceof Map<?, ?> sm
+                    ? PostgresSnapshot.Saved.plan(api, id, (Map<String, Object>) sm) : null;
             if (Files.exists(dataRoot.resolve(id)) || Files.exists(inbox(dataRoot, id)))
                 throw new ApiException(409, ErrorCodes.CONFLICT, "the data directory already holds '" + id + "'; choose another name");
             long max = lim.get(LaLimit.IMPORT_MAX_DATASETS);
@@ -204,8 +205,8 @@ final class OnboardImport {
                 AtomicFiles.write(pipelineFile, ConfigCodec.toToon(pipeline).getBytes(StandardCharsets.UTF_8), ".cfg-");
                 job.undo.push(() -> Files.deleteIfExists(pipelineFile));
                 if (snapshot != null) {
-                    PostgresSnapshot.write(snapshotFile, snapshot);
-                    job.undo.push(() -> Files.deleteIfExists(snapshotFile));
+                    job.undo.push(() -> snapshot.undo(snapshotFile));
+                    snapshot.write(api, snapshotFile);
                 }
                 job.undo.push(() -> {
                     service.unregisterPipeline(pipelineFile);
@@ -1998,7 +1999,7 @@ final class OnboardImport {
         void retire() throws IOException {
             service.unregisterPipeline(pipelineFile);
             Files.deleteIfExists(schemaFile);
-            Files.deleteIfExists(PostgresSnapshot.configFile(writeRoot, id));   // BASIC-ONBOARD-1 P3: a snapshot's settings go too
+            PostgresSnapshot.retire(writeRoot, id, service);   // BASIC-ONBOARD-1 P3: a snapshot's settings (and its Connection) go too
             PipelineHistory.purge(writeRoot, id);
             Files.deleteIfExists(pipelineFile);
         }
