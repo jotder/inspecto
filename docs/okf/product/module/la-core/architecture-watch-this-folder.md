@@ -27,7 +27,8 @@ Basic import inbox may poll; still no user-defined schedule). Class `inspecto/..
 > (`ImportPreRunSteps`), the per-file stability gate decides what is read (O1: per file, no longer the whole inbox),
 > the commit steps compact, follow on and check Expectations (`ImportCommitSteps`). `watched` = the entry flag AND
 > the preset; the feed keeps its shape (`watch`, `watchable` true while watched, `feed.kind: uploads`, `watchError`
-> after a failed scheduled run) until the UI's U4-Watch slice. The run waits while `data.self_import` is off, as
+> after a failed scheduled run): U4-Watch (2026-11-19) kept it, since the switch is a run switch over server state, not
+> Collector authoring, and the preset's cadence and stability are fixed, so nothing of the Collector is shown. The run waits while `data.self_import` is off, as
 > before. A watch survives a restart because it is the Pipeline. An entry switched on before B1 (`watchInbox: true`
 > over a manual Pipeline) is moved onto the preset when the control plane starts (`InboxWatch.migrate`, through the
 > same write path; under an approval policy over Pipelines it is logged and reads as off). *Stop the feed*
@@ -107,4 +108,5 @@ Basic import inbox may poll; still no user-defined schedule). Class `inspecto/..
   aside and the follow-on and Expectation after, a file still being written waiting alone, a file that settles after
   the pre-run check, off and a restart, a kept column taken back after a run that did not succeed or that set the file
   aside (with `watchError`), Add data off, *Stop the feed*, the startup migration, refusals, armed 401/403/200),
-  `dataset-feed.component.spec.ts` (toggle, refusal, schedule hides it, the Data status words).
+  `dataset-feed.component.spec.ts` (toggle, refusal, schedule hides it, the Data status words; since U4-Watch both bodies
+  the switch sends, `{"watch":true}` and `{"watch":false}`, pinned byte for byte, and B1's watched answer switched off).
