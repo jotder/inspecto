@@ -6,6 +6,10 @@ description: The requirement-of-record and as-built specification for the Assist
 status: current
 written: 2026-09-08
 supersedes-rows: REQUIREMENTS §3.13 AGT-1..AGT-6b and §3.14 EOI-1..EOI-7 (this file corrects them, see §2)
+item: module.agent
+audience: internal
+verified: 2026-11-19 last-edit
+code: features/inspecto-agent
 ---
 
 # Assistant (`AGT` + `EOI`)

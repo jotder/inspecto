@@ -4,6 +4,11 @@ title: "Link Analysis trade showcase — architecture"
 description: "How the la-trade template is built: seven feeds, seven Pipelines, one link Job that checks every bill of lading against its vessel's daily position, four derived view Jobs, four saved views, and how its stories are generated and pinned."
 tags: [la-trade, architecture]
 timestamp: 2026-11-07T00:00:00Z
+item: solution-pack.la-trade
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-trade
 ---
 
 # Link Analysis trade showcase — architecture

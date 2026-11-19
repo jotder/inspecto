@@ -4,6 +4,11 @@ title: Jobs & Scheduling — The Job Framework
 description: Part 1 of 4 of Jobs & Scheduling: The Job Framework (P0–P3, shipped 2026-07-09; feat! → 5.0)
 tags: [control-plane, jobs, scheduling, cron, triggers, async-runs]
 timestamp: 2026-07-07T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: inspecto
 ---
 
 # Jobs & Scheduling — The Job Framework

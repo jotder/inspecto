@@ -4,6 +4,10 @@ title: Shell and editing on Windows - gotchas
 description: Git Bash, PowerShell, cmd.exe, heredoc and Python edit traps on this Windows sandbox.
 tags: [shell, powershell, bash, windows, gotchas]
 timestamp: 2026-11-19T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Shell and editing on Windows - gotchas

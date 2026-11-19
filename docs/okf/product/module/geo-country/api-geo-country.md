@@ -5,6 +5,11 @@ description: The Java contract the geo-country provider implements - methods, se
 resource: spi/inspecto-auth-spi/
 tags: [module, geo-country, spi, api]
 timestamp: 2026-10-19T00:00:00Z
+item: module.geo-country
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-geo-country
 ---
 
 # GeoCountryResolver SPI

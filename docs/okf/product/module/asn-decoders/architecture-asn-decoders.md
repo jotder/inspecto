@@ -5,6 +5,11 @@ description: How the separate asn-decoders reactor is layered, how it reaches th
 resource: providers/asn-parser/asn-decoders/
 tags: [module, asn-decoders, asn1, telecom, architecture]
 timestamp: 2026-10-19T00:00:00Z
+item: module.asn-decoders
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: providers/asn-parser/asn-decoders/asn-facade
 ---
 
 # ASN.1 decoders — architecture

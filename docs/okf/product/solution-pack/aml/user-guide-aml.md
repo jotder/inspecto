@@ -4,6 +4,11 @@ title: "AML — user guide"
 description: "Working day to day in a Space created from the aml Space Template."
 tags: [aml, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.aml
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/aml
 ---
 
 # AML — user guide

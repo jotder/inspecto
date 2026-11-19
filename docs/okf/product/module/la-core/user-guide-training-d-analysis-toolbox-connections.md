@@ -4,6 +4,11 @@ title: Inspecto LA training videos — D · The analysis toolbox: narration scri
 description: Part 1 of 3 of Inspecto LA training videos — D · The analysis toolbox: narration scripts: Episodes in D; D1_Quick-questions-busiest-tight-groups-route; D2_How-are-they-connected; D3_Who-matters-most
 tags: [module, la-core, link-analysis, user-guide, training, video]
 timestamp: 2026-11-16T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA training videos — D · The analysis toolbox: narration scripts — Episodes D1-D3 — quick questions, connections, who matters

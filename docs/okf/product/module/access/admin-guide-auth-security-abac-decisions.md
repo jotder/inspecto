@@ -4,6 +4,11 @@ title: Auth & Security — Advanced ABAC and the 2026-07-25 decisions
 description: Part 1 of 3 of Auth & Security: Advanced ABAC — the Access Policy engine (inspecto-policy, workstream A); Decisions of record — 2026-07-25 product session (BACKLOG D4 / D14 / D15)
 tags: [auth, security, spi, oidc, keycloak, wso2, bff, write-gate, rbac, abac, policy-engine, edition-standard, edition-advanced]
 timestamp: 2026-07-24T00:00:00Z
+item: module.access
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-access
 ---
 
 # Auth & Security — Advanced ABAC and the 2026-07-25 decisions

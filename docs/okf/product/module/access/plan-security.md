@@ -5,6 +5,11 @@ description: Who may call what — the auth-free core, the Authenticator/Subject
 resource: providers/inspecto-oidc/, providers/inspecto-policy/
 tags: [sec, capability, security, oidc, rbac, abac, capabilities, roles, access-policy, secrets, https, write-gate]
 timestamp: 2026-09-08T00:00:00Z
+item: module.access
+audience: internal
+status: plan
+verified: 2026-11-20 last-edit
+code: platform/inspecto-access
 ---
 
 # Security — capability spec (`SEC`)

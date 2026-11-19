@@ -3,6 +3,9 @@ type: Capability
 title: Editions & packaging (PKG) — capability spec — Specification — the plan's tables; decisions and not built
 description: Part 3 of 4 of Editions & packaging (PKG) — capability spec: Decisions (dated one-liners); Not built
 status: current
+item: layer.platform
+audience: internal
+verified: 2026-11-19 last-edit
 ---
 
 # Editions & packaging (PKG) — capability spec — Specification — the plan's tables; decisions and not built

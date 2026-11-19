@@ -4,6 +4,11 @@ title: Engine seams and performance
 description: The durable engine seams: the single ingestion SPI, union versus generation mode, and their performance levers.
 tags: [engine, ingestion, performance, seams]
 timestamp: 2026-11-19T00:00:00Z
+item: module.engine
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-engine
 ---
 
 # Engine seams and performance

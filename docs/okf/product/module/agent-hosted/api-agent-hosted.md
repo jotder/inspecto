@@ -5,6 +5,11 @@ description: The Java contract the hosted-model jar implements - HostedProviderP
 resource: features/inspecto-agent/
 tags: [module, agent-hosted, spi, api]
 timestamp: 2026-10-19T00:00:00Z
+item: module.agent-hosted
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-agent-hosted
 ---
 
 # HostedProviderPlugin SPI

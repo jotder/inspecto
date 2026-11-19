@@ -4,6 +4,11 @@ title: "Link Analysis audit showcase — user guide"
 description: "How an auditor works the la-audit Space day to day: the workpaper Investigation, Entity profiles, algorithms, Dossier and Case."
 tags: [la-audit, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.la-audit
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-audit
 ---
 
 # Link Analysis audit showcase — user guide

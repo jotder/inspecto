@@ -4,6 +4,11 @@ title: Control API (API) — Specification
 description: Part 2 of 3 of Control API (API): Specification
 tags: [api, capability, control-api, v1, envelope, error-codes, etag, idempotency, cursor, openapi, route-module, public-api, semver]
 timestamp: 2026-09-08T00:00:00Z
+item: module.processor
+audience: internal
+status: plan
+verified: 2026-11-20 last-edit
+code: inspecto
 ---
 
 # Control API (API) — Specification

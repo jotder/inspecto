@@ -4,6 +4,11 @@ title: Acquisition — specification — File connectivity, discovery, stability
 description: Part 1 of 2 of Acquisition — specification: Collector (File) Connectivity; File Discovery; File Stability Detection; Duplicate Prevention; File Change Detection; Collection Guarantees; File Retrieval; Parallel Fetching; Post Processing Actions; Failure Handling; Integrity Verification; Observability; Configuration Example; Design Philosophy; What acquisition is, and where it stops; The poll …
 tags: [acquisition, requirements, discovery, stability, dedup, watermark, guarantees, unpack, decompression, collector, archive, consignment]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # Acquisition — specification — File connectivity, discovery, stability and collection guarantees

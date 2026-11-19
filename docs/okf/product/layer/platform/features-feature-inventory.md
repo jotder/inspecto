@@ -4,6 +4,10 @@ title: Feature and example inventory
 description: Every user-facing engine feature an example can exercise, its TOON shape and where it is defined, plus the example set.
 tags: [features, examples, toon, inventory]
 timestamp: 2026-11-19T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Feature & Example Inventory — advanced reference

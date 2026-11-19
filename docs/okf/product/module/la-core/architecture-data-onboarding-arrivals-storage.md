@@ -4,6 +4,11 @@ title: Link Analysis — data onboarding — Arrivals, arrival feeds and Dataset
 description: Part 3 of 3 of Link Analysis — data onboarding: Arrivals: the ledger, Data status and what a later file does (LA-ARRIVAL-LEDGER-1 + LA-ARRIVAL-MODES-1, as built 2026-11-03/05); Arrival feeds: the inbox and Keep this up to date (LA-ARRIVAL-FEEDS-1, as built 2026-11-05); Dataset storage: compaction, the merge map and retention (LA-DATASET-COMPACT-1, as built 2026-11-05); Watch this folder: the …
 tags: [module, link-analysis, onboarding, add-data, arrivals, dataset, architecture]
 timestamp: 2026-11-12T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — data onboarding — Arrivals, arrival feeds and Dataset storage

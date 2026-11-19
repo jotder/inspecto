@@ -4,6 +4,11 @@ title: Link Analysis — HTTP surface and Investigation UI — Outbound integrat
 description: Part 2 of 4 of Link Analysis — HTTP surface and Investigation UI: Third-party integration (outbound) (LA-EDITIONS-1 phase 6, built 2026-10-17); Analyst CSV upload (LA-ANALYST-UPLOAD-1, as built 2026-10-18); Masked-alias refusal on identity writes (as built 2026-10-18); Category exclusion lists in Investigations (LA-GROW-EXCLUDE-1 phase 4, as built 2026-10-22)
 tags: [module, la-core, link-analysis, architecture, http, investigation, spa]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — HTTP surface and Investigation UI — Outbound integration, CSV upload, masking and exclusion lists

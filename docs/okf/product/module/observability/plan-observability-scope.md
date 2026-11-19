@@ -3,6 +3,10 @@ type: Capability
 title: Observability & maintenance (OPS) — capability spec — Purpose, scope and requirements of record
 description: Part 1 of 4 of Observability & maintenance (OPS) — capability spec: Purpose & scope; Requirements of record
 status: current
+item: module.observability
+audience: internal
+verified: 2026-11-19 last-edit
+code: features/inspecto-observability
 ---
 
 # Observability & maintenance (OPS) — capability spec — Purpose, scope and requirements of record

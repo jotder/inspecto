@@ -5,6 +5,11 @@ description: The AssistAgent SPI, UccAssistAgent's seven read-only skills on age
 resource: inspecto/src/main/java/com/gamma/assist/spi/AssistAgent.java
 tags: [agent, assist, spi, agent-kernel, skills]
 timestamp: 2026-11-07T00:00:00Z
+item: module.agent
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-agent
 ---
 
 # Assist Agent

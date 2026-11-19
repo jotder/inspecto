@@ -3,6 +3,9 @@ type: Capability
 title: Studio (BI + INV) — capability spec — Specification — KPIs, Reports and scheduled delivery onward
 description: Part 2 of 3 of Studio (BI + INV) — capability spec: 
 status: current
+item: layer.product
+audience: internal
+verified: 2026-11-19 last-edit
 ---
 
 # Studio (BI + INV) — capability spec — Specification — KPIs, Reports and scheduled delivery onward

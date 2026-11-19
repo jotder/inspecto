@@ -4,6 +4,11 @@ title: "Screening — features"
 description: "Screening checks entities against watch lists and records hits for a decision."
 tags: [screening, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: addon.screening
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-screening
 ---
 
 # Screening — features

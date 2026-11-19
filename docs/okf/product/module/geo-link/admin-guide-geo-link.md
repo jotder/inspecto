@@ -5,6 +5,11 @@ description: Installing, switching on, configuring outbound integration and trou
 resource: la/inspecto-geo-link/
 tags: [module, geo-link, link-analysis, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.geo-link
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: la/inspecto-geo-link
 ---
 
 # Geo and link adapters — admin guide

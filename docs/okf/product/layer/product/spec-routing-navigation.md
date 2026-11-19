@@ -5,6 +5,10 @@ description: Lazy feature routes, the nav data file, breadcrumbs, and the client
 resource: inspecto-ui/src/app/app.routes.ts
 tags: [routing, navigation, lazy-loading, breadcrumbs]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
 ---
 
 # Routing & Navigation

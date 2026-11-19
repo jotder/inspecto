@@ -4,6 +4,11 @@ title: "Backup and restore — architecture"
 description: "How the optional backup module plugs into the maintenance Job Type and how backup, verify and restore fit together."
 tags: [backup, architecture]
 timestamp: 2026-10-19T00:00:00Z
+item: module.backup
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-backup
 ---
 
 # Backup and restore — architecture

@@ -2,6 +2,10 @@
 type: Concept
 title: Local feature testing without a real IAM or Postgres
 description: Two build/run paths — Demo User sign-in (the offline demo build, no IAM, no Postgres) for local evaluation and feature testing, and the real Standard/Advanced release path with a genuine OIDC provider and Postgres.
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-16 last-edit
 ---
 
 # Local feature testing without a real IAM or Postgres

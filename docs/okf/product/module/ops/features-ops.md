@@ -4,6 +4,11 @@ title: "Case management and objects — features"
 description: "Operational objects are the Alerts, Incidents, Cases and Tasks the platform raises, with notes, links and tags."
 tags: [ops, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.ops
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-ops
 ---
 
 # Case management and objects — features

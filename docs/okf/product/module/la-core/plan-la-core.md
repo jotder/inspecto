@@ -5,6 +5,11 @@ description: What la-core is required to do, what is built, what is left and wha
 resource: la/inspecto-la-core/
 tags: [module, la-core, link-analysis, plan]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link analysis core and ports - plan of record

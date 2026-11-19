@@ -4,6 +4,11 @@ title: "Partner settlement — decisions and as-built record"
 description: "Slices S0 to S7 of PACK-PARTNER-SETTLEMENT-1 as built: the answered decisions with how to reverse them, the corpus, the mutation passes, the measurements, the deviations from the plan and the traps found."
 tags: [partner-settlement, plan, as-built]
 timestamp: 2026-11-01T00:00:00Z
+item: solution-pack.partner-settlement
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: spaces/_templates/partner-settlement
 ---
 
 # Partner settlement — decisions and as-built record

@@ -5,6 +5,11 @@ description: Sections 6.1-6.9 and 6.14 of the Link Analysis architecture - the g
 resource: la/
 tags: [module, la-core, link-analysis, architecture, http, investigation, spa]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — HTTP surface and Investigation UI

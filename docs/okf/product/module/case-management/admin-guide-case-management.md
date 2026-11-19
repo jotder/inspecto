@@ -5,6 +5,11 @@ description: Enabling the Case Management module, capabilities, Case Rule files,
 resource: features/inspecto-case-management/src/main/resources/META-INF/inspecto/module.toon
 tags: [case-management, admin-guide, case-rule, configuration]
 timestamp: 2026-10-19T00:00:00Z
+item: module.case-management
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-case-management
 ---
 
 # Case Management — admin guide

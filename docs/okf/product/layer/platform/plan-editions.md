@@ -6,6 +6,9 @@ description: The requirement-of-record and as-built specification for what Inspe
 status: current
 written: 2026-09-09
 supersedes-rows: REQUIREMENTS §3.16 PKG-1 through PKG-4, and EDITIONS OPS-07 (this file corrects them, see §2)
+item: layer.platform
+audience: internal
+verified: 2026-11-19 last-edit
 ---
 
 # Editions & packaging (`PKG`)

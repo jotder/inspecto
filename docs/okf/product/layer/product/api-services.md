@@ -5,6 +5,10 @@ description: The inspecto/api resource services, shared HTTP helpers, intercepto
 resource: inspecto-ui/src/app/inspecto/api/index.ts
 tags: [api, services, interceptors, catalog]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
 ---
 
 # API Services Catalog

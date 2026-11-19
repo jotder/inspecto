@@ -4,6 +4,11 @@ title: Inspecto LA training videos — D · The analysis toolbox: narration scri
 description: Part 3 of 3 of Inspecto LA training videos — D · The analysis toolbox: narration scripts: D7_Money-and-time; D8_On-screen-vs-Whole-Dataset
 tags: [module, la-core, link-analysis, user-guide, training, video]
 timestamp: 2026-11-16T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA training videos — D · The analysis toolbox: narration scripts — Episodes D7-D8 — money, time and the whole Dataset

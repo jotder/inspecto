@@ -4,6 +4,11 @@ title: Onboarding authoring seams (draft lifecycle, previews, register pair) —
 description: Part 2 of 3 of Onboarding authoring seams (draft lifecycle, previews, register pair): Add data: /onboard/files (file in → Dataset out; LA-ONBOARD-1 phase 2, 2026-10-22)
 tags: [control-plane, onboarding, config, enrichment, pipeline, reference]
 timestamp: 2026-07-16T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: inspecto
 ---
 
 # Onboarding authoring seams (draft lifecycle, previews, register pair) — Add data — /onboard/files

@@ -3,6 +3,9 @@ type: Capability
 title: Surfaces & Lenses (UI) — capability spec — Decisions, not built, refused and verification
 description: Part 2 of 2 of Surfaces & Lenses (UI) — capability spec: Decisions (dated one-liners); Not built; Refused & superseded; As-built pointers; Verification
 status: current
+item: layer.product
+audience: internal
+verified: 2026-11-20 last-edit
 ---
 
 # Surfaces & Lenses (UI) — capability spec — Decisions, not built, refused and verification

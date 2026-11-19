@@ -5,6 +5,11 @@ description: What la-api is required to do, what is built, what is left and what
 resource: la/inspecto-la-api/
 tags: [module, la-api, link-analysis, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.la-api
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-api
 ---
 
 # Link analysis and geo routes - plan of record

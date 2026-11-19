@@ -4,6 +4,10 @@ title: Build & Test — The verify loop, affected modules and CI
 description: Part 1 of 3 of Build & Test: Verify loop (offline, authoritative); Affected-module protocol — build/test only what a change reaches (AFFECTED-BUILD-1, 2026-10-19); When GitHub CI runs (operator, 2026-10-09); Nightly Postgres-gated tests (nightly-postgres.yml, ASSURE-OPERABILITY-1 D2, 2026-10-20); Mandatory DuckDB native-access flag; Seeding a fresh checkout — tools/seed-samples.mjs
 tags: [build, test, maven, duckdb, packaging]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
 ---
 
 # Build & Test — The verify loop, affected modules and CI

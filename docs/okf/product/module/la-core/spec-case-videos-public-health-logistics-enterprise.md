@@ -5,6 +5,11 @@ description: "Six case-film specs (bid rotation, address farm, referral kickback
 resource: tools/la-demo-cases.mjs
 tags: [module, la-core, link-analysis, video, case-video, spec]
 timestamp: 2026-11-19T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA case videos v2 — public sector, healthcare, logistics, enterprise

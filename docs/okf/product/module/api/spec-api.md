@@ -4,6 +4,11 @@ title: "Public API annotations — spec"
 description: "The one type in platform/inspecto-api: the @PublicApi annotation, its targets, retention and since() attribute."
 tags: [api, spec]
 timestamp: 2026-10-19T00:00:00Z
+item: module.api
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-api
 ---
 
 # Public API annotations — spec

@@ -4,6 +4,11 @@ title: Step catalog — every Step kind, delivered and pending — Webhook and E
 description: Part 4 of 5 of Step catalog — every Step kind, delivered and pending: webhook → sink.webhook — the outbound webhook; excel → sink.excel — the Excel workbook sink; The delivered processors that are not chain Steps — where their keys live
 tags: [pipeline-graph, steps, catalog, processors, palette, examples, roadmap]
 timestamp: 2026-09-06T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # Step catalog — every Step kind, delivered and pending — Webhook and Excel sinks, and the non-chain processors

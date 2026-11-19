@@ -4,6 +4,11 @@ title: "Business assurance — user guide"
 description: "Working day to day in a Space created from the business-assurance Space Template."
 tags: [business-assurance, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.business-assurance
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/business-assurance
 ---
 
 # Business assurance — user guide

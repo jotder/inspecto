@@ -4,6 +4,11 @@ title: "Telecom fraud — user guide"
 description: "Working day to day in a Space created from the telco-fraud Space Template."
 tags: [telco-fraud, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.telco-fraud
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/telco-fraud
 ---
 
 # Telecom fraud — user guide

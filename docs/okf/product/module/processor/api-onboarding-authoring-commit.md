@@ -4,6 +4,11 @@ title: Onboarding authoring seams (draft lifecycle, previews, register pair) —
 description: Part 3 of 3 of Onboarding authoring seams (draft lifecycle, previews, register pair): 
 tags: [control-plane, onboarding, config, enrichment, pipeline, reference]
 timestamp: 2026-07-16T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: inspecto
 ---
 
 # Onboarding authoring seams (draft lifecycle, previews, register pair) — Add data — the commit onward

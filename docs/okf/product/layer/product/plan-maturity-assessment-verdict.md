@@ -4,6 +4,10 @@ title: Product maturity assessment — every client-facing item — Verdict, sco
 description: Part 1 of 8 of Product maturity assessment — every client-facing item: Verdict; How it was scored; Scorecard; Cross-cutting findings; What raises the levels — ranked by leverage
 tags: [maturity, assessment, rfp, competitive, enterprise, product]
 timestamp: 2026-10-20T00:00:00Z
+item: layer.product
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
 ---
 
 # Product maturity assessment — every client-facing item — Verdict, scoring and scorecard

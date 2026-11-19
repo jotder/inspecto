@@ -5,6 +5,11 @@ description: Scheduled jobs and run history, with a descriptor-driven authoring 
 resource: inspecto-ui/src/app/modules/admin/jobs/jobs.routes.ts
 tags: [feature, jobs, operations, schedules]
 timestamp: 2026-06-28T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: inspecto
 ---
 
 # Jobs

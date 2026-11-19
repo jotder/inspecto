@@ -5,6 +5,11 @@ description: The assistant agent in four parts — the eoiagent architecture (el
 resource: jotder/inspect-agent/docs/architecture/, jotder/inspect-agent, features/inspecto-agent/, features/inspecto-agent/src/main/java/com/gamma/agent/  # the two jotder/… entries are the upstream GitHub repo; NOT local paths (corrected 2026-09-09)
 tags: [agentic, architecture, hexagonal, ports, application-pack, eoiagent, overview, langchain4j, module, agent, assist, vendored-kernel, optional, inspecto, model-transport, intelligence]
 timestamp: 2026-07-07T00:00:00Z  # the first three parts; the integration part carried 2026-07-16. Part types were Concept, Overview, Module, Concept
+item: module.agent
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-agent
 ---
 
 # Assistant agent and eoiagent

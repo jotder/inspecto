@@ -4,6 +4,11 @@ title: ELT — user guide — Authoring gap list, enrich, load, ingest options a
 description: Part 5 of 7 of ELT — user guide: Enrich; Load — sinks, partitioning and route branches; Ingest options and feed contracts; Testing what you author
 tags: [feature, pipelines, editor, authoring, g6, graph, workbench, schema, mapping, transform, parsing-ingest, enrichment, onboarding, use-cases, user-guide, collectors, acquisition, connections, runs, operations, detail, breadcrumb]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # ELT — user guide — Authoring gap list, enrich, load, ingest options and testing

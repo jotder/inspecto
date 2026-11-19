@@ -4,6 +4,11 @@ title: "Analytics Kernel — admin guide"
 description: "Operating the Analytics Kernel: no install step, the entity-cap flags that bound score runs, the function catalogue route, the CI duplication guard and common failures."
 tags: [analytics, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.analytics
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-analytics
 ---
 
 # Analytics Kernel — admin guide

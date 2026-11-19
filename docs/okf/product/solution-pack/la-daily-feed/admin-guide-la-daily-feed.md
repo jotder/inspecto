@@ -4,6 +4,11 @@ title: "Link Analysis daily feed — admin guide"
 description: "Install, adapt and verify the la-daily-feed Space Template."
 tags: [la-daily-feed, admin-guide]
 timestamp: 2026-10-23T00:00:00Z
+item: solution-pack.la-daily-feed
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-daily-feed
 ---
 
 # Link Analysis daily feed — admin guide

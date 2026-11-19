@@ -4,6 +4,11 @@ title: Inspecto LA demo kit - runbook and stakeholder Q&A — Short version, cla
 description: Part 2 of 3 of Inspecto LA demo kit - runbook and stakeholder Q&A: Ten-minute short version; Claims we do NOT make, and what is not yet; Contradictions found between sources (2026-10-12); Rehearsal record: fresh full bake, 2026-10-13; Final go/no-go rehearsal: fresh full bake, 2026-10-14; Building a private showcase on a customer's real feed (lessons, 2026-10-15/16); Technical / security …
 tags: [module, la-core, link-analysis, demo, presales, admin-guide]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA demo kit - runbook and stakeholder Q&A — Short version, claims, rehearsals and requirements

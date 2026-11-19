@@ -4,6 +4,11 @@ title: "Workflow and SLA models — spec"
 description: "Classes, component files and the host seam of the com.gamma.workflow models."
 tags: [workflow, spec]
 timestamp: 2026-10-19T00:00:00Z
+item: module.workflow
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-workflow
 ---
 
 # Workflow and SLA models — spec

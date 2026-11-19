@@ -4,6 +4,10 @@ title: Build & Test — Packaging — package.ps1
 description: Part 2 of 3 of Build & Test: Packaging — package.ps1
 tags: [build, test, maven, duckdb, packaging]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
 ---
 
 # Build & Test — Packaging — package.ps1

@@ -5,6 +5,11 @@ description: The one reference for every Step a Pipeline can chain — every del
 resource: inspecto-ui/src/app/inspecto/contracts/node-attributes.contract.json
 tags: [pipeline-graph, steps, catalog, processors, palette, examples, roadmap]
 timestamp: 2026-09-06T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # Step catalog — every Step kind, delivered and pending

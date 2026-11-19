@@ -4,6 +4,11 @@ title: API stability policy — The marker, the release baseline and the pending
 description: Part 1 of 3 of API stability policy: What the marker means; Release baseline — nothing after 3.x has shipped; The baseline guard (PUBLIC-API-SURFACE-1, 2026-11-12); Release notes — the pending MAJOR (draft, kept current until the tag is cut)
 tags: [api, stability, publicapi, semver, release]
 timestamp: 2026-07-16T00:00:00Z
+item: module.api
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: platform/inspecto-api
 ---
 
 # API stability policy — The marker, the release baseline and the pending release notes

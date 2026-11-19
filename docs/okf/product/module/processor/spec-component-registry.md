@@ -5,6 +5,11 @@ description: Reusable grammar/transform/sink components (now + dataset/widget/da
 resource: platform/inspecto-engine/src/main/java/com/gamma/pipeline/ComponentStore.java
 tags: [components, registry, grammar, transform, sink, etag, routes]
 timestamp: 2026-07-07T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: inspecto
 ---
 
 # Component Registry

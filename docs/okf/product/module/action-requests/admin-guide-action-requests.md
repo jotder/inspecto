@@ -5,6 +5,11 @@ description: Enabling the Action Requests module, who may approve, the dispatch 
 resource: features/inspecto-action-requests/src/main/resources/META-INF/inspecto/module.toon
 tags: [action-requests, admin-guide, egress, approvers, configuration]
 timestamp: 2026-10-19T00:00:00Z
+item: module.action-requests
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-action-requests
 ---
 
 # Action Requests — admin guide

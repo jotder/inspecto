@@ -4,6 +4,11 @@ title: Auth & Security — Fail-closed boot, Space and config guards
 description: Part 2 of 3 of Auth & Security: An undeclared mutating route does not boot either (ROUTE-UNGATED-DEFAULT-1, 2026-09-16); A Space a signed-in person creates is closed (LA-FULL-CYCLE-TEST-1 finding 32, decision D5, 2026-11-15); A Standard/Advanced bundle does not boot without OIDC configuration; A Space's config cannot name another Space's directory (CROSS-SPACE-JAIL-1, 2026-09-24); The …
 tags: [auth, security, spi, oidc, keycloak, wso2, bff, write-gate, rbac, abac, policy-engine, edition-standard, edition-advanced]
 timestamp: 2026-07-24T00:00:00Z
+item: module.access
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-access
 ---
 
 # Auth & Security — Fail-closed boot, Space and config guards

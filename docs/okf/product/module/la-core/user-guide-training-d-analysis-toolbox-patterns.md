@@ -4,6 +4,11 @@ title: Inspecto LA training videos — D · The analysis toolbox: narration scri
 description: Part 2 of 3 of Inspecto LA training videos — D · The analysis toolbox: narration scripts: D4_Groups-and-weak-points; D5_What-looks-unusual; D6_Pattern-match
 tags: [module, la-core, link-analysis, user-guide, training, video]
 timestamp: 2026-11-16T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA training videos — D · The analysis toolbox: narration scripts — Episodes D4-D6 — groups, the unusual and pattern match

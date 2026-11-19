@@ -5,6 +5,11 @@ description: The one shared inline authoring surface — a pane names a non-muta
 resource: inspecto-ui/src/app/inspecto/ai-assist
 tags: [ai, authoring, assist, agent, panes, agt-6a]
 timestamp: 2026-07-27T00:00:00Z
+item: module.intelligence
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: features/inspecto-intelligence
 ---
 
 # Inline AI authoring (`<inspecto-ai-assist>`, AGT-6a)

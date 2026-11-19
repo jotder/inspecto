@@ -4,6 +4,11 @@ title: Ingest — the ingestion SPI, ingesters, Consignment coordination and bra
 description: Part 1 of 3 of Ingest — the ingestion SPI, ingesters, Consignment coordination and branch-aware ingest: Plugin ingester; Execution modes — the framework picks by file size; Segment schemas and the partition declaration; Pipeline config (plugin); Output layout; Shipped ingesters; Plugin author workflow
 tags: [elt, engine, ingestion, spi, streaming, consignment, ingester, duckdb, seam, partitions, contract-test, plugins, segments, quarantine, route, branch, arming, fail-closed, lanes, addressing, revisions, watermark, selector, event-time, concurrency, scheduler, priority, backpressure, operations, parsing, grammar, csv, plugin, read-csv, frontend, options, asn1, xml, decode-profile]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # Ingest — the ingestion SPI, ingesters, Consignment coordination and branch-aware ingest — The plugin ingester, modes, schemas and shipped ingesters

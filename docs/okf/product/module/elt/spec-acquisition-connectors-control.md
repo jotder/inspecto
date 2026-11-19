@@ -4,6 +4,11 @@ title: Acquisition — specification — Retry, the connector SPI, connection pr
 description: Part 2 of 2 of Acquisition — specification: Phase F — retry, circuit breaker, post-action; The connector SPI and the resolvable schemes; Connection profiles, secrets, host keys, tunnels and proxies; The control surface; Observability; Network shares — the declined design, recorded once; Defaults worth not 'fixing'; References
 tags: [acquisition, requirements, discovery, stability, dedup, watermark, guarantees, unpack, decompression, collector, archive, consignment]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # Acquisition — specification — Retry, the connector SPI, connection profiles and control

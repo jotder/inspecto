@@ -5,6 +5,11 @@ description: The cross-instance config bundle — v2 envelope (refs + provenance
 resource: inspecto/src/main/java/com/gamma/control/BundleRoutes.java
 tags: [control-plane, bundle, transportability, promotion, content-hash, drift]
 timestamp: 2026-10-04T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: inspecto
 ---
 
 # Metadata Bundle & Transportability

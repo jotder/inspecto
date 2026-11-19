@@ -5,6 +5,11 @@ description: "The /assist/* control-plane routes served by the agent module, wit
 resource: inspecto/src/main/java/com/gamma/control/AssistRoutes.java
 tags: [agent, assist, api]
 timestamp: 2026-10-19T00:00:00Z
+item: module.agent
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-agent
 ---
 
 # Assistant agent — API

@@ -4,6 +4,11 @@ title: Configuration reference — The collector block, type mapping and the Pos
 description: Part 2 of 2 of Configuration reference: Type Mapping Reference; Optional Postgres state store (DAT-6)
 tags: [config, toon, spaces, type-mapping, postgres]
 timestamp: 2026-07-16T00:00:00Z
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-config
 ---
 
 # Configuration reference — The collector block, type mapping and the Postgres state store

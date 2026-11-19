@@ -3,6 +3,9 @@ type: Capability
 title: Editions & packaging (PKG) — capability spec — Purpose, scope and requirements of record
 description: Part 1 of 4 of Editions & packaging (PKG) — capability spec: Purpose & scope; Requirements of record
 status: current
+item: layer.platform
+audience: internal
+verified: 2026-11-19 last-edit
 ---
 
 # Editions & packaging (PKG) — capability spec — Purpose, scope and requirements of record

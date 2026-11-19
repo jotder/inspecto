@@ -6,6 +6,9 @@ description: The requirement-of-record and as-built specification for the SPA sh
 status: current
 written: 2026-09-08
 supersedes-rows: REQUIREMENTS §3.15 UI-1..UI-8 (this file corrects them, see §2)
+item: layer.product
+audience: internal
+verified: 2026-11-20 last-edit
 ---
 
 # Surfaces & Lenses (`UI`)

@@ -7,6 +7,10 @@ resource: inspecto-ui/src/app/modules/admin/processing-status/
 status: current
 written: 2026-09-08
 supersedes-rows: REQUIREMENTS §3.7 OPS-1..OPS-6 (this file corrects them, see §2)
+item: module.observability
+audience: internal
+verified: 2026-11-19 last-edit
+code: features/inspecto-observability
 ---
 
 # Observability & maintenance (`OPS`)

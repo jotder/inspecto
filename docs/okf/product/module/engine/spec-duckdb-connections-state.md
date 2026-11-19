@@ -4,6 +4,11 @@ title: DuckDB Integration — Sealed connections, time zones and aggregate state
 description: Part 2 of 2 of DuckDB Integration: Every ingest connection is sealed (SEC-INGEST-EXPR-EXTERNAL-ACCESS-1, 2026-09-30); Every in-memory scratch connection is sealed by default (ENGINE-INMEMORY-UNSEALED-1, 2026-10-03); The source time zone for temporal data; Aggregate state cannot be persisted and restored (§7.5 probe)
 tags: [engine, duckdb, performance, appender, threads]
 timestamp: 2026-06-28T00:00:00Z
+item: module.engine
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-engine
 ---
 
 # DuckDB Integration — Sealed connections, time zones and aggregate state

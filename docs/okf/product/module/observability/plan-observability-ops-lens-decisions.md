@@ -3,6 +3,10 @@ type: Capability
 title: Observability & maintenance (OPS) — capability spec — Specification — Ops Lens screens; decisions and not built
 description: Part 3 of 4 of Observability & maintenance (OPS) — capability spec: Decisions (dated one-liners); Not built
 status: current
+item: module.observability
+audience: internal
+verified: 2026-11-19 last-edit
+code: features/inspecto-observability
 ---
 
 # Observability & maintenance (OPS) — capability spec — Specification — Ops Lens screens; decisions and not built

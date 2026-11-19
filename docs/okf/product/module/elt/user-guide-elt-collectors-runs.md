@@ -4,6 +4,11 @@ title: ELT — user guide — Collectors, Runs and references
 description: Part 7 of 7 of ELT — user guide: Collectors and Collector configuration; Runs and Run Detail; References
 tags: [feature, pipelines, editor, authoring, g6, graph, workbench, schema, mapping, transform, parsing-ingest, enrichment, onboarding, use-cases, user-guide, collectors, acquisition, connections, runs, operations, detail, breadcrumb]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # ELT — user guide — Collectors, Runs and references

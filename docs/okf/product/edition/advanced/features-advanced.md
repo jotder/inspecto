@@ -4,6 +4,11 @@ title: "Advanced Edition — features"
 description: "Advanced includes Standard and adds policy, a PostgreSQL investigation store and intelligence modules."
 tags: [advanced, edition, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: edition.advanced
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: offerings/advanced.toon
 ---
 
 # Advanced Edition — features

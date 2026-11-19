@@ -4,6 +4,11 @@ title: Auth & Security — Imports, identity files and maker-checker
 description: Part 3 of 3 of Auth & Security: No import may write an identity, access or settings file (SEC-IMPORT-ROLES-ESCALATION-1, 2026-09-26); Maker-checker: a held config change needs a different person (ASSURE-MAKER-CHECKER-1, 2026-09-26)
 tags: [auth, security, spi, oidc, keycloak, wso2, bff, write-gate, rbac, abac, policy-engine, edition-standard, edition-advanced]
 timestamp: 2026-07-24T00:00:00Z
+item: module.access
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-access
 ---
 
 # Auth & Security — Imports, identity files and maker-checker

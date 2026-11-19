@@ -4,6 +4,11 @@ title: Security (SEC) — Decisions, not built, refused and as-built pointers
 description: Part 3 of 4 of Security (SEC): Decisions; Not built; Refused & superseded; As-built mechanism (pointers only)
 tags: [sec, capability, security, oidc, rbac, abac, capabilities, roles, access-policy, secrets, https, write-gate]
 timestamp: 2026-09-08T00:00:00Z
+item: module.access
+audience: internal
+status: plan
+verified: 2026-11-20 last-edit
+code: platform/inspecto-access
 ---
 
 # Security (SEC) — Decisions, not built, refused and as-built pointers

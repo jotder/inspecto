@@ -5,6 +5,11 @@ description: An outbound call raised from an Incident or Case (or a Decision Rul
 resource: features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/ActionRequestRoutes.java
 tags: [control-plane, action-request, maker-checker, four-eyes, webhook, egress, decision-rule, incident]
 timestamp: 2026-09-28T00:00:00Z
+item: module.action-requests
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-action-requests
 ---
 
 # Action Requests

@@ -5,6 +5,10 @@ description: Maps processor/node types to gamma SVG icons used across the flow e
 resource: inspecto-ui/src/app/modules/admin/icon-settings/icon-settings.routes.ts
 tags: [feature, icon-settings, settings, icons]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
 ---
 
 # Icon Settings

@@ -4,6 +4,11 @@ title: "Link Analysis audit showcase — features"
 description: "A seeded finance-and-audit Space that shows procure-to-pay and journal risk as a graph, ending in a verifiable Dossier."
 tags: [la-audit, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.la-audit
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-audit
 ---
 
 # Link Analysis audit showcase — features

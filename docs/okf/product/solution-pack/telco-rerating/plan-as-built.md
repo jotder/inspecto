@@ -4,6 +4,11 @@ title: "Telecom re-rating (tariff validation) — decisions and as-built record"
 description: "Slices R0 to R3 of PACK-RERATING-1 as built: why there is no kernel, the answered decisions, gate G-K, the R0 answers, the corpus, the mutation passes, the known limits and the traps found."
 tags: [telco-rerating, plan, as-built]
 timestamp: 2026-10-22T00:00:00Z
+item: solution-pack.telco-rerating
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: spaces/_templates/telco-rerating
 ---
 
 # Telecom re-rating (tariff validation) — decisions and as-built record

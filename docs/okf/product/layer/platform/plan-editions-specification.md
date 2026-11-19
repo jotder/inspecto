@@ -3,6 +3,9 @@ type: Capability
 title: Editions & packaging (PKG) — capability spec — Specification
 description: Part 2 of 4 of Editions & packaging (PKG) — capability spec: Specification
 status: current
+item: layer.platform
+audience: internal
+verified: 2026-11-19 last-edit
 ---
 
 # Editions & packaging (PKG) — capability spec — Specification

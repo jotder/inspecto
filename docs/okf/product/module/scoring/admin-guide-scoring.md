@@ -5,6 +5,11 @@ description: "Enabling Risk Scores, permissions, config keys and flags, storage,
 resource: features/inspecto-scoring/src/main/resources/META-INF/inspecto/module.toon
 tags: [scoring, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.scoring
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-scoring
 ---
 
 # Scoring — admin guide

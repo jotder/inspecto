@@ -5,6 +5,11 @@ description: DEMO-AUTH-1 — passwordless Demo User sign-in for offline demo bun
 resource: providers/inspecto-demo-auth/
 tags: [module, demo-auth, plan, demo]
 timestamp: 2026-10-19T00:00:00Z
+item: module.demo-auth
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: providers/inspecto-demo-auth
 ---
 
 # Demo authenticator — plan of record

@@ -5,6 +5,10 @@ description: The Builder-lens BI authoring hub — Datasets, Query Library, Viz 
 resource: inspecto-ui/src/app/modules/admin/studio/
 tags: [feature, studio, bi, dataset, query, widget, dashboard]
 timestamp: 2026-07-07T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
 ---
 
 # Studio

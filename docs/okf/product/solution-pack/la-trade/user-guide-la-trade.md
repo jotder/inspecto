@@ -4,6 +4,11 @@ title: "Link Analysis trade showcase — user guide"
 description: "A five-minute tour of the la-trade Space and one exercise per planted story (over-invoicing, phantom shipment, circular trade, shell importers), each with a hint and an answer, and the look-alikes that must not join them."
 tags: [la-trade, user-guide]
 timestamp: 2026-11-07T00:00:00Z
+item: solution-pack.la-trade
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-trade
 ---
 
 # Link Analysis trade showcase — user guide

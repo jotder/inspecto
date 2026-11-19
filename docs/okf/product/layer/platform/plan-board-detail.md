@@ -4,6 +4,10 @@ title: layer.platform - board row detail
 description: The narrative behind layer.platform's long rows on the board (docs/BACKLOG.md), moved here verbatim so each board row stays a short summary.
 tags: [layer, platform, plan, backlog]
 timestamp: 2026-11-19T00:00:00Z
+item: layer.platform
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
 ---
 
 # layer.platform - board row detail

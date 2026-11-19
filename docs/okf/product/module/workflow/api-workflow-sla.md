@@ -4,6 +4,11 @@ title: "Workflow and SLA — API"
 description: "Control-plane routes for Workflow and SLA, with their gates."
 tags: [workflow, workflow-sla, api]
 timestamp: 2026-10-19T00:00:00Z
+item: module.workflow
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-workflow
 ---
 
 # Workflow and SLA — API

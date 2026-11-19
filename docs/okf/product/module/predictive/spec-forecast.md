@@ -5,6 +5,11 @@ description: As built for PREDICTIVE-FORECAST-1 (2026-11-01) — slice S4 of the
 resource: docs/okf/product/module/anomaly/plan-predictive-analytics.md
 tags: [predictive, forecast, holt-winters, seasonal-naive, backtest, job, analytics]
 timestamp: 2026-11-01T00:00:00Z
+item: module.predictive
+audience: internal
+status: current
+verified: 2026-11-01 last-edit
+code: features/inspecto-predictive
 ---
 
 # Forecasts (seasonal-naive and Holt-Winters)

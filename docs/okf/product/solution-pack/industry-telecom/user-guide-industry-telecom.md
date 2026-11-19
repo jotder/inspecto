@@ -4,6 +4,11 @@ title: "Telecom industry pack — user guide"
 description: "What changes for an analyst when a Space uses the telecom domain profile."
 tags: [industry-telecom, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.industry-telecom
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-entity-store/src/main/resources/META-INF/inspecto/industry-packs/telecom
 ---
 
 # Telecom industry pack — user guide

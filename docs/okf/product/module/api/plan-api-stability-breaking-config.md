@@ -4,6 +4,11 @@ title: API stability policy — Release notes — breaking configuration and CLI
 description: Part 2 of 3 of API stability policy: 
 tags: [api, stability, publicapi, semver, release]
 timestamp: 2026-07-16T00:00:00Z
+item: module.api
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: platform/inspecto-api
 ---
 
 # API stability policy — Release notes — breaking configuration and CLI changes onward

@@ -5,6 +5,11 @@ description: What the `@PublicApi` marker means and does not mean, the release b
 resource: platform/inspecto-api/src/main/java/com/gamma/api/PublicApi.java
 tags: [api, stability, publicapi, semver, release]
 timestamp: 2026-07-16T00:00:00Z
+item: module.api
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: platform/inspecto-api
 ---
 
 # API Stability Policy

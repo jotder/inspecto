@@ -4,6 +4,11 @@ title: "Event model and log — plan"
 description: "Requirement of record for the event model, event log and audit chain: what is required, built, left and refused."
 tags: [event, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.event
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: platform/inspecto-event
 ---
 
 # Event model and log — plan

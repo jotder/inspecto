@@ -4,6 +4,11 @@ title: "Telecom ASN.1 decoder — features"
 description: "The telecom ASN.1 decoder adds the `parser.asn1.ber` step kind for BER-encoded telecom CDRs."
 tags: [telecom-asn1, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.telecom-asn1
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-telecom-asn1
 ---
 
 # Telecom ASN.1 decoder — features

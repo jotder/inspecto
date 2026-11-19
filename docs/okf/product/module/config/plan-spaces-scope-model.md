@@ -4,6 +4,11 @@ title: Spaces & tenancy (SPC) — Purpose, requirements and the Space model
 description: Part 1 of 4 of Spaces & tenancy (SPC): Purpose & scope; Requirements of record; Specification
 tags: [spc, capability, spaces, tenancy, multi-space, space-root, migrator, templates, metadata-bundle, exchange, isolation]
 timestamp: 2026-09-08T00:00:00Z
+item: module.config
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: platform/inspecto-config
 ---
 
 # Spaces & tenancy (SPC) — Purpose, requirements and the Space model

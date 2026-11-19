@@ -4,6 +4,11 @@ title: Link Analysis — data onboarding — Add data, help and onboarding resid
 description: Part 1 of 3 of Link Analysis — data onboarding: Add data: the shared import route (LA-ONBOARD-1 phase 2, as built 2026-10-22); Help on every screen and the onboarding counters (LA-ONBOARD-1 phase 8, as built 2026-10-22; UC-15, A-9, A-10, OB-13); Explorer defects found by the acceptance drive, fixed (LA-ONBOARD-DEFECTS-1, as built 2026-10-23); Onboarding residuals (LA-ONBOARD-RESIDUALS-1, as …
 tags: [module, link-analysis, onboarding, add-data, arrivals, dataset, architecture]
 timestamp: 2026-11-12T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — data onboarding — Add data, help and onboarding residuals

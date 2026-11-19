@@ -5,6 +5,11 @@ description: The closure query and why reference direction is irreducibly incons
 resource: inspecto/src/main/java/com/gamma/control
 tags: [pipeline, closure, references, catalog, related]
 timestamp: 2026-08-18T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-12 last-edit
+code: inspecto
 ---
 
 # Pipeline closure — what belongs to a pipeline

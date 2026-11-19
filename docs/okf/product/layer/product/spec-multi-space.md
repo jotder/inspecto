@@ -5,6 +5,10 @@ description: SpacesService holds the active space; the spaceInterceptor rewrites
 resource: inspecto-ui/src/app/inspecto/api/space.interceptor.ts
 tags: [multi-space, multi-tenant, interceptor, spaces]
 timestamp: 2026-07-07T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
 ---
 
 # Multi-Space Scoping

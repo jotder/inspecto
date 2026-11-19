@@ -5,6 +5,11 @@ description: Remote source connectors (SFTP/FTP/FTPS/DB) and all network depende
 resource: providers/inspecto-connectors/
 tags: [module, connectors, network, sftp, ftp, jdbc]
 timestamp: 2026-06-28T00:00:00Z
+item: module.connectors
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-connectors
 ---
 
 # Connectors Module (`providers/inspecto-connectors/`)

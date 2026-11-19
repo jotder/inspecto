@@ -4,6 +4,11 @@ title: Config and TOON - gotchas
 description: TOON serialization and hand-authoring rules, the two schema shapes, component registration, flow and path resolution.
 tags: [config, toon, schema, gotchas]
 timestamp: 2026-11-19T00:00:00Z
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-config
 ---
 
 # Config and TOON - gotchas

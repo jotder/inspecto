@@ -4,6 +4,10 @@ title: Platform requirements and MoSCoW
 description: The platform requirements-of-record with their MoSCoW priority; a hub plan §2 overrides it where they differ.
 tags: [requirements, moscow, platform]
 timestamp: 2026-11-19T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Inspecto — Platform Requirements & MoSCoW Analysis

@@ -4,6 +4,11 @@ title: ELT — user guide — Steps, Step configuration and Collect
 description: Part 2 of 7 of ELT — user guide: Steps — the vocabulary, the flags and the authoring model; Configuring a Step — the definition drawer; Collect — the acquisition Step
 tags: [feature, pipelines, editor, authoring, g6, graph, workbench, schema, mapping, transform, parsing-ingest, enrichment, onboarding, use-cases, user-guide, collectors, acquisition, connections, runs, operations, detail, breadcrumb]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # ELT — user guide — Steps, Step configuration and Collect

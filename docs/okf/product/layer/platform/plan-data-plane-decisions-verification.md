@@ -4,6 +4,10 @@ title: Data plane (DAT) — Decisions, not built, refused and verification
 description: Part 3 of 3 of Data plane (DAT): Decisions; Not built; Refused & superseded; As-built mechanism (pointers only); Verification
 tags: [dat, capability, dataset, query, parameters, result-set, bi-query, sql-guard, expression-guard, matrix, materialize, duckdb, postgres, operational-db, ducklake, warehouse, timezone]
 timestamp: 2026-09-08T00:00:00Z
+item: layer.platform
+audience: internal
+status: plan
+verified: 2026-11-20 last-edit
 ---
 
 # Data plane (DAT) — Decisions, not built, refused and verification

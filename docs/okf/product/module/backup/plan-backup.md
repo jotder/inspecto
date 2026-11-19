@@ -4,6 +4,11 @@ title: "Backup and restore — plan"
 description: "Requirement of record for the backup, backup_verify and restore maintenance tasks: what was required, built, left and refused."
 tags: [backup, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.backup
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: features/inspecto-backup
 ---
 
 # Backup and restore — plan

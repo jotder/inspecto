@@ -5,6 +5,11 @@ description: Operational objects in a mail-like 3-pane UI — one ObjectMailComp
 resource: inspecto-ui/src/app/modules/admin/objects/object-mail.component.ts
 tags: [feature, objects, incidents, cases, operations, mail-ui, workflow]
 timestamp: 2026-07-16T00:00:00Z
+item: module.ops
+audience: internal
+status: current
+verified: 2026-11-10 last-edit
+code: features/inspecto-ops
 ---
 
 # Incidents & Cases (Objects)

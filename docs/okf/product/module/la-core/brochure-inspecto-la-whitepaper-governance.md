@@ -2,6 +2,11 @@
 type: Brochure
 title: Inspecto LA whitepaper — Enterprise governance, security and access control
 description: Part 4 of 6 of Inspecto LA whitepaper: · Enterprise governance, security & access control
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA whitepaper — Enterprise governance, security and access control

@@ -5,6 +5,11 @@ description: One server, many isolated Spaces — the on-disk layout and the one
 resource: inspecto/src/main/java/com/gamma/service/SpaceManager.java, inspecto/src/main/java/com/gamma/control/BundleRoutes.java
 tags: [spc, capability, spaces, tenancy, multi-space, space-root, migrator, templates, metadata-bundle, exchange, isolation]
 timestamp: 2026-09-08T00:00:00Z
+item: module.config
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: platform/inspecto-config
 ---
 
 # Spaces & tenancy — capability spec (`SPC`)

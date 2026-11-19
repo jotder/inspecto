@@ -4,6 +4,11 @@ title: "Link Analysis showcase catalogue — user guide"
 description: "Pick a Link Analysis showcase Space: the 18 templates grouped by 9 industries, with what each teaches, its planted stories, its edition tiers, its download size and its user guide; how to install one, and where to start."
 tags: [la-showcase, user-guide, showcase, catalogue]
 timestamp: 2026-11-08T00:00:00Z
+item: solution-pack.la-showcase
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-showcase
 ---
 
 # Link Analysis showcase catalogue — user guide

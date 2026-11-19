@@ -4,6 +4,10 @@ title: Control plane, SPIs and packaging - gotchas
 description: Backend traps across routes and authorization, SPIs, optional modules, Postgres stores, packaging and launchers.
 tags: [control-api, spi, packaging, editions, gotchas]
 timestamp: 2026-11-19T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Control plane, SPIs and packaging - gotchas

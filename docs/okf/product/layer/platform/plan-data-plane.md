@@ -5,6 +5,10 @@ description: Datasets over partitioned Parquet and the relations they resolve to
 resource: platform/inspecto-engine/src/main/java/com/gamma/query, platform/inspecto-sql/src/main/java/com/gamma/sql, inspecto/src/main/java/com/gamma/service/OperationalDb.java
 tags: [dat, capability, dataset, query, parameters, result-set, bi-query, sql-guard, expression-guard, matrix, materialize, duckdb, postgres, operational-db, ducklake, warehouse, timezone]
 timestamp: 2026-09-08T00:00:00Z
+item: layer.platform
+audience: internal
+status: plan
+verified: 2026-11-20 last-edit
 ---
 
 # Data plane — capability spec (`DAT`)

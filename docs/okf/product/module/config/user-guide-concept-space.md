@@ -4,6 +4,9 @@ title: Space
 description: What a Space is — the isolated project that owns your data, configuration and audit trail — and how you work with Spaces in the console.
 item: module.config
 audience: external
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-config
 ---
 
 # Space

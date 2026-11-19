@@ -4,6 +4,11 @@ title: "Control plane and processor host — admin guide"
 description: "Booting, securing and checking the control plane host: its JVM flags, health routes and common boot failures."
 tags: [processor, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: inspecto
 ---
 
 # Control plane and processor host — admin guide

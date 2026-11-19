@@ -4,6 +4,11 @@ title: DuckDB Integration — DuckDB 2.0.0.0, the pinned version
 description: Part 1 of 2 of DuckDB Integration: DuckDB 2.0.0.0 (pinned 2026-10-23, DUCKDB-2-MIGRATION-1)
 tags: [engine, duckdb, performance, appender, threads]
 timestamp: 2026-06-28T00:00:00Z
+item: module.engine
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-engine
 ---
 
 # DuckDB Integration — DuckDB 2.0.0.0, the pinned version

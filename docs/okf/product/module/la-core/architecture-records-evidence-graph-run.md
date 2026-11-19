@@ -4,6 +4,11 @@ title: Link Analysis — as-built reference and design records — Evidence, the
 description: Part 3 of 6 of Link Analysis — as-built reference and design records: Graph Run
 tags: [module, la-core, link-analysis, architecture]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — as-built reference and design records — Evidence, the op log and Graph Run

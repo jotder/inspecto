@@ -4,6 +4,11 @@ title: "Observability — spec"
 description: "Developer reference for features/inspecto-observability: the two RouteModules, edition gating, masking and the seams they read."
 tags: [observability, spec]
 timestamp: 2026-10-19T00:00:00Z
+item: module.observability
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-observability
 ---
 
 # Observability — spec

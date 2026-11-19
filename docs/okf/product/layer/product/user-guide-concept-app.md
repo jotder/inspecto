@@ -4,6 +4,8 @@ title: App
 description: What an App is — a finished business application on Inspecto, such as Revenue Assurance or Link Analysis — and how it differs from a Space Template and an Add-on.
 item: layer.product
 audience: external
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # App

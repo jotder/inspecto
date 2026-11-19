@@ -3,6 +3,10 @@ type: Capability
 title: Observability & maintenance (OPS) — capability spec — Refused, as-built pointers and verification
 description: Part 4 of 4 of Observability & maintenance (OPS) — capability spec: Refused & superseded; As-built pointers; Verification
 status: current
+item: module.observability
+audience: internal
+verified: 2026-11-19 last-edit
+code: features/inspecto-observability
 ---
 
 # Observability & maintenance (OPS) — capability spec — Refused, as-built pointers and verification

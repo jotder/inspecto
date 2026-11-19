@@ -5,6 +5,10 @@ description: Symptom-first fixes for operational failures — pg_duckdb view err
 resource: platform/inspecto-util/src/main/java/com/gamma/util/DuckDbUtil.java
 tags: [troubleshooting, diagnostics, duckdb, operations]
 timestamp: 2026-07-16T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
 ---
 
 # Troubleshooting

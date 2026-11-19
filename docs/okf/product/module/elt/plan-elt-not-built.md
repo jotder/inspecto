@@ -5,6 +5,10 @@ description: Part 4 of 7 of Acquisition, ingestion and Pipelines (ACQ, ING, PIP)
 status: current
 tags: [acq, ing, pip, capability, acquisition, connections, collectors, connectors, ledger, ingestion, parsing, consignment, grammar, parser-plugin, quarantine, expectation, pipeline, authoring, step-catalog, execution, scheduler, jobs, plan]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # Acquisition, ingestion and Pipelines (ACQ, ING, PIP) — plan — Not built and open

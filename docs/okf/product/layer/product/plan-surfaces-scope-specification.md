@@ -3,6 +3,9 @@ type: Capability
 title: Surfaces & Lenses (UI) — capability spec — Purpose, requirements and specification
 description: Part 1 of 2 of Surfaces & Lenses (UI) — capability spec: Purpose & scope; Requirements of record; Specification
 status: current
+item: layer.product
+audience: internal
+verified: 2026-11-20 last-edit
 ---
 
 # Surfaces & Lenses (UI) — capability spec — Purpose, requirements and specification

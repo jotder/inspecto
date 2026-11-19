@@ -4,6 +4,11 @@ title: Inspecto LA training videos — F · Investigations (Standard): narration
 description: Part 1 of 3 of Inspecto LA training videos — F · Investigations (Standard): narration scripts: Episodes in F; F1_Signing-in-roles-and-your-first-Investigation; F2_Expand-with-intent; F3_Recorded-clean-up-and-scope
 tags: [module, la-core, link-analysis, user-guide, training, video]
 timestamp: 2026-11-16T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA training videos — F · Investigations (Standard): narration scripts — Episodes F1-F3 — roles, expand, clean-up

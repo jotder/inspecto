@@ -4,6 +4,11 @@ title: Control API (API) — Purpose, scope and requirements of record
 description: Part 1 of 3 of Control API (API): Purpose & scope; Requirements of record
 tags: [api, capability, control-api, v1, envelope, error-codes, etag, idempotency, cursor, openapi, route-module, public-api, semver]
 timestamp: 2026-09-08T00:00:00Z
+item: module.processor
+audience: internal
+status: plan
+verified: 2026-11-20 last-edit
+code: inspecto
 ---
 
 # Control API (API) — Purpose, scope and requirements of record

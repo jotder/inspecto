@@ -4,6 +4,11 @@ title: "Identity and Access — screens"
 description: "Where Identity and Access lives in the UI and what each screen does."
 tags: [access, access, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.access
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-access
 ---
 
 # Identity and Access — screens

@@ -4,6 +4,10 @@ title: Operations reference — utilities, batching, output, deployment — Outp
 description: Part 1 of 4 of Operations reference — utilities, batching, output, deployment: Pre-ETL file staging — retired; Output Structure; Status Log & Auditing
 tags: [operations, utilities, deployment, batching, output, onboarding]
 timestamp: 2026-07-16T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
 ---
 
 # Operations reference — utilities, batching, output, deployment — Output structure and the status log

@@ -4,6 +4,11 @@ title: "Screening — features"
 description: "Screening matches subjects (a key, a name, an identifier) against Entity Lists and keeps a reviewable record of every match a scheduled run finds."
 tags: [screening, screening, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.screening
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-screening
 ---
 
 # Screening — features

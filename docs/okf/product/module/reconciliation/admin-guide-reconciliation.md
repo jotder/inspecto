@@ -5,6 +5,11 @@ description: Enabling Reconciliation, its capabilities, the recon.run Job, the d
 resource: features/inspecto-reconciliation/src/main/resources/META-INF/inspecto/module.toon
 tags: [reconciliation, admin-guide, configuration, retention]
 timestamp: 2026-10-19T00:00:00Z
+item: module.reconciliation
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-reconciliation
 ---
 
 # Reconciliation — admin guide

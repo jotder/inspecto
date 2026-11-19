@@ -4,6 +4,11 @@ title: Link Analysis — architecture — Domain core — discovery; link index,
 description: Part 3 of 4 of Link Analysis — architecture: Link index (la-storage); Graph Run (graph + la-core + la-storage); HTTP surface (la-api, geo-link)
 tags: [module, la-core, link-analysis, architecture]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — architecture — Domain core — discovery; link index, Graph Run and HTTP surface

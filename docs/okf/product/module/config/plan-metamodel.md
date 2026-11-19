@@ -5,6 +5,11 @@ description: Everything authored is a Component — the kind registry and Compon
 resource: platform/inspecto-engine/src/main/java/com/gamma/pipeline/ComponentStore.java, platform/inspecto-engine/src/main/java/com/gamma/catalog
 tags: [met, capability, component, component-store, kind-registry, catalog, metadata-graph, node-kind, id-scheme, schema, mapping, field-types, onboarding, lineage]
 timestamp: 2026-09-08T00:00:00Z
+item: module.config
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: platform/inspecto-config
 ---
 
 # Component metamodel & Catalog — capability spec (`MET`)

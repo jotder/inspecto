@@ -5,6 +5,11 @@ description: Jobs and the scheduler (the module summary); the full capability co
 resource: platform/inspecto-engine/src/main/java/com/gamma/job/JobContext.java, inspecto/src/main/java/com/gamma/service/SpaceManager.java
 tags: [control-plane, jobs, pipeline-graph, steps, executables, boundary, plugins, multi-space, isolation, mdc, spaces]
 timestamp: 2026-08-09T00:00:00Z  # the Job vs Pipeline Step part; the Multi-Space Hosting part carried 2026-07-07
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: inspecto
 ---
 
 # Jobs, scheduler and multi-Space

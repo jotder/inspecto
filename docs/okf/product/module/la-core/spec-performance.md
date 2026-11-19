@@ -5,6 +5,11 @@ description: As-built facts of the LA performance work (2026-10-24 to 2026-11-13
 resource: inspecto-ui/projects/link-analysis/
 tags: [module, la-core, link-analysis, performance, spec]
 timestamp: 2026-11-13T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link analysis performance - decisions, seams and measured no-gos

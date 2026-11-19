@@ -4,6 +4,11 @@ title: "Link analysis storage — features"
 description: "Link analysis storage keeps the link index that investigations read."
 tags: [la-storage, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.la-storage
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: la/inspecto-la-storage
 ---
 
 # Link analysis storage — features

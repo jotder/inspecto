@@ -3,6 +3,9 @@ type: Capability
 title: Editions & packaging (PKG) — capability spec — Refused, as-built pointers and verification
 description: Part 4 of 4 of Editions & packaging (PKG) — capability spec: Refused & superseded; As-built pointers; Verification
 status: current
+item: layer.platform
+audience: internal
+verified: 2026-11-19 last-edit
 ---
 
 # Editions & packaging (PKG) — capability spec — Refused, as-built pointers and verification

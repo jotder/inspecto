@@ -4,6 +4,11 @@ title: "Action Requests — API"
 description: "Control-plane routes for Action Requests, with their gates."
 tags: [action-requests, action-requests, api]
 timestamp: 2026-10-19T00:00:00Z
+item: module.action-requests
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-action-requests
 ---
 
 # Action Requests — API

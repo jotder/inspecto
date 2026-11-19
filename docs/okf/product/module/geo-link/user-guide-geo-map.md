@@ -5,6 +5,11 @@ description: The offline geographic investigation studio — GeoSource/GeoQuery 
 resource: inspecto-ui/projects/link-analysis/src/geo-map/
 tags: [feature, studio, geo, maplibre, investigation]
 timestamp: 2026-07-07T00:00:00Z
+item: module.geo-link
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-geo-link
 ---
 
 # Geo Map Analysis

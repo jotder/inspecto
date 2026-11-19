@@ -5,6 +5,11 @@ description: /decision-rules routes — sample-driven simulate over a query-type
 resource: inspecto/src/main/java/com/gamma/control/DecisionRoutes.java
 tags: [control-plane, decision-rule, condition-tree, simulate, rules, signal-network]
 timestamp: 2026-07-18T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: inspecto
 ---
 
 # Decision Rules & the Condition-Tree Evaluator

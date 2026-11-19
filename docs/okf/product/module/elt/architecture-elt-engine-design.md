@@ -4,6 +4,11 @@ title: ELT — architecture — Engine code, design scope and how a file becomes
 description: Part 2 of 3 of ELT — architecture: Where the engine's code lives; Design Philosophy & Scope; How a file becomes Tables
 tags: [elt, acquisition, phases, dedup, watermark, stability, ledger, multi-location, composition, pattern, module, core, composition-root, inspecto-processor, engine, architecture, stage1, multiplexer, ingest, layout, pipeline-graph, lift, node-types, derived, tokens, sinks, consignment, observability, audit, provenance, quarantine, status]
 timestamp: 2026-11-18T00:00:00Z  # merged 2026-11-18 from the elt, acquire and engine architecture pages; the multi-location ingest part carried type Practice (2026-08-25)
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # ELT — architecture — Engine code, design scope and how a file becomes Tables

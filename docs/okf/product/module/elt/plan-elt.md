@@ -9,6 +9,10 @@ supersedes-rows: REQUIREMENTS §3.1 ACQ-1 through ACQ-7, §3.2 ING-1 through ING
 resource: platform/inspecto-acquire/src/main/java/com/gamma/acquire, platform/inspecto-engine/src/main/java/com/gamma/inspector, platform/inspecto-etl/src/main/java/com/gamma/etl, platform/inspecto-engine/src/main/java/com/gamma/parse, platform/inspecto-engine/src/main/java/com/gamma/pipeline
 tags: [acq, ing, pip, capability, acquisition, connections, collectors, connectors, ledger, ingestion, parsing, consignment, grammar, parser-plugin, quarantine, expectation, pipeline, authoring, step-catalog, execution, scheduler, jobs, plan]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # Acquisition, ingestion and Pipelines — plan (`ACQ`, `ING`, `PIP`)

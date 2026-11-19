@@ -4,6 +4,11 @@ title: "Link Analysis utility showcase — install"
 description: "Install the la-utility showcase from its three downloads (product, Space, data) side by side on a Basic or later build, start it, check that it loaded, drop in the staged month, reset it, and rebuild the downloads."
 tags: [la-utility, admin-guide, install, showcase]
 timestamp: 2026-11-08T00:00:00Z
+item: solution-pack.la-utility
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-utility
 ---
 
 # Link Analysis utility showcase — install

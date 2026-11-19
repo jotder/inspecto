@@ -5,6 +5,11 @@ description: Read-only catalogue of the Analytics Kernel's functions (id, parame
 resource: inspecto-ui/src/app/modules/admin/analytics-functions/analytics-functions.routes.ts
 tags: [feature, analytics, catalogue, operations]
 timestamp: 2026-10-18T00:00:00Z
+item: module.analytics
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-analytics
 ---
 
 # Analytics functions

@@ -4,6 +4,9 @@ title: Space Template
 description: What a Space Template is — a ready-made blueprint that creates a new Space with its Pipelines, Datasets and Dashboards — and how it differs from exporting a Space.
 item: module.config
 audience: external
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-config
 ---
 
 # Space Template

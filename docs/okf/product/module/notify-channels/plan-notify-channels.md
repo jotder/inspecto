@@ -5,6 +5,11 @@ description: What was required of notifications and their email and webhook chan
 resource: providers/inspecto-notify-channels/
 tags: [notify-channels, notifications, plan, requirement, email, webhook]
 timestamp: 2026-10-19T00:00:00Z
+item: module.notify-channels
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: providers/inspecto-notify-channels
 ---
 
 # Notifications — requirement of record

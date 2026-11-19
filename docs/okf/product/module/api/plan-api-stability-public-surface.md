@@ -4,6 +4,11 @@ title: API stability policy — The public surface and what is internal
 description: Part 3 of 3 of API stability policy: The public surface (as it stands for the pending 4.0.0; unchanged since 2.0.0 except where noted); Explicitly internal (do not depend on); What is *not* covered by code-level stability — but is still stable; Why no module-info.java
 tags: [api, stability, publicapi, semver, release]
 timestamp: 2026-07-16T00:00:00Z
+item: module.api
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: platform/inspecto-api
 ---
 
 # API stability policy — The public surface and what is internal

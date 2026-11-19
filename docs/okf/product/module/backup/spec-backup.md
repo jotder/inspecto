@@ -4,6 +4,11 @@ title: "Backup and restore — spec"
 description: "Implementation detail of the inspecto-backup module: classes, the MaintenanceTaskProvider seam, task parameters, archive format and signals."
 tags: [backup, spec]
 timestamp: 2026-10-19T00:00:00Z
+item: module.backup
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-backup
 ---
 
 # Backup and restore — spec

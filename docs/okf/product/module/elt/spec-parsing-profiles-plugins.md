@@ -4,6 +4,11 @@ title: Parsing — frontends, the parsing block, parser plugins, XML and ASN.1, 
 description: Part 2 of 3 of Parsing — frontends, the parsing block, parser plugins, XML and ASN.1, Decode Profiles: Per-format profiles (copy-paste starting points); Decision matrix — pick a frontend; Roadmap status and corrections to the PDF; Parser plugins — the self-describing Parser framework
 tags: [elt, engine, ingestion, spi, streaming, consignment, ingester, duckdb, seam, partitions, contract-test, plugins, segments, quarantine, route, branch, arming, fail-closed, lanes, addressing, revisions, watermark, selector, event-time, concurrency, scheduler, priority, backpressure, operations, parsing, grammar, csv, plugin, read-csv, frontend, options, asn1, xml, decode-profile]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # Parsing — frontends, the parsing block, parser plugins, XML and ASN.1, Decode Profiles — Format profiles, decision matrix and parser plugins

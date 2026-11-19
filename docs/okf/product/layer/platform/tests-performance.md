@@ -5,6 +5,10 @@ description: Measured stage-isolated benchmark results (JDK 26 / DuckDB 1.5.2 vi
 resource: platform/inspecto-etl/src/test/java/com/gamma/etl/PipelineBenchmark.java
 tags: [performance, benchmark, duckdb, ingest, concurrency, bottleneck]
 timestamp: 2026-07-16T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
 ---
 
 # Performance Assessment & Bottleneck Analysis

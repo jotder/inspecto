@@ -4,6 +4,11 @@ title: ASN.1 decoder modules
 description: The asn-decoders reactor: its modules, build, benchmarks and how it maps to the redesign (moved from its README).
 tags: [asn1, decoders, modules, benchmark]
 timestamp: 2026-11-19T00:00:00Z
+item: module.asn-decoders
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: providers/asn-parser/asn-decoders/asn-facade
 ---
 
 # asn-decoders

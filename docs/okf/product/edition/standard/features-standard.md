@@ -4,6 +4,11 @@ title: "Standard Edition — features"
 description: "Standard includes Basic and adds sign-in, operations, case, assurance and detection modules plus six content packs."
 tags: [standard, edition, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: edition.standard
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: offerings/standard.toon
 ---
 
 # Standard Edition — features

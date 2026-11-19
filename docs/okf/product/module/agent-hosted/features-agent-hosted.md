@@ -4,6 +4,11 @@ title: "Hosted model providers for the assistant — features"
 description: "Hosted model providers plug external LLM SDKs into the assistant as ModelProviders."
 tags: [agent-hosted, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.agent-hosted
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-agent-hosted
 ---
 
 # Hosted model providers for the assistant — features

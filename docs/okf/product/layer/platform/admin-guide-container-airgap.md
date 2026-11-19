@@ -4,6 +4,10 @@ title: "Platform — container image, Helm chart and air-gapped install"
 description: "How to build a Product's OCI image and Helm chart, and an air-gapped bundle that installs on a host or a cluster with no network; what each holds and what has been proven."
 tags: [platform, admin-guide, container, helm, airgap, install]
 timestamp: 2026-11-12T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-12 last-edit
 ---
 
 # Platform — container image, Helm chart and air-gapped install

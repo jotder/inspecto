@@ -4,6 +4,11 @@ title: "MaxMind geo-country resolver — features"
 description: "The MaxMind geo-country resolver maps IP addresses to countries through the `GeoCountryResolver` contract."
 tags: [geo-country, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.geo-country
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-geo-country
 ---
 
 # MaxMind geo-country resolver — features

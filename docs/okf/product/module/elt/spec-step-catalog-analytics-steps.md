@@ -4,6 +4,11 @@ title: Step catalog — every Step kind, delivered and pending — Forecast to o
 description: Part 2 of 5 of Step catalog — every Step kind, delivered and pending: forecast → transform.timeseries.forecast — Time-series forecaster (Holt-Winters); changepoint → transform.timeseries.changepoint — Change-point, regime & drift detector; retention → transform.cohort.retention — Cohort retention matrix; funnel → transform.cohort.funnel — Ordered conversion funnel; similarity → …
 tags: [pipeline-graph, steps, catalog, processors, palette, examples, roadmap]
 timestamp: 2026-09-06T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # Step catalog — every Step kind, delivered and pending — Forecast to outlier — analytics Steps

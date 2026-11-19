@@ -4,6 +4,9 @@ title: Roles and Access Policies
 description: What a Role and an Access Policy are, how they decide what each signed-in person may see and do, and how they differ from a Lens.
 item: module.access
 audience: external
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-access
 ---
 
 # Roles and Access Policies

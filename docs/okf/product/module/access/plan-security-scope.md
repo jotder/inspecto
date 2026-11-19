@@ -4,6 +4,11 @@ title: Security (SEC) — Purpose, scope and requirements of record
 description: Part 1 of 4 of Security (SEC): Purpose & scope; Requirements of record
 tags: [sec, capability, security, oidc, rbac, abac, capabilities, roles, access-policy, secrets, https, write-gate]
 timestamp: 2026-09-08T00:00:00Z
+item: module.access
+audience: internal
+status: plan
+verified: 2026-11-20 last-edit
+code: platform/inspecto-access
 ---
 
 # Security (SEC) — Purpose, scope and requirements of record

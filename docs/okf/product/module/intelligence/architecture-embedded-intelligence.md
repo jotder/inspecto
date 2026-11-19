@@ -5,6 +5,11 @@ description: The deliberative AI layer, distinct from the reflex assist agent â€
 resource: features/inspecto-intelligence/src/main/java
 tags: [agent, intelligence, autonomy, investigation, authoring, agt-5]
 timestamp: 2026-07-21T00:00:00Z
+item: module.intelligence
+audience: internal
+status: current
+verified: 2026-11-17 last-edit
+code: features/inspecto-intelligence
 ---
 
 # Embedded intelligence (AGT-5)

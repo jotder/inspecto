@@ -5,6 +5,11 @@ description: The v1 business contract — response envelope, error-code catalog,
 resource: inspecto/src/main/java/com/gamma/control/ControlApi.java
 tags: [control-plane, api, v1, envelope, etag, openapi, async]
 timestamp: 2026-07-07T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: inspecto
 ---
 
 # Versioned API (/api/v1)

@@ -4,6 +4,11 @@ title: Events & Metrics — Notifications and audit — the audit hash chain onw
 description: Part 2 of 4 of Events & Metrics: 
 tags: [control-plane, events, metrics, observability, deadlock]
 timestamp: 2026-07-16T00:00:00Z
+item: module.event
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-event
 ---
 
 # Events & Metrics — Notifications and audit — the audit hash chain onward

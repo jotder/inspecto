@@ -5,6 +5,11 @@ description: How data reaches Link Analysis and what a first-time user meets - A
 resource: la/
 tags: [module, link-analysis, onboarding, add-data, arrivals, dataset, architecture]
 timestamp: 2026-11-12T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — data onboarding

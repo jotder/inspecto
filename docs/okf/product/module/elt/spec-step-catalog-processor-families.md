@@ -4,6 +4,11 @@ title: Step catalog — every Step kind, delivered and pending — Processor fam
 description: Part 5 of 5 of Step catalog — every Step kind, delivered and pending: Collectors & Ingestion (ACQ) — 4 delivered · 5 partial · 11 planned; Extraction & Format Parsers (PRS) — 7 delivered · 1 partial · 9 planned; Data Quality, Validation & Cleansing (DQ) — 10 delivered · 1 partial · 3 planned; Transformers & Dimensional Modeling (XFM) — 10 delivered · 1 partial · 10 planned; Analytics …
 tags: [pipeline-graph, steps, catalog, processors, palette, examples, roadmap]
 timestamp: 2026-09-06T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # Step catalog — every Step kind, delivered and pending — Processor families, and keeping this page true

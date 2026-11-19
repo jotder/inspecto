@@ -4,6 +4,11 @@ title: "Telecom bypass (SIM-box) — features"
 description: "Twelve CDR signals per SIM per day, an explainable Risk Score, an allow list with expiry, persistence, agreement, shadow mode, a SIM Alert and one Incident and Case per suspected box, with per-signal degradation."
 tags: [telco-bypass, features, presales]
 timestamp: 2026-10-20T00:00:00Z
+item: solution-pack.telco-bypass
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/telco-bypass
 ---
 
 # Telecom bypass (SIM-box) — features

@@ -5,6 +5,11 @@ description: What SCREENING-1 built — the optional inspecto-screening module (
 resource: features/inspecto-screening/src/main/java/com/gamma/screening/ScreeningRoutes.java
 tags: [control-plane, screening, entity-list, compliance, add-on, job-type]
 timestamp: 2026-10-14T00:00:00Z
+item: module.screening
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: features/inspecto-screening
 ---
 
 # Screening

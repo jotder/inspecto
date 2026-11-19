@@ -4,6 +4,11 @@ title: Link Analysis — HTTP surface and Investigation UI — Gate order, embed
 description: Part 1 of 4 of Link Analysis — HTTP surface and Investigation UI: Gate order for an /inv request; Embed links (LA-EMBED-VIEW-1: API S1-S3 built 2026-10-12; the SPA shell S4 and the frame headers S5 built 2026-10-13); Entity profile routes (as built 2026-10-15); Third-party integration (inbound) (as built 2026-10-17, LA-EDITIONS-1 phase 5)
 tags: [module, la-core, link-analysis, architecture, http, investigation, spa]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — HTTP surface and Investigation UI — Gate order, embeds, entity profiles and inbound integration

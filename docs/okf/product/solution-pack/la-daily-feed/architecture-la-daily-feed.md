@@ -4,6 +4,11 @@ title: "Link Analysis daily feed — architecture"
 description: "How the daily feed pack moves one file per day into the Link Analysis index, with monitors."
 tags: [la-daily-feed, architecture]
 timestamp: 2026-10-23T00:00:00Z
+item: solution-pack.la-daily-feed
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: spaces/_templates/la-daily-feed
 ---
 
 # Link Analysis daily feed — architecture

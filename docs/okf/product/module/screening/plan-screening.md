@@ -5,6 +5,11 @@ description: "Requirement of record for the screening add-on: what was required,
 resource: features/inspecto-screening/src/main/resources/META-INF/inspecto/module.toon
 tags: [screening, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.screening
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: features/inspecto-screening
 ---
 
 # Screening — plan

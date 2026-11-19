@@ -4,6 +4,11 @@ title: Link Analysis — features
 description: What an analyst can do with Link Analysis (LA), as a short presales capability list with the editions it ships in; each line links to the user guide or the architecture section that explains it.
 tags: [module, la-core, link-analysis, features, presales]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — features

@@ -5,6 +5,11 @@ description: What was required of Regulatory Reporting (four-eyes regulator-form
 resource: features/inspecto-regulatory-reporting/
 tags: [regulatory-reporting, plan, requirement, four-eyes, sar]
 timestamp: 2026-10-19T00:00:00Z
+item: module.regulatory-reporting
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: features/inspecto-regulatory-reporting
 ---
 
 # Regulatory Reporting — requirement of record

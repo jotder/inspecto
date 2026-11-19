@@ -4,6 +4,11 @@ title: Configuration reference — Configuration reference and Spaces
 description: Part 1 of 2 of Configuration reference: Configuration Reference; Spaces (multi-project layout)
 tags: [config, toon, spaces, type-mapping, postgres]
 timestamp: 2026-07-16T00:00:00Z
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-config
 ---
 
 # Configuration reference — Configuration reference and Spaces

@@ -2,6 +2,11 @@
 type: Brochure
 title: Inspecto LA whitepaper — Executive summary and the forensic lifecycle
 description: Part 1 of 6 of Inspecto LA whitepaper: · Executive summary — graph intelligence without the cluster tax; · The forensic investigation lifecycle & evidentiary chain of custody
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA whitepaper — Executive summary and the forensic lifecycle

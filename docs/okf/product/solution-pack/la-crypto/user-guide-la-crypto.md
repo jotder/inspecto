@@ -4,6 +4,11 @@ title: "Link Analysis crypto laundering showcase — user guide"
 description: "A five-minute tour of the la-crypto Space from its three saved views, then one exercise per planted story with a hint and an answer, and the tester's checklist of look-alikes that must not join a story."
 tags: [la-crypto, user-guide, showcase]
 timestamp: 2026-11-08T00:00:00Z
+item: solution-pack.la-crypto
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-crypto
 ---
 
 # Link Analysis crypto laundering showcase — user guide

@@ -4,6 +4,11 @@ title: Link Analysis — data onboarding — Column roles and discovery in Basic
 description: Part 2 of 3 of Link Analysis — data onboarding: Column roles (LA-COLUMN-ROLES-1, as built 2026-11-04/05); Discovery in Basic: presets, Discover, entity summary, query builder (LA-BASIC-DISCOVERY-1, as built 2026-11-03/05)
 tags: [module, link-analysis, onboarding, add-data, arrivals, dataset, architecture]
 timestamp: 2026-11-12T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — data onboarding — Column roles and discovery in Basic

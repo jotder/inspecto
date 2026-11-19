@@ -4,6 +4,11 @@ title: "Decision Kernel (Decision Rules and the Condition Language) — features
 description: "The **Decision Kernel** is the one runtime every decision kind shares: the **Condition Language** (the condition tree), the when / then model and the **Consequence registry**."
 tags: [scoring, decision-kernel, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.scoring
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-scoring
 ---
 
 # Decision Kernel (Decision Rules and the Condition Language) — features

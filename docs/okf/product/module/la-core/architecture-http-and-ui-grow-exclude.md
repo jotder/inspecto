@@ -4,6 +4,11 @@ title: Link Analysis — HTTP surface and Investigation UI — Grow, Held and Ex
 description: Part 3 of 4 of Link Analysis — HTTP surface and Investigation UI: Grow, Held and Exclude on the graph (LA-GROW-EXCLUDE-1, SPA, as built 2026-10-22)
 tags: [module, la-core, link-analysis, architecture, http, investigation, spa]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — HTTP surface and Investigation UI — Grow, Held and Exclude on the graph

@@ -3,6 +3,9 @@ type: Capability
 title: Studio (BI + INV) — capability spec — Decisions, not built, refused and verification
 description: Part 3 of 3 of Studio (BI + INV) — capability spec: Decisions (dated one-liners); Not built; Refused & superseded; As-built pointers; Verification
 status: current
+item: layer.product
+audience: internal
+verified: 2026-11-19 last-edit
 ---
 
 # Studio (BI + INV) — capability spec — Decisions, not built, refused and verification

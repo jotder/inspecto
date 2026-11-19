@@ -4,6 +4,11 @@ title: Link Analysis — architecture — Host registration, editions, bounds an
 description: Part 4 of 4 of Link Analysis — architecture: Host registration, Jobs and live detection; Editions and packaging; Concurrency and resource bounds (summary); Known seams and residuals
 tags: [module, la-core, link-analysis, architecture]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — architecture — Host registration, editions, bounds and known seams

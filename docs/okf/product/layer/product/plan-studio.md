@@ -6,6 +6,9 @@ description: The requirement-of-record and as-built specification for Studio —
 status: current
 written: 2026-09-08
 supersedes-rows: REQUIREMENTS §3.5 BI-1..BI-8 and §3.6 INV-1..INV-4 (this file corrects them, see §2)
+item: layer.product
+audience: internal
+verified: 2026-11-19 last-edit
 ---
 
 # Studio (`BI` + `INV`)

@@ -5,6 +5,11 @@ description: Every top-level block of <name>_pipeline.toon — who declares it (
 resource: platform/inspecto-etl/src/test/java/com/gamma/etl/PipelineKeyCoverageContractTest.java
 tags: [pipeline-graph, config, pipeline, config-spec, parser, coverage, ratchet]
 timestamp: 2026-09-01T00:00:00Z
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-config
 ---
 
 # Pipeline config keys — the single block census

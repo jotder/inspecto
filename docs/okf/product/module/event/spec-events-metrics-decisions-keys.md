@@ -4,6 +4,11 @@ title: Events & Metrics — Bounce handling, rate-limit classes and unmodelled k
 description: Part 4 of 4 of Events & Metrics: Decision 2026-09-06 — bounce/complaint handling stays manual until receipts persist; Link Analysis rate-limit classes; Unmodelled keys on a Notification Rule and Channel (MODULE-REORG-P4-2); Unmodelled keys on a Saved View (MODULE-REORG-P4-2)
 tags: [control-plane, events, metrics, observability, deadlock]
 timestamp: 2026-07-16T00:00:00Z
+item: module.event
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-event
 ---
 
 # Events & Metrics — Bounce handling, rate-limit classes and unmodelled keys

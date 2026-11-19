@@ -5,6 +5,11 @@ description: Install, configure, secure, back up and troubleshoot the PostgreSQL
 resource: la/inspecto-la-store-pg/
 tags: [module, la-store-pg, link-analysis, postgres, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.la-store-pg
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: la/inspecto-la-store-pg
 ---
 
 # Link analysis PostgreSQL store - admin guide

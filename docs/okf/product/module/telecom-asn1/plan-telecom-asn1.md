@@ -5,6 +5,11 @@ description: What the telecom ASN.1 provider is required to do, what shipped, an
 resource: providers/inspecto-telecom-asn1/
 tags: [module, telecom-asn1, asn1, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.telecom-asn1
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: providers/inspecto-telecom-asn1
 ---
 
 # Telecom ASN.1 decoder — plan of record

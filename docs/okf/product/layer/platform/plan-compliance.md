@@ -6,6 +6,9 @@ description: The requirement-of-record and as-built specification for the compli
 status: current
 written: 2026-09-08
 supersedes-rows: EDITIONS CMP-01..CMP-08 and REQUIREMENTS NFR-7 (this file corrects them, see §2)
+item: layer.platform
+audience: internal
+verified: 2026-11-19 last-edit
 ---
 
 # Compliance (`CMP`)

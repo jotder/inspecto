@@ -5,6 +5,11 @@ description: "Requirement of record for the anomaly module: what was required, w
 resource: features/inspecto-anomaly/src/main/resources/META-INF/inspecto/module.toon
 tags: [anomaly, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.anomaly
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: features/inspecto-anomaly
 ---
 
 # Anomaly Detection — plan

@@ -4,6 +4,11 @@ title: module.intelligence - board row detail
 description: The narrative behind module.intelligence's long rows on the board (docs/BACKLOG.md), moved here verbatim so each board row stays a short summary.
 tags: [module, intelligence, plan, backlog]
 timestamp: 2026-11-19T00:00:00Z
+item: module.intelligence
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: features/inspecto-intelligence
 ---
 
 # module.intelligence - board row detail

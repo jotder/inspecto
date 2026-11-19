@@ -4,6 +4,11 @@ title: "Link Analysis showcase release — build and boot-test"
 description: "Build a Link Analysis showcase release: the Basic and Preview demo products, the 18 Space and 18 data downloads from one commit, checksums and README, then boot-test every Space live on both products; with the record of the 2026-11-09 release."
 tags: [la-showcase, admin-guide, release, showcase]
 timestamp: 2026-11-09T00:00:00Z
+item: solution-pack.la-showcase
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-showcase
 ---
 
 # Link Analysis showcase release — build and boot-test

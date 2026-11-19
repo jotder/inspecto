@@ -5,6 +5,10 @@ description: The long-form operations manual — output structure, the status lo
 resource: inspecto/package.ps1
 tags: [operations, utilities, deployment, batching, output, onboarding]
 timestamp: 2026-07-16T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
 ---
 
 # Operations: Utilities, Batching, Output & Deployment

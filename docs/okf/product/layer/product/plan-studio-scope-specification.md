@@ -3,6 +3,9 @@ type: Capability
 title: Studio (BI + INV) — capability spec — Purpose, requirements and specification
 description: Part 1 of 3 of Studio (BI + INV) — capability spec: Purpose & scope; Requirements of record; Specification
 status: current
+item: layer.product
+audience: internal
+verified: 2026-11-19 last-edit
 ---
 
 # Studio (BI + INV) — capability spec — Purpose, requirements and specification

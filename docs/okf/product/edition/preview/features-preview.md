@@ -4,6 +4,11 @@ title: "Preview Edition — features"
 description: "Preview includes Advanced; its offering adds no further modules, add-ons or content packs."
 tags: [preview, edition, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: edition.preview
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: offerings/preview.toon
 ---
 
 # Preview Edition — features

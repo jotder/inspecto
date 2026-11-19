@@ -4,6 +4,11 @@ title: "Storage — features"
 description: "Inspecto has no ORM and no single database."
 tags: [entity-store, storage, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.entity-store
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-entity-store
 ---
 
 # Storage — features

@@ -3,6 +3,10 @@ type: Spec
 title: Work tracking — one board, tagged rows, generated hub views
 description: How open work and defects are tracked against Product Map Items, and the path a feature takes from plan to shipped docs.
 tags: [backlog, product-item, docs, process]
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Work tracking — one board, tagged rows, generated hub views

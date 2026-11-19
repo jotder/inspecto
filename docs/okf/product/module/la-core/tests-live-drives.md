@@ -4,6 +4,11 @@ title: Link Analysis - live drives and user sessions
 description: The recorded live acceptance drives of Link Analysis (onboarding, data trust, analyst coverage, Investigation tab) with their set-up, steps, results and defects, and the think-aloud session script for real users. The generated test-class list is tests-inventory.
 tags: [module, la-core, link-analysis, tests]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis - live drives and user sessions

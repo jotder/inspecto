@@ -5,6 +5,11 @@ description: ConfigCodec (JToon), the three config file types, PipelineConfigPar
 resource: platform/inspecto-config/src/main/java/com/gamma/config/io/ConfigCodec.java
 tags: [config, toon, jtoon, parser, gotcha]
 timestamp: 2026-09-23T00:00:00Z
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-config
 ---
 
 # TOON Configuration

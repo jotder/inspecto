@@ -5,6 +5,10 @@ description: <inspecto-tree-table> — an expandable indented hierarchy column p
 resource: inspecto-ui/src/app/inspecto/tree-table/tree-table.component.ts
 tags: [design-system, tree-table, ag-grid, hierarchy, reconciliation]
 timestamp: 2026-07-16T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
 ---
 
 # Tree Table

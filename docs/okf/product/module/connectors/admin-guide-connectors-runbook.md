@@ -5,6 +5,11 @@ description: Copy-pasteable connection profiles and the verification sequence fo
 resource: providers/inspecto-connectors/src/main/java/com/gamma/acquire/connectors
 tags: [acquisition, connectors, sftp, ftps, bastion, host-key, db-export, runbook]
 timestamp: 2026-09-08T00:00:00Z
+item: module.connectors
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: providers/inspecto-connectors
 ---
 
 # Remote connectors — operator runbook

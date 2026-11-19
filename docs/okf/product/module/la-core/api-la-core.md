@@ -4,6 +4,11 @@ title: Link Analysis — API
 description: Control-plane routes for Link Analysis, grouped, with the request gate order; the full route table with write capabilities is architecture-la-core.md section 6.
 tags: [module, la-core, link-analysis, api]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — API

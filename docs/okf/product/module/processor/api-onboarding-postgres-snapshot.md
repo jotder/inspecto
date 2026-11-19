@@ -5,6 +5,11 @@ description: Add data's third way in on every edition — a Postgres table or on
 resource: inspecto/src/main/java/com/gamma/control/PostgresSnapshot.java
 tags: [control-plane, onboarding, add-data, postgres, snapshot, basic]
 timestamp: 2026-11-19T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: inspecto
 ---
 
 # Choose a table: a Postgres snapshot (`PostgresSnapshot`; `BASIC-ONBOARD-1` P3, 2026-11-05)

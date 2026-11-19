@@ -5,6 +5,11 @@ description: Appender-based bulk ingest (~75× vs JDBC), thread auto-derivation,
 resource: platform/inspecto-engine/src/main/java/com/gamma/inspector/DuckDbRecordSink.java
 tags: [engine, duckdb, performance, appender, threads]
 timestamp: 2026-06-28T00:00:00Z
+item: module.engine
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-engine
 ---
 
 # DuckDB Integration

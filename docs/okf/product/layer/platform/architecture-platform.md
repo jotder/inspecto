@@ -5,6 +5,10 @@ description: The entry-point architecture page for the whole platform — what t
 resource: pom.xml
 tags: [architecture, platform, framework-free, spi, serviceloader, duckdb, editions, metadata]
 timestamp: 2026-11-12T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
 ---
 
 # Inspecto platform architecture

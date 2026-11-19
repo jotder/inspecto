@@ -4,6 +4,10 @@ title: Operations reference — utilities, batching, output, deployment — Batc
 description: Part 2 of 4 of Operations reference — utilities, batching, output, deployment: Batch Processing
 tags: [operations, utilities, deployment, batching, output, onboarding]
 timestamp: 2026-07-16T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
 ---
 
 # Operations reference — utilities, batching, output, deployment — Batch processing

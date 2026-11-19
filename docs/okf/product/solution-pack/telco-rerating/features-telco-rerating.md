@@ -4,6 +4,11 @@ title: "Telecom re-rating (tariff validation) — features"
 description: "Independent re-rating of rated usage against an effective-dated tariff, with tariff-table hygiene, per-call ambiguity verdicts, counterfactual causes with confidence and root causes."
 tags: [telco-rerating, features, presales]
 timestamp: 2026-10-21T00:00:00Z
+item: solution-pack.telco-rerating
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/telco-rerating
 ---
 
 # Telecom re-rating (tariff validation) — features

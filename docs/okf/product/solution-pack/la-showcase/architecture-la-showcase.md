@@ -4,6 +4,11 @@ title: "Link Analysis showcase"
 description: "The Link Analysis solution page for the Space Templates la-showcase and la-mobile-money (business problem, data in, what the pack sets up, tiers, showcase design rules), and how the 18 Link Analysis showcase Spaces are built and shipped: the three downloads and how the server finds them, the packer and industry composition, the edition rule (a Basic tier plus an inert Advanced tier), the shared Advanced-tier pattern, the data-generation rules, and the deliberate decisions."
 tags: [la-showcase, architecture, showcase, catalogue, distribution]
 timestamp: 2026-11-09T00:00:00Z  # the showcase catalogue part
+item: solution-pack.la-showcase
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-showcase
 ---
 
 # Link Analysis showcase

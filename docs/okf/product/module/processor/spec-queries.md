@@ -5,6 +5,11 @@ description: Query as a first-class Component — the Query Library store, $-Par
 resource: platform/inspecto-engine/src/main/java/com/gamma/query/
 tags: [control-plane, query, parameter, result-set, duckdb, studio]
 timestamp: 2026-07-16T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: inspecto
 ---
 
 # Query catalog & execution
