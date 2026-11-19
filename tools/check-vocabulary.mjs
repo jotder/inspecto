@@ -161,7 +161,7 @@ const DOC_TREES_LABEL = `{all tracked *.md minus ${DOC_SKIP.join(', ')}}`;
 const DOC_ALLOW = {
     '.claude/memory/doc-guard-traps.md::source-acquisition-entity':
         'Subject is the banned term itself: the team lesson that a citation heading named with it trips this guard.',
-    'docs/okf/product/module/engine/spec-db-layer.md::data-store':
+    'docs/okf/product/module/engine/spec-db-layer-topology-postgres.md::data-store':
         'Sanctioned sense: "Business-data stores" read via a DuckDB sandbox is the physical backend, not a Dataset.',
     // The vocabulary-and-config-contract plan's two entries were RETIRED 2026-08-04 when the plan shipped
     // and moved to docs/archived-documents/plans-archive/ (a permanently unscanned tier). The

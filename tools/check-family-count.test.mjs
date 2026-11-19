@@ -15,7 +15,7 @@ const GUARD = join(REPO, 'tools', 'check-family-count.mjs');
 
 const FILES = [
     'inspecto/src/main/java/com/gamma/service/OperationalDb.java',
-    'docs/okf/product/module/engine/spec-db-layer.md',
+    'docs/okf/product/module/engine/spec-db-layer-schemas-continued.md',
     'docs/okf/product/layer/platform/plan-data-plane.md',
     'docs/superpower/enterprise-scale-out-plan.md',
     'inspecto/src/test/java/com/gamma/service/OperationalDbTest.java',
@@ -53,9 +53,9 @@ test('the real tree: GREEN, 12 core + 4 contributed = 16', () => {
 });
 
 test('RED: prose states a stale total', () => {
-    const r = run(fixture((m) => m('docs/okf/product/module/engine/spec-db-layer.md', (t) => t.replace('all sixteen families', 'all fifteen families'))));
+    const r = run(fixture((m) => m('docs/okf/product/module/engine/spec-db-layer-schemas-continued.md', (t) => t.replace('all sixteen families', 'all fifteen families'))));
     assert.equal(r.code, 1);
-    assert.match(r.out, /db-layer\.md:\d+ says "fifteen families" but the roster has 16/);
+    assert.match(r.out, /db-layer-schemas-continued\.md:\d+ says "fifteen families" but the roster has 16/);
 });
 
 test('RED: a module contributes a fifth family and nothing else moved (the stale count the guard exists for)', () => {

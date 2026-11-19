@@ -15,7 +15,7 @@ tags: [product-item, addon]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Alerts & Incidents (INC)](plan-incidents.md) |
+| plan | current | [Alerts & Incidents (INC) — Notifications, decisions and not built](plan-incidents-notifications-decisions.md) · [Alerts & Incidents (INC) — Specification — Incidents as operational objects](plan-incidents-operational-objects.md) · [Alerts & Incidents (INC) — Refused, as-built pointers and verification](plan-incidents-refused-verification.md) · [Alerts & Incidents (INC) — Purpose, scope and requirements of record](plan-incidents-scope.md) · [Alerts & Incidents (INC) — Specification](plan-incidents-specification.md) · [Alerts & Incidents (INC)](plan-incidents.md) |
 | spec | n/a | an Add-on licenses modules — see the hubs of the modules it holds |
 | architecture | current | [Incidents and Alerts](architecture-incidents.md) |
 | features | current | [Alerts — features](features-alerts.md) · [Incidents — features](features-incidents.md) |

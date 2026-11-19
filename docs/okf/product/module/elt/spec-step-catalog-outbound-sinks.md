@@ -219,8 +219,8 @@ under `<write-root>/registry` (`ExpectationRoutes`). It is never a chain Step.
 
 **Function.** `AlertService` sweeps the rules on a timer and on `POST /alerts/evaluate`. A breach emits
 `ALERT_FIRED` and the `alert-rule.fired` Signal, which the notification reactor fans out to channels
-([incidents § Alert Rules](../../addon/incidents/plan-incidents.md#32-alert-rules),
-[§ the default reactor](../../addon/incidents/plan-incidents.md#82-alerts-notifications-and-diagnosis--the-default-reactor)).
+([incidents § Alert Rules](../../addon/incidents/plan-incidents-specification.md#32-alert-rules),
+[§ the default reactor](../../addon/incidents/plan-incidents-refused-verification.md#82-alerts-notifications-and-diagnosis--the-default-reactor)).
 Rules are persisted as `alert-rule` components under `<write-root>/registry`, through
 `/alerts/rules*` (`AlertRoutes`). Parser: `AlertRule.fromMap`, a flat map of the keys below. Spec:
 `ConfigSpecs.alert()`, with `dataset`/`measure`/`when` parser-only (`ALERT_PARSER_ONLY`). One record,

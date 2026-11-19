@@ -190,7 +190,7 @@ tracked on [`BACKLOG.md`](../../../../BACKLOG.md) §2 *X5*.
 outlets through `PipelineRel.canonical(rel)`, so a receipt says `reject:dropped` even for a relation still spelled
 `dropped` (a stored graph or a contributed Step written before 4.0.0). The receipt is the durable record of one hop of the token:
 rows in, rows per outlet, where the data rests, a schema fingerprint and bounded diagnostics, at most 1024 bytes
-(`StepReceipt`; lanes in [§ Execution lanes](spec-pipeline-execution.md#execution-lanes) below). The main outlet stays spelled `data`
+(`StepReceipt`; lanes in [§ Execution lanes](spec-pipeline-execution-engines-lanes.md#execution-lanes) below). The main outlet stays spelled `data`
 (X5 D4 = b).
 
 | Type | emits | Authorable? |

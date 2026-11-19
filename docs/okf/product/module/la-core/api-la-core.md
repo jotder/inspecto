@@ -11,7 +11,7 @@ timestamp: 2026-11-15T00:00:00Z
 - [Routes by group](#routes-by-group) · [Gate order](#gate-order)
 
 Routes for Link Analysis. Design and internals: [Link Analysis architecture](architecture-la-core.md); the full route table
-with the write capability of each area is [architecture §6](architecture-la-core.md#6-http-surface-la-api-geo-link), and the
+with the write capability of each area is [architecture §6](architecture-la-core-index-http.md#6-http-surface-la-api-geo-link), and the
 gate order in detail is [§6.1](architecture-http-and-ui.md#61-gate-order-for-an-inv-request).
 
 ## Routes by group

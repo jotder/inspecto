@@ -373,7 +373,7 @@ impossible to retrofit after.
 **No output file ever contains rows from two Consignments.** One-directional: one Consignment may write many
 files, but a file belongs to exactly one. This is what makes a Consignment's output deletable by unlinking
 whole files, and it is why compaction (which merges across Consignments) is the one operation that has to be
-handled specially — see [post-sync step chains](spec-pipeline-execution.md#post-sync-step-chains-the-open-dag).
+handled specially — see [post-sync step chains](spec-pipeline-execution-post-sync.md#post-sync-step-chains-the-open-dag).
 
 **Two kinds of delete, only one of which is safe.** Unlinking a whole file owned by a single Consignment is
 fine. **Rewriting** a file that holds several Consignments' rows to remove one of them is the read-modify-write

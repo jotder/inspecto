@@ -627,7 +627,7 @@ nothing said (seen in the 2026-11-15 drive: *Covers* stayed empty). Order:
    without `import_steps` runs it too) and are ONE list, `ImportCommitSteps` (`BASIC-ELT-PROFILE-1` BE-1a,
    2026-11-19): a run of the import Pipeline that Add data did not start (a kept-up-to-date feed's scheduled poll,
    `POST /pipelines/{id}/run`) runs the same steps in the same order, once per run, as registered commit steps
-   ([spec-pipeline-execution.md](../elt/spec-pipeline-execution.md#commit-steps--the-work-a-commit-needs-before-it-is-done));
+   ([spec-pipeline-execution.md](../elt/spec-pipeline-execution-dry-run-recovery.md#commit-steps--the-work-a-commit-needs-before-it-is-done));
    Add data's run holds the Dataset's claim, so they run once for it, here.
 
 **A failed commit leaves nothing behind**: every write is undone in reverse (Dataset entry, data and inbox

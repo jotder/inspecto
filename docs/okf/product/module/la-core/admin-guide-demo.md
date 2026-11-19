@@ -564,7 +564,7 @@ default mode is `typed`: only columns whose classification an Entity Type claims
 are masked; `all` masks every id; `none` shows raw. The same rule applies on the canvas, node lists, paths,
 patterns, Value Measures and the Working Set, and a raw id typed into an alias field is refused, so the route is not
 an oracle for guessing.
-Evidence: [architecture](architecture-la-core.md#34-masking) §3.4; `ControlApiExplorationMaskingTest` (the `everyInvReadOnAMaskedSpaceIsScannedForRawIds`
+Evidence: [architecture](architecture-la-core-masking.md#34-masking) §3.4; `ControlApiExplorationMaskingTest` (the `everyInvReadOnAMaskedSpaceIsScannedForRawIds`
 case scans every Investigation read for raw ids); `ControlApiInvestigationOversightTest` (typed by default).
 Confidence: PROVEN for the routes the tests cover. A new route must be added to that scan; say so if asked about
 future routes.
@@ -573,7 +573,7 @@ future routes.
 Yes, through *Reveal*: a lead of the Investigation holding its own capability (`canRevealLinkEntities`, a separate
 action from approving) reveals the nodes on screen in one step with a reason, and every entity revealed writes one
 audit row with that reason. Reviewers and non-members keep the aliases. In the shipped demo the `admin` persona holds it.
-Evidence: [architecture](architecture-la-core.md#34-masking) §3.4 and backend §6 (Four-eyes / reveal row);
+Evidence: [architecture](architecture-la-core-masking.md#34-masking) §3.4 and backend §6 (Four-eyes / reveal row);
 `ControlApiInvestigationRevealOnScreenTest`, `ControlApiInvestigationOversightTest
 .revealIsPerEntityGatedOnItsOwnCapabilityAndAudited`.
 Confidence: PROVEN.
@@ -642,7 +642,7 @@ that no personal data exists anywhere.
 Columns carry a classification from the Dataset registry and lineage. In `typed` mode a column is masked when an
 Entity Type claims its classification; untraceable lineage fails closed (masked). A Space can also refuse to mint an
 embed link when the strictest classification of the Investigation's columns is on its refusal list.
-Evidence: [architecture](architecture-la-core.md#34-masking) §3.4 and [architecture-http-and-ui](architecture-http-and-ui.md) §6.2; `ControlApiInvestigationOversightTest
+Evidence: [architecture](architecture-la-core-masking.md#34-masking) §3.4 and [architecture-http-and-ui](architecture-http-and-ui.md) §6.2; `ControlApiInvestigationOversightTest
 .aColumnClassificationIsTypedByTheEntityTypeClaimingIt`; `ControlApiInvestigationEmbedTest
 .aSpaceCanRefuseToShareInvestigationsOfAClassificationAndAPolicyCanForbidTheActionEmbed`.
 Confidence: PROVEN.

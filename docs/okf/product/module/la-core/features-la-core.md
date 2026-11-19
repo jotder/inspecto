@@ -19,7 +19,7 @@ sealed dossier, a Case link or a standing detection.
 Every edition from Basic (`linkAnalysis` add-on in `offerings/basic.toon`: `la-storage`, `la-core`, `la-api`,
 `geo-link`); Advanced adds `la-store-pg` (Postgres Investigations). Basic is the **explorer**: it withholds the
 Investigation surface, the Geo map and Entity profile pages (see `docs/EDITIONS.md` and
-[architecture §8](architecture-la-core.md#8-editions-and-packaging)). Investigations need Standard or above and the
+[architecture §8](architecture-la-core-host-editions.md#8-editions-and-packaging)). Investigations need Standard or above and the
 Investigations add-on (`INS-AO-LA-INVESTIGATIONS`, held by default).
 
 ## What an analyst can do
@@ -31,33 +31,33 @@ Investigations add-on (`INS-AO-LA-INVESTIGATIONS`, held by default).
 - **Grow the graph step by step** with a preview of what the next step adds, busy entities held in a tray, and Exclude
   to a list ([§7](user-guide-la-core-analysis.md#7-expand-and-clean-up-the-graph); [architecture §6.9](architecture-http-and-ui.md)).
 - **Find paths and connect seeds** - how A reaches B, and how a set of seeds connect within N hops
-  ([architecture §3.1](architecture-la-core.md#31-investigation-op-log)).
+  ([architecture §3.1](architecture-la-core-shape-modules.md#31-investigation-op-log)).
 - **Run graph algorithms** in the browser or on the server: centrality, communities, cycles, propagated risk and more
-  (29 server algorithms; [§8](user-guide-la-core-analysis.md#8-the-analysis-catalogue); [architecture §5](architecture-la-core.md#5-graph-run-graph--la-core--la-storage)).
+  (29 server algorithms; [§8](user-guide-la-core-analysis.md#8-the-analysis-catalogue); [architecture §5](architecture-la-core-index-http.md#5-graph-run-graph--la-core--la-storage)).
 - **Match patterns** - fan-in / fan-out rings, bursts and regular series ([§9](user-guide-la-core-analysis.md#9-pattern-matching)).
 - **Read an Entity's profile** across every Dataset that holds it (Standard and above;
   [architecture §6.3](architecture-http-and-ui.md)).
 - **Record an Investigation** as a replayable, hash-sealed log with Drafts, members and undo / redo
-  ([§11](user-guide-la-core-investigations.md#11-investigations); [architecture §3](architecture-la-core.md#3-domain-core-la-core)).
+  ([§11](user-guide-la-core-investigations.md#11-investigations); [architecture §3](architecture-la-core-shape-modules.md#3-domain-core-la-core)).
 - **Hand the result on** - a sealed Dossier and bundle, a Case link, a time-limited public embed, a case hand-off to
   another product ([§11.9](user-guide-la-core-investigations.md#119-evidence-snapshot-dossier-sealed-bundle),
   [§11.10](user-guide-la-core-investigations.md#1110-widgets-sharing-and-embed); [architecture §6.2, §6.5](architecture-http-and-ui.md)).
 - **Watch for it again** - Working Set measures and a standing detection that fires an Alert
-  ([§11.8](user-guide-la-core-investigations.md#118-measures-and-alert-rules); [architecture §7](architecture-la-core.md#7-host-registration-jobs-and-live-detection)).
+  ([§11.8](user-guide-la-core-investigations.md#118-measures-and-alert-rules); [architecture §7](architecture-la-core-host-editions.md#7-host-registration-jobs-and-live-detection)).
 - **Speak the industry's words** - a Domain Profile picks the Telecom or Mobile Money pack's vocabulary
-  ([architecture §3.6](architecture-la-core.md#36-domain-profile-and-industry-packs-la-editions-1-phase-4-as-built-2026-10-17-settles-ldp-d7)).
+  ([architecture §3.6](architecture-la-core-index-http.md#36-domain-profile-and-industry-packs-la-editions-1-phase-4-as-built-2026-10-17-settles-ldp-d7)).
 - **Upload a CSV** into a Collector that accepts uploads ([architecture §6.6](architecture-http-and-ui.md)).
 
 ## Governance and trust
 
 - **Masking** - raw identifiers never leave in an answer; reveal needs a capability and is audited
-  ([architecture §3.4](architecture-la-core.md#34-masking)).
+  ([architecture §3.4](architecture-la-core-masking.md#34-masking)).
 - **Four-eyes** - a large expand waits for a second person ([§11.4](user-guide-la-core-investigations.md#114-large-expands-need-a-second-person-four-eyes)).
 - **Category exclusion lists** applied to every new Investigation, restricted lists kept hidden
   ([architecture §6.8](architecture-http-and-ui.md)).
 - **Honest limits** - every bound is a setting and a cut answer says so ([§15](user-guide-la-core-examples-roles.md#15-limits-and-honest-behaviour);
-  [architecture §9](architecture-la-core.md#9-concurrency-and-resource-bounds-summary)).
-- **Scale** - a versioned Parquet link index, proven to 10^8 edges ([architecture §4](architecture-la-core.md#4-link-index-la-storage)).
+  [architecture §9](architecture-la-core-host-editions.md#9-concurrency-and-resource-bounds-summary)).
+- **Scale** - a versioned Parquet link index, proven to 10^8 edges ([architecture §4](architecture-la-core-index-http.md#4-link-index-la-storage)).
 
 ## More
 

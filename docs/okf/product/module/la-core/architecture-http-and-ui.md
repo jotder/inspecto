@@ -103,13 +103,13 @@ Plan archived: [`la-entity-profile-plan`](../../../../archived-documents/plans-a
   D-LAE4), `GET /inv/entity-types/{id}/profile?sections=` (bindings, volume, shapes, time, lineage, links, relationships,
   measures - [architecture-data-onboarding.md](architecture-data-onboarding.md) §6.15) and
   `GET /inv/entities/{type}/{key}/profile`. Audit events `LINK_ENTITY_*` (three).
-* **A raw identifier never travels in a URL** (the rule, the resolve POST and the type-ahead: [architecture-la-core.md](architecture-la-core.md#34-masking)
+* **A raw identifier never travels in a URL** (the rule, the resolve POST and the type-ahead: [architecture-la-core.md](architecture-la-core-masking.md#34-masking)
   §3.4 *Entity profiles*). Type pages are aggregates only (D-EP3): a dominant value is reported as
   `kind:"dominant"`, `value:null`; only the built-in sentinels (`''`, `-99`, `0`, `NULL`, `null`, `unknown`, `n/a`) are shown by value.
   **Dominance counts a value the normaliser rejects by its raw (trimmed) text (2026-10-18)**, so a name filling a number column still
   raises the sentinel (seen on the IMS Space); built-in sentinels and blanks never dominate. The SPA never rounds a share short of
   all up to 100 % (`percent()` caps it at 99.9 %: a 99.95 % one-to-one share sat beside a maximum of 15 per Entity).
-* **Bindings** (`EntityTypeBindings`, one Entity = the normalised typed key `EntityKeySql`, D-EP5: [architecture-la-core.md](architecture-la-core.md#34-masking)
+* **Bindings** (`EntityTypeBindings`, one Entity = the normalised typed key `EntityKeySql`, D-EP5: [architecture-la-core.md](architecture-la-core-masking.md#34-masking)
   §3.4 *Entity profiles*); a column no link end names has `role` `attribute`.
   **Parties (2026-10-16):** a Dataset column may carry `party` (free text, trimmed, lower-case; the binding shows it). Relationships
   and an Entity's related identifiers pair two columns of a row only when their parties match or either has none, so a served IMSI
@@ -196,7 +196,7 @@ surface). Outbound (case hand-off, webhooks, client-credentials trust) is a sepa
   `{entity?: {type, key, masked}, investigation?: {id, title}, window?}`; an Investigation the caller cannot read is the 404 of absence.
   `reveal:true` returns a masked entity's raw value only to a holder of `canRevealLinkEntities` (403 otherwise), audited as
   `LINK_ENTITY_REVEALED` with `via: deep-link` naming the alias as `alias` and as the row's target (never as `tokens`, which the
-  event sink's `SecretScrubber` redacts; LA-DEEPLINK-REVEAL-AUDIT-1, 2026-11-16). Aliases are resolved from the Space's alias book ([architecture-la-core.md](architecture-la-core.md#34-masking) §3.4), which is
+  event sink's `SecretScrubber` redacts; LA-DEEPLINK-REVEAL-AUDIT-1, 2026-11-16). Aliases are resolved from the Space's alias book ([architecture-la-core.md](architecture-la-core-masking.md#34-masking) §3.4), which is
   persisted beside the Space key, so a deep link still works after a restart (2026-10-19).
 * **Tests:** `ControlApiInvestigationInboundTest` (geo-link, armed Authenticator: seeding and window, idempotency incl. other system /
   id, invalid entity / reference / window / binding 422 with nothing written, 403 / 401 / 409, 503, the deep-link masking and reveal

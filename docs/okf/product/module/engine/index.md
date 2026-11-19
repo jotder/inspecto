@@ -16,7 +16,7 @@ tags: [product-item, module]
 | Slot | Status | Document |
 |---|---|---|
 | plan | n/a | documented in the ELT hub module/elt plan-elt.md (part EXE), merged 2026-11-18 (DOCS-ELT-CONSOLIDATE-1) |
-| spec | current | [Database / persistence layer](spec-db-layer.md) · [DuckDB Integration](spec-duckdb.md) |
+| spec | current | [Database / persistence layer — Three data classes and the operational store inventory](spec-db-layer-data-classes.md) · [Database / persistence layer — Schemas — consignment outputs onward](spec-db-layer-schemas-continued.md) · [Database / persistence layer — Schemas (operational, non-Parquet)](spec-db-layer-schemas.md) · [Database / persistence layer — File topology, Postgres and the raw tables](spec-db-layer-topology-postgres.md) · [Database / persistence layer](spec-db-layer.md) · [DuckDB Integration](spec-duckdb.md) |
 | architecture | n/a | documented in the ELT hub module/elt architecture-elt.md (Execution engine internals, sections E1-E7), merged 2026-11-18 |
 | features | n/a | documented in the ELT hub module/elt features-elt.md (Execution engine), merged 2026-11-18 |
 | feature-db | current | [Execution engine — feature database](feature-db.md) |

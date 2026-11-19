@@ -15,7 +15,7 @@ timestamp: 2026-10-24T00:00:00Z
 (checked against `inspecto-ui/projects/la-app` and `projects/link-analysis` on 2026-10-24) with the on-screen
 names; **Today** keeps the 2026-10-22 walkthrough state the work started from. The acceptance drive is
 [`tests-live-drives.md#onboarding-acceptance-drive-la-onboard-1-2026-10-22`](tests-live-drives.md#onboarding-acceptance-drive-la-onboard-1-2026-10-22) (Basic: first graph 2 min 40 s after first
-launch); the as-built design is [architecture](architecture-la-core.md#34-masking) §3.4, [architecture-data-onboarding](architecture-data-onboarding.md) §6.10-§6.13.
+launch); the as-built design is [architecture](architecture-la-core-masking.md#34-masking) §3.4, [architecture-data-onboarding](architecture-data-onboarding.md) §6.10-§6.13.
 
 **Evidence.** On 2026-10-22 a fresh Basic bundle (`la-app` UI, master `cb4feedd9`) was started on an empty Spaces
 root and driven as a first-time user with a synthetic mobile-money file pair (`transfers.csv` 2,215 rows,

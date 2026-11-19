@@ -118,7 +118,7 @@ limits and the commit's write order are in
 ## 6.11 Help on every screen and the onboarding counters (LA-ONBOARD-1 phase 8, as built 2026-10-22; UC-15, A-9, A-10, OB-13)
 
 `LA-ONBOARD-1` closed with this phase; the plan is archived
-(`docs/archived-documents/plans-archive/la-onboarding-plan.md`). What phases 1-7 built is in [architecture-la-core.md#34-masking](architecture-la-core.md#34-masking) §3.4 (*Start from...*,
+(`docs/archived-documents/plans-archive/la-onboarding-plan.md`). What phases 1-7 built is in [architecture-la-core.md#34-masking](architecture-la-core-masking.md#34-masking) §3.4 (*Start from...*,
 *My work*), §6.10 and [architecture-la-core.md](architecture-la-core.md) §8 (*Trust vs level*); the acceptance drive is
 [`tests-live-drives.md#onboarding-acceptance-drive-la-onboard-1-2026-10-22`](tests-live-drives.md#onboarding-acceptance-drive-la-onboard-1-2026-10-22).
 
@@ -700,7 +700,7 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
   of the import for such a run: compaction as above (phase `COMMIT`, per commit, before the Jobs), then each
   `ImportFollowOn` (the link index) and the Expectations once per run, after its last commit and outside ingest (phase
   `RUN`). Same `isOurs` / `IN_FLIGHT` rules. `DatasetCompaction.afterCommit` is gone. See
-  [spec-pipeline-execution.md](../elt/spec-pipeline-execution.md#commit-steps--the-work-a-commit-needs-before-it-is-done).
+  [spec-pipeline-execution.md](../elt/spec-pipeline-execution-dry-run-recovery.md#commit-steps--the-work-a-commit-needs-before-it-is-done).
 - **The graph after a compaction (`LA-DATASET-COMPACT-2`).** The link index's read gate (`IndexedRead.select`,
   `IndexStaleness.removedInput`) already refuses an index whose input files are gone, so the graph reads the flat Dataset
   after a compaction - but it compared the files through `InputFingerprintCache` (30 s, cleared only by an index build), so

@@ -611,7 +611,7 @@ Closes design §13 R3: an **active** pipeline carrying `route:` executes its bra
 ordinary ingest path — the graph editor's route vocabulary finally runs where it is authored.
 
 This section owns the **ingest flat / graph-fork mechanism**; the map of all lanes lives in
-[spec-pipeline-execution.md](spec-pipeline-execution.md#execution-lanes).
+[spec-pipeline-execution.md](spec-pipeline-execution-engines-lanes.md#execution-lanes).
 
 ### How it runs
 
