@@ -364,7 +364,7 @@ JVM under `MultiCollectorProcessor`.
 
 1. **Scan and Unpack.** `CollectorProcessor.ingest` scans the inbox and expands Archives and
    compressed streams through the Unpack stage (`UnpackStage`, `UnpackLimits`) before planning, so an
-   Entry is an ordinary file from then on ([unpack-stage](spec-acquisition.md)).
+   Entry is an ordinary file from then on ([unpack-stage](spec-acquisition-unpack.md)).
 2. **Plan.** `ConsignmentPlanner` cuts the candidate list into Consignments bounded by
    `collector.consignment: {max_files, max_bytes, order}` (`order` is `mtime` by default, or `name`).
 3. **Parse.** `ConsignmentIngestor` picks a strategy: `CsvIngestStrategy` for the DuckDB-native
@@ -1400,7 +1400,7 @@ write it Space-relative (`data/<pipeline>/database`); a config ref sits beside i
 
 ## References
 
-- [spec-acquisition.md](spec-acquisition.md) — the acquisition mechanism: the connector SPI, the resolvable schemes, the phases, the Unpack stage
+- [spec-acquisition.md](spec-acquisition.md) — the acquisition mechanism: the connector SPI, the resolvable schemes, the phases; the Unpack stage is [spec-acquisition-unpack.md](spec-acquisition-unpack.md)
 - [spec-ingest.md](spec-ingest.md) — the ingest SPI, Consignment coordination, failover, branch-aware ingest
 - [spec-consignments.md](spec-consignments.md) — Consignment addressing (Selector, revisions, Watermark) and concurrency
 - [spec-parsing.md](spec-parsing.md) — parse mechanisms, the `parsing:` block, parser plugins

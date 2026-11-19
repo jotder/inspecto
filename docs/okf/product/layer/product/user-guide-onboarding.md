@@ -140,7 +140,7 @@ timestamp: 2026-07-16T00:00:00Z
 > table is exported to a temporary file first, and only the complete file is put in the Dataset's inbox and imported,
 > so a refresh that fails changes nothing. It is not refreshed on its own. *Another database
 > or a remote system* stays locked on Basic. As built: `add-data/postgres-table.component.ts` on
-> `/onboard/postgres/test` and `/onboard/postgres` (`module/processor/api-onboarding-authoring.md`, *Choose a table*).
+> `/onboard/postgres/test` and `/onboard/postgres` (`module/processor/api-onboarding-postgres-snapshot.md`, *Choose a table*).
 
 > 🔴 **The stage-rail shell was DELETED 2026-08-16 (definition-surface unification P6-e, plan
 > archived).** Onboarding a data origin now means: this **create dialog**, then the **guided pipeline
