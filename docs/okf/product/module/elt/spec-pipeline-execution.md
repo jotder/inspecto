@@ -23,6 +23,7 @@ timestamp: 2026-11-18T00:00:00Z
 - [The scratch lane — Pipeline test run (run-to-here)](#the-scratch-lane--pipeline-test-run-run-to-here)
 - [Whole-pipeline dry run (`PIPELINE-DRYRUN-1`, shipped 2026-09-20)](#whole-pipeline-dry-run-pipeline-dryrun-1-shipped-2026-09-20)
 - [Per-Step `enabled` — park and drain](#per-step-enabled--park-and-drain)
+- [Commit steps — the work a commit needs before it is done](#commit-steps--the-work-a-commit-needs-before-it-is-done)
 - [Failure and recovery, per lane](#failure-and-recovery-per-lane)
 - [Post-sync step chains (the open DAG)](#post-sync-step-chains-the-open-dag)
 - [Code pointers](#code-pointers)
@@ -1396,6 +1397,38 @@ and sharpen it — name the archive and the sibling batch ids so the operator dr
 lifecycle rule ("the original moves when its last sibling drains") is recorded here as the shape of the
 eventual fix, not scheduled. Build: `DrainCommand.refuseExpansionMembers` + test (BACKLOG §3 `PARK-MSG-1`).
 
+## Commit steps — the work a commit needs before it is done
+
+(`BASIC-ELT-PROFILE-1` BE-1a, as built 2026-11-19; replaces the single `commitStep` of `LA-DATASET-COMPACT-2`.)
+`CollectorService` keeps one **ordered registry of named commit steps** for the JVM:
+`CollectorService.commitStep(name, order, phase, step)`. Steps of a phase run in ascending `order` (a tie: by name),
+each after the one before has returned. Registering a name again replaces it (each ControlApi re-registers on attach).
+A step that throws is logged and the next step runs; nothing throws out of the publishing thread (the bus also isolates
+its subscribers, but that would skip the remaining steps). There are two phases:
+
+| Phase | When | Handed | Must not |
+|---|---|---|---|
+| `COMMIT` | Every Consignment (SUCCESS or FAILED, dry runs included; the step filters), on the publishing thread, before the Space's Jobs are handed it. The subscriber is registered in the constructor, before `JobService.start()`. | that commit | be slow, start a run, or wait for ingest to end: the thread is inside the Consignment's `IngestActivity` scope and holds the run's claim |
+| `RUN` | Once per run of a Pipeline that committed: after the run's last Consignment, outside every ingest scope, while the run's claim is still held (`commitStepRun`, around `runPipeline`'s and the poll's `runOne` run). A SUCCESS commit published outside a run (an enrichment's, a replay of rejected records, one Consignment each) runs it at once. | the run's last SUCCESS, non-dry commit | assume the Space's Jobs have not seen the commits; they have |
+
+- **Why two phases.** A run commits once per Consignment, and `collector.consignment.max_files` (legacy `processing.batch`) defaults to `1`, so a run of
+  N inbox files commits N times. Work that should happen once per run (an index build, the Expectations) would
+  otherwise run N times. It also cannot run on the publishing thread: a Link Analysis index build waits while
+  `IngestActivity.active()`, and that thread is inside its own Consignment's ingest scope, so the build would wait for
+  itself until its timeout. `COMMIT` keeps the old guarantee (the work finishes before the Space's Jobs see the commit)
+  for quick work such as compaction.
+- **The import's steps** (`ImportCommitSteps`, control plane): `import.compaction` (100, `COMMIT`),
+  `import.follow_on` (200, `RUN`: each `ImportFollowOn`, e.g. Link Analysis's `index`), `import.expectations` (300,
+  `RUN`). They act only for a Pipeline Add data wrote for that Dataset (`OnboardImport.isOurs`), whose `import_steps`
+  names `follow_on` (a Pipeline with no `import_steps`, written before BASIC-ONBOARD-1 P1, runs all four steps). Each
+  claims the Dataset in `OnboardImport.IN_FLIGHT` and skips it when the claim is held. Add data's own run holds that
+  claim and calls the same list in-run (`ImportCommitSteps.runAll`), so the steps run once, in the same order, with
+  the same outcome shapes (`compaction`, `index`, `expectations`).
+- ⚠ **A Standard feed's `la.index.build` Job still runs** (`DatasetFeed.indexJob`, offered by *Keep this up to date*).
+  It now overlaps the `import.follow_on` step on a scheduled run: the follow-on's build waits for the Job's build
+  (`LinkIndexFollowOn`, wait budget -1) and re-plans, so the index is not built wrong, only checked twice. It also
+  still runs while `import.compaction` merges files, as before. Retiring the Job is BE-1 follow-up work, not done here.
+
 ## Failure and recovery, per lane
 
 **One recovery affordance per lane, and they are not interchangeable**: ingest has **reprocess** — which
@@ -1697,6 +1730,7 @@ current citations named classes the 2026-08-31 rename removed (plan §EXE.5.3 it
 | Per-pipeline exclusion | `PipelineRunGuard` | Non-reentrant on purpose ([spec-consignments.md](spec-consignments.md#part-b--concurrency-the-four-layer-hierarchy)) |
 | Pipeline triggers | `PipelineTrigger` (6 kinds + a scheduler enum) | ⚠ The glossary's trigger entry omits a shipped kind |
 | The commit bus | `ConsignmentEventBus` | ⚠ Cited under its **old** name in a concept page |
+| Commit steps | `CollectorService.commitStep` / `CommitPhase` / `commitStepRun`; the import's: `ImportCommitSteps` | — |
 | The lane fork | `ConsignmentIngestStrategy.admittedLift` / `flatReason` | — |
 | The whole-pipeline dry run | `RunRoutes.triggerPipeline`, `CollectorProcessor.run`/`ingest`, `ConsignmentIngestor.process`, `PipelineTestRun.dryIngest`, `EventLog.CONTAINED`, `ConsignmentAuditWriter` | *Whole-pipeline dry run* above — `strategy.ingest` runs contained (member copies, scratch root, throwaway event log), so parsing IS re-validated and reported per member |
 | The graph runner | `ConsignmentGraphRunner` — `engages`, `run`, `dataFedSinkCount` | 🔴 The backlog names a **non-existent** class and denies its callers (§EXE.2.3) |

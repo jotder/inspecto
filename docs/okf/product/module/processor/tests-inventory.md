@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-457 test class(es): 185 unit, 272 real-HTTP control-plane, 0 IT.
+459 test class(es): 186 unit, 273 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -165,6 +165,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiHttpsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiHttpsTest.java` | {@code SEC-4} — HTTPS over the pure-JDK {@code HttpsServer} + keystore. A **Must (S)** that the security |
 | `ControlApiIdempotencyScopeTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiIdempotencyScopeTest.java` | SEC-IDEMPOTENCY-REPLAY-1 over real HTTP with armed Subjects: an {@code Idempotency-Key} replay is scoped to |
 | `ControlApiImportCapabilityGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportCapabilityGateTest.java` | `IMPORT-CONNECTION-JOB-GATE-1`, over real HTTP with an ARMED Authenticator (without a Subject every capability |
+| `ControlApiImportCommitStepsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportCommitStepsTest.java` | {@code BASIC-ELT-PROFILE-1} BE-1a over real HTTP: a commit of an import Pipeline outside Add data (a scheduled run) runs |
 | `ControlApiImportConcurrentRollbackTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportConcurrentRollbackTest.java` | `IMPORT-RESIDUALS-1` (3) over real HTTP: a refused {@code POST /spaces/{id}/import} rolls back every file it |
 | `ControlApiImportFilterEditTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportFilterEditTest.java` | {@code ADD-DATA-FILTER-EDIT-1} over real HTTP: {@code PUT /datasets/{id}/filter} rewrites an import's row conditions |
 | `ControlApiImportRefusalAuditTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportRefusalAuditTest.java` | Round 5: the IMPORT doors write Pipeline configs through {@code ImportJournal}, not the write routes — each import |
@@ -411,6 +412,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `BundleImporterTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/BundleImporterTest.java` | Parses a bundle zip and unpacks it into a config dir (jailed against zip-slip). |
 | `CancelRunsLeaseTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CancelRunsLeaseTest.java` | HA-GRACEFUL-STOP-LEASE-RELEASE-1, lease side: a cancel never releases the lease - the run thread does, after |
 | `CollectorServiceCatalogTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CollectorServiceCatalogTest.java` | Verifies CollectorService owns and wires the metadata catalog end-to-end (P5). |
+| `CollectorServiceCommitStepsTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CollectorServiceCommitStepsTest.java` | {@code BASIC-ELT-PROFILE-1} BE-1a: the engine's ordered registry of named commit steps. Steps run in their stated order, |
 | `CollectorServiceDispatchTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CollectorServiceDispatchTest.java` | Characterization tests for the poll tick's <b>dispatch-and-return</b> path |
 | `CollectorServiceIngestLockTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CollectorServiceIngestLockTest.java` | Characterization tests for {@link PipelineRunGuard} — the <b>per-pipeline</b> ingest exclusion every |
 | `CollectorServicePipelineForgetTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CollectorServicePipelineForgetTest.java` | Regression guard for the S4/E1 map-leak fix: within a single long-lived {@link CollectorService} |

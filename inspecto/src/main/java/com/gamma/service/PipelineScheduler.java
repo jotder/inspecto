@@ -326,6 +326,15 @@ final class PipelineScheduler {
         if (id != null) this.spaceId = id;
     }
 
+    /** BE-1a: what a poll's run of one Pipeline runs inside - {@code CollectorService}'s RUN-phase commit steps; set by it. */
+    private volatile java.util.function.BiFunction<String, java.util.function.Supplier<MultiCollectorProcessor.RunResult>,
+            MultiCollectorProcessor.RunResult> runScope = (id, run) -> run.get();
+
+    void runScope(java.util.function.BiFunction<String, java.util.function.Supplier<MultiCollectorProcessor.RunResult>,
+            MultiCollectorProcessor.RunResult> scope) {
+        this.runScope = scope;
+    }
+
     /**
      * The one predicate every automatic path asks (the poll cycle, the acquisition cycle, both event triggers, the
      * stream lanes): not paused, {@code active: true}, and not held. SE-1b (D-SE12): a held Pipeline acts as an
@@ -440,8 +449,8 @@ final class PipelineScheduler {
             try {
                 // policy-narrowing-design S2b (D8): pinned once per run; an unreadable Safety Policy file throws
                 // here, BEFORE any file is touched, and lands in the RuntimeException arm below (poll failed).
-                MultiCollectorProcessor.RunResult r = com.gamma.config.safety.SafetyPolicy.pinnedForRun(() ->
-                        MultiCollectorProcessor.runConfigs(List.of(due.cfg()), 1, bus.sink(), acquireFirst));
+                MultiCollectorProcessor.RunResult r = com.gamma.config.safety.SafetyPolicy.pinnedForRun(() -> runScope.apply(due.id(),
+                        () -> MultiCollectorProcessor.runConfigs(List.of(due.cfg()), 1, bus.sink(), acquireFirst)));
                 // DUCKLE-C9: stamped for EVERY dispatched poll, including one that found nothing — a quiet
                 // poll is exactly the case that previously left no trace anywhere.
                 poll.polled(System.currentTimeMillis());
