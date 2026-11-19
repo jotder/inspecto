@@ -275,8 +275,15 @@ function main() {
     if (docs.length < listed.length) console.log(`docs-health: ${listed.length - docs.length} tracked doc(s) missing on disk, skipped`);
     const m = measure(docs, (p) => readFileSync(join(root, p), 'utf8'), isTracked);
     if (m.pages.length < 300) { console.error(`✗ docs-health: only ${m.pages.length} page(s) measured — run from the repository root`); process.exit(2); }
+    // Memoized: hundreds of pages name the same few code paths, and each lookup is a git process.
+    const changed = new Map();
     const lastChange = (p) => {
-        try { return execFileSync('git', ['log', '-1', '--format=%cs', '--', p], { cwd: root, encoding: 'utf8' }).trim() || null; } catch { return null; }
+        if (!changed.has(p)) {
+            let d = null;
+            try { d = execFileSync('git', ['log', '-1', '--format=%cs', '--', p], { cwd: root, encoding: 'utf8' }).trim() || null; } catch { /* untracked: no date */ }
+            changed.set(p, d);
+        }
+        return changed.get(p);
     };
     if (args.has('--baseline-write')) {
         writeFileSync(BASELINE, JSON.stringify({ _note: 'tools/docs-health.mjs --baseline-write; only debt is kept, and it may only shrink (INFO-RESTRUCTURE-1 W2)', ...baselineOf(m) }, null, 1) + '\n');
