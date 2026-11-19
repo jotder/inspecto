@@ -10,7 +10,7 @@ import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { penByLabel, pickerSet } from '@inspecto/core/testing/pen-field';
 import { EntityProfileService, EntitySuggestions } from '@inspecto/link-analysis/api/entity-profile.service';
 import type { EntityListSummary } from '@inspecto/link-analysis/api/inv.service';
-import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
+import { ledgerTime } from '@inspecto/core/add-data/add-data.model';
 import { LinkAnalysisStartBoxComponent, StartNotice } from './link-analysis-start-box.component';
 import {
     NewInvestigationInput,

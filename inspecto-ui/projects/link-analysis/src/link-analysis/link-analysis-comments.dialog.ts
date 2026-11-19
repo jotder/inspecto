@@ -10,7 +10,7 @@ import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ObjectNote } from '@inspecto/core/api';
 import { NotesService } from '@inspecto/link-analysis/api/notes.service';
 import { InspectoEmptyStateComponent } from '@inspecto/core/components/empty-state.component';
-import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
+import { ledgerTime } from '@inspecto/core/add-data/add-data.model';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { guardDirtyClose } from '@inspecto/core/dialog-dirty-guard';
 

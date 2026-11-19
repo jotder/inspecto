@@ -24,7 +24,7 @@ timestamp: 2026-07-16T00:00:00Z
 
 > **File first: Add data in the console (`ONBOARDING-FIRST-RUN-1` slice C3, 2026-11-01).** The primary start is
 > **Add data** at `/add-data` (screen title *Onboard a file*): the one Add data screen Inspecto LA uses
-> (`@inspecto/link-analysis/add-data`, OF-1) over the shared `/onboard/files` draft and commit — no new route.
+> (`@inspecto/core/add-data`, OF-1; moved out of the Link Analysis library by `BASIC-ELT-PROFILE-1` UI-0) over the shared `/onboard/files` draft and commit — no new route.
 > The console passes `whatColumnsHold="optional"` (the entity step starts closed), `exploreRoute=/studio/link-analysis`
 > and `editorRoute=/pipelines`. Under the screen, a card per Dataset with `origin: import` offers *Add a file* and
 > *Run now*; on Standard and up the card's *Open in editor* opens the import's Pipeline in the guided editor

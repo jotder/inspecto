@@ -34,10 +34,10 @@ import {
     RecordTypeGuide,
     anyRecordOption,
     entityTypeOptions,
-} from '@inspecto/link-analysis/api/entity-type-options';
-import { ImportDatasetCardComponent } from '@inspecto/link-analysis/add-data/import-dataset-card.component';
+} from '@inspecto/core/api/entity-type-options';
+import { ImportDatasetCardComponent } from '@inspecto/core/add-data/import-dataset-card.component';
 import { LinkAnalysisDatasetDiscoverComponent } from '@inspecto/link-analysis/link-analysis/link-analysis-dataset-discover.component';
-import { recordPhrase } from '@inspecto/link-analysis/api/column-roles';
+import { recordPhrase } from '@inspecto/core/api/column-roles';
 import { ADD_DATA_ROUTE } from './first-run';
 import {
     ColumnRole,
@@ -61,6 +61,7 @@ import {
     roleOf,
     typeOf,
 } from './data-page';
+import { provideAddDataLinkAnalysis } from '@inspecto/link-analysis/link-analysis/add-data-link-analysis.providers';
 
 /**
  * The **Data** page (LA-DATA-PAGE-1, plan `docs/superpower/la-data-arrival-plan.md` §8): every Dataset that may be a
@@ -75,6 +76,8 @@ import {
  */
 @Component({
     selector: 'la-app-data-page',
+    // Entity Types, import limits and the link index for Add data / the Dataset card (BASIC-ELT-PROFILE-1 UI-0)
+    providers: [provideAddDataLinkAnalysis()],
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [

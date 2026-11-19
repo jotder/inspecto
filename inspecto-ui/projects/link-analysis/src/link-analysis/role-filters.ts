@@ -1,5 +1,5 @@
 import type { Condition, ConditionGroup } from '@inspecto/core/query/query-types';
-import { columnsOfRole } from '@inspecto/link-analysis/api/column-roles';
+import { columnsOfRole } from '@inspecto/core/api/column-roles';
 
 /**
  * **Filter by role** (LA-COLUMN-ROLES-1 P3): a range per Measure, a value list per Category and a window on any Time

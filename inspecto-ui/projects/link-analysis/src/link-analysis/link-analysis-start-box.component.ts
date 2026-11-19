@@ -24,7 +24,7 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { StepperFieldComponent } from '@inspecto/core/components/stepper-field.component';
 import { DISABLED_REASON, expandOnStartCap, mostDegrees } from './disabled-reasons';
-import { DataStatusComponent } from '@inspecto/link-analysis/add-data/data-status.component';
+import { DataStatusComponent } from '@inspecto/link-analysis/link-analysis/data-status.component';
 import { timeZoneOptions } from '@inspecto/core/schema/time-zones';
 import {
     EntityProfileService,

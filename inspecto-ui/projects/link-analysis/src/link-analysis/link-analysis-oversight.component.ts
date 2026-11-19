@@ -10,7 +10,7 @@ import { SessionService } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
-import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
+import { ledgerTime } from '@inspecto/core/add-data/add-data.model';
 import { thresholdWords } from './investigate-number';
 import { RevealedIds, refusal403 } from './investigation-state';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';

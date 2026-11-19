@@ -7,7 +7,7 @@ import { LockedActionComponent } from '@inspecto/core/components/locked-action.c
 import { SpaceGuideComponent } from '@inspecto/core/onboarding/space-guide.component';
 import { SpaceGuideState, SpaceGuideStepId } from '@inspecto/core/onboarding/space-guide';
 import { SpaceGuideService } from '@inspecto/core/onboarding/space-guide.service';
-import { AddDataAccess } from '@inspecto/link-analysis/add-data/add-data-access';
+import { AddDataAccess } from '@inspecto/core/add-data/add-data-access';
 import { FirstRun } from './first-run';
 import { NextStep, nextSteps } from './next-steps';
 

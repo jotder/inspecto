@@ -1,3 +1,4 @@
+import { NgComponentOutlet } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
     ChangeDetectionStrategy,
@@ -48,9 +49,7 @@ import { DatasetFeedComponent } from './dataset-feed.component';
 import { DatasetStorageComponent } from './dataset-storage.component';
 import { ReferenceCoverageComponent } from './reference-coverage.component';
 import { ImportRunFailed, OnboardService } from './onboard.service';
-import { GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
-import { datasetIndexStatus } from '@inspecto/link-analysis/link-analysis/index-status';
-import { IndexRebuildComponent } from '@inspecto/link-analysis/link-analysis/index-rebuild.component';
+import { ADD_DATA_LINK_ANALYSIS } from './add-data-link-analysis';
 
 /**
  * The **Dataset card** of an imported Dataset (LA-ONBOARD-1 phase 4, UC-06, UC-14; console B4's manual-run gesture):
@@ -84,7 +83,7 @@ import { IndexRebuildComponent } from '@inspecto/link-analysis/link-analysis/ind
         DatasetStorageComponent,
         ImportFilterEditComponent,
         ReferenceCoverageComponent,
-        IndexRebuildComponent,
+        NgComponentOutlet,
     ],
     host: { class: 'block' },
     template: `
@@ -109,8 +108,8 @@ import { IndexRebuildComponent } from '@inspecto/link-analysis/link-analysis/ind
                             <dd class="m-0 break-words">
                                 <span [attr.data-testid]="f.id">{{ f.value }}</span>
                                 <!-- LA-FULL-CYCLE-TEST-1 phase 4: Rebuild beside an out-of-date link index -->
-                                @if (f.id === 'fact-graph') {
-                                    <inspecto-la-index-rebuild [dataset]="dataset().id" />
+                                @if (f.id === 'fact-graph' && linkAnalysis.rebuild; as rebuild) {
+                                    <ng-container *ngComponentOutlet="rebuild; inputs: { dataset: dataset().id }" />
                                 }
                             </dd>
                         </div>
@@ -268,7 +267,8 @@ export class ImportDatasetCardComponent {
     protected readonly access = inject(AddDataAccess);
     private readonly onboard = inject(OnboardService);
     private readonly destroyRef = inject(DestroyRef);
-    private readonly graphRuns = inject(GraphRunsService);
+    /** The link index's live status and its Rebuild come from Link Analysis, when the page placing the card provides them. */
+    protected readonly linkAnalysis = inject(ADD_DATA_LINK_ANALYSIS);
 
     /** The imported Dataset (its registry entry: `origin: import`). */
     readonly dataset = input.required<ImportDataset>();
@@ -328,12 +328,12 @@ export class ImportDatasetCardComponent {
             this.arrivalsAnswer(),
             this.dataset().description ?? '',
             this.keepsRows(),
-            datasetIndexStatus(this.graphRuns.indexes(), this.dataset().id),
+            this.linkAnalysis.indexStatus(this.dataset().id),
         ),
     );
 
     constructor() {
-        this.graphRuns.loadIndexes(); // the link index's live status (phase 4); unanswered on Basic, then the arrivals decide
+        this.linkAnalysis.loadIndexes(); // the link index's live status (phase 4); unanswered on Basic, then the arrivals decide
         effect(() => {
             const s = this.summary();
             untracked(() => this.last.set(s));
@@ -404,7 +404,7 @@ export class ImportDatasetCardComponent {
                 this.last.set(s);
                 this.imported.emit(s);
                 this.loadArrivals(this.dataset().id);
-                this.graphRuns.reloadIndexes(); // the import built (or skipped) the index: read its status again
+                this.linkAnalysis.reloadIndexes(); // the import built (or skipped) the index: read its status again
                 this.feedPanel()?.load();
                 this.storagePanel()?.load();
             },

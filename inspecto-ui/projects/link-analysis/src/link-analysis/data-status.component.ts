@@ -11,8 +11,8 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subscription } from 'rxjs';
-import { Arrivals, dataStatusLines } from './add-data.model';
-import { OnboardService } from './onboard.service';
+import { Arrivals, dataStatusLines } from '@inspecto/core/add-data/add-data.model';
+import { OnboardService } from '@inspecto/core/add-data/onboard.service';
 import { GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
 import { datasetIndexStatus } from '@inspecto/link-analysis/link-analysis/index-status';
 

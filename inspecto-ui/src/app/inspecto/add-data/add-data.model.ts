@@ -2,10 +2,13 @@ import { FeedSummary, feedFact, feedSummaryLine } from './dataset-feed.model';
 import { DatasetStorageState, storageFacts, storageStatusLine } from './dataset-storage.model';
 import { formatNumber } from '@inspecto/core/viz/number-format';
 import type { ColDef } from 'ag-grid-community';
-import { type ColumnRole, ROLE_LABELS, hintedRole, recordPhrase } from '@inspecto/link-analysis/api/column-roles';
-import type { RecordTypeGuide } from '@inspecto/link-analysis/api/entity-type-options';
-import type { LinkIndexStatus } from '@inspecto/link-analysis/link-analysis/index-status';
+import { type ColumnRole, ROLE_LABELS, hintedRole, recordPhrase } from '@inspecto/core/api/column-roles';
+import type { RecordTypeGuide } from '@inspecto/core/api/entity-type-options';
+import type { LinkIndexState } from './add-data-link-analysis';
 import { pick, plural } from './words';
+
+/** The link index's live status for a Dataset (Link Analysis's `LinkIndexStatus`; the Graph clock reads only its state). */
+type LinkIndexStatus = { readonly state: LinkIndexState };
 
 /**
  * **Add data** - the contract of `POST /onboard/files` and its commit (LA-ONBOARD-1 OB-2, phase 2), and the pure rules the

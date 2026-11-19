@@ -1,13 +1,14 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { LensService } from '@inspecto/core/api';
-import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
+import { SessionService } from '@inspecto/core/auth/session.service';
 import { AUTOMATION_FALLBACK, NO_UPLOAD_RIGHT, REMOTE_FALLBACK, SELF_IMPORT_OFF, editionLock } from './add-data.model';
 import { OnboardService } from './onboard.service';
 
 /**
  * Who may **Add data** here, and which edition-withheld choices show locked (LA-ONBOARD-1 OB-7, OB-10; A-11, A-15). One
  * place, so the Add data screen, the Dataset card and both apps' hosts ask the same question. The host's facts (sign-in,
- * edition, `/bootstrap` flags and reasons) arrive through `LA_FEATURES`.
+ * edition, `/bootstrap` flags and reasons) are read from `SessionService` (inside Link Analysis they were `LA_FEATURES`, which
+ * both shells fill from the same service).
  *
  * - No sign-in: every permission passes (the person is their own administrator); the Space's `data.self_import` still
  *   decides, read from `GET /settings/data` (space-scoped, so a multi-Space install reads the Space in use).
@@ -16,7 +17,7 @@ import { OnboardService } from './onboard.service';
  */
 @Injectable({ providedIn: 'root' })
 export class AddDataAccess {
-    private readonly features = inject(LA_FEATURES);
+    private readonly session = inject(SessionService);
     private readonly lens = inject(LensService);
     private readonly onboard = inject(OnboardService);
 
@@ -25,7 +26,7 @@ export class AddDataAccess {
     /** A refusal the server sent while adding data (403 self-import off, or no right): shown as the lock reason. */
     private readonly refused = signal<string | null>(null);
     /** People sign in here: rights are checked. With no sign-in every check passes. */
-    private readonly signIn = computed(() => this.features.signIn?.() ?? false);
+    private readonly signIn = computed(() => this.session.authMode() === 'oidc');
 
     /** May upload data: no sign-in, or `canUploadData` (the server gates `/onboard/files` the same way). */
     readonly canUpload = computed(() => !this.signIn() || this.lens.canUploadData());
@@ -61,9 +62,9 @@ export class AddDataAccess {
     private lock(feature: string, fallback: string): string | null {
         return editionLock(
             feature,
-            this.features.flags?.() ?? {},
-            this.features.featureReasons?.() ?? {},
-            this.features.edition?.() ?? '',
+            this.session.features(),
+            this.session.featureReasons(),
+            this.session.edition(),
             fallback,
         );
     }
