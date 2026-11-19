@@ -211,7 +211,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Unpack & codecs
 
-- **P3** · **Unpack (11) absent codecs** — trigger: the first `.xz`/`.zst` delivery arrives (it forces the decompression-library sign-off at the same moment). ⬜ Re-confirmed NOT fired 2026-09-15 — asked and declined, so do not re-raise it as an oversight. xz and zstd have no plugin (a dependency sign-off, not a build); `.Z` has no round-trip test; multi-part/split archives (`.z01`, `.part1.rar`) are unhandled — arrival completeness is a Collector question. → `okf/product/module/elt/spec-acquisition.md` [items: module.acquire · kind: feature · hold: demand]
+- **P3** · **Unpack (11) absent codecs** — trigger: the first `.xz`/`.zst` delivery arrives (it forces the decompression-library sign-off at the same moment). ⬜ Re-confirmed NOT fired 2026-09-15 — asked and declined, so do not re-raise it as an oversight. xz and zstd have no plugin (a dependency sign-off, not a build); `.Z` has no round-trip test; multi-part/split archives (`.z01`, `.part1.rar`) are unhandled — arrival completeness is a Collector question. → `okf/product/module/elt/spec-acquisition-unpack.md` [items: module.acquire · kind: feature · hold: demand]
 
 #### Parsing
 
