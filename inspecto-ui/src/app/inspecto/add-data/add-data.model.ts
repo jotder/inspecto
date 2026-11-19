@@ -198,9 +198,6 @@ export function isSnapshot(d: { importSource?: string }): boolean {
     return d.importSource === 'postgres';
 }
 
-/** The `${ENV:INSPECTO_PG_…}` form the server accepts for the password: only a variable an administrator named for it. */
-export const PASSWORD_REFERENCE = /^\$\{ENV:INSPECTO_PG_[A-Z0-9_]{1,100}\}$/;
-
 /** The format choices a re-draft states (`?delimiter=&header=&quote=`). */
 export interface FormatOverrides {
     delimiter?: string;

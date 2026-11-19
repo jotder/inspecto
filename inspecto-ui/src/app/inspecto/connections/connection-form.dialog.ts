@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -10,7 +9,13 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ConnectionProfile, ConnectionsService, ConnectionTestResult, LensService } from 'app/inspecto/api';
+import {
+    apiErrorMessage,
+    ConnectionProfile,
+    ConnectionsService,
+    ConnectionTestResult,
+    LensService,
+} from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import {
     InspectoOptionPickerComponent,
@@ -19,7 +24,15 @@ import {
 } from 'app/inspecto/components/option-picker.component';
 import { LockedActionComponent } from 'app/inspecto/components/locked-action.component';
 import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
-import { CONNECTION_TYPES, ConnAttr, REMOTE_CONNECTORS, attrsFor, connTypeDef, typeForConnector } from './connection-types';
+import { ConnectionFieldsComponent } from './connection-fields.component';
+import {
+    CONNECTION_TYPES,
+    attrsFor,
+    connAttrsGroup,
+    connTypeDef,
+    connectorLock,
+    typeForConnector,
+} from './connection-types';
 
 /** Dialog data: `profile` set ⇒ edit mode (name/id locked); absent ⇒ create. */
 interface ConnectionFormData {
@@ -56,7 +69,6 @@ export interface ConnectionFormResult {
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
-        MatCheckboxModule,
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
@@ -64,6 +76,7 @@ export interface ConnectionFormResult {
         MatSlideToggleModule,
         MatTooltipModule,
         InspectoAlertComponent,
+        ConnectionFieldsComponent,
         InspectoOptionPickerComponent,
         LockedActionComponent,
         PenFieldComponent,
@@ -85,8 +98,13 @@ export class ConnectionFormDialog {
      */
     readonly remoteLock = computed(() => (this.isEdit ? null : (this.lens.screenLocks()['remoteSystems'] ?? null)));
 
-    /** The connection type picker: the description is the option's hint (the dropdown printed "label — description"). */
-    readonly typeOptions: PickerOption[] = CONNECTION_TYPES.map((t) => ({
+    /**
+     * The connection type picker: the description is the option's hint (the dropdown printed "label — description"). A type
+     * made elsewhere (a Postgres snapshot's Connection) is offered only when editing one.
+     */
+    readonly typeOptions: PickerOption[] = CONNECTION_TYPES.filter(
+        (t) => !t.editOnly || this.data.profile?.connector === t.connector,
+    ).map((t) => ({
         value: t.type,
         label: t.label,
         hint: t.description,
@@ -101,12 +119,10 @@ export class ConnectionFormDialog {
         this.data.profile ? typeForConnector(this.data.profile.connector) : this.remoteLock() ? 'local' : 'sftp',
     );
     /** The chosen type reaches a remote system and the edition withholds that: shown locked, never saved. */
-    readonly typeLocked = computed(() => !!this.remoteLock() && REMOTE_CONNECTORS.has(connTypeDef(this.connType()).connector));
-    readonly attrs = computed(() => attrsFor(this.connType()));
-    /** Each select attribute's choices for its picker, by attribute key. */
-    readonly attrOptions = computed(() =>
-        Object.fromEntries(this.attrs().map((a) => [a.key, pickerOptions(a.options ?? [])] as const)),
+    readonly typeLocked = computed(
+        () => !this.isEdit && !!connectorLock(connTypeDef(this.connType()).connector, this.lens.screenLocks()),
     );
+    readonly attrs = computed(() => attrsFor(this.connType()));
     readonly connTypeLabel = computed(() => connTypeDef(this.connType()).label);
 
     /** The routing panel (SSH tunnel + proxy) is hidden behind a routing icon; this pops it open. */
@@ -189,12 +205,6 @@ export class ConnectionFormDialog {
         }
     }
 
-    /** A required attribute's error line, once the field was left or the form submitted. */
-    requiredError(a: ConnAttr): string {
-        const c = this.attrsForm().get(a.key);
-        return c?.touched && c.hasError('required') ? `${a.label} is required.` : '';
-    }
-
     /** The save step's Name error line, once the field was left or Create pressed. */
     nameError(): string {
         const c = this.saveForm.controls.name;
@@ -218,20 +228,7 @@ export class ConnectionFormDialog {
 
     /** (Re)build the per-type attribute form, seeding from {@code profile} (edit) or the type defaults. */
     private rebuildAttrs(type: string, profile?: ConnectionProfile): void {
-        const fields = profile as unknown as Record<string, unknown> | undefined;
-        const group: Record<string, unknown[]> = {};
-        for (const a of attrsFor(type)) {
-            const fallback = a.default ?? (a.control === 'checkbox' ? false : '');
-            const stored = profile
-                ? a.target === 'option'
-                    ? profile.options?.[a.key]
-                    : fields?.[a.target]
-                : undefined;
-            let init: unknown = stored ?? fallback;
-            if (a.control === 'checkbox') init = init === true || init === 'true';
-            group[a.key] = [init, a.required ? [Validators.required] : []];
-        }
-        this.attrsForm.set(this.fb.group(group));
+        this.attrsForm.set(connAttrsGroup(attrsFor(type), profile));
     }
 
     /** The suggested connection name: `<type>_<host>` (base path for local), sanitized to the id charset. */
@@ -257,6 +254,7 @@ export class ConnectionFormDialog {
         for (const a of def.attrs) {
             let v = raw[a.key];
             if (a.control === 'number') v = v === '' || v == null ? null : Number(v);
+            if (a.pattern && typeof v === 'string') v = v.trim(); // sent as its pattern was checked
             if (a.target === 'option') {
                 if (a.control === 'checkbox') options[a.key] = v ? 'true' : 'false';
                 else if (v !== '' && v != null) options[a.key] = String(v);

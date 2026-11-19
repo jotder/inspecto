@@ -9,6 +9,7 @@ import { SessionService } from 'app/inspecto/auth/session.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { penByLabel, penEdit, penError, refresh } from 'app/inspecto/testing/pen-field';
 import { ConnectionFormDialog } from './connection-form.dialog';
+import { POSTGRES_CONNECTOR, connectorLock } from './connection-types';
 
 const TEST_OK: ConnectionTestResult = {
     id: '(unsaved)',
@@ -47,7 +48,75 @@ function create(profile?: ConnectionProfile, existingIds?: string[], remoteLocke
     return { fixture, c: fixture.componentInstance, close, api };
 }
 
-const REMOTE_WHY = 'Collecting from remote systems (SFTP, FTP, object stores, databases, Kafka) is in Standard and above; Basic adds files and copies Postgres tables.';
+/** The settings rows as a person reads them: the control kind, then its visible text (label, value, hint). */
+function settingsRows(el: HTMLElement): string[] {
+    const grid = el.querySelector('section[aria-label="Connection settings"] .grid')!;
+    return Array.from(grid.children).map((row) => {
+        const kind = row.matches('inspecto-pen-field')
+            ? 'pen'
+            : row.matches('inspecto-option-picker')
+              ? 'picker'
+              : row.matches('mat-form-field')
+                ? 'boxed'
+                : row.querySelector('mat-checkbox')
+                  ? 'check'
+                  : row.tagName.toLowerCase();
+        return `${kind}:${(row.textContent ?? '').replace(/\s+/g, ' ').trim()}`;
+    });
+}
+
+/** Every create-time type's rows, pinned before `connection-fields` was extracted (BASIC-ELT-PROFILE-1 U2). */
+const SETTINGS_ROWS: Record<string, string[]> = {
+    database: [
+        'picker:Database type postgres',
+        'pen:Host *—',
+        'pen:Port 5432',
+        'pen:Database *—',
+        'pen:Username —',
+        'boxed:Passworda ${ENV:VAR} reference, not a raw secret',
+        'pen:Default schema —',
+        'picker:SSL mode require',
+    ],
+    ftp: [
+        'pen:Host *—',
+        'pen:Port 21',
+        'pen:Username —',
+        'boxed:Passworda ${ENV:VAR} reference, not a raw secret',
+        'pen:Base path —',
+        'check:Passive mode',
+        'pen:Encoding UTF-8',
+    ],
+    ftps: [
+        'pen:Host *—',
+        'pen:Port 990',
+        'pen:Username —',
+        'boxed:Passworda ${ENV:VAR} reference, not a raw secret',
+        'pen:Base path —',
+        'check:Implicit TLS',
+        'check:Passive mode',
+    ],
+    local: ['pen:Directory *—', 'pen:File pattern —glob, e.g. *.csv.gz', 'check:Recurse subdirectories'],
+    sftp: [
+        'pen:Host *—',
+        'pen:Port 22',
+        'pen:Username *—',
+        'picker:Auth method password',
+        'boxed:Password / passphrasea ${ENV:VAR} reference, not a raw secret',
+        'pen:Private key path —path to the private key (key auth)',
+        'pen:Remote directory —',
+        'check:Strict host-key checking',
+    ],
+    https: [
+        'pen:Host *—',
+        'pen:Port 443',
+        'pen:Path —e.g. /hooks/orders',
+        'boxed:Bearer tokena ${ENV:VAR} reference, not a raw secret',
+        'pen:Request timeout (s) 10',
+    ],
+};
+
+const REMOTE_WHY =
+    'Collecting from remote systems (SFTP, FTP, object stores, databases, Kafka) is in Standard and above; Basic adds files and copies Postgres tables.';
 
 describe('ConnectionFormDialog', () => {
     it('DATA-TIERS-1 P4: where remote systems are withheld, a new Connection starts on Local and a remote type shows locked', async () => {
@@ -306,6 +375,131 @@ describe('ConnectionFormDialog', () => {
         c.attrsForm().patchValue({ host: 'sftp.example.com' });
         c.onTypeChange('sftp');
         expect(c.attrsForm().get('host')!.value).toBe('sftp.example.com');
+    });
+
+    it('BASIC-ELT-PROFILE-1 U2: renders every type’s settings rows as before (control, label, value, hint)', () => {
+        const { fixture, c } = create();
+        const got: Record<string, string[]> = {};
+        for (const type of ['database', 'ftp', 'ftps', 'local', 'sftp', 'https']) {
+            c.onTypeChange(type);
+            refresh(fixture);
+            got[type] = settingsRows(fixture.nativeElement);
+        }
+        expect(got).toEqual(SETTINGS_ROWS);
+    });
+
+    it('BASIC-ELT-PROFILE-1 U2: an edited profile’s stored values show in its rows, and a typed row writes the form', () => {
+        const { fixture, c } = create({
+            id: 'cdr_sftp',
+            connector: 'sftp',
+            host: 'sftp.example.com',
+            username: 'drop',
+            password: '${ENV:SFTP_PW}',
+            options: { strict_host_key: 'false' },
+        } as ConnectionProfile);
+        const el = fixture.nativeElement as HTMLElement;
+        expect(settingsRows(el)).toEqual([
+            'pen:Host * sftp.example.com',
+            'pen:Port 22',
+            'pen:Username * drop',
+            'picker:Auth method password',
+            'boxed:Password / passphrasea ${ENV:VAR} reference, not a raw secret',
+            'pen:Private key path —path to the private key (key auth)',
+            'pen:Remote directory —',
+            'check:Strict host-key checking',
+        ]);
+        expect(c.attrsForm().get('password')!.value).toBe('${ENV:SFTP_PW}');
+        expect(c.attrsForm().get('strict_host_key')!.value).toBe(false);
+        penEdit(fixture, penByLabel(el, 'Host')!, 'sftp2.example.com');
+        const box = el.querySelector<HTMLInputElement>(
+            'section[aria-label="Connection settings"] mat-form-field input',
+        )!;
+        box.value = '${ENV:SFTP_PW2}';
+        box.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+        expect(c.attrsForm().get('host')!.value).toBe('sftp2.example.com');
+        expect(c.attrsForm().get('password')!.value).toBe('${ENV:SFTP_PW2}');
+    });
+
+    it('BASIC-ELT-PROFILE-1 U2: a new Connection is never a Postgres table copy (Add data makes those)', () => {
+        const { c } = create();
+        expect(c.typeOptions.map((o) => o.value)).toEqual(['database', 'ftp', 'ftps', 'local', 'sftp', 'https']);
+    });
+
+    it('BASIC-ELT-PROFILE-1 U2: editing any other Connection never offers the Postgres table copy type', () => {
+        const { c } = create({ id: 'cdr_sftp', connector: 'sftp', host: 'h' } as ConnectionProfile);
+        expect(c.typeOptions.map((o) => o.value)).toEqual(['database', 'ftp', 'ftps', 'local', 'sftp', 'https']);
+    });
+
+    it('BASIC-ELT-PROFILE-1 U2: editing a snapshot’s postgres Connection keeps its connector and what it copies', () => {
+        const { fixture, c, api } = create(
+            {
+                id: 'sales_postgres',
+                connector: 'postgres',
+                host: 'db.internal',
+                port: 5432,
+                database: 'sales',
+                username: 'reader',
+                password: '${ENV:INSPECTO_PG_SALES}',
+                options: { schema: 'public', table: 'transfers' },
+            },
+            [],
+            true,
+        );
+        expect(c.connType()).toBe('postgres');
+        expect(c.typeOptions.map((o) => o.value)).toContain('postgres');
+        expect(c.typeLocked()).toBe(false);
+        const rows = settingsRows(fixture.nativeElement);
+        const starts = [
+            'pen:Host',
+            'pen:Port',
+            'pen:Database',
+            'pen:Username',
+            'boxed:Password',
+            'pen:Schema',
+            'pen:Table',
+            'pen:Query',
+        ];
+        expect(rows.length).toBe(starts.length);
+        starts.forEach((s, i) => expect(rows[i].startsWith(s), rows[i]).toBe(true));
+        c.attrsForm().patchValue({ table: 'daily' });
+        c.submit();
+        expect(api.update).toHaveBeenCalledWith('sales_postgres', {
+            id: 'sales_postgres',
+            connector: 'postgres',
+            host: 'db.internal',
+            port: 5432,
+            database: 'sales',
+            username: 'reader',
+            password: '${ENV:INSPECTO_PG_SALES}',
+            options: { schema: 'public', table: 'daily' },
+        });
+    });
+
+    it('BASIC-ELT-PROFILE-1 U2: a postgres Connection’s password must name an INSPECTO_PG_ variable (the server’s rule)', () => {
+        const { fixture, c, api } = create({
+            id: 'sales_postgres',
+            connector: 'postgres',
+            host: 'db.internal',
+            database: 'sales',
+            username: 'reader',
+            password: '${ENV:INSPECTO_PG_SALES}',
+            options: { schema: 'public', table: 'transfers' },
+        });
+        c.attrsForm().patchValue({ password: '${ENV:AWS_SECRET_ACCESS_KEY}' });
+        c.submit();
+        fixture.detectChanges();
+        expect(api.update).not.toHaveBeenCalled();
+        const box = fixture.nativeElement.querySelector('section[aria-label="Connection settings"] mat-form-field');
+        expect(box.querySelector('mat-error')?.textContent).toContain('Write it as ${ENV:INSPECTO_PG_…}');
+    });
+
+    it('BASIC-ELT-PROFILE-1 D5: one rule locks a new Connection — remote connectors only; postgres, local and https are open', () => {
+        const locks = { remoteSystems: REMOTE_WHY };
+        for (const remote of ['db', 'ftp', 'ftps', 'sftp', 's3', 'azure', 'gcs', 'kafka'])
+            expect(connectorLock(remote, locks), remote).toBe(REMOTE_WHY);
+        for (const open of [POSTGRES_CONNECTOR, 'local', 'https']) expect(connectorLock(open, locks), open).toBeNull();
+        expect(connectorLock('db', {})).toBeNull();
     });
 
     it('keeps the secret fields boxed — a password reference never shows in a closed row', () => {
