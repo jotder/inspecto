@@ -20,6 +20,7 @@
 - [Stream & Reference Onboarding](../../layer/product/user-guide-onboarding.md)
 - [Spaces](../../layer/product/user-guide-spaces.md)
 - [Studio](../../layer/product/user-guide-studio.md)
+- [Tutorial 4 — Present it: a Dashboard for the business user](../../layer/product/user-guide-tutorial-dashboard.md)
 
 ## Link Analysis
 

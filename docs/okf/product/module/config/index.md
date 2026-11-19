@@ -20,7 +20,7 @@ tags: [product-item, module]
 | architecture | current | [Spaces](architecture-config.md) · [Space anatomy — every folder and file in a Space](architecture-space-anatomy.md) |
 | features | current | [Spaces — features](features-spaces.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Space Template](user-guide-concept-space-template.md) · [Space](user-guide-concept-space.md) · [Config](user-guide-config.md) · [Grammar configuration (the one surface)](user-guide-grammar-config.md) · [Spaces — screens](user-guide-spaces.md) |
+| user-guide | current | [Space Template](user-guide-concept-space-template.md) · [Space](user-guide-concept-space.md) · [Config](user-guide-config.md) · [Grammar configuration (the one surface)](user-guide-grammar-config.md) · [Spaces — screens](user-guide-spaces.md) · [Tutorial 1 — Your first Space and Dataset](user-guide-tutorial-first-space.md) |
 | admin-guide | current | [Configuration reference](admin-guide-configuration-reference.md) |
 | api | current | [Spaces — API](api-spaces.md) |
 | tests | current | [Config model and codecs — tests inventory](tests-inventory.md) |
