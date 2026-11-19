@@ -310,6 +310,19 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         await expectNoA11yViolations(el);
     });
 
+    it('BASIC-ELT-PROFILE-1 U2 (D5): where /bootstrap withholds remote systems, Postgres is still offered and the rest stays locked', () => {
+        const { fixture, el } = create({
+            features: { remoteSystems: false },
+            reasons: { remoteSystems: 'Not on Basic.' },
+        });
+        const postgres = q(el, 'data-origin')!.querySelectorAll<HTMLInputElement>('input[type="radio"]')[1];
+        expect(postgres.disabled).toBe(false);
+        postgres.click();
+        fixture.detectChanges();
+        expect(el.querySelector('inspecto-postgres-table')).not.toBeNull();
+        expect(el.querySelector('inspecto-locked-action')!.textContent).toContain('Not on Basic.');
+    });
+
     it('BASIC-ONBOARD-1 P3: step 1 offers a Postgres table on Basic; its draft reads as a file draft (no violations)', async () => {
         const { fixture, el } = create();
         const postgres = q(el, 'data-origin')!.querySelectorAll<HTMLInputElement>('input[type="radio"]')[1];

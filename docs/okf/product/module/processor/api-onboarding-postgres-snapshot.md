@@ -47,6 +47,7 @@ not migrate-on-write). Only this commit writes the snapshot file: an import into
 (`ImportPaths.REFUSED_SUFFIXES`, 2026-11-05), so an import cannot point Run now at another database. A new Space
 created from a bundle (`canAdminister`) keeps the file, as it keeps every file it seeds.
 **Run now** (`POST /datasets/{id}/run`) on such a Dataset copies the table again and runs the Add-a-file replace path.
+**The screen (U2):** Add data asks the connection on the core Connection rows (`inspecto-connection-fields`); the Connections dialog edits the saved `postgres` Connection as itself (no Routing).
 
 **Export, then move (redesigned 2026-11-05, operator).**
 - **The export.** Run now EXPORTS the table with DuckDB `COPY (...) TO '<file>.parquet'`, through the same
