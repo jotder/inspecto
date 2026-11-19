@@ -2,7 +2,6 @@ package com.gamma.control;
 
 import com.gamma.etl.ExcelExtension;
 import com.gamma.parse.SampleProfiler;
-import com.gamma.pipeline.exec.SchemaSuggest;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.util.DuckDbUtil;
@@ -750,13 +749,14 @@ final class OnboardDraft {
     private static Analysis typed(Connection conn, Path file, String relation, Map<String, Object> typeChoice, boolean declaredTypes,
                                   List<String> selectors, String decimal, Map<String, String> stated, boolean positional)
             throws SQLException, IOException {
+        // the engine's sample profiler (BASIC-ELT-PROFILE-1 BE-3 slice 2): each column's DuckDB type (what a file that
+        // declares its types declares) and the vote over its first values as text - the vote schema suggest gives too
+        List<SampleProfiler.ColumnType> profiled = SampleProfiler.types(conn, relation, SAMPLE_ROWS);
         List<String> headers = new ArrayList<>();
         List<String> declared = new ArrayList<>();
-        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("DESCRIBE SELECT * FROM " + relation)) {
-            while (rs.next()) {
-                headers.add(rs.getString(1));
-                declared.add(rs.getString(2));
-            }
+        for (SampleProfiler.ColumnType c : profiled) {
+            headers.add(c.name());
+            declared.add(c.duckdb());
         }
         if (headers.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the file has no columns");
         List<String> names = safeNames(headers);
@@ -784,18 +784,6 @@ final class OnboardDraft {
         }
         if (sample.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the file holds no rows");
 
-        List<SchemaSuggest.Field> voted;
-        if (declaredTypes) {
-            voted = new ArrayList<>();
-            for (int i = 0; i < names.size(); i++) voted.add(new SchemaSuggest.Field(names.get(i), engineType(declared.get(i))));
-        } else {
-            try {
-                voted = SchemaSuggest.infer(sample);
-            } catch (SQLException e) {
-                throw new IOException(e);
-            }
-        }
-
         List<String> fractions = fractions(conn, relation, headers);
 
         List<List<String>> valuesOf = new ArrayList<>();
@@ -818,9 +806,9 @@ final class OnboardDraft {
         List<EntityShapes.Column> sampled = new ArrayList<>();
         for (int i = 0; i < names.size(); i++) {
             String n = names.get(i);
-            SchemaSuggest.Field f = voted.get(i);
             List<String> values = valuesOf.get(i);
-            String type = f.type(), fmt = f.format(), colMark = null;
+            String type = declaredTypes ? engineType(declared.get(i)) : profiled.get(i).type();
+            String fmt = declaredTypes ? null : profiled.get(i).format(), colMark = null;
             long fits = values.size();
             Map<String, Object> typeCh;
             String numeric = mark == null ? null : DecimalMark.numberType(values, mark);

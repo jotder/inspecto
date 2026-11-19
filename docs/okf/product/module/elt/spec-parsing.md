@@ -276,6 +276,22 @@ with the first file's quote, so a no-quote import reads a later file's quoted fi
 splits the field and the line no longer fits — inferred from the reader, not tested); the quote entry of the fix catalogue offers `"` when the draft's lines do not split alike. ⛔ The
 grammar editor cannot author "no quote" (clearing the field removes the key, which means `"`).
 
+**One type inference (BE-3 slice 2, 2026-11-19).** `SampleProfiler.types(conn, relation, limit)` is the one entry for
+column types. Per column it answers two ways: `duckdb`, the type DuckDB's own reader gives the column (`DESCRIBE`:
+the auto-detect sniff for the parse preview's `read_csv(…, auto_detect=true)`, the declared type for Parquet, `VARCHAR`
+for an all-text read), and the **vote** (`type`, `format`) over the first `limit` values read as text — the TRY_CAST
+vote that was `SchemaSuggest`'s (`BIGINT` → `DOUBLE` → `TIMESTAMP`/`DATE` → `BOOLEAN`, then `SampleProfiler.DATE_FORMATS`
+with ambiguity refused). Each caller keeps its own answer: the parse preview's `columnTypes` give `duckdb`; schema
+suggest (`SchemaSuggest.infer`, over the preview's parsed rows) gives the vote; Add data (`OnboardDraft.typed`) gives
+the vote — or `duckdb` for a file that declares its types — and then its own layers: the decimal mark (C1), a later
+fraction (DECIMAL-TEXT-NOT-BIGINT-1), almost-all numbers or dates (finding 3), the timestamp format and the person's
+stated types. `TypeInferenceGoldenTest` pins the three answers; where they differ on a TYPE (not only on whether a
+format is reported) a `disagreement…` test keeps each one, for the operator to decide: dates written in words (text
+in the preview, `DATE` with `%B %d, %Y` in the other two), times of day (`TIME` in the preview, text in the other two),
+numbers with a decimal comma and columns that are almost all numbers (numbers only in Add data), and the full-cycle
+transfers fixture (an amount and a booking time that are text in the preview and suggest, a number and a date with a
+time in Add data).
+
 ---
 
 ## P.4 Beyond CSV — the other DuckDB-native readers

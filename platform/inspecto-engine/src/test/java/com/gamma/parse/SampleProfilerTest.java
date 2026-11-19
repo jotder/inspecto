@@ -82,6 +82,35 @@ class SampleProfilerTest {
         assertEquals(0, new SampleProfiler.Dialect(Map.of()).skip(), "nothing reported is nothing skipped");
     }
 
+    /**
+     * BE-3 slice 2, {@link SampleProfiler#types}: DuckDB's own type beside the vote, per column, in the relation's order;
+     * the vote reads the first {@code limit} rows only and leaves no table behind. All three callers' answers are pinned
+     * end to end in {@code com.gamma.control.TypeInferenceGoldenTest}.
+     */
+    @Test
+    void typesGiveDuckDbsTypeBesideTheVote(@TempDir Path dir) throws Exception {
+        DuckDbUtil.loadDriver();
+        Path f = dir.resolve("types.csv");
+        Files.writeString(f, "n,d,t,w\n1,2026-01-02,09:30:00,\"March 22, 2025\"\n2,2026-03-04,17:05:00,\"April 1, 2025\"\n3.5,x,x,x\n");
+        String sniffed = "read_csv(" + com.gamma.util.SqlIdent.pathStr(f) + ", auto_detect = true)";
+        try (Connection conn = DuckDbUtil.openInMemory(null, List.of(dir), null)) {
+            List<SampleProfiler.ColumnType> two = SampleProfiler.types(conn, sniffed, 2);
+            assertEquals(List.of(
+                    // the vote reads the values as the relation renders them: DuckDB's DOUBLE 1 is the text '1.0'
+                    new SampleProfiler.ColumnType("n", "DOUBLE", "DOUBLE", null),
+                    new SampleProfiler.ColumnType("d", "VARCHAR", "DATE", "%Y-%m-%d"),
+                    new SampleProfiler.ColumnType("t", "VARCHAR", "VARCHAR", null),
+                    new SampleProfiler.ColumnType("w", "VARCHAR", "DATE", "%B %d, %Y")), two,
+                    "DuckDB types the whole sample; the vote reads the first two rows");
+            assertEquals("VARCHAR", SampleProfiler.types(conn, sniffed, 0).get(1).type(), "every row: 'x' is not a date");
+            try (var st = conn.createStatement();
+                 var rs = st.executeQuery("SELECT count(*) FROM duckdb_tables() WHERE table_name = 'sample_profiler_values'")) {
+                rs.next();
+                assertEquals(0, rs.getLong(1), "the vote's scratch table is dropped");
+            }
+        }
+    }
+
     @Test
     void theOptionsCannotBeChanged(@TempDir Path dir) throws Exception {
         Map<String, String> options = sniff(dir, "a,b\n1,2\n", null).options();
