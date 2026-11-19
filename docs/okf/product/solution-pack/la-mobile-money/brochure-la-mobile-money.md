@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis mobile money showcase — brochure
+description: Brochure for the Link Analysis mobile money showcase: seven stories — agent-assisted structuring, a mule chain, a device farm and more — found in fourteen days of synthetic wallet data.
+item: solution-pack.la-mobile-money
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-mobile-money]
+---
+
 # Link Analysis mobile money showcase — brochure
 
 > **Seven mobile-money stories — structuring through an agent, a mule chain, a device farm — found in fourteen days of wallet data.**

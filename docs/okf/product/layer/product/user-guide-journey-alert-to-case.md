@@ -1,3 +1,13 @@
+---
+type: Guide
+title: Journey: from an alert to a closed Case
+description: Walk-through of one signal from an Event or Alert Rule through the Alert, Incident and Case to a four-eyes Action Request and closure, naming the screen and /api/v1 route at each step and what can go wrong.
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+---
+
 # Journey: from an alert to a closed Case
 
 ## Purpose

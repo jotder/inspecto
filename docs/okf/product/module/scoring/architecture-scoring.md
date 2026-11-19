@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Scoring and the Decision Kernel
+description: How Risk Scores and the Entity Lists they feed are built, and the Decision Kernel shared by every decision kind — the Condition Language, its two backends, the when/then model and the Consequence registry.
+item: module.scoring
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [features/inspecto-scoring]
+---
+
 # Scoring and the Decision Kernel
 
 The architecture of the `scoring` hub, in two parts: Risk Scores with the Entity Lists they feed (two

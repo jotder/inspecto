@@ -1,3 +1,14 @@
+---
+type: Spec
+title: Space origin — which template made a Space (SE-5a)
+description: How a Space records which template and template version created it (created-from.toon, SE-5a), the origin read and adopt routes, and the upgrade proposal (SE-5b).
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-15 last-edit
+code: [platform/inspecto-config]
+---
+
 # Space origin — which template made a Space (SE-5a)
 
 **State:** SE-5a built 2026-11-13 (the Space evolution plan, §4.5 steps 1 and 2); SE-5b, the upgrade proposal (step 3),

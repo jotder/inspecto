@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Telecom revenue assurance — brochure
+description: Sales brochure for the Telecom revenue assurance pack: proving every call, message and session was switched, mediated, rated, billed and settled, with Reconciliations and controls that value what was not.
+item: solution-pack.telco-ra
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/telco-ra]
+---
+
 # Telecom revenue assurance — brochure
 
 > **Prove every call, message and session was switched, mediated, rated, billed and settled — and put a value on what was not.**

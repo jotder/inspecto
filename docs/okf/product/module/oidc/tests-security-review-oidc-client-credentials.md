@@ -1,3 +1,14 @@
+---
+type: Reference
+title: Security review: inbound OIDC client-credentials tokens for Link Analysis
+description: Security review (2026-11-01) of accepting inbound OIDC client-credentials tokens for Link Analysis: the verdict to enable under deployment conditions, the checklist, how it was checked and the board rows filed.
+item: module.oidc
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [providers/inspecto-oidc]
+---
+
 # Security review: inbound OIDC client-credentials tokens for Link Analysis
 
 Reviewed 2026-11-01 against master `a24fca153`, for item (5b) of `LA-EDITIONS-RESIDUALS-1` ([BACKLOG](../../../../BACKLOG.md)).

@@ -16,7 +16,7 @@ timestamp: 2026-11-06T00:00:00Z
 > history, `docs/EDITIONS.md` for what a customer sees. Mentions of "EDITIONS.md §…" or "EDITIONS `<row-id>`" in older
 > docs, code comments and tests mean the section or board row of the same name in THIS file.
 >
-> 🔴 **Correction found by the split (2026-11-06): TLS is not an edition feature.** The *Matrix* below reads "Plain HTTP"
+> 🔴 **Correction found by the split (2026-11-06): TLS is not an edition feature.** The *Matrix* ([placement part](spec-editions-placement.md#matrix)) reads "Plain HTTP"
 > for Basic and HTTPS for Standard, but `ControlApi.createServer` serves HTTPS (TLS 1.3, PKCS12 keystore) in EVERY edition
 > when `-Dhttps.keystore` is set, and every edition's generated `serve.sh` / `serve.bat` passes `HTTPS_KEYSTORE` through
 > (`inspecto/package.ps1`, the launcher templates). Plain HTTP is only the default. The customer guide states it that way.

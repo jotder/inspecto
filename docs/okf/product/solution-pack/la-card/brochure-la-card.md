@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis card fraud showcase — brochure
+description: Brochure for the Link Analysis card fraud showcase: card testing, an account-takeover ring, a colluding merchant and a compromised fuel pump among 6 500 cards, each beside an innocent look-alike.
+item: solution-pack.la-card
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-card]
+---
+
 # Link Analysis card fraud showcase — brochure
 
 > **Card testing, an account-takeover ring, a colluding merchant and a compromised fuel pump, hidden among 6 500 ordinary cards. Find each one from a saved view in minutes, and see why the innocent look-alikes stay apart.**

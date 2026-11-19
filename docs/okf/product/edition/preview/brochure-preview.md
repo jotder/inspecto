@@ -1,3 +1,13 @@
+---
+type: Brochure
+title: Inspecto Preview — brochure
+description: Brochure for the Preview build: every module (today identical to Advanced) plus demo sign-in and the seeded Link Analysis showcases, for evaluation and presales rather than production.
+item: edition.preview
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+---
+
 # Inspecto Preview — brochure
 
 > **Everything Inspecto has, in one build — to evaluate, demonstrate and try what is coming next.**

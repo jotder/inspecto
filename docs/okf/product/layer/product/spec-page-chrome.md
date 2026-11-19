@@ -1,3 +1,13 @@
+---
+type: Convention
+title: Page chrome — the shared header, filter bar, tiles, tabs and bulk actions
+description: As-built rules of the shared page chrome from the UI consolidation — the page header (with its compact mode), filter bar, tiles, tabs, bulk actions, empty state and single-choice controls — with the traps met and what is still open.
+item: layer.product
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
+---
+
 # Page chrome — the shared header, filter bar, tiles, tabs and bulk actions
 
 **One header, one filter bar, one empty state, one way to degrade, one way to ask for a choice.**

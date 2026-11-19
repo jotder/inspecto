@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Inspecto LA industry videos — story, data, map, investigation, conclusion
+description: Draft shot scripts for the Link Analysis industry videos, each walking two bundled cases from the industry's problem through the data, the mapping and the investigation to a conclusion, with the telling rules and shot format.
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-16 last-edit
+code: [la/inspecto-la-core]
+---
+
 # Inspecto LA industry videos — story, data, map, investigation, conclusion
 
 > **Draft of 2026-11-15, not reviewed by product or legal.** One video per industry, each walking two bundled cases through the same arc: the problem in the industry, the data that is available and ingested, how its key fields and relations are mapped, then the investigation step by step with the product's own tools until the conclusion. Replaces, for these videos, the per-case screenshot scripts (kept with their screenshots outside the repository); the common brief in [brochure-video-scripts.md](brochure-video-scripts.md) still binds (the outcome is a lead and never a verdict; own-data message; edition close).

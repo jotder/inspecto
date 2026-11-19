@@ -1,3 +1,13 @@
+---
+type: Brochure
+title: Inspecto Basic — brochure
+description: Sales brochure for the Basic edition: a single-machine data-assurance desk with three ways to add data, checked imports, Pipelines, Datasets, dashboards and Link Analysis, with nothing else to install.
+item: edition.basic
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+---
+
 # Inspecto Basic — brochure
 
 > **Land your files, check them, explore them as a graph — on one machine, with nothing else to install.**

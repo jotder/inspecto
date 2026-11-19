@@ -1,3 +1,13 @@
+---
+type: Reference
+title: Accessibility audit — `inspecto-ui` (WCAG 2.2 Level AA)
+description: WCAG 2.2 AA accessibility audit of inspecto-ui: what is already remediated, the axe-core regression gate in CI, the findings with their status, the remaining fix priority and what is out of scope.
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-02 last-edit
+---
+
 # Accessibility audit — `inspecto-ui` (WCAG 2.2 Level AA)
 
 **Date:** 2026-06-16 · **App:** `inspecto-ui/` (Angular 21 + Material M2 + Tailwind on the gamma/Fuse shell)

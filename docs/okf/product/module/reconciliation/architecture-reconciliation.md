@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Reconciliation
+description: How Reconciliation compares two or three Datasets at a key-column grain and reports the differences as four types of Break, with a stateless compare, server-side Break lifecycle, the recon.run Job and its routes.
+item: module.reconciliation
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [features/inspecto-reconciliation]
+---
+
 # Reconciliation
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.

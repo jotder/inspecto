@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Analytics kernel
+description: The Analytics kernel (platform/inspecto-analytics): one shared home for every statistic and time-series primitive as pure Java functions and DuckDB SQL builders, with no routes, state or third-party dependency.
+item: module.analytics
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [platform/inspecto-analytics]
+---
+
 # Analytics kernel
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.

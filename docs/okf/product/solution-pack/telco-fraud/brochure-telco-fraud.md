@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Telecom fraud — brochure
+description: Sales brochure for the Telecom fraud pack: fourteen fraud typologies detected per offender from CDR, subscriber and payment feeds, with Decision Rules and a Case Rule grouping correlated Incidents.
+item: solution-pack.telco-fraud
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/telco-fraud]
+---
+
 # Telecom fraud — brochure
 
 > **Fourteen telecom fraud typologies, per offender, from your CDR, subscriber and payment feeds.**
