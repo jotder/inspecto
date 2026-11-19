@@ -156,8 +156,8 @@ node tools/inspecto-app.mjs verify --package C:\work\o2c-assurance\dist\o2c-assu
 ## 6. Install it on the second server
 
 On the second server, an administrator adds your signer once. Append the line from `o2c-signing-1.properties` to
-`conf\app-signers.properties` in the installation folder (create `conf\` if it does not exist), then restart the
-server. Then preview the install, and install:
+`conf\app-signers.properties` in the installation folder (create `conf\` if it does not exist). Then preview the
+install, and install:
 
 ```powershell
 $v1 = 'C:\work\o2c-assurance\dist\o2c-assurance-1.0.0.zip'
@@ -240,7 +240,8 @@ Version 2 adds a check that payments arrive on time and a tile that shows who pa
      o2c_days_late_by_customer,3
    ```
 
-4. Set `version: 2.0.0` in both `app.toon` and `templates\o2c-assurance\template.toon`.
+4. Set `version: 2.0.0` in both `app.toon` and `templates\o2c-assurance\template.toon`, and in the template's
+   `contents` line mention the late-payment check and tile, so the gallery describes version 2.
 
 Then validate, test and package again, exactly as in steps 4 and 5. The package is now `o2c-assurance-2.0.0.zip`.
 
@@ -276,7 +277,8 @@ Invoke-RestMethod -Method Post -Uri "$api/spaces/o2c-live/origin/upgrade" -Heade
 The proposal says `fromVersion 1.0.0`, `toVersion 2.0.0` and lists each file. Applying it writes every `update` and
 `add` through the same safety checks and audit trail as any configuration change, and answers `applied` (the
 Dashboard, the Expectation and the Widget) and `recordedVersion: 2.0.0`. The Space's own `egress.toon` is listed as
-`template-removed` and left as it is. A `customised` file is never overwritten:
+`template-removed` and left as it is. A file the Space changed is listed as `kept` (the template did not change it)
+or `conflict` (both changed it), and is never overwritten:
 change it yourself, through its own screen. To apply only some files, add `"files": [...]` to the body.
 
 ```check

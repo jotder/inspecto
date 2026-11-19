@@ -38,7 +38,9 @@ Set-Location C:\inspecto\inspecto-deploy
 
 You see `PASS sha256 …` and `OK`. When the release also ships a `.asc` signature, the script checks it too;
 without one it warns that only the integrity was checked. The folder holds `bin\` (the launchers and the deploy kit),
-`deploy\proxy\` (nginx and Caddy templates), `docs\`, `lib\`, `runtime\` (Java is included) and an empty `spaces\`.
+`deploy\proxy\` (nginx and Caddy templates), `docs\`, `lib\`, `runtime\` (Java is included) and a `spaces\` folder
+that holds only the shipped Space Templates. On a first installation the check runs from the zip's own copy of the
+script; for an upgrade, step 6 runs the installed one.
 
 ## 2. Connect sign-in
 
@@ -259,14 +261,17 @@ current configuration first when you restore over a Space in use: that backup is
 Run the backup Jobs first. Then stop the server, upgrade, and start it again:
 
 ```powershell
-.\bin\upgrade.ps1 C:\drop\inspecto-deploy-windows_amd64.zip -BackupDir .\spaces\o2c\data\backups -ProxyConfig C:\caddy\Caddyfile -NoService
+Set-Location C:\inspecto\inspecto-deploy
+.\bin\upgrade.ps1 C:\drop\inspecto-deploy-windows_amd64.zip -BackupDir C:\inspecto\inspecto-deploy\spaces\o2c\data\backups -ProxyConfig C:\caddy\Caddyfile -NoService
+Set-Location C:\inspecto\inspecto-deploy
 .\bin\serve.bat
 ```
 
-The script works in seven steps and stops at the first failure: it verifies the zip, checks the newest backup in
-`-BackupDir`, unpacks and checks the new bundle (a different edition is refused), stops the server, keeps the previous
-bundle as `inspecto-deploy.pre-upgrade-<time>`, preflights the new one, and starts it and waits for `/health` and
-`/ready`. It ends with `DONE: Standard -> Standard`. Your Spaces and their data, installed Apps, `logs\` and your own
+Give `-BackupDir` as a full path: the script works from the folder above the bundle. The script works in seven steps
+and stops at the first failure: it verifies the zip, checks the newest backup in `-BackupDir`, unpacks and checks the
+new bundle (a different edition is refused), stops the server, keeps the previous bundle as
+`inspecto-deploy.pre-upgrade-<time>`, preflights the new one, and starts it and waits for `/health` and `/ready` (with
+`-NoService` it reminds you to start it). It ends with `DONE: Standard -> Standard`. Your Spaces and their data, installed Apps, `logs\` and your own
 files stay where they are.
 
 - `-NoService` is for a server you start yourself, as in this tutorial: stop it before the script, start it after.
@@ -291,8 +296,8 @@ Invoke-RestMethod -Method Post -Uri "$api/spaces/o2c/audit/anchors" -Headers $h
 
 `ok: true` with `checked` (how many entries were recomputed) and `firstBad: null` means no entry was changed, removed
 or re-ordered. A broken chain still answers 200, with `ok: false` and the first bad entry. An anchor is a signed record
-of the chain's end; keep `GET …/audit/anchors` exports off the machine, and the next verify checks them too
-(`anchorsChecked`). Only an administrator may verify or anchor.
+of the chain's end, kept by the server; every later verify checks the chain against its anchors (`anchorsChecked`).
+Export them with `GET …/audit/anchors` and keep the copy off the machine as your own evidence. Only an administrator may verify or anchor.
 
 ### Check it worked
 

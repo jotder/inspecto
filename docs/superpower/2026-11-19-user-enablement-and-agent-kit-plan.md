@@ -260,6 +260,9 @@ console** — today only the App kit CLI can (§1). It goes on the board in plan
 - **The backup guide's "restore into a new Space" is refused by the path jail** (`target_dir ../../<new>/config` lies
   outside the Job's Space) unless `-Dassist.safety.roots` names the spaces root, which the guide does not say. T6
   shows the in-place restore.
+- **`upgrade.ps1` takes a relative `-BackupDir` from the wrong folder.** It changes to the bundle's parent before
+  checking the backup, so `.\spaces\…` is not found and nothing is upgraded; it also leaves the shell there. T6 gives a
+  full path and changes back.
 - **Not proven live:** the reverse proxy itself (no nginx or Caddy on the test machine; the preflight's config check
   passed), the OS-service install and the service-mode upgrade, and the Linux `.sh` scripts.
 
