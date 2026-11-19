@@ -763,7 +763,7 @@ not own.*
 > seven weeks before the plan bullet was written), and "partition by Space" which was always a statement of
 > direction rather than work. ⚠ **A plan section can be staler than the code it plans**, and §12 of *this
 > same document* already recorded one of them as closed. ⛔ Ground every bullet against the code before
-> building it — see PROJECT_NOTES §4.
+> building it — see `layer/platform/architecture-backend-gotchas.md` and `module/engine/spec-engine-gotchas.md`.
 
 Work:
 - **Partition by Space, not by pipeline** (D3). Spaces are already the tenant boundary and the

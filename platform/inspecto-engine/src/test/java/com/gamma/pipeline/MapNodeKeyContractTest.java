@@ -37,7 +37,7 @@ class MapNodeKeyContractTest {
      * {@code formatList} (the settings it compiles with), and {@code mappingSchemaOf} (the rules). It ends
      * at {@code toSelect}, the first method after them that is about something else. Scoping the scan
      * matters both ways — the whole file reads {@code branches}/{@code keys}/{@code where}/… for OTHER
-     * node types, and a method-scoped probe would have missed the sibling readers (PROJECT_NOTES §4).
+     * node types, and a method-scoped probe would have missed the sibling readers (docs/okf/product/layer/platform/tests-guards-and-claims-gotchas.md).
      */
     private static final String REGION_START = "private static List<?> columnsOf(";
     private static final String REGION_END = "public static Optional<String> toSelect(";
