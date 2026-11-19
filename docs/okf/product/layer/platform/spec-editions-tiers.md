@@ -5,6 +5,10 @@ description: Part 2 of 5 of Editions — engineering specification: Preview, Bas
 resource: offerings/
 tags: [editions, packaging, offerings, gating, decisions]
 timestamp: 2026-11-06T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
 ---
 
 # Editions — engineering specification — Preview, Basic, the data layer and the assembly model

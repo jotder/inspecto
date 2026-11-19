@@ -6,6 +6,7 @@ item: solution-pack.industry-telecom
 audience: internal
 status: plan
 verified: 2026-11-18 last-edit
+code: platform/inspecto-entity-store/src/main/resources/META-INF/inspecto/industry-packs/telecom
 ---
 
 # 5G / IoT / cloud / digital service assurance: a plan for a file-fed platform

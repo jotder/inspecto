@@ -6,6 +6,7 @@ item: solution-pack.industry-telecom
 audience: internal
 status: current
 verified: 2026-11-18 last-edit
+code: platform/inspecto-entity-store/src/main/resources/META-INF/inspecto/industry-packs/telecom
 ---
 
 # Telecom industry pack — brochure

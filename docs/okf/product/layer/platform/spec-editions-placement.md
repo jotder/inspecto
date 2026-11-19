@@ -5,6 +5,10 @@ description: Part 1 of 5 of Editions — engineering specification: LA feature p
 resource: offerings/
 tags: [editions, packaging, offerings, gating, decisions]
 timestamp: 2026-11-06T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
 ---
 
 # Editions — engineering specification — LA feature placement, the Matrix and the Offerings matrix

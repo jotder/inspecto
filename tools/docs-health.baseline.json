@@ -9,20 +9,6 @@
   "docs/okf/product/module/agent/spec-governance.md": 1
  },
  "headerless": [],
- "partialHeader": [
-  "docs/okf/product/addon/incidents/architecture-incidents.md",
-  "docs/okf/product/edition/advanced/brochure-advanced.md",
-  "docs/okf/product/edition/basic/brochure-basic.md",
-  "docs/okf/product/edition/preview/brochure-preview.md",
-  "docs/okf/product/edition/standard/brochure-standard.md",
-  "docs/okf/product/layer/platform/spec-editions-feature-matrix.md",
-  "docs/okf/product/layer/platform/spec-editions-placement.md",
-  "docs/okf/product/layer/platform/spec-editions-platform-board.md",
-  "docs/okf/product/layer/platform/spec-editions-step-processors.md",
-  "docs/okf/product/layer/platform/spec-editions-tiers.md",
-  "docs/okf/product/solution-pack/industry-mobile-money/brochure-industry-mobile-money.md",
-  "docs/okf/product/solution-pack/industry-telecom/brochure-industry-telecom.md",
-  "docs/okf/product/solution-pack/industry-telecom/plan-5g-iot-assurance.md"
- ],
+ "partialHeader": [],
  "editions": {}
 }

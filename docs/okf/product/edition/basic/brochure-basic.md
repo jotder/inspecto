@@ -6,6 +6,7 @@ item: edition.basic
 audience: internal
 status: current
 verified: 2026-11-18 last-edit
+code: offerings/basic.toon
 ---
 
 # Inspecto Basic — brochure
