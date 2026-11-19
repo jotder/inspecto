@@ -26,6 +26,16 @@ public final class InMemoryAcquisitionLedger implements AcquisitionLedger {
     }
 
     @Override
+    public Optional<LedgerEntry> findByChecksum(String sourceId, String checksum) {
+        if (checksum == null) return Optional.empty();
+        LedgerEntry newest = null;
+        for (LedgerEntry e : rows.values())
+            if (e.sourceId().equals(sourceId) && checksum.equals(e.checksum())
+                    && (newest == null || e.processedAt() > newest.processedAt())) newest = e;
+        return Optional.ofNullable(newest);
+    }
+
+    @Override
     public OptionalLong highWatermark(String sourceId) {
         long max = Long.MIN_VALUE;
         boolean any = false;

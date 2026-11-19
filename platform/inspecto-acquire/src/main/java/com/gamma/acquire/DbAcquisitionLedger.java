@@ -80,6 +80,28 @@ public final class DbAcquisitionLedger implements AcquisitionLedger, com.gamma.u
         }
     }
 
+    @Override
+    public Optional<LedgerEntry> findByChecksum(String sourceId, String checksum) {
+        if (checksum == null) return Optional.empty();
+        String sql = "SELECT " + COLS + " FROM " + TABLE + " WHERE source_id = ? AND checksum = ?"
+                + " ORDER BY processed_at DESC, relative_path DESC LIMIT 1";
+        try {
+            return src.with(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, sourceId);
+                    ps.setString(2, checksum);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        return rs.next() ? Optional.of(mapRow(rs)) : Optional.<LedgerEntry>empty();
+                    }
+                }
+            });
+        } catch (SQLException e) {
+            // as find: an unavailable lookup reads as "not seen", so the file is processed rather than lost
+            log.warn("ledger checksum lookup failed for {}: {}", sourceId, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
     /**
      * Replace this file's fingerprint, atomically.
      *

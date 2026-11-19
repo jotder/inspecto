@@ -527,7 +527,7 @@ public final class ConsignmentIngestor {
         // markers, after every other side-effect is durable — so a crash mid-commit doesn't leave a stranded
         // "already processed" fingerprint. PATH mode records nothing (it uses marker sentinels).
         boolean ledgerRecord = cfg.processing().duplicateCheckEnabled() && cfg.collector().duplicate().contentBased();
-        boolean checksumMode = ledgerRecord && "checksum".equals(cfg.collector().duplicate().mode());
+        boolean checksumMode = ledgerRecord && com.gamma.acquire.DuplicatePolicy.Mode.from(cfg.collector().duplicate().mode()).hashes();
         // Path-marker sentinels are the dedup mechanism only in PATH mode. In content-based mode
         // (checksum/metadata) the fingerprint ledger is the source of truth and the marker is dead
         // weight that actively breaks reprocessing: a CHANGED file re-ingested at a known path would

@@ -21,7 +21,11 @@ public final class DuplicatePolicy {
         /** Compare the connector-supplied etag/version from the listing (ACQ-7; free — no fetch, no file
          *  read). Falls back to version when the etag is absent, then to size+mtime when neither side has
          *  either — so a connector without {@code ETAG}/{@code VERSIONING} capability degrades to METADATA. */
-        ETAG;
+        ETAG,
+        /** Content identity ({@code BASIC-ELT-PROFILE-1} B3): bytes the source already processed under ANY name are a
+         *  duplicate - a file re-sent under a new name is caught; a known path with new bytes is judged as
+         *  {@link #CHECKSUM}. Hashed at processing time, looked up with {@link AcquisitionLedger#findByChecksum}. */
+        CONTENT;
 
         public static Mode from(String s) {
             if (s == null) return PATH;
@@ -29,8 +33,14 @@ public final class DuplicatePolicy {
                 case "METADATA" -> METADATA;
                 case "CHECKSUM" -> CHECKSUM;
                 case "ETAG" -> ETAG;
+                case "CONTENT" -> CONTENT;
                 default -> PATH;
             };
+        }
+
+        /** Whether this mode hashes the file's bytes (so the ledger records a checksum). */
+        public boolean hashes() {
+            return this == CHECKSUM || this == CONTENT;
         }
     }
 
@@ -73,12 +83,23 @@ public final class DuplicatePolicy {
      */
     public static Decision decide(Mode mode, LedgerEntry prior, long size, long lastModified,
                                   String checksum, String etag, String version) {
+        return decide(mode, prior, null, size, lastModified, checksum, etag, version);
+    }
+
+    /**
+     * Decide NEW / DUPLICATE / CHANGED for a candidate given its prior ledger entry by path ({@code prior}) and, in
+     * {@link Mode#CONTENT}, the source's entry with the same bytes under any path ({@code sameContent}, from
+     * {@link AcquisitionLedger#findByChecksum}; ignored in every other mode). Either may be {@code null}.
+     */
+    public static Decision decide(Mode mode, LedgerEntry prior, LedgerEntry sameContent, long size, long lastModified,
+                                  String checksum, String etag, String version) {
+        if (mode == Mode.CONTENT && sameContent != null) return Decision.DUPLICATE;   // the same bytes, whatever their name
         if (prior == null) return Decision.NEW;
         return switch (mode) {
             case PATH -> Decision.DUPLICATE;
             case METADATA -> (prior.size() == size && prior.lastModified() == lastModified)
                     ? Decision.DUPLICATE : Decision.CHANGED;
-            case CHECKSUM -> (checksum != null && checksum.equals(prior.checksum()))
+            case CHECKSUM, CONTENT -> (checksum != null && checksum.equals(prior.checksum()))
                     ? Decision.DUPLICATE : Decision.CHANGED;
             case ETAG -> {
                 // Strongest dimension both sides carry wins: etag, then version, then the metadata fallback —

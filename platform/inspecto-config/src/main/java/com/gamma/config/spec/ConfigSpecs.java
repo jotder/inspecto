@@ -318,6 +318,15 @@ public final class ConfigSpecs {
                         "How long a tripped breaker skips acquisition before one trial listing: a bare number of "
                                 + "seconds or N s|m|h|d. Default 5m.",
                         FieldType.STRING, false, null, List.of(), DURATION, null, null),
+                // ── duplicate detection (BASIC-ELT-PROFILE-1 B3, 2026-11-20): until now only the parser knew the
+                // mode, and DuplicatePolicy.Mode.from read a typo as `path`. No spec default, as above.
+                FieldSpec.enumField("collector.duplicate.mode", "Duplicate detection",
+                        List.of("path", "metadata", "checksum", "etag", "content"), null,
+                        "How a re-seen file is recognised: path (the processed marker), metadata (size + mtime at the "
+                                + "same path), checksum (the bytes at the same path), etag (the remote listing's etag or "
+                                + "version), content (the bytes under any name: a file re-sent under a new name is a "
+                                + "duplicate too). Every mode but path keeps the fingerprint ledger, which outlives a "
+                                + "restart only with -Dacquire.ledger.backend=db. Default path."),
                 // ── source-side post-action (PROCESSOR-RELEASE-READINESS-1, sink.archive, 2026-09-24) ──
                 // RemoteAcquisitionHandler.resolvePostAction reads an unknown on_success as RETAIN with a
                 // run-time log line only, so a typo silently archived nothing. No spec defaults, as above.

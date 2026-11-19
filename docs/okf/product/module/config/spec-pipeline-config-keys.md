@@ -236,6 +236,7 @@ against, round-tripped untouched.
 | `collector.accepts_upload` | spec |
 | `collector.circuit_breaker` | spec |
 | `collector.consignment` | spec |
+| `collector.duplicate` | spec |
 | `collector.fetch` | spec |
 | `collector.gap_detection` | spec |
 | `collector.post_action` | spec |

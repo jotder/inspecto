@@ -428,7 +428,10 @@ adopted. The code (`DuplicatePolicy.java`) has:
 - **`Mode`** — *how a re-seen path is judged*: `PATH` (default), `METADATA` (name+size+mtime, no read),
   `CHECKSUM` (content hash, read at processing time), `ETAG` (ACQ-7 — the connector-supplied etag/version
   from the *listing*, so it costs no fetch and no read; falls back to version, then to size+mtime, so a
-  connector without `ETAG`/`VERSIONING` capability degrades to METADATA).
+  connector without `ETAG`/`VERSIONING` capability degrades to METADATA), `CONTENT` (`BASIC-ELT-PROFILE-1` B3 — the
+  checksum against every file of the Collector, under any name: `AcquisitionLedger.findByChecksum`, so the same bytes
+  re-sent under a new name, or two copies in one cycle, are a `DUPLICATE`; a known path with new bytes is judged as
+  `CHECKSUM`; like `CHECKSUM` it never pre-skips a remote file and degrades to METADATA on `countPending`).
 - **`OnChange`** — *what happens when a known path's content changed*: `IGNORE` (treat as duplicate, skip),
   `REPROCESS` (default), `ALERT` (process + emit `FILE_CHANGED`), `ARCHIVE_OLD_VERSION` (archive the prior
   version first). `reprocessOnChange` is `policy != IGNORE`; `alertsOnChange` is `policy == ALERT`.
