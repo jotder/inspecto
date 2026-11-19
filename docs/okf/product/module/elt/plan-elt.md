@@ -48,7 +48,7 @@ spec files (§3) and the screens in [the user guide](user-guide-elt.md).
 > that tell it how, living **inline** on the parse Step; a **Grammar Template** is a Grammar saved to the
 > `grammar` kind as a **copy source** — ⛔ never "linked", "shared" or "referenced". An **Archive** is a
 > container file; an **Entry** is one inner file — ⛔ never *member*; **Unpack** is the Collector-level stage
-> ([acquisition spec](spec-acquisition.md#part-3--the-unpack-stage)). An **Expectation** is the data-quality rule
+> ([acquisition spec](spec-acquisition-unpack.md)). An **Expectation** is the data-quality rule
 > engine; a **Segment** is one record kind a plugin ingester emits (⚠ undefined in the glossary — §5).
 >
 > **Acquisition vocabulary.** The two authored nouns are **Connection** (a named endpoint + credential
@@ -253,7 +253,7 @@ table mirrors it.
 |---|---|---|---|---|
 | `ING-1` | Stage-1 M..N multiplexer: parse → transform → partition → commit, batch-atomic | Must | ✅ SHIPPED | All |
 | `ING-2` | Format frontends: delimited grammar, fixed-width (text + binary), plugin `StreamingFileIngester` SPI | Must | ✅ SHIPPED — ⚠ **understated**: the built set is **eight formats** | All |
-| `ING-3` | Compressed input streaming (gzip / bz2 / zip) | Must | ✅ SHIPPED — **superseded in shape** by the Unpack stage (2026-08-23): streams *and* Archives, at the Collector, with caps and a verdict ([acquisition spec](spec-acquisition.md#part-3--the-unpack-stage)) | All |
+| `ING-3` | Compressed input streaming (gzip / bz2 / zip) | Must | ✅ SHIPPED — **superseded in shape** by the Unpack stage (2026-08-23): streams *and* Archives, at the Collector, with caps and a verdict ([acquisition spec](spec-acquisition-unpack.md)) | All |
 | `ING-4` | Schema casting + reject routing (quarantine: unreadable / mismatch / sink-flush fail) | Must | ✅ SHIPPED | All |
 | `ING-5` | Unified `parsing:` block + JSON/NDJSON + text/regex frontends | Must | ✅ SHIPPED 2026-07-07 — ⚠ "LDIF block-records stay PROPOSED" is stale: blank-line record splitting is **live** via `text_regex.record_split` (2026-08-28) | All |
 | `ING-6` | **Expectation** engine: data-quality rules against a Schema | Must | ✅ **SHIPPED, server and UI.** `/expectations*` CRUD + evaluate; the SPA's Expectations pane (`/admin/expectations`, `inspecto-ui/src/app/modules/admin/expectations/`, `ExpectationsService`, dating from 2026-07-04, C2); evaluation is a COUNT over **at-rest Parquet**, not at ingest | All |
@@ -440,7 +440,7 @@ now lives once, in its owner:
 | `route:` on the poll path and `-Dingest.lane` | [ingest spec](spec-ingest.md) · [Pipeline spec — execution](spec-pipeline-execution.md) |
 | The `parsing:` block, the frontends and their engines, `ParserPlugin` / `Parsers`, ASN.1, the XML bridge, every parsing key and its refusals | [ingest spec — parsing](spec-parsing.md) |
 | The wrap-SPI (`StreamingFileIngester`, `RecordSink`, `DuckDbRecordSink`, the Appender), segments, the two `partitions[]` readers | [ingest spec](spec-ingest.md) |
-| Unpack — placement, caps, verdict, ledger, identity | [acquisition spec Part 3](spec-acquisition.md#part-3--the-unpack-stage) |
+| Unpack — placement, caps, verdict, ledger, identity | [acquisition spec Part 3](spec-acquisition-unpack.md) |
 | Casting, cast-failure measurement (`-1` = not measured), quarantine reasons, reject rows, the ledgers, in-memory live progress | [architecture](architecture-elt.md) · [ingest spec](spec-parsing.md) |
 | The source time zone (`SourceZones`), the Appender, threads | [engine — DuckDB](../engine/spec-duckdb.md) · [ingest spec — parsing](spec-parsing.md) |
 | Per-field date format and epoch timestamps; content refusal (`processing.refusal`); the `postmed_xdr` reference build; the daily-feed template, export contract and delivery checks; the Parse pane and field tiers | [user guide](user-guide-elt.md) |
@@ -1529,7 +1529,7 @@ against `git ls-files` and the module tree — and in this area, that check woul
 
 | Mechanism | Owning file |
 |---|---|
-| The original requirement, the engine as built, the Unpack stage | [spec-acquisition.md](spec-acquisition.md) |
+| The original requirement, the engine as built, the Unpack stage | [spec-acquisition.md](spec-acquisition.md) · [spec-acquisition-unpack.md](spec-acquisition-unpack.md) |
 | Poll cycle and phases A–F summary, the Collectors module page, multi-location ingest | [architecture-elt.md](architecture-elt.md) |
 | Screens and the Collector configuration surface | [user-guide-elt.md](user-guide-elt.md) |
 | Connector SPI, remote schemes, profiles, secrets, workbench, proxy chain | [connectors/spec-connectors.md](../connectors/spec-connectors.md) |

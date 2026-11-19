@@ -373,7 +373,7 @@ like the built-ins. Three consequences, each of which cost a test:
   it keys on the `configuredIngester` FQCN input, which the drawer never passes.
 * **A Decode Profile is READ BACK, so the form shows effective values** (2026-09-25). When the block names
   `asn1.profile_file`, the pane calls `ParsersService.decodeProfile(ref, subdir)` (`GET /parsers/asn1/profile`,
-  [parser-plugins.md § Decode Profile](../elt/spec-parsing.md)) and seeds the editor with the
+  [parser-plugins.md § Decode Profile](../elt/spec-parsing-decode-profile.md)) and seeds the editor with the
   profile's own values UNDER the Pipeline's (`withDecodeProfile`; a key the Pipeline saved blank is unset, and
   `segments` stays the Pipeline's). A `data-test="decode-profile"` list above the editor names each served
   `asn1.*` key's effective value and provenance — **from profile `<file>`**, **set here**, or **default**
